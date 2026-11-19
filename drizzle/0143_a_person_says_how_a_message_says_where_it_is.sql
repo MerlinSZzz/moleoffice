@@ -1,0 +1,31 @@
+-- WHETHER A MESSAGE SAYS WHICH PROJECT IT IS IN, AND HOW ITS PICTURES ARE DRAWN, for one person.
+--
+-- Two columns, both choices of the person.
+--
+-- `message_project_mark` IS CRITERION M73. A line "in mole office" appeared under messages only
+-- when the reader stood in another project, and it should be either always drawn or never
+-- drawn. So it is a setting of the person, off by default; when it is on, the mark is
+-- drawn on every message whatever project the reader stands in.
+--
+-- `message_pictures`: how a picture in a message is drawn (M64) was built
+-- as a setting of the BROWSER, in localStorage. It follows the person instead, like
+-- every other choice about how their chat is drawn, so it moves here.
+--
+-- THEY ARE COLUMNS ON `people` AND NOT A TABLE OF THEIR OWN, for the reason `circle_shows` gives:
+-- each is one fact about one person, the same shape as the choices beside it. A settings table
+-- would be a place for any future setting to go, which is the sixth rule of CLAUDE.md.
+--
+-- NULL MEANS NOBODY HAS CHOSEN in both, and a reader is told that rather than being told they chose
+-- the default. That is rule five of CLAUDE.md. Null on the project mark is read as "not drawn",
+-- which is the default the owner set; null on the pictures is read as "shown", which M64 set.
+--
+-- THE WORDS EACH MAY HOLD are declared once in TypeScript, for the door, the reply and the control.
+-- There is no CHECK constraint here for the reason every other word column in this schema has none:
+-- the declaration is what the write gate reads, and a second list in SQL would be the same fact in
+-- two places.
+--
+-- ADDITIVE, AND IT REWRITES NOTHING. Two ALTER TABLE ADD COLUMN and no UPDATE. Nobody's stored
+-- browser choice is copied up: this product cannot read a browser's storage from here, and writing
+-- a default into every row would say every person had chosen when none of them had.
+ALTER TABLE `people` ADD `message_project_mark` text;--> statement-breakpoint
+ALTER TABLE `people` ADD `message_pictures` text;

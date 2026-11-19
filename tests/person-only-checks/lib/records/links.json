@@ -1,0 +1,5 @@
+{
+  "sort": "carried",
+  "checks": 1,
+  "why": "deleting the link that takes a fork off the queue (assertMayPutAForkBackOnTheQueue). An agent goes through actsForThePerson first, and only after that is a request from another machine refused unless thePersonIsProved."
+}

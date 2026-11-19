@@ -1,0 +1,18 @@
+<!-- Copyright © 2026 Zhengyang Shen -->
+<!-- Licensed under the MIT License. See LICENSE. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-label="A raven">
+<title>Raven</title>
+<defs><clipPath id="raven-disc"><circle cx="128" cy="128" r="128"/></clipPath></defs>
+<g clip-path="url(#raven-disc)">
+<circle cx="128" cy="128" r="128" fill="#64B964"/>
+<ellipse cx="128" cy="248" rx="90" ry="44" fill="#2E3243"/>
+<ellipse cx="128" cy="128" rx="78" ry="68" fill="#454B66"/>
+<ellipse cx="128" cy="98" rx="46" ry="23" fill="#565E7E"/>
+<g fill="#DCD8CE"><circle cx="92" cy="128" r="13"/><circle cx="164" cy="128" r="13"/></g>
+<g fill="#14151C"><circle cx="92" cy="128" r="7.5"/><circle cx="164" cy="128" r="7.5"/></g>
+<path d="M98 146 L158 146 L128 226 Z" fill="#191B25"/>
+<path d="M98 146 L128 146 L128 226 Z" fill="#2C3040"/>
+<path d="M98 152 L158 152" stroke="#0D0E13" stroke-width="5" stroke-linecap="round"/>
+<circle cx="112" cy="164" r="4" fill="#0D0E13"/>
+</g>
+</svg>

@@ -1,0 +1,78 @@
+{
+  "purpose": "Synthetic empty host attention, outside the office-map read contract.",
+  "whole": {
+    "visible": [],
+    "remainder": [],
+    "total": 0,
+    "remainderByGroup": [],
+    "remainderNote": null,
+    "unclassified": [],
+    "noState": [],
+    "directions": [],
+    "reports": [],
+    "paused": [],
+    "machine": [],
+    "passedOver": [],
+    "counts": {
+      "candidates": 0,
+      "selected": 0,
+      "visible": 0,
+      "remainder": 0,
+      "passedOver": 0,
+      "deleted": 0
+    },
+    "at": "2026-10-15 10:00:00",
+    "read": {
+      "records": 0,
+      "links": 0,
+      "changes": 0,
+      "changesCapped": false
+    }
+  },
+  "home": {
+    "visible": [],
+    "remainder": [],
+    "total": 0,
+    "remainderByGroup": [],
+    "remainderNote": null,
+    "passedOver": [],
+    "counts": {
+      "candidates": 0,
+      "selected": 0,
+      "visible": 0,
+      "remainder": 0,
+      "passedOver": 0,
+      "deleted": 0
+    },
+    "reports": [],
+    "reportCounts": {
+      "waiting": 0,
+      "read": 0
+    },
+    "questions": {
+      "paused": {
+        "total": 0,
+        "holding": 0,
+        "holdingByStanding": [],
+        "onList": []
+      },
+      "unclassified": {
+        "count": 0,
+        "words": []
+      },
+      "noState": {
+        "count": 0,
+        "written": 0,
+        "noField": 0,
+        "unknownKind": 0
+      }
+    },
+    "at": "2026-10-15 10:00:00",
+    "read": {
+      "records": 0,
+      "links": 0,
+      "changes": 0,
+      "changesCapped": false
+    }
+  }
+}

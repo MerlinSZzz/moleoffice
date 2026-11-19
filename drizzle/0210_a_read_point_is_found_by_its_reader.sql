@@ -1,0 +1,24 @@
+-- ONE INDEX, SO A READER'S READ POINT IN ONE CONVERSATION IS FOUND WITHOUT READING EVERY READ THAT READER MADE.
+--
+-- Wave 13y round 14. The waiter's read, GET /api/messages/groups?move=1, took a
+-- median of 7,976 ms in the office's call log of 9 October 2026. `whatTheGroupsGained` in src/server/lib/messages.ts
+-- asks `whenTheyLastRead` for the reader's read point in each group it is in, and before this index each of those
+-- found every row the reader ever wrote through `conversation_reads_reader_idx` and sorted them by time to keep the
+-- newest. The agent in the most groups is in 253 and had written 487,372 rows: on an office of the live counts that
+-- was 254 scans and 8,816 ms of a 9,102 ms read, and with this index the same 254 reads take 2.1 ms.
+--
+--   `conversation_reads_newest_idx`   a reader's reads of one conversation, by time.
+--
+-- THE INDEX HOLDS THE READERS' OWN ORDER. They ask for the newest by `at`, and by `rowid` among reads in one second.
+-- SQLite keeps the entries of equal key in rowid order, so the index read backwards is exactly that order, the read
+-- needs no sort, and it stops at the first row. Nothing in the reader changed.
+--
+-- THIS MIGRATION MOVES NO ROW AND REMOVES NONE. When it was written every read stayed in `conversation_reads`, and only
+-- the newest of a reader's reads of one conversation was read on the way to an answer. Since migration 0278 (wave
+-- 13s round 64) the table keeps only that newest read of each reader in each conversation in each project, and that
+-- row is the record criterion M12 asks for.
+--
+-- The index is not unique, and it changes no row.
+--
+-- ADDITIVE, AND IT REWRITES NOTHING. One CREATE INDEX statement and no UPDATE.
+CREATE INDEX IF NOT EXISTS `conversation_reads_newest_idx` ON `conversation_reads` (`reader_kind`, `reader_id`, `pair`, `at`);

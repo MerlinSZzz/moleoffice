@@ -1,0 +1,17 @@
+-- A PERSON'S LOOK, AND THE THEMES THEY MADE, for one person.
+--
+-- `themes` holds JSON: {"chosen": "<the id of a look>", "own": [<a theme>, ...]}. `chosen` is the look the
+-- person chose: auto, light, dark, one of the six shipped themes, or one of their own. `own` is the list of
+-- themes the person made from a copy, at most twelve, each in the shape `src/shared/themes.ts` reads. The
+-- office reads every value with that reader, and checks every own theme with the one readability check,
+-- before it stores one. Only that person is given their own themes back.
+--
+-- IT IS A COLUMN ON `people` AND NOT A TABLE OF ITS OWN, for the reason `chat_labels` beside it gives:
+-- it is one choice of one person, held as JSON, and it follows the person to any machine rather than
+-- staying in one browser. The choice and the list are one column so that a deleted theme and the choice
+-- of it are changed in one write.
+--
+-- NULL MEANS NOBODY HAS CHOSEN OR MADE ONE, and the page then draws the browser's stored choice. A page
+-- load never writes that choice here. There is no CHECK constraint here, as `chat_labels` has none: the
+-- one reading of the JSON is in the code.
+ALTER TABLE `people` ADD `themes` text;

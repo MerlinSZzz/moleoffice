@@ -1,0 +1,5 @@
+{
+  "sort": "carried",
+  "checks": 1,
+  "why": "whether the person is the one filing (thePersonIsFilingThisSession). While the person's press admits a waiting registration it reads thePersonIsProved(actor) || aRaiseCarriesIt(actor), so a raise carries it there; everywhere else it reads theProvedPerson."
+}

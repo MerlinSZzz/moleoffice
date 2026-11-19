@@ -1,0 +1,8 @@
+Source Serif 4; Google Fonts v15; https://fonts.gstatic.com/s/sourceserif4/v15/; SIL Open Font License 1.1, in sourceserif4/OFL.txt, with no Reserved Font Name
+Atkinson Hyperlegible; Google Fonts v12; https://fonts.gstatic.com/s/atkinsonhyperlegible/v12/; SIL Open Font License 1.1, in atkinsonhyperlegible/OFL.txt, with no Reserved Font Name
+Lato; Google Fonts v25; https://fonts.gstatic.com/s/lato/v25/; SIL Open Font License 1.1, in lato/OFL.txt, with the Reserved Font Name "Lato"
+Nunito; Google Fonts v32; https://fonts.gstatic.com/s/nunito/v32/; SIL Open Font License 1.1, in nunito/OFL.txt, with no Reserved Font Name
+ZCOOL KuaiLe; Google Fonts v22; https://fonts.gstatic.com/s/zcoolkuaile/v22/; SIL Open Font License 1.1, in zcoolkuaile/OFL.txt, with no Reserved Font Name
+Inter; Google Fonts v20; https://fonts.gstatic.com/s/inter/v20/; SIL Open Font License 1.1, in inter/OFL.txt, with no Reserved Font Name
+Lexend; Google Fonts v26; https://fonts.gstatic.com/s/lexend/v26/; SIL Open Font License 1.1, in lexend/OFL.txt, with the Reserved Font Name "RevReading Lexend"
+Noto Sans SC; Google Fonts v41; https://fonts.gstatic.com/s/notosanssc/v41/; SIL Open Font License 1.1, in notosanssc/OFL.txt, with the Reserved Font Name "Source"

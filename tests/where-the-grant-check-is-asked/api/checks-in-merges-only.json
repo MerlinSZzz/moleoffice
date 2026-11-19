@@ -1,0 +1,7 @@
+{
+  "doors": [
+    "office.set-checks-in-merges-only",
+    "office.set-stale-fork-bases"
+  ],
+  "why": "Both settings in this file are changed through one guard, which asks whether a raise carries the press."
+}

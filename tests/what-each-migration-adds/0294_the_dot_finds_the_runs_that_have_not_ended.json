@@ -1,0 +1,8 @@
+{
+  "why": "Round 66 of wave 13y: one index of the session records whose run has not ended, partial to the kind and to a state that does not end a run. The people view's dot and the online view read a project's runs that have not ended through it, with the message worker's runs, rather than every run of the project. No table, column, trigger or write changes.",
+  "indexesAddedAfterTheRebuild": {
+    "records": [
+      "records_session_not_ended_idx"
+    ]
+  }
+}

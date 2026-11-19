@@ -1,0 +1,6 @@
+{
+  "why": "A use line keeps what its proof showed, wave 13n round R, item 2i: one nullable column on tool_uses holding what the use door found when it checked the line's proof that tools/use-line.mjs sent it. NULL is a row written before the door checked, so an older row is never called hand-sent.",
+  "columnsAddedAfterTheRebuild": {
+    "tool_uses": ["proof"]
+  }
+}

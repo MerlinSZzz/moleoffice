@@ -1,0 +1,6 @@
+{
+  "why": "Keep each agent's current owner separately from its original starter.",
+  "columnsAddedAfterTheRebuild": {
+    "agents": ["owner_id", "owner_kind"]
+  }
+}

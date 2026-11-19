@@ -1,0 +1,12 @@
+-- A COUNTER ROW KEEPS ITS MOMENT. Wave 13r round P.
+--
+-- `at` is the local wall clock with no offset. On the night the clocks go back the hour from 01:00 to 02:00 comes twice,
+-- so `at` alone cannot say which of the two 01:30s a firing happened at, and a due time counted from it can land an hour
+-- early. `at_instant` holds the same moment as an instant with its offset (clockStamp's `instant` in src/shared/time.ts),
+-- written in the same write as `at` and from the same reading of the clock.
+--
+-- NULL is every row written before this migration. The counter reads such a row's `at` as the later of the moments it
+-- can name, so nothing comes due early.
+--
+-- ADDITIVE, AND IT REWRITES NOTHING. One ALTER TABLE ADD COLUMN and no UPDATE.
+ALTER TABLE `counter_rows` ADD COLUMN `at_instant` text;

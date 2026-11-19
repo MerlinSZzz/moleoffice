@@ -1,0 +1,20 @@
+-- A RUN'S OWN MESSAGE TO ITS STARTER IS FOUND FROM THE RUN'S OWN CREATE REVISIONS. Wave 13s round 189, item 37.
+--
+-- When a run seals, `theRunsOwnMessageTo` in src/server/lib/sealed-tip.ts finds the newest message the run wrote that
+-- was delivered to its starter, so the seal's notice can be one line. The round's end asks the same. A message is the
+-- run's own when its create revision was written in the run's session, and no index of the revisions was on the
+-- session. So the read started from every delivery to the starter and read each one's revisions. A secretary that
+-- started many runs holds thousands of deliveries. The made-up office of 22 October was given a made-up create
+-- revision for each record, in a made-up run; there the busiest starter has 17,034 deliveries, and the read took a
+-- median of 41 ms. In the live office's slow record writes of 31 October and 1 November it took a median of 137 ms,
+-- and once 5.7 s.
+--
+--   revisions_session_create_idx  each create revision, by the session it was written in.
+--
+-- The read now starts from this index, names it with INDEXED BY so that a missing index is a failure and not a slow
+-- read, and says `op = 'create'`, the term of the index's WHERE, in the same words.
+--
+-- The index is not unique, and it changes no row.
+--
+-- ADDITIVE, AND IT REWRITES NOTHING. One CREATE INDEX statement and no UPDATE.
+CREATE INDEX IF NOT EXISTS `revisions_session_create_idx` ON `revisions` (`session_id`) WHERE `op` = 'create';

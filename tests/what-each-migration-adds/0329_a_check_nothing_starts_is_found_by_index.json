@@ -1,0 +1,8 @@
+{
+  "why": "Wave 13n round DP: one index of the runs whose mark that nothing in the office would start their queued check still waits, partial to those runs and keyed by the time their starter is told, so the minute pass finds the runs that are due without reading every run. No table, column, trigger or write changes.",
+  "indexesAddedAfterTheRebuild": {
+    "records": [
+      "records_session_check_nothing_starts_idx"
+    ]
+  }
+}

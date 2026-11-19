@@ -1,0 +1,27 @@
+# Wave 13r round 6: the process, resource and presence files, and the residents' pages.
+# One path per line, relative to the checkout; # starts a comment. The neutral-words gate
+# (tests/the-owners-project-is-not-in-the-source.test.ts) reads every string each file ships.
+# Moved here from the list NEUTRAL_SOURCES in the gate's test file by wave 13r round 7.
+
+src/server/lib/resources.ts
+src/server/lib/presence.ts
+src/server/lib/residents.ts
+src/server/lib/session-origins.ts
+src/server/lib/mole-office-parts.ts
+src/server/lib/own-rows.ts
+src/server/lib/listeners.ts
+src/server/lib/register-this-server.ts
+src/server/lib/runtime.ts
+src/server/api/resources.ts
+src/server/api/residents.ts
+src/server/api/runtime.ts
+src/shared/residents.ts
+src/web/components/ResidentSection.tsx
+src/web/components/ResidentProposals.tsx
+src/web/lib/residents.ts
+
+# Wave 13r round 8: the Vite config and its cache test, whose comments wave 13p made neutral, and the
+# test runner config. This list reads only their strings; the gate's whole-file part reads their comments too.
+vite.config.ts
+tests/every-vite-keeps-its-own-dependency-cache.test.ts
+vitest.config.ts

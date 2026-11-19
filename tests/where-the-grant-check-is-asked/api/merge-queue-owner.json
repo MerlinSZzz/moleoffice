@@ -1,0 +1,6 @@
+{
+  "doors": [
+    "office.set-merge-queue-owner"
+  ],
+  "why": "The door that changes who runs the merge queue asks whether the secretary acts for the person before it writes the change."
+}

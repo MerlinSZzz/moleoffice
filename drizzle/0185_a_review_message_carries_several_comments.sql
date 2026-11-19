@@ -1,0 +1,14 @@
+-- ONE MESSAGE MAY CARRY SEVERAL COMMENTS OF A SENT REVIEW.
+--
+-- WHY. A sent review writes one message for each recipient. When two or more comments go to one
+-- recipient, that one message holds all of them, in the order they were written, each with its own
+-- quote. `from_annotation_id` names one comment, so it cannot say which comments such a message
+-- carries.
+--
+-- WHAT IS STORED. `carries` is JSON: a list of {"commentId", "quote"}, in the order the comments were
+-- written. `quote` has the shape a message's context has. The column is NULL on every other message.
+-- A message that carries one comment keeps `from_annotation_id` and leaves this NULL, exactly as
+-- before this migration. `carriedComments` in src/server/lib/dispatch.ts is the one reader of both.
+--
+-- ONE NEW COLUMN, NULLABLE TEXT, NO DEFAULT AND NO BACKFILL. Nothing already stored is rewritten.
+ALTER TABLE `agent_messages` ADD COLUMN `carries` text;

@@ -1,0 +1,23 @@
+-- WHICH PICTURE ONE PERSON HAS PUT ON THE ROUND CHAT BUTTON.
+--
+-- Criterion M38, from the owner on the night of 4 September. A few named pictures stay to choose
+-- from, the rest are removed, and `mole-at-the-sill` is the default.
+--
+-- A COLUMN ON `people`, beside `circle_shows` from 0128 and for the same reasons: it is one fact
+-- about one person, and a settings table would be a place for any future setting to go, which is
+-- the sixth rule of CLAUDE.md.
+--
+-- IT IS NOT THE SAME COLUMN AS `circle_shows`. That one says how the button's NUMBER is drawn, one
+-- merged or two bubbles; this says which PICTURE the button carries. Two facts, and a person may
+-- change either without touching the other.
+--
+-- NULL MEANS NOBODY HAS CHOSEN, and it is read as `mole-at-the-sill` because that is the default the
+-- owner named. It is deliberately not written as that word on every row: a reader is then told "the
+-- person has not chosen" rather than "the person chose mole-at-the-sill", which is rule five.
+--
+-- THE NAMES IT MAY HOLD are declared once in `src/shared/messages.ts`, beside the file that draws
+-- each. There is no CHECK constraint here for the reason every other word column in this schema has
+-- none: the declaration is what the door reads, and a second list in SQL would be the same fact in
+-- two places.
+
+ALTER TABLE `people` ADD `circle_picture` text;

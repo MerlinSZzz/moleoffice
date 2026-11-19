@@ -1,0 +1,12 @@
+{
+  "why": "The run-key lookups, wave 13n run st5EG9M1BNjt: an index on every revision by the run key its data names, one on session records by the same, and one on first revisions by the dispatched run their data names, so that a keyed write finds its key's binding without reading the whole revisions table. It touches no row and no column.",
+  "indexesAddedAfterTheRebuild": {
+    "records": [
+      "records_session_run_key_id_idx"
+    ],
+    "revisions": [
+      "revisions_run_key_id_idx",
+      "revisions_first_agent_run_idx"
+    ]
+  }
+}

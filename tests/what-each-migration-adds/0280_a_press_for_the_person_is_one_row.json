@@ -1,0 +1,10 @@
+{
+  "why": "A press a secretary makes for the person under their grant is one row, wave 13s round 65 of the flow design's step 3: which secretary pressed which door, under which grant, with what reason and when. Every change row that press writes names it in press_id, which is NULL on every row written before, meaning nobody recorded a press. Its own table and not a record, so no record door can file, change or delete one.",
+  "tables": ["presses_for_the_person"],
+  "indexesAddedAfterTheRebuild": {
+    "changes": ["changes_press_idx"]
+  },
+  "columnsAddedAfterTheRebuild": {
+    "changes": ["press_id"]
+  }
+}

@@ -1,0 +1,28 @@
+-- AN INDEX ON `api_calls` LED BY THE PROJECT AND THE OPERATION, FOR TWO USAGE DOORS.
+--
+-- `GET /api/usage/operations` and `GET /api/usage/patterns` count the call rows of one project, grouped
+-- by operation. Without this index SQLite walks every row of the window by time and then sorts it by
+-- operation, and on the timing test's 703,341 rows the two doors were red under load
+-- (tests/the-usage-reads-answer-before-a-person-gives-up.test.ts). With it, SQLite reads the rows of one
+-- project already in operation order, and never opens the table itself, because every column the two
+-- queries read is in the index.
+--
+-- WHY THE COLUMNS ARE IN THIS ORDER. The project and the operation come first, so one project's rows
+-- are next to each other and already grouped. The actor and the reply size come next, because the
+-- patterns door groups by operation, actor and size. The rest are only there so the table is not read:
+-- the time, the status, read or write, the long-poll flag, the milliseconds and the target.
+--
+-- WHY ONLY THE ROWS WITH AN OPERATION. SQLite uses a partial index only for a query that says
+-- `operation` is not null, so the two usage queries, which say so, use it, and the other reads of this
+-- table that name a project keep the plan they had. Without the condition SQLite chose this index for
+-- two of them, because it starts with the project: the traced-rows read behind `GET /api/usage/sequences`
+-- and `GET /api/usage/traces` went from about 100 ms to about 2,000 ms on the timing test's rows, and the
+-- per-run counts behind `GET /api/usage/agents` from about 400 ms to about 2,500 ms. A row with no
+-- operation is a request no route matched, and neither usage query needs it in the index.
+--
+-- WHAT IT COSTS. Measured on a copy of the office on 27 September 2026 (944,834 call rows, 220 of them
+-- with no operation): 77,778,944 bytes, about 82 bytes per row, beside 194,490,368 bytes for the
+-- table itself. Building it took 1.8 to 2.0 s at a load average of 9 to 12.
+--
+-- ADDITIVE, AND IT WRITES NO ROW. One CREATE INDEX and nothing else.
+CREATE INDEX IF NOT EXISTS `api_calls_workspace_operation_idx` ON `api_calls` (`workspace_id`,`operation`,`actor_id`,`bytes`,`at_ms`,`status`,`effect`,`waits`,`ms`,`target_id`) WHERE operation IS NOT NULL;

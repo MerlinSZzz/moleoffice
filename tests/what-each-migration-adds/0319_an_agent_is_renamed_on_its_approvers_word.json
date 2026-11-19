@@ -1,0 +1,4 @@
+{
+  "why": "Wave 13s round 192, item 42: one row for each new name an agent was given or proposed. A proposal names its reason and the approver it waits for, the first secretary up the agent's chain of starters or the person, and keeps who approved or refused it and why. The person's own rename through the participants PATCH door is a row too. The handle and the id never change.",
+  "tables": ["agent_renames"]
+}

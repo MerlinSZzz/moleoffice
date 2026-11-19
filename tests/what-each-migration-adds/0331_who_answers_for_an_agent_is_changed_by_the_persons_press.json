@@ -1,0 +1,4 @@
+{
+  "why": "Wave 13u round 186, the owner's decision zuHll_ClLFe5: one row for each change of who answers for an agent. The person's press writes it, naming the starter before and after, who pressed, the reason, when, and the agent's runs that had not ended. The agent's id is keyed to agents.id, so the re-mint of an agent's id rewrites it.",
+  "tables": ["agent_starter_changes"]
+}

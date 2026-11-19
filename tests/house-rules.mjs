@@ -1,0 +1,177 @@
+// Copyright © 2026 Zhengyang Shen
+// Licensed under the MIT License. See LICENSE.
+// @ts-check
+/**
+ * THE HOUSE-RULE TESTS, ONE LINE EACH.
+ *
+ * A house-rule test checks a rule that governs how the office and its code are written, rather than
+ * the behaviour of one feature. This list is the inventory of them: one line per test file, with the
+ * class it belongs to, the kind of house rule it checks first, and a mark when it is not purely a
+ * house-rule test.
+ *
+ * The classes are: S, which keeps the live office and its data safe; P, which guards the owner's
+ * privacy and what leaves the machine; Q, which is code and behaviour quality; H, which is a house
+ * rule (wording, Chinese words, test hygiene, timing registration, naming, record ids); and F, which
+ * is flow and process.
+ *
+ * A mark is absent for a house-rule test. A feature file that also holds a whole-source scan is mixed;
+ * a file that is mostly a feature test is borderline.
+ *
+ * A test file that is not on this list counts as a feature test. Nothing reads this list yet. A new
+ * house-rule test declares itself by adding its own line here. Keep each entry on one line, because
+ * the merge tool joins two additions here only when each is a whole line.
+ */
+
+/** The five classes. */
+export const CLASSES = ['H', 'P', 'S', 'Q', 'F']
+/** The twelve kinds, by the first kind each file checks. */
+export const KINDS = ['chinese-words', 'other', 'registry-consistency', 'wording', 'test-hygiene', 'translation', 'owner-content', 'naming', 'bundle-content', 'timing-registration', 'privacy-marker', 'record-id']
+/** A feature file that also holds a whole-source scan is mixed; a file that is mostly a feature test is borderline. */
+export const MARKS = ['mixed', 'borderline']
+
+/** @type {Record<string, { class: string, kind: string, mark?: string }>} */
+export const HOUSE_RULES = {
+  'tests/a-browser-test-is-served-one-page-built-once.test.ts': { class: 'Q', kind: 'other', mark: 'borderline' },
+  'tests/a-browser-test-starts-the-server-from-a-current-build.test.ts': { class: 'Q', kind: 'other', mark: 'borderline' },
+  'tests/a-browser-tests-servers-are-in-its-own-ledger.test.ts': { class: 'H', kind: 'test-hygiene', mark: 'borderline' },
+  'tests/a-bundle-carries-none-of-the-owners-content.test.ts': { class: 'P', kind: 'owner-content' },
+  'tests/a-count-and-what-it-is-counted-over-join-by-the-spacing-rule.test.ts': { class: 'H', kind: 'wording', mark: 'borderline' },
+  'tests/a-deadline-chip-keeps-its-phrase-whole.test.ts': { class: 'H', kind: 'chinese-words', mark: 'borderline' },
+  'tests/a-detail-control-changes-what-is-drawn.test.ts': { class: 'Q', kind: 'registry-consistency' },
+  'tests/a-diagram-is-drawn-with-no-network.test.ts': { class: 'Q', kind: 'bundle-content', mark: 'borderline' },
+  'tests/a-files-first-office-is-built-in-a-hook.test.ts': { class: 'H', kind: 'timing-registration', mark: 'borderline' },
+  'tests/a-fresh-clone-names-nobody.test.ts': { class: 'P', kind: 'owner-content' },
+  'tests/a-fresh-office-copies-the-default-regulations.test.ts': { class: 'H', kind: 'registry-consistency', mark: 'borderline' },
+  'tests/a-landed-migration-is-not-taken-again.test.ts': { class: 'S', kind: 'other' },
+  'tests/a-leads-place-is-named-in-the-page-language.test.ts': { class: 'H', kind: 'translation', mark: 'borderline' },
+  'tests/a-page-on-another-origin.test.ts': { class: 'Q', kind: 'registry-consistency', mark: 'borderline' },
+  'tests/a-plugin-only-change-is-named-by-one-rule.test.ts': { class: 'Q', kind: 'other', mark: 'borderline' },
+  'tests/a-refused-file-preview-speaks-the-page-language.test.ts': { class: 'H', kind: 'chinese-words', mark: 'borderline' },
+  'tests/a-refused-pin-is-drawn-in-the-page-language.test.ts': { class: 'H', kind: 'chinese-words', mark: 'borderline' },
+  'tests/a-replaced-decision-leaves-normal-content.test.ts': { class: 'Q', kind: 'other', mark: 'borderline' },
+  'tests/a-role-card-has-all-its-parts.test.ts': { class: 'Q', kind: 'registry-consistency' },
+  'tests/a-row-holds-its-own-text.test.ts': { class: 'Q', kind: 'other', mark: 'borderline' },
+  'tests/a-rows-recorded-process-is-read-in-one-place.test.ts': { class: 'Q', kind: 'other' },
+  'tests/a-save-answer-is-in-the-pages-language.test.ts': { class: 'H', kind: 'chinese-words', mark: 'borderline' },
+  'tests/a-state-is-a-type.test.ts': { class: 'H', kind: 'wording', mark: 'borderline' },
+  'tests/a-test-database-says-when-it-was-made.test.ts': { class: 'H', kind: 'test-hygiene', mark: 'borderline' },
+  'tests/a-test-folder-is-removed-and-swept.test.ts': { class: 'H', kind: 'test-hygiene', mark: 'borderline' },
+  'tests/a-test-never-reaches-the-live-office.test.ts': { class: 'S', kind: 'test-hygiene' },
+  'tests/a-test-office-draws-no-machine-name.test.ts': { class: 'P', kind: 'privacy-marker', mark: 'borderline' },
+  'tests/a-test-sees-no-agents-environment.test.ts': { class: 'S', kind: 'test-hygiene' },
+  'tests/a-test-taken-out-says-why.test.ts': { class: 'H', kind: 'test-hygiene' },
+  'tests/a-test-that-starts-nothing-keeps-the-short-budget.test.ts': { class: 'H', kind: 'timing-registration' },
+  'tests/a-test-that-starts-something-gets-the-time-to-do-it.test.ts': { class: 'H', kind: 'timing-registration' },
+  'tests/a-twelve-letter-word-is-not-a-record-id.test.ts': { class: 'H', kind: 'record-id', mark: 'borderline' },
+  'tests/a-wake-is-wanted-and-nothing-starts.test.ts': { class: 'Q', kind: 'other', mark: 'borderline' },
+  'tests/absence-weight.test.ts': { class: 'H', kind: 'wording', mark: 'mixed' },
+  'tests/api-families.test.ts': { class: 'Q', kind: 'registry-consistency', mark: 'borderline' },
+  'tests/avatars.test.ts': { class: 'P', kind: 'privacy-marker', mark: 'borderline' },
+  'tests/blocks-profiles.test.ts': { class: 'Q', kind: 'registry-consistency', mark: 'borderline' },
+  'tests/by-id-boundary.test.ts': { class: 'Q', kind: 'registry-consistency', mark: 'borderline' },
+  'tests/changes.test.ts': { class: 'Q', kind: 'other', mark: 'borderline' },
+  'tests/coded-refusals-keep-the-server-english.test.ts': { class: 'Q', kind: 'registry-consistency', mark: 'borderline' },
+  'tests/config.test.ts': { class: 'Q', kind: 'registry-consistency', mark: 'mixed' },
+  'tests/cut-mark-is-shared.test.ts': { class: 'Q', kind: 'other' },
+  'tests/decision-form-quiet.test.ts': { class: 'H', kind: 'wording', mark: 'mixed' },
+  'tests/detail-readers-are-current.test.ts': { class: 'Q', kind: 'registry-consistency' },
+  'tests/developer-pages-in-the-browser.test.ts': { class: 'H', kind: 'chinese-words', mark: 'mixed' },
+  'tests/effective-sidebar-readers.test.ts': { class: 'Q', kind: 'other', mark: 'mixed' },
+  'tests/embassy-pages-in-three-languages.test.ts': { class: 'H', kind: 'chinese-words', mark: 'mixed' },
+  'tests/every-bundle-carries-the-terminal-holder.test.ts': { class: 'Q', kind: 'bundle-content' },
+  'tests/every-declared-bundle-part-has-a-reader.test.ts': { class: 'Q', kind: 'registry-consistency', mark: 'borderline' },
+  'tests/every-declared-field-has-a-word.test.ts': { class: 'H', kind: 'chinese-words' },
+  'tests/every-mixed-page-sets-its-sections-side-by-side.test.ts': { class: 'H', kind: 'other', mark: 'mixed' },
+  'tests/every-office-notice-says-whether-it-wakes.test.ts': { class: 'Q', kind: 'registry-consistency' },
+  'tests/every-person-only-check-is-sorted-for-a-raise.test.ts': { class: 'F', kind: 'registry-consistency' },
+  'tests/every-timer-is-named-and-a-long-run-is-a-line.test.ts': { class: 'Q', kind: 'registry-consistency', mark: 'mixed' },
+  'tests/every-vite-keeps-its-own-dependency-cache.test.ts': { class: 'Q', kind: 'test-hygiene', mark: 'borderline' },
+  'tests/every-window-b-step-is-named.test.ts': { class: 'Q', kind: 'registry-consistency', mark: 'borderline' },
+  'tests/every-window-b-step-keeps-the-ledger.test.ts': { class: 'Q', kind: 'registry-consistency', mark: 'borderline' },
+  'tests/every-write-that-changes-a-chat-list-announces-it.test.ts': { class: 'Q', kind: 'registry-consistency', mark: 'mixed' },
+  'tests/g6b-agent-cards-in-the-browser.test.ts': { class: 'H', kind: 'chinese-words', mark: 'mixed' },
+  'tests/g8-plan-words.test.ts': { class: 'H', kind: 'chinese-words', mark: 'mixed' },
+  'tests/guard-registry.test.ts': { class: 'F', kind: 'registry-consistency' },
+  'tests/implementation-map-boundary.test.ts': { class: 'Q', kind: 'other' },
+  'tests/late-work-is-called-late.test.ts': { class: 'H', kind: 'wording', mark: 'borderline' },
+  'tests/migration-numbering.test.ts': { class: 'Q', kind: 'registry-consistency' },
+  'tests/no-column-default-names-a-person.test.ts': { class: 'P', kind: 'owner-content' },
+  'tests/no-door-reads-an-agent-by-a-bare-handle.test.ts': { class: 'Q', kind: 'other' },
+  'tests/no-file-in-the-tools-kit-names-the-owner.test.ts': { class: 'P', kind: 'owner-content' },
+  'tests/no-link-points-at-a-record-page-that-does-not-exist.test.ts': { class: 'Q', kind: 'other' },
+  'tests/no-new-id-begins-with-a-dash.test.ts': { class: 'H', kind: 'record-id', mark: 'mixed' },
+  'tests/no-personal-default-in-the-tools-kit.test.ts': { class: 'P', kind: 'owner-content' },
+  'tests/no-private-names-in-the-flow-documents.test.ts': { class: 'P', kind: 'owner-content' },
+  'tests/no-stray-servers.test.ts': { class: 'S', kind: 'test-hygiene' },
+  'tests/no-test-file-name-carries-a-pronoun-or-a-name.test.ts': { class: 'P', kind: 'naming' },
+  'tests/no-test-leaves-a-rules-file-in-the-worktree.test.ts': { class: 'S', kind: 'test-hygiene' },
+  'tests/no-test-opens-the-live-corpus.test.ts': { class: 'S', kind: 'test-hygiene' },
+  'tests/no-test-writes-into-the-owners-home.test.ts': { class: 'S', kind: 'test-hygiene' },
+  'tests/one-configuration-source.test.ts': { class: 'Q', kind: 'other' },
+  'tests/one-declaration-decides-what-a-role-may-do.test.ts': { class: 'Q', kind: 'registry-consistency', mark: 'mixed' },
+  'tests/one-dispatch-door.test.ts': { class: 'Q', kind: 'other', mark: 'mixed' },
+  'tests/one-function-answers-a-database-directory.test.ts': { class: 'Q', kind: 'other', mark: 'mixed' },
+  'tests/one-message-door.test.ts': { class: 'Q', kind: 'other', mark: 'mixed' },
+  'tests/one-module-answers-the-office-key.test.ts': { class: 'Q', kind: 'other', mark: 'mixed' },
+  'tests/one-path-rule.test.ts': { class: 'Q', kind: 'other', mark: 'mixed' },
+  'tests/one-run-door.test.ts': { class: 'Q', kind: 'other', mark: 'mixed' },
+  'tests/one-table-of-readings.test.ts': { class: 'Q', kind: 'other', mark: 'mixed' },
+  'tests/one-work-state-door.test.ts': { class: 'Q', kind: 'other', mark: 'mixed' },
+  'tests/ops-vocabulary.test.ts': { class: 'Q', kind: 'registry-consistency' },
+  'tests/project-name-module.test.ts': { class: 'Q', kind: 'other', mark: 'mixed' },
+  'tests/reach-declared.test.ts': { class: 'Q', kind: 'registry-consistency' },
+  'tests/read-before-edit.test.ts': { class: 'H', kind: 'registry-consistency', mark: 'mixed' },
+  'tests/request-headers-api-index.test.ts': { class: 'Q', kind: 'registry-consistency', mark: 'borderline' },
+  'tests/sandbox-template.test.ts': { class: 'S', kind: 'other' },
+  'tests/schedule-words-and-undo.test.ts': { class: 'H', kind: 'chinese-words', mark: 'mixed' },
+  'tests/schema-inventory.test.ts': { class: 'Q', kind: 'registry-consistency' },
+  'tests/schema-tables.test.ts': { class: 'Q', kind: 'registry-consistency' },
+  'tests/sections.test.ts': { class: 'Q', kind: 'registry-consistency' },
+  'tests/server-wiring.test.ts': { class: 'Q', kind: 'registry-consistency', mark: 'borderline' },
+  'tests/stamp-columns.test.ts': { class: 'Q', kind: 'registry-consistency', mark: 'mixed' },
+  'tests/still-going-is-listed-once.test.ts': { class: 'Q', kind: 'other' },
+  'tests/target-vocabulary.test.ts': { class: 'Q', kind: 'registry-consistency', mark: 'borderline' },
+  'tests/the-acting-line-has-one-spacing-rule.test.ts': { class: 'H', kind: 'chinese-words', mark: 'borderline' },
+  'tests/the-address-card-draws-its-refusal-in-the-page-language.test.ts': { class: 'H', kind: 'chinese-words', mark: 'borderline' },
+  'tests/the-address-card-names-its-setter-in-both-languages.test.ts': { class: 'H', kind: 'chinese-words', mark: 'borderline' },
+  'tests/the-address-gate.test.ts': { class: 'P', kind: 'privacy-marker' },
+  'tests/the-applied-migrations-keep-their-statements.test.ts': { class: 'S', kind: 'other' },
+  'tests/the-chat-words-and-tiers.test.ts': { class: 'H', kind: 'chinese-words', mark: 'mixed' },
+  'tests/the-demo-corpus-names-none-of-the-owners-work.test.ts': { class: 'P', kind: 'owner-content' },
+  'tests/the-first-read-is-named-in-one-place.test.ts': { class: 'Q', kind: 'registry-consistency', mark: 'mixed' },
+  'tests/the-hook-parses.test.ts': { class: 'Q', kind: 'other' },
+  'tests/the-install-and-data-declaration.test.ts': { class: 'Q', kind: 'other', mark: 'mixed' },
+  'tests/the-installed-office-carries-what-an-agent-starts-with.test.ts': { class: 'Q', kind: 'bundle-content' },
+  'tests/the-installer-carries-no-development-material.test.ts': { class: 'P', kind: 'bundle-content' },
+  'tests/the-kinds-examples-name-no-home.test.ts': { class: 'P', kind: 'owner-content' },
+  'tests/the-ledgers-holding-answer-is-read-in-one-place.test.ts': { class: 'Q', kind: 'other', mark: 'mixed' },
+  'tests/the-machine-word-gate.test.ts': { class: 'H', kind: 'wording' },
+  'tests/the-office-runs-from-a-bundle.test.ts': { class: 'Q', kind: 'bundle-content' },
+  'tests/the-owner-content-gate.test.ts': { class: 'P', kind: 'owner-content' },
+  'tests/the-owners-project-is-not-in-the-source.test.ts': { class: 'P', kind: 'owner-content' },
+  'tests/the-owners-research-words-are-one-list.test.ts': { class: 'P', kind: 'owner-content' },
+  'tests/the-packed-app-carries-what-it-should.test.ts': { class: 'Q', kind: 'bundle-content' },
+  'tests/the-packed-office-holds-node-pty.test.ts': { class: 'Q', kind: 'bundle-content' },
+  'tests/the-persons-acts-are-declared-once.test.ts': { class: 'F', kind: 'registry-consistency' },
+  'tests/the-plan-reader-says-why-in-the-page-language.test.ts': { class: 'H', kind: 'chinese-words', mark: 'borderline' },
+  'tests/the-powers-are-a-tree-and-no-may-not-list-is-written.test.ts': { class: 'F', kind: 'registry-consistency', mark: 'mixed' },
+  'tests/the-queue-does-not-name-stable-as-a-target.test.ts': { class: 'S', kind: 'other' },
+  'tests/the-record-page-says-who-and-what-in-plain-words.test.ts': { class: 'H', kind: 'wording', mark: 'borderline' },
+  'tests/the-review-pane-in-words-and-chinese.test.ts': { class: 'H', kind: 'chinese-words', mark: 'borderline' },
+  'tests/the-review-panes-gaps-speak-the-pages-language.test.ts': { class: 'H', kind: 'chinese-words', mark: 'borderline' },
+  'tests/the-review-panes-place-sentence-speaks-the-pages-language.test.ts': { class: 'H', kind: 'chinese-words', mark: 'borderline' },
+  'tests/the-routed-line-is-drawn-in-the-page-language.test.ts': { class: 'H', kind: 'chinese-words', mark: 'borderline' },
+  'tests/the-send-plan-speaks-the-pages-language.test.ts': { class: 'H', kind: 'chinese-words', mark: 'borderline' },
+  'tests/the-sentences-after-a-press-speak-the-pages-language.test.ts': { class: 'H', kind: 'chinese-words', mark: 'borderline' },
+  'tests/the-shipped-role-cards-are-general.test.ts': { class: 'P', kind: 'owner-content' },
+  'tests/the-sidebar-project-block.test.ts': { class: 'Q', kind: 'other', mark: 'mixed' },
+  'tests/the-test-files-name-no-real-home.test.ts': { class: 'P', kind: 'owner-content' },
+  'tests/the-test-offices-owner-is-read-from-one-place.test.ts': { class: 'P', kind: 'owner-content' },
+  'tests/the-three-declarations-are-gone.test.ts': { class: 'Q', kind: 'registry-consistency' },
+  'tests/the-traces-two-words-are-declared-once.test.ts': { class: 'Q', kind: 'other' },
+  'tests/the-version-is-held-in-one-place.test.ts': { class: 'Q', kind: 'other' },
+  'tests/the-window-and-terminal-drivers-pass-no-office-on.test.ts': { class: 'S', kind: 'test-hygiene' },
+  'tests/vocabulary-families.test.ts': { class: 'Q', kind: 'registry-consistency', mark: 'mixed' },
+  'tests/vocabulary.test.ts': { class: 'Q', kind: 'registry-consistency', mark: 'borderline' },
+  'tests/z-index.test.ts': { class: 'Q', kind: 'other' },
+}

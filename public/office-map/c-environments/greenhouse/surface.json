@@ -1,0 +1,149 @@
+{
+  "version": 2,
+  "scene": "greenhouse",
+  "tileSize": 32,
+  "sprites": {
+    "greenhouse-ground-0": {
+      "src": "/office-map/c-environments/greenhouse/ground/greenhouse-ground-0.png",
+      "width": 32,
+      "height": 32,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "sha256": "90a7220486fd5a60f10b288b478d04b99cdcb299fb38abeef207b9a85f82feb1"
+    },
+    "greenhouse-ground-1": {
+      "src": "/office-map/c-environments/greenhouse/ground/greenhouse-ground-1.png",
+      "width": 32,
+      "height": 32,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "sha256": "1739e015503d260df983aba6e268191ec3a0e3f86f05bd3f8e7df40cb713e59f"
+    },
+    "greenhouse-ground-plain": {
+      "src": "/office-map/c-environments/greenhouse/ground/greenhouse-ground-plain.png",
+      "width": 32,
+      "height": 32,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "sha256": "f8e923ce73d56d7281b4fb31a6f6a73dfc92618e47d1bfaa58ada120cb815400"
+    },
+    "greenhouse-path-0": {
+      "src": "/office-map/c-environments/greenhouse/ground/greenhouse-path-0.png",
+      "width": 32,
+      "height": 32,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "sha256": "6e8a7b07fd3f5217b3e860d61cb2dcebd36d2203bc52dce7a1080717f8c95b62"
+    },
+    "greenhouse-path-1": {
+      "src": "/office-map/c-environments/greenhouse/ground/greenhouse-path-1.png",
+      "width": 32,
+      "height": 32,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "sha256": "61c7585b770a0e2ec933cb5f51953debe92e0f23c75b466d786bd3443cad90e1"
+    },
+    "shared-wood-quiet-0": {
+      "src": "/office-map/c-environments/shared/materials/shared-wood-quiet-0.png",
+      "width": 32,
+      "height": 32,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "sha256": "4450602269ab3936a16b7d90e2c47ecd04463c8aee593ab749d6257b9c897cf8"
+    },
+    "shared-wood-quiet-1": {
+      "src": "/office-map/c-environments/shared/materials/shared-wood-quiet-1.png",
+      "width": 32,
+      "height": 32,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "sha256": "379de331bf43866e6470832ad7d8a1c15af9bf05d707ec0cbc73cbc5dd19f467"
+    },
+    "shared-wood-quiet-2": {
+      "src": "/office-map/c-environments/shared/materials/shared-wood-quiet-2.png",
+      "width": 32,
+      "height": 32,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "sha256": "db8108219ebff46a2810aec7709aee87c1a23cc0d30ca3cb2c4b7b4c38440df4"
+    }
+  },
+  "materials": {
+    "ground": [
+      {
+        "sprite": "greenhouse-ground-plain",
+        "weight": 24
+      },
+      {
+        "sprite": "greenhouse-ground-0",
+        "weight": 1
+      },
+      {
+        "sprite": "greenhouse-ground-1",
+        "weight": 1
+      }
+    ],
+    "road": [
+      {
+        "sprite": "greenhouse-path-0",
+        "weight": 5
+      },
+      {
+        "sprite": "greenhouse-path-1",
+        "weight": 1
+      }
+    ],
+    "plainWork": [
+      {
+        "sprite": "greenhouse-ground-plain",
+        "weight": 24
+      },
+      {
+        "sprite": "greenhouse-ground-0",
+        "weight": 1
+      },
+      {
+        "sprite": "greenhouse-ground-1",
+        "weight": 1
+      }
+    ],
+    "sharedWork": [
+      {
+        "sprite": "shared-wood-quiet-0",
+        "weight": 1
+      },
+      {
+        "sprite": "shared-wood-quiet-1",
+        "weight": 1
+      },
+      {
+        "sprite": "shared-wood-quiet-2",
+        "weight": 1
+      }
+    ]
+  },
+  "provenance": {
+    "basis": "The quiet ground/material direction was accepted; actual world placement/navigation still needs review.",
+    "ground": "Native32px low-frequency stone/soil samples;24:1:1 for high-rise,cavern,greenhouse; original library wood tiles1:1. High-rise and plain base tiles are explicitly procedural, not claimed imagegen tiles.",
+    "road": "Native32px flat material with sparse low-contrast marks5:1. High-rise/greenhouse stone, cavern worn stone, library blue-gray carpet. No floor lighting baked in.",
+    "geometry": "The same runtime road/plainWork/sharedWork polygons determine pixel masks and navigation. No static preview polygons or unused adjacency edge PNGs are included.",
+    "height": 0,
+    "sourceFacts": "a facts file kept outside this repository"
+  }
+}

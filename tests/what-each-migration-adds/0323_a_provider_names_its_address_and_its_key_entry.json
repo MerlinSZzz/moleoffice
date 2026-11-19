@@ -1,0 +1,7 @@
+{
+  "why": "Wave 13n round CT: the provider table beside the Casting table. One row for each place a program sends its model requests to, naming the programs it is for, its base address and the name of the key file's entry that holds its key, never a key's value; and an append-only table of every add, change and removal with the fields before and after.",
+  "tables": [
+    "providers",
+    "provider_changes"
+  ]
+}

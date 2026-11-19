@@ -1,0 +1,15 @@
+{
+  "doors": [
+    "office.trust-machine",
+    "office.untrust-machine",
+    "office.confirm-visitor",
+    "office.end-visitor",
+    "office.revoke-key",
+    "office.undo-key-revocation",
+    "office.close-key-window",
+    "office.end-visitor:a-persons-device",
+    "office.revoke-key:a-persons-key",
+    "office.undo-key-revocation:a-persons-key"
+  ],
+  "why": "Every press of this file that is the person's own goes through one guard, which also asks about the part a door touches when it is the person's own device or key. Closing the key window asks after it that a key proves the caller."
+}

@@ -1,0 +1,11 @@
+{
+  "why": "A request with no key that named the person or nobody is refused only when a listener carried it and the key window does not cover it; this test injects its requests, so no listener carried one. tests/an-unproved-page-read-has-a-stable-refusal.test.ts meets it through the real second listener and a remote address. This route sends the code and status a page reads.",
+  "refusals": [
+    {
+      "code": "identityNotProved",
+      "status": 403,
+      "english": "Test: the office could not verify who made this request.",
+      "values": {}
+    }
+  ]
+}

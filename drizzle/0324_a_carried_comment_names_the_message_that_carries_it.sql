@@ -1,0 +1,14 @@
+-- A CARRIED COMMENT NAMES THE MESSAGE THAT CARRIES IT. Wave 13s round 209.
+--
+-- A sent review gives each agent one message holding its comments. A comment that names its own agent also has a
+-- delivery row to that agent, so the agent was handed the same words twice. The send now archives that row, and
+-- `carried_in` names the review's message on it, written in the same statement as the mark (`archiveDeliveries` in
+-- src/server/lib/messages.ts). The waiting list leaves such a comment out, and a start press on it asks for the run
+-- of the message named here. Both find the message from the comment's own row by `message_delivery_message_idx`, so
+-- neither reads the other messages.
+--
+-- NULL is NONE: no message carries this row's words. That is every row written before this migration, and every row
+-- since that a review's send did not archive.
+--
+-- ADDITIVE, AND IT REWRITES NOTHING. One ALTER TABLE ADD COLUMN and no UPDATE.
+ALTER TABLE `message_delivery` ADD COLUMN `carried_in` text;

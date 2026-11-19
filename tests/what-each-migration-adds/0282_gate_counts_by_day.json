@@ -1,0 +1,4 @@
+{
+  "why": "Gate encounters and later judgements of the seal reminder are counted by local day in their own table.",
+  "tables": ["gate_counts"]
+}

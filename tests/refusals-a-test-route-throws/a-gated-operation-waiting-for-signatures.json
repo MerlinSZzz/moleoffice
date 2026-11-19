@@ -1,0 +1,13 @@
+{
+  "why": "A gated operation waiting for signatures (wave 13u round 13b). tests/an-operation-that-reaches-others-waits-for-their-signatures.test.ts meets it through the install door.",
+  "refusals": [
+    {
+      "code": "readinessWaits",
+      "status": 409,
+      "english": "Test: the readiness checklist waits for signatures.",
+      "values": {
+        "checklist": "test-checklist"
+      }
+    }
+  ]
+}

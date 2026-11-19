@@ -1,0 +1,14 @@
+-- ONE INDEX, SO THE MESSAGES WHOSE WORD MOVED SINCE A MOMENT ARE FOUND WITHOUT READING EVERY MESSAGE.
+--
+-- Wave 13y round 10. `theRowsChangedSince` in src/server/lib/messages.ts re-reads what changed in a conversation
+-- since a page last read it. It now asks `messagesCarrying` in src/server/lib/dispatch.ts for
+-- the messages whose `state_at` is at or after that moment, and `state_at` had no index, so every re-read walked the
+-- whole of `agent_messages`.
+--
+--   `agent_messages_state_at_idx`   when a message's word last moved, `state_at`.
+--
+-- The index is not unique, and it changes no row. A NULL `state_at` (a message written before the column existed)
+-- is never at or after a moment, so the reader misses nothing it did not miss before.
+--
+-- ADDITIVE, AND IT REWRITES NOTHING. One CREATE INDEX statement and no UPDATE.
+CREATE INDEX IF NOT EXISTS `agent_messages_state_at_idx` ON `agent_messages` (`state_at`);

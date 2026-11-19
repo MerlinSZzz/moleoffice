@@ -1,0 +1,7 @@
+{
+  "doors": [
+    "office.install-entry",
+    "office.install-entry.other-runtimes.write"
+  ],
+  "why": "Installing the way into the office, for this runtime or the others, asks whether a raise carries the press."
+}

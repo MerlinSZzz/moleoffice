@@ -1,0 +1,29 @@
+-- A DELIVERY ROW SAYS WHETHER ANYBODY NAMED THE RECIPIENT, OR WHETHER A MIGRATION WORKED IT OUT.
+--
+-- One nullable column on `message_delivery`. No row is deleted and no message's words are touched.
+--
+-- WHY IT EXISTS. Until today, a message written with nobody named and nothing pointed at was stored
+-- as addressed to the owner, and nothing said that was an interpretation. That breaks CLAUDE.md's
+-- eighth rule the wrong way round: what Mole Office made of somebody's words is shown BESIDE them and
+-- never instead of them. A reader could not tell a message addressed to the owner on purpose from
+-- one addressed to the owner by that rule. The door now refuses such a write and says what to add, so
+-- nothing new is ever inferred.
+--
+-- THE OLD ROWS STAY, AND NOW SAY SO. The twenty-five messages already in the corpus were given a
+-- delivery row to the owner by the data migration in
+-- src/server/db/message-delivery-migration.ts, because that is what a line on the message board has
+-- always been. That reading was right and it is kept. This column is where it is written down: the
+-- row says which migration worked the recipient out, so the interpretation is visible rather than
+-- silent.
+--
+-- NULL MEANS THE WRITER NAMED THE RECIPIENT. It is the value every row written through the door
+-- carries, and it is not "unknown": the door refuses a message that names nobody, so a row with no
+-- migration named is a row somebody addressed.
+--
+-- THE ROWS THE BACKFILL ALREADY WROTE ARE STAMPED BY THE DATA MIGRATION, NOT BY THIS FILE. A SQL
+-- migration here is additive and never rewrites a row — tests/migration.test.ts refuses an UPDATE
+-- in one, and that rule is what makes a migration safe to run against the only copy of the data.
+-- `stampWhatWasInferred` in src/server/db/message-delivery-migration.ts does it instead: it runs on
+-- every `npm run db:migrate`, writes only where the stamp is missing and the message names no
+-- recipient of its own, and says in numbers how many rows it stamped.
+ALTER TABLE `message_delivery` ADD `inferred_by` text;

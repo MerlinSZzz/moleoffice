@@ -1,0 +1,731 @@
+{
+  "version": 1,
+  "sprites": {
+    "shared-complete-stool-sw": {
+      "src": "/office-map/c-environments/shared/props/shared-complete-stool-sw.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "329c92eb7d52df6bb4df9ef70c3a117a625be1e9eb2af781a667410a5434fd8d"
+    },
+    "shared-complete-stool-se": {
+      "src": "/office-map/c-environments/shared/props/shared-complete-stool-se.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "0a9013d08116668e070e950b51b6f5d859134ad69d58409b8f85ca0ae13c289b"
+    },
+    "shared-single-desk-back": {
+      "src": "/office-map/c-environments/shared/props/shared-single-desk-back.png",
+      "width": 210,
+      "height": 100,
+      "anchor": {
+        "x": 105,
+        "y": 100
+      },
+      "sha256": "1814afc3941e3171f777c8c78223a443fada1ccade515b2f19a98b94c6ce6853"
+    },
+    "shared-single-desk-front": {
+      "src": "/office-map/c-environments/shared/props/shared-single-desk-front.png",
+      "width": 210,
+      "height": 100,
+      "anchor": {
+        "x": 105,
+        "y": 100
+      },
+      "sha256": "637124b2b35382f23d31b78dcee491a9c5496c8c621ffe73bf8be852183ced9b"
+    },
+    "shared-three-seat-desk-back": {
+      "src": "/office-map/c-environments/shared/props/shared-three-seat-desk-back.png",
+      "width": 800,
+      "height": 137,
+      "anchor": {
+        "x": 400,
+        "y": 137
+      },
+      "sha256": "38b4ef62eaface5dfb5276a94e3f920217535923ea15452c708496f2bc338663"
+    },
+    "shared-three-seat-desk-front": {
+      "src": "/office-map/c-environments/shared/props/shared-three-seat-desk-front.png",
+      "width": 800,
+      "height": 137,
+      "anchor": {
+        "x": 400,
+        "y": 137
+      },
+      "sha256": "a13c9c82b516db4435247d444d6720a403b4f7d076c75013f3ba926e08cd9e32"
+    },
+    "shared-octagonal-desk-back": {
+      "src": "/office-map/c-environments/shared/props/shared-octagonal-desk-back.png",
+      "width": 430,
+      "height": 158,
+      "anchor": {
+        "x": 215,
+        "y": 158
+      },
+      "sha256": "b46961e67c457ca3e842e36229310dcfdd71b4180457341f6bae207bc3cbddc4"
+    },
+    "shared-octagonal-desk-front": {
+      "src": "/office-map/c-environments/shared/props/shared-octagonal-desk-front.png",
+      "width": 430,
+      "height": 158,
+      "anchor": {
+        "x": 215,
+        "y": 158
+      },
+      "sha256": "23b312551c54b76c41620dded1abc1ad5c58ab749185b2bda942445148b42cc3"
+    }
+  },
+  "props": {
+    "shared-complete-stool-sw": {
+      "defaultScale": 1,
+      "blocking": true,
+      "footprint": {
+        "x": -3,
+        "y": -6,
+        "width": 63,
+        "height": 6
+      },
+      "layers": [
+        {
+          "sprite": "shared-complete-stool-sw",
+          "role": "back"
+        }
+      ]
+    },
+    "shared-complete-stool-se": {
+      "defaultScale": 1,
+      "blocking": true,
+      "footprint": {
+        "x": -60,
+        "y": -6,
+        "width": 63,
+        "height": 6
+      },
+      "layers": [
+        {
+          "sprite": "shared-complete-stool-se",
+          "role": "back"
+        }
+      ]
+    },
+    "shared-single-desk": {
+      "defaultScale": 1,
+      "blocking": true,
+      "footprint": {
+        "x": -99,
+        "y": -24,
+        "width": 197,
+        "height": 24
+      },
+      "layers": [
+        {
+          "sprite": "shared-single-desk-back",
+          "role": "back",
+          "depthOffset": -15
+        },
+        {
+          "sprite": "shared-single-desk-front",
+          "role": "front"
+        }
+      ],
+      "desktop": {
+        "version": 1,
+        "surface": { "x": -91, "y": -84, "width": 181, "height": 58 },
+        "edgeMargin": 4,
+        "reserves": [
+          { "kind": "foreground", "rect": { "x": -91, "y": -41, "width": 181, "height": 15 }, "source": "shared-single-desk-front lip, sprite y59-74" },
+          { "kind": "fixture", "rect": { "x": -98, "y": -100, "width": 85, "height": 45 }, "source": "adopted back-sprite book and plant, sprite x7-92 y0-45" }
+        ]
+      },
+      "stations": {
+        "bare": {
+          "placement": "fixed-seat",
+          "actorFoot": {
+            "x": 114,
+            "y": -26
+          },
+          "actorContact": {
+            "x": -22.5,
+            "y": -25
+          },
+          "propContact": {
+            "x": 90,
+            "y": -52
+          },
+          "stoolProp": "shared-complete-stool-sw",
+          "foregroundAfter": "front",
+          "facing": "sw",
+          "actions": {
+            "sit": "sit_sw",
+            "work": "work_sw",
+            "stand": "stand_sw"
+          }
+        },
+        "scarf": {
+          "placement": "fixed-seat",
+          "actorFoot": {
+            "x": 114,
+            "y": -26
+          },
+          "actorContact": {
+            "x": -32,
+            "y": -21
+          },
+          "propContact": {
+            "x": 90,
+            "y": -52
+          },
+          "stoolProp": "shared-complete-stool-sw",
+          "foregroundAfter": "front",
+          "facing": "sw",
+          "actions": {
+            "sit": "sit_sw",
+            "work": "work_sw",
+            "stand": "stand_sw"
+          }
+        },
+        "sand-apron": {
+          "placement": "fixed-seat",
+          "actorFoot": {
+            "x": 114,
+            "y": -26
+          },
+          "actorContact": {
+            "x": -28,
+            "y": -30
+          },
+          "propContact": {
+            "x": 90,
+            "y": -52
+          },
+          "stoolProp": "shared-complete-stool-sw",
+          "foregroundAfter": "front",
+          "facing": "sw",
+          "actions": {
+            "pick_book": "pick_book_sw",
+            "sit": "sit_sw",
+            "work": "work_sw",
+            "stand": "stand_sw",
+            "put_book": "put_book_sw"
+          },
+          "bookPoint": {
+            "x": 82,
+            "y": -56
+          }
+        },
+        "cocoa-vest": {
+          "placement": "fixed-seat",
+          "actorFoot": {
+            "x": 114,
+            "y": -26
+          },
+          "actorContact": {
+            "x": -16.5,
+            "y": -41
+          },
+          "propContact": {
+            "x": 90,
+            "y": -52
+          },
+          "stoolProp": "shared-complete-stool-sw",
+          "foregroundAfter": "front",
+          "facing": "sw",
+          "actions": {
+            "pick_book": "pick_book_sw",
+            "sit": "sit_sw",
+            "work": "work_sw",
+            "stand": "stand_sw",
+            "put_book": "put_book_sw"
+          }
+        },
+        "silver-glasses": {
+          "placement": "fixed-seat",
+          "actorFoot": {
+            "x": 114,
+            "y": -26
+          },
+          "actorContact": {
+            "x": -20,
+            "y": -42
+          },
+          "propContact": {
+            "x": 90,
+            "y": -52
+          },
+          "stoolProp": "shared-complete-stool-sw",
+          "foregroundAfter": "front",
+          "facing": "sw",
+          "actions": {
+            "pick_book": "pick_book_sw",
+            "sit": "sit_sw",
+            "work": "work_sw",
+            "stand": "stand_sw",
+            "put_book": "put_book_sw"
+          },
+          "bookPoint": {
+            "x": 82,
+            "y": -56
+          }
+        }
+      }
+    },
+    "shared-three-seat-desk": {
+      "defaultScale": 1,
+      "blocking": true,
+      "footprint": {
+        "x": -387,
+        "y": -24,
+        "width": 775,
+        "height": 24
+      },
+      "layers": [
+        {
+          "sprite": "shared-three-seat-desk-back",
+          "role": "back",
+          "depthOffset": -73
+        },
+        {
+          "sprite": "shared-three-seat-desk-front",
+          "role": "front"
+        }
+      ],
+      "desktop": {
+        "version": 1,
+        "surface": { "x": -372, "y": -131, "width": 743, "height": 84 },
+        "edgeMargin": 4,
+        "reserves": [
+          { "kind": "foreground", "rect": { "x": -372, "y": -75, "width": 743, "height": 28 }, "source": "shared-three-seat-desk-front lip, sprite y62-90" }
+        ]
+      },
+      "seats": {
+        "left": {
+          "actorFoot": {
+            "x": -288,
+            "y": -84
+          },
+          "facing": "se",
+          "actions": {
+            "sit": "sit",
+            "work": "work",
+            "stand": "stand"
+          },
+          "foregroundLayer": 1,
+          "contacts": {
+            "bare": {
+              "actor": {
+                "x": 22.5,
+                "y": -25
+              },
+              "prop": {
+                "x": -264,
+                "y": -104
+              },
+              "stoolProp": "shared-complete-stool-se"
+            },
+            "scarf": {
+              "actor": {
+                "x": 32,
+                "y": -21
+              },
+              "prop": {
+                "x": -264,
+                "y": -104
+              },
+              "stoolProp": "shared-complete-stool-se"
+            },
+            "sand-apron": {
+              "actor": {
+                "x": 28,
+                "y": -30
+              },
+              "prop": {
+                "x": -264,
+                "y": -104
+              },
+              "stoolProp": "shared-complete-stool-se",
+              "bookPoint": {
+                "x": -256,
+                "y": -108
+              }
+            },
+            "cocoa-vest": {
+              "actor": {
+                "x": 16.5,
+                "y": -41
+              },
+              "prop": {
+                "x": -264,
+                "y": -104
+              },
+              "stoolProp": "shared-complete-stool-se"
+            },
+            "silver-glasses": {
+              "actor": {
+                "x": 20,
+                "y": -42
+              },
+              "prop": {
+                "x": -264,
+                "y": -104
+              },
+              "stoolProp": "shared-complete-stool-se",
+              "bookPoint": {
+                "x": -256,
+                "y": -108
+              }
+            }
+          }
+        },
+        "middle": {
+          "actorFoot": {
+            "x": 0,
+            "y": -84
+          },
+          "facing": "se",
+          "actions": {
+            "sit": "sit",
+            "work": "work",
+            "stand": "stand"
+          },
+          "foregroundLayer": 1,
+          "contacts": {
+            "bare": {
+              "actor": {
+                "x": 22.5,
+                "y": -25
+              },
+              "prop": {
+                "x": 24,
+                "y": -104
+              },
+              "stoolProp": "shared-complete-stool-se"
+            },
+            "scarf": {
+              "actor": {
+                "x": 32,
+                "y": -21
+              },
+              "prop": {
+                "x": 24,
+                "y": -104
+              },
+              "stoolProp": "shared-complete-stool-se"
+            },
+            "sand-apron": {
+              "actor": {
+                "x": 28,
+                "y": -30
+              },
+              "prop": {
+                "x": 24,
+                "y": -104
+              },
+              "stoolProp": "shared-complete-stool-se",
+              "bookPoint": {
+                "x": 32,
+                "y": -108
+              }
+            },
+            "cocoa-vest": {
+              "actor": {
+                "x": 16.5,
+                "y": -41
+              },
+              "prop": {
+                "x": 24,
+                "y": -104
+              },
+              "stoolProp": "shared-complete-stool-se"
+            },
+            "silver-glasses": {
+              "actor": {
+                "x": 20,
+                "y": -42
+              },
+              "prop": {
+                "x": 24,
+                "y": -104
+              },
+              "stoolProp": "shared-complete-stool-se",
+              "bookPoint": {
+                "x": 32,
+                "y": -108
+              }
+            }
+          }
+        },
+        "right": {
+          "actorFoot": {
+            "x": 288,
+            "y": -84
+          },
+          "facing": "se",
+          "actions": {
+            "sit": "sit",
+            "work": "work",
+            "stand": "stand"
+          },
+          "foregroundLayer": 1,
+          "contacts": {
+            "bare": {
+              "actor": {
+                "x": 22.5,
+                "y": -25
+              },
+              "prop": {
+                "x": 312,
+                "y": -104
+              },
+              "stoolProp": "shared-complete-stool-se"
+            },
+            "scarf": {
+              "actor": {
+                "x": 32,
+                "y": -21
+              },
+              "prop": {
+                "x": 312,
+                "y": -104
+              },
+              "stoolProp": "shared-complete-stool-se"
+            },
+            "sand-apron": {
+              "actor": {
+                "x": 28,
+                "y": -30
+              },
+              "prop": {
+                "x": 312,
+                "y": -104
+              },
+              "stoolProp": "shared-complete-stool-se",
+              "bookPoint": {
+                "x": 320,
+                "y": -108
+              }
+            },
+            "cocoa-vest": {
+              "actor": {
+                "x": 16.5,
+                "y": -41
+              },
+              "prop": {
+                "x": 312,
+                "y": -104
+              },
+              "stoolProp": "shared-complete-stool-se"
+            },
+            "silver-glasses": {
+              "actor": {
+                "x": 20,
+                "y": -42
+              },
+              "prop": {
+                "x": 312,
+                "y": -104
+              },
+              "stoolProp": "shared-complete-stool-se",
+              "bookPoint": {
+                "x": 320,
+                "y": -108
+              }
+            }
+          }
+        }
+      }
+    },
+    "shared-octagonal-desk": {
+      "defaultScale": 0.62,
+      "blocking": true,
+      "footprint": {
+        "x": -138,
+        "y": -13,
+        "width": 276,
+        "height": 13
+      },
+      "layers": [
+        {
+          "sprite": "shared-octagonal-desk-back",
+          "role": "back",
+          "depthOffset": -24
+        },
+        {
+          "sprite": "shared-octagonal-desk-front",
+          "role": "front"
+        }
+      ],
+      "desktop": {
+        "version": 1,
+        "surface": { "x": -152, "y": -149, "width": 304, "height": 91 },
+        "edgeMargin": 4,
+        "reserves": [
+          { "kind": "foreground", "rect": { "x": -152, "y": -70, "width": 304, "height": 12 }, "source": "shared-octagonal-desk-front lip, sprite y88-100" },
+          { "kind": "fixture", "rect": { "x": -47, "y": -122, "width": 44, "height": 22 }, "source": "adopted back-sprite notebook, sprite x168-212 y36-58" },
+          { "kind": "fixture", "rect": { "x": 9, "y": -132, "width": 34, "height": 28 }, "source": "adopted back-sprite mug, sprite x224-258 y26-54" }
+        ]
+      },
+      "stations": {
+        "bare": {
+          "placement": "fixed-seat",
+          "actorFoot": {
+            "x": 229.51612903225805,
+            "y": -41.935483870967744
+          },
+          "actorContact": {
+            "x": -22.5,
+            "y": -25
+          },
+          "propContact": {
+            "x": 193,
+            "y": -88
+          },
+          "stoolProp": "shared-complete-stool-sw",
+          "foregroundAfter": "front",
+          "facing": "sw",
+          "actions": {
+            "sit": "sit_sw",
+            "work": "work_sw",
+            "stand": "stand_sw"
+          }
+        },
+        "scarf": {
+          "placement": "fixed-seat",
+          "actorFoot": {
+            "x": 229.51612903225805,
+            "y": -41.935483870967744
+          },
+          "actorContact": {
+            "x": -32,
+            "y": -21
+          },
+          "propContact": {
+            "x": 193,
+            "y": -88
+          },
+          "stoolProp": "shared-complete-stool-sw",
+          "foregroundAfter": "front",
+          "facing": "sw",
+          "actions": {
+            "sit": "sit_sw",
+            "work": "work_sw",
+            "stand": "stand_sw"
+          }
+        },
+        "sand-apron": {
+          "placement": "fixed-seat",
+          "actorFoot": {
+            "x": 229.51612903225805,
+            "y": -41.935483870967744
+          },
+          "actorContact": {
+            "x": -28,
+            "y": -30
+          },
+          "propContact": {
+            "x": 193,
+            "y": -88
+          },
+          "stoolProp": "shared-complete-stool-sw",
+          "foregroundAfter": "front",
+          "facing": "sw",
+          "actions": {
+            "pick_book": "pick_book_sw",
+            "sit": "sit_sw",
+            "work": "work_sw",
+            "stand": "stand_sw",
+            "put_book": "put_book_sw"
+          },
+          "bookPoint": {
+            "x": 171.4516129032258,
+            "y": -90.3225806451613
+          }
+        },
+        "cocoa-vest": {
+          "placement": "fixed-seat",
+          "actorFoot": {
+            "x": 229.51612903225805,
+            "y": -41.935483870967744
+          },
+          "actorContact": {
+            "x": -16.5,
+            "y": -41
+          },
+          "propContact": {
+            "x": 193,
+            "y": -88
+          },
+          "stoolProp": "shared-complete-stool-sw",
+          "foregroundAfter": "front",
+          "facing": "sw",
+          "actions": {
+            "pick_book": "pick_book_sw",
+            "sit": "sit_sw",
+            "work": "work_sw",
+            "stand": "stand_sw",
+            "put_book": "put_book_sw"
+          }
+        },
+        "silver-glasses": {
+          "placement": "fixed-seat",
+          "actorFoot": {
+            "x": 229.51612903225805,
+            "y": -41.935483870967744
+          },
+          "actorContact": {
+            "x": -20,
+            "y": -42
+          },
+          "propContact": {
+            "x": 193,
+            "y": -88
+          },
+          "stoolProp": "shared-complete-stool-sw",
+          "foregroundAfter": "front",
+          "facing": "sw",
+          "actions": {
+            "pick_book": "pick_book_sw",
+            "sit": "sit_sw",
+            "work": "work_sw",
+            "stand": "stand_sw",
+            "put_book": "put_book_sw"
+          },
+          "bookPoint": {
+            "x": 171.4516129032258,
+            "y": -90.3225806451613
+          }
+        }
+      }
+    }
+  },
+  "provenance": {
+    "completeStools": {
+      "source": "TS6woEo2Y6RR complete-stool repair accepted for the anonymous sample; formal-map support/collision still requires hJC integration review",
+      "sourceSha256": "329c92eb7d52df6bb4df9ef70c3a117a625be1e9eb2af781a667410a5434fd8d",
+      "orientation": "SW is the accepted complete-end-stool PNG unchanged; SE is its complete horizontal mirror, not a second generated stool",
+      "anchorMeaning": "same160canvas as the associated actor;anchor80,156 refers to actorfoot,not geometric stoolcenter",
+      "footprintBasis": "measured occupied bbox in the bottom6canvas rows;not a complete physical collision acceptance"
+    },
+    "contact": "Nonzero contact errors remain measured, not corrected by moving a table or a person. Normal long-table layers hide the stools; this is not support verification.",
+    "octagonal": "Original1.0 candidate failed ground/support view and remains in cache evidence. This candidate draws the exact same PNG layers uniformly at0.62 (267x98 rounded), with a fixed ground-based seat declaration. Six bare/scarf size views have been examined; all nonzero errors remain. It supplies one SW seat, not a full ring of seats.",
+    "threeFurniture": "Candidate for the next review world: fixed SW single desk, fixed three SE seats at one long desk, and a single SW end seat at the octagonal desk. PNGs alone do not select furniture; environment definitions name these IDs.",
+    "lookBindingStatus": "Five looks have their own recorded hand points, complete stool orientation and real source actions on the three adopted furniture types. Single and octagonal seats face SW; long seats face SE. Existing bare/scarf declarations and all image bytes are unchanged. This is a candidate for actual world playback, not completed world acceptance.",
+    "silverBookTransfer": {
+      "report": "4Qm5e3Td5s39",
+      "sourcePropsSha256": "31f3ad986e63bd666a0c191846ef2b88ee7bd2e3213247d3d6e402b4a1e6217a",
+      "method": "Fern played twelve anonymous fixed-seat cases using the production frame, station and table-book readers. Brook viewed the three long-table transfer sheets and octagonal transfer/work sheets. The actual CForestMotion message route was not part of those clips.",
+      "limits": [
+        "Long-table lower body and stools remain obscured in the normal view.",
+        "At actor scale 0.92, 3 long-table and 13 octagonal book pixels fall outside the full table image alpha. This measurement is not physical support verification.",
+        "The reading book is held above the old desk reference point. Nonzero contact errors remain.",
+        "Rear-facing sitting and a full ring of octagonal seats are not provided."
+      ]
+    }
+  }
+}

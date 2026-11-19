@@ -1,0 +1,6 @@
+{
+  "doors": [
+    "office.set-what-is-kept"
+  ],
+  "why": "The door that changes what the office keeps asks whether the secretary acts for the person before it writes the change."
+}

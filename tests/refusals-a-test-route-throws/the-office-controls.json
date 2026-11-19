@@ -1,0 +1,131 @@
+{
+  "why": "Made-up routes test the shared serializer for the office controls. The real permission and value cases are in the-office-controls-keep-values-and-the-restart-grant.test.ts and the-dead-letter-thresholds-are-chosen-without-a-file-edit.test.ts.",
+  "refusals": [
+    {
+      "code": "runtimeSettingsBadValue",
+      "status": 400,
+      "english": "Test: the setting value is invalid.",
+      "values": {
+        "reason": "Test: the setting value is invalid."
+      }
+    },
+    {
+      "code": "runtimeSettingsReadOnly",
+      "status": 400,
+      "english": "Test: this setting uses another door.",
+      "values": {
+        "reason": "Test: this setting uses another door."
+      }
+    },
+    {
+      "code": "runtimeSettingsNotAllowed",
+      "status": 403,
+      "english": "Test: this caller may not change settings.",
+      "values": {
+        "reason": "Test: this caller may not change settings."
+      }
+    },
+    {
+      "code": "runtimeSettingsBadDecision",
+      "status": 400,
+      "english": "Test: the setting needs a live decision.",
+      "values": {
+        "reason": "Test: the setting needs a live decision."
+      }
+    },
+    {
+      "code": "runtimeSettingsBadWarrant",
+      "status": 400,
+      "english": "Test: the setting warrant is invalid.",
+      "values": {
+        "reason": "Test: the setting warrant is invalid."
+      }
+    },
+    {
+      "code": "officeRestartNotAllowed",
+      "status": 403,
+      "english": "Test: this caller may not restart or pause.",
+      "values": {
+        "reason": "Test: this caller may not restart or pause."
+      }
+    },
+    {
+      "code": "officeRestartBadGrant",
+      "status": 400,
+      "english": "Test: the restart grant is invalid.",
+      "values": {
+        "reason": "Test: the restart grant is invalid."
+      }
+    },
+    {
+      "code": "officeRestartBadWarrant",
+      "status": 400,
+      "english": "Test: the restart warrant is invalid.",
+      "values": {
+        "reason": "Test: the restart warrant is invalid."
+      }
+    },
+    {
+      "code": "officeRestartBadReason",
+      "status": 400,
+      "english": "Test: give a reason for the restart.",
+      "values": {
+        "reason": "Test: give a reason for the restart."
+      }
+    },
+    {
+      "code": "shutDownBadWarrant",
+      "status": 403,
+      "english": "Test: the shutdown warrant is invalid.",
+      "values": {
+        "reason": "Test: the shutdown warrant is invalid."
+      }
+    },
+    {
+      "code": "officeRestartNoManager",
+      "status": 409,
+      "english": "Test: this office has no restart manager.",
+      "values": {
+        "reason": "Test: this office has no restart manager."
+      }
+    },
+    {
+      "code": "officePauseNotReady",
+      "status": 503,
+      "english": "Test: this office has no pause manager.",
+      "values": {
+        "reason": "Test: this office has no pause manager."
+      }
+    },
+    {
+      "code": "deadLetterThresholdsNotAllowed",
+      "status": 403,
+      "english": "Test: this caller may not change the limits.",
+      "values": {}
+    },
+    {
+      "code": "deadLetterThresholdsBadValue",
+      "status": 400,
+      "english": "Test: enter positive whole limits.",
+      "values": {}
+    },
+    {
+      "code": "deadLetterThresholdsBadWarrant",
+      "status": 400,
+      "english": "Test: the limits warrant is invalid.",
+      "values": {}
+    },
+    {
+      "code": "deadLetterThresholdsBadDecision",
+      "status": 400,
+      "english": "Test: the limits need a live decision.",
+      "values": {}
+    },
+    {
+      "code": "deadLetterThresholdsNoInstallation",
+      "status": 409,
+      "english": "Test: this office is not prepared.",
+      "values": {}
+    }
+  ]
+}

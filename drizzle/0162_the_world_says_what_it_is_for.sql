@@ -1,0 +1,37 @@
+-- THE WORLD SAYS WHAT IT IS FOR.
+--
+-- Criterion P87: on 9 September 2026 the owner could not see the running test world from the main
+-- world. A world is a copy of the corpus kept up so somebody can look at a change, and until this
+-- column there was nowhere on the row to say WHAT that change was. The row held where the world
+-- was, who started it and whether it had ended, and a reader still had to guess what they were
+-- being asked to look at.
+--
+-- ONE NEW NULLABLE TEXT COLUMN AND NOTHING ELSE. Nothing existing changes and no data is rewritten.
+-- NULL IS A REAL ANSWER: a world whose starter said nothing about its purpose says so on the page
+-- rather than being given an invented one, which is the fifth invariant.
+--
+-- IT IS NOT THE NAME. A world's name is what a person reads and may rename; this is the sentence
+-- the tool that started it wrote down. The name a server gives an agent-made world already folds in
+-- a purpose when one arrives later, and that is a different fact about a different moment.
+ALTER TABLE `worlds` ADD COLUMN `purpose` TEXT;--> statement-breakpoint
+
+-- AND WHICH HANDBACK IT BELONGS TO.
+--
+-- Criterion C33: a person asking what a world wanted of them could not
+-- find its report in the world itself. A world is a copy taken when it starts, so a
+-- handback filed afterwards is not inside it, and until this column nothing on the row said where
+-- that handback was. The person had to guess which report a world belonged to.
+--
+-- IT HOLDS A RECORD ID AND NOT A LINK. A link row needs two records and a world is a row in this
+-- table, not a record: RECORD_KINDS in src/shared/types.ts has no `world`, and POST /api/links
+-- refuses an end that is not a record. c-worlds measured that refusal (404, "Both ends of a link
+-- must exist"). So the pointer lives here, the way the criticised design of 8 September said it
+-- should (design/permissions/DESIGN-2026-09-08-perm-5.md version 2, critic note IyKUXwTqwOTq: the
+-- tool writes the fields, "the handback it belongs to" among them).
+--
+-- NOTHING CHECKS THAT THE RECORD EXISTS, and that is deliberate. A world is usually started before
+-- its handback is written, so a column that refused an unknown id would refuse the ordinary case.
+-- A page that draws it says so when the record is not there, rather than drawing a dead address.
+--
+-- NULL IS A REAL ANSWER: a world nobody tied to a handback says so. The fifth invariant.
+ALTER TABLE `worlds` ADD COLUMN `handback` TEXT;

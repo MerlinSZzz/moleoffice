@@ -1,0 +1,49 @@
+{
+  "why": "The install and start-at-login refusals, and the sandbox memory limit's in a test world: no door here can safely meet them, because each needs this computer's HOME, systemd or a world that is not a test world.",
+  "refusals": [
+    {
+      "code": "harnessNoHome",
+      "status": 400,
+      "english": "Test: this server has no HOME.",
+      "values": {}
+    },
+    {
+      "code": "startAtLoginTestWorld",
+      "status": 409,
+      "english": "Test: this Mole Office is a test world.",
+      "values": {}
+    },
+    {
+      "code": "startAtLoginNotLinux",
+      "status": 409,
+      "english": "Test: this computer is not Linux.",
+      "values": {}
+    },
+    {
+      "code": "startAtLoginNoSystemd",
+      "status": 409,
+      "english": "Test: systemd does not answer.",
+      "values": {}
+    },
+    {
+      "code": "startAtLoginNotOurs",
+      "status": 409,
+      "english": "Test: that unit is not the office's.",
+      "values": {
+        "path": "/test/mole-office.service"
+      }
+    },
+    {
+      "code": "startAtLoginSystemdRefused",
+      "status": 409,
+      "english": "Test: systemd refused.",
+      "values": {}
+    },
+    {
+      "code": "sandboxCapTestWorld",
+      "status": 409,
+      "english": "Test: this Mole Office is a test world.",
+      "values": {}
+    }
+  ]
+}

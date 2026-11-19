@@ -1,0 +1,25 @@
+<!-- Copyright © 2026 Zhengyang Shen -->
+<!-- Licensed under the MIT License. See LICENSE. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-label="A rabbit">
+<title>Rabbit</title>
+<defs><clipPath id="rabbit-disc"><circle cx="128" cy="128" r="128"/></clipPath></defs>
+<g clip-path="url(#rabbit-disc)">
+<circle cx="128" cy="128" r="128" fill="#B964B9"/>
+<ellipse cx="96" cy="70" rx="24" ry="64" fill="#DCD2C8" transform="rotate(-11 96 70)"/>
+<ellipse cx="96" cy="72" rx="12" ry="46" fill="#F0A8B4" transform="rotate(-11 96 72)"/>
+<ellipse cx="160" cy="70" rx="24" ry="64" fill="#DCD2C8" transform="rotate(11 160 70)"/>
+<ellipse cx="160" cy="72" rx="12" ry="46" fill="#F0A8B4" transform="rotate(11 160 72)"/>
+<ellipse cx="128" cy="162" rx="72" ry="64" fill="#DCD2C8"/>
+<ellipse cx="102" cy="188" rx="30" ry="24" fill="#EFE8E0"/>
+<ellipse cx="154" cy="188" rx="30" ry="24" fill="#EFE8E0"/>
+<g stroke="#A9A096" stroke-width="4" stroke-linecap="round">
+<path d="M88 184 L36 168"/><path d="M88 194 L34 196"/>
+<path d="M168 184 L220 168"/><path d="M168 194 L222 196"/>
+</g>
+<g fill="#17161A"><circle cx="98" cy="152" r="14"/><circle cx="158" cy="152" r="14"/></g>
+<g fill="#FFFFFF"><circle cx="93" cy="147" r="5"/><circle cx="153" cy="147" r="5"/></g>
+<path d="M114 178 L142 178 L128 194 Z" fill="#E88FA0"/>
+<rect x="118" y="198" width="20" height="24" rx="5" fill="#FFFFFF"/>
+<path d="M128 200 L128 220" stroke="#C9C0B6" stroke-width="3"/>
+</g>
+</svg>

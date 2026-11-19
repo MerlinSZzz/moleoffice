@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "sprites": {
+    "high-rise-city-window": {
+      "src": "/office-map/c-environments/high-rise/props/high-rise-city-window.png",
+      "width": 172,
+      "height": 192,
+      "anchor": {
+        "x": 86.0,
+        "y": 192
+      },
+      "sha256": "cc8814f4ae4d0b6ff915a4369ca13b66cf33a1421d5a0ddde2cde2e2782fc07d"
+    }
+  },
+  "props": {
+    "high-rise-city-window": {
+      "defaultScale": 1,
+      "blocking": true,
+      "footprint": {
+        "x": -86.0,
+        "y": -10,
+        "width": 172,
+        "height": 10
+      },
+      "layers": [
+        {
+          "sprite": "high-rise-city-window",
+          "role": "back"
+        }
+      ]
+    }
+  },
+  "provenance": {
+    "phase": "one representative pilot prop; not a complete environment pack",
+    "source": "a source image drawn outside this repository",
+    "alpha": "true-alpha request returned an opaque RGB image with a painted transparency grid; transparency is explicit post-processing, not successful native-alpha generation",
+    "footprint": "authored rectangle from visible lower base, relative to bottom-center anchor; window/glass panel are closed boundary obstacles; rock pillar is solid, not an arch"
+  }
+}

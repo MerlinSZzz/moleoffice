@@ -1,0 +1,409 @@
+{
+  "note": "Icons are drawn with image2 by a worker as the first icon set, and sandbox, git and regulations were redrawn, and project-record, governance, coordination and office-flow drawn, by a worker as the redrawn icon set; each worker's provenance.json holds the prompts and times. The files in tools/architecture/icons/<hue>/ are their circle forms, copied unchanged. The generator makes the navy form, the padlock and the warning triangle itself, as each entry below says. The mole-* pictures are the redrawn icon set's round-3 and round-4 drawings, which are not circle forms; they are copied into icons/purple/ unchanged. The four part moles are drawn cropped to their visible box (icons.visible, measured from each file's alpha), so the drawn size is the mole's own height.",
+  "icons": [
+    {
+      "id": "backup",
+      "diagrams": [
+        "technical"
+      ],
+      "forms": [
+        "purple"
+      ],
+      "drawn_by": "the first icon set (image2)"
+    },
+    {
+      "id": "branch",
+      "diagrams": [
+        "flow",
+        "technical"
+      ],
+      "forms": [
+        "green",
+        "navy"
+      ],
+      "drawn_by": "draw.mjs",
+      "note": "No icon in the set stands for a copy of the code. A branch is drawn as a white line glyph on the circle form."
+    },
+    {
+      "id": "cast",
+      "diagrams": [
+        "technical"
+      ],
+      "forms": [
+        "purple"
+      ],
+      "drawn_by": "draw.mjs",
+      "note": "No icon in the set stands for the Casting table. Two people are drawn white on the circle form."
+    },
+    {
+      "id": "chain",
+      "diagrams": [
+        "technical"
+      ],
+      "forms": [
+        "purple"
+      ],
+      "drawn_by": "draw.mjs",
+      "note": "No icon in the set stands for a chain of responsibility. Two linked rings are drawn white on the circle form."
+    },
+    {
+      "id": "checklist",
+      "diagrams": [
+        "technical"
+      ],
+      "forms": [
+        "purple"
+      ],
+      "drawn_by": "draw.mjs",
+      "note": "No icon in the set stands for a checklist. Three ticked lines are drawn white on the circle form."
+    },
+    {
+      "id": "database",
+      "diagrams": [
+        "technical"
+      ],
+      "forms": [
+        "purple"
+      ],
+      "drawn_by": "draw.mjs",
+      "note": "No icon in the set stands for a database file. A cylinder is drawn white on the circle form."
+    },
+    {
+      "id": "decision",
+      "diagrams": [
+        "general",
+        "path",
+        "technical"
+      ],
+      "forms": [
+        "blue",
+        "purple"
+      ],
+      "drawn_by": "the first icon set (image2)"
+    },
+    {
+      "id": "gauge",
+      "diagrams": [
+        "technical"
+      ],
+      "forms": [
+        "purple"
+      ],
+      "drawn_by": "draw.mjs",
+      "note": "No icon in the set stands for usage figures. A gauge is drawn as a white line glyph on the circle form."
+    },
+    {
+      "id": "holder",
+      "diagrams": [
+        "technical"
+      ],
+      "forms": [
+        "purple"
+      ],
+      "drawn_by": "draw.mjs",
+      "note": "No icon in the set stands for the terminal holder. Two stacked terminals are drawn white on the circle form."
+    },
+    {
+      "id": "idea",
+      "diagrams": [
+        "technical"
+      ],
+      "forms": [
+        "purple"
+      ],
+      "drawn_by": "draw.mjs",
+      "note": "No icon in the set stands for findings and ideas. A light bulb is drawn white on the circle form."
+    },
+    {
+      "id": "inspector",
+      "diagrams": [
+        "flow",
+        "general"
+      ],
+      "forms": [
+        "green"
+      ],
+      "drawn_by": "the first icon set (image2)"
+    },
+    {
+      "id": "key",
+      "diagrams": [
+        "technical"
+      ],
+      "forms": [
+        "purple"
+      ],
+      "drawn_by": "the first icon set (image2)"
+    },
+    {
+      "id": "lock",
+      "diagrams": [
+        "flow",
+        "technical"
+      ],
+      "forms": [
+        "orange",
+        "purple"
+      ],
+      "drawn_by": "draw.mjs",
+      "note": "No icon in the set stands for a seal. The padlock is cut from the redrawn icon set's sandbox icon (orange form), turned white, and set on a circle of the group's hue."
+    },
+    {
+      "id": "machine",
+      "diagrams": [
+        "flow"
+      ],
+      "forms": [
+        "green",
+        "navy"
+      ],
+      "drawn_by": "draw.mjs",
+      "note": "No icon in the set stands for a computer. A screen on a stand is drawn white on the circle form."
+    },
+    {
+      "id": "merge-tool",
+      "diagrams": [
+        "flow",
+        "general",
+        "roles"
+      ],
+      "forms": [
+        "green"
+      ],
+      "drawn_by": "the first icon set (image2)"
+    },
+    {
+      "id": "message",
+      "diagrams": [
+        "general",
+        "technical"
+      ],
+      "forms": [
+        "purple"
+      ],
+      "drawn_by": "the first icon set (image2)"
+    },
+    {
+      "id": "mole-coordination",
+      "diagrams": [
+        "technical"
+      ],
+      "forms": [
+        "purple"
+      ],
+      "drawn_by": "the redrawn icon set (image2)"
+    },
+    {
+      "id": "mole-database",
+      "diagrams": [
+        "technical"
+      ],
+      "forms": [
+        "purple"
+      ],
+      "drawn_by": "the redrawn icon set (image2)"
+    },
+    {
+      "id": "mole-governance",
+      "diagrams": [
+        "technical"
+      ],
+      "forms": [
+        "purple"
+      ],
+      "drawn_by": "the redrawn icon set (image2)"
+    },
+    {
+      "id": "mole-message-worker",
+      "diagrams": [
+        "roles",
+        "technical"
+      ],
+      "forms": [
+        "purple"
+      ],
+      "drawn_by": "the redrawn icon set (image2)"
+    },
+    {
+      "id": "mole-roles",
+      "diagrams": [
+        "technical"
+      ],
+      "forms": [
+        "purple"
+      ],
+      "drawn_by": "the first icon set (image2)"
+    },
+    {
+      "id": "office-flow",
+      "diagrams": [
+        "technical"
+      ],
+      "forms": [
+        "purple"
+      ],
+      "drawn_by": "the redrawn icon set (image2)"
+    },
+    {
+      "id": "pipeline",
+      "diagrams": [
+        "technical"
+      ],
+      "forms": [
+        "purple"
+      ],
+      "drawn_by": "draw.mjs",
+      "note": "The office sidebar's pipeline icon, drawn white on the circle form."
+    },
+    {
+      "id": "planning",
+      "diagrams": [
+        "technical"
+      ],
+      "forms": [
+        "purple"
+      ],
+      "drawn_by": "the first icon set (image2)"
+    },
+    {
+      "id": "plugin",
+      "diagrams": [
+        "technical"
+      ],
+      "forms": [
+        "purple"
+      ],
+      "drawn_by": "draw.mjs",
+      "note": "No icon in the set stands for a plugin. A puzzle piece is drawn as a white line glyph on the circle form."
+    },
+    {
+      "id": "problem",
+      "diagrams": [
+        "general",
+        "technical"
+      ],
+      "forms": [
+        "purple"
+      ],
+      "drawn_by": "draw.mjs",
+      "note": "No icon in the set stands for a problem. The generator draws a plain warning triangle in the same circle form."
+    },
+    {
+      "id": "push",
+      "diagrams": [
+        "technical"
+      ],
+      "forms": [
+        "purple"
+      ],
+      "drawn_by": "the first icon set (image2)"
+    },
+    {
+      "id": "records",
+      "diagrams": [
+        "technical"
+      ],
+      "forms": [
+        "purple"
+      ],
+      "drawn_by": "the first icon set (image2)"
+    },
+    {
+      "id": "regulations",
+      "diagrams": [
+        "technical"
+      ],
+      "forms": [
+        "purple"
+      ],
+      "drawn_by": "the redrawn icon set (image2)"
+    },
+    {
+      "id": "report",
+      "diagrams": [
+        "general",
+        "technical"
+      ],
+      "forms": [
+        "purple"
+      ],
+      "drawn_by": "the first icon set (image2)"
+    },
+    {
+      "id": "role-card",
+      "diagrams": [
+        "technical"
+      ],
+      "forms": [
+        "purple"
+      ],
+      "drawn_by": "the first icon set (image2)"
+    },
+    {
+      "id": "sandbox",
+      "diagrams": [
+        "general"
+      ],
+      "forms": [
+        "orange"
+      ],
+      "drawn_by": "the redrawn icon set (image2)"
+    },
+    {
+      "id": "terminal",
+      "diagrams": [
+        "technical"
+      ],
+      "forms": [
+        "blue",
+        "purple"
+      ],
+      "drawn_by": "draw.mjs",
+      "note": "The office sidebar's terminal icon (src/web/components/Sidebar.tsx), drawn white on the circle form."
+    },
+    {
+      "id": "tool",
+      "diagrams": [
+        "flow",
+        "technical"
+      ],
+      "forms": [
+        "green",
+        "purple"
+      ],
+      "drawn_by": "draw.mjs",
+      "note": "The office sidebar's toolset icon, drawn white on the circle form."
+    },
+    {
+      "id": "waiter",
+      "diagrams": [
+        "technical"
+      ],
+      "forms": [
+        "purple"
+      ],
+      "drawn_by": "the first icon set (image2)"
+    },
+    {
+      "id": "window",
+      "diagrams": [
+        "technical"
+      ],
+      "forms": [
+        "blue"
+      ],
+      "drawn_by": "draw.mjs",
+      "note": "The office sidebar's window icon, drawn white on the circle form."
+    },
+    {
+      "id": "worlds",
+      "diagrams": [
+        "technical"
+      ],
+      "forms": [
+        "purple"
+      ],
+      "drawn_by": "the first icon set (image2)"
+    }
+  ]
+}

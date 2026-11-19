@@ -1,0 +1,4 @@
+{
+  "why": "How far the office has read each day file of the gate-count spool, wave 13r round O: one row per day file, holding how many of its bytes are read, so the sandbox tools' lines are each counted once, also across a restart. A line is counted and its file's bytes move in one transaction. One CREATE TABLE; it rewrites no row and touches no other table.",
+  "tables": ["gate_count_spool_reads"]
+}

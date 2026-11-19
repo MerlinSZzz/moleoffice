@@ -1,0 +1,6 @@
+{
+  "doors": [
+    "office.set-load-ranges"
+  ],
+  "why": "The door that changes the load ranges asks whether the secretary acts for the person before it writes the change."
+}

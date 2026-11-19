@@ -1,0 +1,5 @@
+{
+  "sort": "mixed",
+  "checks": 2,
+  "why": "writing an agent's handover is that agent's own act or the person's, and under the person's grant the secretary writes it for the person and is named as its writer. Reading it is that agent's, its starter's or the person's: the read door asks the grant after them (src/server/api/handovers.ts), and the agent's page and the read after a compaction do not"
+}

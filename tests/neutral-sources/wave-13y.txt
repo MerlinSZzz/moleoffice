@@ -1,0 +1,7 @@
+# The files wave 13y wrote neutral, one path per line, relative to the checkout. The neutral-words
+# gate (tests/the-owners-project-is-not-in-the-source.test.ts) reads every string each one ships.
+# # starts a comment.
+
+# Round 69: the page list. Its rows and their comments came out of src/web/App.tsx, which
+# wave-13q.txt names, so the gate reads them where they are now.
+src/web/lib/pagelist.tsx

@@ -1,0 +1,11 @@
+{
+  "doors": [
+    "terminals.way-back",
+    "terminals.bring-back",
+    "terminals.agent-pane",
+    "terminals.show-pane",
+    "terminals.agent-steps",
+    "terminals.open-an-agent"
+  ],
+  "why": "The grant remains a path where the door has no ordinary secretary authority: opening an agent and its reads check a secretary's own key first; bringing a run back and showing a pane retain their grant guards."
+}

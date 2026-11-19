@@ -1,0 +1,7 @@
+{
+  "doors": [
+    "agent.retire",
+    "participant.release-reading"
+  ],
+  "why": "Retiring an agent and releasing what an agent was reading each ask whether a raise carries the press."
+}

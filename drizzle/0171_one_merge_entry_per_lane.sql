@@ -1,0 +1,18 @@
+-- ONE MERGE ENTRY PER LANE, HELD BY THE DATABASE. Sandbox v1, piece P6, and its
+-- rule R3: the queue carries a changeset through a git or a files adapter.
+--
+-- SPEC.md section 5.1 asks that "one entry at a time per repository" be a database constraint and
+-- never a read followed by a write. Widened by R3, the lane is the directory a changeset lands in: a
+-- repository's checkout for git, the target folder for files.
+--
+-- A PARTIAL UNIQUE INDEX ON `records`, AND NOT THE `merge_lanes` TABLE THE SPEC SKETCHED. A merge
+-- entry is a record, and its state already says whether it holds its lane; a second table naming the
+-- holder would be the same fact in two places (invariant 9), and a lane row left behind by a bounced
+-- entry would block the lane with nothing failing. So the entry carries `data.occupies` — the lane it
+-- holds, present only while its state holds one — and one function writes it, together with the state
+-- (`moveEntry` in src/server/lib/merge-queue.ts). This index makes a second holder impossible to write.
+--
+-- ADDITIVE ONLY. No table changes and no row is touched: no merge entry exists before this migration,
+-- because the kind arrives with it, so the index is built over nothing and cannot be born violated.
+-- No state word is written here, so the state machine can change without a migration.
+CREATE UNIQUE INDEX IF NOT EXISTS `records_one_merge_entry_per_lane` ON `records` (json_extract(`data`, '$.occupies')) WHERE `kind` = 'merge_entry' AND `deleted_at` IS NULL AND json_extract(`data`, '$.occupies') IS NOT NULL;

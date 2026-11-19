@@ -1,0 +1,24 @@
+{
+  "name": "mole-office-dev",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": "."
+  },
+  "runArgs": ["--network=host"],
+  "init": false,
+  "overrideCommand": false,
+  "containerUser": "1000:1000",
+  "remoteUser": "1000:1000",
+  "updateRemoteUserUID": false,
+  "userEnvProbe": "none",
+  "workspaceMount": "type=bind,source=${localEnv:SANDBOX_DIR},target=${localEnv:SANDBOX_DIR}",
+  "workspaceFolder": "${localEnv:SANDBOX_DIR}",
+  "mounts": [
+    "type=bind,source=${localEnv:SANDBOX_MAIN_CHECKOUT},target=${localEnv:SANDBOX_MAIN_CHECKOUT},readonly",
+    "type=tmpfs,target=${localEnv:SANDBOX_MAIN_CHECKOUT}/data,readonly,tmpfs-size=65536",
+    "type=tmpfs,target=${localEnv:SANDBOX_MAIN_CHECKOUT}/node_modules/.vite-temp,tmpfs-size=67108864,tmpfs-mode=1777"
+  ],
+  "containerEnv": {
+    "HOME": "${localEnv:SANDBOX_DIR}/home"
+  }
+}

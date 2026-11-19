@@ -1,0 +1,8 @@
+{
+  "doors": [
+    "office.rules.set-chapter",
+    "office.rules.restore-chapter",
+    "office.rules.mark-only-this-office"
+  ],
+  "why": "Writing a chapter, as setting or restoring one does, asks whether a raise carries the press and the writing of a regulation, and whether a secretary carries the owner's words for this one change. Marking a rule as only for this office asks whether a raise carries the press, and whether a secretary carries the owner's words for this one mark."
+}

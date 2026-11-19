@@ -1,0 +1,21 @@
+-- WHICH RUN REGISTERED AN AGENT. One nullable column on `agents`.
+--
+-- Criterion P11 of design/permissions/ACCEPTANCE.md: a run has to be
+-- able to say which run started it. *Measured on 6 September 2026: of 904 runs recorded in this
+-- project, 0 carry a parent.* The `session` kind has had `parentAttachment` since August and
+-- nothing ever wrote one, because nothing knew the answer.
+--
+-- WHAT THIS HOLDS. The session record of the run that called POST /api/agents/started to register
+-- this agent. That run is the one that started it, said by the run itself at the moment it did so,
+-- which is the only moment anybody knows.
+--
+-- WHAT IT IS FOR. When that agent files the session record of its FIRST run, Mole Office writes this
+-- id into `parentAttachment` and says in the reply that it did. A second run of the same agent gets
+-- nothing: an agent has many runs over its life and only the first was started by the run that
+-- registered it, so filling the rest in would be a guess wearing a fact's clothes.
+--
+-- NULL MEANS NOBODY RECORDED ONE: an agent a person registered by hand, one registered by a caller
+-- that sent no session header, and every row written before this column existed.
+--
+-- ADDITIVE, AND IT REWRITES NOTHING. One ALTER TABLE ADD COLUMN and no UPDATE.
+ALTER TABLE `agents` ADD `started_by_run` text;

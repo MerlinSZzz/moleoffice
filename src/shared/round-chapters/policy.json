@@ -1,0 +1,181 @@
+{
+  "version": 1,
+  "kinds": {
+    "development": {
+      "CODE.md": [
+        {
+          "chapter": 1,
+          "descendants": true
+        },
+        {
+          "chapter": 2,
+          "descendants": true
+        },
+        {
+          "chapter": 3,
+          "descendants": true
+        },
+        {
+          "chapter": 4,
+          "descendants": true
+        },
+        {
+          "chapter": 5,
+          "descendants": true
+        },
+        {
+          "chapter": 7,
+          "descendants": true
+        },
+        {
+          "chapter": 9,
+          "descendants": true
+        }
+      ],
+      "LINE-common.md": "*",
+      "TERRITORIES.md": "*"
+    },
+    "tests": {
+      "CODE.md": [
+        {
+          "chapter": 1,
+          "descendants": true
+        },
+        {
+          "chapter": 2,
+          "descendants": true
+        },
+        {
+          "chapter": 3,
+          "descendants": true
+        },
+        {
+          "chapter": 4,
+          "descendants": true
+        },
+        {
+          "chapter": 5,
+          "descendants": true
+        },
+        {
+          "chapter": 9,
+          "descendants": true
+        }
+      ],
+      "LINE-common.md": "*",
+      "TERRITORIES.md": "*"
+    },
+    "documents": {
+      "CODE.md": [
+        {
+          "chapter": 3,
+          "descendants": true
+        },
+        {
+          "chapter": 4,
+          "descendants": true
+        },
+        {
+          "chapter": 7,
+          "descendants": true
+        },
+        {
+          "chapter": 9,
+          "descendants": true
+        },
+        {
+          "chapter": 10,
+          "descendants": true
+        }
+      ],
+      "LINE-common.md": "*",
+      "TERRITORIES.md": "*"
+    },
+    "words": {
+      "CODE.md": [
+        {
+          "chapter": 3,
+          "descendants": true
+        },
+        {
+          "chapter": 4,
+          "descendants": true
+        },
+        {
+          "chapter": 7,
+          "descendants": true
+        },
+        {
+          "chapter": 9,
+          "descendants": true
+        },
+        {
+          "chapter": 10,
+          "descendants": true
+        }
+      ],
+      "LINE-common.md": "*",
+      "TERRITORIES.md": "*"
+    },
+    "one-plugin": {
+      "CODE.md": [
+        {
+          "chapter": 1,
+          "descendants": true
+        },
+        {
+          "chapter": 2,
+          "descendants": true
+        },
+        {
+          "chapter": 3,
+          "descendants": true
+        },
+        {
+          "chapter": 4,
+          "descendants": true
+        },
+        {
+          "chapter": 5,
+          "descendants": true
+        },
+        {
+          "chapter": 7,
+          "descendants": true
+        },
+        {
+          "chapter": 9,
+          "descendants": true
+        }
+      ],
+      "LINE-common.md": "*",
+      "TERRITORIES.md": "*"
+    }
+  },
+  "territories": {
+    "src/web": {
+      "CODE.md": [
+        {
+          "chapter": 6,
+          "descendants": true
+        }
+      ]
+    },
+    "src/desktop": {
+      "CODE.md": [
+        {
+          "chapter": 6,
+          "descendants": true
+        }
+      ]
+    },
+    "plugins": {
+      "CODE.md": [
+        {
+          "chapter": 6,
+          "descendants": true
+        }
+      ]
+    }
+  }
+}

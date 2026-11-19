@@ -1,0 +1,4 @@
+{
+  "why": "The office keeps its runtime choices, this line's migration 0225 (wave 13r), renumbered to 0275 when it landed: one row for each runtime choice the office stores, by the setting's name, and one row for each agent granted the restart of the office, with the decision that grants it. Their own tables and not records, so no record door can file, change or delete one.",
+  "tables": ["runtime_settings", "office_restart_grants"]
+}

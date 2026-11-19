@@ -1,0 +1,6 @@
+{
+  "doors": [
+    "agent.handover"
+  ],
+  "why": "Reading an agent's handover asks, after the agent itself, its starter and the person, whether the grant carries the press. The agent's page and the read after a compaction read it by the same rule and do not ask the grant."
+}

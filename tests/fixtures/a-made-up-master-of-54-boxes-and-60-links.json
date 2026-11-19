@@ -1,0 +1,1572 @@
+{
+  "about": "A made-up master pipeline at its Boxes level with 54 boxes and 60 links in 8 areas, grown from the master in tests/fixtures/a-made-up-master-and-reel-in-lanes.json by a script kept outside the repository, on 16 November 2026. It keeps that master's 13 steps, the block pipeline hung on each, its 15 modules, its 8 areas and its 25 links, each record's kind, role and state, and each link's type, gate, inferred flag and ends. Twenty of its placed boxes, those with the most links first, each have a copy, box-35 to box-54, in the same block pipeline and the same area, placed after that area's last item, with the same state; \"copyOf\" names the box copied. Thirty-five more links are copies of the master's links, with one or both ends replaced by that end's copy; \"copyOf\" names the link copied by its place in \"links\". Every title, area name and carried word is made up; a title is about as long as the one it replaced, or the shortest plain one. Records are named by keys and no record id is kept. One box is stored with no state in the master it was grown from; here, as there, the office stores it as to do, since it stores no step without a state.",
+  "pipeline": {
+    "key": "master",
+    "title": "Example master of 54 boxes (made up)"
+  },
+  "steps": [
+    {
+      "key": "step-01",
+      "title": "Example step 01 with words (made up)",
+      "state": "done"
+    },
+    {
+      "key": "step-02",
+      "title": "Example step 02 with words that (made up)",
+      "state": "done"
+    },
+    {
+      "key": "step-03",
+      "title": "Example step 03 with words that (made up)",
+      "state": "done"
+    },
+    {
+      "key": "step-04",
+      "title": "Example step 04 (made up)",
+      "state": "done"
+    },
+    {
+      "key": "step-05",
+      "title": "Example step 05 with words (made up)",
+      "state": "done"
+    },
+    {
+      "key": "step-06",
+      "title": "Example step 06 with words (made up)",
+      "state": "done"
+    },
+    {
+      "key": "step-07",
+      "title": "Example step 07 (made up)",
+      "state": "done"
+    },
+    {
+      "key": "step-08",
+      "title": "Example step 08 with (made up)",
+      "state": "done"
+    },
+    {
+      "key": "step-09",
+      "title": "Example step 09 (made up)",
+      "state": "done"
+    },
+    {
+      "key": "step-10",
+      "title": "Example step 10 (made up)",
+      "state": "done"
+    },
+    {
+      "key": "step-11",
+      "title": "Example step 11 with words (made up)",
+      "state": "done"
+    },
+    {
+      "key": "step-12",
+      "title": "Example step 12 (made up)",
+      "state": "done"
+    },
+    {
+      "key": "step-13",
+      "title": "Example step 13 with words (made up)",
+      "state": "done"
+    }
+  ],
+  "waitsOn": [
+    {
+      "type": "blocks",
+      "from": "step-01",
+      "to": "step-04",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "blocks",
+      "from": "step-03",
+      "to": "step-02",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "blocks",
+      "from": "step-04",
+      "to": "step-05",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "blocks",
+      "from": "step-04",
+      "to": "step-06",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "blocks",
+      "from": "step-04",
+      "to": "step-07",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "blocks",
+      "from": "step-04",
+      "to": "step-08",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "blocks",
+      "from": "step-04",
+      "to": "step-09",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "blocks",
+      "from": "step-08",
+      "to": "step-09",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "blocks",
+      "from": "step-10",
+      "to": "step-04",
+      "gate": null,
+      "inferred": false
+    }
+  ],
+  "blockPipelines": [
+    {
+      "key": "block-01",
+      "title": "Example block pipeline 01 (made up)",
+      "partOf": "step-01",
+      "boxes": [
+        "box-01",
+        "box-35"
+      ]
+    },
+    {
+      "key": "block-02",
+      "title": "Example block pipeline 02 with words (made up)",
+      "partOf": "step-02",
+      "boxes": [
+        "box-02",
+        "box-03",
+        "box-36",
+        "box-37"
+      ]
+    },
+    {
+      "key": "block-03",
+      "title": "Example block pipeline 03 with (made up)",
+      "partOf": "step-03",
+      "boxes": [
+        "box-04",
+        "box-05",
+        "box-38",
+        "box-39"
+      ]
+    },
+    {
+      "key": "block-04",
+      "title": "Example block pipeline 04 (made up)",
+      "partOf": "step-04",
+      "boxes": [
+        "box-06"
+      ]
+    },
+    {
+      "key": "block-05",
+      "title": "Example block pipeline 05 with (made up)",
+      "partOf": "step-05",
+      "boxes": [
+        "box-07"
+      ]
+    },
+    {
+      "key": "block-06",
+      "title": "Example block pipeline 06 (made up)",
+      "partOf": "step-06",
+      "boxes": [
+        "box-08",
+        "box-09"
+      ]
+    },
+    {
+      "key": "block-07",
+      "title": "Example block pipeline 07 (made up)",
+      "partOf": "step-07",
+      "boxes": [
+        "box-10"
+      ]
+    },
+    {
+      "key": "block-08",
+      "title": "Example block pipeline 08 (made up)",
+      "partOf": "step-08",
+      "boxes": [
+        "box-11",
+        "box-12",
+        "box-13",
+        "box-14",
+        "box-15",
+        "box-16",
+        "box-17",
+        "box-18",
+        "box-40",
+        "box-41",
+        "box-42",
+        "box-43",
+        "box-44",
+        "box-45"
+      ]
+    },
+    {
+      "key": "block-09",
+      "title": "Example block pipeline 09 (made up)",
+      "partOf": "step-09",
+      "boxes": [
+        "box-19",
+        "box-20",
+        "box-21",
+        "box-22",
+        "box-23",
+        "box-24",
+        "box-46",
+        "box-47",
+        "box-48"
+      ]
+    },
+    {
+      "key": "block-10",
+      "title": "Example block pipeline 10 (made up)",
+      "partOf": "step-10",
+      "boxes": [
+        "box-25",
+        "box-26",
+        "box-27",
+        "box-28",
+        "box-49",
+        "box-50",
+        "box-51"
+      ]
+    },
+    {
+      "key": "block-11",
+      "title": "Example block pipeline 11 with (made up)",
+      "partOf": "step-11",
+      "boxes": [
+        "box-29",
+        "box-30",
+        "box-31",
+        "box-52",
+        "box-53"
+      ]
+    },
+    {
+      "key": "block-12",
+      "title": "Example block pipeline 12 (made up)",
+      "partOf": "step-12",
+      "boxes": [
+        "box-32",
+        "box-54"
+      ]
+    },
+    {
+      "key": "block-13",
+      "title": "Example block pipeline 13 (made up)",
+      "partOf": "step-13",
+      "boxes": [
+        "box-33",
+        "box-34"
+      ]
+    }
+  ],
+  "records": [
+    {
+      "key": "box-01",
+      "kind": "block",
+      "role": "box",
+      "state": "done",
+      "title": "Example box 01 (made up)"
+    },
+    {
+      "key": "box-02",
+      "kind": "block",
+      "role": "box",
+      "state": "blocked",
+      "title": "Example box 02 (made up)"
+    },
+    {
+      "key": "box-03",
+      "kind": "block",
+      "role": "box",
+      "state": "done",
+      "title": "Example box 03 (made up)"
+    },
+    {
+      "key": "box-04",
+      "kind": "block",
+      "role": "box",
+      "state": "done",
+      "title": "Example box 04 (made up)"
+    },
+    {
+      "key": "box-05",
+      "kind": "block",
+      "role": "box",
+      "state": "done",
+      "title": "Example box 05 (made up)"
+    },
+    {
+      "key": "box-06",
+      "kind": "block",
+      "role": "box",
+      "state": "done",
+      "title": "Example box 06 (made up)"
+    },
+    {
+      "key": "box-07",
+      "kind": "block",
+      "role": "box",
+      "state": "done",
+      "title": "Example box 07 (made up)"
+    },
+    {
+      "key": "box-08",
+      "kind": "block",
+      "role": "box",
+      "state": "done",
+      "title": "Example box 08 (made up)"
+    },
+    {
+      "key": "box-09",
+      "kind": "block",
+      "role": "box",
+      "state": "done",
+      "title": "Example box 09 (made up)"
+    },
+    {
+      "key": "box-10",
+      "kind": "block",
+      "role": "box",
+      "state": "done",
+      "title": "Example box 10 (made up)"
+    },
+    {
+      "key": "box-11",
+      "kind": "block",
+      "role": "box",
+      "state": "done",
+      "title": "Example box 11 (made up)"
+    },
+    {
+      "key": "box-12",
+      "kind": "block",
+      "role": "box",
+      "state": "done",
+      "title": "Example box 12 (made up)"
+    },
+    {
+      "key": "box-13",
+      "kind": "block",
+      "role": "box",
+      "state": "done",
+      "title": "Example box 13 (made up)"
+    },
+    {
+      "key": "box-14",
+      "kind": "block",
+      "role": "box",
+      "state": "done",
+      "title": "Example box 14 (made up)"
+    },
+    {
+      "key": "box-15",
+      "kind": "block",
+      "role": "box",
+      "state": "done",
+      "title": "Example box 15 (made up)"
+    },
+    {
+      "key": "box-16",
+      "kind": "block",
+      "role": "box",
+      "state": "done",
+      "title": "Example box 16 (made up)"
+    },
+    {
+      "key": "box-17",
+      "kind": "block",
+      "role": "box",
+      "state": "done",
+      "title": "Example box 17 (made up)"
+    },
+    {
+      "key": "box-18",
+      "kind": "block",
+      "role": "box",
+      "state": "done",
+      "title": "Example box 18 (made up)"
+    },
+    {
+      "key": "box-19",
+      "kind": "block",
+      "role": "box",
+      "state": "done",
+      "title": "Example box 19 (made up)"
+    },
+    {
+      "key": "box-20",
+      "kind": "block",
+      "role": "box",
+      "state": "done",
+      "title": "Example box 20 (made up)"
+    },
+    {
+      "key": "box-21",
+      "kind": "block",
+      "role": "box",
+      "state": "done",
+      "title": "Example box 21 (made up)"
+    },
+    {
+      "key": "box-22",
+      "kind": "block",
+      "role": "box",
+      "state": "done",
+      "title": "Example box 22 (made up)"
+    },
+    {
+      "key": "box-23",
+      "kind": "block",
+      "role": "box",
+      "state": "done",
+      "title": "Example box 23 (made up)"
+    },
+    {
+      "key": "box-24",
+      "kind": "block",
+      "role": "box",
+      "state": "done",
+      "title": "Example box 24 (made up)"
+    },
+    {
+      "key": "box-25",
+      "kind": "block",
+      "role": "box",
+      "state": "done",
+      "title": "Example box 25 (made up)"
+    },
+    {
+      "key": "box-26",
+      "kind": "block",
+      "role": "box",
+      "state": "done",
+      "title": "Example box 26 (made up)"
+    },
+    {
+      "key": "box-27",
+      "kind": "block",
+      "role": "box",
+      "state": "done",
+      "title": "Example box 27 (made up)"
+    },
+    {
+      "key": "box-28",
+      "kind": "block",
+      "role": "box",
+      "state": "done",
+      "title": "Example box 28 (made up)"
+    },
+    {
+      "key": "box-29",
+      "kind": "block",
+      "role": "box",
+      "state": "done",
+      "title": "Example box 29 (made up)"
+    },
+    {
+      "key": "box-30",
+      "kind": "block",
+      "role": "box",
+      "state": "done",
+      "title": "Example box 30 (made up)"
+    },
+    {
+      "key": "box-31",
+      "kind": "block",
+      "role": "box",
+      "state": "done",
+      "title": "Example box 31 (made up)"
+    },
+    {
+      "key": "box-32",
+      "kind": "block",
+      "role": "box",
+      "state": null,
+      "title": "Example box 32 (made up)"
+    },
+    {
+      "key": "box-33",
+      "kind": "block",
+      "role": "box",
+      "state": "done",
+      "title": "Example box 33 with (made up)"
+    },
+    {
+      "key": "box-34",
+      "kind": "block",
+      "role": "box",
+      "state": "done",
+      "title": "Example box 34 (made up)"
+    },
+    {
+      "key": "box-35",
+      "kind": "block",
+      "role": "box",
+      "state": "done",
+      "title": "Example box 35 (made up)",
+      "copyOf": "box-01"
+    },
+    {
+      "key": "box-36",
+      "kind": "block",
+      "role": "box",
+      "state": "blocked",
+      "title": "Example box 36 (made up)",
+      "copyOf": "box-02"
+    },
+    {
+      "key": "box-37",
+      "kind": "block",
+      "role": "box",
+      "state": "done",
+      "title": "Example box 37 (made up)",
+      "copyOf": "box-03"
+    },
+    {
+      "key": "box-38",
+      "kind": "block",
+      "role": "box",
+      "state": "done",
+      "title": "Example box 38 (made up)",
+      "copyOf": "box-04"
+    },
+    {
+      "key": "box-39",
+      "kind": "block",
+      "role": "box",
+      "state": "done",
+      "title": "Example box 39 (made up)",
+      "copyOf": "box-05"
+    },
+    {
+      "key": "box-40",
+      "kind": "block",
+      "role": "box",
+      "state": "done",
+      "title": "Example box 40 (made up)",
+      "copyOf": "box-11"
+    },
+    {
+      "key": "box-41",
+      "kind": "block",
+      "role": "box",
+      "state": "done",
+      "title": "Example box 41 (made up)",
+      "copyOf": "box-14"
+    },
+    {
+      "key": "box-42",
+      "kind": "block",
+      "role": "box",
+      "state": "done",
+      "title": "Example box 42 (made up)",
+      "copyOf": "box-15"
+    },
+    {
+      "key": "box-43",
+      "kind": "block",
+      "role": "box",
+      "state": "done",
+      "title": "Example box 43 (made up)",
+      "copyOf": "box-16"
+    },
+    {
+      "key": "box-44",
+      "kind": "block",
+      "role": "box",
+      "state": "done",
+      "title": "Example box 44 (made up)",
+      "copyOf": "box-17"
+    },
+    {
+      "key": "box-45",
+      "kind": "block",
+      "role": "box",
+      "state": "done",
+      "title": "Example box 45 (made up)",
+      "copyOf": "box-18"
+    },
+    {
+      "key": "box-46",
+      "kind": "block",
+      "role": "box",
+      "state": "done",
+      "title": "Example box 46 (made up)",
+      "copyOf": "box-21"
+    },
+    {
+      "key": "box-47",
+      "kind": "block",
+      "role": "box",
+      "state": "done",
+      "title": "Example box 47 (made up)",
+      "copyOf": "box-22"
+    },
+    {
+      "key": "box-48",
+      "kind": "block",
+      "role": "box",
+      "state": "done",
+      "title": "Example box 48 (made up)",
+      "copyOf": "box-23"
+    },
+    {
+      "key": "box-49",
+      "kind": "block",
+      "role": "box",
+      "state": "done",
+      "title": "Example box 49 (made up)",
+      "copyOf": "box-26"
+    },
+    {
+      "key": "box-50",
+      "kind": "block",
+      "role": "box",
+      "state": "done",
+      "title": "Example box 50 (made up)",
+      "copyOf": "box-27"
+    },
+    {
+      "key": "box-51",
+      "kind": "block",
+      "role": "box",
+      "state": "done",
+      "title": "Example box 51 (made up)",
+      "copyOf": "box-28"
+    },
+    {
+      "key": "box-52",
+      "kind": "block",
+      "role": "box",
+      "state": "done",
+      "title": "Example box 52 (made up)",
+      "copyOf": "box-29"
+    },
+    {
+      "key": "box-53",
+      "kind": "block",
+      "role": "box",
+      "state": "done",
+      "title": "Example box 53 (made up)",
+      "copyOf": "box-30"
+    },
+    {
+      "key": "box-54",
+      "kind": "block",
+      "role": "box",
+      "state": null,
+      "title": "Example box 54 (made up)",
+      "copyOf": "box-32"
+    },
+    {
+      "key": "module-01",
+      "kind": "module",
+      "role": "module",
+      "state": null,
+      "title": "Example module 01 (made up)"
+    },
+    {
+      "key": "module-02",
+      "kind": "module",
+      "role": "module",
+      "state": null,
+      "title": "Example module 02 (made up)"
+    },
+    {
+      "key": "module-03",
+      "kind": "module",
+      "role": "module",
+      "state": null,
+      "title": "Example module 03 (made up)"
+    },
+    {
+      "key": "module-04",
+      "kind": "module",
+      "role": "module",
+      "state": null,
+      "title": "Example module 04 (made up)"
+    },
+    {
+      "key": "module-05",
+      "kind": "module",
+      "role": "module",
+      "state": null,
+      "title": "Example module 05 (made up)"
+    },
+    {
+      "key": "module-06",
+      "kind": "module",
+      "role": "module",
+      "state": null,
+      "title": "Example module 06 (made up)"
+    },
+    {
+      "key": "module-07",
+      "kind": "module",
+      "role": "module",
+      "state": null,
+      "title": "Example module 07 (made up)"
+    },
+    {
+      "key": "module-08",
+      "kind": "module",
+      "role": "module",
+      "state": null,
+      "title": "Example module 08 (made up)"
+    },
+    {
+      "key": "module-09",
+      "kind": "module",
+      "role": "module",
+      "state": null,
+      "title": "Example module 09 (made up)"
+    },
+    {
+      "key": "module-10",
+      "kind": "module",
+      "role": "module",
+      "state": null,
+      "title": "Example module 10 (made up)"
+    },
+    {
+      "key": "module-11",
+      "kind": "module",
+      "role": "module",
+      "state": null,
+      "title": "Example module 11 (made up)"
+    },
+    {
+      "key": "module-12",
+      "kind": "module",
+      "role": "module",
+      "state": null,
+      "title": "Example module 12 (made up)"
+    },
+    {
+      "key": "module-13",
+      "kind": "module",
+      "role": "module",
+      "state": null,
+      "title": "Example module 13 (made up)"
+    },
+    {
+      "key": "module-14",
+      "kind": "module",
+      "role": "module",
+      "state": null,
+      "title": "Example module 14 (made up)"
+    },
+    {
+      "key": "module-15",
+      "kind": "module",
+      "role": "module",
+      "state": null,
+      "title": "Example module 15 (made up)"
+    }
+  ],
+  "links": [
+    {
+      "type": "feeds",
+      "from": "box-02",
+      "to": "box-29",
+      "gate": null,
+      "inferred": false,
+      "carries": "example words 1"
+    },
+    {
+      "type": "feeds",
+      "from": "box-14",
+      "to": "box-15",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "feeds",
+      "from": "box-15",
+      "to": "box-16",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "feeds",
+      "from": "box-22",
+      "to": "box-23",
+      "gate": null,
+      "inferred": false,
+      "carries": "example words 2"
+    },
+    {
+      "type": "feeds",
+      "from": "box-26",
+      "to": "box-27",
+      "gate": null,
+      "inferred": false,
+      "carries": "example words 3"
+    },
+    {
+      "type": "feeds",
+      "from": "box-28",
+      "to": "box-27",
+      "gate": null,
+      "inferred": false,
+      "carries": "example words 4"
+    },
+    {
+      "type": "feeds",
+      "from": "box-32",
+      "to": "box-03",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "feeds",
+      "from": "module-01",
+      "to": "box-03",
+      "gate": null,
+      "inferred": false,
+      "carries": "example words 5"
+    },
+    {
+      "type": "feeds",
+      "from": "module-04",
+      "to": "box-18",
+      "gate": null,
+      "inferred": false,
+      "carries": "example words 6"
+    },
+    {
+      "type": "feeds",
+      "from": "module-01",
+      "to": "module-02",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "feeds",
+      "from": "module-02",
+      "to": "module-03",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "feeds",
+      "from": "module-03",
+      "to": "module-04",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "feeds",
+      "from": "box-03",
+      "to": "module-08",
+      "gate": null,
+      "inferred": false,
+      "carries": "example words 7"
+    },
+    {
+      "type": "feeds",
+      "from": "box-18",
+      "to": "module-08",
+      "gate": null,
+      "inferred": false,
+      "carries": "example words 8"
+    },
+    {
+      "type": "feeds",
+      "from": "box-14",
+      "to": "module-08",
+      "gate": null,
+      "inferred": false,
+      "carries": "example words 9"
+    },
+    {
+      "type": "feeds",
+      "from": "box-21",
+      "to": "module-08",
+      "gate": null,
+      "inferred": false,
+      "carries": "example words 10"
+    },
+    {
+      "type": "feeds",
+      "from": "box-22",
+      "to": "module-08",
+      "gate": null,
+      "inferred": false,
+      "carries": "example words 11"
+    },
+    {
+      "type": "feeds",
+      "from": "box-29",
+      "to": "module-08",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "feeds",
+      "from": "box-30",
+      "to": "module-08",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "feeds",
+      "from": "module-08",
+      "to": "box-11",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "feeds",
+      "from": "module-08",
+      "to": "box-01",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "feeds",
+      "from": "box-16",
+      "to": "module-05",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "feeds",
+      "from": "box-22",
+      "to": "module-06",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "feeds",
+      "from": "box-17",
+      "to": "module-07",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "blocks",
+      "from": "box-03",
+      "to": "box-02",
+      "gate": "hard",
+      "inferred": false
+    },
+    {
+      "type": "feeds",
+      "from": "box-36",
+      "to": "box-52",
+      "gate": null,
+      "inferred": false,
+      "carries": "example words 12",
+      "copyOf": 0
+    },
+    {
+      "type": "feeds",
+      "from": "box-41",
+      "to": "box-42",
+      "gate": null,
+      "inferred": false,
+      "copyOf": 1
+    },
+    {
+      "type": "feeds",
+      "from": "box-42",
+      "to": "box-43",
+      "gate": null,
+      "inferred": false,
+      "copyOf": 2
+    },
+    {
+      "type": "feeds",
+      "from": "box-47",
+      "to": "box-48",
+      "gate": null,
+      "inferred": false,
+      "carries": "example words 13",
+      "copyOf": 3
+    },
+    {
+      "type": "feeds",
+      "from": "box-49",
+      "to": "box-50",
+      "gate": null,
+      "inferred": false,
+      "carries": "example words 14",
+      "copyOf": 4
+    },
+    {
+      "type": "feeds",
+      "from": "box-51",
+      "to": "box-50",
+      "gate": null,
+      "inferred": false,
+      "carries": "example words 15",
+      "copyOf": 5
+    },
+    {
+      "type": "feeds",
+      "from": "box-54",
+      "to": "box-37",
+      "gate": null,
+      "inferred": false,
+      "copyOf": 6
+    },
+    {
+      "type": "blocks",
+      "from": "box-37",
+      "to": "box-36",
+      "gate": "hard",
+      "inferred": false,
+      "copyOf": 24
+    },
+    {
+      "type": "feeds",
+      "from": "box-36",
+      "to": "box-29",
+      "gate": null,
+      "inferred": false,
+      "carries": "example words 16",
+      "copyOf": 0
+    },
+    {
+      "type": "feeds",
+      "from": "box-41",
+      "to": "box-15",
+      "gate": null,
+      "inferred": false,
+      "copyOf": 1
+    },
+    {
+      "type": "feeds",
+      "from": "box-42",
+      "to": "box-16",
+      "gate": null,
+      "inferred": false,
+      "copyOf": 2
+    },
+    {
+      "type": "feeds",
+      "from": "box-47",
+      "to": "box-23",
+      "gate": null,
+      "inferred": false,
+      "carries": "example words 17",
+      "copyOf": 3
+    },
+    {
+      "type": "feeds",
+      "from": "box-49",
+      "to": "box-27",
+      "gate": null,
+      "inferred": false,
+      "carries": "example words 18",
+      "copyOf": 4
+    },
+    {
+      "type": "feeds",
+      "from": "box-51",
+      "to": "box-27",
+      "gate": null,
+      "inferred": false,
+      "carries": "example words 19",
+      "copyOf": 5
+    },
+    {
+      "type": "feeds",
+      "from": "box-54",
+      "to": "box-03",
+      "gate": null,
+      "inferred": false,
+      "copyOf": 6
+    },
+    {
+      "type": "feeds",
+      "from": "box-37",
+      "to": "module-08",
+      "gate": null,
+      "inferred": false,
+      "carries": "example words 20",
+      "copyOf": 12
+    },
+    {
+      "type": "feeds",
+      "from": "box-45",
+      "to": "module-08",
+      "gate": null,
+      "inferred": false,
+      "carries": "example words 21",
+      "copyOf": 13
+    },
+    {
+      "type": "feeds",
+      "from": "box-41",
+      "to": "module-08",
+      "gate": null,
+      "inferred": false,
+      "carries": "example words 22",
+      "copyOf": 14
+    },
+    {
+      "type": "feeds",
+      "from": "box-46",
+      "to": "module-08",
+      "gate": null,
+      "inferred": false,
+      "carries": "example words 23",
+      "copyOf": 15
+    },
+    {
+      "type": "feeds",
+      "from": "box-47",
+      "to": "module-08",
+      "gate": null,
+      "inferred": false,
+      "carries": "example words 24",
+      "copyOf": 16
+    },
+    {
+      "type": "feeds",
+      "from": "box-52",
+      "to": "module-08",
+      "gate": null,
+      "inferred": false,
+      "copyOf": 17
+    },
+    {
+      "type": "feeds",
+      "from": "box-53",
+      "to": "module-08",
+      "gate": null,
+      "inferred": false,
+      "copyOf": 18
+    },
+    {
+      "type": "feeds",
+      "from": "box-43",
+      "to": "module-05",
+      "gate": null,
+      "inferred": false,
+      "copyOf": 21
+    },
+    {
+      "type": "feeds",
+      "from": "box-47",
+      "to": "module-06",
+      "gate": null,
+      "inferred": false,
+      "copyOf": 22
+    },
+    {
+      "type": "feeds",
+      "from": "box-44",
+      "to": "module-07",
+      "gate": null,
+      "inferred": false,
+      "copyOf": 23
+    },
+    {
+      "type": "blocks",
+      "from": "box-37",
+      "to": "box-02",
+      "gate": "hard",
+      "inferred": false,
+      "copyOf": 24
+    },
+    {
+      "type": "feeds",
+      "from": "box-02",
+      "to": "box-52",
+      "gate": null,
+      "inferred": false,
+      "carries": "example words 25",
+      "copyOf": 0
+    },
+    {
+      "type": "feeds",
+      "from": "box-14",
+      "to": "box-42",
+      "gate": null,
+      "inferred": false,
+      "copyOf": 1
+    },
+    {
+      "type": "feeds",
+      "from": "box-15",
+      "to": "box-43",
+      "gate": null,
+      "inferred": false,
+      "copyOf": 2
+    },
+    {
+      "type": "feeds",
+      "from": "box-22",
+      "to": "box-48",
+      "gate": null,
+      "inferred": false,
+      "carries": "example words 26",
+      "copyOf": 3
+    },
+    {
+      "type": "feeds",
+      "from": "box-26",
+      "to": "box-50",
+      "gate": null,
+      "inferred": false,
+      "carries": "example words 27",
+      "copyOf": 4
+    },
+    {
+      "type": "feeds",
+      "from": "box-28",
+      "to": "box-50",
+      "gate": null,
+      "inferred": false,
+      "carries": "example words 28",
+      "copyOf": 5
+    },
+    {
+      "type": "feeds",
+      "from": "box-32",
+      "to": "box-37",
+      "gate": null,
+      "inferred": false,
+      "copyOf": 6
+    },
+    {
+      "type": "feeds",
+      "from": "module-01",
+      "to": "box-37",
+      "gate": null,
+      "inferred": false,
+      "carries": "example words 29",
+      "copyOf": 7
+    },
+    {
+      "type": "feeds",
+      "from": "module-04",
+      "to": "box-45",
+      "gate": null,
+      "inferred": false,
+      "carries": "example words 30",
+      "copyOf": 8
+    }
+  ],
+  "placement": {
+    "direction": "down",
+    "lanes": [
+      {
+        "name": "Area A",
+        "arrange": "row",
+        "order": 1,
+        "tint": "--area-1"
+      },
+      {
+        "name": "Area B",
+        "arrange": "row",
+        "order": 2,
+        "tint": "--area-2"
+      },
+      {
+        "name": "Example C",
+        "arrange": "stack",
+        "order": 3,
+        "head": "module-08"
+      },
+      {
+        "name": "Example area D",
+        "arrange": "grid",
+        "order": 2,
+        "in": "Example C",
+        "columns": 3,
+        "tint": "--area-4"
+      },
+      {
+        "name": "Area E",
+        "arrange": "stack",
+        "order": 4,
+        "beside": "left",
+        "of": "Example C",
+        "tint": "--area-3"
+      },
+      {
+        "name": "Area F",
+        "arrange": "stack",
+        "order": 5,
+        "beside": "right",
+        "of": "Example C",
+        "tint": "--area-5"
+      },
+      {
+        "name": "Area G",
+        "arrange": "stack",
+        "order": 6,
+        "beside": "right",
+        "of": "Area F"
+      },
+      {
+        "name": "Area H",
+        "arrange": "row",
+        "order": 7,
+        "tint": "--area-6"
+      }
+    ],
+    "nodes": {
+      "module-01": {
+        "lane": "Area A",
+        "order": 1
+      },
+      "module-02": {
+        "lane": "Area A",
+        "order": 2
+      },
+      "module-03": {
+        "lane": "Area A",
+        "order": 3
+      },
+      "module-04": {
+        "lane": "Area A",
+        "order": 4
+      },
+      "box-02": {
+        "lane": "Area B",
+        "order": 1
+      },
+      "box-03": {
+        "lane": "Area B",
+        "order": 2
+      },
+      "box-32": {
+        "lane": "Area B",
+        "order": 3
+      },
+      "box-18": {
+        "lane": "Area B",
+        "order": 4
+      },
+      "box-04": {
+        "lane": "Example C",
+        "order": 1
+      },
+      "box-06": {
+        "lane": "Example area D",
+        "order": 1
+      },
+      "box-08": {
+        "lane": "Example area D",
+        "order": 2
+      },
+      "box-07": {
+        "lane": "Example area D",
+        "order": 3
+      },
+      "box-05": {
+        "lane": "Example area D",
+        "order": 4
+      },
+      "box-10": {
+        "lane": "Example area D",
+        "order": 5
+      },
+      "box-19": {
+        "lane": "Example area D",
+        "order": 6
+      },
+      "box-20": {
+        "lane": "Example area D",
+        "order": 7
+      },
+      "box-12": {
+        "lane": "Example area D",
+        "order": 8
+      },
+      "box-31": {
+        "lane": "Example area D",
+        "order": 9
+      },
+      "box-13": {
+        "lane": "Example area D",
+        "order": 10
+      },
+      "box-09": {
+        "lane": "Example area D",
+        "order": 11
+      },
+      "box-25": {
+        "lane": "Example area D",
+        "order": 12
+      },
+      "box-26": {
+        "lane": "Example C",
+        "order": 3
+      },
+      "box-29": {
+        "lane": "Area E",
+        "order": 1
+      },
+      "box-11": {
+        "lane": "Area E",
+        "order": 2
+      },
+      "box-30": {
+        "lane": "Area E",
+        "order": 3
+      },
+      "box-01": {
+        "lane": "Area E",
+        "order": 4
+      },
+      "box-14": {
+        "lane": "Area F",
+        "order": 1
+      },
+      "box-15": {
+        "lane": "Area F",
+        "order": 2
+      },
+      "box-16": {
+        "lane": "Area F",
+        "order": 3
+      },
+      "box-21": {
+        "lane": "Area F",
+        "order": 4
+      },
+      "box-22": {
+        "lane": "Area F",
+        "order": 5
+      },
+      "box-17": {
+        "lane": "Area F",
+        "order": 6
+      },
+      "module-05": {
+        "lane": "Area G",
+        "order": 1
+      },
+      "module-06": {
+        "lane": "Area G",
+        "order": 2
+      },
+      "module-07": {
+        "lane": "Area G",
+        "order": 3
+      },
+      "box-28": {
+        "lane": "Area H",
+        "order": 1
+      },
+      "box-27": {
+        "lane": "Area H",
+        "order": 2
+      },
+      "box-23": {
+        "lane": "Area H",
+        "order": 3
+      },
+      "box-35": {
+        "lane": "Area E",
+        "order": 5
+      },
+      "box-36": {
+        "lane": "Area B",
+        "order": 5
+      },
+      "box-37": {
+        "lane": "Area B",
+        "order": 6
+      },
+      "box-38": {
+        "lane": "Example C",
+        "order": 4
+      },
+      "box-39": {
+        "lane": "Example area D",
+        "order": 13
+      },
+      "box-40": {
+        "lane": "Area E",
+        "order": 6
+      },
+      "box-41": {
+        "lane": "Area F",
+        "order": 7
+      },
+      "box-42": {
+        "lane": "Area F",
+        "order": 8
+      },
+      "box-43": {
+        "lane": "Area F",
+        "order": 9
+      },
+      "box-44": {
+        "lane": "Area F",
+        "order": 10
+      },
+      "box-45": {
+        "lane": "Area B",
+        "order": 7
+      },
+      "box-46": {
+        "lane": "Area F",
+        "order": 11
+      },
+      "box-47": {
+        "lane": "Area F",
+        "order": 12
+      },
+      "box-48": {
+        "lane": "Area H",
+        "order": 4
+      },
+      "box-49": {
+        "lane": "Example C",
+        "order": 5
+      },
+      "box-50": {
+        "lane": "Area H",
+        "order": 5
+      },
+      "box-51": {
+        "lane": "Area H",
+        "order": 6
+      },
+      "box-52": {
+        "lane": "Area E",
+        "order": 7
+      },
+      "box-53": {
+        "lane": "Area E",
+        "order": 8
+      },
+      "box-54": {
+        "lane": "Area B",
+        "order": 8
+      }
+    }
+  }
+}

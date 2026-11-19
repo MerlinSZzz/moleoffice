@@ -1,0 +1,17 @@
+{
+  "doors": [
+    "terminals.list",
+    "terminals.read",
+    "terminals.type",
+    "terminals.resize",
+    "terminals.start-holder",
+    "terminals.restart-holder",
+    "terminals.last-line",
+    "terminals.keeping",
+    "terminals.set-keeping",
+    "terminals.open",
+    "terminals.close",
+    "terminals.keep-line"
+  ],
+  "why": "The list and agent-terminal streams check the secretary's own key first. Manual streams and other terminal mutations retain their grant guards. Typing keeps its exact-line words or grant check."
+}

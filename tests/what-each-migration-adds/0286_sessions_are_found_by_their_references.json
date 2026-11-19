@@ -1,0 +1,11 @@
+{
+  "why": "Round 63 of wave 13y: listed people and work views find session reference candidates by index before applying the unchanged JSON narrowing. No table, column, trigger or write changes.",
+  "indexesAddedAfterTheRebuild": {
+    "records": [
+      "records_session_serving_agent_id_idx",
+      "records_session_serving_agent_idx",
+      "records_session_first_binding_agent_idx",
+      "records_session_reference_fallback_idx"
+    ]
+  }
+}

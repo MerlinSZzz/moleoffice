@@ -1,0 +1,8 @@
+{
+  "doors": [
+    "delegation.confirm",
+    "delegation.take",
+    "delegation.return"
+  ],
+  "why": "Confirming a delegation package, taking a package outside the office and returning one all ask whether a raise carries the press."
+}

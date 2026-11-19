@@ -1,0 +1,13 @@
+-- A SENT REVIEW'S RUNS THAT NO WORKER TOOK ARE WITHDRAWN, AND THEIR KEYS ARE REVOKED. Wave 13u round 19, decision
+-- madeUpwxbpkd and argus's answers yMYX20nfBuep and 69_KJoAwXeKg.
+--
+-- THIS FILE CHANGES NO TABLE AND WRITES NO ROW. The work is the data step in
+-- src/server/db/withdraw-review-runs-migration.ts, which `npm run db:migrate` runs after every file here, and which
+-- does its work only in the run that applies this file. tests/migration.test.ts allows no UPDATE in a migration file
+-- that is not on its REBUILDS list, and a rewrite of stored values is a data step under decision 13.
+--
+-- WHY THE FILE EXISTS. Every data step runs on every migration, and this one must run once: a run the person starts
+-- later in a sent review's conversation is a real request. The journal row drizzle writes for this file is what says
+-- the work was done. A landing also runs `npm run db:migrate` only when the landed commits bring a file under drizzle/
+-- (tools/merge-tool/land.mjs). So this file carries the one statement below, which reads and writes nothing.
+SELECT 1;

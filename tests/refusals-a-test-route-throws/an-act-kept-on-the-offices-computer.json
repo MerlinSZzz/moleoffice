@@ -1,0 +1,11 @@
+{
+  "why": "The hook that keeps an act on this computer answers only a request from another machine, which an injected request never is. tests/the-person-makes-their-decisions-from-another-computer.test.ts meets it through the real second listener.",
+  "refusals": [
+    {
+      "code": "keptOnTheOfficesComputer",
+      "status": 403,
+      "english": "Test: kept on the computer the office runs on.",
+      "values": {}
+    }
+  ]
+}

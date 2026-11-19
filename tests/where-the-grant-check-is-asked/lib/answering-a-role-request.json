@@ -1,0 +1,7 @@
+{
+  "doors": [
+    "role.request",
+    "one-press.agree"
+  ],
+  "why": "Answering a role request asks whether a raise carries the press, from its own door and from the one-press act that agrees to it. The route in src/server/api/roles.ts and the person's one press in src/server/lib/one-press.ts both run this answer."
+}

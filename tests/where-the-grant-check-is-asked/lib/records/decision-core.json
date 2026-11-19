@@ -1,0 +1,31 @@
+{
+  "doors": [
+    "record.write",
+    "record.check",
+    "record.change",
+    "record.remove",
+    "record.restore",
+    "record.promote",
+    "record.move",
+    "record.choose-again",
+    "record.checklist",
+    "revision.restore",
+    "toolset.confirm",
+    "record:regulation",
+    "record:decision",
+    "link.write",
+    "link.remove",
+    "act.revoke",
+    "plan.time",
+    "plan.write",
+    "plan:committing-hours",
+    "implementation.accept",
+    "implementation.write",
+    "implementation.repository-write",
+    "import.accept",
+    "restriction.judge",
+    "role.request",
+    "one-press.agree"
+  ],
+  "why": "The doors are the ones the entry for records.ts named when these calls were there, copied when the code moved into this file; they were not traced again for it. The call is aRaiseCarriesIt inside thePersonIsFilingThisSession, which the record write that files a session reaches."
+}

@@ -1,0 +1,17 @@
+-- WHETHER THE MERGE TOOL RUNS AN ENTRY'S RELATED TESTS BEFORE ITS WHOLE SUITE. Round 17c of wave 13v, on the owner's
+-- decision madeUpliamvk, part B. The owner was told part B would not go live until it no longer slows anything
+-- (message xTBpZSUFC-Qi), so it is off until somebody switches it on.
+--
+-- A COLUMN ON `installation`, because it is one fact about the office, as 0175 and 0208 put the office's other
+-- settings there. It is not one of the owner's decided numbers, so the secretary card may switch it, with a reason.
+--
+-- NULL MEANS NOBODY HAS CHOSEN, and it reads as off. 1 is on and 0 is off. The one reader and writer is
+-- src/server/lib/related-tests-first.ts, and it refuses any other value.
+--
+-- IT IS 0213, INDEX 213, AND NOT 0212. The live office already holds wave 13p's 0212 (entry aKWEE_-0OCN2), which a
+-- landing applied there before it was withdrawn, so 0212 is that migration's number. Since round 17d a migration from
+-- index 212 on is applied because its hash is missing, not because its "when" is later (src/config/migration-look.mjs),
+-- so this one's "when", 1791368770081, decides nothing.
+--
+-- ADDITIVE, AND IT REWRITES NOTHING. One ALTER TABLE ADD COLUMN and no UPDATE.
+ALTER TABLE `installation` ADD COLUMN `related_tests_first` integer;

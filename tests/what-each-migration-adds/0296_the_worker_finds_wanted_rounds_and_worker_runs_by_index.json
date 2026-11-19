@@ -1,0 +1,9 @@
+{
+  "why": "Round 74 of wave 13y: two indexes of the session records, each partial to the kind and to one stored field: a run whose next round is wanted, and a run whose data holds worker runs. The message worker finds the rounds and the worker runs to start through them, rather than reading every run of the project. No table, column, trigger or write changes.",
+  "indexesAddedAfterTheRebuild": {
+    "records": [
+      "records_session_wants_a_next_round_idx",
+      "records_session_holds_worker_runs_idx"
+    ]
+  }
+}

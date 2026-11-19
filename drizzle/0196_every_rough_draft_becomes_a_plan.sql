@@ -1,0 +1,26 @@
+-- EVERY ROUGH DRAFT BECOMES A PLAN.
+--
+-- Rough thinking was kept in two stores, `planning_drafts` and `plans`. This file
+-- carries out the migration an earlier report proposed.
+-- drizzle/0010_plans.sql said the move belongs in the same change as the removal of the drafts
+-- routes, so that at no moment is a draft stored twice; this is that change.
+--
+-- THIS FILE ADDS ONE COLUMN AND MOVES NO ROW. The move is a data step,
+-- src/server/db/drafts-into-plans-migration.ts, which `npm run db:migrate` runs after every SQL
+-- migration, inside the one transaction all the data steps share. It cannot be SQL, for two reasons:
+--   1. A draft is moved only when its title and every line meet a plan's limits, and the line limit
+--      is a word budget counted by `whyALineIsOverItsBudget` in src/shared/planline.ts. Counting it
+--      again in SQL would be the same rule in two places.
+--   2. A draft that does not meet them stays where it is, and the table stays with it. So whether
+--      `planning_drafts` is dropped depends on what the step found, and a SQL file cannot ask.
+-- That is also why this file does not drop `planning_drafts`: the step drops it once it is empty.
+--
+-- `plans.moved_from_draft`: THE DRAFT A PLAN WAS, or NULL because it was written as a plan. The
+-- step keeps a draft's id as its plan's id when no plan holds that id, and gives it a new one when a
+-- plan does. This column is the mapping in both cases, and the one place an old draft id is
+-- resolved to the plan it became. src/server/db/schema.ts says the rest.
+--
+-- A RENUMBER IS A FILE NAME AND A JOURNAL LINE. Nothing in this file or in the code names its number.
+ALTER TABLE `plans` ADD `moved_from_draft` text;
+--> statement-breakpoint
+CREATE UNIQUE INDEX IF NOT EXISTS `plans_moved_from_draft_idx` ON `plans` (`moved_from_draft`) WHERE `moved_from_draft` IS NOT NULL;

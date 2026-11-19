@@ -1,0 +1,16 @@
+-- A PERSON'S OWN SETTINGS FOR THE TWO FLAGS THE OFFICE SHIPS, AND FOR THE MENU'S 'NO MARK' ENTRY, for one person.
+--
+-- `shipped_flags` holds JSON: one object keyed by `just-ask`, `proposal-first` and `none`. Each of the
+-- first two may hold a name, a description, an instruction, a short word, a colour and a words colour.
+-- `none` holds only a name, because the entry that takes a flag off hands the agent nothing. A thing
+-- left out is the office's default, so an empty object is every default. The limits and the colour set
+-- are declared once in `src/shared/intent-mark.ts` and `src/shared/message-label.ts`, and the office
+-- reads every value with the one reader in `src/shared/intent-mark.ts` before it stores one.
+--
+-- IT IS A COLUMN ON `people` AND NOT A TABLE OF ITS OWN, for the reason `chat_labels` beside it gives:
+-- it is one person's settings, held as JSON, and it follows the person to any machine rather than
+-- staying in one browser.
+--
+-- NULL MEANS NOBODY HAS CHANGED THE SHIPPED TWO OR THE NO MARK ENTRY, and their defaults then hold.
+-- There is no CHECK constraint here, as `chat_labels` has none: the one reading of the JSON is in the code.
+ALTER TABLE `people` ADD `shipped_flags` text;

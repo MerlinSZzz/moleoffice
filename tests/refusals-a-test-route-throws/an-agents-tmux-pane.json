@@ -1,0 +1,23 @@
+{
+  "why": "An agent's tmux pane (wave 13u, round 10, way B): these three need a process on a terminal, and a tmux or none, which no door here can meet without starting one. tests/an-agents-tmux-pane-is-watched-without-moving-the-persons.test.ts meets the first two through the door.",
+  "refusals": [
+    {
+      "code": "paneNotInATerminal",
+      "status": 409,
+      "english": "Test: the agent's process has no terminal.",
+      "values": {}
+    },
+    {
+      "code": "paneNotInTmux",
+      "status": 409,
+      "english": "Test: the agent's terminal is no tmux pane.",
+      "values": {}
+    },
+    {
+      "code": "paneNoTmux",
+      "status": 409,
+      "english": "Test: tmux is not on the PATH of this server.",
+      "values": {}
+    }
+  ]
+}

@@ -1,0 +1,28 @@
+-- THE REVISIONS OF ONE KIND IN A PROJECT ARE FOUND WITHOUT READING THE PROJECT'S OTHER REVISIONS. Wave 13y round 144,
+-- item 82c.
+--
+-- The record page's history (`historyEvents` in src/server/lib/history.ts) reads every pipeline revision of the
+-- project. Seven more reads ask for the first revisions of one kind in a project: the take-back checks in
+-- src/server/lib/take-back.ts and src/server/lib/merge-queue.ts, three reads in
+-- src/server/lib/stable-bootstrap-authority.ts and two in src/server/lib/records.ts. No index of the table held the
+-- kind, so SQLite read every revision of the project by `revisions_workspace_at_idx` and kept those of the kind asked.
+--
+--   revisions_kind_workspace_seq_idx  every revision, by its kind, then its project, then its place in its record.
+--
+-- The kind comes first, so a read that asks for a project alone keeps `revisions_workspace_at_idx`. With the project
+-- first, SQLite chose the new index for some of those reads as well. Four reads that ask for one kind in every
+-- project, three in src/server/lib/stable-bootstrap-authority.ts and one in src/server/lib/keys.ts, search it by the
+-- kind.
+--
+-- MEASURED on the made-up office of 4 November 2026 (476,105 revisions; 385,431 in its largest project, 335 of them
+-- pipeline). With the database's pages not in memory, GET /api/records/:id/history answered in 9.2 and 9.1 s before and
+-- in 265 and 275 ms after, with the same answer by hash. With them in memory, it answered in 363 and 361 ms before and
+-- in 103 and 101 ms after. The take-back check took 8.8 s before and 293 ms after with the pages not in memory, and
+-- 305 ms and 5 ms with them. The index there is 13,103,104 bytes, about 28 a revision, beside 3,452,358,656 for the
+-- table. It was built in 8.4 s with the pages not in memory. A revision written took about 1.4 microseconds longer
+-- with it.
+--
+-- The index is not unique, and it changes no row.
+--
+-- ADDITIVE, AND IT REWRITES NOTHING. One CREATE INDEX statement and no UPDATE.
+CREATE INDEX IF NOT EXISTS `revisions_kind_workspace_seq_idx` ON `revisions` (`kind`,`workspace_id`,`seq`);

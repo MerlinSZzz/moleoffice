@@ -1,0 +1,6 @@
+{
+  "doors": [
+    "office.set-dead-letter-thresholds"
+  ],
+  "why": "The door that changes when a message counts as undelivered asks whether the secretary acts for the person before it writes the change: on the person's words for the exact values, or else the person's grant."
+}

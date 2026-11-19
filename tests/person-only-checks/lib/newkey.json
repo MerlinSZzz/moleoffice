@@ -1,0 +1,5 @@
+{
+  "sort": "kept",
+  "checks": 2,
+  "why": "a lost agent's new key is given by the owner or by its starter, and nobody else"
+}

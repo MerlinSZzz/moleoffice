@@ -1,0 +1,22 @@
+-- TWO INDEXES, SO THE WORKER FINDS THE RUNS THAT WANT A NEXT ROUND OR A WORKER RUN AND NOT EVERY RUN OF THE PROJECT.
+--
+-- Round 74 of wave 13y. On every pass the message worker asks which runs want a next round (`theRoundsToStart` in
+-- src/server/lib/next-round.ts) and which want a worker run (`theWorkerRunsToStart` in src/server/lib/worker-runs.ts).
+-- Each read every session record of the project, whole, to find the few that do. Each now names the WHERE of its own
+-- index below as one more term, so SQLite reads only the rows that index holds.
+--
+-- PARTIAL TO THE KIND AND TO ONE STORED FIELD EACH. The first holds a run whose `data.nextRound.state` is `wanted`; the
+-- second holds a run whose data has a `workerRuns` field at all, of any value, because the worker reads its entries with
+-- json_each, which no index WHERE may name. A row whose data is not JSON is in both, so a read of these rows fails on it
+-- as a read of every row does. SQLite uses a partial index only for a query that names its WHERE terms in the same
+-- words; `STORED_FIELDS.sessionWantsANextRound` and `STORED_FIELDS.sessionHoldsWorkerRuns` in src/server/db/schema.ts
+-- are those words.
+--
+-- A row moves into or out of an index when its ask is written or its state changes, so such a write costs one change to
+-- that index. Every write that changes a run's data has SQLite work out both WHEREs again, on the data before and after.
+-- Neither index is unique, and neither changes a row.
+--
+-- ADDITIVE, AND IT REWRITES NOTHING. Two CREATE INDEX statements, no UPDATE, no table rebuild and no column change.
+CREATE INDEX IF NOT EXISTS `records_session_wants_a_next_round_idx` ON `records` (`workspace_id`, `deleted_at`) WHERE `kind` = 'session' AND (CASE WHEN json_valid(`data`) THEN json_extract(`data`, '$.nextRound.state') = 'wanted' ELSE 1 END);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS `records_session_holds_worker_runs_idx` ON `records` (`workspace_id`, `deleted_at`) WHERE `kind` = 'session' AND (CASE WHEN json_valid(`data`) THEN json_type(`data`, '$.workerRuns') IS NOT NULL ELSE 1 END);

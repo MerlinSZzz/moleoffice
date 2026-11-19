@@ -1,0 +1,4 @@
+{
+  "why": "The re-mint keeps five lists of old to new in one table, one pair per generation: an agent's old id and its new id, a revision's old content hash and its new one, the old hash a seal pinned a revision row by and the new hash of that row, the old hash a seal pinned a link's row by and the new hash of that row, named by the link's id, and a seal's old own hash and the own hash of its rewritten content, named by the seal's record and seq. The rewrite writes it in its own transaction, and only the re-mint verifier and the import of an archive written before the run read it.",
+  "tables": ["registry_remint_kept_lists"]
+}

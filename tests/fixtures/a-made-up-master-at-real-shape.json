@@ -1,0 +1,2418 @@
+{
+  "about": "A made-up master with the counts supplied by the supervisor; all names are invented.",
+  "pipeline": {
+    "key": "master",
+    "title": "Example master of 34 boxes (made up)"
+  },
+  "steps": [
+    {
+      "key": "step-01",
+      "title": "Example master step 01 (made up)",
+      "state": "todo"
+    },
+    {
+      "key": "step-02",
+      "title": "Example master step 02 (made up)",
+      "state": "todo"
+    },
+    {
+      "key": "step-03",
+      "title": "Example master step 03 (made up)",
+      "state": "todo"
+    },
+    {
+      "key": "step-04",
+      "title": "Example master step 04 (made up)",
+      "state": "todo"
+    },
+    {
+      "key": "step-05",
+      "title": "Example master step 05 (made up)",
+      "state": "todo"
+    },
+    {
+      "key": "step-06",
+      "title": "Example master step 06 (made up)",
+      "state": "todo"
+    },
+    {
+      "key": "step-07",
+      "title": "Example master step 07 (made up)",
+      "state": "todo"
+    },
+    {
+      "key": "step-08",
+      "title": "Example master step 08 (made up)",
+      "state": "todo"
+    },
+    {
+      "key": "step-09",
+      "title": "Example master step 09 (made up)",
+      "state": "todo"
+    },
+    {
+      "key": "step-10",
+      "title": "Example master step 10 (made up)",
+      "state": "todo"
+    },
+    {
+      "key": "step-11",
+      "title": "Example master step 11 (made up)",
+      "state": "todo"
+    },
+    {
+      "key": "step-12",
+      "title": "Example master step 12 (made up)",
+      "state": "todo"
+    },
+    {
+      "key": "step-13",
+      "title": "Example master step 13 (made up)",
+      "state": "todo"
+    }
+  ],
+  "waitsOn": [
+    {
+      "type": "blocks",
+      "from": "step-01",
+      "to": "step-02",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "blocks",
+      "from": "step-02",
+      "to": "step-03",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "blocks",
+      "from": "step-03",
+      "to": "step-04",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "blocks",
+      "from": "step-04",
+      "to": "step-05",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "blocks",
+      "from": "step-05",
+      "to": "step-06",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "blocks",
+      "from": "step-06",
+      "to": "step-07",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "blocks",
+      "from": "step-07",
+      "to": "step-08",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "blocks",
+      "from": "step-08",
+      "to": "step-09",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "blocks",
+      "from": "step-09",
+      "to": "step-10",
+      "gate": null,
+      "inferred": false
+    }
+  ],
+  "blockPipelines": [
+    {
+      "key": "block-01",
+      "title": "Example block pipeline 01 (made up)",
+      "partOf": "step-01",
+      "boxes": [
+        "box-01"
+      ]
+    },
+    {
+      "key": "block-02",
+      "title": "Example block pipeline 02 (made up)",
+      "partOf": "step-02",
+      "boxes": [
+        "box-02",
+        "box-03"
+      ]
+    },
+    {
+      "key": "block-03",
+      "title": "Example block pipeline 03 (made up)",
+      "partOf": "step-03",
+      "boxes": [
+        "box-04",
+        "box-05"
+      ]
+    },
+    {
+      "key": "block-04",
+      "title": "Example block pipeline 04 (made up)",
+      "partOf": "step-04",
+      "boxes": [
+        "box-06"
+      ]
+    },
+    {
+      "key": "block-05",
+      "title": "Example block pipeline 05 (made up)",
+      "partOf": "step-05",
+      "boxes": [
+        "box-07"
+      ]
+    },
+    {
+      "key": "block-06",
+      "title": "Example block pipeline 06 (made up)",
+      "partOf": "step-06",
+      "boxes": [
+        "box-08",
+        "box-09"
+      ]
+    },
+    {
+      "key": "block-07",
+      "title": "Example block pipeline 07 (made up)",
+      "partOf": "step-07",
+      "boxes": [
+        "box-10"
+      ]
+    },
+    {
+      "key": "block-08",
+      "title": "Example block pipeline 08 (made up)",
+      "partOf": "step-08",
+      "boxes": [
+        "box-11",
+        "box-12",
+        "box-13",
+        "box-14",
+        "box-15",
+        "box-16",
+        "box-17",
+        "box-18"
+      ]
+    },
+    {
+      "key": "block-09",
+      "title": "Example block pipeline 09 (made up)",
+      "partOf": "step-09",
+      "boxes": [
+        "box-19",
+        "box-20",
+        "box-21",
+        "box-22",
+        "box-23",
+        "box-24"
+      ]
+    },
+    {
+      "key": "block-10",
+      "title": "Example block pipeline 10 (made up)",
+      "partOf": "step-10",
+      "boxes": [
+        "box-25",
+        "box-26",
+        "box-27",
+        "box-28"
+      ]
+    },
+    {
+      "key": "block-11",
+      "title": "Example block pipeline 11 (made up)",
+      "partOf": "step-11",
+      "boxes": [
+        "box-29",
+        "box-30",
+        "box-31"
+      ]
+    },
+    {
+      "key": "block-12",
+      "title": "Example block pipeline 12 (made up)",
+      "partOf": "step-12",
+      "boxes": [
+        "box-32"
+      ]
+    },
+    {
+      "key": "block-13",
+      "title": "Example block pipeline 13 (made up)",
+      "partOf": "step-13",
+      "boxes": [
+        "box-33",
+        "box-34"
+      ]
+    }
+  ],
+  "records": [
+    {
+      "key": "box-01",
+      "kind": "block",
+      "role": "box",
+      "title": "Example box 01 (made up)",
+      "state": "todo",
+      "tier": "services"
+    },
+    {
+      "key": "box-02",
+      "kind": "block",
+      "role": "box",
+      "title": "Example box 02 (made up)",
+      "state": "todo",
+      "tier": "services"
+    },
+    {
+      "key": "box-03",
+      "kind": "block",
+      "role": "box",
+      "title": "Example box 03 (made up)",
+      "state": "todo",
+      "tier": "services"
+    },
+    {
+      "key": "box-04",
+      "kind": "block",
+      "role": "box",
+      "title": "Example box 04 (made up)",
+      "state": "todo",
+      "tier": "services"
+    },
+    {
+      "key": "box-05",
+      "kind": "block",
+      "role": "box",
+      "title": "Example box 05 (made up)",
+      "state": "todo",
+      "tier": "services"
+    },
+    {
+      "key": "box-06",
+      "kind": "block",
+      "role": "box",
+      "title": "Example box 06 (made up)",
+      "state": "todo",
+      "tier": "services"
+    },
+    {
+      "key": "box-07",
+      "kind": "block",
+      "role": "box",
+      "title": "Example box 07 (made up)",
+      "state": "todo",
+      "tier": "services"
+    },
+    {
+      "key": "box-08",
+      "kind": "block",
+      "role": "box",
+      "title": "Example box 08 (made up)",
+      "state": "todo",
+      "tier": "services"
+    },
+    {
+      "key": "box-09",
+      "kind": "block",
+      "role": "box",
+      "title": "Example box 09 (made up)",
+      "state": "todo",
+      "tier": "services"
+    },
+    {
+      "key": "box-10",
+      "kind": "block",
+      "role": "box",
+      "title": "Example box 10 (made up)",
+      "state": "todo",
+      "tier": "services"
+    },
+    {
+      "key": "box-11",
+      "kind": "block",
+      "role": "box",
+      "title": "Example box 11 (made up)",
+      "state": "todo",
+      "tier": "services"
+    },
+    {
+      "key": "box-12",
+      "kind": "block",
+      "role": "box",
+      "title": "Example box 12 (made up)",
+      "state": "todo",
+      "tier": "services"
+    },
+    {
+      "key": "box-13",
+      "kind": "block",
+      "role": "box",
+      "title": "Example box 13 (made up)",
+      "state": "todo",
+      "tier": "runtime"
+    },
+    {
+      "key": "box-14",
+      "kind": "block",
+      "role": "box",
+      "title": "Example box 14 (made up)",
+      "state": "todo",
+      "tier": "runtime"
+    },
+    {
+      "key": "box-15",
+      "kind": "block",
+      "role": "box",
+      "title": "Example box 15 (made up)",
+      "state": "todo",
+      "tier": "runtime"
+    },
+    {
+      "key": "box-16",
+      "kind": "block",
+      "role": "box",
+      "title": "Example box 16 (made up)",
+      "state": "todo",
+      "tier": "runtime"
+    },
+    {
+      "key": "box-17",
+      "kind": "block",
+      "role": "box",
+      "title": "Example box 17 (made up)",
+      "state": "todo",
+      "tier": "runtime"
+    },
+    {
+      "key": "box-18",
+      "kind": "block",
+      "role": "box",
+      "title": "Example box 18 (made up)",
+      "state": "todo",
+      "tier": "runtime"
+    },
+    {
+      "key": "box-19",
+      "kind": "block",
+      "role": "box",
+      "title": "Example box 19 (made up)",
+      "state": "todo",
+      "tier": "hosting"
+    },
+    {
+      "key": "box-20",
+      "kind": "block",
+      "role": "box",
+      "title": "Example box 20 (made up)",
+      "state": "todo",
+      "tier": "hosting"
+    },
+    {
+      "key": "box-21",
+      "kind": "block",
+      "role": "box",
+      "title": "Example box 21 (made up)",
+      "state": "todo",
+      "tier": "hosting"
+    },
+    {
+      "key": "box-22",
+      "kind": "block",
+      "role": "box",
+      "title": "Example box 22 (made up)",
+      "state": "todo",
+      "tier": "hosting"
+    },
+    {
+      "key": "box-23",
+      "kind": "block",
+      "role": "box",
+      "title": "Example box 23 (made up)",
+      "state": "todo",
+      "tier": "ways-in"
+    },
+    {
+      "key": "box-24",
+      "kind": "block",
+      "role": "box",
+      "title": "Example box 24 (made up)",
+      "state": "todo",
+      "tier": "ways-in"
+    },
+    {
+      "key": "box-25",
+      "kind": "block",
+      "role": "box",
+      "title": "Example box 25 (made up)",
+      "state": "todo",
+      "tier": "ways-in"
+    },
+    {
+      "key": "box-26",
+      "kind": "block",
+      "role": "box",
+      "title": "Example box 26 (made up)",
+      "state": "todo",
+      "tier": "ways-in"
+    },
+    {
+      "key": "box-27",
+      "kind": "block",
+      "role": "box",
+      "title": "Example box 27 (made up)",
+      "state": "todo",
+      "tier": "stores"
+    },
+    {
+      "key": "box-28",
+      "kind": "block",
+      "role": "box",
+      "title": "Example box 28 (made up)",
+      "state": "todo",
+      "tier": "stores"
+    },
+    {
+      "key": "box-29",
+      "kind": "block",
+      "role": "box",
+      "title": "Example box 29 (made up)",
+      "state": "todo",
+      "tier": "stores"
+    },
+    {
+      "key": "box-30",
+      "kind": "block",
+      "role": "box",
+      "title": "Example box 30 (made up)",
+      "state": "todo",
+      "tier": "data"
+    },
+    {
+      "key": "box-31",
+      "kind": "block",
+      "role": "box",
+      "title": "Example box 31 (made up)",
+      "state": "todo",
+      "tier": "gate"
+    },
+    {
+      "key": "box-32",
+      "kind": "block",
+      "role": "box",
+      "title": "Example box 32 (made up)",
+      "state": "todo",
+      "tier": null
+    },
+    {
+      "key": "box-33",
+      "kind": "block",
+      "role": "box",
+      "title": "Example box 33 (made up)",
+      "state": "todo",
+      "tier": null
+    },
+    {
+      "key": "box-34",
+      "kind": "block",
+      "role": "box",
+      "title": "Example box 34 (made up)",
+      "state": "todo",
+      "tier": null
+    },
+    {
+      "key": "module-01",
+      "kind": "module",
+      "role": "module",
+      "title": "Example module 01 (made up)",
+      "state": null
+    },
+    {
+      "key": "module-02",
+      "kind": "module",
+      "role": "module",
+      "title": "Example module 02 (made up)",
+      "state": null
+    },
+    {
+      "key": "module-03",
+      "kind": "module",
+      "role": "module",
+      "title": "Example module 03 (made up)",
+      "state": null
+    },
+    {
+      "key": "module-04",
+      "kind": "module",
+      "role": "module",
+      "title": "Example module 04 (made up)",
+      "state": null
+    },
+    {
+      "key": "module-05",
+      "kind": "module",
+      "role": "module",
+      "title": "Example module 05 (made up)",
+      "state": null
+    },
+    {
+      "key": "module-06",
+      "kind": "module",
+      "role": "module",
+      "title": "Example module 06 (made up)",
+      "state": null
+    },
+    {
+      "key": "module-07",
+      "kind": "module",
+      "role": "module",
+      "title": "Example module 07 (made up)",
+      "state": null
+    },
+    {
+      "key": "module-08",
+      "kind": "module",
+      "role": "module",
+      "title": "Example module 08 (made up)",
+      "state": null
+    },
+    {
+      "key": "module-09",
+      "kind": "module",
+      "role": "module",
+      "title": "Example module 09 (made up)",
+      "state": null
+    },
+    {
+      "key": "module-10",
+      "kind": "module",
+      "role": "module",
+      "title": "Example module 10 (made up)",
+      "state": null
+    },
+    {
+      "key": "module-11",
+      "kind": "module",
+      "role": "module",
+      "title": "Example module 11 (made up)",
+      "state": null
+    },
+    {
+      "key": "module-12",
+      "kind": "module",
+      "role": "module",
+      "title": "Example module 12 (made up)",
+      "state": null
+    },
+    {
+      "key": "module-13",
+      "kind": "module",
+      "role": "module",
+      "title": "Example module 13 (made up)",
+      "state": null
+    },
+    {
+      "key": "module-14",
+      "kind": "module",
+      "role": "module",
+      "title": "Example module 14 (made up)",
+      "state": null
+    },
+    {
+      "key": "module-15",
+      "kind": "module",
+      "role": "module",
+      "title": "Example module 15 (made up)",
+      "state": null
+    },
+    {
+      "key": "module-16",
+      "kind": "module",
+      "role": "module",
+      "title": "Example module 16 (made up)",
+      "state": null
+    },
+    {
+      "key": "module-17",
+      "kind": "module",
+      "role": "module",
+      "title": "Example module 17 (made up)",
+      "state": null
+    },
+    {
+      "key": "module-18",
+      "kind": "module",
+      "role": "module",
+      "title": "Example module 18 (made up)",
+      "state": null
+    },
+    {
+      "key": "module-19",
+      "kind": "module",
+      "role": "module",
+      "title": "Example module 19 (made up)",
+      "state": null
+    },
+    {
+      "key": "module-20",
+      "kind": "module",
+      "role": "module",
+      "title": "Example module 20 (made up)",
+      "state": null
+    },
+    {
+      "key": "module-21",
+      "kind": "module",
+      "role": "module",
+      "title": "Example module 21 (made up)",
+      "state": null
+    },
+    {
+      "key": "module-22",
+      "kind": "module",
+      "role": "module",
+      "title": "Example module 22 (made up)",
+      "state": null
+    },
+    {
+      "key": "module-23",
+      "kind": "module",
+      "role": "module",
+      "title": "Example module 23 (made up)",
+      "state": null
+    },
+    {
+      "key": "module-24",
+      "kind": "module",
+      "role": "module",
+      "title": "Example module 24 (made up)",
+      "state": null
+    },
+    {
+      "key": "module-25",
+      "kind": "module",
+      "role": "module",
+      "title": "Example module 25 (made up)",
+      "state": null
+    },
+    {
+      "key": "module-26",
+      "kind": "module",
+      "role": "module",
+      "title": "Example module 26 (made up)",
+      "state": null
+    },
+    {
+      "key": "module-27",
+      "kind": "module",
+      "role": "module",
+      "title": "Example module 27 (made up)",
+      "state": null
+    },
+    {
+      "key": "module-28",
+      "kind": "module",
+      "role": "module",
+      "title": "Example module 28 (made up)",
+      "state": null
+    },
+    {
+      "key": "module-29",
+      "kind": "module",
+      "role": "module",
+      "title": "Example module 29 (made up)",
+      "state": null
+    },
+    {
+      "key": "module-30",
+      "kind": "module",
+      "role": "module",
+      "title": "Example module 30 (made up)",
+      "state": null
+    },
+    {
+      "key": "module-31",
+      "kind": "module",
+      "role": "module",
+      "title": "Example module 31 (made up)",
+      "state": null
+    },
+    {
+      "key": "module-32",
+      "kind": "module",
+      "role": "module",
+      "title": "Example module 32 (made up)",
+      "state": null
+    },
+    {
+      "key": "module-33",
+      "kind": "module",
+      "role": "module",
+      "title": "Example module 33 (made up)",
+      "state": null
+    },
+    {
+      "key": "module-34",
+      "kind": "module",
+      "role": "module",
+      "title": "Example module 34 (made up)",
+      "state": null
+    },
+    {
+      "key": "module-35",
+      "kind": "module",
+      "role": "module",
+      "title": "Example module 35 (made up)",
+      "state": null
+    },
+    {
+      "key": "module-36",
+      "kind": "module",
+      "role": "module",
+      "title": "Example module 36 (made up)",
+      "state": null
+    },
+    {
+      "key": "module-37",
+      "kind": "module",
+      "role": "module",
+      "title": "Example module 37 (made up)",
+      "state": null
+    },
+    {
+      "key": "module-38",
+      "kind": "module",
+      "role": "module",
+      "title": "Example module 38 (made up)",
+      "state": null
+    },
+    {
+      "key": "module-39",
+      "kind": "module",
+      "role": "module",
+      "title": "Example module 39 (made up)",
+      "state": null
+    },
+    {
+      "key": "module-40",
+      "kind": "module",
+      "role": "module",
+      "title": "Example module 40 (made up)",
+      "state": null
+    }
+  ],
+  "extras": [
+    {
+      "key": "extra-01",
+      "title": "Example nested pipeline 01 (made up)"
+    },
+    {
+      "key": "extra-02",
+      "title": "Example nested pipeline 02 (made up)"
+    },
+    {
+      "key": "extra-03",
+      "title": "Example nested pipeline 03 (made up)"
+    },
+    {
+      "key": "extra-04",
+      "title": "Example nested pipeline 04 (made up)"
+    },
+    {
+      "key": "extra-05",
+      "title": "Example nested pipeline 05 (made up)"
+    },
+    {
+      "key": "extra-06",
+      "title": "Example nested pipeline 06 (made up)"
+    },
+    {
+      "key": "extra-07",
+      "title": "Example nested pipeline 07 (made up)"
+    },
+    {
+      "key": "extra-08",
+      "title": "Example nested pipeline 08 (made up)"
+    },
+    {
+      "key": "extra-09",
+      "title": "Example nested pipeline 09 (made up)"
+    },
+    {
+      "key": "extra-10",
+      "title": "Example nested pipeline 10 (made up)"
+    },
+    {
+      "key": "extra-11",
+      "title": "Example nested pipeline 11 (made up)"
+    },
+    {
+      "key": "extra-12",
+      "title": "Example nested pipeline 12 (made up)"
+    },
+    {
+      "key": "extra-13",
+      "title": "Example nested pipeline 13 (made up)"
+    },
+    {
+      "key": "extra-14",
+      "title": "Example nested pipeline 14 (made up)"
+    },
+    {
+      "key": "extra-15",
+      "title": "Example nested pipeline 15 (made up)"
+    },
+    {
+      "key": "extra-16",
+      "title": "Example nested pipeline 16 (made up)"
+    }
+  ],
+  "session": {
+    "key": "session-01",
+    "title": "Example run (made up)"
+  },
+  "links": [
+    {
+      "type": "relates_to",
+      "from": "box-01",
+      "to": "step-01",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-08",
+      "to": "box-01",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-09",
+      "to": "box-01",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-10",
+      "to": "box-01",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-11",
+      "to": "box-01",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-12",
+      "to": "box-01",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-13",
+      "to": "box-01",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-14",
+      "to": "box-01",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-15",
+      "to": "box-01",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-16",
+      "to": "box-01",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-17",
+      "to": "box-01",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "part_of",
+      "from": "extra-01",
+      "to": "box-01",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "relates_to",
+      "from": "box-02",
+      "to": "step-02",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-15",
+      "to": "box-02",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-16",
+      "to": "box-02",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-17",
+      "to": "box-02",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-18",
+      "to": "box-02",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-19",
+      "to": "box-02",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-20",
+      "to": "box-02",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-21",
+      "to": "box-02",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-22",
+      "to": "box-02",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-23",
+      "to": "box-02",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-24",
+      "to": "box-02",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "part_of",
+      "from": "extra-02",
+      "to": "box-02",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "relates_to",
+      "from": "box-03",
+      "to": "step-02",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-22",
+      "to": "box-03",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-23",
+      "to": "box-03",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-24",
+      "to": "box-03",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-25",
+      "to": "box-03",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-26",
+      "to": "box-03",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-27",
+      "to": "box-03",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-28",
+      "to": "box-03",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-29",
+      "to": "box-03",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-30",
+      "to": "box-03",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-31",
+      "to": "box-03",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "part_of",
+      "from": "extra-03",
+      "to": "box-03",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "relates_to",
+      "from": "box-04",
+      "to": "step-03",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-29",
+      "to": "box-04",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-30",
+      "to": "box-04",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-31",
+      "to": "box-04",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-32",
+      "to": "box-04",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-33",
+      "to": "box-04",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-34",
+      "to": "box-04",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-35",
+      "to": "box-04",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-36",
+      "to": "box-04",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-37",
+      "to": "box-04",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-38",
+      "to": "box-04",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "part_of",
+      "from": "extra-04",
+      "to": "box-04",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "relates_to",
+      "from": "box-05",
+      "to": "step-03",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-36",
+      "to": "box-05",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-37",
+      "to": "box-05",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-38",
+      "to": "box-05",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-39",
+      "to": "box-05",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "part_of",
+      "from": "extra-05",
+      "to": "box-05",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "relates_to",
+      "from": "box-06",
+      "to": "step-04",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-03",
+      "to": "box-06",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-04",
+      "to": "box-06",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-05",
+      "to": "box-06",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-06",
+      "to": "box-06",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "part_of",
+      "from": "extra-06",
+      "to": "box-06",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "relates_to",
+      "from": "box-07",
+      "to": "step-05",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-10",
+      "to": "box-07",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-11",
+      "to": "box-07",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-12",
+      "to": "box-07",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-13",
+      "to": "box-07",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "part_of",
+      "from": "extra-07",
+      "to": "box-07",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "relates_to",
+      "from": "box-08",
+      "to": "step-06",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-17",
+      "to": "box-08",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-18",
+      "to": "box-08",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-19",
+      "to": "box-08",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-20",
+      "to": "box-08",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "part_of",
+      "from": "extra-08",
+      "to": "box-08",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "relates_to",
+      "from": "box-09",
+      "to": "step-06",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-24",
+      "to": "box-09",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-25",
+      "to": "box-09",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-26",
+      "to": "box-09",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-27",
+      "to": "box-09",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "part_of",
+      "from": "extra-09",
+      "to": "box-09",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "relates_to",
+      "from": "box-10",
+      "to": "step-07",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-31",
+      "to": "box-10",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-32",
+      "to": "box-10",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-33",
+      "to": "box-10",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-34",
+      "to": "box-10",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "part_of",
+      "from": "extra-10",
+      "to": "box-10",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "relates_to",
+      "from": "box-11",
+      "to": "step-08",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-38",
+      "to": "box-11",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-39",
+      "to": "box-11",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-40",
+      "to": "box-11",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-01",
+      "to": "box-11",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "part_of",
+      "from": "extra-11",
+      "to": "box-11",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "relates_to",
+      "from": "box-12",
+      "to": "step-08",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-05",
+      "to": "box-12",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-06",
+      "to": "box-12",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-07",
+      "to": "box-12",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-08",
+      "to": "box-12",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "part_of",
+      "from": "extra-12",
+      "to": "box-12",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "relates_to",
+      "from": "box-13",
+      "to": "step-08",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-12",
+      "to": "box-13",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-13",
+      "to": "box-13",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-14",
+      "to": "box-13",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-15",
+      "to": "box-13",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "part_of",
+      "from": "extra-13",
+      "to": "box-13",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "relates_to",
+      "from": "box-14",
+      "to": "step-08",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-19",
+      "to": "box-14",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-20",
+      "to": "box-14",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-21",
+      "to": "box-14",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-22",
+      "to": "box-14",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "part_of",
+      "from": "extra-14",
+      "to": "box-14",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "relates_to",
+      "from": "box-15",
+      "to": "step-08",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-26",
+      "to": "box-15",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-27",
+      "to": "box-15",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-28",
+      "to": "box-15",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-29",
+      "to": "box-15",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "part_of",
+      "from": "extra-15",
+      "to": "box-15",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "relates_to",
+      "from": "box-16",
+      "to": "step-08",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-33",
+      "to": "box-16",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-34",
+      "to": "box-16",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-35",
+      "to": "box-16",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-36",
+      "to": "box-16",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "part_of",
+      "from": "extra-16",
+      "to": "box-16",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "relates_to",
+      "from": "box-17",
+      "to": "step-08",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-40",
+      "to": "box-17",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-01",
+      "to": "box-17",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-02",
+      "to": "box-17",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-03",
+      "to": "box-17",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "relates_to",
+      "from": "box-18",
+      "to": "step-08",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-07",
+      "to": "box-18",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-08",
+      "to": "box-18",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-09",
+      "to": "box-18",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-10",
+      "to": "box-18",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "relates_to",
+      "from": "box-19",
+      "to": "step-09",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-14",
+      "to": "box-19",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-15",
+      "to": "box-19",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-16",
+      "to": "box-19",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-17",
+      "to": "box-19",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "relates_to",
+      "from": "box-20",
+      "to": "step-09",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-21",
+      "to": "box-20",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-22",
+      "to": "box-20",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-23",
+      "to": "box-20",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-24",
+      "to": "box-20",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "relates_to",
+      "from": "box-21",
+      "to": "step-09",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-28",
+      "to": "box-21",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-29",
+      "to": "box-21",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-30",
+      "to": "box-21",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-31",
+      "to": "box-21",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "relates_to",
+      "from": "box-22",
+      "to": "step-09",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-35",
+      "to": "box-22",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-36",
+      "to": "box-22",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-37",
+      "to": "box-22",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-38",
+      "to": "box-22",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "relates_to",
+      "from": "box-23",
+      "to": "step-09",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-02",
+      "to": "box-23",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-03",
+      "to": "box-23",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-04",
+      "to": "box-23",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-05",
+      "to": "box-23",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "relates_to",
+      "from": "box-24",
+      "to": "step-09",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-09",
+      "to": "box-24",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-10",
+      "to": "box-24",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-11",
+      "to": "box-24",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-12",
+      "to": "box-24",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "relates_to",
+      "from": "box-25",
+      "to": "step-10",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-16",
+      "to": "box-25",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-17",
+      "to": "box-25",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-18",
+      "to": "box-25",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-19",
+      "to": "box-25",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "relates_to",
+      "from": "box-26",
+      "to": "step-10",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-23",
+      "to": "box-26",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-24",
+      "to": "box-26",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-25",
+      "to": "box-26",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-26",
+      "to": "box-26",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "relates_to",
+      "from": "box-27",
+      "to": "step-10",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-30",
+      "to": "box-27",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-31",
+      "to": "box-27",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-32",
+      "to": "box-27",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-33",
+      "to": "box-27",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "relates_to",
+      "from": "box-28",
+      "to": "step-10",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-37",
+      "to": "box-28",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-38",
+      "to": "box-28",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-39",
+      "to": "box-28",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-40",
+      "to": "box-28",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "relates_to",
+      "from": "box-29",
+      "to": "step-11",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-04",
+      "to": "box-29",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-05",
+      "to": "box-29",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-06",
+      "to": "box-29",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-07",
+      "to": "box-29",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "relates_to",
+      "from": "box-30",
+      "to": "step-11",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-11",
+      "to": "box-30",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-12",
+      "to": "box-30",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-13",
+      "to": "box-30",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-14",
+      "to": "box-30",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "relates_to",
+      "from": "box-31",
+      "to": "step-11",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-18",
+      "to": "box-31",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-19",
+      "to": "box-31",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-20",
+      "to": "box-31",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-21",
+      "to": "box-31",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "relates_to",
+      "from": "box-32",
+      "to": "step-12",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-25",
+      "to": "box-32",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-26",
+      "to": "box-32",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-27",
+      "to": "box-32",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-28",
+      "to": "box-32",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "relates_to",
+      "from": "box-33",
+      "to": "step-13",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-32",
+      "to": "box-33",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-33",
+      "to": "box-33",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-34",
+      "to": "box-33",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-35",
+      "to": "box-33",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "relates_to",
+      "from": "box-34",
+      "to": "step-13",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-39",
+      "to": "box-34",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-40",
+      "to": "box-34",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-01",
+      "to": "box-34",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-02",
+      "to": "box-34",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "feeds",
+      "from": "box-11",
+      "to": "box-12",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "feeds",
+      "from": "box-13",
+      "to": "box-14",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "feeds",
+      "from": "box-19",
+      "to": "box-20",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "feeds",
+      "from": "box-25",
+      "to": "box-26",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "feeds",
+      "from": "box-29",
+      "to": "box-30",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "feeds",
+      "from": "box-02",
+      "to": "box-11",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "feeds",
+      "from": "box-15",
+      "to": "box-21",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "part_of",
+      "from": "session-01",
+      "to": "box-01",
+      "gate": null,
+      "inferred": false
+    }
+  ]
+}

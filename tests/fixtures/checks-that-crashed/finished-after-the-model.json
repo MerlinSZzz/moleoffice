@@ -1,0 +1,154 @@
+{
+  "changes": [
+    {
+      "op": "update",
+      "field": "data.startSteps",
+      "oldValue": null,
+      "newValue": "[{\"name\":\"registering\",\"says\":\"The doors that registered this run and the write that filed its session record.\",\"operations\":[\"agent.register-myself\",\"agent.register-started\",\"session.discover\"],\"requests\":0,\"firstAt\":\"2026-10-24 22:20:20\",\"lastAt\":\"2026-10-24 22:20:20\",\"spentMs\":0,\"tokensSays\":\"Tokens are known for the whole start, not for each step: the receipt the office stores is one figure for the run, and no runtime reports usage per request yet.\"},{\"name\":\"restoring\",\"says\":\"The reads that restored the project's knowledge before the run wrote anything outside its own session record.\",\"operations\":[\"project.onboarding\",\"participant.restore\",\"project.brief\",\"project.where-you-stand\",\"project.bootstrap\",\"project.schema\",\"project.index\"],\"requests\":0},{\"name\":\"the first write\",\"says\":\"The first write outside this session record, which ends the start.\",\"operations\":[],\"requests\":0,\"firstAt\":\"2026-10-24 22:20:46\",\"lastAt\":\"2026-10-24 22:20:46\",\"spentMs\":0,\"tokensSays\":\"Tokens are known for the whole start, not for each step: the receipt the office stores is one figure for the run, and no runtime reports usage per request yet.\",\"endsTheStart\":true}]",
+      "at": "2026-10-24 22:37:39",
+      "appendOrder": 553006
+    },
+    {
+      "op": "update",
+      "field": "data.theCheck",
+      "oldValue": null,
+      "newValue": "{\"askedAt\":\"2026-10-24 22:31:03\",\"checkout\":{\"directory\":\"~/.cache/mole-office/sandboxes/w13y/worktrees/wave-13y-supervisor\",\"cutFrom\":\"main\"},\"says\":\"No check was asked for: a registered work area is unknown; a target with no inspector role or purpose in its history is missing. Register the worker’s work area. Submit the worker’s run; an inspector’s own run cannot be checked.\",\"eligibility\":{\"eligible\":false,\"code\":\"CHECK_NOT_ELIGIBLE\",\"missing\":[{\"fact\":\"registeredArea\",\"state\":\"unknown\"},{\"fact\":\"noInspector\",\"state\":\"missing\"}],\"says\":\"No check was asked for: a registered work area is unknown; a target with no inspector role or purpose in its history is missing.\",\"nextAct\":\"Register the worker’s work area. Submit the worker’s run; an inspector’s own run cannot be checked.\"}}",
+      "at": "2026-10-24 22:31:03",
+      "appendOrder": 552849
+    },
+    {
+      "op": "update",
+      "field": "data.state",
+      "oldValue": "running",
+      "newValue": "finished",
+      "at": "2026-10-24 22:31:02",
+      "appendOrder": 552846
+    },
+    {
+      "op": "update",
+      "field": "data.usageReceipt",
+      "oldValue": null,
+      "newValue": "{\"inputTokens\":229983,\"cachedInputTokens\":6366208,\"cacheCreationInputTokens\":0,\"outputTokens\":8133,\"reasoningTokens\":33495,\"costUsd\":0.07857287399999999,\"runtime\":\"opencode\",\"source\":\"--format json step_finish.part.tokens and cost\",\"inputIncludesCached\":false,\"says\":\"Not given in this output: model, duration.\"}",
+      "at": "2026-10-24 22:30:48",
+      "appendOrder": 552841
+    },
+    {
+      "op": "delete",
+      "field": "resource.process",
+      "oldValue": "2591724 — Host group controlling check znWMMsOaTBTi in mole-office-checkview-znwmmsoatbti-71b2f4881b67697a: sh /inputs/commands/opencode.sh — pid 14 inside container mole-office-checkview-znwmmsoatbti-71b2f4881b67697a (4ff7e9127b51), which is pid 2591724 on this machine — sh -c IFS= read -r go; [ \"$go\" = go ] || exit 111; exec \"$@\" check-view-gate sh /inputs/commands/opencode.sh",
+      "newValue": "released: Nothing was signalled: Nothing is running as pid 2591724. The row was closed by the session that registered it. [Check view command ended with exit 0.; closed after the process was found gone; forced while the session was still running]",
+      "at": "2026-10-24 22:30:48",
+      "appendOrder": 552840
+    },
+    {
+      "op": "delete",
+      "field": "resource.container",
+      "oldValue": "mole-office-checkview-znwmmsoatbti-71b2f4881b67697a — Private container view for check znWMMsOaTBTi in inspector-inspector; releasing this row stops it.",
+      "newValue": "released: Nothing was signalled: No running container is called \"mole-office-checkview-znwmmsoatbti-71b2f4881b67697a\". The row was closed by the session that registered it. [Check view command ended with exit 0.; closed after the process was found gone; forced while the session was still running]",
+      "at": "2026-10-24 22:30:47",
+      "appendOrder": 552839
+    },
+    {
+      "op": "create",
+      "field": "resource.process",
+      "oldValue": null,
+      "newValue": "2591724 — Host group controlling check znWMMsOaTBTi in mole-office-checkview-znwmmsoatbti-71b2f4881b67697a: sh /inputs/commands/opencode.sh — pid 14 inside container mole-office-checkview-znwmmsoatbti-71b2f4881b67697a (4ff7e9127b51), which is pid 2591724 on this machine — sh -c IFS= read -r go; [ \"$go\" = go ] || exit 111; exec \"$@\" check-view-gate sh /inputs/commands/opencode.sh",
+      "at": "2026-10-24 22:20:47",
+      "appendOrder": 552775
+    },
+    {
+      "op": "create",
+      "field": "resource.container",
+      "oldValue": null,
+      "newValue": "mole-office-checkview-znwmmsoatbti-71b2f4881b67697a — Private container view for check znWMMsOaTBTi in inspector-inspector; releasing this row stops it.",
+      "at": "2026-10-24 22:20:47",
+      "appendOrder": 552774
+    },
+    {
+      "op": "delete",
+      "field": "resource.process",
+      "oldValue": "2589623 — Host group controlling check znWMMsOaTBTi in mole-office-checkview-znwmmsoatbti-1f25933827efa618: sh /inputs/commands/try-the-view.sh — pid 14 inside container mole-office-checkview-znwmmsoatbti-1f25933827efa618 (d39c526d2f8a), which is pid 2589623 on this machine — sh -c IFS= read -r go; [ \"$go\" = go ] || exit 111; exec \"$@\" check-view-gate sh /inputs/commands/try-the-view.sh",
+      "newValue": "released: Nothing was signalled: Nothing is running as pid 2589623. The row was closed by the session that registered it. [Check view command ended with exit 0.; closed after the process was found gone; forced while the session was still running]",
+      "at": "2026-10-24 22:20:39",
+      "appendOrder": 552772
+    },
+    {
+      "op": "delete",
+      "field": "resource.container",
+      "oldValue": "mole-office-checkview-znwmmsoatbti-1f25933827efa618 — Private container view for check znWMMsOaTBTi in inspector-inspector; releasing this row stops it.",
+      "newValue": "released: Nothing was signalled: No running container is called \"mole-office-checkview-znwmmsoatbti-1f25933827efa618\". The row was closed by the session that registered it. [Check view command ended with exit 0.; closed after the process was found gone; forced while the session was still running]",
+      "at": "2026-10-24 22:20:39",
+      "appendOrder": 552771
+    },
+    {
+      "op": "create",
+      "field": "resource.process",
+      "oldValue": null,
+      "newValue": "2589623 — Host group controlling check znWMMsOaTBTi in mole-office-checkview-znwmmsoatbti-1f25933827efa618: sh /inputs/commands/try-the-view.sh — pid 14 inside container mole-office-checkview-znwmmsoatbti-1f25933827efa618 (d39c526d2f8a), which is pid 2589623 on this machine — sh -c IFS= read -r go; [ \"$go\" = go ] || exit 111; exec \"$@\" check-view-gate sh /inputs/commands/try-the-view.sh",
+      "at": "2026-10-24 22:20:39",
+      "appendOrder": 552770
+    },
+    {
+      "op": "create",
+      "field": "resource.container",
+      "oldValue": null,
+      "newValue": "mole-office-checkview-znwmmsoatbti-1f25933827efa618 — Private container view for check znWMMsOaTBTi in inspector-inspector; releasing this row stops it.",
+      "at": "2026-10-24 22:20:38",
+      "appendOrder": 552769
+    },
+    {
+      "op": "delete",
+      "field": "resource.process",
+      "oldValue": "2587492 — Host group controlling check znWMMsOaTBTi in mole-office-checkview-znwmmsoatbti-48bbe2ec80ab66f5: sh /inputs/commands/checkout.sh — pid 14 inside container mole-office-checkview-znwmmsoatbti-48bbe2ec80ab66f5 (038df9b4e56b), which is pid 2587492 on this machine — sh -c IFS= read -r go; [ \"$go\" = go ] || exit 111; exec \"$@\" check-view-gate sh /inputs/commands/checkout.sh",
+      "newValue": "released: Nothing was signalled: Nothing is running as pid 2587492. The row was closed by the session that registered it. [Check view command ended with exit 0.; closed after the process was found gone; forced while the session was still running]",
+      "at": "2026-10-24 22:20:35",
+      "appendOrder": 552768
+    },
+    {
+      "op": "delete",
+      "field": "resource.container",
+      "oldValue": "mole-office-checkview-znwmmsoatbti-48bbe2ec80ab66f5 — Private container view for check znWMMsOaTBTi in inspector-inspector; releasing this row stops it.",
+      "newValue": "released: Nothing was signalled: No running container is called \"mole-office-checkview-znwmmsoatbti-48bbe2ec80ab66f5\". The row was closed by the session that registered it. [Check view command ended with exit 0.; closed after the process was found gone; forced while the session was still running]",
+      "at": "2026-10-24 22:20:35",
+      "appendOrder": 552767
+    },
+    {
+      "op": "create",
+      "field": "resource.process",
+      "oldValue": null,
+      "newValue": "2587492 — Host group controlling check znWMMsOaTBTi in mole-office-checkview-znwmmsoatbti-48bbe2ec80ab66f5: sh /inputs/commands/checkout.sh — pid 14 inside container mole-office-checkview-znwmmsoatbti-48bbe2ec80ab66f5 (038df9b4e56b), which is pid 2587492 on this machine — sh -c IFS= read -r go; [ \"$go\" = go ] || exit 111; exec \"$@\" check-view-gate sh /inputs/commands/checkout.sh",
+      "at": "2026-10-24 22:20:34",
+      "appendOrder": 552766
+    },
+    {
+      "op": "create",
+      "field": "resource.container",
+      "oldValue": null,
+      "newValue": "mole-office-checkview-znwmmsoatbti-48bbe2ec80ab66f5 — Private container view for check znWMMsOaTBTi in inspector-inspector; releasing this row stops it.",
+      "at": "2026-10-24 22:20:34",
+      "appendOrder": 552765
+    },
+    {
+      "op": "update",
+      "field": "data.shortForms",
+      "oldValue": null,
+      "newValue": "{\"label\":{\"text\":\"Run of inspector\",\"madeFrom\":{\"seq\":1,\"contentHash\":\"64e172871432b6c9\"},\"writtenBy\":\"agent\"}}",
+      "at": "2026-10-24 22:20:20",
+      "appendOrder": 552751
+    },
+    {
+      "op": "create",
+      "field": null,
+      "oldValue": null,
+      "newValue": "Check of w13y-rd61 (run RugoSTF4g9fG)",
+      "at": "2026-10-24 22:20:20",
+      "appendOrder": 552748
+    }
+  ],
+  "changesCarried": {
+    "carried": 18,
+    "total": 18,
+    "budgetBytes": 262144,
+    "next": null
+  }
+}

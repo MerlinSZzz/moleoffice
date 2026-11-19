@@ -1,0 +1,13 @@
+{
+  "why": "Inside the installed Windows app, a keyless request is refused when the operating system has not said within its time which program sent it (wave 13t, round W37). Meeting it needs the Windows app's sender probe and a reading that runs past its time, which no door here has. tests/the-windows-window-is-the-person.test.ts meets it through the waiting door and the pairing door in case T5, with a stand-in probe whose reading is slow.",
+  "refusals": [
+    {
+      "code": "senderNotReadInTime",
+      "status": 503,
+      "english": "Test: the operating system did not say in time which program sent this request.",
+      "values": {
+        "seconds": 10
+      }
+    }
+  ]
+}

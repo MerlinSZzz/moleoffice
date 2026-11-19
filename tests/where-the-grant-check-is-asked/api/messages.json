@@ -1,0 +1,10 @@
+{
+  "doors": [
+    "agent.start-a-new-agent",
+    "message.start-an-agent",
+    "message.mark-broken",
+    "message.not-now",
+    "message.remind-me-later"
+  ],
+  "why": "Marking a message broken, starting a new agent, starting an agent for a message, putting off a message's offer and setting when a line comes back ask whether a raise carries the press when the caller is not the person."
+}

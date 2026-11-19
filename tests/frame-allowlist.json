@@ -1,0 +1,5 @@
+{
+  "rail": "The rail root is `<aside id=\"shell-side\">` in src/web/components/Sidebar.tsx. Step 16 owns that file and declares it `{ surface: 'rail' }`; step 15 could not touch it.",
+  "overlays": "The overlay host is built with document.createElement in src/web/components/ui.tsx, so it has no opening tag and no props. Step 16 owns that file and puts targetAttributes({ kind: 'uiSurface', surfaceId: 'overlays' }) on the element it makes. Until then a right-click inside a popup answers the floor, which is honest and coarse.",
+  "review.pane": "The review column is `<aside className=\"px-pane\">` in src/web/components/agent/ReviewBar.tsx. Step 16's own change list names the review strip and column, so the file is step 16's."
+}

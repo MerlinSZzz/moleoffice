@@ -1,0 +1,6 @@
+{
+  "doors": [
+    "agent.handover-write"
+  ],
+  "why": "Writing an agent's handover asks, after the person and the agent's own key, whether the grant carries the press. Under the grant the secretary is the handover's writer."
+}

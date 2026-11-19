@@ -1,0 +1,12 @@
+-- HOW THE CHAT IS LAID OUT, for one person.
+--
+-- `chat_layout` holds the person's own choice of how the chat is laid out. `one` is the earlier
+-- single column: the list first, then the conversation with its back press. `two` is side by side:
+-- the contacts on the left and the conversation on the right. NULL means nobody has chosen, and the
+-- chat then lays itself out by its width, as it does today.
+--
+-- IT IS A COLUMN ON `people` AND NOT A TABLE OF ITS OWN, for the reason `chat_opens_as` beside it
+-- gives: it is one fact about one person, and it follows the person to any machine rather than
+-- staying in one browser. There is no CHECK constraint, for the reason the other word columns of
+-- this table have none.
+ALTER TABLE `people` ADD `chat_layout` text;

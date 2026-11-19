@@ -1,0 +1,3 @@
+// Copyright © 2026 Zhengyang Shen
+// Licensed under the MIT License. See LICENSE.
+declare module '*.css'

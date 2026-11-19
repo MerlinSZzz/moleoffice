@@ -1,0 +1,18 @@
+-- ONE INDEX, SO A PROJECT'S DOTS READ ITS RUNS THAT HAVE NOT ENDED AND NOT EVERY RUN IT EVER HAD.
+--
+-- Round 66 of wave 13y. The people view and the online view read every session record of each project, whole, to choose
+-- each agent's dot, and most of those runs have ended. Of a run that has ended the dot reads only the agent it ran as,
+-- unless the message worker filed it. The office scene now reads a project's runs that have not ended through this index,
+-- and the message worker's runs through `records_session_delivering_message_idx` (migration 0199), by their ids in one
+-- order (`theRunsTheDotsRead` in src/server/lib/presence.ts).
+--
+-- PARTIAL TO THE KIND AND TO A STATE THAT DOES NOT END A RUN. A row is in it unless its `data.state` is one of the four
+-- words that end a run (`RUN_IS_OVER_STATES` in src/server/lib/keys.ts). A row with no state, with another state, or with
+-- data that is not JSON is in it. SQLite uses a partial index only for a query that names its WHERE terms in the same
+-- words; `STORED_FIELDS.sessionHasNotEnded` in src/server/db/schema.ts is those words, and no other read names them.
+--
+-- A row moves out of this index when its run ends, so a write of a session record that ends its run, or files one, costs
+-- one change to this index. The index is not unique, and it changes no row.
+--
+-- ADDITIVE, AND IT REWRITES NOTHING. One CREATE INDEX statement and no UPDATE.
+CREATE INDEX IF NOT EXISTS `records_session_not_ended_idx` ON `records` (`workspace_id`, `deleted_at`) WHERE `kind` = 'session' AND (CASE WHEN json_valid(`data`) THEN coalesce(json_extract(`data`, '$.state') NOT IN ('finished', 'crashed', 'paused', 'orphaned'), 1) ELSE 1 END);

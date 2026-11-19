@@ -1,0 +1,4 @@
+{
+  "why": "Keep held notice instants, accepted turns and frozen original delivery lists across a restart and restore. No existing message or delivery is rewritten.",
+  "tables": ["notice_batch_deliveries", "notice_batch_turns"]
+}

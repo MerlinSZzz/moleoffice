@@ -1,0 +1,23 @@
+{
+  "format": 1,
+  "what": "The words every image source is given for the candidate mole looks of the office map. Every source draws every figure once, with the same words, so the grids compare sources as well as figures. Nothing here is drawn on the map.",
+  "reference": {
+    "file": "today-sixteen-4x4.png",
+    "sha256First16": "6cef3929b57e73c9",
+    "what": "The sixteen standing looks the map draws today, cut from the plugin's atlases at their native canvas, enlarged twice with nearest-neighbour, four by four on white, 1024 pixels square.",
+    "sentWith": "village"
+  },
+  "frame": "One character only: a small mole standing upright, the whole body from the top of the head to the feet, in a three-quarter view turned to the right, as a sprite for a cosy village map seen from above at an angle. The mole is centred and fills about two thirds of the picture's height. Plain flat magenta background (#FF00FF) over the whole picture: no ground, no shadow, no scenery, no text, no border, no second figure.",
+  "styleWithReference": "Draw it in the same style as the reference sheet of sixteen moles: clean pixel art with a dark outline, a small palette, flat shading in two or three steps, and the same body shape and proportions. It is a new mole for the same village, not a copy of one in the sheet.",
+  "styleFree": "The style is free: change the body, the proportions and the way it is drawn as you like, as long as it still reads as one mole when it is drawn about ninety pixels tall.",
+  "figures": [
+    { "id": "gardener", "group": "village", "words": "A mole gardener in a wide straw hat and green dungarees, holding a small trowel." },
+    { "id": "librarian", "group": "village", "words": "A mole librarian in a long knitted cardigan, holding an open book in both paws." },
+    { "id": "mapmaker", "group": "village", "words": "A mole map-maker in a short woven poncho, with a satchel of rolled paper scrolls." },
+    { "id": "runner", "group": "village", "words": "A mole in a zipped tracksuit and trainers, with a small laptop under one arm." },
+    { "id": "round", "group": "free", "words": "A very round, egg-shaped mole with almost no neck, tiny paws and a big pink nose, wearing a little knitted hat." },
+    { "id": "tall", "group": "free", "words": "A tall, slender mole with a long snout, in a long coat and a striped scarf." },
+    { "id": "felt", "group": "free", "words": "A mole made as a small felt toy, with stitched seams and button eyes, wearing a tiny backpack." },
+    { "id": "flat", "group": "free", "words": "A mole drawn in bold flat shapes with no outline, bright colours and large round glasses." }
+  ]
+}

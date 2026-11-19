@@ -1,0 +1,7 @@
+    1     0     1 Ss   Wed Sep  2 08:01:55 2026     /sbin/launchd
+  611     1   611 Ss   Wed Sep  2 08:02:10 2026     (WindowServer)
+ 4242     1  4242 Ss   Wed Sep 30 09:14:07 2026     /usr/local/bin/node /Volumes/Work/mole-office/src/server/index.ts --port 39017
+ 4243  4242  4242 S    Wed Sep 30 09:14:08 2026     /usr/local/bin/node /Volumes/Work/mole-office/node_modules/.bin/vite
+ 4244  4243  4242 S    Wed Sep 30 09:14:09 2026     /bin/sh -c echo (done)
+ 7310     1  7310 S    Thu Oct  1 10:00:00 2026     /Applications/Visual Studio Code.app/Contents/MacOS/Electron --type=renderer (helper)
+ 7311  7310  7310 Z    Thu Oct  1 10:00:05 2026     <defunct>

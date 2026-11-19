@@ -1,0 +1,113 @@
+# Copyright © 2026 Zhengyang Shen
+# Licensed under the MIT License. See LICENSE.
+# NO TRAILING SLASH: in a worktree, node_modules is a SYMLINK to the main checkout's copy, and
+# `node_modules/` matches a directory only. A `git add -A` in a worktree committed the symlink on
+# 2 September 2026, which would point every other checkout at one machine's home directory.
+node_modules
+
+# Vite's pre-bundled dependencies, one cache per checkout. It used to live in node_modules, which
+# in a worktree is a symlink to the main checkout's copy, so every checkout wrote into one cache
+# and the owner's running dev server read it. vite.config.ts has the account. Rebuilt in about a
+# second by the next `npm run dev`.
+.cache/
+
+dist/
+data/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+.env
+.env.*
+!.env.example
+.DS_Store
+*.log
+
+# Generated screenshots. Regenerable with tools/shot.mjs and the design mockups themselves,
+# and 61 MB of the 63 MB in this tree. The design/*/index.html files ARE kept — they are the
+# work; their renders are not.
+tools/shots/
+tools/review/
+_judge_shots/
+_viz_demo/
+design/*/preview.png
+
+# The same rule, applied to the UI redesign exploration. design/shots/ alone is 357 MB, because
+# these prototypes are review documents that run 20,000 to 40,000 pixels tall and there are four
+# pictures of each. Rebuild any of them in seconds:
+#
+#   node design/shot.mjs design/concepts/E-console/index.html   # one prototype
+#   node design/sheet.mjs                                       # the contact sheet over them all
+#
+# What IS kept is every prototype's index.html and RATIONALE.md, the audits, the fixture and the
+# proposals. Those are the work. A 7 MB picture of a page whose source sits beside it is not, and
+# a repository that is going to be made public should not carry a third of a gigabyte of them.
+# No picture anywhere under design/ is source. Every one of them is rendered from an .html file
+# sitting beside it, including the crops and slices agents made while reading their own work.
+design/shots/
+design/**/*.png
+design/index.html
+
+# ...except the avatar set, which is not a picture of a page. `design/avatars/png/*.png` is what an
+# upload actually sends: the avatar route takes png, jpeg and webp and refuses SVG, so the drawing
+# beside it cannot be the thing uploaded. Each is about 30 KB, not 7 MB, and
+# tests/the-avatar-set-is-complete.test.ts names every one of them, so a checkout without them is a
+# checkout with a failing suite.
+!design/avatars/png/*.png
+
+# And the generated avatars, which are source in the strongest sense: nothing in this repository can
+# remake them. Each came from one paid call to an image model on OpenRouter, asking again costs money
+# and returns a different picture, and there is no .html file beside them to render.
+!design/avatars/generated/*.png
+
+# And the candidates for the round chat button, for the same reason: each came from a paid call and
+# nothing here can remake it. previews.html beside them is the page that shows them at the size the
+# button is actually drawn at, and it is the .html this rule's reason above asks every picture to sit
+# beside -- except that here the pictures are the source and the page is what is rendered from them.
+!design/avatars/circle/*.png
+
+# Python bytecode from a design build script
+__pycache__/
+*.pyc
+
+# Throwaway probe scripts. An adversarial reviewer writes these while a commit is being made,
+# and eight of them were once swept into one by a stage-everything command.
+tools/.*
+
+.logs/
+.claude/worktrees/
+.tmp-r10/
+.probe/
+
+# The rules file Codex and OpenCode read. It is GENERATED, by src/worker/rules.ts, from CLAUDE.md
+# and the Mole Office skill, into the working directory of a run just before that run starts. It is
+# not a source: editing one would be edited over by the next run, and committing one would be a
+# second copy of the rules free to drift from the first. There is one source and one writer, and
+# tests/one-set-of-rules.test.ts holds all three of those facts.
+AGENTS.md
+
+# The role card portraits (P47) are kept, like the drawn avatars
+!design/portraits/**/*.png
+
+# Personal custom portraits stay on this machine and are not uploaded.
+data/portraits/
+
+# The note the secretary leaves a builder with the answers to the forks in its brief. It is a message,
+# not product content, and every builder that gets one would otherwise commit it.
+# A brief a coordinating agent leaves in a builder's worktree. THEIR-ANSWERS.md is where the secretary wrote
+# down the answers to the two criteria a build was waiting on, so the builder could read them
+# without a round trip. It is a message, not a document of this repository: the person's messages belong
+# in design/messages/ACCEPTANCE.md, where the criteria they settle are, and a second copy in the root
+# is one free to drift from that. It is ignored rather than only deleted because `git add -A` brought
+# it back once after it had been removed from the index.
+THEIR-ANSWERS.md
+
+# worker scratch homes (one per worktree; 16 September 2026)
+.scratch/
+
+# Three inventories a tool writes from the tree. They are kept out of git (17 November 2026), so no change has to
+# carry them and the merge queue has nothing to join or rewrite. To have one, run its tool: `npm run ownership` in
+# plugins/office-map/, `node tools/test-audit-table.mjs`, and `node tests/server-refusal-inventory.ts --write`.
+plugins/office-map/OWNERSHIP.md
+design/ground/TEST-AUDIT-2026-09-03.md
+tests/server-refusals-without-codes.json

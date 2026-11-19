@@ -1,0 +1,11 @@
+-- AN AGENT REGISTERED WITH NO KEY OF ITS OWN.
+--
+-- A supervisor registers its own worker at POST /api/agents/started with `noKey: true`. No key is made for the
+-- worker. The office makes it a run key for each run of it that the office starts, or that its starter files with
+-- its own key. This column marks such an agent, so that a write in its name is taken only with a run key or the
+-- office's key. src/server/lib/run-keys-only.ts reads and writes it.
+--
+-- One fact per agent is a column on the row that holds the agent. 1 means the agent was registered with no key of
+-- its own. 0 means it was not. Every row written before this migration was registered the ordinary way, so it
+-- reads 0, and the default writes that.
+ALTER TABLE `agents` ADD COLUMN `run_keys_only` integer NOT NULL DEFAULT 0;

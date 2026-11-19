@@ -1,0 +1,37 @@
+-- A message says which comment it carried, so the words are not in two places with nothing joining them.
+--
+-- ADDITIVE, ONE NULLABLE COLUMN. No row is read, moved, rewritten or taken away, and no table is
+-- rebuilt. Every message that already exists keeps the value this column has for anything nobody
+-- wrote as a comment on something, which is NULL.
+--
+-- ---------------------------------------------------------------------------------------
+-- WHY
+-- ---------------------------------------------------------------------------------------
+--
+-- Sending a review writes each comment into the review's conversation as a message. A comment is a
+-- record — `annotation.body` — so for a moment the same sentence is in two rows, and two rows
+-- holding one sentence with nothing joining them is the defect this repository names as its own.
+--
+-- This column joins them. It buys three things, and the second is the one that made it necessary
+-- rather than tidy:
+--
+--   A READER CAN GET BACK TO WHAT THE PERSON WROTE. The message is a copy taken at the moment both
+--   became immutable; the comment is the thing they wrote, and it is where the reading of their
+--   words is kept.
+--
+--   A SECOND SEND CAN TELL THAT A COMMENT IS ALREADY IN THE CONVERSATION. Without it, a review with
+--   one comment nobody could deliver wrote that comment's words into the conversation AGAIN on the
+--   next press — measured on 19 August 2026 by the test that sends, corrects the address and sends
+--   again. Two messages, one sentence, and an agent with no way to tell it was one request.
+--
+--   AND THE SCREEN CAN SHOW WHERE ONE COMMENT ACTUALLY WENT, from the message that carried it,
+--   rather than from a second reading of the comment.
+--
+-- NUMBERED WELL CLEAR OF THE MIGRATION BEFORE IT, the way 0020 to 0090 were and for the same
+-- reason: several agents add one at the same time. Drizzle applies journal entries in order of
+-- their `when`, so the gap in the numbers costs nothing.
+--
+-- IT IS A SECOND FILE RATHER THAN TWO MORE LINES IN 0090, and that is deliberate: 0090 is already
+-- pending against a live database this session must not migrate, and a statement added to a
+-- migration somebody may have applied is a column that silently never arrives.
+ALTER TABLE `agent_messages` ADD `from_annotation_id` text;

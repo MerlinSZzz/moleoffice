@@ -1,0 +1,13 @@
+-- THE ONE ADDRESS A BROWSER IS SENT TO, chosen by the person on the Settings page. A browser keeps its pairing per
+-- address, so a person who opened the office at this machine's private-network name and at its private-network
+-- number had to pair twice. A page load that arrives at another of this machine's own addresses is sent here.
+--
+-- IT IS A COLUMN ON `installation` AND NOT A TABLE OF ITS OWN, for the reason 0166, 0169, 0175 and 0187 give: it is
+-- one fact about the office. src/server/lib/address-for-browsers.ts is the one reader and the one writer, and it
+-- refuses anything that is not a host name or an address.
+--
+-- NULL MEANS NOBODY HAS CHOSEN, and then the address MOLE_OFFICE_ADDRESS_FOR_OTHER_MACHINES names is the one in
+-- force, or none.
+--
+-- ADDITIVE, AND IT REWRITES NOTHING. One ALTER TABLE ADD COLUMN and no UPDATE.
+ALTER TABLE `installation` ADD COLUMN `address_for_browsers` text;

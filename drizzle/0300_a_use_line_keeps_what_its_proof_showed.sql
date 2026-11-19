@@ -1,0 +1,13 @@
+-- A USE LINE KEEPS WHAT ITS PROOF SHOWED. Wave 13n round R, item 2i.
+--
+-- A run's key proves which run wrote a use line, not that tools/use-line.mjs wrote it: a shell that holds the key can
+-- send POST /api/toolset/uses by hand. The tool now sends a proof beside each line (src/config/use-line-proof.mjs). The
+-- use door checks it against the line's words and the key the request carried, and keeps what it found here:
+-- `matches`, `none` (no proof came) or `does not match`. GET /api/toolset/runs/<run>/uses and the seal preview mark a
+-- line whose proof is not `matches`.
+--
+-- NULL is every row written before this migration, when the door did not check, and every row a caller writes without
+-- asking the door to check. The reading says of those that nobody knows whether the tool sent them.
+--
+-- ADDITIVE, AND IT REWRITES NOTHING. One ALTER TABLE ADD COLUMN and no UPDATE.
+ALTER TABLE `tool_uses` ADD COLUMN `proof` text;

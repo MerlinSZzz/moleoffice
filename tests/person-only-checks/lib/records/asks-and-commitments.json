@@ -1,0 +1,5 @@
+{
+  "sort": "mixed",
+  "checks": 2,
+  "why": "removing an ask that waits on the person (assertMayRemoveAnAsk) and committing an intent as hours (assertMayCommitAnIntent). Committing hours is carried: assertMayCommitTheHours asks actsForThePerson with plan:committing-hours. Removing an ask is carried where the gate position is block and kept where it is not, because there the agent goes through actsForThePersonWithoutTheRaise."
+}

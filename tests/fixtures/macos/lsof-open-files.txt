@@ -1,0 +1,13 @@
+p4242
+fcwd
+n/Volumes/Work/mole-office
+ftxt
+n/usr/local/bin/node
+f19
+n/Volumes/Work/mole-office/data/panelx.db
+f20
+n/Volumes/Work/mole-office/data/panelx.db-wal
+f21
+n/Volumes/Work/mole-office/data/panelx.db-shm
+f23
+n127.0.0.1:39017

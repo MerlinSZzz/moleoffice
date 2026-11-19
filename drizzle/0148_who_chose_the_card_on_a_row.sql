@@ -1,0 +1,12 @@
+-- WHO CHOSE THE CARD ON A REGISTRY ROW. Criterion P75.
+--
+-- The worker card was not given by default. A registration
+-- naming no card now writes the worker card on the row rather than leaving it empty, and this says
+-- whether the rule wrote it, a starter chose it, or the owner gave it when they confirmed a
+-- credential.
+--
+-- ADDITIVE, AND NOT ONE EXISTING ROW IS REWRITTEN. NULL here means nobody recorded who chose the
+-- card, which is the honest state of every row registered before this column existed: the word on
+-- such a row may have been a starter's choice or may be the word the row was read as, and nothing
+-- can tell the two apart now. Backfilling a mark would be inventing the answer.
+ALTER TABLE `agents` ADD `card_chosen_by` text;

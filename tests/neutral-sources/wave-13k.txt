@@ -1,0 +1,18 @@
+# Wave 13k: Home, the Record page, and the eleven files under src/web that only those two pages draw.
+# One path per line, relative to the checkout; # starts a comment. The neutral-words gate
+# (tests/the-owners-project-is-not-in-the-source.test.ts) reads every string each file ships.
+# Moved here from the list NEUTRAL_SOURCES in the gate's test file by wave 13r round 7.
+
+src/web/components/Claims.tsx
+src/web/components/Implementation.tsx
+src/web/components/OnYourWords.tsx
+src/web/components/graph/Against.tsx
+src/web/components/graph/Evolution.tsx
+src/web/components/graph/evolution-model.ts
+src/web/components/graph/origin-mark.tsx
+src/web/components/home/HomeSections.tsx
+src/web/components/home/WhatHasBeenSaid.tsx
+src/web/components/home/pipeline-line.ts
+src/web/components/home/sessions-line.ts
+src/web/pages/HomePage.tsx
+src/web/pages/RecordPage.tsx

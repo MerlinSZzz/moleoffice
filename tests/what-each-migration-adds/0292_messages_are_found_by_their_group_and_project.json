@@ -1,0 +1,10 @@
+{
+  "why": "Round 65 of wave 13y: three indexes partial to messages, each on one stored field and then the project: the group a message went to, the project it was written in and the project it is about. Where-you-stand, the brief and the attention rule find an agent's group messages and a project's view through them, without reading every message. No table, column, trigger or write changes.",
+  "indexesAddedAfterTheRebuild": {
+    "records": [
+      "records_message_to_group_idx",
+      "records_message_written_in_project_idx",
+      "records_message_about_project_idx"
+    ]
+  }
+}

@@ -1,0 +1,99 @@
+{
+  "template": "mole-office-dev",
+  "whatItIsFor": "Developing Mole Office itself: building it, running its tests one file at a time, and running dsh, codex, opencode or claude agents on a clone of it. The owner's real home directory, the live database and the office's key file are not in the sandbox at all.",
+  "devcontainer": "devcontainer.json",
+  "raisesForAMerge": {
+    "memory": "24g",
+    "because": "A merge sandbox runs the whole suite, and at 03:56 on 7 November 2026 the 16 GiB limit of merge sandbox h5qbyjx4ysua killed three headless browsers in the middle of one while the sandbox slice had room, at about 33.5 of its 60 GiB; merge sandboxes run one at a time in the one suite seat, so the slice's cap still holds them all (the coordinator's decision JNAgZOdcw5xK, on the infrastructure agent's 7H8srH6dlCRp)."
+  },
+  "read": {
+    "files": ["CLAUDE.md"],
+    "chapters": [
+      {
+        "record": "R4uALWEQ7z9G",
+        "why": "The sandbox uses the host's network, so the owner's live server answers from inside it, on the live office's port. Read from it and file records to it; never run a test, a restore or a migration against it."
+      },
+      {
+        "record": "OXW5D1ox_NsR",
+        "why": "Anything started in the sandbox that outlives its command is registered first and stopped only by its process group."
+      },
+      {
+        "record": "3yp-FJOj1d9x",
+        "why": "Worktrees go in the instance folder, which is under /home, and the suite is built before it is run."
+      },
+      {
+        "record": "rxxTCoIOQBwV",
+        "why": "A test is proved by a control run, a mutation and a restore. Run only the test files you touched, with --no-file-parallelism."
+      },
+      {
+        "record": "UktkENmOG4ip",
+        "why": "Node 22 is the image's own and is on PATH; there is no nvm in the sandbox. Run noisy commands through tools/q.mjs."
+      }
+    ]
+  },
+  "tools": [
+    {
+      "path": "tools/q.mjs",
+      "for": "Running a noisy command, keeping its full output in .logs/ and printing the conclusion."
+    },
+    {
+      "path": "tools/dsh-hooks/run-agent.sh",
+      "for": "Starting one dsh agent on the office profile, as the leader of its own process group."
+    },
+    {
+      "path": "tools/sandbox-start.mjs",
+      "for": "Starting a supervisor, a worker or a command inside this sandbox. It files the run with its sandbox field, starts the command as the leader of its own process group, registers it in the ledger by its pid here (the office stores the host pid and group), and only then lets it run. SANDBOX_DIR, MOLE_OFFICE_API, MOLE_OFFICE_AGENT and MOLE_OFFICE_SESSION are already in the environment of everything it starts."
+    },
+    {
+      "path": "tools/slot.mjs",
+      "for": "Taking one of the machine's seats before a whole suite or a browser test file. Inside a sandbox a pid is not the host's, so name the holder by the process row: node tools/slot.mjs acquire <pool> --wait --resource $SANDBOX_PROCESS_ROW, then release the seat when the tests end. tools/sandbox-start.mjs --slot <pool> does this for a command it starts."
+    },
+    {
+      "path": "design/agents/kit/send-message.py",
+      "for": "Sending one message as this agent from anything that can run python3, not only Node: python3 design/agents/kit/send-message.py <workspace> <to> \"<title>\" <body file>. It reads MOLE_OFFICE_AGENT, MOLE_OFFICE_SESSION and MOLE_OFFICE_API from the environment, already set there for anything tools/sandbox-start.mjs starts. The image's python3 is what makes this usable here at all (acceptance finding 3)."
+    }
+  ],
+  "contacts": {
+    "office": {
+      "setting": "MOLE_OFFICE_API",
+      "how": "The clone in the sandbox has no .env of its own, so a process there cannot find the office unless it is told. The launcher passes the host's own value of this setting to each agent it starts. It is not set for the whole container, so a test run inside never picks up the live address by accident."
+    },
+    "secretary": {
+      "card": "design/permissions/roles.json, elevation.onlyThisCardCanHoldIt",
+      "how": "Write to whoever holds that card, through the office's messages. Nobody is named here, because who holds the card changes."
+    }
+  },
+  "mounts": {
+    "declaredIn": "devcontainer.json",
+    "extra": {
+      "access": "readonly",
+      "path": "the same absolute path inside the sandbox as outside",
+      "whenAskedForWritable": "refuse"
+    }
+  },
+  "secrets": {
+    "hostFile": "~/.config/mole-office/sandbox-secrets.env",
+    "hostFileMode": "0600",
+    "passedAs": "docker exec --env-file",
+    "envFile": "Written by the launcher for one command, mode 0600, holding only the names below that the host file sets and that a plain exec command requests with repeated --secret flags; without --secret a plain command gets no secrets, with or without --wait. For a run whose runtime the launcher knows (an agent's run, a worker, a round, an isolated run), it holds only those that runtime's program reads (readBy). It is written in a folder that is not mounted into the sandbox.",
+    "never": ["a command line", "containerEnv or remoteEnv in devcontainer.json", "the image"],
+    "officeKeys": "No key of the office's is in a sandbox: not the person's key, and not the office's own. The office keeps both in one file in the checkout's data folder, which devcontainer.json covers with an empty tmpfs, and nothing is put back inside it. So every tool here, the dsh hooks included, sends an agent's headers and no key. The launcher refuses to start anything in a sandbox that still has something mounted inside a folder it covers.",
+    "names": [
+      { "name": "DEEPSEEK_API_KEY", "readBy": ["dsh", "opencode"] },
+      { "name": "OPENAI_API_KEY", "readBy": ["codex", "opencode"] },
+      { "name": "CODEX_API_KEY", "readBy": ["codex"] },
+      { "name": "ANTHROPIC_API_KEY", "readBy": ["claude", "opencode"] },
+      { "name": "CLAUDE_CODE_OAUTH_TOKEN", "readBy": ["claude"] },
+      { "name": "OPENCODE_API_KEY", "readBy": ["opencode"] },
+      { "name": "OPENROUTER_API_KEY", "readBy": ["opencode"] }
+    ],
+    "namesFoundBy": "Reading the installed programs' own text for these names on 21 September 2026. No run has yet used each one; piece P5 confirms them.",
+    "notCopied": [
+      {
+        "file": "dsh/env",
+        "from": "~/.cache/mole-office/dsh/env",
+        "why": "Not copied since 28 September 2026 (problem epOLxauSbzd9): it holds the DeepSeek key, and a copy in the instance could be read by every run in the sandbox, whatever its runtime. Of dsh's folder only the profiles are copied (copyTheDshFolder in tools/sandbox.mjs). A dsh run gets DEEPSEEK_API_KEY from its own env file (readBy above), and tools/dsh-hooks/run-agent.sh reads no key file in a sandbox. An older instance may still hold a copy: nothing reads it, and it is removed only on the owner's word."
+      }
+    ]
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "why": "A Casting label names a kind of work. Each label is a row of casting_labels with its name and what it means, and casting_label_changes keeps each change to one. A Casting row gains the labels it carries and the instant its program is out until, each with where it came from. The run that applies 0349 makes the labels hard and simple and gives each row of those work groups its label.",
+  "tables": ["casting_label_changes", "casting_labels"],
+  "columnsAddedAfterTheRebuild": {
+    "casting_rows": ["labels", "labels_from", "out_until", "out_until_from"]
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "doors": [
+    "participant.look",
+    "participant.set-look"
+  ],
+  "why": "Both the read and the write of one person's look ask whether a raise carries the press, after the person, in the one guard they share."
+}

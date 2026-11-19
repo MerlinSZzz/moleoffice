@@ -1,0 +1,7 @@
+{
+  "doors": [
+    "office.set-sandbox-login",
+    "office.clear-sandbox-login"
+  ],
+  "why": "Setting and clearing a sandbox login go through one guard."
+}

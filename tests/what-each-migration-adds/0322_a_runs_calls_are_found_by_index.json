@@ -1,0 +1,8 @@
+{
+  "why": "Wave 13y round 120, item 54: one index of the call log by run and then time, so the reads that ask for the calls of some runs by session_id (a run's timeline, the newest call of some runs and of each open run, a run's start steps) search the index instead of reading every call. No table, column, trigger or write changes.",
+  "indexesAddedAfterTheRebuild": {
+    "api_calls": [
+      "api_calls_session_at_idx"
+    ]
+  }
+}

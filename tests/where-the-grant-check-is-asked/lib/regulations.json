@@ -1,0 +1,11 @@
+{
+  "doors": [
+    "record.write",
+    "record.check",
+    "record.change",
+    "revision.restore",
+    "act.revoke",
+    "record:regulation"
+  ],
+  "why": "The two callers are createRecordWithReport and patchRecord. Filing and checking a record reach create; ordinary changes, short forms and appended parts reach patch; revision.restore and act.revoke restore through patch. Only a regulation asks this guard. On change a secretary needs words for this revocation; create stays the person\u2019s act and the grant never revokes."
+}

@@ -1,0 +1,6 @@
+{
+  "claude-code": { "program": "claude", "provider": "anthropic", "fastMode": false },
+  "opencode": { "program": "opencode", "provider": null, "fastMode": false },
+  "codex": { "program": "codex", "provider": "openai", "fastMode": false },
+  "dsh": { "program": "dsh", "provider": null, "fastMode": false }
+}

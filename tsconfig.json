@@ -1,0 +1,26 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    // ONE FILE IS JAVASCRIPT, ON PURPOSE, AND IT IS THE SETTINGS DECLARATION.
+    // src/config/settings.mjs is read by tools/session-hook.mjs, which Claude Code spawns with the
+    // bare word `node` — measured as v18.19.1 on this machine, which cannot read TypeScript. The
+    // file carries `// @ts-check` and JSDoc, so it is type-checked as strictly as the rest.
+    "allowJs": true,
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "types": ["node", "vitest/globals"],
+    "paths": { "@shared/*": ["./src/shared/*"] }
+  },
+  // TOOLS JOIN THE TYPECHECK THROUGH .ts OR // @ts-check IN .mjs; checkJs stays off.
+  "include": ["src", "tests", "scripts", "tools", "*.config.ts"]
+}

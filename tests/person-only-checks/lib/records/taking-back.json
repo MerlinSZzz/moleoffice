@@ -1,0 +1,5 @@
+{
+  "sort": "carried",
+  "checks": 1,
+  "why": "revoking an act done on the person's words (assertMayRevokeAnAct). An agent goes through actsForThePerson first, and only after that is a request from another machine refused unless thePersonIsProved."
+}

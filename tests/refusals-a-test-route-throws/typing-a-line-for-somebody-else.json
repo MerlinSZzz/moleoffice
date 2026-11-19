@@ -1,0 +1,47 @@
+{
+  "why": "The office's function that types a line into the person's terminal for somebody else, and the door a secretary types one line through, refuse in these words (wave 13s round 83). Each needs a terminal holder running, or a secretary under the person's grant or carrying the owner's words for one line, and this test's office holds neither. So a test route throws each. tests/a-line-is-typed-for-somebody-else.test.ts meets the first two through the function itself. tests/a-secretary-types-a-line-in-a-terminal.test.ts meets every one but the terminal that ended in the holder's pause through the door, against a real holder and an older one; that one cannot be timed there.",
+  "refusals": [
+    {
+      "code": "terminalHolderTooOld",
+      "status": 409,
+      "english": "Test: the terminal holder is older than this office.",
+      "values": {}
+    },
+    {
+      "code": "terminalLineHalfTyped",
+      "status": 409,
+      "english": "Test: the person has a line half typed.",
+      "values": {}
+    },
+    {
+      "code": "terminalASecretaryTypesALine",
+      "status": 400,
+      "english": "Test: a secretary types one whole line as line.",
+      "values": {}
+    },
+    {
+      "code": "terminalTypingWordsRefused",
+      "status": 403,
+      "english": "Test: the owner's words do not name this line in this terminal.",
+      "values": {}
+    },
+    {
+      "code": "terminalTypedWithoutEnterThePersonTyped",
+      "status": 409,
+      "english": "Test: the person typed in the pause, so Enter was not sent.",
+      "values": {}
+    },
+    {
+      "code": "terminalTypedWithoutEnterEnded",
+      "status": 409,
+      "english": "Test: the terminal ended in the pause, so Enter was not sent.",
+      "values": {}
+    },
+    {
+      "code": "terminalTypedWithoutEnterThePersonEndedTheLine",
+      "status": 409,
+      "english": "Test: the person pressed Enter on the line in the pause, so the office did not press Enter.",
+      "values": {}
+    }
+  ]
+}

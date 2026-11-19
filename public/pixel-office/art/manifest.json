@@ -1,0 +1,524 @@
+{
+  "version": 1,
+  "originalsLocalDirectory": "a folder kept outside this repository",
+  "limits": {
+    "gitImages": 50000000,
+    "originalImages": 1000000000
+  },
+  "bytes": {
+    "gitImages": 8588984,
+    "originalImages": 11102971
+  },
+  "entries": [
+    {
+      "id": "states",
+      "prompt": "Create an ORIGINAL pixel-art character design and sprite reference sheet for Mole Office, using the attached three-mole brand picture only as character identity reference. MUCH SIMPLER than the illustration: chunky clean 32-bit farming-RPG pixels, crisp hard edges, small palette, no gradients, no anti-aliasing, no texture noise. These are unmistakably MOLES, not cats or mice: tiny nearly invisible ears, elongated pale peach muzzle and dark oval nose, broad digging paws, soft rounded bodies, short legs, no long tails. Warm friendly expressions. One 1536x1024 landscape sheet with exactly 4 columns and 3 rows of evenly spaced separate FULL BODY sprites, each centered within its own cell, enormous consistent blank margins, NO cell borders, NO lettering, NO text, NO shadows. Solid perfectly flat light cream background #f5ecd8. Row1: a young small slate mole in blue hoodie typing on a small laptop; an adult broad cocoa mole in green shirt reading a paper; an elder tall silver mole with glasses studying a clipboard; a short round sandy mole with simple trousers holding a little book. Row2: a slate mole carrying a sealed cream envelope; a cocoa mole having a thoughtful discussion with a tiny empty speech bubble; a silver mole holding a finished report with a green check icon; a cream mole waiting calmly next to a tiny sand clock. Row3: a chestnut mole paused with tea cup; a slate mole looking concerned at a small red exclamation sign; a sandy mole smiling with a small green completion star; a neutral slate mole with a small question sign and relaxed paws. No scene or furniture except the tiny held objects. The large sheet should look like enlarged tiny game sprites, with visible squares at least 5-8 actual pixels wide. Style reference, not a copy of any existing game. Keep every sprite distinct and separated for use as a contact sheet in the character wardrobe.",
+      "method": "built-in image_gen",
+      "returnedModel": null,
+      "contentCredential": {
+        "softwareAgents": [
+          {
+            "name": "gpt-image",
+            "version": "2.0"
+          }
+        ],
+        "localValidationState": "Valid",
+        "signatureAndPixelsChecked": {
+          "activeManifest": {
+            "success": [
+              {
+                "code": "timeStamp.validated",
+                "url": "self#jumbf=/c2pa/urn:c2pa:2be2969f-059d-4695-bc88-35cc69ee0a4d/c2pa.signature",
+                "explanation": "timestamp message digest matched: OpenAI TSA Leaf"
+              },
+              {
+                "code": "claimSignature.insideValidity",
+                "url": "self#jumbf=/c2pa/urn:c2pa:2be2969f-059d-4695-bc88-35cc69ee0a4d/c2pa.signature",
+                "explanation": "claim signature valid"
+              },
+              {
+                "code": "claimSignature.validated",
+                "url": "self#jumbf=/c2pa/urn:c2pa:2be2969f-059d-4695-bc88-35cc69ee0a4d/c2pa.signature",
+                "explanation": "claim signature valid"
+              },
+              {
+                "code": "assertion.hashedURI.match",
+                "url": "self#jumbf=/c2pa/urn:c2pa:2be2969f-059d-4695-bc88-35cc69ee0a4d/c2pa.assertions/c2pa.icon",
+                "explanation": "hashed uri matched: self#jumbf=c2pa.assertions/c2pa.icon"
+              },
+              {
+                "code": "assertion.hashedURI.match",
+                "url": "self#jumbf=/c2pa/urn:c2pa:2be2969f-059d-4695-bc88-35cc69ee0a4d/c2pa.assertions/c2pa.actions.v2",
+                "explanation": "hashed uri matched: self#jumbf=c2pa.assertions/c2pa.actions.v2"
+              },
+              {
+                "code": "assertion.hashedURI.match",
+                "url": "self#jumbf=/c2pa/urn:c2pa:2be2969f-059d-4695-bc88-35cc69ee0a4d/c2pa.assertions/c2pa.hash.data",
+                "explanation": "hashed uri matched: self#jumbf=c2pa.assertions/c2pa.hash.data"
+              },
+              {
+                "code": "assertion.dataHash.match",
+                "url": "self#jumbf=/c2pa/urn:c2pa:2be2969f-059d-4695-bc88-35cc69ee0a4d/c2pa.assertions/c2pa.hash.data",
+                "explanation": "data hash valid"
+              }
+            ],
+            "informational": [
+              {
+                "code": "timeStamp.untrusted",
+                "url": "self#jumbf=/c2pa/urn:c2pa:2be2969f-059d-4695-bc88-35cc69ee0a4d/c2pa.signature",
+                "explanation": "timestamp cert untrusted: OpenAI TSA Leaf"
+              }
+            ],
+            "failure": [
+              {
+                "code": "signingCredential.untrusted",
+                "url": "self#jumbf=/c2pa/urn:c2pa:2be2969f-059d-4695-bc88-35cc69ee0a4d/c2pa.signature",
+                "explanation": "signing certificate untrusted"
+              }
+            ]
+          }
+        },
+        "note": "The credential declares gpt-image version 2.0. The reader checks the signature and image hash. Its local trust store does not trust the signing certificate; this is not a claim of trust-list verification."
+      },
+      "original": {
+        "file": "states.png",
+        "sha256": "2f0d94af97bfaf1a1b753b2a8f7bb71ed37d1d9b03565a0b4641460d103a695b",
+        "bytes": 1487432,
+        "width": 1536,
+        "height": 1024
+      },
+      "export": {
+        "file": "states.webp",
+        "sha256": "ccce05634b2731b15aadb07dfe45241a7b3668e6b2247f9d1e573d068524ea8b",
+        "bytes": 1087154,
+        "pixelIdentical": true,
+        "format": "lossless WebP"
+      }
+    },
+    {
+      "id": "woodland",
+      "prompt": "Original 16-bit cozy farming-RPG PIXEL ART background illustration for Mole Office, a woodland office inhabited by moles. Landscape 1536x1024, simple chunky pixels and flat colors with no gradients, no anti-aliasing, no detailed texture noise. Show a charming dollhouse cutaway of a single warm wooden woodland office at dawn: mossy roof, two small desk clusters, one quiet secretary alcove with a blue teapot and letter cubbies, a bookshelf corner for inspectors, a visitor bench by the open door, upper mezzanine desk, wide clear connecting walkways. EMPTY of characters. The furniture should be small simple readable pixel objects. Forest canopy and ferns outside, warm yellow window light, sage green leaves, soft honey wood, slate-blue accents. Rounded burrow doorway with a subtle dark mole-nose-shaped carving above it. No lettering, labels, logos, UI, speech bubbles, or typography. Relaxed inviting spacious composition with large areas of plain floor. Large visible square pixels, equivalent to approximately a 256x170 game art image enlarged nearest neighbor. An original cozy office, NOT any copyrighted game location. This image will be a selectable scene illustration and ambient border behind a live separately rendered room layout.",
+      "method": "built-in image_gen",
+      "returnedModel": null,
+      "contentCredential": {
+        "softwareAgents": [
+          {
+            "name": "gpt-image",
+            "version": "2.0"
+          }
+        ],
+        "localValidationState": "Valid",
+        "signatureAndPixelsChecked": {
+          "activeManifest": {
+            "success": [
+              {
+                "code": "timeStamp.validated",
+                "url": "self#jumbf=/c2pa/urn:c2pa:7b93581a-c445-4610-b524-cc03468bac64/c2pa.signature",
+                "explanation": "timestamp message digest matched: OpenAI TSA Leaf"
+              },
+              {
+                "code": "claimSignature.insideValidity",
+                "url": "self#jumbf=/c2pa/urn:c2pa:7b93581a-c445-4610-b524-cc03468bac64/c2pa.signature",
+                "explanation": "claim signature valid"
+              },
+              {
+                "code": "claimSignature.validated",
+                "url": "self#jumbf=/c2pa/urn:c2pa:7b93581a-c445-4610-b524-cc03468bac64/c2pa.signature",
+                "explanation": "claim signature valid"
+              },
+              {
+                "code": "assertion.hashedURI.match",
+                "url": "self#jumbf=/c2pa/urn:c2pa:7b93581a-c445-4610-b524-cc03468bac64/c2pa.assertions/c2pa.icon",
+                "explanation": "hashed uri matched: self#jumbf=c2pa.assertions/c2pa.icon"
+              },
+              {
+                "code": "assertion.hashedURI.match",
+                "url": "self#jumbf=/c2pa/urn:c2pa:7b93581a-c445-4610-b524-cc03468bac64/c2pa.assertions/c2pa.actions.v2",
+                "explanation": "hashed uri matched: self#jumbf=c2pa.assertions/c2pa.actions.v2"
+              },
+              {
+                "code": "assertion.hashedURI.match",
+                "url": "self#jumbf=/c2pa/urn:c2pa:7b93581a-c445-4610-b524-cc03468bac64/c2pa.assertions/c2pa.hash.data",
+                "explanation": "hashed uri matched: self#jumbf=c2pa.assertions/c2pa.hash.data"
+              },
+              {
+                "code": "assertion.dataHash.match",
+                "url": "self#jumbf=/c2pa/urn:c2pa:7b93581a-c445-4610-b524-cc03468bac64/c2pa.assertions/c2pa.hash.data",
+                "explanation": "data hash valid"
+              }
+            ],
+            "informational": [
+              {
+                "code": "timeStamp.untrusted",
+                "url": "self#jumbf=/c2pa/urn:c2pa:7b93581a-c445-4610-b524-cc03468bac64/c2pa.signature",
+                "explanation": "timestamp cert untrusted: OpenAI TSA Leaf"
+              }
+            ],
+            "failure": [
+              {
+                "code": "signingCredential.untrusted",
+                "url": "self#jumbf=/c2pa/urn:c2pa:7b93581a-c445-4610-b524-cc03468bac64/c2pa.signature",
+                "explanation": "signing certificate untrusted"
+              }
+            ]
+          }
+        },
+        "note": "The credential declares gpt-image version 2.0. The reader checks the signature and image hash. Its local trust store does not trust the signing certificate; this is not a claim of trust-list verification."
+      },
+      "original": {
+        "file": "woodland.png",
+        "sha256": "2f82084cc7bde3c6c498e616aca6d3159c3d3bd5a416169fffeea4be8732ced5",
+        "bytes": 1984922,
+        "width": 1536,
+        "height": 1024
+      },
+      "export": {
+        "file": "woodland.webp",
+        "sha256": "7f13fd5b812acd84f55d5f0c95839bd6e68dd5b029ae7711909520b077a4cd21",
+        "bytes": 1619522,
+        "pixelIdentical": true,
+        "format": "lossless WebP"
+      }
+    },
+    {
+      "id": "greenhouse",
+      "prompt": "Create a DIFFERENT original selectable scene illustration for the same Mole Office pixel-art product. Use the attached woodland scene ONLY as a pixel style reference; completely redesign the building and setting. 1536x1024 landscape, simple enlarged chunky farming-RPG pixel art. A sunlit GREENHOUSE OFFICE beside a quiet pond: airy pale mint metal-and-glass structure, warm terracotta tile floor, wide unobstructed central paths, two small clusters of wooden desks, a visitor bench near the left doorway, a quiet letter-sorting secretary alcove with a rose teapot, a pale wood inspector's bookcase, a raised supervisor nook. Ferns, hanging plants, herbs, soft corals and mint greens, muted ochre highlights, a few pixel butterflies outside. A tiny mole-nose carving over the doorway connects to the brand. EMPTY of all characters, no people or animals, no lettering or symbols or interface. Spacious dollhouse cutaway with clear functional furniture, no clutter. Hard square pixels, minimal shading, warm calm optimistic mood. Not a copy of any existing game. Distinctive low glass roof and open sky, not a recolored woodland cottage.",
+      "method": "built-in image_gen",
+      "returnedModel": null,
+      "contentCredential": {
+        "softwareAgents": [
+          {
+            "name": "gpt-image",
+            "version": "2.0"
+          }
+        ],
+        "localValidationState": "Valid",
+        "signatureAndPixelsChecked": {
+          "activeManifest": {
+            "success": [
+              {
+                "code": "timeStamp.validated",
+                "url": "self#jumbf=/c2pa/urn:c2pa:6f09e323-72b1-47d2-8379-75cac52f8060/c2pa.signature",
+                "explanation": "timestamp message digest matched: OpenAI TSA Leaf"
+              },
+              {
+                "code": "claimSignature.insideValidity",
+                "url": "self#jumbf=/c2pa/urn:c2pa:6f09e323-72b1-47d2-8379-75cac52f8060/c2pa.signature",
+                "explanation": "claim signature valid"
+              },
+              {
+                "code": "claimSignature.validated",
+                "url": "self#jumbf=/c2pa/urn:c2pa:6f09e323-72b1-47d2-8379-75cac52f8060/c2pa.signature",
+                "explanation": "claim signature valid"
+              },
+              {
+                "code": "assertion.hashedURI.match",
+                "url": "self#jumbf=/c2pa/urn:c2pa:6f09e323-72b1-47d2-8379-75cac52f8060/c2pa.assertions/c2pa.icon",
+                "explanation": "hashed uri matched: self#jumbf=c2pa.assertions/c2pa.icon"
+              },
+              {
+                "code": "assertion.hashedURI.match",
+                "url": "self#jumbf=/c2pa/urn:c2pa:6f09e323-72b1-47d2-8379-75cac52f8060/c2pa.assertions/c2pa.actions.v2",
+                "explanation": "hashed uri matched: self#jumbf=c2pa.assertions/c2pa.actions.v2"
+              },
+              {
+                "code": "assertion.hashedURI.match",
+                "url": "self#jumbf=/c2pa/urn:c2pa:6f09e323-72b1-47d2-8379-75cac52f8060/c2pa.assertions/c2pa.hash.data",
+                "explanation": "hashed uri matched: self#jumbf=c2pa.assertions/c2pa.hash.data"
+              },
+              {
+                "code": "assertion.dataHash.match",
+                "url": "self#jumbf=/c2pa/urn:c2pa:6f09e323-72b1-47d2-8379-75cac52f8060/c2pa.assertions/c2pa.hash.data",
+                "explanation": "data hash valid"
+              }
+            ],
+            "informational": [
+              {
+                "code": "timeStamp.untrusted",
+                "url": "self#jumbf=/c2pa/urn:c2pa:6f09e323-72b1-47d2-8379-75cac52f8060/c2pa.signature",
+                "explanation": "timestamp cert untrusted: OpenAI TSA Leaf"
+              }
+            ],
+            "failure": [
+              {
+                "code": "signingCredential.untrusted",
+                "url": "self#jumbf=/c2pa/urn:c2pa:6f09e323-72b1-47d2-8379-75cac52f8060/c2pa.signature",
+                "explanation": "signing certificate untrusted"
+              }
+            ]
+          }
+        },
+        "note": "The credential declares gpt-image version 2.0. The reader checks the signature and image hash. Its local trust store does not trust the signing certificate; this is not a claim of trust-list verification."
+      },
+      "original": {
+        "file": "greenhouse.png",
+        "sha256": "0e04501fc166edc131dccf32a4a32629d86c1de30d74fddde964c3b73ce17a97",
+        "bytes": 2702766,
+        "width": 1536,
+        "height": 1024
+      },
+      "export": {
+        "file": "greenhouse.webp",
+        "sha256": "eba90e6a8c983fe644d9bec8ebac5d3ff0d541013e50d96e71feaaa2d6f8ea0a",
+        "bytes": 2228574,
+        "pixelIdentical": true,
+        "format": "lossless WebP"
+      }
+    },
+    {
+      "id": "night-library",
+      "prompt": "Create a third original selectable scene illustration for the same Mole Office pixel-art product. Use attached scene only for chunky pixel drawing style; COMPLETELY different layout and palette. Landscape 1536x1024, simple 16-bit farming RPG pixel art, crisp enlarged squares, very limited texture. A peaceful MOONLIT LIBRARY OFFICE in an old burrow observatory: a broad circular indigo window showing a crescent moon and a few stars; tall dark plum wooden bookshelves framing the room; two low reading/work tables with brass lamps; a curved secretary letter desk with a cream teapot; a visitor bench near a rounded door on the right; one raised quiet supervisor platform at back left; an inspector research corner on the right with books and a small telescope. Wide uncluttered plum-and-walnut floor paths, warm amber pools of light, lavender shadows, muted blue and lilac furnishings. A little mole nose-and-whiskers carving on the door arch. EMPTY of characters. No people, animals, writing, text labels, signs, interface or typography. Dollhouse cutaway at eye level, large plain floor areas, cozy and elegant rather than spooky. A few gentle fireflies visible outside. Original environment, not any existing game location. Distinct large circular moon window is the main visual signature.",
+      "method": "built-in image_gen",
+      "returnedModel": null,
+      "contentCredential": {
+        "softwareAgents": [
+          {
+            "name": "gpt-image",
+            "version": "2.0"
+          }
+        ],
+        "localValidationState": "Valid",
+        "signatureAndPixelsChecked": {
+          "activeManifest": {
+            "success": [
+              {
+                "code": "timeStamp.validated",
+                "url": "self#jumbf=/c2pa/urn:c2pa:df918301-5347-4453-98a6-96182181653f/c2pa.signature",
+                "explanation": "timestamp message digest matched: OpenAI TSA Leaf"
+              },
+              {
+                "code": "claimSignature.insideValidity",
+                "url": "self#jumbf=/c2pa/urn:c2pa:df918301-5347-4453-98a6-96182181653f/c2pa.signature",
+                "explanation": "claim signature valid"
+              },
+              {
+                "code": "claimSignature.validated",
+                "url": "self#jumbf=/c2pa/urn:c2pa:df918301-5347-4453-98a6-96182181653f/c2pa.signature",
+                "explanation": "claim signature valid"
+              },
+              {
+                "code": "assertion.hashedURI.match",
+                "url": "self#jumbf=/c2pa/urn:c2pa:df918301-5347-4453-98a6-96182181653f/c2pa.assertions/c2pa.icon",
+                "explanation": "hashed uri matched: self#jumbf=c2pa.assertions/c2pa.icon"
+              },
+              {
+                "code": "assertion.hashedURI.match",
+                "url": "self#jumbf=/c2pa/urn:c2pa:df918301-5347-4453-98a6-96182181653f/c2pa.assertions/c2pa.actions.v2",
+                "explanation": "hashed uri matched: self#jumbf=c2pa.assertions/c2pa.actions.v2"
+              },
+              {
+                "code": "assertion.hashedURI.match",
+                "url": "self#jumbf=/c2pa/urn:c2pa:df918301-5347-4453-98a6-96182181653f/c2pa.assertions/c2pa.hash.data",
+                "explanation": "hashed uri matched: self#jumbf=c2pa.assertions/c2pa.hash.data"
+              },
+              {
+                "code": "assertion.dataHash.match",
+                "url": "self#jumbf=/c2pa/urn:c2pa:df918301-5347-4453-98a6-96182181653f/c2pa.assertions/c2pa.hash.data",
+                "explanation": "data hash valid"
+              }
+            ],
+            "informational": [
+              {
+                "code": "timeStamp.untrusted",
+                "url": "self#jumbf=/c2pa/urn:c2pa:df918301-5347-4453-98a6-96182181653f/c2pa.signature",
+                "explanation": "timestamp cert untrusted: OpenAI TSA Leaf"
+              }
+            ],
+            "failure": [
+              {
+                "code": "signingCredential.untrusted",
+                "url": "self#jumbf=/c2pa/urn:c2pa:df918301-5347-4453-98a6-96182181653f/c2pa.signature",
+                "explanation": "signing certificate untrusted"
+              }
+            ]
+          }
+        },
+        "note": "The credential declares gpt-image version 2.0. The reader checks the signature and image hash. Its local trust store does not trust the signing certificate; this is not a claim of trust-list verification."
+      },
+      "original": {
+        "file": "night-library.png",
+        "sha256": "5fc633a9fc0802184004b865049d4a981111d582ad024696780d4b4d11b4e80c",
+        "bytes": 2152121,
+        "width": 1536,
+        "height": 1024
+      },
+      "export": {
+        "file": "night-library.webp",
+        "sha256": "db40e33cd914889c56c5ba26efac90b627df8f5d81e32845a36ee4816db5bb40",
+        "bytes": 1707278,
+        "pixelIdentical": true,
+        "format": "lossless WebP"
+      }
+    },
+    {
+      "id": "clothes",
+      "prompt": "Original modular MOLE OFFICE pixel-game WARDROBE DESIGN SHEET. Match attached mole character sheet's friendly palette, but draw ONLY separate clothing items, no characters, no bodies, no heads, no hands. Very simple coarse 16-bit pixel art with crisp outlines, 3 shades per material, each item looks like a tiny 32x32 inventory icon enlarged. 1536x1024 landscape, EXACT 4-column by 4-row evenly spaced invisible grid. Plain uniform cream #f5ecd8 background, no text or labels, no lines, no decorative objects. Each item FULLY isolated in its own cell with generous blank margins. Reading order left to right: row1 blue buttoned shirt; green hoodie; ochre cable-knit jumper; plum waistcoat. Row2 cream apron; blue long coat with tiny golden stars; charcoal plain trousers; sage shorts. Row3 blue overalls; rose-and-ochre patchwork trousers; brown boots pair; blue trainers pair. Row4 cream slippers pair; green flower-decorated boots pair; EMPTY CELL; EMPTY CELL. Fourteen items total, the last two cells completely blank. These are clothes fitted to small round cartoon moles. Make silhouettes distinct and readable. Don't add any hats or extra accessories. This sheet will be shown as a visual inventory in a character customization feature.",
+      "method": "built-in image_gen",
+      "returnedModel": null,
+      "contentCredential": {
+        "softwareAgents": [
+          {
+            "name": "gpt-image",
+            "version": "2.0"
+          }
+        ],
+        "localValidationState": "Valid",
+        "signatureAndPixelsChecked": {
+          "activeManifest": {
+            "success": [
+              {
+                "code": "timeStamp.validated",
+                "url": "self#jumbf=/c2pa/urn:c2pa:9e2e756b-fda1-49ca-b750-737c8a999d7b/c2pa.signature",
+                "explanation": "timestamp message digest matched: OpenAI TSA Leaf"
+              },
+              {
+                "code": "claimSignature.insideValidity",
+                "url": "self#jumbf=/c2pa/urn:c2pa:9e2e756b-fda1-49ca-b750-737c8a999d7b/c2pa.signature",
+                "explanation": "claim signature valid"
+              },
+              {
+                "code": "claimSignature.validated",
+                "url": "self#jumbf=/c2pa/urn:c2pa:9e2e756b-fda1-49ca-b750-737c8a999d7b/c2pa.signature",
+                "explanation": "claim signature valid"
+              },
+              {
+                "code": "assertion.hashedURI.match",
+                "url": "self#jumbf=/c2pa/urn:c2pa:9e2e756b-fda1-49ca-b750-737c8a999d7b/c2pa.assertions/c2pa.icon",
+                "explanation": "hashed uri matched: self#jumbf=c2pa.assertions/c2pa.icon"
+              },
+              {
+                "code": "assertion.hashedURI.match",
+                "url": "self#jumbf=/c2pa/urn:c2pa:9e2e756b-fda1-49ca-b750-737c8a999d7b/c2pa.assertions/c2pa.actions.v2",
+                "explanation": "hashed uri matched: self#jumbf=c2pa.assertions/c2pa.actions.v2"
+              },
+              {
+                "code": "assertion.hashedURI.match",
+                "url": "self#jumbf=/c2pa/urn:c2pa:9e2e756b-fda1-49ca-b750-737c8a999d7b/c2pa.assertions/c2pa.hash.data",
+                "explanation": "hashed uri matched: self#jumbf=c2pa.assertions/c2pa.hash.data"
+              },
+              {
+                "code": "assertion.dataHash.match",
+                "url": "self#jumbf=/c2pa/urn:c2pa:9e2e756b-fda1-49ca-b750-737c8a999d7b/c2pa.assertions/c2pa.hash.data",
+                "explanation": "data hash valid"
+              }
+            ],
+            "informational": [
+              {
+                "code": "timeStamp.untrusted",
+                "url": "self#jumbf=/c2pa/urn:c2pa:9e2e756b-fda1-49ca-b750-737c8a999d7b/c2pa.signature",
+                "explanation": "timestamp cert untrusted: OpenAI TSA Leaf"
+              }
+            ],
+            "failure": [
+              {
+                "code": "signingCredential.untrusted",
+                "url": "self#jumbf=/c2pa/urn:c2pa:9e2e756b-fda1-49ca-b750-737c8a999d7b/c2pa.signature",
+                "explanation": "signing certificate untrusted"
+              }
+            ]
+          }
+        },
+        "note": "The credential declares gpt-image version 2.0. The reader checks the signature and image hash. Its local trust store does not trust the signing certificate; this is not a claim of trust-list verification."
+      },
+      "original": {
+        "file": "clothes.png",
+        "sha256": "c506ff95eabb1a84aaea0bee18dc64dfb1764b970b6bb03dabe8b5e2f8c4b98b",
+        "bytes": 1415450,
+        "width": 1536,
+        "height": 1024
+      },
+      "export": {
+        "file": "clothes.webp",
+        "sha256": "b997d922034714e79aeb00d96ec0f7663731d171701e90fbb3453ca3419eb4de",
+        "bytes": 998764,
+        "pixelIdentical": true,
+        "format": "lossless WebP"
+      }
+    },
+    {
+      "id": "accessories",
+      "prompt": "Original MOLE OFFICE accessory inventory pixel art. Match the attached clothing sheet in scale, bold chunky pixels, simple shapes, warm muted palette, cream #f5ecd8 background. Draw NO characters, bodies, faces, hands, lettering, text labels or grid lines. Landscape 1536x1024. EXACTLY a regular 4-column by 4-row evenly spaced invisible grid, each isolated item centered with ample empty margin. Row1: blue flat cap; ochre knitted beanie; golden yellow mining helmet with round lamp; a pink daisy hair clip. Row2: plum pointed hat with a tiny crescent moon; round brown glasses; square blue glasses; green headphones. Row3: gold star-shaped glasses; cream name badge with a blue clip and only abstract tiny lines; green leaf pin; silver crescent-moon pin. Row4: red scarf; green bow tie; blue scarf with golden stars; EMPTY CELL. Fifteen items total. Small wearable accessories sized for a friendly cartoon mole, each silhouette clearly different. Only one item per cell, except eyeglasses are naturally a complete pair. Large visible square pixels, no gradients or airbrush. This is a design sheet for modular character customization in a cozy productivity app.",
+      "method": "built-in image_gen",
+      "returnedModel": null,
+      "contentCredential": {
+        "softwareAgents": [
+          {
+            "name": "gpt-image",
+            "version": "2.0"
+          }
+        ],
+        "localValidationState": "Valid",
+        "signatureAndPixelsChecked": {
+          "activeManifest": {
+            "success": [
+              {
+                "code": "timeStamp.validated",
+                "url": "self#jumbf=/c2pa/urn:c2pa:883cc540-8917-4423-9857-cb0fc01f0b3b/c2pa.signature",
+                "explanation": "timestamp message digest matched: OpenAI TSA Leaf"
+              },
+              {
+                "code": "claimSignature.insideValidity",
+                "url": "self#jumbf=/c2pa/urn:c2pa:883cc540-8917-4423-9857-cb0fc01f0b3b/c2pa.signature",
+                "explanation": "claim signature valid"
+              },
+              {
+                "code": "claimSignature.validated",
+                "url": "self#jumbf=/c2pa/urn:c2pa:883cc540-8917-4423-9857-cb0fc01f0b3b/c2pa.signature",
+                "explanation": "claim signature valid"
+              },
+              {
+                "code": "assertion.hashedURI.match",
+                "url": "self#jumbf=/c2pa/urn:c2pa:883cc540-8917-4423-9857-cb0fc01f0b3b/c2pa.assertions/c2pa.icon",
+                "explanation": "hashed uri matched: self#jumbf=c2pa.assertions/c2pa.icon"
+              },
+              {
+                "code": "assertion.hashedURI.match",
+                "url": "self#jumbf=/c2pa/urn:c2pa:883cc540-8917-4423-9857-cb0fc01f0b3b/c2pa.assertions/c2pa.actions.v2",
+                "explanation": "hashed uri matched: self#jumbf=c2pa.assertions/c2pa.actions.v2"
+              },
+              {
+                "code": "assertion.hashedURI.match",
+                "url": "self#jumbf=/c2pa/urn:c2pa:883cc540-8917-4423-9857-cb0fc01f0b3b/c2pa.assertions/c2pa.hash.data",
+                "explanation": "hashed uri matched: self#jumbf=c2pa.assertions/c2pa.hash.data"
+              },
+              {
+                "code": "assertion.dataHash.match",
+                "url": "self#jumbf=/c2pa/urn:c2pa:883cc540-8917-4423-9857-cb0fc01f0b3b/c2pa.assertions/c2pa.hash.data",
+                "explanation": "data hash valid"
+              }
+            ],
+            "informational": [
+              {
+                "code": "timeStamp.untrusted",
+                "url": "self#jumbf=/c2pa/urn:c2pa:883cc540-8917-4423-9857-cb0fc01f0b3b/c2pa.signature",
+                "explanation": "timestamp cert untrusted: OpenAI TSA Leaf"
+              }
+            ],
+            "failure": [
+              {
+                "code": "signingCredential.untrusted",
+                "url": "self#jumbf=/c2pa/urn:c2pa:883cc540-8917-4423-9857-cb0fc01f0b3b/c2pa.signature",
+                "explanation": "signing certificate untrusted"
+              }
+            ]
+          }
+        },
+        "note": "The credential declares gpt-image version 2.0. The reader checks the signature and image hash. Its local trust store does not trust the signing certificate; this is not a claim of trust-list verification."
+      },
+      "original": {
+        "file": "accessories.png",
+        "sha256": "f641d70ea5bf4ca1da106fa8b393ed9fba10303c74cd3be3f15518208175328e",
+        "bytes": 1360280,
+        "width": 1536,
+        "height": 1024
+      },
+      "export": {
+        "file": "accessories.webp",
+        "sha256": "f1d81ec619ad8c0cef7e25d906b46a077025f57760d853fdf822ed5f1d667bfd",
+        "bytes": 947692,
+        "pixelIdentical": true,
+        "format": "lossless WebP"
+      }
+    }
+  ]
+}

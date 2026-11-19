@@ -1,0 +1,6 @@
+{
+  "doors": [
+    "plugins.switch"
+  ],
+  "why": "The door that changes which plugins are on asks whether the secretary acts for the person before it writes the change."
+}

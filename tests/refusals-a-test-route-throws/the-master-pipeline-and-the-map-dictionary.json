@@ -1,0 +1,53 @@
+{
+  "why": "Made-up routes test the shared serializer for the refusals of marking a project's master pipeline and of the map dictionary (wave 13u round 216, package BV). Their real doors are met in tests/a-project-names-its-master-pipeline.test.ts (all six master pipeline refusals: a project that is not there, a secretary with no reason, another agent and a secretary's name with no key, and a missing record, a module and a pipeline of another project), tests/the-project-board-counts-only-runs-that-act.test.ts (a project that is not there, through the board's door) and tests/the-map-dictionary-answers-block-module-and-owning-line.test.ts (both or neither of path and module, and a module id that is not a module).",
+  "refusals": [
+    {
+      "code": "masterPipelineNotAllowed",
+      "status": 403,
+      "english": "Test: only a secretary with a reason, or the owner, may mark a project's master pipeline.",
+      "values": {}
+    },
+    {
+      "code": "masterPipelineNeedsAReason",
+      "status": 400,
+      "english": "Test: a secretary who marks a master pipeline gives a reason.",
+      "values": {}
+    },
+    {
+      "code": "masterPipelineNoSuchProject",
+      "status": 404,
+      "english": "Test: there is no such project here.",
+      "values": {}
+    },
+    {
+      "code": "masterPipelineNoSuchRecord",
+      "status": 400,
+      "english": "Test: no live record has this id.",
+      "values": {}
+    },
+    {
+      "code": "masterPipelineNotAPipeline",
+      "status": 400,
+      "english": "Test: this record is not a pipeline.",
+      "values": {}
+    },
+    {
+      "code": "masterPipelineInAnotherProject",
+      "status": 400,
+      "english": "Test: this pipeline is in another project.",
+      "values": {}
+    },
+    {
+      "code": "mapDictionaryAsksOneThing",
+      "status": 400,
+      "english": "Test: the dictionary is asked one thing at a time.",
+      "values": {}
+    },
+    {
+      "code": "mapDictionaryNoSuchModule",
+      "status": 404,
+      "english": "Test: there is no live module with this id in this project.",
+      "values": {"module": "test-no-such-module"}
+    }
+  ]
+}

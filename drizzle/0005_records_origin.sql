@@ -1,0 +1,16 @@
+-- Give every record somewhere to say how it entered the corpus.
+--
+-- ADDITIVE, AND NOT A ROW REWRITE. One column, nullable, no default, no index, no constraint. No
+-- existing value is read or changed by this file, and no table is rebuilt, so this migration is NOT
+-- an exception under decision 13 and is not on the REBUILDS list in tests/migration.test.ts.
+--
+-- THE COLUMN ARRIVES EMPTY ON EVERY ROW AND THAT IS DELIBERATE. `NULL` means nobody has recorded
+-- how this record got here, which is a different fact from `authored` and the expensive one to
+-- confuse — see the `origin` column in src/server/db/schema.ts. Filling it with a default here would
+-- state 385 judgements nobody made, in the direction that hides the ones the column exists to find.
+--
+-- The values are written afterwards, by src/server/db/origin-migration.ts, one row at a time, from
+-- a measurement its caller hands it. That step is a DATA migration: it
+-- reads a corpus, refuses to guess, and reports what it left alone, none of which a `.sql` file can
+-- do. It is named as an exception under decision 13 in its own header.
+ALTER TABLE `records` ADD `origin` text;

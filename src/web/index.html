@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- Tells the browser this page is styled for both schemes, so form controls and
+         scrollbars follow the system setting rather than staying stubbornly light. -->
+    <meta name="color-scheme" content="light dark" />
+    <!-- Runs before styles so a returning browser's saved theme is ready at first paint. -->
+    <script src="./mole-loading/early-theme.js"></script>
+    <link rel="stylesheet" href="./styles.css" />
+    <!-- The faces the six themes use. They are served from public/fonts, never from the internet. -->
+    <link rel="stylesheet" href="/fonts/fonts.css" />
+    <!--
+      THE TAB'S ICON AND THE HOME SCREEN'S ICON ARE THE OWNER'S OWN PNG LOGO, the same picture the
+      sidebar mark shows. The icon files in ./logo are copies of assets/mole-office.png, made by
+      resizing it into a square with a border above and below: the 16 pixels a tab draws an icon
+      at, twice that for double-density screens, and 180 pixels for an iPhone's Home Screen. Vite
+      serves them and hashes their names in the build. The manifest's 192, 512 and 512 maskable
+      copies are in public/logo, served unhashed at the root. All of the Home Screen copies have
+      the office's light page colour behind the picture, because an iPhone draws a see-through
+      icon on black and the logo's dark edge would disappear.
+      tests/the-brand-carries-the-owners-logo.test.ts checks that they are copies of the owner's
+      PNG and that the built page names files that are really there.
+    -->
+    <link rel="icon" type="image/png" sizes="16x16" href="./logo/mole-office-tab-16.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="./logo/mole-office-tab-32.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="./logo/mole-office-touch-180.png" />
+    <!--
+      THE PAGE AS AN APP, so an iPhone or iPad can add it to the Home Screen and take notifications there, which is
+      the only way those devices take them from a web page. The file is
+      in public/, served at the root beside the push worker. Its larger Home Screen icons are in
+      public/logo, served at the root too.
+    -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <title>Mole Office</title>
+  </head>
+  <body>
+    <!--
+      This message is what you see until the app starts. React replaces the contents of #root
+      when it mounts, so its failure is only ever visible when the JavaScript failed to load or
+      threw on the way up. A blank white page tells you nothing; this tells you where to look.
+
+      IT NAMES NO CAUSE IT HAS NOT BEEN TOLD, AND THAT IS THE FIX MADE ON 1 SEPTEMBER 2026. It
+      used to say to check the proxy key in vite.config.ts. That had been the cause once, and it
+      was NOT the cause the day this page was last seen: the dev server had been serving a
+      seven-hour-old transform of a file outside the Vite root, and a person following the sentence
+      on the screen opened the wrong file. A guessed cause sends a reader to the wrong file.
+
+      IT NOW NAMES THE CAUSE IT IS TOLD, and that is criterion G4's half, made on 3 September 2026.
+      This page cannot work out which module failed, but the browser knows and says so in an error
+      event, and this page can be listening before the app's first module is fetched. The script
+      below is that listener. It reports what the browser reported, and it says "not named by the
+      browser" when the browser did not name it, which is a different sentence from a guess.
+
+      TWO CAUSES WORTH KNOWING, FOR WHOEVER IS READING THE SOURCE RATHER THAN THE SCREEN. Neither
+      belongs on the screen, because putting either there sends a reader to a file before the
+      console has told them which file it is.
+
+        · A proxy key of '/api' in vite.config.ts matches by prefix, so it also swallows this
+          app's own module at /api.ts and forwards it to the API server, which answers 404. The
+          key needs the trailing slash: '/api/'.
+        · A saved file under src/shared can leave the dev server serving an old transform of it,
+          because src/shared is outside the Vite root (src/web). Touching the file does not clear
+          it; the dev server has to be restarted.
+    -->
+    <!--
+      WHAT THIS PAGE CAN SAY ABOUT ITS OWN FAILURE — criterion G4 of design/ground/ACCEPTANCE.md:
+      *the "did not start" page names the module that failed and the world it expected.*
+
+      IT USED TO SAY IT COULD NOT KNOW, and that was true of the HTML and false of the browser. The
+      browser fires an error event naming the module that would not load or that threw, and this
+      page can listen for it before the app's first module is fetched. So it does, and it writes
+      three facts into the notice below:
+
+        · WHICH MODULE FAILED, from the browser's own error event, with the browser's own message.
+        · WHICH API THIS PAGE EXPECTED. Every request the app makes is to `/api` on the page's own
+          address; in development Vite forwards that to MOLE_OFFICE_PORT. A reader who has just
+          been told the app did not start needs to know which server it would have talked to.
+        · THE WORLD OF THE LAST REPLY THIS TAB SAW, when this tab has seen one. `lib/world.ts`
+          leaves it in sessionStorage on every reply, so a page that worked a moment ago and has
+          stopped starting can say what it was talking to before it stopped.
+        · WHETHER THE DEV SUPERVISOR CAN START A SERVER AT ALL, read from the file it writes when a
+          run of starts has all failed. On 4 September 2026 a supervisor
+          failed to start a server ninety-six times in a row over forty-seven minutes and every
+          reading that could have said so needed a server to answer. Vite serves that file at
+          /mole-office/the-supervisor-cannot-start-a-server, and this is the one reader of it that
+          works when nothing is answering. A build has no supervisor and no such address, and the
+          fetch simply fails, which says nothing rather than guessing.
+
+      PLAIN, INLINE, AND NOT A MODULE. A module would be fetched and transformed by the same
+      machinery this exists to report the failure of. It touches nothing the app owns.
+
+      THE STORAGE KEY IS WRITTEN HERE AND IN src/web/lib/world.ts, which is the one fact in two
+      places this repository keeps finding. It cannot be imported — see the paragraph above — so
+      `tests/the-page-shouts-when-it-is-in-the-wrong-world.test.ts` fails when the two disagree.
+    -->
+    <!--
+      WHILE THE APP'S FILES ARE ARRIVING, THE PAGE SAYS IT IS LOADING. Until 8 November 2026 the
+      notice below said "Mole Office did not start." after a fixed 2.5 seconds, whatever the
+      reason. A friend of the owner opened the office from another machine, the first load was
+      about 20 MB, and the red box stayed up for as long as the files took to arrive. It read like
+      a fault, and it made people reload again and again.
+
+      So the notice has four states, and the script below chooses between them. It says the app
+      is loading until the app's own script has run, and then, while main.tsx waits for the
+      office's first read, that it is starting. The loading state is the moving
+      mole, centred in the window, with only its one sentence under it; the paragraph that used to
+      follow the sentence is gone. When the browser names a failure, or the office cannot be
+      reached at all, it says the app did not start, and what to do. After a minute with no failure
+      named it says only that the app has not started after a minute, in no failure colour (wave
+      13y round 148): nothing has failed that anybody knows of. When the app's own script has run,
+      the files have arrived, so that minute's words are about the office instead: after a minute
+      of starting it says the office has not answered, in no failure colour (wave 13y round 171),
+      and a failure named later still replaces them. The files' minute counts from this page
+      loading; the office's minute counts from the app's script running, because those are two
+      different waits and each word is true of its own. With no data-boot set, the failure
+      shows, so a browser that runs no script at all is told the truth. The developer lines are
+      under a closed Details fold, in both the failure and the minute.
+      tests/a-slow-first-load-says-it-is-loading.test.ts proves each state in a browser.
+    -->
+    <div id="root">
+      <div class="boot-notice">
+        <div class="boot-loading" role="status">
+          <div class="boot-brand">
+            <!-- The loading mole: the parts of mole.svg, which public/mole-loading/player.js moves. -->
+            <svg data-boot-mole data-frame="f15" data-phase="idle" viewBox="0 0 477 406" width="141" height="120" aria-hidden="true">
+              <defs><clipPath id="boot-mole-clip"><rect width="477" height="400" /></clipPath></defs>
+              <use href="./mole-loading/mole.svg#back" />
+              <g clip-path="url(#boot-mole-clip)">
+                <g data-boot-mole-body>
+                  <use href="./mole-loading/mole.svg#edge" />
+                  <use href="./mole-loading/mole.svg#jacket" />
+                  <use href="./mole-loading/mole.svg#bust" />
+                  <g data-boot-mole-eye="left"><use href="./mole-loading/mole.svg#eye-left" /></g>
+                  <g data-boot-mole-eye="right"><use href="./mole-loading/mole.svg#eye-right" /></g>
+                  <use href="./mole-loading/mole.svg#collar" />
+                  <use href="./mole-loading/mole.svg#paw-left" />
+                  <use href="./mole-loading/mole.svg#paw-right" />
+                </g>
+              </g>
+            </svg>
+            <strong id="boot-words">Mole Office is loading.</strong>
+          </div>
+        </div>
+        <div class="boot-slow" data-boot-slow="files" role="status">
+          <strong>Mole Office has not started after a minute.</strong>
+          <p>
+            The browser has named no failure in a minute of waiting, so the app's files may still be
+            arriving over a slow connection. If they arrive, this page changes by itself.
+          </p>
+          <p>To try again, reload the page.</p>
+        </div>
+        <div class="boot-slow" data-boot-slow="office" role="status" hidden>
+          <strong>Mole Office has not answered after a minute.</strong>
+          <p>
+            The app's files have arrived, but the office that serves this page has not answered the
+            page's first request. If the office answers, this page changes by itself.
+          </p>
+          <p>To try again, reload the page.</p>
+        </div>
+        <div class="boot-failure">
+          <strong>Mole Office did not start.</strong>
+          <p id="boot-failure-why">
+            The page loaded but the app's JavaScript did not run.
+          </p>
+          <p>To try again, reload the page.</p>
+        </div>
+        <details class="boot-details">
+          <summary>Details</summary>
+          <p id="boot-module">
+            Nothing has told this page which module failed yet. The browser console knows: open it and
+            read the first line in red.
+          </p>
+          <p id="boot-api"></p>
+          <p id="boot-world"></p>
+          <p id="boot-supervisor"></p>
+        </details>
+      </div>
+    </div>
+    <script>
+      (function () {
+        var say = function (id, text) {
+          var node = document.getElementById(id)
+          if (node) node.textContent = text
+        }
+        // Loading, from the first moment; failed once something says so; slow after a quiet minute, in the files'
+        // words or the office's.
+        var notice = document.querySelector('.boot-notice')
+        if (notice) notice.setAttribute('data-boot', 'loading')
+        var failed = function () {
+          if (window.moleBoot) window.moleBoot.cancel()
+          if (notice) notice.setAttribute('data-boot', 'failed')
+        }
+        try {
+          say('boot-api', 'This page expected its Mole Office at ' + window.location.origin + '/api.')
+          var last = window.sessionStorage.getItem('mole-office.world.last-reply')
+          say(
+            'boot-world',
+            last
+              ? 'The last reply this tab read came from: ' + last + '.'
+              : 'This tab has not read a reply from any Mole Office, so there is no world to name.',
+          )
+        } catch (whatever) {
+          say('boot-world', 'This browser will not let the page remember anything, so there is no world to name.')
+        }
+        var told = false
+        // WHICH SLOW NOTICE. The page has two, and only one is drawn. The files' words are for a page whose app
+        // script has not run; the office's words are for a page whose script has run and is waiting for an answer.
+        // Both carry the boot-slow class, so the failure state hides both when a failure is named.
+        var slow = function (theOfficeIsWaiting) {
+          if (notice) notice.setAttribute('data-boot', 'slow')
+          var files = document.querySelector('.boot-slow[data-boot-slow="files"]')
+          var office = document.querySelector('.boot-slow[data-boot-slow="office"]')
+          if (!files || !office) return
+          files.hidden = theOfficeIsWaiting
+          office.hidden = !theOfficeIsWaiting
+        }
+        // THE APP'S OWN SCRIPT HAS RUN, and main.tsx is asking the office who owns it. The files have arrived, so
+        // "loading" would be a lie; nothing has failed, so the words stay quiet.
+        var started = false
+        window.moleBootStarted = function () {
+          if (told || started) return
+          started = true
+          if (notice) notice.setAttribute('data-boot', 'starting')
+          say('boot-words', 'Mole Office is starting.')
+          // THE OFFICE'S OWN MINUTE, counting from here rather than from the page's load. The timer below counts the
+          // files' minute and does nothing once the app's script has run, because the files are then no longer what
+          // the page waits for. A page whose script runs at second 50 therefore says nothing about the office until
+          // second 110, which is the first moment its words are true.
+          setTimeout(function () {
+            if (told || !document.getElementById('boot-module')) return
+            slow(true)
+          }, 60000)
+        }
+        // THE OFFICE ITSELF CANNOT BE REACHED. The page says it did not start, in the failure colours, and says why in
+        // its own words rather than drawing the browser's connection sentence in place of the app.
+        window.moleBootUnreachable = function (where) {
+          if (told || !document.getElementById('boot-module')) return
+          told = true
+          say('boot-failure-why', 'The page loaded but it could not reach its office.')
+          say('boot-module', 'The office that serves this page could not be reached at ' + where + '.')
+          failed()
+        }
+        var blame = function (what, why) {
+          // Only while the app has not started. Once React has mounted, this notice is gone from
+          // the page and a later error belongs to the running app, not to a failure to start.
+          if (told || !document.getElementById('boot-module')) return
+          told = true
+          say('boot-module', 'The module that failed is ' + what + ' — ' + why)
+          // A failure the browser named replaces the words that the files may still be arriving.
+          failed()
+        }
+        window.addEventListener(
+          'error',
+          function (event) {
+            var target = event.target
+            if (target && target !== window && (target.src || target.href)) {
+              blame(target.src || target.href, 'the browser could not load it at all.')
+              return
+            }
+            blame(event.filename || 'not named by the browser', event.message || 'it threw on the way up.')
+          },
+          true,
+        )
+        // THE FILES' MINUTE, AND ONLY THE FILES'. A minute is long past what the files take on a
+        // working connection, but the browser has named nothing, so the files may still be on their
+        // way. The words say only that: it has not started yet, with no failure colour. This timer
+        // does nothing once the app's script has run, because the office's minute is the one started
+        // in window.moleBootStarted above.
+        setTimeout(function () {
+          if (told || started || !document.getElementById('boot-module')) return
+          slow(false)
+        }, 60000)
+        // The supervisor's own trouble, asked for plainly. A failure here adds no line at all:
+        // there being no supervisor is the ordinary case and is not news.
+        try {
+          fetch('/mole-office/the-supervisor-cannot-start-a-server', { cache: 'no-store' })
+            .then(function (reply) {
+              return reply.status === 200 ? reply.json() : null
+            })
+            .then(function (trouble) {
+              if (!trouble || !trouble.says) return
+              say(
+                'boot-supervisor',
+                trouble.says +
+                  ' Stop the supervisor by its process group and start it again: kill -TERM -' +
+                  trouble.supervisorPgid +
+                  ', then npm run dev:server.',
+              )
+            })
+            .catch(function () {})
+        } catch (whatever) {
+          // No fetch, or no Vite. Nothing is claimed either way.
+        }
+        window.addEventListener('unhandledrejection', function (event) {
+          var reason = event.reason
+          blame(
+            'not named by the browser',
+            (reason && reason.message) || String(reason) || 'a promise was rejected and nothing caught it.',
+          )
+        })
+      })()
+    </script>
+    <script src="./mole-loading/player.js"></script>
+    <script type="module" src="./main.tsx"></script>
+  </body>
+</html>

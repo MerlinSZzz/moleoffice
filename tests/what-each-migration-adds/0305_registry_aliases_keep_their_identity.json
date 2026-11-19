@@ -1,0 +1,4 @@
+{
+  "why": "Permanent typed registry identity history is authored, exported and restored without changing existing registry rows or historical bytes.",
+  "tables": ["registry_aliases"]
+}

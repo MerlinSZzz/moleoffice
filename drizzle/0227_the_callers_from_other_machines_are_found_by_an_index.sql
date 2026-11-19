@@ -1,0 +1,20 @@
+-- THE CALLERS FROM OTHER MACHINES ARE FOUND BY AN INDEX, NOT BY READING THE WHOLE CALL LOG. Wave 13w, round 25.
+--
+-- `clientsFromOtherMachines` in src/server/lib/usage-reads.ts counts the calls that came from another machine, grouped
+-- by address. The machine reading (`GET /api/runtime`) and the access page both ask it. Without an index SQLite read
+-- every row of `api_calls` and sorted the remote ones by address. On a copy of the made-up office grown to 1,400,252
+-- call rows, 47,488 of them remote, that took about 64 ms each time, warm. The live office held 1,535,356 rows on
+-- 11 October 2026.
+--
+-- WITH THIS INDEX THE SAME READ TOOK ABOUT 2 MS, on the same copy, and SQLite reads the index alone: the plan is
+-- "SCAN api_calls USING COVERING INDEX api_calls_from_other_machines_idx", with the origin passed as a parameter.
+--
+-- WHY ONLY THE REMOTE ROWS. The query asks only for them, and they are a few per cent of the table. The index cost
+-- about 0.8 MB on that copy and took 77 ms to build. An index over every row, led by the origin, answered in 2.5 ms
+-- but cost 25 MB and took 490 ms to build.
+--
+-- IT IS 0227, INDEX 227. Since round 17d a migration from index 212 on is applied because its hash is missing, not
+-- because its "when" is later (src/config/migration-look.mjs), so this one's "when", 1791368770095, decides nothing.
+--
+-- ADDITIVE, AND IT WRITES NO ROW. One CREATE INDEX and nothing else.
+CREATE INDEX IF NOT EXISTS `api_calls_from_other_machines_idx` ON `api_calls` (`client_addr`,`at_ms`) WHERE client_origin = 'remote';

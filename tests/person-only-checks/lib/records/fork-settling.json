@@ -1,0 +1,5 @@
+{
+  "sort": "carried",
+  "checks": 2,
+  "why": "settling a fork with a link and replacing a fork with another (assertMaySettleFork, assertMayReplaceAFork). An agent goes through theSecretaryActingForThePerson or actsForThePerson first, and only after that is a request from another machine refused unless thePersonIsProved, so a raise carries both."
+}

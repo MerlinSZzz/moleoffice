@@ -1,0 +1,25 @@
+<!-- Copyright © 2026 Zhengyang Shen -->
+<!-- Licensed under the MIT License. See LICENSE. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-label="An owl">
+<title>Owl</title>
+<defs><clipPath id="owl-disc"><circle cx="128" cy="128" r="128"/></clipPath></defs>
+<g clip-path="url(#owl-disc)">
+<circle cx="128" cy="128" r="128" fill="#8F64B9"/>
+<path d="M58 84 L66 22 L110 66 Z" fill="#8E6A46"/>
+<path d="M198 84 L190 22 L146 66 Z" fill="#8E6A46"/>
+<ellipse cx="128" cy="142" rx="84" ry="80" fill="#8E6A46"/>
+<g fill="#B08A62">
+<path d="M96 214 q14 -18 28 0" stroke="#B08A62" stroke-width="6" fill="none" stroke-linecap="round"/>
+<path d="M132 214 q14 -18 28 0" stroke="#B08A62" stroke-width="6" fill="none" stroke-linecap="round"/>
+<path d="M78 194 q14 -18 28 0" stroke="#B08A62" stroke-width="6" fill="none" stroke-linecap="round"/>
+<path d="M150 194 q14 -18 28 0" stroke="#B08A62" stroke-width="6" fill="none" stroke-linecap="round"/>
+</g>
+<circle cx="98" cy="128" r="50" fill="#F0E2C6"/>
+<circle cx="158" cy="128" r="50" fill="#F0E2C6"/>
+<g fill="#F2B134"><circle cx="98" cy="128" r="28"/><circle cx="158" cy="128" r="28"/></g>
+<g fill="#17161A"><circle cx="98" cy="128" r="15"/><circle cx="158" cy="128" r="15"/></g>
+<g fill="#FFFFFF"><circle cx="92" cy="122" r="5.5"/><circle cx="152" cy="122" r="5.5"/></g>
+<path d="M128 140 L116 160 L128 182 L140 160 Z" fill="#E89A2E"/>
+<path d="M128 182 L116 160 L140 160 Z" fill="#C97D1E"/>
+</g>
+</svg>

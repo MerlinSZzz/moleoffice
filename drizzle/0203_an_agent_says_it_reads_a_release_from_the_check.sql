@@ -1,0 +1,12 @@
+-- ONE NULLABLE COLUMN ON `agents`: WHETHER THIS AGENT READS A RELEASE FROM THE CHECK'S OWN RESULT. Wave 13y round 9,
+-- the coordinator's answer, option B. A release written to an agent that says so does not wake it, because it has
+-- already read the verdict where the inspector wrote it. A refusal wakes it whatever this says.
+--
+-- THE VALUE IS ONE JSON OBJECT: {"on": true|false, "by": {"kind","id"}, "at", "because"}, written whole by
+-- `setReadsReleasesFromTheCheck` in src/server/lib/participants.ts, which is its only writer. Turning it off keeps a
+-- row with "on": false, so the page says who turned it off and why.
+--
+-- NULL MEANS NOBODY HAS SAID, and a release to that agent wakes it, as every release did before this column.
+--
+-- ADDITIVE, AND IT WRITES NO VALUE. One ALTER TABLE and no UPDATE.
+ALTER TABLE `agents` ADD `reads_releases_from_the_check` text;

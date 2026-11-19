@@ -1,0 +1,21 @@
+<!-- Copyright © 2026 Zhengyang Shen -->
+<!-- Licensed under the MIT License. See LICENSE. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-label="A bear">
+<title>Bear</title>
+<defs><clipPath id="bear-disc"><circle cx="128" cy="128" r="128"/></clipPath></defs>
+<g clip-path="url(#bear-disc)">
+<circle cx="128" cy="128" r="128" fill="#B9B964"/>
+<circle cx="60" cy="74" r="33" fill="#8A6444"/>
+<circle cx="60" cy="74" r="17" fill="#C79A6E"/>
+<circle cx="196" cy="74" r="33" fill="#8A6444"/>
+<circle cx="196" cy="74" r="17" fill="#C79A6E"/>
+<ellipse cx="128" cy="146" rx="84" ry="76" fill="#8A6444"/>
+<ellipse cx="128" cy="192" rx="54" ry="40" fill="#D9B98C"/>
+<g fill="#17161A"><circle cx="96" cy="138" r="12"/><circle cx="160" cy="138" r="12"/></g>
+<g fill="#FFFFFF"><circle cx="92" cy="134" r="4"/><circle cx="156" cy="134" r="4"/></g>
+<ellipse cx="128" cy="178" rx="22" ry="16" fill="#35302E"/>
+<path d="M128 194 L128 204" stroke="#35302E" stroke-width="5" stroke-linecap="round"/>
+<path d="M128 204 q-15 14 -26 0" stroke="#35302E" stroke-width="5" fill="none" stroke-linecap="round"/>
+<path d="M128 204 q15 14 26 0" stroke="#35302E" stroke-width="5" fill="none" stroke-linecap="round"/>
+</g>
+</svg>

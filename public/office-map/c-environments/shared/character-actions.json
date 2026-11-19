@@ -1,0 +1,54 @@
+{
+  "version": 1,
+  "fromBase": [
+    {
+      "look": "bare",
+      "action": "idle_sw",
+      "source": "idle",
+      "flipX": true
+    },
+    {
+      "look": "bare",
+      "action": "sit_sw",
+      "source": "sit",
+      "flipX": true
+    },
+    {
+      "look": "bare",
+      "action": "work_sw",
+      "source": "work",
+      "flipX": true
+    },
+    {
+      "look": "bare",
+      "action": "stand_sw",
+      "source": "stand",
+      "flipX": true
+    },
+    {
+      "look": "scarf",
+      "action": "idle_sw",
+      "source": "idle",
+      "flipX": true
+    },
+    {
+      "look": "scarf",
+      "action": "sit_sw",
+      "source": "sit",
+      "flipX": true
+    },
+    {
+      "look": "scarf",
+      "action": "work_sw",
+      "source": "work",
+      "flipX": true
+    },
+    {
+      "look": "scarf",
+      "action": "stand_sw",
+      "source": "stand",
+      "flipX": true
+    }
+  ],
+  "provenance": "Explicit SW mirrors of the same look’s original idle/sit/work/stand actions. Body and foreground share the frame flip. Durations come from the original actions. No original PNG or SE action is replaced; no rear-facing work is implied."
+}

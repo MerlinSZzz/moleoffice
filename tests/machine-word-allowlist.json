@@ -1,0 +1,656 @@
+{
+  "aRawStoredWordIsWrittenIntoProse": {
+    "server/api/agents.ts": {
+      "picked_up": "The HTTP API describing its own wire format. This string is served by GET /api/kinds to whoever writes a program against Mole Office, and the machine word IS the value that route accepts: a description saying 'relates to' would name something the route would refuse. No screen in src/web draws it — grep for these keys under src/web returns nothing."
+    },
+    "server/api/kinds.ts": {
+      "relates_to": "The HTTP API describing its own wire format. This string is served by GET /api/kinds to whoever writes a program against Mole Office, and the machine word IS the value that route accepts: a description saying 'relates to' would name something the route would refuse. No screen in src/web draws it — grep for these keys under src/web returns nothing."
+    },
+    "server/api/drafts.ts": {
+      "derived_from": "The HTTP API describing its own wire format. This is the send door's route note, served by GET /api to whoever writes a program against Mole Office, and it names the link type the door writes so a caller can find the link by that exact value: a sentence saying 'derived from' would name a type GET /api/links does not hold. No screen in src/web draws it."
+    },
+    "shared/words/es.ts": {
+      "todo": "The Spanish word todo means all or everything in ordinary prose, and this file is the page's Spanish word list, not a place a stored value is drawn. Spanish needs the word in sentences such as todo el despacho (the whole office) and todo lo demás (everything else). The stored task word todo is drawn through its own table; this file only holds page words."
+    },
+    "shared/words/pt.ts": {
+      "todo": "The Portuguese word todo means all or everything in ordinary prose, and this file is the page's Portuguese word list, not a place a stored value is drawn. Portuguese needs the word in sentences such as todo o escritório (the whole office) and todo o texto (the whole text). The stored task word todo is drawn through its own table; this file only holds page words."
+    }
+  },
+  "aValueReachesDrawnTextWithNothingReadingIt": {
+    "web/lib/prepared-profile.ts": [
+      "kind"
+    ],
+    "server/lib/the-purpose-of-a-round.ts": [
+      "kind"
+    ],
+    "server/lib/casting.ts": [
+      "evidence.kind"
+    ],
+    "server/api/brief.ts": [
+      "loop.kind"
+    ],
+    "server/api/checklists.ts": [
+      "asked.kind",
+      "done.item.state"
+    ],
+    "server/api/composition.ts": [
+      "record.kind"
+    ],
+    "server/api/folderreading.ts": [
+      "piece.kind",
+      "piece.state"
+    ],
+    "server/api/plan-graph.ts": [
+      "kind"
+    ],
+    "server/api/planning.ts": [
+      "proposal.kind"
+    ],
+    "server/api/plans.ts": [
+      "one.kind",
+      "plan.state",
+      "query.state"
+    ],
+    "server/api/records.ts": [
+      "kind",
+      "one.kind",
+      "recordsTable.kind"
+    ],
+    "server/api/roles.ts": [
+      "one.kind",
+      "one.state"
+    ],
+    "server/api/search.ts": [
+      "ask.kind",
+      "exact.kind"
+    ],
+    "server/api/sessions.ts": [
+      "who.kind"
+    ],
+    "server/api/source.ts": [
+      "record.kind"
+    ],
+    "server/db/a-change-naming-none-of.ts": [
+      "changes.field"
+    ],
+    "server/db/a-row-found-by-id.ts": [
+      "kind",
+      "records.kind"
+    ],
+    "server/db/agent-identity.ts": [
+      "one.state",
+      "row.kind",
+      "session.kind"
+    ],
+    "server/db/annotation-state.ts": [
+      "row.state"
+    ],
+    "server/db/blocked-by-migration.ts": [
+      "named.kind"
+    ],
+    "server/db/blocks-migration.ts": [
+      "clash.kind",
+      "takenBy.kind"
+    ],
+    "server/db/context-migration.ts": [
+      "kind",
+      "note.kind"
+    ],
+    "server/db/migrate.ts": [
+      "note.kind"
+    ],
+    "server/db/origin-migration.ts": [
+      "known.kind",
+      "row.kind"
+    ],
+    "server/db/plan-note-migration.ts": [
+      "note.kind",
+      "report.notes.filter((n) => n.kind === 'two_notes').length"
+    ],
+    "server/db/review-migration.ts": [
+      "note.kind"
+    ],
+    "server/db/schema-parts/agent-starter-changes.ts": [
+      "t.state"
+    ],
+    "server/db/tool-uses-migration.ts": [
+      "row.kind"
+    ],
+    "server/db/workspace-migration.ts": [
+      "known.kind",
+      "n.kind",
+      "row.kind"
+    ],
+    "server/db/who-wrote-records.ts": [
+      "row.actorType"
+    ],
+    "server/index.ts": [
+      "world.standing.kind"
+    ],
+    "server/lib/adapters/claude-code.ts": [
+      "line.kind"
+    ],
+    "server/lib/agents.ts": [
+      "String(span.field)",
+      "opts.state",
+      "patch.state",
+      "span.field",
+      "state",
+      "thread.state"
+    ],
+    "server/lib/annotations.ts": [
+      "span.field"
+    ],
+    "server/lib/apply.ts": [
+      "operation.field",
+      "operation.kind"
+    ],
+    "server/lib/before-the-seal.ts": [
+      "records.kind"
+    ],
+    "server/lib/blocks.ts": [
+      "JSON.stringify(input.state)",
+      "record.kind"
+    ],
+    "server/lib/bookings.ts": [
+      "asked.state",
+      "b.data.state",
+      "state"
+    ],
+    "server/lib/checklists.ts": [
+      "before.state",
+      "one.kind",
+      "said.state"
+    ],
+    "server/lib/credential-mismatch.ts": [
+      "records.kind"
+    ],
+    "server/lib/dispatch.ts": [
+      "row.state"
+    ],
+    "server/lib/export.ts": [
+      "kind"
+    ],
+    "server/lib/folderreading.ts": [
+      "piece.kind"
+    ],
+    "server/lib/implementation.ts": [
+      "record.kind"
+    ],
+    "server/lib/history.ts": [
+      "changes.op"
+    ],
+    "server/lib/honour.ts": [
+      "run.kind"
+    ],
+    "server/lib/import.ts": [
+      "c.op"
+    ],
+    "server/lib/inspection.ts": [
+      "how.field",
+      "kind",
+      "seal.seal.kind",
+      "submission.seal.kind"
+    ],
+    "server/lib/key-files.ts": [
+      "file.run.state",
+      "one.to.kind",
+      "to.kind"
+    ],
+    "server/lib/listeners.ts": [
+      "world.standing.kind"
+    ],
+    "server/lib/main-world.ts": [
+      "records.kind"
+    ],
+    "server/lib/message-keys.ts": [
+      "kind"
+    ],
+    "server/lib/move.ts": [
+      "c.heldBy.kind",
+      "m.kind"
+    ],
+    "server/lib/next-round.ts": [
+      "NO_LONGER_WANTED[nextRound.state]",
+      "nextRound.state"
+    ],
+    "server/lib/get-plan.ts": [
+      "row.state"
+    ],
+    "server/lib/resolve-session-ref.ts": [
+      "byId.kind"
+    ],
+    "server/lib/planning.ts": [
+      "patch.state",
+      "planHoursRuleOf(row.kind).why",
+      "row.kind"
+    ],
+    "server/lib/plans.ts": [
+      "MARKER_NAMES[place.mine.kind]",
+      "allocation.state",
+      "input.kind",
+      "kind",
+      "starts.state",
+      "state",
+      "work.kind"
+    ],
+    "server/lib/presentation.ts": [
+      "record.kind"
+    ],
+    "server/lib/recipients.ts": [
+      "first.kind",
+      "target.kind"
+    ],
+    "server/lib/records/asks-and-commitments.ts": [
+      "asked.actorType",
+      "kind",
+      "record.kind"
+    ],
+    "server/lib/records/blocked-by.ts": [
+      "blocker.kind",
+      "found.kind"
+    ],
+    "server/lib/records/checklist-items.ts": [
+      "kind",
+      "l.field",
+      "w.by.actorType",
+      "w.field"
+    ],
+    "server/lib/records/creating.ts": [
+      "other.kind"
+    ],
+    "server/lib/records/delete-restore.ts": [
+      "kind"
+    ],
+    "server/lib/records/fork-settling.ts": [
+      "from.kind"
+    ],
+    "server/lib/records/human-only.ts": [
+      "kind",
+      "r.kind",
+      "t.target.kind"
+    ],
+    "server/lib/records/link-gates.ts": [
+      "gate.kind"
+    ],
+    "server/lib/records/link-requests.ts": [
+      "record.kind",
+      "target.kind"
+    ],
+    "server/lib/records/links.ts": [
+      "gate.kind"
+    ],
+    "server/lib/records/may-write.ts": [
+      "kind"
+    ],
+    "server/lib/records/near-duplicate-titles.ts": [
+      "s.kind"
+    ],
+    "server/lib/records/obligations.ts": [
+      "record.kind",
+      "state"
+    ],
+    "server/lib/records/patching.ts": [
+      "before.kind",
+      "kind",
+      "patch.kind"
+    ],
+    "server/lib/records/pipeline-blocks.ts": [
+      "row.kind"
+    ],
+    "server/lib/records/planning-guards.ts": [
+      "what.kind"
+    ],
+    "server/lib/records/served-doors.ts": [
+      "wrong.field"
+    ],
+    "server/lib/records/session-names.ts": [
+      "record.kind"
+    ],
+    "server/lib/records/stored-link-gates.ts": [
+      "stored.gate.kind"
+    ],
+    "server/lib/records/what-a-decision-files.ts": [
+      "old.kind",
+      "proposal.kind"
+    ],
+    "server/lib/register-this-server.ts": [
+      "world.standing.kind"
+    ],
+    "server/db/registry-aliases/historical-reader.ts": [
+      "entry.pair.field"
+    ],
+    "server/db/registry-aliases/remint-plain.ts": [
+      "quoted(site.pair.field)",
+      "quoted(site.routes.field)"
+    ],
+    "server/lib/reminders.ts": [
+      "kind",
+      "records.kind"
+    ],
+    "server/lib/resources.ts": [
+      "one.liveness.state === 'unknown' ? one.liveness.reason : one.liveness.detail",
+      "record.kind",
+      "session.state"
+    ],
+    "server/lib/reviews.ts": [
+      "review.state"
+    ],
+    "server/lib/revisions.ts": [
+      "kind",
+      "row.actorType"
+    ],
+    "server/lib/secretariat.ts": [
+      "owner.kind",
+      "who.kind"
+    ],
+    "server/lib/sessions.ts": [
+      "claim.project.kind === 'pipeline' ? 'the pipeline' : 'the module'",
+      "evidence.via.kind",
+      "log.field",
+      "record.kind",
+      "view.state"
+    ],
+    "server/lib/slots.ts": [
+      "liveness.state === 'alive' ? 'still running' : 'in a state nobody could check'"
+    ],
+    "server/lib/sourceindex.ts": [
+      "record.kind"
+    ],
+    "server/lib/stale-records.ts": [
+      "records.kind"
+    ],
+    "server/lib/summary.ts": [
+      "copiedField.field"
+    ],
+    "server/lib/targets.ts": [
+      "place.field",
+      "record.kind"
+    ],
+    "server/lib/usage-agents.ts": [
+      "records.kind"
+    ],
+    "server/lib/waiting.ts": [
+      "kind"
+    ],
+    "server/lib/wake.ts": [
+      "row.state"
+    ],
+    "server/lib/windows.ts": [
+      "planHoursRuleOf(row.kind).why",
+      "row.kind",
+      "state"
+    ],
+    "server/lib/worker-runs.ts": [
+      "NO_LONGER_WANTED[workerRun.state]"
+    ],
+    "server/lib/zoom.ts": [
+      "cutFrom.field",
+      "own.field"
+    ],
+    "shared/addresses.ts": [
+      "kind"
+    ],
+    "shared/attention.ts": [
+      "candidate.record.kind",
+      "stopped.state"
+    ],
+    "shared/blocks.ts": [
+      "record.kind"
+    ],
+    "shared/contacts.ts": [
+      "one.who.kind",
+      "row.who.kind",
+      "under.kind"
+    ],
+    "shared/detailsupply.ts": [
+      "String(answer.kind === 'body' ? answer.field : '')",
+      "answer.kind"
+    ],
+    "shared/groups.ts": [
+      "state"
+    ],
+    "shared/intent.ts": [
+      "artefact.refused.kind"
+    ],
+    "shared/kinds/cross-checks.ts": [
+      "kind"
+    ],
+    "shared/kinds/incompleteness.ts": [
+      "kind"
+    ],
+    "shared/kinds/kind-common.ts": [
+      "kind"
+    ],
+    "shared/kinds/placeholder.ts": [
+      "kind"
+    ],
+    "shared/kinds/short-form-fields.ts": [
+      "kind"
+    ],
+    "shared/kinds/the-kinds-as-written.ts": [
+      "kind"
+    ],
+    "shared/kinds/the-lines-fields.ts": [
+      "kind"
+    ],
+    "shared/kinds/type-reader.ts": [
+      "one.field",
+      "one.kind"
+    ],
+    "shared/kinds/validation.ts": [
+      "kind"
+    ],
+    "shared/regions.ts": [
+      "draft.field",
+      "draft.field ?? ''",
+      "from.field",
+      "source.field"
+    ],
+    "shared/targets.ts": [
+      "kind"
+    ],
+    "shared/the-chain-up-with.ts": [
+      "at.kind"
+    ],
+    "shared/title-names-more-than-one.ts": [
+      "record.kind"
+    ],
+    "shared/validation-errors.ts": [
+      "kind"
+    ],
+    "shared/work.ts": [
+      "kind",
+      "state"
+    ],
+    "web/api-parts/records.ts": [
+      "kind"
+    ],
+    "web/components/AgentStarterMove.tsx": [
+      "change.state"
+    ],
+    "web/components/ChecklistParts.tsx": [
+      "list.owner.kind"
+    ],
+    "web/components/ConversationSyncPanel.tsx": [
+      "theStateWord(line.state)"
+    ],
+    "web/components/Chart.tsx": [
+      "s.state"
+    ],
+    "web/components/DetailSays.tsx": [
+      "String(blocksFieldOf(record.kind))"
+    ],
+    "web/components/ModuleView.tsx": [
+      "path.kind",
+      "state"
+    ],
+    "web/components/PipelineFlow.tsx": [
+      "segment.kind",
+      "step.state"
+    ],
+    "web/components/SessionPanel.tsx": [
+      "ORPHAN_WORDS[orphan.kind]",
+      "UNCLAIMED_WORDS[resource.kind]",
+      "resource.kind"
+    ],
+    "web/components/SummaryBlocks.tsx": [
+      "block.kind",
+      "region.field"
+    ],
+    "web/components/TerminalView.tsx": [
+      "reading.kind === 'gone' ? reading.says : reading.sentence"
+    ],
+    "web/components/agent/Recipients.tsx": [
+      "reading.record.kind"
+    ],
+    "web/components/agent/ReviewBar.tsx": [
+      "context.target.kind"
+    ],
+    "web/components/family/parts.tsx": [
+      "kind",
+      "recordPath(reading.record.id, reading.record.kind)"
+    ],
+    "web/components/graph/Edit.tsx": [
+      "state"
+    ],
+    "web/components/graph/Outline.tsx": [
+      "recordPath(item.recordId, item.kind)"
+    ],
+    "web/components/graph/PlanGraph.tsx": [
+      "allocation.state"
+    ],
+    "web/components/graph/model.ts": [
+      "kind"
+    ],
+    "web/components/plans/planitems.tsx": [
+      "one.kind"
+    ],
+    "web/components/router.tsx": [
+      "kind"
+    ],
+    "web/components/ui.tsx": [
+      "kind",
+      "state"
+    ],
+    "web/lib/add-to-a-note.ts": [
+      "stored.field"
+    ],
+    "web/lib/attention.ts": [
+      "state"
+    ],
+    "web/pages/AgentsPage.tsx": [
+      "RUN_STATE_WORDS[run.state]",
+      "THREAD_STATE_WORDS[thread.state]"
+    ],
+    "web/pages/GovernancePage.tsx": [
+      "waitingKind(row.kind, inspect)"
+    ],
+    "web/pages/HomePage.tsx": [
+      "recordPath(pipeline.record.id, pipeline.record.kind)"
+    ],
+    "web/pages/IncidentPage.tsx": [
+      "SCENE_WORDS.state"
+    ],
+    "web/pages/RecordsPage.tsx": [
+      "recordPath(record.id, record.kind)"
+    ],
+    "web/pages/RoleCensusPage.tsx": [
+      "one.kind"
+    ],
+    "worker/index.ts": [
+      "one.to.kind"
+    ],
+    "web/components/LinkPanel.tsx": [
+      "recordPath(link.other.id, link.other.kind)"
+    ],
+    "web/pages/QueriesPage.tsx": [
+      "recordPath(record.id, record.kind)",
+      "recordPath(item.consumer.id, item.consumer.kind)"
+    ],
+    "web/pages/family/FindingsPage.tsx": [
+      "recordPath(reading.record.id, reading.record.kind)"
+    ],
+    "web/pages/family/IdeasPage.tsx": [
+      "recordPath(reading.record.id, reading.record.kind)"
+    ],
+    "web/pages/family/NotesPage.tsx": [
+      "recordPath(row.id, row.kind)"
+    ],
+    "web/pages/family/WorkPage.tsx": [
+      "recordPath(row.id, row.kind)",
+      "recordPath(step.id, step.kind ?? undefined)"
+    ],
+    "web/pages/family/rows.tsx": [
+      "recordPath(record.id, record.kind)"
+    ],
+    "web/pages/family/ModulesPage.tsx": [
+      "recordPath(reading.record.id, reading.record.kind)"
+    ],
+    "web/pages/ShelvedPage.tsx": [
+      "recordPath(record.id, record.kind)"
+    ],
+    "web/components/agent/context.ts": [
+      "context.target.kind"
+    ],
+    "server/lib/readiness.ts": [
+      "STATE_IN_WORDS[checklist.state]",
+      "by.kind === 'person' ? 'The person' : (nameOf('agent', by.id) ?? by.id)",
+      "one.kind"
+    ],
+    "web/pages/ReadinessPage.tsx": [
+      "one.kind"
+    ],
+    "web/components/InstallHarnesses.tsx": [
+      "one.kind"
+    ],
+    "web/pages/RoleCardDifference.tsx": [
+      "fieldLabel(one.field)"
+    ],
+    "server/api/inspection.ts": [
+      "body.kind",
+      "sealed === null ? 'missing' : sealed.seal.kind"
+    ],
+    "server/lib/sealed-tip.ts": [
+      "kind"
+    ],
+    "server/lib/merge-state-machine.ts": [
+      "release.standard.kind"
+    ],
+    "shared/releasing.ts": [
+      "A_STANDARD_KIND_SAYS[standard.kind]",
+      "standard.kind"
+    ],
+    "shared/round-chapters/delivery.ts": [
+      "kind"
+    ],
+    "shared/round-chapters/manifest.ts": [
+      "manifest.kind ?? '(missing)'"
+    ],
+    "shared/round-start-pack.ts": [
+      "inside.takenBy.kind",
+      "material.kind",
+      "parent.kind"
+    ],
+    "web/components/StorageDestinations.tsx": [
+      "size&&size.files>0?bytes(size.bytes):reading.local.state==='unmeasured'?w('notMeasured'):bytes(size?.bytes??0)"
+    ],
+    "web/components/QuickSearch.tsx": [
+      "recordPath(record.id, record.kind)"
+    ],
+    "web/components/RevokeTheirKey.tsx": [
+      "props.who.kind"
+    ]
+  },
+  "whyAValueReachesDrawnTextWithNothingReadingIt": {
+    "server/lib/message-keys.ts": "The kind is message or report, because theRecordsAWriteNames returns before this line for every other kind, and both words read the same as their stored form. It is printed in the English line of the answer to a stored write, read by the program that wrote it, saying that the records its words name could not be read.",
+    "shared/round-chapters/delivery.ts": "The round kind is a caller-declared policy key, printed exactly when a policy mapping is invalid. This is a configuration diagnostic, not a stored record kind or state being used as a page label.",
+    "shared/round-chapters/manifest.ts": "The round kind is the caller-declared policy key in the saved reading manifest. The launcher and check print its exact value so the selected policy can be reviewed; it is not a record-kind or state label.",
+    "shared/round-start-pack.ts": "The round-start pack is text for the agent that takes the round, and no page draws it. A delegation's parent kind (decision or task), a material's kind (decision, point, bundle or task) and the taker's kind (person or agent) are the delegation package's own stored words. The agent names them back to the delegation doors, so the stored word is the one it needs.",
+    "server/lib/sealed-tip.ts": "cutFromCommit is the exact session field a caller must correct when its recorded value is malformed.",
+    "server/db/schema-parts/agent-starter-changes.ts": "The state column is put into the SQL of the table's own check constraints and one partial index, which SQLite reads and no person does. Nothing here is drawn or sent in a reply.",
+    "web/lib/add-to-a-note.ts": "The field is the name of the field a record keeps its blocks in, put into a regular expression that finds a block by its path. Nothing draws the expression or the text it is matched against.",
+    "web/api-parts/records.ts": "The kind is a record kind the page names in its links read, put with a link type into the typeToKind word of the GET /api/links query. The door reads the word, and nothing draws the query.",
+    "web/components/RevokeTheirKey.tsx": "The kind is a participant's kind, agent or person, put with its id into the row word of the GET /api/office/embassy query, which asks for the one row whose keys the panel draws. The door reads the word, and nothing draws it."
+  }
+}

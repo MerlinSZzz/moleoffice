@@ -1,0 +1,26 @@
+-- The agent's answer becomes a message, so a person can reply to it.
+--
+-- ADDITIVE, ONE NULLABLE COLUMN. No row is read, moved, rewritten or taken away, and no table is
+-- rebuilt. Every existing message keeps the value this column has for everything a person wrote,
+-- which is NULL.
+--
+-- ---------------------------------------------------------------------------------------
+-- WHY
+-- ---------------------------------------------------------------------------------------
+--
+-- Until now a finished run wrote its answer into `agent_runs.result` and inserted nothing, so a
+-- conversation read as things a person said and no reply. Replying to an agent was impossible
+-- because there was nothing in the conversation to reply to.
+--
+-- An answer is now a row in `agent_messages` with `role` = 'agent', and `run_id` says which attempt
+-- produced it. NULL means a person wrote it. The reasoning for the column is on the drizzle
+-- declaration in src/server/db/schema.ts, in the house style, and is not repeated here.
+--
+-- THERE IS NO INDEX ON IT. The one read there is is a whole thread in order, which
+-- `agent_messages_thread_idx` already serves. An index nothing reads is a promise about a query
+-- nobody has written.
+--
+-- NUMBERED WELL CLEAR OF THE MIGRATION BEFORE IT, the way 0020 to 0070 were and for the same
+-- reason: several agents add one at the same time. Drizzle applies journal entries in order of
+-- their `when`, so the gap in the numbers costs nothing.
+ALTER TABLE `agent_messages` ADD `run_id` text;

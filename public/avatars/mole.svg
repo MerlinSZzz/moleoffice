@@ -1,0 +1,24 @@
+<!-- Copyright © 2026 Zhengyang Shen -->
+<!-- Licensed under the MIT License. See LICENSE. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-label="A mole">
+<title>Mole</title>
+<defs><clipPath id="mole-disc"><circle cx="128" cy="128" r="128"/></clipPath></defs>
+<g clip-path="url(#mole-disc)">
+<circle cx="128" cy="128" r="128" fill="#B9648F"/>
+<ellipse cx="128" cy="116" rx="70" ry="64" fill="#4A4048"/>
+<ellipse cx="128" cy="84" rx="52" ry="26" fill="#5B5060"/>
+<path d="M103 142 L153 142 L145 184 Q128 197 111 184 Z" fill="#EFA9B2"/>
+<ellipse cx="128" cy="184" rx="17" ry="12" fill="#D48796"/>
+<g fill="#8E5262"><circle cx="121" cy="184" r="4"/><circle cx="135" cy="184" r="4"/></g>
+<g fill="#17161A"><circle cx="96" cy="118" r="9"/><circle cx="160" cy="118" r="9"/></g>
+<g fill="#FFFFFF"><circle cx="93" cy="115" r="3.2"/><circle cx="157" cy="115" r="3.2"/></g>
+<g fill="#EFA9B2">
+<ellipse cx="80" cy="220" rx="29" ry="22" transform="rotate(-16 80 220)"/>
+<ellipse cx="176" cy="220" rx="29" ry="22" transform="rotate(16 176 220)"/>
+</g>
+<g fill="#F7DDE2">
+<path d="M60 208 L52 182 L72 200 Z"/><path d="M78 202 L80 176 L94 196 Z"/><path d="M98 204 L110 184 L110 208 Z"/>
+<path d="M196 208 L204 182 L184 200 Z"/><path d="M178 202 L176 176 L162 196 Z"/><path d="M158 204 L146 184 L146 208 Z"/>
+</g>
+</g>
+</svg>

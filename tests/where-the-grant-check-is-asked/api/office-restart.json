@@ -1,0 +1,6 @@
+{
+  "doors": [
+    "office.set-restart-grant"
+  ],
+  "why": "Giving or removing the permission to restart the office asks whether the secretary acts for the person, and only on the person's words."
+}

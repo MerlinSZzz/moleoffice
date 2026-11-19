@@ -1,0 +1,24 @@
+-- ONE INDEX, SO THE COMMENTS ON A PROJECT'S RECORDS ARE FOUND WITHOUT READING EVERY MESSAGE.
+--
+-- Wave 13y round 13. GET /api/messages/comments averaged 13.8 s in the office's
+-- call log of 9 October 2026. `commentRecordsIn` in src/server/lib/messages.ts keeps a message only when its target
+-- names a record of the project, and before this index it parsed the data of every message in the message centre to
+-- find out: 33 ms for 40 comments among 12,500 messages on the office of tests/the-office-of-the-slowest-reads.ts,
+-- and 0.1 ms with it.
+--
+--   `records_message_target_idx`   the messages that have a `data.target` at all, by project and deleted stamp.
+--
+-- EVERY COMMENT HAS A TARGET. Each way `aCommentOnARecordOf` in src/server/lib/message-centre.ts takes a message as a
+-- comment asks for a field of `data.target`, so a message with none is never one, and the reader can ask the index
+-- for the messages that have one before it asks anything else.
+--
+-- IT HOLDS ONLY MESSAGES WITH A TARGET, so writing any other record costs nothing more, and a query uses it only when
+-- it names the kind and the target in the same words.
+--
+-- THE TARGET IS READ ONLY FROM DATA THAT IS VALID JSON, and is null otherwise, for the reason migration 0199 gives.
+-- The reader asks the same words, from `STORED_FIELDS` in src/server/db/schema.ts.
+--
+-- The index is not unique, and it changes no row.
+--
+-- ADDITIVE, AND IT REWRITES NOTHING. One CREATE INDEX statement and no UPDATE.
+CREATE INDEX IF NOT EXISTS `records_message_target_idx` ON `records` (`workspace_id`, `deleted_at`) WHERE `kind` = 'message' AND (CASE WHEN json_valid(`data`) THEN json_type(`data`, '$.target') END) IS NOT NULL;

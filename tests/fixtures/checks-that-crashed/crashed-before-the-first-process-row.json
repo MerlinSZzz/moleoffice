@@ -1,0 +1,50 @@
+{
+  "changes": [
+    {
+      "op": "update",
+      "field": "data.state",
+      "oldValue": "running",
+      "newValue": "crashed",
+      "at": "2026-10-25 01:04:24",
+      "appendOrder": 554588
+    },
+    {
+      "op": "delete",
+      "field": "resource.container",
+      "oldValue": "mole-office-sandbox-inspector-inspector — Sandbox inspector-inspector, from the template mole-office-dev; its folder is ~/.cache/mole-office/sandboxes/inspector-inspector. Started by node tools/sandbox.mjs up; stop it with node tools/sandbox.mjs down inspector-inspector, which releases this row.",
+      "newValue": "released: Stopped container mole-office-sandbox-inspector-inspector (vsc-inspector-inspector-<a key, not shown>). [node tools/sandbox.mjs down inspector-inspector, by inspector in session 0aEkyxtFx9pE (--force); confirmed: Stop container mole-office-sandbox-inspector-inspector (vsc-inspector-inspector-<a key, not shown>, id 912d43a18979), ending everything inside it and nothing else on this host.; forced while the session was still running]",
+      "at": "2026-10-25 01:04:24",
+      "appendOrder": 554587
+    },
+    {
+      "op": "create",
+      "field": "resource.container",
+      "oldValue": null,
+      "newValue": "mole-office-sandbox-inspector-inspector — Sandbox inspector-inspector, from the template mole-office-dev; its folder is ~/.cache/mole-office/sandboxes/inspector-inspector. Started by node tools/sandbox.mjs up; stop it with node tools/sandbox.mjs down inspector-inspector, which releases this row.",
+      "at": "2026-10-25 01:04:08",
+      "appendOrder": 554584
+    },
+    {
+      "op": "update",
+      "field": "data.shortForms",
+      "oldValue": null,
+      "newValue": "{\"label\":{\"text\":\"Run of inspector\",\"madeFrom\":{\"seq\":1,\"contentHash\":\"90543b92a1889589\"},\"writtenBy\":\"agent\"}}",
+      "at": "2026-10-25 01:03:54",
+      "appendOrder": 554582
+    },
+    {
+      "op": "create",
+      "field": null,
+      "oldValue": null,
+      "newValue": "Check of w13r-rd69 (run cGsNm_MnEMOJ)",
+      "at": "2026-10-25 01:03:54",
+      "appendOrder": 554579
+    }
+  ],
+  "changesCarried": {
+    "carried": 5,
+    "total": 5,
+    "budgetBytes": 262144,
+    "next": null
+  }
+}

@@ -1,0 +1,30 @@
+<!-- Copyright © 2026 Zhengyang Shen -->
+<!-- Licensed under the MIT License. See LICENSE. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="The Mole Office mole, looking out of the arch in an M">
+<path d="M5 52.5 L5 9 L20.5 9 L31 22 L41.5 9 L57 9 L57 52.5 Z" fill="#E7E2D6" stroke="#16233A" stroke-width="2.6" stroke-linejoin="miter"/>
+<g stroke="#16233A" stroke-width="1.6">
+<path d="M5.5 14 L17.5 14"/><path d="M44.5 14 L56.5 14"/>
+</g>
+<path d="M2.5 52.5 L59.5 52.5 L59.5 56.2 L2.5 56.2 Z" fill="#16233A"/>
+<path d="M15 52.5 L15 38 A16 16 0 0 1 47 38 L47 52.5 Z" fill="#16233A"/>
+<path d="M27.5 27 L29 23.4 L30.2 26.2 L31.6 23 L32.8 26.2 L34.4 24 Z" fill="#33486B"/>
+<path d="M23.2 52.5 A14 14.5 0 1 1 38.8 52.5 Z" fill="#33486B"/>
+<g stroke="#F2EFE6" stroke-width="0.9" stroke-linecap="round">
+<path d="M24.6 40 L18 38"/><path d="M24.6 42.2 L17.5 42.6"/><path d="M25.2 44.4 L18.6 46.8"/>
+<path d="M37.4 40 L44 38"/><path d="M37.4 42.2 L44.5 42.6"/><path d="M36.8 44.4 L43.4 46.8"/>
+</g>
+<ellipse cx="31" cy="43" rx="7.6" ry="5.9" fill="#E3C49A"/>
+<g fill="#F2EFE6"><circle cx="25.2" cy="34.6" r="2"/><circle cx="36.8" cy="34.6" r="2"/></g>
+<ellipse cx="31" cy="40.8" rx="2.4" ry="1.9" fill="#16233A"/>
+<path d="M31 42.7 L31 45.8" stroke="#16233A" stroke-width="1.1" stroke-linecap="round"/>
+<path d="M24.6 46.6 L31 51 L37.4 46.6 L37.4 52.5 L24.6 52.5 Z" fill="#F2EFE6"/>
+<path d="M29.2 47.8 L32.8 47.8 L32 52.5 L30 52.5 Z" fill="#6E7A3C"/>
+<g fill="#E3C49A">
+<path d="M16.4 52.5 L16.4 47.4 A3.8 3.8 0 0 1 24 47.4 L24 52.5 Z"/>
+<path d="M38 52.5 L38 47.4 A3.8 3.8 0 0 1 45.6 47.4 L45.6 52.5 Z"/>
+</g>
+<g stroke="#16233A" stroke-width="0.75" stroke-linecap="round">
+<path d="M18.3 52.5 L18.3 48.7"/><path d="M20.2 52.5 L20.2 48"/><path d="M22.1 52.5 L22.1 48.7"/>
+<path d="M39.9 52.5 L39.9 48.7"/><path d="M41.8 52.5 L41.8 48"/><path d="M43.7 52.5 L43.7 48.7"/>
+</g>
+</svg>

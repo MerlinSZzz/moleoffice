@@ -1,0 +1,873 @@
+{
+  "about": "A made-up reel page: a pipeline at its Steps level with eight modules in areas, and the steps of five other pipelines that its records link to, each drawn in an area headed by its pipeline. Its shape was read on 16 November 2026 from the drawing input of a pipeline page in an office copy that holds made-up data, by a script kept outside the repository. Kept: each record's kind, role and state; the order of the pipeline's own steps; which other pipeline lists each other step, and in what order; each link's type, ends, gate and inferred flag; each area and place. Every title, area name and partial gate's reach is made up and about as long as the words it replaced; a title shorter than its bare made-up form keeps that form. Records are named by keys made for this file and no record id is kept. Each title's length on the copy is beside it as \"length\".",
+  "pipeline": {
+    "key": "reel",
+    "title": "Example reel (made up)",
+    "length": 23
+  },
+  "steps": [
+    {
+      "key": "step-01",
+      "title": "Example step 01 with words (made up)",
+      "state": "done",
+      "length": 34
+    },
+    {
+      "key": "step-02",
+      "title": "Example step 02 with words (made up)",
+      "state": "done",
+      "length": 34
+    },
+    {
+      "key": "step-03",
+      "title": "Example step 03 with words (made up)",
+      "state": "done",
+      "length": 34
+    },
+    {
+      "key": "step-04",
+      "title": "Example step 04 with (made up)",
+      "state": "doing",
+      "length": 28
+    },
+    {
+      "key": "step-05",
+      "title": "Example step 05 (made up)",
+      "state": "doing",
+      "length": 27
+    },
+    {
+      "key": "step-06",
+      "title": "Example step 06 with words that (made up)",
+      "state": "doing",
+      "length": 41
+    },
+    {
+      "key": "step-07",
+      "title": "Example step 07 with words (made up)",
+      "state": "blocked",
+      "length": 37
+    },
+    {
+      "key": "step-08",
+      "title": "Example step 08 with words (made up)",
+      "state": "todo",
+      "length": 38
+    },
+    {
+      "key": "step-09",
+      "title": "Example step 09 with words that stand (made up)",
+      "state": "todo",
+      "length": 48
+    },
+    {
+      "key": "step-10",
+      "title": "Example step 10 with words (made up)",
+      "state": "todo",
+      "length": 36
+    },
+    {
+      "key": "step-11",
+      "title": "Example step 11 with words that (made up)",
+      "state": "doing",
+      "length": 40
+    },
+    {
+      "key": "step-12",
+      "title": "Example step 12 with words that stand (made up)",
+      "state": "todo",
+      "length": 46
+    }
+  ],
+  "modules": [
+    {
+      "key": "module-1",
+      "title": "Example module 1 (made up)",
+      "length": 18
+    },
+    {
+      "key": "module-2",
+      "title": "Example module 2 (made up)",
+      "length": 18
+    },
+    {
+      "key": "module-3",
+      "title": "Example module 3 (made up)",
+      "length": 13
+    },
+    {
+      "key": "module-4",
+      "title": "Example module 4 (made up)",
+      "length": 25
+    },
+    {
+      "key": "module-5",
+      "title": "Example module 5 (made up)",
+      "length": 7
+    },
+    {
+      "key": "module-6",
+      "title": "Example module 6 (made up)",
+      "length": 8
+    },
+    {
+      "key": "module-7",
+      "title": "Example module 7 (made up)",
+      "length": 16
+    },
+    {
+      "key": "module-8",
+      "title": "Example module 8 (made up)",
+      "length": 20
+    }
+  ],
+  "others": [
+    {
+      "key": "other-1",
+      "title": "Example pipeline 1 with words (made up)",
+      "steps": [
+        {
+          "key": "other-1-step-1",
+          "title": "Example step 1.1 (made up)",
+          "state": "blocked",
+          "length": 26
+        },
+        {
+          "key": "other-1-step-2",
+          "title": "Example step 1.2 with (made up)",
+          "state": "todo",
+          "length": 29
+        },
+        {
+          "key": "other-1-step-3",
+          "title": "Example step 1.3 with words that (made up)",
+          "state": "todo",
+          "length": 44
+        }
+      ],
+      "length": 41
+    },
+    {
+      "key": "other-2",
+      "title": "Example pipeline 2 (made up)",
+      "steps": [
+        {
+          "key": "other-2-step-1",
+          "title": "Example step 2.1 with words that (made up)",
+          "state": "done",
+          "length": 40
+        },
+        {
+          "key": "other-2-step-2",
+          "title": "Example step 2.2 with words that (made up)",
+          "state": "doing",
+          "length": 44
+        },
+        {
+          "key": "other-2-step-3",
+          "title": "Example step 2.3 with words that stand (made up)",
+          "state": "blocked",
+          "length": 46
+        },
+        {
+          "key": "other-2-step-4",
+          "title": "Example step 2.4 with words that (made up)",
+          "state": "todo",
+          "length": 40
+        },
+        {
+          "key": "other-2-step-5",
+          "title": "Example step 2.5 with words (made up)",
+          "state": "todo",
+          "length": 35
+        },
+        {
+          "key": "other-2-step-6",
+          "title": "Example step 2.6 with words that stand (made up)",
+          "state": "todo",
+          "length": 46
+        }
+      ],
+      "length": 18
+    },
+    {
+      "key": "other-3",
+      "title": "Example pipeline 3 (made up)",
+      "steps": [
+        {
+          "key": "other-3-step-1",
+          "title": "Example step 3.1 (made up)",
+          "state": "todo",
+          "length": 23
+        }
+      ],
+      "length": 23
+    },
+    {
+      "key": "other-4",
+      "title": "Example pipeline 4 (made up)",
+      "steps": [
+        {
+          "key": "other-4-step-1",
+          "title": "Example step 4.1 with words that (made up)",
+          "state": "done",
+          "length": 44
+        },
+        {
+          "key": "other-4-step-2",
+          "title": "Example step 4.2 with (made up)",
+          "state": "doing",
+          "length": 30
+        },
+        {
+          "key": "other-4-step-3",
+          "title": "Example step 4.3 with words (made up)",
+          "state": "doing",
+          "length": 36
+        },
+        {
+          "key": "other-4-step-4",
+          "title": "Example step 4.4 with words that (made up)",
+          "state": "todo",
+          "length": 42
+        },
+        {
+          "key": "other-4-step-5",
+          "title": "Example step 4.5 with words that stand (made up)",
+          "state": "todo",
+          "length": 46
+        }
+      ],
+      "length": 29
+    },
+    {
+      "key": "other-5",
+      "title": "Example pipeline 5 with words (made up)",
+      "steps": [
+        {
+          "key": "other-5-step-1",
+          "title": "Example step 5.1 with words that stand in (made up)",
+          "state": "done",
+          "length": 51
+        },
+        {
+          "key": "other-5-step-2",
+          "title": "Example step 5.2 (made up)",
+          "state": "doing",
+          "length": 28
+        },
+        {
+          "key": "other-5-step-3",
+          "title": "Example step 5.3 with words that (made up)",
+          "state": "done",
+          "length": 43
+        },
+        {
+          "key": "other-5-step-4",
+          "title": "Example step 5.4 with words that (made up)",
+          "state": "done",
+          "length": 43
+        },
+        {
+          "key": "other-5-step-5",
+          "title": "Example step 5.5 with words that (made up)",
+          "state": "todo",
+          "length": 42
+        }
+      ],
+      "length": 39
+    }
+  ],
+  "links": [
+    {
+      "type": "consumes",
+      "from": "module-1",
+      "to": "module-5",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-4",
+      "to": "step-02",
+      "gate": null,
+      "inferred": true
+    },
+    {
+      "type": "blocks",
+      "from": "step-01",
+      "to": "step-02",
+      "gate": "hard",
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-4",
+      "to": "step-03",
+      "gate": null,
+      "inferred": true
+    },
+    {
+      "type": "implements",
+      "from": "module-3",
+      "to": "step-03",
+      "gate": null,
+      "inferred": true
+    },
+    {
+      "type": "blocks",
+      "from": "step-02",
+      "to": "step-03",
+      "gate": "hard",
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-6",
+      "to": "step-04",
+      "gate": null,
+      "inferred": true
+    },
+    {
+      "type": "blocks",
+      "from": "step-03",
+      "to": "step-04",
+      "gate": "hard",
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-6",
+      "to": "step-05",
+      "gate": null,
+      "inferred": true
+    },
+    {
+      "type": "blocks",
+      "from": "step-04",
+      "to": "step-05",
+      "gate": "hard",
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-7",
+      "to": "step-06",
+      "gate": null,
+      "inferred": true
+    },
+    {
+      "type": "blocks",
+      "from": "step-04",
+      "to": "step-06",
+      "gate": "partial",
+      "upTo": "up to example reach 1 with words that stand in for a title of",
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-8",
+      "to": "step-07",
+      "gate": null,
+      "inferred": true
+    },
+    {
+      "type": "blocks",
+      "from": "step-03",
+      "to": "step-07",
+      "gate": "hard",
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-7",
+      "to": "step-08",
+      "gate": null,
+      "inferred": true
+    },
+    {
+      "type": "implements",
+      "from": "module-6",
+      "to": "step-08",
+      "gate": null,
+      "inferred": true
+    },
+    {
+      "type": "blocks",
+      "from": "step-05",
+      "to": "step-08",
+      "gate": "hard",
+      "inferred": false
+    },
+    {
+      "type": "blocks",
+      "from": "step-06",
+      "to": "step-08",
+      "gate": "hard",
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-2",
+      "to": "step-09",
+      "gate": null,
+      "inferred": true
+    },
+    {
+      "type": "blocks",
+      "from": "step-08",
+      "to": "step-09",
+      "gate": "hard",
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-1",
+      "to": "step-10",
+      "gate": null,
+      "inferred": true
+    },
+    {
+      "type": "implements",
+      "from": "module-5",
+      "to": "step-10",
+      "gate": null,
+      "inferred": true
+    },
+    {
+      "type": "blocks",
+      "from": "step-09",
+      "to": "step-10",
+      "gate": "partial",
+      "upTo": "up to example reach 2 with words that stand",
+      "inferred": false
+    },
+    {
+      "type": "blocks",
+      "from": "step-07",
+      "to": "step-10",
+      "gate": "hard",
+      "inferred": false
+    },
+    {
+      "type": "blocks",
+      "from": "step-03",
+      "to": "step-11",
+      "gate": "hard",
+      "inferred": false
+    },
+    {
+      "type": "blocks",
+      "from": "step-07",
+      "to": "step-12",
+      "gate": "hard",
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-2",
+      "to": "other-5-step-1",
+      "gate": null,
+      "inferred": true
+    },
+    {
+      "type": "implements",
+      "from": "module-2",
+      "to": "other-5-step-2",
+      "gate": null,
+      "inferred": true
+    },
+    {
+      "type": "blocks",
+      "from": "other-5-step-1",
+      "to": "other-5-step-2",
+      "gate": "hard",
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-6",
+      "to": "other-5-step-3",
+      "gate": null,
+      "inferred": true
+    },
+    {
+      "type": "blocks",
+      "from": "other-5-step-1",
+      "to": "other-5-step-3",
+      "gate": "hard",
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-6",
+      "to": "other-5-step-4",
+      "gate": null,
+      "inferred": true
+    },
+    {
+      "type": "blocks",
+      "from": "other-5-step-1",
+      "to": "other-5-step-4",
+      "gate": "hard",
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-6",
+      "to": "other-5-step-5",
+      "gate": null,
+      "inferred": true
+    },
+    {
+      "type": "implements",
+      "from": "module-2",
+      "to": "other-5-step-5",
+      "gate": null,
+      "inferred": true
+    },
+    {
+      "type": "blocks",
+      "from": "other-5-step-2",
+      "to": "other-5-step-5",
+      "gate": "hard",
+      "inferred": false
+    },
+    {
+      "type": "blocks",
+      "from": "other-5-step-3",
+      "to": "other-5-step-5",
+      "gate": "hard",
+      "inferred": false
+    },
+    {
+      "type": "blocks",
+      "from": "other-5-step-4",
+      "to": "other-5-step-5",
+      "gate": "hard",
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-5",
+      "to": "other-2-step-1",
+      "gate": null,
+      "inferred": true
+    },
+    {
+      "type": "implements",
+      "from": "module-5",
+      "to": "other-2-step-2",
+      "gate": null,
+      "inferred": true
+    },
+    {
+      "type": "blocks",
+      "from": "other-2-step-1",
+      "to": "other-2-step-2",
+      "gate": "hard",
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-5",
+      "to": "other-2-step-3",
+      "gate": null,
+      "inferred": true
+    },
+    {
+      "type": "blocks",
+      "from": "other-2-step-2",
+      "to": "other-2-step-3",
+      "gate": "partial",
+      "upTo": "up to example reach 3 with words that stand",
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-5",
+      "to": "other-2-step-4",
+      "gate": null,
+      "inferred": true
+    },
+    {
+      "type": "blocks",
+      "from": "other-2-step-2",
+      "to": "other-2-step-4",
+      "gate": "hard",
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-1",
+      "to": "other-2-step-5",
+      "gate": null,
+      "inferred": true
+    },
+    {
+      "type": "blocks",
+      "from": "other-2-step-3",
+      "to": "other-2-step-5",
+      "gate": "hard",
+      "inferred": false
+    },
+    {
+      "type": "blocks",
+      "from": "other-2-step-4",
+      "to": "other-2-step-5",
+      "gate": "hard",
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-5",
+      "to": "other-2-step-6",
+      "gate": null,
+      "inferred": true
+    },
+    {
+      "type": "blocks",
+      "from": "other-2-step-5",
+      "to": "other-2-step-6",
+      "gate": "partial",
+      "upTo": "up to example reach 4 with words",
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-6",
+      "to": "other-1-step-1",
+      "gate": null,
+      "inferred": true
+    },
+    {
+      "type": "implements",
+      "from": "module-4",
+      "to": "other-1-step-2",
+      "gate": null,
+      "inferred": true
+    },
+    {
+      "type": "implements",
+      "from": "module-1",
+      "to": "other-1-step-3",
+      "gate": null,
+      "inferred": true
+    },
+    {
+      "type": "implements",
+      "from": "module-4",
+      "to": "other-3-step-1",
+      "gate": null,
+      "inferred": true
+    },
+    {
+      "type": "implements",
+      "from": "module-2",
+      "to": "other-4-step-1",
+      "gate": null,
+      "inferred": true
+    },
+    {
+      "type": "implements",
+      "from": "module-2",
+      "to": "other-4-step-2",
+      "gate": null,
+      "inferred": true
+    },
+    {
+      "type": "blocks",
+      "from": "other-4-step-1",
+      "to": "other-4-step-2",
+      "gate": "hard",
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-2",
+      "to": "other-4-step-3",
+      "gate": null,
+      "inferred": true
+    },
+    {
+      "type": "blocks",
+      "from": "other-4-step-2",
+      "to": "other-4-step-3",
+      "gate": "hard",
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-2",
+      "to": "other-4-step-4",
+      "gate": null,
+      "inferred": true
+    },
+    {
+      "type": "implements",
+      "from": "module-6",
+      "to": "other-4-step-4",
+      "gate": null,
+      "inferred": true
+    },
+    {
+      "type": "blocks",
+      "from": "other-4-step-2",
+      "to": "other-4-step-4",
+      "gate": "hard",
+      "inferred": false
+    },
+    {
+      "type": "implements",
+      "from": "module-6",
+      "to": "other-4-step-5",
+      "gate": null,
+      "inferred": true
+    },
+    {
+      "type": "measures",
+      "from": "module-2",
+      "to": "module-6",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "measures",
+      "from": "module-2",
+      "to": "module-7",
+      "gate": null,
+      "inferred": false
+    },
+    {
+      "type": "measures",
+      "from": "other-5",
+      "to": "module-6",
+      "gate": null,
+      "inferred": false
+    }
+  ],
+  "placement": {
+    "lanes": [
+      {
+        "name": "Example lane B",
+        "arrange": "row",
+        "order": 2,
+        "tint": "--area-6"
+      },
+      {
+        "name": "Example grid lane",
+        "arrange": "grid",
+        "columns": 3,
+        "order": 3,
+        "tint": "--area-2"
+      },
+      {
+        "name": "Small lane",
+        "arrange": "row",
+        "order": 4,
+        "tint": "--area-1"
+      },
+      {
+        "name": "Example beside one",
+        "arrange": "row",
+        "order": 5,
+        "beside": "right",
+        "of": "Small lane",
+        "tint": "--area-4"
+      },
+      {
+        "name": "Stack one",
+        "arrange": "stack",
+        "order": 6,
+        "beside": "right",
+        "of": "Example lane B",
+        "tint": "--area-3"
+      },
+      {
+        "name": "Example lane of eight",
+        "arrange": "grid",
+        "columns": 4,
+        "order": 1,
+        "tint": "--area-5"
+      }
+    ],
+    "nodes": {
+      "module-1": {
+        "lane": "Example lane of eight",
+        "order": 1
+      },
+      "module-2": {
+        "lane": "Example lane of eight",
+        "order": 2
+      },
+      "module-3": {
+        "lane": "Example lane of eight",
+        "order": 3
+      },
+      "module-4": {
+        "lane": "Example lane of eight",
+        "order": 4
+      },
+      "module-5": {
+        "lane": "Example lane of eight",
+        "order": 5
+      },
+      "module-6": {
+        "lane": "Example lane of eight",
+        "order": 6
+      },
+      "module-7": {
+        "lane": "Example lane of eight",
+        "order": 7
+      },
+      "module-8": {
+        "lane": "Example lane of eight",
+        "order": 8
+      },
+      "step-01": {
+        "lane": "Example lane B",
+        "order": 1
+      },
+      "step-02": {
+        "lane": "Example lane B",
+        "order": 2
+      },
+      "step-03": {
+        "lane": "Example lane B",
+        "order": 3
+      },
+      "step-04": {
+        "lane": "Example grid lane",
+        "order": 1
+      },
+      "step-05": {
+        "lane": "Example grid lane",
+        "order": 2
+      },
+      "step-06": {
+        "lane": "Example grid lane",
+        "order": 4
+      },
+      "step-07": {
+        "lane": "Example grid lane",
+        "order": 3
+      },
+      "step-08": {
+        "lane": "Example grid lane",
+        "order": 5
+      },
+      "step-09": {
+        "lane": "Small lane",
+        "order": 1
+      },
+      "step-10": {
+        "lane": "Example beside one",
+        "order": 1
+      },
+      "step-11": {
+        "lane": "Stack one",
+        "order": 1
+      }
+    }
+  }
+}

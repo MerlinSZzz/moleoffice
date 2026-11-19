@@ -1,0 +1,8 @@
+{
+  "doors": [
+    "office.data-folder",
+    "office.move-data-folder",
+    "office.confirm-data-folder-move"
+  ],
+  "why": "Both presses ask whether a raise carries them in the one guard they share, and the reading asks the same check without a reason for each of the two presses beside the reading's own door."
+}

@@ -1,0 +1,26 @@
+-- WHETHER A PERSON IS HERE IS A PERSON'S OWN ANSWER, AND THIS IS WHERE IT IS KEPT.
+--
+-- Two columns on `people`. Nothing is dropped, nothing is rewritten, no other table is touched, and
+-- every existing row keeps NULL in both.
+--
+-- A person is online by default and may set online, offline or
+-- invisible. Invisible means an agent learns the person is online only when the person writes to it.
+-- Working, do not disturb and the like go in a separate field, like an agent's working line.
+-- Criterion M20.
+--
+-- NULL MEANS NOBODY HAS CHOSEN, AND THAT IS NOT THE SAME AS ONLINE. It is read as online because the
+-- owner said the default is online, and the sentence a reader gets says which of the two it is: "the
+-- person has not chosen, so this is the default" reads differently from "the person set themselves
+-- online". Writing
+-- `online` into every existing row would turn a default into a choice nobody made, which is the one
+-- thing a migration here may not do.
+--
+-- THE WORKING LINE IS NOT THIS. `state` on the same table is the free text a person writes about
+-- themselves, and it stays exactly what it is: the owner put working and do not disturb in a
+-- separate field from online and offline. Neither column reads the other.
+--
+-- WHY IT IS ON `people` AND NOT ON `agents`. An agent's presence is worked out from what is running
+-- (criterion M4) and an agent has nothing to declare. A person is not a process, so there is nothing
+-- to measure and the answer has to be theirs.
+ALTER TABLE `people` ADD `presence_choice` text;--> statement-breakpoint
+ALTER TABLE `people` ADD `presence_choice_at` text;

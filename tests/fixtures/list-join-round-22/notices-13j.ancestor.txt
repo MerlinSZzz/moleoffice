@@ -1,0 +1,120 @@
+  aNotebookHasNotChanged: WAKES('It reminds an agent of its notebook duty and asks it to write, at most once a day.'),
+  modulesHaveNotChanged: WAKES('It asks the named secretary to look at modules left unchanged, at most once a day.'),
+  keyFilesLeftInASandbox: WAKES('Key files are left in a sandbox, and somebody has to remove them.'),
+  youAreRaised: WAKES('It says the agent may now do what it was waiting to be allowed to do.'),
+  yourRaiseEnded: QUIET('It says a raise has ended.'),
+  aSettingChangedFromAnotherComputer: QUIET('It says a setting was changed on another computer.'),
+  aSettingChangedForHim: QUIET('It says a setting was changed for the person.'),
+  agentsInTerminalsAfterTheHolderRestarted: WAKES('Agents in terminals lost their holder, and somebody has to look.'),
+  theRunsAStopCauseStopped: WAKES('Runs stopped for one cause, and the person has to act on it.'),
+  packageTakenOutside: WAKES('A package was taken outside, and the one responsible has to answer for it.'),
+  aClaimTookThePackage: WAKES('A claim took a package, and the one responsible has to answer for it.'),
+  aChecklistItemIsDue: WAKES('The owner of a checklist switched this reminder on so that it would act on the item.'),
+  questionThePlan: WAKES('The planning flow waits on the planner, who has to question the plan and submit it.'),
+  aBookingWasMoved: WAKES('A GPU booking moved, and its holder has to start at the new time.'),
+  aBookingGoesFirstNow: WAKES('Another booking goes first on the GPU, and the holder has to stop within the grace.'),
+  aGoFirstIsAsked: WAKES('An agent asks to go first on the GPU, and the one asked has to grant or refuse it.'),
+  aGoFirstWasAnswered: WAKES('A request to go first was answered, and the applicant has to act on the answer.'),
+  aCounterFired: WAKES('A counter fired, and it was set up to make somebody act.'),
+  oldDeadLetterLinesFolded: QUIET('It says old lines were folded together.'),
+  theGovernsCheckFoundWork: WAKES('It asks the named secretary to act on the decisions the governs check listed, at most once a night.'),
+  aMessageBackAsYouAsked: WAKES('The person asked for this message back at this time, so it waits on them again.'),
+  theIntentMarkWasBroken: WAKES('The person said a reply broke their mark, which asked the agent to change nothing or to build nothing yet.'),
+  theLoginsWeekIsPartUsed: WAKES('A login has used 50% or 80% of its week, and each secretary plans the rest of the week by it.'),
+  // ---------------------------------------------------------------- the merge queue
+  aQueuedEntryConflicts: WAKES('A waiting entry conflicts with new main and was not sent back, and its starter can prepare a carry round.'),
+  migrationsWereRenumbered: QUIET('The merge tool renumbered independent migration additions. The entry continues through its usual checks; its starter has no action to take.'),
+  anEntryLanded: WAKES("It asks the queue's owner to push and start the next round."),
+  anEntryBouncedForTheSecretary: WAKES('An entry bounced, and the secretary decides what happens next.'),
+  aLandingStalled: WAKES('A landing stalled, and a person must look.'),
+  anEntryWasWithdrawn: QUIET('It says an entry was withdrawn by somebody who already knows.'),
+  anEntryEndedInAnotherState: WAKES('An entry ended in a state no other row names, so it is not assumed to ask nothing.'),
+  anEntryBounced: WAKES("An entry bounced, and its run's agent, starter and submitter have to act."),
+  confirmTheDeletes: WAKES('It asks the secretary to confirm deletes before an entry can land.'),
+  anEntryWaitsOnACheckAgain: WAKES('An entry waits on a check again, and the message says what to run.'),
+  anEntryWaitsForRoom: QUIET('It says an entry waits for room in the sandbox launcher. It goes on by itself.'),
+  redOnMain: WAKES('Main is red, and the build sheriff and the secretary have to act.'),
+  // ---------------------------------------------------------------- the check
+  released: WAKES('It tells the worker it is released and may end.'),
+  checkedAndReleased: WAKES('It asks the starter to confirm the report before the run closes.'),
+  releasedAndTheStarterIsTold: QUIET("It tells the worker it is released while the run's starter, who submits the run, is told too. The worker has nothing to do."),
+  releasedToOneThatReadsTheCheck: QUIET('It tells an agent of a release it has already read in the check itself, as that agent said it does. A refusal still wakes it.'),
+  refused: WAKES('It tells the worker it is not released, and what is missing.'),
+  aRefusalForTheStarter: WAKES('It tells the starter its worker was refused.'),
+  aRunWasClosed: QUIET('It says a run is closed after its starter confirmed it.'),
+  noInspectorCheckItYourself: WAKES('No inspector is appointed, so it asks the starter to check the work.'),
+  aCheckWasQueued: QUIET('It says the office queued a check. The office runs the check itself.'),
+  aResealAsksForACheck: WAKES('A refused run was sealed again, and it asks whoever filed the refused check to start a fresh one.'),
+  noInspectorTellTheSecretary: WAKES('A run finished in a project with no inspector, and the secretary has to act.'),
+  theCheckStarted: QUIET('It says the check started.'),
+  theCheckEnded: QUIET('It says the check ended with a verdict. The verdict itself is the message that wakes.'),
+  theCheckFailed: WAKES('The check failed and gave no verdict, so somebody has to start it again.'),
+  // ---------------------------------------------------------------- keys and letters
+  aNewKeyIsAskedFor: WAKES('It asks the starter to grant or refuse a new key.'),
+  lettersForRetiredAgents: WAKES('Letters for retired agents were passed to this reader to answer.'),
+}
+
+/**
+ * ROWS WRITTEN BEFORE THE CODE THAT WRITES THEIR KIND, each with the wave whose round writes it. The kind was
+ * agreed with that wave by message (wave 13y, round 9, message uFwR6-TEwZgb), so the wave writes its kind and leaves
+ * this file alone. A new line in `SYSTEM_LINES` is not awaited here: the type above makes its own branch add its
+ * row, so a second row here would be the same key twice. tests/every-office-notice-says-whether-it-wakes.test.ts
+ * lets these rows stand while nothing writes them yet, and once the wave has landed the kind may come off this list.
+ */
+export const AWAITED: { readonly [K in NoticeKind]?: string } = {}
+
+/** Whether a string names a kind of notice in the table. */
+export function isANoticeKind(kind: unknown): kind is NoticeKind {
+  return typeof kind === 'string' && Object.hasOwn(NOTICES, kind)
+}
+
+/** Whether a registered inspector is this sender. A row with no role reads as a worker, so it is not one. */
+export function isAnInspector(sentBy: ParticipantRef | null): boolean {
+  if (sentBy === null || sentBy.kind !== 'agent') return false
+  const row = readParticipant(sentBy)
+  return row !== null && 'role' in row && row.role === THE_INSPECTOR
+}
+
+/**
+ * WHY THIS MESSAGE WAKES NO WAITER, or null because it wakes.
+ *
+ * Quiet only when Mole Office or a registered inspector wrote it and its kind's row says it asks
+ * nothing. The sentence travels on the waiting row, so a caller can see why the row did not end its
+ * hold.
+ */
+export function whyThisWakesNoWaiter(sentBy: ParticipantRef | null, notice: unknown): string | null {
+  if (sentBy === null || !isANoticeKind(notice)) return null
+  if (!isMoleOffice(sentBy) && !isAnInspector(sentBy)) return null
+  const row = NOTICES[notice]
+  if (row.wakes) return null
+  return (
+    `This is a notice of the kind "${notice}", written by ${isMoleOffice(sentBy) ? 'Mole Office' : 'the inspector'}. ` +
+    `${row.because} It does not wake a waiter on its own. It is handed over with the next message that does, and ` +
+    'the inbox shows it.'
+  )
+}
+
+/**
+ * REFUSE A MESSAGE THAT NAMES A KIND OF NOTICE IT MAY NOT. Strict storage: only Mole Office and a
+ * registered inspector write `notice`, because a kind is what makes a message quiet, and an agent that
+ * could set it could keep its own message from waking anybody. A kind the table does not hold is
+ * refused too, so no stored kind is one nothing can read.
+ */
+export function refuseANoticeKindNotAllowed(data: Record<string, unknown>, writtenByTheOffice: boolean, writer: ParticipantRef | null): void {
+  if (!Object.hasOwn(data, 'notice')) return
+  const kind = data['notice']
+  if (!writtenByTheOffice && !isAnInspector(writer)) {
+    throw new PanelError(
+      'Only Mole Office and the inspector write `notice` on a message, because the kind of notice decides whether ' +
+        'it wakes its reader. Leave it out: a message without it wakes its reader. Nothing was written.',
+      403,
+    )
+  }
+  if (!isANoticeKind(kind)) {
+    throw new PanelError(
+      `"${String(kind)}" is not a kind of notice the office knows. The kinds are listed in src/server/lib/notices.ts. ` +
+        'Nothing was written.',
+      422,
+    )
+  }
+}

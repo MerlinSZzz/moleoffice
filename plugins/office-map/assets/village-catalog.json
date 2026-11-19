@@ -1,0 +1,9724 @@
+{
+  "format": 1,
+  "atlases": {
+    "village-0": {
+      "size": [
+        1021,
+        1024
+      ],
+      "bytes": 266928,
+      "decodedBytes": 4182016,
+      "sha256": "ce2079614b44240fe996a8a017b8a5e3e03d630e1ecb2f0c4af5c1497f56d708"
+    },
+    "village-1": {
+      "size": [
+        1023,
+        1011
+      ],
+      "bytes": 218959,
+      "decodedBytes": 4137012,
+      "sha256": "4d6243add374b9418fb8a1a4f062e1a7865749bcf9d84194a241d83f5f591a06"
+    },
+    "village-2": {
+      "size": [
+        1016,
+        1020
+      ],
+      "bytes": 128601,
+      "decodedBytes": 4145280,
+      "sha256": "8eb28ebf4be609288befae5e1cfe546c1e24099553295730e81c24a403ed94c6"
+    },
+    "village-3": {
+      "size": [
+        1009,
+        1023
+      ],
+      "bytes": 136364,
+      "decodedBytes": 4128828,
+      "sha256": "9626d9a3ce5ba821bbbadab49cc73292bb737d3a1b7e321b7ca64be5bb878e15"
+    },
+    "village-4": {
+      "size": [
+        1023,
+        1006
+      ],
+      "bytes": 494824,
+      "decodedBytes": 4116552,
+      "sha256": "3f8a155a22addc206d8ab2d03245841facbf41d5e02f006a667a6402268faefc"
+    },
+    "village-5": {
+      "size": [
+        1021,
+        564
+      ],
+      "bytes": 247827,
+      "decodedBytes": 2303376,
+      "sha256": "c1082c31ab69f18e5130ff644d8ed21fe7813557393e550a43a68e0bfd047804"
+    }
+  },
+  "sprites": {
+    "A01-floor": {
+      "source": "round7a-batch-a/sprites/a01-floor.png",
+      "sha256": "a901ef9b50dc39307b0cced5c5a88461b38030be12b74c930abb775f90c82e49",
+      "pixelHash": "c40ce3169006da03784e26024eeb56014f5b42ab85fca3ae2725e9cea6740cc7",
+      "size": [
+        416,
+        312
+      ],
+      "trim": [
+        52,
+        78,
+        364,
+        312
+      ],
+      "anchor": [
+        208,
+        286
+      ],
+      "rect": [
+        628,
+        419,
+        312,
+        234
+      ],
+      "atlas": "village-0"
+    },
+    "A01-back": {
+      "source": "round7a-batch-a/sprites/a01-back.png",
+      "sha256": "ce07a81583271c8bfa9fe74ad7252bafed1c4539d6675b8ac7ed5ae8ce5ed019",
+      "pixelHash": "993b8b1922f46b2664fab8570956727dad04c6d842d945b9610cb728e55d7820",
+      "size": [
+        416,
+        312
+      ],
+      "trim": [
+        0,
+        0,
+        416,
+        286
+      ],
+      "anchor": [
+        208,
+        286
+      ],
+      "rect": [
+        2,
+        289,
+        416,
+        286
+      ],
+      "atlas": "village-4"
+    },
+    "A01-front": {
+      "source": "round7a-batch-a/sprites/a01-front.png",
+      "sha256": "1731780f7a8c834eb66fb132fe75a294bf55bbbe8ca0cc2767a6ac9a3f746b9f",
+      "pixelHash": "c2287b51d7deaeb1656ce9d5b8b7ad87a47f66ff185ee9f6a52013d47179d4fd",
+      "size": [
+        416,
+        312
+      ],
+      "trim": [
+        3,
+        246,
+        413,
+        312
+      ],
+      "anchor": [
+        208,
+        286
+      ],
+      "rect": [
+        2,
+        69,
+        410,
+        66
+      ],
+      "atlas": "village-5"
+    },
+    "A02-floor": {
+      "source": "round7a-batch-a/sprites/a02-floor.png",
+      "sha256": "606308386446bea6d02741c67ebcf0a6200752c87733ff7f96b391eebbb93869",
+      "pixelHash": "85f94d7272a6903a182bab047266e37f9c5774b47b9e06799a20320321b1803f",
+      "size": [
+        416,
+        312
+      ],
+      "trim": [
+        52,
+        78,
+        364,
+        312
+      ],
+      "anchor": [
+        208,
+        286
+      ],
+      "rect": [
+        628,
+        1,
+        312,
+        234
+      ],
+      "atlas": "village-1"
+    },
+    "A02-back": {
+      "source": "round7a-batch-a/sprites/a02-back.png",
+      "sha256": "70c8268339adf1015f44ba3a7414e3985c1554a8c059b1d093f13f3558a22fa0",
+      "pixelHash": "7f7c1a72c270413d642ae737b7b903787a1cfd2c88480a71600d8d3e8027f0e7",
+      "size": [
+        416,
+        312
+      ],
+      "trim": [
+        0,
+        0,
+        416,
+        307
+      ],
+      "anchor": [
+        208,
+        286
+      ],
+      "rect": [
+        524,
+        681,
+        416,
+        307
+      ],
+      "atlas": "village-3"
+    },
+    "A02-front": {
+      "source": "round7a-batch-a/sprites/a02-front.png",
+      "sha256": "b23d3b1b185e037dc287801501b0dc8cf48efa6081d4111b3164cdd878d2c0f2",
+      "pixelHash": "f4df0ba0fb521493d86b17fa567f05033302745c2ef8f136272c3e52f1c3e67e",
+      "size": [
+        416,
+        312
+      ],
+      "trim": [
+        52,
+        246,
+        364,
+        311
+      ],
+      "anchor": [
+        208,
+        286
+      ],
+      "rect": [
+        628,
+        1,
+        312,
+        65
+      ],
+      "atlas": "village-5"
+    },
+    "A03-floor": {
+      "source": "round7a-batch-a/sprites/a03-floor.png",
+      "sha256": "99475f6eca9d1e8114dd8f6af7ccd4ef998a662fbd1a91afaa30380e3d9d5884",
+      "pixelHash": "5081cc3abb2c244dd88ae0904d6d75252f4f37df9edd16e316a62dd0d21ce2f7",
+      "size": [
+        624,
+        416
+      ],
+      "trim": [
+        52,
+        78,
+        572,
+        416
+      ],
+      "anchor": [
+        312,
+        390
+      ],
+      "atlas": "village-3",
+      "rect": [
+        2,
+        1,
+        520,
+        338
+      ]
+    },
+    "A03-back": {
+      "source": "round7a-batch-a/sprites/a03-back.png",
+      "sha256": "55c98291c3e5c307572c254fe22b29e0049f31218adbcf51cd92acea8c20f8f6",
+      "pixelHash": "88403cf2d8fc516dac8c31ee2e2230b2b9365bdcf885dfef34f12864e7707b7e",
+      "size": [
+        624,
+        416
+      ],
+      "trim": [
+        0,
+        0,
+        624,
+        416
+      ],
+      "anchor": [
+        312,
+        390
+      ],
+      "atlas": "village-0",
+      "rect": [
+        2,
+        1,
+        624,
+        416
+      ]
+    },
+    "A03-partition": {
+      "source": "round7a-batch-a/sprites/a03-partition.png",
+      "sha256": "d75f993fd10c0ebd7affbda5df8e032c5dbc2d6ef4a69cbe1f629d93368239e4",
+      "pixelHash": "75b8c96bb2b8b44c0d1cdf6e57dfdf66015400620b7534cb28df50670156df41",
+      "size": [
+        624,
+        416
+      ],
+      "trim": [
+        56,
+        209,
+        568,
+        259
+      ],
+      "anchor": [
+        312,
+        390
+      ],
+      "rect": [
+        2,
+        204,
+        512,
+        50
+      ],
+      "atlas": "village-5"
+    },
+    "A03-front": {
+      "source": "round7a-batch-a/sprites/a03-front.png",
+      "sha256": "e493407ebccb426651c11f5e8e8ced5cc6e9295d6713d7605a1802d4b18f139b",
+      "pixelHash": "8a1badc4add2413e7ac704450befa2aa7dd1cc7650b70286108e35ee7db0d232",
+      "size": [
+        624,
+        416
+      ],
+      "trim": [
+        52,
+        350,
+        572,
+        414
+      ],
+      "anchor": [
+        312,
+        390
+      ],
+      "rect": [
+        2,
+        959,
+        520,
+        64
+      ],
+      "atlas": "village-0"
+    },
+    "A04-floor": {
+      "source": "round7a-batch-a/sprites/a04-floor.png",
+      "sha256": "a224b311f3235196dd0db01712392201f2c5dfa6f40abb4a4817235a97d3ebb8",
+      "pixelHash": "113956612857b9a9bd8abea41c7d57d19c95893969689844bc4cdfd9f7178872",
+      "size": [
+        728,
+        364
+      ],
+      "trim": [
+        52,
+        78,
+        676,
+        364
+      ],
+      "anchor": [
+        364,
+        338
+      ],
+      "rect": [
+        2,
+        733,
+        624,
+        286
+      ],
+      "atlas": "village-2"
+    },
+    "A04-back": {
+      "source": "round7a-batch-a/sprites/a04-back.png",
+      "sha256": "93f2ec95c780b499cebc1f39da8a2afc953cecd32cfbc4f4eb9e8f28980b28d1",
+      "pixelHash": "a06c37e4f067cf262a084ae052296523e52c21a59dc0cf093ef7ff18a5d66295",
+      "size": [
+        728,
+        364
+      ],
+      "trim": [
+        0,
+        0,
+        728,
+        364
+      ],
+      "anchor": [
+        364,
+        338
+      ],
+      "atlas": "village-2",
+      "rect": [
+        2,
+        1,
+        728,
+        364
+      ]
+    },
+    "A04-front": {
+      "source": "round7a-batch-a/sprites/a04-front.png",
+      "sha256": "d30a3859b3c248b675069c815eb0a6ce0de8729dc7839af75b5c3a49ef3589b7",
+      "pixelHash": "52334671b0da53441fe1efa3e7fb5ecb6260461bdc18f5a8313d496dedc48a6c",
+      "size": [
+        728,
+        364
+      ],
+      "trim": [
+        52,
+        298,
+        676,
+        359
+      ],
+      "anchor": [
+        364,
+        338
+      ],
+      "rect": [
+        316,
+        137,
+        624,
+        61
+      ],
+      "atlas": "village-5"
+    },
+    "A27": {
+      "source": "round7a-batch-a/sprites/a27.png",
+      "sha256": "dc0e23de02d3cea968b0ce3e9119292658cf6e8aef14b44e87045140407e8de6",
+      "pixelHash": "38e15476cf42ec58a34b26c0f40cd7fedc91d60d8d793f646ba0e0737553f80f",
+      "size": [
+        156,
+        52
+      ],
+      "trim": [
+        2,
+        2,
+        154,
+        50
+      ],
+      "anchor": [
+        78,
+        50
+      ],
+      "collision": [],
+      "hitArea": [
+        [
+          2,
+          2
+        ],
+        [
+          154,
+          2
+        ],
+        [
+          154,
+          50
+        ],
+        [
+          2,
+          50
+        ]
+      ],
+      "layer": "floor / before props and actors",
+      "rect": [
+        516,
+        204,
+        152,
+        48
+      ],
+      "atlas": "village-5"
+    },
+    "A28": {
+      "source": "round7a-batch-a/sprites/a28.png",
+      "sha256": "3d1285cd550b0a21265b5cd5604c7baa2b7d9579bfc24a55a9bb7ff439dc75ee",
+      "pixelHash": "731de9aa0e863d5e3513788630af2d337d995f31983895a2e71597b425059488",
+      "size": [
+        104,
+        78
+      ],
+      "trim": [
+        2,
+        2,
+        102,
+        76
+      ],
+      "anchor": [
+        52,
+        76
+      ],
+      "collision": [],
+      "hitArea": [
+        [
+          2,
+          2
+        ],
+        [
+          102,
+          2
+        ],
+        [
+          102,
+          76
+        ],
+        [
+          2,
+          76
+        ]
+      ],
+      "layer": "floor / before props and actors",
+      "rect": [
+        348,
+        927,
+        100,
+        74
+      ],
+      "atlas": "village-4"
+    },
+    "A29": {
+      "source": "round7a-batch-a/sprites/a29.png",
+      "sha256": "3d1859dc2073c09d62f72e4033672a1915219467818512417d4bc2219581d829",
+      "pixelHash": "c13c55efc01ed9185d72b8c2fefceac9a9dd9e309738d9431f3dfc82a9957501",
+      "size": [
+        78,
+        52
+      ],
+      "trim": [
+        2,
+        2,
+        76,
+        50
+      ],
+      "anchor": [
+        39,
+        50
+      ],
+      "collision": [],
+      "hitArea": [
+        [
+          2,
+          2
+        ],
+        [
+          76,
+          2
+        ],
+        [
+          76,
+          50
+        ],
+        [
+          2,
+          50
+        ]
+      ],
+      "layer": "back-wall attachment / before actors",
+      "rect": [
+        942,
+        137,
+        74,
+        48
+      ],
+      "atlas": "village-5"
+    },
+    "A30": {
+      "source": "round7a-batch-a/sprites/a30.png",
+      "sha256": "699169dd045c38bac8e9cfa778656e470b911b80bb1f9f59fd4eb3b96c9c734d",
+      "pixelHash": "84c3ad12a1881706c681ec211b968fa29e9773689dcb1b82f15bc81fc51f753e",
+      "size": [
+        104,
+        52
+      ],
+      "trim": [
+        2,
+        2,
+        102,
+        50
+      ],
+      "anchor": [
+        52,
+        50
+      ],
+      "collision": [
+        [
+          [
+            2,
+            38
+          ],
+          [
+            102,
+            38
+          ],
+          [
+            102,
+            50
+          ],
+          [
+            2,
+            50
+          ]
+        ]
+      ],
+      "hitArea": [
+        [
+          2,
+          2
+        ],
+        [
+          102,
+          2
+        ],
+        [
+          102,
+          50
+        ],
+        [
+          2,
+          50
+        ]
+      ],
+      "layer": "object / depth sort by ground anchor",
+      "rect": [
+        888,
+        69,
+        100,
+        48
+      ],
+      "atlas": "village-5"
+    },
+    "A32": {
+      "source": "round7a-batch-a/sprites/a32.png",
+      "sha256": "eebab160f278b2ada73e8346f22d208f929156160bd635863a62827f1c7492bd",
+      "pixelHash": "d58c48f977e669b39022371b4132b2f57519e39b0dbf7ef5b1b70c1da3889f63",
+      "size": [
+        52,
+        52
+      ],
+      "trim": [
+        2,
+        2,
+        50,
+        50
+      ],
+      "anchor": [
+        26,
+        50
+      ],
+      "collision": [
+        [
+          [
+            2,
+            38
+          ],
+          [
+            50,
+            38
+          ],
+          [
+            50,
+            50
+          ],
+          [
+            2,
+            50
+          ]
+        ]
+      ],
+      "hitArea": [
+        [
+          2,
+          2
+        ],
+        [
+          50,
+          2
+        ],
+        [
+          50,
+          50
+        ],
+        [
+          2,
+          50
+        ]
+      ],
+      "layer": "object / depth sort by ground anchor",
+      "rect": [
+        848,
+        204,
+        48,
+        48
+      ],
+      "atlas": "village-5"
+    },
+    "A33": {
+      "source": "round7a-batch-a/sprites/a33.png",
+      "sha256": "89642e4c84ce2f470a595490faa659ca7d145b77124cbc5fdc9536d7bd505f80",
+      "pixelHash": "9e4126a4c6f4c02c4cba9c7e1ab2b6c95c283fb8a905a5991982373217ab257c",
+      "size": [
+        104,
+        78
+      ],
+      "trim": [
+        0,
+        17,
+        104,
+        51
+      ],
+      "anchor": [
+        52,
+        52
+      ],
+      "collision": [
+        [
+          [
+            0,
+            12
+          ],
+          [
+            13,
+            12
+          ],
+          [
+            13,
+            52
+          ],
+          [
+            0,
+            52
+          ]
+        ],
+        [
+          [
+            91,
+            12
+          ],
+          [
+            104,
+            12
+          ],
+          [
+            104,
+            52
+          ],
+          [
+            91,
+            52
+          ]
+        ]
+      ],
+      "hitArea": [
+        [
+          0,
+          17
+        ],
+        [
+          104,
+          17
+        ],
+        [
+          104,
+          51
+        ],
+        [
+          0,
+          51
+        ]
+      ],
+      "layer": "composite preview; render listed layers",
+      "rect": [
+        179,
+        256,
+        104,
+        34
+      ],
+      "atlas": "village-5"
+    },
+    "A42": {
+      "source": "round7a-batch-a/sprites/a42.png",
+      "sha256": "2aa97640563f491f0e8bf0ce4348a133f3f35b92bd19d5704e7cfa2249397e20",
+      "pixelHash": "e0479b9fa93317a2cf29a21b11f9508f6e5985440824e145a30a6d39cb0a26f2",
+      "size": [
+        78,
+        104
+      ],
+      "trim": [
+        2,
+        2,
+        76,
+        102
+      ],
+      "anchor": [
+        39,
+        102
+      ],
+      "collision": [
+        [
+          [
+            2,
+            84
+          ],
+          [
+            76,
+            84
+          ],
+          [
+            76,
+            102
+          ],
+          [
+            2,
+            102
+          ]
+        ]
+      ],
+      "hitArea": [
+        [
+          2,
+          2
+        ],
+        [
+          76,
+          2
+        ],
+        [
+          76,
+          102
+        ],
+        [
+          2,
+          102
+        ]
+      ],
+      "layer": "object / depth sort by ground anchor",
+      "rect": [
+        626,
+        837,
+        74,
+        100
+      ],
+      "atlas": "village-0"
+    },
+    "A46": {
+      "source": "round7a-batch-a/sprites/a46.png",
+      "sha256": "8a5448148900c12888a7476f3ee00dbc87d396adcad5dc5df2b356aa7ffbfa71",
+      "pixelHash": "50103f1dbba8a0432826dd14181213694e7968aa2728751a8adda05a827a1192",
+      "size": [
+        78,
+        104
+      ],
+      "trim": [
+        2,
+        2,
+        76,
+        102
+      ],
+      "anchor": [
+        39,
+        102
+      ],
+      "collision": [
+        [
+          [
+            2,
+            84
+          ],
+          [
+            76,
+            84
+          ],
+          [
+            76,
+            102
+          ],
+          [
+            2,
+            102
+          ]
+        ]
+      ],
+      "hitArea": [
+        [
+          2,
+          2
+        ],
+        [
+          76,
+          2
+        ],
+        [
+          76,
+          102
+        ],
+        [
+          2,
+          102
+        ]
+      ],
+      "layer": "object / depth sort by ground anchor",
+      "rect": [
+        702,
+        837,
+        74,
+        100
+      ],
+      "atlas": "village-0"
+    },
+    "A56": {
+      "source": "round7a-batch-a/sprites/a56.png",
+      "sha256": "237690491d912d19aa4110812998f3adad0a883c858fb001d2923c08049ed2a1",
+      "pixelHash": "f42595f14fe213a3518ac47acd064469917b69dda9b060c4a892255f02711a42",
+      "size": [
+        26,
+        26
+      ],
+      "trim": [
+        2,
+        2,
+        24,
+        24
+      ],
+      "anchor": [
+        13,
+        24
+      ],
+      "collision": [],
+      "hitArea": [
+        [
+          2,
+          2
+        ],
+        [
+          24,
+          2
+        ],
+        [
+          24,
+          24
+        ],
+        [
+          2,
+          24
+        ]
+      ],
+      "layer": "floor / before props and actors",
+      "rect": [
+        166,
+        996,
+        22,
+        22
+      ],
+      "atlas": "village-3"
+    },
+    "A57": {
+      "source": "round7a-batch-a/sprites/a57.png",
+      "sha256": "3493428a1d7334b5769a5b39fdaf0c2c5d4b95b4310aec4ad05f2cedb61d0afd",
+      "pixelHash": "b800e1532e6a1fbb2816dcd67fc007f401f1d77b5c699613ffbc255d172a6c69",
+      "size": [
+        78,
+        52
+      ],
+      "trim": [
+        2,
+        2,
+        76,
+        50
+      ],
+      "anchor": [
+        39,
+        50
+      ],
+      "collision": [
+        [
+          [
+            2,
+            42
+          ],
+          [
+            76,
+            42
+          ],
+          [
+            76,
+            50
+          ],
+          [
+            2,
+            50
+          ]
+        ]
+      ],
+      "hitArea": [
+        [
+          2,
+          2
+        ],
+        [
+          76,
+          2
+        ],
+        [
+          76,
+          50
+        ],
+        [
+          2,
+          50
+        ]
+      ],
+      "layer": "object / depth sort by ground anchor",
+      "rect": [
+        772,
+        204,
+        74,
+        48
+      ],
+      "atlas": "village-5"
+    },
+    "A58": {
+      "source": "round7a-batch-a/sprites/a58.png",
+      "sha256": "43444ee97a3b9abfdf4c277fa739a61fdcb4552b7decd1ad7d60c2ac28f1fc34",
+      "pixelHash": "f5bf5e4711fbf6a414dc25aa6a7ac5431b2c69ab3e4eb6d4a6d507e8fd4101c3",
+      "size": [
+        156,
+        104
+      ],
+      "trim": [
+        2,
+        2,
+        154,
+        102
+      ],
+      "anchor": [
+        78,
+        102
+      ],
+      "collision": [
+        [
+          [
+            3,
+            34
+          ],
+          [
+            153,
+            34
+          ],
+          [
+            153,
+            100
+          ],
+          [
+            3,
+            100
+          ]
+        ]
+      ],
+      "hitArea": [
+        [
+          2,
+          2
+        ],
+        [
+          154,
+          2
+        ],
+        [
+          154,
+          102
+        ],
+        [
+          2,
+          102
+        ]
+      ],
+      "layer": "object / depth sort by ground anchor",
+      "rect": [
+        370,
+        837,
+        152,
+        100
+      ],
+      "atlas": "village-0"
+    },
+    "A62": {
+      "source": "round7a-batch-a/sprites/a62.png",
+      "sha256": "4b3e80943a390a7ace93e48571a52b8f4524c1969c47384b1c47683564d0251a",
+      "pixelHash": "b73f89849161bbf4f042b014cd11f9ab4fe6b508b7a2b0c9120deb3bedf270c1",
+      "size": [
+        104,
+        104
+      ],
+      "trim": [
+        2,
+        2,
+        102,
+        102
+      ],
+      "anchor": [
+        52,
+        102
+      ],
+      "collision": [
+        [
+          [
+            2,
+            90
+          ],
+          [
+            102,
+            90
+          ],
+          [
+            102,
+            102
+          ],
+          [
+            2,
+            102
+          ]
+        ]
+      ],
+      "hitArea": [
+        [
+          2,
+          2
+        ],
+        [
+          102,
+          2
+        ],
+        [
+          102,
+          102
+        ],
+        [
+          2,
+          102
+        ]
+      ],
+      "layer": "object / depth sort by ground anchor",
+      "rect": [
+        524,
+        837,
+        100,
+        100
+      ],
+      "atlas": "village-0"
+    },
+    "A63": {
+      "source": "round7a-batch-a/sprites/a63.png",
+      "sha256": "755f5c383d002c5e5a64957371f1ad4035833cbe806a944eebeedd063250d398",
+      "pixelHash": "1068ae01d97ec82937b66e7b36c7269687db5d3cf3669d37b36df053574fd447",
+      "size": [
+        104,
+        52
+      ],
+      "trim": [
+        2,
+        2,
+        102,
+        50
+      ],
+      "anchor": [
+        52,
+        50
+      ],
+      "collision": [
+        [
+          [
+            2,
+            42
+          ],
+          [
+            102,
+            42
+          ],
+          [
+            102,
+            50
+          ],
+          [
+            2,
+            50
+          ]
+        ]
+      ],
+      "hitArea": [
+        [
+          2,
+          2
+        ],
+        [
+          102,
+          2
+        ],
+        [
+          102,
+          50
+        ],
+        [
+          2,
+          50
+        ]
+      ],
+      "layer": "object / depth sort by ground anchor",
+      "rect": [
+        670,
+        204,
+        100,
+        48
+      ],
+      "atlas": "village-5"
+    },
+    "A65": {
+      "source": "round7a-batch-a/sprites/a65.png",
+      "sha256": "28f1d4850552c7acbb8e94135a525873d79324835cf27dd66b3470adc52c266e",
+      "pixelHash": "4a783a6fc1111eb9e6b8362fb5fda836e5d6e07c90d802892c1f280107907f50",
+      "size": [
+        52,
+        78
+      ],
+      "trim": [
+        2,
+        2,
+        50,
+        76
+      ],
+      "anchor": [
+        26,
+        76
+      ],
+      "collision": [
+        [
+          [
+            2,
+            63
+          ],
+          [
+            50,
+            63
+          ],
+          [
+            50,
+            76
+          ],
+          [
+            2,
+            76
+          ]
+        ]
+      ],
+      "hitArea": [
+        [
+          2,
+          2
+        ],
+        [
+          50,
+          2
+        ],
+        [
+          50,
+          76
+        ],
+        [
+          2,
+          76
+        ]
+      ],
+      "layer": "object / depth sort by ground anchor",
+      "rect": [
+        450,
+        927,
+        48,
+        74
+      ],
+      "atlas": "village-4"
+    },
+    "B01-floor": {
+      "source": "round7b-batch-b/sprites/B01-floor.png",
+      "sha256": "bf72c6f40f62d6e4961394f14da99ea65e090d341a5f9fe3ad9a23c69e85b314",
+      "pixelHash": "7dc04daa77328702beda6a3d715ca506e4d7e39a14e6a11ce046864d94ab831a",
+      "size": [
+        416,
+        312
+      ],
+      "trim": [
+        52,
+        78,
+        364,
+        312
+      ],
+      "anchor": [
+        208,
+        286
+      ],
+      "rect": [
+        628,
+        419,
+        312,
+        234
+      ],
+      "atlas": "village-1"
+    },
+    "B01-back": {
+      "source": "round7b-batch-b/sprites/B01-back.png",
+      "sha256": "513ed40b32c32f342d626fb22b8554abf1233db6c7baa911d97589f8baf65380",
+      "pixelHash": "98703f955b6dc390d662cb42c6ece6e7a8d83b22813a1a364f1f7987d8d86ea2",
+      "size": [
+        416,
+        312
+      ],
+      "trim": [
+        0,
+        0,
+        416,
+        312
+      ],
+      "anchor": [
+        208,
+        286
+      ],
+      "rect": [
+        524,
+        1,
+        416,
+        312
+      ],
+      "atlas": "village-3"
+    },
+    "B01-front": {
+      "source": "round7b-batch-b/sprites/B01-front.png",
+      "sha256": "c04e3f7bdd72891b4c2a9c74cb4897ad10a54d5267923abab5d6c7fdbc6d1936",
+      "pixelHash": "8a52ee194a768c71aeb4fb065de1ec57c8dfff4df7684e4abb542ea2e78fd1ac",
+      "size": [
+        416,
+        312
+      ],
+      "trim": [
+        52,
+        246,
+        364,
+        311
+      ],
+      "anchor": [
+        208,
+        286
+      ],
+      "rect": [
+        414,
+        69,
+        312,
+        65
+      ],
+      "atlas": "village-5"
+    },
+    "B02-floor": {
+      "source": "round7b-batch-b/sprites/B02-floor.png",
+      "sha256": "af57008c473cf41dea921067d9b8fde016472ceabe1a18c1579da20aa7721b55",
+      "pixelHash": "072fcc01c7c07b4ca829b796b5c2db004091134d954992e3faf7f5c2778b0c1f",
+      "size": [
+        416,
+        312
+      ],
+      "trim": [
+        52,
+        78,
+        364,
+        312
+      ],
+      "anchor": [
+        208,
+        286
+      ],
+      "rect": [
+        628,
+        733,
+        312,
+        234
+      ],
+      "atlas": "village-2"
+    },
+    "B02-back": {
+      "source": "round7b-batch-b/sprites/B02-back.png",
+      "sha256": "e97d73dd57e4ba72e24a216efe540196cd65bd1874d167f6898596be5f4eee14",
+      "pixelHash": "ae146700a06903c7b7cab27a86435e48ed9169e164b11a401544af4d44201adf",
+      "size": [
+        416,
+        312
+      ],
+      "trim": [
+        0,
+        0,
+        416,
+        312
+      ],
+      "anchor": [
+        208,
+        286
+      ],
+      "rect": [
+        524,
+        341,
+        416,
+        312
+      ],
+      "atlas": "village-3"
+    },
+    "B02-front": {
+      "source": "round7b-batch-b/sprites/B02-front.png",
+      "sha256": "dd087882c5c277999056d3a5a4f091f46a811dca7e189201ec3e006c6254e87e",
+      "pixelHash": "d27a988aaac3328d40f870401890851541ddd61c365cc0d686087eefb626d8f8",
+      "size": [
+        416,
+        312
+      ],
+      "trim": [
+        52,
+        246,
+        364,
+        311
+      ],
+      "anchor": [
+        208,
+        286
+      ],
+      "rect": [
+        2,
+        137,
+        312,
+        65
+      ],
+      "atlas": "village-5"
+    },
+    "B03-floor": {
+      "source": "round7b-batch-b/sprites/B03-floor.png",
+      "sha256": "a482bb31ba027d02ff2bac5d36a5d5a9ab4b7adcbce733b0a800b4d8d92db79d",
+      "pixelHash": "e0ab54e62d6828b0accfc5b955f47e8edfc5f6fcdad21078650090a082d54fa4",
+      "size": [
+        624,
+        416
+      ],
+      "trim": [
+        52,
+        78,
+        572,
+        416
+      ],
+      "anchor": [
+        312,
+        390
+      ],
+      "rect": [
+        2,
+        341,
+        520,
+        338
+      ],
+      "atlas": "village-3"
+    },
+    "B03-back": {
+      "source": "round7b-batch-b/sprites/B03-back.png",
+      "sha256": "6e7b77307bb3dd84427a70b6f012937215fa2bb9a223fe22b86a0a13b8401454",
+      "pixelHash": "66ff5a9e2414dc7116e4ea13b8898fe340ebab4661db843bf6b30bc628e93f90",
+      "size": [
+        624,
+        416
+      ],
+      "trim": [
+        0,
+        0,
+        624,
+        415
+      ],
+      "anchor": [
+        312,
+        390
+      ],
+      "rect": [
+        2,
+        419,
+        624,
+        415
+      ],
+      "atlas": "village-1"
+    },
+    "B03-front": {
+      "source": "round7b-batch-b/sprites/B03-front.png",
+      "sha256": "58fdb833b7db030a65fa8e7a6d502d8defbe1d7354ed7e2dc41853f5aaa8d466",
+      "pixelHash": "9ba6b96fba4294f74c74225108cee11e916e34a7ca24c7484c4e5700ce9eb7ae",
+      "size": [
+        624,
+        416
+      ],
+      "trim": [
+        52,
+        338,
+        572,
+        416
+      ],
+      "anchor": [
+        312,
+        390
+      ],
+      "rect": [
+        255,
+        841,
+        520,
+        78
+      ],
+      "atlas": "village-4"
+    },
+    "B04-floor": {
+      "source": "round7b-batch-b/sprites/B04-floor.png",
+      "sha256": "3e5572ad570966acbbc0096fa3186c410cddcb37a2f8a418e3c506460d6093bb",
+      "pixelHash": "e48b0a97497ed3accdb2942a306c2ada399903a73c86f5690723fde8ebf2171c",
+      "size": [
+        728,
+        364
+      ],
+      "trim": [
+        52,
+        78,
+        676,
+        364
+      ],
+      "anchor": [
+        364,
+        338
+      ],
+      "atlas": "village-4",
+      "rect": [
+        2,
+        1,
+        624,
+        286
+      ]
+    },
+    "B04-back": {
+      "source": "round7b-batch-b/sprites/B04-back.png",
+      "sha256": "a268bfc3bd718b60e5bb862e87b7c56f8643972fbabb456437a5c660c452a1da",
+      "pixelHash": "bc17c83d033dad069422990fd193c02344cd57c9f8b192c387a541749ca17497",
+      "size": [
+        728,
+        364
+      ],
+      "trim": [
+        0,
+        0,
+        728,
+        364
+      ],
+      "anchor": [
+        364,
+        338
+      ],
+      "rect": [
+        2,
+        367,
+        728,
+        364
+      ],
+      "atlas": "village-2"
+    },
+    "B04-front": {
+      "source": "round7b-batch-b/sprites/B04-front.png",
+      "sha256": "a58b9d8b36e5706c713e8fe10b84ab0770c030bae3c2119f15ed6280500e0212",
+      "pixelHash": "5b5fc00353221a4edacb92e5c2e38385730d9174dcb64f04c19b8e81aee821f9",
+      "size": [
+        728,
+        364
+      ],
+      "trim": [
+        52,
+        298,
+        676,
+        364
+      ],
+      "anchor": [
+        364,
+        338
+      ],
+      "atlas": "village-5",
+      "rect": [
+        2,
+        1,
+        624,
+        66
+      ]
+    },
+    "B06-floor": {
+      "source": "round7b-batch-b/sprites/B06-floor.png",
+      "sha256": "52a4ae33a468c3f23b244b87ef7a0e2dd1bd3e761ba795ce2fcd4e1b9cdeab32",
+      "pixelHash": "f4e69c17ccd068dbbe401c91682c58624e4622942d33cf2485dca99aa43f9ffb",
+      "size": [
+        624,
+        416
+      ],
+      "trim": [
+        52,
+        78,
+        572,
+        391
+      ],
+      "anchor": [
+        312,
+        390
+      ],
+      "rect": [
+        2,
+        681,
+        520,
+        313
+      ],
+      "atlas": "village-3"
+    },
+    "B06-back": {
+      "source": "round7b-batch-b/sprites/B06-back.png",
+      "sha256": "67f4b217c491d35e4ca7dd63d071a7c6e6705dda7383aafeac8566d04b88009d",
+      "pixelHash": "c4d5c3f950454e4c88c2ea85b92b9f31322c786ce39162d5544eea1d58cccea8",
+      "size": [
+        624,
+        416
+      ],
+      "trim": [
+        0,
+        0,
+        624,
+        416
+      ],
+      "anchor": [
+        312,
+        390
+      ],
+      "rect": [
+        2,
+        419,
+        624,
+        416
+      ],
+      "atlas": "village-0"
+    },
+    "B06-front": {
+      "source": "round7b-batch-b/sprites/B06-front.png",
+      "sha256": "19d2e459ae916a6e680df4520b5e07e173bdd570eb3f2a22e9afd7cd6a70ef05",
+      "pixelHash": "5dbf5d24bffa6904662507efedee3fda32de662de036c63fa8d43e404b202886",
+      "size": [
+        624,
+        416
+      ],
+      "trim": [
+        0,
+        0,
+        624,
+        416
+      ],
+      "anchor": [
+        312,
+        390
+      ],
+      "atlas": "village-1",
+      "rect": [
+        2,
+        1,
+        624,
+        416
+      ]
+    },
+    "B27": {
+      "source": "round7b-batch-b/sprites/B27.png",
+      "sha256": "7029cd4c23b17b8129bdce1c0b2221ba398c8264a779df501661cdb071885873",
+      "pixelHash": "bdf8fe8e8dd08104008757844994701c09ff74b208caac6fb219eb12cb0ece97",
+      "size": [
+        156,
+        52
+      ],
+      "trim": [
+        0,
+        0,
+        156,
+        52
+      ],
+      "anchor": [
+        78,
+        49
+      ],
+      "collision": [],
+      "hitArea": [
+        [
+          0,
+          0
+        ],
+        [
+          156,
+          0
+        ],
+        [
+          156,
+          52
+        ],
+        [
+          0,
+          52
+        ]
+      ],
+      "layer": "floor / before props and actors",
+      "rect": [
+        792,
+        959,
+        156,
+        52
+      ],
+      "atlas": "village-0"
+    },
+    "B28": {
+      "source": "round7b-batch-b/sprites/B28.png",
+      "sha256": "caa7dae275f4f154edcc969994fd3a312edf01594f6623b078bc0b32f0e3a5e3",
+      "pixelHash": "c406557fe69dc4e9a97e9faea1433f0f7ece3df3828b3056279ab5569dd46609",
+      "size": [
+        104,
+        78
+      ],
+      "trim": [
+        0,
+        0,
+        104,
+        78
+      ],
+      "anchor": [
+        52,
+        75
+      ],
+      "collision": [],
+      "hitArea": [
+        [
+          0,
+          0
+        ],
+        [
+          104,
+          0
+        ],
+        [
+          104,
+          78
+        ],
+        [
+          0,
+          78
+        ]
+      ],
+      "layer": "floor / before props and actors",
+      "rect": [
+        777,
+        841,
+        104,
+        78
+      ],
+      "atlas": "village-4"
+    },
+    "B29": {
+      "source": "round7b-batch-b/sprites/B29.png",
+      "sha256": "da64a33f4c20e7d213a9b6bb0f84b62e199494e7af51ec1b640e0f467c801edb",
+      "pixelHash": "96ec7609206863f8467ecf381857ebccb4053bab7d2dbd90ea553bbecbb062cd",
+      "size": [
+        78,
+        52
+      ],
+      "trim": [
+        0,
+        0,
+        78,
+        52
+      ],
+      "anchor": [
+        39,
+        49
+      ],
+      "collision": [],
+      "hitArea": [
+        [
+          0,
+          0
+        ],
+        [
+          78,
+          0
+        ],
+        [
+          78,
+          52
+        ],
+        [
+          0,
+          52
+        ]
+      ],
+      "layer": "back-wall decoration / before actors",
+      "rect": [
+        942,
+        1,
+        78,
+        52
+      ],
+      "atlas": "village-5"
+    },
+    "B30": {
+      "source": "round7b-batch-b/sprites/B30.png",
+      "sha256": "cda03ea9b4dc17778f279e35ca54ffa49e00e4279bbf69dd6ace4ddc3b781674",
+      "pixelHash": "41e0c85ee301fe2e65f1ead50d2cc9d55db148b63a0a58fdab7ee8dd1d7a34e7",
+      "size": [
+        104,
+        52
+      ],
+      "trim": [
+        0,
+        0,
+        104,
+        52
+      ],
+      "anchor": [
+        52,
+        49
+      ],
+      "collision": [
+        [
+          [
+            13,
+            36
+          ],
+          [
+            91,
+            36
+          ],
+          [
+            91,
+            50
+          ],
+          [
+            13,
+            50
+          ]
+        ]
+      ],
+      "hitArea": [
+        [
+          0,
+          0
+        ],
+        [
+          104,
+          0
+        ],
+        [
+          104,
+          52
+        ],
+        [
+          0,
+          52
+        ]
+      ],
+      "layer": "object / sort by groundAnchor.y",
+      "rect": [
+        763,
+        927,
+        104,
+        52
+      ],
+      "atlas": "village-4"
+    },
+    "B32": {
+      "source": "round7b-batch-b/sprites/B32.png",
+      "sha256": "b5f1c9dc8eb6b45d3e5e91eb88295d0f8e0b782c33125f22bbad35226c484192",
+      "pixelHash": "d8564e0a8fe57a215254b8a99da20e79856774f79bc25eec97ce0ddf9d201d4c",
+      "size": [
+        52,
+        52
+      ],
+      "trim": [
+        0,
+        0,
+        52,
+        52
+      ],
+      "anchor": [
+        26,
+        49
+      ],
+      "collision": [
+        [
+          [
+            6,
+            36
+          ],
+          [
+            46,
+            36
+          ],
+          [
+            46,
+            50
+          ],
+          [
+            6,
+            50
+          ]
+        ]
+      ],
+      "hitArea": [
+        [
+          0,
+          0
+        ],
+        [
+          52,
+          0
+        ],
+        [
+          52,
+          52
+        ],
+        [
+          0,
+          52
+        ]
+      ],
+      "layer": "object / sort by groundAnchor.y",
+      "rect": [
+        950,
+        959,
+        52,
+        52
+      ],
+      "atlas": "village-0"
+    },
+    "B33": {
+      "source": "round7b-batch-b/sprites/B33.png",
+      "sha256": "a1e7270286640cff2bd336ff6ce02c9196129bfa4a219cae9f9e88251839ba88",
+      "pixelHash": "43822564c1dcc0586b52d1aa6e7bdd675ad6e576c055fe8990b39a92c37a1913",
+      "size": [
+        104,
+        78
+      ],
+      "trim": [
+        0,
+        29,
+        104,
+        65
+      ],
+      "anchor": [
+        52,
+        65
+      ],
+      "collision": [
+        [
+          [
+            0,
+            53
+          ],
+          [
+            13,
+            53
+          ],
+          [
+            13,
+            65
+          ],
+          [
+            0,
+            65
+          ]
+        ],
+        [
+          [
+            91,
+            53
+          ],
+          [
+            104,
+            53
+          ],
+          [
+            104,
+            65
+          ],
+          [
+            91,
+            65
+          ]
+        ]
+      ],
+      "hitArea": [
+        [
+          0,
+          0
+        ],
+        [
+          104,
+          0
+        ],
+        [
+          104,
+          78
+        ],
+        [
+          0,
+          78
+        ]
+      ],
+      "layer": "object / sort by groundAnchor.y",
+      "rect": [
+        73,
+        256,
+        104,
+        36
+      ],
+      "atlas": "village-5"
+    },
+    "B38": {
+      "source": "round7b-batch-b/sprites/B38.png",
+      "sha256": "67395438cb682cc9b595e6adc6f2dc604e3c460c9fbadc028841bc4e877c207e",
+      "pixelHash": "9bd7d792b23c460e1c0ef5c3532b5d0eb02b9d73ba2dbf5f3ac769babb3a02d1",
+      "size": [
+        104,
+        78
+      ],
+      "trim": [
+        0,
+        0,
+        104,
+        78
+      ],
+      "anchor": [
+        52,
+        75
+      ],
+      "collision": [
+        [
+          [
+            13,
+            62
+          ],
+          [
+            91,
+            62
+          ],
+          [
+            91,
+            76
+          ],
+          [
+            13,
+            76
+          ]
+        ]
+      ],
+      "hitArea": [
+        [
+          0,
+          0
+        ],
+        [
+          104,
+          0
+        ],
+        [
+          104,
+          78
+        ],
+        [
+          0,
+          78
+        ]
+      ],
+      "layer": "object / sort by groundAnchor.y",
+      "rect": [
+        883,
+        841,
+        104,
+        78
+      ],
+      "atlas": "village-4"
+    },
+    "B40": {
+      "source": "round7b-batch-b/sprites/B40.png",
+      "sha256": "c5e7b7a2bfea4895cc64ac0bc9bc6e144fcff09368c3c15335d24154bd17d6a8",
+      "pixelHash": "41b044f273f9db9ab91da9cdf073881ad3fd7d7406fa3e612d18a42e9f70472a",
+      "size": [
+        52,
+        78
+      ],
+      "trim": [
+        0,
+        0,
+        52,
+        78
+      ],
+      "anchor": [
+        26,
+        75
+      ],
+      "collision": [
+        [
+          [
+            6,
+            62
+          ],
+          [
+            46,
+            62
+          ],
+          [
+            46,
+            76
+          ],
+          [
+            6,
+            76
+          ]
+        ]
+      ],
+      "hitArea": [
+        [
+          0,
+          0
+        ],
+        [
+          52,
+          0
+        ],
+        [
+          52,
+          78
+        ],
+        [
+          0,
+          78
+        ]
+      ],
+      "layer": "object / sort by groundAnchor.y",
+      "rect": [
+        294,
+        927,
+        52,
+        78
+      ],
+      "atlas": "village-4"
+    },
+    "B42": {
+      "source": "round7b-batch-b/sprites/B42.png",
+      "sha256": "1315af04a838e86ee082e37dd68b58b8c8bfc5ba015b7d359ee84a184869276b",
+      "pixelHash": "3aa1bb100a5a2acb69359d57dcb20def30a1530aff93c4390f4e06a4defb94aa",
+      "size": [
+        156,
+        104
+      ],
+      "trim": [
+        0,
+        0,
+        156,
+        104
+      ],
+      "anchor": [
+        78,
+        101
+      ],
+      "collision": [
+        [
+          [
+            19,
+            88
+          ],
+          [
+            137,
+            88
+          ],
+          [
+            137,
+            102
+          ],
+          [
+            19,
+            102
+          ]
+        ]
+      ],
+      "hitArea": [
+        [
+          0,
+          0
+        ],
+        [
+          156,
+          0
+        ],
+        [
+          156,
+          104
+        ],
+        [
+          0,
+          104
+        ]
+      ],
+      "layer": "object / sort by groundAnchor.y",
+      "rect": [
+        106,
+        837,
+        156,
+        104
+      ],
+      "atlas": "village-0"
+    },
+    "B43": {
+      "source": "round7b-batch-b/sprites/B43.png",
+      "sha256": "5f96796817264174fe34a3cdee43fb5063ecd256d56d7ae78b506e79e2c43130",
+      "pixelHash": "fec8850e6fd20b26bc66083656c2959c2d935a224bcb01b4b774f195d413fa19",
+      "size": [
+        78,
+        104
+      ],
+      "trim": [
+        0,
+        0,
+        78,
+        104
+      ],
+      "anchor": [
+        39,
+        101
+      ],
+      "collision": [
+        [
+          [
+            9,
+            88
+          ],
+          [
+            69,
+            88
+          ],
+          [
+            69,
+            102
+          ],
+          [
+            9,
+            102
+          ]
+        ]
+      ],
+      "hitArea": [
+        [
+          0,
+          0
+        ],
+        [
+          78,
+          0
+        ],
+        [
+          78,
+          104
+        ],
+        [
+          0,
+          104
+        ]
+      ],
+      "layer": "object / sort by groundAnchor.y",
+      "rect": [
+        942,
+        419,
+        78,
+        104
+      ],
+      "atlas": "village-0"
+    },
+    "B48": {
+      "source": "round7b-batch-b/sprites/B48.png",
+      "sha256": "da2eb333040c53883f176dd7087c1131c333f13b7445bced5ef92252c8cc951b",
+      "pixelHash": "448ffb4bbe9c206ed768722f8f3e26a9cfe383b70e924f31c794784049b43583",
+      "size": [
+        78,
+        78
+      ],
+      "trim": [
+        0,
+        0,
+        78,
+        78
+      ],
+      "anchor": [
+        39,
+        75
+      ],
+      "collision": [
+        [
+          [
+            9,
+            62
+          ],
+          [
+            69,
+            62
+          ],
+          [
+            69,
+            76
+          ],
+          [
+            9,
+            76
+          ]
+        ]
+      ],
+      "hitArea": [
+        [
+          0,
+          0
+        ],
+        [
+          78,
+          0
+        ],
+        [
+          78,
+          78
+        ],
+        [
+          0,
+          78
+        ]
+      ],
+      "layer": "object / sort by groundAnchor.y",
+      "rect": [
+        214,
+        927,
+        78,
+        78
+      ],
+      "atlas": "village-4"
+    },
+    "B52": {
+      "source": "round7b-batch-b/sprites/B52.png",
+      "sha256": "e6322dd0e0f3b8125402acec0a1861190098b339e1794158f7b8781a2f777a68",
+      "pixelHash": "d85305c93b71e6d36ede721bb4940ce049e3728d0cd4e5c94d871bae2f46f14d",
+      "size": [
+        104,
+        78
+      ],
+      "trim": [
+        0,
+        0,
+        104,
+        78
+      ],
+      "anchor": [
+        52,
+        75
+      ],
+      "collision": [
+        [
+          [
+            13,
+            62
+          ],
+          [
+            91,
+            62
+          ],
+          [
+            91,
+            76
+          ],
+          [
+            13,
+            76
+          ]
+        ]
+      ],
+      "hitArea": [
+        [
+          0,
+          0
+        ],
+        [
+          104,
+          0
+        ],
+        [
+          104,
+          78
+        ],
+        [
+          0,
+          78
+        ]
+      ],
+      "layer": "object / sort by groundAnchor.y",
+      "rect": [
+        2,
+        927,
+        104,
+        78
+      ],
+      "atlas": "village-4"
+    },
+    "B54": {
+      "source": "round7b-batch-b/sprites/B54.png",
+      "sha256": "71ed9944271ecd44dcee09f0912b25c9d010861a457973beec1e0e65fdccf7bc",
+      "pixelHash": "5505fc8f9999dccad0d9da7eb67eb6640ef54699cbe1c67b6238e420ca7d2454",
+      "size": [
+        104,
+        52
+      ],
+      "trim": [
+        0,
+        0,
+        104,
+        52
+      ],
+      "anchor": [
+        52,
+        49
+      ],
+      "collision": [
+        [
+          [
+            13,
+            36
+          ],
+          [
+            91,
+            36
+          ],
+          [
+            91,
+            50
+          ],
+          [
+            13,
+            50
+          ]
+        ]
+      ],
+      "hitArea": [
+        [
+          0,
+          0
+        ],
+        [
+          104,
+          0
+        ],
+        [
+          104,
+          52
+        ],
+        [
+          0,
+          52
+        ]
+      ],
+      "layer": "object / sort by groundAnchor.y",
+      "rect": [
+        869,
+        927,
+        104,
+        52
+      ],
+      "atlas": "village-4"
+    },
+    "B56": {
+      "source": "round7b-batch-b/sprites/B56.png",
+      "sha256": "fa1e4d0ee682ff460dd1a39d2b4a67c159fee0cc16305e5f0ec7b34168695c3a",
+      "pixelHash": "c798c6138777bc11a562edc0db0a3134e90858c0c056093c0339ddd7ea4f79e2",
+      "size": [
+        78,
+        156
+      ],
+      "trim": [
+        0,
+        0,
+        78,
+        156
+      ],
+      "anchor": [
+        39,
+        153
+      ],
+      "collision": [
+        [
+          [
+            27,
+            141
+          ],
+          [
+            51,
+            141
+          ],
+          [
+            51,
+            154
+          ],
+          [
+            27,
+            154
+          ]
+        ]
+      ],
+      "hitArea": [
+        [
+          0,
+          0
+        ],
+        [
+          78,
+          0
+        ],
+        [
+          78,
+          156
+        ],
+        [
+          0,
+          156
+        ]
+      ],
+      "layer": "backdrop / before rooms and actors",
+      "rect": [
+        838,
+        1,
+        78,
+        156
+      ],
+      "atlas": "village-0"
+    },
+    "B57": {
+      "source": "round7b-batch-b/sprites/B57.png",
+      "sha256": "29c5ef82ca380b977dfed69cfaef23fceaa8b58a3567767e9ece208bde1d0796",
+      "pixelHash": "ad7b4e461650b3233f0aebf19a3b61517e1e7f32a18ddf97766b7c356c4b9565",
+      "size": [
+        52,
+        26
+      ],
+      "trim": [
+        0,
+        0,
+        52,
+        26
+      ],
+      "anchor": [
+        26,
+        23
+      ],
+      "collision": [],
+      "hitArea": [
+        [
+          0,
+          0
+        ],
+        [
+          52,
+          0
+        ],
+        [
+          52,
+          26
+        ],
+        [
+          0,
+          26
+        ]
+      ],
+      "layer": "floor / before props and actors",
+      "rect": [
+        2,
+        996,
+        52,
+        26
+      ],
+      "atlas": "village-3"
+    },
+    "B59": {
+      "source": "round7b-batch-b/sprites/B59.png",
+      "sha256": "309815421077f8aded0550fd0c57507f4451cebc2857a634261e9489dc3e02b2",
+      "pixelHash": "9ed3c3c538e164c2903db0e11b5e65c77f279df7ed8ec7a8a01dc4662aa26f29",
+      "size": [
+        104,
+        52
+      ],
+      "trim": [
+        0,
+        0,
+        104,
+        52
+      ],
+      "anchor": [
+        52,
+        49
+      ],
+      "collision": [
+        [
+          [
+            4,
+            36
+          ],
+          [
+            52,
+            26
+          ],
+          [
+            100,
+            36
+          ],
+          [
+            98,
+            50
+          ],
+          [
+            52,
+            42
+          ],
+          [
+            6,
+            50
+          ]
+        ]
+      ],
+      "hitArea": [
+        [
+          0,
+          0
+        ],
+        [
+          104,
+          0
+        ],
+        [
+          104,
+          52
+        ],
+        [
+          0,
+          52
+        ]
+      ],
+      "layer": "object / sort by groundAnchor.y",
+      "rect": [
+        728,
+        69,
+        104,
+        52
+      ],
+      "atlas": "village-5"
+    },
+    "B60": {
+      "source": "round7b-batch-b/sprites/B60.png",
+      "sha256": "98131d4f7e32c340921bfab44daefa69cd32c669595d5e7963d6592a3534de0b",
+      "pixelHash": "51934115e73bd646fa4e0c546c4c5e229f7e74bfbf01897986263c546ee27490",
+      "size": [
+        52,
+        26
+      ],
+      "trim": [
+        0,
+        0,
+        52,
+        26
+      ],
+      "anchor": [
+        26,
+        23
+      ],
+      "collision": [],
+      "hitArea": [
+        [
+          0,
+          0
+        ],
+        [
+          52,
+          0
+        ],
+        [
+          52,
+          26
+        ],
+        [
+          0,
+          26
+        ]
+      ],
+      "layer": "floor / before props and actors",
+      "rect": [
+        56,
+        996,
+        52,
+        26
+      ],
+      "atlas": "village-3"
+    },
+    "B61": {
+      "source": "round7b-batch-b/sprites/B61.png",
+      "sha256": "db9f3385a9eb32bd49322057c9e0571d6c41e616e6d5113abe0095667440820c",
+      "pixelHash": "e86e8c5bf70722d21e511da25f383c3dc76c8104afd3a9fff628d5a744426738",
+      "size": [
+        104,
+        78
+      ],
+      "trim": [
+        0,
+        0,
+        104,
+        78
+      ],
+      "anchor": [
+        52,
+        75
+      ],
+      "collision": [],
+      "hitArea": [
+        [
+          0,
+          0
+        ],
+        [
+          104,
+          0
+        ],
+        [
+          104,
+          78
+        ],
+        [
+          0,
+          78
+        ]
+      ],
+      "layer": "floor / before props and actors",
+      "rect": [
+        108,
+        927,
+        104,
+        78
+      ],
+      "atlas": "village-4"
+    },
+    "B64": {
+      "source": "round7b-batch-b/sprites/B64.png",
+      "sha256": "5c9c1fd8c38b231d59f777307ba0cfe959557933a3e133140b50be95ff82a0d5",
+      "pixelHash": "ae8f4a7d349fc995a0e6677862c16f0625a191e7e8a667acd4d1d862e19ca9ec",
+      "size": [
+        104,
+        104
+      ],
+      "trim": [
+        0,
+        0,
+        104,
+        104
+      ],
+      "anchor": [
+        52,
+        101
+      ],
+      "collision": [
+        [
+          [
+            13,
+            88
+          ],
+          [
+            91,
+            88
+          ],
+          [
+            91,
+            102
+          ],
+          [
+            13,
+            102
+          ]
+        ]
+      ],
+      "hitArea": [
+        [
+          0,
+          0
+        ],
+        [
+          104,
+          0
+        ],
+        [
+          104,
+          104
+        ],
+        [
+          0,
+          104
+        ]
+      ],
+      "layer": "object / sort by groundAnchor.y",
+      "rect": [
+        264,
+        837,
+        104,
+        104
+      ],
+      "atlas": "village-0"
+    },
+    "B65": {
+      "source": "round7b-batch-b/sprites/B65.png",
+      "sha256": "f0d379796ff477f921eba42dae3f971c30c795f20a056b264776c5f6f5c0e154",
+      "pixelHash": "cd5663e59485b5df4af5fdf5cd02dfe0dfd1b02f1a50e7d5dd37b5429af5af0e",
+      "size": [
+        52,
+        52
+      ],
+      "trim": [
+        0,
+        0,
+        52,
+        52
+      ],
+      "anchor": [
+        26,
+        49
+      ],
+      "collision": [
+        [
+          [
+            11,
+            41
+          ],
+          [
+            41,
+            41
+          ],
+          [
+            38,
+            50
+          ],
+          [
+            14,
+            50
+          ]
+        ]
+      ],
+      "hitArea": [
+        [
+          0,
+          0
+        ],
+        [
+          52,
+          0
+        ],
+        [
+          52,
+          52
+        ],
+        [
+          0,
+          52
+        ]
+      ],
+      "layer": "object / sort by groundAnchor.y",
+      "rect": [
+        834,
+        69,
+        52,
+        52
+      ],
+      "atlas": "village-5"
+    },
+    "grass-0": {
+      "source": "round2e/sprites/grass-0-runtime.png",
+      "sha256": "a1240f8206b74034dec05d659d0faf0d1451d85405aa17e70cc2d631aa81bef7",
+      "pixelHash": "986c050c135f816a2b783287397e4b9b9f417f81db0b1445dfec1f3a4d60f208",
+      "size": [
+        26,
+        26
+      ],
+      "trim": [
+        0,
+        0,
+        26,
+        26
+      ],
+      "anchor": [
+        13,
+        25
+      ],
+      "rect": [
+        138,
+        996,
+        26,
+        26
+      ],
+      "atlas": "village-3"
+    },
+    "earth-0": {
+      "source": "round2e/sprites/earth-0-runtime.png",
+      "sha256": "1efc2f343b29ae243ca42388057b402178a91812a437e986bc501df9029dd414",
+      "pixelHash": "6cd85d5bf809ee43a25e0523f41aed227f8106670cf4a8784828453f0bc4e97b",
+      "size": [
+        26,
+        26
+      ],
+      "trim": [
+        0,
+        0,
+        26,
+        26
+      ],
+      "anchor": [
+        13,
+        25
+      ],
+      "rect": [
+        110,
+        996,
+        26,
+        26
+      ],
+      "atlas": "village-3"
+    },
+    "worker-desk": {
+      "source": "round2e/sprites/worker-desk-runtime.png",
+      "sha256": "80bceaf5ce10ce55fb23100db97fba9100b2d6de3c234510accd8f6cd8209ab5",
+      "pixelHash": "04ab1b9119f5c7f585a2241326ad59ee8004541801a4e88d33c7dd829307166b",
+      "size": [
+        144,
+        73
+      ],
+      "trim": [
+        0,
+        0,
+        144,
+        73
+      ],
+      "anchor": [
+        72,
+        72
+      ],
+      "rect": [
+        500,
+        927,
+        144,
+        73
+      ],
+      "atlas": "village-4"
+    },
+    "desk-lamp": {
+      "source": "round2e/sprites/desk-lamp-runtime.png",
+      "sha256": "1ef91e407f34421bbc3c1dddd0146ad6b93de11fe3c664bb778d891660b76b56",
+      "pixelHash": "f651022f1112cb7670e0b26d88e5a73f63c8a45552e88fef6bff36d241136b3a",
+      "size": [
+        40,
+        45
+      ],
+      "trim": [
+        0,
+        0,
+        40,
+        45
+      ],
+      "anchor": [
+        20,
+        44
+      ],
+      "rect": [
+        980,
+        753,
+        40,
+        45
+      ],
+      "atlas": "village-4"
+    },
+    "desk-plant": {
+      "source": "round2e/sprites/desk-plant-runtime.png",
+      "sha256": "97677419fabd3593f7887fe2ef0cfe4f574f5556ad2651d946cbb46898adf6b1",
+      "pixelHash": "de154bdd76e4a6880c0161bbbef5d5b9d026f54e1b233d27b1dcec7e6194ff26",
+      "size": [
+        11,
+        13
+      ],
+      "trim": [
+        0,
+        0,
+        11,
+        13
+      ],
+      "anchor": [
+        5,
+        12
+      ],
+      "rect": [
+        1004,
+        1,
+        11,
+        13
+      ],
+      "atlas": "village-1"
+    },
+    "bookshelf": {
+      "source": "round2e/sprites/bookshelf-runtime.png",
+      "sha256": "acb949812f9658522b668152dc25b10ce35402a86225667a067d8ce29598b33e",
+      "pixelHash": "b64e34b5f6ffd5ecbbf37de241dda72d44411fe30c2f66496c4599e08f63cd7c",
+      "size": [
+        102,
+        120
+      ],
+      "trim": [
+        0,
+        0,
+        102,
+        120
+      ],
+      "anchor": [
+        51,
+        119
+      ],
+      "rect": [
+        2,
+        837,
+        102,
+        120
+      ],
+      "atlas": "village-0"
+    },
+    "tea-table": {
+      "source": "round2e/sprites/tea-table-runtime.png",
+      "sha256": "6f6a3861341634214f5a1c7dc875d7c3d356d3657af54f383b40a6eb4792e8b0",
+      "pixelHash": "5fecfaae186f1da85f780e21b1950622cfd34fe1a193f8fd970f334d3646b7a4",
+      "size": [
+        115,
+        70
+      ],
+      "trim": [
+        0,
+        0,
+        115,
+        70
+      ],
+      "anchor": [
+        57,
+        69
+      ],
+      "rect": [
+        646,
+        927,
+        115,
+        70
+      ],
+      "atlas": "village-4"
+    },
+    "tea-set": {
+      "source": "round2e/sprites/tea-set-runtime.png",
+      "sha256": "87a741295afd1035a001293058807bab9fa3e43c225e5406af66d099a77b29fd",
+      "pixelHash": "d7a60e6fbeddd0ef41d3bd1b6b7d38c162fdc025fec90218ed9725fcd1afa45b",
+      "size": [
+        40,
+        28
+      ],
+      "trim": [
+        0,
+        0,
+        40,
+        28
+      ],
+      "anchor": [
+        20,
+        27
+      ],
+      "rect": [
+        963,
+        204,
+        40,
+        28
+      ],
+      "atlas": "village-5"
+    },
+    "stool-sw": {
+      "source": "round2e/sprites/stool-sw-runtime.png",
+      "sha256": "b86a823a1cd460fd5ca82410a247ac53e16f26a85fb6ac4095a8293f44582907",
+      "pixelHash": "ab8fbdfb49402ff39e8cadd18ee98afcb71e742fe41af2d0fad346b149ad5f05",
+      "size": [
+        58,
+        60
+      ],
+      "trim": [
+        0,
+        0,
+        58,
+        60
+      ],
+      "anchor": [
+        29,
+        59
+      ],
+      "rect": [
+        687,
+        959,
+        58,
+        60
+      ],
+      "atlas": "village-0"
+    },
+    "stool-se": {
+      "source": "round2e/sprites/stool-se-runtime.png",
+      "sha256": "39ac64a41cbacf9f64d9f0a3df30f3b500d54ce35276fe05ebf2739daee9be21",
+      "pixelHash": "01346b5c6cb5d0b6100b2d4c3d72610202839e57dc6a5976f5d0256a013cce45",
+      "size": [
+        58,
+        60
+      ],
+      "trim": [
+        0,
+        0,
+        58,
+        60
+      ],
+      "anchor": [
+        29,
+        59
+      ],
+      "rect": [
+        627,
+        959,
+        58,
+        60
+      ],
+      "atlas": "village-0"
+    },
+    "message-board": {
+      "source": "round2e/sprites/message-board-runtime.png",
+      "sha256": "aeca91b6bf956226a1bdc1a4efe9b5b18c0979c41fc7b3c34bb68ea9a7b867a2",
+      "pixelHash": "e75f873acb13024380ccfc5abe25babd6eb3d2904429c36dfbe8e610a5e06d04",
+      "size": [
+        144,
+        83
+      ],
+      "trim": [
+        0,
+        0,
+        144,
+        83
+      ],
+      "anchor": [
+        72,
+        82
+      ],
+      "rect": [
+        52,
+        841,
+        144,
+        83
+      ],
+      "atlas": "village-4"
+    },
+    "tree-assembled": {
+      "source": "round2e/sprites/tree-assembled-runtime.png",
+      "sha256": "04380d1d379fec56f75945eba291d51eae23fd1dfd56bdd13ee989e355cb2f13",
+      "pixelHash": "f2bb8030d9192c7828245dbdb7f8f5cb0d7075420837a0f2b3b34beca8956fb8",
+      "size": [
+        208,
+        240
+      ],
+      "trim": [
+        0,
+        0,
+        208,
+        240
+      ],
+      "anchor": [
+        104,
+        239
+      ],
+      "rect": [
+        628,
+        1,
+        208,
+        240
+      ],
+      "atlas": "village-0"
+    },
+    "ground-fern": {
+      "source": "round2e/sprites/ground-fern-runtime.png",
+      "sha256": "bcb9b7682f9da2e35d5993811c243094a341cb5b610cd4063831ba82cc7d8acc",
+      "pixelHash": "7fc2f72565f65fa671a457a2dae2640db405ad61e39cecd154e06d252a1f3cdc",
+      "size": [
+        27,
+        18
+      ],
+      "trim": [
+        0,
+        0,
+        27,
+        18
+      ],
+      "anchor": [
+        13,
+        17
+      ],
+      "rect": [
+        190,
+        996,
+        27,
+        18
+      ],
+      "atlas": "village-3"
+    },
+    "daisies": {
+      "source": "round2e/sprites/daisies-runtime.png",
+      "sha256": "66ff7692349b00514592a6a8d1e5272435b255c72b8ac7bc13209f9dc3cc2cef",
+      "pixelHash": "b24f2a9a21fb7cc36f38cd446344b3d8f71f96fcfef302b67c6cbc29aeb863ec",
+      "size": [
+        20,
+        15
+      ],
+      "trim": [
+        0,
+        0,
+        20,
+        15
+      ],
+      "anchor": [
+        10,
+        14
+      ],
+      "rect": [
+        219,
+        996,
+        20,
+        15
+      ],
+      "atlas": "village-3"
+    },
+    "lantern": {
+      "source": "round2e/sprites/lantern-runtime.png",
+      "sha256": "d6089cd1c439cade0441a2069956e4bbcf95ca78d730230a4be8f273b1420713",
+      "pixelHash": "bb3b292423996695d78a364236eb62d1d9ee8a8563ed4bf77c058c60101d1fc9",
+      "size": [
+        26,
+        62
+      ],
+      "trim": [
+        0,
+        0,
+        26,
+        62
+      ],
+      "anchor": [
+        13,
+        61
+      ],
+      "rect": [
+        599,
+        959,
+        26,
+        62
+      ],
+      "atlas": "village-0"
+    },
+    "open-laptop": {
+      "source": "round5a-woodland-pack2/sprites/01-open-laptop-runtime.png",
+      "sha256": "4b211d386c09e9df3872496341a92536ee1a05e7ac9a062641574d071b0f1e50",
+      "pixelHash": "c1b103de2bcafb2eca4f58d3af76023854cb2d313496af6fb14d677824bdca5b",
+      "size": [
+        35,
+        32
+      ],
+      "trim": [
+        2,
+        2,
+        33,
+        30
+      ],
+      "anchor": [
+        17,
+        31
+      ],
+      "rect": [
+        989,
+        841,
+        31,
+        28
+      ],
+      "atlas": "village-4"
+    },
+    "coffee-mug": {
+      "source": "round5a-woodland-pack2/sprites/02-coffee-mug-runtime.png",
+      "sha256": "679b09f9475b0cf4c78866ac3e645b785449f01bce65d7fb8c9e8b34fd3f1859",
+      "pixelHash": "fe9a7ea240237a692b8117bf775319e06e6e298685a0d3630c30821ecdf7ba39",
+      "size": [
+        20,
+        18
+      ],
+      "trim": [
+        2,
+        2,
+        18,
+        16
+      ],
+      "anchor": [
+        10,
+        17
+      ],
+      "rect": [
+        1004,
+        959,
+        16,
+        14
+      ],
+      "atlas": "village-0"
+    },
+    "paper-stack": {
+      "source": "round5a-woodland-pack2/sprites/03-paper-stack-runtime.png",
+      "sha256": "fdb668c6251f5741e8a469f39336dab27663905ee1413a14f5402d67b4d1fc67",
+      "pixelHash": "d2b0d4139ebabf5e6d6a5b4981083ee949b22038a4e147d3e4dc6620965d0c85",
+      "size": [
+        23,
+        18
+      ],
+      "trim": [
+        2,
+        2,
+        21,
+        16
+      ],
+      "anchor": [
+        11,
+        17
+      ],
+      "rect": [
+        241,
+        996,
+        19,
+        14
+      ],
+      "atlas": "village-3"
+    },
+    "log-seat-a": {
+      "source": "round5a-woodland-pack2/sprites/10-log-seat-a-runtime.png",
+      "sha256": "81c7556ee91188bcdba04d55e3e5fad0c24a95f6d107e3611c1d1c83cc5055f6",
+      "pixelHash": "3ea4b245784734f2dff18db70ec748530c1e76f26503bae5bbc9c912b30e8775",
+      "size": [
+        73,
+        44
+      ],
+      "trim": [
+        2,
+        2,
+        71,
+        42
+      ],
+      "anchor": [
+        36,
+        43
+      ],
+      "rect": [
+        2,
+        256,
+        69,
+        40
+      ],
+      "atlas": "village-5"
+    },
+    "kettle-stand": {
+      "source": "round5a-woodland-pack2/sprites/14-kettle-stand-runtime.png",
+      "sha256": "ccbf9b474007702f0ceae4aaaaf25aa760ac389a41a6338e9368f0a96b852f91",
+      "pixelHash": "b804cef12ec8795dc9f8b980fb08191600b5bb2abb7673c1af738fa8eb5d4b9a",
+      "size": [
+        47,
+        58
+      ],
+      "trim": [
+        2,
+        2,
+        45,
+        56
+      ],
+      "anchor": [
+        23,
+        57
+      ],
+      "rect": [
+        747,
+        959,
+        43,
+        54
+      ],
+      "atlas": "village-0"
+    },
+    "mushroom-cluster": {
+      "source": "round5a-woodland-pack2/sprites/21-mushroom-cluster-runtime.png",
+      "sha256": "1ae8b94f30386c6f12a5faa005987b6c0bc864cfc9a8756b96af42ac5df3fc5c",
+      "pixelHash": "a83106984b4c290b22a7e5f90882226ca0a4a79ed0cc6aedfb7de51f5ecde159",
+      "size": [
+        42,
+        40
+      ],
+      "trim": [
+        2,
+        2,
+        40,
+        38
+      ],
+      "anchor": [
+        21,
+        39
+      ],
+      "rect": [
+        975,
+        927,
+        38,
+        36
+      ],
+      "atlas": "village-4"
+    },
+    "berry-bush": {
+      "source": "round5a-woodland-pack2/sprites/22-berry-bush-runtime.png",
+      "sha256": "00d6898ca895afefee10dd3bf0d865b6de58daeb9a76fb9ee2e3dd5f25d332ab",
+      "pixelHash": "6d9c8952990fad902c88465928a038e9a443f899ac57f9e15b62e01ccc0a924b",
+      "size": [
+        77,
+        68
+      ],
+      "trim": [
+        2,
+        2,
+        75,
+        66
+      ],
+      "anchor": [
+        38,
+        67
+      ],
+      "rect": [
+        524,
+        959,
+        73,
+        64
+      ],
+      "atlas": "village-0"
+    },
+    "pine-tree": {
+      "source": "round5a-woodland-pack2/sprites/23-pine-tree-runtime.png",
+      "sha256": "c1197578d5c44ce9364f376037ab3a76cb8aedf3845c550a5087d81c1e100dbf",
+      "pixelHash": "5a50a3c00c138cce4cd0c8762aee410faa66f5aad8841c2c0c68bc36162067ff",
+      "size": [
+        106,
+        143
+      ],
+      "trim": [
+        2,
+        2,
+        104,
+        141
+      ],
+      "anchor": [
+        53,
+        142
+      ],
+      "rect": [
+        918,
+        1,
+        102,
+        139
+      ],
+      "atlas": "village-0"
+    },
+    "tree-stump": {
+      "source": "round5a-woodland-pack2/sprites/24-tree-stump-runtime.png",
+      "sha256": "52a71e8db7ef848d901b28f60ab54971db9e619567c1ad3060958347af3976a4",
+      "pixelHash": "8223f8a45f45b34771304babd49d945744c1fbb7783438ea764beb8ae1f611e2",
+      "size": [
+        67,
+        51
+      ],
+      "trim": [
+        2,
+        2,
+        65,
+        49
+      ],
+      "anchor": [
+        33,
+        50
+      ],
+      "rect": [
+        898,
+        204,
+        63,
+        47
+      ],
+      "atlas": "village-5"
+    },
+    "stand-tuft": {
+      "source": "round3o-side-stride/sprites/stand.png",
+      "sha256": "c52327072d44c1d6dfd3e93894821b84ddafca62ee21ff1128314fec91b3cdf1",
+      "pixelHash": "e818fa641b4131a56242392086b91d4a9b67d0c94eaeb583192207e1c011477f",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        34,
+        25,
+        94,
+        112
+      ],
+      "anchor": [
+        64,
+        111
+      ],
+      "rect": [
+        911,
+        837,
+        60,
+        87
+      ],
+      "atlas": "village-0"
+    },
+    "walk-tuft-A": {
+      "source": "round3o-side-stride/sprites/S1-A.png",
+      "sha256": "7f0a89978862ba2c654e0c4ca50988338e46175d44fc29a0791f1ea23d582270",
+      "pixelHash": "36895dc29ccbeee8dd6ab44c05e4653a45bef8d647f7d0a2a4038415d27c0c7a",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        38,
+        26,
+        92,
+        111
+      ],
+      "anchor": [
+        64,
+        111
+      ],
+      "rect": [
+        506,
+        753,
+        54,
+        85
+      ],
+      "atlas": "village-4"
+    },
+    "walk-tuft-pass": {
+      "source": "round3o-side-stride/sprites/pass.png",
+      "sha256": "e84fe4752dd5b498b420171f4eb34e49eedf660b0920ab410cd890c72e8aa017",
+      "pixelHash": "fd589985e1e21aa59209062831b898d83b976c134aec7fd6a7e1d3f8647b0fd9",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        42,
+        25,
+        89,
+        110
+      ],
+      "anchor": [
+        64,
+        111
+      ],
+      "rect": [
+        617,
+        753,
+        47,
+        85
+      ],
+      "atlas": "village-4"
+    },
+    "walk-tuft-B": {
+      "source": "round3o-side-stride/sprites/S1-B.png",
+      "sha256": "b907c31dfe935793568f9c17b743398fb5cdeaca4c2a472d612e155502088e08",
+      "pixelHash": "eff0867bab3b171aac3cecaa724a6a874c1f5864b57d6833be7bd97039284a2c",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        37,
+        26,
+        92,
+        110
+      ],
+      "anchor": [
+        64,
+        111
+      ],
+      "rect": [
+        923,
+        753,
+        55,
+        84
+      ],
+      "atlas": "village-4"
+    },
+    "carry-tuft": {
+      "source": "round5b-poses-a/sprites/01-tuft-carry.png",
+      "sha256": "849f969e3a9d4f3511cc59d61ae1bca7c95eac784e3c232169fca7f5456c9839",
+      "pixelHash": "ffe90373ab63b9430dbafc028831291ffbc16859db7b0cc8207c109b553b38b2",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        34,
+        25,
+        94,
+        112
+      ],
+      "anchor": [
+        64,
+        111
+      ],
+      "rect": [
+        849,
+        837,
+        60,
+        87
+      ],
+      "atlas": "village-0"
+    },
+    "cheer-tuft": {
+      "source": "round5b-poses-a/sprites/01-tuft-cheer.png",
+      "sha256": "6d8ae87938eec5244b39166c9f7ced98b79a746f3fa8a6df27fc59fb2d03a306",
+      "pixelHash": "6153aee0ab99aacd8d5f77b41ea7d9308e6023b479ea539be8e27da63329332c",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        29,
+        25,
+        98,
+        112
+      ],
+      "anchor": [
+        64,
+        111
+      ],
+      "rect": [
+        778,
+        837,
+        69,
+        87
+      ],
+      "atlas": "village-0"
+    },
+    "wave-tuft": {
+      "source": "round5b-poses-a/sprites/01-tuft-wave.png",
+      "sha256": "5ca96bb2133774f4de713375b396e3ee037eb3556dd3fb375c7662d4afae528a",
+      "pixelHash": "91899b0a9c7311a4a091eaa59830a0efedddb8168f227b500e787f2e810fe221",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        34,
+        25,
+        94,
+        112
+      ],
+      "anchor": [
+        64,
+        111
+      ],
+      "rect": [
+        942,
+        1,
+        60,
+        87
+      ],
+      "atlas": "village-1"
+    },
+    "stand-fringe": {
+      "source": "round4-feet-a/sprites/02-fringe-standing.png",
+      "sha256": "4f0d6c9d31d6b0fd0f2da45e3972847e8932d5847ee3c9c7da1c02f3274e457f",
+      "pixelHash": "268727734174b28f58addff72bf632759b54c8c4d92adb0b9ad5104c38b7458f",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        33,
+        25,
+        94,
+        111
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        446,
+        577,
+        61,
+        86
+      ],
+      "atlas": "village-4"
+    },
+    "walk-fringe-A": {
+      "source": "round4s-stride-a/sprites/02-fringe-A.png",
+      "sha256": "7017a3f50cc61fa5cfb5ee55b603000a779a802bd3d723f1fc0d990afe545ea5",
+      "pixelHash": "82b76d22a877ead2399dbb95c8a524f23d491e7e012625a0079c18113f1c3521",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        32,
+        26,
+        95,
+        112
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        748,
+        289,
+        63,
+        86
+      ],
+      "atlas": "village-4"
+    },
+    "walk-fringe-pass": {
+      "source": "round4s-stride-a/sprites/02-fringe-pass.png",
+      "sha256": "65a705595e0292d6093ff6c64eda766d8714b6ca1dcb2387b6596f895718559a",
+      "pixelHash": "de5785654b5f60759132ee7da7cbe0e80df393c23fe8847380fdceaeb2afd057",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        41,
+        25,
+        91,
+        111
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        271,
+        753,
+        50,
+        86
+      ],
+      "atlas": "village-4"
+    },
+    "walk-fringe-B": {
+      "source": "round4s-stride-a/sprites/02-fringe-B.png",
+      "sha256": "000639a9221db5daa6dbce801cc42f1f2796c33d45dab854b159e9dcc405578a",
+      "pixelHash": "61a988563a376c9549cfd71d74a726d1f7a478fdcd8d36786f9e34e027cf1d2b",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        35,
+        26,
+        93,
+        112
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        62,
+        665,
+        58,
+        86
+      ],
+      "atlas": "village-4"
+    },
+    "carry-fringe": {
+      "source": "round5b-poses-a/sprites/02-fringe-carry.png",
+      "sha256": "c8a701a448bc659ece5a0bbc90509ede25ced54eb5052efbaad2188c37d15a80",
+      "pixelHash": "a52a17fa05471d48a02149151968270a3b190b9eb743ab5ebfe8ffb3c695351e",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        34,
+        25,
+        93,
+        111
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        822,
+        577,
+        59,
+        86
+      ],
+      "atlas": "village-4"
+    },
+    "cheer-fringe": {
+      "source": "round5b-poses-a/sprites/02-fringe-cheer.png",
+      "sha256": "c5c1ea9f4129564d46653440e1a371e0b8a0a9aeae07309e31b3cd90bb73b78c",
+      "pixelHash": "cf740e99e557015a17c934c0de87dc582d121c48959d3212c30de212357f7d21",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        27,
+        25,
+        100,
+        111
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        77,
+        924,
+        73,
+        86
+      ],
+      "atlas": "village-1"
+    },
+    "wave-fringe": {
+      "source": "round5b-poses-a/sprites/02-fringe-wave.png",
+      "sha256": "8dd328a18e360dbe4060b58759dc017b6e7f708e9ddaf8ef075bc2e0a74b668b",
+      "pixelHash": "61ad6f5b17c23962cadc948ac48dc0649c2779bc0628a24e3e7f5ac519cbfffe",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        32,
+        25,
+        96,
+        111
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        552,
+        289,
+        64,
+        86
+      ],
+      "atlas": "village-4"
+    },
+    "stand-bun": {
+      "source": "round4-feet-a/sprites/03-bun-standing.png",
+      "sha256": "94fd61cb1c4a19b72093380f1c2a2a5f97f248a3cefc574f00c7e704fff20237",
+      "pixelHash": "d09329daf9e00e9fe2ab8c75fb5f96b71a70709f8a9d3e9b88f5e8c0b6fd172e",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        30,
+        25,
+        96,
+        111
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        956,
+        924,
+        66,
+        86
+      ],
+      "atlas": "village-1"
+    },
+    "walk-bun-A": {
+      "source": "round4s-stride-a/registered/sprites/03-bun-A.png",
+      "sha256": "9e24f4730c043d6c24ee6a868d82b1d67307f2b69cac8add8bc44ed3a31e3c1c",
+      "pixelHash": "dcd65e326970e69f7b449910cbcda57e4df1a1119e6ac14bdde3e01bc1e93bae",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        32,
+        26,
+        93,
+        112
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        509,
+        577,
+        61,
+        86
+      ],
+      "atlas": "village-4"
+    },
+    "walk-bun-pass": {
+      "source": "round4s-stride-a/registered/sprites/03-bun-pass.png",
+      "sha256": "5d92255abf8089eb4fa26b053a717e61c399247fcc2b1cc6d862c63e2dce4ca7",
+      "pixelHash": "d8da85d6bd598bf48a62955c6cbf89ec06a605d53e55c6fbd5ac03a9223883ae",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        35,
+        25,
+        92,
+        111
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        301,
+        665,
+        57,
+        86
+      ],
+      "atlas": "village-4"
+    },
+    "walk-bun-B": {
+      "source": "round4s-stride-a/registered/sprites/03-bun-B.png",
+      "sha256": "33a21c8306ee2fcfd4f04d97f471dccfc34124cf598806115d4ba3c0cd4a102f",
+      "pixelHash": "a05e316330c33a4b39c346abd68e7e83879da70c8f1a6895a0bf3c0a7d9e66cd",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        31,
+        26,
+        92,
+        112
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        572,
+        577,
+        61,
+        86
+      ],
+      "atlas": "village-4"
+    },
+    "carry-bun": {
+      "source": "round5b-poses-a/sprites/03-bun-carry.png",
+      "sha256": "12a0fe5ae0f9a28da08f663612dd6d2297707b841cefc4164a0b429b711e541a",
+      "pixelHash": "761fe6eb14bbcebc616fd4463b025b1b8b19a8fe8add17262c8778e9382f99b6",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        31,
+        25,
+        96,
+        111
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        696,
+        1,
+        65,
+        86
+      ],
+      "atlas": "village-4"
+    },
+    "cheer-bun": {
+      "source": "round5b-poses-a/sprites/03-bun-cheer.png",
+      "sha256": "e3ce6cf1c36fa68498c72f8c96de469ae49d46e517e85924a27fbbe4be0e592f",
+      "pixelHash": "2b962528668e0f4ae0681641b78dd403ee2beb6979c25a60992d07b2b5e41f36",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        27,
+        25,
+        100,
+        111
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        2,
+        924,
+        73,
+        86
+      ],
+      "atlas": "village-1"
+    },
+    "wave-bun": {
+      "source": "round5b-poses-a/sprites/03-bun-wave.png",
+      "sha256": "2706da5955233bd375458cf584f6eabcc8e792e5818ab1cd4edf23dd397d6197",
+      "pixelHash": "e6e631fa68b9d6d2f61d1e355a0021ec0ec8a868f733b6f606f85ddae721a9f2",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        28,
+        25,
+        100,
+        111
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        226,
+        924,
+        72,
+        86
+      ],
+      "atlas": "village-1"
+    },
+    "stand-fan": {
+      "source": "round4-feet-a/sprites/04-fan-standing.png",
+      "sha256": "178ce22d500bd21f86234e03f01c067515c47e91e3dc64280bdcb1bd5531606c",
+      "pixelHash": "1fedf728422405d037f972d3d8c11cc68fa36962b96b3621d86810f021b1d68b",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        32,
+        25,
+        95,
+        111
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        618,
+        289,
+        63,
+        86
+      ],
+      "atlas": "village-4"
+    },
+    "walk-fan-A": {
+      "source": "round4s-stride-a/registered/sprites/04-fan-A.png",
+      "sha256": "cea1d9ae5a505ded263a17235748361d2b6ce0689f0cde656a5a4fd8ba1d1a6c",
+      "pixelHash": "22372397b160095d397a91e82801e3c385bcccf412932a8d837bd97cf423261c",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        28,
+        26,
+        94,
+        112
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        942,
+        341,
+        66,
+        86
+      ],
+      "atlas": "village-3"
+    },
+    "walk-fan-pass": {
+      "source": "round4s-stride-a/registered/sprites/04-fan-pass.png",
+      "sha256": "6ae6bd4bcfc422af702563db22b14b9a238e10f3d8daeb2da1c4616604c4c764",
+      "pixelHash": "ce5f0a3278193c181c6fc0504070eafcf19d61daeb83c35a66628e82cf75b5e4",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        38,
+        25,
+        94,
+        111
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        536,
+        665,
+        56,
+        86
+      ],
+      "atlas": "village-4"
+    },
+    "walk-fan-B": {
+      "source": "round4s-stride-a/registered/sprites/04-fan-B.png",
+      "sha256": "74bdce5a3a872359a7a6f039eff479a7f7b3b49af9cb9c8741e86e1de88da5ed",
+      "pixelHash": "9a1ede1666c0ba75035912408037355f23fbad4f0243521bd9ab35367d3eb9a3",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        41,
+        26,
+        95,
+        112
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        937,
+        665,
+        54,
+        86
+      ],
+      "atlas": "village-4"
+    },
+    "carry-fan": {
+      "source": "round5b-poses-a/sprites/04-fan-carry.png",
+      "sha256": "15b73c428c1a42d8d1d95ad126f8db336624e2ab10f383a232f57e9b2358be01",
+      "pixelHash": "a3e18fd7a12447da3d27c20104e7aff66a724351da5bd74217aaa2f4f84544bd",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        35,
+        25,
+        92,
+        111
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        242,
+        665,
+        57,
+        86
+      ],
+      "atlas": "village-4"
+    },
+    "cheer-fan": {
+      "source": "round5b-poses-a/sprites/04-fan-cheer.png",
+      "sha256": "229f2ff85de54f37e1649054f8ba861f53dfcf14d5a416388a5648d056830258",
+      "pixelHash": "0c4b2f5091d3fee170124f748c967c5dcc690d561b3934d1739ee1b6c63bdabe",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        27,
+        25,
+        101,
+        111
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        730,
+        836,
+        74,
+        86
+      ],
+      "atlas": "village-1"
+    },
+    "wave-fan": {
+      "source": "round5b-poses-a/sprites/04-fan-wave.png",
+      "sha256": "9805937c051e2594b2727592db13ab404aed96f2032b0e6a5cf56276f7c6f58f",
+      "pixelHash": "fff19284a3c39085f53d30824237f251e900105dc5504a2abb9f1dbd846f0d8b",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        33,
+        25,
+        94,
+        111
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        635,
+        577,
+        61,
+        86
+      ],
+      "atlas": "village-4"
+    },
+    "stand-crest": {
+      "source": "round4-feet-a/sprites/05-crest-standing.png",
+      "sha256": "0fa4a4bea3375f57decfdbe9df5cd827a4a1040a6ad89b35d10c2991a6a4b45c",
+      "pixelHash": "4322b9420ae9554a74f64de43d7ce7d9010bc5bf58b0cf89444be2fa2102444e",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        31,
+        25,
+        96,
+        111
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        763,
+        1,
+        65,
+        86
+      ],
+      "atlas": "village-4"
+    },
+    "walk-crest-A": {
+      "source": "round4s-stride-a/registered/sprites/05-crest-A.png",
+      "sha256": "b1d22a54b6e2910ae1013c9325b69c963419e3bb54f3cc4468214a1e65e3b0ad",
+      "pixelHash": "38316b8095f05cc285100f9d952e7fe78ab3c2db11a045595bdb44b37a24f728",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        30,
+        26,
+        94,
+        112
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        420,
+        289,
+        64,
+        86
+      ],
+      "atlas": "village-4"
+    },
+    "walk-crest-pass": {
+      "source": "round4s-stride-a/registered/sprites/05-crest-pass.png",
+      "sha256": "c33ce99f3b97aa9ec818bad8a819fe35bec0604563cada4cbc50ad84d0554d1d",
+      "pixelHash": "7e4a1c905ce23d9caacf5576ca0c57107d3bff02656c923ec8470ff6cb6d7a37",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        40,
+        25,
+        92,
+        111
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        111,
+        753,
+        52,
+        86
+      ],
+      "atlas": "village-4"
+    },
+    "walk-crest-B": {
+      "source": "round4s-stride-a/registered/sprites/05-crest-B.png",
+      "sha256": "8cb4731f781a4cb3534cdb8b2d40fe304f0b0e8a459c259004f9c01623d33414",
+      "pixelHash": "9a2dbccf072d807c4fbed93a3369933e6a2753659053818dd6c9581e8529f35c",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        36,
+        26,
+        94,
+        112
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        964,
+        1,
+        58,
+        86
+      ],
+      "atlas": "village-4"
+    },
+    "carry-crest": {
+      "source": "round5b-poses-a/sprites/05-crest-carry.png",
+      "sha256": "e959751deb04e3c2996b0a58075a496090f3e837819cdce63fe5c8ddd4b6169e",
+      "pixelHash": "eb462e41b5a0649d1c9d411a6234db4b6865fca7c1135ccd42fb6d5c510a1868",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        33,
+        25,
+        95,
+        111
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        878,
+        289,
+        62,
+        86
+      ],
+      "atlas": "village-4"
+    },
+    "cheer-crest": {
+      "source": "round5b-poses-a/sprites/05-crest-cheer.png",
+      "sha256": "52213a5f173c0e33ab7f959038becf0d389b750e94474e656e7e5b820fd19dae",
+      "pixelHash": "e0522e6628d25a0c7f2e1bea606e37506203907931a476a1a243942de22ad1a6",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        27,
+        25,
+        101,
+        111
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        654,
+        836,
+        74,
+        86
+      ],
+      "atlas": "village-1"
+    },
+    "wave-crest": {
+      "source": "round5b-poses-a/sprites/05-crest-wave.png",
+      "sha256": "a0fe6365c7e4ebd31e920364bd358b2ba6679eda7d511c7be285d1b5ce3ce715",
+      "pixelHash": "f0107108da9b5718068bd1c76d447298b2729deeb2430353864018d11e77ae62",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        29,
+        25,
+        98,
+        111
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        732,
+        367,
+        69,
+        86
+      ],
+      "atlas": "village-2"
+    },
+    "stand-helmet": {
+      "source": "round4-feet-a/sprites/06-helmet-standing.png",
+      "sha256": "8b838a84059550d5926f0e9b824adc5c37cd5455bd3fb3551a31ba0b806b83fb",
+      "pixelHash": "fd8f6b5fe89004feb501f8680d3280e6e06fdcbdf9eabff43166664be71482b0",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        31,
+        25,
+        96,
+        111
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        830,
+        1,
+        65,
+        86
+      ],
+      "atlas": "village-4"
+    },
+    "walk-helmet-A": {
+      "source": "round4s-stride-a/registered/sprites/06-helmet-A.png",
+      "sha256": "d15cbf4831764fb0f633dfc907e27c3ec1ff1a9ec19790e2e623ea35729361d3",
+      "pixelHash": "1b3f3fc06ac635affdcaade9c546b65a2d56bf2fd0997602f07bba5b6645b745",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        25,
+        26,
+        96,
+        112
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        593,
+        924,
+        71,
+        86
+      ],
+      "atlas": "village-1"
+    },
+    "walk-helmet-pass": {
+      "source": "round4s-stride-a/registered/sprites/06-helmet-pass.png",
+      "sha256": "6edacc49c10cd45a613a5aed2b93209e9a4f6ae364a56861c8776e6edcf81946",
+      "pixelHash": "1628be333e33458fbda96980955aa6ada0e380eda76c9cfecef25b01a627ecf3",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        40,
+        25,
+        96,
+        111
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        594,
+        665,
+        56,
+        86
+      ],
+      "atlas": "village-4"
+    },
+    "walk-helmet-B": {
+      "source": "round4s-stride-a/registered/sprites/06-helmet-B.png",
+      "sha256": "2341031469e752eea018bad97f1c6c3c8c6279130e0a55906e73ce9c3aca9e4f",
+      "pixelHash": "a3d3959ee7fdccd07140adf132a209d7c3f35d8c2d9f51caa0cb8360f91ded66",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        33,
+        26,
+        96,
+        112
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        813,
+        289,
+        63,
+        86
+      ],
+      "atlas": "village-4"
+    },
+    "carry-helmet": {
+      "source": "round5b-poses-a/sprites/06-helmet-carry.png",
+      "sha256": "30b79b5d249c17213189ae113b45164d6f833280623a551132c98e01b8624de4",
+      "pixelHash": "4a45fe49bd99f2c475b28d415d395deebeef469f655ecc843eb89f2e75e9629c",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        33,
+        25,
+        94,
+        111
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        194,
+        577,
+        61,
+        86
+      ],
+      "atlas": "village-4"
+    },
+    "cheer-helmet": {
+      "source": "round5b-poses-a/sprites/06-helmet-cheer.png",
+      "sha256": "e391abff1fd67aaf133f336ebab918c64aa7ceabd36db99d80f9268fc00da257",
+      "pixelHash": "826c41ca5a9f2f07a6042aea9bd11940c74fa8e66c7722887c86d6b79e4d2407",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        27,
+        25,
+        101,
+        111
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        806,
+        836,
+        74,
+        86
+      ],
+      "atlas": "village-1"
+    },
+    "wave-helmet": {
+      "source": "round5b-poses-a/sprites/06-helmet-wave.png",
+      "sha256": "dff4b0d8f2a29e81cab1ed41d245d96a9895abb5c5a8bdde1393336c45f3a869",
+      "pixelHash": "80846077fdcde1621a1a28c4dbcfea618ab29cea26b4d55a5cd2c4736e28b552",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        29,
+        25,
+        99,
+        111
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        732,
+        1,
+        70,
+        86
+      ],
+      "atlas": "village-2"
+    },
+    "stand-waves": {
+      "source": "round4-feet-a/sprites/07-waves-standing.png",
+      "sha256": "dcfabfd13a93502ef81b896cf305504dc702b03bcc7e56ddb9894a1443ad145c",
+      "pixelHash": "7755bbe2178e4859b377bf48c50a2ac310559e940e9c18d129596a09a47eb4b2",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        31,
+        25,
+        96,
+        111
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        897,
+        1,
+        65,
+        86
+      ],
+      "atlas": "village-4"
+    },
+    "walk-waves-A": {
+      "source": "round4s-stride-a/registered/sprites/07-waves-A.png",
+      "sha256": "b6c78ba62609e9b8f17f5dd25839696daee0b68c3d5b44ee26be3c0c59769fcf",
+      "pixelHash": "baea11640bc431a15ccc3e905df2390620fbc31e01433b28686ccfaf5f148d67",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        27,
+        26,
+        96,
+        112
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        946,
+        1,
+        69,
+        86
+      ],
+      "atlas": "village-2"
+    },
+    "walk-waves-pass": {
+      "source": "round4s-stride-a/registered/sprites/07-waves-pass.png",
+      "sha256": "e043e88814a57937b70e354fdfc30394bdca7f70fc5fa4304f121c7dac0be86d",
+      "pixelHash": "c266f02436e0241ca829a5e90de7cf547ae4b3d2310a22912cf08eadcac0bea0",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        38,
+        25,
+        96,
+        111
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        182,
+        665,
+        58,
+        86
+      ],
+      "atlas": "village-4"
+    },
+    "walk-waves-B": {
+      "source": "round4s-stride-a/registered/sprites/07-waves-B.png",
+      "sha256": "926d6ee9c9c6652e9447afe4fc07491787b614f01035ac22d52d4f2b915d2624",
+      "pixelHash": "b293ff0942b494076b508314b2a209e3c5b74c706a4667c5edf0c05764f96c4e",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        30,
+        26,
+        96,
+        112
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        942,
+        681,
+        66,
+        86
+      ],
+      "atlas": "village-3"
+    },
+    "carry-waves": {
+      "source": "round5b-poses-a/sprites/07-waves-carry.png",
+      "sha256": "ae0dfc332cdab57c1fb6597da77fee8fe14fb879244fb346cb44fff60d2e2e11",
+      "pixelHash": "1bd95d62e518f0779c7d0b2659ade275e81e240a66c4eea8c653a48554eb9520",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        33,
+        25,
+        95,
+        111
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        942,
+        289,
+        62,
+        86
+      ],
+      "atlas": "village-4"
+    },
+    "cheer-waves": {
+      "source": "round5b-poses-a/sprites/07-waves-cheer.png",
+      "sha256": "6fc2663084f4333ba294f26d85c9560139be9fd6cc5ce229c059c8c663689f21",
+      "pixelHash": "16aa1f2e90db8a66ebf05ce27b08ec53c1da371d1ea14515bac813a2d94cc8ff",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        25,
+        25,
+        103,
+        111
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        341,
+        836,
+        78,
+        86
+      ],
+      "atlas": "village-1"
+    },
+    "wave-waves": {
+      "source": "round5b-poses-a/sprites/07-waves-wave.png",
+      "sha256": "ee55d0b1c9cb7ccb1e2a84497b14f93ba98538d32aae0da8ed0c0c70bcd65316",
+      "pixelHash": "a33f7e7091549bac4d72c129e3ecec5fdf989e925cc7e4977cedb4ce24b94f46",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        28,
+        25,
+        100,
+        111
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        300,
+        924,
+        72,
+        86
+      ],
+      "atlas": "village-1"
+    },
+    "stand-part": {
+      "source": "round4-feet-a/sprites/08-part-standing.png",
+      "sha256": "6444e0470688066e7e6d163504e001a4e8ef57488738200b358d2d6bc2c59184",
+      "pixelHash": "aad215f26bba3a82de6cc2ebd564e8ce979253bb3e887ef317f6c011b4a89bcf",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        29,
+        25,
+        98,
+        111
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        804,
+        1,
+        69,
+        86
+      ],
+      "atlas": "village-2"
+    },
+    "walk-part-A": {
+      "source": "round4s-stride-a/registered/sprites/08-part-A.png",
+      "sha256": "cf73b12e4dafe5c9b5cec245dc04cf6e6e659d3677a9e151cb1f4c07ab2c2d73",
+      "pixelHash": "c285db6c34f683f6b2acbb921067d6a99224181dac1cf9de061bb84f38ade3f5",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        29,
+        26,
+        98,
+        112
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        875,
+        1,
+        69,
+        86
+      ],
+      "atlas": "village-2"
+    },
+    "walk-part-pass": {
+      "source": "round4s-stride-a/registered/sprites/08-part-pass.png",
+      "sha256": "9ff709362bc45c42a689475ff456d223f586fe9cbe45b32a175caf1cfdb0c0b1",
+      "pixelHash": "f1c47397510aa352106e604c3ec40b0c20af072aa2dcf16290e385f62ce4065d",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        39,
+        25,
+        98,
+        111
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        944,
+        577,
+        59,
+        86
+      ],
+      "atlas": "village-4"
+    },
+    "walk-part-B": {
+      "source": "round4s-stride-a/registered/sprites/08-part-B.png",
+      "sha256": "745f142396b664fe348ac969fb75930497ab6b6ec35aea300651b114b272268c",
+      "pixelHash": "ab69f5eaf8932575032f17f6e89c53eb63bf707560de39d7b6dbc8cb9db4c68d",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        31,
+        26,
+        98,
+        112
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        803,
+        367,
+        67,
+        86
+      ],
+      "atlas": "village-2"
+    },
+    "carry-part": {
+      "source": "round5b-poses-a/sprites/08-part-carry.png",
+      "sha256": "f03f03deaf4fc61c9849e464a85a7a8362bc64aa74b8627209c3f27b8ebd03dc",
+      "pixelHash": "6ecf5ffdd89910c6c1dfaaf5fc24eb4d19a3b22ef0d678a18cdd76f047c1c3f9",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        33,
+        25,
+        94,
+        111
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        257,
+        577,
+        61,
+        86
+      ],
+      "atlas": "village-4"
+    },
+    "cheer-part": {
+      "source": "round5b-poses-a/sprites/08-part-cheer.png",
+      "sha256": "44848b019ad8b5367994a821082d0df081e40efaeae867a685557cfa07648117",
+      "pixelHash": "ad6e0c312a81afe210a08ba921289645b70968e03c48119d3d0a088addb79c5a",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        24,
+        25,
+        103,
+        111
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        179,
+        836,
+        79,
+        86
+      ],
+      "atlas": "village-1"
+    },
+    "wave-part": {
+      "source": "round5b-poses-a/sprites/08-part-wave.png",
+      "sha256": "aeca28d5d300941032193d96a603d924f62b3f6298531c7f4d02bf12685aacf2",
+      "pixelHash": "9083fc8e7327b6aee3c64612cb906e0b605694265de0863ce9ebe3e9c11f2558",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        28,
+        25,
+        99,
+        111
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        739,
+        924,
+        71,
+        86
+      ],
+      "atlas": "village-1"
+    },
+    "stand-beret": {
+      "source": "round4-feet-a/sprites/09-beret-standing.png",
+      "sha256": "230ed50e7d041967352889b214413250c6a06cba889cf2f22e77dca54fd3d773",
+      "pixelHash": "fb94a3c4adbcc4aeadcd03a721aa04ceb8995964917156ea23cf92305c84c83b",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        33,
+        25,
+        94,
+        111
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        383,
+        577,
+        61,
+        86
+      ],
+      "atlas": "village-4"
+    },
+    "walk-beret-A": {
+      "source": "round4s-stride-a/registered/sprites/09-beret-A.png",
+      "sha256": "1f059e6223ede7233f94372f35d61553dc6470bc508a60c4aa620e56a9867f45",
+      "pixelHash": "f2d5b5b53d33c5cb72894abba8d522ed9166fee360fd8819bdd887cc9203e389",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        30,
+        26,
+        94,
+        112
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        958,
+        836,
+        64,
+        86
+      ],
+      "atlas": "village-1"
+    },
+    "walk-beret-pass": {
+      "source": "round4s-stride-a/registered/sprites/09-beret-pass.png",
+      "sha256": "78fc6e3d117152ed8b01aefeabae1baafe13d3ec453ebc03010a42a0416cee56",
+      "pixelHash": "04bc11cff3e3685d51a59598be3d48fb0af3b08ce1faea3d40f11619dd293762",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        40,
+        25,
+        94,
+        111
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        881,
+        665,
+        54,
+        86
+      ],
+      "atlas": "village-4"
+    },
+    "walk-beret-B": {
+      "source": "round4s-stride-a/registered/sprites/09-beret-B.png",
+      "sha256": "a275844ba385c429c2d86663f0c86050601a4d4310a1bbf80bde915f36611274",
+      "pixelHash": "7a9609f4b93a3a3bff6d1849feeb39e99d63847d2783c2eeee699ec4b0508c81",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        32,
+        26,
+        94,
+        112
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        130,
+        577,
+        62,
+        86
+      ],
+      "atlas": "village-4"
+    },
+    "carry-beret": {
+      "source": "round5b-poses-b/sprites/09-beret/carry.png",
+      "sha256": "8032ec144882ca2c5c9521d34812281aea8e07c9220a75360b8a5c8018df3a65",
+      "pixelHash": "8ca92432a256068421d9fefe1205e8ba5e940f97797080f0f006762dea328567",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        39,
+        25,
+        94,
+        111
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        710,
+        665,
+        55,
+        86
+      ],
+      "atlas": "village-4"
+    },
+    "cheer-beret": {
+      "source": "round5b-poses-b/sprites/09-beret/cheer.png",
+      "sha256": "1dffb48101949e877481ab5ec844ab7ff020cc7bd4ccf1bc061d310af3a3c438",
+      "pixelHash": "060ff170daab4ff7c03a184724572efecc7f740cbc6dc10c3454524c3456d660",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        30,
+        25,
+        100,
+        111
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        812,
+        924,
+        70,
+        86
+      ],
+      "atlas": "village-1"
+    },
+    "wave-beret": {
+      "source": "round5b-poses-b/sprites/09-beret/wave.png",
+      "sha256": "e1058e380e3ce68e6fef77b89d18c9a653e03a0ba204bc428b96cf82afefa1f8",
+      "pixelHash": "999004b77b623782fa0afa56fc9eb5de0bbf481f17f7f1bfa44573add05d002b",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        30,
+        25,
+        94,
+        111
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        486,
+        289,
+        64,
+        86
+      ],
+      "atlas": "village-4"
+    },
+    "stand-knit": {
+      "source": "round4-feet-b/sprites/10-knit/standing.png",
+      "sha256": "7516139c4e3600b0786bf2c41dfbb21d46658e7a24c59241ebf1dcee4dc99e20",
+      "pixelHash": "3f640f99b4419ad5f313632102cf4ff7bdc0f9b945368b830e7f03f74a4784d7",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        36,
+        25,
+        91,
+        111
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        767,
+        665,
+        55,
+        86
+      ],
+      "atlas": "village-4"
+    },
+    "walk-knit-A": {
+      "source": "round4s-stride-b/sprites/10-knit/A.png",
+      "sha256": "430309a836dc43184a964aac880baf2e69b71f40ab9e94a40f0b71c2f6876768",
+      "pixelHash": "30d8920fb84632975d1d9fb60254295bea83ba88f3acb5ea1ed9528be72c85cb",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        32,
+        26,
+        90,
+        112
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        122,
+        665,
+        58,
+        86
+      ],
+      "atlas": "village-4"
+    },
+    "walk-knit-pass": {
+      "source": "round4s-stride-b/sprites/10-knit/pass.png",
+      "sha256": "12f1eed394f2c42cb0aa9a4a7556a36f38b2723b2c9cbef36c72cb3a8ec57932",
+      "pixelHash": "24bb39b53b08f4c411dd01caf750a341b56933dde6fe24ead1535ff6d5a141e8",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        40,
+        25,
+        87,
+        110
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        973,
+        837,
+        47,
+        85
+      ],
+      "atlas": "village-0"
+    },
+    "walk-knit-B": {
+      "source": "round4s-stride-b/sprites/10-knit/B.png",
+      "sha256": "f88af201b20a16be4f3f38cf8df50ab72cc2550f34cbccba3644043b3119c0d4",
+      "pixelHash": "07611bb68807e5f41168508a0e8823cc202ec99eda9ae8dcaf9fcfe2a02818f3",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        34,
+        26,
+        87,
+        111
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        562,
+        753,
+        53,
+        85
+      ],
+      "atlas": "village-4"
+    },
+    "carry-knit": {
+      "source": "round5b-poses-b/sprites/10-knit/carry.png",
+      "sha256": "9c558a876343c118807a7d2488071be6e4ee180633655ca9916675c678ecbf01",
+      "pixelHash": "d472b7250036bf67aac73f6d2ef6ace4a6411e9ac837e3298118b130a125948f",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        40,
+        25,
+        91,
+        111
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        165,
+        753,
+        51,
+        86
+      ],
+      "atlas": "village-4"
+    },
+    "cheer-knit": {
+      "source": "round5b-poses-b/sprites/10-knit/cheer.png",
+      "sha256": "3622e83130b60ca989d13b3612dd6f8a98afa0f6121dbd6ede9e32e64d369e2c",
+      "pixelHash": "bf72c85357048c1da23f260b362795f0ae7a22ba9cd699f7e317384dc6717819",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        27,
+        25,
+        99,
+        111
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        152,
+        924,
+        72,
+        86
+      ],
+      "atlas": "village-1"
+    },
+    "wave-knit": {
+      "source": "round5b-poses-b/sprites/10-knit/wave.png",
+      "sha256": "a49c8e11d9e996c68f1235fd5e7f20c9067483886baa2af63126d06d1484f81c",
+      "pixelHash": "d0212f70779c9b7037d712f7d609cdfafd6008cfecf360286bed31d863b5df0d",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        34,
+        25,
+        91,
+        111
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        419,
+        665,
+        57,
+        86
+      ],
+      "atlas": "village-4"
+    },
+    "stand-raincoat": {
+      "source": "round4-feet-b/sprites/11-raincoat/standing.png",
+      "sha256": "614a9a55878cc01b352f8baa4b7575a064237e4938de88a50211f94c5f0e3d7c",
+      "pixelHash": "81203e09dc9a6525aff13cf40b8fd7fa99dd247af0e6416d18557cfc59492f40",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        31,
+        25,
+        97,
+        111
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        942,
+        733,
+        66,
+        86
+      ],
+      "atlas": "village-2"
+    },
+    "walk-raincoat-A": {
+      "source": "round4s-stride-b/registered/work/11-raincoat/sprites/S1-A.png",
+      "sha256": "4c3ce436b4d09f0f455bccc0115205c6df4eb70d918ac5078896a48bfa753b9b",
+      "pixelHash": "9c5e46f6b7812dde7721ada536cbdc4051d6d07581e2a4a8801b9df6c48bde2e",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        31,
+        26,
+        93,
+        111
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        323,
+        753,
+        62,
+        85
+      ],
+      "atlas": "village-4"
+    },
+    "walk-raincoat-pass": {
+      "source": "round4s-stride-b/registered/work/11-raincoat/sprites/pass.png",
+      "sha256": "9be3fce938776b8454109c3d66c30d7f564c6856e8c81205024f6e49ec7573ba",
+      "pixelHash": "99ba2a2fcc270ecc1c05fb25f61a8b11ee1615b1161967731613d5017d627537",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        36,
+        25,
+        92,
+        111
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        652,
+        665,
+        56,
+        86
+      ],
+      "atlas": "village-4"
+    },
+    "walk-raincoat-B": {
+      "source": "round4s-stride-b/registered/work/11-raincoat/sprites/S1-B.png",
+      "sha256": "a96ec35306e45364f5e6f7a74356d5ed3d5ad973b614e09df7d6a8fb93b21f71",
+      "pixelHash": "ff4faa1cabba6b452615c228ec1ff3c0c61c073863fd93edc2d7ab49d6016f04",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        33,
+        26,
+        93,
+        111
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        387,
+        753,
+        60,
+        85
+      ],
+      "atlas": "village-4"
+    },
+    "carry-raincoat": {
+      "source": "round5b-poses-b/sprites/11-raincoat/carry.png",
+      "sha256": "d2209722c5ef5b0de0c2c2e7418da5a99d3388026d6df36209fea6e675b8e8bd",
+      "pixelHash": "70d7b950ef220a4e3ecac00b7d899ab6445ac0877a4e68ba5d64a3bda704bc38",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        35,
+        25,
+        96,
+        111
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        320,
+        577,
+        61,
+        86
+      ],
+      "atlas": "village-4"
+    },
+    "cheer-raincoat": {
+      "source": "round5b-poses-b/sprites/11-raincoat/cheer.png",
+      "sha256": "b9690521a6c1b3719e6da4ab7149f98bcd781e24a25f74dd3b9104026afe887f",
+      "pixelHash": "bb2eadd2eb7c4d6c8f2f555c9de76c35012c816e8f3abbd528f09acaabdb0c66",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        28,
+        25,
+        102,
+        111
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        882,
+        836,
+        74,
+        86
+      ],
+      "atlas": "village-1"
+    },
+    "wave-raincoat": {
+      "source": "round5b-poses-b/sprites/11-raincoat/wave.png",
+      "sha256": "adbe29523ef4deff1f1deacb90f5d3fd96256665d1a714fef2736c2223bdc04e",
+      "pixelHash": "134507a49f2398a9a959447e1fc20bd9cf61e8851000b345d7d9d166169029a6",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        30,
+        25,
+        97,
+        111
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        941,
+        367,
+        67,
+        86
+      ],
+      "atlas": "village-2"
+    },
+    "stand-apron": {
+      "source": "round4-feet-b/sprites/12-apron/standing.png",
+      "sha256": "768e5bd072be89028d15884031ea42f79747b238c9d0a6762f08c050411d5144",
+      "pixelHash": "2d08e25cb6e3c8305b6f8cb6acedce322bbb6e1b00ff4715535cbbd7480c585f",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        28,
+        25,
+        99,
+        111
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        520,
+        924,
+        71,
+        86
+      ],
+      "atlas": "village-1"
+    },
+    "walk-apron-A": {
+      "source": "round4s-stride-b/registered/work/12-apron/sprites/S1-A.png",
+      "sha256": "dd1417351abb2c0f647898ad0e7633bcdf257ca98037efab3f47597b17e996f1",
+      "pixelHash": "9fb4bbc22c39bb7ca56e4598cd87ecdc105165b51c0cef65d81286fe80a69bf5",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        30,
+        26,
+        96,
+        110
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        666,
+        753,
+        66,
+        84
+      ],
+      "atlas": "village-4"
+    },
+    "walk-apron-pass": {
+      "source": "round4s-stride-b/registered/work/12-apron/sprites/pass.png",
+      "sha256": "3338878d787024d86ab9f7d72789fefd39d8d4f4883d45b445c2f6888490506a",
+      "pixelHash": "308bab2e90a4908b4c6cc2f414dbc23562c6efc82fd5741e3a731d363ff3ca06",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        33,
+        25,
+        95,
+        111
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        66,
+        577,
+        62,
+        86
+      ],
+      "atlas": "village-4"
+    },
+    "walk-apron-B": {
+      "source": "round4s-stride-b/registered/work/12-apron/sprites/S1-B.png",
+      "sha256": "3286b5e6d3252bd8c4748ac9bb491621b003cb05385803ab5d2d0afa9322430a",
+      "pixelHash": "72983eedc10443cfa348e87308f2dc4bed2b56b3b941b10879fb0c40a317d20b",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        29,
+        26,
+        95,
+        112
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        942,
+        1,
+        66,
+        86
+      ],
+      "atlas": "village-3"
+    },
+    "carry-apron": {
+      "source": "round5b-poses-b/sprites/12-apron/carry.png",
+      "sha256": "31a186ab5c436815bc3d9ae9ee9190f216393e0f674438e2ccd01ad2fa6940fb",
+      "pixelHash": "5c372cbe0602c3d2c891f849620e96e74817ea2f725a7ac960310b8b5c007015",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        28,
+        25,
+        99,
+        111
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        374,
+        924,
+        71,
+        86
+      ],
+      "atlas": "village-1"
+    },
+    "cheer-apron": {
+      "source": "round5b-poses-b/sprites/12-apron/cheer.png",
+      "sha256": "9d695f3dd0f30a599f7759641715086657b089a11dba4257ed069ebfe2938dc7",
+      "pixelHash": "4c26e1de07307857e75744745bfb4284d2524a6817802be44012f7f60fffd091",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        28,
+        25,
+        105,
+        111
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        421,
+        836,
+        77,
+        86
+      ],
+      "atlas": "village-1"
+    },
+    "wave-apron": {
+      "source": "round5b-poses-b/sprites/12-apron/wave.png",
+      "sha256": "25730ece6b7a8a3962091256192a9df6d2c58f82ad8f1e5db4d84ea11b7765e7",
+      "pixelHash": "3d8fff3a405c02dba13d8629ef1ac7b7e2273e219b7ba6311def851c02454b47",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        28,
+        25,
+        99,
+        111
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        666,
+        924,
+        71,
+        86
+      ],
+      "atlas": "village-1"
+    },
+    "stand-bowtie": {
+      "source": "round4-feet-b/sprites/13-bowtie/standing.png",
+      "sha256": "ae4314679154ca6129b9ca0182ad61aaa659b06b1a7568b637195580312c72e7",
+      "pixelHash": "09be6c96eea6afcc78f7b1f98e540d00d66cd756993f2bedc548e2dc6856ad1a",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        36,
+        25,
+        92,
+        111
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        478,
+        665,
+        56,
+        86
+      ],
+      "atlas": "village-4"
+    },
+    "walk-bowtie-A": {
+      "source": "round4s-stride-b/sprites/13-bowtie/A.png",
+      "sha256": "df61bfd903dd3476a830e4fb938bd14a9288aca1d8da8df1c3eae9325cd42ee9",
+      "pixelHash": "6fad2a6a7705dede520b837df2f2604278394a091f407737a759fe5d3559928e",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        33,
+        26,
+        92,
+        112
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        883,
+        577,
+        59,
+        86
+      ],
+      "atlas": "village-4"
+    },
+    "walk-bowtie-pass": {
+      "source": "round4s-stride-b/sprites/13-bowtie/pass.png",
+      "sha256": "b8e4d28e2f6174259a4f7c6959f28fd3b7f75fd8bf8792389c6e73c9bb1c649b",
+      "pixelHash": "5c6328b6cf8f08b33a4bcc4350716d19fcaea01062333e5c42bf086a6fd4fbb9",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        38,
+        25,
+        89,
+        111
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        218,
+        753,
+        51,
+        86
+      ],
+      "atlas": "village-4"
+    },
+    "walk-bowtie-B": {
+      "source": "round4s-stride-b/sprites/13-bowtie/B.png",
+      "sha256": "2aa50740daec1d93786e6b9c86e25b8adf2e58faa48e50fe804b64a1298b8b04",
+      "pixelHash": "a10b33a27bfc531e478b400ebfbe9814530efe911b6aad620c0b38c8641ad050",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        35,
+        26,
+        90,
+        112
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        824,
+        665,
+        55,
+        86
+      ],
+      "atlas": "village-4"
+    },
+    "carry-bowtie": {
+      "source": "round5b-poses-b/sprites/13-bowtie/carry.png",
+      "sha256": "5f0d207293cc7cb2c38730eb8ef256e6d6aa212bd0cf9480168c4fff68b27dd6",
+      "pixelHash": "b7cc155b4677ec95ff873b37c51b9cbc647863c8acea30c769e80340be1075cf",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        39,
+        25,
+        92,
+        111
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        2,
+        753,
+        53,
+        86
+      ],
+      "atlas": "village-4"
+    },
+    "cheer-bowtie": {
+      "source": "round5b-poses-b/sprites/13-bowtie/cheer.png",
+      "sha256": "8f5101ea9e61bb06ed561203b9247d33463865ea3367b5fdc720dfd1e0092cf5",
+      "pixelHash": "0661ed8cad87ad9ac0320847f16f60c925644ca9e8efcbcc34571c7229c6f576",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        29,
+        25,
+        100,
+        111
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        447,
+        924,
+        71,
+        86
+      ],
+      "atlas": "village-1"
+    },
+    "wave-bowtie": {
+      "source": "round5b-poses-b/sprites/13-bowtie/wave.png",
+      "sha256": "9eb57838098096f3966de7126d2996c10352a26e1b53adfb59471f5068e1d4bf",
+      "pixelHash": "c2884a372d5e4c9f1e563acddb9a0040596609cac4e5dec77f31a479b5a97ff0",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        25,
+        25,
+        92,
+        111
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        872,
+        367,
+        67,
+        86
+      ],
+      "atlas": "village-2"
+    },
+    "stand-backpack": {
+      "source": "round4-feet-b/sprites/14-backpack/standing.png",
+      "sha256": "ba3905fb1123aa2b11a65b2989f022400000dff51a156380a02a935762cc69ba",
+      "pixelHash": "9755cb1f1d28e5030a899258811125266eded47c9838c5a7512fc96c26e3ac65",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        26,
+        25,
+        101,
+        111
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        577,
+        836,
+        75,
+        86
+      ],
+      "atlas": "village-1"
+    },
+    "walk-backpack-A": {
+      "source": "round4s-stride-b/sprites/14-backpack/A.png",
+      "sha256": "59692e47803162cdc74d0d71ab2d8ad284c6179e8ed2b64159b07b3c307a075b",
+      "pixelHash": "f1d72fa1cd5d1c002db89a146c93ee24441b3a60d1e7534e35114c5ecf0428c3",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        33,
+        26,
+        96,
+        112
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        683,
+        289,
+        63,
+        86
+      ],
+      "atlas": "village-4"
+    },
+    "walk-backpack-pass": {
+      "source": "round4s-stride-b/sprites/14-backpack/pass.png",
+      "sha256": "161ab47a9289cdfb533032d90bc500dc444fb7d0c56d14d452be04887e9b63b9",
+      "pixelHash": "b4307a953b4e2ff1f29b9286b9b4af88cb899a52ef1fc446e0e58a4e4e26883a",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        33,
+        25,
+        96,
+        109
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        799,
+        753,
+        63,
+        84
+      ],
+      "atlas": "village-4"
+    },
+    "walk-backpack-B": {
+      "source": "round4s-stride-b/sprites/14-backpack/B.png",
+      "sha256": "6fa44e1b5bbb8b9b22156b267ebabd357b06faaf94ef073befc6d05bfc6f47df",
+      "pixelHash": "a133b965e78d6e614bb65a33c495151fea896a4a295c4b12912f4abab713119f",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        33,
+        26,
+        96,
+        110
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        734,
+        753,
+        63,
+        84
+      ],
+      "atlas": "village-4"
+    },
+    "carry-backpack": {
+      "source": "round5b-poses-b/sprites/14-backpack/carry.png",
+      "sha256": "a1fcf44c35990388b8cac9f6fb3ca3ff8dcc7cfa45fcb7c665f387d72728cf09",
+      "pixelHash": "8193f87832fbb64affb21b4204b0470b5f378f99e08e3c0fcf7645ed1c0709a1",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        26,
+        25,
+        101,
+        111
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        500,
+        836,
+        75,
+        86
+      ],
+      "atlas": "village-1"
+    },
+    "cheer-backpack": {
+      "source": "round5b-poses-b/sprites/14-backpack/cheer.png",
+      "sha256": "59b87dee35aa6725e5930ca8365abc78e7aebfa6bf4db151fa953750c3fecf18",
+      "pixelHash": "781cc4253ac6c7cc961bd6113bb794063f9188f1fb3e952ddbe0eafd951be02d",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        21,
+        25,
+        111,
+        111
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        2,
+        836,
+        90,
+        86
+      ],
+      "atlas": "village-1"
+    },
+    "wave-backpack": {
+      "source": "round5b-poses-b/sprites/14-backpack/wave.png",
+      "sha256": "0f1cca64c50f8c445943918fb55d6006387180c0c3aa12ee5b351179f6ab39b8",
+      "pixelHash": "584cf76ad91cbd40fa77dbe930491778c22953595259e349b0a70fbc0e1e255d",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        18,
+        25,
+        101,
+        111
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        94,
+        836,
+        83,
+        86
+      ],
+      "atlas": "village-1"
+    },
+    "stand-roll": {
+      "source": "round4-feet-b/sprites/15-roll/standing.png",
+      "sha256": "ba8f5d8e52df019d243ef10170d21b873ec3f7ab4069deb285449c83bdfad58f",
+      "pixelHash": "a69ba4650bc3670df7524caed333d847a7c7afef46e5b0a84e1f9854ae1f0901",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        34,
+        25,
+        94,
+        111
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        760,
+        577,
+        60,
+        86
+      ],
+      "atlas": "village-4"
+    },
+    "walk-roll-A": {
+      "source": "round4s-stride-b/sprites/15-roll/A.png",
+      "sha256": "21486c22ead7818d68ca0620c219c10611caa10cda095d6cbe3a070bed0e6637",
+      "pixelHash": "67f7a5ca12e525fae581bd667639f3ea66d3983c53bdda742a4981a326c6465e",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        33,
+        26,
+        90,
+        112
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        360,
+        665,
+        57,
+        86
+      ],
+      "atlas": "village-4"
+    },
+    "walk-roll-pass": {
+      "source": "round4s-stride-b/sprites/15-roll/pass.png",
+      "sha256": "9ae43bb2e0bd816eb850c4f12b233b3d010dfa1a5744c7f1c5c7f5a7504ed799",
+      "pixelHash": "c24fb0a62b20734ac071e2666d28010de415305dbfb5885909dce075201a6143",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        40,
+        25,
+        88,
+        109
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        2,
+        841,
+        48,
+        84
+      ],
+      "atlas": "village-4"
+    },
+    "walk-roll-B": {
+      "source": "round4s-stride-b/sprites/15-roll/B.png",
+      "sha256": "50bac9d1db35a18b6c7c81b05bf3701fd9bdb072592ad66d6c9bec83bf2acba0",
+      "pixelHash": "93b0b8532378f9bf43cd736d0c941627919b4176ca2702881a3832a8c2be6f3a",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        35,
+        26,
+        90,
+        109
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        198,
+        841,
+        55,
+        83
+      ],
+      "atlas": "village-4"
+    },
+    "carry-roll": {
+      "source": "round5b-poses-b/sprites/15-roll/carry.png",
+      "sha256": "9caaece5673ddcb7e525d040ade6c7e80e16cedaa5ac309909232ec61c2ff54b",
+      "pixelHash": "01e18fa31dbb81e5a69d8f37fe700f3ecca20d8265aaa923752d151178f48920",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        40,
+        25,
+        92,
+        111
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        57,
+        753,
+        52,
+        86
+      ],
+      "atlas": "village-4"
+    },
+    "cheer-roll": {
+      "source": "round5b-poses-b/sprites/15-roll/cheer.png",
+      "sha256": "6ed0debae9a06c7c02bbca68daf1d32b40ef6957307a35c98ff2f33d5f558efc",
+      "pixelHash": "9c3cee88fab3dc7e4c33253a12ed2102796ab75c210ca75fd6458a8b3ae1f57d",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        26,
+        25,
+        105,
+        111
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        260,
+        836,
+        79,
+        86
+      ],
+      "atlas": "village-1"
+    },
+    "wave-roll": {
+      "source": "round5b-poses-b/sprites/15-roll/wave.png",
+      "sha256": "64877085b028ffb874d02666d69083c6dfd7c5c1c0b69af9a4771a782177d056",
+      "pixelHash": "4f5635db6946b9692c9a5b530282ca0997490ba328ce9c2e632d7692424094e3",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        28,
+        25,
+        94,
+        111
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        628,
+        1,
+        66,
+        86
+      ],
+      "atlas": "village-4"
+    },
+    "stand-flower": {
+      "source": "round4-feet-b/sprites/16-flower/standing.png",
+      "sha256": "2b5f8d5156c89381e2ec06a33d0127721ed8eee3dc46af9b35e3200217694b8d",
+      "pixelHash": "c6c888997acfba575166ff0686c4dde18ec80e78eb9125c08ab03f25b54b19aa",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        33,
+        25,
+        95,
+        111
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        2,
+        577,
+        62,
+        86
+      ],
+      "atlas": "village-4"
+    },
+    "walk-flower-A": {
+      "source": "round4s-stride-b/fix/work/16-flower/sprites/S1-A.png",
+      "sha256": "1999321830c58ee56e85f141a4f6fed6d8867b1f747c8cb37a4858a3f3c88927",
+      "pixelHash": "061112ff6aee409ff919f941542f9c20a667c777d163e215bbf94696684c68da",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        34,
+        26,
+        92,
+        112
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        2,
+        665,
+        58,
+        86
+      ],
+      "atlas": "village-4"
+    },
+    "walk-flower-pass": {
+      "source": "round4s-stride-b/fix/work/16-flower/sprites/pass.png",
+      "sha256": "c8ddfe9335c699ecbd8313512e4e75cb6d8827731c37ca3ddce4c443beff05ba",
+      "pixelHash": "68d4913ff3d8c67b98205c47404b98f371a642aecf48a0c724a7abd024382a5a",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        37,
+        25,
+        92,
+        110
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        449,
+        753,
+        55,
+        85
+      ],
+      "atlas": "village-4"
+    },
+    "walk-flower-B": {
+      "source": "round4s-stride-b/fix/work/16-flower/sprites/S1-B.png",
+      "sha256": "3f291ea02ef1ee1e9876a92f423d0a51711a71b1105605dbf69c1c29d076dfd0",
+      "pixelHash": "566faf6c36c4506a55e24ac584f3c70ff794c00bb1178b904a4632d569b0a8e1",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        35,
+        26,
+        92,
+        110
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        864,
+        753,
+        57,
+        84
+      ],
+      "atlas": "village-4"
+    },
+    "carry-flower": {
+      "source": "round5b-poses-b/sprites/16-flower/carry.png",
+      "sha256": "1cc2b981bafe26c0a3f9dcbdf6efa34c522d3e8cd7889dd0ef9106ffa6a70674",
+      "pixelHash": "3777bcc0ac979aa366ea903c94c52a5908b32d1d92931ef4a4f01fa97e28943a",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        35,
+        25,
+        95,
+        111
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        698,
+        577,
+        60,
+        86
+      ],
+      "atlas": "village-4"
+    },
+    "cheer-flower": {
+      "source": "round5b-poses-b/sprites/16-flower/cheer.png",
+      "sha256": "7dd1d11ef98052ef05a663091c2d5b42a25277832f16ed269da89f19b165de84",
+      "pixelHash": "fcf5c88e1f0e1d6664a250c154dc0cb589d4c5cc04e8446566ea88b295cfc278",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        24,
+        25,
+        104,
+        111
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        942,
+        419,
+        80,
+        86
+      ],
+      "atlas": "village-1"
+    },
+    "wave-flower": {
+      "source": "round5b-poses-b/sprites/16-flower/wave.png",
+      "sha256": "883ae673a74412bcea2413f9956b3955c0d6e2845232e448498837aaad5a0b76",
+      "pixelHash": "a156fc60852ecc612f831ba90b55e7dba32a121c857027ba4e0f46e31fa3f0c6",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        25,
+        25,
+        95,
+        111
+      ],
+      "anchor": [
+        64,
+        110
+      ],
+      "rect": [
+        884,
+        924,
+        70,
+        86
+      ],
+      "atlas": "village-1"
+    },
+    "stand-gardener": {
+      "source": "cut-the-frames.mjs, stand-gardener",
+      "sha256": "89cf7b655c7a8d8fcb176b33e68a648974844addb5b6673db9222d4deed339b5",
+      "pixelHash": "72738b97f549940c1132d4a94b54fdfab56ce5ab841ca169cbc9cd251257d7cb",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        32,
+        25,
+        96,
+        112
+      ],
+      "anchor": [
+        64,
+        111
+      ],
+      "rect": [
+        2,
+        298,
+        64,
+        87
+      ],
+      "atlas": "village-5"
+    },
+    "walk-gardener-A": {
+      "source": "cut-the-frames.mjs, walk-gardener-A",
+      "sha256": "f254f1f32c6281fc2ee4c741db262c46427de65b497b5ec9439a07d06f5e06a2",
+      "pixelHash": "32bd0cdd6fb36b406bf88973c76ae31710efbdf0d5c81ed376833ebad24db667",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        36,
+        26,
+        94,
+        111
+      ],
+      "anchor": [
+        64,
+        111
+      ],
+      "rect": [
+        68,
+        298,
+        58,
+        85
+      ],
+      "atlas": "village-5"
+    },
+    "walk-gardener-pass": {
+      "source": "cut-the-frames.mjs, walk-gardener-pass",
+      "sha256": "6377210f4d7222e09d224ecf475acb76903b09ab8dd8664ac619a974e758adc1",
+      "pixelHash": "11bdbcad4d63c2b687e342db8df50d98e311436ef7295f817e15d868882f8246",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        40,
+        25,
+        92,
+        110
+      ],
+      "anchor": [
+        64,
+        111
+      ],
+      "rect": [
+        128,
+        298,
+        52,
+        85
+      ],
+      "atlas": "village-5"
+    },
+    "walk-gardener-B": {
+      "source": "cut-the-frames.mjs, walk-gardener-B",
+      "sha256": "3ad4e3a4620588de5632cfb22074f86654e02c8fb8bca686256c8136aa940d1b",
+      "pixelHash": "160d112cb0e5dba5cc7ffecdc395e281dae5fb78b6ebe7498097b5e0dc461b78",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        36,
+        26,
+        93,
+        110
+      ],
+      "anchor": [
+        64,
+        111
+      ],
+      "rect": [
+        182,
+        298,
+        57,
+        84
+      ],
+      "atlas": "village-5"
+    },
+    "wave-gardener": {
+      "source": "cut-the-frames.mjs, wave-gardener",
+      "sha256": "76145d9d8febb35645273269f2fbd2fa6c93e19508cf702701f83d7bccdbb02a",
+      "pixelHash": "4cf548953179025186410ee710c96b84b940226e52ff8559fb366ea96f64957b",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        33,
+        25,
+        96,
+        112
+      ],
+      "anchor": [
+        64,
+        111
+      ],
+      "rect": [
+        241,
+        298,
+        63,
+        87
+      ],
+      "atlas": "village-5"
+    },
+    "cheer-gardener": {
+      "source": "cut-the-frames.mjs, cheer-gardener",
+      "sha256": "63da9aba748f8bf4b17a3fb38f0c33d2a9ee27fb15265f34daf148e8ab8c89d3",
+      "pixelHash": "25aec0cc743693d0a06e03fe968997ab9ed3ba157f9a6db1db0faf732f658002",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        30,
+        25,
+        98,
+        112
+      ],
+      "anchor": [
+        64,
+        111
+      ],
+      "rect": [
+        306,
+        298,
+        68,
+        87
+      ],
+      "atlas": "village-5"
+    },
+    "carry-gardener": {
+      "source": "cut-the-frames.mjs, carry-gardener",
+      "sha256": "782fa2fbdc9e6a47c622938ad5da863f5a0cdf5b3460ef5fe5a5739cd1a61943",
+      "pixelHash": "296f89fc7465a074aa3f2e78cd29b797893df992ae4d0132afa5f8857ab82e7c",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        35,
+        25,
+        94,
+        112
+      ],
+      "anchor": [
+        64,
+        111
+      ],
+      "rect": [
+        376,
+        298,
+        59,
+        87
+      ],
+      "atlas": "village-5"
+    },
+    "stand-mapmaker": {
+      "source": "cut-the-frames.mjs, stand-mapmaker",
+      "sha256": "4282779f2f7782083d70ed0112f3f1626b04411878d546e91bf61ecd9937a649",
+      "pixelHash": "09cdbb8672e0e6a46ad96785552c6a108fd841b40fed8b2e83384f413333bae5",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        34,
+        25,
+        94,
+        112
+      ],
+      "anchor": [
+        64,
+        111
+      ],
+      "rect": [
+        2,
+        387,
+        60,
+        87
+      ],
+      "atlas": "village-5"
+    },
+    "walk-mapmaker-A": {
+      "source": "cut-the-frames.mjs, walk-mapmaker-A",
+      "sha256": "ecd6ab6cc4334ff52f98a6a181f5323330fad7b553e3facdfc4571abe47382b4",
+      "pixelHash": "70890bee831bfb13a13a1c8990d5a102a6ad2d0e9870aae1abf542bb9e4c8bb1",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        38,
+        26,
+        93,
+        111
+      ],
+      "anchor": [
+        64,
+        111
+      ],
+      "rect": [
+        64,
+        387,
+        55,
+        85
+      ],
+      "atlas": "village-5"
+    },
+    "walk-mapmaker-pass": {
+      "source": "cut-the-frames.mjs, walk-mapmaker-pass",
+      "sha256": "5a2f51a9b8a20a2385160e56039840b4982fddfe2678d256a1f5f2830b251e0f",
+      "pixelHash": "b53591f04daf20658b1e53ef4d119697bb1754f1ec7b2a3ae351d0c69b5a9a08",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        42,
+        25,
+        90,
+        110
+      ],
+      "anchor": [
+        64,
+        111
+      ],
+      "rect": [
+        121,
+        387,
+        48,
+        85
+      ],
+      "atlas": "village-5"
+    },
+    "walk-mapmaker-B": {
+      "source": "cut-the-frames.mjs, walk-mapmaker-B",
+      "sha256": "6fb4bb0f194e44f774068c218164cc1dde6b5c80eab72448e13988b1ab8b0807",
+      "pixelHash": "7b0061dcae988a2c1bc2c2f1fd5a74bd255361b5210c41dd263fd87d9fa7e096",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        36,
+        26,
+        94,
+        110
+      ],
+      "anchor": [
+        64,
+        111
+      ],
+      "rect": [
+        171,
+        387,
+        58,
+        84
+      ],
+      "atlas": "village-5"
+    },
+    "wave-mapmaker": {
+      "source": "cut-the-frames.mjs, wave-mapmaker",
+      "sha256": "a3fefa86ee107dbc3f7e06c52cb2d4fd031f3253f9ac3c29c559d58553418f83",
+      "pixelHash": "4ee287e8c4712df4c60ab6d3f27782e91f2ec2c1bd817452822a5229fa026115",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        34,
+        25,
+        94,
+        112
+      ],
+      "anchor": [
+        64,
+        111
+      ],
+      "rect": [
+        231,
+        387,
+        60,
+        87
+      ],
+      "atlas": "village-5"
+    },
+    "cheer-mapmaker": {
+      "source": "cut-the-frames.mjs, cheer-mapmaker",
+      "sha256": "e234f829323748fcc000a1aa55c190e1bce1367347089d44a0c76d9d5e1228cf",
+      "pixelHash": "fcd9d3c60c88068beb4270931df738d57e6fde74362fe0887059718dd36ab338",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        29,
+        25,
+        99,
+        112
+      ],
+      "anchor": [
+        64,
+        111
+      ],
+      "rect": [
+        293,
+        387,
+        70,
+        87
+      ],
+      "atlas": "village-5"
+    },
+    "carry-mapmaker": {
+      "source": "cut-the-frames.mjs, carry-mapmaker",
+      "sha256": "2dd7031365b471c7f9af9877da76782132768652435f60db5839bb454f9237a6",
+      "pixelHash": "c5ef850256766ab89ac8207a787b572f63293ebd4708dd0244f0637942be5dcb",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        34,
+        25,
+        95,
+        112
+      ],
+      "anchor": [
+        64,
+        111
+      ],
+      "rect": [
+        365,
+        387,
+        61,
+        87
+      ],
+      "atlas": "village-5"
+    },
+    "stand-runner": {
+      "source": "cut-the-frames.mjs, stand-runner",
+      "sha256": "4e8d49d4799414e43a643fcadc5a4be40cafd08da6c2a755e6a86463fdbcb95c",
+      "pixelHash": "ceab814ac7bf8f06e0506a7c2d7bfaccb407a5bb1501b3cf38d6b7801e1ca915",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        35,
+        25,
+        94,
+        112
+      ],
+      "anchor": [
+        64,
+        111
+      ],
+      "rect": [
+        2,
+        476,
+        59,
+        87
+      ],
+      "atlas": "village-5"
+    },
+    "walk-runner-A": {
+      "source": "cut-the-frames.mjs, walk-runner-A",
+      "sha256": "ad4406b875a4ec7208342ff075d4fd402928cdb53f9b172ff8555181a83daacc",
+      "pixelHash": "2189b3f706d15581aa8b455cf8682dbcb79df16454a7decdfb46d632c36ee3ab",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        37,
+        26,
+        94,
+        111
+      ],
+      "anchor": [
+        64,
+        111
+      ],
+      "rect": [
+        63,
+        476,
+        57,
+        85
+      ],
+      "atlas": "village-5"
+    },
+    "walk-runner-pass": {
+      "source": "cut-the-frames.mjs, walk-runner-pass",
+      "sha256": "6d7b4058184c2aeaeb5f88f51ccc0ca10c02af9ffb23df2d38712970fcbeb45c",
+      "pixelHash": "3f59387e7069ea01b8c69aaef89e0389e89667005718c2b4194bcd3652408884",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        42,
+        25,
+        92,
+        110
+      ],
+      "anchor": [
+        64,
+        111
+      ],
+      "rect": [
+        122,
+        476,
+        50,
+        85
+      ],
+      "atlas": "village-5"
+    },
+    "walk-runner-B": {
+      "source": "cut-the-frames.mjs, walk-runner-B",
+      "sha256": "ec2d929cd810190636404a1780c630d5316e960640bcf26d1007afe3ac599423",
+      "pixelHash": "01afff97590d0c915fe621d9b1bef183e6be50c80ece8c8d02c7f0e87d82b662",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        36,
+        26,
+        94,
+        110
+      ],
+      "anchor": [
+        64,
+        111
+      ],
+      "rect": [
+        174,
+        476,
+        58,
+        84
+      ],
+      "atlas": "village-5"
+    },
+    "wave-runner": {
+      "source": "cut-the-frames.mjs, wave-runner",
+      "sha256": "3f98d5327d436a1df87d4b6a5490cd9703b9406f483d152f0c2a73266104005c",
+      "pixelHash": "88dab6c7cce3ccb2e89db3e8b3619a5a80b4f301593d56e15f5736174a0fbbff",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        34,
+        25,
+        95,
+        112
+      ],
+      "anchor": [
+        64,
+        111
+      ],
+      "rect": [
+        234,
+        476,
+        61,
+        87
+      ],
+      "atlas": "village-5"
+    },
+    "cheer-runner": {
+      "source": "cut-the-frames.mjs, cheer-runner",
+      "sha256": "386a17072ea7c594f591efc32420fed4473b7a0ebc3ae2e4e5514338009cd1fa",
+      "pixelHash": "b9b992babb8d1f078533cf7c94a493cea5d4da7e15025b415226e23fc28983d2",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        30,
+        25,
+        98,
+        112
+      ],
+      "anchor": [
+        64,
+        111
+      ],
+      "rect": [
+        297,
+        476,
+        68,
+        87
+      ],
+      "atlas": "village-5"
+    },
+    "carry-runner": {
+      "source": "cut-the-frames.mjs, carry-runner",
+      "sha256": "0c9b1098c18d0d0e8730e650cb3a04ac3e661c512d4933192966be83f3310ee2",
+      "pixelHash": "e07b7bf09833f26c9a51397a5055b42f043cccf86e34f458805ef8a02eeb5635",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        37,
+        25,
+        92,
+        112
+      ],
+      "anchor": [
+        64,
+        111
+      ],
+      "rect": [
+        367,
+        476,
+        55,
+        87
+      ],
+      "atlas": "village-5"
+    }
+  },
+  "houses": {
+    "A01": {
+      "canvasSize": [
+        416,
+        312
+      ],
+      "groundAnchor": [
+        208,
+        286
+      ],
+      "collisionPolygons": [
+        [
+          [
+            40,
+            78
+          ],
+          [
+            52,
+            78
+          ],
+          [
+            52,
+            286
+          ],
+          [
+            40,
+            286
+          ]
+        ],
+        [
+          [
+            364,
+            78
+          ],
+          [
+            376,
+            78
+          ],
+          [
+            376,
+            286
+          ],
+          [
+            364,
+            286
+          ]
+        ],
+        [
+          [
+            52,
+            68
+          ],
+          [
+            364,
+            68
+          ],
+          [
+            364,
+            78
+          ],
+          [
+            52,
+            78
+          ]
+        ],
+        [
+          [
+            52,
+            282
+          ],
+          [
+            169,
+            282
+          ],
+          [
+            169,
+            312
+          ],
+          [
+            52,
+            312
+          ]
+        ],
+        [
+          [
+            247,
+            282
+          ],
+          [
+            364,
+            282
+          ],
+          [
+            364,
+            312
+          ],
+          [
+            247,
+            312
+          ]
+        ],
+        [
+          [
+            156,
+            246
+          ],
+          [
+            169,
+            246
+          ],
+          [
+            169,
+            286
+          ],
+          [
+            156,
+            286
+          ]
+        ],
+        [
+          [
+            247,
+            246
+          ],
+          [
+            260,
+            246
+          ],
+          [
+            260,
+            286
+          ],
+          [
+            247,
+            286
+          ]
+        ]
+      ],
+      "walkableAreas": [
+        [
+          [
+            52,
+            78
+          ],
+          [
+            364,
+            78
+          ],
+          [
+            364,
+            286
+          ],
+          [
+            52,
+            286
+          ]
+        ],
+        [
+          [
+            169,
+            246
+          ],
+          [
+            247,
+            246
+          ],
+          [
+            247,
+            312
+          ],
+          [
+            169,
+            312
+          ]
+        ]
+      ],
+      "hitArea": [
+        [
+          0,
+          0
+        ],
+        [
+          416,
+          0
+        ],
+        [
+          416,
+          312
+        ],
+        [
+          0,
+          312
+        ]
+      ],
+      "floorBounds": [
+        52,
+        78,
+        364,
+        286
+      ],
+      "deskSlots": [
+        {
+          "xy": [
+            56,
+            128
+          ],
+          "size": [
+            144,
+            73
+          ],
+          "kind": "worker desk",
+          "proposed": true
+        },
+        {
+          "xy": [
+            212,
+            128
+          ],
+          "size": [
+            144,
+            73
+          ],
+          "kind": "worker desk",
+          "proposed": true
+        }
+      ],
+      "openings": [
+        [
+          [
+            169,
+            246
+          ],
+          [
+            247,
+            246
+          ],
+          [
+            247,
+            312
+          ],
+          [
+            169,
+            312
+          ]
+        ]
+      ],
+      "layers": [
+        {
+          "sprite": "A01-floor",
+          "layer": "floor",
+          "anchor": [
+            208,
+            286
+          ],
+          "depth": null
+        },
+        {
+          "sprite": "A01-back",
+          "layer": "back",
+          "anchor": [
+            208,
+            286
+          ],
+          "depth": null
+        },
+        {
+          "sprite": "A01-front",
+          "layer": "front",
+          "anchor": [
+            208,
+            286
+          ],
+          "depth": null
+        }
+      ],
+      "metadataSource": "round7a-batch-a/sprites/a01.json",
+      "metadataSha256": "dedabfeda59c595415ee412175718d8a1843f73812f88d52ee6259a21b2ad450"
+    },
+    "A02": {
+      "canvasSize": [
+        416,
+        312
+      ],
+      "groundAnchor": [
+        208,
+        286
+      ],
+      "collisionPolygons": [
+        [
+          [
+            40,
+            78
+          ],
+          [
+            52,
+            78
+          ],
+          [
+            52,
+            286
+          ],
+          [
+            40,
+            286
+          ]
+        ],
+        [
+          [
+            364,
+            78
+          ],
+          [
+            376,
+            78
+          ],
+          [
+            376,
+            286
+          ],
+          [
+            364,
+            286
+          ]
+        ],
+        [
+          [
+            52,
+            68
+          ],
+          [
+            364,
+            68
+          ],
+          [
+            364,
+            78
+          ],
+          [
+            52,
+            78
+          ]
+        ],
+        [
+          [
+            52,
+            282
+          ],
+          [
+            169,
+            282
+          ],
+          [
+            169,
+            312
+          ],
+          [
+            52,
+            312
+          ]
+        ],
+        [
+          [
+            156,
+            246
+          ],
+          [
+            169,
+            246
+          ],
+          [
+            169,
+            286
+          ],
+          [
+            156,
+            286
+          ]
+        ],
+        [
+          [
+            247,
+            246
+          ],
+          [
+            260,
+            246
+          ],
+          [
+            260,
+            286
+          ],
+          [
+            247,
+            286
+          ]
+        ],
+        [
+          [
+            247,
+            282
+          ],
+          [
+            364,
+            282
+          ],
+          [
+            364,
+            312
+          ],
+          [
+            247,
+            312
+          ]
+        ]
+      ],
+      "walkableAreas": [
+        [
+          [
+            52,
+            78
+          ],
+          [
+            364,
+            78
+          ],
+          [
+            364,
+            286
+          ],
+          [
+            52,
+            286
+          ]
+        ],
+        [
+          [
+            169,
+            246
+          ],
+          [
+            247,
+            246
+          ],
+          [
+            247,
+            312
+          ],
+          [
+            169,
+            312
+          ]
+        ]
+      ],
+      "hitArea": [
+        [
+          0,
+          0
+        ],
+        [
+          416,
+          0
+        ],
+        [
+          416,
+          312
+        ],
+        [
+          0,
+          312
+        ]
+      ],
+      "floorBounds": [
+        52,
+        78,
+        364,
+        286
+      ],
+      "deskSlots": [
+        {
+          "xy": [
+            56,
+            128
+          ],
+          "size": [
+            144,
+            73
+          ],
+          "kind": "worker desk",
+          "proposed": true
+        },
+        {
+          "xy": [
+            212,
+            128
+          ],
+          "size": [
+            144,
+            73
+          ],
+          "kind": "worker desk",
+          "proposed": true
+        }
+      ],
+      "openings": [
+        [
+          [
+            169,
+            246
+          ],
+          [
+            247,
+            246
+          ],
+          [
+            247,
+            312
+          ],
+          [
+            169,
+            312
+          ]
+        ]
+      ],
+      "layers": [
+        {
+          "sprite": "A02-floor",
+          "layer": "floor",
+          "anchor": [
+            208,
+            286
+          ],
+          "depth": null
+        },
+        {
+          "sprite": "A02-back",
+          "layer": "back",
+          "anchor": [
+            208,
+            286
+          ],
+          "depth": null
+        },
+        {
+          "sprite": "A02-front",
+          "layer": "front",
+          "anchor": [
+            208,
+            286
+          ],
+          "depth": null
+        }
+      ],
+      "metadataSource": "round7a-batch-a/sprites/a02.json",
+      "metadataSha256": "c22492b3bf3596212df55a3703a4b0e349f5267fcbc4eccd1daccf65040ea11e"
+    },
+    "A03": {
+      "canvasSize": [
+        624,
+        416
+      ],
+      "groundAnchor": [
+        312,
+        390
+      ],
+      "collisionPolygons": [
+        [
+          [
+            40,
+            78
+          ],
+          [
+            52,
+            78
+          ],
+          [
+            52,
+            390
+          ],
+          [
+            40,
+            390
+          ]
+        ],
+        [
+          [
+            572,
+            78
+          ],
+          [
+            584,
+            78
+          ],
+          [
+            584,
+            390
+          ],
+          [
+            572,
+            390
+          ]
+        ],
+        [
+          [
+            52,
+            68
+          ],
+          [
+            572,
+            68
+          ],
+          [
+            572,
+            78
+          ],
+          [
+            52,
+            78
+          ]
+        ],
+        [
+          [
+            52,
+            386
+          ],
+          [
+            117,
+            386
+          ],
+          [
+            117,
+            416
+          ],
+          [
+            52,
+            416
+          ]
+        ],
+        [
+          [
+            104,
+            350
+          ],
+          [
+            117,
+            350
+          ],
+          [
+            117,
+            390
+          ],
+          [
+            104,
+            390
+          ]
+        ],
+        [
+          [
+            195,
+            350
+          ],
+          [
+            208,
+            350
+          ],
+          [
+            208,
+            390
+          ],
+          [
+            195,
+            390
+          ]
+        ],
+        [
+          [
+            195,
+            386
+          ],
+          [
+            429,
+            386
+          ],
+          [
+            429,
+            416
+          ],
+          [
+            195,
+            416
+          ]
+        ],
+        [
+          [
+            416,
+            350
+          ],
+          [
+            429,
+            350
+          ],
+          [
+            429,
+            390
+          ],
+          [
+            416,
+            390
+          ]
+        ],
+        [
+          [
+            507,
+            350
+          ],
+          [
+            520,
+            350
+          ],
+          [
+            520,
+            390
+          ],
+          [
+            507,
+            390
+          ]
+        ],
+        [
+          [
+            507,
+            386
+          ],
+          [
+            572,
+            386
+          ],
+          [
+            572,
+            416
+          ],
+          [
+            507,
+            416
+          ]
+        ],
+        [
+          [
+            52,
+            246
+          ],
+          [
+            273,
+            246
+          ],
+          [
+            273,
+            260
+          ],
+          [
+            52,
+            260
+          ]
+        ],
+        [
+          [
+            351,
+            246
+          ],
+          [
+            572,
+            246
+          ],
+          [
+            572,
+            260
+          ],
+          [
+            351,
+            260
+          ]
+        ]
+      ],
+      "walkableAreas": [
+        [
+          [
+            52,
+            78
+          ],
+          [
+            572,
+            78
+          ],
+          [
+            572,
+            390
+          ],
+          [
+            52,
+            390
+          ]
+        ],
+        [
+          [
+            117,
+            350
+          ],
+          [
+            195,
+            350
+          ],
+          [
+            195,
+            416
+          ],
+          [
+            117,
+            416
+          ]
+        ],
+        [
+          [
+            429,
+            350
+          ],
+          [
+            507,
+            350
+          ],
+          [
+            507,
+            416
+          ],
+          [
+            429,
+            416
+          ]
+        ]
+      ],
+      "hitArea": [
+        [
+          0,
+          0
+        ],
+        [
+          624,
+          0
+        ],
+        [
+          624,
+          416
+        ],
+        [
+          0,
+          416
+        ]
+      ],
+      "floorBounds": [
+        52,
+        78,
+        572,
+        390
+      ],
+      "deskSlots": [
+        {
+          "xy": [
+            56,
+            128
+          ],
+          "size": [
+            144,
+            73
+          ],
+          "kind": "worker desk",
+          "proposed": true
+        },
+        {
+          "xy": [
+            424,
+            128
+          ],
+          "size": [
+            144,
+            73
+          ],
+          "kind": "worker desk",
+          "proposed": true
+        },
+        {
+          "xy": [
+            56,
+            286
+          ],
+          "size": [
+            144,
+            73
+          ],
+          "kind": "worker desk",
+          "proposed": true
+        },
+        {
+          "xy": [
+            424,
+            286
+          ],
+          "size": [
+            144,
+            73
+          ],
+          "kind": "worker desk",
+          "proposed": true
+        }
+      ],
+      "openings": [
+        [
+          [
+            117,
+            350
+          ],
+          [
+            195,
+            350
+          ],
+          [
+            195,
+            416
+          ],
+          [
+            117,
+            416
+          ]
+        ],
+        [
+          [
+            429,
+            350
+          ],
+          [
+            507,
+            350
+          ],
+          [
+            507,
+            416
+          ],
+          [
+            429,
+            416
+          ]
+        ]
+      ],
+      "layers": [
+        {
+          "sprite": "A03-floor",
+          "layer": "floor",
+          "anchor": [
+            312,
+            390
+          ],
+          "depth": null
+        },
+        {
+          "sprite": "A03-back",
+          "layer": "back",
+          "anchor": [
+            312,
+            390
+          ],
+          "depth": null
+        },
+        {
+          "sprite": "A03-partition",
+          "layer": "object",
+          "anchor": [
+            312,
+            390
+          ],
+          "depth": 260
+        },
+        {
+          "sprite": "A03-front",
+          "layer": "front",
+          "anchor": [
+            312,
+            390
+          ],
+          "depth": null
+        }
+      ],
+      "metadataSource": "round7a-batch-a/sprites/a03.json",
+      "metadataSha256": "7d39c1f721948271b6db4f4b615e961b42fbc8ffbe773fec099b31c9cb4461a5"
+    },
+    "A04": {
+      "canvasSize": [
+        728,
+        364
+      ],
+      "groundAnchor": [
+        364,
+        338
+      ],
+      "collisionPolygons": [
+        [
+          [
+            40,
+            78
+          ],
+          [
+            52,
+            78
+          ],
+          [
+            52,
+            338
+          ],
+          [
+            40,
+            338
+          ]
+        ],
+        [
+          [
+            676,
+            78
+          ],
+          [
+            688,
+            78
+          ],
+          [
+            688,
+            338
+          ],
+          [
+            676,
+            338
+          ]
+        ],
+        [
+          [
+            52,
+            68
+          ],
+          [
+            676,
+            68
+          ],
+          [
+            676,
+            78
+          ],
+          [
+            52,
+            78
+          ]
+        ],
+        [
+          [
+            52,
+            334
+          ],
+          [
+            65,
+            334
+          ],
+          [
+            65,
+            364
+          ],
+          [
+            52,
+            364
+          ]
+        ],
+        [
+          [
+            52,
+            298
+          ],
+          [
+            65,
+            298
+          ],
+          [
+            65,
+            338
+          ],
+          [
+            52,
+            338
+          ]
+        ],
+        [
+          [
+            169,
+            298
+          ],
+          [
+            182,
+            298
+          ],
+          [
+            182,
+            338
+          ],
+          [
+            169,
+            338
+          ]
+        ],
+        [
+          [
+            169,
+            334
+          ],
+          [
+            559,
+            334
+          ],
+          [
+            559,
+            364
+          ],
+          [
+            169,
+            364
+          ]
+        ],
+        [
+          [
+            546,
+            298
+          ],
+          [
+            559,
+            298
+          ],
+          [
+            559,
+            338
+          ],
+          [
+            546,
+            338
+          ]
+        ],
+        [
+          [
+            663,
+            298
+          ],
+          [
+            676,
+            298
+          ],
+          [
+            676,
+            338
+          ],
+          [
+            663,
+            338
+          ]
+        ],
+        [
+          [
+            663,
+            334
+          ],
+          [
+            676,
+            334
+          ],
+          [
+            676,
+            364
+          ],
+          [
+            663,
+            364
+          ]
+        ]
+      ],
+      "walkableAreas": [
+        [
+          [
+            52,
+            78
+          ],
+          [
+            676,
+            78
+          ],
+          [
+            676,
+            338
+          ],
+          [
+            52,
+            338
+          ]
+        ],
+        [
+          [
+            65,
+            298
+          ],
+          [
+            169,
+            298
+          ],
+          [
+            169,
+            364
+          ],
+          [
+            65,
+            364
+          ]
+        ],
+        [
+          [
+            559,
+            298
+          ],
+          [
+            663,
+            298
+          ],
+          [
+            663,
+            364
+          ],
+          [
+            559,
+            364
+          ]
+        ]
+      ],
+      "hitArea": [
+        [
+          0,
+          0
+        ],
+        [
+          728,
+          0
+        ],
+        [
+          728,
+          364
+        ],
+        [
+          0,
+          364
+        ]
+      ],
+      "floorBounds": [
+        52,
+        78,
+        676,
+        338
+      ],
+      "deskSlots": [
+        {
+          "xy": [
+            56,
+            128
+          ],
+          "size": [
+            144,
+            73
+          ],
+          "kind": "worker desk",
+          "proposed": true
+        },
+        {
+          "xy": [
+            212,
+            128
+          ],
+          "size": [
+            144,
+            73
+          ],
+          "kind": "worker desk",
+          "proposed": true
+        },
+        {
+          "xy": [
+            368,
+            128
+          ],
+          "size": [
+            144,
+            73
+          ],
+          "kind": "worker desk",
+          "proposed": true
+        },
+        {
+          "xy": [
+            524,
+            128
+          ],
+          "size": [
+            144,
+            73
+          ],
+          "kind": "worker desk",
+          "proposed": true
+        }
+      ],
+      "openings": [
+        [
+          [
+            65,
+            298
+          ],
+          [
+            169,
+            298
+          ],
+          [
+            169,
+            364
+          ],
+          [
+            65,
+            364
+          ]
+        ],
+        [
+          [
+            559,
+            298
+          ],
+          [
+            663,
+            298
+          ],
+          [
+            663,
+            364
+          ],
+          [
+            559,
+            364
+          ]
+        ]
+      ],
+      "layers": [
+        {
+          "sprite": "A04-floor",
+          "layer": "floor",
+          "anchor": [
+            364,
+            338
+          ],
+          "depth": null
+        },
+        {
+          "sprite": "A04-back",
+          "layer": "back",
+          "anchor": [
+            364,
+            338
+          ],
+          "depth": null
+        },
+        {
+          "sprite": "A04-front",
+          "layer": "front",
+          "anchor": [
+            364,
+            338
+          ],
+          "depth": null
+        }
+      ],
+      "metadataSource": "round7a-batch-a/sprites/a04.json",
+      "metadataSha256": "84a9cad41aca69d02359240826666e948f246be4fb49307c4a9f29968393e60e"
+    },
+    "B01": {
+      "canvasSize": [
+        416,
+        312
+      ],
+      "groundAnchor": [
+        208,
+        286
+      ],
+      "collisionPolygons": [
+        [
+          [
+            40,
+            78
+          ],
+          [
+            52,
+            78
+          ],
+          [
+            52,
+            286
+          ],
+          [
+            40,
+            286
+          ]
+        ],
+        [
+          [
+            364,
+            78
+          ],
+          [
+            376,
+            78
+          ],
+          [
+            376,
+            286
+          ],
+          [
+            364,
+            286
+          ]
+        ],
+        [
+          [
+            52,
+            68
+          ],
+          [
+            364,
+            68
+          ],
+          [
+            364,
+            78
+          ],
+          [
+            52,
+            78
+          ]
+        ],
+        [
+          [
+            52,
+            286
+          ],
+          [
+            169,
+            286
+          ],
+          [
+            169,
+            312
+          ],
+          [
+            52,
+            312
+          ]
+        ],
+        [
+          [
+            156,
+            246
+          ],
+          [
+            169,
+            246
+          ],
+          [
+            169,
+            286
+          ],
+          [
+            156,
+            286
+          ]
+        ],
+        [
+          [
+            247,
+            246
+          ],
+          [
+            260,
+            246
+          ],
+          [
+            260,
+            286
+          ],
+          [
+            247,
+            286
+          ]
+        ],
+        [
+          [
+            247,
+            286
+          ],
+          [
+            364,
+            286
+          ],
+          [
+            364,
+            312
+          ],
+          [
+            247,
+            312
+          ]
+        ]
+      ],
+      "walkableAreas": [
+        [
+          [
+            52,
+            78
+          ],
+          [
+            364,
+            78
+          ],
+          [
+            364,
+            286
+          ],
+          [
+            52,
+            286
+          ]
+        ],
+        [
+          [
+            169,
+            286
+          ],
+          [
+            247,
+            286
+          ],
+          [
+            247,
+            312
+          ],
+          [
+            169,
+            312
+          ]
+        ]
+      ],
+      "hitArea": [
+        [
+          0,
+          0
+        ],
+        [
+          416,
+          0
+        ],
+        [
+          416,
+          312
+        ],
+        [
+          0,
+          312
+        ]
+      ],
+      "floorBounds": [
+        52,
+        78,
+        364,
+        286
+      ],
+      "deskSlots": [
+        {
+          "xy": [
+            56,
+            128
+          ],
+          "size": [
+            144,
+            73
+          ]
+        },
+        {
+          "xy": [
+            216,
+            128
+          ],
+          "size": [
+            144,
+            73
+          ]
+        }
+      ],
+      "openings": [
+        [
+          [
+            169,
+            286
+          ],
+          [
+            247,
+            286
+          ],
+          [
+            247,
+            312
+          ],
+          [
+            169,
+            312
+          ]
+        ]
+      ],
+      "layers": [
+        {
+          "sprite": "B01-floor",
+          "layer": "floor",
+          "anchor": [
+            208,
+            286
+          ],
+          "depth": null
+        },
+        {
+          "sprite": "B01-back",
+          "layer": "back",
+          "anchor": [
+            208,
+            286
+          ],
+          "depth": null
+        },
+        {
+          "sprite": "B01-front",
+          "layer": "front",
+          "anchor": [
+            208,
+            286
+          ],
+          "depth": null
+        }
+      ],
+      "metadataSource": "round7b-batch-b/sprites/B01.json",
+      "metadataSha256": "7694f7e140d6a3b8edfbcf38851783f9f2cd663606410ee8b333581fabfadbd5"
+    },
+    "B02": {
+      "canvasSize": [
+        416,
+        312
+      ],
+      "groundAnchor": [
+        208,
+        286
+      ],
+      "collisionPolygons": [
+        [
+          [
+            40,
+            78
+          ],
+          [
+            52,
+            78
+          ],
+          [
+            52,
+            286
+          ],
+          [
+            40,
+            286
+          ]
+        ],
+        [
+          [
+            364,
+            78
+          ],
+          [
+            376,
+            78
+          ],
+          [
+            376,
+            286
+          ],
+          [
+            364,
+            286
+          ]
+        ],
+        [
+          [
+            52,
+            68
+          ],
+          [
+            364,
+            68
+          ],
+          [
+            364,
+            78
+          ],
+          [
+            52,
+            78
+          ]
+        ],
+        [
+          [
+            52,
+            286
+          ],
+          [
+            169,
+            286
+          ],
+          [
+            169,
+            312
+          ],
+          [
+            52,
+            312
+          ]
+        ],
+        [
+          [
+            156,
+            246
+          ],
+          [
+            169,
+            246
+          ],
+          [
+            169,
+            286
+          ],
+          [
+            156,
+            286
+          ]
+        ],
+        [
+          [
+            247,
+            246
+          ],
+          [
+            260,
+            246
+          ],
+          [
+            260,
+            286
+          ],
+          [
+            247,
+            286
+          ]
+        ],
+        [
+          [
+            247,
+            286
+          ],
+          [
+            364,
+            286
+          ],
+          [
+            364,
+            312
+          ],
+          [
+            247,
+            312
+          ]
+        ]
+      ],
+      "walkableAreas": [
+        [
+          [
+            52,
+            78
+          ],
+          [
+            364,
+            78
+          ],
+          [
+            364,
+            286
+          ],
+          [
+            52,
+            286
+          ]
+        ],
+        [
+          [
+            169,
+            286
+          ],
+          [
+            247,
+            286
+          ],
+          [
+            247,
+            312
+          ],
+          [
+            169,
+            312
+          ]
+        ]
+      ],
+      "hitArea": [
+        [
+          0,
+          0
+        ],
+        [
+          416,
+          0
+        ],
+        [
+          416,
+          312
+        ],
+        [
+          0,
+          312
+        ]
+      ],
+      "floorBounds": [
+        52,
+        78,
+        364,
+        286
+      ],
+      "deskSlots": [
+        {
+          "xy": [
+            56,
+            128
+          ],
+          "size": [
+            144,
+            73
+          ]
+        },
+        {
+          "xy": [
+            216,
+            128
+          ],
+          "size": [
+            144,
+            73
+          ]
+        }
+      ],
+      "openings": [
+        [
+          [
+            169,
+            286
+          ],
+          [
+            247,
+            286
+          ],
+          [
+            247,
+            312
+          ],
+          [
+            169,
+            312
+          ]
+        ]
+      ],
+      "layers": [
+        {
+          "sprite": "B02-floor",
+          "layer": "floor",
+          "anchor": [
+            208,
+            286
+          ],
+          "depth": null
+        },
+        {
+          "sprite": "B02-back",
+          "layer": "back",
+          "anchor": [
+            208,
+            286
+          ],
+          "depth": null
+        },
+        {
+          "sprite": "B02-front",
+          "layer": "front",
+          "anchor": [
+            208,
+            286
+          ],
+          "depth": null
+        }
+      ],
+      "metadataSource": "round7b-batch-b/sprites/B02.json",
+      "metadataSha256": "65ec6b3993d6b2afcf8395d93c05b37c84510ef9a5cca81fe4b1d453a1ec9c94"
+    },
+    "B03": {
+      "canvasSize": [
+        624,
+        416
+      ],
+      "groundAnchor": [
+        312,
+        390
+      ],
+      "collisionPolygons": [
+        [
+          [
+            40,
+            78
+          ],
+          [
+            52,
+            78
+          ],
+          [
+            52,
+            390
+          ],
+          [
+            40,
+            390
+          ]
+        ],
+        [
+          [
+            572,
+            78
+          ],
+          [
+            584,
+            78
+          ],
+          [
+            584,
+            390
+          ],
+          [
+            572,
+            390
+          ]
+        ],
+        [
+          [
+            52,
+            68
+          ],
+          [
+            572,
+            68
+          ],
+          [
+            572,
+            78
+          ],
+          [
+            52,
+            78
+          ]
+        ],
+        [
+          [
+            52,
+            390
+          ],
+          [
+            273,
+            390
+          ],
+          [
+            273,
+            416
+          ],
+          [
+            52,
+            416
+          ]
+        ],
+        [
+          [
+            260,
+            350
+          ],
+          [
+            273,
+            350
+          ],
+          [
+            273,
+            390
+          ],
+          [
+            260,
+            390
+          ]
+        ],
+        [
+          [
+            351,
+            350
+          ],
+          [
+            364,
+            350
+          ],
+          [
+            364,
+            390
+          ],
+          [
+            351,
+            390
+          ]
+        ],
+        [
+          [
+            351,
+            390
+          ],
+          [
+            572,
+            390
+          ],
+          [
+            572,
+            416
+          ],
+          [
+            351,
+            416
+          ]
+        ]
+      ],
+      "walkableAreas": [
+        [
+          [
+            52,
+            78
+          ],
+          [
+            572,
+            78
+          ],
+          [
+            572,
+            390
+          ],
+          [
+            52,
+            390
+          ]
+        ],
+        [
+          [
+            273,
+            390
+          ],
+          [
+            351,
+            390
+          ],
+          [
+            351,
+            416
+          ],
+          [
+            273,
+            416
+          ]
+        ]
+      ],
+      "hitArea": [
+        [
+          0,
+          0
+        ],
+        [
+          624,
+          0
+        ],
+        [
+          624,
+          416
+        ],
+        [
+          0,
+          416
+        ]
+      ],
+      "floorBounds": [
+        52,
+        78,
+        572,
+        390
+      ],
+      "deskSlots": [
+        {
+          "xy": [
+            62,
+            104
+          ],
+          "size": [
+            144,
+            73
+          ]
+        },
+        {
+          "xy": [
+            418,
+            104
+          ],
+          "size": [
+            144,
+            73
+          ]
+        },
+        {
+          "xy": [
+            62,
+            236
+          ],
+          "size": [
+            144,
+            73
+          ]
+        },
+        {
+          "xy": [
+            418,
+            236
+          ],
+          "size": [
+            144,
+            73
+          ]
+        }
+      ],
+      "openings": [
+        [
+          [
+            273,
+            390
+          ],
+          [
+            351,
+            390
+          ],
+          [
+            351,
+            416
+          ],
+          [
+            273,
+            416
+          ]
+        ]
+      ],
+      "layers": [
+        {
+          "sprite": "B03-floor",
+          "layer": "floor",
+          "anchor": [
+            312,
+            390
+          ],
+          "depth": null
+        },
+        {
+          "sprite": "B03-back",
+          "layer": "back",
+          "anchor": [
+            312,
+            390
+          ],
+          "depth": null
+        },
+        {
+          "sprite": "B03-front",
+          "layer": "front",
+          "anchor": [
+            312,
+            390
+          ],
+          "depth": null
+        }
+      ],
+      "metadataSource": "round7b-batch-b/sprites/B03.json",
+      "metadataSha256": "f85e8b9b1f9372cd5b815a35c229cfaa7b32efb3d1c55f83d8da5062f33827ca"
+    },
+    "B04": {
+      "canvasSize": [
+        728,
+        364
+      ],
+      "groundAnchor": [
+        364,
+        338
+      ],
+      "collisionPolygons": [
+        [
+          [
+            40,
+            78
+          ],
+          [
+            52,
+            78
+          ],
+          [
+            52,
+            338
+          ],
+          [
+            40,
+            338
+          ]
+        ],
+        [
+          [
+            676,
+            78
+          ],
+          [
+            688,
+            78
+          ],
+          [
+            688,
+            338
+          ],
+          [
+            676,
+            338
+          ]
+        ],
+        [
+          [
+            52,
+            68
+          ],
+          [
+            676,
+            68
+          ],
+          [
+            676,
+            78
+          ],
+          [
+            52,
+            78
+          ]
+        ],
+        [
+          [
+            52,
+            338
+          ],
+          [
+            104,
+            338
+          ],
+          [
+            104,
+            364
+          ],
+          [
+            52,
+            364
+          ]
+        ],
+        [
+          [
+            91,
+            298
+          ],
+          [
+            104,
+            298
+          ],
+          [
+            104,
+            338
+          ],
+          [
+            91,
+            338
+          ]
+        ],
+        [
+          [
+            182,
+            298
+          ],
+          [
+            195,
+            298
+          ],
+          [
+            195,
+            338
+          ],
+          [
+            182,
+            338
+          ]
+        ],
+        [
+          [
+            182,
+            338
+          ],
+          [
+            546,
+            338
+          ],
+          [
+            546,
+            364
+          ],
+          [
+            182,
+            364
+          ]
+        ],
+        [
+          [
+            533,
+            298
+          ],
+          [
+            546,
+            298
+          ],
+          [
+            546,
+            338
+          ],
+          [
+            533,
+            338
+          ]
+        ],
+        [
+          [
+            624,
+            298
+          ],
+          [
+            637,
+            298
+          ],
+          [
+            637,
+            338
+          ],
+          [
+            624,
+            338
+          ]
+        ],
+        [
+          [
+            624,
+            338
+          ],
+          [
+            676,
+            338
+          ],
+          [
+            676,
+            364
+          ],
+          [
+            624,
+            364
+          ]
+        ]
+      ],
+      "walkableAreas": [
+        [
+          [
+            52,
+            78
+          ],
+          [
+            676,
+            78
+          ],
+          [
+            676,
+            338
+          ],
+          [
+            52,
+            338
+          ]
+        ],
+        [
+          [
+            104,
+            338
+          ],
+          [
+            182,
+            338
+          ],
+          [
+            182,
+            364
+          ],
+          [
+            104,
+            364
+          ]
+        ],
+        [
+          [
+            546,
+            338
+          ],
+          [
+            624,
+            338
+          ],
+          [
+            624,
+            364
+          ],
+          [
+            546,
+            364
+          ]
+        ]
+      ],
+      "hitArea": [
+        [
+          0,
+          0
+        ],
+        [
+          728,
+          0
+        ],
+        [
+          728,
+          364
+        ],
+        [
+          0,
+          364
+        ]
+      ],
+      "floorBounds": [
+        52,
+        78,
+        676,
+        338
+      ],
+      "deskSlots": [
+        {
+          "xy": [
+            62,
+            104
+          ],
+          "size": [
+            144,
+            73
+          ]
+        },
+        {
+          "xy": [
+            522,
+            104
+          ],
+          "size": [
+            144,
+            73
+          ]
+        }
+      ],
+      "openings": [
+        [
+          [
+            104,
+            338
+          ],
+          [
+            182,
+            338
+          ],
+          [
+            182,
+            364
+          ],
+          [
+            104,
+            364
+          ]
+        ],
+        [
+          [
+            546,
+            338
+          ],
+          [
+            624,
+            338
+          ],
+          [
+            624,
+            364
+          ],
+          [
+            546,
+            364
+          ]
+        ]
+      ],
+      "layers": [
+        {
+          "sprite": "B04-floor",
+          "layer": "floor",
+          "anchor": [
+            364,
+            338
+          ],
+          "depth": null
+        },
+        {
+          "sprite": "B04-back",
+          "layer": "back",
+          "anchor": [
+            364,
+            338
+          ],
+          "depth": null
+        },
+        {
+          "sprite": "B04-front",
+          "layer": "front",
+          "anchor": [
+            364,
+            338
+          ],
+          "depth": null
+        }
+      ],
+      "metadataSource": "round7b-batch-b/sprites/B04.json",
+      "metadataSha256": "9fae7c0927d39f02f6a0183dfe0d55164c63320dc0425392e663636c2297617a"
+    },
+    "B06": {
+      "canvasSize": [
+        624,
+        416
+      ],
+      "groundAnchor": [
+        312,
+        390
+      ],
+      "collisionPolygons": [
+        [
+          [
+            40,
+            78
+          ],
+          [
+            52,
+            78
+          ],
+          [
+            52,
+            390
+          ],
+          [
+            40,
+            390
+          ]
+        ],
+        [
+          [
+            572,
+            78
+          ],
+          [
+            584,
+            78
+          ],
+          [
+            584,
+            390
+          ],
+          [
+            572,
+            390
+          ]
+        ],
+        [
+          [
+            52,
+            68
+          ],
+          [
+            572,
+            68
+          ],
+          [
+            572,
+            78
+          ],
+          [
+            52,
+            78
+          ]
+        ]
+      ],
+      "walkableAreas": [
+        [
+          [
+            52,
+            78
+          ],
+          [
+            572,
+            78
+          ],
+          [
+            572,
+            390
+          ],
+          [
+            52,
+            390
+          ]
+        ]
+      ],
+      "hitArea": [
+        [
+          0,
+          0
+        ],
+        [
+          624,
+          0
+        ],
+        [
+          624,
+          416
+        ],
+        [
+          0,
+          416
+        ]
+      ],
+      "floorBounds": [
+        52,
+        78,
+        572,
+        390
+      ],
+      "deskSlots": [
+        {
+          "xy": [
+            62,
+            104
+          ],
+          "size": [
+            144,
+            73
+          ]
+        },
+        {
+          "xy": [
+            418,
+            104
+          ],
+          "size": [
+            144,
+            73
+          ]
+        },
+        {
+          "xy": [
+            62,
+            236
+          ],
+          "size": [
+            144,
+            73
+          ]
+        },
+        {
+          "xy": [
+            418,
+            236
+          ],
+          "size": [
+            144,
+            73
+          ]
+        }
+      ],
+      "openings": [
+        [
+          [
+            52,
+            390
+          ],
+          [
+            572,
+            390
+          ],
+          [
+            572,
+            416
+          ],
+          [
+            52,
+            416
+          ]
+        ]
+      ],
+      "layers": [
+        {
+          "sprite": "B06-floor",
+          "layer": "floor",
+          "anchor": [
+            312,
+            390
+          ],
+          "depth": null
+        },
+        {
+          "sprite": "B06-back",
+          "layer": "back",
+          "anchor": [
+            312,
+            390
+          ],
+          "depth": null
+        },
+        {
+          "sprite": "B06-front",
+          "layer": "front",
+          "anchor": [
+            312,
+            390
+          ],
+          "depth": null
+        }
+      ],
+      "metadataSource": "round7b-batch-b/sprites/B06.json",
+      "metadataSha256": "dc4e094f87034cd8803374e971be9e802340ba8fab3cdcbd9378d675078d1019"
+    }
+  },
+  "packing": "Native RGBA pixels, no resampling, reversible transparent-margin crop; exact full-canvas pixel hashes verified."
+}

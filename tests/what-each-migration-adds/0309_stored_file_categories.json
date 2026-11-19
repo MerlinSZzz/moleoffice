@@ -1,0 +1,4 @@
+{
+  "why": "Keep physical file categories, running totals and checked measurement state. These installation inventories can be rebuilt from the physical stores and are omitted from text archives.",
+  "tables": ["storage_files", "storage_totals", "storage_measurement"]
+}

@@ -1,0 +1,23 @@
+{
+  "why": "The owner's own written words on a checklist item (wave 14a round 1). The item door reaches these only with a checklist, one of its items, and a caller who either is or is not that checklist's owner with a key to prove it, so no door in this test meets them; tests/the-owner-writes-their-own-words-on-a-checklist-item.test.ts meets each through the door.",
+  "refusals": [
+    {
+      "code": "checklistOwnWordsNotTheOwner",
+      "status": 403,
+      "english": "Only the owner of checklist \"Test list\", person Test Owner, writes their own words on an item, and only with the press that marks it done. Nothing was written.",
+      "values": {}
+    },
+    {
+      "code": "checklistOwnWordsNeedTheDonePress",
+      "status": 400,
+      "english": "Item Test item of checklist \"Test list\": the written response goes with the press that marks the item done, so send \"state\":\"done\" in the same change. Nothing was written.",
+      "values": {}
+    },
+    {
+      "code": "checklistOwnWordsNeedTheVersion",
+      "status": 400,
+      "english": "Item Test item of checklist \"Test list\": the written response goes with the version the checklist had when you read it, so send \"ifVersion\" in the same change. Nothing was written.",
+      "values": {}
+    }
+  ]
+}

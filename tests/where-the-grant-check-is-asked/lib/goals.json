@@ -1,0 +1,7 @@
+{
+  "doors": [
+    "record.write",
+    "record.change"
+  ],
+  "why": "Confirming a goal, when a goal record is written or changed, asks whether the secretary acts for the person."
+}

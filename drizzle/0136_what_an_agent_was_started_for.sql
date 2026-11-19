@@ -1,0 +1,23 @@
+-- WHAT AN AGENT WAS STARTED FOR. One nullable column on `agents`.
+--
+-- Criterion P15 of design/permissions/ACCEPTANCE.md.
+-- A role may end by more than one kind of marker, and every card says which. *Measured: a worker
+-- whose task is released is retired with "the task it was started for was released", and its
+-- handle is not reused.*
+--
+-- WHY A COLUMN. Every card's "What ends it" line names the thing whose end ends the role, and for
+-- the worker and the investigator that thing is the piece of work they were started for. Nothing
+-- recorded it, so nothing could ever notice that the end had come. It holds the id of a record --
+-- a task, a problem, a block, whatever the starter named -- or NULL because nobody said.
+--
+-- NULL MEANS NOBODY SAID, AND SUCH AN AGENT IS NEVER RETIRED BY THIS RULE. An agent started for
+-- nothing in particular has no end to come, and inventing one would retire an agent because a
+-- field was empty.
+--
+-- IT IS NOT `work_area`, ADDED IN 0135. That says WHERE this agent changes things, so its work can
+-- be found afterwards. This says WHAT it was started for, so the end of that thing can end the
+-- role. Two questions with two answers, and folding them together would make neither usable.
+--
+-- ADDITIVE, AND IT REWRITES NOTHING. One ALTER TABLE ADD COLUMN and no UPDATE, so no stored value
+-- moves and this migration is not in DATA_MIGRATIONS.
+ALTER TABLE `agents` ADD `started_for` text;

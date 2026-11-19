@@ -1,0 +1,6 @@
+{
+  "doors": [
+    "office.set-machine-names"
+  ],
+  "why": "The door that changes the names of the machines asks whether the secretary acts for the person before it writes the change."
+}

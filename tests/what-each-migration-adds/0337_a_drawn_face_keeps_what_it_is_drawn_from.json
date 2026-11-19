@@ -1,0 +1,6 @@
+{
+  "why": "Let a drawn face keep the digest it is drawn from, so the re-mint can rename it to the key of its agent's new id and the face stays byte for byte the same. Every row already there reads NULL, which means the face is drawn from the participant its key names.",
+  "columnsAddedAfterTheRebuild": {
+    "assets": ["drawn_from"]
+  }
+}

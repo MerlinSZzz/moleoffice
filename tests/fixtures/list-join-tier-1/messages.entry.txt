@@ -1,0 +1,57 @@
+/**
+ * THE ONE MESSAGE POOL. The board, a conversation and a page's comments are all read from here.
+ *
+ * ---------------------------------------------------------------------------------------
+ * WHY THERE IS ONE LIBRARY AND NOT THREE READERS
+ * ---------------------------------------------------------------------------------------
+ *
+ * Criterion M1 of design/messages/ACCEPTANCE.md: *The message board, a conversation and a page's
+ * comments read the same rows through one library.* Before this file each of the three asked the
+ * database its own question, so a message could appear on one and not the others with nothing
+ * failing. That is the defect CLAUDE.md names at the top: the same fact worked out in two places.
+ *
+ * ---------------------------------------------------------------------------------------
+ * WHAT A COMMENT IS
+ * ---------------------------------------------------------------------------------------
+ *
+ * A comment is a message that says what on a page it is about. The person's words: 人留下的comment只是一种特殊的
+ * message. So `commentsIn` returns two kinds of row and says which each one is:
+ *
+ *   a record of kind `annotation`  every comment written before this build. They stay exactly as
+ *                                  they are, are drawn exactly as they were, and nothing rewrites
+ *                                  one.
+ *   a record of kind `message`     with a `target`. Every comment written from now on.
+ *
+ * Nothing here converts one into the other. A reader that wants comments asks this function and
+ * gets both, in one order.
+ *
+ * ---------------------------------------------------------------------------------------
+ * WHO A MESSAGE IS TO IS WRITTEN TWICE, AND A TEST IS WHAT KEEPS THE TWO TOGETHER
+ * ---------------------------------------------------------------------------------------
+ *
+ * The record carries `to`, because that is the field an author writes and the field GET /api/kinds
+ * publishes. `message_delivery` carries one row per recipient, because a delivery mark changes and
+ * a record field cannot change without a revision. `writeTheDeliveries` writes both, in one
+ * transaction, and it is the only thing that writes either. `tests/one-message-pool.test.ts` fails
+ * when a message's rows and its `to` field name different people, which is the third of CLAUDE.md's
+ * three ways to fix one fact in two places.
+ */
+
+import { isAHandOverSentence } from '@shared/handles.ts'
+import { and, desc, eq, inArray, isNotNull, isNull, ne, or, sql, type SQL } from 'drizzle-orm'
+import { anOfficeId } from './ids.ts'
+import { hasOriginalUpgradeNoticeForOwner } from './stable-upgrade-notices.ts'
+import { db, sqlite } from '../db/client.ts'
+import { piecesOf, readInPieces } from '../db/in-pieces.ts'
+import { ONE_KIND_WRITTEN_OUT, STORED_FIELDS, agentRecords, theKindOfARowFoundById, conversationReads, groupMembers, handleHolds, messageDelivery, records } from '../db/schema.ts'
+import { localStamp, nowStamp, parseStoredStamp } from '@shared/time.ts'
+import { theSummaryFactsOf, theSweepFactsOf } from '@shared/dead-letter-lines.ts'
+import {
+  declaredRuntimeOrNull,
+  isMoleOffice,
+  MOLE_OFFICE,
+  participantWord,
+  type AgentRuntime,
+  type ParticipantRef,
+} from '@shared/participants.ts'
+import { sayInEnglish } from '@shared/i18n.ts'

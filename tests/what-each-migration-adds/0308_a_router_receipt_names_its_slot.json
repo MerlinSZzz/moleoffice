@@ -1,0 +1,4 @@
+{
+  "why": "Keep one receipt for each request the provider router carries, with the run, the slot, the provider's own token counts and the price, and never a key or a token. No existing record is rewritten.",
+  "tables": ["router_receipts"]
+}

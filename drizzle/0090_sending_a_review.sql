@@ -1,0 +1,40 @@
+-- Sending a review: the conversation it went out in, and when it went.
+--
+-- ADDITIVE, TWO NULLABLE COLUMNS. No row is read, moved, rewritten or taken away, and no table is
+-- rebuilt. Every review that already exists keeps the value both columns have for a review nobody
+-- has sent, which is NULL.
+--
+-- ---------------------------------------------------------------------------------------
+-- WHY
+-- ---------------------------------------------------------------------------------------
+--
+-- Until now nothing in PanelX sent a review. `POST /api/reviews/<id>/send` is the act, and it works
+-- the way the rest of this product works: the comments become messages in ONE conversation, and
+-- dispatch groups those messages by who each is for and writes one run per recipient. So a sent
+-- review has a conversation, and without a column saying which one, a person who reloaded the page
+-- had no way back to the answers — the review would say "Sent" and point at nothing.
+--
+-- `sent_at` IS THE COMPANION OF `collected_at` AND EXISTS FOR THE SAME REASON. A review that says
+-- it was sent and cannot say when is a state word with no moment behind it, and the refusal a
+-- second Send gets has to be able to name the first one.
+--
+-- ---------------------------------------------------------------------------------------
+-- WHY `sent_thread_id` IS NOT `from_thread_id`
+-- ---------------------------------------------------------------------------------------
+--
+-- They are two different facts and one of them already had a column. `from_thread_id` is where a
+-- review's remarks were WRITTEN, and it is set only by the migration that brought round seven's
+-- reviews forward. `sent_thread_id` is where the review WENT. For a brought-forward review the two
+-- end up holding the same id, because its remarks are already messages in that conversation and
+-- sending it is dispatching the conversation they are in — copying them into a second one would be
+-- the same words in two writable rows. Overloading one column to mean both would have made that
+-- coincidence into the definition.
+--
+-- NEITHER IS A DECLARED FOREIGN KEY, for the reason `from_thread_id` is not one: what a review was
+-- sent in has to survive whatever happens to that conversation.
+--
+-- NUMBERED WELL CLEAR OF THE MIGRATION BEFORE IT, the way 0020 to 0080 were and for the same
+-- reason: several agents add one at the same time. Drizzle applies journal entries in order of
+-- their `when`, so the gap in the numbers costs nothing.
+ALTER TABLE `reviews` ADD `sent_thread_id` text;--> statement-breakpoint
+ALTER TABLE `reviews` ADD `sent_at` text;

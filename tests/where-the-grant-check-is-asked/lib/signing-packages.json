@@ -1,0 +1,8 @@
+{
+  "doors": [
+    "signing-packages.sign",
+    "signing-packages.refuse",
+    "signing-packages.take-back"
+  ],
+  "why": "Signing a package asks whether a raise carries the press and what each item it signs touches. Refusing a package and taking back its hold each ask whether a raise carries the press."
+}

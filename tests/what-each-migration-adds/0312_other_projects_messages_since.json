@@ -1,0 +1,6 @@
+{
+  "why": "Wave 13y round 112, item 46: the moment the message worker first took messages written in another project, as one column of the one installation row. Nullable with no default and no backfill, so NULL is the rule not having run on this database yet; the first full reading of the worker's queue writes it once, and a message written in another project is handed over only when it was written after it.",
+  "columnsAddedAfterTheRebuild": {
+    "installation": ["other_projects_messages_since"]
+  }
+}

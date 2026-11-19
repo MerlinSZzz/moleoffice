@@ -1,0 +1,134 @@
+# The files wave 13s made neutral or wrote neutral, one path per line, relative to the checkout.
+# The neutral-words gate (tests/the-owners-project-is-not-in-the-source.test.ts) reads every string
+# each one ships. # starts a comment.
+
+# Round 7: the copy of the default regulations into a fresh office, and the regulations it serves.
+src/server/lib/default-regulations.ts
+src/server/lib/office-regulations.ts
+src/server/api/office-regulations.ts
+src/shared/office-rules.ts
+
+# Round 5: the record door, revisions, history, reviews, links, the kinds and the warrant.
+# Moved here from the list NEUTRAL_SOURCES in the gate's test file by wave 13r round 7.
+src/server/lib/records.ts
+src/server/api/records.ts
+src/server/lib/revisions.ts
+src/server/lib/history.ts
+src/server/lib/reviews.ts
+src/server/api/links.ts
+src/shared/kinds.ts
+src/shared/warrant.ts
+
+# Round 30: the Resources page, which App.tsx draws.
+src/web/pages/ResourcesPage.tsx
+
+# The modules the record door moved out of src/server/lib/records.ts, whose text this list already
+# reads. They joined at wave 13r round 59, when the last of them had moved, and the ones wave 13r
+# moved on 17 and 18 November 2026 joined as they moved.
+src/server/lib/records/actor.ts
+src/server/lib/records/addressed-run.ts
+src/server/lib/records/anchors.ts
+src/server/lib/records/asks-and-commitments.ts
+src/server/lib/records/attention.ts
+src/server/lib/records/blocked-by.ts
+src/server/lib/records/broadcast-settings.ts
+src/server/lib/records/change-log.ts
+src/server/lib/records/checklist-items.ts
+src/server/lib/records/created-between.ts
+src/server/lib/records/creating.ts
+src/server/lib/records/decision-core.ts
+src/server/lib/records/decisions-naming-a-fork.ts
+src/server/lib/records/delete-restore.ts
+src/server/lib/records/export-list-guards.ts
+src/server/lib/records/file-records-in-workspace.ts
+src/server/lib/records/filed-from.ts
+src/server/lib/records/fork-settled.ts
+src/server/lib/records/fork-settling.ts
+src/server/lib/records/governance-guards.ts
+src/server/lib/records/human-only.ts
+src/server/lib/records/link-by-title.ts
+src/server/lib/records/link-gates.ts
+src/server/lib/records/link-readers.ts
+src/server/lib/records/link-requests.ts
+src/server/lib/records/links.ts
+src/server/lib/records/main-suite-fix-checks.ts
+src/server/lib/records/may-write.ts
+src/server/lib/records/merge-data.ts
+src/server/lib/records/near-duplicate-titles.ts
+src/server/lib/records/notebook-entries.ts
+src/server/lib/records/obligations.ts
+src/server/lib/records/own-words.ts
+src/server/lib/records/page-reads.ts
+src/server/lib/records/patching.ts
+src/server/lib/records/pipeline-blocks.ts
+src/server/lib/records/pipeline-membership.ts
+src/server/lib/records/planning-guards.ts
+src/server/lib/records/queries.ts
+src/server/lib/records/reading.ts
+src/server/lib/records/record-by-title.ts
+src/server/lib/records/registration-doors.ts
+src/server/lib/records/restrictions.ts
+src/server/lib/records/run-writes.ts
+src/server/lib/records/same-agent.ts
+src/server/lib/records/save-revision.ts
+src/server/lib/records/served-doors.ts
+src/server/lib/records/session-names.ts
+src/server/lib/records/setting-changes.ts
+src/server/lib/records/stored-link-gates.ts
+src/server/lib/records/taking-back.ts
+src/server/lib/records/territory.ts
+src/server/lib/records/the-other-ends-of.ts
+src/server/lib/records/the-persons-own-acts.ts
+src/server/lib/records/unregistered-agent.ts
+src/server/lib/records/updating.ts
+src/server/lib/records/what-a-decision-files.ts
+src/server/lib/records/who-files-an-incident.ts
+src/server/lib/records/who-recorded-it.ts
+
+# The modules that hold what wave 13r moved out of src/shared/kinds.ts on 17 and 18 November 2026,
+# whose text this list already reads.
+src/shared/kinds/agent.ts
+src/shared/kinds/block-fields.ts
+src/shared/kinds/booking.ts
+src/shared/kinds/checklist.ts
+src/shared/kinds/context-bundle.ts
+src/shared/kinds/criticism.ts
+src/shared/kinds/cross-checks.ts
+src/shared/kinds/decision-fields.ts
+src/shared/kinds/decision.ts
+src/shared/kinds/describe-value.ts
+src/shared/kinds/design-reminder.ts
+src/shared/kinds/design.ts
+src/shared/kinds/direction.ts
+src/shared/kinds/drawn-on.ts
+src/shared/kinds/flow-run.ts
+src/shared/kinds/flow.ts
+src/shared/kinds/goal.ts
+src/shared/kinds/handbook.ts
+src/shared/kinds/ids-used-twice.ts
+src/shared/kinds/incident.ts
+src/shared/kinds/incompleteness.ts
+src/shared/kinds/key-suggestions.ts
+src/shared/kinds/kind-words.ts
+src/shared/kinds/message.ts
+src/shared/kinds/module.ts
+src/shared/kinds/note.ts
+src/shared/kinds/notebook.ts
+src/shared/kinds/problem.ts
+src/shared/kinds/project-chapter.ts
+src/shared/kinds/regulation.ts
+src/shared/kinds/report-blocks.ts
+src/shared/kinds/report.ts
+src/shared/kinds/session.ts
+src/shared/kinds/shape-cross-checks.ts
+src/shared/kinds/shared-shapes.ts
+src/shared/kinds/short-form-fields.ts
+src/shared/kinds/stopping-point.ts
+src/shared/kinds/task.ts
+src/shared/kinds/the-kinds-as-written.ts
+src/shared/kinds/the-lines-fields.ts
+src/shared/kinds/tool-use.ts
+src/shared/kinds/trajectory.ts
+src/shared/kinds/type-reader.ts
+src/shared/kinds/validation.ts
+src/shared/kinds/work-domain.ts

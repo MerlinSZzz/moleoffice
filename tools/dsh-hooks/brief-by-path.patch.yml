@@ -1,0 +1,15 @@
+# Copyright © 2026 Zhengyang Shen
+# Licensed under the MIT License. See LICENSE.
+# THE BRIEF BY PATH: the one extra overlay run-agent.sh passes on dsh's command line.
+#
+# The one-shot dsh app takes its task as the command line itself (its `--help` says "the task text;
+# multiple words are joined by spaces"), so handing it the brief's text would print every agent's
+# brief in `ps` and `pgrep -a`. This overlay replaces the task with the content of the file the
+# task names. run-agent.sh passes the brief's PATH as the task, and the headless runner reads that
+# file whole, once, including its last line, before the model is asked anything.
+#
+# The profile on disk is not touched and its hooks are not touched: this rides in on `--patch`,
+# which the launcher applies after the profile's own layers.
+- id: headless-runner
+  config:
+    task: !!js process.getBuiltinModule('node:fs').readFileSync(ctx.headlessStartup.task, 'utf8')

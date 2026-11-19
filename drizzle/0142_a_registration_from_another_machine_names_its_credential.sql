@@ -1,0 +1,22 @@
+-- A REGISTRATION FROM ANOTHER MACHINE NAMES THE CREDENTIAL IT CAME IN ON.
+--
+-- Criterion P69 of design/permissions/ACCEPTANCE.md, on what the owner found on 7 September 2026:
+-- the Codex worker on the owner's other machine registered itself in Mole Office as a worker, from
+-- that machine's private-network address, with nobody recorded as having started it and no confirmation from
+-- the owner at all. It became a contact rather than a visitor, and the owner's confirming step
+-- never happened.
+--
+-- The refusal is the other half and lives in the code. This column is what a row says AFTERWARDS:
+-- which credential the office let this agent in on, so that a row registered from elsewhere can be
+-- told from one registered here, and so the Embassy can join an agent to the credential the
+-- owner confirmed for it.
+--
+-- NULL IS THE ORDINARY ANSWER AND MEANS THIS MACHINE. Every row written before today is null, and
+-- so is every row a registration on the owner's own machine writes; a registration from elsewhere
+-- cannot be written at all without one. Null therefore says "no credential was needed", never
+-- "nobody looked".
+--
+-- ADDITIVE, AND IT REWRITES NOTHING. One ALTER TABLE ADD COLUMN and no UPDATE. The Codex row keeps
+-- exactly what it holds: it was written before this door existed, and rewriting it now would be this
+-- migration inventing a confirmation the owner never made.
+ALTER TABLE `agents` ADD `credential` text;

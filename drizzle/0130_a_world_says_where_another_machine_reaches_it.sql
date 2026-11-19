@@ -1,0 +1,1 @@
+ALTER TABLE `worlds` ADD `address_for_other_machines` text;

@@ -1,0 +1,13 @@
+{
+  "why": "The mail tool's press and its turn-off refused when a file stands where a folder of its service goes (wave 13t, round W28): no door here can safely meet it, because it needs this computer's HOME and systemd. tests/the-mail-tool-is-installed-by-the-persons-press.test.ts meets it with a scratch home and a stand-in systemctl.",
+  "refusals": [
+    {
+      "code": "mailToolUnderAFile",
+      "status": 409,
+      "english": "Test: a file stands where a folder of the mail tool's service goes.",
+      "values": {
+        "path": "/test/systemd"
+      }
+    }
+  ]
+}

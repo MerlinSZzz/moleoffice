@@ -1,0 +1,416 @@
+{
+  "version": 1,
+  "tileSize": 32,
+  "connectionOrder": "nesw",
+  "sprites": {
+    "grass-0": {
+      "src": "/office-map/c-forest/terrain/grass-0.png",
+      "width": 32,
+      "height": 32,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "sha256": "24e4d7cea07cf35bdfa084658c74ca5f4a01577c310de3b3b4bc3d90883e5972"
+    },
+    "grass-1": {
+      "src": "/office-map/c-forest/terrain/grass-1.png",
+      "width": 32,
+      "height": 32,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "sha256": "fd9b13fe5b587ca4acc3d1628a4f252adcefb193e1fb1213be27daa26778c6a4"
+    },
+    "grass-2": {
+      "src": "/office-map/c-forest/terrain/grass-2.png",
+      "width": 32,
+      "height": 32,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "sha256": "a1d5a33ca46aeef54ed961cf014372817c704476f3c9f1c1ac55e0227cbde40c"
+    },
+    "earth-fill": {
+      "src": "/office-map/c-forest/terrain/earth-fill.png",
+      "width": 32,
+      "height": 32,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "sha256": "c5e42003f0f4d617f1135495ee184212a14c9015d11470134fb35eb7fd962b5a"
+    },
+    "platform-isolated": {
+      "src": "/office-map/c-forest/terrain/platform-isolated.png",
+      "width": 32,
+      "height": 32,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "sha256": "a5aab6a82a642f5ee94b33e51377f6011deb6922b9fd5c9dab617298edd158af"
+    },
+    "platform-n": {
+      "src": "/office-map/c-forest/terrain/platform-n.png",
+      "width": 32,
+      "height": 32,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "sha256": "814f41210ba09b014ea50f6bea8ade90cf62cbfa0cc5c883d436a166522e8088"
+    },
+    "platform-e": {
+      "src": "/office-map/c-forest/terrain/platform-e.png",
+      "width": 32,
+      "height": 32,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "sha256": "df6def98c43ae7fd083805fb47dd837d99ccdb4f390c91bf4dc1ccd521149d51"
+    },
+    "platform-ne": {
+      "src": "/office-map/c-forest/terrain/platform-ne.png",
+      "width": 32,
+      "height": 32,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "sha256": "f043f6846e25c41342316e15c9816a0b6c9ef347f4189e234dc417455b86ea8f"
+    },
+    "platform-s": {
+      "src": "/office-map/c-forest/terrain/platform-s.png",
+      "width": 32,
+      "height": 32,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "sha256": "65d15caf1f781cd10b62d45a902808aed0c8a0dfedeaf0437725b77fe189ae75"
+    },
+    "platform-ns": {
+      "src": "/office-map/c-forest/terrain/platform-ns.png",
+      "width": 32,
+      "height": 32,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "sha256": "db6379fa1dbb7b1681c23b2037463607e004bd8687333ef38e57cfabe9fde9f5"
+    },
+    "platform-es": {
+      "src": "/office-map/c-forest/terrain/platform-es.png",
+      "width": 32,
+      "height": 32,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "sha256": "cf250ab1f5407e10d4ba93fc72d3b68d5aab0604abb863edb3d29a51102b9a53"
+    },
+    "platform-nes": {
+      "src": "/office-map/c-forest/terrain/platform-nes.png",
+      "width": 32,
+      "height": 32,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "sha256": "65fa831c1248f26a62c7c22ba835b31bc08ad5edec3b22a4d9c13f3eb6a86539"
+    },
+    "platform-w": {
+      "src": "/office-map/c-forest/terrain/platform-w.png",
+      "width": 32,
+      "height": 32,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "sha256": "8f5a85b249ef86d66901391e008c9f5d95dffde0911763be60136c42e6ef8395"
+    },
+    "platform-nw": {
+      "src": "/office-map/c-forest/terrain/platform-nw.png",
+      "width": 32,
+      "height": 32,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "sha256": "31a61e41cf5397d8204895cd592f95924742c55b998e125996fead0cd99df37e"
+    },
+    "platform-ew": {
+      "src": "/office-map/c-forest/terrain/platform-ew.png",
+      "width": 32,
+      "height": 32,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "sha256": "357ae9b6d31f95378212323e9e86b020ba352448bea61d60c065b0826c303c42"
+    },
+    "platform-new": {
+      "src": "/office-map/c-forest/terrain/platform-new.png",
+      "width": 32,
+      "height": 32,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "sha256": "d3cf9ebe1d6ccc71c26faaf1b897fb4e7d35c6fe91c9aa8d51fd1d44ff3997f8"
+    },
+    "platform-sw": {
+      "src": "/office-map/c-forest/terrain/platform-sw.png",
+      "width": 32,
+      "height": 32,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "sha256": "d3629843c68827ce48fdb7dd97fd26937aef4a357b378cefa84f46f43612463e"
+    },
+    "platform-nsw": {
+      "src": "/office-map/c-forest/terrain/platform-nsw.png",
+      "width": 32,
+      "height": 32,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "sha256": "109988d5a11f2d13557406f91315b87160ee95e440b7eaf21eae8936731ebfbc"
+    },
+    "platform-esw": {
+      "src": "/office-map/c-forest/terrain/platform-esw.png",
+      "width": 32,
+      "height": 32,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "sha256": "fffa76707e2f9eb83d16e1d579c97a55dfdcdfa314381473f3f90c079ba49959"
+    },
+    "platform-nesw": {
+      "src": "/office-map/c-forest/terrain/platform-nesw.png",
+      "width": 32,
+      "height": 32,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "sha256": "06176811042014aa2cb61585bcd9c645ff62b9a6436eba21c152e9f2790dc200"
+    },
+    "road-isolated": {
+      "src": "/office-map/c-forest/terrain/road-isolated.png",
+      "width": 32,
+      "height": 32,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "sha256": "b067f790fea58a4ea3330bc2a9fcce57fbab2c3fd743b1bbbded475adb05ec4d"
+    },
+    "road-n": {
+      "src": "/office-map/c-forest/terrain/road-n.png",
+      "width": 32,
+      "height": 32,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "sha256": "6dc14b3b1111e14f327b5f1830c9ae36205608abbf93c4aef9c8ef2698d1e9ef"
+    },
+    "road-e": {
+      "src": "/office-map/c-forest/terrain/road-e.png",
+      "width": 32,
+      "height": 32,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "sha256": "a5d12a00c0feabf828d5c77e720f15f2d4396314e5105e86b126ea3ac6157e5b"
+    },
+    "road-ne": {
+      "src": "/office-map/c-forest/terrain/road-ne.png",
+      "width": 32,
+      "height": 32,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "sha256": "268c794bbac7cb1b24acdfc16d580619d236e87e09b74d44f623f5ae8aaf8914"
+    },
+    "road-s": {
+      "src": "/office-map/c-forest/terrain/road-s.png",
+      "width": 32,
+      "height": 32,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "sha256": "3dd80a331479b385bb24d35b0d747872d3d29e28b7826aa3f4cae7d3d81ff336"
+    },
+    "road-ns": {
+      "src": "/office-map/c-forest/terrain/road-ns.png",
+      "width": 32,
+      "height": 32,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "sha256": "6158bcc93bc61cd9961f865932f83168be862e94afeb7cf942efcd5c8a4addc4"
+    },
+    "road-es": {
+      "src": "/office-map/c-forest/terrain/road-es.png",
+      "width": 32,
+      "height": 32,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "sha256": "fc493683e08c94715919f0f73a2923d99ebe4e0df6b28022c6b149cae3bb25df"
+    },
+    "road-nes": {
+      "src": "/office-map/c-forest/terrain/road-nes.png",
+      "width": 32,
+      "height": 32,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "sha256": "bfef5560f1d292d5ba4c50e438148875c5621b7e56375ea024dde9cd823cb860"
+    },
+    "road-w": {
+      "src": "/office-map/c-forest/terrain/road-w.png",
+      "width": 32,
+      "height": 32,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "sha256": "97ffbb74ef8f67b454855bf459f6e6f5e010c4695cd38009c433700079a98e6e"
+    },
+    "road-nw": {
+      "src": "/office-map/c-forest/terrain/road-nw.png",
+      "width": 32,
+      "height": 32,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "sha256": "b8acbd682cb13465345d86fbb3e62f634090225582b6f4880b465b7f677bf27a"
+    },
+    "road-ew": {
+      "src": "/office-map/c-forest/terrain/road-ew.png",
+      "width": 32,
+      "height": 32,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "sha256": "96f585f68e020c34cc1d9d860167ef421d5b266d0f106935a0dd87b3e0404a86"
+    },
+    "road-new": {
+      "src": "/office-map/c-forest/terrain/road-new.png",
+      "width": 32,
+      "height": 32,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "sha256": "8cc3485e4839c5d190b7ed46852796efd296ce362203a90e173b4935172b04c2"
+    },
+    "road-sw": {
+      "src": "/office-map/c-forest/terrain/road-sw.png",
+      "width": 32,
+      "height": 32,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "sha256": "f55d4ac20807bb00e7fc85a17aef709d0e060da9a56d19845f1c3995e3a7cc2e"
+    },
+    "road-nsw": {
+      "src": "/office-map/c-forest/terrain/road-nsw.png",
+      "width": 32,
+      "height": 32,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "sha256": "e8b7abe05da3889c465408ea781582d60a9505e4caa396f9cfac0bf4417084ce"
+    },
+    "road-esw": {
+      "src": "/office-map/c-forest/terrain/road-esw.png",
+      "width": 32,
+      "height": 32,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "sha256": "7dc5c2e1a844a589ae081d9cda611b5e1cdacedf6f59d8fb794b6979ff480ce2"
+    },
+    "road-nesw": {
+      "src": "/office-map/c-forest/terrain/road-nesw.png",
+      "width": 32,
+      "height": 32,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "sha256": "c5e42003f0f4d617f1135495ee184212a14c9015d11470134fb35eb7fd962b5a"
+    }
+  },
+  "grass": [
+    "grass-0",
+    "grass-1",
+    "grass-2"
+  ],
+  "earthFill": "earth-fill",
+  "road": {
+    "": "road-isolated",
+    "n": "road-n",
+    "e": "road-e",
+    "ne": "road-ne",
+    "s": "road-s",
+    "ns": "road-ns",
+    "es": "road-es",
+    "nes": "road-nes",
+    "w": "road-w",
+    "nw": "road-nw",
+    "ew": "road-ew",
+    "new": "road-new",
+    "sw": "road-sw",
+    "nsw": "road-nsw",
+    "esw": "road-esw",
+    "nesw": "road-nesw"
+  },
+  "platform": {
+    "": "platform-isolated",
+    "n": "platform-n",
+    "e": "platform-e",
+    "ne": "platform-ne",
+    "s": "platform-s",
+    "ns": "platform-ns",
+    "es": "platform-es",
+    "nes": "platform-nes",
+    "w": "platform-w",
+    "nw": "platform-nw",
+    "ew": "platform-ew",
+    "new": "platform-new",
+    "sw": "platform-sw",
+    "nsw": "platform-nsw",
+    "esw": "platform-esw",
+    "nesw": "platform-nesw"
+  },
+  "adjacencyMeaning": "Keys name adjacent cells of the same material in n,e,s,w order. They do not name narrow road centerline ports. Four connected neighbors produce full material.",
+  "provenance": {
+    "materials": "New built-in imagegen grass, soil and wood sources, independent of the old floor image.",
+    "processing": "Selected crops, nearest-neighbor32px sampling, matching opposite3px edge bands, shared grass borders, no-dither quantization. Platform borders/corners authored from the generated wood material.",
+    "roadProcessing": "Full soil on material interiors. Only exposed sides receive a3-to5px irregular grass fringe and external rounded corners. 96px planning bands remain passable material cells; the grass fringe is decorative.",
+    "authorization": "Cedar confirmed same-material adjacency and96px-or-wider road planning in the formal integration brief."
+  }
+}

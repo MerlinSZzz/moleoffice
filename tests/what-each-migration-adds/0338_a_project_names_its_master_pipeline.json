@@ -1,0 +1,6 @@
+{
+  "why": "Let a project name its master pipeline, the pipeline whose steps are its architecture blocks, so the project board reads its rows from that one record. Every row already there reads NULL, which means nobody has marked one.",
+  "columnsAddedAfterTheRebuild": {
+    "workspaces": ["master_pipeline"]
+  }
+}

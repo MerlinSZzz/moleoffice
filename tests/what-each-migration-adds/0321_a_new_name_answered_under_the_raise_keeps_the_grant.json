@@ -1,0 +1,6 @@
+{
+  "why": "Wave 13s round 195, item 43: a secretary the person has raised may answer a new name that waits for the person, and the rename row keeps the grant it answered under. One nullable column beside answered_at. NULL is the person's answer, an approver's answer in its own right, a new name that still waits, or a row written before this migration, so an older row never says a raise answered it.",
+  "columnsAddedAfterTheRebuild": {
+    "agent_renames": ["answered_under_grant"]
+  }
+}

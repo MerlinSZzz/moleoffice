@@ -1,0 +1,12 @@
+-- NOT NOW PUTS A LEAD OFFER OFF FOR A WHILE AND LEAVES THE MESSAGE UNREAD. The person's decisions
+-- madeUpiiyasq and madeUpfpgrrq.
+--
+-- IT IS A COLUMN ON `message_delivery`, because the fact is about one message and one recipient,
+-- and that row is already the one place that says how far a message got with a recipient. It is not
+-- a mark: the message stays unread, so `mark` and `at` do not move when it is written.
+--
+-- NULL MEANS THE RECIPIENT NEVER PRESSED NOT NOW ON IT. The offers read leaves a message out until
+-- thirty minutes after the moment stored here (src/shared/short-lists.ts).
+--
+-- ADDITIVE, AND IT REWRITES NOTHING. One ALTER TABLE ADD COLUMN and no UPDATE.
+ALTER TABLE `message_delivery` ADD COLUMN `offer_put_off_at` text;

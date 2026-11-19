@@ -1,0 +1,149 @@
+{
+  "version": 2,
+  "scene": "cavern",
+  "tileSize": 32,
+  "sprites": {
+    "cavern-ground-0": {
+      "src": "/office-map/c-environments/cavern/ground/cavern-ground-0.png",
+      "width": 32,
+      "height": 32,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "sha256": "4f0d3dfd285a756ba4564449a6c2863f034832940ed5a98cc83015101f6725da"
+    },
+    "cavern-ground-1": {
+      "src": "/office-map/c-environments/cavern/ground/cavern-ground-1.png",
+      "width": 32,
+      "height": 32,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "sha256": "c09d49d9f80fbcfaec04c4473af66e46c40156bd837c9f34f37b42f2de315e58"
+    },
+    "cavern-ground-plain": {
+      "src": "/office-map/c-environments/cavern/ground/cavern-ground-plain.png",
+      "width": 32,
+      "height": 32,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "sha256": "2a9a3148b50a2a54ef6637433ee9ffcc6f7ed89c71bb8d0e10eeeab5a35994b6"
+    },
+    "cavern-path-0": {
+      "src": "/office-map/c-environments/cavern/ground/cavern-path-0.png",
+      "width": 32,
+      "height": 32,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "sha256": "29babbd6413831dbb0d0723146d1acc925c861ef875fe679256ea28a1814f468"
+    },
+    "cavern-path-1": {
+      "src": "/office-map/c-environments/cavern/ground/cavern-path-1.png",
+      "width": 32,
+      "height": 32,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "sha256": "7807ed4a6a90f06efd226f765dde46c5440cb4aa3fdd9d0ebf895540279cd25e"
+    },
+    "shared-wood-quiet-0": {
+      "src": "/office-map/c-environments/shared/materials/shared-wood-quiet-0.png",
+      "width": 32,
+      "height": 32,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "sha256": "4450602269ab3936a16b7d90e2c47ecd04463c8aee593ab749d6257b9c897cf8"
+    },
+    "shared-wood-quiet-1": {
+      "src": "/office-map/c-environments/shared/materials/shared-wood-quiet-1.png",
+      "width": 32,
+      "height": 32,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "sha256": "379de331bf43866e6470832ad7d8a1c15af9bf05d707ec0cbc73cbc5dd19f467"
+    },
+    "shared-wood-quiet-2": {
+      "src": "/office-map/c-environments/shared/materials/shared-wood-quiet-2.png",
+      "width": 32,
+      "height": 32,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "sha256": "db8108219ebff46a2810aec7709aee87c1a23cc0d30ca3cb2c4b7b4c38440df4"
+    }
+  },
+  "materials": {
+    "ground": [
+      {
+        "sprite": "cavern-ground-plain",
+        "weight": 24
+      },
+      {
+        "sprite": "cavern-ground-0",
+        "weight": 1
+      },
+      {
+        "sprite": "cavern-ground-1",
+        "weight": 1
+      }
+    ],
+    "road": [
+      {
+        "sprite": "cavern-path-0",
+        "weight": 5
+      },
+      {
+        "sprite": "cavern-path-1",
+        "weight": 1
+      }
+    ],
+    "plainWork": [
+      {
+        "sprite": "cavern-ground-plain",
+        "weight": 24
+      },
+      {
+        "sprite": "cavern-ground-0",
+        "weight": 1
+      },
+      {
+        "sprite": "cavern-ground-1",
+        "weight": 1
+      }
+    ],
+    "sharedWork": [
+      {
+        "sprite": "shared-wood-quiet-0",
+        "weight": 1
+      },
+      {
+        "sprite": "shared-wood-quiet-1",
+        "weight": 1
+      },
+      {
+        "sprite": "shared-wood-quiet-2",
+        "weight": 1
+      }
+    ]
+  },
+  "provenance": {
+    "basis": "The quiet ground/material direction was accepted; actual world placement/navigation still needs review.",
+    "ground": "Native32px low-frequency stone/soil samples;24:1:1 for high-rise,cavern,greenhouse; original library wood tiles1:1. High-rise and plain base tiles are explicitly procedural, not claimed imagegen tiles.",
+    "road": "Native32px flat material with sparse low-contrast marks5:1. High-rise/greenhouse stone, cavern worn stone, library blue-gray carpet. No floor lighting baked in.",
+    "geometry": "The same runtime road/plainWork/sharedWork polygons determine pixel masks and navigation. No static preview polygons or unused adjacency edge PNGs are included.",
+    "height": 0,
+    "sourceFacts": "a facts file kept outside this repository"
+  }
+}

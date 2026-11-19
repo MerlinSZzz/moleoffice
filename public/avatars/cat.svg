@@ -1,0 +1,28 @@
+<!-- Copyright © 2026 Zhengyang Shen -->
+<!-- Licensed under the MIT License. See LICENSE. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-label="A cat">
+<title>Cat</title>
+<defs><clipPath id="cat-disc"><circle cx="128" cy="128" r="128"/></clipPath></defs>
+<g clip-path="url(#cat-disc)">
+<circle cx="128" cy="128" r="128" fill="#B96464"/>
+<path d="M60 116 L58 30 L124 82 Z" fill="#7D8A99"/>
+<path d="M70 106 L68 56 L108 84 Z" fill="#E9A9B4"/>
+<path d="M196 116 L198 30 L132 82 Z" fill="#7D8A99"/>
+<path d="M186 106 L188 56 L148 84 Z" fill="#E9A9B4"/>
+<ellipse cx="128" cy="144" rx="78" ry="70" fill="#7D8A99"/>
+<g stroke="#5C6773" stroke-width="6" stroke-linecap="round" fill="none">
+<path d="M112 94 L120 82 L128 94"/><path d="M128 94 L136 82 L144 94"/>
+</g>
+<ellipse cx="108" cy="188" rx="32" ry="24" fill="#F0EDE8"/>
+<ellipse cx="148" cy="188" rx="32" ry="24" fill="#F0EDE8"/>
+<g stroke="#EFE9E2" stroke-width="5" stroke-linecap="round">
+<path d="M84 180 L28 164"/><path d="M82 192 L26 194"/><path d="M84 204 L32 222"/>
+<path d="M172 180 L228 164"/><path d="M174 192 L230 194"/><path d="M172 204 L224 222"/>
+</g>
+<g fill="#8FC46A"><ellipse cx="96" cy="140" rx="17" ry="14"/><ellipse cx="160" cy="140" rx="17" ry="14"/></g>
+<g fill="#17161A"><ellipse cx="96" cy="140" rx="5" ry="13"/><ellipse cx="160" cy="140" rx="5" ry="13"/></g>
+<g fill="#FFFFFF"><circle cx="89" cy="134" r="4"/><circle cx="153" cy="134" r="4"/></g>
+<path d="M114 168 L142 168 L128 184 Z" fill="#E88FA0"/>
+<path d="M128 183 L128 190" stroke="#5C6773" stroke-width="4" stroke-linecap="round"/>
+</g>
+</svg>

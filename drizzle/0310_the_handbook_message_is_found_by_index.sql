@@ -1,0 +1,21 @@
+-- THE MESSAGE THAT CARRIED A CARD'S HANDBOOK IS FOUND WITHOUT READING EVERY MESSAGE. Wave 13s round 144, item 39.
+--
+-- A card message that carries a card's handbook holds a mark in its `extra` bag, `handbookSent`, whose `card` names the
+-- card. Each time a card message is written to an agent, `theHandbookWasSentIn` in src/server/lib/cardmessage.ts asks
+-- whether a message already carried that card's handbook to that agent, so the handbook is sent only once. It read every
+-- message and each one's data: 72 ms a call on the made-up office of 22 October, and once in each agent's start.
+--
+--   records_message_handbook_sent_card_idx  messages that carry the mark only, by the card it names.
+--
+-- A query uses it only by asking the field in these same words, written out and not as a bound value. src/server/db/schema.ts
+-- holds them once as `STORED_FIELDS.messageHandbookSentCard`. The reader also says `kind = 'message'` and that the field
+-- `IS NOT NULL`, the two terms of the index's WHERE.
+--
+-- THE FIELD IS READ ONLY FROM DATA THAT IS VALID JSON, and is null otherwise, for the reason migration 0199 gives. An index
+-- that read it plainly would refuse to write a message whose data SQLite cannot read as JSON, and would stop this
+-- migration on one already stored. The reader asked only valid JSON before this too, so it finds the same messages.
+--
+-- The index is not unique, and it changes no row.
+--
+-- ADDITIVE, AND IT REWRITES NOTHING. One CREATE INDEX statement and no UPDATE.
+CREATE INDEX IF NOT EXISTS `records_message_handbook_sent_card_idx` ON `records` ((CASE WHEN json_valid(`data`) THEN json_extract(`data`, '$.extra.handbookSent.card') END)) WHERE `kind` = 'message' AND (CASE WHEN json_valid(`data`) THEN json_extract(`data`, '$.extra.handbookSent.card') END) IS NOT NULL;

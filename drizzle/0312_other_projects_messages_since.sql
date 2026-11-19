@@ -1,0 +1,18 @@
+-- WHEN THE MESSAGE WORKER FIRST TOOK MESSAGES WRITTEN IN ANOTHER PROJECT. Wave 13y round 112, item 46.
+--
+-- The office's one message worker watches one project. Since this round its queue also holds a message written in another
+-- project, when the agent it is for has a conversation that a message picks up in the worker's project. Only messages
+-- written after the change are taken: a message written in another project before it is left as it was, waiting for a
+-- press. This column holds that moment.
+--
+--   installation.other_projects_messages_since  the moment, as a local stamp of `YYYY-MM-DD HH:MM:SS`, the form of
+--                                               `records.created_at`; a message counts only when it was written after it.
+--
+-- A COLUMN ON THE ONE INSTALLATION ROW, because the moment is one fact about this office's database, as the merges-only
+-- choice of migration 0251 is. NULL means the rule has not run on this database yet. The first full reading of the
+-- worker's queue writes it once and never again. `src/server/lib/worker.ts` is the one reader and writer.
+--
+-- IT IS 0312, INDEX 312. Index 311 was held for another round when this one was written.
+--
+-- ADDITIVE, AND IT REWRITES NOTHING. One ALTER TABLE ADD COLUMN and no UPDATE.
+ALTER TABLE `installation` ADD COLUMN `other_projects_messages_since` text;

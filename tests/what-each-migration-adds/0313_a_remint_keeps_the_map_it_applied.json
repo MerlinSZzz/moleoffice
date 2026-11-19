@@ -1,0 +1,4 @@
+{
+  "why": "Wave 13s round 158, item 30c part 3: the re-mint keeps which staged map it applied, by the map's digest, with the digest of the migrations it was staged at and how many agents took a new id. A second run with the same map finds its row and writes nothing, and a run with another map is refused.",
+  "tables": ["registry_remint_generations"]
+}

@@ -1,0 +1,13 @@
+-- THE MERGE QUEUE'S OWNER IS ONE SETTING, chosen by the person on the Settings page.
+-- Besides the person, the merge queue's owner may move a merge entry to the front of its lane.
+-- It is a stored setting with a press, as the dead-letter secretary has (0198).
+--
+-- IT IS A COLUMN ON `installation`, for the same reason as 0175, 0187 and 0198: it is one fact about the
+-- office. It holds the registry id of one agent.
+--
+-- NULL MEANS NOBODY HAS NAMED ONE. Then only the person may move an entry to the front. The reader in
+-- src/server/lib/merge-queue-owner.ts checks, each time it reads, that the agent is registered, not retired,
+-- and holds the secretary's card.
+--
+-- ADDITIVE, AND IT REWRITES NOTHING. One ALTER TABLE ADD COLUMN and no UPDATE.
+ALTER TABLE `installation` ADD COLUMN `merge_queue_owner` text;

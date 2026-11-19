@@ -1,0 +1,22 @@
+<!-- Copyright © 2026 Zhengyang Shen -->
+<!-- Licensed under the MIT License. See LICENSE. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-label="A mouse">
+<title>Mouse</title>
+<defs><clipPath id="mouse-disc"><circle cx="128" cy="128" r="128"/></clipPath></defs>
+<g clip-path="url(#mouse-disc)">
+<circle cx="128" cy="128" r="128" fill="#648FB9"/>
+<circle cx="68" cy="78" r="45" fill="#A6A3B0"/>
+<circle cx="68" cy="78" r="28" fill="#EEC3CD"/>
+<circle cx="188" cy="78" r="45" fill="#A6A3B0"/>
+<circle cx="188" cy="78" r="28" fill="#EEC3CD"/>
+<ellipse cx="128" cy="148" rx="68" ry="66" fill="#A6A3B0"/>
+<ellipse cx="128" cy="186" rx="44" ry="36" fill="#D6D3DE"/>
+<g stroke="#6E6B78" stroke-width="4" stroke-linecap="round">
+<path d="M88 190 L34 172"/><path d="M88 200 L32 200"/><path d="M88 210 L36 228"/>
+<path d="M168 190 L222 172"/><path d="M168 200 L224 200"/><path d="M168 210 L220 228"/>
+</g>
+<ellipse cx="128" cy="204" rx="13" ry="10" fill="#E68CA0"/>
+<g fill="#17161A"><circle cx="100" cy="142" r="14"/><circle cx="156" cy="142" r="14"/></g>
+<g fill="#FFFFFF"><circle cx="95" cy="137" r="5"/><circle cx="151" cy="137" r="5"/></g>
+</g>
+</svg>

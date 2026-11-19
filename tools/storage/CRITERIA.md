@@ -1,0 +1,28 @@
+# Stored file categories and measured sizes
+
+Old criterion: stored files have no shared durable category or per-category summary. The unnamed report-file read walks files and materializes records and revisions. There is no independent checked category backfill.
+
+New criterion: physical store paths have one durable category (reports, text, pictures, videos, other), decided from a bounded byte prefix and extension with documented precedence. Supplied MIME is not evidence. Inventory inserts, replacements and deletions maintain fixed category totals. The installation-wide authorized category read reads only five totals and one measurement row; it neither opens files nor scans inventory, records or revisions. A new installation starts unmeasured. Partial totals are labelled as measured inventory only.
+
+The backfill walks all five physical stores with streaming directory handles. It defaults to a read-only NDJSON plan, uses bounded buffers and one file at a time, and never reads records or revisions. Apply requires the plan and its exact checked digest, validates the complete current physical manifest before writes, refuses changed bytes, paths or store state, and uses bounded idempotent transactions with a resumable checked receipt. Links and missing stores are explicit omissions. Classification already stored for unchanged bytes is preserved. The heap probe uses a made-up office, many files and large fake records/revisions with a heap limit and core dumps disabled; its assertions include measured memory and SQL work shape.
+
+Reason: category settings need cheap, truthful measured sizes before any upload policy exists. Physical inventory avoids reference double counting. A checked standalone backfill avoids blocking an office request or changing legacy files without review.
+
+Scope exception: the report-file and avatar writers are deferred for concurrent work. Backfill may measure their existing files, but every read exposes these deferred stores and never claims installation-wide current completeness. No page, destination or uploader is added. Hooks cover message pictures, returned files, personal files, retained earlier versions, and generated session-origin files. Memory files use the personal-file writer. No existing scan is changed.
+
+New test files (each receives control, real production mutation red, restore green):
+
+- tests/storage-categories.test.ts: detected signatures beat misleading endings; document container endings beat generic archive; plain text, unknown binary, bounded prefix and ignored MIME.
+- tests/storage-inventory.test.ts: migrated schema, single path upsert, overwrite/rename/delete totals, store hooks and generated origins, fixed-row SQL/read bound, authorized discovery and refusal without paths, deferred/unmeasured state, raw SQLite backup/restore equality and deliberate omission from text/project archives, with restored reads unmeasured.
+- tests/storage-backfill.test.ts: made-up files across stores, read-only default, checked apply/rerun/resume, digest and stale/changed/missing/new file refusal before writes, links and missing stores, existing category preservation.
+- tests/storage-memory.test.ts: child probe with heap limit and ulimit -c 0, many synthetic physical files and large fake records/revisions; bounded memory, streamed plan and fixed-size read work.
+
+Named neighbours, run once sequentially: tests/schema-tables.test.ts; tests/export-format.test.ts; tests/a-schema-part-says-what-happens-to-its-tables.test.ts; tests/a-schema-part-table-is-exported-and-restored.test.ts; tests/a-message-carries-pictures.test.ts; tests/a-permanent-resident-has-a-space-of-its-own.test.ts; tests/a-residents-session-origins-are-kept.test.ts; tests/a-zip-comes-back-through-its-own-door.test.ts.
+
+Named door neighbours reserved for the supervisor: tests/kinds.test.ts; tests/ops-vocabulary.test.ts; tests/reach-declared.test.ts; tests/local-only-routes.test.ts. The supervisor runs these and the remaining kind/door neighbours, the thirteen whole-tree gates, typecheck and build on the joined tree. Test logs and mutation evidence live outside the worktree. No live data, copied office or live scan is used.
+
+Archive scope criterion: old proposal carried inventory in generic text archives. New criterion preserves inventory/category/totals/state in raw SQLite backups and explicitly excludes these installation tables from text/project archives, with checked-backfill repair. Reason: generic export materializes each exported part table, so including physical inventory would add a forbidden request-time full inventory scan. The real text export/import must leave these tables empty and the restored summary unmeasured.
+
+Authorization criterion refinement: old test checked an ordinary agent receives HTTP 403. New test uses its own fixture key and also requires a declared coded refusal with an English word. Reason: the API refusal must typecheck and be readable through the shared refusal vocabulary. The existing child_process entry in tests/how-long-a-test-may-take.ts covers both direct-spawn test files; no new starter helper is added.
+
+Memory and retained-version refinement: old probe asserted heap growth only, and document-container fixtures used direct names. New criteria require measured RSS growth as well as heap, fixed per-connection prepared statements, and detection of legacy numbered personal-space versions using the original filename embedded in their physical path. Reason: native SQLite allocations also count as memory, and extensionless retained versions must keep the document category without consulting records.

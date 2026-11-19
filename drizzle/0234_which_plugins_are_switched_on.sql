@@ -1,0 +1,12 @@
+-- WHICH PLUGINS ARE SWITCHED ON. Wave 13x round 14, step 1 of the plugin pipeline udGnc-Bsr15R (block N0TWpg5xe6mo). A
+-- plugin is a folder under plugins/ in this repository (the owner's choice A on madeUpphoxjq). Each one has a switch
+-- on the Settings page, off until somebody switches it on, and the switch takes effect with no restart.
+--
+-- ONE COLUMN ON `installation`, because which plugins are on is one fact about the office, as 0175, 0208 and 0213 put
+-- the office's other settings there. It holds a JSON object from a plugin's id to true or false.
+--
+-- NULL MEANS NOBODY HAS SWITCHED ANY PLUGIN, and every plugin reads as off. A plugin missing from the object also reads
+-- as off. The one reader and writer is src/server/lib/plugins.ts, and it refuses any value that is not such an object.
+--
+-- ADDITIVE, AND IT REWRITES NOTHING. One ALTER TABLE ADD COLUMN and no UPDATE.
+ALTER TABLE `installation` ADD COLUMN `plugin_switches` text;

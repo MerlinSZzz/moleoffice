@@ -1,0 +1,3666 @@
+{
+  "style": {
+    "colours": {
+      "ink": "#060624",
+      "body": "#2B2F45",
+      "blue": "#045CFC",
+      "purple": "#4C22BC",
+      "orange": "#FC5A08",
+      "green": "#068C4C",
+      "navy": "#04146C",
+      "machine": "#5B6178",
+      "flow": "#2B2F45"
+    },
+    "fonts": {
+      "en": "Lato, sans-serif",
+      "zh": "Lato, 'Noto Sans CJK SC', sans-serif"
+    },
+    "needFonts": [
+      "Lato:style=Regular",
+      "Lato:style=Bold",
+      "Noto Sans CJK SC:style=Regular",
+      "Noto Sans CJK SC:style=Bold"
+    ],
+    "sizes": {
+      "headline": 60,
+      "tagline": 36,
+      "group": 48,
+      "title": 36,
+      "line": 30,
+      "label": 24
+    },
+    "minPxAt1200": 16,
+    "pictureMax": 150,
+    "cutouts": {
+      "human": {
+        "file": "Human_c.png",
+        "visible": [
+          112,
+          83,
+          609,
+          578
+        ]
+      },
+      "logo": {
+        "file": "Mole_Office.png",
+        "visible": [
+          127,
+          153,
+          593,
+          548
+        ]
+      },
+      "agents": {
+        "file": "moleagents.png",
+        "visible": [
+          65,
+          70,
+          651,
+          565
+        ]
+      },
+      "world": {
+        "file": "project_world.png",
+        "visible": [
+          96,
+          75,
+          622,
+          594
+        ]
+      },
+      "secretary": {
+        "file": "secretary.png",
+        "visible": [
+          140,
+          140,
+          582,
+          557
+        ]
+      },
+      "worker": {
+        "file": "worker.png",
+        "visible": [
+          39,
+          8,
+          680,
+          678
+        ]
+      },
+      "supervisor": {
+        "file": "supervisor.png",
+        "visible": [
+          11,
+          8,
+          708,
+          678
+        ]
+      },
+      "inspector": {
+        "file": "inspector.png",
+        "visible": [
+          125,
+          8,
+          595,
+          678
+        ]
+      },
+      "secretary2": {
+        "file": "secretary2.png",
+        "visible": [
+          10,
+          49,
+          710,
+          638
+        ]
+      }
+    },
+    "tints": {
+      "blue": "#F1F6FF",
+      "purple": "#F4F1FC",
+      "orange": "#FFF4ED",
+      "green": "#EEF8F2",
+      "navy": "#EEF0F8"
+    },
+    "boundaries": {
+      "machine": {
+        "color": "machine",
+        "dash": "22 12",
+        "keyDash": "12 6",
+        "width": 3
+      },
+      "container": {
+        "color": "orange",
+        "dash": "16 9",
+        "keyDash": "10 6",
+        "width": 3
+      }
+    }
+  },
+  "icons": {
+    "note": "Icons are drawn with image2 by a worker as the first icon set, and sandbox, git and regulations were redrawn, and project-record, governance, coordination and office-flow drawn, by a worker as the redrawn icon set; each worker's provenance.json holds the prompts and times. The files in tools/architecture/icons/<hue>/ are their circle forms, copied unchanged. The generator makes the navy form, the padlock and the warning triangle itself, as each entry below says. The mole-* pictures are the redrawn icon set's round-3 and round-4 drawings, which are not circle forms; they are copied into icons/purple/ unchanged. The four part moles are drawn cropped to their visible box (icons.visible, measured from each file's alpha), so the drawn size is the mole's own height.",
+    "redrawn": [
+      "coordination",
+      "git",
+      "governance",
+      "mole-checker",
+      "mole-coordination",
+      "mole-database",
+      "mole-governance",
+      "mole-merge-tool",
+      "mole-message-worker",
+      "mole-project-record",
+      "office-flow",
+      "project-record",
+      "regulations",
+      "sandbox"
+    ],
+    "recolour": {
+      "navy": "blue",
+      "blue": "purple"
+    },
+    "recolourNote": "No navy circle form exists. The generator recolours the blue form to navy with a colour matrix that reads the green channel, so the circle becomes navy and the glyph stays white.",
+    "cutFrom": "orange",
+    "drawn": {
+      "problem": {
+        "note": "No icon in the set stands for a problem. The generator draws a plain warning triangle in the same circle form."
+      },
+      "lock": {
+        "note": "No icon in the set stands for a seal. The padlock is cut from the redrawn icon set's sandbox icon (orange form), turned white, and set on a circle of the group's hue.",
+        "crop": {
+          "from": "sandbox",
+          "form": "orange",
+          "box": [
+            150,
+            255,
+            246,
+            365
+          ],
+          "scale": 0.6
+        }
+      },
+      "plugin": {
+        "note": "No icon in the set stands for a plugin. A puzzle piece is drawn as a white line glyph on the circle form.",
+        "glyph": "<path d=\"M9 4h4v2.2a1.8 1.8 0 1 0 3.6 0V4H20v5h-2.2a1.8 1.8 0 1 0 0 3.6H20V20H13v-2.2a1.8 1.8 0 1 0-3.6 0V20H4V4z\"/>"
+      },
+      "terminal": {
+        "note": "The office sidebar's terminal icon (src/web/components/Sidebar.tsx), drawn white on the circle form.",
+        "glyph": "<rect x=\"3\" y=\"4.5\" width=\"18\" height=\"15\" rx=\"1.5\"/><path d=\"M7 9.5l3 2.5-3 2.5\"/><path d=\"M12.5 15h4.5\"/>"
+      },
+      "branch": {
+        "note": "No icon in the set stands for a copy of the code. A branch is drawn as a white line glyph on the circle form.",
+        "glyph": "<circle cx=\"7\" cy=\"5.5\" r=\"2\"/><circle cx=\"7\" cy=\"18.5\" r=\"2\"/><circle cx=\"17\" cy=\"9\" r=\"2\"/><path d=\"M7 7.5v9\"/><path d=\"M17 11c0 4-10 2.5-10 5.5\"/>"
+      },
+      "gauge": {
+        "note": "No icon in the set stands for usage figures. A gauge is drawn as a white line glyph on the circle form.",
+        "glyph": "<path d=\"M4 17a8 8 0 0 1 16 0\"/><path d=\"M12 17l4.5-5\"/><path d=\"M4 17h16\"/>"
+      },
+      "person": {
+        "note": "A plain person: a head and shoulders, with no face, drawn white on the circle form.",
+        "glyph": "<circle cx=\"12\" cy=\"8.5\" r=\"3.6\"/><path d=\"M5 20c.8-4 3.6-6 7-6s6.2 2 7 6\"/>"
+      },
+      "window": {
+        "note": "The office sidebar's window icon, drawn white on the circle form.",
+        "glyph": "<rect x=\"3.5\" y=\"4.5\" width=\"17\" height=\"15\" rx=\"2\"/><path d=\"M3.5 10h17\"/>"
+      },
+      "database": {
+        "note": "No icon in the set stands for a database file. A cylinder is drawn white on the circle form.",
+        "glyph": "<ellipse cx=\"12\" cy=\"6\" rx=\"7\" ry=\"2.5\"/><path d=\"M5 6v12c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5V6\"/><path d=\"M5 12c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5\"/>"
+      },
+      "tool": {
+        "note": "The office sidebar's toolset icon, drawn white on the circle form.",
+        "glyph": "<path d=\"M14.7 6.3a4 4 0 0 0-5.2 5.2l-5.6 5.6a1.4 1.4 0 0 0 2 2l5.6-5.6a4 4 0 0 0 5.2-5.2l-2.4 2.4-2-2 2.4-2.4z\"/>"
+      },
+      "idea": {
+        "note": "No icon in the set stands for findings and ideas. A light bulb is drawn white on the circle form.",
+        "glyph": "<path d=\"M9 18h6\"/><path d=\"M10 21h4\"/><path d=\"M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z\"/>"
+      },
+      "pipeline": {
+        "note": "The office sidebar's pipeline icon, drawn white on the circle form.",
+        "glyph": "<rect x=\"2.5\" y=\"9\" width=\"6\" height=\"6\" rx=\"1.5\"/><rect x=\"15.5\" y=\"9\" width=\"6\" height=\"6\" rx=\"1.5\"/><path d=\"M8.5 12h7\"/>"
+      },
+      "checklist": {
+        "note": "No icon in the set stands for a checklist. Three ticked lines are drawn white on the circle form.",
+        "glyph": "<path d=\"M4 7l1.5 1.5L8 6\"/><path d=\"M11 7h9\"/><path d=\"M4 13l1.5 1.5L8 12\"/><path d=\"M11 13h9\"/><path d=\"M4 19l1.5 1.5L8 18\"/><path d=\"M11 19h9\"/>"
+      },
+      "cast": {
+        "note": "No icon in the set stands for the Casting table. Two people are drawn white on the circle form.",
+        "glyph": "<circle cx=\"8.5\" cy=\"9\" r=\"2.8\"/><path d=\"M3.5 19c.6-3 2.5-4.6 5-4.6s4.4 1.6 5 4.6\"/><circle cx=\"16.5\" cy=\"8\" r=\"2.4\"/><path d=\"M14.5 13.2c.6-.2 1.3-.3 2-.3 2.3 0 4 1.4 4.6 4.1\"/>"
+      },
+      "holder": {
+        "note": "No icon in the set stands for the terminal holder. Two stacked terminals are drawn white on the circle form.",
+        "glyph": "<rect x=\"6\" y=\"3.5\" width=\"15\" height=\"11\" rx=\"1.5\"/><path d=\"M3 8v10.5a1.5 1.5 0 0 0 1.5 1.5H17\"/><path d=\"M9.5 7.5l2.5 2-2.5 2\"/>"
+      },
+      "chain": {
+        "note": "No icon in the set stands for a chain of responsibility. Two linked rings are drawn white on the circle form.",
+        "glyph": "<path d=\"M10 14a4 4 0 0 1 0-5.7l2.3-2.3a4 4 0 0 1 5.7 5.7l-1.2 1.2\"/><path d=\"M14 10a4 4 0 0 1 0 5.7l-2.3 2.3a4 4 0 0 1-5.7-5.7l1.2-1.2\"/>"
+      },
+      "machine": {
+        "note": "No icon in the set stands for a computer. A screen on a stand is drawn white on the circle form.",
+        "glyph": "<rect x=\"3\" y=\"4.5\" width=\"18\" height=\"12\" rx=\"1.5\"/><path d=\"M9 20h6\"/><path d=\"M12 16.5V20\"/>"
+      }
+    },
+    "visible": {
+      "mole-database": [
+        19,
+        22,
+        494,
+        495
+      ],
+      "mole-message-worker": [
+        34,
+        23,
+        470,
+        487
+      ],
+      "mole-checker": [
+        17,
+        28,
+        498,
+        491
+      ],
+      "mole-merge-tool": [
+        39,
+        14,
+        473,
+        499
+      ],
+      "mole-roles": [
+        0,
+        39,
+        512,
+        472
+      ]
+    }
+  },
+  "sources": {
+    "intro": "Generated by `tools/architecture/draw.mjs` from `tools/architecture/diagrams.json`; edit the `source` field there, not this file. Sections are those of a read-only inventory of main at cd2dc7b. Files are relative to the repository; `api/` means `src/server/api/` and `lib/` means `src/server/lib/`. The line numbers were checked against the code on 1 November 2026.",
+    "after": [
+      "## What the picture does not draw, and why",
+      "",
+      "- **Who starts runs in a sandbox.** The picture draws one arrow for it: the secretaries start runs in the sandbox with the sandbox tool. The message worker starts runs as well: an agent's run for a message, and a worker in a sandbox when a supervisor asks for one (`src/worker/index.ts:3-35`; `src/server/api/worker-runs.ts:1-3, :25-36`; `src/server/lib/worker-runs.ts:26-36`; `tools/sandbox.mjs:140-148`, the worker command). Its box says this as \"starts runs\", and the picture draws no arrow for it.",
+      "- **HTTP, not HTTPS.** The server listens on 127.0.0.1 and the page calls the API port directly (3.1, 3.3). The inventory names no TLS.",
+      "- **The live office's setting.** The code lets the message worker start agent runs for messages, checks and the merge tool. In merges-only mode it starts the merge tool, the rounds asked for at the next-round door and the workers a supervisor asks for, and no run for a message (`src/config/settings.mjs:1033-1074`). When the inventory was made, the live office ran in that mode (inventory, the note at the top; 3.4). The picture draws what the code does.",
+      "- **The office's key, before an agent is registered.** A session's hook calls the API with the office's key until the agent is registered and its key is set; after that it uses the agent's own key (`tools/session-hook.mjs:650-667`, theHookIdentity). The arrow label \"API calls, own key\" names the usual case.",
+      "- **The checker and the merge tool.** They are drawn in the development-flow picture, as its steps 5 to 9, from \"Judged\" to \"Landed\", and not in this one.",
+      "",
+      "## The facts behind the short labels",
+      "",
+      "The picture carries at most two short lines under each title. These are the full statements, each traced in the table above.",
+      "",
+      "- **Web app.** Runs in the user's browser and talks to the server only through its API, over HTTP, with the user's key in the pairing cookie; it hears one server-sent event stream.",
+      "- **Secretaries.** Agents whose job is the person, for example Claude Code in a terminal on the user's machine. Each joins the office through session hooks. It calls the API with its own key once the agent is registered and its key is set, and with the office's key before that. It hands large work to supervisors and starts their runs in a sandbox with the sandbox tool, naming itself as the starter.",
+      "- **Mole Office server.** One process. Every read and write passes its API layer, which checks each caller's key and role card. Decisions, problems, reports and messages are all records of one kind or another, linked together, and every write is kept whole. Only the user makes regulations; an agent writes a decision only by citing authority or the user's words, and otherwise files a proposal. Changes are pushed to open pages as events, and reminders and counters run in the background.",
+      "- **Database file.** One file. The server reads and writes it while it runs. The stable upgrade backs it up and then migrates it (`tools/stable/stable-upgrade-transaction.mjs:1078-1104`). A landing moves only the development main and does not touch it (`tools/merge-tool/the-stable-office.mjs:1-8`). Every change keeps its full history.",
+      "- **Sandbox.** A container where agents run: Claude Code, Codex, DeepSeek and others. It cannot reach the database. Each run holds its own temporary key, which ends when the run ends, and talks to the server only through the API.",
+      "- **Message worker.** A separate process that the server starts. It starts an agent's run for a message, and a worker in a sandbox when a supervisor asks for one. It starts the check tool and the merge tool, and delivers messages. It calls the API with the office's key.",
+      "",
+      "- **Office flows are one capability, not a column.** The owner's correction of round 8: a technical reader should know the office keeps registered procedures, not read each one. The tile \"Office flows\" traces to the flow register. The change path the code enforces is drawn in the development-flow picture instead. Neither picture draws that the starter confirms only after the work lands (stage 6 of the flow for the check of a run and its confirmation), so it is said here only."
+    ]
+  },
+  "diagrams": {
+    "general": {
+      "width": 1800,
+      "height": 1050,
+      "budget": 70,
+      "svgTitle": {
+        "en": "Mole Office architecture: the general picture",
+        "zh": "Mole Office 架构总览"
+      },
+      "elements": [
+        {
+          "type": "text",
+          "x": 900,
+          "y": 96,
+          "anchor": "middle",
+          "size": "headline",
+          "weight": 700,
+          "t": {
+            "en": "Mole Office architecture",
+            "zh": "Mole Office 架构总览"
+          }
+        },
+        {
+          "type": "text",
+          "x": 900,
+          "y": 152,
+          "anchor": "middle",
+          "size": "tagline",
+          "t": {
+            "en": [
+              [
+                "Your agents are temporary. ",
+                {
+                  "s": "Your work isn’t.",
+                  "color": "blue",
+                  "weight": 700
+                }
+              ]
+            ],
+            "zh": [
+              [
+                "智能体来来去去，",
+                {
+                  "s": "工作始终留存。",
+                  "color": "blue",
+                  "weight": 700
+                }
+              ]
+            ]
+          }
+        },
+        {
+          "type": "card",
+          "id": "you",
+          "x": 62,
+          "y": 200,
+          "w": 240,
+          "h": 410,
+          "picture": {
+            "image": "human"
+          },
+          "title": {
+            "en": [
+              "You"
+            ],
+            "zh": [
+              "用户"
+            ]
+          },
+          "line": {
+            "en": [
+              "Ask, decide,",
+              "review"
+            ],
+            "zh": [
+              "提需求、",
+              "做决定、",
+              "审成果"
+            ]
+          },
+          "color": "blue"
+        },
+        {
+          "type": "card",
+          "id": "agents",
+          "x": 417,
+          "y": 200,
+          "w": 240,
+          "h": 410,
+          "picture": {
+            "image": "agents"
+          },
+          "title": {
+            "en": [
+              "Agents"
+            ],
+            "zh": [
+              "智能体"
+            ]
+          },
+          "line": {
+            "en": [
+              "Do the work,",
+              "then leave"
+            ],
+            "zh": [
+              "动手干活，",
+              "干完就走"
+            ]
+          },
+          "color": "orange"
+        },
+        {
+          "type": "card",
+          "id": "sandboxes",
+          "x": 787,
+          "y": 200,
+          "w": 240,
+          "h": 410,
+          "picture": {
+            "icons": [
+              "sandbox"
+            ],
+            "size": 96
+          },
+          "title": {
+            "en": [
+              "Sandboxes"
+            ],
+            "zh": [
+              "沙箱"
+            ]
+          },
+          "line": {
+            "en": [
+              "Shut off from",
+              "your data"
+            ],
+            "zh": [
+              "碰不到",
+              "正式数据"
+            ]
+          },
+          "color": "orange"
+        },
+        {
+          "type": "card",
+          "id": "check",
+          "x": 1142,
+          "y": 200,
+          "w": 240,
+          "h": 410,
+          "picture": {
+            "icons": [
+              "inspector",
+              "merge-tool"
+            ],
+            "size": 80
+          },
+          "title": {
+            "en": [
+              "Check and",
+              "merge"
+            ],
+            "zh": [
+              "检查与合并"
+            ]
+          },
+          "line": {
+            "en": [
+              "Checked,",
+              "then merged"
+            ],
+            "zh": [
+              "先过检查，",
+              "再合入"
+            ]
+          },
+          "color": "green"
+        },
+        {
+          "type": "card",
+          "id": "work",
+          "x": 1497,
+          "y": 200,
+          "w": 240,
+          "h": 410,
+          "picture": {
+            "image": "world",
+            "size": 96
+          },
+          "title": {
+            "en": [
+              "Your work"
+            ],
+            "zh": [
+              "工作成果"
+            ]
+          },
+          "line": {
+            "en": [
+              "Code and",
+              "documents"
+            ],
+            "zh": [
+              "代码与文档"
+            ]
+          },
+          "color": "navy"
+        },
+        {
+          "type": "arrow",
+          "pts": [
+            [
+              314,
+              305
+            ],
+            [
+              405,
+              305
+            ]
+          ],
+          "label": {
+            "x": 359,
+            "y": 288,
+            "t": {
+              "en": "You ask",
+              "zh": "提需求"
+            }
+          },
+          "color": "blue"
+        },
+        {
+          "type": "arrow",
+          "pts": [
+            [
+              669,
+              305
+            ],
+            [
+              775,
+              305
+            ]
+          ],
+          "label": {
+            "x": 722,
+            "y": 288,
+            "t": {
+              "en": "They work",
+              "zh": "干活"
+            }
+          },
+          "color": "orange"
+        },
+        {
+          "type": "arrow",
+          "pts": [
+            [
+              1039,
+              305
+            ],
+            [
+              1130,
+              305
+            ]
+          ],
+          "label": {
+            "x": 1084,
+            "y": 288,
+            "t": {
+              "en": "Hand in",
+              "zh": "提交"
+            }
+          },
+          "color": "orange"
+        },
+        {
+          "type": "arrow",
+          "pts": [
+            [
+              1394,
+              305
+            ],
+            [
+              1485,
+              305
+            ]
+          ],
+          "label": {
+            "x": 1439,
+            "y": 288,
+            "t": {
+              "en": "Merged",
+              "zh": "合入"
+            }
+          },
+          "color": "green"
+        },
+        {
+          "type": "arrow",
+          "pts": [
+            [
+              1617,
+              622
+            ],
+            [
+              1617,
+              708
+            ]
+          ],
+          "label": {
+            "x": 1593,
+            "y": 674,
+            "anchor": "end",
+            "t": {
+              "en": "Recorded",
+              "zh": "记录在案"
+            }
+          },
+          "color": "navy"
+        },
+        {
+          "type": "arrow",
+          "pts": [
+            [
+              182,
+              708
+            ],
+            [
+              182,
+              622
+            ]
+          ],
+          "label": {
+            "x": 206,
+            "y": 674,
+            "anchor": "start",
+            "t": {
+              "en": "You decide next",
+              "zh": "用户决定下一步"
+            }
+          },
+          "color": "purple"
+        },
+        {
+          "type": "band",
+          "id": "office",
+          "x": 62,
+          "y": 720,
+          "w": 1675,
+          "h": 230,
+          "image": "logo",
+          "title": {
+            "en": "Mole Office",
+            "zh": "Mole Office"
+          },
+          "line": {
+            "en": "Keeps the project’s record",
+            "zh": "项目的记录都留在这里"
+          },
+          "items": [
+            {
+              "icon": "decision",
+              "t": {
+                "en": "Decisions",
+                "zh": "决定"
+              }
+            },
+            {
+              "icon": "problem",
+              "t": {
+                "en": "Problems",
+                "zh": "问题"
+              }
+            },
+            {
+              "icon": "report",
+              "t": {
+                "en": "Reports",
+                "zh": "报告"
+              }
+            },
+            {
+              "icon": "message",
+              "t": {
+                "en": "Messages",
+                "zh": "消息"
+              }
+            }
+          ],
+          "color": "purple"
+        },
+        {
+          "type": "key",
+          "x": 355,
+          "y": 985,
+          "cols": 5,
+          "colW": 230,
+          "entries": [
+            {
+              "color": "blue",
+              "t": {
+                "en": "You",
+                "zh": "用户"
+              }
+            },
+            {
+              "color": "purple",
+              "t": {
+                "en": "Office",
+                "zh": "办公室"
+              }
+            },
+            {
+              "color": "orange",
+              "t": {
+                "en": "Agents",
+                "zh": "智能体"
+              }
+            },
+            {
+              "color": "green",
+              "t": {
+                "en": "Checks",
+                "zh": "检查"
+              }
+            },
+            {
+              "color": "navy",
+              "t": {
+                "en": "Your work",
+                "zh": "工作成果"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "technical": {
+      "width": 2400,
+      "height": "fit",
+      "budget": 380,
+      "wrap": true,
+      "rules": {
+        "titleWords": 3,
+        "lineWords": 14,
+        "lineHan": 30,
+        "groups": null,
+        "parts": 5,
+        "topBoxes": null,
+        "lineRows": 2,
+        "tileLineRows": 1,
+        "gridTiles": [
+          8,
+          24
+        ]
+      },
+      "svgTitle": {
+        "en": "How Mole Office works: the technical picture",
+        "zh": "Mole Office 技术架构"
+      },
+      "elements": [
+        {
+          "type": "feature",
+          "id": "person",
+          "x": 50,
+          "y": 110,
+          "w": 470,
+          "h": 260,
+          "color": "blue",
+          "title": {
+            "en": "Person",
+            "zh": "用户"
+          },
+          "line": {
+            "en": [
+              "asks, reads",
+              "and decides"
+            ],
+            "zh": [
+              "提问、阅读",
+              "并做决定"
+            ]
+          },
+          "source": {
+            "section": "the person: the one who decides; the person cards",
+            "files": "src/config/roles.json:576-578, :180, :607"
+          },
+          "picture": {
+            "image": "human",
+            "h": 150
+          },
+          "slot": 160
+        },
+        {
+          "type": "feature",
+          "id": "terminal",
+          "x": 560,
+          "y": 110,
+          "w": 470,
+          "h": 123,
+          "color": "blue",
+          "title": {
+            "en": "Terminal",
+            "zh": "终端"
+          },
+          "line": {
+            "en": [
+              "typing to a secretary"
+            ],
+            "zh": [
+              "直接对秘书打字"
+            ]
+          },
+          "source": {
+            "section": "the office's own terminal: words the person types there count as their own",
+            "files": "src/holder/index.mjs:1-20, src/server/api/terminals.ts"
+          },
+          "icon": "terminal",
+          "iconSize": 64,
+          "slot": 70,
+          "titleSize": 40
+        },
+        {
+          "type": "feature",
+          "id": "web",
+          "x": 560,
+          "y": 247,
+          "w": 470,
+          "h": 123,
+          "color": "blue",
+          "title": {
+            "en": "Web app",
+            "zh": "网页应用"
+          },
+          "line": {
+            "en": [
+              "browser or window"
+            ],
+            "zh": [
+              "浏览器或桌面窗口"
+            ]
+          },
+          "source": {
+            "section": "3.3 The web app; the desktop window",
+            "files": "src/web/api.ts:811-844, src/desktop/main.mjs:1-45"
+          },
+          "icon": "window",
+          "iconSize": 64,
+          "slot": 70,
+          "titleSize": 40
+        },
+        {
+          "type": "feature",
+          "id": "secretaries",
+          "x": 1070,
+          "y": 110,
+          "w": 550,
+          "h": 260,
+          "color": "orange",
+          "title": {
+            "en": "Secretaries",
+            "zh": "秘书"
+          },
+          "line": {
+            "en": [
+              "between the person",
+              "and the agents"
+            ],
+            "zh": [
+              "连接用户和",
+              "干活的智能体"
+            ]
+          },
+          "source": {
+            "section": "the secretary card: the agent whose job is the person; it hands large work to supervisors and starts runs",
+            "files": "src/config/roles.json:438, tools/sandbox.mjs:57-62"
+          },
+          "picture": {
+            "image": "secretary",
+            "h": 150
+          },
+          "slot": 170
+        },
+        {
+          "type": "group",
+          "id": "server",
+          "x": 50,
+          "y": 430,
+          "w": 1570,
+          "color": "purple",
+          "picture": {
+            "image": "logo",
+            "h": 90
+          },
+          "title": {
+            "en": [
+              "Mole Office server"
+            ],
+            "zh": [
+              "Mole Office 服务器"
+            ]
+          },
+          "source": {
+            "section": "3.1 The server (one Node process)",
+            "files": "src/server/index.ts"
+          },
+          "grid": [
+            {
+              "heading": {
+                "en": "Project record",
+                "zh": "项目记录"
+              },
+              "icon": "mole-database",
+              "tiles": [
+                {
+                  "icon": "records",
+                  "title": {
+                    "en": [
+                      "Linked records"
+                    ],
+                    "zh": [
+                      "相连的记录"
+                    ]
+                  },
+                  "source": {
+                    "section": "3.1 Records and links; 3.2 every write kept whole",
+                    "files": "api/records.ts, api/links.ts, src/server/db/schema.ts:658, :772, :974"
+                  },
+                  "line": {
+                    "en": [
+                      "full history"
+                    ],
+                    "zh": [
+                      "保留完整历史"
+                    ]
+                  }
+                },
+                {
+                  "icon": "problem",
+                  "title": {
+                    "en": [
+                      "Tasks, problems"
+                    ],
+                    "zh": [
+                      "任务与问题"
+                    ]
+                  },
+                  "source": {
+                    "section": "the work-to-do family of kinds",
+                    "files": "src/shared/work.ts:1228 (KIND_FAMILIES.work)"
+                  }
+                },
+                {
+                  "icon": "pipeline",
+                  "title": {
+                    "en": [
+                      "Pipelines"
+                    ],
+                    "zh": [
+                      "模块与流程"
+                    ]
+                  },
+                  "source": {
+                    "section": "the modules-and-pipelines family of kinds",
+                    "files": "src/shared/work.ts:1228 (KIND_FAMILIES.structure)"
+                  },
+                  "line": {
+                    "en": [
+                      "modules and steps"
+                    ],
+                    "zh": [
+                      "模块与步骤"
+                    ]
+                  }
+                },
+                {
+                  "icon": "idea",
+                  "title": {
+                    "en": [
+                      "Findings, ideas"
+                    ],
+                    "zh": [
+                      "发现与想法"
+                    ]
+                  },
+                  "source": {
+                    "section": "the findings and ideas families of kinds",
+                    "files": "src/shared/work.ts:1228 (KIND_FAMILIES.findings, .ideas)"
+                  }
+                },
+                {
+                  "icon": "report",
+                  "title": {
+                    "en": [
+                      "Reports, notes"
+                    ],
+                    "zh": [
+                      "报告与笔记"
+                    ]
+                  },
+                  "source": {
+                    "section": "3.1 Reports; the reports-and-notes family",
+                    "files": "api/reportfiles.ts, src/shared/work.ts:1228 (KIND_FAMILIES.notes)"
+                  }
+                },
+                {
+                  "icon": "planning",
+                  "title": {
+                    "en": [
+                      "Plans, schedule"
+                    ],
+                    "zh": [
+                      "计划与日程"
+                    ]
+                  },
+                  "source": {
+                    "section": "3.1 Planning",
+                    "files": "api/planning.ts, api/plans.ts, api/goal-spans.ts, api/work.ts"
+                  }
+                },
+                {
+                  "icon": "decision",
+                  "title": {
+                    "en": [
+                      "Goals"
+                    ],
+                    "zh": [
+                      "目标"
+                    ]
+                  },
+                  "source": {
+                    "section": "goals at four horizons",
+                    "files": "kind goal, src/shared/work.ts:1228"
+                  },
+                  "line": {
+                    "en": [
+                      "four horizons"
+                    ],
+                    "zh": [
+                      "四个时间跨度"
+                    ]
+                  }
+                },
+                {
+                  "icon": "backup",
+                  "title": {
+                    "en": [
+                      "Export, backup"
+                    ],
+                    "zh": [
+                      "导出与备份"
+                    ]
+                  },
+                  "source": {
+                    "section": "3.1 Export and import; backups beside the file",
+                    "files": "api/export.ts, api/import.ts, lib/export.ts"
+                  }
+                }
+              ]
+            },
+            {
+              "heading": {
+                "en": "Governance",
+                "zh": "治理"
+              },
+              "icon": "mole-governance",
+              "tiles": [
+                {
+                  "icon": "decision",
+                  "title": {
+                    "en": [
+                      "Decisions"
+                    ],
+                    "zh": [
+                      "提议与决定"
+                    ]
+                  },
+                  "source": {
+                    "section": "3.1 Decisions and what replaces them",
+                    "files": "src/shared/types.ts:382-383, lib/records.ts"
+                  },
+                  "line": {
+                    "en": [
+                      "choices and reasons"
+                    ],
+                    "zh": [
+                      "选择及依据"
+                    ]
+                  }
+                },
+                {
+                  "icon": "regulations",
+                  "title": {
+                    "en": [
+                      "Regulations"
+                    ],
+                    "zh": [
+                      "办公室规定"
+                    ]
+                  },
+                  "source": {
+                    "section": "regulation records, revoked only by the person",
+                    "files": "src/server/lib/office-regulations.ts"
+                  },
+                  "line": {
+                    "en": [
+                      "the person's alone"
+                    ],
+                    "zh": [
+                      "仅用户可定"
+                    ]
+                  }
+                },
+                {
+                  "icon": "lock",
+                  "title": {
+                    "en": [
+                      "Gates"
+                    ],
+                    "zh": [
+                      "关卡"
+                    ]
+                  },
+                  "source": {
+                    "section": "the one gate list: switches and positions",
+                    "files": "src/config/gates.mjs:22-54"
+                  },
+                  "line": {
+                    "en": [
+                      "permission switches"
+                    ],
+                    "zh": [
+                      "权限与规则开关"
+                    ]
+                  }
+                },
+                {
+                  "icon": "office-flow",
+                  "title": {
+                    "en": [
+                      "Office flows"
+                    ],
+                    "zh": [
+                      "办公流程"
+                    ]
+                  },
+                  "source": {
+                    "section": "the flow register (GET /api/flows)",
+                    "files": "kind flow, src/shared/work.ts (KIND_FAMILIES.notes)"
+                  },
+                  "line": {
+                    "en": [
+                      "on the register"
+                    ],
+                    "zh": [
+                      "登记在案"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "heading": {
+                "en": "Roles",
+                "zh": "角色分工"
+              },
+              "icon": "mole-roles",
+              "tiles": [
+                {
+                  "icon": "role-card",
+                  "title": {
+                    "en": [
+                      "Role cards"
+                    ],
+                    "zh": [
+                      "角色卡"
+                    ]
+                  },
+                  "source": {
+                    "section": "role cards and the starting rule",
+                    "files": "src/config/roles.json, src/shared/roles.ts:2320-2357"
+                  },
+                  "line": {
+                    "en": [
+                      "powers and duties"
+                    ],
+                    "zh": [
+                      "各角色的权限与职责"
+                    ]
+                  }
+                },
+                {
+                  "icon": "cast",
+                  "title": {
+                    "en": [
+                      "Casting"
+                    ],
+                    "zh": [
+                      "选角表"
+                    ]
+                  },
+                  "source": {
+                    "section": "the Casting table: role to program, model and effort",
+                    "files": "src/server/db/schema.ts:6217-6250, src/server/lib/casting.ts:164"
+                  },
+                  "line": {
+                    "en": [
+                      "harness and model"
+                    ],
+                    "zh": [
+                      "harness 与模型"
+                    ]
+                  }
+                },
+                {
+                  "icon": "key",
+                  "title": {
+                    "en": [
+                      "Identity, keys"
+                    ],
+                    "zh": [
+                      "身份与密钥"
+                    ]
+                  },
+                  "source": {
+                    "section": "3.10 who sends which key; a temporary key per run",
+                    "files": "src/server/lib/keys.ts:160-195"
+                  },
+                  "line": {
+                    "en": [
+                      "verified on each call"
+                    ],
+                    "zh": [
+                      "每次调用验证身份"
+                    ]
+                  }
+                },
+                {
+                  "icon": "chain",
+                  "title": {
+                    "en": [
+                      "Chain of duty"
+                    ],
+                    "zh": [
+                      "责任链条"
+                    ]
+                  },
+                  "source": {
+                    "section": "who starts whom and who answers for an agent and its work: the starting rule and the role cards",
+                    "files": "src/shared/roles.ts:2320-2357, src/config/roles.json:323-507"
+                  },
+                  "line": {
+                    "en": [
+                      "agent and task owners"
+                    ],
+                    "zh": [
+                      "智能体与任务的负责人"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "heading": {
+                "en": "Coordination",
+                "zh": "协作"
+              },
+              "icon": "mole-coordination",
+              "iconSize": 84,
+              "tiles": [
+                {
+                  "icon": "message",
+                  "title": {
+                    "en": [
+                      "Message centre"
+                    ],
+                    "zh": [
+                      "消息中心"
+                    ]
+                  },
+                  "source": {
+                    "section": "the message centre: one store, a view per project",
+                    "files": "src/shared/workspaces.ts:81-91, src/server/lib/message-centre.ts:14-27"
+                  }
+                },
+                {
+                  "icon": "push",
+                  "title": {
+                    "en": [
+                      "Live updates"
+                    ],
+                    "zh": [
+                      "实时推送"
+                    ]
+                  },
+                  "source": {
+                    "section": "server-sent events to open pages",
+                    "files": "src/server/api/events.ts:353, :374"
+                  }
+                },
+                {
+                  "icon": "waiter",
+                  "title": {
+                    "en": [
+                      "Reminders, counters"
+                    ],
+                    "zh": [
+                      "提醒与计数器"
+                    ]
+                  },
+                  "source": {
+                    "section": "counters and their timed triggers",
+                    "files": "kind counter, src/server/lib"
+                  }
+                },
+                {
+                  "icon": "checklist",
+                  "title": {
+                    "en": [
+                      "To-do lists"
+                    ],
+                    "zh": [
+                      "待办清单"
+                    ]
+                  },
+                  "source": {
+                    "section": "one checklist per person or agent",
+                    "files": "kind checklist"
+                  },
+                  "line": {
+                    "en": [
+                      "for people or agents"
+                    ],
+                    "zh": [
+                      "用户或智能体"
+                    ]
+                  }
+                },
+                {
+                  "icon": "terminal",
+                  "title": {
+                    "en": [
+                      "Agent sessions"
+                    ],
+                    "zh": [
+                      "智能体运行"
+                    ]
+                  },
+                  "source": {
+                    "section": "one session record per agent working session",
+                    "files": "kind session, nav.sessions"
+                  },
+                  "line": {
+                    "en": [
+                      "who is working"
+                    ],
+                    "zh": [
+                      "谁在干活"
+                    ]
+                  }
+                },
+                {
+                  "icon": "gauge",
+                  "title": {
+                    "en": [
+                      "Agent usage"
+                    ],
+                    "zh": [
+                      "智能体使用情况"
+                    ]
+                  },
+                  "source": {
+                    "section": "the usage layer: one row per call",
+                    "files": "src/server/db/schema.ts:3346-3371, src/server/api/usage.ts:173-181"
+                  },
+                  "line": {
+                    "en": [
+                      "API call counts"
+                    ],
+                    "zh": [
+                      "接口调用统计"
+                    ]
+                  }
+                },
+                {
+                  "icon": "records",
+                  "title": {
+                    "en": [
+                      "Context bundles"
+                    ],
+                    "zh": [
+                      "上下文包"
+                    ]
+                  },
+                  "source": {
+                    "section": "what somebody wanted a copy of, and a task packaged for somebody outside the office",
+                    "files": "kind context_bundle, src/server/lib/delegation.ts"
+                  },
+                  "line": {
+                    "en": [
+                      "packed to hand outside"
+                    ],
+                    "zh": [
+                      "项目打包与外包"
+                    ]
+                  }
+                },
+                {
+                  "icon": "worlds",
+                  "title": {
+                    "en": [
+                      "Worlds"
+                    ],
+                    "zh": [
+                      "办公室的世界"
+                    ]
+                  },
+                  "source": {
+                    "section": "worlds and visitors",
+                    "files": "src/server/api/office.ts:1-7 (GET /api/office/worlds), src/server/lib/world.ts, src/web/api-parts/worlds.ts"
+                  },
+                  "line": {
+                    "en": [
+                      "main and other worlds"
+                    ],
+                    "zh": [
+                      "主世界与其他世界"
+                    ]
+                  }
+                }
+              ]
+            }
+          ],
+          "panels": [
+            [
+              2,
+              1
+            ],
+            [
+              0,
+              3
+            ]
+          ],
+          "tileCols": 2,
+          "headingSize": "title",
+          "headingIcon": 72,
+          "tileH": 84,
+          "tileIcon": 58,
+          "tileTitleSize": 30,
+          "tileLineSize": 26
+        },
+        {
+          "type": "feature",
+          "id": "sandbox",
+          "x": 1740,
+          "y": 110,
+          "w": 610,
+          "h": 162,
+          "color": "orange",
+          "title": {
+            "en": "Sandbox",
+            "zh": "沙箱"
+          },
+          "line": {
+            "en": [
+              "isolated agent workspaces"
+            ],
+            "zh": [
+              "主管与工人的隔离工作区"
+            ]
+          },
+          "source": {
+            "section": "3.7 Sandboxes (files, reaching the office); 3.4 A run (runtimes); a check of the code at d9c567ec for DeepSeek; the temporary key ends with the run: it was observed on 30 September, when the run key of one sandbox round was last used at 02:42:20 and revoked at 02:42:27",
+            "files": "tools/sandbox.mjs:5-9, :1259-1260, sandboxes/mole-office-dev/devcontainer.json:7-22, src/config/roles.json:323-507"
+          },
+          "slot": 130,
+          "lineSize": 26,
+          "picture": {
+            "image": "worker",
+            "h": 140
+          },
+          "border": "container"
+        },
+        {
+          "type": "feature",
+          "id": "worker",
+          "x": 1740,
+          "y": 302,
+          "w": 610,
+          "h": 162,
+          "color": "purple",
+          "title": {
+            "en": "Message worker",
+            "zh": "消息处理进程"
+          },
+          "line": {
+            "en": [
+              "starts runs, delivers messages"
+            ],
+            "zh": [
+              "启动运行，投递消息"
+            ]
+          },
+          "source": {
+            "section": "3.4 The message worker; section 4 items 4, 5, 6",
+            "files": "lib/resources.ts:2016-2044, src/worker/index.ts, src/worker/runtimes/index.ts:38-57"
+          },
+          "slot": 130,
+          "lineSize": 26,
+          "icon": "mole-message-worker",
+          "iconSize": 120
+        },
+        {
+          "type": "feature",
+          "id": "plugins",
+          "x": 1740,
+          "y": 494,
+          "w": 610,
+          "h": 162,
+          "color": "purple",
+          "title": {
+            "en": "Plugins",
+            "zh": "插件"
+          },
+          "line": {
+            "en": [
+              "own pages, read-only views"
+            ],
+            "zh": [
+              "独立页面，只读视图"
+            ]
+          },
+          "source": {
+            "section": "plugins: a folder each, pages in a sandboxed frame, read-only views, a switch per office",
+            "files": "src/server/lib/plugins.ts:1-41, src/server/api/plugin-read.ts:1-17, src/server/api/plugins.ts:46-75"
+          },
+          "slot": 130,
+          "lineSize": 26,
+          "icon": "plugin"
+        },
+        {
+          "type": "feature",
+          "id": "toolset",
+          "x": 1740,
+          "y": 686,
+          "w": 610,
+          "h": 162,
+          "color": "purple",
+          "title": {
+            "en": "Toolset",
+            "zh": "工具集"
+          },
+          "line": {
+            "en": [
+              "tools and their manuals"
+            ],
+            "zh": [
+              "工具与说明书"
+            ]
+          },
+          "source": {
+            "section": "the toolset catalogue: categories and tools, each with its manual page",
+            "files": "src/server/api/toolset.ts:1-14, src/server/lib/toolset.ts"
+          },
+          "slot": 130,
+          "lineSize": 26,
+          "icon": "tool"
+        },
+        {
+          "type": "feature",
+          "id": "holder",
+          "x": 1740,
+          "y": 878,
+          "w": 610,
+          "h": 162,
+          "color": "purple",
+          "title": {
+            "en": "Terminal holder",
+            "zh": "终端保持进程"
+          },
+          "line": {
+            "en": [
+              "terminals that survive restarts"
+            ],
+            "zh": [
+              "重启不断的终端"
+            ]
+          },
+          "source": {
+            "section": "the terminal holder: a separate process that owns the terminals; the server reaches it over a local socket",
+            "files": "src/holder/index.mjs:1-20"
+          },
+          "slot": 130,
+          "lineSize": 26,
+          "icon": "holder"
+        },
+        {
+          "type": "feature",
+          "id": "database",
+          "x": 1740,
+          "y": 1070,
+          "w": 610,
+          "h": 162,
+          "color": "purple",
+          "title": {
+            "en": "Database file",
+            "zh": "数据库文件"
+          },
+          "line": {
+            "en": [
+              "server-only access"
+            ],
+            "zh": [
+              "只由服务器读写"
+            ]
+          },
+          "source": {
+            "section": "3.2 The database; the stable upgrade backs up and migrates the live database (since the stable switch a landing moves only the development main)",
+            "files": "src/server/db/client.ts, tools/stable/stable-upgrade-transaction.mjs:1078-1104, tools/merge-tool/the-stable-office.mjs:1-8"
+          },
+          "slot": 130,
+          "lineSize": 26,
+          "icon": "database"
+        },
+        {
+          "type": "feature",
+          "id": "stable",
+          "x": 1740,
+          "y": 1262,
+          "w": 610,
+          "h": 162,
+          "color": "navy",
+          "title": {
+            "en": "Stable copy",
+            "zh": "稳定副本"
+          },
+          "line": {
+            "en": [
+              "the code that runs live"
+            ],
+            "zh": [
+              "正式运行的代码"
+            ]
+          },
+          "source": {
+            "section": "the stable copy: the live office runs from a separate checkout, upgraded by one transaction (build, back up, migrate, restart; back on any failure)",
+            "files": "tools/stable/upgrade-stable.mjs:1-63, tools/stable/stable-upgrade-transaction.mjs:1018-1197"
+          },
+          "slot": 130,
+          "lineSize": 26,
+          "icon": "branch"
+        },
+        {
+          "type": "arrow",
+          "color": "blue",
+          "pts": [
+            [
+              520,
+              171
+            ],
+            [
+              554,
+              171
+            ]
+          ]
+        },
+        {
+          "type": "arrow",
+          "color": "blue",
+          "pts": [
+            [
+              520,
+              308
+            ],
+            [
+              554,
+              308
+            ]
+          ]
+        },
+        {
+          "type": "arrow",
+          "color": "blue",
+          "pts": [
+            [
+              1030,
+              171
+            ],
+            [
+              1064,
+              171
+            ]
+          ]
+        },
+        {
+          "type": "arrow",
+          "color": "blue",
+          "pts": [
+            [
+              1030,
+              308
+            ],
+            [
+              1064,
+              308
+            ]
+          ]
+        },
+        {
+          "type": "arrow",
+          "color": "blue",
+          "pts": [
+            [
+              680,
+              370
+            ],
+            [
+              680,
+              424
+            ]
+          ],
+          "label": {
+            "x": 692,
+            "y": 408,
+            "anchor": "start",
+            "t": {
+              "en": "API calls",
+              "zh": "接口调用"
+            }
+          },
+          "source": {
+            "section": "3.3 How the page calls the server",
+            "files": "src/web/api.ts:811-844"
+          }
+        },
+        {
+          "type": "arrow",
+          "color": "purple",
+          "pts": [
+            [
+              900,
+              430
+            ],
+            [
+              900,
+              376
+            ]
+          ],
+          "label": {
+            "x": 912,
+            "y": 408,
+            "anchor": "start",
+            "t": {
+              "en": "pushes events",
+              "zh": "推送事件"
+            }
+          },
+          "source": {
+            "section": "server-sent events to open pages",
+            "files": "src/server/api/events.ts:353, :374"
+          }
+        },
+        {
+          "type": "arrow",
+          "color": "orange",
+          "pts": [
+            [
+              1360,
+              370
+            ],
+            [
+              1360,
+              424
+            ]
+          ],
+          "label": {
+            "x": 1372,
+            "y": 408,
+            "anchor": "start",
+            "t": {
+              "en": "API calls, own key",
+              "zh": "自带密钥调用"
+            }
+          },
+          "source": {
+            "section": "3.10 Who sends which key: a secretary's own key",
+            "files": "tools/session-hook.mjs:650-667"
+          }
+        },
+        {
+          "type": "arrow",
+          "color": "orange",
+          "pts": [
+            [
+              1360,
+              110
+            ],
+            [
+              1360,
+              65
+            ],
+            [
+              2035,
+              65
+            ],
+            [
+              2035,
+              104
+            ]
+          ],
+          "label": {
+            "x": 1697,
+            "y": 48,
+            "t": {
+              "en": "start runs with the sandbox tool",
+              "zh": "用沙箱工具启动运行"
+            }
+          },
+          "source": {
+            "section": "a secretary starts supervisors in sandboxes with the sandbox tool",
+            "files": "tools/sandbox.mjs:57-62, tools/sandbox-start.mjs:7-8"
+          }
+        },
+        {
+          "type": "arrow",
+          "color": "purple",
+          "pts": [
+            [
+              1740,
+              191
+            ],
+            [
+              1726,
+              191
+            ],
+            [
+              1726,
+              490
+            ],
+            [
+              1626,
+              490
+            ]
+          ],
+          "label": {
+            "x": 1674,
+            "y": 436,
+            "t": {
+              "en": [
+                "API",
+                "calls"
+              ],
+              "zh": [
+                "接口",
+                "调用"
+              ]
+            }
+          },
+          "source": {
+            "section": "runs in sandboxes call the office with their run key",
+            "files": "tools/sandbox.mjs:88-95"
+          }
+        },
+        {
+          "type": "arrow",
+          "color": "purple",
+          "pts": [
+            [
+              1726,
+              383
+            ],
+            [
+              1740,
+              383
+            ]
+          ],
+          "heads": "none"
+        },
+        {
+          "type": "arrow",
+          "color": "purple",
+          "pts": [
+            [
+              1740,
+              575
+            ],
+            [
+              1626,
+              575
+            ]
+          ],
+          "label": {
+            "x": 1680,
+            "y": 531,
+            "t": {
+              "en": [
+                "read",
+                "only"
+              ],
+              "zh": [
+                "只读"
+              ]
+            }
+          },
+          "source": {
+            "section": "a plugin reads the office only through the read-only views",
+            "files": "src/server/api/plugin-read.ts:1-17"
+          }
+        },
+        {
+          "type": "arrow",
+          "color": "purple",
+          "pts": [
+            [
+              1740,
+              767
+            ],
+            [
+              1626,
+              767
+            ]
+          ],
+          "heads": "both"
+        },
+        {
+          "type": "arrow",
+          "color": "purple",
+          "pts": [
+            [
+              1740,
+              959
+            ],
+            [
+              1626,
+              959
+            ]
+          ],
+          "label": {
+            "x": 1680,
+            "y": 915,
+            "t": {
+              "en": [
+                "local",
+                "link"
+              ],
+              "zh": [
+                "本地",
+                "连接"
+              ]
+            }
+          },
+          "source": {
+            "section": "the server talks to the terminal holder over a local socket",
+            "files": "src/holder/index.mjs:1-20"
+          },
+          "heads": "both"
+        },
+        {
+          "type": "arrow",
+          "color": "purple",
+          "pts": [
+            [
+              1740,
+              1151
+            ],
+            [
+              1626,
+              1151
+            ]
+          ],
+          "label": {
+            "x": 1680,
+            "y": 1107,
+            "t": {
+              "en": [
+                "reads,",
+                "writes"
+              ],
+              "zh": [
+                "读写"
+              ]
+            }
+          },
+          "source": {
+            "section": "3.2 The database: only the server reads and writes it",
+            "files": "src/server/db/client.ts"
+          },
+          "heads": "both"
+        },
+        {
+          "type": "arrow",
+          "color": "navy",
+          "pts": [
+            [
+              1740,
+              1343
+            ],
+            [
+              1626,
+              1343
+            ]
+          ],
+          "label": {
+            "x": 1680,
+            "y": 1329,
+            "t": {
+              "en": "code",
+              "zh": "代码"
+            }
+          },
+          "source": {
+            "section": "the live server runs from the stable copy",
+            "files": "tools/merge-tool/the-stable-office.mjs:1-8"
+          }
+        },
+        {
+          "type": "key",
+          "x": 60,
+          "y": 1474,
+          "cols": 5,
+          "colW": 460,
+          "rowH": 50,
+          "entries": [
+            {
+              "color": "blue",
+              "t": {
+                "en": "The person, ways in",
+                "zh": "用户和接口"
+              }
+            },
+            {
+              "color": "purple",
+              "t": {
+                "en": "The office",
+                "zh": "办公室"
+              }
+            },
+            {
+              "color": "orange",
+              "t": {
+                "en": "Agents, sandboxes",
+                "zh": "智能体与沙箱"
+              }
+            },
+            {
+              "color": "navy",
+              "t": {
+                "en": "The code it runs",
+                "zh": "运行的代码"
+              }
+            },
+            {
+              "boundary": "container",
+              "t": {
+                "en": "A container",
+                "zh": "容器"
+              }
+            }
+          ]
+        }
+      ],
+      "lineSize": "label",
+      "tileTitleSize": "line",
+      "stepTitleSize": "line",
+      "minPxAt1200": 12
+    },
+    "flow": {
+      "width": 2400,
+      "height": "fit",
+      "budget": 200,
+      "minPxAt1200": 12,
+      "wrap": true,
+      "rules": {
+        "titleWords": 3,
+        "lineWords": 14,
+        "lineHan": 30,
+        "groups": null,
+        "parts": 5,
+        "topBoxes": null,
+        "lineRows": 2,
+        "tileLineRows": 1,
+        "gridTiles": [
+          8,
+          24
+        ]
+      },
+      "svgTitle": {
+        "en": "Mole Office: one round from item to landing",
+        "zh": "Mole Office 开发流程：一轮从需求到合入"
+      },
+      "elements": [
+        {
+          "type": "feature",
+          "id": "s1",
+          "x": 40,
+          "y": 60,
+          "w": 550,
+          "h": 190,
+          "color": "orange",
+          "title": {
+            "en": "1  Next item",
+            "zh": "1  下一项"
+          },
+          "line": {
+            "en": [
+              "from a list or a handoff"
+            ],
+            "zh": [
+              "来自需求清单或交接"
+            ]
+          },
+          "source": {
+            "section": "the merge queue states, the inspector, the merger and the bus",
+            "files": "src/shared/merge-queue.ts:83, :110-216; tools/the-inspector.mjs:6-25; tools/the-merger.mjs:107-194; tools/merge-tool/pairs.mjs:1-10"
+          },
+          "titleSize": 36,
+          "lineSize": 26,
+          "slot": 110,
+          "picture": {
+            "image": "secretary",
+            "h": 110
+          }
+        },
+        {
+          "type": "feature",
+          "id": "s2",
+          "x": 630,
+          "y": 60,
+          "w": 550,
+          "h": 190,
+          "color": "orange",
+          "title": {
+            "en": "2  Round started",
+            "zh": "2  开始一轮"
+          },
+          "line": {
+            "en": [
+              "a branch from main"
+            ],
+            "zh": [
+              "从主线新开分支"
+            ]
+          },
+          "source": {
+            "section": "the merge queue states, the inspector, the merger and the bus",
+            "files": "src/shared/merge-queue.ts:83, :110-216; tools/the-inspector.mjs:6-25; tools/the-merger.mjs:107-194; tools/merge-tool/pairs.mjs:1-10"
+          },
+          "titleSize": 36,
+          "lineSize": 26,
+          "slot": 110,
+          "picture": {
+            "image": "supervisor",
+            "h": 110
+          }
+        },
+        {
+          "type": "feature",
+          "id": "s3",
+          "x": 1220,
+          "y": 60,
+          "w": 550,
+          "h": 190,
+          "color": "orange",
+          "title": {
+            "en": "3  Built",
+            "zh": "3  动手做"
+          },
+          "line": {
+            "en": [
+              "failing check, then change"
+            ],
+            "zh": [
+              "先写失败的检查，再改"
+            ]
+          },
+          "source": {
+            "section": "the merge queue states, the inspector, the merger and the bus",
+            "files": "src/shared/merge-queue.ts:83, :110-216; tools/the-inspector.mjs:6-25; tools/the-merger.mjs:107-194; tools/merge-tool/pairs.mjs:1-10"
+          },
+          "titleSize": 36,
+          "lineSize": 26,
+          "slot": 110,
+          "picture": {
+            "image": "worker",
+            "h": 110
+          }
+        },
+        {
+          "type": "feature",
+          "id": "s4",
+          "x": 1810,
+          "y": 60,
+          "w": 550,
+          "h": 190,
+          "color": "orange",
+          "title": {
+            "en": "4  Sealed",
+            "zh": "4  封存"
+          },
+          "line": {
+            "en": [
+              "commit fixed by hashes"
+            ],
+            "zh": [
+              "按哈希固定提交"
+            ]
+          },
+          "source": {
+            "section": "the merge queue states, the inspector, the merger and the bus",
+            "files": "src/shared/merge-queue.ts:83, :110-216; tools/the-inspector.mjs:6-25; tools/the-merger.mjs:107-194; tools/merge-tool/pairs.mjs:1-10"
+          },
+          "titleSize": 36,
+          "lineSize": 26,
+          "slot": 110,
+          "icon": "lock"
+        },
+        {
+          "type": "feature",
+          "id": "s5",
+          "x": 1930,
+          "y": 420,
+          "w": 430,
+          "h": 190,
+          "color": "green",
+          "title": {
+            "en": "5  Judged",
+            "zh": "5  审查"
+          },
+          "line": {
+            "en": [
+              "released or refused"
+            ],
+            "zh": [
+              "放行或退回"
+            ]
+          },
+          "source": {
+            "section": "the merge queue states, the inspector, the merger and the bus",
+            "files": "src/shared/merge-queue.ts:83, :110-216; tools/the-inspector.mjs:6-25; tools/the-merger.mjs:107-194; tools/merge-tool/pairs.mjs:1-10"
+          },
+          "titleSize": 36,
+          "lineSize": 26,
+          "slot": 110,
+          "picture": {
+            "image": "inspector",
+            "h": 110
+          }
+        },
+        {
+          "type": "feature",
+          "id": "s6",
+          "x": 1460,
+          "y": 420,
+          "w": 430,
+          "h": 190,
+          "color": "green",
+          "title": {
+            "en": "6  Integrated",
+            "zh": "6  整合"
+          },
+          "line": {
+            "en": [
+              "rebased in its lane"
+            ],
+            "zh": [
+              "在自己的道里变基"
+            ]
+          },
+          "source": {
+            "section": "the merge queue states, the inspector, the merger and the bus",
+            "files": "src/shared/merge-queue.ts:83, :110-216; tools/the-inspector.mjs:6-25; tools/the-merger.mjs:107-194; tools/merge-tool/pairs.mjs:1-10"
+          },
+          "titleSize": 36,
+          "lineSize": 26,
+          "slot": 110,
+          "icon": "merge-tool"
+        },
+        {
+          "type": "feature",
+          "id": "s7",
+          "x": 990,
+          "y": 420,
+          "w": 430,
+          "h": 190,
+          "color": "green",
+          "title": {
+            "en": "7  Re-checked",
+            "zh": "7  复查"
+          },
+          "line": {
+            "en": [
+              "only what changed"
+            ],
+            "zh": [
+              "只查改动部分"
+            ]
+          },
+          "source": {
+            "section": "the merge queue states, the inspector, the merger and the bus",
+            "files": "src/shared/merge-queue.ts:83, :110-216; tools/the-inspector.mjs:6-25; tools/the-merger.mjs:107-194; tools/merge-tool/pairs.mjs:1-10"
+          },
+          "titleSize": 36,
+          "lineSize": 26,
+          "slot": 110,
+          "icon": "inspector"
+        },
+        {
+          "type": "feature",
+          "id": "s8",
+          "x": 520,
+          "y": 420,
+          "w": 430,
+          "h": 190,
+          "color": "green",
+          "title": {
+            "en": "8  Tested",
+            "zh": "8  测试"
+          },
+          "line": {
+            "en": [
+              "a bus of up to 8"
+            ],
+            "zh": [
+              "最多 8 个一车"
+            ]
+          },
+          "source": {
+            "section": "the merge queue states, the inspector, the merger and the bus",
+            "files": "src/shared/merge-queue.ts:83, :110-216; tools/the-inspector.mjs:6-25; tools/the-merger.mjs:107-194; tools/merge-tool/pairs.mjs:1-10"
+          },
+          "titleSize": 36,
+          "lineSize": 26,
+          "slot": 110,
+          "icon": "machine"
+        },
+        {
+          "type": "feature",
+          "id": "s9",
+          "x": 50,
+          "y": 420,
+          "w": 430,
+          "h": 190,
+          "color": "green",
+          "title": {
+            "en": "9  Landed",
+            "zh": "9  合入"
+          },
+          "line": {
+            "en": [
+              "main moves, pushed"
+            ],
+            "zh": [
+              "主线前进并推送"
+            ]
+          },
+          "source": {
+            "section": "the merge queue states, the inspector, the merger and the bus",
+            "files": "src/shared/merge-queue.ts:83, :110-216; tools/the-inspector.mjs:6-25; tools/the-merger.mjs:107-194; tools/merge-tool/pairs.mjs:1-10"
+          },
+          "titleSize": 36,
+          "lineSize": 26,
+          "slot": 110,
+          "icon": "branch"
+        },
+        {
+          "type": "feature",
+          "id": "stable",
+          "x": 50,
+          "y": 780,
+          "w": 430,
+          "h": 190,
+          "color": "navy",
+          "title": {
+            "en": "Stable copy",
+            "zh": "稳定副本"
+          },
+          "line": {
+            "en": [
+              "upgraded, then live"
+            ],
+            "zh": [
+              "升级后正式运行"
+            ]
+          },
+          "source": {
+            "section": "the merge queue states, the inspector, the merger and the bus",
+            "files": "src/shared/merge-queue.ts:83, :110-216; tools/the-inspector.mjs:6-25; tools/the-merger.mjs:107-194; tools/merge-tool/pairs.mjs:1-10"
+          },
+          "titleSize": 36,
+          "lineSize": 26,
+          "slot": 110,
+          "icon": "branch"
+        },
+        {
+          "type": "feature",
+          "id": "cloud",
+          "x": 520,
+          "y": 780,
+          "w": 430,
+          "h": 190,
+          "color": "navy",
+          "title": {
+            "en": "Cloud machine",
+            "zh": "云端机器"
+          },
+          "line": {
+            "en": [
+              "runs the whole suite"
+            ],
+            "zh": [
+              "跑完整测试"
+            ]
+          },
+          "source": {
+            "section": "the merge queue states, the inspector, the merger and the bus",
+            "files": "src/shared/merge-queue.ts:83, :110-216; tools/the-inspector.mjs:6-25; tools/the-merger.mjs:107-194; tools/merge-tool/pairs.mjs:1-10"
+          },
+          "titleSize": 36,
+          "lineSize": 26,
+          "slot": 110,
+          "icon": "machine"
+        },
+        {
+          "type": "feature",
+          "id": "fix",
+          "x": 990,
+          "y": 780,
+          "w": 430,
+          "h": 190,
+          "color": "green",
+          "title": {
+            "en": "Fixed on entry",
+            "zh": "就地修复"
+          },
+          "line": {
+            "en": [
+              "fix commit, re-check"
+            ],
+            "zh": [
+              "修复提交后复查"
+            ]
+          },
+          "source": {
+            "section": "the merge queue states, the inspector, the merger and the bus",
+            "files": "src/shared/merge-queue.ts:83, :110-216; tools/the-inspector.mjs:6-25; tools/the-merger.mjs:107-194; tools/merge-tool/pairs.mjs:1-10"
+          },
+          "titleSize": 36,
+          "lineSize": 26,
+          "slot": 110,
+          "icon": "tool"
+        },
+        {
+          "type": "arrow",
+          "color": "orange",
+          "pts": [
+            [
+              590,
+              155
+            ],
+            [
+              624,
+              155
+            ]
+          ]
+        },
+        {
+          "type": "arrow",
+          "color": "orange",
+          "pts": [
+            [
+              1180,
+              155
+            ],
+            [
+              1214,
+              155
+            ]
+          ]
+        },
+        {
+          "type": "arrow",
+          "color": "orange",
+          "pts": [
+            [
+              1770,
+              155
+            ],
+            [
+              1804,
+              155
+            ]
+          ]
+        },
+        {
+          "type": "arrow",
+          "color": "green",
+          "pts": [
+            [
+              2085,
+              250
+            ],
+            [
+              2085,
+              414
+            ]
+          ]
+        },
+        {
+          "type": "arrow",
+          "color": "green",
+          "pts": [
+            [
+              1930,
+              515
+            ],
+            [
+              1896,
+              515
+            ]
+          ]
+        },
+        {
+          "type": "arrow",
+          "color": "green",
+          "pts": [
+            [
+              1460,
+              515
+            ],
+            [
+              1426,
+              515
+            ]
+          ]
+        },
+        {
+          "type": "arrow",
+          "color": "green",
+          "pts": [
+            [
+              990,
+              515
+            ],
+            [
+              956,
+              515
+            ]
+          ]
+        },
+        {
+          "type": "arrow",
+          "color": "green",
+          "pts": [
+            [
+              520,
+              515
+            ],
+            [
+              486,
+              515
+            ]
+          ]
+        },
+        {
+          "type": "arrow",
+          "color": "orange",
+          "pts": [
+            [
+              1990,
+              420
+            ],
+            [
+              1990,
+              340
+            ],
+            [
+              905,
+              340
+            ]
+          ],
+          "label": {
+            "x": 1447,
+            "y": 326,
+            "t": {
+              "en": "refused",
+              "zh": "退回"
+            }
+          },
+          "source": {
+            "section": "the merge queue states, the inspector, the merger and the bus",
+            "files": "src/shared/merge-queue.ts:83, :110-216; tools/the-inspector.mjs:6-25; tools/the-merger.mjs:107-194; tools/merge-tool/pairs.mjs:1-10"
+          },
+          "heads": "none"
+        },
+        {
+          "type": "arrow",
+          "color": "orange",
+          "pts": [
+            [
+              580,
+              420
+            ],
+            [
+              580,
+              340
+            ],
+            [
+              905,
+              340
+            ]
+          ],
+          "label": {
+            "x": 742,
+            "y": 326,
+            "t": {
+              "en": "bounced",
+              "zh": "弹回"
+            }
+          },
+          "source": {
+            "section": "the merge queue states, the inspector, the merger and the bus",
+            "files": "src/shared/merge-queue.ts:83, :110-216; tools/the-inspector.mjs:6-25; tools/the-merger.mjs:107-194; tools/merge-tool/pairs.mjs:1-10"
+          },
+          "heads": "none"
+        },
+        {
+          "type": "arrow",
+          "color": "orange",
+          "pts": [
+            [
+              905,
+              340
+            ],
+            [
+              905,
+              256
+            ]
+          ]
+        },
+        {
+          "type": "arrow",
+          "color": "green",
+          "pts": [
+            [
+              950,
+              560
+            ],
+            [
+              970,
+              560
+            ],
+            [
+              970,
+              875
+            ],
+            [
+              984,
+              875
+            ]
+          ],
+          "label": {
+            "x": 962,
+            "y": 700,
+            "anchor": "end",
+            "t": {
+              "en": "red",
+              "zh": "变红"
+            }
+          },
+          "source": {
+            "section": "the merge queue states, the inspector, the merger and the bus",
+            "files": "src/shared/merge-queue.ts:83, :110-216; tools/the-inspector.mjs:6-25; tools/the-merger.mjs:107-194; tools/merge-tool/pairs.mjs:1-10"
+          }
+        },
+        {
+          "type": "arrow",
+          "color": "green",
+          "pts": [
+            [
+              1205,
+              780
+            ],
+            [
+              1205,
+              616
+            ]
+          ],
+          "label": {
+            "x": 1217,
+            "y": 670,
+            "anchor": "start",
+            "t": {
+              "en": "re-check",
+              "zh": "复查"
+            }
+          },
+          "source": {
+            "section": "the merge queue states, the inspector, the merger and the bus",
+            "files": "src/shared/merge-queue.ts:83, :110-216; tools/the-inspector.mjs:6-25; tools/the-merger.mjs:107-194; tools/merge-tool/pairs.mjs:1-10"
+          }
+        },
+        {
+          "type": "arrow",
+          "color": "navy",
+          "pts": [
+            [
+              670,
+              610
+            ],
+            [
+              670,
+              774
+            ]
+          ],
+          "label": {
+            "x": 682,
+            "y": 670,
+            "anchor": "start",
+            "t": {
+              "en": "whole suite",
+              "zh": "完整测试"
+            }
+          },
+          "source": {
+            "section": "the merge queue states, the inspector, the merger and the bus",
+            "files": "src/shared/merge-queue.ts:83, :110-216; tools/the-inspector.mjs:6-25; tools/the-merger.mjs:107-194; tools/merge-tool/pairs.mjs:1-10"
+          },
+          "heads": "both"
+        },
+        {
+          "type": "arrow",
+          "color": "navy",
+          "pts": [
+            [
+              265,
+              610
+            ],
+            [
+              265,
+              774
+            ]
+          ],
+          "label": {
+            "x": 277,
+            "y": 670,
+            "anchor": "start",
+            "t": {
+              "en": "upgrade",
+              "zh": "升级"
+            }
+          },
+          "source": {
+            "section": "the merge queue states, the inspector, the merger and the bus",
+            "files": "src/shared/merge-queue.ts:83, :110-216; tools/the-inspector.mjs:6-25; tools/the-merger.mjs:107-194; tools/merge-tool/pairs.mjs:1-10"
+          }
+        },
+        {
+          "type": "key",
+          "x": 1450,
+          "y": 820,
+          "cols": 1,
+          "colW": 600,
+          "rowH": 56,
+          "entries": [
+            {
+              "color": "orange",
+              "t": {
+                "en": "Agents at work",
+                "zh": "智能体干活"
+              }
+            },
+            {
+              "color": "green",
+              "t": {
+                "en": "Checks and merging",
+                "zh": "检查与合入"
+              }
+            },
+            {
+              "color": "navy",
+              "t": {
+                "en": "Machines and the live code",
+                "zh": "机器与正式代码"
+              }
+            }
+          ]
+        }
+      ],
+      "lineSize": "label",
+      "tileTitleSize": "line",
+      "stepTitleSize": "line"
+    },
+    "roles": {
+      "width": 2400,
+      "height": 740,
+      "budget": 200,
+      "minPxAt1200": 12,
+      "wrap": true,
+      "rules": {
+        "titleWords": 3,
+        "lineWords": 14,
+        "lineHan": 30,
+        "groups": null,
+        "parts": 5,
+        "topBoxes": null,
+        "lineRows": 2,
+        "tileLineRows": 1,
+        "gridTiles": [
+          8,
+          24
+        ]
+      },
+      "svgTitle": {
+        "en": "Mole Office: the roles and how they relate",
+        "zh": "Mole Office 的角色与关系"
+      },
+      "elements": [
+        {
+          "type": "feature",
+          "id": "person",
+          "x": 40,
+          "y": 60,
+          "w": 480,
+          "h": 200,
+          "color": "blue",
+          "title": {
+            "en": "Person",
+            "zh": "用户"
+          },
+          "line": {
+            "en": [
+              "decides; sets rules"
+            ],
+            "zh": [
+              "做决定、定规矩"
+            ]
+          },
+          "source": {
+            "section": "the role cards, the starting rule, the message worker, the inspector and the merge tool",
+            "files": "src/config/roles.json; src/shared/roles.ts:2320-2357; src/worker/index.ts:3-40; tools/the-inspector.mjs:6-25; tools/the-merger.mjs"
+          },
+          "titleSize": 40,
+          "lineSize": 26,
+          "slot": 130,
+          "picture": {
+            "image": "human",
+            "h": 130
+          }
+        },
+        {
+          "type": "feature",
+          "id": "secretaries",
+          "x": 650,
+          "y": 60,
+          "w": 500,
+          "h": 200,
+          "color": "orange",
+          "title": {
+            "en": "Secretaries",
+            "zh": "秘书"
+          },
+          "line": {
+            "en": [
+              "link to the agents"
+            ],
+            "zh": [
+              "连接用户和智能体"
+            ]
+          },
+          "source": {
+            "section": "the role cards, the starting rule, the message worker, the inspector and the merge tool",
+            "files": "src/config/roles.json; src/shared/roles.ts:2320-2357; src/worker/index.ts:3-40; tools/the-inspector.mjs:6-25; tools/the-merger.mjs"
+          },
+          "titleSize": 40,
+          "lineSize": 26,
+          "slot": 130,
+          "picture": {
+            "image": "secretary",
+            "h": 130
+          }
+        },
+        {
+          "type": "feature",
+          "id": "supervisors",
+          "x": 1280,
+          "y": 60,
+          "w": 500,
+          "h": 200,
+          "color": "orange",
+          "title": {
+            "en": "Supervisors",
+            "zh": "主管"
+          },
+          "line": {
+            "en": [
+              "one line of work each"
+            ],
+            "zh": [
+              "各管一条工作线"
+            ]
+          },
+          "source": {
+            "section": "the role cards, the starting rule, the message worker, the inspector and the merge tool",
+            "files": "src/config/roles.json; src/shared/roles.ts:2320-2357; src/worker/index.ts:3-40; tools/the-inspector.mjs:6-25; tools/the-merger.mjs"
+          },
+          "titleSize": 40,
+          "lineSize": 26,
+          "slot": 130,
+          "picture": {
+            "image": "supervisor",
+            "h": 130
+          }
+        },
+        {
+          "type": "feature",
+          "id": "workers",
+          "x": 1910,
+          "y": 60,
+          "w": 450,
+          "h": 200,
+          "color": "orange",
+          "title": {
+            "en": "Workers",
+            "zh": "工人"
+          },
+          "line": {
+            "en": [
+              "one task each"
+            ],
+            "zh": [
+              "各做一件事"
+            ]
+          },
+          "source": {
+            "section": "the role cards, the starting rule, the message worker, the inspector and the merge tool",
+            "files": "src/config/roles.json; src/shared/roles.ts:2320-2357; src/worker/index.ts:3-40; tools/the-inspector.mjs:6-25; tools/the-merger.mjs"
+          },
+          "titleSize": 40,
+          "lineSize": 26,
+          "slot": 130,
+          "picture": {
+            "image": "worker",
+            "h": 130
+          }
+        },
+        {
+          "type": "feature",
+          "id": "msgworker",
+          "x": 650,
+          "y": 430,
+          "w": 500,
+          "h": 200,
+          "color": "purple",
+          "title": {
+            "en": "Message worker",
+            "zh": "消息处理进程"
+          },
+          "line": {
+            "en": [
+              "messages; starts agents"
+            ],
+            "zh": [
+              "传消息、启动智能体"
+            ]
+          },
+          "source": {
+            "section": "the role cards, the starting rule, the message worker, the inspector and the merge tool",
+            "files": "src/config/roles.json; src/shared/roles.ts:2320-2357; src/worker/index.ts:3-40; tools/the-inspector.mjs:6-25; tools/the-merger.mjs"
+          },
+          "titleSize": 40,
+          "lineSize": 26,
+          "slot": 130,
+          "icon": "mole-message-worker",
+          "iconSize": 120
+        },
+        {
+          "type": "feature",
+          "id": "inspector",
+          "x": 1280,
+          "y": 430,
+          "w": 500,
+          "h": 200,
+          "color": "green",
+          "title": {
+            "en": "Inspector",
+            "zh": "检查员"
+          },
+          "line": {
+            "en": [
+              "appointed by the person"
+            ],
+            "zh": [
+              "由用户任命，独立审查"
+            ]
+          },
+          "source": {
+            "section": "the role cards, the starting rule, the message worker, the inspector and the merge tool",
+            "files": "src/config/roles.json; src/shared/roles.ts:2320-2357; src/worker/index.ts:3-40; tools/the-inspector.mjs:6-25; tools/the-merger.mjs"
+          },
+          "titleSize": 40,
+          "lineSize": 26,
+          "slot": 130,
+          "picture": {
+            "image": "inspector",
+            "h": 130
+          }
+        },
+        {
+          "type": "feature",
+          "id": "mergetool",
+          "x": 1910,
+          "y": 430,
+          "w": 450,
+          "h": 200,
+          "color": "green",
+          "title": {
+            "en": "Merge tool",
+            "zh": "合并工具"
+          },
+          "line": {
+            "en": [
+              "tests, then lands"
+            ],
+            "zh": [
+              "测试并合入每一轮"
+            ]
+          },
+          "source": {
+            "section": "the role cards, the starting rule, the message worker, the inspector and the merge tool",
+            "files": "src/config/roles.json; src/shared/roles.ts:2320-2357; src/worker/index.ts:3-40; tools/the-inspector.mjs:6-25; tools/the-merger.mjs"
+          },
+          "titleSize": 40,
+          "lineSize": 26,
+          "slot": 130,
+          "icon": "merge-tool"
+        },
+        {
+          "type": "arrow",
+          "color": "orange",
+          "pts": [
+            [
+              520,
+              130
+            ],
+            [
+              644,
+              130
+            ]
+          ],
+          "label": {
+            "x": 585,
+            "y": 116,
+            "t": {
+              "en": "appoints",
+              "zh": "任命"
+            }
+          },
+          "source": {
+            "section": "the role cards, the starting rule, the message worker, the inspector and the merge tool",
+            "files": "src/config/roles.json; src/shared/roles.ts:2320-2357; src/worker/index.ts:3-40; tools/the-inspector.mjs:6-25; tools/the-merger.mjs"
+          }
+        },
+        {
+          "type": "arrow",
+          "color": "orange",
+          "pts": [
+            [
+              650,
+              190
+            ],
+            [
+              526,
+              190
+            ]
+          ],
+          "label": {
+            "x": 585,
+            "y": 222,
+            "t": {
+              "en": "reports",
+              "zh": "汇报"
+            }
+          },
+          "source": {
+            "section": "the role cards, the starting rule, the message worker, the inspector and the merge tool",
+            "files": "src/config/roles.json; src/shared/roles.ts:2320-2357; src/worker/index.ts:3-40; tools/the-inspector.mjs:6-25; tools/the-merger.mjs"
+          }
+        },
+        {
+          "type": "arrow",
+          "color": "orange",
+          "pts": [
+            [
+              1150,
+              130
+            ],
+            [
+              1274,
+              130
+            ]
+          ],
+          "label": {
+            "x": 1215,
+            "y": 116,
+            "t": {
+              "en": "starts",
+              "zh": "启动"
+            }
+          },
+          "source": {
+            "section": "the role cards, the starting rule, the message worker, the inspector and the merge tool",
+            "files": "src/config/roles.json; src/shared/roles.ts:2320-2357; src/worker/index.ts:3-40; tools/the-inspector.mjs:6-25; tools/the-merger.mjs"
+          }
+        },
+        {
+          "type": "arrow",
+          "color": "orange",
+          "pts": [
+            [
+              1280,
+              190
+            ],
+            [
+              1156,
+              190
+            ]
+          ],
+          "label": {
+            "x": 1215,
+            "y": 222,
+            "t": {
+              "en": "reports",
+              "zh": "汇报"
+            }
+          },
+          "source": {
+            "section": "the role cards, the starting rule, the message worker, the inspector and the merge tool",
+            "files": "src/config/roles.json; src/shared/roles.ts:2320-2357; src/worker/index.ts:3-40; tools/the-inspector.mjs:6-25; tools/the-merger.mjs"
+          }
+        },
+        {
+          "type": "arrow",
+          "color": "orange",
+          "pts": [
+            [
+              1780,
+              130
+            ],
+            [
+              1904,
+              130
+            ]
+          ],
+          "label": {
+            "x": 1845,
+            "y": 116,
+            "t": {
+              "en": "starts",
+              "zh": "启动"
+            }
+          },
+          "source": {
+            "section": "the role cards, the starting rule, the message worker, the inspector and the merge tool",
+            "files": "src/config/roles.json; src/shared/roles.ts:2320-2357; src/worker/index.ts:3-40; tools/the-inspector.mjs:6-25; tools/the-merger.mjs"
+          }
+        },
+        {
+          "type": "arrow",
+          "color": "orange",
+          "pts": [
+            [
+              1910,
+              190
+            ],
+            [
+              1786,
+              190
+            ]
+          ],
+          "label": {
+            "x": 1845,
+            "y": 222,
+            "t": {
+              "en": "reports",
+              "zh": "汇报"
+            }
+          },
+          "source": {
+            "section": "the role cards, the starting rule, the message worker, the inspector and the merge tool",
+            "files": "src/config/roles.json; src/shared/roles.ts:2320-2357; src/worker/index.ts:3-40; tools/the-inspector.mjs:6-25; tools/the-merger.mjs"
+          }
+        },
+        {
+          "type": "arrow",
+          "color": "purple",
+          "pts": [
+            [
+              900,
+              260
+            ],
+            [
+              900,
+              430
+            ]
+          ],
+          "label": {
+            "x": 912,
+            "y": 353,
+            "anchor": "start",
+            "t": {
+              "en": "messages",
+              "zh": "消息"
+            }
+          },
+          "source": {
+            "section": "the role cards, the starting rule, the message worker, the inspector and the merge tool",
+            "files": "src/config/roles.json; src/shared/roles.ts:2320-2357; src/worker/index.ts:3-40; tools/the-inspector.mjs:6-25; tools/the-merger.mjs"
+          },
+          "heads": "both"
+        },
+        {
+          "type": "arrow",
+          "color": "green",
+          "pts": [
+            [
+              1530,
+              260
+            ],
+            [
+              1530,
+              424
+            ]
+          ],
+          "label": {
+            "x": 1542,
+            "y": 353,
+            "anchor": "start",
+            "t": {
+              "en": "a sealed round",
+              "zh": "封存的一轮"
+            }
+          },
+          "source": {
+            "section": "the role cards, the starting rule, the message worker, the inspector and the merge tool",
+            "files": "src/config/roles.json; src/shared/roles.ts:2320-2357; src/worker/index.ts:3-40; tools/the-inspector.mjs:6-25; tools/the-merger.mjs"
+          }
+        },
+        {
+          "type": "arrow",
+          "color": "green",
+          "pts": [
+            [
+              1780,
+              530
+            ],
+            [
+              1904,
+              530
+            ]
+          ],
+          "label": {
+            "x": 1845,
+            "y": 516,
+            "t": {
+              "en": "released",
+              "zh": "放行"
+            }
+          },
+          "source": {
+            "section": "the role cards, the starting rule, the message worker, the inspector and the merge tool",
+            "files": "src/config/roles.json; src/shared/roles.ts:2320-2357; src/worker/index.ts:3-40; tools/the-inspector.mjs:6-25; tools/the-merger.mjs"
+          }
+        },
+        {
+          "type": "key",
+          "x": 70,
+          "y": 460,
+          "cols": 1,
+          "colW": 460,
+          "rowH": 48,
+          "entries": [
+            {
+              "color": "blue",
+              "t": {
+                "en": "The person",
+                "zh": "用户"
+              }
+            },
+            {
+              "color": "orange",
+              "t": {
+                "en": "Agents",
+                "zh": "智能体"
+              }
+            },
+            {
+              "color": "green",
+              "t": {
+                "en": "Checks and merging",
+                "zh": "检查与合入"
+              }
+            },
+            {
+              "color": "purple",
+              "t": {
+                "en": "The office’s programs",
+                "zh": "办公室的程序"
+              }
+            }
+          ]
+        }
+      ],
+      "lineSize": "label",
+      "tileTitleSize": "line",
+      "stepTitleSize": "line"
+    },
+    "path": {
+      "width": 2400,
+      "height": 730,
+      "budget": 200,
+      "minPxAt1200": 12,
+      "wrap": true,
+      "rules": {
+        "titleWords": 3,
+        "lineWords": 14,
+        "lineHan": 30,
+        "groups": null,
+        "parts": 5,
+        "topBoxes": null,
+        "lineRows": 2,
+        "tileLineRows": 1,
+        "gridTiles": [
+          8,
+          24
+        ]
+      },
+      "svgTitle": {
+        "en": "Mole Office: one person's path",
+        "zh": "Mole Office：用户的一条完整路径"
+      },
+      "elements": [
+        {
+          "type": "feature",
+          "id": "p1",
+          "x": 60,
+          "y": 60,
+          "w": 640,
+          "h": 200,
+          "color": "blue",
+          "title": {
+            "en": "1  Asks",
+            "zh": "1  提出"
+          },
+          "line": {
+            "en": [
+              "in the chat or the terminal"
+            ],
+            "zh": [
+              "在聊天或终端里"
+            ]
+          },
+          "source": {
+            "section": "the secretary card, the person's own acts, the terminal holder, the message centre, the development flow",
+            "files": "src/config/roles.json:180, :438, :607; src/holder/index.mjs:1-20; src/server/lib/message-centre.ts:14-27"
+          },
+          "titleSize": 40,
+          "lineSize": 26,
+          "slot": 130,
+          "picture": {
+            "image": "human",
+            "h": 130
+          }
+        },
+        {
+          "type": "feature",
+          "id": "p2",
+          "x": 880,
+          "y": 60,
+          "w": 640,
+          "h": 200,
+          "color": "orange",
+          "title": {
+            "en": "2  Shapes the work",
+            "zh": "2  安排工作"
+          },
+          "line": {
+            "en": [
+              "an item for a supervisor"
+            ],
+            "zh": [
+              "交给主管的一项"
+            ]
+          },
+          "source": {
+            "section": "the secretary card, the person's own acts, the terminal holder, the message centre, the development flow",
+            "files": "src/config/roles.json:180, :438, :607; src/holder/index.mjs:1-20; src/server/lib/message-centre.ts:14-27"
+          },
+          "titleSize": 40,
+          "lineSize": 26,
+          "slot": 130,
+          "picture": {
+            "image": "secretary",
+            "h": 130
+          }
+        },
+        {
+          "type": "feature",
+          "id": "p3",
+          "x": 1700,
+          "y": 60,
+          "w": 640,
+          "h": 200,
+          "color": "orange",
+          "title": {
+            "en": "3  Builds in rounds",
+            "zh": "3  分轮去做"
+          },
+          "line": {
+            "en": [
+              "workers take long parts"
+            ],
+            "zh": [
+              "长任务交给工人"
+            ]
+          },
+          "source": {
+            "section": "the secretary card, the person's own acts, the terminal holder, the message centre, the development flow",
+            "files": "src/config/roles.json:180, :438, :607; src/holder/index.mjs:1-20; src/server/lib/message-centre.ts:14-27"
+          },
+          "titleSize": 40,
+          "lineSize": 26,
+          "slot": 130,
+          "picture": {
+            "image": "supervisor",
+            "h": 130
+          }
+        },
+        {
+          "type": "feature",
+          "id": "p4",
+          "x": 1700,
+          "y": 400,
+          "w": 640,
+          "h": 200,
+          "color": "green",
+          "title": {
+            "en": "4  Checked, landed",
+            "zh": "4  检查并合入"
+          },
+          "line": {
+            "en": [
+              "the inspector, then the queue"
+            ],
+            "zh": [
+              "检查员审查，队列合入"
+            ]
+          },
+          "source": {
+            "section": "the secretary card, the person's own acts, the terminal holder, the message centre, the development flow",
+            "files": "src/config/roles.json:180, :438, :607; src/holder/index.mjs:1-20; src/server/lib/message-centre.ts:14-27"
+          },
+          "titleSize": 40,
+          "lineSize": 26,
+          "slot": 130,
+          "picture": {
+            "image": "inspector",
+            "h": 130
+          }
+        },
+        {
+          "type": "feature",
+          "id": "p5",
+          "x": 880,
+          "y": 400,
+          "w": 640,
+          "h": 200,
+          "color": "orange",
+          "title": {
+            "en": "5  Reports",
+            "zh": "5  汇报"
+          },
+          "line": {
+            "en": [
+              "what changed, what to decide"
+            ],
+            "zh": [
+              "改了什么、要定什么"
+            ]
+          },
+          "source": {
+            "section": "the secretary card, the person's own acts, the terminal holder, the message centre, the development flow",
+            "files": "src/config/roles.json:180, :438, :607; src/holder/index.mjs:1-20; src/server/lib/message-centre.ts:14-27"
+          },
+          "titleSize": 40,
+          "lineSize": 26,
+          "slot": 130,
+          "picture": {
+            "image": "secretary2",
+            "h": 130
+          }
+        },
+        {
+          "type": "feature",
+          "id": "p6",
+          "x": 60,
+          "y": 400,
+          "w": 640,
+          "h": 200,
+          "color": "blue",
+          "title": {
+            "en": "6  Decides",
+            "zh": "6  决定"
+          },
+          "line": {
+            "en": [
+              "kept with the person's words"
+            ],
+            "zh": [
+              "连同原话一起留档"
+            ]
+          },
+          "source": {
+            "section": "the secretary card, the person's own acts, the terminal holder, the message centre, the development flow",
+            "files": "src/config/roles.json:180, :438, :607; src/holder/index.mjs:1-20; src/server/lib/message-centre.ts:14-27"
+          },
+          "titleSize": 40,
+          "lineSize": 26,
+          "slot": 130,
+          "icon": "decision",
+          "iconSize": 90
+        },
+        {
+          "type": "arrow",
+          "color": "orange",
+          "pts": [
+            [
+              700,
+              160
+            ],
+            [
+              874,
+              160
+            ]
+          ]
+        },
+        {
+          "type": "arrow",
+          "color": "orange",
+          "pts": [
+            [
+              1520,
+              160
+            ],
+            [
+              1694,
+              160
+            ]
+          ]
+        },
+        {
+          "type": "arrow",
+          "color": "green",
+          "pts": [
+            [
+              2020,
+              260
+            ],
+            [
+              2020,
+              394
+            ]
+          ]
+        },
+        {
+          "type": "arrow",
+          "color": "orange",
+          "pts": [
+            [
+              1700,
+              500
+            ],
+            [
+              1526,
+              500
+            ]
+          ]
+        },
+        {
+          "type": "arrow",
+          "color": "blue",
+          "pts": [
+            [
+              880,
+              500
+            ],
+            [
+              706,
+              500
+            ]
+          ]
+        },
+        {
+          "type": "arrow",
+          "color": "blue",
+          "pts": [
+            [
+              380,
+              400
+            ],
+            [
+              380,
+              266
+            ]
+          ],
+          "label": {
+            "x": 394,
+            "y": 338,
+            "anchor": "start",
+            "t": {
+              "en": "the next request",
+              "zh": "下一个请求"
+            }
+          },
+          "source": {
+            "section": "the secretary card, the person's own acts, the terminal holder, the message centre, the development flow",
+            "files": "src/config/roles.json:180, :438, :607; src/holder/index.mjs:1-20; src/server/lib/message-centre.ts:14-27"
+          }
+        },
+        {
+          "type": "key",
+          "x": 880,
+          "y": 310,
+          "cols": 3,
+          "colW": 420,
+          "rowH": 50,
+          "entries": [
+            {
+              "color": "blue",
+              "t": {
+                "en": "The person",
+                "zh": "用户"
+              }
+            },
+            {
+              "color": "orange",
+              "t": {
+                "en": "Agents",
+                "zh": "智能体"
+              }
+            },
+            {
+              "color": "green",
+              "t": {
+                "en": "Checks and merging",
+                "zh": "检查与合入"
+              }
+            }
+          ]
+        }
+      ],
+      "lineSize": "label",
+      "tileTitleSize": "line",
+      "stepTitleSize": "line"
+    }
+  }
+}

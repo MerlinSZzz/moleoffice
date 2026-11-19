@@ -1,0 +1,9 @@
+{
+  "id": "office-map",
+  "name": { "en": "Office Map", "zh": "办公地图" },
+  "version": "0.1.0",
+  "interface": "office-read/1",
+  "pages": [{ "slug": "main", "title": { "en": "Office Map", "zh": "办公地图" } }],
+  "reads": ["projects", "roster", "people", "work", "talk", "online", "asleep"],
+  "budget": { "builtKilobytes": 3328 }
+}

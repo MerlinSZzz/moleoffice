@@ -1,0 +1,19 @@
+-- ONE INDEX, SO A CHECK FINDS WHAT THE RUN'S AGENT FILED WITHOUT READING THE WHOLE CHANGE LOG.
+--
+-- A check lists the records the run's agent filed (`everythingThisAgentWrote` in src/server/lib/inspection.ts).
+-- It reads them from the change log's create rows written as an agent, under the agent's stamps. No index of
+-- `changes` started with the actor, so the plan read every row of the log. A copy of the live database taken on
+-- 11 November 2026 held 993,525 change rows in about 2 GB, and 277,108 of them were create rows written as an
+-- agent. On 12 November the live log showed the read take 5.1 to 8.7 s seven times in 75 minutes. Its other
+-- logged runs took 0.18 to 0.33 s. An agent that had filed 46 records waited as long as one that had filed 6,382,
+-- so the time went on the whole log, not on the agent's own rows.
+--
+-- `changes_agent_create_idx` HOLDS ONLY THE CREATE ROWS WRITTEN AS AN AGENT: the stamp, the order written, the
+-- record and the project. Those are all the read takes from the log, so the read finds an agent's rows in the
+-- index and opens no row of the log. It is partial, so an update row, or a row written by a person, adds nothing
+-- to it. SQLite plans three other reads through it as well: the count of an agent's records in
+-- src/server/lib/residents.ts, an agent's recent records in src/server/lib/agentmemory.ts, and the inspector's
+-- changes to what the run's agent filed in src/server/lib/inspection.ts.
+--
+-- ADDITIVE, AND IT REWRITES NOTHING. One CREATE INDEX statement and no UPDATE. The index is not unique.
+CREATE INDEX IF NOT EXISTS `changes_agent_create_idx` ON `changes` (`actor_id`,`append_order`,`record_id`,`workspace_id`) WHERE `op` = 'create' AND `actor_type` = 'agent';

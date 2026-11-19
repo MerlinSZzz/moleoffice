@@ -1,0 +1,13 @@
+-- A PROJECT NAMES ITS MASTER PIPELINE, in one column on the project's own row.
+--
+-- ONE COLUMN ON `workspaces`, because which pipeline is a project's master is one fact about one project. It holds
+-- the record id of a pipeline in the same project, and it is set at PUT /api/projects/:project/master-pipeline. Who
+-- changed it, when and why is written in the office's change log, on the row `setting:master-pipeline:<project>`, so
+-- no second column keeps the reason.
+--
+-- NULL MEANS NOBODY HAS MARKED ONE. The board then says the project has no master pipeline and draws no rows. The one
+-- reader and writer is src/server/lib/master-pipeline.ts, which checks on every read that the record is still a live
+-- pipeline of the project.
+--
+-- ADDITIVE, AND IT REWRITES NOTHING. One ALTER TABLE statement and no UPDATE.
+ALTER TABLE `workspaces` ADD `master_pipeline` text;

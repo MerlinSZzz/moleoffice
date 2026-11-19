@@ -1,0 +1,21 @@
+-- ONE INDEX, SO THE STABLE UPGRADE NOTICES ARE FOUND WITHOUT READING THE FIRST REVISION OF EVERY MESSAGE.
+--
+-- Wave 13q item 1k. Six reads in src/server/lib/stable-upgrade-notices.ts look for a notice: by its send id, by the
+-- notice it ends, for the history, for the earlier emergency releases, for the newest completed release, and for whether
+-- the owner was ever told (`hasOriginalUpgradeNoticeForOwner`, which the messages page asks). Each read the first
+-- revision of every message to find the few that are notices. Each now names the WHERE of the index below, so SQLite
+-- reads only the rows that index holds.
+--
+-- PARTIAL TO THE FIRST REVISION OF A NOTICE, KEYED ON `at` AND THE RECORD. The reads order the notices by `at` and the
+-- record, so the index holds them in that order. Every notice is written by the system line `stableUpgradeNotice`, whose
+-- first revision has `data.notice` set to that word, and the writers check that revision in the same transaction. SQLite
+-- uses a partial index only for a query that names its WHERE terms in the same words;
+-- `theFirstRevisionOfAnUpgradeNotice` in src/server/db/schema.ts holds those words.
+--
+-- READ PLAINLY, WITHOUT A json_valid GUARD. Migration 0277's index on every revision already reads `data` as JSON, so
+-- SQLite refuses a revision whose data is not JSON before this index would read it.
+--
+-- The index holds one entry for each notice and none for any other message. It is not unique, and it changes no row.
+--
+-- ADDITIVE, AND IT REWRITES NOTHING. One CREATE INDEX statement, no UPDATE, no table rebuild and no column change.
+CREATE INDEX IF NOT EXISTS `revisions_first_upgrade_notice_idx` ON `revisions` (`at`, `record_id`) WHERE `seq` = 1 AND `op` = 'create' AND `kind` = 'message' AND json_extract(`data`, '$.notice') = 'stableUpgradeNotice';

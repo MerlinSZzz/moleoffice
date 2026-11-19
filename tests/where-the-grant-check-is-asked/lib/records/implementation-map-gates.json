@@ -1,0 +1,10 @@
+{
+  "doors": [
+    "implementation.accept",
+    "implementation.write",
+    "implementation.repository-write",
+    "import.accept",
+    "record.write"
+  ],
+  "why": "The four gates are reached by the implementation accept door, the implementation write door that retires a row, the implementation repository-write door that re-points a root, the import accept door, and the record write that acts on a queued machine guess through the waiting queue. The calls in this file are the gates' own calls to the check; no other door reaches them."
+}

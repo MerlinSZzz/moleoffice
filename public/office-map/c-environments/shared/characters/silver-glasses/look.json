@@ -1,0 +1,738 @@
+{
+  "version": 1,
+  "sprites": {
+    "silver-glasses-idle": {
+      "src": "/office-map/c-environments/shared/characters/silver-glasses/idle.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "f51659604c3140ca8287d1ad6ade64ba808d815f2d3acdd395f00bd53b64dc3e"
+    },
+    "silver-glasses-walk-0": {
+      "src": "/office-map/c-environments/shared/characters/silver-glasses/walk-0.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "dd5a26f0b46c908a0cbd0bc7b64f14c25a5b21bec5335ebd08cedabf56bf34ac"
+    },
+    "silver-glasses-walk-1": {
+      "src": "/office-map/c-environments/shared/characters/silver-glasses/walk-1.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "0a60d1f464e30abb4ca7283f59e26d8d8af1d569977fef29bd2f12fb0b007a6e"
+    },
+    "silver-glasses-walk-2": {
+      "src": "/office-map/c-environments/shared/characters/silver-glasses/walk-2.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "2ee6bcaec7050a96fbd7defec5509623c2941a2b88f98a03a113d6740de406f9"
+    },
+    "silver-glasses-walk-3": {
+      "src": "/office-map/c-environments/shared/characters/silver-glasses/walk-3.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "2f8497984f3be399a6cea6cc99c71e90aa0cd19e3bc4bf1a539d859354fd66bf"
+    },
+    "silver-glasses-book-0": {
+      "src": "/office-map/c-environments/shared/characters/silver-glasses/book-0.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "e69d31e468c59ba504cb42480c3b33666431af430dc901593380b43f8628f443"
+    },
+    "silver-glasses-book-0-hands-book": {
+      "src": "/office-map/c-environments/shared/characters/silver-glasses/book-0-hands-book.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "5791d404be08d1771efa270cdf60b7c3e7ba0cf4582fb359f12a144e34908995"
+    },
+    "silver-glasses-book-1": {
+      "src": "/office-map/c-environments/shared/characters/silver-glasses/book-1.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "9476479652a5e02316bbf535def086e95214276dd68c26a6343285fcaab9c3e5"
+    },
+    "silver-glasses-book-1-hands-book": {
+      "src": "/office-map/c-environments/shared/characters/silver-glasses/book-1-hands-book.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "12eb48ca708980c392d2aa502a31bad4d6c93d877817578335224d015c3fee2a"
+    },
+    "silver-glasses-book-2": {
+      "src": "/office-map/c-environments/shared/characters/silver-glasses/book-2.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "c00b2f3872b5cdc824f49e687f3964604f4ff5fecec4a78b7c10de58c14b873e"
+    },
+    "silver-glasses-book-2-hands-book": {
+      "src": "/office-map/c-environments/shared/characters/silver-glasses/book-2-hands-book.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "7d0fa2e02d908b879c20a0664398ee044bd5cbab295dd8b7a49e472e58f55d41"
+    },
+    "silver-glasses-book-3": {
+      "src": "/office-map/c-environments/shared/characters/silver-glasses/book-3.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "da59cd5a961891465f5c9fa2df32563f7b47b55258800d54c446c8a8ff331738"
+    },
+    "silver-glasses-book-3-hands-book": {
+      "src": "/office-map/c-environments/shared/characters/silver-glasses/book-3-hands-book.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "2da3a4d631cbf2323f893e88598ec5d098b851729116de1216390d5825306dab"
+    },
+    "silver-glasses-sit-1": {
+      "src": "/office-map/c-environments/shared/characters/silver-glasses/sit-1.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "98b1a5e0f6abe953552ee8b9223133ba2dffe53926739ae9534f56b8927c5d7c"
+    },
+    "silver-glasses-sit-1-hands-book": {
+      "src": "/office-map/c-environments/shared/characters/silver-glasses/sit-1-hands-book.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "0e2164265bd57b561e67b0db0a8a3183487631e1ac581d0d21dae1ac8f122935"
+    },
+    "silver-glasses-sit-2": {
+      "src": "/office-map/c-environments/shared/characters/silver-glasses/sit-2.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "5cbc7f7919b5b9296ce37cd9b3e0d6fe7a68dccd2a7c0c2fe809d56ac854e1ec"
+    },
+    "silver-glasses-sit-2-hands-book": {
+      "src": "/office-map/c-environments/shared/characters/silver-glasses/sit-2-hands-book.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "27048009499c339a2c88383fad97cc47b996c6d9ab74d7068329a90d05630582"
+    },
+    "silver-glasses-sit-3": {
+      "src": "/office-map/c-environments/shared/characters/silver-glasses/sit-3.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "3e1c1f5e9df7762d8be177e75682a14439995f839fd0229e0cec1486277247c8"
+    },
+    "silver-glasses-sit-3-hands-book": {
+      "src": "/office-map/c-environments/shared/characters/silver-glasses/sit-3-hands-book.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "a6b942c9cb64c21c07ce094ff37aecf32f65050d63a62c80ec891d9ab3f5d128"
+    },
+    "silver-glasses-rear-idle": {
+      "src": "/office-map/c-environments/shared/characters/silver-glasses/rear-idle.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "83b89b38bf3f83d6989b50170ca98e7bd12c1e2a042631a124cb0df3f0f7c46b"
+    },
+    "silver-glasses-rear-walk-0": {
+      "src": "/office-map/c-environments/shared/characters/silver-glasses/rear-walk-0.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "aab319969ac5bef7b8dc51d20e8d327ef3d392420d040254865061b0bb4cba5e"
+    },
+    "silver-glasses-rear-walk-1": {
+      "src": "/office-map/c-environments/shared/characters/silver-glasses/rear-walk-1.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "1fbcb4608402bb0b4da79c6304d82d24435c57f96175e127a613d0054c8c09ef"
+    },
+    "silver-glasses-rear-walk-2": {
+      "src": "/office-map/c-environments/shared/characters/silver-glasses/rear-walk-2.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "c973ceaff487f308c7f4648260803258059bfb188fb45e134627c7492d850f8c"
+    },
+    "silver-glasses-rear-walk-3": {
+      "src": "/office-map/c-environments/shared/characters/silver-glasses/rear-walk-3.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "fd5e7f618080b54ccbefb0e826415afe65e337ea08b5d4951a58642ce1daa42b"
+    },
+    "silver-glasses-talk-0": {
+      "src": "/office-map/c-environments/shared/characters/silver-glasses/talk-0.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "f9fac4918496bed5f301e28a39c63eb39d5e5b0ae57605947ff8769971362d33"
+    },
+    "silver-glasses-talk-1": {
+      "src": "/office-map/c-environments/shared/characters/silver-glasses/talk-1.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "cc9682cd4f6966e2783cf06b64105e9a37c9d7bac06c000c237d017d4699a4eb"
+    },
+    "silver-glasses-talk-2": {
+      "src": "/office-map/c-environments/shared/characters/silver-glasses/talk-2.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "b857720ffa993ef6a3a6168e861524b76cb11c69386aedc04d0b605863f73b3c"
+    },
+    "silver-glasses-closed-book": {
+      "src": "/office-map/c-environments/shared/characters/silver-glasses/closed-book.png",
+      "width": 52,
+      "height": 33,
+      "anchor": {
+        "x": 26,
+        "y": 33
+      },
+      "sha256": "2db1ace3b7c5613b152d997c18041b6495c1740404055219e534b2e6239ff91d"
+    }
+  },
+  "looks": {
+    "silver-glasses": {
+      "label": {
+        "en": "Silver Glasses",
+        "zh": "银灰眼镜"
+      },
+      "idleSprite": "silver-glasses-idle",
+      "tableBook": {
+        "sprite": "silver-glasses-closed-book"
+      }
+    }
+  },
+  "actions": {
+    "silver-glasses": {
+      "idle": {
+        "loop": true,
+        "frames": [
+          {
+            "sprite": "silver-glasses-idle",
+            "durationMs": 1000
+          }
+        ]
+      },
+      "idle_sw": {
+        "loop": true,
+        "frames": [
+          {
+            "sprite": "silver-glasses-idle",
+            "durationMs": 1000,
+            "flipX": true
+          }
+        ]
+      },
+      "idle_ne": {
+        "loop": true,
+        "frames": [
+          {
+            "sprite": "silver-glasses-rear-idle",
+            "durationMs": 1000
+          }
+        ]
+      },
+      "idle_nw": {
+        "loop": true,
+        "frames": [
+          {
+            "sprite": "silver-glasses-rear-idle",
+            "durationMs": 1000,
+            "flipX": true
+          }
+        ]
+      },
+      "walk_se": {
+        "loop": true,
+        "frames": [
+          {
+            "sprite": "silver-glasses-walk-0",
+            "durationMs": 140
+          },
+          {
+            "sprite": "silver-glasses-walk-1",
+            "durationMs": 140
+          },
+          {
+            "sprite": "silver-glasses-walk-2",
+            "durationMs": 140
+          },
+          {
+            "sprite": "silver-glasses-walk-3",
+            "durationMs": 140
+          }
+        ]
+      },
+      "walk_sw": {
+        "loop": true,
+        "frames": [
+          {
+            "sprite": "silver-glasses-walk-0",
+            "durationMs": 140,
+            "flipX": true
+          },
+          {
+            "sprite": "silver-glasses-walk-1",
+            "durationMs": 140,
+            "flipX": true
+          },
+          {
+            "sprite": "silver-glasses-walk-2",
+            "durationMs": 140,
+            "flipX": true
+          },
+          {
+            "sprite": "silver-glasses-walk-3",
+            "durationMs": 140,
+            "flipX": true
+          }
+        ]
+      },
+      "walk_ne": {
+        "loop": true,
+        "frames": [
+          {
+            "sprite": "silver-glasses-rear-walk-0",
+            "durationMs": 140
+          },
+          {
+            "sprite": "silver-glasses-rear-walk-1",
+            "durationMs": 140
+          },
+          {
+            "sprite": "silver-glasses-rear-walk-2",
+            "durationMs": 140
+          },
+          {
+            "sprite": "silver-glasses-rear-walk-3",
+            "durationMs": 140
+          }
+        ]
+      },
+      "walk_nw": {
+        "loop": true,
+        "frames": [
+          {
+            "sprite": "silver-glasses-rear-walk-0",
+            "durationMs": 140,
+            "flipX": true
+          },
+          {
+            "sprite": "silver-glasses-rear-walk-1",
+            "durationMs": 140,
+            "flipX": true
+          },
+          {
+            "sprite": "silver-glasses-rear-walk-2",
+            "durationMs": 140,
+            "flipX": true
+          },
+          {
+            "sprite": "silver-glasses-rear-walk-3",
+            "durationMs": 140,
+            "flipX": true
+          }
+        ]
+      },
+      "pick_book": {
+        "loop": false,
+        "frames": [
+          {
+            "sprite": "silver-glasses-book-0",
+            "durationMs": 180,
+            "foregroundSprite": "silver-glasses-book-0-hands-book",
+            "tableBookVisible": true
+          },
+          {
+            "sprite": "silver-glasses-book-1",
+            "durationMs": 220,
+            "foregroundSprite": "silver-glasses-book-1-hands-book",
+            "tableBookVisible": false
+          },
+          {
+            "sprite": "silver-glasses-book-2",
+            "durationMs": 180,
+            "foregroundSprite": "silver-glasses-book-2-hands-book",
+            "tableBookVisible": false
+          },
+          {
+            "sprite": "silver-glasses-book-3",
+            "durationMs": 250,
+            "foregroundSprite": "silver-glasses-book-3-hands-book",
+            "tableBookVisible": false
+          }
+        ]
+      },
+      "pick_book_sw": {
+        "loop": false,
+        "frames": [
+          {
+            "sprite": "silver-glasses-book-0",
+            "durationMs": 180,
+            "foregroundSprite": "silver-glasses-book-0-hands-book",
+            "flipX": true,
+            "tableBookVisible": true
+          },
+          {
+            "sprite": "silver-glasses-book-1",
+            "durationMs": 220,
+            "foregroundSprite": "silver-glasses-book-1-hands-book",
+            "flipX": true,
+            "tableBookVisible": false
+          },
+          {
+            "sprite": "silver-glasses-book-2",
+            "durationMs": 180,
+            "foregroundSprite": "silver-glasses-book-2-hands-book",
+            "flipX": true,
+            "tableBookVisible": false
+          },
+          {
+            "sprite": "silver-glasses-book-3",
+            "durationMs": 250,
+            "foregroundSprite": "silver-glasses-book-3-hands-book",
+            "flipX": true,
+            "tableBookVisible": false
+          }
+        ]
+      },
+      "sit": {
+        "loop": false,
+        "frames": [
+          {
+            "sprite": "silver-glasses-book-3",
+            "durationMs": 220,
+            "foregroundSprite": "silver-glasses-book-3-hands-book"
+          },
+          {
+            "sprite": "silver-glasses-sit-1",
+            "durationMs": 220,
+            "foregroundSprite": "silver-glasses-sit-1-hands-book"
+          },
+          {
+            "sprite": "silver-glasses-sit-2",
+            "durationMs": 220,
+            "foregroundSprite": "silver-glasses-sit-2-hands-book"
+          }
+        ]
+      },
+      "sit_sw": {
+        "loop": false,
+        "frames": [
+          {
+            "sprite": "silver-glasses-book-3",
+            "durationMs": 220,
+            "foregroundSprite": "silver-glasses-book-3-hands-book",
+            "flipX": true
+          },
+          {
+            "sprite": "silver-glasses-sit-1",
+            "durationMs": 220,
+            "foregroundSprite": "silver-glasses-sit-1-hands-book",
+            "flipX": true
+          },
+          {
+            "sprite": "silver-glasses-sit-2",
+            "durationMs": 220,
+            "foregroundSprite": "silver-glasses-sit-2-hands-book",
+            "flipX": true
+          }
+        ]
+      },
+      "work": {
+        "loop": true,
+        "frames": [
+          {
+            "sprite": "silver-glasses-sit-2",
+            "durationMs": 650,
+            "foregroundSprite": "silver-glasses-sit-2-hands-book"
+          },
+          {
+            "sprite": "silver-glasses-sit-3",
+            "durationMs": 650,
+            "foregroundSprite": "silver-glasses-sit-3-hands-book"
+          }
+        ]
+      },
+      "work_sw": {
+        "loop": true,
+        "frames": [
+          {
+            "sprite": "silver-glasses-sit-2",
+            "durationMs": 650,
+            "foregroundSprite": "silver-glasses-sit-2-hands-book",
+            "flipX": true
+          },
+          {
+            "sprite": "silver-glasses-sit-3",
+            "durationMs": 650,
+            "foregroundSprite": "silver-glasses-sit-3-hands-book",
+            "flipX": true
+          }
+        ]
+      },
+      "stand": {
+        "loop": false,
+        "frames": [
+          {
+            "sprite": "silver-glasses-sit-2",
+            "durationMs": 220,
+            "foregroundSprite": "silver-glasses-sit-2-hands-book"
+          },
+          {
+            "sprite": "silver-glasses-sit-1",
+            "durationMs": 220,
+            "foregroundSprite": "silver-glasses-sit-1-hands-book"
+          },
+          {
+            "sprite": "silver-glasses-book-3",
+            "durationMs": 220,
+            "foregroundSprite": "silver-glasses-book-3-hands-book"
+          }
+        ]
+      },
+      "stand_sw": {
+        "loop": false,
+        "frames": [
+          {
+            "sprite": "silver-glasses-sit-2",
+            "durationMs": 220,
+            "foregroundSprite": "silver-glasses-sit-2-hands-book",
+            "flipX": true
+          },
+          {
+            "sprite": "silver-glasses-sit-1",
+            "durationMs": 220,
+            "foregroundSprite": "silver-glasses-sit-1-hands-book",
+            "flipX": true
+          },
+          {
+            "sprite": "silver-glasses-book-3",
+            "durationMs": 220,
+            "foregroundSprite": "silver-glasses-book-3-hands-book",
+            "flipX": true
+          }
+        ]
+      },
+      "put_book": {
+        "loop": false,
+        "frames": [
+          {
+            "sprite": "silver-glasses-book-3",
+            "durationMs": 180,
+            "foregroundSprite": "silver-glasses-book-3-hands-book",
+            "tableBookVisible": false
+          },
+          {
+            "sprite": "silver-glasses-book-2",
+            "durationMs": 180,
+            "foregroundSprite": "silver-glasses-book-2-hands-book",
+            "tableBookVisible": false
+          },
+          {
+            "sprite": "silver-glasses-book-1",
+            "durationMs": 220,
+            "foregroundSprite": "silver-glasses-book-1-hands-book",
+            "tableBookVisible": false
+          },
+          {
+            "sprite": "silver-glasses-book-0",
+            "durationMs": 180,
+            "foregroundSprite": "silver-glasses-book-0-hands-book",
+            "tableBookVisible": true
+          },
+          {
+            "sprite": "silver-glasses-idle",
+            "durationMs": 250,
+            "tableBookVisible": true
+          }
+        ]
+      },
+      "put_book_sw": {
+        "loop": false,
+        "frames": [
+          {
+            "sprite": "silver-glasses-book-3",
+            "durationMs": 180,
+            "foregroundSprite": "silver-glasses-book-3-hands-book",
+            "flipX": true,
+            "tableBookVisible": false
+          },
+          {
+            "sprite": "silver-glasses-book-2",
+            "durationMs": 180,
+            "foregroundSprite": "silver-glasses-book-2-hands-book",
+            "flipX": true,
+            "tableBookVisible": false
+          },
+          {
+            "sprite": "silver-glasses-book-1",
+            "durationMs": 220,
+            "foregroundSprite": "silver-glasses-book-1-hands-book",
+            "flipX": true,
+            "tableBookVisible": false
+          },
+          {
+            "sprite": "silver-glasses-book-0",
+            "durationMs": 180,
+            "foregroundSprite": "silver-glasses-book-0-hands-book",
+            "flipX": true,
+            "tableBookVisible": true
+          },
+          {
+            "sprite": "silver-glasses-idle",
+            "durationMs": 250,
+            "flipX": true,
+            "tableBookVisible": true
+          }
+        ]
+      },
+      "talk": {
+        "loop": false,
+        "frames": [
+          {
+            "sprite": "silver-glasses-talk-0",
+            "durationMs": 450
+          },
+          {
+            "sprite": "silver-glasses-talk-1",
+            "durationMs": 450
+          },
+          {
+            "sprite": "silver-glasses-talk-2",
+            "durationMs": 450
+          }
+        ]
+      },
+      "talk_sw": {
+        "loop": false,
+        "frames": [
+          {
+            "sprite": "silver-glasses-talk-0",
+            "durationMs": 450,
+            "flipX": true
+          },
+          {
+            "sprite": "silver-glasses-talk-1",
+            "durationMs": 450,
+            "flipX": true
+          },
+          {
+            "sprite": "silver-glasses-talk-2",
+            "durationMs": 450,
+            "flipX": true
+          }
+        ]
+      }
+    }
+  },
+  "provenance": {
+    "status": "delivered public world candidate;Cedar accepted frozen minimum playback and visible support. Saved look IDs/global activation remain Cedar/Brook work;no full world acceptance.",
+    "identity": "same precomposed individual, fur+vest or glasses in each full PNG, not mixed garment layers or another body color substituted",
+    "support": "new imagegen pelvis/leg support on unchanged complete stool;separate head lean/nod edits preserve body/stool. Whole source uniformly scaled then exact source-pixel mask removes generated wood, original complete stool remains separate. No whole-body squash or body-part warp.",
+    "phaseReuse": "sit first and stand last directly use book-3. No duplicate PNG to inflate phase count. Stand and put sequence reverse actual poses.",
+    "mirrors": "SE front and NE rear are actual poses. SW/NW explicitly mirror the entire body and matching foreground once. Never mirror a_sw action again.",
+    "unverified": [
+      "formal world full chain,foot load transfer and route",
+      "all legacy worker/secretary desk contacts",
+      "dedicated turning poses and rear seated/talk poses"
+    ],
+    "bookSource": "one independent table book. Pick/put frames explicitly declare visibility. Canonical closed PNG is SE;mirror once at SW station. Source tabletop rest anchor is from reviewed anonymous SW player at actorScale.86, not from hand-contact solver.",
+    "assetRevision": "supported-20260911-r1",
+    "sourceCandidateManifestSha256": "171a920e6b64108a821b9cc20336da5310640d9d754e73faed81743848cb756e",
+    "reviewEvidence": "cedar-supported-players/ and q00-17-40-601Z;Cedar viewed6keymoments per look after actual playback",
+    "heldBookContact": "nonzero original desk-point difference retained;book held above tabletop,not claimed resting on old contact point"
+  }
+}

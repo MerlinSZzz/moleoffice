@@ -1,0 +1,6 @@
+{
+  "doors": [
+    "office.set-quick-inputs"
+  ],
+  "why": "Changing the quick inputs asks whether a raise carries the press when the caller is not the person."
+}

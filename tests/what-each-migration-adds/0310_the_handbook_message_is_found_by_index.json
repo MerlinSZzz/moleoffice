@@ -1,0 +1,8 @@
+{
+  "why": "Wave 13s item 39 (c): one index of the messages that carry the mark that a card's handbook was sent, partial to those messages and keyed by the card the mark names, so the read that asks whether a handbook was already sent finds the message without reading every message. No table, column, trigger or write changes.",
+  "indexesAddedAfterTheRebuild": {
+    "records": [
+      "records_message_handbook_sent_card_idx"
+    ]
+  }
+}

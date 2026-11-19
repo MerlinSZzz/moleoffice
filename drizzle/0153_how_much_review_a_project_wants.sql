@@ -1,0 +1,11 @@
+-- HOW MUCH REVIEW A FINISHED RUN GETS, SET PER PROJECT.
+--
+-- Three values: none, light, full. NULL is nobody having chosen, and it is read as `full` — today's
+-- behaviour — by `reviewLevelOf` in src/shared/workspaces.ts, which is the one place that says so.
+-- No SQL default and no CHECK constraint: the three words are declared in shared code and enforced
+-- at PATCH /api/workspaces/:id, and a second copy of the list here would be two places that must
+-- agree with nothing making them agree.
+--
+-- NOTHING CHANGES ON THE DAY THIS RUNS. Every existing row gets NULL, every NULL reads as `full`,
+-- and `full` is what the office does today.
+ALTER TABLE `workspaces` ADD COLUMN `review_level` TEXT;

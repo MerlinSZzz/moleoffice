@@ -1,0 +1,62 @@
+{
+  "why": "The start-at-login press's refusals at its backup and at its write (wave 13t, round W26), and, since round W28, a first unit whose file beside it is left and a file where a folder of the unit goes, and, since round W29, a unit kept whose file beside it is left and a unit kept whose copy and file beside it are both left: no door here can safely meet them, because each needs this computer's HOME and systemd. tests/the-office-starts-at-login-by-the-persons-press.test.ts meets each with a scratch home and a stand-in systemctl.",
+  "refusals": [
+    {
+      "code": "startAtLoginNotBackedUp",
+      "status": 409,
+      "english": "Test: the unit could not be backed up.",
+      "values": {
+        "path": "/test/mole-office.service.mole-office-backup"
+      }
+    },
+    {
+      "code": "startAtLoginNotWritten",
+      "status": 409,
+      "english": "Test: the unit could not be written.",
+      "values": {
+        "path": "/test/mole-office.service"
+      }
+    },
+    {
+      "code": "startAtLoginCopyLeft",
+      "status": 409,
+      "english": "Test: the unit could not be written, and its copy is still there.",
+      "values": {
+        "path": "/test/mole-office.service.mole-office-backup"
+      }
+    },
+    {
+      "code": "startAtLoginFileLeft",
+      "status": 409,
+      "english": "Test: the unit could not be written, and the file beside it is still there.",
+      "values": {
+        "path": "/test/mole-office.service.1.new"
+      }
+    },
+    {
+      "code": "startAtLoginUnitKeptFileLeft",
+      "status": 409,
+      "english": "Test: the unit could not be written and was kept, and the file beside it is still there.",
+      "values": {
+        "path": "/test/mole-office.service.1.new"
+      }
+    },
+    {
+      "code": "startAtLoginCopyAndFileLeft",
+      "status": 409,
+      "english": "Test: the unit could not be written and was kept, and its copy and the file beside it are still there.",
+      "values": {
+        "path": "/test/mole-office.service.mole-office-backup",
+        "beside": "/test/mole-office.service.1.new"
+      }
+    },
+    {
+      "code": "startAtLoginUnderAFile",
+      "status": 409,
+      "english": "Test: a file stands where a folder of the unit goes.",
+      "values": {
+        "path": "/test/systemd"
+      }
+    }
+  ]
+}

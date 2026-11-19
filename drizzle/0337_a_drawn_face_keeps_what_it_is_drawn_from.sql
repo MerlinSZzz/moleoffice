@@ -1,0 +1,13 @@
+-- A DRAWN FACE KEEPS WHAT IT IS DRAWN FROM: the digest its drawing is made of, so its key can name a new id.
+--
+-- A face this product draws is worked out when it is asked for, from the SHA-256 of the kind and id of the participant
+-- its key names. When the re-mint gives an agent a new id, it renames the agent's drawn face to the key of the new id,
+-- and the face must stay the same, byte for byte. So the renamed row keeps the digest of the old id, and the face is
+-- drawn from that.
+--
+--   drawn_from  the SHA-256 a drawn face is made of, as 64 lowercase hex digits, on a row whose origin is `default`.
+--               NULL means the face is drawn from the participant its key names, as before. Only the re-mint writes
+--               it, when it renames a face. The function that says what an asset row sends reads it.
+--
+-- ADDITIVE. One nullable column. No row is rewritten, and every row already there reads NULL.
+ALTER TABLE `assets` ADD COLUMN `drawn_from` text CONSTRAINT `assets_drawn_from_is_a_digest` CHECK (`drawn_from` IS NULL OR (`origin` = 'default' AND length(`drawn_from`) = 64 AND `drawn_from` NOT GLOB '*[^0-9a-f]*'));

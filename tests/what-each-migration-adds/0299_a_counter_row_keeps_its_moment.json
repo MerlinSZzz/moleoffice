@@ -1,0 +1,6 @@
+{
+  "why": "A counter row keeps its moment, wave 13r round P (item 11, problem tl4r2TCQl_Oh): one nullable column beside at on counter_rows, holding the same moment as an instant with its offset, written in the same write as at. On the night the clocks go back, at alone cannot say which of the two 01:30s it means. NULL is a row written before this migration, which the counter reads as the later of its stamp's moments, so nothing comes due early. One ALTER TABLE; it rewrites no row.",
+  "columnsAddedAfterTheRebuild": {
+    "counter_rows": ["at_instant"]
+  }
+}

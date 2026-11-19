@@ -1,0 +1,6 @@
+# done: every file on this list calls the owner by no pronoun
+tests/migration.test.ts
+tests/a-reports-pictures-and-files-are-saved-from-another-machine.test.ts
+tests/a-video-file-block-plays.test.ts
+tests/one-set-of-rules.test.ts
+tests/the-first-read-is-named-in-one-place.test.ts

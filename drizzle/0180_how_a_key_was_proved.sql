@@ -1,0 +1,26 @@
+-- HOW THE CALL THAT MADE A KEY WAS PROVED, STORED ON THE KEY. The rule:
+-- the press that closes the key window refuses while a live agent holds no proved key.
+--
+-- WHY. An agent's list found that 222 of the 233 keys agents held had no proved holder:
+-- 210 were given to a registration that carried no key, and 12 had no recorded origin. The office
+-- could not answer "does this agent hold a proved key?" because it never stored how a key was made.
+--
+-- WHAT IS STORED. One word, written when the key is made, by `holdTheKeyWhoseHashIs` in
+-- src/server/lib/keys.ts. The words are declared in src/server/lib/provedkeys.ts:
+--   the-persons-press        the person's press, made with their key (a new-key grant, an admission,
+--                            a credential confirm)
+--   the-persons-key          the call that made the key carried the person's key
+--   the-offices-key          the call carried the office's own key (a run the office started)
+--   a-proved-agents-key      the call carried an agent's key, and every live key that agent held
+--                            was itself proved (a starter's re-key or registration, a run key)
+--   an-unproved-agents-key   the call carried an agent's key, and that agent held a key that was not
+--   no-key                   the call carried no key (a registration by name while the window was open)
+--
+-- Rows written before wave 13s may still hold the older words for the first two, and
+-- src/shared/renamed-words.ts reads them as `the-persons-press` and `the-persons-key`.
+--
+-- NULL MEANS NOBODY RECORDED IT. Every row made before this migration holds NULL, and it is read as
+-- unproved, never guessed proved. No backfill.
+--
+-- `held_keys` stays out of every copy, backup and export, as before (NOT_CARRIED_TABLES).
+ALTER TABLE `held_keys` ADD COLUMN `mint_proved_by` text;

@@ -1,0 +1,679 @@
+{
+  "version": 1,
+  "sprites": {
+    "cocoa-vest-idle": {
+      "src": "/office-map/c-environments/shared/characters/cocoa-vest/idle.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "e4001f7971a45702287d8f1b0ad4f6815fbf6b2c37c239874be3177a051dc641"
+    },
+    "cocoa-vest-walk-0": {
+      "src": "/office-map/c-environments/shared/characters/cocoa-vest/walk-0.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "67e1810d79abd65a84ce6b71cbc793883c2ffb8a98340b0c20dd39c77b42d7b7"
+    },
+    "cocoa-vest-walk-1": {
+      "src": "/office-map/c-environments/shared/characters/cocoa-vest/walk-1.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "585f70f9a4e6027749452cf5342bd74049166f2e2830560bd28b3144b616f72a"
+    },
+    "cocoa-vest-walk-2": {
+      "src": "/office-map/c-environments/shared/characters/cocoa-vest/walk-2.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "bf0117c77b4d01b3102e348f5db58537f4aa9c2996c52909bdd9281f98483f07"
+    },
+    "cocoa-vest-walk-3": {
+      "src": "/office-map/c-environments/shared/characters/cocoa-vest/walk-3.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "ab8024cef0494a300ceb8683fd4e95bc8349474dbb116c8bb90e5069e6f5d61e"
+    },
+    "cocoa-vest-book-0": {
+      "src": "/office-map/c-environments/shared/characters/cocoa-vest/book-0.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "8a88f6aa004c9f4830f95aeeac5fafbb857e1d418ce186e12f6c8fbe6add09d0"
+    },
+    "cocoa-vest-book-1": {
+      "src": "/office-map/c-environments/shared/characters/cocoa-vest/book-1.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "41638246801eea334a95b0c979d39401c1f3798a12e91bc2b4e99c28192b4465"
+    },
+    "cocoa-vest-book-2": {
+      "src": "/office-map/c-environments/shared/characters/cocoa-vest/book-2.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "9d7e7f1aae26fcd8d3528150ebca3d823fb38d7563e2cfc7943e63753e1b9e0b"
+    },
+    "cocoa-vest-book-2-hands-book": {
+      "src": "/office-map/c-environments/shared/characters/cocoa-vest/book-2-hands-book.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "139117926b0e3ab66292fc3435cfa7a5a5a0b0647d4fed86e8be17edface7946"
+    },
+    "cocoa-vest-book-3": {
+      "src": "/office-map/c-environments/shared/characters/cocoa-vest/book-3.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "82aeb4c24d766af38084b77cf5f3735b332d615709f99149793dd770895546ac"
+    },
+    "cocoa-vest-book-3-hands-book": {
+      "src": "/office-map/c-environments/shared/characters/cocoa-vest/book-3-hands-book.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "7d9e10c873601f2a17de1bad12da435567895a22c18cab0f39b2d822830e8672"
+    },
+    "cocoa-vest-sit-1": {
+      "src": "/office-map/c-environments/shared/characters/cocoa-vest/sit-1.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "1b8455f66f6224b9baa84abfc10b6413bc11c8558906e56c3e8171467f7ffbee"
+    },
+    "cocoa-vest-sit-1-hands-book": {
+      "src": "/office-map/c-environments/shared/characters/cocoa-vest/sit-1-hands-book.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "8e75dd9a52f3d2090a76741d6bc73e1bb9e26202411f24f9ccd359ffd8c95e16"
+    },
+    "cocoa-vest-sit-2": {
+      "src": "/office-map/c-environments/shared/characters/cocoa-vest/sit-2.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "e7ff85506e03db9075febe5fdc8ec0de3057e93ba3083de53a91bf47fcd67ada"
+    },
+    "cocoa-vest-sit-2-hands-book": {
+      "src": "/office-map/c-environments/shared/characters/cocoa-vest/sit-2-hands-book.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "582d542e06acd59fe91b1b93b6228a5f0912a762cc71cfa6dd99d5727aeeb603"
+    },
+    "cocoa-vest-sit-3": {
+      "src": "/office-map/c-environments/shared/characters/cocoa-vest/sit-3.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "823777d395635f167dadecbc05ed895a8ec230499632ac02021eac48f9d6804c"
+    },
+    "cocoa-vest-sit-3-hands-book": {
+      "src": "/office-map/c-environments/shared/characters/cocoa-vest/sit-3-hands-book.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "f9d6065e4e32619f8559acd056bd5103245f1eab165ac47c4d53c8b7b9fc2cd5"
+    },
+    "cocoa-vest-rear-idle": {
+      "src": "/office-map/c-environments/shared/characters/cocoa-vest/rear-idle.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "6f773a31d72556ec995f781ee4c2a51be40c81406b1c23d38a6753d84f111728"
+    },
+    "cocoa-vest-rear-walk-0": {
+      "src": "/office-map/c-environments/shared/characters/cocoa-vest/rear-walk-0.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "7551ec7a6bd61fe2e50d2c669f7ec8c56bd2b3e19d1e526a5638909925274ac1"
+    },
+    "cocoa-vest-rear-walk-1": {
+      "src": "/office-map/c-environments/shared/characters/cocoa-vest/rear-walk-1.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "06a75b26e50d99b5961b1bb6718b096ee3b9a35250fc1652a49d2e3e6947076f"
+    },
+    "cocoa-vest-rear-walk-2": {
+      "src": "/office-map/c-environments/shared/characters/cocoa-vest/rear-walk-2.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "dd872e4da058eb2c322abf261f90b725b9945291885de6344b5c25e52e5e1b5d"
+    },
+    "cocoa-vest-rear-walk-3": {
+      "src": "/office-map/c-environments/shared/characters/cocoa-vest/rear-walk-3.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "6980410a907f21cc1c1dd1b76e258697ca6cb820443e7e10b0699757da3221fd"
+    },
+    "cocoa-vest-talk-0": {
+      "src": "/office-map/c-environments/shared/characters/cocoa-vest/talk-0.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "a20132b69c383696a47c3ee919b94b63c99f8ec62cbf00f4a8494706790e7abe"
+    },
+    "cocoa-vest-talk-1": {
+      "src": "/office-map/c-environments/shared/characters/cocoa-vest/talk-1.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "8b46ad823a0a4798d77ddcb2fa6226b6d6fadf0ced05fa36214f6d994a865426"
+    },
+    "cocoa-vest-talk-2": {
+      "src": "/office-map/c-environments/shared/characters/cocoa-vest/talk-2.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "7e5bfa74c1f2b94b28811f39adf35bb729be6e66fe1c70c7e4ea9ccc5325b7a0"
+    }
+  },
+  "looks": {
+    "cocoa-vest": {
+      "label": {
+        "en": "Cocoa Vest",
+        "zh": "可可背心"
+      },
+      "idleSprite": "cocoa-vest-idle"
+    }
+  },
+  "actions": {
+    "cocoa-vest": {
+      "idle": {
+        "loop": true,
+        "frames": [
+          {
+            "sprite": "cocoa-vest-idle",
+            "durationMs": 1000
+          }
+        ]
+      },
+      "idle_sw": {
+        "loop": true,
+        "frames": [
+          {
+            "sprite": "cocoa-vest-idle",
+            "durationMs": 1000,
+            "flipX": true
+          }
+        ]
+      },
+      "idle_ne": {
+        "loop": true,
+        "frames": [
+          {
+            "sprite": "cocoa-vest-rear-idle",
+            "durationMs": 1000
+          }
+        ]
+      },
+      "idle_nw": {
+        "loop": true,
+        "frames": [
+          {
+            "sprite": "cocoa-vest-rear-idle",
+            "durationMs": 1000,
+            "flipX": true
+          }
+        ]
+      },
+      "walk_se": {
+        "loop": true,
+        "frames": [
+          {
+            "sprite": "cocoa-vest-walk-0",
+            "durationMs": 140
+          },
+          {
+            "sprite": "cocoa-vest-walk-1",
+            "durationMs": 140
+          },
+          {
+            "sprite": "cocoa-vest-walk-2",
+            "durationMs": 140
+          },
+          {
+            "sprite": "cocoa-vest-walk-3",
+            "durationMs": 140
+          }
+        ]
+      },
+      "walk_sw": {
+        "loop": true,
+        "frames": [
+          {
+            "sprite": "cocoa-vest-walk-0",
+            "durationMs": 140,
+            "flipX": true
+          },
+          {
+            "sprite": "cocoa-vest-walk-1",
+            "durationMs": 140,
+            "flipX": true
+          },
+          {
+            "sprite": "cocoa-vest-walk-2",
+            "durationMs": 140,
+            "flipX": true
+          },
+          {
+            "sprite": "cocoa-vest-walk-3",
+            "durationMs": 140,
+            "flipX": true
+          }
+        ]
+      },
+      "walk_ne": {
+        "loop": true,
+        "frames": [
+          {
+            "sprite": "cocoa-vest-rear-walk-0",
+            "durationMs": 140
+          },
+          {
+            "sprite": "cocoa-vest-rear-walk-1",
+            "durationMs": 140
+          },
+          {
+            "sprite": "cocoa-vest-rear-walk-2",
+            "durationMs": 140
+          },
+          {
+            "sprite": "cocoa-vest-rear-walk-3",
+            "durationMs": 140
+          }
+        ]
+      },
+      "walk_nw": {
+        "loop": true,
+        "frames": [
+          {
+            "sprite": "cocoa-vest-rear-walk-0",
+            "durationMs": 140,
+            "flipX": true
+          },
+          {
+            "sprite": "cocoa-vest-rear-walk-1",
+            "durationMs": 140,
+            "flipX": true
+          },
+          {
+            "sprite": "cocoa-vest-rear-walk-2",
+            "durationMs": 140,
+            "flipX": true
+          },
+          {
+            "sprite": "cocoa-vest-rear-walk-3",
+            "durationMs": 140,
+            "flipX": true
+          }
+        ]
+      },
+      "pick_book": {
+        "loop": false,
+        "frames": [
+          {
+            "sprite": "cocoa-vest-book-0",
+            "durationMs": 180
+          },
+          {
+            "sprite": "cocoa-vest-book-1",
+            "durationMs": 220
+          },
+          {
+            "sprite": "cocoa-vest-book-2",
+            "durationMs": 180,
+            "foregroundSprite": "cocoa-vest-book-2-hands-book"
+          },
+          {
+            "sprite": "cocoa-vest-book-3",
+            "durationMs": 250,
+            "foregroundSprite": "cocoa-vest-book-3-hands-book"
+          }
+        ]
+      },
+      "pick_book_sw": {
+        "loop": false,
+        "frames": [
+          {
+            "sprite": "cocoa-vest-book-0",
+            "durationMs": 180,
+            "flipX": true
+          },
+          {
+            "sprite": "cocoa-vest-book-1",
+            "durationMs": 220,
+            "flipX": true
+          },
+          {
+            "sprite": "cocoa-vest-book-2",
+            "durationMs": 180,
+            "foregroundSprite": "cocoa-vest-book-2-hands-book",
+            "flipX": true
+          },
+          {
+            "sprite": "cocoa-vest-book-3",
+            "durationMs": 250,
+            "foregroundSprite": "cocoa-vest-book-3-hands-book",
+            "flipX": true
+          }
+        ]
+      },
+      "sit": {
+        "loop": false,
+        "frames": [
+          {
+            "sprite": "cocoa-vest-book-3",
+            "durationMs": 220,
+            "foregroundSprite": "cocoa-vest-book-3-hands-book"
+          },
+          {
+            "sprite": "cocoa-vest-sit-1",
+            "durationMs": 220,
+            "foregroundSprite": "cocoa-vest-sit-1-hands-book"
+          },
+          {
+            "sprite": "cocoa-vest-sit-2",
+            "durationMs": 220,
+            "foregroundSprite": "cocoa-vest-sit-2-hands-book"
+          }
+        ]
+      },
+      "sit_sw": {
+        "loop": false,
+        "frames": [
+          {
+            "sprite": "cocoa-vest-book-3",
+            "durationMs": 220,
+            "foregroundSprite": "cocoa-vest-book-3-hands-book",
+            "flipX": true
+          },
+          {
+            "sprite": "cocoa-vest-sit-1",
+            "durationMs": 220,
+            "foregroundSprite": "cocoa-vest-sit-1-hands-book",
+            "flipX": true
+          },
+          {
+            "sprite": "cocoa-vest-sit-2",
+            "durationMs": 220,
+            "foregroundSprite": "cocoa-vest-sit-2-hands-book",
+            "flipX": true
+          }
+        ]
+      },
+      "work": {
+        "loop": true,
+        "frames": [
+          {
+            "sprite": "cocoa-vest-sit-2",
+            "durationMs": 650,
+            "foregroundSprite": "cocoa-vest-sit-2-hands-book"
+          },
+          {
+            "sprite": "cocoa-vest-sit-3",
+            "durationMs": 650,
+            "foregroundSprite": "cocoa-vest-sit-3-hands-book"
+          }
+        ]
+      },
+      "work_sw": {
+        "loop": true,
+        "frames": [
+          {
+            "sprite": "cocoa-vest-sit-2",
+            "durationMs": 650,
+            "foregroundSprite": "cocoa-vest-sit-2-hands-book",
+            "flipX": true
+          },
+          {
+            "sprite": "cocoa-vest-sit-3",
+            "durationMs": 650,
+            "foregroundSprite": "cocoa-vest-sit-3-hands-book",
+            "flipX": true
+          }
+        ]
+      },
+      "stand": {
+        "loop": false,
+        "frames": [
+          {
+            "sprite": "cocoa-vest-sit-2",
+            "durationMs": 220,
+            "foregroundSprite": "cocoa-vest-sit-2-hands-book"
+          },
+          {
+            "sprite": "cocoa-vest-sit-1",
+            "durationMs": 220,
+            "foregroundSprite": "cocoa-vest-sit-1-hands-book"
+          },
+          {
+            "sprite": "cocoa-vest-book-3",
+            "durationMs": 220,
+            "foregroundSprite": "cocoa-vest-book-3-hands-book"
+          }
+        ]
+      },
+      "stand_sw": {
+        "loop": false,
+        "frames": [
+          {
+            "sprite": "cocoa-vest-sit-2",
+            "durationMs": 220,
+            "foregroundSprite": "cocoa-vest-sit-2-hands-book",
+            "flipX": true
+          },
+          {
+            "sprite": "cocoa-vest-sit-1",
+            "durationMs": 220,
+            "foregroundSprite": "cocoa-vest-sit-1-hands-book",
+            "flipX": true
+          },
+          {
+            "sprite": "cocoa-vest-book-3",
+            "durationMs": 220,
+            "foregroundSprite": "cocoa-vest-book-3-hands-book",
+            "flipX": true
+          }
+        ]
+      },
+      "put_book": {
+        "loop": false,
+        "frames": [
+          {
+            "sprite": "cocoa-vest-book-3",
+            "durationMs": 180,
+            "foregroundSprite": "cocoa-vest-book-3-hands-book"
+          },
+          {
+            "sprite": "cocoa-vest-book-2",
+            "durationMs": 180,
+            "foregroundSprite": "cocoa-vest-book-2-hands-book"
+          },
+          {
+            "sprite": "cocoa-vest-book-1",
+            "durationMs": 220
+          },
+          {
+            "sprite": "cocoa-vest-book-0",
+            "durationMs": 180
+          },
+          {
+            "sprite": "cocoa-vest-idle",
+            "durationMs": 250
+          }
+        ]
+      },
+      "put_book_sw": {
+        "loop": false,
+        "frames": [
+          {
+            "sprite": "cocoa-vest-book-3",
+            "durationMs": 180,
+            "foregroundSprite": "cocoa-vest-book-3-hands-book",
+            "flipX": true
+          },
+          {
+            "sprite": "cocoa-vest-book-2",
+            "durationMs": 180,
+            "foregroundSprite": "cocoa-vest-book-2-hands-book",
+            "flipX": true
+          },
+          {
+            "sprite": "cocoa-vest-book-1",
+            "durationMs": 220,
+            "flipX": true
+          },
+          {
+            "sprite": "cocoa-vest-book-0",
+            "durationMs": 180,
+            "flipX": true
+          },
+          {
+            "sprite": "cocoa-vest-idle",
+            "durationMs": 250,
+            "flipX": true
+          }
+        ]
+      },
+      "talk": {
+        "loop": false,
+        "frames": [
+          {
+            "sprite": "cocoa-vest-talk-0",
+            "durationMs": 450
+          },
+          {
+            "sprite": "cocoa-vest-talk-1",
+            "durationMs": 450
+          },
+          {
+            "sprite": "cocoa-vest-talk-2",
+            "durationMs": 450
+          }
+        ]
+      },
+      "talk_sw": {
+        "loop": false,
+        "frames": [
+          {
+            "sprite": "cocoa-vest-talk-0",
+            "durationMs": 450,
+            "flipX": true
+          },
+          {
+            "sprite": "cocoa-vest-talk-1",
+            "durationMs": 450,
+            "flipX": true
+          },
+          {
+            "sprite": "cocoa-vest-talk-2",
+            "durationMs": 450,
+            "flipX": true
+          }
+        ]
+      }
+    }
+  },
+  "provenance": {
+    "status": "delivered public world candidate;Cedar accepted frozen minimum playback and visible support. Saved look IDs/global activation remain Cedar/Brook work;no full world acceptance.",
+    "identity": "same precomposed individual, fur+vest or glasses in each full PNG, not mixed garment layers or another body color substituted",
+    "support": "new imagegen pelvis/leg support on unchanged complete stool;separate head lean/nod edits preserve body/stool. Whole source uniformly scaled then exact source-pixel mask removes generated wood, original complete stool remains separate. No whole-body squash or body-part warp.",
+    "phaseReuse": "sit first and stand last directly use book-3. No duplicate PNG to inflate phase count. Stand and put sequence reverse actual poses.",
+    "mirrors": "SE front and NE rear are actual poses. SW/NW explicitly mirror the entire body and matching foreground once. Never mirror a_sw action again.",
+    "unverified": [
+      "formal world full chain,foot load transfer and route",
+      "all legacy worker/secretary desk contacts",
+      "dedicated turning poses and rear seated/talk poses"
+    ],
+    "bookSource": "inside existing blue vest opening",
+    "assetRevision": "supported-20260911-r1",
+    "sourceCandidateManifestSha256": "c38028f11448b26f26394636f89e2ad4ec188aacf1536339dc9cb77fb0110e1b",
+    "reviewEvidence": "cedar-supported-players/ and q00-17-40-601Z;Cedar viewed6keymoments per look after actual playback",
+    "heldBookContact": "nonzero original desk-point difference retained;book held above tabletop,not claimed resting on old contact point"
+  }
+}

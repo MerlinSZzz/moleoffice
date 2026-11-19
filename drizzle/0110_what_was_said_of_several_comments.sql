@@ -1,0 +1,30 @@
+-- What a reading said about SEVERAL comments at once is stored once, on the review.
+--
+-- ADDITIVE, ONE NULLABLE COLUMN. No row is read, moved, rewritten or taken away, and no table is
+-- rebuilt. Every review that already exists keeps the value this column has for a review nothing
+-- has read, which is NULL.
+--
+-- ---------------------------------------------------------------------------------------
+-- WHY
+-- ---------------------------------------------------------------------------------------
+--
+-- A reading can say a thing that is true of two comments at once: the same complaint made twice,
+-- one cause behind three. Until this column, that sentence was written into the reading stored
+-- beside EVERY member of the group — `annotation.interpretation`, one copy per comment, with
+-- nothing holding the copies together.
+--
+-- So a person correcting one comment's reading destroyed that comment's copy and left the others
+-- announcing a group it was no longer in. Measured on 19 August 2026 on the isolated corpus: four
+-- comments, a group of two, one hand-written reading, and afterwards one comment said "Said with 1
+-- other comment: …" while the only other member said nothing of the kind. That is the defect
+-- CLAUDE.md names as this repository's own — one fact worked out in several places, with nothing
+-- making them agree — and the fix is the one that file names: store it once and derive the rest.
+--
+-- NULL AND '[]' ARE DIFFERENT ANSWERS. NULL is "nothing has read these comments". '[]' is "somebody
+-- read them and found nothing true of several at once". A screen that read the two the same would
+-- turn a real finding into an absence.
+--
+-- NUMBERED WELL CLEAR OF THE MIGRATION BEFORE IT, the way 0020 to 0100 were and for the same
+-- reason: several agents add one at the same time. Drizzle applies journal entries in order of
+-- their `when`, so the gap in the numbers costs nothing.
+ALTER TABLE `reviews` ADD `read_groups` text;

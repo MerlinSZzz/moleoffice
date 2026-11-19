@@ -1,0 +1,6 @@
+{
+  "why": "Wave 13s round 209: a comment that a sent review's message carries names that message on its own archived delivery row, so the agent's waiting list leaves the comment out and a start press on it asks for the run of the message that carries it, both by the comment's own rows. No table, index or trigger changes, and no row is rewritten.",
+  "columnsAddedAfterTheRebuild": {
+    "message_delivery": ["carried_in"]
+  }
+}

@@ -1,0 +1,63 @@
+#!/usr/bin/perl
+# Copyright © 2026 Zhengyang Shen
+# Licensed under the MIT License. See LICENSE.
+# THE COMMAND THAT KEEPS A SANDBOX CONTAINER RUNNING. The image's CMD; devcontainer.json says "init": false and
+# "overrideCommand": false, so this is the container's first process, pid 1 inside it, and runs as uid 1000.
+#
+# WHY NOT THE DEVCONTAINER CLI'S OWN. Left to itself the CLI starts every container with
+#   /bin/sh -c 'echo Container started; trap "exit 0" 15; exec "$@"; while sleep 1 & wait $!; do :; done'
+# under docker-init, everything as uid 1000. Any process of uid 1000 inside could then end the container without a
+# word: a `kill -TERM -1`, or a signal to the shell's group, reaches the shell, the shell exits 0, and docker-init
+# ends the container with it. On 15 October 2026 a line sandbox ended with exit 0, most likely that way, though it was
+# not proven, and a run stayed "running" in it for six hours.
+#
+# WHAT THIS DOES INSTEAD:
+#   - As pid 1 it is out of reach of every signal from inside the container that it does not handle: the kernel
+#     drops them, SIGKILL included, and `kill -1` skips pid 1.
+#   - A signal it does handle is obeyed only when it came from outside the container's pid namespace, as docker
+#     stop's SIGTERM does. The kernel writes pid 0 into such a signal's sender, and the signal was sent by kill (code
+#     SI_USER). A process inside cannot forge both: its kill carries its own pid, and a signal it queues with a pid
+#     of its choosing carries another code (SI_QUEUE).
+#   - Every signal it gets is written to its output, which is the container's log (`docker logs`): the one it obeys
+#     before the container ends, and each one it refuses with the sender's pid and uid.
+#   - It reaps the processes left to it, as docker-init did: SIGCHLD ignored, so the kernel reaps them.
+# It runs as uid 1000 because the office reads the container's pid namespace through its first process, and the
+# kernel shows that only to the process's own user. Nothing here changes uid or needs root.
+use strict;
+use warnings;
+use POSIX ();
+
+$| = 1;
+my $SI_USER = 0;
+
+sub log_line {
+  my ($line) = @_;
+  print STDOUT POSIX::strftime('%Y-%m-%d %H:%M:%S', localtime) . " keep-alive: $line\n";
+}
+
+my @names = qw(TERM INT HUP QUIT USR1 USR2);
+my %number = map { $_ => POSIX->can("SIG$_")->() } @names;
+# Each handled signal is held back while a handler runs, so two arriving together are written one after the other.
+my $handled = POSIX::SigSet->new(values %number);
+
+sub on_signal {
+  my ($name, $info) = @_;
+  my $pid = $info->{pid} // 'unknown';
+  my $uid = $info->{uid} // 'unknown';
+  my $code = $info->{code} // 'unknown';
+  if ($pid eq '0' && $code eq "$SI_USER") {
+    log_line("SIG$name from outside the container, so the container ends now, with exit 0");
+    exit 0;
+  }
+  log_line("refused SIG$name from pid $pid (uid $uid, code $code), sent from inside the container; it goes on running");
+}
+
+for my $name (@names) {
+  my $action = POSIX::SigAction->new(sub { on_signal($name, $_[1]) }, $handled, POSIX::SA_SIGINFO());
+  POSIX::sigaction($number{$name}, $action) or die "keep-alive: SIG$name could not be handled: $!\n";
+}
+$SIG{CHLD} = 'IGNORE';
+
+log_line("started as pid $$, uid $<");
+log_line("is not the container's first process, so a SIGKILL from inside can end it") if $$ != 1;
+POSIX::pause() while 1;

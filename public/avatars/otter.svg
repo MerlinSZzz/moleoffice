@@ -1,0 +1,26 @@
+<!-- Copyright © 2026 Zhengyang Shen -->
+<!-- Licensed under the MIT License. See LICENSE. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-label="An otter">
+<title>Otter</title>
+<defs><clipPath id="otter-disc"><circle cx="128" cy="128" r="128"/></clipPath></defs>
+<g clip-path="url(#otter-disc)">
+<circle cx="128" cy="128" r="128" fill="#6464B9"/>
+<ellipse cx="128" cy="250" rx="84" ry="38" fill="#E7D6C0"/>
+<circle cx="58" cy="104" r="16" fill="#6A4E3B"/>
+<circle cx="58" cy="104" r="7" fill="#9A7659"/>
+<circle cx="198" cy="104" r="16" fill="#6A4E3B"/>
+<circle cx="198" cy="104" r="7" fill="#9A7659"/>
+<ellipse cx="128" cy="134" rx="86" ry="64" fill="#7A5B45"/>
+<ellipse cx="128" cy="190" rx="74" ry="44" fill="#E7D6C0"/>
+<g stroke="#B29B82" stroke-width="4.5" stroke-linecap="round">
+<path d="M92 182 L26 168"/><path d="M92 194 L22 196"/><path d="M94 206 L30 224"/>
+<path d="M164 182 L230 168"/><path d="M164 194 L234 196"/><path d="M162 206 L226 224"/>
+</g>
+<g fill="#17161A"><circle cx="98" cy="126" r="12"/><circle cx="158" cy="126" r="12"/></g>
+<g fill="#FFFFFF"><circle cx="94" cy="122" r="4.2"/><circle cx="154" cy="122" r="4.2"/></g>
+<rect x="103" y="160" width="50" height="28" rx="14" fill="#35302E"/>
+<path d="M128 188 L128 198" stroke="#35302E" stroke-width="5" stroke-linecap="round"/>
+<path d="M128 198 q-16 13 -28 0" stroke="#35302E" stroke-width="5" fill="none" stroke-linecap="round"/>
+<path d="M128 198 q16 13 28 0" stroke="#35302E" stroke-width="5" fill="none" stroke-linecap="round"/>
+</g>
+</svg>

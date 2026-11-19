@@ -1,0 +1,27 @@
+/* Copyright © 2026 Zhengyang Shen */
+/* Licensed under the MIT License. See LICENSE. */
+/* The window's own check page, before any page of the office. Its colours are the office's own, read
+   from the office's tokens (src/web/tokens.css), so the window keeps one shade as the office opens:
+   warm paper and dark ink in light, near-black and white in dark, following the system's choice. The
+   page sets no data-theme, so the tokens follow the system's scheme as the office does on Auto. */
+@import url('../web/tokens.css');
+html, body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.5 var(--font-ui); }
+main { max-width: 40rem; margin: 3rem auto; padding: 0 1.25rem; }
+.icon { width: 47px; height: 40px; }
+h1 { font-size: 1.5rem; font-weight: 500; margin: 0.5rem 0 1rem; }
+/* text-wrap: pretty keeps a last word from standing alone on its line. */
+#lines p { margin: 0 0 0.6rem; overflow-wrap: anywhere; text-wrap: pretty; }
+#lines p.busy { color: var(--text-3); }
+/* Larger than the text as well as bold, so it reads as a heading where a font has no bold face. */
+#lines h2 { font-size: 1.125rem; font-weight: 700; margin: 1.25rem 0 0.5rem; }
+#lines .fact { display: flex; flex-direction: column; margin: 0 0 0.5rem; }
+#lines .fact .label { color: var(--text-3); font-size: 0.875rem; }
+#lines .fact .value { overflow-wrap: anywhere; }
+/* A piece of a folder path is never broken inside; the path breaks only after its slashes. */
+#lines .fact .value .whole { white-space: nowrap; }
+#lines p.todo { margin-top: 1.25rem; padding-left: 0.75rem; border-left: 3px solid var(--button-primary-bg); text-wrap: pretty; }
+#offers { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 1.25rem; }
+button { font: inherit; font-weight: var(--button-weight); padding: 0.4rem 0.9rem; border: 2px solid var(--border-strong); border-radius: var(--radius); background: var(--bg); color: var(--text); cursor: pointer; }
+button.first { background: var(--button-primary-bg); color: var(--button-primary-ink); border-color: var(--button-primary-border); }
+/* The About line, at the foot: the version, quiet beside the check itself. */
+#about { margin-top: 2rem; color: var(--text-3); font-size: 0.875rem; }

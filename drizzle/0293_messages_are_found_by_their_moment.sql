@@ -1,0 +1,19 @@
+-- ONE INDEX, SO THE TALK VIEW READS A PROJECT'S MESSAGES FROM ITS PLACE AND NOT FROM THE FIRST MESSAGE.
+--
+-- Round 66 of wave 13y. No index on records held a message's moment, `created_at`. So GET /api/plugin-read/v1/talk with
+-- start=latest read every message of the office through the index of every record of a kind and sorted them, once for
+-- each project, to keep the newest four. A read from a place read every live message of the message centre through
+-- `records_live_idx` to keep the ones at or after it. `messagePoolAtOrAfter` and `newestMessagePoolFirst` in
+-- src/server/lib/messages.ts now read this index from the place, through `theViewFromAMoment` in
+-- src/server/lib/message-centre.ts.
+--
+-- PARTIAL TO THE KIND AND THE MESSAGE CENTRE BOTH. SQLite uses a partial index only for a query that names its WHERE
+-- terms in the same words, with values and not parameters. Many reads name the kind so, and some of them order by the
+-- moment, so an index partial to the kind alone could move them onto it unmeasured. No read names the message centre in
+-- words but the two above, so no other query is moved onto this one.
+--
+-- Every message is filed in the message centre, as the office decided, so this index holds every message, deleted ones
+-- included. It is not unique and changes no row.
+--
+-- ADDITIVE, AND IT REWRITES NOTHING. One CREATE INDEX statement and no UPDATE.
+CREATE INDEX IF NOT EXISTS `records_message_moment_idx` ON `records` (`created_at`) WHERE `kind` = 'message' AND `workspace_id` = 'message-centre';

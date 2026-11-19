@@ -1,0 +1,24 @@
+<!-- Copyright © 2026 Zhengyang Shen -->
+<!-- Licensed under the MIT License. See LICENSE. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-label="A badger">
+<title>Badger</title>
+<defs><clipPath id="badger-disc"><circle cx="128" cy="128" r="128"/></clipPath></defs>
+<g clip-path="url(#badger-disc)">
+<circle cx="128" cy="128" r="128" fill="#64B9B9"/>
+<circle cx="64" cy="88" r="22" fill="#4A4650"/>
+<circle cx="64" cy="88" r="11" fill="#F2EFE9"/>
+<circle cx="192" cy="88" r="22" fill="#4A4650"/>
+<circle cx="192" cy="88" r="11" fill="#F2EFE9"/>
+<ellipse cx="128" cy="140" rx="76" ry="74" fill="#F2EFE9"/>
+<rect x="80" y="68" width="34" height="128" rx="17" fill="#2B2830" transform="rotate(-7 97 132)"/>
+<rect x="142" y="68" width="34" height="128" rx="17" fill="#2B2830" transform="rotate(7 159 132)"/>
+<g fill="#7A7682"><circle cx="97" cy="132" r="14"/><circle cx="159" cy="132" r="14"/></g>
+<g fill="#14131A"><circle cx="97" cy="132" r="8"/><circle cx="159" cy="132" r="8"/></g>
+<g fill="#FFFFFF"><circle cx="93" cy="128" r="3.5"/><circle cx="155" cy="128" r="3.5"/></g>
+<ellipse cx="128" cy="192" rx="38" ry="28" fill="#DAD5CC"/>
+<ellipse cx="128" cy="180" rx="17" ry="13" fill="#2B2830"/>
+<path d="M128 192 L128 200" stroke="#2B2830" stroke-width="5" stroke-linecap="round"/>
+<path d="M128 200 q-12 12 -22 0" stroke="#2B2830" stroke-width="5" fill="none" stroke-linecap="round"/>
+<path d="M128 200 q12 12 22 0" stroke="#2B2830" stroke-width="5" fill="none" stroke-linecap="round"/>
+</g>
+</svg>

@@ -1,0 +1,45 @@
+{
+  "about": "Answers of macOS ps and lsof, WRITTEN FROM THE DOCUMENTATION AND APPLE'S SOURCE, NOT RECORDED ON A MAC. Each file is what the command named beside it prints, in the format its source says. The pids, paths and times are invented. What only a real Mac can settle is listed in tests/darwin-probe.test.ts. When a Mac joins, replace each file with the same command's output recorded there, and change 'recorded' to the date.",
+  "recorded": null,
+  "sourcesRead": {
+    "ps(1)": "Apple's ps manual, adv_cmds ps/ps.1, https://github.com/apple-oss-distributions/adv_cmds/blob/main/ps/ps.1, read on 3 October 2026",
+    "print.c": "Apple's ps source, adv_cmds ps/print.c, https://github.com/apple-oss-distributions/adv_cmds/blob/main/ps/print.c, read on 3 October 2026",
+    "ps.c": "Apple's ps source, adv_cmds ps/ps.c, https://github.com/apple-oss-distributions/adv_cmds/blob/main/ps/ps.c, read on 3 October 2026",
+    "strftime": "POSIX.1-2017 strftime(), https://pubs.opengroup.org/onlinepubs/9699919799/functions/strftime.html: in the POSIX locale, %c is %a %b %e %H:%M:%S %Y",
+    "lsof(8)": "lsof's manual, lsof-org/lsof Lsof.8, https://github.com/lsof-org/lsof/blob/master/Lsof.8, read on 3 October 2026"
+  },
+  "fixtures": {
+    "ps-one-process.txt": {
+      "command": "LC_ALL=C ps -o pid=,ppid=,pgid=,stat=,lstart=,command= -p 4242",
+      "source": "ps(1): -o takes keywords; pid, ppid, pgid (process group number), state (alias stat), lstart and command; 'Keywords may be appended with an equals' sign and a header text, and 'If all keywords have empty header texts, no header line is written' (also print.c, printheader). lstart is 'The exact time the command started, using the %c format described in strftime(3)' (also print.c, lstarted: strftime(buf, ..., \"%c\", localtime(&then))), so in the C locale it reads 'Wed Sep 30 09:14:07 2026', in local time, to the second. The spacing between columns is not documented; the reader splits on any run of spaces. A pid no process has: ps.c prints the header (none here) and then 'if (nkept == 0) exit(1)', so ps prints nothing and exits 1, which the reader reads as gone."
+    },
+    "ps-every-process.txt": {
+      "command": "LC_ALL=C ps -axo pid=,ppid=,pgid=,stat=,lstart=,command=",
+      "source": "As ps-one-process.txt. Pid 611 is a process whose arguments ps could not read: print.c prints its name as \"(%s)\"; ps(1) says square brackets instead, and the reader takes both. Pid 7311 is a zombie: ps(1) says its state letter is Z ('Marks a dead process (a zombie)') and the command keyword lists it as '<defunct>'."
+    },
+    "ps-a-process-that-has-ended.txt": {
+      "command": "LC_ALL=C ps -o pid=,ppid=,pgid=,stat=,lstart=,command= -p 7311",
+      "source": "ps(1): state Z marks a zombie, and the command keyword prints '<defunct>' for it."
+    },
+    "ps-ucomm.txt": {
+      "command": "ps -o ucomm= -p 4242",
+      "source": "ps(1): ucomm is the 'name to be used for accounting'; print.c, ucomm, prints the kernel's p_comm."
+    },
+    "lsof-program-file.txt": {
+      "command": "lsof -a -p 4242 -d txt -Fn",
+      "source": "lsof(8): -a joins the selections with AND, -d selects by descriptor name, 'txt' is 'program text (code and data)'; in -F output 'p' is the process ID (always selected) and 'n' the file name. lsof 4.88 to 4.93.2 also always print the 'f' field; this file has it. Which txt file macOS lists first is not documented. lsof(8), DIAGNOSTICS: lsof 'returns a one (1) if any error was detected, including the failure to locate ... PIDs ... it was asked to list'."
+    },
+    "lsof-working-directories.txt": {
+      "command": "lsof -a -d cwd -Fpn",
+      "source": "lsof(8): 'cwd' is the 'current working directory'; -F fields p and n, with the 'f' field lsof 4.88 to 4.93.2 always add."
+    },
+    "lsof-listening-sockets.txt": {
+      "command": "lsof -nP -iTCP -sTCP:LISTEN -Fptn",
+      "source": "lsof(8): 'to list only network files with TCP state LISTEN, use: -iTCP -sTCP:LISTEN'; -n and -P keep addresses and ports as numbers; 't' is the file's type (IPv4 or IPv6); in the name 'the local host name or IP number is followed by a colon (':'), the port', unspecified addresses are an asterisk, and 'colon-separated IPv6 numbers are enclosed in square brackets'."
+    },
+    "lsof-open-files.txt": {
+      "command": "lsof -p 4242 -Fn",
+      "source": "lsof(8): -p selects one process; -F fields p, f and n as above."
+    }
+  }
+}

@@ -1,0 +1,21 @@
+-- WHICH KEY SENDS A MESSAGE, for one person.
+--
+-- Enter makes a new line by default, Shift+Enter or
+-- Alt+Enter sends, and this is the first shortcut setting.
+--
+-- IT IS A COLUMN ON `people` AND NOT A TABLE OF ITS OWN, for the reason `chat_text_size` beside it
+-- gives: it is one fact about one person, the same shape as the choices around it. A settings table
+-- would be a place for any future setting to go, which is the sixth rule of CLAUDE.md.
+--
+-- IT FOLLOWS THE PERSON AND NOT THIS BROWSER, like the language and the chat's text size: it is read
+-- wherever the person opens Mole Office, on any machine.
+--
+-- NULL MEANS NOBODY HAS CHOSEN, and it is read as `shift-or-alt-enter`, the owner's new default:
+-- Enter makes a new line, and Shift+Enter or Alt+Enter sends. That is rule five of CLAUDE.md: a
+-- reader is told "the person has not chosen" rather than "the person chose the default".
+--
+-- THE TWO WORDS IT MAY HOLD are `shift-or-alt-enter` and `enter`, declared once in
+-- `src/shared/participants.ts` for the door, the reply and the control. There is no CHECK constraint
+-- here for the reason every other word column in this schema has none: the declaration is what the
+-- write gate reads, and a second list in SQL would be the same fact in two places.
+ALTER TABLE `people` ADD `send_key` text;

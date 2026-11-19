@@ -1,0 +1,23 @@
+# Wave 13n, round 32 (FLO-49): the messages and sessions files this round touched, made neutral.
+# One path per line, relative to the checkout; # starts a comment. The neutral-words gate
+# (tests/the-owners-project-is-not-in-the-source.test.ts) reads every string each file ships.
+
+# The message centre: its door, its store, its shared words and its two pages.
+src/server/api/messages.ts
+src/server/lib/messages.ts
+src/shared/messages.ts
+src/web/pages/MessagePage.tsx
+src/web/pages/MessagesPage.tsx
+
+# Groups: the store and the shared rules.
+src/server/lib/groups.ts
+src/shared/groups.ts
+
+# Dead letters: the fold script, the lines' shared reader, the doors, the store, the secretary and its panel.
+scripts/fold-the-old-dead-letter-lines.ts
+src/shared/dead-letter-lines.ts
+src/server/api/dead-letter-secretary.ts
+src/server/api/dead-letters.ts
+src/server/lib/dead-letter-secretary.ts
+src/server/lib/deadletters.ts
+src/web/components/DeadLetterSecretary.tsx

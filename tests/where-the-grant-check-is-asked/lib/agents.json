@@ -1,0 +1,7 @@
+{
+  "doors": [
+    "agent.dispatch",
+    "review.send"
+  ],
+  "why": "Starting a new agent from a dispatched thread or a sent review asks whether a raise carries the press."
+}

@@ -1,0 +1,715 @@
+{
+  "version": 1,
+  "sprites": {
+    "sand-apron-idle": {
+      "src": "/office-map/c-environments/shared/characters/sand-apron/idle.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "7761dbe48e87f568c9abe847b410da200379fca9b49d2c2fe24fb1a9afab2e2d"
+    },
+    "sand-apron-walk-0": {
+      "src": "/office-map/c-environments/shared/characters/sand-apron/walk-0.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "d280ad3ac76000f892429127b60e02017234ee550ce0f94048d16429f7c740f1"
+    },
+    "sand-apron-walk-1": {
+      "src": "/office-map/c-environments/shared/characters/sand-apron/walk-1.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "23d20acff1a691db2433106422d18b4ff97183bc4242231fd185216a0c78adeb"
+    },
+    "sand-apron-walk-2": {
+      "src": "/office-map/c-environments/shared/characters/sand-apron/walk-2.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "df03e459e01a1fd4a35286ec6d13e247f13b574c36090c3b54870ac87149cb40"
+    },
+    "sand-apron-walk-3": {
+      "src": "/office-map/c-environments/shared/characters/sand-apron/walk-3.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "1f50ca536218d477c840bf304f0a046c1cbd09b2897107cb0350c3cebf214af4"
+    },
+    "sand-apron-sit-0": {
+      "src": "/office-map/c-environments/shared/characters/sand-apron/sit-0.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "42dade1f820c5647388901fd59a8e9fd60086e7e233ec82894216edb3657a605"
+    },
+    "sand-apron-sit-0-hands-book": {
+      "src": "/office-map/c-environments/shared/characters/sand-apron/sit-0-hands-book.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "0876aa59278dbc652c440305f3e1e379d931b293b659580fef60c83dce87663b"
+    },
+    "sand-apron-sit-1": {
+      "src": "/office-map/c-environments/shared/characters/sand-apron/sit-1.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "f1c11c01f70add229b605ea727158edb5cc84e38fb5330afe0d3541eeae53d73"
+    },
+    "sand-apron-sit-1-hands-book": {
+      "src": "/office-map/c-environments/shared/characters/sand-apron/sit-1-hands-book.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "a2a03f617267a88de7f0c784e431b07707fd96c2e974f2d313b1fc0161030398"
+    },
+    "sand-apron-sit-2": {
+      "src": "/office-map/c-environments/shared/characters/sand-apron/sit-2.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "98f0febd6656009587bc18db580952124e77f482ed63a8293c5842d4306d5110"
+    },
+    "sand-apron-sit-2-hands-book": {
+      "src": "/office-map/c-environments/shared/characters/sand-apron/sit-2-hands-book.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "837ef1470c8727ecff4e5b03309f38e1553a5f1a04192a37f2dc8475e8d56eab"
+    },
+    "sand-apron-sit-3": {
+      "src": "/office-map/c-environments/shared/characters/sand-apron/sit-3.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "cb5eb902e8b76bec8d5b06632c84a39117580cd0d0b50313e93f8feea8843c42"
+    },
+    "sand-apron-sit-3-hands-book": {
+      "src": "/office-map/c-environments/shared/characters/sand-apron/sit-3-hands-book.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "9afe69bffc5aa03a70b123743f4bfbcc25e52f9edb762a1a0cb4b7477e51626d"
+    },
+    "sand-apron-book-0": {
+      "src": "/office-map/c-environments/shared/characters/sand-apron/book-0.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "250fa1fb90742030a6c517344b9f27b49a4cffe7f0b513c46f9e59d27e17e0d1"
+    },
+    "sand-apron-book-1": {
+      "src": "/office-map/c-environments/shared/characters/sand-apron/book-1.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "e089d3f21e0bd67f294c1f49807fbf830651323c737d9180614d4878ac2eecdc"
+    },
+    "sand-apron-book-2": {
+      "src": "/office-map/c-environments/shared/characters/sand-apron/book-2.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "0a8dd6b90463080d5375a7d6fd0273ef923c6237cca22ef6e2b88fa497368cc6"
+    },
+    "sand-apron-book-2-hands-book": {
+      "src": "/office-map/c-environments/shared/characters/sand-apron/book-2-hands-book.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "bd8498fedc08eaf9f66e6ff36f7a5246b6f23bdb369a911fa7033e91d93a7275"
+    },
+    "sand-apron-book-3": {
+      "src": "/office-map/c-environments/shared/characters/sand-apron/book-3.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "4ef6c67e5e43015cf8139353425e47a85e3049fba6603b2c50ff0300e3eb2121"
+    },
+    "sand-apron-book-3-hands-book": {
+      "src": "/office-map/c-environments/shared/characters/sand-apron/book-3-hands-book.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "028a1cb7b314df1783a48686a276d90e41285f2dd119fde8c54da5ca0a068134"
+    },
+    "sand-apron-rear-idle": {
+      "src": "/office-map/c-environments/shared/characters/sand-apron/rear-idle.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "2b9467784b99785891e6e1140b8089c667b8cd30f8182e0a88491bf10c2a5aec"
+    },
+    "sand-apron-rear-walk-0": {
+      "src": "/office-map/c-environments/shared/characters/sand-apron/rear-walk-0.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "1160081d894e91a0af9d3afe86e20a18bcd6f20fe536f23560169ca1300a0adf"
+    },
+    "sand-apron-rear-walk-1": {
+      "src": "/office-map/c-environments/shared/characters/sand-apron/rear-walk-1.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "81385ea7e88a9d57fa36a95ae9b7d9f5517ddafab8b9955861bb53bafb539632"
+    },
+    "sand-apron-rear-walk-2": {
+      "src": "/office-map/c-environments/shared/characters/sand-apron/rear-walk-2.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "0c5b34620181130ab36b7f8bc0cb4c552320f04d4955cf8af7794743f5afc618"
+    },
+    "sand-apron-rear-walk-3": {
+      "src": "/office-map/c-environments/shared/characters/sand-apron/rear-walk-3.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "117b3f791c3e66b4499d0813940f37100a564c3c1e5bc888862d303cad138d7e"
+    },
+    "sand-apron-talk-0": {
+      "src": "/office-map/c-environments/shared/characters/sand-apron/talk-0.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "cb2998eaca59f0b1aa8cbe90e9b50596ae476f02af8ddfe967f8391f22a4b935"
+    },
+    "sand-apron-talk-1": {
+      "src": "/office-map/c-environments/shared/characters/sand-apron/talk-1.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "9899f5229397bb1b7918955efab6996ff9e88ce54c68c5aa0732dae77e810e60"
+    },
+    "sand-apron-talk-2": {
+      "src": "/office-map/c-environments/shared/characters/sand-apron/talk-2.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "b0886e584c54d9c4172a98de175f4689c17ee74bea7230995849c65888f2425a"
+    }
+  },
+  "looks": {
+    "sand-apron": {
+      "label": {
+        "en": "Sand Apron",
+        "zh": "浅沙围裙"
+      },
+      "idleSprite": "sand-apron-idle",
+      "tableBook": {
+        "sprite": "silver-glasses-closed-book"
+      }
+    }
+  },
+  "actions": {
+    "sand-apron": {
+      "idle": {
+        "loop": true,
+        "frames": [
+          {
+            "sprite": "sand-apron-idle",
+            "durationMs": 1000
+          }
+        ]
+      },
+      "idle_sw": {
+        "loop": true,
+        "frames": [
+          {
+            "sprite": "sand-apron-idle",
+            "durationMs": 1000,
+            "flipX": true
+          }
+        ]
+      },
+      "idle_ne": {
+        "loop": true,
+        "frames": [
+          {
+            "sprite": "sand-apron-rear-idle",
+            "durationMs": 1000
+          }
+        ]
+      },
+      "idle_nw": {
+        "loop": true,
+        "frames": [
+          {
+            "sprite": "sand-apron-rear-idle",
+            "durationMs": 1000,
+            "flipX": true
+          }
+        ]
+      },
+      "walk_se": {
+        "loop": true,
+        "frames": [
+          {
+            "sprite": "sand-apron-walk-0",
+            "durationMs": 140
+          },
+          {
+            "sprite": "sand-apron-walk-1",
+            "durationMs": 140
+          },
+          {
+            "sprite": "sand-apron-walk-3",
+            "durationMs": 140
+          },
+          {
+            "sprite": "sand-apron-walk-2",
+            "durationMs": 140
+          }
+        ]
+      },
+      "walk_sw": {
+        "loop": true,
+        "frames": [
+          {
+            "sprite": "sand-apron-walk-0",
+            "durationMs": 140,
+            "flipX": true
+          },
+          {
+            "sprite": "sand-apron-walk-1",
+            "durationMs": 140,
+            "flipX": true
+          },
+          {
+            "sprite": "sand-apron-walk-3",
+            "durationMs": 140,
+            "flipX": true
+          },
+          {
+            "sprite": "sand-apron-walk-2",
+            "durationMs": 140,
+            "flipX": true
+          }
+        ]
+      },
+      "walk_ne": {
+        "loop": true,
+        "frames": [
+          {
+            "sprite": "sand-apron-rear-walk-0",
+            "durationMs": 140
+          },
+          {
+            "sprite": "sand-apron-rear-walk-1",
+            "durationMs": 140
+          },
+          {
+            "sprite": "sand-apron-rear-walk-2",
+            "durationMs": 140
+          },
+          {
+            "sprite": "sand-apron-rear-walk-3",
+            "durationMs": 140
+          }
+        ]
+      },
+      "walk_nw": {
+        "loop": true,
+        "frames": [
+          {
+            "sprite": "sand-apron-rear-walk-0",
+            "durationMs": 140,
+            "flipX": true
+          },
+          {
+            "sprite": "sand-apron-rear-walk-1",
+            "durationMs": 140,
+            "flipX": true
+          },
+          {
+            "sprite": "sand-apron-rear-walk-2",
+            "durationMs": 140,
+            "flipX": true
+          },
+          {
+            "sprite": "sand-apron-rear-walk-3",
+            "durationMs": 140,
+            "flipX": true
+          }
+        ]
+      },
+      "pick_book": {
+        "loop": false,
+        "frames": [
+          {
+            "sprite": "sand-apron-book-0",
+            "durationMs": 180,
+            "tableBookVisible": true
+          },
+          {
+            "sprite": "sand-apron-book-1",
+            "durationMs": 220,
+            "tableBookVisible": false
+          },
+          {
+            "sprite": "sand-apron-book-2",
+            "durationMs": 180,
+            "foregroundSprite": "sand-apron-book-2-hands-book",
+            "tableBookVisible": false
+          },
+          {
+            "sprite": "sand-apron-book-3",
+            "durationMs": 250,
+            "foregroundSprite": "sand-apron-book-3-hands-book",
+            "tableBookVisible": false
+          }
+        ]
+      },
+      "pick_book_sw": {
+        "loop": false,
+        "frames": [
+          {
+            "sprite": "sand-apron-book-0",
+            "durationMs": 180,
+            "flipX": true,
+            "tableBookVisible": true
+          },
+          {
+            "sprite": "sand-apron-book-1",
+            "durationMs": 220,
+            "flipX": true,
+            "tableBookVisible": false
+          },
+          {
+            "sprite": "sand-apron-book-2",
+            "durationMs": 180,
+            "foregroundSprite": "sand-apron-book-2-hands-book",
+            "flipX": true,
+            "tableBookVisible": false
+          },
+          {
+            "sprite": "sand-apron-book-3",
+            "durationMs": 250,
+            "foregroundSprite": "sand-apron-book-3-hands-book",
+            "flipX": true,
+            "tableBookVisible": false
+          }
+        ]
+      },
+      "sit": {
+        "loop": false,
+        "frames": [
+          {
+            "sprite": "sand-apron-sit-0",
+            "durationMs": 220,
+            "foregroundSprite": "sand-apron-sit-0-hands-book"
+          },
+          {
+            "sprite": "sand-apron-sit-1",
+            "durationMs": 220,
+            "foregroundSprite": "sand-apron-sit-1-hands-book"
+          },
+          {
+            "sprite": "sand-apron-sit-2",
+            "durationMs": 220,
+            "foregroundSprite": "sand-apron-sit-2-hands-book"
+          }
+        ]
+      },
+      "sit_sw": {
+        "loop": false,
+        "frames": [
+          {
+            "sprite": "sand-apron-sit-0",
+            "durationMs": 220,
+            "foregroundSprite": "sand-apron-sit-0-hands-book",
+            "flipX": true
+          },
+          {
+            "sprite": "sand-apron-sit-1",
+            "durationMs": 220,
+            "foregroundSprite": "sand-apron-sit-1-hands-book",
+            "flipX": true
+          },
+          {
+            "sprite": "sand-apron-sit-2",
+            "durationMs": 220,
+            "foregroundSprite": "sand-apron-sit-2-hands-book",
+            "flipX": true
+          }
+        ]
+      },
+      "work": {
+        "loop": true,
+        "frames": [
+          {
+            "sprite": "sand-apron-sit-2",
+            "durationMs": 650,
+            "foregroundSprite": "sand-apron-sit-2-hands-book"
+          },
+          {
+            "sprite": "sand-apron-sit-3",
+            "durationMs": 650,
+            "foregroundSprite": "sand-apron-sit-3-hands-book"
+          }
+        ]
+      },
+      "work_sw": {
+        "loop": true,
+        "frames": [
+          {
+            "sprite": "sand-apron-sit-2",
+            "durationMs": 650,
+            "foregroundSprite": "sand-apron-sit-2-hands-book",
+            "flipX": true
+          },
+          {
+            "sprite": "sand-apron-sit-3",
+            "durationMs": 650,
+            "foregroundSprite": "sand-apron-sit-3-hands-book",
+            "flipX": true
+          }
+        ]
+      },
+      "stand": {
+        "loop": false,
+        "frames": [
+          {
+            "sprite": "sand-apron-sit-2",
+            "durationMs": 220,
+            "foregroundSprite": "sand-apron-sit-2-hands-book"
+          },
+          {
+            "sprite": "sand-apron-sit-1",
+            "durationMs": 220,
+            "foregroundSprite": "sand-apron-sit-1-hands-book"
+          },
+          {
+            "sprite": "sand-apron-sit-0",
+            "durationMs": 220,
+            "foregroundSprite": "sand-apron-sit-0-hands-book"
+          }
+        ]
+      },
+      "stand_sw": {
+        "loop": false,
+        "frames": [
+          {
+            "sprite": "sand-apron-sit-2",
+            "durationMs": 220,
+            "foregroundSprite": "sand-apron-sit-2-hands-book",
+            "flipX": true
+          },
+          {
+            "sprite": "sand-apron-sit-1",
+            "durationMs": 220,
+            "foregroundSprite": "sand-apron-sit-1-hands-book",
+            "flipX": true
+          },
+          {
+            "sprite": "sand-apron-sit-0",
+            "durationMs": 220,
+            "foregroundSprite": "sand-apron-sit-0-hands-book",
+            "flipX": true
+          }
+        ]
+      },
+      "put_book": {
+        "loop": false,
+        "frames": [
+          {
+            "sprite": "sand-apron-book-3",
+            "durationMs": 180,
+            "foregroundSprite": "sand-apron-book-3-hands-book",
+            "tableBookVisible": false
+          },
+          {
+            "sprite": "sand-apron-book-2",
+            "durationMs": 180,
+            "foregroundSprite": "sand-apron-book-2-hands-book",
+            "tableBookVisible": false
+          },
+          {
+            "sprite": "sand-apron-book-1",
+            "durationMs": 220,
+            "tableBookVisible": false
+          },
+          {
+            "sprite": "sand-apron-book-0",
+            "durationMs": 180,
+            "tableBookVisible": true
+          },
+          {
+            "sprite": "sand-apron-idle",
+            "durationMs": 250,
+            "tableBookVisible": true
+          }
+        ]
+      },
+      "put_book_sw": {
+        "loop": false,
+        "frames": [
+          {
+            "sprite": "sand-apron-book-3",
+            "durationMs": 180,
+            "foregroundSprite": "sand-apron-book-3-hands-book",
+            "flipX": true,
+            "tableBookVisible": false
+          },
+          {
+            "sprite": "sand-apron-book-2",
+            "durationMs": 180,
+            "foregroundSprite": "sand-apron-book-2-hands-book",
+            "flipX": true,
+            "tableBookVisible": false
+          },
+          {
+            "sprite": "sand-apron-book-1",
+            "durationMs": 220,
+            "flipX": true,
+            "tableBookVisible": false
+          },
+          {
+            "sprite": "sand-apron-book-0",
+            "durationMs": 180,
+            "flipX": true,
+            "tableBookVisible": true
+          },
+          {
+            "sprite": "sand-apron-idle",
+            "durationMs": 250,
+            "flipX": true,
+            "tableBookVisible": true
+          }
+        ]
+      },
+      "talk": {
+        "loop": false,
+        "frames": [
+          {
+            "sprite": "sand-apron-talk-0",
+            "durationMs": 450
+          },
+          {
+            "sprite": "sand-apron-talk-1",
+            "durationMs": 450
+          },
+          {
+            "sprite": "sand-apron-talk-2",
+            "durationMs": 450
+          }
+        ]
+      },
+      "talk_sw": {
+        "loop": false,
+        "frames": [
+          {
+            "sprite": "sand-apron-talk-0",
+            "durationMs": 450,
+            "flipX": true
+          },
+          {
+            "sprite": "sand-apron-talk-1",
+            "durationMs": 450,
+            "flipX": true
+          },
+          {
+            "sprite": "sand-apron-talk-2",
+            "durationMs": 450,
+            "flipX": true
+          }
+        ]
+      }
+    }
+  },
+  "provenance": {
+    "phase": "independent candidate fragment;not automatically activated in the current2look runtime",
+    "source": "original approved front/book/sit/foreground PNG bytes preserved;new imagegen rear idle/walk and talk;stool fix is separate props.json",
+    "wholeLook": "fur/body/apron are precomposed in every character frame, not interchangeable clothing parts",
+    "mirror": "walk_sw mirrors walk_se once;walk_nw mirrors walk_ne once;idle_sw/nw use the matching source once. Character and its foreground must receive the same flip. Base talk/sit/work/stand/pick/put areSE;the SW variants are explicitly named andalready mirrored. Do not mirror a SW action twice.",
+    "notMade": [
+      "dedicated turning poses",
+      "rear-view work/sit/stand/talk",
+      "cocoa-vest and silver-glasses action chains in this package"
+    ],
+    "reviewLimit": "rear/talk/static completeness and candidate extraction are not a formal world navigation or per-frame load-transfer acceptance"
+  }
+}

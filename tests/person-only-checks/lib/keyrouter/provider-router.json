@@ -1,0 +1,5 @@
+{
+  "sort": "kept",
+  "checks": 1,
+  "why": "asking for a run's provider router credential: the person, the office's own key, or the agent key of whoever registered the run's agent may ask, and nobody else. A raise does not open it, as for a lost agent's new key, which only the owner or its starter gives; a secretary that registered the agent asks as its starter, with its own key."
+}

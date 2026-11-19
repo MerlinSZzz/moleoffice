@@ -1,0 +1,26 @@
+-- HOW ONE PERSON WANTS THE NUMBER ON THE CHAT CIRCLE DRAWN.
+--
+-- Criterion M32, from the owner on the evening of 4 September. The circle may draw two
+-- bubbles of different colours, one for the contacts' unread messages and one for the number of
+-- unread groups, or draw the two added together as one number; added together is the default, and
+-- the choice is made in the person's settings.
+--
+-- IT IS A COLUMN ON `people` AND NOT A TABLE OF ITS OWN. It is one fact about one person, the same
+-- shape as `presence_choice` beside it: a choice they made, stored on their own row. A settings
+-- table would be a place for any future setting to go, which is the sixth rule — do not build for a
+-- future that has not happened — and it would need its own reading rules, its own door and its own
+-- archive entry to hold one word.
+--
+-- NULL MEANS NOBODY HAS CHOSEN, and it is read as the merged number because that is the default the
+-- owner set. It is deliberately not written as `merged` on every row: a reader is then told "the
+-- person has not chosen" rather than "the person chose the merged number", which is rule five of
+-- CLAUDE.md. The same
+-- argument `presence_choice` makes, two columns above.
+--
+-- THE TWO WORDS IT MAY HOLD are `merged` and `two`, and `src/shared/participants.ts` declares them
+-- once for the door, the reply and the control. There is no CHECK constraint here for the reason
+-- every other word column in this schema has none: the declaration is what the write gate reads, and
+-- a second list in SQL would be the same fact in two places, free to disagree the day a word is
+-- added.
+
+ALTER TABLE `people` ADD `circle_shows` text;

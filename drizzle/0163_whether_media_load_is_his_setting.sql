@@ -1,0 +1,27 @@
+-- WHETHER MEDIA A RECORD POINTS AT ARE LOADED, AND WHEN, for one person.
+--
+-- Criterion U5 of design/settings/ACCEPTANCE.md asks for a
+-- setting: transfer by default, do not transfer by default, and transfer after a click and then
+-- show. Three choices on the Settings page, the person's own.
+--
+-- IT IS A COLUMN ON `people` AND NOT A TABLE OF ITS OWN, for the reason `circle_shows` gives: it is
+-- one fact about one person, the same shape as the choices beside it. A settings table would be a
+-- place for any future setting to go, which is the sixth rule of CLAUDE.md.
+--
+-- IT IS NOT `message_pictures` BESIDE IT. That is a picture inside a CHAT MESSAGE and its three
+-- words are `shown`, `pressed` and `path`; `path` draws the file's path as text and is not "never
+-- load, and show the name, the size and a press". This setting is about media a RECORD points at,
+-- and the two are kept apart in `src/shared/mediaload.ts` and `src/shared/messagepictures.ts`.
+--
+-- NULL MEANS NOBODY HAS CHOSEN, and it is read as `with-page`, which is the behaviour every record
+-- drew before this column existed. That is rule five of CLAUDE.md: a reader is told "the person has
+-- not chosen" rather than "the person chose with the page".
+--
+-- THE THREE WORDS IT MAY HOLD are `with-page`, `never` and `on-press`, declared once in
+-- `src/shared/mediaload.ts` for the door, the reply and the control. There is no CHECK constraint
+-- here for the reason every other word column in this schema has none: the declaration is what the
+-- write gate reads, and a second list in SQL would be the same fact in two places.
+--
+-- ADDITIVE, AND IT REWRITES NOTHING. One ALTER TABLE ADD COLUMN and no UPDATE. Writing a default
+-- into every row would say every person had chosen when none of them had.
+ALTER TABLE `people` ADD `media_load` text;

@@ -1,0 +1,42 @@
+-- Titles stop being identity: the unique index on (workspace_id, title) becomes a plain index.
+--
+-- WHAT CHANGES, EXACTLY. `records_title_idx` was `CREATE UNIQUE INDEX` from the very first
+-- migration. It is dropped and made again without the word UNIQUE, over the same two columns and
+-- under the same name. NOT ONE ROW IS READ, MOVED OR REWRITTEN. Nothing is added and nothing is
+-- taken away; the only thing that changes is which writes the database will accept afterwards.
+--
+-- WHY. The owner settled the rule on 16 August 2026. The id is what makes a record itself, and the
+-- title is only how it is shown, so titles may repeat. A record with the same title may be offered
+-- as an existing record to link to, but an equal title must not make PanelX treat two records as
+-- one or refuse a record that is really distinct. The owner met the old rule by deleting a line of a
+-- plan, writing the line again, and being refused because work with that title already existed.
+-- The owner had deleted that work a minute earlier, but this index covered deleted rows and PanelX
+-- never really deletes anything. So a name could be held for ever by a record nobody could see.
+--
+-- THE ORDER THIS COMES IN IS NOT OPTIONAL, and it is recorded in design/CURRENT-CAMPAIGN.md.
+-- FIRST every place that turns a title into a record was made to refuse ambiguity by name rather
+-- than take SQLite's first row; THEN this. Reversed, the same day's work turns about ten visible
+-- refusals into silently wrong links. The refusals are in src/server/lib/records.ts —
+-- `recordsByTitle` hands back every match, `liveMatches` says which of them a typed name can mean,
+-- and `getRecordByTitle`, `liveRecordByTitle` and `resolveSessionRef` each refuse with every
+-- candidate's id in the sentence.
+--
+-- THE INDEX IS KEPT RATHER THAN DROPPED. Linking by name is a lookup a person waits for, and it
+-- runs on the write path; without an index it becomes a table scan of every record in the project.
+-- What is being removed is a constraint, not a lookup.
+--
+-- WHAT A DATABASE LOOKS LIKE AFTERWARDS. Two records in one project may hold one title. Nothing in
+-- the schema tells them apart and nothing needs to: `records.id` is the primary key and always was.
+-- Every reader that used to lean on this index for its answer now asks its own question.
+--
+-- SAFE TO RUN AGAINST A DATABASE THAT ALREADY HOLDS WORK, and safe to run twice. `DROP INDEX IF
+-- EXISTS` does nothing on a database that never had it, and `CREATE INDEX IF NOT EXISTS` does
+-- nothing on one that has already been through this. A DROP INDEX cannot lose a row: an index is
+-- derived from the table.
+--
+-- NUMBERED WELL CLEAR OF THE MIGRATIONS AROUND IT, the way 0020 was and for the same reason —
+-- several agents are adding one at the same time. Drizzle applies journal entries in order of their
+-- `when`, so the gap in the numbers costs nothing.
+
+DROP INDEX IF EXISTS `records_title_idx`;--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS `records_title_idx` ON `records` (`workspace_id`,`title`);

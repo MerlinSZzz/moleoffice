@@ -1,0 +1,36 @@
+-- WHO A KEY PROVED, BESIDE THE ACTOR THE HEADERS NAMED. Criterion P83, point 5, on the coordinator's ruling
+-- of 13 September 2026 (Q1(b) and Q2). The question still open is left open.
+--
+-- WHERE A REQUEST CARRIES A KEY, THE ROW RECORDS WHO THE KEY PROVED. `changes.actor_id` and
+-- `revisions.actor_id` keep exactly what they are: the name the request's headers gave. That is
+-- deliberate and it is the whole of Q1(b). Six of the office's own processes — tools/session-hook.mjs,
+-- tools/hold-the-handle.mjs, tools/the-inspector.mjs, src/worker/index.ts, tools/agent-worker.mjs and
+-- tools/serve-dev.mjs — send the OFFICE's key under an agent's name on every request. Making the
+-- actor id the key's holder, the literal reading of the first ruling, would have made the change log
+-- stop naming the agent that wrote each record and start naming the office, one way before this
+-- migration and another way after. So the fact is recorded HERE, beside the name, and nothing a
+-- reader has today moves.
+--
+-- ONE COLUMN ON BOTH LEDGERS, NOT ONE OF THEM. `attributionFor` in src/server/lib/records.ts is
+-- shared by `logChange` and `saveRevision` on purpose, and the comments beside `warrantWritten` and
+-- `elevationWritten` say why: a write cannot carry a fact in one ledger and not the other without
+-- the two drifting with nothing failing (the ninth invariant). Both statements are in this file.
+--
+-- ONE NEW COLUMN, NULLABLE TEXT, NO DEFAULT AND NO REBUILD. The two ALTER TABLE statements append;
+-- nothing already stored is rewritten and every row written before this migration holds NULL, which
+-- is the honest answer and means the rule did not apply.
+--
+-- WHAT NULL MEANS, IN ONE SENTENCE. No key proved this caller, or the key's holder is the very name
+-- the headers gave. It never means "nobody looked", and it is never a default written in.
+--
+-- THE VALUE IS JSON, INLINE, and is the same object `Actor.provedHolder` carries: the id the key
+-- proved, the word for how it proved, and the name the headers gave instead. It is stored through
+-- drizzle's `{ mode: 'json' }`, exactly as `revisions.data` is, so the browser reads the object off
+-- the row. `design/durability/FORMAT.md` carries the same column inline, as one JSON value on one
+-- field line; `INLINE_JSON_COLUMNS` in src/server/lib/export.ts says so.
+--
+-- IT REFUSES NOTHING. This migration changes what is RECORDED, never what is allowed. Whether a
+-- mismatch should be refused is the owner's rule to make, and it is open. The brief forbids
+-- building one.
+ALTER TABLE `changes` ADD COLUMN `proved_holder` text;--> statement-breakpoint
+ALTER TABLE `revisions` ADD COLUMN `proved_holder` text;

@@ -1,0 +1,23 @@
+{
+  "why": "A quick input's refusals that come after the terminal holder typed, or may have typed, an input (wave 13u, round 21). Too soon needs an input typed for the agent first, and the other two need a holder that answers in a particular way, so no door here can meet them without a terminal holder running. tests/an-agent-asks-for-a-quick-input.test.ts meets too soon with a real holder.",
+  "refusals": [
+    {
+      "code": "quickInputTooSoon",
+      "status": 429,
+      "english": "Test: an input was typed for this agent too recently.",
+      "values": { "nextAllowedAt": "2026-10-13 21:00:00" }
+    },
+    {
+      "code": "quickInputTypedWithoutEnter",
+      "status": 502,
+      "english": "Test: the input was typed, and Enter was not pressed after it.",
+      "values": { "nextAllowedAt": "2026-10-13 21:00:00" }
+    },
+    {
+      "code": "quickInputTypingUnknown",
+      "status": 502,
+      "english": "Test: the terminal holder gave no answer the office can read.",
+      "values": { "nextAllowedAt": "2026-10-13 21:00:00" }
+    }
+  ]
+}

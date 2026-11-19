@@ -1,0 +1,75 @@
+{
+  "startValues": {
+    "claude-opus-5-5": {
+      "effort": "xhigh"
+    },
+    "gpt-6.1-sol": {
+      "effort": "xhigh"
+    },
+    "gpt-6-astra": {
+      "effort": "xhigh"
+    },
+    "gpt-6-luna": {
+      "effort": "max"
+    },
+    "claude-sonnet-5": {
+      "effort": "max"
+    },
+    "claude-sonnet-5-5": {
+      "effort": "max"
+    },
+    "deepseek-v4.1-flash": {
+      "effort": "max"
+    },
+    "claude-fable-5-1": {
+      "effort": "xhigh"
+    },
+    "claude-haiku-4-5": {
+      "effort": "max"
+    },
+    "claude-haiku-4-5-20251001": {
+      "effort": "max"
+    }
+  },
+  "aliases": {
+    "claude-opus-5-5": "claude-opus-5-5",
+    "anthropic/claude-opus-5-5": "claude-opus-5-5",
+    "gpt-6.1-sol": "gpt-6.1-sol",
+    "openai/gpt-6.1-sol": "gpt-6.1-sol",
+    "gpt-6-astra": "gpt-6-astra",
+    "openai/gpt-6-astra": "gpt-6-astra",
+    "gpt-6-luna": "gpt-6-luna",
+    "openai/gpt-6-luna": "gpt-6-luna",
+    "claude-sonnet-5": "claude-sonnet-5",
+    "anthropic/claude-sonnet-5": "claude-sonnet-5",
+    "claude-sonnet-5-5": "claude-sonnet-5-5",
+    "anthropic/claude-sonnet-5-5": "claude-sonnet-5-5",
+    "deepseek-v4.1-flash": "deepseek-v4.1-flash",
+    "deepseek/deepseek-v4.1-flash": "deepseek-v4.1-flash",
+    "claude-fable-5-1": "claude-fable-5-1",
+    "anthropic/claude-fable-5-1": "claude-fable-5-1",
+    "claude-haiku-4-5": "claude-haiku-4-5",
+    "anthropic/claude-haiku-4-5": "claude-haiku-4-5",
+    "claude-haiku-4-5-20251001": "claude-haiku-4-5-20251001",
+    "anthropic/claude-haiku-4-5-20251001": "claude-haiku-4-5-20251001",
+    "opencode-go/deepseek-v4.1-flash": "deepseek-v4.1-flash"
+  },
+  "dsh": {
+    "models": [
+      "deepseek-v4.1-flash",
+      "deepseek/deepseek-v4.1-flash"
+    ],
+    "provider": "deepseek-official",
+    "model": "deepseek-flash",
+    "disabledThinkingEffort": "off"
+  },
+  "dshProviderNamespaces": {
+    "deepseek-official": "llm-deepseek"
+  },
+  "askAgainAfterACodexUsageLimit": {
+    "gpt-6-luna": {
+      "runtime": "opencode",
+      "model": "opencode-go/gpt-6-luna"
+    }
+  }
+}

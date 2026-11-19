@@ -1,0 +1,5 @@
+{
+  "sort": "kept",
+  "checks": 1,
+  "why": "each person keeps their own Home layout: the door writes only the row named for the person who asks, so an agent is refused and a raise does not carry it"
+}

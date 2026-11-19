@@ -1,0 +1,6 @@
+{
+  "sort": "carried",
+  "checks": 2,
+  "why": "setting or clearing the owner's list of quick inputs, which says what the office may type into an agent's terminal with nobody pressing anything: the card keeps it for the owner, so a secretary holding the owner's grant changes it only where this office's list of what the grant carries says the grant presses it",
+  "background": "QUICK INPUTS (wave 13u round 21): the office types into an agent's terminal only an input on the owner's list, so the list is the owner's alone."
+}

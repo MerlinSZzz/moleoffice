@@ -1,0 +1,913 @@
+{
+  "version": 1,
+  "looks": {
+    "bare": {
+      "label": {
+        "en": "Slate mole",
+        "zh": "灰裸身鼹鼠"
+      },
+      "idleSprite": "mole-bare-front"
+    },
+    "scarf": {
+      "label": {
+        "en": "Brown mole with scarf",
+        "zh": "棕围巾鼹鼠"
+      },
+      "idleSprite": "mole-scarf-front"
+    }
+  },
+  "sprites": {
+    "mole-bare-front": {
+      "src": "/office-map/c-forest/characters/mole-bare-front.png",
+      "width": 128,
+      "height": 128,
+      "anchor": {
+        "x": 64.0,
+        "y": 128
+      },
+      "sha256": "6a090716f1df120df8dfb78b3cbab44a454ca34a91b4848a2da252921e3910a1"
+    },
+    "mole-scarf-front": {
+      "src": "/office-map/c-forest/characters/mole-scarf-front.png",
+      "width": 124,
+      "height": 128,
+      "anchor": {
+        "x": 62.0,
+        "y": 128
+      },
+      "sha256": "81397ad9dd45f796f175d94d549025260d242fc70cea1d73d95ea39f3c2ec90e"
+    },
+    "mole-scarf-sit-0": {
+      "src": "/office-map/c-forest/characters/mole-scarf-sit-0.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "6f4202e98ae225d3aac43c3f64dea2c1e4c75281c4ff7c51b228842251c524cb"
+    },
+    "mole-scarf-sit-1": {
+      "src": "/office-map/c-forest/characters/mole-scarf-sit-1.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "5f10dc40a13da8b4a1b897d0fe62abb4b4bb7e6698d0efbed844cb50f1b532d5"
+    },
+    "mole-scarf-sit-2": {
+      "src": "/office-map/c-forest/characters/mole-scarf-sit-2.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "c9ebb93b8fdd46e187aa214b74573eb402b9b6ee1fa32a1c2dd983fa767be9e0"
+    },
+    "mole-scarf-sit-3": {
+      "src": "/office-map/c-forest/characters/mole-scarf-sit-3.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "5326b60eaed4c0ed6510990ef3bb4f9bfefb81c1fa467202de38ade3677393a0"
+    },
+    "mole-scarf-stool": {
+      "src": "/office-map/c-forest/characters/mole-scarf-stool.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "73b2caed4d70b866d1680b4157da496d3170a7ef1e76665e8c4ef2cebd6e5dc9"
+    },
+    "mole-scarf-sit-2-hands-book": {
+      "src": "/office-map/c-forest/characters/mole-scarf-sit-2-hands-book.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "adc527a9c1646d31f367b77e05caff2f853b217bda32649a309ecf053cf583ef"
+    },
+    "mole-scarf-sit-3-hands-book": {
+      "src": "/office-map/c-forest/characters/mole-scarf-sit-3-hands-book.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "21ed3eebb79ff59d63213d9e031e031a38b8057a17aa0050bfd0c52db3e22106"
+    },
+    "mole-scarf-talk-0": {
+      "src": "/office-map/c-forest/characters/mole-scarf-talk-0.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "5e2a34642c3664af6bdd3019cde0a96f487fb0da389c1deddbe68c25baa25e1d"
+    },
+    "mole-scarf-talk-1": {
+      "src": "/office-map/c-forest/characters/mole-scarf-talk-1.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "c73edbf48fee74146adc465bd7c7e5d917562aa00c7110708aa9b4ac8212deb9"
+    },
+    "mole-bare-talk-0": {
+      "src": "/office-map/c-forest/characters/mole-bare-talk-0.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "af631d79490b5f4407bd7559bdfe6e714eea31a2616abbf56f6e349785e84bd8"
+    },
+    "mole-bare-talk-1": {
+      "src": "/office-map/c-forest/characters/mole-bare-talk-1.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "c2b1b304872532fa6c9344da92f9d9c279fa94e4821b215a35ea8f8ca2455597"
+    },
+    "mole-bare-walk-front-0": {
+      "src": "/office-map/c-forest/characters/mole-bare-walk-front-0.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "322bf6e18b98cfb8b7e4639e04492dd3e770b754e1977b534a70f0c5a69ccfdb"
+    },
+    "mole-bare-walk-front-1": {
+      "src": "/office-map/c-forest/characters/mole-bare-walk-front-1.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "7581fce176877a29acd0fc8548ef4ed0979f63963194ec0b6a2d92ec53296b7b"
+    },
+    "mole-bare-walk-front-2": {
+      "src": "/office-map/c-forest/characters/mole-bare-walk-front-2.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "cfeef360e5a9b729c350b7d507bf9653381e53781cda1a726a2ab95de1fce0fd"
+    },
+    "mole-bare-walk-front-3": {
+      "src": "/office-map/c-forest/characters/mole-bare-walk-front-3.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "9e963c98033d3d8aafeaff767d7d0c297566eacea9e3fd5627babd5a73271ffb"
+    },
+    "mole-bare-walk-front-0-left": {
+      "src": "/office-map/c-forest/characters/mole-bare-walk-front-0-left.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "41955cb3080df0d5dfac4d310f36a30cb8d7c0298c2643b53476262f7c590b07",
+      "sourceOperation": "horizontal pixel mirror of mole-bare-walk-front-0"
+    },
+    "mole-bare-walk-front-1-left": {
+      "src": "/office-map/c-forest/characters/mole-bare-walk-front-1-left.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "cb255726258849de62a5078696a111602909c8d65a45a31e85209789e44dee90",
+      "sourceOperation": "horizontal pixel mirror of mole-bare-walk-front-1"
+    },
+    "mole-bare-walk-front-2-left": {
+      "src": "/office-map/c-forest/characters/mole-bare-walk-front-2-left.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "12288189fcfb0c7b15d18bfc8c7d3817293ad4096c2449aa30f8cf2f1479f865",
+      "sourceOperation": "horizontal pixel mirror of mole-bare-walk-front-2"
+    },
+    "mole-bare-walk-front-3-left": {
+      "src": "/office-map/c-forest/characters/mole-bare-walk-front-3-left.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "11438bdd814bdb5669b10564a9a7fe98eb871e056ae02a114ce79f24b93e575e",
+      "sourceOperation": "horizontal pixel mirror of mole-bare-walk-front-3"
+    },
+    "mole-bare-walk-rear-0": {
+      "src": "/office-map/c-forest/characters/mole-bare-walk-rear-0.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "a072805b85cc50e579779f711ae312f7765ccd042b02207658a01bff328a43a7"
+    },
+    "mole-bare-walk-rear-1": {
+      "src": "/office-map/c-forest/characters/mole-bare-walk-rear-1.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "57fcd779cd2c47c8e6bf58690387bb5e1fa0d5773a2df855d1fa41ba2604e9b4"
+    },
+    "mole-bare-walk-rear-2": {
+      "src": "/office-map/c-forest/characters/mole-bare-walk-rear-2.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "3c6c60ae944e8ab384f9d17c246187eea5540a5bd350eaa213d69d049b2236fe"
+    },
+    "mole-bare-walk-rear-3": {
+      "src": "/office-map/c-forest/characters/mole-bare-walk-rear-3.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "2274b828ff213738c17c238aa0028ad5f770192a4deb96df5874c5692419cd0d"
+    },
+    "mole-bare-walk-rear-0-left": {
+      "src": "/office-map/c-forest/characters/mole-bare-walk-rear-0-left.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "c20112a0dc4621b7ec9dcfde108d23d97ff6499dd30d32090e7e5eb277dbfc19",
+      "sourceOperation": "horizontal pixel mirror of mole-bare-walk-rear-0"
+    },
+    "mole-bare-walk-rear-1-left": {
+      "src": "/office-map/c-forest/characters/mole-bare-walk-rear-1-left.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "92cff89d5d0cc28e727bb1f5a3cd17a5e32e1c63b138a37fc41bb621635dde39",
+      "sourceOperation": "horizontal pixel mirror of mole-bare-walk-rear-1"
+    },
+    "mole-bare-walk-rear-2-left": {
+      "src": "/office-map/c-forest/characters/mole-bare-walk-rear-2-left.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "b835baaebaf73ee92af47041b68da69526c7c05e2510c3a92517cd59c4534c17",
+      "sourceOperation": "horizontal pixel mirror of mole-bare-walk-rear-2"
+    },
+    "mole-bare-walk-rear-3-left": {
+      "src": "/office-map/c-forest/characters/mole-bare-walk-rear-3-left.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "d8ba5a4431480f16bbc558794461c0432c8ebf86d1fad6c6e2b28d0cf41efdf1",
+      "sourceOperation": "horizontal pixel mirror of mole-bare-walk-rear-3"
+    },
+    "mole-scarf-walk-0": {
+      "src": "/office-map/c-forest/characters/mole-scarf-walk-0.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "0e691420b6f0b771a6897e53bd5bee227bc8fe556970045283fe091553f1229f"
+    },
+    "mole-scarf-walk-1": {
+      "src": "/office-map/c-forest/characters/mole-scarf-walk-1.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "9a839e7b5aa6b50847cefd6f9cd21634a0b7126bb2e29551c54bc2e2a52ce748"
+    },
+    "mole-scarf-walk-2": {
+      "src": "/office-map/c-forest/characters/mole-scarf-walk-2.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "8965d800d3edc33083287f48ec91b200c334662784387e3ac15b1402c5f5823f"
+    },
+    "mole-scarf-walk-3": {
+      "src": "/office-map/c-forest/characters/mole-scarf-walk-3.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "1f689097a3deeaee22562292f926c80943f1339775c06293711011a8c8a8b8c3"
+    },
+    "mole-scarf-walk-0-left": {
+      "src": "/office-map/c-forest/characters/mole-scarf-walk-0-left.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "43779c87ef7466095163c3d2660be0725311ce76819b742ae715510f71659265",
+      "sourceOperation": "horizontal pixel mirror of mole-scarf-walk-0"
+    },
+    "mole-scarf-walk-1-left": {
+      "src": "/office-map/c-forest/characters/mole-scarf-walk-1-left.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "da843c9bb940bf0a5f3e40836d7555aa3a375bf829630d75771822fb50aef65f",
+      "sourceOperation": "horizontal pixel mirror of mole-scarf-walk-1"
+    },
+    "mole-scarf-walk-2-left": {
+      "src": "/office-map/c-forest/characters/mole-scarf-walk-2-left.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "d5e60189b28cf0d9799873614e4df19cf5205da37012f8ac6b897c288ea693db",
+      "sourceOperation": "horizontal pixel mirror of mole-scarf-walk-2"
+    },
+    "mole-scarf-walk-3-left": {
+      "src": "/office-map/c-forest/characters/mole-scarf-walk-3-left.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "ec2a6f91a965b1c29ae38da091f564ff1f9c63760d3fa76e22e33a6969b04601",
+      "sourceOperation": "horizontal pixel mirror of mole-scarf-walk-3"
+    },
+    "mole-scarf-walk-rear-0": {
+      "src": "/office-map/c-forest/characters/mole-scarf-walk-rear-0.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "d4114de5d207a1e1cfb97635e76d9079805ef0ad5f9ac0f0f9fc164da8285042"
+    },
+    "mole-scarf-walk-rear-0-left": {
+      "src": "/office-map/c-forest/characters/mole-scarf-walk-rear-0-left.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "e265d513f581a42725497414e689791644aaf0a93656e63fcb72cbf9515d7256",
+      "derivedBy": "horizontal pixel mirror"
+    },
+    "mole-scarf-walk-rear-1": {
+      "src": "/office-map/c-forest/characters/mole-scarf-walk-rear-1.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "2e72594a8e265b05c3f7561dc57b5c559ad00a0e1afd4cef9446e632cdafd8e0"
+    },
+    "mole-scarf-walk-rear-1-left": {
+      "src": "/office-map/c-forest/characters/mole-scarf-walk-rear-1-left.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "62902031a5a994f74dd430013e801babdc47dc13c5cb6035619151bd677b3928",
+      "derivedBy": "horizontal pixel mirror"
+    },
+    "mole-scarf-walk-rear-2": {
+      "src": "/office-map/c-forest/characters/mole-scarf-walk-rear-2.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "0665dc40803aa56553f884b8705d876114f08b6bf4120792ac9672aa7efb6801"
+    },
+    "mole-scarf-walk-rear-2-left": {
+      "src": "/office-map/c-forest/characters/mole-scarf-walk-rear-2-left.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "d613af5ab34eaf870877ddbefe0688a59d6b0a1e92d99a803dd6485d039a4fb8",
+      "derivedBy": "horizontal pixel mirror"
+    },
+    "mole-scarf-walk-rear-3": {
+      "src": "/office-map/c-forest/characters/mole-scarf-walk-rear-3.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "6502b1b6415471e051c5d80adf6feb6a403de0cbbe36938fbc3f30c3cd8bfda4"
+    },
+    "mole-scarf-walk-rear-3-left": {
+      "src": "/office-map/c-forest/characters/mole-scarf-walk-rear-3-left.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "12631033ad3e4ec01fed1590c57f40bb18474924d6dd730ebf28824cf6a2e505",
+      "derivedBy": "horizontal pixel mirror"
+    },
+    "mole-bare-sit-0": {
+      "src": "/office-map/c-forest/characters/mole-bare-sit-0.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "4e98ffda3b03fb73b2fd70986db6863e1497d5cabae0964185184727852c8822"
+    },
+    "mole-bare-sit-1": {
+      "src": "/office-map/c-forest/characters/mole-bare-sit-1.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "1208174a57cb52b0b1bf436d3278d5c7c5698c2c58b9937cffc1a938c13c85cb"
+    },
+    "mole-bare-sit-2": {
+      "src": "/office-map/c-forest/characters/mole-bare-sit-2.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "3af481d788e51603ea79434585cab58aeb71e9b2faee0498fb379bb4cd9df540"
+    },
+    "mole-bare-sit-3": {
+      "src": "/office-map/c-forest/characters/mole-bare-sit-3.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "262cf093ffb4cbb7c45876e3bfd9762da076a425429afa7f0bf285c4a63f6ce4"
+    },
+    "mole-bare-stool": {
+      "src": "/office-map/c-forest/characters/mole-bare-stool.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "7744e8a47980e96ee2f3d73ba30fe5a45cc189625242446965726201b7a8af46"
+    },
+    "mole-bare-sit-2-hands-book": {
+      "src": "/office-map/c-forest/characters/mole-bare-sit-2-hands-book.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "735c811a3b569cea5327c7d40f3948f8c0cbfdfab2b5a65e7fba25ced6127c58"
+    },
+    "mole-bare-sit-3-hands-book": {
+      "src": "/office-map/c-forest/characters/mole-bare-sit-3-hands-book.png",
+      "width": 160,
+      "height": 160,
+      "anchor": {
+        "x": 80,
+        "y": 156
+      },
+      "sha256": "394d01de051fba1393c4df11aa6120e074df3429973db186af8fa4065b3ed158"
+    }
+  },
+  "actions": {
+    "bare": {
+      "idle": {
+        "fps": 1,
+        "loop": true,
+        "frames": [
+          {
+            "sprite": "mole-bare-front"
+          }
+        ]
+      },
+      "talk": {
+        "fps": 2.222,
+        "loop": false,
+        "frames": [
+          {
+            "sprite": "mole-bare-talk-1",
+            "durationMs": 450
+          },
+          {
+            "sprite": "mole-bare-talk-0",
+            "durationMs": 450
+          },
+          {
+            "sprite": "mole-bare-talk-1",
+            "durationMs": 450
+          }
+        ]
+      },
+      "walk_se": {
+        "fps": 7.143,
+        "loop": true,
+        "frames": [
+          {
+            "sprite": "mole-bare-walk-front-0",
+            "durationMs": 140
+          },
+          {
+            "sprite": "mole-bare-walk-front-1",
+            "durationMs": 140
+          },
+          {
+            "sprite": "mole-bare-walk-front-2",
+            "durationMs": 140
+          },
+          {
+            "sprite": "mole-bare-walk-front-3",
+            "durationMs": 140
+          }
+        ]
+      },
+      "walk_sw": {
+        "fps": 7.143,
+        "loop": true,
+        "frames": [
+          {
+            "sprite": "mole-bare-walk-front-0-left",
+            "durationMs": 140
+          },
+          {
+            "sprite": "mole-bare-walk-front-1-left",
+            "durationMs": 140
+          },
+          {
+            "sprite": "mole-bare-walk-front-2-left",
+            "durationMs": 140
+          },
+          {
+            "sprite": "mole-bare-walk-front-3-left",
+            "durationMs": 140
+          }
+        ]
+      },
+      "walk_ne": {
+        "fps": 7.143,
+        "loop": true,
+        "frames": [
+          {
+            "sprite": "mole-bare-walk-rear-0",
+            "durationMs": 140
+          },
+          {
+            "sprite": "mole-bare-walk-rear-1",
+            "durationMs": 140
+          },
+          {
+            "sprite": "mole-bare-walk-rear-2",
+            "durationMs": 140
+          },
+          {
+            "sprite": "mole-bare-walk-rear-3",
+            "durationMs": 140
+          }
+        ]
+      },
+      "walk_nw": {
+        "fps": 7.143,
+        "loop": true,
+        "frames": [
+          {
+            "sprite": "mole-bare-walk-rear-0-left",
+            "durationMs": 140
+          },
+          {
+            "sprite": "mole-bare-walk-rear-1-left",
+            "durationMs": 140
+          },
+          {
+            "sprite": "mole-bare-walk-rear-2-left",
+            "durationMs": 140
+          },
+          {
+            "sprite": "mole-bare-walk-rear-3-left",
+            "durationMs": 140
+          }
+        ]
+      },
+      "sit": {
+        "fps": 4.545454545454546,
+        "loop": false,
+        "frames": [
+          {
+            "sprite": "mole-bare-sit-0",
+            "durationMs": 220
+          },
+          {
+            "sprite": "mole-bare-sit-1",
+            "durationMs": 220
+          },
+          {
+            "sprite": "mole-bare-sit-2",
+            "durationMs": 220,
+            "foregroundSprite": "mole-bare-sit-2-hands-book"
+          }
+        ]
+      },
+      "work": {
+        "fps": 1.5384615384615385,
+        "loop": true,
+        "frames": [
+          {
+            "sprite": "mole-bare-sit-2",
+            "durationMs": 650,
+            "foregroundSprite": "mole-bare-sit-2-hands-book"
+          },
+          {
+            "sprite": "mole-bare-sit-3",
+            "durationMs": 650,
+            "foregroundSprite": "mole-bare-sit-3-hands-book"
+          }
+        ]
+      },
+      "stand": {
+        "fps": 4.545454545454546,
+        "loop": false,
+        "frames": [
+          {
+            "sprite": "mole-bare-sit-2",
+            "durationMs": 220,
+            "foregroundSprite": "mole-bare-sit-2-hands-book"
+          },
+          {
+            "sprite": "mole-bare-sit-1",
+            "durationMs": 220
+          },
+          {
+            "sprite": "mole-bare-sit-0",
+            "durationMs": 220
+          }
+        ]
+      }
+    },
+    "scarf": {
+      "idle": {
+        "fps": 1,
+        "loop": true,
+        "frames": [
+          {
+            "sprite": "mole-scarf-front"
+          }
+        ]
+      },
+      "talk": {
+        "fps": 2.222,
+        "loop": false,
+        "frames": [
+          {
+            "sprite": "mole-scarf-talk-1",
+            "durationMs": 450
+          },
+          {
+            "sprite": "mole-scarf-talk-0",
+            "durationMs": 450
+          },
+          {
+            "sprite": "mole-scarf-talk-1",
+            "durationMs": 450
+          }
+        ]
+      },
+      "sit": {
+        "fps": 4.545,
+        "loop": false,
+        "frames": [
+          {
+            "sprite": "mole-scarf-sit-0",
+            "durationMs": 220
+          },
+          {
+            "sprite": "mole-scarf-sit-1",
+            "durationMs": 220
+          },
+          {
+            "sprite": "mole-scarf-sit-2",
+            "durationMs": 220,
+            "foregroundSprite": "mole-scarf-sit-2-hands-book"
+          }
+        ]
+      },
+      "work": {
+        "fps": 1.538,
+        "loop": true,
+        "frames": [
+          {
+            "sprite": "mole-scarf-sit-2",
+            "durationMs": 650,
+            "foregroundSprite": "mole-scarf-sit-2-hands-book"
+          },
+          {
+            "sprite": "mole-scarf-sit-3",
+            "durationMs": 650,
+            "foregroundSprite": "mole-scarf-sit-3-hands-book"
+          }
+        ]
+      },
+      "stand": {
+        "fps": 4.545,
+        "loop": false,
+        "frames": [
+          {
+            "sprite": "mole-scarf-sit-2",
+            "durationMs": 220,
+            "foregroundSprite": "mole-scarf-sit-2-hands-book"
+          },
+          {
+            "sprite": "mole-scarf-sit-1",
+            "durationMs": 220
+          },
+          {
+            "sprite": "mole-scarf-sit-0",
+            "durationMs": 220
+          }
+        ]
+      },
+      "walk_se": {
+        "fps": 7.143,
+        "loop": true,
+        "frames": [
+          {
+            "sprite": "mole-scarf-walk-0",
+            "durationMs": 140
+          },
+          {
+            "sprite": "mole-scarf-walk-1",
+            "durationMs": 140
+          },
+          {
+            "sprite": "mole-scarf-walk-2",
+            "durationMs": 140
+          },
+          {
+            "sprite": "mole-scarf-walk-3",
+            "durationMs": 140
+          }
+        ]
+      },
+      "walk_sw": {
+        "fps": 7.143,
+        "loop": true,
+        "frames": [
+          {
+            "sprite": "mole-scarf-walk-0-left",
+            "durationMs": 140
+          },
+          {
+            "sprite": "mole-scarf-walk-1-left",
+            "durationMs": 140
+          },
+          {
+            "sprite": "mole-scarf-walk-2-left",
+            "durationMs": 140
+          },
+          {
+            "sprite": "mole-scarf-walk-3-left",
+            "durationMs": 140
+          }
+        ]
+      },
+      "walk_ne": {
+        "fps": 7.142857142857143,
+        "loop": true,
+        "frames": [
+          {
+            "sprite": "mole-scarf-walk-rear-0",
+            "durationMs": 140
+          },
+          {
+            "sprite": "mole-scarf-walk-rear-1",
+            "durationMs": 140
+          },
+          {
+            "sprite": "mole-scarf-walk-rear-2",
+            "durationMs": 140
+          },
+          {
+            "sprite": "mole-scarf-walk-rear-3",
+            "durationMs": 140
+          }
+        ]
+      },
+      "walk_nw": {
+        "fps": 7.142857142857143,
+        "loop": true,
+        "frames": [
+          {
+            "sprite": "mole-scarf-walk-rear-0-left",
+            "durationMs": 140
+          },
+          {
+            "sprite": "mole-scarf-walk-rear-1-left",
+            "durationMs": 140
+          },
+          {
+            "sprite": "mole-scarf-walk-rear-2-left",
+            "durationMs": 140
+          },
+          {
+            "sprite": "mole-scarf-walk-rear-3-left",
+            "durationMs": 140
+          }
+        ]
+      }
+    }
+  },
+  "provenance": {
+    "referenceSha256": "74a8fbd54f404d76c88e0fed0f434f0e12d35c51715183dd263b856a7172ea75",
+    "method": "Built-in imagegen; explicit magenta extraction, nearest sampling, per-look palette and source-sheet scale; left orientations are pixel mirrors.",
+    "acceptedBaseline": "5544 existing walk PNGs and timings preserved as the accepted baseline. Low-step trials are local unadopted experiments.",
+    "state": "all shared role actions present; runtime contact review pending",
+    "limitations": [
+      "Idle is static.",
+      "Stand reverses the sit sequence.",
+      "Work is held-book reading/page turning.",
+      "Book pickup, put-down, tea and typing are not made."
+    ]
+  }
+}

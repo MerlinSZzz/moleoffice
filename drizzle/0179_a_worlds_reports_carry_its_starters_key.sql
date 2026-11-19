@@ -1,0 +1,15 @@
+-- A WORLD'S REPORTS CARRY A KEY OF THE AGENT THAT STARTED IT.
+--
+-- Criterion P83, point 5. A test world's server tells
+-- the office it was copied from that it has started, what it is called, which visits it holds, and
+-- that it has ended. It sent those reports with no key, so once header claims stop counting they
+-- would count as nobody. The world holds its own keys, which the office does not know.
+--
+-- So when an agent registers a world with its own key, the office makes one more live key of that
+-- agent, as it does for a run, and answers it once. This column says which `held_keys` row that key
+-- is, so the office can take the key back when it marks the world ended. The key itself is never
+-- stored: `held_keys` keeps only its SHA-256, and this column keeps only the row's id.
+--
+-- ONE NEW NULLABLE TEXT COLUMN AND NOTHING ELSE. NULL means no key was made for this world: it was
+-- registered by its own server, by a caller that proved no agent key, or before this column existed.
+ALTER TABLE `worlds` ADD COLUMN `run_key_id` TEXT;

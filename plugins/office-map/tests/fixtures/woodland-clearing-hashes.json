@@ -1,0 +1,36 @@
+{
+  "source": "c5cf39de3",
+  "reason": "The reviewer U_UmRnRJmODr requires exactly fixed clearing positions and totals during the woodland correction.",
+  "rows": [
+    {
+      "count": 1000,
+      "zoom": 0.052675585284280936,
+      "sha256": "6e639ad2ec095f7779090ac15af0c16cd8aaeb9dc3fff6963b2ed457ed3f4bcd"
+    },
+    {
+      "count": 1000,
+      "zoom": 0.025,
+      "sha256": "4855715dd590a25908d8f337e6e04daaefc6cb93850e54635c8cc9088ce5b7a8"
+    },
+    {
+      "count": 1000,
+      "zoom": 0.015,
+      "sha256": "43d51afc4d2acdcded36738c20afaa91091534051e22c184b4fcf98120fadd9f"
+    },
+    {
+      "count": 5000,
+      "zoom": 0.052675585284280936,
+      "sha256": "c53fcfb8ee82d18d3de44ba9b9f0121ef3ef20d8a0b1748a34d07200a7b701c8"
+    },
+    {
+      "count": 5000,
+      "zoom": 0.025,
+      "sha256": "2e80be46fd924f4abf8979fce4f4b3ce9a17ebacce1ce9a69362dcd6b13360df"
+    },
+    {
+      "count": 5000,
+      "zoom": 0.015,
+      "sha256": "f90a7a1b1678445cc824a5093f1c1042b8eebcf322d870101f0db60566dc2794"
+    }
+  ]
+}

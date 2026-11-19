@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "scene": "high-rise",
+  "stations": {
+    "worker": "worker-desk",
+    "secretary": "secretary-desk"
+  },
+  "decorations": {
+    "ground": [],
+    "backdrop": [],
+    "boundary": [
+      "high-rise-city-window"
+    ]
+  },
+  "furniture": {
+    "single": [
+      "shared-single-desk",
+      "shared-octagonal-desk"
+    ],
+    "shared": [
+      "shared-three-seat-desk"
+    ]
+  }
+}

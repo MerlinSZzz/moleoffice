@@ -1,0 +1,6 @@
+{
+  "why": "Three columns of the one installation row record when the person closed the one-version window and who closed it, as a moment and the same kind-and-id pair trusted_machines stores for who added a machine. All three are nullable and nothing existing changes, so an open window is the state of every database until the person closes it. Criterion P83, point 6.",
+  "columnsAddedAfterTheRebuild": {
+    "installation": ["window_closed_at", "window_closed_by_kind", "window_closed_by_id"]
+  }
+}

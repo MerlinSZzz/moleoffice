@@ -1,0 +1,14 @@
+-- WHICH ADDRESS IS WHICH MACHINE, IN THE PERSON'S OWN WORDS.
+-- The person names, once, in a small table in Settings, which address
+-- is which machine, so a message reads as from that machine's name.
+--
+-- IT IS A COLUMN ON `installation` AND NOT A TABLE OF ITS OWN. The names are one fact about the office, and
+-- `installation` is the office's one row, which is where 0166, 0169 and 0175 put the office's other settings for
+-- the same reason. It holds a JSON object from address to name; src/server/lib/machine-names.ts is the one reader
+-- and the one writer, and it refuses anything else.
+--
+-- NULL MEANS NOBODY HAS NAMED ANY ADDRESS, and then every message from another machine reads its address, as
+-- before.
+--
+-- ADDITIVE, AND IT REWRITES NOTHING. One ALTER TABLE ADD COLUMN and no UPDATE.
+ALTER TABLE `installation` ADD COLUMN `machine_names` text;

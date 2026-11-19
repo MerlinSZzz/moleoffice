@@ -1,0 +1,50 @@
+-- THREE INDEXES OF MESSAGES, SO THREE READS FIND THEIR FEW MESSAGES WITHOUT READING EVERY MESSAGE. The file's name
+-- names the first two; the third is the index of the week-use notices.
+--
+-- 1. `records_message_about_run_idx` HOLDS THE RUN A MESSAGE IS ABOUT, `data.aboutRun`, for messages only. Before the
+-- office writes a line about a run, it asks whether it already wrote that line, so that it never writes it twice. Two
+-- lookups ask it when a child session finishes (`tellTheParentAChildFinished` in src/server/lib/worker.ts), inside the
+-- write that finishes the run, and one asks it when a line's next round is asked or starts (`tellOnce` in
+-- src/server/lib/the-line-next-round.ts). No index held the run, so each lookup read the data of every message. The
+-- live office held 122,682 messages on 13 November 2026, 1,402 bytes of data each on average, 47,097 of them about a
+-- run, and its log showed each lookup take about 210 ms. Each lookup now names the run in this index's words,
+-- `STORED_FIELDS.messageAboutRun` in src/server/db/schema.ts. Its plan, on a made-up office of that size:
+--   before:  SEARCH records USING INDEX records_kind_idx (kind=?)
+--   after:   SEARCH records USING INDEX records_message_about_run_idx (<expr>=?)
+-- The lookup of the seal's notice reads the message as `r`, and its plan says `SEARCH r` with the same index, then
+-- SCAN one EXISTS VIRTUAL TABLE INDEX 3: for the list of whom the one message went to.
+--
+-- 2. `records_message_summons_idx` HOLDS THE TIME EACH SUMMONS WAS MADE, for messages that carry `data.summons` only,
+-- which only the summons door writes. The read of the summonses since a place (src/server/lib/summons.ts) read every
+-- message and sorted what it found. The live office held no summons, and the read still took up to 6.2 s in its log.
+-- That read names this index with INDEXED BY, as the other reads of a partial index in this office do. Its plan:
+--   before:  SEARCH records USING INDEX records_kind_idx (kind=?) | USE TEMP B-TREE FOR ORDER BY
+--   after:   SCAN records USING INDEX records_message_summons_idx
+-- The scan is of the index only, which holds the summonses and nothing else, already in the order the read asks.
+--
+-- 3. `records_message_logins_week_idx` HOLDS THE TIME EACH WEEK-USE NOTICE WAS SENT, for messages that carry
+-- `data.extra.loginsWeek` only, which only the week-use notice writes (`tellTheSecretaryHowMuchOfTheWeekIsUsed` in
+-- src/server/lib/logins-week.ts). Each minute the notice reads the notices it already sent, so that it never tells a
+-- share twice, and that read went through every message. The live office held 122 such notices among 122,682
+-- messages on 13 November 2026. The read names this index with INDEXED BY, in the words of
+-- `STORED_FIELDS.messageLoginsWeek`. Its plan:
+--   before:  SEARCH records USING INDEX records_kind_idx (kind=?)
+--   after:   SCAN records USING INDEX records_message_logins_week_idx
+-- On the made-up office below, holding 122 notices, the read took 151.5 to 179.3 ms before and 0.2 to 0.4 ms after.
+--
+-- THE BUILD, measured on a made-up office of 122,686 messages, 1,358 bytes of data each on average, in a file of
+-- 1,858,433,024 bytes, three times, each in a transaction that was rolled back: the first index took 188 to 189 ms and
+-- held 47,101 messages, the second took 170 to 174 ms and held none. The third was measured the same way later, on the
+-- same office grown to 122,699 messages in a file of 2,838,036,480 bytes: it took 338, 175 and 171 ms and held 122
+-- notices. Each reads every message once. The file's pages were already in memory; a first build on an office whose
+-- file is not will read it from the disk as well.
+--
+-- Each index's expression is guarded by `json_valid`, as every stored field is, so a message whose data is not JSON
+-- is in no index, and a read asking a value of the field never finds it.
+--
+-- ADDITIVE, AND IT REWRITES NOTHING. Three CREATE INDEX statements and no UPDATE. No index is unique.
+CREATE INDEX IF NOT EXISTS `records_message_about_run_idx` ON `records` ((CASE WHEN json_valid(`data`) THEN json_extract(`data`, '$.aboutRun') END)) WHERE `kind` = 'message' AND (CASE WHEN json_valid(`data`) THEN json_extract(`data`, '$.aboutRun') END) IS NOT NULL;
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS `records_message_summons_idx` ON `records` (`created_at`) WHERE `kind` = 'message' AND (CASE WHEN json_valid(`data`) THEN json_extract(`data`, '$.summons') END) IS NOT NULL;
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS `records_message_logins_week_idx` ON `records` (`created_at`) WHERE `kind` = 'message' AND (CASE WHEN json_valid(`data`) THEN json_extract(`data`, '$.extra.loginsWeek') END) IS NOT NULL;

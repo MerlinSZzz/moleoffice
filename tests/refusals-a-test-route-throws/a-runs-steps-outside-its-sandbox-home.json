@@ -1,0 +1,11 @@
+{
+  "why": "A run's steps outside its sandbox home (wave 13u, round 10b) need a sandbox folder in the server's own sandboxes folder. tests/a-sandboxed-runs-steps-are-read-as-written.test.ts meets it through the door, case 7.",
+  "refusals": [
+    {
+      "code": "stepsOutsideTheHome",
+      "status": 400,
+      "english": "Test: the run's record leads outside its sandbox home.",
+      "values": {}
+    }
+  ]
+}

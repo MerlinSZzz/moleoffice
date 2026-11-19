@@ -1,0 +1,16 @@
+# Wave 13j round 21: the settings, the seed scripts and the first-run guide.
+# One path per line, relative to the checkout; # starts a comment. The neutral-words gate
+# (tests/the-owners-project-is-not-in-the-source.test.ts) reads every string each file ships.
+# Moved here from the list NEUTRAL_SOURCES in the gate's test file by wave 13r round 7.
+
+src/config/settings.mjs
+scripts/seed-corpus.ts
+scripts/restore-check.ts
+scripts/remove-the-throwaway-records.mjs
+src/web/pages/WelcomePage.tsx
+src/web/components/OwnerGate.tsx
+src/web/owner.ts
+src/shared/owner.ts
+src/server/api/office-owner.ts
+src/server/lib/owner.ts
+src/server/db/owner-setting.ts

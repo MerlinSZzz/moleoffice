@@ -1,0 +1,5 @@
+{
+  "sort": "on words only",
+  "checks": 1,
+  "why": "Revoking on a change may be carried by a secretary using its own key with the person\u2019s words naming this revocation and record. An agent never files a regulation already revoked, and the grant never revokes."
+}

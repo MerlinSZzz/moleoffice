@@ -1,0 +1,7 @@
+{
+  "doors": [
+    "office.start-at-login",
+    "office.set-start-at-login"
+  ],
+  "why": "Both start-at-login doors ask whether a raise carries the press, after the person and before the old refusal, in the one guard they share."
+}

@@ -1,0 +1,6 @@
+{
+  "why": "The dead-letter thresholds are choices, this line's migration 0218 (wave 13r), renumbered to 0274 when it landed: how many days the oldest unclaimed dead letter may sit, and how many may pile up, before the office sends its summary to the named secretary, as two columns of the one installation row. Nullable with no default and no backfill, so NULL is nobody having chosen one in the office.",
+  "columnsAddedAfterTheRebuild": {
+    "installation": ["dead_letter_after_days", "dead_letter_after_count"]
+  }
+}

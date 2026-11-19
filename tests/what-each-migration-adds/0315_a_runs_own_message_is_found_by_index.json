@@ -1,0 +1,8 @@
+{
+  "why": "Wave 13s item 37: one index of the revisions, partial to create revisions and keyed by the session they were written in, so the read of a run's own message to its starter starts from the run's own create revisions and not from every delivery to the starter. No table, column, trigger or write changes.",
+  "indexesAddedAfterTheRebuild": {
+    "revisions": [
+      "revisions_session_create_idx"
+    ]
+  }
+}

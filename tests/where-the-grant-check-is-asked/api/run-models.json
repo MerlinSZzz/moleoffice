@@ -1,0 +1,7 @@
+{
+  "doors": [
+    "office.set-run-models",
+    "office.set-agent-run-model"
+  ],
+  "why": "Setting the models for runs, for the office or for one agent, goes through one guard."
+}

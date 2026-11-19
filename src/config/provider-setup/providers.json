@@ -1,0 +1,146 @@
+[
+  {
+    "id": "digitalocean",
+    "name": "DigitalOcean",
+    "page": "https://cloud.digitalocean.com/account/api/tokens",
+    "documentation": "https://docs.digitalocean.com/reference/api/create-personal-access-token/",
+    "instructions": "In the intended server account, open the Tokens page and choose Generate New Token under Personal access tokens. Name it for the intended server and choose Custom Scopes. The key is shown once; keep the page open and paste it in the next step. Scopes apply to resource types, not one server, so use a dedicated account.",
+    "folder": "mole-office-id",
+    "file": "digitalocean.token",
+    "prefix": "dop_v1_",
+    "min": 20,
+    "trial": {
+      "url": "https://api.digitalocean.com/v2/account",
+      "method": "GET"
+    },
+    "trialDescription": "Reads the account without changing it. It does not prove that all server operations are authorized.",
+    "instructionsZh": "登录目标服务器所属账号，在 API 的 Tokens 页面找到 Personal access tokens，点 Generate New Token。名称可写 mole-office-id-server，选择 Custom Scopes（自定义权限）。令牌只显示一次，留在页面上，下一步贴入隐藏输入。权限按资源类型授权，不能限定到单台服务器，请使用专门账号。",
+    "trialDescriptionZh": "只读取账号，不更改数据；不能证明所有服务器操作均已授权。",
+    "permissions": {
+      "droplet": [
+        "Create",
+        "Read",
+        "Update"
+      ],
+      "ssh_key": [
+        "Create",
+        "Read"
+      ],
+      "firewall": [
+        "Create",
+        "Read",
+        "Update"
+      ],
+      "tag": [
+        "Create",
+        "Read"
+      ],
+      "regions": [
+        "Read"
+      ],
+      "sizes": [
+        "Read"
+      ],
+      "image": [
+        "Read"
+      ],
+      "account": [
+        "Read"
+      ]
+    },
+    "otherPermissionsOff": "Do not grant any Delete action. Turn every other permission off.",
+    "otherPermissionsOffZh": "所有 Delete 都不勾，其他所有权限都关闭。",
+    "expiry": "Choose an explicit Expiration, not never; record it and replace the token before it expires.",
+    "expiryZh": "在 Expiration 选择明确的到期日，不选永不过期；记下日期，到期前重新设置。",
+    "confirm": "Have you selected only the listed permissions, no Delete, turned everything else off, and chosen an expiry?",
+    "confirmZh": "已经按上面勾好（不勾任何 Delete），其他全关，并选了到期日吗？",
+    "confirmationFailure": "Check the permissions and expiry before creating the token.",
+    "confirmationFailureZh": "请先核对权限和到期日，再生成令牌。"
+  },
+  {
+    "id": "resend",
+    "name": "Resend",
+    "page": "https://resend.com/api-keys",
+    "documentation": "https://resend.com/docs/dashboard/api-keys/introduction",
+    "instructions": "In the intended Resend account open API Keys and choose Create API Key. Name it for the office mail service. If moleoffice.com is missing, add and verify that domain first. The key is shown once; keep the page open and paste it in the next step.",
+    "scopes": "Choose Sending access and bind only moleoffice.com.",
+    "folder": "mole-office-id",
+    "file": "resend.key",
+    "prefix": "re_",
+    "min": 16,
+    "trial": {
+      "url": "https://api.resend.com/domains",
+      "method": "GET",
+      "answersFrom": "https://resend.com/docs/api-reference/errors",
+      "answers": [
+        {
+          "status": 401,
+          "name": "restricted_api_key",
+          "means": "passed"
+        },
+        {
+          "status": 401,
+          "name": "validation_error",
+          "means": "refused"
+        },
+        {
+          "status": 401,
+          "means": "refused"
+        },
+        {
+          "status": 200,
+          "means": "too-broad"
+        },
+        {
+          "status": 400,
+          "name": "validation_error",
+          "means": "refused"
+        },
+        {
+          "status": 403,
+          "means": "refused"
+        }
+      ]
+    },
+    "trialDescription": "The trial asks Resend for its list of domains. It changes nothing and sends no email. Resend's error list says a key with Sending access only may do nothing but send, so Resend refuses this request, and that refusal passes the trial. If Resend returns the list, the key has more than Sending access. The trial cannot show which domain the key may send from, or that mail will arrive.",
+    "instructionsZh": "登录目标 Resend 账号，打开 API keys，点 Create API Key；名称可写 mole-office-id-mail。如果没有 moleoffice.com，先到 Domains 添加并验证，再回到这里。密钥只显示一次，留在页面上，下一步贴入隐藏输入。",
+    "scopesZh": "Permission 只选 Sending access，不选 Full access；Domain 只选 moleoffice.com，不选 All domains。",
+    "trialDescriptionZh": "试跑向 Resend 请求域名列表。它不更改任何数据，也不发信。Resend 的错误说明写明：只有 Sending access 的密钥做发信以外的事会被拒绝；收到这个拒绝即为通过。如果 Resend 返回了域名列表，说明密钥的权限超过 Sending access。试跑不能证明密钥限定在哪个域名，也不能证明邮件能送达。",
+    "otherPermissionsOff": "Do not grant Full access or all-domain access.",
+    "otherPermissionsOffZh": "关闭 Full access 和 All domains。",
+    "expiry": "If an expiration option is offered, choose and record an explicit expiry.",
+    "expiryZh": "如提供到期日，选择明确的到期日并记下。",
+    "confirm": "Is the permission Sending access and the domain restricted to moleoffice.com?",
+    "confirmZh": "权限是 Sending access，域名只选了 moleoffice.com 吗？",
+    "confirmationFailure": "Choose Sending access and restrict the domain to moleoffice.com.",
+    "confirmationFailureZh": "请先把权限设为 Sending access，并只选 moleoffice.com。"
+  },
+  {
+    "id": "openai",
+    "name": "OpenAI",
+    "page": "https://platform.openai.com/",
+    "documentation": "https://help.openai.com/en/articles/9186755-managing-projects-in-the-api-platform",
+    "instructions": "In the intended account open Settings, Projects and create a separate project named Mole Office. Switch to that project, open API keys and choose Create new secret key. Choose Restricted if offered. The key is shown once; keep the page open and paste it in the next step. Check Billing and turn auto-recharge OFF. Confirm whether the current balance limits spending; billing delays may affect the limit. See https://help.openai.com/en/articles/8264644-what-is-prepaid-billing",
+    "scopes": "Enable only the image API permissions needed for the intended work and, if separately offered, model-list read permission for the trial.",
+    "folder": "mole-office-openai",
+    "file": "api-key",
+    "prefix": "sk-",
+    "min": 16,
+    "trial": {
+      "url": "https://api.openai.com/v1/models",
+      "method": "GET"
+    },
+    "trialDescription": "Lists models without changing provider data. It cannot prove image generation is authorized or the balance is sufficient.",
+    "instructionsZh": "登录目标账号，在 Settings（设置）的 Projects（项目）中新建独立项目 Mole Office。切换到该项目，打开 API keys，点 Create new secret key；如提供 Restricted（受限）密钥请选择它。密钥只显示一次，留在页面上，下一步贴入隐藏输入。打开 Billing，确认 auto-recharge 为 OFF，并确认现有余额是否限制支出；账单延迟可能影响限额。账单说明：https://help.openai.com/en/articles/8264644-what-is-prepaid-billing",
+    "scopesZh": "只开启图像 API 所需权限，模型能力选 images；如单列模型列表读取权限，也为只读试跑开启。",
+    "trialDescriptionZh": "只列出模型，不更改提供商数据；不能证明图像生成权限或余额足够。",
+    "otherPermissionsOff": "Turn all other permissions off.",
+    "otherPermissionsOffZh": "其他权限关闭。",
+    "expiry": "If an expiration option is offered, choose and record an explicit expiry.",
+    "expiryZh": "如提供到期日，选择明确的到期日并记下。",
+    "confirm": "Have you checked the project and permissions, turned auto-recharge OFF and confirmed the balance cap?",
+    "confirmZh": "你看到并完成了上述项目、权限及账单设置，并确认自动充值关闭和余额上限吗？",
+    "confirmationFailure": "Check the project, permissions, automatic recharge and balance cap.",
+    "confirmationFailureZh": "请先核对页面上的项目、权限、自动充值和余额上限。"
+  }
+]

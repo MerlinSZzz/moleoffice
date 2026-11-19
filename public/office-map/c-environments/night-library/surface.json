@@ -1,0 +1,97 @@
+{
+  "version": 2,
+  "scene": "night-library",
+  "tileSize": 32,
+  "sprites": {
+    "night-library-ground-0": {
+      "src": "/office-map/c-environments/night-library/ground/night-library-ground-0.png",
+      "width": 32,
+      "height": 32,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "sha256": "259ff4d3d4348a79cc7291b15afcecb5209fb5a75b84406924069831076a6074"
+    },
+    "night-library-ground-1": {
+      "src": "/office-map/c-environments/night-library/ground/night-library-ground-1.png",
+      "width": 32,
+      "height": 32,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "sha256": "0abba384c89f6fb48fd271d7dbbf5621ab98d4e14a6e63f035ca913e5c38c613"
+    },
+    "night-library-path-0": {
+      "src": "/office-map/c-environments/night-library/ground/night-library-path-0.png",
+      "width": 32,
+      "height": 32,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "sha256": "8f5d7a31c689d2936c44e601d69c417fff860a10b69de79193bdd42dac0a6c20"
+    },
+    "night-library-path-1": {
+      "src": "/office-map/c-environments/night-library/ground/night-library-path-1.png",
+      "width": 32,
+      "height": 32,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "sha256": "9be09196fad22683a15e0acab5f2e8bfe9805844fdea1ab788e9db49fbf79275"
+    }
+  },
+  "materials": {
+    "ground": [
+      {
+        "sprite": "night-library-ground-0",
+        "weight": 1
+      },
+      {
+        "sprite": "night-library-ground-1",
+        "weight": 1
+      }
+    ],
+    "road": [
+      {
+        "sprite": "night-library-path-0",
+        "weight": 5
+      },
+      {
+        "sprite": "night-library-path-1",
+        "weight": 1
+      }
+    ],
+    "plainWork": [
+      {
+        "sprite": "night-library-ground-0",
+        "weight": 1
+      },
+      {
+        "sprite": "night-library-ground-1",
+        "weight": 1
+      }
+    ],
+    "sharedWork": [
+      {
+        "sprite": "night-library-ground-0",
+        "weight": 1
+      },
+      {
+        "sprite": "night-library-ground-1",
+        "weight": 1
+      }
+    ]
+  },
+  "provenance": {
+    "basis": "The quiet ground/material direction was accepted; actual world placement/navigation still needs review.",
+    "ground": "Native32px low-frequency stone/soil samples;24:1:1 for high-rise,cavern,greenhouse; original library wood tiles1:1. High-rise and plain base tiles are explicitly procedural, not claimed imagegen tiles.",
+    "road": "Native32px flat material with sparse low-contrast marks5:1. High-rise/greenhouse stone, cavern worn stone, library blue-gray carpet. No floor lighting baked in.",
+    "geometry": "The same runtime road/plainWork/sharedWork polygons determine pixel masks and navigation. No static preview polygons or unused adjacency edge PNGs are included.",
+    "height": 0,
+    "sourceFacts": "a facts file kept outside this repository"
+  }
+}

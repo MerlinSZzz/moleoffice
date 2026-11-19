@@ -1,0 +1,1101 @@
+/* Copyright © 2026 Zhengyang Shen */
+/* Licensed under the MIT License. See LICENSE. */
+/* ==========================================================================================
+   Mole Office design tokens — the whole visual contract of the app, in one file.
+
+   Read this before styling anything. Nothing below the token layer is allowed to write a
+   colour or a size literal; if a component needs a value that is not here, the value belongs
+   here (or it is a component prop, never a stray literal).
+
+   THREE IDEAS DO ALL THE WORK
+   ---------------------------------------------------------------------------------------
+   1. MEANING LIVES IN THE STATE NAMESPACE, NOT IN THE COLOUR NAMESPACE.
+      There is deliberately no --red or --green. A failed run reads --st-failed. This is not
+      pedantry: the user can swap the whole colour system at runtime, and the two looks
+      use different colours for the same state. If meaning lived in --red, swapping the
+      theme would change what a colour MEANS, and a researcher glancing at a wall of rows
+      would silently misread it. Semantic names survive a theme swap; hue names do not.
+
+   2. COLOUR IS NEVER THE ONLY CHANNEL.
+      Every state also ships a WORD (--st-x-word), a SHAPE (--st-x-glyph), a WEIGHT
+      (--st-x-weight) and a BORDER STYLE (--st-x-border-style). A person with deuteranopia,
+      a greyscale screenshot pasted into a paper, and a projector with a blown red channel
+      all still read the state correctly. If the glyph font is missing and renders tofu, the
+      word and the weight are still two independent channels — the design degrades, it does
+      not fail.
+
+   3. PRESETS ARE PURE TOKEN SWAPS.
+      data-theme / data-density / data-radius / data-font / data-size on <html> only ever
+      rewrite values in this file. No component branches on a preset. That is why twelve explored
+      design directions collapsed into one component tree: they disagreed about six numbers, and
+      all six numbers are below.
+
+   WHERE THE VALUES CAME FROM
+   ---------------------------------------------------------------------------------------
+   Light is the F look and dark is the H look.
+   F has thick ink borders, hard shadows, yellow buttons and indigo links on warm white.
+   H has near-black surfaces, soft shadows and blue buttons and links.
+   Only these two looks are kept. Auto follows the browser's scheme.
+   The type scale stays shared; each look declares its own geometry below.
+
+   MEASURED CONTRAST of body text (--text) on --panel, worst-case per theme:
+     light (F) 14.16   dark (H) 17.78
+   The worst ratio anywhere in the system — any text token on any surface it is allowed to
+   sit on, including state foregrounds on their own tints — is 4.64:1. The floor is 4.5:1.
+
+   TWO BORDER TOKENS, AND ONLY ONE OF THEM IS HELD TO A RATIO.
+     --border         a hairline that separates two surfaces. Decoration: a panel edge and a
+                      row rule carry no information a reader would lose if they faded, so
+                      there is no floor on them and there is not meant to be one.
+     --border-strong  the line that IS the object — the edge of a button, an input, a select,
+                      a menu, a severe chip, the rail that ranks a row, a chart axis. Nothing
+                      else says where the control ends, so this one is a boundary in the sense
+                      of WCAG 1.4.11 and its floor is 3:1.
+   It measured 1.63:1 in `light` and 1.78:1 in `dark` against --panel, and every theme was
+   under 2:1 — the entire product shipped with controls whose outline could not be seen.
+   MEASURED WORST CASE per theme, --border-strong against the WORST of --bg, --panel,
+   --panel-2 and --panel-3, which is every surface a control is allowed to sit on:
+     light (F) 12.21   dark (H) 3.81
+   tests/legibility.test.ts recomputes all of that from this file and fails below 3.
+   ========================================================================================== */
+
+:root {
+  /* Timing shared by the office's waits, arrivals and place changes. */
+  --motion-delay: 150ms;
+  --motion-quick: 160ms;
+  --motion-open: 240ms;
+  --motion-settle: 420ms;
+  --motion-lap: 1200ms;
+  --motion-lap-wide: 2000ms;
+  --motion-linger-period: 1600ms;
+  --motion-linger: var(--motion-linger-period);
+  --ease-out: cubic-bezier(.2, .8, .2, 1);
+  --ease-in: cubic-bezier(.4, 0, 1, 1);
+  --ease-lap: linear;
+  --ease-pop: cubic-bezier(.3, 1.4, .5, 1);
+  --motion-glow: none;
+  --motion-glow-reach: 0px;
+  /* ---------------------------------------------------------------------------------------
+     TYPE
+     Three concrete stacks; --font-ui is a ROLE that points at one of them and is what
+     data-font re-aims. A component that genuinely needs fixed-width digits asks for
+     --font-mono directly and is therefore immune to the preset.
+
+     Every stack ends in a CJK family. A record title that mixes Chinese and Latin words must set
+     on one line with both scripts on a shared baseline; without the CJK entries the browser
+     picks an arbitrary system fallback whose metrics do not match the Latin face.
+     --------------------------------------------------------------------------------------- */
+  --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue',
+    Arial, 'Noto Sans', 'Noto Sans CJK SC', 'Source Han Sans SC', 'PingFang SC',
+    'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  /* THE MONO STACK LEADS WITH A FACE THAT TELLS A CAPITAL O FROM A ZERO.
+
+     WHAT WENT WRONG. This stack used to begin `ui-monospace`, which means "whatever this system
+     calls its monospace face". On this machine that is DejaVu Sans Mono, whose zero is a plain oval
+     with a dot so small it disappears at the 13px an id is drawn at. Photographed in Chromium on 27
+     August 2026: the three capital O of an id such as `OOO65dhfahzm` could not be told from three
+     zeros. Everything in this face is read character by character: an
+     id somebody quotes to an agent, a hash, a path, a port. A face that hides which character it is
+     showing is the wrong face for all of them.
+
+     WHY Noto Sans Mono. It draws a SLASHED zero, the slash is still legible at 13px and at 390, it
+     is a Noto face like the CJK entries this stack already ended with, and it was already installed
+     wherever the previous stack's own fallbacks were. Measured against Liberation Mono, Ubuntu Mono,
+     Nimbus Mono PS and DejaVu Sans Mono; only Noto's mark survived 13px. The pictures and the
+     script that made them are under design/round-eleven/repairs/.
+
+     ui-monospace STAYS, one place further down, so a system with no Noto still gets its own mono
+     face rather than the browser's last resort. What changed is which one wins when both are there.
+
+     THE OTHER TWO STACKS ARE UNTOUCHED. Every stack still ends in a CJK family, for the reason
+     above this. */
+  --font-mono: 'Noto Sans Mono', ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas,
+    'DejaVu Sans Mono', 'Liberation Mono', 'Noto Sans Mono CJK SC', 'Sarasa Mono SC', monospace;
+  --font-read: ui-serif, Georgia, Cambria, 'Noto Serif', 'Noto Serif CJK SC',
+    'Source Han Serif SC', 'Songti SC', SimSun, serif;
+
+  /* The UI role. data-font re-points this and nothing else. */
+  --font-ui: var(--font-sans);
+
+  /* rem, not px, so a user who has raised their browser's base font size gets a bigger app
+     instead of being overridden. The comment on each line is the size at the 16px default.
+
+     13 IS THE FLOOR, AND THE PHONE IS WHY. These three were 12/13/15, and the bottom step did
+     most of the work: measured across ten pages at 1440 (tools/legibility.mjs), 69% of every
+     visible text node in the app was set at 12px, and 213 of those were not labels but full
+     sentences of eight words or more inside the page body — a 210-word explanation on a record
+     page, a 125-word one on the component sheet, a 102-word one on Home. A chip reading "DONE"
+     is meant to be small. A paragraph is not, and --fs-1 was carrying both.
+
+     THE VALUES ARE NOT INVENTED: they are the ones this file already shipped to phones. The
+     block at the foot of the file used to raise these same three tokens to 13/14/16 under
+     (max-width: 480px), on the argument that a phone is held further from the eye than a
+     monitor is — and at 390 there was not one text node below 13px on any page. So the app has
+     been read at this scale on every page for as long as the breakpoint has existed; what was
+     missing was the reason a desk should be denied it. There is none, so the desk now gets the
+     same scale and the phone block no longer restates it. Photographed at 1440 in both themes
+     before and after; the sheet, the plan grid and the records list were the three worth
+     doubting and none of them lost a column or a row.
+
+     WHAT STAYED SMALL, DELIBERATELY. `code`, `kbd` and `pre` in styles.css sit at 0.925em of
+     whatever holds them, because the mono face runs optically larger than the sans at the same
+     size. An inline code span inside label text is therefore still about 12px. That is a
+     compensation for a face, not a reading size for prose, and raising it would make code set
+     bigger than the sentence it sits in.
+
+     THE THREE FLOORS BELOW ARE WHAT LETS TEXT SIZE HAVE A `Small`. `data-size` moves the root
+     font size, and every size here is in rem, so Small at 93.75% would take --fs-1 to 12.19px —
+     the exact size 213 sentences were measured at before this pass, and the size
+     tests/legibility.test.ts forbids. A floor per token keeps the three reading sizes at 13/14/15
+     at Small while the three heading sizes above them still shrink, so the hierarchy is kept and
+     the sentence is not. The floors are absolute and the values are relative on purpose: a reader
+     who raised their browser's own base size still gets a bigger app. */
+  --fs-1: max(13px, 0.8125rem);  /* 13 — labels, meta, chips */
+  --fs-2: max(14px, 0.875rem);   /* 14 — UI body, row text; the size most of the app is set in */
+  --fs-3: max(15px, 1rem);       /* 16 — prose, section headings */
+  --fs-4: 1.1875rem;  /* 19 — panel titles */
+  --fs-5: 1.5rem;     /* 24 — record titles */
+  --fs-6: 2rem;       /* 32 — the one display number on a page */
+
+  --lh-tight: 1.35;   /* headings and single-line rows */
+  --lh-body: 1.45;    /* UI text that may wrap to two lines */
+  --lh-read: 1.60;    /* multi-sentence prose */
+
+  /* ---------------------------------------------------------------------------------------
+     GEOMETRY — defaults; data-density and data-radius override the two groups below.
+     --------------------------------------------------------------------------------------- */
+  /* THE HEIGHT A ROW NEEDS TO HOLD ONE LINE OF ITS OWN TEXT. Declared once, here, and named by
+     every --row-h declaration in this file.
+
+     WHY IT EXISTS. Density writes px row heights; text size moves the rem type. The two are
+     orthogonal until a row has to hold a line: at Large the root is 18px, so --fs-2 comes to
+     15.75px, and 15.75 x 1.45 of text plus two lots of Compact's 6px padding is 34.8px being
+     asked to sit in a 28px row.
+
+     WHY var(--pad) AND NOT A NUMBER. Every density block redeclares --pad on this same element,
+     and a custom property is substituted where it is USED, so each density's --row-fit picks up
+     its own padding. That was reasoned rather than measured until 25 August 2026, when it was
+     read out of Chromium at three densities by three text sizes by two widths — eighteen values,
+     all eighteen holding, with the computed token stream showing `2 * 6px` under Compact. The
+     test is tests/a-row-holds-its-own-text.test.ts and the fallback it made unnecessary was
+     three --row-fit-* tokens, one per density.
+
+     WHAT IT COSTS, MEASURED RATHER THAN DISCOVERED. This is a floor, and it is already above two
+     of the three densities at the DEFAULT text size: 14 x 1.45 + 2 x 6 is 32.3, so a Compact row
+     draws at 32.3px and not 28px, and a Default row at 36.3px and not 32px, whatever the text
+     size. Comfortable and the phone floor barely move (44 to 44.3). The three densities stay
+     ordered and stay apart. Whether Compact should keep its 28px instead is a question about
+     what a row is for, and it is the owner's; nothing here decides it quietly, and the nine
+     desktop values are pinned in that test so the answer is visible. */
+  --row-fit: calc(var(--fs-2) * var(--lh-body) + 2 * var(--pad));
+  /* Minimum height of one list row. NOTE that this default is never the computed value in the
+     running app: PresetBar.applyPresets always writes data-density on <html>, so one of the three
+     density blocks below always wins on specificity. It carries the same max() as the other four
+     because a stylesheet is read by people, and a site that looked exempt would be copied. */
+  --row-h: max(32px, var(--row-fit));
+  --pad: 8px;         /* padding inside a row */
+  --pad-lg: 14px;     /* padding inside a panel */
+  --gut: 10px;        /* gap between panels and between columns */
+  --rail: 3px;        /* the left spine that ranks a row by state */
+  --radius-sm: var(--look-radius-sm);
+  --radius: var(--look-radius);
+  --radius-lg: var(--look-radius-lg);
+  --radius-pill: 999px;
+
+  /* The focus ring is a size as well as a colour, and both are tokens so that no component
+     can quietly shrink it. */
+  --focus-w: 2px;
+  --focus-offset: 2px;
+
+  /* ---------------------------------------------------------------------------------------
+     WHAT FLOATS ABOVE WHAT
+
+     THE SIX LAYERS OF THE APP, LOWEST FIRST. The order below IS the order on the screen: each
+     line sits above every line before it. The numbers are a ladder with room in it and mean
+     nothing on their own — only the order matters, and reading it off this list is the point.
+
+     WHY IT EXISTS. There were twenty-eight z-index numbers in src/web across six unrelated
+     scales — 100 in one file, 60 and 55 in another, 45, 40, 30, 20 — and no token. Nothing said
+     which was meant to be above which, so a new floating thing landed underneath something by
+     accident and the only way to find out was to look at it. That happened: a menu was
+     clipped underneath a table.
+
+     WHAT IS NOT ON THIS LIST. A single digit — 1 to 9 — is a LOCAL nudge: two things inside one
+     component, where one has to paint over the other and neither competes with anything else on
+     the page. A row's title over its own hit area, a table's frozen column over its own cells.
+     Those stay as numbers, because naming a layer for them would say they rank against the
+     drawer and they do not. tests/z-index.test.ts holds the line: in src/web a z-index is either
+     one of these tokens or a single digit, and nothing else. */
+  --z-circle: 10;    /* a comment circle beside a block. Under the top bar and the strips, so it passes under them as the page
+                        scrolls: at 660 circle 1 was drawn across the bar (wave 13t round 34) */
+  --z-picked: 11;    /* the outline of the thing the talk box is open about. Under the phone's top bar, so it passes under the
+                        bar as the page scrolls: at 390 it was drawn through the bar (wave 13s rounds 13 and 13c) */
+  --z-bar: 12;       /* the one bar across the top of the shell on a phone */
+  --z-mark: 15;      /* the mark Mole Office draws on the words a comment is about, over the page and under everything that opens.
+                        Over the top bar and the strips, so the review ring's edges are never covered. The comment circles
+                        are not marks on the words, and sit under the bar at --z-circle */
+  --z-popover: 20;   /* a small body that opens from a mark and stays inside the page */
+  --z-scrim: 30;     /* the dimming behind the navigation drawer */
+  --z-drawer: 40;    /* the navigation drawer itself, on a phone */
+  --z-chat-button: 41; /* the corner chat button, over the navigation drawer and under the overlay host */
+  --z-overlay: 50;   /* the overlay host: every menu, composer, picker and review overlay */
+  --z-first-entry: 55; /* a new office's first entry: the grey over everything but the one place it shows (wave 13y round 138).
+                        Over the overlay host, so no menu opens over the grey, and under the skip link */
+  --z-skip: 60;      /* the skip link — the keyboard's way into the page, over everything */
+  --z-blocked: 70;   /* the sheet that swallows every press on a page in the wrong world */
+  --z-wrong-world: 80; /* the red banner naming which Mole Office this page is really talking to */
+
+  /* THE CORNER CHAT BUTTON'S SIZE, ITS INSET FROM THE WINDOW'S EDGES, AND THE ROOM IT NEEDS.
+     The button is fixed to the bottom-right corner of the window (.px-chat-circle in
+     components/Chat.tsx), so without room at the foot of the page it sits over the page's last line.
+     --fab-room is the button's height and one inset below it and one above
+     it. The .shell-main rule in App.tsx leaves this room under the page and under the review pane.
+     No column is kept down the page's right edge: the button may cover text there, and a person who
+     cannot see a line scrolls.
+     The button's own rule reads --fab-size and --fab-inset at every width, so the room and the
+     button cannot drift; tests/the-corner-button-leaves-the-last-line-visible.test.ts compares the
+     boxes. */
+  --fab-size: 3rem;
+  --fab-inset: 1rem;
+  --fab-room: calc(var(--fab-size) + 2 * var(--fab-inset));
+
+  /* Width the app shell stops growing at. Long lines of 13px text are unreadable past this. */
+  --shell-max: 1440px;
+  /* THE WIDEST A LINE OF TEXT GETS ANYWHERE IN THIS PRODUCT. 58rem, which is 928px at the browser's
+     default size and about 120 characters at --fs-3.
+
+     THE NUMBER AND THIS COMMENT USED TO DISAGREE. Two paragraphs stood here saying 32rem, one of
+     them in the present tense, over a declaration that had said 58rem since the caption fix below.
+     A reader deciding a width believed the prose and got a column two thirds the size. That is this
+     repository's own recurring defect — one fact written twice, free to disagree — sitting in the
+     file that defines the fact. There is now one paragraph and it states the number that is
+     declared.
+
+     WHY IT WAS RAISED FROM 32rem. 32rem is a book measure and it was doing a caption's job.
+     Measured on the live product: descriptions wrapped at 512px inside panels 1108-1146px wide, so
+     every one of them broke into short ragged lines with six hundred pixels of empty space beside
+     it. The owner read that as "strange line breaks everywhere", which is what it was. Most of what
+     this product draws is one or two sentences in a card, and a one-sentence caption does not want
+     a book column.
+
+     A PAGE OF CONTINUOUS READING IS THE OTHER CASE AND IT ASKS FOR .prose-measure, in styles.css.
+     58rem is too wide for a report; that rule is the one place a reading column is decided, and it
+     is a cap on the space the column is given rather than a width, so a side pane that later takes
+     horizontal space narrows the text instead of pushing the page sideways.
+
+     ROOT-RELATIVE, NOT `em`, AND THAT IS THE WHOLE POINT. `em` resolves against the element's own
+     font size, so one token became one wrap column per font size: a paragraph at --fs-3 stopped at
+     510px, a meta note at --fs-1 at 408px, and ten different columns were measured in one 807px
+     record-page column. Neighbouring paragraphs breaking at ten different widths is what reads as
+     "hard-wrapped to a terminal", and no stored newline was ever involved -- the database holds 84
+     newlines, all of them blank-line pairs. rem also means a reader who raised their browser's base
+     font size gets a wider measure with the bigger text, which `px` would deny them. */
+  --measure: 58rem;
+  /* --measure AS A FLOOR, AND THE BOX AS THE WIDTH. A fixed 58rem cap leaves a
+     stranded band beside the text as soon as the box it is drawn in is wider than 58rem, which is
+     the fault with --read. So a line takes the whole of its box, and 58rem is
+     only the least it is allowed to be given. On a page whose sections differ in kind the box is
+     one column of components/SideBySide.tsx, and that column is what keeps a line short.
+     The pages moved onto that rule read this token. The other pages still read --measure, and
+     are listed for the next round. */
+  --measure-in-box: max(var(--measure), var(--reading-in-box));
+  /* The column a page of continuous reading is set in: a report, an agent's reply, a plan's
+     writing. About 75 characters at --fs-3, which is the width a paragraph is read at fastest.
+
+     IT IS A SECOND TOKEN AND NOT A SECOND OPINION. --measure caps every line in the product;
+     this caps the ones somebody sits and reads. docs/UX-CONTRACT.md allows exactly this and
+     names the condition: declare it here, beside --measure, and have everything that draws
+     reading matter read it — never write a width of your own into a component.
+
+     THE SHORTER FORMS PANEL NO LONGER ASKS FOR THIS CAP, since 2 September 2026. A form there is
+     one sentence to one paragraph, not continuous reading, and the cap left every one of them
+     wrapping at 640px inside a panel 1,146px wide. The rule did not suit that panel, so the
+     panel's text now takes its panel's own width. The cap is unchanged and still applies where somebody sits and reads: an agent's reply
+     and the three paragraphs of the review bar. A report BODY was never capped by it — its prose
+     is 1,164px wide at a 1440 window — which is why the panel under it looked wrong beside it. */
+  --measure-read: 40rem;
+
+  /* THE READING MEASURE, 34rem, WHICH IS 544px AT A 16px ROOT.
+
+     WHAT IT IS NOW: the width the `narrow` preset resolves to. An Agent writing a Report may ask
+     for a reading measure on a prose child, and `narrow` is the classic one — about 68 characters,
+     which is where a reader's eye finds the next line without hunting for it. The preset was called
+     `readable` until 11 September 2026. It was renamed because the name said the other widths
+     were hard to read.
+
+     WHAT IT IS NOT ANY MORE: the width prose gets. It was that, and being that was a fault found
+     in two consecutive campaigns. Measured in Chromium on 28 August 2026, before it
+     was changed: every body paragraph of every report drawn at 544px inside a region 1164px wide,
+     620px of the region — 53% — carrying no ink at any height of the page, and a nine-row table
+     typed into one of those paragraphs drawn at 542px while wanting 1414px.
+
+     NOTHING READS IT AT THIS COMMIT, AND THAT IS SAID HERE RATHER THAN LEFT TO BE DISCOVERED. The
+     two tokens below used it as a floor until this commit and no longer do. The thing that will
+     read it — a `measure` preset on a prose child — is not built yet; it is section 3 of
+     design/problem-01/COMPOSITION-DESIGN-AMENDMENT.md and it lands with the renderer. The token is
+     left declared so that preset has one place to take its value from. If a second 34rem appears
+     anywhere — a component, a test, src/shared/beside.ts — that is one fact worked out in two
+     places, which is the defect this repository keeps producing.
+
+     WHY IT IS A SEPARATE TOKEN AND NOT --measure. SummaryBlocks.tsx used to REDECLARE --measure,
+     once per reading style, inside its own subtree. There are 124 rules reading --measure in 25
+     files and only 12 of them are in that component, so the other 112 resolved to whichever number
+     the subtree they happened to render in had set: three different reading columns were in force
+     on one screen at once and nothing said which was which. A report may want a different column
+     from the app. It must not get one by moving a token every other rule in the product reads.
+
+     WHY IT IS ONE DECLARATION AND WAS SIX. This used to be `--lane-prose`, and each of the six
+     reading profiles set it on itself: 36rem, 34rem, 28rem, 30rem, 30rem and the value here. The
+     profiles are gone and this is the only declaration left; tests/report-document.test.ts counts
+     them and fails at two. A reader who changes their text size still moves it, because the
+     appearance bar scales the root and this is written in rem — one mechanism, no second chain.
+
+     NOTHING OUTSIDE A BLOCK CONTAINER READS IT. It is declared here, beside --measure and
+     --measure-read, because this is where a person looks for a width, and because the last time a
+     surface needed a width of its own that is where it went. */
+  --read: 34rem;
+
+  /* HOW WIDE THE READING COMES OUT: THE WHOLE OF THE BOX IT IS IN.
+     ---------------------------------------------------------------------------------------
+     THE RULE. A Semantic Region owns its space, all of it. A composition of one part is one column
+     at the full width of that region, so the reading is the region and there is nothing beside it.
+
+     WHAT THIS SAID UNTIL 28 AUGUST 2026, AND WHY IT CHANGED.
+
+         min(100cqi, max(--read, 100cqi * 0.78))
+
+     That left prose 78% of its region and an empty 22% strip beside it — 908px of reading and a
+     256px band in a 1164px report, measured. It was defended at length on this spot as "the reading
+     takes its region, less at most a quarter", with a paragraph arguing why 0.78 rather than 0.75.
+     THAT WHOLE ARGUMENT IS DEAD and it is deleted rather than softened, because the question it
+     answered was never asked. The rule is this: a single-part composition owns 100% of its
+     Semantic Region. No fixed 22% margin and no latent empty second track remains as a structural
+     rule. There are several columns only when the composition has several sibling regions.
+
+     The quarter was a bound an agent chose where the rule gave none, written down as though it were
+     part of the rule. ACCEPTANCE.md criterion 3 held it and was withdrawn in
+     commit 7e2f44b; C22 replaced it — a region owns 100% of its space.
+
+     A MEASURE STILL EXISTS. It moves from structure to authorship. Prose that asks for nothing
+     takes its column, which is every report in the corpus today; an Agent that wants a narrower one
+     asks for it per prose child and the engine may still adapt it. That is --read above.
+
+     WHAT IT DOES AT REAL WIDTHS, measured on the corpus with tools/dead-band.mjs on 28 August 2026,
+     at 1440 in both themes. A 1164px report region gives 1164px of prose and no band: the widest
+     strip in a report that nothing covers went from 256px to nothing at all. A 366px phone region
+     gives 366px, as it already did.
+
+     WHAT IS NOT DONE HERE. The report grid in SummaryBlocks.tsx still declares a second track,
+     `minmax(0, 1fr)`, which these values now resolve to 0px at every width. Zero-width is not the
+     same as absent, and the rule allows no latent second track, so the track goes when the renderer
+     builds columns from the number of parts a composition has. Until then it is empty and it is
+     zero.
+
+     TWO FORMS, ONE RULE, BECAUSE OF WHAT THE PERCENTAGE IS OF. A report body measures itself against
+     its container query; a box nested inside one — a column, a list, a finding, a grid cell —
+     measures itself against its own box, or a track of 100cqi would be the width of the whole report
+     and would push the page sideways. That difference was load-bearing before this change and it is
+     preserved exactly. */
+  --reading-in-container: 100cqi;
+  --reading-in-box: 100%;
+
+  /* ---------------------------------------------------------------------------------------
+     STATE — THE NON-COLOUR CHANNELS
+     Theme-independent by design: the word "FAILED" is the word "FAILED" in every theme, and
+     that stability is the point. Only the colours below change when the theme changes.
+
+     -word          set as content, or rendered as the chip's label
+     -glyph         a shape, so the states are distinguishable in greyscale and at a glance
+     -weight        heavier for states that demand action; a third, font-agnostic channel
+     -border-style  DASHED IS RESERVED FOR `inferred` AND NOTHING ELSE. Across the whole app,
+                    a dashed edge means "Mole Office worked this out, a human did not assert it".
+                    Spend it anywhere else and the signal is gone.
+
+     Glyphs are geometric-shape and arrow code points (U+25xx, U+21xx, U+29xx) rather than
+     emoji, because emoji render in colour and would fight the theme.
+     --------------------------------------------------------------------------------------- */
+  /* 'TO DO', not 'TODO'. src/shared/words.ts is the one table and it says `todo` reads "to do";
+     tests/ui.test.ts holds this line and STATE_WORDS in ui.tsx to the same word, upper-cased. */
+  --st-todo-word: 'TO DO';        --st-todo-glyph: '○';      --st-todo-weight: 500;
+  --st-doing-word: 'DOING';       --st-doing-glyph: '◐';     --st-doing-weight: 600;
+  --st-done-word: 'DONE';         --st-done-glyph: '✓';      --st-done-weight: 500;
+  --st-failed-word: 'FAILED';     --st-failed-glyph: '✕';    --st-failed-weight: 700;
+  --st-blocked-word: 'BLOCKED';   --st-blocked-glyph: '⊘';   --st-blocked-weight: 700;
+  --st-broken-word: 'BROKEN';     --st-broken-glyph: '↮';    --st-broken-weight: 700;
+  --st-inferred-word: 'INFERRED'; --st-inferred-glyph: '◌';  --st-inferred-weight: 500;
+  --st-overdue-word: 'OVERDUE';   --st-overdue-glyph: '◷';   --st-overdue-weight: 600;
+  --st-running-word: 'RUNNING';   --st-running-glyph: '▶';   --st-running-weight: 600;
+  --st-crashed-word: 'CRASHED';   --st-crashed-glyph: '↯';   --st-crashed-weight: 700;
+
+  /* ---------------------------------------------------------------------------------------
+     THE ALARM SCALE — how loudly a row is drawn, in four steps.
+
+     A STATE SAYS WHAT IS WRONG. A LEVEL SAYS HOW LOUDLY TO SAY IT. Before this there was one
+     strength: a checklist item that failed thirteen days ago and an obligation five days past a
+     date somebody agreed were the same red, the same weight and the same spine, so a page of
+     old failures shouted as loudly as the one row that had to be dealt with today. Strong red
+     is now reserved for the top step, and an old failure recedes to the bottom one.
+
+     WHAT THE TOP STEP SPENDS RED ON, AND WHAT IT NO LONGER DOES. A level was reaching every
+     object on its row at once — the state word, the age, the rail, the row tint and the border —
+     so six rows of one colour said nothing about which of them was worst. Strong red is now
+     spent on the objects a reader cannot infer: a person who could be hurt, a date somebody
+     agreed that has passed, a real error, and the rail that ranks the row. Descriptive metadata
+     — the stored word, how old it is, the kind — is drawn in text colour at every level. AT MOST
+     ONE STRONG-RED OBJECT PER ROW.
+
+     THE COLOURS ARE NOT SET HERE, ON PURPOSE. Every step gets an ink and a line of its own, and
+     only the MARKS at the top two steps keep the --st-x tone the row carries, so a theme that
+     recolours "failed" still recolours the safety mark and the rail with it. What each step does
+     with fill, border and spine is in UI_CSS beside the components.
+
+     RED HAS NO HEADROOM ABOVE RED. There is no step above `urgent`, and there is not meant to
+     be: escalation past that point is carried by the NUMBER printed inside the mark — "2 days
+     late", "5 days late", "18 days late" are one colour and three numbers.
+     --------------------------------------------------------------------------------------- */
+  --alarm-urgent-weight: 700;
+  --alarm-raised-weight: 600;
+  --alarm-plain-weight: 500;
+  --alarm-faded-weight: 500;
+
+  /* THE FILLED GROUND OF THE TOP STEP IS NOT DECLARED HERE, AND THAT IS THE FIX FOR A REAL BUG.
+     It separates the top step from the one below it, which is otherwise the same colour at outline
+     strength. ONLY MARKS TAKE IT — a safety mark and a recorded consequence — so the fill means
+     "a person is in this row".
+
+     It used to read `--alarm-urgent-fill: var(--px-tone-bg)` on this line, and it did not work in
+     six of the seven themes. `--px-tone-bg` is set by `toneVars()` on the chip, which is a
+     DESCENDANT of :root, and a custom property is substituted at computed-value time on the
+     element that declares it. So :root asked for a variable only its descendants have, the
+     declaration became invalid at computed-value time, and every reference to it resolved to
+     nothing: measured in Chromium, the urgent mark's background computed to rgba(0,0,0,0) in
+     `light` and `dark` while an ordinary chip beside it filled correctly. The one object the red
+     budget spends its fill on — a person could be hurt — had no fill in the theme the tool is used
+     in. `hc` was the only theme that worked, because its override names `--press`, which :root has.
+
+     So the DEFAULT now lives at the point of use, in UI_CSS, as the fallback of
+     `var(--alarm-urgent-fill, var(--px-tone-bg))`, where the tone does exist. This token survives
+     only as an OVERRIDE: a theme that sets it wins, a theme that leaves it unset gets the state's
+     own chip tint. NOTHING IN THIS FILE MAY REFERENCE A --px-* PROPERTY, for the same reason;
+     tests/ui.test.ts fails if one comes back. */
+
+  /* The ink and edge each step draws its ORDINARY objects in — the stored state word, the age,
+     the kind. None of them carries hue: what is red on a row is the rail, a mark, and a date
+     that has passed. `urgent` is full text colour, `raised` one step down, and `faded` is the
+     quietest so an old failure recedes. All are var() aliases rather than literals, so every
+     theme gets its own answer for free. */
+  --alarm-urgent-ink: var(--text);
+  --alarm-urgent-line: var(--border-strong);
+  --alarm-raised-ink: var(--text-2);
+  --alarm-raised-line: var(--border-strong);
+  --alarm-plain-ink: var(--text-2);
+  --alarm-plain-line: var(--border-strong);
+  --alarm-faded-ink: var(--text-3);
+  /* THE QUIETEST STEP STILL GETS THE STRUCTURAL LINE, AND THAT IS A CORRECTION.
+     This read var(--border), the decorative hairline, and the only object that takes this token is
+     the edge of a chip. Measured by tools/legibility.mjs on 15 August 2026: 1.16:1 in light and
+     1.45:1 in dark against the surface behind it, over a transparent fill, so a chip drawn at this
+     step had no visible boundary at all. Two of the three chips it hit were "done" and "inferred"
+     on the component sheet.
+     THE INFERRED CHIP IS WHY THIS IS NOT A MATTER OF TASTE. A chip carries its state in a border
+     STYLE as well as a colour, and dashed means inferred across the whole app. Drawn in a line
+     nobody can see, that channel is gone: the reader loses the one mark that says Mole Office worked
+     this out rather than a person asserting it.
+     WHAT QUIET NOW MEANS HERE. The step keeps its lighter ink, --text-3, and that is the whole of
+     its quietness. --border-strong is the line this system holds to a ratio; the measured
+     values over the control surfaces are in the header. A quieter decorative edge would
+     lose the boundary that tells a person where the chip ends. */
+  --alarm-faded-line: var(--border-strong);
+
+  /* The spine on a row below the top step. Neutral: a rail says WHERE the row ranks, and only the
+     top step's rail is allowed to say it in the alarm colour. */
+  --alarm-raised-rail: var(--border-strong);
+
+  --st-todo-border-style: solid;
+  --st-doing-border-style: solid;
+  --st-done-border-style: solid;
+  --st-failed-border-style: solid;
+  --st-blocked-border-style: solid;
+  --st-broken-border-style: solid;
+  --st-inferred-border-style: dashed;
+  --st-overdue-border-style: solid;
+  --st-running-border-style: solid;
+  --st-crashed-border-style: solid;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-quick: 0ms;
+    --motion-open: 0ms;
+    --motion-settle: 0ms;
+    --motion-lap: 0ms;
+    --motion-lap-wide: 0ms;
+    --motion-linger: 0ms;
+  }
+}
+
+/* ==========================================================================================
+   THEMES
+
+   Two looks, each with its own colours and shapes. Each block sets the same names, so a look can
+   never be half-applied: there is no state in which the surfaces are dark and the state
+   colours are still light.
+
+   Beyond the named contract each theme also carries:
+     --text-dis    disabled text (never used for information, only for unavailable controls)
+     --accent-soft the accent at panel strength, for selected rows and quiet accent fills
+     --hover --press --sel   interaction fills
+     --st-x-row    a MUCH weaker tint than --st-x-bg, for filling a whole row or panel.
+                   --st-x-bg is sized for a chip; painted across a 900px panel the same tint
+                   is a shout. Both exist so neither has to be compromised.
+     --elev-1 --elev-2       elevation
+     --pen-blue    the blue a quick note's pen draws in
+     color-scheme            so the native scrollbar, select popup and caret follow the theme
+   ========================================================================================== */
+
+/* ---- LIGHT / F — the default when nothing has been chosen yet ---------------------------- */
+:root,
+:root[data-theme='light'] {
+  color-scheme: light;
+  --area-1: #fbe4ea;
+  --area-2: #dde9f7;
+  --area-3: #e7ebee;
+  --area-4: #dcf0df;
+  --area-5: #e9e3f8;
+  --area-6: #f8eec6;
+  --lanes-line: #1c293c;
+  --lanes-badge-0: #8d6e63;
+  --lanes-badge-text-0: #ffffff;
+  --lanes-badge-1: #1e88e5;
+  --lanes-badge-text-1: #000000;
+  --lanes-badge-2: #3949ab;
+  --lanes-badge-text-2: #ffffff;
+  --lanes-badge-3: #00897b;
+  --lanes-badge-text-3: #000000;
+  --lanes-badge-4: #8e24aa;
+  --lanes-badge-text-4: #ffffff;
+  --lanes-badge-5: #d81b60;
+  --lanes-badge-text-5: #ffffff;
+  --lanes-badge-6: #f4511e;
+  --lanes-badge-text-6: #000000;
+  --lanes-badge-7: #6d4c41;
+  --lanes-badge-text-7: #ffffff;
+  --lanes-badge-8: #43a047;
+  --lanes-badge-text-8: #000000;
+  --lanes-badge-9: #c0a000;
+  --lanes-badge-text-9: #000000;
+  --lanes-badge-10: #546e7a;
+  --lanes-badge-text-10: #ffffff;
+  --lanes-badge-11: #00acc1;
+  --lanes-badge-text-11: #000000;
+  --lanes-badge-12: #7cb342;
+  --lanes-badge-text-12: #000000;
+
+  --bg: #f3efe4;
+  --panel: #fbfbf9;
+  --panel-2: #ffffff;
+  --panel-3: #eeeae0;
+  --border: #1c293c;
+  --border-strong: #1c293c;
+
+  --text: #1c293c;
+  --text-2: #2e3b4e;
+  --text-3: #4a5568;
+  --text-dis: #4a5568;
+
+  --accent: #432dd7;
+  --accent-text: #ffffff;
+  --accent-soft: #e3dffb;
+  --focus: #432dd7;
+  --pen-blue: #1f5fbf;
+
+  --hover: #fff3b8;
+  --press: #f5e5a3;
+  --sel: #e3dffb;
+
+  --chosen-bg: #fdc800; --chosen-shadow: 2px 2px 0 #1c293c;
+  --chosen-ink: #1c293c;
+  --chosen-edge: #1c293c;
+
+  --elev-1: 4px 4px 0 #1c293c;
+  --elev-2: 8px 8px 0 #1c293c;
+
+  --st-todo: #5c636e;      --st-todo-bg: #edeeef;      --st-todo-line: #5c636e;      --st-todo-row: #f8f8f9;
+  --st-doing: #432dd7;     --st-doing-bg: #e3dffb;     --st-doing-line: #432dd7;     --st-doing-row: #f5f7fd;
+  --st-done: #014821;      --st-done-bg: #e3ebe7;      --st-done-line: #014821;      --st-done-row: #f4f7f5;
+  /* WHETHER A PERSON OR AN AGENT CAN BE REACHED. Three colours: green for online,
+     grey for offline, red for no longer there. They are in the state namespace and not
+     named after their hue, so swapping the theme changes the colour and never the meaning;
+     the dot also carries the word and the whole sentence, so colour is never the only channel. */
+  --presence-online: var(--st-done);
+  /* Read ticks need enough green chroma to stay distinct at 0.7rem. */
+  --chat-read: #15803d;
+  /* The ticks before a message is read. A theme may give them a grey of their own. */
+  --chat-tick: var(--text-3);
+  --presence-offline: var(--text-3);
+  --presence-gone: var(--st-crashed);
+  --st-failed: #ac3d30;    --st-failed-bg: #f7eae9;    --st-failed-line: #ac3d30;    --st-failed-row: #fcf7f6;
+  --st-blocked: #ac3d30;   --st-blocked-bg: #f7eae9;   --st-blocked-line: #ac3d30;   --st-blocked-row: #fcf7f6;
+  --st-broken: #ac3d30;    --st-broken-bg: #f7eae9;    --st-broken-line: #ac3d30;    --st-broken-row: #fcf7f6;
+  --st-inferred: #7f4f01;  --st-inferred-bg: #f1ece3;  --st-inferred-line: #7f4f01;  --st-inferred-row: #f9f7f4;
+  --st-overdue: #ac3d30;   --st-overdue-bg: #f7eae9;   --st-overdue-line: #ac3d30;   --st-overdue-row: #fcf7f6;
+  --st-running: #432dd7;   --st-running-bg: #e3dffb;   --st-running-line: #432dd7;   --st-running-row: #f5f7fd;
+  --st-crashed: #ac3d30;   --st-crashed-bg: #f7eae9;   --st-crashed-line: #ac3d30;   --st-crashed-row: #fcf7f6;
+  /* WAITING ON A PERSON — the one thing this product had no colour for. A fork nobody has settled
+     is neither a fault nor work in progress, so it was borrowing link-blue on one surface and
+     alarm-red on another, and neither is true. Spent on the decision queue, a proposal row and the
+     button that settles one. Nowhere else: a second use would make it mean "important". */
+  --ask: #6b21a8;       --ask-bg: #f4ecfc;       --ask-line: #6b21a8;       --ask-row: #fbf7fe;
+  /* REVIEW’S TWO MODE ACCENTS. Two set hues: blue for a comment about this one thing, amber for a
+     comment about the whole thing. The register uses these two as they were specified rather than
+     inventing others. Colour is never what carries the distinction: a local
+     mark draws one edge and a global mark draws a doubled edge, which says the same in greyscale.
+     They are configurable from Settings; these are the defaults a fresh browser starts at. */
+  --review-local: #432dd7;  --review-global: #7f4f01;
+  /* AN AGENT'S WINDOW ON THE SCHEDULE, criterion P5. A second colour beside the person's hours,
+     never a total: a window carries no hours and no arithmetic reads it. The rail down the block's
+     leading edge and the agent's own name carry the same fact, so the hue is never the only
+     channel. Declared in every palette below or it computes empty and the browser test fails. */
+  --plan-agent: #8a2a6b;
+  /* A GOAL'S OWN INK. Criterion P1: a goal sits at the root of the plan drawing beside the
+     obligations and directions and is what the work below it is for. The hue is not the only
+     channel: the card carries a left rail and the word "goal" is on the key and on the card in
+     full, so a greyscale print still says what it is. Declared in EVERY
+     palette below or it falls back to this light value and the browser test fails. */
+  --plan-goal: #0f6f68;
+
+  /* The look owns these shapes. Corners Default reads them; Sharp and Soft override them. */
+  --border-w: 2px;
+  --look-radius-sm: 4px;
+  --look-radius: 8px;
+  --look-radius-lg: 8px;
+  --title-weight: 900;
+  --heading-weight: 800;
+  --section-weight: 700;
+  --section-size: var(--fs-1);
+  --section-font: var(--font-mono);
+  --section-case: uppercase;
+  --section-space: .08em;
+  --section-rule: 2px solid var(--border);
+  --section-pad: 8px;
+  --panel-title-size: var(--fs-1);
+  --button-weight: 700;
+  --button-shadow: 2px 2px 0 #1c293c;
+  --button-hover-shadow: 3px 3px 0 #1c293c;
+  --button-press-shadow: none;
+  --button-lift: translate(-1px, -1px);
+  --button-press: translate(2px, 2px);
+  --button-primary-bg: #fdc800;
+  --button-primary-ink: #1c293c;
+  --button-primary-hover: #ffd83d;
+  --button-primary-border: #1c293c;
+  --control-hover-border: var(--border-strong);
+
+  /* The corner chat button uses this frame. */
+  --fab-bg: #fdc800;
+  --fab-ink: #1c293c;
+  /* Round, as in the dark look, so the button is a circle in every look (wave 13y round 145). */
+  --fab-radius: 50%;
+  --fab-border: 3px solid #1c293c;
+  --fab-shadow: 4px 4px 0 #1c293c;
+}
+
+/* ---- DARK / H — near-black glass and soft blue ----------------------------------------- */
+:root[data-boot-theme='dark']:not([data-theme]),
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --area-1: #373039;
+  --area-2: #303640;
+  --area-3: #34373b;
+  --area-4: #303a35;
+  --area-5: #36333e;
+  --area-6: #3b3930;
+  --lanes-line: #c5c8cf;
+  --lanes-badge-0: #8d6e63;
+  --lanes-badge-text-0: #ffffff;
+  --lanes-badge-1: #1e88e5;
+  --lanes-badge-text-1: #000000;
+  --lanes-badge-2: #3949ab;
+  --lanes-badge-text-2: #ffffff;
+  --lanes-badge-3: #00897b;
+  --lanes-badge-text-3: #000000;
+  --lanes-badge-4: #8e24aa;
+  --lanes-badge-text-4: #ffffff;
+  --lanes-badge-5: #d81b60;
+  --lanes-badge-text-5: #ffffff;
+  --lanes-badge-6: #f4511e;
+  --lanes-badge-text-6: #000000;
+  --lanes-badge-7: #6d4c41;
+  --lanes-badge-text-7: #ffffff;
+  --lanes-badge-8: #43a047;
+  --lanes-badge-text-8: #000000;
+  --lanes-badge-9: #c0a000;
+  --lanes-badge-text-9: #000000;
+  --lanes-badge-10: #546e7a;
+  --lanes-badge-text-10: #ffffff;
+  --lanes-badge-11: #00acc1;
+  --lanes-badge-text-11: #000000;
+  --lanes-badge-12: #7cb342;
+  --lanes-badge-text-12: #000000;
+  --motion-glow: drop-shadow(0 0 2px color-mix(in srgb, var(--accent) 80%, transparent)) drop-shadow(0 0 2.5px color-mix(in srgb, var(--accent) 50%, transparent));
+  --motion-glow-reach: 6px;
+
+  --bg: #09090b;
+  /* Opaque result of 4% white glass over #09090b, so contrast has one measurable surface. */
+  --panel: #131315;
+  --panel-2: #121216;
+  --panel-3: #202024;
+  --border: #303033;
+  --border-strong: #7a7a82;
+
+  --text: #fafafa;
+  --text-2: #c9cdd4;
+  --text-3: #a0a6b0;
+  --text-dis: #a0a6b0;
+
+  --accent: #7dbbf2;
+  --accent-text: #0b0b10;
+  --accent-soft: #18283d;
+  --focus: #7dbbf2;
+  --pen-blue: var(--accent);
+
+  --hover: #222226;
+  --press: #29292e;
+  --sel: #1b304a;
+
+  --chosen-bg: #18283d; --chosen-shadow: none;
+  --chosen-ink: #fafafa;
+  --chosen-edge: #7dbbf2;
+
+  --elev-1: 0 1px 0 rgba(255, 255, 255, .04) inset, 0 12px 32px rgba(0, 0, 0, .45);
+  --elev-2: 0 20px 60px rgba(0, 0, 0, .6);
+
+  --st-todo: #98a0af;      --st-todo-bg: #2c2f37;      --st-todo-line: #98a0af;      --st-todo-row: #1f2329;
+  --st-doing: #7dbbf2;     --st-doing-bg: #283342;     --st-doing-line: #7dbbf2;     --st-doing-row: #1e242e;
+  --st-done: #89f9b3;      --st-done-bg: #293e38;      --st-done-line: #89f9b3;      --st-done-row: #1e2829;
+  /* WHETHER A PERSON OR AN AGENT CAN BE REACHED. Three colours: green for online,
+     grey for offline, red for no longer there. They are in the state namespace and not
+     named after their hue, so swapping the theme changes the colour and never the meaning;
+     the dot also carries the word and the whole sentence, so colour is never the only channel. */
+  --presence-online: var(--st-done);
+  /* Read ticks need enough green chroma to stay distinct at 0.7rem. */
+  --chat-read: #89f9b3;
+  /* The ticks before a message is read. A theme may give them a grey of their own. */
+  --chat-tick: var(--text-3);
+  --presence-offline: var(--text-3);
+  --presence-gone: var(--st-crashed);
+  --st-failed: #e77961;    --st-failed-bg: #38292a;    --st-failed-line: #e77961;    --st-failed-row: #242024;
+  --st-blocked: #e77961;   --st-blocked-bg: #38292a;   --st-blocked-line: #e77961;   --st-blocked-row: #242024;
+  --st-broken: #e77961;    --st-broken-bg: #38292a;    --st-broken-line: #e77961;    --st-broken-row: #242024;
+  --st-inferred: #dab456;  --st-inferred-bg: #363329;  --st-inferred-line: #dab456;  --st-inferred-row: #232423;
+  --st-overdue: #e77961;   --st-overdue-bg: #38292a;   --st-overdue-line: #e77961;   --st-overdue-row: #242024;
+  --st-running: #7dbbf2;   --st-running-bg: #283342;   --st-running-line: #7dbbf2;   --st-running-row: #1e242e;
+  --st-crashed: #e77961;   --st-crashed-bg: #38292a;   --st-crashed-line: #e77961;   --st-crashed-row: #242024;
+  /* WAITING ON A PERSON — the one thing this product had no colour for. A fork nobody has settled
+     is neither a fault nor work in progress, so it was borrowing link-blue on one surface and
+     alarm-red on another, and neither is true. Spent on the decision queue, a proposal row and the
+     button that settles one. Nowhere else: a second use would make it mean "important". */
+  --ask: #cbb1f7;       --ask-bg: #2f2740;       --ask-line: #a98cf0;       --ask-row: #232030;
+  --review-local: #7dbbf2;  --review-global: #dab456;
+  --plan-agent: #f0a6cf;
+  --plan-goal: #5fd3c8;
+
+  /* The look owns these shapes. Corners Default reads them; Sharp and Soft override them. */
+  --border-w: 1px;
+  --look-radius-sm: 6px;
+  --look-radius: 12px;
+  --look-radius-lg: 12px;
+  --title-weight: 600;
+  --heading-weight: 600;
+  --section-weight: 600;
+  --section-size: var(--fs-3);
+  --section-font: var(--font-ui);
+  --section-case: none;
+  --section-space: 0;
+  --section-rule: 0 solid transparent;
+  --section-pad: 0;
+  --panel-title-size: var(--fs-4);
+  --button-weight: 600;
+  --button-shadow: none;
+  --button-hover-shadow: none;
+  --button-press-shadow: none;
+  --button-lift: none;
+  --button-press: none;
+  --button-primary-bg: #2673c9;
+  --button-primary-ink: #ffffff;
+  --button-primary-hover: #2875cc;
+  --button-primary-border: #7dbbf2;
+  --control-hover-border: var(--text-3);
+
+  /* The corner chat button uses this frame. */
+  --fab-bg: #2673c9;
+  --fab-ink: #ffffff;
+  --fab-radius: 50%;
+  --fab-border: 1px solid #7dbbf2;
+  --fab-shadow: 0 10px 30px rgba(12, 92, 171, .45);
+}
+
+/* ---- Follow the operating system until the user has chosen -----------------------------
+   This block repeats the dark palette verbatim, and it is the only duplication in the file.
+   It is here because the alternative is worse: PresetBar can only set data-theme once its
+   module has been evaluated, so a system-dark user would otherwise get a white flash on
+   every cold load. It repeats the FULL palette rather than only the surfaces, because a
+   partial application would leave dark surfaces carrying light-theme state colours — an
+   unreadable half-theme, which is exactly the silent failure the token layer exists to
+   prevent. Keep the two dark blocks in step; the theme screenshots catch it if they drift.
+   ---------------------------------------------------------------------------------------- */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]):not([data-boot-theme]) {
+    color-scheme: dark;
+    --area-1: #373039;
+    --area-2: #303640;
+    --area-3: #34373b;
+    --area-4: #303a35;
+    --area-5: #36333e;
+    --area-6: #3b3930;
+    --lanes-line: #c5c8cf;
+    --lanes-badge-0: #8d6e63;
+    --lanes-badge-text-0: #ffffff;
+    --lanes-badge-1: #1e88e5;
+    --lanes-badge-text-1: #000000;
+    --lanes-badge-2: #3949ab;
+    --lanes-badge-text-2: #ffffff;
+    --lanes-badge-3: #00897b;
+    --lanes-badge-text-3: #000000;
+    --lanes-badge-4: #8e24aa;
+    --lanes-badge-text-4: #ffffff;
+    --lanes-badge-5: #d81b60;
+    --lanes-badge-text-5: #ffffff;
+    --lanes-badge-6: #f4511e;
+    --lanes-badge-text-6: #000000;
+    --lanes-badge-7: #6d4c41;
+    --lanes-badge-text-7: #ffffff;
+    --lanes-badge-8: #43a047;
+    --lanes-badge-text-8: #000000;
+    --lanes-badge-9: #c0a000;
+    --lanes-badge-text-9: #000000;
+    --lanes-badge-10: #546e7a;
+    --lanes-badge-text-10: #ffffff;
+    --lanes-badge-11: #00acc1;
+    --lanes-badge-text-11: #000000;
+    --lanes-badge-12: #7cb342;
+    --lanes-badge-text-12: #000000;
+    --motion-glow: drop-shadow(0 0 2px color-mix(in srgb, var(--accent) 80%, transparent)) drop-shadow(0 0 2.5px color-mix(in srgb, var(--accent) 50%, transparent));
+    --motion-glow-reach: 6px;
+
+    --bg: #09090b;
+    /* Opaque result of 4% white glass over #09090b, so contrast has one measurable surface. */
+    --panel: #131315;
+    --panel-2: #121216;
+    --panel-3: #202024;
+    --border: #303033;
+    --border-strong: #7a7a82;
+
+    --text: #fafafa;
+    --text-2: #c9cdd4;
+    --text-3: #a0a6b0;
+    --text-dis: #a0a6b0;
+
+    --accent: #7dbbf2;
+    --accent-text: #0b0b10;
+    --accent-soft: #18283d;
+    --focus: #7dbbf2;
+    --pen-blue: var(--accent);
+
+    --hover: #222226;
+    --press: #29292e;
+    --sel: #1b304a;
+
+    --chosen-bg: #18283d; --chosen-shadow: none;
+    --chosen-ink: #fafafa;
+    --chosen-edge: #7dbbf2;
+
+    --elev-1: 0 1px 0 rgba(255, 255, 255, .04) inset, 0 12px 32px rgba(0, 0, 0, .45);
+    --elev-2: 0 20px 60px rgba(0, 0, 0, .6);
+
+    --st-todo: #98a0af;      --st-todo-bg: #2c2f37;      --st-todo-line: #98a0af;      --st-todo-row: #1f2329;
+    --st-doing: #7dbbf2;     --st-doing-bg: #283342;     --st-doing-line: #7dbbf2;     --st-doing-row: #1e242e;
+    --st-done: #89f9b3;      --st-done-bg: #293e38;      --st-done-line: #89f9b3;      --st-done-row: #1e2829;
+    /* WHETHER A PERSON OR AN AGENT CAN BE REACHED. Three colours: green for online,
+       grey for offline, red for no longer there. They are in the state namespace and not
+       named after their hue, so swapping the theme changes the colour and never the meaning;
+       the dot also carries the word and the whole sentence, so colour is never the only channel. */
+    --presence-online: var(--st-done);
+    /* Read ticks need enough green chroma to stay distinct at 0.7rem. */
+    --chat-read: #89f9b3;
+    /* The ticks before a message is read. A theme may give them a grey of their own. */
+    --chat-tick: var(--text-3);
+    --presence-offline: var(--text-3);
+    --presence-gone: var(--st-crashed);
+    --st-failed: #e77961;    --st-failed-bg: #38292a;    --st-failed-line: #e77961;    --st-failed-row: #242024;
+    --st-blocked: #e77961;   --st-blocked-bg: #38292a;   --st-blocked-line: #e77961;   --st-blocked-row: #242024;
+    --st-broken: #e77961;    --st-broken-bg: #38292a;    --st-broken-line: #e77961;    --st-broken-row: #242024;
+    --st-inferred: #dab456;  --st-inferred-bg: #363329;  --st-inferred-line: #dab456;  --st-inferred-row: #232423;
+    --st-overdue: #e77961;   --st-overdue-bg: #38292a;   --st-overdue-line: #e77961;   --st-overdue-row: #242024;
+    --st-running: #7dbbf2;   --st-running-bg: #283342;   --st-running-line: #7dbbf2;   --st-running-row: #1e242e;
+    --st-crashed: #e77961;   --st-crashed-bg: #38292a;   --st-crashed-line: #e77961;   --st-crashed-row: #242024;
+    /* WAITING ON A PERSON — the one thing this product had no colour for. A fork nobody has settled
+       is neither a fault nor work in progress, so it was borrowing link-blue on one surface and
+       alarm-red on another, and neither is true. Spent on the decision queue, a proposal row and the
+       button that settles one. Nowhere else: a second use would make it mean "important". */
+    --ask: #cbb1f7;       --ask-bg: #2f2740;       --ask-line: #a98cf0;       --ask-row: #232030;
+    --review-local: #7dbbf2;  --review-global: #dab456;
+    --plan-agent: #f0a6cf;
+    --plan-goal: #5fd3c8;
+
+    /* The look owns these shapes. Corners Default reads them; Sharp and Soft override them. */
+    --border-w: 1px;
+    --look-radius-sm: 6px;
+    --look-radius: 12px;
+    --look-radius-lg: 12px;
+    --title-weight: 600;
+    --heading-weight: 600;
+    --section-weight: 600;
+    --section-size: var(--fs-3);
+    --section-font: var(--font-ui);
+    --section-case: none;
+    --section-space: 0;
+    --section-rule: 0 solid transparent;
+    --section-pad: 0;
+    --panel-title-size: var(--fs-4);
+    --button-weight: 600;
+    --button-shadow: none;
+    --button-hover-shadow: none;
+    --button-press-shadow: none;
+    --button-lift: none;
+    --button-press: none;
+    --button-primary-bg: #2673c9;
+    --button-primary-ink: #ffffff;
+    --button-primary-hover: #2875cc;
+    --button-primary-border: #7dbbf2;
+    --control-hover-border: var(--text-3);
+
+    /* The corner chat button uses this frame. */
+    --fab-bg: #2673c9;
+    --fab-ink: #ffffff;
+    --fab-radius: 50%;
+    --fab-border: 1px solid #7dbbf2;
+    --fab-shadow: 0 10px 30px rgba(12, 92, 171, .45);
+  }
+}
+
+/* ==========================================================================================
+   TEXT SIZE — one control, one property, the whole ladder.
+
+   This is the text-size control. It moves the ROOT font size and nothing
+   else. Every one of the six sizes above is declared once, in rem, so moving the root moves
+   all six together and the hierarchy between them is preserved exactly. Nothing is redeclared
+   here, and a per-surface override is deliberately not built: it is one inline
+   `style={{ fontSize: '112.5%' }}` on a container the day a surface is measured to need one.
+
+   `default` is the ABSENCE of the attribute, the way `auto` is for theme, so the two rules
+   below are the whole mechanism. --fs-1..3 carry floors, above, which is why Small can exist.
+
+   THIS IS ORTHOGONAL TO DENSITY, DELIBERATELY. data-density rewrites px spacing; data-size
+   moves the rem type. They never write the same token. The one place they meet is a row
+   holding a line of text, and --row-h answers that below.
+   ========================================================================================== */
+:root[data-size='small'] { font-size: 93.75%; }   /* 15px against a 16px browser default */
+:root[data-size='large'] { font-size: 112.5%; }   /* 18px against a 16px browser default */
+
+/* ==========================================================================================
+   DENSITY — how much air a row gets. The twelve design directions disagreed about exactly
+   this number and almost nothing else, so it is a preset rather than an argument.
+   ========================================================================================== */
+:root[data-density='compact'] {
+  --row-h: max(28px, var(--row-fit));
+  --pad: 6px;
+  --pad-lg: 10px;
+  --gut: 6px;
+  --rail: 3px;
+}
+:root[data-density='default'] {
+  --row-h: max(var(--look-row-h, 32px), var(--row-fit));
+  --pad: var(--look-pad, 8px);
+  --pad-lg: var(--look-pad-lg, 14px);
+  --gut: var(--look-gut, 10px);
+  --rail: var(--look-rail, 3px);
+}
+:root[data-density='comfortable'] {
+  --row-h: max(44px, var(--row-fit));
+  --pad: 12px;
+  --pad-lg: 20px;
+  --gut: 16px;
+  --rail: 4px;
+}
+
+/* ==========================================================================================
+   RADIUS — sharp reads as an instrument, soft reads as a document. Same tree either way.
+   ========================================================================================== */
+:root[data-radius='sharp'] {
+  --radius-sm: 1px;
+  --radius: 2px;
+  --radius-lg: 3px;
+}
+:root[data-radius='default'] {
+  --radius-sm: var(--look-radius-sm);
+  --radius: var(--look-radius);
+  --radius-lg: var(--look-radius-lg);
+}
+:root[data-radius='soft'] {
+  --radius-sm: 12px;
+  --radius: 22px;
+  --radius-lg: 28px;
+}
+
+/* ==========================================================================================
+   FONT ROLE — re-aims --font-ui only. --font-mono and --font-read keep pointing at their own
+   stacks, so a component that needs real tabular digits (a duration column) or real prose
+   (a summary) is unaffected by this preset.
+   ========================================================================================== */
+:root[data-font='ui'] {
+  --font-ui: var(--font-sans);
+}
+:root[data-font='mono'] {
+  --font-ui: var(--font-mono);
+}
+:root[data-font='read'] {
+  --font-ui: var(--font-read);
+}
+
+/* ==========================================================================================
+   ACCESSIBILITY — phone targets and the browser's request for more contrast.
+   ========================================================================================== */
+
+/* Phone. A 28px row is a miss-tap on a touch screen, so density stops applying below 480px
+   and every row becomes a 44px target — the floor, not a suggestion.
+
+   TYPE IS NO LONGER STEPPED UP HERE, and that is not a loss for the phone: this block used to
+   raise --fs-1, --fs-2 and --fs-3 to 13/14/16, and those are now the values at the top of this
+   file for every width. Restating them would be the same fact worked out in two places, so the
+   two could disagree — change the scale up there and the phone would silently go on drawing the
+   old one. tests/legibility.test.ts fails if a second declaration of any --fs-* comes back into
+   a width query. That check used to be credited here to tests/type-scale.test.ts, which has
+   never existed in this repository; the three checks are legibility.test.ts's `the type scale`
+   block. */
+@media (max-width: 480px) {
+  :root,
+  :root[data-density] {
+    --row-h: max(44px, var(--row-fit));
+    --pad: 12px;
+    --pad-lg: 16px;
+    --gut: 12px;
+  }
+}
+
+/* Someone who has asked their OS for more contrast gets the structural border everywhere,
+   whatever theme they are in. */
+@media (prefers-contrast: more) {
+  :root,
+  :root[data-theme] {
+    --border: var(--border-strong);
+  }
+}
+
+/* A CHINESE PAGE DOES NOT UPPER-CASE ITS SECTION TITLES. Chinese has no capital letters, so in the
+   light look the only thing upper-casing did on a Chinese page was turn a Latin name inside a title,
+   such as Mole Office in the appearance fold, into MOLE OFFICE. */
+:root:lang(zh),
+:root[data-theme]:lang(zh) {
+  --section-case: none;
+}

@@ -1,0 +1,432 @@
+[
+  {
+    "source": "tuft",
+    "fur": 0,
+    "clothes": 0,
+    "hash": "e818fa641b4131a56242392086b91d4a9b67d0c94eaeb583192207e1c011477f",
+    "anchor": [
+      64,
+      111
+    ]
+  },
+  {
+    "source": "tuft",
+    "fur": 0,
+    "clothes": 1,
+    "hash": "17a321eedfb76122576e1c42e341fb0ac8d16c68c454fec992685045aea9539b",
+    "anchor": [
+      64,
+      111
+    ]
+  },
+  {
+    "source": "tuft",
+    "fur": 0,
+    "clothes": 2,
+    "hash": "1fa9f47c0b55f5f7c5fda421ccb979342d24446eb6946398a6887fe496397909",
+    "anchor": [
+      64,
+      111
+    ]
+  },
+  {
+    "source": "fringe",
+    "fur": 0,
+    "clothes": 0,
+    "hash": "268727734174b28f58addff72bf632759b54c8c4d92adb0b9ad5104c38b7458f",
+    "anchor": [
+      64,
+      110
+    ]
+  },
+  {
+    "source": "fringe",
+    "fur": 0,
+    "clothes": 1,
+    "hash": "978d273ab6e08f8e5ea8c2ca87451901bf6c5d3155ead1395906a8fcc24b0d3d",
+    "anchor": [
+      64,
+      110
+    ]
+  },
+  {
+    "source": "fringe",
+    "fur": 0,
+    "clothes": 2,
+    "hash": "42d1ec4768597f73e918e75fed414f62f51b0ad8679162ee91fc1014c294d806",
+    "anchor": [
+      64,
+      110
+    ]
+  },
+  {
+    "source": "bun",
+    "fur": 0,
+    "clothes": 0,
+    "hash": "d09329daf9e00e9fe2ab8c75fb5f96b71a70709f8a9d3e9b88f5e8c0b6fd172e",
+    "anchor": [
+      64,
+      110
+    ]
+  },
+  {
+    "source": "fan",
+    "fur": 0,
+    "clothes": 0,
+    "hash": "1fedf728422405d037f972d3d8c11cc68fa36962b96b3621d86810f021b1d68b",
+    "anchor": [
+      64,
+      110
+    ]
+  },
+  {
+    "source": "fan",
+    "fur": 0,
+    "clothes": 1,
+    "hash": "89326bb80d392b776e5498d9195d853187ef9b175d333832cfd7a7ab94496312",
+    "anchor": [
+      64,
+      110
+    ]
+  },
+  {
+    "source": "fan",
+    "fur": 0,
+    "clothes": 2,
+    "hash": "2e0541cf09ade964603fc540ebd82874f8c91b3c03e70ce07afe844ca0b93f26",
+    "anchor": [
+      64,
+      110
+    ]
+  },
+  {
+    "source": "crest",
+    "fur": 0,
+    "clothes": 0,
+    "hash": "4322b9420ae9554a74f64de43d7ce7d9010bc5bf58b0cf89444be2fa2102444e",
+    "anchor": [
+      64,
+      110
+    ]
+  },
+  {
+    "source": "helmet",
+    "fur": 0,
+    "clothes": 0,
+    "hash": "fd8f6b5fe89004feb501f8680d3280e6e06fdcbdf9eabff43166664be71482b0",
+    "anchor": [
+      64,
+      110
+    ]
+  },
+  {
+    "source": "helmet",
+    "fur": 0,
+    "clothes": 1,
+    "hash": "9a9ea167815b0afb8f8e1c123cf86d9d615a436965748e5c1ffdea7253cab353",
+    "anchor": [
+      64,
+      110
+    ]
+  },
+  {
+    "source": "helmet",
+    "fur": 0,
+    "clothes": 2,
+    "hash": "802ab2ba49d94796ef8f7c6f1689c78b44a0b354a15f3a5cd1a15ce81bf4b429",
+    "anchor": [
+      64,
+      110
+    ]
+  },
+  {
+    "source": "waves",
+    "fur": 0,
+    "clothes": 0,
+    "hash": "7755bbe2178e4859b377bf48c50a2ac310559e940e9c18d129596a09a47eb4b2",
+    "anchor": [
+      64,
+      110
+    ]
+  },
+  {
+    "source": "waves",
+    "fur": 0,
+    "clothes": 1,
+    "hash": "958642cdf368900ddee847245e5ff871206decda7a08b1f559363d6112ed891a",
+    "anchor": [
+      64,
+      110
+    ]
+  },
+  {
+    "source": "part",
+    "fur": 0,
+    "clothes": 0,
+    "hash": "aad215f26bba3a82de6cc2ebd564e8ce979253bb3e887ef317f6c011b4a89bcf",
+    "anchor": [
+      64,
+      110
+    ]
+  },
+  {
+    "source": "part",
+    "fur": 0,
+    "clothes": 1,
+    "hash": "09f967ed8ef0de4f313d326c6c146b542000f145d1a4d90034960ba0ed60aee7",
+    "anchor": [
+      64,
+      110
+    ]
+  },
+  {
+    "source": "part",
+    "fur": 0,
+    "clothes": 2,
+    "hash": "dbf34b49cd3707a1228b3dc6836ad6700762f091306fe53f7919394fcaa86962",
+    "anchor": [
+      64,
+      110
+    ]
+  },
+  {
+    "source": "beret",
+    "fur": 0,
+    "clothes": 0,
+    "hash": "fb94a3c4adbcc4aeadcd03a721aa04ceb8995964917156ea23cf92305c84c83b",
+    "anchor": [
+      64,
+      110
+    ]
+  },
+  {
+    "source": "beret",
+    "fur": 0,
+    "clothes": 1,
+    "hash": "e1b19b0baf75e783c6ec5624d18e630f98aada9ae7b9d69821a7d1ba7e50ca19",
+    "anchor": [
+      64,
+      110
+    ]
+  },
+  {
+    "source": "beret",
+    "fur": 0,
+    "clothes": 2,
+    "hash": "93a4679a1aa3e10ae72b6128530d23d0e1c07e2142a9a1add47add645972e6ca",
+    "anchor": [
+      64,
+      110
+    ]
+  },
+  {
+    "source": "knit",
+    "fur": 0,
+    "clothes": 0,
+    "hash": "3f640f99b4419ad5f313632102cf4ff7bdc0f9b945368b830e7f03f74a4784d7",
+    "anchor": [
+      64,
+      110
+    ]
+  },
+  {
+    "source": "knit",
+    "fur": 0,
+    "clothes": 1,
+    "hash": "a9a4f4f841e5ebfe35ed73e89fa4059355dd5250e747384c06d883832097675d",
+    "anchor": [
+      64,
+      110
+    ]
+  },
+  {
+    "source": "knit",
+    "fur": 0,
+    "clothes": 2,
+    "hash": "0439dc4ee9312825a5fabcf66446327d43acc682711cddc9ac96c7050049648d",
+    "anchor": [
+      64,
+      110
+    ]
+  },
+  {
+    "source": "raincoat",
+    "fur": 0,
+    "clothes": 0,
+    "hash": "81203e09dc9a6525aff13cf40b8fd7fa99dd247af0e6416d18557cfc59492f40",
+    "anchor": [
+      64,
+      110
+    ]
+  },
+  {
+    "source": "raincoat",
+    "fur": 0,
+    "clothes": 1,
+    "hash": "b673e4e19dfaa4c94f4b7215e7fbdf255dbfe1ebc023d1daa2151ca9d7f5353d",
+    "anchor": [
+      64,
+      110
+    ]
+  },
+  {
+    "source": "raincoat",
+    "fur": 0,
+    "clothes": 2,
+    "hash": "94d33a28b33395bb23f9c921cccefe606cd6f87dc88b7a90abe0808e0c0646cc",
+    "anchor": [
+      64,
+      110
+    ]
+  },
+  {
+    "source": "apron",
+    "fur": 0,
+    "clothes": 0,
+    "hash": "2d08e25cb6e3c8305b6f8cb6acedce322bbb6e1b00ff4715535cbbd7480c585f",
+    "anchor": [
+      64,
+      110
+    ]
+  },
+  {
+    "source": "apron",
+    "fur": 0,
+    "clothes": 1,
+    "hash": "69ca3ce8dab5d568ec2e5bcd0a82a37816a534f96c20fffd0b917c2a6cfe49fa",
+    "anchor": [
+      64,
+      110
+    ]
+  },
+  {
+    "source": "apron",
+    "fur": 0,
+    "clothes": 2,
+    "hash": "36627fd0f7e5db8deac3fc2c1a8f1a0b37ffc5984accf2e32b2d9b6d4425a561",
+    "anchor": [
+      64,
+      110
+    ]
+  },
+  {
+    "source": "bowtie",
+    "fur": 0,
+    "clothes": 0,
+    "hash": "09be6c96eea6afcc78f7b1f98e540d00d66cd756993f2bedc548e2dc6856ad1a",
+    "anchor": [
+      64,
+      110
+    ]
+  },
+  {
+    "source": "bowtie",
+    "fur": 0,
+    "clothes": 1,
+    "hash": "8681aca0df9469aae1dc2d11a9f3e760922a6e41d204b4a720bc8a8ca50d40be",
+    "anchor": [
+      64,
+      110
+    ]
+  },
+  {
+    "source": "bowtie",
+    "fur": 0,
+    "clothes": 2,
+    "hash": "6f861287f82c1c1d9da08e7c565934eef855a50ef97e83e3d2185d91ceebd83b",
+    "anchor": [
+      64,
+      110
+    ]
+  },
+  {
+    "source": "backpack",
+    "fur": 0,
+    "clothes": 0,
+    "hash": "9755cb1f1d28e5030a899258811125266eded47c9838c5a7512fc96c26e3ac65",
+    "anchor": [
+      64,
+      110
+    ]
+  },
+  {
+    "source": "backpack",
+    "fur": 0,
+    "clothes": 1,
+    "hash": "5ebfe872d59e6384992089094aed096ee3267478657c76d6f9898f0b21a37f4f",
+    "anchor": [
+      64,
+      110
+    ]
+  },
+  {
+    "source": "backpack",
+    "fur": 0,
+    "clothes": 2,
+    "hash": "f05ac211f0cd956e647ab79e1559cba89b1f595d797fc4d60e65d4a6a04631d6",
+    "anchor": [
+      64,
+      110
+    ]
+  },
+  {
+    "source": "roll",
+    "fur": 0,
+    "clothes": 0,
+    "hash": "a69ba4650bc3670df7524caed333d847a7c7afef46e5b0a84e1f9854ae1f0901",
+    "anchor": [
+      64,
+      110
+    ]
+  },
+  {
+    "source": "roll",
+    "fur": 0,
+    "clothes": 1,
+    "hash": "d180c25dda8ae535c5dbc50cda6cb5b3ae0f485fc284237a4304c388f3c19dcb",
+    "anchor": [
+      64,
+      110
+    ]
+  },
+  {
+    "source": "roll",
+    "fur": 0,
+    "clothes": 2,
+    "hash": "a3e984f51f147107430e3fde14de608bc4277deae6cfedb6097280fb1cafd694",
+    "anchor": [
+      64,
+      110
+    ]
+  },
+  {
+    "source": "flower",
+    "fur": 0,
+    "clothes": 0,
+    "hash": "c6c888997acfba575166ff0686c4dde18ec80e78eb9125c08ab03f25b54b19aa",
+    "anchor": [
+      64,
+      110
+    ]
+  },
+  {
+    "source": "flower",
+    "fur": 0,
+    "clothes": 1,
+    "hash": "661b509a6c3ded139b61612be8d3354270e1259483044e56a6917b9fdf1a289b",
+    "anchor": [
+      64,
+      110
+    ]
+  },
+  {
+    "source": "flower",
+    "fur": 0,
+    "clothes": 2,
+    "hash": "2d8c2be28a474552b1505b7832c2a2312011a686cbcbb11aa63f8b89f87c8b6e",
+    "anchor": [
+      64,
+      110
+    ]
+  }
+]

@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "sprites": {
+    "greenhouse-glass-bay": {
+      "src": "/office-map/c-environments/greenhouse/props/greenhouse-glass-bay.png",
+      "width": 162,
+      "height": 192,
+      "anchor": {
+        "x": 81.0,
+        "y": 192
+      },
+      "sha256": "7b392e0331d72e080288c322f0bdfafefd77bdf8ec63ca72b2f2c81bfdbdb204"
+    }
+  },
+  "props": {
+    "greenhouse-glass-bay": {
+      "defaultScale": 1,
+      "blocking": true,
+      "footprint": {
+        "x": -80.0,
+        "y": -10,
+        "width": 161,
+        "height": 10
+      },
+      "layers": [
+        {
+          "sprite": "greenhouse-glass-bay",
+          "role": "back"
+        }
+      ]
+    }
+  },
+  "provenance": {
+    "phase": "one representative pilot prop; not a complete environment pack",
+    "source": "a source image drawn outside this repository",
+    "alpha": "true-alpha request returned an opaque RGB image with a painted transparency grid; transparency is explicit post-processing, not successful native-alpha generation",
+    "footprint": "authored rectangle from visible lower base, relative to bottom-center anchor; window/glass panel are closed boundary obstacles; rock pillar is solid, not an arch"
+  }
+}

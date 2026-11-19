@@ -1,0 +1,23 @@
+-- THE NOTE A SECRETARY FILED UNDER THE PERSON'S GRANT IS FOUND WITHOUT READING EVERY NOTE. Wave 13s round 2b.
+--
+-- A note a secretary files under the person's grant holds `filed_under_the_grant`, whose `from` names the prepared note
+-- it was filed from. Two statements in src/server/lib/the-persons-own-words.ts look for it. `theNoteFiledUnderTheGrantFrom`
+-- is asked on every press that files or marks a prepared note, and `theNotesWaitingForThePerson` asks it of each prepared
+-- note on every page of the notes waiting for the person and on its count. Each read the data of every note to find it.
+--
+--   records_note_filed_under_the_grant_from_idx  notes that carry the field only, by the prepared note it names.
+--
+-- A query uses it only by asking the field in these same words, written out and not as a bound value. src/server/db/schema.ts
+-- holds them once as `STORED_FIELDS.noteFiledUnderTheGrantFrom`. Both readers also say `kind = 'note'` and that the field
+-- `IS NOT NULL`, the two terms of the index's WHERE.
+--
+-- THE FIELD IS READ ONLY FROM DATA THAT IS VALID JSON, and is null otherwise, for the reason migration 0199 gives. An index
+-- that read it plainly would refuse to write a note whose data SQLite cannot read as JSON, and would stop this migration on
+-- one already stored. Tests write such notes straight into SQLite on purpose, to prove that a reader and the export stop
+-- on them. The cost: a note whose data json_valid does not call JSON is not in this index, so the lookup of a filed note
+-- does not find it.
+--
+-- The index is not unique, and it changes no row.
+--
+-- ADDITIVE, AND IT REWRITES NOTHING. One CREATE INDEX statement and no UPDATE.
+CREATE INDEX IF NOT EXISTS `records_note_filed_under_the_grant_from_idx` ON `records` ((CASE WHEN json_valid(`data`) THEN json_extract(`data`, '$.filed_under_the_grant.from') END)) WHERE `kind` = 'note' AND (CASE WHEN json_valid(`data`) THEN json_extract(`data`, '$.filed_under_the_grant.from') END) IS NOT NULL;

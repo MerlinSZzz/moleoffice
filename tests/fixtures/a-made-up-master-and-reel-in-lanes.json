@@ -1,0 +1,1557 @@
+{
+  "about": "A made-up copy of a master pipeline at its Boxes level and of an ordinary pipeline at its Steps level, each with the areas and places a drawing study stored for it on 14 November 2026. It was made once by a script kept outside the repository. Every title, short line, area name and link word is Latin filler with the same number of characters as the words it replaced; digits, spaces and punctuation stayed where they were. Records are named by keys made for this file and no record id is kept. Kept: each record's kind, role and state; each link's type, gate and inferred flag; each area and place. Dropped: the tuning fields. A box's short line is kept here and is not stored by the test, because no stored field holds one.",
+  "master": {
+    "pipeline": {
+      "key": "master",
+      "title": "Amet Tempor: eum voluptatibus"
+    },
+    "steps": [
+      {
+        "key": "step-01",
+        "title": "E0 Labore ipsum, dolor non deserunt",
+        "state": "done"
+      },
+      {
+        "key": "step-02",
+        "title": "E1 Elit et: est qui, dolore, nostrud laboris",
+        "state": "done"
+      },
+      {
+        "key": "step-03",
+        "title": "E2 Occaecat, fugiat eum sed officia quis",
+        "state": "done"
+      },
+      {
+        "key": "step-04",
+        "title": "E3 Commodo nisi",
+        "state": "done"
+      },
+      {
+        "key": "step-05",
+        "title": "E4 Incididunt, magna non mollit velit",
+        "state": "done"
+      },
+      {
+        "key": "step-06",
+        "title": "E5 Proident, eiusmod est cupidatat",
+        "state": "done"
+      },
+      {
+        "key": "step-07",
+        "title": "E6 Voluptas qui nesciunt",
+        "state": "done"
+      },
+      {
+        "key": "step-08",
+        "title": "E7 Enim, veniam eum consequat",
+        "state": "done"
+      },
+      {
+        "key": "step-09",
+        "title": "E8 Culpa, minim sed irure",
+        "state": "done"
+      },
+      {
+        "key": "step-10",
+        "title": "E9 Sunt non doloremque",
+        "state": "done"
+      },
+      {
+        "key": "step-11",
+        "title": "E10 Esse, voluptate, fugit est beatae",
+        "state": "done"
+      },
+      {
+        "key": "step-12",
+        "title": "E11 Dolorem",
+        "state": "done"
+      },
+      {
+        "key": "step-13",
+        "title": "E12 Nulla, ullamco, lorem qui odit",
+        "state": "done"
+      }
+    ],
+    "waitsOn": [
+      {
+        "type": "blocks",
+        "from": "step-01",
+        "to": "step-04",
+        "gate": null,
+        "inferred": false
+      },
+      {
+        "type": "blocks",
+        "from": "step-03",
+        "to": "step-02",
+        "gate": null,
+        "inferred": false
+      },
+      {
+        "type": "blocks",
+        "from": "step-04",
+        "to": "step-05",
+        "gate": null,
+        "inferred": false
+      },
+      {
+        "type": "blocks",
+        "from": "step-04",
+        "to": "step-06",
+        "gate": null,
+        "inferred": false
+      },
+      {
+        "type": "blocks",
+        "from": "step-04",
+        "to": "step-07",
+        "gate": null,
+        "inferred": false
+      },
+      {
+        "type": "blocks",
+        "from": "step-04",
+        "to": "step-08",
+        "gate": null,
+        "inferred": false
+      },
+      {
+        "type": "blocks",
+        "from": "step-04",
+        "to": "step-09",
+        "gate": null,
+        "inferred": false
+      },
+      {
+        "type": "blocks",
+        "from": "step-08",
+        "to": "step-09",
+        "gate": null,
+        "inferred": false
+      },
+      {
+        "type": "blocks",
+        "from": "step-10",
+        "to": "step-04",
+        "gate": null,
+        "inferred": false
+      }
+    ],
+    "blockPipelines": [
+      {
+        "key": "block-01",
+        "title": "E0: Labore ipsum, dolor sed quisquam",
+        "partOf": "step-01",
+        "boxes": [
+          "box-01"
+        ]
+      },
+      {
+        "key": "block-02",
+        "title": "E1: Elit ea: non est, dolore, aliquip nostrud",
+        "partOf": "step-02",
+        "boxes": [
+          "box-02",
+          "box-03"
+        ]
+      },
+      {
+        "key": "block-03",
+        "title": "E2: Pariatur, fugiat qui eum laboris quis",
+        "partOf": "step-03",
+        "boxes": [
+          "box-04",
+          "box-05"
+        ]
+      },
+      {
+        "key": "block-04",
+        "title": "E3: Officia nisi",
+        "partOf": "step-04",
+        "boxes": [
+          "box-06"
+        ]
+      },
+      {
+        "key": "block-05",
+        "title": "E4: Laudantium, magna sed mollit velit",
+        "partOf": "step-05",
+        "boxes": [
+          "box-07"
+        ]
+      },
+      {
+        "key": "block-06",
+        "title": "E5: Deserunt, commodo non inventore",
+        "partOf": "step-06",
+        "boxes": [
+          "box-08",
+          "box-09"
+        ]
+      },
+      {
+        "key": "block-07",
+        "title": "E6: Occaecat est proident",
+        "partOf": "step-07",
+        "boxes": [
+          "box-10"
+        ]
+      },
+      {
+        "key": "block-08",
+        "title": "E7: Enim, veniam qui explicabo",
+        "partOf": "step-08",
+        "boxes": [
+          "box-11",
+          "box-12",
+          "box-13",
+          "box-14",
+          "box-15",
+          "box-16",
+          "box-17",
+          "box-18"
+        ]
+      },
+      {
+        "key": "block-09",
+        "title": "E8: Culpa, minim eum irure",
+        "partOf": "step-09",
+        "boxes": [
+          "box-19",
+          "box-20",
+          "box-21",
+          "box-22",
+          "box-23",
+          "box-24"
+        ]
+      },
+      {
+        "key": "block-10",
+        "title": "E9: Sunt sed architecto",
+        "partOf": "step-10",
+        "boxes": [
+          "box-25",
+          "box-26",
+          "box-27",
+          "box-28"
+        ]
+      },
+      {
+        "key": "block-11",
+        "title": "E10: Esse, veritatis, fugit non beatae",
+        "partOf": "step-11",
+        "boxes": [
+          "box-29",
+          "box-30",
+          "box-31"
+        ]
+      },
+      {
+        "key": "block-12",
+        "title": "E11: Eiusmod",
+        "partOf": "step-12",
+        "boxes": [
+          "box-32"
+        ]
+      },
+      {
+        "key": "block-13",
+        "title": "E12: Nulla, dolorem, lorem est odit",
+        "partOf": "step-13",
+        "boxes": [
+          "box-33",
+          "box-34"
+        ]
+      }
+    ],
+    "records": [
+      {
+        "key": "box-01",
+        "kind": "block",
+        "role": "box",
+        "state": "done",
+        "title": "Tempor ipsum + labore",
+        "line": "qui/dolore, eum/fugiat"
+      },
+      {
+        "key": "box-02",
+        "kind": "block",
+        "role": "box",
+        "state": "blocked",
+        "title": "Ullamco mollit",
+        "line": "Voluptas, sed/aliquip"
+      },
+      {
+        "key": "box-03",
+        "kind": "block",
+        "role": "box",
+        "state": "done",
+        "title": "Non UT",
+        "line": "Dolor + Amet, est/qui"
+      },
+      {
+        "key": "box-04",
+        "kind": "block",
+        "role": "box",
+        "state": "done",
+        "title": "Nostrud elit",
+        "line": "magna, quis nisi, eum veniam, laboris enim, velit, culpa"
+      },
+      {
+        "key": "box-05",
+        "kind": "block",
+        "role": "box",
+        "state": "done",
+        "title": "Beatae + tempor",
+        "line": "sunt, nesciunt, labore-sed"
+      },
+      {
+        "key": "box-06",
+        "kind": "block",
+        "role": "box",
+        "state": "done",
+        "title": "Officia esse",
+        "line": "commodo.et; minim"
+      },
+      {
+        "key": "box-07",
+        "kind": "block",
+        "role": "box",
+        "state": "done",
+        "title": "Voluptatem",
+        "line": "quisquam, irure, fugit"
+      },
+      {
+        "key": "box-08",
+        "kind": "block",
+        "role": "box",
+        "state": "done",
+        "title": "Pariatur + dolore",
+        "line": "odit, deserunt, eiusmod"
+      },
+      {
+        "key": "box-09",
+        "kind": "block",
+        "role": "box",
+        "state": "done",
+        "title": "Nulla + accusamus",
+        "line": "occaecat, amet, elit"
+      },
+      {
+        "key": "box-10",
+        "kind": "block",
+        "role": "box",
+        "state": "done",
+        "title": "Proident + quis",
+        "line": "lorem, fugiat, adipiscing"
+      },
+      {
+        "key": "box-11",
+        "kind": "block",
+        "role": "box",
+        "state": "done",
+        "title": "Voluptas mollit",
+        "line": "nisi non ipsum Enim"
+      },
+      {
+        "key": "box-12",
+        "kind": "block",
+        "role": "box",
+        "state": "done",
+        "title": "Sunt (veniam esse)",
+        "line": "nesciunt, odit-dolor"
+      },
+      {
+        "key": "box-13",
+        "kind": "block",
+        "role": "box",
+        "state": "done",
+        "title": "Excepteur beatae",
+        "line": "tempor ea est labore"
+      },
+      {
+        "key": "box-14",
+        "kind": "block",
+        "role": "box",
+        "state": "done",
+        "title": "Dolorem dolore",
+        "line": "qui/fugiat; mollit magna eum"
+      },
+      {
+        "key": "box-15",
+        "kind": "block",
+        "role": "box",
+        "state": "done",
+        "title": "Ullamco quisquam",
+        "line": "sed non velit EST"
+      },
+      {
+        "key": "box-16",
+        "kind": "block",
+        "role": "box",
+        "state": "done",
+        "title": "Aliquip pariatur",
+        "line": "culpa/nostrud.qui"
+      },
+      {
+        "key": "box-17",
+        "kind": "block",
+        "role": "box",
+        "state": "done",
+        "title": "Deserunt veniam",
+        "line": "minim occaecat amet"
+      },
+      {
+        "key": "box-18",
+        "kind": "block",
+        "role": "box",
+        "state": "done",
+        "title": "EUM irure + fugit sed",
+        "line": "beatae-laboris"
+      },
+      {
+        "key": "box-19",
+        "kind": "block",
+        "role": "box",
+        "state": "done",
+        "title": "Nulla lorem",
+        "line": "ipsum-dolor-officia"
+      },
+      {
+        "key": "box-20",
+        "kind": "block",
+        "role": "box",
+        "state": "done",
+        "title": "Incididunt + elit",
+        "line": "commodo, magna, eiusmod"
+      },
+      {
+        "key": "box-21",
+        "kind": "block",
+        "role": "box",
+        "state": "done",
+        "title": "Cupidatat",
+        "line": "non dolorem est tempor qui"
+      },
+      {
+        "key": "box-22",
+        "kind": "block",
+        "role": "box",
+        "state": "done",
+        "title": "Velit quis + culpa",
+        "line": "minim nisi; irure ut enim"
+      },
+      {
+        "key": "box-23",
+        "kind": "block",
+        "role": "box",
+        "state": "done",
+        "title": "Fugit sunt eum",
+        "line": "esse nulla sed non ullamco"
+      },
+      {
+        "key": "box-24",
+        "kind": "block",
+        "role": "box",
+        "state": "done",
+        "title": "Lorem est ipsum dolor",
+        "line": null
+      },
+      {
+        "key": "box-25",
+        "kind": "block",
+        "role": "box",
+        "state": "done",
+        "title": "Labore + dolore",
+        "line": "fugiat, mollit, aliquip"
+      },
+      {
+        "key": "box-26",
+        "kind": "block",
+        "role": "box",
+        "state": "done",
+        "title": "Odit veniam",
+        "line": "beatae-tempor3 + nostrud"
+      },
+      {
+        "key": "box-27",
+        "kind": "block",
+        "role": "box",
+        "state": "done",
+        "title": "Labore proident",
+        "line": "qui amet; laboris; dolore"
+      },
+      {
+        "key": "box-28",
+        "kind": "block",
+        "role": "box",
+        "state": "done",
+        "title": "Fugiat magna officia",
+        "line": "mollit, commodo, veniam"
+      },
+      {
+        "key": "box-29",
+        "kind": "block",
+        "role": "box",
+        "state": "done",
+        "title": "Eiusmod dolorem",
+        "line": "elit-beatae, eum/tempor"
+      },
+      {
+        "key": "box-30",
+        "kind": "block",
+        "role": "box",
+        "state": "done",
+        "title": "Quis sed labore",
+        "line": "velit/non-est-nisi-enim"
+      },
+      {
+        "key": "box-31",
+        "kind": "block",
+        "role": "box",
+        "state": "done",
+        "title": "Consequat dolore",
+        "line": "voluptate.et, ullamco"
+      },
+      {
+        "key": "box-32",
+        "kind": "block",
+        "role": "box",
+        "state": null,
+        "title": "Fugiat-qui mollit",
+        "line": "veniam, aliquip/beatae-eum"
+      },
+      {
+        "key": "box-33",
+        "kind": "block",
+        "role": "box",
+        "state": "done",
+        "title": "Culpa, nostrud sed non laboris",
+        "line": null
+      },
+      {
+        "key": "box-34",
+        "kind": "block",
+        "role": "box",
+        "state": "done",
+        "title": "Sunt est tempor minim",
+        "line": null
+      },
+      {
+        "key": "module-01",
+        "kind": "module",
+        "role": "module",
+        "state": null,
+        "title": "Labore (irure)",
+        "line": "officia, dolore, esse"
+      },
+      {
+        "key": "module-02",
+        "kind": "module",
+        "role": "module",
+        "state": null,
+        "title": "Consequatur",
+        "line": "odit qui amet elit voluptas"
+      },
+      {
+        "key": "module-03",
+        "kind": "module",
+        "role": "module",
+        "state": null,
+        "title": "Quis accusantium",
+        "line": null
+      },
+      {
+        "key": "module-04",
+        "kind": "module",
+        "role": "module",
+        "state": null,
+        "title": "Commodo eum fugiat",
+        "line": null
+      },
+      {
+        "key": "module-05",
+        "kind": "module",
+        "role": "module",
+        "state": null,
+        "title": "Mollit",
+        "line": "perspiciatis"
+      },
+      {
+        "key": "module-06",
+        "kind": "module",
+        "role": "module",
+        "state": null,
+        "title": "sed / Veniam",
+        "line": "nisi beatae"
+      },
+      {
+        "key": "module-07",
+        "kind": "module",
+        "role": "module",
+        "state": null,
+        "title": "Fugit Enim",
+        "line": "inventore"
+      },
+      {
+        "key": "module-08",
+        "kind": "module",
+        "role": "module",
+        "state": null,
+        "title": "NON tempor",
+        "line": "Eiusmod, est dolorem, qui/labore"
+      },
+      {
+        "key": "module-09",
+        "kind": "module",
+        "role": "module",
+        "state": null,
+        "title": "Dolore",
+        "line": "eum fugiat, praesentium, sunt dignissimos, ullamco sed mollit"
+      },
+      {
+        "key": "module-10",
+        "kind": "module",
+        "role": "module",
+        "state": null,
+        "title": "Aliquip nulla",
+        "line": "Veniam, non est Beatae, lorem Esse"
+      },
+      {
+        "key": "module-11",
+        "kind": "module",
+        "role": "module",
+        "state": null,
+        "title": "Odit ea",
+        "line": null
+      },
+      {
+        "key": "module-12",
+        "kind": "module",
+        "role": "module",
+        "state": null,
+        "title": "Tempor nesciunt",
+        "line": "qui/labore/eum"
+      },
+      {
+        "key": "module-13",
+        "kind": "module",
+        "role": "module",
+        "state": null,
+        "title": "Nostrud",
+        "line": null
+      },
+      {
+        "key": "module-14",
+        "kind": "module",
+        "role": "module",
+        "state": null,
+        "title": "Laboris",
+        "line": null
+      },
+      {
+        "key": "module-15",
+        "kind": "module",
+        "role": "module",
+        "state": null,
+        "title": "Fugiat",
+        "line": null
+      }
+    ],
+    "links": [
+      {
+        "type": "feeds",
+        "from": "box-02",
+        "to": "box-29",
+        "gate": null,
+        "inferred": false,
+        "carries": "ipsum / amet"
+      },
+      {
+        "type": "feeds",
+        "from": "box-14",
+        "to": "box-15",
+        "gate": null,
+        "inferred": false
+      },
+      {
+        "type": "feeds",
+        "from": "box-15",
+        "to": "box-16",
+        "gate": null,
+        "inferred": false
+      },
+      {
+        "type": "feeds",
+        "from": "box-22",
+        "to": "box-23",
+        "gate": null,
+        "inferred": false,
+        "carries": "dolor"
+      },
+      {
+        "type": "feeds",
+        "from": "box-26",
+        "to": "box-27",
+        "gate": null,
+        "inferred": false,
+        "carries": "SED"
+      },
+      {
+        "type": "feeds",
+        "from": "box-28",
+        "to": "box-27",
+        "gate": null,
+        "inferred": false,
+        "carries": "non EST"
+      },
+      {
+        "type": "feeds",
+        "from": "box-32",
+        "to": "box-03",
+        "gate": null,
+        "inferred": false
+      },
+      {
+        "type": "feeds",
+        "from": "module-01",
+        "to": "box-03",
+        "gate": null,
+        "inferred": false,
+        "carries": "elit"
+      },
+      {
+        "type": "feeds",
+        "from": "module-04",
+        "to": "box-18",
+        "gate": null,
+        "inferred": false,
+        "carries": "qui"
+      },
+      {
+        "type": "feeds",
+        "from": "module-01",
+        "to": "module-02",
+        "gate": null,
+        "inferred": false
+      },
+      {
+        "type": "feeds",
+        "from": "module-02",
+        "to": "module-03",
+        "gate": null,
+        "inferred": false
+      },
+      {
+        "type": "feeds",
+        "from": "module-03",
+        "to": "module-04",
+        "gate": null,
+        "inferred": false
+      },
+      {
+        "type": "feeds",
+        "from": "box-03",
+        "to": "module-08",
+        "gate": null,
+        "inferred": false,
+        "carries": "QUIS + EUM"
+      },
+      {
+        "type": "feeds",
+        "from": "box-18",
+        "to": "module-08",
+        "gate": null,
+        "inferred": false,
+        "carries": "NISI"
+      },
+      {
+        "type": "feeds",
+        "from": "box-14",
+        "to": "module-08",
+        "gate": null,
+        "inferred": false,
+        "carries": "ENIM"
+      },
+      {
+        "type": "feeds",
+        "from": "box-21",
+        "to": "module-08",
+        "gate": null,
+        "inferred": false,
+        "carries": "officia"
+      },
+      {
+        "type": "feeds",
+        "from": "box-22",
+        "to": "module-08",
+        "gate": null,
+        "inferred": false,
+        "carries": "magna"
+      },
+      {
+        "type": "feeds",
+        "from": "box-29",
+        "to": "module-08",
+        "gate": null,
+        "inferred": false
+      },
+      {
+        "type": "feeds",
+        "from": "box-30",
+        "to": "module-08",
+        "gate": null,
+        "inferred": false
+      },
+      {
+        "type": "feeds",
+        "from": "module-08",
+        "to": "box-11",
+        "gate": null,
+        "inferred": false
+      },
+      {
+        "type": "feeds",
+        "from": "module-08",
+        "to": "box-01",
+        "gate": null,
+        "inferred": false
+      },
+      {
+        "type": "feeds",
+        "from": "box-16",
+        "to": "module-05",
+        "gate": null,
+        "inferred": false
+      },
+      {
+        "type": "feeds",
+        "from": "box-22",
+        "to": "module-06",
+        "gate": null,
+        "inferred": false
+      },
+      {
+        "type": "feeds",
+        "from": "box-17",
+        "to": "module-07",
+        "gate": null,
+        "inferred": false
+      },
+      {
+        "type": "blocks",
+        "from": "box-03",
+        "to": "box-02",
+        "gate": "hard",
+        "inferred": false
+      }
+    ],
+    "placement": {
+      "direction": "down",
+      "lanes": [
+        {
+          "name": "Mollit",
+          "arrange": "row",
+          "order": 1,
+          "tint": "--area-1"
+        },
+        {
+          "name": "Sunt ut",
+          "arrange": "row",
+          "order": 2,
+          "tint": "--area-2"
+        },
+        {
+          "name": "SED veniam",
+          "arrange": "stack",
+          "order": 3,
+          "head": "module-08"
+        },
+        {
+          "name": "Beatae quisquam",
+          "arrange": "grid",
+          "order": 2,
+          "in": "SED veniam",
+          "columns": 3,
+          "tint": "--area-4"
+        },
+        {
+          "name": "Commodo",
+          "arrange": "stack",
+          "order": 4,
+          "beside": "left",
+          "of": "SED veniam",
+          "tint": "--area-3"
+        },
+        {
+          "name": "Eiusmod",
+          "arrange": "stack",
+          "order": 5,
+          "beside": "right",
+          "of": "SED veniam",
+          "tint": "--area-5"
+        },
+        {
+          "name": "Dolorem",
+          "arrange": "stack",
+          "order": 6,
+          "beside": "right",
+          "of": "Eiusmod"
+        },
+        {
+          "name": "Tempor",
+          "arrange": "row",
+          "order": 7,
+          "tint": "--area-6"
+        }
+      ],
+      "nodes": {
+        "module-01": {
+          "lane": "Mollit",
+          "order": 1
+        },
+        "module-02": {
+          "lane": "Mollit",
+          "order": 2
+        },
+        "module-03": {
+          "lane": "Mollit",
+          "order": 3
+        },
+        "module-04": {
+          "lane": "Mollit",
+          "order": 4
+        },
+        "box-02": {
+          "lane": "Sunt ut",
+          "order": 1
+        },
+        "box-03": {
+          "lane": "Sunt ut",
+          "order": 2
+        },
+        "box-32": {
+          "lane": "Sunt ut",
+          "order": 3
+        },
+        "box-18": {
+          "lane": "Sunt ut",
+          "order": 4
+        },
+        "box-04": {
+          "lane": "SED veniam",
+          "order": 1
+        },
+        "box-06": {
+          "lane": "Beatae quisquam",
+          "order": 1
+        },
+        "box-08": {
+          "lane": "Beatae quisquam",
+          "order": 2
+        },
+        "box-07": {
+          "lane": "Beatae quisquam",
+          "order": 3
+        },
+        "box-05": {
+          "lane": "Beatae quisquam",
+          "order": 4
+        },
+        "box-10": {
+          "lane": "Beatae quisquam",
+          "order": 5
+        },
+        "box-19": {
+          "lane": "Beatae quisquam",
+          "order": 6
+        },
+        "box-20": {
+          "lane": "Beatae quisquam",
+          "order": 7
+        },
+        "box-12": {
+          "lane": "Beatae quisquam",
+          "order": 8
+        },
+        "box-31": {
+          "lane": "Beatae quisquam",
+          "order": 9
+        },
+        "box-13": {
+          "lane": "Beatae quisquam",
+          "order": 10
+        },
+        "box-09": {
+          "lane": "Beatae quisquam",
+          "order": 11
+        },
+        "box-25": {
+          "lane": "Beatae quisquam",
+          "order": 12
+        },
+        "box-26": {
+          "lane": "SED veniam",
+          "order": 3
+        },
+        "box-29": {
+          "lane": "Commodo",
+          "order": 1
+        },
+        "box-11": {
+          "lane": "Commodo",
+          "order": 2
+        },
+        "box-30": {
+          "lane": "Commodo",
+          "order": 3
+        },
+        "box-01": {
+          "lane": "Commodo",
+          "order": 4
+        },
+        "box-14": {
+          "lane": "Eiusmod",
+          "order": 1
+        },
+        "box-15": {
+          "lane": "Eiusmod",
+          "order": 2
+        },
+        "box-16": {
+          "lane": "Eiusmod",
+          "order": 3
+        },
+        "box-21": {
+          "lane": "Eiusmod",
+          "order": 4
+        },
+        "box-22": {
+          "lane": "Eiusmod",
+          "order": 5
+        },
+        "box-17": {
+          "lane": "Eiusmod",
+          "order": 6
+        },
+        "module-05": {
+          "lane": "Dolorem",
+          "order": 1
+        },
+        "module-06": {
+          "lane": "Dolorem",
+          "order": 2
+        },
+        "module-07": {
+          "lane": "Dolorem",
+          "order": 3
+        },
+        "box-28": {
+          "lane": "Tempor",
+          "order": 1
+        },
+        "box-27": {
+          "lane": "Tempor",
+          "order": 2
+        },
+        "box-23": {
+          "lane": "Tempor",
+          "order": 3
+        }
+      }
+    }
+  },
+  "reel": {
+    "pipeline": {
+      "key": "reel",
+      "title": "Odit ut architecto amet"
+    },
+    "records": [
+      {
+        "key": "reel-step-01",
+        "kind": "block",
+        "role": "step",
+        "state": "done",
+        "title": "Velit non esse est et odit ullamco",
+        "line": null
+      },
+      {
+        "key": "reel-step-02",
+        "kind": "block",
+        "role": "step",
+        "state": "done",
+        "title": "Amet qui elit ea 400 eum explicabo",
+        "line": null
+      },
+      {
+        "key": "reel-step-03",
+        "kind": "block",
+        "role": "step",
+        "state": "done",
+        "title": "Culpa sed labore quis dolore minim",
+        "line": null
+      },
+      {
+        "key": "reel-step-04",
+        "kind": "block",
+        "role": "step",
+        "state": "doing",
+        "title": "Irure non pariatur nisi enim",
+        "line": null
+      },
+      {
+        "key": "reel-step-05",
+        "kind": "block",
+        "role": "step",
+        "state": "doing",
+        "title": "Sunt est esse qui odit amet",
+        "line": null
+      },
+      {
+        "key": "reel-step-06",
+        "kind": "block",
+        "role": "step",
+        "state": "doing",
+        "title": "Elit eum aliquip, fugiat sed mollit fugit",
+        "line": null
+      },
+      {
+        "key": "reel-step-07",
+        "kind": "block",
+        "role": "step",
+        "state": "blocked",
+        "title": "Quis non nulla nisi enim est deserunt",
+        "line": null
+      },
+      {
+        "key": "reel-step-08",
+        "kind": "block",
+        "role": "step",
+        "state": "todo",
+        "title": "Qui sunt nostrud'e esse veniam eum sed",
+        "line": null
+      },
+      {
+        "key": "reel-step-09",
+        "kind": "block",
+        "role": "step",
+        "state": "todo",
+        "title": "Lorem non-doloremque occaecat est qui laudantium",
+        "line": null
+      },
+      {
+        "key": "reel-step-10",
+        "kind": "block",
+        "role": "step",
+        "state": "todo",
+        "title": "Laboris eum ipsum ut sed beatae odit",
+        "line": null
+      },
+      {
+        "key": "reel-step-11",
+        "kind": "block",
+        "role": "step",
+        "state": "doing",
+        "title": "Amet non elit tempor et est labore dolor",
+        "line": null
+      },
+      {
+        "key": "reel-step-12",
+        "kind": "block",
+        "role": "step",
+        "state": "todo",
+        "title": "Magna quis velit culpa dolore ea veritatis qui",
+        "line": null
+      },
+      {
+        "key": "reel-module-01",
+        "kind": "module",
+        "role": "module",
+        "state": null,
+        "title": "Fugiat accusamus",
+        "line": null
+      },
+      {
+        "key": "reel-module-02",
+        "kind": "module",
+        "role": "module",
+        "state": null,
+        "title": "Proident nisi mollit",
+        "line": null
+      },
+      {
+        "key": "reel-module-03",
+        "kind": "module",
+        "role": "module",
+        "state": null,
+        "title": "Excepteur officia commodo",
+        "line": null
+      },
+      {
+        "key": "reel-module-04",
+        "kind": "module",
+        "role": "module",
+        "state": null,
+        "title": "EUM enim",
+        "line": null
+      },
+      {
+        "key": "reel-module-05",
+        "kind": "module",
+        "role": "module",
+        "state": null,
+        "title": "Sunt voluptas",
+        "line": null
+      },
+      {
+        "key": "reel-module-06",
+        "kind": "module",
+        "role": "module",
+        "state": null,
+        "title": "Exercitation minim",
+        "line": null
+      },
+      {
+        "key": "reel-module-07",
+        "kind": "module",
+        "role": "module",
+        "state": null,
+        "title": "Veniam beatae esse",
+        "line": null
+      },
+      {
+        "key": "reel-module-08",
+        "kind": "module",
+        "role": "module",
+        "state": null,
+        "title": "eiusmod",
+        "line": null
+      }
+    ],
+    "links": [
+      {
+        "type": "consumes",
+        "from": "reel-module-07",
+        "to": "reel-module-08",
+        "gate": null,
+        "inferred": false
+      },
+      {
+        "type": "implements",
+        "from": "reel-module-03",
+        "to": "reel-step-02",
+        "gate": null,
+        "inferred": true
+      },
+      {
+        "type": "blocks",
+        "from": "reel-step-01",
+        "to": "reel-step-02",
+        "gate": "hard",
+        "inferred": false
+      },
+      {
+        "type": "implements",
+        "from": "reel-module-03",
+        "to": "reel-step-03",
+        "gate": null,
+        "inferred": true
+      },
+      {
+        "type": "implements",
+        "from": "reel-module-05",
+        "to": "reel-step-03",
+        "gate": null,
+        "inferred": true
+      },
+      {
+        "type": "blocks",
+        "from": "reel-step-02",
+        "to": "reel-step-03",
+        "gate": "hard",
+        "inferred": false
+      },
+      {
+        "type": "implements",
+        "from": "reel-module-04",
+        "to": "reel-step-04",
+        "gate": null,
+        "inferred": true
+      },
+      {
+        "type": "blocks",
+        "from": "reel-step-03",
+        "to": "reel-step-04",
+        "gate": "hard",
+        "inferred": false
+      },
+      {
+        "type": "implements",
+        "from": "reel-module-04",
+        "to": "reel-step-05",
+        "gate": null,
+        "inferred": true
+      },
+      {
+        "type": "blocks",
+        "from": "reel-step-04",
+        "to": "reel-step-05",
+        "gate": "hard",
+        "inferred": false
+      },
+      {
+        "type": "implements",
+        "from": "reel-module-01",
+        "to": "reel-step-06",
+        "gate": null,
+        "inferred": true
+      },
+      {
+        "type": "blocks",
+        "from": "reel-step-04",
+        "to": "reel-step-06",
+        "gate": "partial",
+        "inferred": false,
+        "upTo": "irure elit sed 1920e dolorem, fugit non ullamco est nesciunt"
+      },
+      {
+        "type": "implements",
+        "from": "reel-module-02",
+        "to": "reel-step-07",
+        "gate": null,
+        "inferred": true
+      },
+      {
+        "type": "blocks",
+        "from": "reel-step-03",
+        "to": "reel-step-07",
+        "gate": "hard",
+        "inferred": false
+      },
+      {
+        "type": "implements",
+        "from": "reel-module-01",
+        "to": "reel-step-08",
+        "gate": null,
+        "inferred": true
+      },
+      {
+        "type": "implements",
+        "from": "reel-module-04",
+        "to": "reel-step-08",
+        "gate": null,
+        "inferred": true
+      },
+      {
+        "type": "blocks",
+        "from": "reel-step-05",
+        "to": "reel-step-08",
+        "gate": "hard",
+        "inferred": false
+      },
+      {
+        "type": "blocks",
+        "from": "reel-step-06",
+        "to": "reel-step-08",
+        "gate": "hard",
+        "inferred": false
+      },
+      {
+        "type": "implements",
+        "from": "reel-module-06",
+        "to": "reel-step-09",
+        "gate": null,
+        "inferred": true
+      },
+      {
+        "type": "blocks",
+        "from": "reel-step-08",
+        "to": "reel-step-09",
+        "gate": "hard",
+        "inferred": false
+      },
+      {
+        "type": "implements",
+        "from": "reel-module-07",
+        "to": "reel-step-10",
+        "gate": null,
+        "inferred": true
+      },
+      {
+        "type": "implements",
+        "from": "reel-module-08",
+        "to": "reel-step-10",
+        "gate": null,
+        "inferred": true
+      },
+      {
+        "type": "blocks",
+        "from": "reel-step-09",
+        "to": "reel-step-10",
+        "gate": "partial",
+        "inferred": false,
+        "upTo": "quisquam qui voluptatem quis aliquip tempor"
+      },
+      {
+        "type": "blocks",
+        "from": "reel-step-07",
+        "to": "reel-step-10",
+        "gate": "hard",
+        "inferred": false
+      },
+      {
+        "type": "blocks",
+        "from": "reel-step-03",
+        "to": "reel-step-11",
+        "gate": "hard",
+        "inferred": false
+      },
+      {
+        "type": "blocks",
+        "from": "reel-step-07",
+        "to": "reel-step-12",
+        "gate": "hard",
+        "inferred": false
+      },
+      {
+        "type": "measures",
+        "from": "reel-module-06",
+        "to": "reel-module-04",
+        "gate": null,
+        "inferred": false
+      },
+      {
+        "type": "measures",
+        "from": "reel-module-06",
+        "to": "reel-module-01",
+        "gate": null,
+        "inferred": false
+      }
+    ],
+    "placement": {
+      "direction": "down",
+      "lanes": [
+        {
+          "name": "Et eum nostrud",
+          "arrange": "row",
+          "order": 2,
+          "tint": "--area-6"
+        },
+        {
+          "name": "Laboris sed nulla",
+          "arrange": "grid",
+          "order": 3,
+          "columns": 3,
+          "tint": "--area-2"
+        },
+        {
+          "name": "Adipiscing",
+          "arrange": "row",
+          "order": 4,
+          "tint": "--area-1"
+        },
+        {
+          "name": "Ea non labore nisi",
+          "arrange": "row",
+          "order": 5,
+          "beside": "right",
+          "of": "Adipiscing",
+          "tint": "--area-4"
+        },
+        {
+          "name": "Enim sunt",
+          "arrange": "stack",
+          "order": 6,
+          "beside": "right",
+          "of": "Et eum nostrud",
+          "tint": "--area-3"
+        },
+        {
+          "name": "Pariatur est deserunt",
+          "arrange": "grid",
+          "order": 1,
+          "columns": 4,
+          "tint": "--area-5"
+        }
+      ],
+      "nodes": {
+        "reel-step-01": {
+          "lane": "Et eum nostrud",
+          "order": 1
+        },
+        "reel-step-02": {
+          "lane": "Et eum nostrud",
+          "order": 2
+        },
+        "reel-step-03": {
+          "lane": "Et eum nostrud",
+          "order": 3
+        },
+        "reel-step-04": {
+          "lane": "Laboris sed nulla",
+          "order": 1
+        },
+        "reel-step-05": {
+          "lane": "Laboris sed nulla",
+          "order": 2
+        },
+        "reel-step-06": {
+          "lane": "Laboris sed nulla",
+          "order": 4
+        },
+        "reel-step-07": {
+          "lane": "Laboris sed nulla",
+          "order": 3
+        },
+        "reel-step-08": {
+          "lane": "Laboris sed nulla",
+          "order": 5
+        },
+        "reel-step-09": {
+          "lane": "Adipiscing",
+          "order": 1
+        },
+        "reel-step-10": {
+          "lane": "Ea non labore nisi",
+          "order": 1
+        },
+        "reel-step-11": {
+          "lane": "Enim sunt",
+          "order": 1
+        },
+        "reel-module-03": {
+          "lane": "Pariatur est deserunt",
+          "order": 4
+        },
+        "reel-module-05": {
+          "lane": "Pariatur est deserunt",
+          "order": 3
+        },
+        "reel-module-04": {
+          "lane": "Pariatur est deserunt",
+          "order": 6
+        },
+        "reel-module-01": {
+          "lane": "Pariatur est deserunt",
+          "order": 7
+        },
+        "reel-module-02": {
+          "lane": "Pariatur est deserunt",
+          "order": 8
+        },
+        "reel-module-06": {
+          "lane": "Pariatur est deserunt",
+          "order": 2
+        },
+        "reel-module-07": {
+          "lane": "Pariatur est deserunt",
+          "order": 1
+        },
+        "reel-module-08": {
+          "lane": "Pariatur est deserunt",
+          "order": 5
+        }
+      }
+    }
+  }
+}

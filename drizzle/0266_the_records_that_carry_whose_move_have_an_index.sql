@@ -1,0 +1,17 @@
+-- ONE INDEX, SO THE WAITING LIST FINDS THE RECORDS THAT SAY WHOSE NEXT MOVE IT IS WITHOUT READING EVERY RECORD.
+--
+-- GET /api/waiting lists every record whose `data.whose_move` says the next move is the person's, and counts
+-- the deleted ones that something still points at. Both reads asked for the records that carry the field at
+-- all, and SQLite read the data of every record to find them. On 13 October 2026, on a copy of the office at
+-- scale (53,646 records, 1,414 of them carrying the field), they took 74 ms and 27 ms of one reading.
+--
+-- `records_whose_move_idx` holds only the records that carry the field, of any kind, by `deleted_at`, so the
+-- live read and the deleted read each find theirs in it. It reads the field only from data that is valid JSON,
+-- like the indexes of migration 0199, so a row whose data is not JSON is left out of it and is never refused.
+-- A query uses it only by asking in the same words, which src/server/db/schema.ts holds once as
+-- `STORED_FIELDS.whoseMove`. The reader is `recordsWhereSomebodyAsked` in src/server/lib/waiting.ts.
+--
+-- The index is not unique, and it changes no row.
+--
+-- ADDITIVE, AND IT REWRITES NOTHING. One CREATE INDEX statement and no UPDATE.
+CREATE INDEX IF NOT EXISTS `records_whose_move_idx` ON `records` (`deleted_at`) WHERE (CASE WHEN json_valid(`data`) THEN json_extract(`data`, '$.whose_move') END) IS NOT NULL;

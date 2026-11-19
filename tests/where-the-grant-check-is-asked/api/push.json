@@ -1,0 +1,9 @@
+{
+  "doors": [
+    "office.push",
+    "office.push-allow",
+    "office.push-stop",
+    "office.push-test"
+  ],
+  "why": "Reading, allowing, stopping and testing notifications on the person's devices go through one guard."
+}

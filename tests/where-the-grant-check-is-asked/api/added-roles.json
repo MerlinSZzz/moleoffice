@@ -1,0 +1,7 @@
+{
+  "doors": [
+    "role.set-added",
+    "role.restore-added"
+  ],
+  "why": "Adding a role and putting back a removed one ask whether the secretary acts for the person, in the one guard both doors share: on the person's words for the exact card, or else the person's grant."
+}

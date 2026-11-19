@@ -1,0 +1,19 @@
+-- WHETHER AGENTS MAY INJECT IS ONE SETTING FOR EVERY AGENT, on the Settings page. Criterion M91 of
+-- design/messages/ACCEPTANCE.md.
+--
+-- M91 is one setting, on the Settings page, drawn as a toggle, and it is one switch for all agents
+-- rather than one per agent.
+--
+-- IT IS A COLUMN ON `installation` AND NOT A FIELD ON EACH AGENT'S RECORD. Before this the right was
+-- `mayInject` on each agent's `agent` record. One switch for every agent is one fact about the
+-- office, and `installation` is the office's one row, which is where 0165, 0166 and 0169 put the
+-- office's other settings for the same reason.
+--
+-- NULL MEANS NOBODY HAS CHOSEN, and it reads as "agents may inject", which is what an absent
+-- `mayInject` meant before. 1 is the switch on, 0 is the switch off. Nothing else is written by the
+-- door, and the reader refuses any other value rather than guessing.
+--
+-- ADDITIVE, AND IT REWRITES NOTHING. One ALTER TABLE ADD COLUMN and no UPDATE. No agent record held
+-- `mayInject` when this was written (measured on a copy of the office database on 25 September
+-- 2026), so there is no stored choice to carry over.
+ALTER TABLE `installation` ADD COLUMN `agents_may_inject` integer;

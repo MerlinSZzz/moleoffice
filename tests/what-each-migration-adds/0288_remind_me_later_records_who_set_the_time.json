@@ -1,0 +1,6 @@
+{
+  "why": "Remind me later records who set the time, wave 13s round 68: two nullable columns beside remind_at on message_delivery, holding the actor that pressed it. NULL is nobody recorded, which is every row written before this migration, so an older row never says the person set it.",
+  "columnsAddedAfterTheRebuild": {
+    "message_delivery": ["remind_set_by_kind", "remind_set_by_id"]
+  }
+}

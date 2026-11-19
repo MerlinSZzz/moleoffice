@@ -1,0 +1,30 @@
+<!-- Copyright © 2026 Zhengyang Shen -->
+<!-- Licensed under the MIT License. See LICENSE. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48" role="img" aria-label="A mole looking out of a round porthole, its paws on the rim">
+<defs><clipPath id="porthole-glass"><circle cx="24" cy="24" r="18.4"/></clipPath></defs>
+<circle cx="24" cy="24" r="23.3" fill="#7C8842" stroke="#4A5228" stroke-width="1.4"/>
+<g fill="#4A5228"><circle cx="24" cy="3.4" r="1.5"/><circle cx="44.6" cy="24" r="1.5"/><circle cx="24" cy="44.6" r="1.5"/><circle cx="3.4" cy="24" r="1.5"/></g>
+<circle cx="24" cy="24" r="18.4" fill="#F1EBDD"/>
+<g clip-path="url(#porthole-glass)">
+<path d="M20.6 13.6 L21.8 9.6 L23.2 12.6 L24.4 9.2 L25.6 12.6 L27 10.4 Z" fill="#2C3E5C"/>
+<path d="M10.8 42.4 L10.8 26.6 A13.2 13.2 0 0 1 37.2 26.6 L37.2 42.4 Z" fill="#2C3E5C"/>
+<g stroke="#F1EBDD" stroke-width="0.8" stroke-linecap="round">
+<path d="M18.4 28.8 L12.6 27.2"/><path d="M18.4 30.8 L12.4 31.8"/>
+<path d="M29.6 28.8 L35.4 27.2"/><path d="M29.6 30.8 L35.6 31.8"/>
+</g>
+<g fill="#FFFFFF"><circle cx="19" cy="22.4" r="3.5"/><circle cx="29" cy="22.4" r="3.5"/></g>
+<g fill="#16233A"><circle cx="19.5" cy="22.9" r="1.8"/><circle cx="28.5" cy="22.9" r="1.8"/></g>
+<ellipse cx="24" cy="29.2" rx="6" ry="4.5" fill="#E0A878"/>
+<ellipse cx="24" cy="27.4" rx="1.9" ry="1.5" fill="#16233A"/>
+<path d="M24 28.8 L24 31.2" stroke="#16233A" stroke-width="0.9" stroke-linecap="round"/>
+<g fill="#F3E4CC">
+<path d="M11.6 42.4 L11.6 36.4 A3.5 3.5 0 0 1 18.6 36.4 L18.6 42.4 Z"/>
+<path d="M29.4 42.4 L29.4 36.4 A3.5 3.5 0 0 1 36.4 36.4 L36.4 42.4 Z"/>
+</g>
+<g stroke="#B79A6E" stroke-width="0.7" stroke-linecap="round">
+<path d="M13.4 41 L13.4 37"/><path d="M15.1 41 L15.1 36.5"/><path d="M16.8 41 L16.8 37"/>
+<path d="M31.2 41 L31.2 37"/><path d="M32.9 41 L32.9 36.5"/><path d="M34.6 41 L34.6 37"/>
+</g>
+</g>
+<circle cx="24" cy="24" r="18.4" fill="none" stroke="#4A5228" stroke-width="1.2"/>
+</svg>

@@ -1,0 +1,6 @@
+{
+  "why": "Give every router credential its kind, so a run can hold its Casting credential and one tool credential at once. Existing rows read casting, and the one-live index becomes one live row per run and kind.",
+  "columnsAddedAfterTheRebuild": {
+    "run_tokens": ["kind"]
+  }
+}

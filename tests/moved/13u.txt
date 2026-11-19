@@ -1,0 +1,5 @@
+tests/the-persons-typing-is-kept-with-no-press.test.ts
+tests/the-terminal-pages-filter-and-find.test.ts
+tests/the-terminal-doors-are-the-persons.test.ts
+tests/the-terminal-pages-in-the-browser.test.ts
+tests/the-terminals-first-use-is-plain.test.ts

@@ -1,0 +1,6 @@
+{
+  "why": "Wave 13n round CB: the work group of each Casting row, hard, simple or empty, with where it came from. The run that applies 0318 sets the rows the roll's old list put in a group, and every other row, and every row added later, is in no group until its cell is set.",
+  "columnsAddedAfterTheRebuild": {
+    "casting_rows": ["work_group", "work_group_from"]
+  }
+}

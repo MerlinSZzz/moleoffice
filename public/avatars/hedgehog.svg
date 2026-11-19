@@ -1,0 +1,19 @@
+<!-- Copyright © 2026 Zhengyang Shen -->
+<!-- Licensed under the MIT License. See LICENSE. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-label="A hedgehog">
+<title>Hedgehog</title>
+<defs><clipPath id="hedgehog-disc"><circle cx="128" cy="128" r="128"/></clipPath></defs>
+<g clip-path="url(#hedgehog-disc)">
+<circle cx="128" cy="128" r="128" fill="#8FB964"/>
+<ellipse cx="128" cy="190" rx="90" ry="86" fill="#5F5041"/>
+<path d="M44.1 185.6 L9.0 174.2 L45.9 172.3 L13.1 155.4 L49.7 159.5 L20.0 137.6 L55.6 147.4 L29.8 121.1 L63.3 136.4 L42.0 106.3 L72.7 126.8 L56.4 93.7 L83.4 118.8 L72.6 83.5 L95.3 112.6 L90.3 76.1 L108.1 108.4 L108.9 71.5 L121.3 106.3 L128.0 70.0 L134.7 106.3 L147.1 71.5 L147.9 108.4 L165.7 76.1 L160.7 112.6 L183.4 83.5 L172.6 118.8 L199.6 93.7 L183.3 126.8 L214.0 106.3 L192.7 136.4 L226.2 121.1 L200.4 147.4 L236.0 137.6 L206.3 159.5 L242.9 155.4 L210.1 172.3 L247.0 174.2 L211.9 185.6 Z" fill="#5F5041"/>
+<path d="M70.9 179.9 L35.4 164.6 L73.7 169.5 L41.7 147.9 L78.5 159.8 L51.0 132.7 L84.9 151.2 L62.9 119.4 L92.8 143.9 L77.1 108.6 L102.0 138.2 L93.1 100.6 L112.0 134.2 L110.2 95.7 L122.6 132.3 L128.0 94.0 L133.4 132.3 L145.8 95.7 L144.0 134.2 L162.9 100.6 L154.0 138.2 L178.9 108.6 L163.2 143.9 L193.1 119.4 L171.1 151.2 L205.0 132.7 L177.5 159.8 L214.3 147.9 L182.3 169.5 L220.6 164.6 L185.1 179.9 Z" fill="#8A7359"/>
+<circle cx="72" cy="182" r="16" fill="#C9AE8C"/>
+<circle cx="184" cy="182" r="16" fill="#C9AE8C"/>
+<ellipse cx="128" cy="196" rx="62" ry="50" fill="#E9D3B4"/>
+<path d="M100 210 L156 210 L128 252 Z" fill="#E9D3B4"/>
+<ellipse cx="128" cy="240" rx="14" ry="11" fill="#35302E"/>
+<g fill="#17161A"><circle cx="102" cy="192" r="12"/><circle cx="154" cy="192" r="12"/></g>
+<g fill="#FFFFFF"><circle cx="98" cy="188" r="4.2"/><circle cx="150" cy="188" r="4.2"/></g>
+</g>
+</svg>

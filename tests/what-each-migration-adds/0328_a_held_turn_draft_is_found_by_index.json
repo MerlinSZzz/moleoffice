@@ -1,0 +1,8 @@
+{
+  "why": "Wave 13r round BV: one index of the drafts an agent's run holds now, partial to the drafts with a turn that is neither sent nor refused, and keyed by the agent the draft is held for, so the chat's Replying and the reads of the held drafts find them without reading every draft ever kept. No table, column, trigger or write changes.",
+  "indexesAddedAfterTheRebuild": {
+    "records": [
+      "records_held_turn_draft_agent_idx"
+    ]
+  }
+}

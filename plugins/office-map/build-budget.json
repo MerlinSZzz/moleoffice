@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "initialBytes": 2097152,
+  "lazyActionBytes": 1310720,
+  "initialRules": [
+    "^main\\.html$",
+    "^assets/(main|assets|look-assets|geometry\\.worker)-[A-Za-z0-9_-]{8}\\.js$",
+    "^assets/main-[A-Za-z0-9_-]{8}\\.css$",
+    "^assets/village-[0-5]-[A-Za-z0-9_-]{8}\\.png$",
+    "^assets/(bed|tuft-sleep)-[A-Za-z0-9_-]{8}\\.png$"
+  ],
+  "lazyActionRules": [
+    "^assets/tuft-actions-[A-Za-z0-9_-]{8}\\.js$",
+    "^assets/tuft-action-(r1|c1|p2|seated|p1|c2|c4)-[A-Za-z0-9_-]{8}\\.png$",
+    "^assets/(sleep-cast-assets|sleep-look-assets|pose-look-assets)-[A-Za-z0-9_-]{8}\\.js$",
+    "^assets/(fringe|bun|fan|crest|helmet|waves|part|beret|knit|raincoat|apron|bowtie|backpack|roll|flower|gardener|mapmaker|runner)-sleep-[A-Za-z0-9_-]{8}\\.png$"
+  ]
+}

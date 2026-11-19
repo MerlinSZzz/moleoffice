@@ -1,0 +1,134 @@
+{
+  "why": "A Casting row that names a provider row (wave 13n, piece 4(b)) is refused at the Casting door and the provider door, and at the run-models door when a check starts. The last needs a key file beside the database, an inspector the person registered and a dsh or codex row of its own, which no door here has. tests/a-casting-row-names-a-provider-row-for-a-dsh-check.test.ts meets each refusal of a dsh row through its door, in cases 2, 3, 4, 5 and 6, and tests/a-codex-check-takes-its-one-key-from-a-provider-row.test.ts each refusal of a codex row, in cases 1, 2, 4 and 6.",
+  "refusals": [
+    {
+      "code": "providerNamedByACastingRow",
+      "status": 409,
+      "english": "Test: a Casting row names this provider.",
+      "values": {
+        "id": "test-provider",
+        "rows": "7"
+      }
+    },
+    {
+      "code": "castingProviderRowNotFound",
+      "status": 400,
+      "english": "Test: no provider has this id.",
+      "values": {
+        "provider": "test-provider"
+      }
+    },
+    {
+      "code": "castingProviderRowNoProgram",
+      "status": 400,
+      "english": "Test: this Casting row has no program.",
+      "values": {
+        "provider": "test-provider"
+      }
+    },
+    {
+      "code": "castingProviderRowNotForTheProgram",
+      "status": 400,
+      "english": "Test: this provider is not for the row's program.",
+      "values": {
+        "provider": "test-provider",
+        "program": "dsh",
+        "programs": "opencode"
+      }
+    },
+    {
+      "code": "castingProviderRowNotYet",
+      "status": 400,
+      "english": "Test: this program does not take its key from a provider yet.",
+      "values": {
+        "provider": "test-provider",
+        "program": "opencode"
+      }
+    },
+    {
+      "code": "castingProviderRowOnlyForTheInspector",
+      "status": 400,
+      "english": "Test: only a check takes its key from a provider so far.",
+      "values": {
+        "provider": "test-provider",
+        "role": "test-role"
+      }
+    },
+    {
+      "code": "dshProviderGone",
+      "status": 409,
+      "english": "Test: the provider this row names is gone.",
+      "values": {
+        "row": "7",
+        "provider": "test-provider"
+      }
+    },
+    {
+      "code": "dshProviderNotForDsh",
+      "status": 409,
+      "english": "Test: the provider this row names is not for dsh now.",
+      "values": {
+        "row": "7",
+        "provider": "test-provider",
+        "programs": "codex"
+      }
+    },
+    {
+      "code": "dshProviderKeyNotSet",
+      "status": 409,
+      "english": "Test: the key file's entry is not set.",
+      "values": {
+        "row": "7",
+        "provider": "test-provider",
+        "entry": "test-entry"
+      }
+    },
+    {
+      "code": "dshProviderWhileTheRouterIsOn",
+      "status": 409,
+      "english": "Test: the provider router is on.",
+      "values": {
+        "row": "7",
+        "provider": "test-provider"
+      }
+    },
+    {
+      "code": "codexProviderGone",
+      "status": 409,
+      "english": "Test: the provider this Codex row names is gone.",
+      "values": {
+        "row": "7",
+        "provider": "test-provider"
+      }
+    },
+    {
+      "code": "codexProviderNotForCodex",
+      "status": 409,
+      "english": "Test: the provider this row names is not for codex now.",
+      "values": {
+        "row": "7",
+        "provider": "test-provider",
+        "programs": "dsh"
+      }
+    },
+    {
+      "code": "codexProviderKeyNotSet",
+      "status": 409,
+      "english": "Test: the key file's entry for this Codex row is not set.",
+      "values": {
+        "row": "7",
+        "provider": "test-provider",
+        "entry": "test-entry"
+      }
+    },
+    {
+      "code": "codexProviderWhileTheRouterIsOn",
+      "status": 409,
+      "english": "Test: the provider router is on, for a Codex row.",
+      "values": {
+        "row": "7",
+        "provider": "test-provider"
+      }
+    }
+  ]
+}

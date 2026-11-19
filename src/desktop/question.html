@@ -1,0 +1,26 @@
+<!doctype html>
+<!-- Copyright © 2026 Zhengyang Shen -->
+<!-- Licensed under the MIT License. See LICENSE. -->
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Mole Office</title>
+    <link rel="stylesheet" href="question.css" />
+  </head>
+  <body>
+    <main role="alertdialog" aria-modal="true" aria-labelledby="question" aria-describedby="says">
+      <div class="top">
+        <img class="icon" src="../web/logo/mole-office-mark-40.png" alt="" />
+        <h1 id="question"></h1>
+      </div>
+      <p id="says"></p>
+      <div class="acts">
+        <button id="cancel" type="button"></button>
+        <button id="yes" class="danger" type="button"></button>
+      </div>
+    </main>
+    <script src="question.js"></script>
+  </body>
+</html>

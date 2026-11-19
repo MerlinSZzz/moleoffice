@@ -1,0 +1,93 @@
+{
+  "why": "The data folder doors' refusals (criteria DF17 to DF21). Each needs this computer's process table, a real data folder move, or a server given no way to start the mover, so no door here can safely meet them: a move here would start a process that stops an office, and a confirm would remove files. tests/the-data-folder-door.test.ts meets each press refusal through the door on a scratch office, whose mover is a process the test starts and stops itself. The stored files' refusal for an unreadable mark is met by tests/a-moved-data-folder-still-shows-its-stored-files.test.ts.",
+  "refusals": [
+    {
+      "code": "dataFolderNotUnderTheGrant",
+      "status": 403,
+      "english": "Test: the grant's check refused the press.",
+      "values": {
+        "why": "Test: the secretary card keeps this press for the person."
+      }
+    },
+    {
+      "code": "dataFolderMarkUnreadable",
+      "status": 503,
+      "english": "Test: the data folder move's mark cannot be read.",
+      "values": {
+        "mark": "/test/data-folder-move.json",
+        "why": "Test: the file is not a mark this version writes."
+      }
+    },
+    {
+      "code": "dataFolderOnlyThePerson",
+      "status": 403,
+      "english": "Test: only the person may move the data folder or confirm a move.",
+      "values": {}
+    },
+    {
+      "code": "dataFolderTestWorld",
+      "status": 409,
+      "english": "Test: a test world refuses a data folder move.",
+      "values": {}
+    },
+    {
+      "code": "dataFolderNoWayToStart",
+      "status": 503,
+      "english": "Test: this server has no way to start the data folder mover.",
+      "values": {}
+    },
+    {
+      "code": "dataFolderNotABundle",
+      "status": 409,
+      "english": "Test: a checkout's data folder is not moved from Settings.",
+      "values": {}
+    },
+    {
+      "code": "dataFolderRunsAtWork",
+      "status": 409,
+      "english": "Test: two agent runs are at work.",
+      "values": {
+        "runs": "test-one, test-two"
+      }
+    },
+    {
+      "code": "dataFolderMoveStarting",
+      "status": 409,
+      "english": "Test: a data folder move is already starting.",
+      "values": {}
+    },
+    {
+      "code": "dataFolderMoveRefused",
+      "status": 409,
+      "english": "Test: the mover's own check refused the place.",
+      "values": {
+        "why": "Test: the place is not a full path."
+      }
+    },
+    {
+      "code": "dataFolderMoverEnded",
+      "status": 409,
+      "english": "Test: the mover ended before it was seen at work.",
+      "values": {
+        "log": "Test: the end of the mover's log."
+      }
+    },
+    {
+      "code": "dataFolderMoverNotSeen",
+      "status": 503,
+      "english": "Test: the mover wrote no mark this door could see.",
+      "values": {
+        "group": "4321",
+        "log": "/test/data-folder-move.log"
+      }
+    },
+    {
+      "code": "dataFolderNothingToConfirm",
+      "status": 409,
+      "english": "Test: the mark does not say a move started.",
+      "values": {
+        "why": "Test: the mark says the move was switched back."
+      }
+    }
+  ]
+}

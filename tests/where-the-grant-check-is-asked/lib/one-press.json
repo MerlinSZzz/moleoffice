@@ -1,0 +1,7 @@
+{
+  "doors": [
+    "one-press.agree",
+    "one-press.refuse"
+  ],
+  "why": "Agreeing to a request asks whether a raise carries the press and the parts the request touches. Refusing one asks whether a raise carries the press."
+}

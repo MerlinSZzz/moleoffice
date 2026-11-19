@@ -1,0 +1,5 @@
+p4242
+ftxt
+n/usr/local/bin/node
+ftxt
+n/usr/lib/dyld

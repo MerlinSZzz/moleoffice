@@ -1,0 +1,14 @@
+-- A PERSON'S OWN LABELS FOR THE MESSAGES THEY WRITE, for one person.
+--
+-- `chat_labels` holds JSON: a list of {"text": "<a short word>", "colour": "<a colour name>"}, in the
+-- order the person keeps them. The flag left of Send lists them after its marks, and a label chosen
+-- there goes with the message. The longest word, the most labels and the colour names are declared
+-- once in `src/shared/message-label.ts`, and the office reads every list with it before it stores one.
+--
+-- IT IS A COLUMN ON `people` AND NOT A TABLE OF ITS OWN, for the reason `shortcuts` beside it gives:
+-- it is one choice of one person, held as JSON, and it follows the person to any machine rather than
+-- staying in one browser.
+--
+-- NULL MEANS NOBODY HAS MADE ONE, and the flag's list then holds the marks alone. There is no CHECK
+-- constraint here, as `shortcuts` has none: the one reading of the JSON is in the code.
+ALTER TABLE `people` ADD `chat_labels` text;

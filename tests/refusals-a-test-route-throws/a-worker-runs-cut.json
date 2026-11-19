@@ -1,0 +1,29 @@
+{
+  "why": "The cut a worker's worktree is made at (wave 13j, the round after loop-10). The worker-run door reaches these only with a sandbox the office vouches for, a run key minted for the supervisor's run and a git repository in the sandbox folder, and for a clone the sandbox's instance.json. tests/a-supervisor-starts-its-own-worker.test.ts meets each through the door.",
+  "refusals": [
+    {
+      "code": "workerCutNotInTheSandbox",
+      "status": 400,
+      "english": "Test: no branch or tag of the sandbox's repository reaches the cut.",
+      "values": {}
+    },
+    {
+      "code": "workerCutHeadUnread",
+      "status": 409,
+      "english": "Test: the asking run's own commit could not be read.",
+      "values": {}
+    },
+    {
+      "code": "workerCutWorktreeAlreadyThere",
+      "status": 409,
+      "english": "Test: the worker's worktree is there already.",
+      "values": {}
+    },
+    {
+      "code": "workerCloneNotOfTheSandbox",
+      "status": 400,
+      "english": "Test: the clone named is not one of the sandbox's clones.",
+      "values": {}
+    }
+  ]
+}

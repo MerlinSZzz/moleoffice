@@ -1,0 +1,22 @@
+-- HOW BIG THE CHAT'S OWN TEXT IS, for one person.
+--
+-- Criterion M112: the chat's text size is
+-- set on the Settings page.
+--
+-- IT IS A COLUMN ON `people` AND NOT A TABLE OF ITS OWN, for the reason `circle_shows` gives: it is
+-- one fact about one person, the same shape as the choices beside it. A settings table would be a
+-- place for any future setting to go, which is the sixth rule of CLAUDE.md.
+--
+-- IT IS NOT THE APPEARANCE BAR'S TEXT SIZE. That one is `data-size` on `<html>`, remembered in the
+-- browser, and it moves the whole app. This one moves only the chat's list, bubbles and box, and it
+-- follows the person rather than the browser: read wherever they open Mole Office, on any machine.
+--
+-- NULL MEANS NOBODY HAS CHOSEN, and it is read as `normal`, which is what the chat drew before this
+-- column existed. That is rule five of CLAUDE.md: a reader is told "the person has not chosen"
+-- rather than "the person chose normal".
+--
+-- THE THREE WORDS IT MAY HOLD are `small`, `normal` and `large`, declared once in
+-- `src/shared/participants.ts` for the door, the reply and the control. There is no CHECK
+-- constraint here for the reason every other word column in this schema has none: the declaration
+-- is what the write gate reads, and a second list in SQL would be the same fact in two places.
+ALTER TABLE `people` ADD `chat_text_size` text;

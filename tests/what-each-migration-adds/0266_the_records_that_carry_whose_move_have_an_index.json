@@ -1,0 +1,8 @@
+{
+  "why": "The records that say whose next move it is, wave 13y round 27: one index over the records that carry data.whose_move, by deleted_at, so the waiting list finds them without reading every record. It touches no row and no column.",
+  "indexesAddedAfterTheRebuild": {
+    "records": [
+      "records_whose_move_idx"
+    ]
+  }
+}

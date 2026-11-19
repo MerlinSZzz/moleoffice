@@ -1,0 +1,21 @@
+-- WHICH OF THE TWO NAMES A RECORD NAMED IN A MESSAGE IS DRAWN UNDER, for one person.
+--
+-- Criterion M47. The words on the link were a little long and
+-- looked like level 2. A person chooses between level 1 and level 2 in the settings, with
+-- level 1 the default.
+--
+-- IT IS A COLUMN ON `people` AND NOT A TABLE OF ITS OWN, for the reason `circle_shows` gives four
+-- columns above: it is one fact about one person, the same shape as the choice beside it. A settings
+-- table would be a place for any future setting to go, which is the sixth rule of CLAUDE.md.
+--
+-- NULL MEANS NOBODY HAS CHOSEN, and it is read as the label because that is the default the owner
+-- set. It is deliberately not written as `label` on every row: a reader is then told "the person has
+-- not chosen" rather than "the person chose the label", which is rule five of CLAUDE.md.
+--
+-- THE TWO WORDS IT MAY HOLD are `label` and `title`, and `src/shared/participants.ts` declares them
+-- once for the door, the reply and the control. They are the reading ladder's own two rungs, so the
+-- word stored here is the word `POST /api/short-forms/rows` is asked for. There is no CHECK
+-- constraint here for the reason every other word column in this schema has none: the declaration is
+-- what the write gate reads, and a second list in SQL would be the same fact in two places.
+
+ALTER TABLE `people` ADD `message_link_level` text;

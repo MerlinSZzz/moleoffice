@@ -1,0 +1,6 @@
+{
+  "why": "Three partial indexes on messages: one by the run a message is about, so the office finds the lines it already wrote about a run without reading every message; one by the time a summons was made, so the read of the summonses since a place reads only the summonses; and one by the time a week-use notice was sent, so the notice reads only the notices it already sent. No table, column, trigger or row changes.",
+  "indexesAddedAfterTheRebuild": {
+    "records": ["records_message_about_run_idx", "records_message_summons_idx", "records_message_logins_week_idx"]
+  }
+}

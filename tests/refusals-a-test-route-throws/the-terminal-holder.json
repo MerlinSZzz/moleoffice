@@ -1,0 +1,59 @@
+{
+  "why": "The terminal holder's refusals (wave 13u). No door here can meet them without a terminal holder running, so a test route throws each in the doors' own shape. Closing an agent's terminal under the grant is tested through its real door in the terminal grant test; this test app has no holder with an agent's run.",
+  "refusals": [
+    {
+      "code": "terminalHolderNoAnswer",
+      "status": 504,
+      "english": "Test: the terminal holder did not answer.",
+      "values": {}
+    },
+    {
+      "code": "terminalHolderUnusable",
+      "status": 503,
+      "english": "Test: the terminal holder cannot be used.",
+      "values": {}
+    },
+    {
+      "code": "terminalNotHeld",
+      "status": 400,
+      "english": "Test: the holder holds no such terminal.",
+      "values": {}
+    },
+    {
+      "code": "terminalEnded",
+      "status": 400,
+      "english": "Test: that terminal has ended.",
+      "values": {}
+    },
+    {
+      "code": "terminalNoLineToKeep",
+      "status": 409,
+      "english": "Test: there is no line to keep.",
+      "values": {}
+    },
+    {
+      "code": "terminalLineChanged",
+      "status": 409,
+      "english": "Test: the line changed since it was read.",
+      "values": {}
+    },
+    {
+      "code": "terminalHolderDidNotStart",
+      "status": 502,
+      "english": "Test: the terminal holder did not start.",
+      "values": {}
+    },
+    {
+      "code": "terminalHolderTurnedOff",
+      "status": 409,
+      "english": "Test: the terminal holder is turned off.",
+      "values": {}
+    },
+    {
+      "code": "terminalHoldsAnAgentsRun",
+      "status": 403,
+      "english": "Under the person's grant, a secretary may close only a terminal no agent runs in. Nothing was closed.",
+      "values": {}
+    }
+  ]
+}

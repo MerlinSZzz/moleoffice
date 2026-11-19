@@ -1,0 +1,6 @@
+{
+  "doors": [
+    "office.set-related-tests-first"
+  ],
+  "why": "The door that changes whether related tests run first asks whether the secretary acts for the person before it writes the change."
+}

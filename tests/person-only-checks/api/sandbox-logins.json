@@ -1,0 +1,6 @@
+{
+  "sort": "mixed",
+  "checks": 2,
+  "why": "The existing set and clear guard preserves secretary delegation under the existing login policy. The separate private sign-in guard requires the proved person who presses it; no grant, terminal authority or agent receives private sign-in material.",
+  "background": "THE OWNER'S SETTINGS KEPT OUTSIDE THE RECORDS, carried for a secretary on the owner's words or under the owner's raise."
+}

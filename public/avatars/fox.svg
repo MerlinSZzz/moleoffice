@@ -1,0 +1,23 @@
+<!-- Copyright © 2026 Zhengyang Shen -->
+<!-- Licensed under the MIT License. See LICENSE. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-label="A fox">
+<title>Fox</title>
+<defs><clipPath id="fox-disc"><circle cx="128" cy="128" r="128"/></clipPath></defs>
+<g clip-path="url(#fox-disc)">
+<circle cx="128" cy="128" r="128" fill="#B98F64"/>
+<path d="M62 122 L44 28 L118 84 Z" fill="#DE7430"/>
+<path d="M66 112 L58 56 L102 86 Z" fill="#2E2831"/>
+<path d="M194 122 L212 28 L138 84 Z" fill="#DE7430"/>
+<path d="M190 112 L198 56 L154 86 Z" fill="#2E2831"/>
+<ellipse cx="128" cy="140" rx="78" ry="70" fill="#DE7430"/>
+<path d="M64 142 L44 214 L114 186 Z" fill="#F7F1E8"/>
+<path d="M192 142 L212 214 L142 186 Z" fill="#F7F1E8"/>
+<ellipse cx="128" cy="184" rx="50" ry="38" fill="#F7F1E8"/>
+<g fill="#17161A"><ellipse cx="96" cy="136" rx="14" ry="12"/><ellipse cx="160" cy="136" rx="14" ry="12"/></g>
+<g fill="#FFFFFF"><circle cx="92" cy="132" r="4.5"/><circle cx="156" cy="132" r="4.5"/></g>
+<ellipse cx="128" cy="168" rx="16" ry="12" fill="#2E2831"/>
+<path d="M128 180 L128 190" stroke="#2E2831" stroke-width="5" stroke-linecap="round"/>
+<path d="M128 190 q-13 13 -24 0" stroke="#2E2831" stroke-width="5" fill="none" stroke-linecap="round"/>
+<path d="M128 190 q13 13 24 0" stroke="#2E2831" stroke-width="5" fill="none" stroke-linecap="round"/>
+</g>
+</svg>

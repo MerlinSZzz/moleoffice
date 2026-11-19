@@ -1,0 +1,8 @@
+{
+  "why": "Wave 13s round 155, item 30c part 3: a kind column, person or agent, beside four columns that hold the id of whoever did a thing, so the identity census can tell a person's id from an agent's. Each is nullable, its writer fills it, and the data half of the migration tells the rows written before it where the registries say. A row it cannot tell keeps NULL and is counted as one that cannot be told.",
+  "columnsAddedAfterTheRebuild": {
+    "folder_readings": ["read_by_kind", "owner_kind"],
+    "revalidations": ["decided_by_kind"],
+    "conversation_reads": ["as_side_kind"]
+  }
+}

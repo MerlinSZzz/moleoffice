@@ -1,0 +1,4 @@
+{
+  "why": "The re-mint retains each original and rewritten saved round manifest and the corresponding derived acknowledgements, links affected revisions by their original and new whole-content hashes, and links rewritten change sides by their original and rewritten fields, value digests and exact values. A change side that exactly matches both retained manifest values may refer to that body without duplicating it. The evidence belongs to the re-mint generation, is written transactionally, and travels with an exported and restored installation; a derived acknowledgement is not a receipt.",
+  "tables": ["registry_remint_manifests", "registry_remint_manifest_revisions", "registry_remint_manifest_change_sides"]
+}

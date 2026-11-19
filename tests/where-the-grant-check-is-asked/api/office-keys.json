@@ -1,0 +1,7 @@
+{
+  "doors": [
+    "office.set-key",
+    "office.test-key"
+  ],
+  "why": "Setting a key and testing one go through one guard, which asks whether the secretary acts for the person."
+}

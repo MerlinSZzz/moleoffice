@@ -1,0 +1,5 @@
+{
+  "sort": "mixed",
+  "checks": 3,
+  "why": "the write guard of the kinds only the person may write (assertMayWrite), which asks thePersonIsProved twice, after actsForThePerson, theSecretaryActingForThePerson and aRaiseCarriesIt, so a raise carries those; and a change to a chapter's outline (refuseAnOutlineChangeWithoutTheirDecision), which no raise carries: it asks only thePersonIsProved or a warrant that a live decision of the owner's rests on."
+}

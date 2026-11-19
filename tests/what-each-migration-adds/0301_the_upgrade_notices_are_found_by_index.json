@@ -1,0 +1,8 @@
+{
+  "why": "Wave 13q item 1k: one index of the revisions, partial to the first revision of a stable upgrade notice, in time and record order, so the six reads of the notices find them without reading the first revision of every message. No table, column, trigger or write changes.",
+  "indexesAddedAfterTheRebuild": {
+    "revisions": [
+      "revisions_first_upgrade_notice_idx"
+    ]
+  }
+}

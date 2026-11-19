@@ -1,0 +1,148 @@
+{
+  "version": 1,
+  "tileSize": 32,
+  "sprites": {
+    "shared-grass-quiet-0": {
+      "src": "/office-map/c-environments/shared/materials/shared-grass-quiet-0.png",
+      "width": 32,
+      "height": 32,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "sha256": "d4d8c8fdbb4c17cf187d6fb21fb6c6e5f0f36804e3e6c9b43c16a916d22cf4be"
+    },
+    "shared-grass-quiet-1": {
+      "src": "/office-map/c-environments/shared/materials/shared-grass-quiet-1.png",
+      "width": 32,
+      "height": 32,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "sha256": "02f5e1c900c2b1f37f08e399a9e581754433aec16e69bf3562acb7c78d6102b0"
+    },
+    "shared-grass-quiet-2": {
+      "src": "/office-map/c-environments/shared/materials/shared-grass-quiet-2.png",
+      "width": 32,
+      "height": 32,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "sha256": "34aebc97c82b64e5fe3c8f961a739753c025c500ca38338b6a9883e7404b33e2"
+    },
+    "shared-earth-quiet-0": {
+      "src": "/office-map/c-environments/shared/materials/shared-earth-quiet-0.png",
+      "width": 32,
+      "height": 32,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "sha256": "98c3d7aa466a1201f8f73cfa68404bd5bda2203c084a6a97272dc28a4a231c14"
+    },
+    "shared-earth-quiet-1": {
+      "src": "/office-map/c-environments/shared/materials/shared-earth-quiet-1.png",
+      "width": 32,
+      "height": 32,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "sha256": "b7d3690762724dcf69719c1b062175b95c211fc85f9334b8cf1a0c01089cb029"
+    },
+    "shared-earth-quiet-2": {
+      "src": "/office-map/c-environments/shared/materials/shared-earth-quiet-2.png",
+      "width": 32,
+      "height": 32,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "sha256": "25a02eb20e8d02a57116df4c65bf0394925a78535a5636f65f4185ed624d6db9"
+    },
+    "shared-wood-quiet-0": {
+      "src": "/office-map/c-environments/shared/materials/shared-wood-quiet-0.png",
+      "width": 32,
+      "height": 32,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "sha256": "4450602269ab3936a16b7d90e2c47ecd04463c8aee593ab749d6257b9c897cf8"
+    },
+    "shared-wood-quiet-1": {
+      "src": "/office-map/c-environments/shared/materials/shared-wood-quiet-1.png",
+      "width": 32,
+      "height": 32,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "sha256": "379de331bf43866e6470832ad7d8a1c15af9bf05d707ec0cbc73cbc5dd19f467"
+    },
+    "shared-wood-quiet-2": {
+      "src": "/office-map/c-environments/shared/materials/shared-wood-quiet-2.png",
+      "width": 32,
+      "height": 32,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "sha256": "db8108219ebff46a2810aec7709aee87c1a23cc0d30ca3cb2c4b7b4c38440df4"
+    }
+  },
+  "materials": {
+    "grass": [
+      {
+        "sprite": "shared-grass-quiet-0",
+        "weight": 5
+      },
+      {
+        "sprite": "shared-grass-quiet-1",
+        "weight": 1
+      },
+      {
+        "sprite": "shared-grass-quiet-2",
+        "weight": 1
+      }
+    ],
+    "earth": [
+      {
+        "sprite": "shared-earth-quiet-0",
+        "weight": 5
+      },
+      {
+        "sprite": "shared-earth-quiet-1",
+        "weight": 1
+      },
+      {
+        "sprite": "shared-earth-quiet-2",
+        "weight": 1
+      }
+    ],
+    "wood": [
+      {
+        "sprite": "shared-wood-quiet-0",
+        "weight": 1
+      },
+      {
+        "sprite": "shared-wood-quiet-1",
+        "weight": 1
+      },
+      {
+        "sprite": "shared-wood-quiet-2",
+        "weight": 1
+      }
+    ]
+  },
+  "provenance": {
+    "boundaryMethod": "Runtime outlines are derived from saved coordinates. Integer pixel-center masks and navigation both use forestPolygonContains.",
+    "notUsedInRuntime": [
+      "The seven example edge PNGs",
+      "The road/platform example polygons from the preview sheets"
+    ],
+    "scope": "This pack supplies adopted material PNGs. The shared map supplies actual contours; a material name does not add height."
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "why": "Refusals whose words live in wave 13n's English file, which declares its server.* words to be the server's own sentences. Each code here is a difference the check would otherwise refuse.",
+  "refusals": [
+    {
+      "code": "shutDownOnlyTheOwner",
+      "reason": "The server's sentence is the person's-act guard's, which names the caller, and the code's values carry no caller, so the page's words cannot hold it."
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "why": "A worker row whose ask has no recorded time (wave 13n, package OP). tests/a-packages-workers-are-accounted.test.ts meets it through the door, describe 5.",
+  "refusals": [
+    {
+      "code": "packageWorkerAskHasNoTime",
+      "status": 409,
+      "english": "Test: the ask of xp-notime has no recorded time, so its row refuses rather than showing a made-up time.",
+      "values": {
+        "worker": "xp-notime"
+      }
+    }
+  ]
+}

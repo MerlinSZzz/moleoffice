@@ -1,0 +1,5 @@
+{
+  "sort": "carried",
+  "checks": 2,
+  "why": "taking something out of a planned future (assertMayShapeTheFuture) and shelving a direction (assertMayShelve). An agent goes through actsForThePerson or theSecretaryActingForThePerson; a stated person must prove themselves with assertThePersonIsProved."
+}

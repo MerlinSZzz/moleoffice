@@ -1,0 +1,9 @@
+# Wave 13p: the role gate, the route table, and the access and casting doors.
+# One path per line, relative to the checkout; # starts a comment. The neutral-words gate
+# (tests/the-owners-project-is-not-in-the-source.test.ts) reads every string each file ships.
+# Moved here from the list NEUTRAL_SOURCES in the gate's test file by wave 13r round 7.
+
+src/server/lib/rolegate.ts
+src/server/lib/route.ts
+src/server/api/access.ts
+src/server/api/casting.ts

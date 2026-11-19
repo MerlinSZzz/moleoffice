@@ -1,0 +1,11 @@
+{
+  "why": "Wave 13u: four indexes of the merge entries that landed, partial to merged entries that are not deleted and keyed by the project, the repository or lane, the moment of landing and the id, so the landed-since read in src/server/lib/landed-since.ts seeks a page of landings instead of reading every merge entry. No table, column, trigger or write changes.",
+  "indexesAddedAfterTheRebuild": {
+    "records": [
+      "records_landed_instant_idx",
+      "records_landed_instant_repo_idx",
+      "records_landed_lane_idx",
+      "records_landed_repo_lane_idx"
+    ]
+  }
+}

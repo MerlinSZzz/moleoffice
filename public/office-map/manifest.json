@@ -1,0 +1,60 @@
+{
+  "method": "Imagegen source atlases; local cell extraction, nearest-neighbour sizing and requested fur-colour variants.",
+  "entries": [
+    {
+      "id": "heads",
+      "sourceSHA256": "bb8074c311cfa5b16581cc9162675f6d49fcafa1837444d3c236d43e268dad45",
+      "alpha": "local magenta-key removal",
+      "frame": [
+        64,
+        64
+      ],
+      "columns": [
+        "neutral",
+        "happy",
+        "curious",
+        "focused",
+        "sleepy",
+        "surprised",
+        "side",
+        "back"
+      ],
+      "rows": [
+        "slate",
+        "cocoa",
+        "chestnut",
+        "sand",
+        "silver",
+        "cream"
+      ],
+      "bytes": 119318,
+      "sha256": "12c6f348e08fdbd9e6df6b59094162978b9113c8d5333ecf19e924d93ec5adac"
+    },
+    {
+      "id": "environment",
+      "sourceSHA256": "20d12c7a5912523a98071485f43d4706de92298ffc7972754dae156ca7717bf5",
+      "alpha": "generated RGBA preserved",
+      "extraction": "4x3 cells, with third-row window/plant boundary at source x=420",
+      "frame": [
+        128,
+        128
+      ],
+      "cells": [
+        "tree",
+        "pine",
+        "mushrooms",
+        "boulder",
+        "crystals",
+        "lantern",
+        "arch",
+        "pond",
+        "window",
+        "plant",
+        "bookcase",
+        "sofa"
+      ],
+      "bytes": 189098,
+      "sha256": "2a99388c34bdeabe97a9fa7f5a1f308f7fe03cff0e898e9248d5c651d4b1deb0"
+    }
+  ]
+}

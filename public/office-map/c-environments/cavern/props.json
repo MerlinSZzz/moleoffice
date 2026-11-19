@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "sprites": {
+    "cavern-rock-pillar": {
+      "src": "/office-map/c-environments/cavern/props/cavern-rock-pillar.png",
+      "width": 93,
+      "height": 176,
+      "anchor": {
+        "x": 46.5,
+        "y": 176
+      },
+      "sha256": "4e93752ee582fa72487125eac96f7cc9123c1ea2bd4ab6f29b2a2faea1285a29"
+    }
+  },
+  "props": {
+    "cavern-rock-pillar": {
+      "defaultScale": 1,
+      "blocking": true,
+      "footprint": {
+        "x": -46.5,
+        "y": -24,
+        "width": 93,
+        "height": 24
+      },
+      "layers": [
+        {
+          "sprite": "cavern-rock-pillar",
+          "role": "front"
+        }
+      ]
+    }
+  },
+  "provenance": {
+    "phase": "one representative pilot prop; not a complete environment pack",
+    "source": "a source image drawn outside this repository",
+    "alpha": "true-alpha request returned an opaque RGB image with a painted transparency grid; transparency is explicit post-processing, not successful native-alpha generation",
+    "footprint": "authored rectangle from visible lower base, relative to bottom-center anchor; window/glass panel are closed boundary obstacles; rock pillar is solid, not an arch"
+  }
+}

@@ -1,0 +1,4 @@
+{
+  "why": "Quick inputs, wave 13u round 21: the owner's list of inputs the office may type into an agent's terminal, one row for the installation, and one row for every ask an agent made for one. Their own tables and not records, so no record door can file, change or delete one.",
+  "tables": ["quick_input_list", "quick_input_asks"]
+}

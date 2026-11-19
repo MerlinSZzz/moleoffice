@@ -1,0 +1,8 @@
+{
+  "why": "Round 66 of wave 13y: one index partial to messages filed in the message centre, on the moment each was written. The talk view finds a project's messages from its place through it, and the newest of them without sorting every message. No table, column, trigger or write changes.",
+  "indexesAddedAfterTheRebuild": {
+    "records": [
+      "records_message_moment_idx"
+    ]
+  }
+}

@@ -1,0 +1,80 @@
+{
+  "record": {
+    "id": "invented-report-0001",
+    "workspaceId": "default",
+    "kind": "report",
+    "title": "Round three of the tool library: booking finished, repairs started",
+    "summary": "An invented report for a test. The goal is met and five volunteers proved it. What they could not do, and what is still wrong, is listed.",
+    "data": {
+      "for": "the person who asked for round three",
+      "date": "2031-03-03",
+      "blocks": [
+        {
+          "id": "b1",
+          "type": "text",
+          "text": "# Round three of the tool library, reviewed\n\n**This report is invented for a test.** Nothing in it happened, and every name, number and path in it\nis made up. It stands in for a long report somebody really wrote, with the same shapes in it.\n\nWritten on 3 March 2031.\n\n---"
+        },
+        {
+          "id": "b2",
+          "type": "text",
+          "heading": "The goal, in your words, and where it stands",
+          "text": "> *\"A member can find a tool, book it for a weekend and see who has it now, without asking at the\n> counter.\"*\n\n**Met.** Five volunteers who had never used the library's screens booked a ladder, a drill and a\nwallpaper steamer, start to finish, in about twelve minutes each.\n\n> *\"A volunteer can check many returns, note what is broken, and send one repair list at the end.\"*\n\n**Met, and the \"send one list\" half is a count rather than a claim.** `GET /api/repairs` was read\nfour times during one check-in session and answered `0` every time. Then *Send the list*, and `1`.\n\n**But two of the five could not finish without help**, and one of them lost six minutes on a single\nstep. Those failures are fixed and listed below; nobody has tried the fixes yet.\n\n---"
+        },
+        {
+          "id": "b3",
+          "type": "text",
+          "heading": "What you asked for, and where each landed",
+          "text": "### Part A — finding a tool\n\n| You asked | State |\n|---|---|\n| **1 · One count of tools everywhere** | **Done.** `src/shelf/count.ts` is the only place a shelf is counted, and the two pages now print **41 tools, 3 out and 2 broken** on both |\n| **2 · Name, Shelf, Keeper, Note** | **Done.** *Where it lives* is gone — the shelf became a column you can change. A first-time member set all four in under a minute |\n| **3 · The shelf editable after booking** | **Done, and it was worse than you thought.** It lost the note and said it had kept it. A note set aside now comes back when the shelf changes back |\n| **4 · Search by what the tool does** | **Done.** \"cut a pipe\" finds the pipe cutter & the hacksaw, and says which words matched |\n| **5 · Pictures of each tool** | **Done.** One picture per tool, taken at the counter, drawn beside its name and never stretched |\n| **6 · Say who has it now** | **Done, with a date.** The row names the borrower's first name and the day it is due back, and *overdue* in words when it is late |\n| **7 · Tools that come as a set** | **Done.** A set is one row with its parts under it; booking the set books every part, and a missing part is named |\n\n### Part B — booking\n\n| You asked | State |\n|---|---|\n| **8 · The weekend is a board** | **Done.** Book, move, stretch across Sunday, and say so when a booking runs past the weekend |\n| **9 · One press to return a tool** | **Done.** Where a tool can come back in two states, the press opens both words rather than choosing |\n| **10 · A note for the next borrower** | **Built, and it was behind a press nobody found.** See *What they could not do* |\n| **11 · Bookings that clash** | **Done.** Two bookings of one tool on one day are refused at the door, and the refusal names the other booking and its day |\n| **12 · Late returns in words** | **Done.** *Two days late* replaces `-2`, and a tool with no due day says *no day was set* rather than *0 days* |\n| **13 · A waiting list** | **Done.** The next member on the list is told when the tool comes back, and nobody is told twice |\n| **14 · Bookings in plain words** | **Done, without a model.** \"next Saturday\", \"this weekend\" and \"the 14th to the 16th\" are read by rules, and the board shows what it made of them |\n\n### Parts C and D — repairs"
+        },
+        {
+          "id": "b4",
+          "type": "text",
+          "text": "| You asked | State |\n|---|---|\n| **15 · A repair is not a return** | **Done.** A repair is a row a volunteer claims; nothing starts one by itself |\n| **16 · Right-click a tool to report it** | **Done** on a row, a booking and words selected inside a note. One small box, not three buttons |\n| **17 · The repair list waits for Send** | **Done.** Notes are stored as they are written, so a reload cannot lose them |\n| **18 · A repair says what it cost** | **Mostly.** Parts are counted in pounds and time in hours; a repair done for free says *nothing was spent* rather than showing a zero |\n| **19 · Old repairs stay readable** | **Done.** A closed repair keeps its notes, its pictures and who closed it |\n\n### Your addition — who fixes it\n\n| You asked | State |\n|---|---|\n| **Suggest a volunteer from who fixed it last** | **Done.** Every suggestion carries the sentence saying why, and none is applied for you |\n| **Do not guess; let me pick** | **Done.** One match is named with the words that matched; two or more are refused, naming each |\n| **Say when nobody can fix it** | **Done.** With no volunteer who has fixed that kind of tool, the list says *nobody has fixed one yet* and offers everyone |\n| **One repair may go to two volunteers** | **Done and counted.** One list, two volunteers, **two repairs**, and the reply says so in words |\n\n---"
+        },
+        {
+          "id": "b5",
+          "type": "text",
+          "heading": "What was measured, not asserted",
+          "text": "**Nothing was sent before Send.** `0` repair lists, four times, then `1`.\n\n**Each note kept the words it was about.** The stored list holds all three, each with the quote and\nwhere it was — *the line \"blade is loose\" of the note on the jigsaw*. The deleted note is absent.\n\n**The refusal is the same at both ends.** Book a tool that is out for repair: the board says\n*\"This tool is being mended and cannot be booked\"* and greys the press; the booking door, reached\nanother way, answers **409** with the same sentence. Bookings before and after: **7 and 7.**\n\n---"
+        },
+        {
+          "id": "b6",
+          "type": "text",
+          "heading": "What they could not do, and what changed afterwards",
+          "text": "These are the failures the volunteers wrote down. Each is fixed unless it says otherwise.\n\n| What happened to them | Now |\n|---|---|\n| **The shelf page said nothing was out** while the count beside it said three were | Two sentences, both true. *Nothing is out today* and *nothing is overdue* are different facts |\n| **The board's own arrow keys worked exactly once** — every press moved the focus away | The board holds its last answer while it reads the weekend again. Three presses, the same button each time |\n| **There was nowhere to leave a note on a booking** | **Add a note** at rest, in the note's own place |\n| **The repair box was cut off at the right edge** at 1440: *\"epair\"*, *\"end\"* | Fixed |\n| **Nothing said you could report selected words.** Both found it by right-clicking at random | A press appears when words are selected, and it names them |\n| **A note on selected words lost the words** in the repair list | The quote is drawn |\n| **The due date was drawn as `2031-03-08T00:00:00Z`** on the phone | It says *Saturday 8 March* |\n| **The search box cleared itself after every letter** on the phone | It keeps what was typed, and the list under it changes as you type |\n| **A booking moved to the next weekend vanished with no hint of where it went** | It says which weekend it is on now, and takes you there |\n| **Three things on screen were called Done** | The one that means the tool is back keeps the word; the other two say *stop editing* and *close this box* |\n| **\"null days\", \"1 field changed: data.shelf.\" and \"a overdue\"** | All three fixed. The first two were the stored words reaching a reader |\n\n---"
+        },
+        {
+          "id": "b7",
+          "type": "text",
+          "heading": "What is still wrong",
+          "text": "**A booking made on paper cannot be moved on the board.** It now says so rather than doing nothing,\nbut the commonest thing you will want after reading it is to move it.\n\n**Two volunteers on one weekend still overwrite each other.** The page no longer claims a state it\nhas not checked; the conflict underneath is untouched.\n\n**The home page and the shelf page disagree about how many tools are overdue** — 2 against 4, with\nnear-identical labels. It was there before this round, a volunteer found it, and nothing changed it.\n\n**A set with a missing part can still be booked.** The part is named on the row, but the booking\ndoor does not refuse, so a member can arrive for a set that is not whole.\n\n---"
+        },
+        {
+          "id": "b8",
+          "type": "text",
+          "heading": "What only you can decide",
+          "text": "- **Whether returning a tool should close its repair.** The last pass took a position and wrote\n  down what the other choice would cost.\n- **Whether a paper booking should get a row of its own**, so it can be moved.\n\n---"
+        },
+        {
+          "id": "b9",
+          "type": "text",
+          "heading": "What this round deliberately did not build",
+          "text": "A loan page for members. Fines. A second library. Text messages. A model reading a date. Sign-in\nfrom home. Any change to how a tool is priced.\n\n---"
+        },
+        {
+          "id": "b10",
+          "type": "text",
+          "heading": "What proved it",
+          "text": "**61 test files, 1,204 tests, `npx tsc --noEmit` and `npm run build` all clean.**\n\n**Every fix carries the change that proves its test can fail.** About forty of them: the count\nreversed, the guard removed, the refusal deleted, the sentence put back. Two changes *failed to\nfail*, and each was worth more than the fix it was testing —\n\n- one proved a test could not tell a moved booking from a kept one, and it was made stronger;\n- one proved a focus rule could be deleted with nothing going red, so it was deleted. The browser\n  keeps the focus through the move it was written for.\n\n**Five volunteers drove it in a browser**, each on their own copy of the library, and each stopped\ntheir copy and checked its port was free again.\n\n**Two migrations were applied**, each after a backup that was read back, and every row count was\nunchanged. Three junk rows a test had written — *drill 2*, *drill 22* and *ladder test* — were\ndeleted, and this sentence is here because deleting them quietly would have been the same fault.\n\n---"
+        },
+        {
+          "id": "b11",
+          "type": "text",
+          "heading": "Where everything is",
+          "text": "| | |\n|---|---|\n| **The design, and every choice it made** | `notes/round-three.md` |\n| **What the volunteers did** | `notes/volunteers/`, five write-ups and 40 pictures beside them |\n| **The choices, with what each one turned down** | `notes/choices.md`, six new entries |\n| **What the code looked like before** | `notes/before/`, four write-ups, each claim with a file and a line |\n| **Starting the board** | `npm run board`, and `npm run board -- --help` |"
+        }
+      ],
+      "source": "notes/round-three.md"
+    }
+  }
+}

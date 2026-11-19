@@ -1,0 +1,717 @@
+/* Copyright © 2026 Zhengyang Shen */
+/* Licensed under the MIT License. See LICENSE. */
+/* ==========================================================================================
+   Mole Office global stylesheet.
+
+   Scope, deliberately narrow: the reset, base typography, the focus ring, the app shell and
+   the page-level column layout. Components style themselves. If a rule here names a Panel, a
+   Row or a StateChip, it is in the wrong file — those live with their components so that six
+   people can work on this app at once without editing the same stylesheet.
+
+   Everything visual resolves through tokens.css. There is not one colour literal and not one
+   spacing literal below this comment, with the single exception of hairline values that are
+   definitionally 1px (a 1px line is a 1px line in every theme) and the 0/100%/auto keywords.
+   ========================================================================================== */
+
+@import './tokens.css';
+
+/* ==========================================================================================
+   RESET
+   ========================================================================================== */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--bg);
+  color: var(--text);
+  /* Stop iOS inflating text in landscape; the density presets already decide the size. */
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: var(--fs-2);
+  line-height: var(--lh-body);
+  /* Latin and CJK in one title must sit on one baseline; see the font stacks in tokens.css. */
+  font-synthesis-weight: none;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p,
+figure,
+blockquote,
+dl,
+dd {
+  margin: 0;
+}
+
+ul,
+ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Media never widens its container. Combined with the min-width:0 rules on grid children
+   below, this is what keeps the page body from ever scrolling sideways. */
+img,
+svg,
+video,
+canvas {
+  max-width: 100%;
+}
+
+/* Form controls do not inherit type by default, and a select rendering in 13px Arial next to
+   13px system-ui is the kind of small wrongness nobody can name but everybody sees. */
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+  letter-spacing: inherit;
+}
+
+button {
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+a {
+  color: var(--accent);
+  text-underline-offset: 0.15em;
+}
+:where(:root[data-theme-from='data'] a:any-link) {
+  text-decoration-line: var(--link-decoration);
+  text-decoration-thickness: var(--link-thickness);
+}
+
+code,
+kbd,
+samp,
+pre {
+  font-family: var(--font-mono);
+  font-size: 0.925em;
+}
+
+/* Numbers that sit in a column must line up. Anything showing a count, a duration or a
+   timestamp opts in with .num; tabular figures are not the default because they look wrong
+   inside a sentence. */
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ==========================================================================================
+   FOCUS
+
+   One rule, applied to everything, never removed anywhere. A keyboard user has to be able to
+   see where they are on every control in the app, including ones written by someone who did
+   not think about it. Components may change the ring's OFFSET to sit inside a tight row; they
+   may not turn it off.
+
+   :focus-visible rather than :focus, so a mouse click on a button does not leave a ring
+   behind. The browser's own heuristic decides, which is the one that matches what users of
+   each input device expect.
+   ========================================================================================== */
+
+:focus-visible {
+  outline: var(--focus-w) solid var(--focus);
+  outline-offset: var(--focus-offset);
+}
+
+/* Visually hidden but still read aloud. This is how a state that is drawn as a shape gets its
+   word to a screen reader, and how an icon-only control gets a name. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Skip link: hidden until focused, then a real, visible control at the top-left. */
+.skip-link:focus-visible {
+  position: fixed;
+  z-index: var(--z-skip);
+  top: var(--pad);
+  left: var(--pad);
+  width: auto;
+  height: auto;
+  margin: 0;
+  padding: var(--pad) var(--pad-lg);
+  clip-path: none;
+  background: var(--panel);
+  color: var(--text);
+  border: var(--border-w) solid var(--border-strong);
+  border-radius: var(--radius);
+  box-shadow: var(--elev-2);
+}
+
+/* ==========================================================================================
+   BASE TYPOGRAPHY
+   Raw semantic HTML has to look deliberate on its own, because half the app's text arrives as
+   a heading or a paragraph with no class on it.
+   ========================================================================================== */
+
+/* `pretty`, NOT `balance`. Balance equalises the length of every line in a heading, which on a
+   1140px panel turned "What the ICRA submission draft would mean as project structure" into two
+   half-width lines with dead space beside both — the owner's "every title has such strange line
+   breaks". `pretty` leaves the lines long and only refuses to leave one word alone on the last one,
+   which is the part worth having. */
+h1 {
+  font-size: var(--fs-6);
+  line-height: var(--lh-tight);
+  text-wrap: pretty;
+}
+h2 {
+  font-size: var(--fs-5);
+  line-height: var(--lh-tight);
+  text-wrap: pretty;
+}
+/* THE LOOK'S SECTION HEADING goes only on an h2 with no class of its own. In F it is small,
+   uppercase and ruled. A classed h2 can hold a record's own title (a counter, a plan, a shelved
+   line of work), and a record's title is content: it is drawn as its author wrote it, never in
+   capitals. Panel titles take the section look from UI_CSS in ui.tsx. */
+h2:not([class]) {
+  font-size: var(--section-size);
+  font-family: var(--section-font);
+  text-transform: var(--section-case);
+  letter-spacing: var(--section-space);
+  padding-bottom: var(--section-pad);
+  border-bottom: var(--section-rule);
+}
+h3 {
+  font-size: var(--fs-4);
+  line-height: var(--lh-tight);
+}
+/* Pages keep their own heading sizes. The look chooses the weight, including on classed titles. */
+h1, h1[class] { font-weight: var(--title-weight); }
+:where(:root[data-theme-from='data']) h1[class] { font-family: var(--font-head); letter-spacing: var(--head-space); }
+h2, h2[class] { font-weight: var(--section-weight); }
+h3, h3[class] { font-weight: var(--heading-weight); }
+h4,
+h5,
+h6 {
+  font-size: var(--fs-3);
+  font-weight: 600;
+  line-height: var(--lh-tight);
+}
+
+/* A block of sentences, as opposed to a row of fields.
+ *
+ * NO READING MEASURE, AND THAT IS THE FIX FOR A REAL COMPLAINT. This used to cap at a book measure.
+ * Every stored string in the product renders through here, and every one of them sits inside a
+ * panel — so a 512px ribbon was drawn inside a 790px card on every record page, which is what the
+ * "strange wrapping" report was about. The stored text was never hard-wrapped; this rule was.
+ *
+ * A book measure is for a page of long-form reading, not for a field value in a card that is
+ * already narrower than the measure is trying to make it. Regular prose now wraps at the width its
+ * component actually has, which is the browser's job. A surface that is genuinely long-form asks
+ * for `.prose-measure` below, which is one rule and not a default.
+ *
+ * An earlier pass looked at this, concluded the stored text was fine, and removed the cap from the
+ * page's own notes instead. That was half of it: the notes were never the visible ribbon. */
+.prose {
+  font-size: var(--fs-3);
+  line-height: var(--lh-read);
+  color: var(--text-2);
+}
+
+/* A PAGE OF CONTINUOUS READING: a report, an agent's reply, a review comment worth several
+ * sentences. Ask for it explicitly, beside `.prose`, on the element that holds the reading.
+ *
+ * THE NUMBER IS NOT HERE. It is `--measure-read` in tokens.css, so that the stylesheets that draw
+ * their own elements — every component in this app draws its own — read the same one number rather
+ * than each writing a width. Two places deciding a reading width, free to disagree, is exactly how
+ * a report ended up in a narrow column under a summary card that spanned the page.
+ *
+ * IT IS A CAP ON THE SPACE THE ELEMENT IS GIVEN, NEVER A WIDTH, and that is what makes it compose
+ * with a side pane. A pane takes horizontal space from the row the reading sits in; a cap then
+ * narrows the text and the page still does not scroll sideways. A width, or a cap counted in
+ * viewport units, would ignore the pane and slide under it. */
+.prose-measure { max-width: var(--measure-read); }
+
+/* Titles and free text come from users and agents and can contain anything, including a
+   400-character path with no spaces. Break inside a long word rather than push the page
+   sideways, but never break a CJK line at a forbidden position. */
+.wrap-anywhere {
+  overflow-wrap: break-word;
+  word-break: normal;
+  line-break: strict;
+  min-width: 0;
+}
+
+.truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+/* ==========================================================================================
+   LAYOUT PRIMITIVES
+
+   Two of them, and they are enough for every page in the app. Both set min-width:0 on their
+   children, because a grid or flex child defaults to min-width:auto and will refuse to shrink
+   below its content — which is precisely how a long path in one row makes the whole page
+   scroll horizontally.
+   ========================================================================================== */
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gut);
+  min-width: 0;
+}
+
+.cluster {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--pad);
+  min-width: 0;
+}
+
+.stack > *,
+.cluster > * {
+  min-width: 0;
+}
+
+/* PUT THIS ON ANYTHING FILLED WITH --accent.
+
+   In five of the seven themes --focus and --accent are the same colour, because the accent is
+   the most legible hue the palette has. That means a button filled with --accent draws its
+   focus ring in its own fill colour and the ring vanishes — on precisely the control the
+   keyboard user is standing on. Re-pointing the --focus TOKEN on the subtree fixes it for
+   every descendant at once, with no rule anywhere naming a colour. --accent-text is the
+   token already guaranteed to contrast with --accent (measured 6.7:1 at worst, in light). */
+.on-accent {
+  --focus: var(--accent-text);
+}
+
+/* `.scroll-x` IS DELETED. It was the app-wide box for anything wider than its container, it had one
+   user, and it took content off the right with nothing saying so — no scrollbar is drawn on this
+   platform until a pointer moves. Its one user was stored JSON, which now wraps. A box that scrolls
+   sideways is components/InReach.tsx, which draws its own edges. */
+
+/* ==========================================================================================
+   APP SHELL
+   ========================================================================================== */
+
+.page {
+  width: 100%;
+  max-width: var(--shell-max);
+  margin: 0 auto;
+  padding: var(--pad-lg);
+  min-width: 0;
+}
+
+/* ---- top bar ----------------------------------------------------------------------------
+   GONE. The app had a top bar carrying five links, the actor picker, a record count and the
+   appearance controls; it became a left sidebar, and the rules that dressed it — .topbar,
+   .topbar .brand, .topbar .nav and .topbar-right — kept being shipped to every reader after
+   nothing rendered that markup any more. Nothing in src, tests or tools mentions the class.
+   The header of App.tsx asked for them to go and left them alone because it did not own this
+   file; they are removed here. Their sticky layer was one of the twenty-eight loose z-index
+   numbers the token scale in tokens.css replaced. */
+
+/* ---- the message that shows until the app starts ----------------------------------------
+   Lives in index.html and is replaced the moment React mounts. It has four states, and the
+   inline script there chooses. While the app's files are arriving it says the app is loading,
+   in the page's own quiet colours. When the browser names a failure, it says the app did not
+   start, in failure colours, because that is then what it is. After a minute with no failure
+   named, it says the app has not started after a minute, in the quiet colours again, because
+   nothing is known to have failed (wave 13y round 148). Until 8 November 2026 the failure showed
+   after a fixed 2.5 seconds whatever the reason, and a slow connection read as a broken office.
+   The developer lines are under a closed Details fold, in the failure and after the minute.
+   On 15 November 2026 the loading state was enlarged to a 141 by 120 mole and centred in the
+   window, with only its one sentence under it; the other two states are as they were. On 17
+   November 2026 a fourth state, starting, was added: the app's own script has run and is waiting
+   for the office's first read, so the page says it is starting. An office that cannot be reached
+   at all takes the failure state, with its own sentence for why. */
+
+.boot-notice[data-boot='loading'] .boot-failure,
+.boot-notice[data-boot='starting'] .boot-failure,
+.boot-notice[data-boot='loading'] .boot-details,
+.boot-notice[data-boot='starting'] .boot-details,
+.boot-notice[data-boot='slow'] .boot-failure,
+.boot-notice:not([data-boot='slow']) .boot-slow,
+.boot-notice:not([data-boot='loading']):not([data-boot='starting']) .boot-loading {
+  display: none;
+}
+
+.boot-loading,
+.boot-slow {
+  margin: var(--pad-lg) auto;
+  padding: var(--pad-lg);
+  text-align: center;
+  color: var(--text-2);
+  font-family: var(--font-ui);
+  font-size: var(--fs-2);
+  line-height: var(--lh-body);
+}
+
+/* THE LOADING STATE FILLS THE WINDOW, so that the mole can sit at the window's centre. The
+   one-minute notice keeps its place in the page above, and so does the failure notice. */
+.boot-loading {
+  position: fixed;
+  inset: 0;
+  margin: 0;
+  padding: 0;
+}
+
+.boot-brand {
+  position: absolute;
+  top: calc(50% - 60px);
+  left: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--pad);
+}
+.boot-brand svg { flex: none; width: 141px; height: 120px; }
+
+.boot-loading strong,
+.boot-slow strong {
+  color: var(--text);
+  font-weight: var(--heading-weight);
+}
+
+.boot-loading p,
+.boot-slow p {
+  margin: var(--pad) 0 0;
+}
+
+.boot-failure {
+  max-width: var(--measure);
+  margin: var(--pad-lg) auto;
+  padding: var(--pad-lg);
+  background: var(--st-failed-row);
+  border: var(--border-w) solid var(--st-failed-line);
+  border-left-width: var(--rail);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: var(--fs-2);
+  line-height: var(--lh-body);
+}
+
+.boot-failure strong {
+  color: var(--st-failed);
+  font-weight: var(--st-failed-weight);
+}
+
+.boot-failure p {
+  margin: var(--pad) 0 0;
+  color: var(--text-2);
+}
+
+.boot-details {
+  max-width: var(--measure-in-box);
+  margin: 0 auto var(--pad-lg);
+  padding: 0 var(--pad-lg);
+  color: var(--text-2);
+  font-family: var(--font-ui);
+  font-size: var(--fs-2);
+  line-height: var(--lh-body);
+}
+
+.boot-details summary {
+  cursor: pointer;
+  color: var(--text);
+}
+
+.boot-details p {
+  margin: var(--pad) 0 0;
+}
+
+/* A line the script has nothing to say in, such as the supervisor's when it has no trouble. */
+.boot-details p:empty {
+  display: none;
+}
+
+/* THE WORDS THAT DID NOT COME are said above every page, the first-run guide too
+   (src/web/lib/the-words-that-did-not-come.tsx). */
+.words-did-not-come {
+  padding: var(--pad) var(--pad-lg) 0;
+}
+
+/* ==========================================================================================
+   PRESET BAR (src/web/components/PresetBar.tsx)
+   Shell chrome, not a reusable component: it is the one control that edits the token layer
+   itself, so it ships with the token layer.
+   ========================================================================================== */
+
+.presetbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--pad);
+  min-width: 0;
+}
+
+.presetbar-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.presetbar-label {
+  font-size: var(--fs-1);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-3);
+  line-height: var(--lh-tight);
+  white-space: nowrap;
+}
+
+/* Segmented control. One border around the set, hairlines between, so it reads as one
+   control with N positions rather than N buttons that happen to be adjacent. */
+.presetbar-seg {
+  display: flex;
+  border: var(--border-w) solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--panel);
+}
+
+.presetbar-seg button {
+  padding: 0 var(--pad);
+  min-height: 28px;
+  min-width: 28px;
+  font-size: var(--fs-1);
+  font-weight: 600;
+  line-height: var(--lh-tight);
+  color: var(--text-2);
+  background: var(--panel);
+  /* THE STRUCTURAL LINE, NOT THE DECORATIVE HAIRLINE. This is the boundary between one segment and
+     the next, so it is the visual boundary of a control and WCAG 1.4.11 asks 3:1 of it. Drawn with
+     var(--border) it measured 1.26:1 in light and 1.33:1 in dark on 15 August 2026, which is no
+     boundary at all: six segments read as one wide button. --border-strong is the one neutral line
+     this system holds to 3:1 in every palette, and tests/legibility.test.ts holds it there. */
+  border-right: var(--border-w) solid var(--border-strong);
+  white-space: nowrap;
+}
+
+.presetbar-seg button:last-child {
+  border-right: 0;
+}
+
+.presetbar-seg button:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.presetbar-seg button[aria-pressed='true'] {
+  background: var(--accent);
+  color: var(--accent-text);
+  /* See .on-accent above: without this the ring is drawn in the fill colour and disappears. */
+  --focus: var(--accent-text);
+}
+
+/* Inset offset and a raised z-index, so the ring is not clipped by the group's overflow
+   and is not painted over by the neighbouring segment. */
+.presetbar-seg button:focus-visible {
+  outline-offset: calc(-1 * var(--focus-w));
+  position: relative;
+  z-index: 1;
+}
+
+.presetbar-select {
+  min-height: 28px;
+  padding: 0 var(--pad);
+  font-size: var(--fs-1);
+  font-weight: 600;
+  color: var(--text);
+  background: var(--panel);
+  border: var(--border-w) solid var(--border-strong);
+  border-radius: var(--radius-sm);
+}
+
+/* Persistence failed, or a stored value was not one this build knows. Visible, in the bar,
+   next to the control it is about — never a console warning nobody reads. */
+.presetbar-fault {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px var(--pad);
+  font-size: var(--fs-1);
+  line-height: var(--lh-tight);
+  color: var(--st-failed);
+  background: var(--st-failed-bg);
+  border-left: var(--rail) solid var(--st-failed-line);
+  border-radius: var(--radius-sm);
+  font-weight: var(--st-failed-weight);
+  max-width: 40ch;
+}
+
+/* ==========================================================================================
+   RESPONSIVE SHELL
+   ========================================================================================== */
+
+/* Below 768px the shell is a single column of stacked things and the chrome stops trying to
+   be one line. Nav and controls wrap onto their own rows rather than shrinking below a
+   thumb-sized target. */
+@media (max-width: 767px) {
+  .page {
+    padding: var(--pad);
+  }
+
+  .topbar {
+    align-items: flex-start;
+    gap: var(--pad);
+  }
+
+  .topbar-right {
+    margin-left: 0;
+    width: 100%;
+  }
+}
+
+/* Phone. Every control in the shell becomes a 44px target, and text inputs go to 16px because
+   anything smaller makes iOS Safari zoom the page on focus — which then leaves the user
+   scrolled sideways in a layout that was never meant to be. */
+@media (max-width: 480px) {
+  .topbar .nav a,
+  .presetbar-seg button,
+  .presetbar-select {
+    min-height: 44px;
+  }
+
+  .presetbar-seg button {
+    padding: 0 var(--pad-lg);
+  }
+
+  input,
+  select,
+  textarea {
+    font-size: 1rem;
+  }
+}
+
+/* Honour the OS setting. Nothing in this app needs motion to be understood. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ==========================================================================================
+   A SUMMARY, MARKED AS A SUMMARY.
+
+   On the plan page, a line like "1 deadline · 1 direction ·
+   3 of 14 on the plan" is a summary of what is below it, and it was drawn as ordinary body text,
+   so it read as more content to get through. It gets the treatment a markdown quote gets —
+   a grey ground with a rule down the left. The same problem is everywhere in the
+   product, not only on that page, so it lives here, in the shared stylesheet.
+
+   Use it for a line that COUNTS or RESTATES what is below it. Do not use it for content.
+
+     <p class="px-sum"><span class="px-sum-key">Sum</span> <b class="num">1</b> deadline · … </p>
+
+   px-sum-key is optional and is the word that names the block; it adds its own colon. A
+   <b class="num"> inside draws as the figure. A block form works too: a <div class="px-sum"> with
+   several <p> inside, which get their own spacing from the sibling rule.
+   ========================================================================================== */
+
+.px-sum {
+  margin: 0 0 var(--pad);
+  padding: 5px var(--pad-lg);
+  background: var(--panel-2);
+  border-left: var(--rail) solid var(--border-strong);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  font-size: var(--fs-2);
+  line-height: var(--lh-body);
+  color: var(--text-2);
+}
+.px-sum > * + * { margin-top: 2px; }
+.px-sum .num { color: var(--text); font-weight: 700; }
+.px-sum-key { color: var(--text-3); font-weight: 600; }
+.px-sum-key::after { content: ':'; margin-right: 5px; }
+/* A small panel comes from its press; its still form is immediate. */
+.ckw-panel { interpolate-size: allow-keywords; animation: motion-panel-open var(--motion-open) var(--ease-out); }
+.ckw-panel[data-motion-closing='yes'] { animation: motion-panel-close var(--motion-quick) var(--ease-in); pointer-events: none; }
+@keyframes motion-panel-open { from { height: 0; overflow: clip; transform: translateY(-12px); } to { height: auto; overflow: clip; transform: none; } }
+@keyframes motion-panel-close { from { transform: none; opacity: 1; } to { transform: translateY(-12px); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .ckw-panel, .ckw-panel[data-motion-closing='yes'] { animation: none; } }
+
+/* The project choices come from their Switch press and leave together. */
+.sbp-choices:not([hidden]) { interpolate-size: allow-keywords; animation: motion-panel-open var(--motion-open) var(--ease-out); }
+.sbp-choices[data-motion-closing='yes'] { animation: motion-panel-close var(--motion-quick) var(--ease-in); pointer-events: none; }
+@media (prefers-reduced-motion: reduce) { .sbp-choices:not([hidden]), .sbp-choices[data-motion-closing='yes'] { animation: none; } }
+
+/* A record fold moves the material below it as its own height changes. */
+.rd-fold { interpolate-size: allow-keywords; }
+.rd-fold::details-content {
+  display: flow-root;
+  block-size: 0;
+  overflow: clip;
+  transition: block-size var(--motion-open) var(--ease-out), content-visibility var(--motion-open) allow-discrete;
+}
+.rd-fold[open]::details-content { block-size: auto; }
+.rd-fold > summary::before { transition: transform var(--motion-quick) var(--ease-out); }
+.rd-fold.rd-fold[open] > summary::before { content: '▸'; transform: rotate(90deg); }
+@media (prefers-reduced-motion: reduce) {
+  .rd-fold::details-content, .rd-fold > summary::before { transition: none !important; }
+}
+
+/* Contact groups uncover their rows and move the groups below with them. */
+.px-contact-motion-fold { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: 0fr; min-width: 0; min-height: 0; transition: grid-template-rows var(--motion-open) var(--ease-out); }
+.px-contact-motion-fold[data-open='yes'] { grid-template-rows: 1fr; }
+.px-contact-motion-inside { display: flow-root; min-width: 0; min-height: 0; overflow: clip; }
+.px-chat-top-group[data-side='human'] .px-chat-fold-arrow,
+.px-chat-top-group[data-side='agent'] .px-chat-fold-arrow { transition: transform var(--motion-quick) var(--ease-out); }
+.px-chat-top-group[data-side='human'] .px-chat-fold[aria-expanded='true'] .px-chat-fold-arrow,
+.px-chat-top-group[data-side='agent'] .px-chat-fold[aria-expanded='true'] .px-chat-fold-arrow { transform: rotate(90deg); }
+@media (prefers-reduced-motion: reduce) {
+  .px-contact-motion-fold, .px-chat-top-group .px-chat-fold-arrow { transition: none; }
+}
+
+/* The failed reread appears from the foot of the page column. */
+.px-reread[data-says='failed'] { max-height: 33dvh; overflow: hidden; animation: motion-reread-rise var(--motion-open) var(--ease-out); }
+.px-reread[data-says='failed'] .px-error { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+@keyframes motion-reread-rise { from { transform: translateY(100%); } to { transform: none; } }
+@media (prefers-reduced-motion: reduce) { .px-reread[data-says='failed'] { animation: none; } }
+
+/* The travelling light replaces the older rotating refresh rings. */
+.sbp-disc[data-refreshing]::after, .shell-menu[data-refreshing]::after { display: none !important; }
+
+@media (max-width: 1023.98px) {
+  .shell-side[data-drawer='open'] { animation: motion-drawer-open var(--motion-open) var(--ease-out); }
+  .shell-side[data-motion-closing='yes'] { animation: motion-drawer-close var(--motion-quick) var(--ease-in); pointer-events: none; }
+  .shell-scrim { animation: motion-scrim-open var(--motion-open) var(--ease-out); }
+  .shell-scrim[data-motion-closing='yes'] { animation: motion-scrim-close var(--motion-quick) var(--ease-in); pointer-events: none; }
+}
+@keyframes motion-drawer-open { from { transform: translateX(-100%); } to { transform: none; } }
+@keyframes motion-drawer-close { from { transform: none; } to { transform: translateX(-100%); } }
+@keyframes motion-scrim-open { from { opacity: 0; } to { opacity: 1; } }
+@keyframes motion-scrim-close { from { opacity: 1; } to { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .shell-side[data-drawer='open'], .shell-side[data-motion-closing='yes'], .shell-scrim, .shell-scrim[data-motion-closing='yes'] { animation: none; }
+}

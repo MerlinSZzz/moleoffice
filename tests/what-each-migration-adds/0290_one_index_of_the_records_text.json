@@ -1,0 +1,4 @@
+{
+  "why": "Round 64 of wave 13y: one full-text index of every record's title, summary and the text values of its data, kept by three triggers on records and read by GET /api/search and GET /api/report-files/named-inside to choose the records they look in. record_text is the index and SQLite keeps it in the four tables beside it; record_text_keys gives each record id the number the index knows it by.",
+  "tables": ["record_text", "record_text_config", "record_text_data", "record_text_docsize", "record_text_idx", "record_text_keys"]
+}

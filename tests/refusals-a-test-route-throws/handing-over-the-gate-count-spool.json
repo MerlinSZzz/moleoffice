@@ -1,0 +1,54 @@
+{
+  "why": "Handing the gate-count spool to this office's world (wave 13r round W). The press answers only in an office that started reading a spool, and no door here starts one. tests/the-gate-count-spool-is-handed-over-by-the-person.test.ts starts a reader on a made-up spool and meets each of these refusals through the press's own door.",
+  "refusals": [
+    {
+      "code": "gateCountSpoolOnlyThePerson",
+      "status": 403,
+      "english": "Test: only the person hands the gate-count spool to another world.",
+      "values": {}
+    },
+    {
+      "code": "gateCountSpoolBadBody",
+      "status": 400,
+      "english": "Test: the press takes the world it saw and a reason, and nothing else.",
+      "values": {}
+    },
+    {
+      "code": "gateCountSpoolNoReason",
+      "status": 400,
+      "english": "Test: the press needs a reason.",
+      "values": {}
+    },
+    {
+      "code": "gateCountSpoolNotRead",
+      "status": 409,
+      "english": "Test: this office does not read the gate-count spool.",
+      "values": {}
+    },
+    {
+      "code": "gateCountSpoolNotAnotherWorlds",
+      "status": 409,
+      "english": "Test: no other world owns the gate-count spool.",
+      "values": {
+        "reason": "Test: the spool belongs to this office's world already."
+      }
+    },
+    {
+      "code": "gateCountSpoolNotWhatYouSaw",
+      "status": 409,
+      "english": "Test: another world owns the gate-count spool than the one the page showed.",
+      "values": {
+        "saw": "test-world-seen",
+        "now": "test-world-now"
+      }
+    },
+    {
+      "code": "gateCountSpoolNotRemoved",
+      "status": 500,
+      "english": "Test: the spool's world file was not removed.",
+      "values": {
+        "reason": "Test: the removal failed."
+      }
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+-- A RUN'S CALLS ARE FOUND BY THE RUN, WITHOUT READING EVERY CALL. Wave 13y round 120, item 54.
+--
+-- Four reads ask `api_calls` for the calls of some runs by `session_id`: a run's timeline (`sessionTimeline` in
+-- src/server/lib/sessions.ts), the newest call of one agent's runs and of every open run (`newestRequestFor` and
+-- `newestRequestOfEachRun` in src/server/lib/arrivals.ts, the second for `GET /api/working`), and a run's start steps
+-- (`startStepsOfSession` in src/server/lib/start-cost.ts). No index of the table started with `session_id`, so SQLite
+-- read every call, by time or by rowid, and kept those of the runs asked.
+--
+--   api_calls_session_at_idx  every call, by its run and then its time.
+--
+-- MEASURED on the made-up office built at the scale of 22 October 2026 (2,526,769 calls), each read with the same answer
+-- by hash before and after: a run's timeline statement 193 ms before, 0.32 ms after; the start steps of the
+-- busiest run 195 ms and 0.83 ms; the newest call of each of 7,053 open runs 823 ms and 90 ms. The index there is
+-- 66,756,608 bytes, about 26 a call, beside 431,259,648 for the table and 431,124,480 for its other indexes. It was built
+-- in 895 ms.
+--
+-- The index is not unique, and it changes no row.
+--
+-- ADDITIVE, AND IT REWRITES NOTHING. One CREATE INDEX statement and no UPDATE.
+CREATE INDEX IF NOT EXISTS `api_calls_session_at_idx` ON `api_calls` (`session_id`,`at_ms`);

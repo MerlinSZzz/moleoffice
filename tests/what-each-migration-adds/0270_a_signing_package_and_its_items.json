@@ -1,0 +1,4 @@
+{
+  "why": "A signing package and its items, wave 13k round 54: one row per package a secretary brings the person to sign, and one row per known act in it, with each item's state and what it did. Their own tables and not records, so no record door can file, change or delete one.",
+  "tables": ["signing_package_items", "signing_packages"]
+}

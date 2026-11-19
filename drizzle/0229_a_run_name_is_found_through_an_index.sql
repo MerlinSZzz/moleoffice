@@ -1,0 +1,17 @@
+-- ONE INDEX, SO A RUN NAME IS FOUND WITHOUT READING THE WHOLE PROJECT'S CHANGE LOG.
+--
+-- On 10 October 2026 the live log said GET /api/sessions/awA_lfYhMfBJ and GET /api/sessions/xD4MyQvhMNmn
+-- each took about 5.2 s cold, about 4.4 s of it inside SQLite. One statement took 85 ms each time and
+-- returned no row: the run-name rung of `resolveSessionRef` (`boundToName` in src/server/lib/records.ts),
+-- which asks for the newest `sessionName` row that binds one name. No index held the field or the value,
+-- so each ask walked the project's whole log. The session read resolves every distinct value in the log's
+-- session column once, and a value that is not a record id reaches this rung, so a log with sixty such
+-- values asked it sixty times.
+--
+-- `changes_session_name_idx` HOLDS ONLY THE ROWS THAT BIND A NAME, in the order the rung reads them:
+-- project, name, then newest first by `at` and `id`. It is partial, so the large values other rows carry
+-- in `new_value` are not copied into it. SQLite uses it when the field is bound as a value too: it reads
+-- the bound value when it chooses a partial index, as `EXPLAIN QUERY PLAN` shows for `boundToName`.
+--
+-- ADDITIVE, AND IT REWRITES NOTHING. One CREATE INDEX statement and no UPDATE. The index is not unique.
+CREATE INDEX IF NOT EXISTS `changes_session_name_idx` ON `changes` (`workspace_id`, `new_value`, `at`, `id`) WHERE `field` = 'sessionName';

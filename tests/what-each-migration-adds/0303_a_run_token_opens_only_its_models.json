@@ -1,0 +1,4 @@
+{
+  "why": "Keep router credentials separate from office identity, with only hashes, exact provider/model policies, expiry, revocation and a run budget shared across replacements. No existing record is rewritten.",
+  "tables": ["run_tokens"]
+}

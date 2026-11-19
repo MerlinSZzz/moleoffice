@@ -1,0 +1,9 @@
+{
+  "why": "The probability cell of each Casting row; existing castings keep it empty.",
+  "columnsAddedAfterTheRebuild": {
+    "casting_rows": [
+      "probability",
+      "probability_from"
+    ]
+  }
+}

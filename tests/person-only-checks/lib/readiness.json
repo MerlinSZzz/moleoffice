@@ -1,0 +1,5 @@
+{
+  "sort": "kept",
+  "checks": 2,
+  "why": "signing a readiness checklist as the person, and counting a caller as the person signer (theCallerAsASigner) only when proved: a decision says the person's signature goes only through the door only the person can use, so a raise does not carry it"
+}

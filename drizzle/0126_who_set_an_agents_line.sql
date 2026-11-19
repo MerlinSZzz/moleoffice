@@ -1,0 +1,21 @@
+-- WHO SET THE LINE AN AGENT SHOWS ABOUT ITSELF.
+--
+-- Two columns on `agents`. Nothing is dropped, nothing is rewritten, no other table is touched, and
+-- every existing row keeps NULL in both.
+--
+-- The owner keeps the power to set an agent's line, and that
+-- line is a working mark like reporting or working, not online or offline. Criterion M21: the owner
+-- may set or clear an agent's state line, the line says the owner set it, and an agent may still set
+-- its own.
+--
+-- NULL MEANS NOBODY RECORDED WHO SET IT, WHICH IS WHAT EVERY EXISTING ROW HOLDS. Until now an agent's
+-- line could only be its own, so it is tempting to write the agent into every row and be done. That
+-- would be inventing a record of an act nobody witnessed, and a screen would then say "set by this
+-- agent" on a line whose origin was never written down. The screen says nothing where these are NULL,
+-- which is the honest reading of a row from before anybody was asked.
+--
+-- WHY IT IS NOT ON `people`. A person's line is their own and nobody else may set it — that rule is
+-- unchanged and is enforced in src/server/lib/participants.ts. A column there would have exactly one
+-- possible value, which is a column that says nothing.
+ALTER TABLE `agents` ADD `state_by_kind` text;--> statement-breakpoint
+ALTER TABLE `agents` ADD `state_by_id` text;

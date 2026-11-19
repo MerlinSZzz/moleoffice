@@ -1,0 +1,6 @@
+{
+  "doors": [
+    "office.set-agents-may-inject"
+  ],
+  "why": "The door that changes whether agents may write into a running session asks whether the secretary acts for the person before it writes the change."
+}

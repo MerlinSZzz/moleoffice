@@ -1,0 +1,37 @@
+{
+  "why": "Refusals whose words live in wave 13q's English file, which declares its server.* words to be the server's own sentences. The server sends each code here with more than one sentence, or with a sentence another check writes, and the code carries no values. The page's words say the refusal in general, and the reply keeps the exact reason.",
+  "refusals": [
+    {
+      "code": "bootstrapStopShapeRefused",
+      "reason": "The server has a sentence for each part of the request that can be wrong: the query, its JSON and its fields. One page sentence cannot be all of them."
+    },
+    {
+      "code": "bootstrapStopCallerRefused",
+      "reason": "The server sends the sentences of the upgrade notices' writer check: one when the caller is not an authenticated agent, one when the run is not that agent's running session. One page sentence cannot be both."
+    },
+    {
+      "code": "bootstrapStopPreparedRefused",
+      "reason": "The server has a sentence for each check of the original preparation, and it passes on the sentences of the record, decision, warrant and evidence checks it runs. One page sentence cannot be all of them."
+    },
+    {
+      "code": "bootstrapStopDecisionRefused",
+      "reason": "The server has a sentence for each check of the original decision: the record is missing, its pin does not match, or it is not the owner's filed decision. One page sentence cannot be all of them."
+    },
+    {
+      "code": "bootstrapStopScopeRefused",
+      "reason": "The server has one sentence for the preparation's scope and another for the decision's scope. The page's words cover both."
+    },
+    {
+      "code": "bootstrapStopWarrantRefused",
+      "reason": "The server sends the warrant check's own sentence, which names the cited message and its times, and the code's values carry neither."
+    },
+    {
+      "code": "bootstrapStopReservationRefused",
+      "reason": "The server has a sentence for each way the original reservation does not fit: another run holds it, it was already used, it is doubled, or it cannot be verified. One page sentence cannot be all of them."
+    },
+    {
+      "code": "upgradeHistoryReadRefused",
+      "reason": "The server has a sentence for each reason the history cannot be read, from the request's options to the stored notices, and keeps that reason in the error on purpose. The page says only that the history could not be read."
+    }
+  ]
+}

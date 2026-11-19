@@ -1,0 +1,76 @@
+{
+  "version": 1,
+  "sprites": {
+    "night-library-bookcase": {
+      "src": "/office-map/c-environments/night-library/props/night-library-bookcase.png",
+      "width": 131,
+      "height": 192,
+      "anchor": {
+        "x": 65.5,
+        "y": 192
+      },
+      "sha256": "66c5424d217fc27a811ba5bcca145216690fff74f46aa64bb04bd3d6a6c50641"
+    },
+    "night-library-moon-window": {
+      "src": "/office-map/c-environments/night-library/props/night-library-moon-window.png",
+      "width": 196,
+      "height": 192,
+      "anchor": {
+        "x": 98,
+        "y": 192
+      },
+      "sha256": "4da8c202172d28547a4600904cf1e6cf9614ce4d9a1b10351020594730d68a39"
+    }
+  },
+  "props": {
+    "night-library-bookcase": {
+      "defaultScale": 1,
+      "blocking": true,
+      "footprint": {
+        "x": -65.5,
+        "y": -18,
+        "width": 131,
+        "height": 18
+      },
+      "layers": [
+        {
+          "sprite": "night-library-bookcase",
+          "role": "front"
+        }
+      ]
+    },
+    "night-library-moon-window": {
+      "defaultScale": 1,
+      "blocking": true,
+      "footprint": {
+        "x": -95,
+        "y": -10,
+        "width": 190,
+        "height": 10
+      },
+      "footprintBasis": "authored lower base strip relative to ground anchor; boundary placement/collision pending world review",
+      "layers": [
+        {
+          "sprite": "night-library-moon-window",
+          "role": "back"
+        }
+      ]
+    }
+  },
+  "provenance": {
+    "bookcase": {
+      "phase": "one representative pilot prop; not a complete environment pack",
+      "source": "a source image drawn outside this repository",
+      "alpha": "true-alpha request returned an opaque RGB image with a painted transparency grid; transparency is explicit post-processing, not successful native-alpha generation",
+      "footprint": "authored rectangle from visible lower base, relative to bottom-center anchor; window/glass panel are closed boundary obstacles; rock pillar is solid, not an arch"
+    },
+    "moonWindow": {
+      "source": "a source image drawn outside this repository (version 2)",
+      "generation": "built-in imagegen native RGBA; source alpha thresholded at128 before crop, uniform nearest196x192, ordinary64colour quantization plus original pale cool pixels;218final colours",
+      "history": "v1 retained but not used; corrected bottom transparent margin and preserved moon colour",
+      "processingFacts": "a processing facts file kept outside this repository (version 2)",
+      "placement": "architectural boundaries only; not a floor shadow or an open arch"
+    },
+    "phase": "selected static props for runtime integration;world collision and placement not yet accepted"
+  }
+}

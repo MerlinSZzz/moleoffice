@@ -1,0 +1,153 @@
+<!doctype html>
+<!-- Copyright © 2026 Zhengyang Shen -->
+<!-- Licensed under the MIT License. See LICENSE. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Candidates for the round chat button</title>
+<style>
+  :root { color-scheme: light; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+  body { margin: 0; padding: 24px; background: #f4f2ee; color: #1c1c20; line-height: 1.5; }
+  h1 { font-size: 1.4rem; margin: 0 0 .3rem; }
+  h2 { font-size: 1rem; margin: 0 0 .2rem; }
+  p { max-width: 62ch; margin: 0 0 .8rem; }
+  .lede { color: #4a4a52; }
+  .row { display: flex; gap: 18px; align-items: flex-start; flex-wrap: wrap;
+         background: #fff; border: 1px solid #d8d5ce; border-radius: 10px; padding: 14px; margin-bottom: 14px; }
+  .big { width: 168px; height: 168px; border-radius: 8px; display: block; }
+  .says { flex: 1 1 22ch; min-width: 22ch; }
+  .says p { margin: .2rem 0 0; font-size: .92rem; color: #3a3a42; }
+  .ground { padding: 14px 16px; border-radius: 8px; display: flex; gap: 12px; align-items: center; }
+  .light { background: #ffffff; border: 1px solid #d8d5ce; }
+  .dark  { background: #15161a; border: 1px solid #3a3c44; }
+  .ground b { font-size: .72rem; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
+  .light b { color: #7a7a82; }
+  .dark b { color: #9a9aa2; }
+  /* The button as the product draws it: 3rem across, round, a border, a shadow. */
+  .dot { width: 48px; height: 48px; border-radius: 50%; display: block; flex: none;
+         background-size: cover; background-position: center; box-shadow: 0 1px 6px rgb(0 0 0 / 18%); }
+  .light .dot { border: 1px solid #c9c9cf; background-color: #fff; }
+  .dark .dot { border: 1px solid #3a3c44; background-color: #1e1f25; }
+  .now { display: grid; place-items: center; font-size: 1.1rem; }
+  .light .now { color: #1c1c20; }
+  .dark .now { color: #e8e8ee; }
+  .drawn { display: grid; place-items: center; overflow: hidden; }
+  .drawn svg, .drawn img { width: 48px; height: 48px; display: block; }
+  footer { color: #4a4a52; font-size: .9rem; max-width: 68ch; }
+</style>
+</head>
+<body>
+<h1>Candidates for the round chat button</h1>
+<p class="lede">
+  The button at the bottom right of every page is 48 pixels across, round, with a border and a
+  shadow, and it carries a black dot today. These are pictures to put there instead: each shows a
+  mole, or a group of moles, holding on to the edge of a window. Nothing here is wired into the product
+  &mdash; the owner chooses.
+</p>
+<p class="lede">
+  Each row shows the whole picture, then the same picture cut to the button's real size on a light
+  page and on a dark one, with today's dot beside it for comparison. The last two rows are drawn by
+  hand as SVG, so they stay sharp at any size and weigh under two kilobytes.
+</p>
+
+<div class="row">
+  <img class="big" src="mole-at-the-sill.png" alt="One mole looking over a window sill">
+  <div class="ground light"><b>light</b>
+    <span class="dot" style="background-image:url('mole-at-the-sill.png')"></span>
+    <span class="dot now">&#9679;</span></div>
+  <div class="ground dark"><b>dark</b>
+    <span class="dot" style="background-image:url('mole-at-the-sill.png')"></span>
+    <span class="dot now">&#9679;</span></div>
+  <div class="says"><h2>mole-at-the-sill</h2>
+    <p>The first idea. One mole in round glasses, up to its eyes over a green sill, both clawed paws
+      on the ledge. The face fills the circle and reads at 48 pixels.</p></div>
+</div>
+
+<div class="row">
+  <img class="big" src="three-moles-at-the-sill.png" alt="Three moles looking over a window sill">
+  <div class="ground light"><b>light</b>
+    <span class="dot" style="background-image:url('three-moles-at-the-sill.png')"></span>
+    <span class="dot now">&#9679;</span></div>
+  <div class="ground dark"><b>dark</b>
+    <span class="dot" style="background-image:url('three-moles-at-the-sill.png')"></span>
+    <span class="dot now">&#9679;</span></div>
+  <div class="says"><h2>three-moles-at-the-sill</h2>
+    <p>The second idea. Three moles of different heights in an arched window, six paws on the ledge,
+      one in glasses. It is the warmest picture of the set and the busiest at 48 pixels: at that size
+      it reads as several moles rather than as three.</p></div>
+</div>
+
+</div>
+
+<div class="row">
+  <img class="big" src="mole-in-a-porthole.png" alt="A mole looking out of a round porthole">
+  <div class="ground light"><b>light</b>
+    <span class="dot" style="background-image:url('mole-in-a-porthole.png')"></span>
+    <span class="dot now">&#9679;</span></div>
+  <div class="ground dark"><b>dark</b>
+    <span class="dot" style="background-image:url('mole-in-a-porthole.png')"></span>
+    <span class="dot now">&#9679;</span></div>
+  <div class="says"><h2>mole-in-a-porthole</h2>
+    <p>Mine. A mole in a round ship's porthole with a bolted olive rim, both paws on it. The round
+      frame is already the shape of the button, so it loses nothing to the crop and it is the
+      sharpest of them all at 48 pixels.</p></div>
+</div>
+
+</div>
+
+<div class="row">
+  <img class="big" src="two-moles-talking.png" alt="Two moles, one whispering to the other">
+  <div class="ground light"><b>light</b>
+    <span class="dot" style="background-image:url('two-moles-talking.png')"></span>
+    <span class="dot now">&#9679;</span></div>
+  <div class="ground dark"><b>dark</b>
+    <span class="dot" style="background-image:url('two-moles-talking.png')"></span>
+    <span class="dot now">&#9679;</span></div>
+  <div class="says"><h2>two-moles-talking</h2>
+    <p>Mine. One mole whispering into the other's ear, a paw raised beside its mouth. At 48 pixels
+      the whisper is lost and it reads as two friendly faces, which is not the worst thing a chat
+      button could say.</p></div>
+</div>
+
+</div>
+
+<div class="row">
+  <div class="big drawn" style="width:168px;height:168px">
+    <img src="mole-at-the-sill.svg" alt="A mole over a sill, drawn by hand" style="width:168px;height:168px">
+  </div>
+  <div class="ground light"><b>light</b>
+    <span class="dot drawn"><img src="mole-at-the-sill.svg" alt=""></span>
+    <span class="dot now">&#9679;</span></div>
+  <div class="ground dark"><b>dark</b>
+    <span class="dot drawn"><img src="mole-at-the-sill.svg" alt=""></span>
+    <span class="dot now">&#9679;</span></div>
+  <div class="says"><h2>mole-at-the-sill.svg &mdash; drawn</h2>
+    <p>The same idea drawn by hand on a 48-unit grid, so nothing is resampled at the size it is used.
+      1.8 kB, flat shapes, no gradient. Looked at from 24 to 128 pixels on both grounds.</p></div>
+</div>
+
+<div class="row">
+  <div class="big drawn" style="width:168px;height:168px">
+    <img src="mole-in-a-porthole.svg" alt="A mole in a porthole, drawn by hand" style="width:168px;height:168px">
+  </div>
+  <div class="ground light"><b>light</b>
+    <span class="dot drawn"><img src="mole-in-a-porthole.svg" alt=""></span>
+    <span class="dot now">&#9679;</span></div>
+  <div class="ground dark"><b>dark</b>
+    <span class="dot drawn"><img src="mole-in-a-porthole.svg" alt=""></span>
+    <span class="dot now">&#9679;</span></div>
+  <div class="says"><h2>mole-in-a-porthole.svg &mdash; drawn</h2>
+    <p>The porthole drawn by hand, 1.9 kB. The olive rim does the job the button's border does today,
+      so this one could replace the whole button rather than sit inside it.</p></div>
+</div>
+
+<footer>
+  <p>Seven pictures were asked of <code>openai/gpt-image-2</code> and seven came back; this round cost
+    $0.0535, and every avatar asked for so far comes to $0.4203. Each figure is the price the model's
+    own reply reported.</p>
+  <p>Nothing here is wired into the product. <code>.px-chat-circle</code> in
+    <code>src/web/components/Chat.tsx</code> still draws the dot it drew before.</p>
+</footer>
+</body>
+</html>

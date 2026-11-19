@@ -1,0 +1,24 @@
+-- A registered resource says which world it serves, and whether the product started it.
+--
+-- Criterion G5 of design/ground/ACCEPTANCE.md. Two columns on `session_resources`, both nullable,
+-- no row rewritten and nothing dropped.
+--
+-- WHY `world`. The ledger knew that a session had taken port 29601. It did not know WHAT was on
+-- 29601 — which checkout, which database, which commit — so a row could not tell an API serving the
+-- real corpus from one serving a temporary copy, and a reader of the list had to go and look. On
+-- 1 September 2026 an unregistered test stack held 29601 and 29602 over a temporary database for a
+-- day and a half and nobody's list had it; when rows like that ARE registered, the row still has to
+-- say what it is a resource of. The column holds the JSON shape `World` in src/shared/runtime.ts:
+-- repository, database, port, HEAD, and whether it was scratch or canonical with the reasons.
+--
+-- WHY `started_by_the_product`. The owner's F1 answer of 3 September 2026 was to name such a
+-- process and never kill it. Nothing the product did not start may ever be stopped by it; what it
+-- started, and whose owner session has ended, may be stopped by a press. That is a fact about how a
+-- process came
+-- to exist, so it is written down when the row is written and never inferred afterwards.
+--
+-- NULL IS A REAL VALUE HERE AND IT IS THE ONE EVERY EXISTING ROW GETS: nobody recorded this. It is
+-- not the same as "no", and the release door treats it the same way it treats no — it will not stop
+-- the process — because "nobody wrote it down" is the weakest evidence there is, not permission.
+ALTER TABLE `session_resources` ADD `world` text;--> statement-breakpoint
+ALTER TABLE `session_resources` ADD `started_by_the_product` integer;

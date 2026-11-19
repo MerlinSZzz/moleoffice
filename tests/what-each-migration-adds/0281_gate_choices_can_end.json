@@ -1,0 +1,6 @@
+{
+  "why": "A saved gate choice may end at a time. The nullable column leaves existing choices without an end.",
+  "columnsAddedAfterTheRebuild": {
+    "runtime_settings": ["until"]
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "doors": [
+    "resident.decline",
+    "resident.successor",
+    "resident.confirm"
+  ],
+  "why": "Declining a resident and naming its successor ask whether a raise carries the press. Confirming a resident asks the check last, with the proposal's filer, so a secretary confirms another secretary's proposal under the grant and never its own."
+}

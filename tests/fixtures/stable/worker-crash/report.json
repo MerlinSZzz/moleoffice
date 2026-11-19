@@ -1,0 +1,456 @@
+{
+  "about": "Sanitized historical report: original top-level counts and three sampled files. Tests synthesize the omitted assertions; no suite is run.",
+  "topLevel": {
+    "numTotalTestSuites": 10778,
+    "numPassedTestSuites": 10766,
+    "numFailedTestSuites": 10,
+    "numPendingTestSuites": 2,
+    "numTotalTests": 31733,
+    "numPassedTests": 31491,
+    "numFailedTests": 7,
+    "numPendingTests": 213,
+    "numTodoTests": 0,
+    "snapshot": {
+      "added": 0,
+      "failure": false,
+      "filesAdded": 0,
+      "filesRemoved": 0,
+      "filesRemovedList": [],
+      "filesUnmatched": 0,
+      "filesUpdated": 0,
+      "matched": 0,
+      "total": 0,
+      "unchecked": 0,
+      "uncheckedKeysByFile": [],
+      "unmatched": 0,
+      "updated": 0,
+      "didUpdate": false
+    },
+    "startTime": 1793098412797,
+    "success": false
+  },
+  "testResultsSample": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": [
+            "forest assignment persistence"
+          ],
+          "fullName": "forest assignment persistence keeps the saved gap and coordinates after the database is closed and reopened",
+          "status": "passed",
+          "title": "keeps the saved gap and coordinates after the database is closed and reopened",
+          "duration": 106.22949300000005,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "forest assignment persistence"
+          ],
+          "fullName": "forest assignment persistence does not write again on an unchanged read and keeps grouping layouts separately",
+          "status": "passed",
+          "title": "does not write again on an unchanged read and keeps grouping layouts separately",
+          "duration": 93.456865,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "forest assignment persistence"
+          ],
+          "fullName": "forest assignment persistence does not discard a corrupt saved layout and invent a replacement",
+          "status": "passed",
+          "title": "does not discard a corrupt saved layout and invent a replacement",
+          "duration": 15.192943000000014,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1793099742342,
+      "endTime": 1793099742557.1929,
+      "status": "passed",
+      "message": "",
+      "name": "<clone>/tests/forest-map-persistence.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": [
+            "saved forest map allocation"
+          ],
+          "fullName": "saved forest map allocation adds natural areas without moving existing seats or roads (synthetic-forest-17)",
+          "status": "passed",
+          "title": "adds natural areas without moving existing seats or roads (synthetic-forest-17)",
+          "duration": 147.908812,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "saved forest map allocation"
+          ],
+          "fullName": "saved forest map allocation adds natural areas without moving existing seats or roads (synthetic-forest-42)",
+          "status": "passed",
+          "title": "adds natural areas without moving existing seats or roads (synthetic-forest-42)",
+          "duration": 97.57316900000001,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "saved forest map allocation"
+          ],
+          "fullName": "saved forest map allocation adds natural areas without moving existing seats or roads (synthetic-forest-73)",
+          "status": "passed",
+          "title": "adds natural areas without moving existing seats or roads (synthetic-forest-73)",
+          "duration": 82.34384399999999,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "saved forest map allocation"
+          ],
+          "fullName": "saved forest map allocation keeps holes on deletion, fills only a free station, and moves only a regrouped person",
+          "status": "passed",
+          "title": "keeps holes on deletion, fills only a free station, and moves only a regrouped person",
+          "duration": 32.949383999999895,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "saved forest map allocation"
+          ],
+          "fullName": "saved forest map allocation does not rearrange saved seats when decoration seed or project membership order changes",
+          "status": "passed",
+          "title": "does not rearrange saved seats when decoration seed or project membership order changes",
+          "duration": 22.14686400000005,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "saved forest map allocation"
+          ],
+          "fullName": "saved forest map allocation finds routes through the actual furniture footprint map, including a small office",
+          "status": "passed",
+          "title": "finds routes through the actual furniture footprint map, including a small office",
+          "duration": 391.2493079999999,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "saved forest map allocation"
+          ],
+          "fullName": "saved forest map allocation adopts complete stools without rewriting the original source or moving saved people and desks",
+          "status": "passed",
+          "title": "adopts complete stools without rewriting the original source or moving saved people and desks",
+          "duration": 21.550590000000057,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "saved forest map allocation"
+          ],
+          "fullName": "saved forest map allocation reads adopted ground and routes over the exact projected road coverage",
+          "status": "passed",
+          "title": "reads adopted ground and routes over the exact projected road coverage",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "saved forest map allocation"
+          ],
+          "fullName": "saved forest map allocation indexes the same collision rectangles across cell edges and keeps the own-stool exception",
+          "status": "pending",
+          "title": "indexes the same collision rectangles across cell edges and keeps the own-stool exception",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "saved forest map allocation"
+          ],
+          "fullName": "saved forest map allocation derives explicit SW body and hand mirrors from the same original action without changing its timing",
+          "status": "pending",
+          "title": "derives explicit SW body and hand mirrors from the same original action without changing its timing",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "saved forest map allocation"
+          ],
+          "fullName": "saved forest map allocation keeps a declared fixed single table still and refuses missing look actions",
+          "status": "pending",
+          "title": "keeps a declared fixed single table still and refuses missing look actions",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "saved forest map allocation"
+          ],
+          "fullName": "saved forest map allocation merges complete look fragments before validation and refuses conflicting saved looks or actions",
+          "status": "pending",
+          "title": "merges complete look fragments before validation and refuses conflicting saved looks or actions",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "saved forest map allocation"
+          ],
+          "fullName": "saved forest map allocation loads all five actual ground packs without changing saved geometry or borrowing another scene",
+          "status": "pending",
+          "title": "loads all five actual ground packs without changing saved geometry or borrowing another scene",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "saved forest map allocation"
+          ],
+          "fullName": "saved forest map allocation binds every adopted look to its own measured contact without moving the table, stool or saved foot",
+          "status": "pending",
+          "title": "binds every adopted look to its own measured contact without moving the table, stool or saved foot",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "saved forest map allocation"
+          ],
+          "fullName": "saved forest map allocation resolves strict v2 and strict v3 sand-apron to the same saved table book as the separate silver-glasses baseline",
+          "status": "pending",
+          "title": "resolves strict v2 and strict v3 sand-apron to the same saved table book as the separate silver-glasses baseline",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "saved forest map allocation"
+          ],
+          "fullName": "saved forest map allocation gives sand-apron its own independent table book and real frames, and still fails loudly without a point",
+          "status": "pending",
+          "title": "gives sand-apron its own independent table book and real frames, and still fails loudly without a point",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "saved forest map allocation"
+          ],
+          "fullName": "saved forest map allocation uses each project environment furniture without changing saved seats, and names a missing pack",
+          "status": "pending",
+          "title": "uses each project environment furniture without changing saved seats, and names a missing pack",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "saved forest map allocation"
+          ],
+          "fullName": "saved forest map allocation places shared furniture once without moving saved feet or stools when people have different sizes",
+          "status": "pending",
+          "title": "places shared furniture once without moving saved feet or stools when people have different sizes",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "saved forest map allocation"
+          ],
+          "fullName": "saved forest map allocation reports an unreachable route instead of replacing it with a straight line",
+          "status": "pending",
+          "title": "reports an unreachable route instead of replacing it with a straight line",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "saved forest map allocation"
+          ],
+          "fullName": "saved forest map allocation refuses duplicate identities and corrupt saved station references",
+          "status": "pending",
+          "title": "refuses duplicate identities and corrupt saved station references",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "saved forest map allocation"
+          ],
+          "fullName": "saved forest map allocation rejects an invalid saved road in the production projection instead of publishing a partial surface",
+          "status": "pending",
+          "title": "rejects an invalid saved road in the production projection instead of publishing a partial surface",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "saved forest map allocation"
+          ],
+          "fullName": "saved forest map allocation cuts the real 32-pixel road grid into full and edge tiles through the shared reader",
+          "status": "pending",
+          "title": "cuts the real 32-pixel road grid into full and edge tiles through the shared reader",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "saved forest map allocation"
+          ],
+          "fullName": "saved forest map allocation omits exactly the isolated saved elbow and still routes across the 45-degree chord",
+          "status": "pending",
+          "title": "omits exactly the isolated saved elbow and still routes across the 45-degree chord",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "C map work and book sequences"
+          ],
+          "fullName": "C map work and book sequences uses frame-declared table-book visibility and keeps one fixed book at the person\u2019s scale",
+          "status": "pending",
+          "title": "uses frame-declared table-book visibility and keeps one fixed book at the person\u2019s scale",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "C map work and book sequences"
+          ],
+          "fullName": "C map work and book sequences keeps the starting book location when pickup, return, or the independent image is missing",
+          "status": "pending",
+          "title": "keeps the starting book location when pickup, return, or the independent image is missing",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "C map work and book sequences"
+          ],
+          "fullName": "C map work and book sequences finishes a started book pickup before a later badge change puts it back",
+          "status": "pending",
+          "title": "finishes a started book pickup before a later badge change puts it back",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "C map work and book sequences"
+          ],
+          "fullName": "C map work and book sequences plays the three actual new-look book sequences at adopted seats with their own source frames",
+          "status": "pending",
+          "title": "plays the three actual new-look book sequences at adopted seats with their own source frames",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "C map work and book sequences"
+          ],
+          "fullName": "C map work and book sequences retains the original no-book timing and uses each supplied book step in order",
+          "status": "pending",
+          "title": "retains the original no-book timing and uses each supplied book step in order",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "C map work and book sequences"
+          ],
+          "fullName": "C map work and book sequences puts the book away before walking and takes it out after the sender returns",
+          "status": "pending",
+          "title": "puts the book away before walking and takes it out after the sender returns",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "C map work and book sequences"
+          ],
+          "fullName": "C map work and book sequences uses explicit SW frames once and refuses a missing SW book step instead of playing SE",
+          "status": "pending",
+          "title": "uses explicit SW frames once and refuses a missing SW book step instead of playing SE",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1793098441555,
+      "endTime": 1793098442351.5505,
+      "status": "passed",
+      "message": "",
+      "name": "<clone>/tests/forest-map.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": [],
+          "fullName": "a Settings press updates an open page without a reload, keeps hostile words as text, and restores the shipped word",
+          "status": "failed",
+          "title": "a Settings press updates an open page without a reload, keeps hostile words as text, and restores the shipped word",
+          "duration": 34848.881523,
+          "failureMessages": [
+            "locator.click: Timeout 30000ms exceeded.\nCall log:\n  - waiting for locator('[data-word-table]').locator('[data-word-key=\"g6c.pixel.office.turnedOff\"]').getByRole('button', { name: 'Use shipped word', exact: true })\n    - locator resolved to <button type=\"button\" class=\"px-btn\" data-size=\"md\" aria-disabled=\"true\" data-variant=\"secondary\">Use shipped word</button>\n  - attempting click action\n    2 \u00d7 waiting for element to be visible, enabled and stable\n      - element is not enabled\n    - retrying click action\n    - waiting 20ms\n    2 \u00d7 waiting for element to be visible, enabled and stable\n      - element is not enabled\n    - retrying click action\n      - waiting 100ms\n    58 \u00d7 waiting for element to be visible, enabled and stable\n       - element is not enabled\n     - retrying click action\n       - waiting 500ms\n\n    at ~/.cache/mole-office/plumb/main-suite-poll/producer/attempt-avoqou/clone/tests/saved-page-words-reach-the-browser.test.ts:52:86\n    at ~/.cache/mole-office/plumb/main-suite-poll/producer/attempt-avoqou/clone/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
+          ],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "draws the word table beside Chinese and an edited word at four widths in both themes",
+          "status": "passed",
+          "title": "draws the word table beside Chinese and an edited word at four widths in both themes",
+          "duration": 3029.821707000003,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1793099606959,
+      "endTime": 1793099644837.8218,
+      "status": "failed",
+      "message": "",
+      "name": "<clone>/tests/saved-page-words-reach-the-browser.test.ts"
+    }
+  ]
+}

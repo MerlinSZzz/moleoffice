@@ -1,0 +1,9 @@
+{
+  "why": "A signature holds each chosen item for its named agent for at most 24 hours; both ledgers name the signed item.",
+  "columnsAddedAfterTheRebuild": {
+    "signing_package_items": ["carried_out", "carried_out_by", "carried_out_in"],
+    "signing_packages": ["hold_ends_at", "hold_ended_at", "hold_ended_how"],
+    "changes": ["signed_item"],
+    "revisions": ["signed_item"]
+  }
+}

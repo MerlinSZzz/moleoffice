@@ -1,0 +1,14 @@
+-- EVERY MESSAGE MOVES INTO THE OFFICE'S MESSAGE CENTRE, KEEPING ITS OLD PROJECT AS THE MARK OF WHERE IT WAS SAID.
+--
+-- THIS FILE CHANGES NO TABLE AND WRITES NO ROW. The work is the data step in
+-- src/server/db/message-centre-migration.ts, which `npm run db:migrate` runs after every file here: it writes the message
+-- centre's row in the project registry, moves every message into it with its old project kept as data.writtenIn, writes
+-- one revision for each as the office, refiles the links with a message at one end, and prints what it moved by count.
+-- It deletes nothing, and a second run changes nothing.
+--
+-- WHY THE FILE EXISTS. A landing runs `npm run db:backup` and then `npm run db:migrate` only when the landed commits
+-- bring a file under drizzle/ (tools/merge-tool/land.mjs), and the dev supervisor starts a refused server again when the
+-- journal shows a new migration applied (tools/serve-dev.mjs). Without a file here, the data step would have work to do,
+-- the server would refuse to serve, and nothing would run the migration. So this file carries the one statement below,
+-- which reads and writes nothing, and the journal row drizzle writes for it.
+SELECT 1;

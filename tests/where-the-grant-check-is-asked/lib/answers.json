@@ -1,0 +1,7 @@
+{
+  "doors": [
+    "answer.keep",
+    "answer.send"
+  ],
+  "why": "Keeping and sending a report's answers use the same guard, which asks the person first and then whether the grant carries the press."
+}

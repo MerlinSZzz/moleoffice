@@ -1,0 +1,59 @@
+{
+  "why": "Shared serializer fixtures for private sign-in. The same entries are checked against actual /api/office/sandbox-logins/claude routes in coded-refusals-keep-the-server-english.test.ts, using the real doors, holder and pool with invented adapters and isolated temporary homes. The Unsupported case corrupts a holder transport response to prove protocol rejection; no holder reason is fabricated. Production native and pool adapters stay unavailable.",
+  "refusals": [
+    {
+      "code": "privateLoginUnavailable",
+      "status": 503,
+      "english": "Private sign-in is unavailable until its host prerequisites are verified.",
+      "values": {}
+    },
+    {
+      "code": "privateLoginBusy",
+      "status": 409,
+      "english": "A sign-in is already in progress.",
+      "values": {}
+    },
+    {
+      "code": "privateLoginUnsupported",
+      "status": 409,
+      "english": "This executable’s sign-in output is unsupported.",
+      "values": {}
+    },
+    {
+      "code": "privateLoginExpired",
+      "status": 409,
+      "english": "This sign-in has expired.",
+      "values": {}
+    },
+    {
+      "code": "privateLoginBinding",
+      "status": 409,
+      "english": "This request belongs to another or an ended sign-in.",
+      "values": {}
+    },
+    {
+      "code": "privateLoginInputUsed",
+      "status": 409,
+      "english": "This code was already used or belongs to another sign-in.",
+      "values": {}
+    },
+    {
+      "code": "privateLoginPoolUnknown",
+      "status": 409,
+      "english": "The login could not be confirmed. Its result must be checked before another sign-in.",
+      "values": {}
+    },
+    {
+      "code": "privateLoginPerson",
+      "status": 403,
+      "english": "Only the proved person may use private sign-in. A secretary may still set or clear a login under the existing login policy.",
+      "values": {}
+    },
+    {
+      "code": "privateLoginShape",
+      "status": 400,
+      "english": "The private sign-in request is invalid.",
+      "values": {}
+    }
+  ]
+}

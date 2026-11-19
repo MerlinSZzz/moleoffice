@@ -1,0 +1,21 @@
+-- ONE INDEX, SO A FLOW'S RUNS ARE FOUND WITHOUT READING EVERY FLOW RUN.
+--
+-- Wave 13p round 33, the Flows page (decisions madeUpvzcpgr and madeUppzhlxy). GET /api/flows counts the runs of the
+-- flows on one page, and GET /api/flows/<id> reads one flow's latest runs. A flow run names its flow in `data.flow`.
+-- Before this index both read every flow run's data: 16 ms for one flow's latest 20 runs at 18,780 runs, measured on
+-- a made-up office in round 32.
+--
+--   `records_flow_run_flow_idx`   the flow a flow run names, `data.flow`, then whether it is deleted, then when it was
+--                                 filed, so a flow's live runs come newest first and are counted from the index alone.
+--
+-- IT HOLDS ONLY FLOW RUNS, so writing any other record costs nothing more, and a query uses it only when it names
+-- the kind in the same words.
+--
+-- THE FLOW IS READ ONLY FROM DATA THAT IS VALID JSON, and is null otherwise, for the reason migration 0199 gives.
+-- The reader asks the same words, from `STORED_FIELDS` in src/server/db/schema.ts.
+--
+-- The index is not unique, and it changes no row. The flow a run names stays written in one place, the flow run's
+-- own data; the index is only a way to find it.
+--
+-- ADDITIVE, AND IT REWRITES NOTHING. One CREATE INDEX statement and no UPDATE.
+CREATE INDEX IF NOT EXISTS `records_flow_run_flow_idx` ON `records` ((CASE WHEN json_valid(`data`) THEN json_extract(`data`, '$.flow') END), `deleted_at`, `created_at`) WHERE `kind` = 'flow_run';

@@ -1,0 +1,12 @@
+-- THE OFFICE WRITES needsNoCheck ON THE SECRETARY'S RUNS IT FILED BEFORE IT WROTE THAT FIELD.
+--
+-- THIS FILE CHANGES NO TABLE AND WRITES NO ROW. The work is the data step in
+-- src/server/db/secretary-runs-need-no-check.ts, which `npm run db:migrate` runs after every file here.
+--
+-- WHY THE FILE EXISTS. A landing runs `npm run db:backup` and then `npm run db:migrate` only when the
+-- landed commits bring a file under drizzle/ (tools/merge-tool/land.mjs), and the dev supervisor
+-- starts a refused server again when the journal shows a new migration applied (tools/serve-dev.mjs).
+-- Without a file here, the data step would have work to do, the server would refuse to serve, and
+-- nothing would run the migration. So this file carries the one statement below, which reads and
+-- writes nothing, and the journal row drizzle writes for it.
+SELECT 1;

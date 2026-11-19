@@ -1,0 +1,6 @@
+{
+  "why": "One partial index on the change log's create rows written as an agent, so a check finds what the run's agent filed without reading the whole log. No table, column, trigger or row changes.",
+  "indexesAddedAfterTheRebuild": {
+    "changes": ["changes_agent_create_idx"]
+  }
+}

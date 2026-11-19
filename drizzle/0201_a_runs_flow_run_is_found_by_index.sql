@@ -1,0 +1,20 @@
+-- ONE INDEX, SO A RUN'S FLOW RUN IS FOUND WITHOUT READING EVERY FLOW RUN.
+--
+-- Wave 13p round 25b, on check UD7dt6P3ISh6. `theFlowRunOf` in src/server/lib/flow-runs.ts finds the flow run
+-- whose `data.run` is the run's id. The office files one flow run for every run, so before this index the lookup
+-- read the data of every flow run ever filed: a median of 10.5 ms at 20,000 runs in
+-- tests/a-runs-flow-run-is-found-by-index.test.ts. The bootstrap read and every step append make this lookup.
+--
+--   `records_flow_run_run_idx`   the run a flow run names, `data.run`.
+--
+-- IT HOLDS ONLY FLOW RUNS, so writing any other record costs nothing more, and a query uses it only when it names
+-- the kind in the same words.
+--
+-- THE RUN IS READ ONLY FROM DATA THAT IS VALID JSON, and is null otherwise, for the reason migration 0199 gives.
+-- The reader asks the same words, from `STORED_FIELDS` in src/server/db/schema.ts.
+--
+-- The index is not unique, and it changes no row. The run a flow run names stays written in one place, the flow
+-- run's own data; the index is only a way to find it.
+--
+-- ADDITIVE, AND IT REWRITES NOTHING. One CREATE INDEX statement and no UPDATE.
+CREATE INDEX IF NOT EXISTS `records_flow_run_run_idx` ON `records` ((CASE WHEN json_valid(`data`) THEN json_extract(`data`, '$.run') END)) WHERE `kind` = 'flow_run';

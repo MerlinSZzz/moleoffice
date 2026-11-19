@@ -1,0 +1,14 @@
+{
+  "name": "office-map-plugin",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "ownership": "node tools/write-ownership.mjs",
+    "preview:test": "node --import ../../tools/live-office-guard-preload.mjs tests/browser-fixture.mjs",
+    "typecheck": "tsc --noEmit --project tsconfig.json",
+    "test": "node --import ../../tools/live-office-guard-preload.mjs ../../node_modules/vitest/vitest.mjs run --config vitest.config.ts",
+    "build": "node tools/build.mjs",
+    "check": "node ../../tools/check-a-plugin.mjs office-map --json"
+  }
+}

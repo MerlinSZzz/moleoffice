@@ -1,0 +1,14 @@
+-- A NEW NAME ANSWERED UNDER THE PERSON'S RAISE KEEPS THE GRANT. Wave 13s round 195, item 43.
+--
+-- A raised secretary holds the person's acts but three: closing the key window, changing the regulations and changing
+-- who the owner is. Answering an agent's new name is not one of them, so a secretary the
+-- person has raised may approve or refuse a new name that waits for the person, by its own key. It still never answers
+-- its own new name. Every act under a raise is recorded as done under it, so the rename row keeps the grant beside the
+-- secretary that answered.
+--
+-- `answered_under_grant` is the id of the grant the secretary answered under. It is NULL for the person's answer, for an
+-- approver's answer in its own right, for a new name that still waits, and for every row written before this
+-- migration, when no raise could answer one.
+--
+-- ADDITIVE, AND IT REWRITES NOTHING. One ALTER TABLE ADD COLUMN and no UPDATE.
+ALTER TABLE `agent_renames` ADD COLUMN `answered_under_grant` text;

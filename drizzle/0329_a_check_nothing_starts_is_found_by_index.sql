@@ -1,0 +1,21 @@
+-- THE RUNS WHOSE STARTER IS DUE TO HEAR THAT NOTHING WOULD START THEIR CHECK ARE FOUND WITHOUT READING EVERY RUN. Wave 13n
+-- round DP.
+--
+-- When the office queues a check that nothing in the office would start, the run keeps a mark, `aCheckNothingStarts`,
+-- with the time its starter is told, `tellAfterMs`. On every minute pass, `tellTheStartersOfChecksNothingStarts` in
+-- src/server/lib/a-check-nothing-starts.ts asks for the runs whose time has come and whose mark is neither told
+-- (`told`) nor let go (`notTold`). Without an index that read would read every run and each one's data, every minute.
+--
+--   records_session_check_nothing_starts_idx  runs whose mark waits, by the time their starter is told.
+--
+-- A query uses it only by asking the field in these same words, written out and not as a bound value. src/server/db/schema.ts
+-- holds them once as `STORED_FIELDS.sessionTellsOfACheckNothingStartsAfter`. The reader also says `kind = 'session'` and that
+-- the field `IS NOT NULL`, the two terms of the index's WHERE. A mark that is told or let go leaves the index, so the
+-- index holds only the marks still waiting, and a pass with none due reads no run.
+--
+-- THE FIELD IS READ ONLY FROM DATA THAT IS VALID JSON, and is null otherwise, for the reason migration 0199 gives.
+--
+-- The index is not unique, and it changes no row. No run holds the mark before this round, so the index starts empty.
+--
+-- ADDITIVE, AND IT REWRITES NOTHING. One CREATE INDEX statement and no UPDATE.
+CREATE INDEX IF NOT EXISTS `records_session_check_nothing_starts_idx` ON `records` ((CASE WHEN json_valid(`data`) THEN CASE WHEN json_type(`data`, '$.aCheckNothingStarts.told') IS NULL AND json_type(`data`, '$.aCheckNothingStarts.notTold') IS NULL THEN json_extract(`data`, '$.aCheckNothingStarts.tellAfterMs') END END)) WHERE `kind` = 'session' AND (CASE WHEN json_valid(`data`) THEN CASE WHEN json_type(`data`, '$.aCheckNothingStarts.told') IS NULL AND json_type(`data`, '$.aCheckNothingStarts.notTold') IS NULL THEN json_extract(`data`, '$.aCheckNothingStarts.tellAfterMs') END END) IS NOT NULL;

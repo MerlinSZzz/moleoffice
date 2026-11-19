@@ -1,0 +1,10 @@
+{
+  "doors": [
+    "office.read-summonses",
+    "office.mail-tool",
+    "office.install-mail-tool",
+    "office.take-back-mail-tool-key",
+    "office.disable-mail-tool"
+  ],
+  "why": "The summons read and the four mail-tool doors ask whether a raise carries the press, after the person and the mail tool's own key and before the old refusal."
+}

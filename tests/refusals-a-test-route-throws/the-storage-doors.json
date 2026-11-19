@@ -1,0 +1,95 @@
+{
+  "why": "Made-up routes test the shared serializer for the storage refusals. Their real doors are met in tests/storage-inventory.test.ts (the installation totals), tests/storage-destinations.test.ts (the destination doors' refusals for an unpermitted caller, invalid fields, an unsafe host secrets file, and one code for every check of the file), tests/storage-destinations-in-an-installed-office.test.ts (an installed bundle with no sandbox templates, where each check is refused through the real doors) and tests/storage-restore-media.test.ts (an attachment left out of a restored backup). Those tests make the host secrets file and the omissions journal they need. No door here has them.",
+  "refusals": [
+    {
+      "code": "storageTotalsForbidden",
+      "status": 403,
+      "english": "Test: only the person or a secretary may read these totals.",
+      "values": {}
+    },
+    {
+      "code": "storageDestinationInvalid",
+      "status": 400,
+      "english": "Test: the destination fields are invalid.",
+      "values": {}
+    },
+    {
+      "code": "storageDestinationForbidden",
+      "status": 403,
+      "english": "Test: this caller may not change storage destinations.",
+      "values": {}
+    },
+    {
+      "code": "storageDestinationSecretsUnsafe",
+      "status": 409,
+      "english": "Test: the host secrets file cannot be used safely.",
+      "values": {}
+    },
+    {
+      "code": "storageDestinationSecretsManyDeclared",
+      "status": 409,
+      "english": "Test: more than one sandbox template names a secrets file.",
+      "values": {}
+    },
+    {
+      "code": "storageDestinationSecretsParentIsALink",
+      "status": 409,
+      "english": "Test: a folder above the secrets file is a link.",
+      "values": {}
+    },
+    {
+      "code": "storageDestinationSecretsNoParent",
+      "status": 409,
+      "english": "Test: no folder above the secrets file exists.",
+      "values": {}
+    },
+    {
+      "code": "storageDestinationSecretsNotAPlainFile",
+      "status": 409,
+      "english": "Test: the secrets file is not a plain file with one name.",
+      "values": {}
+    },
+    {
+      "code": "storageDestinationSecretsOthersMayRead",
+      "status": 409,
+      "english": "Test: other users may read the secrets file.",
+      "values": {"mode": "644"}
+    },
+    {
+      "code": "storageDestinationSecretsAnotherOwner",
+      "status": 409,
+      "english": "Test: the secrets file belongs to another user.",
+      "values": {}
+    },
+    {
+      "code": "storageDestinationSecretsTooLarge",
+      "status": 409,
+      "english": "Test: the secrets file is larger than 1 MiB.",
+      "values": {}
+    },
+    {
+      "code": "storageDestinationSecretsChangedWhileRead",
+      "status": 409,
+      "english": "Test: the secrets file changed while it was read.",
+      "values": {}
+    },
+    {
+      "code": "storageDestinationSecretsUnreadable",
+      "status": 409,
+      "english": "Test: the office could not read the secrets file.",
+      "values": {"systemError": "EACCES"}
+    },
+    {
+      "code": "storageDestinationSecretsUnwritable",
+      "status": 409,
+      "english": "Test: the office could not write the secrets file.",
+      "values": {"systemError": "EACCES"}
+    },
+    {
+      "code": "storageMediaOmitted",
+      "status": 404,
+      "english": "Test: this attachment was left out of the backup.",
+      "values": {}
+    }
+  ]
+}

@@ -1,0 +1,47 @@
+{
+  "why": "The terminal holder's restart press refuses in these words (wave 13u round 23). Each needs a terminal holder running, stopping or failing to start, so no door here can meet them. tests/the-terminal-holder-restarts-from-settings.test.ts meets the request's shape, a changed list, a holder that is not running and a full restart through the door, with a holder and a scratch server of its own. tests/a-holder-restart-that-ends-without-a-new-holder.test.ts meets the three that end a restart after the signal: a holder that still runs, a new holder that is turned off, and a new holder that does not answer in time.",
+  "refusals": [
+    {
+      "code": "terminalHolderRestartBadBody",
+      "status": 400,
+      "english": "Test: the restart was not asked in the form the door reads.",
+      "values": {}
+    },
+    {
+      "code": "terminalHolderRestartNoHolder",
+      "status": 409,
+      "english": "Test: no terminal holder the office can use is running.",
+      "values": {}
+    },
+    {
+      "code": "terminalHolderRestartChanged",
+      "status": 409,
+      "english": "Test: the holder or its terminals changed since the list was shown.",
+      "values": {}
+    },
+    {
+      "code": "terminalHolderRestartNotSignalled",
+      "status": 409,
+      "english": "Test: the holder was not asked to stop.",
+      "values": {}
+    },
+    {
+      "code": "terminalHolderRestartStillRuns",
+      "status": 504,
+      "english": "Test: the holder still runs after it was asked to stop.",
+      "values": {}
+    },
+    {
+      "code": "terminalHolderRestartNotStarted",
+      "status": 502,
+      "english": "Test: the old holder stopped and a new one did not start.",
+      "values": {}
+    },
+    {
+      "code": "terminalHolderRestartNoAnswer",
+      "status": 504,
+      "english": "Test: the new holder did not answer in time.",
+      "values": {}
+    }
+  ]
+}

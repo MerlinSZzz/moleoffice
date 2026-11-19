@@ -1,0 +1,17 @@
+-- A CLAIM RECORDS WHICH MACHINE TOOK THE RUN.
+--
+-- Criterion P23 of design/permissions/ACCEPTANCE.md: a person is one
+-- identity from every machine and the machine is recorded beside them — "the owner, from another
+-- machine".
+--
+-- Criterion P21 lets a worker on another machine claim a run, and from that moment "who took it"
+-- and "where it was taken" are two questions. `claimed_by` answers the first and answered both
+-- while there was only one machine. This column answers the second.
+--
+-- IT IS MEASURED AND NEVER SENT IN. `writtenFrom` reads it off the socket that carried the claim,
+-- and the claim body has no field for it: a worker naming its own machine would be a worker able to
+-- name somebody else's. NULL after a claim means nobody could tell, which is a real answer and the
+-- one every existing claimed row will read as.
+--
+-- ADDITIVE, AND IT REWRITES NOTHING. One ALTER TABLE ADD COLUMN and no UPDATE.
+ALTER TABLE `agent_runs` ADD `claimed_from_machine` text;

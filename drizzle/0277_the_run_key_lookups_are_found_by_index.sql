@@ -1,0 +1,34 @@
+-- THREE INDEXES, SO THE RUN-KEY LOOKUPS FIND THEIR ROW WITHOUT READING A WHOLE TABLE.
+--
+-- Since a write's session header was bound to its key, every keyed write asks which run its key is bound to.
+-- `theOriginalMintOf` and `theReopenBindingOf` in src/server/lib/keys.ts each look for the first revision that
+-- names the key, and SQLite read the whole revisions table to find it. A key that no binding names, such as an
+-- agent's own key, found no row and so read all of it twice. On 19 October 2026 the live office's revisions table
+-- held 247,216 rows and 1.24 GB of data, and from 16:00 the office answered nobody for about a quarter of every hour.
+-- `whatTheKeyWithThisIdIsFor`, `aFinishedRunsOwnKey` and `undoEmbassyKeyRevocation` in the same file read every
+-- session record to find the one that names a key.
+--
+--   revisions_run_key_id_idx        every revision, by the run key its data names. The two binding lookups.
+--   records_session_run_key_id_idx  session records only, by the run key their data names. The three session lookups.
+--   revisions_first_agent_run_idx   first revisions only, by the dispatched run their data names. For the lookup of
+--                                   the newest session filed for a dispatched run, which a later change adds.
+--
+-- A query uses one of these only by asking in the same words, which src/server/db/schema.ts holds once as
+-- `STORED_FIELDS.runKeyId` and `STORED_FIELDS.agentRun`. A query uses the two partial ones only when it names
+-- `kind = 'session'` or `seq = 1` with the literal value, not a parameter.
+--
+-- THE FIELD IS READ PLAINLY, not only from data that is valid JSON as the indexes of migration 0199 read theirs.
+-- That keeps the lookups' own words, so they answer what they answered before by construction. The cost: SQLite
+-- now refuses to write a revision, or a session record, whose data SQLite cannot read as JSON, and this migration
+-- stops on the first row SQLite cannot read, if one is already there. SQLite does read JSON5, such as {a:1}, and
+-- json_valid, which the count below used, is stricter. A read-only count of the live database on 19 October 2026
+-- at 18:42 found that 0 of 247,463 revisions and 0 session records had data that json_valid calls not JSON.
+--
+-- The indexes are not unique, and they change no row.
+--
+-- ADDITIVE, AND IT REWRITES NOTHING. Three CREATE INDEX statements and no UPDATE.
+CREATE INDEX IF NOT EXISTS `revisions_run_key_id_idx` ON `revisions` (json_extract(`data`, '$.extra.runKeyId'));
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS `records_session_run_key_id_idx` ON `records` (json_extract(`data`, '$.extra.runKeyId')) WHERE `kind` = 'session';
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS `revisions_first_agent_run_idx` ON `revisions` (json_extract(`data`, '$.extra.agentRun')) WHERE `seq` = 1;

@@ -1,0 +1,11 @@
+-- THE SECRETARY WHO TAKES THE DEAD LETTERS IS ONE SETTING, chosen by the person on the Settings page.
+--
+-- IT IS A COLUMN ON `installation`, for the same reason as 0175 and 0187: it is one fact about the
+-- office. It holds the registry id of one agent.
+--
+-- NULL MEANS NOBODY HAS NAMED ONE. The dead-letter sweep then delivers its line to nobody and keeps a
+-- letter from the person waiting. The reader in src/server/lib/dead-letter-secretary.ts checks, each
+-- time it reads, that the agent is registered, not retired, and holds the dead-letter act.
+--
+-- ADDITIVE, AND IT REWRITES NOTHING. One ALTER TABLE ADD COLUMN and no UPDATE.
+ALTER TABLE `installation` ADD COLUMN `dead_letter_secretary` text;

@@ -1,0 +1,18 @@
+-- WHICH KEYBOARD SHORTCUTS ARE ON, for one person.
+--
+-- The eight questions of the shortcut proposal
+-- are each answered as its recommendation says. Question 3: single-letter keys are on by default,
+-- with one switch that turns them all off. Question 7: each key can be turned on or off now.
+--
+-- ONE JSON COLUMN ON `people`, BESIDE `send_key`. It holds one fact about one person, "which of my
+-- shortcuts are on", and the fact has two parts: the one switch for every single-letter key, and
+-- the list of keys turned off one by one. A column per key would add a migration for every key
+-- added later; a table of its own would be a place for any future setting to go, which is the sixth
+-- rule of CLAUDE.md.
+--
+-- WHAT IT HOLDS is {"singleKeys": true or false, "off": [names of shortcuts]}. The door reads every
+-- value with `readShortcutSettings` in `src/shared/participants.ts` and refuses anything else with a
+-- 400, before it writes; there is no CHECK here, for the reason `send_key` gives in 0188.
+--
+-- NULL MEANS NOBODY HAS CHOSEN, and it is read as every shortcut on.
+ALTER TABLE `people` ADD `shortcuts` text;

@@ -1,0 +1,35 @@
+# Wave 13q round 24: the plans pages, the frame (App.tsx, the sidebar and the components only App.tsx draws), the
+# chat and the Embassy. OwnerGate.tsx and owner.ts are wave 13j's, in wave-13j.txt.
+# One path per line, relative to the checkout; # starts a comment. The neutral-words gate
+# (tests/the-owners-project-is-not-in-the-source.test.ts) reads every string each file ships.
+# Moved here from the list NEUTRAL_SOURCES in the gate's test file by wave 13r round 7.
+
+src/web/pages/PlanPage.tsx
+src/web/pages/plans/PlansPage.tsx
+src/web/pages/plans/OnePlanPage.tsx
+src/web/pages/plans/PlanWriting.tsx
+src/web/components/Planning.tsx
+src/web/components/plans/PlanProgress.tsx
+src/web/components/plans/PlanReview.tsx
+src/web/components/plans/PlanTable.tsx
+src/web/components/plans/PlanUndo.tsx
+src/web/components/plans/PlanWords.ts
+src/web/components/plans/planitems.tsx
+src/web/App.tsx
+src/web/components/Sidebar.tsx
+src/web/components/BehindTheCheckout.tsx
+src/web/components/Forced.tsx
+src/web/components/HomeMoved.tsx
+src/web/components/ReReadStrip.tsx
+src/web/components/ShortcutKeysMount.tsx
+src/web/components/VisitingStrip.tsx
+src/web/components/WrongWorld.tsx
+src/web/components/agent/AgentSaidHere.tsx
+src/web/components/Chat.tsx
+src/web/pages/ChatPage.tsx
+src/web/components/ChatCircle.tsx
+src/web/components/chat/Quotes.tsx
+src/web/lib/chatdeltas.ts
+src/web/pages/EmbassyPage.tsx
+src/web/pages/CredentialPage.tsx
+src/web/components/ResidentMark.tsx

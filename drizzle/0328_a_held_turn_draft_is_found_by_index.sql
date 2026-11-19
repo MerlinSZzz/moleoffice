@@ -1,0 +1,22 @@
+-- A TURN DRAFT HELD NOW IS FOUND BY THE AGENT IT IS HELD FOR, WITHOUT READING EVERY DRAFT. Wave 13r round BV.
+--
+-- An agent's run holds what it writes to one set of readers in one turn as a turn draft, and Mole Office sends it at
+-- the turn's end (src/server/lib/turn-drafts.ts). A sent draft is kept, so the drafts grow by about one for each set of
+-- readers in each turn. Five reads ask for the drafts held now: the conversation with an agent, for the chat's
+-- Replying, on every read; a run's own inbox read; a turn's end; a run's finish or seal; and each pass of the
+-- reminders. No index of the table held a draft's fields, so SQLite read every draft through `records_kind_idx` and
+-- the data of each.
+--
+--   records_held_turn_draft_agent_idx  the drafts held now, by the agent they are held for.
+--
+-- The field is `STORED_FIELDS.heldTurnDraftAgentId` in src/server/db/schema.ts: `data.turn.agent.id` while the draft
+-- has no `sentAs` and no `turn.notSent`, read only from valid JSON. The index holds drafts only, and only those whose
+-- field is not null, so a sent draft leaves it when it is marked sent.
+--
+-- MEASURED on a made-up table of drafts, in memory, one in 200 of them held: the read took 0.9 ms a call at 1,000
+-- drafts, 11.7 ms at 10,000 and 59.0 ms at 50,000 before, and 0.001 ms at each size with the index.
+--
+-- The index is not unique, and it changes no row.
+--
+-- ADDITIVE, AND IT REWRITES NOTHING. One CREATE INDEX statement and no UPDATE.
+CREATE INDEX IF NOT EXISTS `records_held_turn_draft_agent_idx` ON `records` ((CASE WHEN json_valid(`data`) THEN (CASE WHEN json_extract(`data`, '$.sentAs') IS NULL AND json_extract(`data`, '$.turn.notSent') IS NULL THEN json_extract(`data`, '$.turn.agent.id') END) END)) WHERE `kind` = 'draft' AND (CASE WHEN json_valid(`data`) THEN (CASE WHEN json_extract(`data`, '$.sentAs') IS NULL AND json_extract(`data`, '$.turn.notSent') IS NULL THEN json_extract(`data`, '$.turn.agent.id') END) END) IS NOT NULL;

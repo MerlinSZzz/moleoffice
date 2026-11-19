@@ -1,0 +1,82 @@
+{
+  "changes": [
+    {
+      "op": "update",
+      "field": "data.state",
+      "oldValue": "running",
+      "newValue": "crashed",
+      "at": "2026-10-25 08:58:17",
+      "appendOrder": 559112
+    },
+    {
+      "op": "delete",
+      "field": "resource.container",
+      "oldValue": "mole-office-sandbox-inspector-inspector — Sandbox inspector-inspector, from the template mole-office-dev; its folder is ~/.cache/mole-office/sandboxes/inspector-inspector. Started by node tools/sandbox.mjs up; stop it with node tools/sandbox.mjs down inspector-inspector, which releases this row.",
+      "newValue": "released: Stopped container mole-office-sandbox-inspector-inspector (vsc-inspector-inspector-<a key, not shown>). [node tools/sandbox.mjs down inspector-inspector, by inspector in session HzGAjPq7GYvP (--force); confirmed: Stop container mole-office-sandbox-inspector-inspector (vsc-inspector-inspector-<a key, not shown>, id 881d706a7961), ending everything inside it and nothing else on this host.; forced while the session was still running]",
+      "at": "2026-10-25 08:58:17",
+      "appendOrder": 559111
+    },
+    {
+      "op": "delete",
+      "field": "resource.process",
+      "oldValue": "1853259 — Host group controlling check HzGAjPq7GYvP in mole-office-checkview-hzgajpq7gyvp-529d5154c506917b: sh /inputs/commands/checkout.sh — pid 14 inside container mole-office-checkview-hzgajpq7gyvp-529d5154c506917b (85ebbad601d1), which is pid 1853259 on this machine — sh -c IFS= read -r go; [ \"$go\" = go ] || exit 111; exec \"$@\" check-view-gate sh /inputs/commands/checkout.sh",
+      "newValue": "released: Nothing was signalled: Nothing is running as pid 1853259. The row was closed by the session that registered it. [Check view command ended with exit 0.; closed after the process was found gone; forced while the session was still running]",
+      "at": "2026-10-25 08:58:14",
+      "appendOrder": 559110
+    },
+    {
+      "op": "delete",
+      "field": "resource.container",
+      "oldValue": "mole-office-checkview-hzgajpq7gyvp-529d5154c506917b — Private container view for check HzGAjPq7GYvP in inspector-inspector; releasing this row stops it.",
+      "newValue": "released: Nothing was signalled: No running container is called \"mole-office-checkview-hzgajpq7gyvp-529d5154c506917b\". The row was closed by the session that registered it. [Check view command ended with exit 0.; closed after the process was found gone; forced while the session was still running]",
+      "at": "2026-10-25 08:58:14",
+      "appendOrder": 559109
+    },
+    {
+      "op": "create",
+      "field": "resource.process",
+      "oldValue": null,
+      "newValue": "1853259 — Host group controlling check HzGAjPq7GYvP in mole-office-checkview-hzgajpq7gyvp-529d5154c506917b: sh /inputs/commands/checkout.sh — pid 14 inside container mole-office-checkview-hzgajpq7gyvp-529d5154c506917b (85ebbad601d1), which is pid 1853259 on this machine — sh -c IFS= read -r go; [ \"$go\" = go ] || exit 111; exec \"$@\" check-view-gate sh /inputs/commands/checkout.sh",
+      "at": "2026-10-25 08:58:13",
+      "appendOrder": 559108
+    },
+    {
+      "op": "create",
+      "field": "resource.container",
+      "oldValue": null,
+      "newValue": "mole-office-checkview-hzgajpq7gyvp-529d5154c506917b — Private container view for check HzGAjPq7GYvP in inspector-inspector; releasing this row stops it.",
+      "at": "2026-10-25 08:58:12",
+      "appendOrder": 559107
+    },
+    {
+      "op": "create",
+      "field": "resource.container",
+      "oldValue": null,
+      "newValue": "mole-office-sandbox-inspector-inspector — Sandbox inspector-inspector, from the template mole-office-dev; its folder is ~/.cache/mole-office/sandboxes/inspector-inspector. Started by node tools/sandbox.mjs up; stop it with node tools/sandbox.mjs down inspector-inspector, which releases this row.",
+      "at": "2026-10-25 08:58:00",
+      "appendOrder": 559106
+    },
+    {
+      "op": "update",
+      "field": "data.shortForms",
+      "oldValue": null,
+      "newValue": "{\"label\":{\"text\":\"Run of inspector\",\"madeFrom\":{\"seq\":1,\"contentHash\":\"884d34e42f6750c1\"},\"writtenBy\":\"agent\"}}",
+      "at": "2026-10-25 08:57:57",
+      "appendOrder": 559105
+    },
+    {
+      "op": "create",
+      "field": null,
+      "oldValue": null,
+      "newValue": "Check of w13u-rd85 (run v-R2dt5K6UgW)",
+      "at": "2026-10-25 08:57:57",
+      "appendOrder": 559102
+    }
+  ],
+  "changesCarried": {
+    "carried": 9,
+    "total": 9,
+    "budgetBytes": 262144,
+    "next": null
+  }
+}

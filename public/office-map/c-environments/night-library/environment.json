@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "scene": "night-library",
+  "stations": {
+    "worker": "worker-desk",
+    "secretary": "secretary-desk"
+  },
+  "decorations": {
+    "ground": [],
+    "backdrop": [
+      "night-library-bookcase"
+    ],
+    "boundary": [
+      "night-library-moon-window"
+    ]
+  },
+  "furniture": {
+    "single": [
+      "shared-single-desk",
+      "shared-octagonal-desk"
+    ],
+    "shared": [
+      "shared-three-seat-desk"
+    ]
+  }
+}

@@ -1,0 +1,460 @@
+{
+  "version": 1,
+  "sprites": {
+    "desk-worker": {
+      "src": "/office-map/c-forest/props/desk-worker.png",
+      "width": 180,
+      "height": 91,
+      "anchor": {
+        "x": 90.0,
+        "y": 91
+      },
+      "sha256": "0f39c7eb3675a60ecb60723b454a811fe2caa7b39448c5d70f49dc66b5ec4f13"
+    },
+    "desk-secretary": {
+      "src": "/office-map/c-forest/props/desk-secretary.png",
+      "width": 240,
+      "height": 102,
+      "anchor": {
+        "x": 120.0,
+        "y": 102
+      },
+      "sha256": "2bc02788da9b390d8fd288de633607c459c0769baea8c87fce57d6b5acf5e8c2"
+    },
+    "chair": {
+      "src": "/office-map/c-forest/props/chair.png",
+      "width": 72,
+      "height": 96,
+      "anchor": {
+        "x": 36.0,
+        "y": 96
+      },
+      "sha256": "7e84b9770f38e1d10ca6025229541c8b642d6963a5147dd1caedfb2e200163be"
+    },
+    "stone": {
+      "src": "/office-map/c-forest/props/stone.png",
+      "width": 84,
+      "height": 51,
+      "anchor": {
+        "x": 42.0,
+        "y": 51
+      },
+      "sha256": "3a870eb3d92b44c47368d70c0a94faeea72cb862d1dce25c211b79fc682096e6"
+    },
+    "fern": {
+      "src": "/office-map/c-forest/props/fern.png",
+      "width": 84,
+      "height": 69,
+      "anchor": {
+        "x": 42.0,
+        "y": 69
+      },
+      "sha256": "528bfa7acc89b13eabb4c559334f6ec3dc28d5b2cf98f3f0dc547f291407fa01"
+    },
+    "noticeboard": {
+      "src": "/office-map/c-forest/props/noticeboard.png",
+      "width": 180,
+      "height": 104,
+      "anchor": {
+        "x": 90.0,
+        "y": 104
+      },
+      "sha256": "6523996b4eaf4ae83a29d8529222159b06bb91ea128a5eb056dde3e5f209a302"
+    },
+    "lantern": {
+      "src": "/office-map/c-forest/props/lantern.png",
+      "width": 32,
+      "height": 78,
+      "anchor": {
+        "x": 16.0,
+        "y": 78
+      },
+      "sha256": "db8bf9eeac54310c11fbfcf48d15e18dca9f4a9881aa3105c1b80fcfa2177ad9"
+    },
+    "tree-trunk": {
+      "src": "/office-map/c-forest/props/tree-trunk.png",
+      "width": 260,
+      "height": 211,
+      "anchor": {
+        "x": 130,
+        "y": 211
+      },
+      "sha256": "c0ea3411678b775f782427ba59c7eafaf385f3826daa798e13c8c0900724811b"
+    },
+    "tree-canopy": {
+      "src": "/office-map/c-forest/props/tree-canopy.png",
+      "width": 260,
+      "height": 211,
+      "anchor": {
+        "x": 130,
+        "y": 211
+      },
+      "sha256": "94c79de8b78fc519b6f9f96d3bfe04781d77dee89bd0000580f437c0f59f5158"
+    },
+    "daisies": {
+      "src": "/office-map/c-forest/props/daisies.png",
+      "width": 38,
+      "height": 28,
+      "anchor": {
+        "x": 19.0,
+        "y": 28
+      },
+      "sha256": "7f9281af332a9ebef3f2578f58d54fd81e31227025e5a037ce6434ddd68fd780"
+    },
+    "yellow-flowers": {
+      "src": "/office-map/c-forest/props/yellow-flowers.png",
+      "width": 37,
+      "height": 30,
+      "anchor": {
+        "x": 18.5,
+        "y": 30
+      },
+      "sha256": "8fbaea6affd9efac75ed620525fbdd2dd34900f23d7c8b984e35e40a9d17ac5d"
+    },
+    "ground-fern": {
+      "src": "/office-map/c-forest/props/ground-fern.png",
+      "width": 51,
+      "height": 34,
+      "anchor": {
+        "x": 25.5,
+        "y": 34
+      },
+      "sha256": "379dcf68db477f7017fe7dec801a2c8e80cd9f657ddfffd336bafc68430a4eda"
+    },
+    "grass-tuft": {
+      "src": "/office-map/c-forest/props/grass-tuft.png",
+      "width": 45,
+      "height": 26,
+      "anchor": {
+        "x": 22.5,
+        "y": 26
+      },
+      "sha256": "4676c258b07ef35faf7cdf994083a643953c134f6157eda436d42a2da33cf188"
+    }
+  },
+  "props": {
+    "worker-desk": {
+      "defaultScale": 1,
+      "blocking": true,
+      "footprint": {
+        "x": -81,
+        "y": -32,
+        "width": 162,
+        "height": 32
+      },
+      "footprintBasis": "authored lower visible base rectangle",
+      "layers": [
+        {
+          "sprite": "desk-worker",
+          "role": "front"
+        }
+      ],
+      "stations": {
+        "bare": {
+          "actorContact": {
+            "x": 22.5,
+            "y": -25
+          },
+          "propContact": {
+            "x": 22.5,
+            "y": -79
+          },
+          "actorFoot": {
+            "x": 0,
+            "y": -54
+          },
+          "stoolProp": "bare-stool",
+          "foregroundAfter": "front",
+          "contactBasis": "held book lower green cover edge aligned to a clear rear tabletop point; source tabletop row 12"
+        },
+        "scarf": {
+          "actorContact": {
+            "x": 32.0,
+            "y": -21
+          },
+          "propContact": {
+            "x": 32.0,
+            "y": -79
+          },
+          "actorFoot": {
+            "x": 0,
+            "y": -58
+          },
+          "stoolProp": "scarf-stool",
+          "foregroundAfter": "front",
+          "contactBasis": "held book lower green cover edge aligned to a clear rear tabletop point; source tabletop row 12"
+        }
+      }
+    },
+    "secretary-desk": {
+      "defaultScale": 1,
+      "blocking": true,
+      "footprint": {
+        "x": -112,
+        "y": -36,
+        "width": 223,
+        "height": 36
+      },
+      "footprintBasis": "authored lower visible base rectangle",
+      "layers": [
+        {
+          "sprite": "desk-secretary",
+          "role": "front"
+        }
+      ],
+      "stations": {
+        "bare": {
+          "actorContact": {
+            "x": 22.5,
+            "y": -25
+          },
+          "propContact": {
+            "x": 22.5,
+            "y": -70
+          },
+          "actorFoot": {
+            "x": 0,
+            "y": -45
+          },
+          "stoolProp": "bare-stool",
+          "foregroundAfter": "front",
+          "contactBasis": "held book lower green cover edge aligned to a clear rear tabletop point; source tabletop row 32"
+        },
+        "scarf": {
+          "actorContact": {
+            "x": 32.0,
+            "y": -21
+          },
+          "propContact": {
+            "x": 32.0,
+            "y": -70
+          },
+          "actorFoot": {
+            "x": 0,
+            "y": -49
+          },
+          "stoolProp": "scarf-stool",
+          "foregroundAfter": "front",
+          "contactBasis": "held book lower green cover edge aligned to a clear rear tabletop point; source tabletop row 32"
+        }
+      }
+    },
+    "wood-chair": {
+      "defaultScale": 1,
+      "blocking": true,
+      "footprint": {
+        "x": -34,
+        "y": -20,
+        "width": 68,
+        "height": 20
+      },
+      "footprintBasis": "authored lower visible base rectangle",
+      "layers": [
+        {
+          "sprite": "chair",
+          "role": "front"
+        }
+      ]
+    },
+    "stone": {
+      "defaultScale": 1,
+      "blocking": true,
+      "footprint": {
+        "x": -42,
+        "y": -18,
+        "width": 84,
+        "height": 18
+      },
+      "footprintBasis": "authored lower visible base rectangle",
+      "layers": [
+        {
+          "sprite": "stone",
+          "role": "front"
+        }
+      ]
+    },
+    "potted-fern": {
+      "defaultScale": 1,
+      "blocking": false,
+      "footprint": {
+        "x": -19,
+        "y": -14,
+        "width": 35,
+        "height": 14
+      },
+      "footprintBasis": "authored lower visible base rectangle",
+      "layers": [
+        {
+          "sprite": "fern",
+          "role": "front"
+        }
+      ]
+    },
+    "noticeboard": {
+      "defaultScale": 1,
+      "blocking": true,
+      "footprint": {
+        "x": -90,
+        "y": -18,
+        "width": 180,
+        "height": 18
+      },
+      "footprintBasis": "authored lower visible base rectangle",
+      "layers": [
+        {
+          "sprite": "noticeboard",
+          "role": "front"
+        }
+      ]
+    },
+    "lantern": {
+      "defaultScale": 1,
+      "blocking": false,
+      "footprint": {
+        "x": -7,
+        "y": -8,
+        "width": 16,
+        "height": 8
+      },
+      "footprintBasis": "authored lower visible base rectangle",
+      "layers": [
+        {
+          "sprite": "lantern",
+          "role": "front"
+        }
+      ]
+    },
+    "bare-stool": {
+      "defaultScale": 1,
+      "blocking": true,
+      "footprint": {
+        "x": -48,
+        "y": -6,
+        "width": 31,
+        "height": 3
+      },
+      "footprintBasis": "visible stool feet in the bottom ten image rows",
+      "layers": [
+        {
+          "sprite": "mole-bare-stool",
+          "role": "back"
+        }
+      ]
+    },
+    "scarf-stool": {
+      "defaultScale": 1,
+      "blocking": true,
+      "footprint": {
+        "x": -56,
+        "y": -6,
+        "width": 46,
+        "height": 6
+      },
+      "footprintBasis": "visible stool feet in the bottom ten image rows",
+      "layers": [
+        {
+          "sprite": "mole-scarf-stool",
+          "role": "back"
+        }
+      ]
+    },
+    "tree": {
+      "defaultScale": 1,
+      "blocking": true,
+      "footprint": {
+        "x": -44,
+        "y": -30,
+        "width": 92,
+        "height": 30
+      },
+      "footprintBasis": "visible brown root base within bottom thirty image rows",
+      "layers": [
+        {
+          "sprite": "tree-trunk",
+          "role": "back"
+        },
+        {
+          "sprite": "tree-canopy",
+          "role": "front"
+        }
+      ]
+    },
+    "daisies": {
+      "defaultScale": 1,
+      "blocking": false,
+      "footprint": {
+        "x": -19,
+        "y": -4,
+        "width": 37,
+        "height": 4
+      },
+      "footprintBasis": "visible lower plant base; decoration does not block movement",
+      "layers": [
+        {
+          "sprite": "daisies",
+          "role": "front"
+        }
+      ]
+    },
+    "yellow-flowers": {
+      "defaultScale": 1,
+      "blocking": false,
+      "footprint": {
+        "x": -18,
+        "y": -4,
+        "width": 36,
+        "height": 4
+      },
+      "footprintBasis": "visible lower plant base; decoration does not block movement",
+      "layers": [
+        {
+          "sprite": "yellow-flowers",
+          "role": "front"
+        }
+      ]
+    },
+    "ground-fern": {
+      "defaultScale": 1,
+      "blocking": false,
+      "footprint": {
+        "x": -20,
+        "y": -4,
+        "width": 45,
+        "height": 4
+      },
+      "footprintBasis": "visible lower plant base; decoration does not block movement",
+      "layers": [
+        {
+          "sprite": "ground-fern",
+          "role": "front"
+        }
+      ]
+    },
+    "grass-tuft": {
+      "defaultScale": 1,
+      "blocking": false,
+      "footprint": {
+        "x": -18,
+        "y": -4,
+        "width": 39,
+        "height": 4
+      },
+      "footprintBasis": "visible lower plant base; decoration does not block movement",
+      "layers": [
+        {
+          "sprite": "grass-tuft",
+          "role": "front"
+        }
+      ]
+    }
+  },
+  "provenance": {
+    "reusedSource": "Accepted C demo props, excluding the large floor image.",
+    "tree": "Exact disjoint partition: largest connected brown trunk plus adjacent dark outlines; remaining pixels form canopy. Parts recombine to original opaque pixels and alpha. Hidden trunk is not reconstructed.",
+    "plants": "Built-in imagegen; explicit magenta extraction, largest component, nearest resize and32-color quantization. Dark purple edge remnants were measured and removed with a broader plant-only hue threshold.",
+    "footprints": "Authored collision rectangles in logical pixels relative to each sprite foot anchor. Visual lower-base bounds guide the rectangles; canopy is not a collision box.",
+    "stationState": "initial held-book contact offsets; requires integrated visual check",
+    "treeOpaqueReconstructionEqual": true,
+    "treeAlphaReconstructionEqual": true
+  }
+}
