@@ -4,6 +4,7 @@
 
 <p align="center"><strong>你的智能体是临时的，你的工作不是。</strong></p>
 <p align="center">一间为人和智能体准备的、长期存在的项目 Office。</p>
+<p align="center">官网：<a href="https://moleoffice.com">moleoffice.com</a></p>
 
 <p align="center"><a href="../README.md">English</a> · <strong>中文</strong></p>
 
@@ -72,9 +73,16 @@ Mole Office 保持两层。你的**档案**——报告、代码、数据——�
 
 ## 安装
 
-> **预发布：** 还没有发布 npm 包。
+Linux、Windows 和 Mac 的安装包都在 [Releases 页面](../../../releases)上。
 
-请使用下面的仓库开发方式，包括链接 skill。
+装好以后，再做两步，你的智能体就能找到 Mole Office：
+
+1. 打开**设置**，在**普通或开发者**里选**开发者**。
+2. 在**每个会话的入口**下，点**放置入口**。
+
+想从源码运行，就用下面[运行它](#运行它)一节的开发方式，记得链接 skill。想自己构建安装包，或者想知道哪些地方还不能用，请看 [RELEASE-NOTES.md](../RELEASE-NOTES.md)（英文）。
+
+> **预发布：** 还没有发布 npm 包。
 
 <!--
 只有在包/命令行的形态真实存在并已验证之后，才启用下面的内容。

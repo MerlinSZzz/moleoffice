@@ -14,10 +14,15 @@ Mole Office keeps your work in one data folder on your own computer. The folder 
 database, the backups Mole Office makes of it, and the files people attach. "Where your data is", below,
 names the folder on each system. The [README](README.md) says more about what Mole Office does.
 
+## Download the installers
+
+The installers for Linux, Windows and the Mac are on the [Releases page](../../releases). "Install",
+below, says how to install each one.
+
 ## Build the installers
 
-The folder these notes are in holds the source code of Mole Office. It holds no ready-made installers.
-You build the installers from the source code.
+The folder these notes are in holds the source code of Mole Office. You can also build the installers
+from it yourself.
 
 You need Node 22, at version 22.18 or later, and npm. The build loads TypeScript files, and Node 22 does
 that from 22.18 on. The Mac build refuses any Node other than Node 22.

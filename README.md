@@ -4,6 +4,7 @@
 
 <p align="center"><strong>Your agents are temporary. Your work isn't.</strong></p>
 <p align="center">A durable project office for people and agents.</p>
+<p align="center"><a href="https://moleoffice.com">moleoffice.com</a></p>
 
 <p align="center"><strong>English</strong> · <a href="./readme/README_zh.md">中文</a></p>
 
@@ -79,12 +80,18 @@ The development flow picture shows one round, from the next item to the landing 
 
 ## Installation
 
-> **Pre-release:** an npm package has not been published yet.
+The installers for Linux, Windows and the Mac are on the [Releases page](../../releases).
 
-Use the repository development setup below, including the skill link.
+After installing, do this so your agents find the office:
 
-To build the installers for Linux, Windows and the Mac yourself, and to read what does not work yet, see
+1. Open **Settings**, and choose **Developer** under **Normal or Developer**.
+2. Under **The entry for every session**, press **Put the entry in place**.
+
+To run Mole Office from the source instead, use the development setup in [Running it](#running-it),
+with the skill link. To build the installers yourself, and to read what does not work yet, see
 [RELEASE-NOTES.md](RELEASE-NOTES.md).
+
+> **Pre-release:** an npm package has not been published yet.
 
 <!--
 ENABLE ONLY AFTER THE PACKAGE/CLI SHAPE IS REAL AND VERIFIED.
