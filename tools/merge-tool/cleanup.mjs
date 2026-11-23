@@ -35,7 +35,7 @@ export const AN_OFFICE_ANSWER_DURING_A_SUITE_MS = 30_000
 
 /**
  * THE PROCESS GROUPS THE CLEANUP NEVER SIGNALS, whatever was recorded. On 15 October 2026 a line sandbox ended with
- * exit 0 while a worker ran tests/the-merger.test.ts, which drives this cleanup. A group signal from inside that reached
+ * exit 0 while a worker ran a test of the merge tool that drove this cleanup. A group signal from inside that reached
  * the container's keep-alive is the likely cause, though it was not proven. `process.kill(-pid)` turns group 1 into
  * kill(-1), which is every process this user may signal, and 0 into the caller's own group. Group 1 is the first
  * process of the computer or of the container, and the cleanup's own group holds the cleanup. A cleanup that cannot

@@ -78,11 +78,11 @@ import {
 } from '@shared/roles.ts'
 import { isMoleOffice, moleOffice } from '@shared/participants.ts'
 import { SYSTEM_LINES, THE_OVERLAP_ENDED_PREFIX, type AnOfficeLine } from '@shared/groups.ts'
-import { createLink, theAgentIdOfATerritoryRun, theAgentOfATerritoryRun, everyAgentAStoredStampCouldName, getRecord, getRecordsWithIds, patchRecord, throughTheRetireDoor, throughTheCardDoor, whetherThisWriteFinishesTheRun, whoFiled, type RecordPatch, type TerritoryWriteCheck, type TheTerritoryRunLookups } from './records.ts'
+import { createLink, theAgentIdOfATerritoryRun, theAgentOfATerritoryRun, everyAgentAStoredStampCouldName, getRecord, getRecordsWithIds, patchRecord, throughTheCardDoor, whetherThisWriteFinishesTheRun, whoFiled, type RecordPatch, type TerritoryWriteCheck, type TheTerritoryRunLookups } from './records.ts'
 import { PanelError } from './panel-error.ts'
 import { GitFailure, GitSession, Stale } from './async-take-back.ts'
 import { REMINDED_BEFORE_THE_SEAL, readRemindedBeforeTheSeal } from '@shared/before-the-seal.ts'
-import { type RegisteredAgent } from './participants.ts'
+import { retireThisAgent, whyThisActorMayNotRetire, type RegisteredAgent } from './participants.ts'
 import { agentsStartedFor } from '../db/agents-started-for.ts'
 import { repositoryRelativePaths } from './repository-relative-paths.ts'
 import { listParticipants } from '../db/list-participants.ts'
@@ -1764,7 +1764,12 @@ export function releaseAClaim(
   workspaceId: string,
   by: ParticipantRef,
   because: string,
-): ClaimOnTheWire {
+  /**
+   * The releaser as the request carried it, which the retire rule reads: the person's key and an agent's own key are
+   * on it. A caller with no request is the participant `by` names.
+   */
+  actor: Actor = actorFor(by),
+): ClaimOnTheWire & { agentsLeftLive?: AnAgentTheReleaseLeftLive[] } {
   const claim = theClaimOrARefusal(id, workspaceId)
   const mine = participantKey(claim.claimant) === participantKey(by)
   if (!mine && !theSecretaryMayEndThisClaim(claim, by)) {
@@ -1787,9 +1792,10 @@ export function releaseAClaim(
   // write path is not a rule, and this is the write path.
   // A CLAIM MAY NAME SEVERAL THINGS, so every record it named is asked about. A path is not asked:
   // an agent is started for a piece of work, and a folder is not one.
+  const agentsLeftLive: AnAgentTheReleaseLeftLive[] = []
   for (const thing of claim.things) {
     if (thing.what === 'record') {
-      retireWhateverWasStartedFor(thing.id, workspaceId)
+      agentsLeftLive.push(...retireWhateverWasStartedFor(thing.id, workspaceId, by, actor))
       // AND ANY ELEVATION GIVEN UNTIL THIS PIECE OF WORK ENDED HAS ENDED. Criterion P59's second
       // end, here for the reason the retirement is here: this is the one place a claim is released,
       // and the person picked THIS record when they pressed. Nothing is scheduled and nothing polls.
@@ -1797,7 +1803,17 @@ export function releaseAClaim(
     }
   }
   sayTheOverlapEndedIn(groups, workspaceId, actorFor(by), mine ? 'claim released' : 'secretary released it')
-  return theClaimOrARefusal(id, workspaceId)
+  const released = theClaimOrARefusal(id, workspaceId)
+  // THE LIST IS THERE ONLY WHEN THE RELEASE LEFT AN AGENT LIVE, so a release that left none answers as it always did.
+  return agentsLeftLive.length === 0 ? released : { ...released, agentsLeftLive }
+}
+
+/** An agent started for the released work that the releaser may not retire, and the retire rule's reason. */
+export interface AnAgentTheReleaseLeftLive {
+  agent: { kind: 'agent'; id: string }
+  handle: string
+  /** The retire rule's refusal, without the line saying nothing was written: the claim itself was released. */
+  why: string
 }
 
 /** The change-log actor behind a participant. A claim's caller is named as the kind it really is. */
@@ -2000,38 +2016,36 @@ export function theWorkAreaGroupsInsideOneChain(
  * said rather than "there is no end". Retiring an agent because a field was empty would end a role
  * on no evidence at all.
  *
- * IT WRITES THE RECORD AND NOT THE REGISTRY ROW. Retiring an agent is a write to its `agent` record
- * today, and `keepTheAgentRegistryInStep` follows the record to the row. Writing the row here would
- * be the second of two places that decide the same fact.
+ * THE RELEASER IS THE ONE RETIRING, AND THE CARD'S RETIRE RULE IS ASKED FOR EACH AGENT. Releasing work used to
+ * retire every agent started for it, whoever released it, so a release could retire an agent its releaser had no
+ * right to retire, such as one holding a card the person appoints. Now an agent the rule lets the releaser retire is
+ * retired, and one it does not is left live and returned with the rule's reason, so the release's answer names it.
+ * The claim is released either way.
+ * While the gate is at block no agent may retire itself, so a worker that releases its own claim is not retired by
+ * that release, and its starter retires it.
  *
- * IT IS `system` AND NOT THE PERSON RELEASING THE CLAIM. Mole Office worked this out from a rule; the
- * person released a claim and said nothing about any agent. A change row in their name would be a
- * false name in a permanent log.
+ * IT RETIRES THROUGH `retireThisAgent`, the one function every way of retiring an agent goes through. It retires the
+ * row and every agent record mapped to it, and revokes the agent's keys. Its record writes are filed under the
+ * product's own writer of agent records, not under the releaser's name, and the row says who retired it.
+ *
+ * AN AGENT WITH NO RECORD IN THIS PROJECT IS NOT ASKED, as before.
  */
-function retireWhateverWasStartedFor(recordId: string, workspaceId: string): void {
+function retireWhateverWasStartedFor(recordId: string, workspaceId: string, by: ParticipantRef, actor: Actor): AnAgentTheReleaseLeftLive[] {
+  const left: AnAgentTheReleaseLeftLive[] = []
+  const work = getRecord(recordId)
+  const because =
+    'The task it was started for was released' + (work === null ? '.' : `: "${work.title}".`) + ' What ends this role is on its card.'
   for (const agent of agentsStartedFor(recordId)) {
-    const record = recordForAgentIn(agent.id, workspaceId)
-    if (record === null) continue
-    const work = getRecord(recordId)
-    throughTheRetireDoor(() => patchRecord(
-      record,
-      {
-        dataPatch: {
-          state: 'retired',
-          retiredBecause:
-            'The task it was started for was released' +
-            (work === null ? '.' : `: "${work.title}".`) +
-            ' What ends this role is on its card.',
-        },
-      },
-      { type: 'system', id: moleOffice().id },
-    ))
+    if (recordForAgentIn(agent.id, workspaceId) === null) continue
+    const whyNot = whyThisActorMayNotRetire(agent, actor)
+    if (whyNot === null) retireThisAgent(agent.id, by, because)
+    else left.push({ agent: { kind: 'agent', id: agent.id }, handle: agent.handle, why: whyNot })
   }
-  // AND A SECRETARY RETIRED THIS WAY LEAVES THE SECRETARIAT GROUP TOO. This path retires through the
-  // agent's own record rather than through the retire door, so it calls the one reconciliation the
-  // other doors call. It makes no group: the rule makes that at a server start or at the first
-  // secretary's registration.
+  // AND A SECRETARY RETIRED THIS WAY LEAVES THE SECRETARIAT GROUP TOO. This path does not go through the retire
+  // door, so it calls the one reconciliation the other doors call. It makes no group: the rule makes that at a server
+  // start or at the first secretary's registration.
   bringTheSecretariatGroupInStep()
+  return left
 }
 
 /**

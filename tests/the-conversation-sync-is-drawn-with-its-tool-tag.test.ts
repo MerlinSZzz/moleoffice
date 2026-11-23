@@ -12,7 +12,7 @@
  *
  * WHAT IS MEASURED:
  *   1. every copy is drawn, each with its own runtime word and the state word the office read;
- *   2. with the sync off, the panel says so, and only the person is offered the press that turns it on;
+ *   2. with the sync off, the panel reads "Sync: off", and only the person is offered the press that turns it on;
  *   3. with the sync on, only the person is offered the press that copies the conversations, and a reader who is not
  *      the person still sees every copy;
  *   4. the three doors are the read, the set and the run, each at its own path, and the set sends the one boolean.
@@ -161,10 +161,10 @@ describe('the conversation sync panel', () => {
     expect(opencode, 'the OpenCode copy has no tool tag beside it').toMatch(/>opencode<\/span>/)
   })
 
-  it('2: with the sync off, says so, and offers the turn-on to the person only', () => {
+  it('2: with the sync off, reads "Sync: off", and offers the turn-on to the person only', () => {
     const off = aReply({ enabled: false, conversations: [], total: 0, reading: 0 })
     const asPerson = drawn(off, true)
-    expect(strip(asPerson)).toContain(t('conversation.sync.off'))
+    expect(strip(asPerson)).toContain(t('conversation.sync.state.off'))
     expect(buttons(asPerson)).toContain(t('conversation.sync.turnOn'))
     expect(buttons(drawn(off, false))).not.toContain(t('conversation.sync.turnOn'))
   })

@@ -93,6 +93,10 @@ export const AGENT_CSS = `
 /* THE QUOTE BAR IN THE HEAD ROW, beside ✕. It takes the row's width, and its
    look is the chat's quote block (chat/Quotes.tsx); only its place in this row is set here. */
 .px-talk-quote-holder { flex: 1 1 auto; min-width: 0; }
+/* COPY, BESIDE THE QUOTE, KEEPS ITS WORD ON ONE LINE. A press in this box may wrap its words (the rule
+   on presses below), and in this row that let Copy shrink until its word broke in two beside a quote of
+   about eight words. It does not shrink here, and the quote wraps narrower instead. */
+.px-talk-head > .px-btn { flex: none; }
 .px-talk-quote { margin: 0; }
 .px-talk-away { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; margin-top: 2px; }
 .px-talk-title { font-size: var(--fs-2); font-weight: 700; color: var(--text); }
@@ -358,6 +362,14 @@ export const AGENT_CSS = `
 /* THE NOTES SEND CAN GO INTO, drawn as the contacts are, with the line about older notes under them. */
 .px-talk-notes { display: flex; flex-direction: column; gap: 6px; }
 .px-talk-notes-left { margin: 0; font-size: var(--fs-1); color: var(--text-3); line-height: var(--lh-body); }
+/* THE NEW NOTE MARK: a plus in a circle in the accent colour before New note, and a line under New note in the list. */
+.px-talk-new-note { display: inline-flex; align-items: center; gap: 6px; min-width: 0; max-width: 100%; }
+.px-talk-note-sign {
+  flex: 0 0 auto; width: 16px; height: 16px;
+  fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+}
+.px-talk-new-note .px-talk-note-sign { color: var(--accent); }
+.px-talk-notes-new { border-bottom: var(--border-w) solid var(--border-strong); }
 .px-talk-said { margin: 0; font-size: var(--fs-2); color: var(--text); line-height: var(--lh-body); }
 /* WHO WROTE THE FORM THIS BOX IS ABOUT, AND WHEN. A note under the sentence rather than a second
    sentence: smaller and quieter, at the weight the record page gives the same phrase beside a

@@ -6,7 +6,7 @@
  * press, says who it is now and where that came from, and draws the reason given with the newest change.
  *
  *   1. the panel is in the Tools category, straight after the sandbox memory limit, and drawn in normal mode;
- *   2. with nothing set it says nobody is the watcher, says what the watcher may do, and offers Nobody and every agent;
+ *   2. with nothing set its state word is "none", and it offers None and every agent;
  *   3. a press names one: the state and the change line follow the stored value;
  *   4. the office's own step at start: the row it writes (tests/the-gpu-watcher-is-kept-in-the-office.test.ts proves the
  *      step writes exactly this row) is drawn with its reason, and the change line says the office changed it;
@@ -112,15 +112,17 @@ it('is in the Tools category straight after the sandbox memory limit, in normal 
   expect((await app.page.locator(`${ENTRY} .sf-title`).textContent())?.trim()).toBe('The GPU watcher')
 }, 120_000)
 
-it('says nobody is the watcher, says what the watcher may do, and offers Nobody and every agent', async () => {
+// Test change (as decided, the panel draws no explanation): the state is the word "none", where it was a sentence
+// saying nobody is the watcher, under a sentence saying what the watcher may do.
+it('draws none as the watcher, and offers None and every agent', async () => {
   await openThePanel()
-  // The two sentences are read from the word list. What they must say was pinned by a test
-  // deleted on 13 November 2026.
-  expect(await textOf('.gpw-what')).toBe(en['gpuWatcher.what'])
-  expect(await textOf('.gpw-state')).toBe(en['gpuWatcher.inForce.nobody'])
+  expect(await textOf('.gpw-state')).toBe(en['absence.none'])
   expect(await app.page.locator(`${PANEL} .gpw-because`).count()).toBe(0)
   expect(await textOf('.scl-line')).toBe('No change recorded.')
-  const offered = (await app.page.locator(`${PANEL} select option`).allInnerTexts()).map((one) => one.trim())
+  // THE PICKER'S ROWS, once its search box is pressed and the registries it names them from are read.
+  await app.page.locator(PANEL).getByLabel(en['gpuWatcher.pick'], { exact: true }).click()
+  await app.page.locator(`${PANEL} .agp .agp-row:not(.agp-fixed)`).first().waitFor({ timeout: 15_000 })
+  const offered = (await app.page.locator(`${PANEL} .agp .agp-row .agp-name`).allInnerTexts()).map((one) => one.trim())
   expect(offered[0]).toBe('None')
   expect(offered).toContain('Card Reader')
   expect(offered).toContain('Another Worker')
@@ -133,11 +135,12 @@ it.skipIf(!process.env['TEST_SHOTS'])('photographs the panel with nobody named',
 it('names one agent with one press, and draws back what was stored', async () => {
   await openThePanel()
   const chosen = await idOf('card-reader')
-  await app.page.locator(`${PANEL} select`).selectOption(chosen)
+  await app.page.locator(PANEL).getByLabel(en['gpuWatcher.pick'], { exact: true }).fill('card-reader')
+  await app.page.locator(`${PANEL} .agp button.agp-row[data-value="${chosen}"]`).click()
   await app.page.locator(`${PANEL} .gpw-button`).click()
   await app.page.waitForFunction(
     ({ selector, expected }) => document.querySelector(selector)?.textContent?.trim() === expected,
-    { selector: `${PANEL} .gpw-state`, expected: 'Card Reader is the GPU watcher, chosen here.' },
+    { selector: `${PANEL} .gpw-state`, expected: `Card Reader · ${en['settingsState.chosenHere']}` },
     { timeout: 15_000 },
   )
   await app.page.waitForFunction(
@@ -165,7 +168,7 @@ it('draws the reason the office gave when it set the watcher at start, and says 
     db.close()
   }
   await openThePanel()
-  expect(await textOf('.gpw-state')).toBe('Another Worker is the GPU watcher, chosen here.')
+  expect(await textOf('.gpw-state')).toBe(`Another Worker · ${en['settingsState.chosenHere']}`)
   expect(await textOf('.gpw-because')).toBe(`Reason given: ${SET_AT_START}`)
   expect(await textOf('.scl-line')).toMatch(/^Changed by Mole Office /)
 }, 120_000)

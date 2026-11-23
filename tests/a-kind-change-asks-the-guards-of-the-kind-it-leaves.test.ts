@@ -42,7 +42,7 @@
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import type { FastifyInstance } from 'fastify'
-import { apiApp, freshDb, type TestDb } from './helpers.ts'
+import { apiApp, freshDb, type TestDb, governsTheWholeProject } from './helpers.ts'
 import { THE_OWNER } from '../src/shared/kinds.ts'
 import { THE_TEST_OFFICES_OWNER } from './a-page-of-a-test-office.ts'
 
@@ -110,7 +110,8 @@ const fork = (title: string, settles?: string): Promise<string> =>
 
 /** A decision an agent may write: it says what it stands on. */
 const decision = (title: string): Promise<string> =>
-  file('decision', title, { replaces: [], because: 'The measurement is in the record.', authority: 'a measurement', decided_by: 'claude-code' })
+  file('decision', title, {
+    ...governsTheWholeProject(), replaces: [], because: 'The measurement is in the record.', authority: 'a measurement', decided_by: 'claude-code' })
 
 interface Answer {
   statusCode: number
@@ -220,7 +221,9 @@ describe('a fork the owner reserved, after it has been answered', () => {
     const answer = await file(
       'decision',
       'A module card is a boundary',
-      { replaces: [], because: 'They said so on the call.', authority: 'the owner said so', authority_reference: 'the call on 20 August', decided_by: THE_OWNER },
+      {
+        ...governsTheWholeProject(),
+        replaces: [], because: 'They said so on the call.', authority: 'the owner said so', authority_reference: 'the call on 20 August', decided_by: THE_OWNER },
       asPerson,
     )
     const settled = await app.inject({
@@ -278,7 +281,9 @@ describe('a decision, which is the one kind only the person may write', () => {
     const made = await file(
       'decision',
       'The wrist camera is recalibrated before every replay',
-      { replaces: [], because: 'They said so.', authority: 'the owner said so', authority_reference: 'the call on 20 August', decided_by: THE_OWNER },
+      {
+        ...governsTheWholeProject(),
+        replaces: [], because: 'They said so.', authority: 'the owner said so', authority_reference: 'the call on 20 August', decided_by: THE_OWNER },
       asPerson,
     )
     expect((await changeKind(made, 'note', asPerson)).statusCode).toBe(200)

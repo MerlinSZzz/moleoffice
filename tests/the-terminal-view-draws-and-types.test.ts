@@ -357,6 +357,6 @@ describe('the terminal view', () => {
       (read) => !((read.body['terminals'] ?? []) as HeldTerminal[]).some((one) => one.id === terminal.id),
     )
     expect(((listed.body['terminals'] ?? []) as HeldTerminal[]).map((one) => one.id)).not.toContain(terminal.id)
-    await app.page.getByText(t('terminals.none')).waitFor({ state: 'visible' })
+    await app.page.getByText(t('terminals.noneOpen')).waitFor({ state: 'visible' })
   }, 60_000)
 })

@@ -13,6 +13,21 @@
  * office runs from the person's sign-in to their sign-out:
  * no administrator step, and nothing that keeps it running after sign-out. So the read says that signing out stops it.
  *
+ * IN AN APPIMAGE THE PRESS ON WRITES NOTHING, AND THIS FILE SAYS THAT THE .deb INSTALL HAS IT. An AppImage runs from
+ * the folder it is mounted at, which is new at each start and gone after it, so a unit written there would name a folder
+ * that is not there at the next login. It was decided that the press On refuses in an AppImage and points to the .deb
+ * install. So it refuses with its own code and writes and asks nothing, and the read never says on or off and does not
+ * ask systemd. Whether the office runs from an AppImage is `theAppImageFolderHolding`
+ * (./systems/the-installer-of-a-folder.mjs), asked of the folder the unit's command would run from.
+ *
+ * IN AN APPIMAGE THE PRESS OFF TAKES AWAY A UNIT A PRESS WROTE. A unit an older AppImage or another install wrote may
+ * still be there, and a data folder move counts it. It was decided that the press Off removes such a unit and keeps a
+ * copy of it. So, whatever systemd says of the unit, the press Off asks systemd to disable it, copies it to the first
+ * backup name nothing has, removes its file, and asks systemd to read its units again, in that order. Disabling comes
+ * first, so a refusal there has changed nothing, and each later refusal names the copy, or the name it failed at, and
+ * says what was done before it. With no unit there it answers that start at login is already off, and asks systemd
+ * nothing. The read names a unit a press wrote, and says that the press Off removes it.
+ *
  * ---------------------------------------------------------------------------------------
  * WHAT THE PRESS WRITES, AND NOTHING ELSE
  * ---------------------------------------------------------------------------------------
@@ -22,7 +37,8 @@
  * ends with no stop asked for, and stops the office when the unit is stopped. Then it asks systemd, as them, to read
  * the unit again and to enable it, so it starts at their next login. It never touches a system unit, never runs anything
  * as root, and never writes outside their home folder. Turning it off disables the unit and leaves the file, so the next
- * press turns it back on. A unit an older press wrote keeps working as it did until this press writes it again.
+ * press turns it back on; in an AppImage it removes the file, as said above. A unit an older press wrote keeps working
+ * as it did until this press writes it again.
  *
  * NEITHER PRESS STARTS OR STOPS THE OFFICE THAT IS RUNNING NOW. The press is answered by the office's own server, and
  * that server may be the one the unit started. `enable --now` would run `mole-office start`, which asks this same
@@ -98,9 +114,11 @@
  * is the development checkout's service command, because the stable checkout's own, started from a unit with nothing
  * but these three settings, would read the stable checkout's defaults and not the office's; the database and the port this
  * office serves, so the unit starts this office and not whatever a shell with nothing set would start; and the PATH
- * this office runs with, because a user unit gets systemd's short default PATH and the office's worker starts tsx and
- * the agent tools through PATH. Everything else, the keys among it, the command reads from .env and the office's own
- * files as any start does. No key and nothing secret is written into the unit. When the office moves, or its
+ * this office was started with, because a user unit gets systemd's short default PATH and the office's worker starts tsx
+ * and the agent tools through PATH. That PATH is read from this server's environment by `theSearchPathIn` of the system
+ * (./systems/the-system.mjs), the one reader of a search path in src/, and is the office's own from before its start
+ * joined the user's entries after it (`theOfficesOwnSearchPathIn` in ./the-users-own-path.mjs). Everything else, the keys among it, the command
+ * reads from .env and the office's own files as any start does. No key and nothing secret is written into the unit. When the office moves, or its
  * database or port changes, the read says the unit is out of date and the press writes it again.
  *
  * FROM A LINUX BUNDLE THE UNIT NAMES ELECTRON_RUN_AS_NODE=1 AS WELL, because the command there is the app's own program,
@@ -110,11 +128,14 @@
  */
 
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdirSync } from 'node:fs'
+import { existsSync, mkdirSync, unlinkSync } from 'node:fs'
 import { userInfo } from 'node:os'
 import { dirname, join } from 'node:path'
 import { THE_COMMAND_ENTRY, THE_INSTALL, howToStart, settings, theShippedNodeIn } from './settings.mjs'
 import { thePairOfThisProcess } from './the-office-tool-environment.mjs'
+import { theOfficesOwnSearchPathIn } from './the-users-own-path.mjs'
+import { theAppImageFolderHolding } from './systems/the-installer-of-a-folder.mjs'
+import { copyUnderAFreeName } from './a-backup-under-a-free-name.mjs'
 import { TheFileBesideIsLeft, UnderAFile, firstLineOf, quoted, readOrNull, theSystemctl, writeTheUnit } from './the-mail-tool.mjs'
 import { HOLDER_START_WAIT_MS, HOLDER_STOP_WAIT_MS, START_WAIT_MS, STOP_WAIT_MS } from './the-service-command.mjs'
 
@@ -170,6 +191,8 @@ export function theStartAtLoginUnitPath(home) {
 
 /**
  * THE OFFICE THE UNIT WOULD START: this install's command, and the database, port and PATH this server runs with.
+ * The PATH is the office's own, as this server was started with it, and never the user's entries its start joined after
+ * it (./the-users-own-path.mjs): the office the unit starts reads the user's PATH again at its own start.
  * @param {NodeJS.ProcessEnv} [env]
  * @returns {TheOfficeToStart}
  */
@@ -180,7 +203,7 @@ export function theOfficeThisServerIs(env = process.env) {
   const pair = THE_INSTALL.from === 'bundle' ? null : thePairOfThisProcess()
   const args = pair === null ? how.args : [join(pair.development, THE_COMMAND_ENTRY)]
   const s = settings(env)
-  return { command: how.command, args, databasePath: s.databasePath, port: s.apiPort, path: String(env['PATH'] ?? ''), environment: how.environment }
+  return { command: how.command, args, databasePath: s.databasePath, port: s.apiPort, path: String(theOfficesOwnSearchPathIn(env) ?? ''), environment: how.environment }
 }
 
 /**
@@ -229,10 +252,11 @@ export function theStartAtLoginUnit(office) {
 /**
  * @typedef {import('./the-mail-tool.mjs').Systemctl} Systemctl
  * @typedef {(args: string[]) => { code: number, out: string, err: string }} Loginctl
- * @typedef {'startAtLoginNotLinux' | 'startAtLoginNoSystemd' | 'startAtLoginNotOurs' | 'startAtLoginSystemdRefused' | 'startAtLoginNotBackedUp' | 'startAtLoginNotWritten' | 'startAtLoginCopyLeft' | 'startAtLoginUnitKeptFileLeft' | 'startAtLoginCopyAndFileLeft' | 'startAtLoginFileLeft' | 'startAtLoginUnderAFile'} StartAtLoginRefusal
+ * @typedef {'startAtLoginNotLinux' | 'startAtLoginNoSystemd' | 'startAtLoginNotOurs' | 'startAtLoginSystemdRefused' | 'startAtLoginNotBackedUp' | 'startAtLoginNotWritten' | 'startAtLoginCopyLeft' | 'startAtLoginUnitKeptFileLeft' | 'startAtLoginCopyAndFileLeft' | 'startAtLoginFileLeft' | 'startAtLoginUnderAFile' | 'startAtLoginInAnAppImage' | 'startAtLoginOffNotCopied' | 'startAtLoginOffNotRemoved' | 'startAtLoginOffNotReloaded'} StartAtLoginRefusal
  * @typedef {{ ok: false, code: StartAtLoginRefusal, says: string, path?: string, beside?: string }} Refused
- * @typedef {{ home: string, office: TheOfficeToStart, platform?: string, systemctl?: Systemctl, writeWhole?: (path: string, text: string, mode: number) => void }} PressInput
- *   writeWhole is a test's stand-in for the unit's write (round W29); the press itself never gives one.
+ * @typedef {{ home: string, office: TheOfficeToStart, platform?: string, appImage?: string, systemctl?: Systemctl, writeWhole?: (path: string, text: string, mode: number) => void, remove?: (path: string) => void }} PressInput
+ *   writeWhole is a test's stand-in for the unit's write (round W29); the press itself never gives one. appImage is
+ *   the AppImage's own folder when the office runs from one; when it is not given, `theAppImageOf` below asks.
  */
 
 /**
@@ -275,9 +299,10 @@ function theUnitAsItIs(text, wouldWrite) {
 
 /**
  * @typedef {{
- *   systemd: 'answers' | 'no answer' | 'not linux',
+ *   systemd: 'answers' | 'no answer' | 'not linux' | 'not asked',
  *   setInTheMenuBar: boolean,
  *   setInTheTray: boolean,
+ *   fromAnAppImage: boolean,
  *   unit: 'none' | 'current' | 'out of date' | 'not ours',
  *   unitPath: string,
  *   startsAtLogin: boolean | null,
@@ -302,7 +327,8 @@ export function readStartAtLogin(input) {
   const unitPath = theStartAtLoginUnitPath(input.home)
   const user = input.user ?? userInfo().username
   const unit = theUnitAsItIs(readOrNull(unitPath), theStartAtLoginUnit(input.office))
-  const base = { unit, unitPath, user, lingerCommand: THE_LINGER_COMMAND }
+  const appImage = platform === 'linux' ? theAppImageOf(input) : null
+  const base = { unit, unitPath, user, lingerCommand: THE_LINGER_COMMAND, fromAnAppImage: appImage !== null }
   if (platform === 'darwin') {
     // ON A MAC THE SERVER SAYS WHERE, NEVER ON OR OFF (wave 13u's condition to 13t, message Ux__34vHQle1): the login
     // item belongs to the window, and this server cannot read it, so any on or off said here would be a guess.
@@ -325,6 +351,23 @@ export function readStartAtLogin(input) {
   }
   if (platform !== 'linux') {
     return { ...base, systemd: 'not linux', setInTheMenuBar: false, setInTheTray: false, startsAtLogin: null, enabledWord: null, activeWord: null, linger: null, says: `${theSystemdWayIsLinuxOnly(platform)}.` }
+  }
+  if (appImage !== null) {
+    // IN AN APPIMAGE THE SERVER SAYS WHERE IT CAN BE HAD, NEVER ON OR OFF, and asks systemd nothing. A unit there may
+    // name a folder an AppImage was mounted at once, which is gone, so what systemd says of it is not whether the
+    // office starts. The press Off removes a unit a press wrote, so the read names it.
+    const left = unit === 'current' || unit === 'out of date' ? ` A unit a press wrote is at ${unitPath}, and turning start at login off removes it.` : ''
+    return {
+      ...base,
+      systemd: 'not asked',
+      setInTheMenuBar: false,
+      setInTheTray: false,
+      startsAtLogin: null,
+      enabledWord: null,
+      activeWord: null,
+      linger: null,
+      says: `${THE_APPIMAGE_WAY} systemd was not asked, so this does not say whether the office starts at login.${left}`,
+    }
   }
   const run = input.systemctl ?? theSystemctl
   const systemd = run(['show-environment'])
@@ -371,6 +414,19 @@ const THE_WINDOWS_WAY =
 /** What the read says for an office on Windows in the beta. */
 const THE_WINDOWS_SIGN_OUT = 'Signing out of Windows stops the office, and nothing keeps it running until you sign in again.'
 
+/** Why an AppImage has no start at login, and where it can be had, said the same way by the read and by the press's refusal. */
+const THE_APPIMAGE_WAY =
+  'Start at login is not available from the AppImage. A unit would name the folder the AppImage is mounted at, which is new at each start. ' +
+  'The .deb install has it.'
+
+/**
+ * THE APPIMAGE'S OWN FOLDER WHEN THE OFFICE RUNS FROM ONE, or null: the input's when it gives one, or else
+ * `theAppImageFolderHolding` asked of the folder the unit's command would run from.
+ * @param {PressInput} input
+ * @returns {string | null}
+ */
+const theAppImageOf = (input) => input.appImage ?? theAppImageFolderHolding(dirname(input.office.command))
+
 /**
  * WHY THIS PRESS DOES NOTHING OFF LINUX, AND ON A MAC AND ON WINDOWS WHAT DOES IT INSTEAD. A Mac starts Mole Office at
  * login through the window's own login item, by decision fdIhVGe4R7fp: the "Open at login" item of the menu-bar
@@ -402,15 +458,21 @@ export function theUnitIsUnderAFile(err) {
 }
 
 /**
- * The refusals both presses share: not Linux, a file where a folder of the unit goes, and a unit of that name the
- * press did not write.
+ * The refusals both presses share: not Linux, a file where a folder of the unit goes, and a unit of that name the press
+ * did not write. The press On is refused in an AppImage as well (see the header), and the answer says whether the office
+ * runs from one.
  * @param {PressInput} input
- * @returns {Refused | { ok: true, before: string | null, unitPath: string }}
+ * @param {'on' | 'off'} press
+ * @returns {Refused | { ok: true, before: string | null, unitPath: string, inAnAppImage: boolean }}
  */
-function mayThePressTouchTheUnit(input) {
+function mayThePressTouchTheUnit(input, press) {
   const platform = input.platform ?? process.platform
   if (platform !== 'linux') {
     return { ok: false, code: 'startAtLoginNotLinux', says: `${theSystemdWayIsLinuxOnly(platform)}. Nothing was written.` }
+  }
+  const inAnAppImage = theAppImageOf(input) !== null
+  if (inAnAppImage && press === 'on') {
+    return { ok: false, code: 'startAtLoginInAnAppImage', says: `${THE_APPIMAGE_WAY} Nothing was changed, and systemd was not asked.` }
   }
   const unitPath = theStartAtLoginUnitPath(input.home)
   let before
@@ -429,7 +491,7 @@ function mayThePressTouchTheUnit(input) {
       says: `${unitPath} is already there and the press did not write it, so it was left as it is and nothing was changed. Move it aside, and press again.`,
     }
   }
-  return { ok: true, before, unitPath }
+  return { ok: true, before, unitPath, inAnAppImage }
 }
 
 /**
@@ -441,7 +503,7 @@ function mayThePressTouchTheUnit(input) {
  * @returns {Refused | { ok: true, wrote: string[], turned: 'on' | 'already on', says: string }}
  */
 export function turnStartAtLoginOn(input) {
-  const may = mayThePressTouchTheUnit(input)
+  const may = mayThePressTouchTheUnit(input, 'on')
   if (!may.ok) return may
   const run = input.systemctl ?? theSystemctl
   const systemd = run(['show-environment'])
@@ -502,15 +564,17 @@ export function turnStartAtLoginOn(input) {
 
 /**
  * TURN START AT LOGIN OFF: the unit disabled, so it does not start at their next login. The unit's file stays, so the
- * next press turns it back on, and the office running now is left running.
+ * next press turns it back on, and the office running now is left running. In an AppImage a unit a press wrote is
+ * taken away instead (see the header).
  * @param {PressInput} input
  * @returns {Refused | { ok: true, turned: 'off' | 'already off', says: string }}
  */
 export function turnStartAtLoginOff(input) {
-  const may = mayThePressTouchTheUnit(input)
+  const may = mayThePressTouchTheUnit(input, 'off')
   if (!may.ok) return may
   if (may.before === null) return { ok: true, turned: 'already off', says: 'The office does not start when you log in: there is no unit. Nothing was changed.' }
   const run = input.systemctl ?? theSystemctl
+  if (may.inAnAppImage) return takeTheUnitAwayInAnAppImage(may.unitPath, run, input.remove ?? unlinkSync)
   if (whatSystemdSaysAtLogin(run).startsAtLogin === false) {
     return { ok: true, turned: 'already off', says: 'The office already did not start when you log in. Nothing was changed.' }
   }
@@ -519,6 +583,56 @@ export function turnStartAtLoginOff(input) {
     return { ok: false, code: 'startAtLoginSystemdRefused', says: `systemd would not disable the unit (${firstLineOf(disabled)}). Nothing was changed.` }
   }
   return { ok: true, turned: 'off', says: 'The office no longer starts when you log in. The office running now keeps running, and the unit stays, so the press turns it back on.' }
+}
+
+/**
+ * THE PRESS OFF IN AN APPIMAGE, for a unit a press wrote (see the header): disabled, copied, removed, and systemd asked
+ * to read its units again, whatever systemd said of it before. A step that fails refuses, and says what was done before
+ * it. The office running now keeps running.
+ * @param {string} unitPath
+ * @param {Systemctl} run
+ * @param {(path: string) => void} remove unlinkSync, or a test's stand-in for a removal that fails after the copy, which
+ *   no folder can be made to give, because the copy and the unit are in one folder
+ * @returns {Refused | { ok: true, turned: 'off', says: string }}
+ */
+function takeTheUnitAwayInAnAppImage(unitPath, run, remove) {
+  const disabled = run(['disable', START_AT_LOGIN_UNIT])
+  if (disabled.code !== 0) {
+    return { ok: false, code: 'startAtLoginSystemdRefused', says: `systemd would not disable the unit (${firstLineOf(disabled)}). Nothing was changed.` }
+  }
+  const copied = copyUnderAFreeName(unitPath, `${unitPath}${START_AT_LOGIN_BACKUP_SUFFIX}`)
+  if ('failed' in copied) {
+    return {
+      ok: false,
+      code: 'startAtLoginOffNotCopied',
+      path: copied.path,
+      says: `systemd disabled the unit, and then it could not be copied to ${copied.path} (${String(copied.failed)}), so its file at ${unitPath} was not removed.`,
+    }
+  }
+  try {
+    remove(unitPath)
+  } catch (err) {
+    return {
+      ok: false,
+      code: 'startAtLoginOffNotRemoved',
+      path: copied.path,
+      says: `systemd disabled the unit and it was copied to ${copied.path}, and then its file at ${unitPath} could not be removed (${String(err)}).`,
+    }
+  }
+  const reloaded = run(['daemon-reload'])
+  if (reloaded.code !== 0) {
+    return {
+      ok: false,
+      code: 'startAtLoginOffNotReloaded',
+      path: copied.path,
+      says: `systemd disabled the unit, it was copied to ${copied.path}, and ${unitPath} was removed. Then systemd would not read its units again (${firstLineOf(reloaded)}).`,
+    }
+  }
+  return {
+    ok: true,
+    turned: 'off',
+    says: `systemd disabled the unit and ${unitPath} was removed, so the office does not start when you log in. A copy of it is at ${copied.path}. The office running now keeps running.`,
+  }
 }
 
 /**

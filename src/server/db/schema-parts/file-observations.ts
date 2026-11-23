@@ -5,6 +5,33 @@ import { aPartTable } from '../part-tables.ts'
 
 const existingArchive = { existingArchive: true } as const
 
+/**
+ * WHAT ONE SCAN SAW ABOUT ONE FILE AT ONE MOMENT.
+ *
+ * AUTHORED, and that is not obvious, so here is the argument. `source_files` describes the present
+ * and any scan rebuilds it. A row here is a DATED OBSERVATION and nothing can rebuild it: the
+ * comparison a rebuild makes against the scan it is replacing exists for one reply and is then
+ * unrecoverable. A work domain accepted on Tuesday cannot otherwise ask on Friday what changed,
+ * because four scans have run in between and each threw its predecessor away.
+ *
+ * IT STORES NO FILE CONTENT, NO DIFF, NO AUTHOR, NO PARENT, NO BRANCH AND NO MESSAGE. You cannot
+ * reconstruct one line of any file from it, you cannot ask who changed something, and you cannot ask
+ * what it looked like before. The owner's boundary is that Git owns implementation history, and the
+ * first thing on the owner's list of failures is building a second Git. Ten columns, and an eleventh that
+ * answered any of those questions would break the boundary this table is allowed to exist inside.
+ *
+ * `repository_id` IS AN ID AND NOT A ROOT PATH. A root moves; a checkout that moved would split one
+ * repository's observation history in two with nothing failing. NULL has one stated meaning: this
+ * row was written before repositories had ids, by the one process that scans one root.
+ *
+ * `first_scan` MARKS THE WAVE THAT IS NOT A WAVE. A workspace whose index is empty — after a
+ * restore, or on its first rebuild — sees the whole repository as `added`. That is true and it is
+ * not a fortnight of work, so the row says which it was and a drift read answers "cannot say"
+ * rather than "everything changed".
+ *
+ * NOTHING PRUNES IT, deliberately. A rule that deletes observations deletes the evidence a drift
+ * read depends on.
+ */
 export const fileObservations = aPartTable(sqliteTable(
   'file_observations',
   {

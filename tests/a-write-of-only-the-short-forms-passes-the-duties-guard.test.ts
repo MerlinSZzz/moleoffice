@@ -47,7 +47,7 @@ import { KIND_SPECS, THE_OWNER } from '../src/shared/kinds.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { THE_SECRETARY, THE_WORKER } from '../src/shared/roles.ts'
 import { SHORT_FORMS_FIELD } from '../src/shared/zoom.ts'
-import { apiApp, freshDb, thePersonsKeyHeader, type TestDb } from './helpers.ts'
+import { apiApp, freshDb, thePersonsKeyHeader, type TestDb, governsTheWholeProject } from './helpers.ts'
 import { SECRETARY_DUTIES_KIND } from '../src/shared/secretary-duties-record.ts'
 
 type TheGuard = typeof import('../src/server/lib/grant/secretary-duties.ts')
@@ -107,7 +107,7 @@ async function madeUpDutiesFor(handle: string): Promise<{ handle: string; id: st
   const decision = await call('POST', '/api/records', PERSON, {
     kind: 'decision',
     title: 'A made-up decision the duties rest on',
-    data: { option_taken: `The made-up secretary ${handle} looks after a made-up area.`, because: 'A made-up reason.', decided_by: THE_OWNER, replaces: [] },
+    data: { option_taken: `The made-up secretary ${handle} looks after a made-up area.`, because: 'A made-up reason.', decided_by: THE_OWNER, ...governsTheWholeProject(), replaces: [] },
   })
   expect(decision.status, decision.raw).toBe(201)
   const duties = await call('POST', '/api/records', PERSON, {

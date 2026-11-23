@@ -146,6 +146,12 @@ export const thisOfficeDoors = {
       body: JSON.stringify({ name }),
     }),
 
+  testASandboxLogin: (name: string) =>
+    request<import('@shared/sandbox-logins.ts').SandboxLoginTested>('/api/office/sandbox-logins/test', {
+      method: 'POST',
+      body: JSON.stringify({ name }),
+    }),
+
   /**
    * THE KEY SLOTS in the provider router's key slots file: every routed provider a new slot may name, and each slot's
    * provider, id, label and key mark, never a key. `addAKeySlot` writes one key into the file and `removeAKeySlot` takes
@@ -244,6 +250,10 @@ export const thisOfficeDoors = {
    */
   installTheEntry: () =>
     request<import('@shared/entry.ts').TheEntryInstallResult>('/api/office/install-the-entry', { method: 'POST' }),
+
+  /** THE STATE OF THIS COMPUTER'S ENTRY KEY, read when the Settings entry is drawn: none yet, held, or refused. */
+  theEntrysKeyState: () =>
+    request<import('@shared/entry.ts').TheEntrysKeyReading>('/api/office/install-the-entry/this-computers-key'),
 
   /**
    * THE PRICE TABLE THE USAGE PAGE ESTIMATES FROM. Criterion U3.

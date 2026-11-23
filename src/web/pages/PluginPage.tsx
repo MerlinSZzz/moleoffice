@@ -15,12 +15,13 @@
  * that lets it connect to nothing and start a worker only from a blob: address it made. The protocol it speaks is
  * pluginAsksTheSlot in src/shared/plugins.ts.
  *
- * A PLUGIN WITH NO PAGE HERE IS NOT A BLANK FRAME. whyAPluginHasNoPage says why, and the page says it in words: no
- * plugins folder, no such plugin, refused, off, or no page by that name. Then four answers about a page that has one:
- *   · failed to load: the page's file was asked for before the frame was drawn and the office refused it, so its
- *     sentence is shown and no frame is drawn;
+ * A PLUGIN WITH NO PAGE HERE IS NOT A BLANK FRAME. whyAPluginHasNoPage says why, and the page draws it as a short
+ * state word, as decided: no plugins folder, not found, refused, off, never switched on, or no page by that name. Then
+ * four answers about a page that has one:
+ *   · failed to load: the page's file was asked for before the frame was drawn and the office refused it, so "not
+ *     loaded" is drawn, the office's own text goes to Developer mode, and no frame is drawn;
  *   · not answering: the page has not said it is ready within PLUGIN_READY_WITHIN_MS. The frame stays, because a slow
- *     page may still answer, and the sentence goes when it does;
+ *     page may still answer, and the state word goes when it does;
  *   · moved: the frame loaded a second document. The office cannot see where, so it stops answering, takes the frame
  *     away and offers to open the page again;
  *   · refused: a request the slot will not pass on is answered to the plugin, in the protocol, with the reason.
@@ -30,7 +31,7 @@
  * 119), or stop a plugin's page sending what it read away by moving its own frame. plugins/README.md says so.
  */
 
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
 
 import { content, t, wordLanguage } from '@shared/i18n.ts'
 import { settingsPath } from '@shared/addresses.ts'
@@ -55,7 +56,7 @@ import { DRAWS_THE_NAME } from '../components/agent/pointing.ts'
 import { declaredAttributes } from '../components/declares.ts'
 import { useTheLookShowing } from '../components/PresetBar.tsx'
 import { pluginPagePath } from '../components/router.tsx'
-import { ErrorNote, Loading, Panel, useAsync } from '../components/ui.tsx'
+import { ErrorNote, Loading, Panel, ServerNote, useAsync } from '../components/ui.tsx'
 import { useProjectAsync } from '../lib/project-async.ts'
 import { useLanguage } from '../lib/language.ts'
 import { useInspect } from '../lib/mode.ts'
@@ -63,7 +64,14 @@ import { pluginReasonInPlainWords, theRawTextSaysMore } from '../lib/plugin-reas
 import { whereRequestsGo } from '../lib/visiting.ts'
 import { currentWorkspace, subscribeWorkspace } from '../lib/workspace.ts'
 
+export const THE_PLUGIN_PAGE = 'data-plugin-page'
+
 export function PluginPage({ id, slug }: { id: string; slug: string }) {
+  useLayoutEffect(() => {
+    const root = document.documentElement
+    root.setAttribute(THE_PLUGIN_PAGE, 'yes')
+    return () => root.removeAttribute(THE_PLUGIN_PAGE)
+  }, [])
   useLanguage()
   const [state] = useAsync(() => api.plugins(), [id, slug])
   const why = state.status === 'ready' ? whyAPluginHasNoPage(state.value, id, slug) : null
@@ -88,7 +96,7 @@ export function PluginPage({ id, slug }: { id: string; slug: string }) {
   )
 }
 
-/** Why this address has no page, in words, and the way on: Settings for a plugin that could be switched on. */
+/** Why this address has no page, as a short state word, and the way on: Settings for a plugin that could be switched on. */
 export function NoPage({ id, slug, plugin, why }: { id: string; slug: string; plugin: PluginReading | undefined; why: WhyAPluginHasNoPage }) {
   const developer = useInspect()
   const manifest = plugin?.manifest ?? null
@@ -105,18 +113,16 @@ export function NoPage({ id, slug, plugin, why }: { id: string; slug: string; pl
       <h1 className="plgp-title" {...DRAWS_THE_NAME}>
         {t('pluginPage.noPage')}
       </h1>
-      <p className="plgp-why">
+      <p className="plgp-state">
         {why.why === 'no-folder'
-          ? t('pluginPage.why.noFolder')
+          ? t('pluginPage.state.noFolder')
           : why.why === 'unknown'
-            ? t('pluginPage.why.unknown', { id: content(id) })
+            ? `${content(id)} · ${t('pluginState.notFound')}`
             : why.why === 'refused'
-              ? t('pluginPage.why.refused', { name: content(name) })
+              ? `${content(name)} · ${t('pluginState.refused')}`
               : why.why === 'off'
-                ? why.nobodyChose
-                  ? t('pluginPage.why.nobodyChose', { name: content(name) })
-                  : t('pluginPage.why.off', { name: content(name) })
-                : t('pluginPage.why.noSuchPage', { name: content(name), slug: content(slug) })}
+                ? `${content(name)} · ${t(why.nobodyChose ? 'pluginState.neverSwitchedOn' : 'shortcuts.off')}`
+                : `${content(name)} · ${t('pluginPage.state.noSuchPage', { slug: content(slug) })}`}
       </p>
       {refused === undefined ? null : (
         <>
@@ -145,7 +151,7 @@ export function NoPage({ id, slug, plugin, why }: { id: string; slug: string; pl
       ) : null}
       {why.why === 'refused' || why.why === 'off' ? (
         <p className="plgp-way">
-          <a href={`#${settingsPath('settings.plugins')}`}>{t('pluginPage.toSettings')}</a>
+          <a href={`#${settingsPath('settings.plugins')}`}>{t('pluginPage.openTheSwitches')}</a>
         </p>
       ) : null}
     </section>
@@ -187,6 +193,36 @@ function PluginFrame({ id, manifest, slug }: { id: string; manifest: PluginManif
   const [motion] = useProjectAsync(() => (theMap ? api.pixelSettings().then((reading) => reading.settings.motion) : Promise.resolve(true)), [id])
   const motionKnown = !theMap || motion.status !== 'loading'
   const keptStill = theMap && !(motion.status === 'ready' && motion.value)
+
+  // Measure from the frame itself: the shell, page title, panel header and any status above it can all change height.
+  // Document coordinates keep scrolling from changing the frame's size. Subtract each ancestor's bottom padding and border.
+  useEffect(() => {
+    const element = frame.current
+    if (!drawn || element === null) return
+    const size = (): void => {
+      const top = element.getBoundingClientRect().top + window.scrollY
+      let below = 0
+      for (let node = element.parentElement; node !== null; node = node.parentElement) {
+        const style = getComputedStyle(node)
+        below += (parseFloat(style.paddingBottom) || 0) + (parseFloat(style.borderBottomWidth) || 0)
+      }
+      element.style.height = `${Math.max(320, window.innerHeight - top - below)}px`
+    }
+    const observer = new ResizeObserver(size)
+    // Ancestors catch inserted status messages; preceding siblings catch changes that move an ancestor without resizing it.
+    for (let node: Element | null = element; node !== null && node !== document.documentElement; node = node.parentElement) {
+      for (let previous = node.previousElementSibling; previous !== null; previous = previous.previousElementSibling) {
+        observer.observe(previous, { box: 'border-box' })
+      }
+      if (node !== element) observer.observe(node, { box: 'border-box' })
+    }
+    window.addEventListener('resize', size)
+    size()
+    return () => {
+      observer.disconnect()
+      window.removeEventListener('resize', size)
+    }
+  }, [drawn])
 
   const context: TheSlotTellsAPlugin = {
     interface: PLUGIN_READ_INTERFACE,
@@ -320,26 +356,32 @@ function PluginFrame({ id, manifest, slug }: { id: string; manifest: PluginManif
       {file.status === 'loading' ? <Loading what={t('pluginPage.loading')} rows={1} /> : null}
       {file.status === 'error' ? <ErrorNote message={file.message} fault={file.fault} /> : null}
       {file.status === 'ready' && !file.value.loads ? (
-        <p className="plgp-said" role="alert">
-          {t('pluginPage.failedToLoad', { name: content(name), said: content(file.value.said) })}
-        </p>
+        <>
+          <p className="plgp-said" role="alert">
+            {t('pluginPage.state.notLoaded')}
+          </p>
+          <ServerNote text={file.value.said} />
+        </>
       ) : null}
       {moved ? (
         <div className="plgp-moved" role="alert">
-          <p className="plgp-said">{t('pluginPage.moved', { name: content(name) })}</p>
+          <p className="plgp-said">{t('pluginPage.state.frameClosed')}</p>
           <button type="button" className="plgp-again" onClick={openAgain}>
             {t('pluginPage.openAgain')}
           </button>
         </div>
       ) : null}
       {theMap && motion.status === 'error' ? (
-        <p className="plgp-said" role="status">
-          {t('pluginPage.officeMap.unread', { why: content(motion.message) })}
-        </p>
+        <>
+          <p className="plgp-said" role="status">
+            {t('pluginPage.state.motionUnread')}
+          </p>
+          <ServerNote text={motion.message} />
+        </>
       ) : null}
       {late && !ready && drawn ? (
         <p className="plgp-said" role="status">
-          {t('pluginPage.notAnswering', { name: content(name), seconds: String(PLUGIN_READY_WITHIN_MS / 1000) })}
+          {t('pluginPage.state.notAnswering', { seconds: String(PLUGIN_READY_WITHIN_MS / 1000) })}
         </p>
       ) : null}
       {drawn ? (
@@ -363,10 +405,10 @@ function PluginFrame({ id, manifest, slug }: { id: string; manifest: PluginManif
 
 /** The page's own rules. Every value is a token. No backtick inside. */
 const PLUGIN_PAGE_CSS = `
-.plgp { display: flex; flex-direction: column; gap: var(--gut); min-width: 0; }
+.page.plgp { display: flex; flex-direction: column; gap: var(--gut); min-width: 0; padding-bottom: 0; }
 .plgp-title { margin: 0; font: 600 var(--fs-4)/var(--lh-tight) var(--font-ui); color: var(--text); overflow-wrap: anywhere; }
 .plgp-none { display: flex; flex-direction: column; gap: var(--pad); min-width: 0; }
-.plgp-why, .plgp-way { margin: 0; max-width: var(--measure); font: var(--fs-2)/var(--lh-body) var(--font-ui); color: var(--text-2); }
+.plgp-state, .plgp-way { margin: 0; max-width: var(--measure); font: var(--fs-2)/var(--lh-body) var(--font-ui); color: var(--text-2); }
 .plgp-reason { margin: 0; max-width: var(--measure-in-box); font: var(--fs-1)/var(--lh-body) var(--font-ui); color: var(--text-3); overflow-wrap: anywhere; }
 .plgp-raw { margin: 0; max-width: var(--measure); font: var(--fs-1)/var(--lh-body) var(--font-mono); color: var(--text-3); overflow-wrap: anywhere; }
 .plgp-pages { margin: 0; padding-left: calc(var(--pad) * 2); display: flex; flex-direction: column; gap: 4px; font: var(--fs-2)/var(--lh-body) var(--font-ui); }
@@ -383,7 +425,7 @@ const PLUGIN_PAGE_CSS = `
 }
 .plgp-again:focus-visible { outline: var(--focus-w) solid var(--focus); outline-offset: var(--focus-offset); }
 .plgp-frame {
-  display: block; width: 100%; height: 70dvh; min-height: 320px;
+  display: block; width: 100%; height: 320px; min-height: 320px;
   border: var(--border-w) solid var(--border); border-radius: var(--radius-sm); background: var(--bg);
 }
 `

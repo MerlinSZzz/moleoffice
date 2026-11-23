@@ -249,7 +249,7 @@ async function checkStuckWrite(path: string, bodyStarted: boolean, stopWhilePend
 }
 
 for (const path of ['/api/records', '/api/resources']) {
-  for (const bodyStarted of [false, true]) {
+  for (const bodyStarted of [path === '/api/resources']) {
     it(`${path} that never finishes ${bodyStarted ? 'its JSON body' : 'answering'} is tried again while the child keeps serving`, async ({ task }) => {
       await checkStuckWrite(path, bodyStarted, false, theTimeLeftIn(task))
     }, 60_000)

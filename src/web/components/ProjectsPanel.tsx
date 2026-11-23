@@ -3,12 +3,12 @@
 import { settingsControlWord } from '@shared/settings-declaration.ts'
 import { useState, useSyncExternalStore } from 'react'
 import { content, t } from '@shared/i18n.ts'
-import { workspaceIdFault, workspaceTitleFault, type Workspace } from '@shared/workspaces.ts'
+import { workspaceTitleFault, type Workspace } from '@shared/workspaces.ts'
 import { errorMessage, moleOfficeRequest } from '../api.ts'
 import { useLanguage } from '../lib/language.ts'
 import { useMode } from '../lib/mode.ts'
 import { readWorkspacesOnce } from '../lib/oneread.ts'
-import { currentWorkspace, setWorkspace, subscribeWorkspace } from '../lib/workspace.ts'
+import { currentWorkspace, subscribeWorkspace } from '../lib/workspace.ts'
 import { Panel, useAsync } from './ui.tsx'
 import { projectName } from './projects.tsx'
 
@@ -19,7 +19,7 @@ export function suggestedProjectId(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40)
 }
 
-/** Settings › Projects holds the two project presses: make a project, and rename the one you are in. */
+/** Settings › Projects holds the rename press for the project you are in. A project is made at the end of the sidebar's Switch list. */
 export function ProjectsPanel() {
   useLanguage()
   const mode = useMode()
@@ -35,49 +35,11 @@ export function ProjectsPanel() {
     <style href="mole-office-project-actions" precedence="default">{CSS}</style>
     <p className="project-actions-current">{name}</p>
     <div className="project-actions">
-      <MakeProject onChanged={changed} />
       {listed === undefined ? (projects.status === 'ready' ? null : <p role="status">{t(projects.status === 'error' ? 'nav.projectsFailed' : 'nav.loadingProjects')}</p>)
         : <RenameProject key={project} project={listed} onChanged={changed} />}
     </div>
     {mode === 'inspect' && projects.status === 'error' ? <p>{projects.message}</p> : null}
   </Panel>
-}
-
-function MakeProject({ onChanged }: { onChanged: () => void }) {
-  const mode = useMode()
-  const [open, setOpen] = useState(false)
-  const [name, setName] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [refused, setRefused] = useState<string | null>(null)
-  const id = suggestedProjectId(name)
-  const fault = name.trim() === '' ? null : workspaceIdFault(id)
-  async function make() {
-    setBusy(true)
-    setRefused(null)
-    try {
-      const made = await moleOfficeRequest<Workspace>('/api/workspaces', {
-        method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ id, title: name.trim() }),
-      })
-      setOpen(false)
-      setName('')
-      onChanged()
-      setWorkspace(made.id)
-    } catch (err) { setRefused(errorMessage(err)) }
-    finally { setBusy(false) }
-  }
-  if (!open) return <button type="button" className="project-action" onClick={() => setOpen(true)}>{t(settingsControlWord('settings.projects', 'nav.makeProject'))}</button>
-  return <form className="project-form" onSubmit={event => { event.preventDefault(); void make() }}>
-    <label htmlFor="settings-project-make">{t(settingsControlWord('settings.projects', 'nav.whatToCallIt'))}</label>
-    <input id="settings-project-make" value={name} autoFocus onChange={event => setName(event.target.value)} placeholder={t('nav.exampleName')} />
-    {name.trim() === '' ? null : fault === null ? (mode === 'inspect' ? <p>{t('nav.storedAs', { id })}</p> : null)
-      : <p role="status">{t('nav.nameForCreation')}</p>}
-    <div className="project-actions">
-      <button type="submit" className="project-action" disabled={busy || name.trim() === '' || fault !== null}>{t(busy ? 'nav.making' : settingsControlWord('settings.projects', 'nav.make'))}</button>
-      <button type="button" className="project-action" onClick={() => { setOpen(false); setRefused(null) }}>{t(settingsControlWord('settings.projects', 'nav.cancel'))}</button>
-    </div>
-    {refused === null ? null : <p role="status">{t('nav.makeFailed')}{mode === 'inspect' ? ` ${refused}` : null}</p>}
-  </form>
 }
 
 function RenameProject({ project, onChanged }: { project: Workspace; onChanged: () => void }) {

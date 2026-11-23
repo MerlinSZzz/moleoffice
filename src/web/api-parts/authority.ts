@@ -120,6 +120,13 @@ export const authorityDoors = {
   refuseAPackage: (id: string) => request<{ package: ASigningPackage }>(`/api/signing-packages/${encodeURIComponent(id)}/refuse`, { method: 'POST' }),
 
   /**
+   * EVERY CREDENTIAL THIS OFFICE ISSUED, as GET /api/office/visitors answers. The person's card reads their
+   * browsers from it and splits them by the one function the Embassy door counts them with.
+   */
+  visitors: () =>
+    request<{ credentials: VisitorCredential[]; lasts: number }>('/api/office/visitors'),
+
+  /**
    * ONE VISITING AGENT'S CREDENTIAL, ITS FACTS AND EVERY REQUEST MADE UNDER IT. Criteria P24, P27.
    *
    * NO TOKEN COMES BACK. It was shown once, when the credential was issued, and this office stores

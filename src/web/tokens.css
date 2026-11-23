@@ -235,9 +235,15 @@
                         Over the top bar and the strips, so the review ring's edges are never covered. The comment circles
                         are not marks on the words, and sit under the bar at --z-circle */
   --z-popover: 20;   /* a small body that opens from a mark and stays inside the page */
+  --z-project-list: 21; /* the sidebar's column while its project list is open. Over the popover level, because the review
+                        tray is held across the window's foot at that level and the open list reaches into it in a short
+                        window. Under the drawer's dimming and everything above it */
   --z-scrim: 30;     /* the dimming behind the navigation drawer */
   --z-drawer: 40;    /* the navigation drawer itself, on a phone */
-  --z-chat-button: 41; /* the corner chat button, over the navigation drawer and under the overlay host */
+  --z-note: 41;      /* an opened quick note: in front of the chat and every other window of the office. Under the chat
+                        button, which the note leaves room for at its foot, and under the overlay host, so a menu opened
+                        from the note is drawn over it */
+  --z-chat-button: 42; /* the corner chat button, over the navigation drawer and under the overlay host */
   --z-overlay: 50;   /* the overlay host: every menu, composer, picker and review overlay */
   --z-first-entry: 55; /* a new office's first entry: the grey over everything but the one place it shows (wave 13y round 138).
                         Over the overlay host, so no menu opens over the grey, and under the skip link */
@@ -976,6 +982,26 @@
     --fab-radius: 50%;
     --fab-border: 1px solid #7dbbf2;
     --fab-shadow: 0 10px 30px rgba(12, 92, 171, .45);
+  }
+}
+
+/* ---- THE INK OF A FIELD'S EXAMPLE WORDS -------------------------------------------------
+   Every placeholder in the app is drawn in --placeholder. In each look it is that look's own
+   --text-3, except in Light, where --text-3 is too close to typed words for an empty field to
+   look empty. Light's is lighter and still clears 4.5:1 on every ground a field sits on.
+   It is not a theme name: a saved theme holds a value for every theme name, and one written
+   before this name would be refused. So the Light rule uses the light block's own selectors,
+   and the last rule gives Auto on a dark system its own --text-3 back. */
+:root {
+  --placeholder: var(--text-3);
+}
+:root[data-theme='light'],
+:root:not([data-theme]):not([data-boot-theme='dark']) {
+  --placeholder: #5e6a7c;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]):not([data-boot-theme]) {
+    --placeholder: var(--text-3);
   }
 }
 

@@ -1,12 +1,14 @@
 // Copyright © 2026 Zhengyang Shen
 // Licensed under the MIT License. See LICENSE.
+import { ReportStar } from '../components/ReportStar.tsx'
+import { ReportExport } from '../components/ReportExport.tsx'
+import { ReportsScope } from '../components/ReportsScope.tsx'
 import { consumePreparedPage, peekPreparedPage } from '../lib/prepared-page.ts'
-import { WORKSPACE_HEADER } from '../lib/workspace.ts'
+import { WORKSPACE_HEADER, setWorkspace } from '../lib/workspace.ts'
 import { UsageReceipt } from '../components/UsageReceipt.tsx'
 import { FlowRunSteps } from '../components/FlowRunSteps.tsx'
 import { ModulePlanningPanel } from '../components/ModulePlanningPanel.tsx'
 import { FlowReasons } from '../components/FlowReasons.tsx'
-import { DecisionBasis } from '../components/DecisionBasis.tsx'
 import { FileAsMyWords, TheMarkOnADecision } from '../components/TheirOwnWords.tsx'
 import type { UsageReceipt as RuntimeReceipt } from '../../shared/usage-receipts.ts'
 import type { PickUpCost } from '../../shared/pick-up-cost.ts'
@@ -51,8 +53,8 @@ import type { PickUpCost } from '../../shared/pick-up-cost.ts'
  * spending it on a thing that writes nothing would cost it everywhere else.
  */
 
-import { useId, useRef, useState, useEffect } from 'react'
-import { peekPreparedRecord, consumePreparedRecord, recordPageKeepName } from '../lib/prepared-record.ts'
+import { useId, useRef, useState, useEffect, useLayoutEffect } from 'react'
+import { peekPreparedRecord, consumePreparedRecord, recordPageKeepName, theProjectARecordIsKeptIn } from '../lib/prepared-record.ts'
 import { content, LANGUAGES, listJoined, t, WORD_LISTS, writtenMoment, type WordKey } from '@shared/i18n.ts'
 import { theNameASelfRegistrationIsReadBy } from '@shared/profile.ts'
 import { FLOW_RUN_KIND, FLOW_RUN_TITLE } from '@shared/flow-run.ts'
@@ -181,7 +183,10 @@ import {
 // WHAT A PANEL DRAWING ONE SECTION OF THIS RECORD SAYS IT IS, so a right-click on the panel lands
 // on that section rather than walking past it to the whole record. See components/sections.ts.
 import { sectionsOf, theLinkedRecord, theRegion, titleHere } from '../components/sections.ts'
-import { theGovernedPlaces } from '@shared/governs.ts'
+import { DRAWN_IN_THE_GOVERNS_SECTION } from '@shared/governs.ts'
+import { GOVERNS_FILES_FIELD, NOTHING_FITS_FIELD } from '@shared/what-a-record-names.ts'
+import { GovernedPlaces } from '../components/GovernedPlaces.tsx'
+import { DecisionFacts, RelatedList, type RelatedReading } from '../components/RelatedHere.tsx'
 import { bodySectionsDeclaredBy, titleOfSection } from '@shared/sections.ts'
 import { declaredAttributes, type Declares } from '../components/declares.ts'
 import { DRAWS_THE_NAME } from '../components/agent/pointing.ts'
@@ -204,7 +209,7 @@ import {
 // THE TYPE ONLY, which is erased at build time — the same way RecordHistory.tsx reads the revision
 // ledger's shapes. The reader itself opens the database and never reaches the browser.
 import type { LeftOutBucket, OpenLoop, OpenLoops } from '../../server/lib/openloops.ts'
-import type { DecisionAbout as DecisionAboutThis, DecisionsAbout } from '../../server/lib/decisionsabout.ts'
+import type { DecisionsAbout } from '../../server/lib/decisionsabout.ts'
 // THE TYPE ONLY, for the same reason. The panel draws what the server worked out about an act made
 // on the person's own words; nothing about it is re-derived here.
 import type { ActOnTheirWords } from '../../server/lib/warrants.ts'
@@ -299,7 +304,6 @@ import {
   inlineMark,
   Mark,
   ErrorNote,
-  Explain,
   FamilyTag,
   Field,
   Hint,
@@ -315,6 +319,7 @@ import {
   PROGRESS_WORDS,
   Row,
   Select,
+  ServerNote,
   Stamp,
   StampAfter,
   drawnDayWithTime,
@@ -549,6 +554,8 @@ export function RecordHead({
           {/* The kind tag takes its colour, its corner radius and its type from tokens, so it
               follows a theme, a density and a radius preset without a line of code here. */}
           <Tag kind={record.kind} />
+          {record.kind === 'report' && !deleted ? <ReportStar id={record.id} /> : null}
+          {record.kind === 'report' && !deleted ? <ReportExport record={record} /> : null}
           {/* The reading family the kind belongs to, which is how the records list is organised.
               It is a heading word and nothing else: monochrome, no state, and never a filter. */}
           <FamilyTag kind={record.kind} />
@@ -638,10 +645,10 @@ export function RecordHead({
               // no summary has no `section.summaryLine` in its tree — `sectionsOnThisRecord` asks
               // `isWritten` of it — so a target here would name a region the server would answer
               // `gone` about. The walk carries on to the record, which is the honest answer for a
-              // sentence saying nobody wrote one.
+              // word saying there is none.
               <div className="rp-lede rp-lede-none">
-                {/* Its words, not a lone dash under the title (wave 13k round 34). */}
-                <Absence word={t('record.noSummary')} />
+                {/* One short word, told apart as looked: the office read the summary field and it is empty. */}
+                <Absence tier="told-apart" looked word={t('record.noSummaryWord')} />
               </div>
             )}
           </>
@@ -811,11 +818,11 @@ function kindDeclares(kind: string, key: string): boolean {
 }
 
 /** One fact about the record: a mark, and the sentence that belongs to it. */
-function Fact({ mark, said }: { mark: React.ReactNode; said: React.ReactNode }) {
+function Fact({ mark, said = null }: { mark: React.ReactNode; said?: React.ReactNode }) {
   return (
     <div className="rp-fact">
       <span className="rp-fact-mark">{mark}</span>
-      <span className="rp-fact-said">{said}</span>
+      {said === null ? null : <span className="rp-fact-said">{said}</span>}
     </div>
   )
 }
@@ -1248,7 +1255,6 @@ export function WhoseMoveSays({
               detail={moveMeaning(move)}
             />
           }
-          said={moveMeaning(move)}
         />
       </div>
       {/* AND WHERE THE QUESTION IS, criterion P55. A question an agent with a starter asks is with
@@ -1541,11 +1547,15 @@ export function StillOpenHere({
 // ============================================================================ what was settled here
 
 /**
- * THE DECISIONS ABOUT THIS RECORD — what an agent opening a module meets before it starts.
+ * THE DECISIONS ABOUT THIS RECORD AND ITS PARTS — what an agent opening a module meets before it starts.
  *
  * Criterion P37, on the owner's question of 6 September 2026: is there a way to remind an agent that
- * joins the work later of the decisions already made about the project? It draws `decisionsAboutThis` from the SAME reply `StillOpenHere` draws, so
- * the two panels cannot disagree and the page asks one question rather than two.
+ * joins the work later of the decisions already made about the project? It reads the related door
+ * (GET /api/records/:id/related), which reads the decisions about the module and about each of its parts at every
+ * depth, and its runs. A row reached through a part names that part, and a row worked out from files says so.
+ *
+ * THE CONTEXT DOOR'S `decisionsAboutThis` IS LEFT AS IT IS: it is the record's own reading, for an agent, and this panel
+ * is the page's reading of the module with its parts.
  *
  * IT IS BESIDE *WHAT IS STILL OPEN AROUND THIS*, NOT INSIDE IT. That panel's population is the six
  * open-loop kinds and its own declaration says why a decision is not one of them: what happened is
@@ -1555,110 +1565,36 @@ export function StillOpenHere({
  * DRAWN ONLY WHERE THE KIND DECLARES IT, which today is the module. `titleHere` throws on a kind
  * that declares no such section, and that is the check rather than a comment.
  */
-export function DecidedHere({
-  record,
-  relations,
-  reading,
-}: {
-  record: PanelRecord
-  relations: readonly string[]
-  reading: AsyncState<OpenLoops & { decisionsAboutThis?: DecisionsAbout }>
-}) {
-  const inspect = useInspect()
-  if (titleOfSection(record.kind, DECIDED_HERE_KEY) === null) return null
+export function DecidedHere({ record, relations }: { record: PanelRecord; relations: readonly string[] }) {
+  const declared = titleOfSection(record.kind, DECIDED_HERE_KEY) !== null
+  // EACH DECISION'S BASIS, which the row folds one press down, since the second level is folded for agents and for
+  // people alike.
+  const [reading, reload] = useProjectAsync(
+    async () => (declared ? await api.related(record.id, { kind: 'decisions', secondLevel: 'show' }) : null),
+    [record.id, record.updatedAt, declared],
+  )
+  if (!declared) return null
   const thisPanel = sectionsOf({ ...record, relations })(DECIDED_HERE_KEY)
   const title = titleHere(record.kind, DECIDED_HERE_KEY)
   if (reading.status === 'loading') return null
-  if (reading.status === 'error') {
-    return (
-      <Panel declares={thisPanel} title={title} rank={2}>
-        <ErrorNote message={reading.message} fault={reading.fault} />
-      </Panel>
-    )
-  }
-  const answer = reading.value.decisionsAboutThis
-  if (answer === undefined) {
-    // THE READING DID NOT CARRY IT, WHICH IS NOT THE SAME AS THERE BEING NONE. An older server
-    // answers this route without the section, and drawing "nothing has been decided" on that reply
-    // would be a claim nothing checked.
-    return (
-      <Panel declares={thisPanel} title={title} rank={2}>
-        <Absence
-          tier="must-act-on"
-          sentence={
-            <>
-              <b>{t('g2b.decided.notLooked')}</b> {t('g2b.decided.notLookedWhy', { kind: kindWord(record.kind).text })}
-            </>
-          }
-        />
-      </Panel>
-    )
-  }
-  const row = (one: DecisionAboutThis) => (
-    <li
-      key={one.id}
-      className="rp-open"
-      data-kind="decision"
-      {...declaredAttributes(theLinkedRecord(one.id, record.workspaceId))}
-    >
-      <span className="rp-open-head">
-        <Tag kind="decision" />
-        <RouteLink to={recordPath(one.id)} className="rp-open-says" {...DRAWS_THE_NAME}>
-          {one.title}
-        </RouteLink>
-      </span>
-      <span className="rp-open-facts">
-        {/* THE DAY, AND A TOLD-APART ABSENCE WHEN THE DAY IS ONLY WHEN IT WAS FILED. Almost every
-            decision in this corpus carries no `decided_on`, so almost every row needs this — and a
-            whole sentence per row would be weight on something nobody has to act on. It goes
-            through `Absence` at the told-apart tier: the word on the row, the sentence in the
-            tooltip and read out to a screen reader, which is the one place it is written. */}
-        <span className="rp-open-state">{one.decidedOn}</span>
-        {one.nobodyWroteWhen ? (
-          <Absence
-            tier="told-apart"
-            looked
-            word={t('g2b.decided.filed')}
-            title={t('g2b.decided.filedTitle')}
-          />
-        ) : null}
-        {/* HOW IT IS ABOUT THIS, in the server's own two words. A decision reached through a fork is
-            not a decision somebody wrote about this module, and a row that did not say so would
-            present the weaker fact as the stronger one. */}
-        <span className="rp-open-state">{one.how === 'governs it' ? t('w13q.decided.governs') : one.how === 'linked to it' ? t('g2b.decided.linked') : t('g2b.decided.throughFork')}</span>
-        {one.throughTheFork === null ? null : (
-          <RouteLink to={recordPath(one.throughTheFork.id)} className="rp-open-hops">
-            {one.throughTheFork.title}
-          </RouteLink>
-        )}
-      </span>
-      <DecisionBasis basis={one.basis} />
-    </li>
-  )
-
-  // THE SAME FOLD AS THE PANEL ABOVE, and the same number, because the two lists sit together and a
-  // module with 29 settled forks would otherwise bury everything under it. Nothing is dropped: the
-  // press says how many are behind it.
-  const first = answer.decisions.slice(0, OPEN_LOOPS_DRAWN)
-  const rest = answer.decisions.slice(OPEN_LOOPS_DRAWN)
+  const drawn: RelatedReading | null =
+    reading.status === 'error'
+      ? { status: 'error', message: reading.message, fault: reading.fault }
+      : reading.value === null
+        ? null
+        : { status: 'ready', value: reading.value }
+  if (drawn === null) return null
   return (
     <Panel declares={thisPanel} title={title} rank={2}>
-      {answer.decisions.length === 0 ? (
-        <p className="rp-open-none">
-          <Absence tier="told-apart" looked word={t('g2b.decided.none')} title={t('g2b.decided.noneTitle')} />
-        </p>
-      ) : (
-        <ul className="rp-open-list">{first.map(row)}</ul>
-      )}
-      {rest.length === 0 ? null : (
-        <details className="rd-fold rp-open-rest">
-          <summary>{t('g2b.decided.more', { n: rest.length })}</summary>
-          <ul className="rp-open-list">{rest.map(row)}</ul>
-        </details>
-      )}
-      {/* The reading's own note says how it looked, so it is developer mode's (plan 7FEOshq3mBGG,
-          G2c). Its words are the lists' (G2b). */}
-      {inspect ? <p className="rp-open-attach">{answer.decisions.length === 0 ? t('g2b.decided.noneNote') : t('g2b.decided.note', { n: answer.decisions.length })}</p> : null}
+      {/* THE SAME FOLD AS THE PANEL ABOVE, and the same number, because the two lists sit together and a module with
+          29 settled forks would otherwise bury everything under it. Nothing is dropped: the press says how many. */}
+      <RelatedList
+        reading={drawn}
+        fold={OPEN_LOOPS_DRAWN}
+        drawRow={(row) => <DecisionFacts row={row} />}
+        workspaceId={record.workspaceId}
+        retry={reload}
+      />
     </Panel>
   )
 }
@@ -1828,7 +1764,7 @@ export function ObligationPanel({
                 {fulfilment.at === null
                   ? t('g2b.obligation.dischargedNoDay')
                   : t('g2b.obligation.dischargedOn', { at: formatWhen(fulfilment.at) })}{' '}
-                {fulfilment.note ?? t('g2b.obligation.noSettleNote')}
+                {fulfilment.note ?? <Absence tier="ordinary" title={t('g2b.obligation.noSettleNote')} />}
               </>
             }
           />
@@ -1851,7 +1787,7 @@ export function ObligationPanel({
               variant="primary"
               pending={busy}
               disabled={note.trim() === ''}
-              reason={t('g2b.obligation.needsNote')}
+              reason={t('g2b.obligation.saySettled')}
             >
               {t('g2b.obligation.record')}
             </Btn>
@@ -2470,15 +2406,7 @@ export function DeadlineWorkPicker({
   const ticked = new Set(chosen)
   return (
     <div className="dp-pick">
-      {/* The note under this heading is now behind the small round question mark. Why Mole Office asks
-          instead of working it out is worth knowing once and is not worth a paragraph above the
-          list every time. */}
-      <h4 className="dp-group">
-        {t('g2b.deadline.whichWork')}
-        <Hint label={t('g2b.deadline.whySay')}>
-          {t('g2b.deadline.whySayBody')}
-        </Hint>
-      </h4>
+      <h4 className="dp-group">{t('g2b.deadline.whichWork')}</h4>
 
       {problem === null ? null : (
         <ErrorNote label={t('g2b.deadline.planUnread')} message={problem.message} fault={problem.fault}>
@@ -2692,9 +2620,7 @@ export function DeadlinePanel({ record, links }: { record: PanelRecord; links: r
         </span>
         {/* The one thing here that no arrangement of pixels can carry: the same hours can be
             written down twice, at two sizes of period, and only one size is counted. */}
-        <Hint label={t('g2b.deadline.whyHorizon')}>
-          {t('g2b.deadline.whyHorizonBody')}
-        </Hint>
+        <Hint>{t('g2b.deadline.oneSizeCounted')}</Hint>
       </div>
 
       {outlookState.status === 'loading' ? (
@@ -2720,12 +2646,7 @@ export function DeadlinePanel({ record, links }: { record: PanelRecord; links: r
             windowless={outlookState.value.outlook.between === null}
             problem={planState.status === 'error' ? { message: planState.message, fault: planState.fault ?? null } : null}
           />
-          <Explain declares={{ surface: null }}
-            meaning={<span>{t('g2b.deadline.explain')}</span>}
-            opens={t('g2b.deadline.explainOpens')}
-          >
-            <p className="rp-note">{outlookState.value.note}</p>
-          </Explain>
+          <ServerNote text={outlookState.value.note} />
         </>
       )}
     </Panel>
@@ -2774,12 +2695,12 @@ export function DeadlinePanel({ record, links }: { record: PanelRecord; links: r
  * is a vocabulary carrying the product's only safety mark; `paused` carries a `PauseUntil` inside
  * it; `parts` is a list of objects each holding a list of objects. Half a nested object is a hard
  * refusal on the write path, so a control that could only write half of one would be a control
- * that cannot succeed. Each of those says so on the row, in the words of its own declaration,
- * rather than being missing from the list — a field with no box and no explanation is how this
- * whole defect looked in the first place.
+ * that cannot succeed. Each of those is marked on the row as having no box, rather than being
+ * missing from the list — a field with no box and no mark is how this whole defect looked in the
+ * first place.
  */
 
-/** What kind of control one declared field gets, or why it gets none. */
+/** What kind of control one declared field gets, or that it gets none. */
 export type WriteControl =
   /** A paragraph. Every declared `string`. */
   | { at: 'text' }
@@ -2795,13 +2716,13 @@ export type WriteControl =
    * whose form is written on its own rather than inside an object.
    */
   | { at: 'forms'; forms: readonly FieldSpec[]; bare: string }
-  /** There is a control for this field, and it is somewhere else on this page. */
-  | { at: 'elsewhere'; because: string }
-  /** No single honest control exists for this shape. The sentence says what the shape is. */
-  | { at: 'no-control'; because: string }
+  /** There is a control for this field, and it is somewhere else. */
+  | { at: 'elsewhere' }
+  /** No single honest control exists for this shape. */
+  | { at: 'no-control' }
 
 /**
- * Fields that already have a control of their own, and where it is.
+ * Fields that already have a control of their own.
  *
  * NOT A LIST OF WHAT IS UNSUPPORTED — every one of these IS writable in the browser, by a control
  * that knows something this generic one does not. A second box beside it would be a second way to
@@ -2814,21 +2735,10 @@ export type WriteControl =
  * is not a declared field of that kind, which turns a rename into a red test rather than into a
  * field that quietly becomes editable twice.
  */
-// Getters, so each sentence is read in the page's language when it is drawn.
-export const WRITTEN_ELSEWHERE: Partial<Record<RecordKind, Readonly<Record<string, string>>>> = {
-  module: {
-    get parts() { return t('g2b.field.elsewhere.parts') },
-    get planning() { return t('g2b.field.elsewhere.planning') },
-  },
-  pipeline: {
-    get blockIds() { return t('g2b.field.elsewhere.blockIds') },
-  },
-  obligation: {
-    get state() { return t('g2b.field.elsewhere.state') },
-    get done() { return t('g2b.field.elsewhere.done') },
-    get fulfilledAt() { return t('g2b.field.elsewhere.fulfilledAt') },
-    get fulfilledNote() { return t('g2b.field.elsewhere.fulfilledNote') },
-  },
+export const WRITTEN_ELSEWHERE: Partial<Record<RecordKind, Readonly<Record<string, true>>>> = {
+  module: { parts: true, planning: true },
+  pipeline: { blockIds: true },
+  obligation: { state: true, done: true, fulfilledAt: true, fulfilledNote: true },
 }
 
 /**
@@ -2844,8 +2754,7 @@ export const RECORD_REF_KEY = 'recordId'
 
 /** What control one declared field gets. Everything is read from the declaration. */
 export function controlFor(kind: RecordKind, field: FieldSpec): WriteControl {
-  const own = WRITTEN_ELSEWHERE[kind]?.[field.key]
-  if (own !== undefined) return { at: 'elsewhere', because: own }
+  if (WRITTEN_ELSEWHERE[kind]?.[field.key] === true) return { at: 'elsewhere' }
 
   const node = declaredTypeOf(field)
   switch (node.kind) {
@@ -2867,46 +2776,20 @@ export function controlFor(kind: RecordKind, field: FieldSpec): WriteControl {
       const shape = node.options.find((option) => option.node.kind === 'shape')
       const bare = node.options.find((option) => option.node.kind === 'scalar')
       const spec = shape?.node.kind === 'shape' ? SHAPE_SPECS[shape.node.name] : undefined
-      if (spec === undefined || bare === undefined) {
-        return {
-          at: 'no-control',
-          because: t('g2b.field.noControlForms'),
-        }
-      }
+      if (spec === undefined || bare === undefined) return { at: 'no-control' }
       return { at: 'forms', forms: spec.fields, bare: bare.expr }
     }
 
-    // The three sentences below start with the SHAPE and not with the key, because the key is on
-    // the row an inch to the left, and they say nothing about how to write it, because the panel
-    // says that once at its foot. Both were repetition measured on a real module page: seven of
-    // eleven rows carried a paragraph, five of them ending in the same record id.
-    //
-    // THEY NAME NO DECLARED TYPE, AND THAT IS PROBLEM 2E5-mceErAZI. They used to paste it in, so a
-    // person changing a record in Normal mode read "a list (string[])", "an open object of keys you
-    // choose (Record<string, unknown>)" or "a ShortForms … It takes label?, title?, …". Those are
-    // the schema's words for an agent, and GET /api/kinds is where an agent reads them. The sentence
-    // says what KIND of shape it is, which is all a person needs to know why there is no box, and
-    // it is worked out from the same declaration, so a new shape needs no new sentence. Developer
-    // mode still shows the declared type, beside the key in DeclaredFields.
+    // A LIST, AN OPEN OBJECT AND A NESTED SHAPE GET NO BOX, and the row says so in one state word.
+    // It names no declared type: those are the schema's words for an agent, and GET /api/kinds is
+    // where an agent reads them. Developer mode still shows the declared type, beside the key in
+    // DeclaredFields.
     case 'array':
     case 'cells':
-      return {
-        at: 'no-control',
-        because: t('g2b.field.noControlList'),
-      }
-
     case 'record':
     case 'open':
-      return {
-        at: 'no-control',
-        because: t('g2b.field.noControlOpen'),
-      }
-
     case 'shape':
-      return {
-        at: 'no-control',
-        because: t('g2b.field.noControlShape'),
-      }
+      return { at: 'no-control' }
 
     // A BARE NULL IS NEVER A FIELD'S TYPE: kinds.ts reads `null` only as one side of a choice, and
     // declaredTypeOf throws on it alone before this. Reaching here means that rule changed without this page.
@@ -2914,6 +2797,11 @@ export function controlFor(kind: RecordKind, field: FieldSpec): WriteControl {
     case 'null':
       throw new Error('A field is declared as null alone, which no control can write.')
   }
+}
+
+/** The state word on the row of a field that has no box here. */
+function noBoxWord(control: { at: 'elsewhere' | 'no-control' }): string {
+  return t(control.at === 'elsewhere' ? 'g2b.field.writtenElsewhere' : 'g2b.field.noBox')
 }
 
 /**
@@ -3177,7 +3065,7 @@ export function draftValue(
 
     case 'elsewhere':
     case 'no-control':
-      return { can: false, because: control.because }
+      return { can: false, because: noBoxWord(control) }
   }
 }
 
@@ -3552,7 +3440,7 @@ export function DeclaredFields({
                 ) : null}
 
                 {offered ? null : (
-                  <p className="fw-why">{control.because}</p>
+                  <p className="fw-no-box">{noBoxWord(control)}</p>
                 )}
 
                 {/* "Restore this record before writing to it" is gone from here, from the links
@@ -3563,12 +3451,11 @@ export function DeclaredFields({
             )
           })}
         </ul>
-        <p className="rp-note">
-          {t('g2b.declared.note')}{' '}
+        <p className="rp-addresses">
           <code className="fw-patch">
             PATCH /api/records/{record.id} {'{"dataPatch":{…}}'}
           </code>{' '}
-          {t('g2b.declared.noteShape')} <code className="fw-patch">GET /api/kinds/{record.kind}</code>
+          <code className="fw-patch">GET /api/kinds/{record.kind}</code>
         </p>
       </Panel>
     </details>
@@ -3789,6 +3676,8 @@ function BodyValue({
   doors,
   dated,
   governs,
+  governsFiles,
+  nothingFits,
   participants,
   titleById,
   replacedBy,
@@ -3807,6 +3696,10 @@ function BodyValue({
   dated?: boolean
   /** True when the value is what a decision governs. Then each record is drawn by its name and each path as the path. */
   governs?: boolean
+  /** Beside `governs`: the decision's stored files part, drawn in the same section. */
+  governsFiles?: unknown
+  /** Beside `governs`: the decision's stored entries for what no page fits, drawn in the same section. */
+  nothingFits?: unknown
   participants?: ParticipantsReply
   titleById?: ReadonlyMap<string, string>
   /** The decisions in this record's id lists that a newer one replaced, said beside each. */
@@ -3872,30 +3765,12 @@ function BodyValue({
       </ul>
     )
   }
-  // WHAT A DECISION GOVERNS: a module, flow or pipeline by its name, as a list of stored ids is drawn, and a path as
-  // the path. No text mark on a record's row, for the reason `NamedRecordList` gives.
+  // WHAT A DECISION GOVERNS, IN ITS THREE PARTS: the pages by their names, the whole project in words, the files, and
+  // what no page fits. An entry the reader could not read is named by its part and its number and drawn as not read,
+  // so the list is not taken for a whole one. `GovernedPlaces` draws it; the files part and what no page fits come in
+  // beside the stored `governs`, because they are drawn here and not as sections of their own.
   if (governs === true) {
-    return (
-      <ul className="rd-list rd-governs">
-        {theGovernedPlaces(value).map((place, i) =>
-          'record' in place ? (
-            <li key={i} data-governs="record">
-              {titleById?.get(place.record) === undefined ? (
-                <span className="rd-named-gone">
-                  <code>{place.record}</code> {t('g2b.body.noSuchId')}
-                </span>
-              ) : (
-                <RouteLink to={recordPath(place.record)}>{titleById.get(place.record)}</RouteLink>
-              )}
-            </li>
-          ) : (
-            <li key={i} data-governs="path">
-              <code className="wrap-anywhere">{place.path}</code>
-            </li>
-          ),
-        )}
-      </ul>
-    )
+    return <GovernedPlaces governs={value} governsFiles={governsFiles} nothingFits={nothingFits} titleById={titleById} />
   }
   // ONE STORED ID IS DRAWN AS A LIST OF ONE, by the same reader, so it says the same thing when nothing answers to it.
   if (names === true && typeof value === 'string') {
@@ -4018,11 +3893,11 @@ function BodyField({
   participants?: ParticipantsReply
   onChanged: () => void
 }) {
-  const [open, setOpen] = useState(false)
   const inspect = useInspect()
-  const field = KIND_SPECS[record.kind]?.fields.find((f) => f.key === section.key)
-  const control = field === undefined ? undefined : controlFor(record.kind, field)
   const handbook = record.kind === 'role_card_words' && ['howItWorks', 'howItWorksZh', 'inPractice', 'inPracticeZh'].includes(section.key)
+  // THE FIELDS DRAWN INSIDE A DECISION'S GOVERNS SECTION, each with its own box once written. The "Add:" row offers only
+  // a field nobody has written, so a field drawn here with no box of its own could be written once and never again.
+  const inside = section.governs ? DRAWN_IN_THE_GOVERNS_SECTION.filter((key) => isWritten(record.data[key])) : []
   let at = 0
   return (
     <>
@@ -4050,6 +3925,8 @@ function BodyField({
         doors={section.doors}
         dated={section.dated}
         governs={section.governs}
+        governsFiles={section.governs ? record.data[GOVERNS_FILES_FIELD] : undefined}
+        nothingFits={section.governs ? record.data[NOTHING_FITS_FIELD] : undefined}
         participants={participants}
         titleById={titleById}
         replacedBy={replacedBy}
@@ -4057,29 +3934,57 @@ function BodyField({
       {handbook ? (
         <p className="rd-change"><RouteLink to={pathFor('roles')}>{t('g6b.roles.title')}</RouteLink></p>
       ) : null}
-      {!editable || field === undefined || control === undefined ? null : control.at === 'elsewhere' ||
-        control.at === 'no-control' ? (
-        <p className="fw-why">{control.because}</p>
-      ) : open ? (
-        <FieldWriter
-          recordId={record.id}
-          kind={record.kind}
-          field={field}
-          control={control}
-          stored={record.data[field.key]}
-          records={records}
-          hint
-          onSaved={onChanged}
-          onClose={() => setOpen(false)}
-        />
-      ) : (
-        <div className="rd-change">
-          <Btn size="sm" onClick={() => setOpen(true)}>
-            {t('g2b.body.change', { field: titleInASentence(section.heading) })}
-          </Btn>
-        </div>
+      {/* A GOVERNS SECTION FILLED ONLY BY ITS FILES, OR BY WHAT NO PAGE FITS, leaves `governs` to the "Add:" row, which
+          offers it while nobody has written it. Every other section is drawn only once its field is written. */}
+      {!editable || !isWritten(record.data[section.key]) ? null : (
+        <FieldChange record={record} fieldKey={section.key} heading={section.heading} records={records} onChanged={onChanged} />
       )}
+      {!editable
+        ? null
+        : inside.map((key) => (
+            <FieldChange key={key} record={record} fieldKey={key} heading={titleHere(record.kind, key)} records={records} onChanged={onChanged} />
+          ))}
     </>
+  )
+}
+
+/** The box that changes one written field, behind its Change press, or the sentence saying why it has none. */
+function FieldChange({
+  record,
+  fieldKey,
+  heading,
+  records,
+  onChanged,
+}: {
+  record: PanelRecord
+  fieldKey: string
+  heading: string
+  records: readonly NamedRecord[]
+  onChanged: () => void
+}) {
+  const [open, setOpen] = useState(false)
+  const field = KIND_SPECS[record.kind]?.fields.find((f) => f.key === fieldKey)
+  const control = field === undefined ? undefined : controlFor(record.kind, field)
+  if (field === undefined || control === undefined) return null
+  if (control.at === 'elsewhere' || control.at === 'no-control') return <p className="fw-no-box">{noBoxWord(control)}</p>
+  return open ? (
+    <FieldWriter
+      recordId={record.id}
+      kind={record.kind}
+      field={field}
+      control={control}
+      stored={record.data[field.key]}
+      records={records}
+      hint
+      onSaved={onChanged}
+      onClose={() => setOpen(false)}
+    />
+  ) : (
+    <div className="rd-change">
+      <Btn size="sm" onClick={() => setOpen(true)}>
+        {t('g2b.body.change', { field: titleInASentence(heading) })}
+      </Btn>
+    </div>
   )
 }
 
@@ -4121,7 +4026,7 @@ function WordControl({
   if (control.at !== 'words') {
     // Not a vocabulary on this kind. Said rather than left blank: a control that silently vanishes
     // is how the missing write controls went unnoticed for as long as they did.
-    return <p className="rd-none">{control.at === 'elsewhere' || control.at === 'no-control' ? control.because : ''}</p>
+    return <p className="rd-none">{control.at === 'elsewhere' || control.at === 'no-control' ? noBoxWord(control) : ''}</p>
   }
   const stored = typeof record.data[fieldKey] === 'string' ? (record.data[fieldKey] as string) : ''
 
@@ -4435,7 +4340,7 @@ function EffortWriter({
 }) {
   const control = controlFor(record.kind, field)
   if (control.at === 'elsewhere' || control.at === 'no-control') {
-    return <p className="fw-why">{control.because}</p>
+    return <p className="fw-no-box">{noBoxWord(control)}</p>
   }
   return (
     <FieldWriter
@@ -4627,7 +4532,7 @@ function KindLead({
       return (
         <Panel declares={{ surface: null }} title={t('g2b.session.title')} rank={1}>
           {doing === null ? (
-            <p className="rd-none"><Absence tier="ordinary" title={t('g2b.session.noDoing')} /></p>
+            <p className="rd-none"><Absence tier="told-apart" looked={false} word={t('word.notRecorded')} /></p>
           ) : (
             <p className="rd-lead" {...textAttributes('data.doing', 0)}>
               {doing}
@@ -5089,10 +4994,7 @@ function TheCommentsNewWords({
 
   return (
     <div className="rd-comment-write">
-      <Field
-        label={t('g2b.comment.whatYouWrote')}
-        hint={t('g2b.comment.nameHint')}
-      >
+      <Field label={t('g2b.comment.whatYouWrote')}>
         <TextArea value={typed} onChange={setTyped} rows={4} growTo={20} autoFocus />
       </Field>
       {refused === null ? null : <ErrorNote message={refused.message} fault={refused.fault} label={t('g2b.comment.refused')} />}
@@ -5287,7 +5189,8 @@ export function WhatWasSpent({ spent, declares, kind }: { spent: SpentOnThis | u
   // NOTHING COUNTED, SAID AS ONE PLAIN LINE (wave 13k round 34). The summary read "No cost is counted: no
   // change to this record names the agent run that made it", and the fold under it explained the change
   // log, which a person cannot act on (the review in 3Zgf2lTGanJw). With no run named, what is true
-  // for a person is that nobody recorded a cost; developer mode keeps the fold and why.
+  // for a person is that nobody recorded a cost; developer mode keeps the fold and why. The line is the
+  // section's label and the word for not recorded, told apart as not looked, in both modes.
   //
   // A REPORT DRAWS NOTHING IN NORMAL MODE WHEN NO RUN IS NAMED (wave 13s round 261), because the line tells
   // the reader of a report nothing. Every other kind keeps it.
@@ -5295,7 +5198,7 @@ export function WhatWasSpent({ spent, declares, kind }: { spent: SpentOnThis | u
   if (runs.length === 0 && !inspect) {
     return (
       <p className="rd-spent-none" data-testid="spent-on-this" {...declaredAttributes(declares)}>
-        {t('g2b.spent.summaryNoRuns')}
+        {t('record.section.spent')} <Absence tier="told-apart" looked={false} word={t('word.notRecorded')} />
       </p>
     )
   }
@@ -5306,7 +5209,7 @@ export function WhatWasSpent({ spent, declares, kind }: { spent: SpentOnThis | u
     <details className="rd-fold" data-testid="spent-on-this" {...declaredAttributes(declares)}>
       <summary {...DRAWS_THE_NAME}>
         {runs.length === 0
-          ? t('g2b.spent.summaryNoRuns')
+          ? <>{t('record.section.spent')} <Absence tier="told-apart" looked={false} word={t('word.notRecorded')} /></>
           : spentSummary(
               runs.length,
               overall.values.inputTokens,
@@ -5315,7 +5218,6 @@ export function WhatWasSpent({ spent, declares, kind }: { spent: SpentOnThis | u
             )}
       </summary>
       <div>
-        <p className="rd-sub">{t('g2b.spent.countsWhat')}</p>
         {runs.length === 0 ? (
           <p className="rd-none">{t('g2b.spent.nobodyChangedIt')}</p>
         ) : (
@@ -6172,6 +6074,8 @@ function ModuleBody(props: RecordDetailProps & { sectionHere: (key: string) => D
         // ModuleView cannot look, and a module with reports about it would draw none of them —
         // which reads as "nobody has written one" and is a different fact.
         moduleId={props.record.id}
+        // THE FOLD OF THE DECISIONS LIST, so the reports and checklists lists beside it fold at the same number.
+        fold={OPEN_LOOPS_DRAWN}
         // WHICH RELATIONS THIS MODULE HAS LINKS OF, so this view's `sectionsOf` and the rail's are
         // the same reading of what the page is made of.
         relations={props.relations}
@@ -6190,6 +6094,7 @@ function ModuleBody(props: RecordDetailProps & { sectionHere: (key: string) => D
       />
       </div>
       {/* WHERE THE PLAN STANDS IN THE PLANNING FLOW. Read only: the office writes it. */}
+      <ReportsScope id={props.record.id} title={props.record.title} />
       <ModulePlanningPanel
         record={props.record}
         participants={props.participants}
@@ -6283,7 +6188,7 @@ function AddRow({
         ))}
       </p>
       {field === undefined || control === undefined ? null : control.at === 'elsewhere' || control.at === 'no-control' ? (
-        <p className="fw-why">{control.because}</p>
+        <p className="fw-no-box">{noBoxWord(control)}</p>
       ) : (
         <FieldWriter
           recordId={record.id}
@@ -6597,10 +6502,9 @@ export function RecordPage({
       {deleted ? (
         <Panel declares={{ surface: null }} title={t('record.deletedTitle')} titleIs="label" kind={t('record.softDelete')} rank={0} tone="broken">
           {/* "It is still here" was the page saying what the page is: the whole record is on screen
-              under this banner, with a Restore button in it. What is NOT visible from here is what
-              the deletion did to every other record that points at this one. */}
-          <p className="rp-deleted-note">
-            {t('record.deletedAt')} {record.deletedAt ? <Stamp at={record.deletedAt} /> : null}. {t('record.brokenLinks')}
+              under this banner, with a Restore button in it. */}
+          <p className="rp-deleted-at">
+            {t('record.deletedAt')} {record.deletedAt ? <Stamp at={record.deletedAt} /> : null}.
           </p>
           <div className="rp-edit-act">
             <Btn variant="primary" pending={busy} onClick={() => void run(() => api.restoreRecord(record.id))}>
@@ -6880,7 +6784,7 @@ export function RecordPage({
           if (field === null) return null
           const control = controlFor(record.kind, field)
           if (control.at === 'elsewhere' || control.at === 'no-control') {
-            return <p className="fw-why">{control.because}</p>
+            return <p className="fw-no-box">{noBoxWord(control)}</p>
           }
           return (
             <FieldWriter
@@ -7036,9 +6940,9 @@ export function RecordPage({
           arrives. It draws nothing when nothing is open, and a reading that failed is drawn. */}
       <StillOpenHere record={record} relations={relationsHere} reading={openLoops} />
 
-      {/* AND WHAT WAS ALREADY SETTLED HERE, from the same reading. It draws nothing on a kind that
+      {/* AND WHAT WAS ALREADY SETTLED HERE AND IN ITS PARTS, from the related door. It draws nothing on a kind that
           declares no such section, which today is every kind but the module. */}
-      <DecidedHere record={record} relations={relationsHere} reading={openLoops} />
+      <DecidedHere record={record} relations={relationsHere} />
       </div>
       </SideBySide>
 
@@ -7315,7 +7219,9 @@ export function titleToDraw(record: { kind: string; title: string; data?: unknow
   // ONLY THE EXACT AUTOGENERATED TITLE IS REDRAWN. A title somebody edited, or an authored title on a record that
   // happens to carry the marker, is theirs and is drawn as stored.
   if (selfRegistration !== null && record.title === `${selfRegistration.handle} registers itself`) {
-    return `${theNameASelfRegistrationIsReadBy(selfRegistration)} registers itself`
+    // HOME'S ROW WORDS, so the heading and the breadcrumb are in the page's language. Written out here, they were
+    // English on a Chinese page.
+    return t('decisions.selfRegistrationRow', { name: theNameASelfRegistrationIsReadBy(selfRegistration) })
   }
   const newKey = theNewKeyAskOn(record)
   if (newKey !== null) {
@@ -7399,6 +7305,17 @@ export function useAsyncRecord(id: string, editing: boolean): [AsyncState<Record
   const [held] = useState(() => peekPreparedRecord(id, editing))
   const used = useRef(false)
   const ready = used.current || held === undefined ? undefined : peekPreparedRecord(id, editing, held)
+  // A RECORD KEPT ONLY IN ITS OWN PROJECT IS OPENED IN THAT PROJECT. Its address names no project, so the browser's
+  // Back, or a link to it followed again, arrives in whichever project is open, where nothing is kept for it. The page
+  // then drew the reading state, and moved only when the server said the record is in another project. A kept answer
+  // belongs to one reader and one project, so it is never drawn under another one: the page moves to the record's
+  // project here, before the first paint, and draws the kept answer there, marked as being read again. A record moved
+  // to another project after its answer was kept is not handled: the page moves to the old project, and the read there
+  // fails beside the kept answer.
+  const [keptIn] = useState(() => (held === undefined ? theProjectARecordIsKeptIn(id, editing) : null))
+  useLayoutEffect(() => {
+    if (keptIn !== null) setWorkspace(keptIn)
+  }, [keptIn])
   return useProjectAsync(() => {
     if (ready !== undefined && !used.current) {
       used.current = true
@@ -7604,17 +7521,17 @@ html[data-theme="light"] .rp-lede-tag[data-title-is="its-label"] { text-transfor
  * banner, the server's reply -- and each already sits inside a panel that constrains it. Capping
  * those at the measure as well drew a 512px ribbon inside a 1146px panel, which is the look the
  * "hard-wrapped prose" complaint was about; the stored text was never the problem. */
-.rp-deleted-note { margin: 0; font-size: var(--fs-2); line-height: var(--lh-body); color: var(--text); }
+.rp-deleted-at { margin: 0; font-size: var(--fs-2); line-height: var(--lh-body); color: var(--text); }
 .rp-recover { display: flex; align-items: center; gap: var(--pad); flex-wrap: wrap; }
 .rp-way-out { color: var(--accent); font-weight: 600; text-decoration: underline; text-underline-offset: .16em; }
 .rp-count { font-size: var(--fs-1); font-weight: 600; color: var(--text-3); }
-.rp-note {
+.rp-addresses {
   margin: var(--gut) 0 0;
   font-size: var(--fs-1);
   line-height: var(--lh-body);
   color: var(--text-3);
 }
-.rp-note code { font-family: var(--font-mono); font-size: 0.94em; }
+.rp-addresses code { font-family: var(--font-mono); font-size: 0.94em; }
 
 /* ---------------------------------------------------------------- what the state says */
 /* One line per fact: the mark, then the sentence that belongs to it. Baseline-aligned and
@@ -8025,9 +7942,9 @@ html[data-theme="light"] .rp-lede-tag[data-title-is="its-label"] { text-transfor
 .fw-now { flex: 1 1 12rem; min-width: 0; font-size: var(--fs-1); color: var(--text-2); overflow-wrap: anywhere; }
 .fw-value { font-family: var(--font-mono); font-size: var(--fs-1); color: var(--text); }
 .fw-written { color: var(--text-3); }
-/* Why there is no box. Quiet, at the reading measure, because it is an explanation and not an
-   alarm — a field with a shape too big for one control is not a fault in the record. */
-.fw-why {
+/* That there is no box. Quiet, because it is a state and not an alarm — a field with a shape too
+   big for one control is not a fault in the record. */
+.fw-no-box {
   margin: 0;
   font-size: var(--fs-1);
   line-height: var(--lh-body);

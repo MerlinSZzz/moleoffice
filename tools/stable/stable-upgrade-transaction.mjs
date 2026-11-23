@@ -19,10 +19,13 @@ import { artifactIdentity, backupSqliteInOneStep, copyArtifactTree, requireIndep
 import { announceUpgrade, beforeEmergencyRequest, beforeUpgradeRequest, completedOutcome, emergencyNoticeContract, finishUpgradeNotice, retryUpgradeNotice, triedAgainForAMinute, validateNoticeConfig } from './stable-upgrade-notices.mjs'
 import { theDatabaseHolders, theExclusiveLockGuard, theFileHash } from '../database-holders.mjs'
 
-import { observeUpgradeTopology, servingUpgradeTopology, upgradeServiceGroups } from './stable-upgrade-processes.mjs'
+import { aProcessByItsName, observeUpgradeTopology, servingUpgradeTopology, theClockTicksASecond, theOrdinaryTopologyUnder, theTicksBy, theUptimeInHundredths, upgradeServiceGroups, whyNotTheStartsOwn } from './stable-upgrade-processes.mjs'
+import { currentProcessRecord } from './stable-bootstrap-processes.mjs'
+import { descendantsOf } from './stable-bootstrap-support.mjs'
 import { STABLE_SERVICE_SETTINGS as SERVICE_SETTINGS } from './stable-service-settings.mjs'
 import { THE_MIGRATIONS_PATH, theReviewedList, theWayBackCheck } from './the-way-back.mjs'
 import { theGateCountSpoolStep } from './stable-gate-count-spool-step.mjs'
+import { THE_ELECTRON_PACKAGE, electronsBinaryIn } from './electrons-binary.mjs'
 import { A_GIGABYTE, THE_ROOM_IS_READ_EVERY_MS, theBuildBytes, theReleaseFloor, theRoom, theRoomRefusal, watchTheRoom } from './stable-release-room.mjs'
 import { THE_FOLDER_WORD, readClosedVerificationResult, validateClosedVerification } from './closed-upgrade-verification.mjs'
 import { clearTheUpgradeMark, readTheUpgradeMark, theResumeCommand, theUpgradeMarkPath, writeTheUpgradeMark } from '../../src/config/the-upgrade-mark.mjs'
@@ -166,13 +169,45 @@ function servingGroup(c) {
   }
   return topology
 }
-function workerIdentity(runtime, primary, c) {
-  const topology = observeUpgradeTopology(runtime, primary, c)
+/** Each process of an ordinary start must name the configured database, port and checkout in its environment. */
+function checkTheStartsEnvironment(topology, c) {
   for (const record of topology.records) {
     const raw = processEnvironment(record.pid)
     explicitDatabaseAndPort(raw, c); developmentCheckout(raw, c)
   }
   return topology
+}
+function workerIdentity(runtime, primary, c) {
+  return checkTheStartsEnvironment(observeUpgradeTopology(runtime, primary, c), c)
+}
+/** When a gate ended, read at its exit event. It never throws, because it runs inside that event. */
+function theGatesEnd() {
+  try { return { hundredths: theUptimeInHundredths() } } catch (error) { return { unread: String(error.message ?? error) } }
+}
+/** Whether the gate of `group` still runs as the recorded process: not ended, not a zombie and not a reused pid. */
+function theGateRuns(group) {
+  try { const gate = processIdentity(group.pgid); return !['Z', 'X'].includes(gate.state) && gate.startTime === group.startTime }
+  catch (error) { if (['ENOENT', 'ESRCH'].includes(error.code)) return false; throw error }
+}
+/**
+ * The live processes `alive` that an ordinary start left in its gate's group after the gate ended, each shown to be the
+ * start's own by whyNotTheStartsOwn, or a failure that names each one that is not. The gate's end is the time of its
+ * exit event, which comes when Node reaps it, so the end is never earlier than the gate really ended.
+ */
+function theStartsOwnInItsEndedGroup(group, alive, c) {
+  if (group.endedAt?.hundredths === undefined) fail(`The time its gate ended could not be read from /proc/uptime (${group.endedAt?.unread ?? 'its exit was not seen'}), so no process's start time can be set beside it.`)
+  const gate = { startTicks: Number(group.startTime), endTicks: theTicksBy(group.endedAt.hundredths) }
+  const strangers = alive.map(row => whyNotTheStartsOwn(row.pid, gate, c)).filter(why => why !== null)
+  if (strangers.length) fail(`Its gate has ended, and its group still holds ${strangers.join('; ')}.`)
+  return alive
+}
+/**
+ * The way back's one sentence when it cannot find or check the processes of an ordinary start. It names the start's
+ * group, says why, and says that nothing was restored.
+ */
+function theWayBackCannotCheck(group, error) {
+  const why = String(error?.message ?? error)
+  return new Error(`The way back restored nothing, because it could not find and check the processes of the ordinary start in process group ${group.pgid}. ${/[.!?]$/.test(why) ? why : `${why}.`}`)
 }
 function listeners(port) {
   const r = spawnSync('ss', ['-H', '-ltnp', `sport = :${port}`], { encoding: 'utf8', timeout: 5_000, env: gitEnvironment() })
@@ -186,12 +221,14 @@ function ownedPort(port, groups) {
   if (!rows || !pids.length || pids.some((pid) => !groups.some((g) => processIdentity(pid).pgid === g.pgid))) fail(`Port ${port} is not served only by the recorded groups.`)
   return pids
 }
-function onlyRecordedDatabaseHolders(c, groups, note = null) {
+/** `wayBack` is set only by the way back, whose failure here also says that it restored nothing. */
+function onlyRecordedDatabaseHolders(c, groups, note = null, wayBack = false) {
   const check = theDatabaseHolders(c.database)
   if (note) note(check)
   const outside = check.holders.filter((p) => !groups.some((g) => g.pgid === p.pgid))
-  if (outside.length) fail(`The database has a holder outside the recorded service groups: ${outside.map((p) => `process ${p.pid} (${p.name})`).join(', ')}.`)
-  if (check.unnamedLocks.length) fail(`A lock on the database names no process found under /proc: ${check.unnamedLocks.join('; ')}.`)
+  const said = wayBack ? 'The way back restored nothing, because the database' : 'The database'
+  if (outside.length) fail(`${said} has a holder outside the recorded service groups: ${outside.map((p) => `process ${p.pid} (${p.name})`).join(', ')}.`)
+  if (check.unnamedLocks.length) fail(`${wayBack ? 'The way back restored nothing, because a lock' : 'A lock'} on the database names no process found under /proc: ${check.unnamedLocks.join('; ')}.`)
   return check
 }
 function checkDatabase(file) {
@@ -325,6 +362,10 @@ export function validateUpgradeConfig(config, wayBack = null) {
   servingGroup(c)
   onlyRecordedDatabaseHolders(c, c.serviceGroups)
   freePort(c.releaseCheckPort)
+  // The way back needs the clock's tick rate to judge an ended gate's group (theStartsOwnInItsEndedGroup). It is read
+  // here, while the old version still serves, so a rate that cannot be read stops this with nothing changed. The way back
+  // then uses the rate kept from this reading.
+  theClockTicksASecond()
   const tree = git(c.developmentRepository, ['rev-parse', `${c.targetCommit}^{tree}`])
   // An emergency BEFORE names the switch's throw and the message, which only the release check reads.
   const beforeRequest = emergency ? null : beforeUpgradeRequest(c, baseline, tree)
@@ -600,6 +641,7 @@ function actionOf(step) {
     'candidate-database': 'copy SQLite into the private candidate database', 'candidate-checkpoint': 'checkpoint the private candidate database into DELETE journal mode',
     clone: 'clone the development repository into independent candidate storage', 'candidate-checkout': 'check out the exact candidate commit detached',
     install: 'install the locked candidate dependencies with npm ci',
+    'electron-binary': "fetch Electron's binary into the candidate's node_modules with the electron package's own install.js, which npm ci does not run",
     'candidate-live-mode': `ask the candidate's own settings whether they take ${LIVE_MODE}`,
     'candidate-typecheck': 'type-check the exact candidate', 'web-build': 'build and stamp the candidate web page',
     'candidate-migrate': 'migrate the private candidate database with the target on the scratch port',
@@ -974,10 +1016,11 @@ async function theTransaction(input, options, wayBack, resumed = null) {
       const out = openSync(log, 'ax', 0o600)
       let child
       try { child = spawn(process.execPath, ['-e', GATE, command, JSON.stringify(args)], { cwd, env: environment, detached: true, stdio: ['ignore', out, out, 'ipc'] }) } finally { closeSync(out) }
-      let exit
-      const ended = new Promise((resolve) => { child.once('error', (e) => { exit = { error: e }; resolve(exit) }); child.once('exit', (code, signal) => { exit = { code, signal }; resolve(exit) }) })
+      let exit, endedAt = null
+      // The gate's end is read here, at its exit event, for the way back's check of what is left in its group.
+      const ended = new Promise((resolve) => { child.once('error', (e) => { exit = { error: e }; resolve(exit) }); child.once('exit', (code, signal) => { endedAt = theGatesEnd(); exit = { code, signal }; resolve(exit) }) })
       if (!child.pid) { await ended; fail(`${name} could not start: ${exit?.error?.message}`) }
-      const group = { pgid: child.pid, startTime: processIdentity(child.pid).startTime, cwd, port, child, ended, log, gateOpened: false, get exit() { return exit } }
+      const group = { pgid: child.pid, startTime: processIdentity(child.pid).startTime, cwd, port, child, ended, log, gateOpened: false, get exit() { return exit }, get endedAt() { return endedAt } }
       if (mode === 'ordinary') group.ordinary = { commit: git(cwd, ['rev-parse', 'HEAD']), repository: cwd, database: readSetting('MOLE_OFFICE_DB', environment).value, port, mode, workerKnown: false, detachedGroups: [] }
       spawned.push(group)
       journal(name, 'group-recorded', { pgid: group.pgid, startTime: group.startTime, cwd, port, log })
@@ -1001,10 +1044,16 @@ async function theTransaction(input, options, wayBack, resumed = null) {
     await step(name, async () => {
       if (group.child && group.exit && members(group.pgid).length === 0) { if (checkPort && group.port) freePort(group.port); return }
       const alive = members(group.pgid)
-      if (group.child && group.exit && alive.length) fail(`The completed group ${group.pgid} has live members or its id was reused; refusing to signal it.`)
+      // An ordinary start's gate can end and leave the start's own processes in its group, such as serve-dev's
+      // stand-in. The way back stops them by the group's id once each is shown to be the start's own. Anything else
+      // stops the way back.
+      const leftByItsStart = Boolean(group.child && group.exit && alive.length && rollingBack && group.ordinary)
+      if (leftByItsStart) { try { theStartsOwnInItsEndedGroup(group, alive, c) } catch (error) { throw theWayBackCannotCheck(group, error) } }
+      else if (group.child && group.exit && alive.length) fail(`The completed group ${group.pgid} has live members or its id was reused; refusing to signal it.`)
       if (alive.length) {
-        const leader = processIdentity(group.pgid)
-        if (leader.pgid !== group.pgid || leader.startTime !== group.startTime) fail(`Refusing to signal reused or unknown group ${group.pgid}.`)
+        // The leader of a group whose start's own processes are left is the gate, which has ended.
+        const leader = leftByItsStart ? null : processIdentity(group.pgid)
+        if (leader && (leader.pgid !== group.pgid || leader.startTime !== group.startTime)) fail(`Refusing to signal reused or unknown group ${group.pgid}.`)
         process.kill(-group.pgid, 'SIGTERM')
         const deadline = Date.now() + c.health.stopTimeoutMs
         while (members(group.pgid).length && Date.now() < deadline) await delay(20)
@@ -1054,7 +1103,10 @@ async function theTransaction(input, options, wayBack, resumed = null) {
     syncTree(to); syncDirectory(dirname(to))
   }
   async function recordWorker(group, runtime) {
-    const topology = workerIdentity(runtime, group, c)
+    await recordTheStartsGroups(group, workerIdentity(runtime, group, c))
+  }
+  /** Records the detached groups of an ordinary start, its server's and its worker's, from its checked topology. */
+  async function recordTheStartsGroups(group, topology) {
     for (const record of [topology.server, topology.worker].filter(Boolean)) {
       if (!group.ordinary.detachedGroups.some(g => g.pgid === record.pgid)) {
         const detachedGroup = { pgid: record.pgid, startTime: record.startTime, cwd: record.cwd, database: c.database, port: null }
@@ -1069,11 +1121,35 @@ async function theTransaction(input, options, wayBack, resumed = null) {
     group.ordinary.serviceGroups = upgradeServiceGroups(topology, c)
     group.ordinary.workerKnown = true
   }
+  /**
+   * The way back reads no health. A start that never answers would never be recorded by it. Instead the way back finds
+   * what each opened ordinary start left running from /proc, under the start's gate, and records the groups it must
+   * stop. A start whose processes it cannot find or check stops the way back before anything is restored.
+   */
   async function recordWorkersBeforeStopping() {
     for (const group of [...spawned].filter(g => g.ordinary && g.gateOpened && !g.ordinary.workerKnown)) {
-      if (group.exit) fail('An ordinary start ended before its detached process identities could be verified.')
-      try { await waitHealth(c, officeRequest, { ...group.ordinary, observeRuntime: runtime => recordWorker(group, runtime) }, theLimitInForce()) } catch (error) { if (!group.ordinary.workerKnown) throw error }
+      try { await recordTheStartUnder(group) } catch (error) { throw theWayBackCannotCheck(group, error) }
     }
+  }
+  async function recordTheStartUnder(group) {
+    if (!theGateRuns(group)) {
+      if (!group.exit) await group.ended
+      const alive = members(group.pgid)
+      if (alive.length === 0) {
+        journal('ordinary-topology', 'gate-ended', { pgid: group.pgid, says: `The ordinary start's gate, process group ${group.pgid}, has ended with nothing left in its group, so the way back records nothing more for it.` })
+        return
+      }
+      const own = theStartsOwnInItsEndedGroup(group, alive, c)
+      journal('ordinary-topology', 'gate-ended-with-members', { pgid: group.pgid, members: own.map(row => row.pid), says: `The ordinary start's gate, process group ${group.pgid}, has ended. Its group still holds ${own.map(row => aProcessByItsName(row.pid)).join(', ')}. Each is the start's own, so the way back stops the group by its id.` })
+      return
+    }
+    if (descendantsOf({ pid: group.pgid, startTime: group.startTime }).every(row => row.pgid === group.pgid)) {
+      journal('ordinary-topology', 'gate-group-only', { pgid: group.pgid, says: `Every live process under the ordinary start's gate is in the gate's own process group ${group.pgid}, so the way back records nothing more and stops that group.` })
+      return
+    }
+    const gate = currentProcessRecord(group.pgid)
+    if (gate.pgid !== group.pgid || gate.startTime !== group.startTime) fail(`Its gate, process ${group.pgid}, ended while its processes were being found.`)
+    await recordTheStartsGroups(group, checkTheStartsEnvironment(theOrdinaryTopologyUnder(gate, c, null), c))
   }
   /**
    * A start's health step. Its done line says, in `seconds` and in its sentence, how long the start took to answer.
@@ -1311,6 +1387,9 @@ async function theTransaction(input, options, wayBack, resumed = null) {
     await step('candidate-checkout', () => git(paths.candidate, ['checkout', '--detach', c.targetCommit]))
     if (git(paths.candidate, ['rev-parse', 'HEAD']) !== c.targetCommit) fail('The candidate did not check out the exact target.')
     await command('install', paths.candidate, 'npm', ['ci', '--include=dev', '--no-audit', '--no-fund'], prepareEnv)
+    await command('electron-binary', paths.candidate, process.execPath, [`${THE_ELECTRON_PACKAGE}/install.js`], prepareEnv)
+    const electron = electronsBinaryIn(paths.candidate, fail)
+    journal('electron-binary', 'checked', { ...electron, says: `Electron's binary ${electron.binary} is in the candidate, ${electron.bytes} bytes.` })
     if (releaseCase.case === 1) {
       const answerFile = join(paths.work, 'live-mode.json')
       await command('candidate-live-mode', paths.candidate, process.execPath, ['--input-type=module', '--eval', ASK_FOR_THE_LIVE_MODE, answerFile], prepareEnv)
@@ -1494,7 +1573,7 @@ async function theTransaction(input, options, wayBack, resumed = null) {
       if (downtime) {
         for (const group of oldGroups()) await stopGroup(group, `recover-old-stop-${group.pgid}`, false)
         freePort(c.servicePort)
-        onlyRecordedDatabaseHolders(c, [], check => recordSetAside(check, 'recovery'))
+        onlyRecordedDatabaseHolders(c, [], check => recordSetAside(check, 'recovery'), true)
         await guardDatabase('recovery')
         if (tagTouched && git(c.stableCheckout, ['tag', '--list', c.candidateTag])) await step('recover-tag', () => git(c.stableCheckout, ['tag', '-d', c.candidateTag]))
         if (codeTouched) await step('recover-checkout', () => git(c.stableCheckout, ['checkout', '-B', 'stable', baseline]))
@@ -1614,6 +1693,10 @@ function theJournalledUpgrade(first) {
  * upgrade mark names runs this. It ends "published", "restored", "unchanged" or NOT RESTORED, as an upgrade does.
  */
 export async function resumeStableUpgrade(lock, options = {}) {
+  // A resume does not run the upgrade's checks, so it reads the clock's tick rate here, for the way back
+  // (theStartsOwnInItsEndedGroup). It reads it first: readTheCrashedJournal takes a claim beside the lock and cuts a torn
+  // last line off the journal, so a rate that cannot be read stops the resume with everything as the crash left it.
+  theClockTicksASecond()
   const crashed = readTheCrashedJournal(lock)
   let resumed
   try {

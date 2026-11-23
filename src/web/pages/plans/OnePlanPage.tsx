@@ -167,7 +167,7 @@ import { PlanProgress } from '../../components/plans/PlanProgress.tsx'
 import { PlanTable } from '../../components/plans/PlanTable.tsx'
 import { lineWithMaths } from '../../components/plans/PlanMaths.tsx'
 import { navigate, plansPath, RouteLink } from '../../components/router.tsx'
-import { Btn, ErrorNote, Hint, Loading, Stamp, StoredState, useAsync } from '../../components/ui.tsx'
+import { Btn, ErrorNote, Loading, Stamp, StoredState, useAsync } from '../../components/ui.tsx'
 import { readChoice, writeStored, type StoreFault } from '../../lib/store.ts'
 import { readParticipantsOnce } from '../../lib/oneread.ts'
 import { type ParticipantsNamed } from '../../lib/participant-lookup.ts'
@@ -583,7 +583,6 @@ function HowItEnds({ plan, title, state, onState, storedLines }: {
     <div className="op-end-head">
       <button type="button" className="op-end-open" aria-expanded={open} onClick={() => setOpen(!open)}>
         <span aria-hidden="true" className="op-end-arrow">{open ? '▾' : '▸'}</span>{t('g8.onePlan.endingThisPlan')}</button>
-      <Hint label={t('g8.onePlan.whatHappensToAPlanThatHasEnded')}>{t('g8.onePlan.itLeavesTheListOnThePlansPageAnd')}</Hint>
     </div>
     <div hidden={!open}>
       <div className="op-end-acts">
@@ -591,7 +590,7 @@ function HowItEnds({ plan, title, state, onState, storedLines }: {
         <PlanUndoPress press={t('g8.onePlan.markItGivenUp')} done={t('g8.onePlan.markedGivenUp')} available={state === 'open'} disabled={busy} onPress={() => end('dropped')} />
       </div>
       {state === 'open' ? null : <>
-        <p className="op-end-say">{t('g8.onePlan.thisPlanHasEndedYouCanStillWriteIn')}</p>
+        <p className="op-end-say">{t('onePlan.ended')}</p>
         <Btn size="sm" pending={busy} onClick={() => {
           setBusy(true); setFailed(null)
           // BUILT ON THE STATE THIS PAGE SHOWS (problem GR4LcaNI-XZk). The write reads the plan, is refused when its state
@@ -702,9 +701,9 @@ function NotAName({ name }: { name: string }) {
   const long = name.length > LONG_FOR_A_NAME
   if (!lines && !long) return null
   return (
-    <p className="op-title-note" role="status">{t('g8.onePlan.itIsStoredExactlyAsYouTypedItThe', { value1: lines
-        ? t('g8.onePlan.thisNameHasMoreThanOneLineInIt')
-        : t('g8.onePlan.thisNameIsCharactersLong', { value1: name.length }) })}</p>
+    <p className="op-title-note" role="status">{lines
+      ? t('g8.onePlan.thisNameHasMoreThanOneLineInIt')
+      : t('g8.onePlan.thisNameIsCharactersLong', { value1: name.length })}</p>
   )
 }
 
@@ -767,8 +766,7 @@ function WrittenSince({ plan, since }: { plan: string; since: PlanSinceReadReply
         {marked ? <>{t('onePlan.markedUnderYourGrant', { secretary: marked.secretary })}{endOfSentence(counted ?? undefined)}</> : null}
         {counted === null ? null : (
           <>
-            {counted}{!inspect || since.writtenBy.length === 0 ? '' : t('g8.onePlan.by', { value1: listJoined(since.writtenBy) })}{endOfSentence('?')}
-            <Hint label={t('g8.onePlan.whyItDoesNotSayAddedOrChanged')}>{t('g8.onePlan.nothingStoresWhenALineFirstAppearedSoMole')}</Hint>
+            {counted}{!inspect || since.writtenBy.length === 0 ? '' : t('g8.onePlan.by', { value1: listJoined(since.writtenBy) })}{endOfSentence()}
           </>
         )}
       </div>

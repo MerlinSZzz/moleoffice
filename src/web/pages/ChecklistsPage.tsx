@@ -1,154 +1,113 @@
 // Copyright © 2026 Zhengyang Shen
 // Licensed under the MIT License. See LICENSE.
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { t } from '@shared/i18n.ts'
 import { EVERY_PROJECT, type ProjectChoice } from '@shared/across-projects.ts'
 import { isClosed, type ChecklistReading, type ChecklistRequest } from '@shared/checklists.ts'
 import { api, type ChecklistsAcrossReply } from '../api.ts'
-import { ProjectChoiceControl, ProjectName, useProjectChoice, useProjectTitles } from '../components/ProjectChoice.tsx'
-import { Btn, ErrorNote, Loading, useAsync, type AsyncState } from '../components/ui.tsx'
+import { ProjectChoiceControl, useProjectTitles } from '../components/ProjectChoice.tsx'
+import { Btn, ErrorNote, Loading, useAsync } from '../components/ui.tsx'
 import { useProjectAsync } from '../lib/project-async.ts'
-import { checklistsPath, RouteLink } from '../components/router.tsx'
 import { declaredAttributes } from '../components/declares.ts'
+import { CHECKLIST_SECTIONS_CSS, ChecklistCard, NewChecklistPress, OpenCount, useOwners } from '../components/ChecklistSections.tsx'
 import {
   CHECKLIST_PARTS_CSS,
   aRefusedPress,
   aSpecialChecklistItem,
   theChecklistsWindowSwitch,
-  countsWords,
   EvidencePicker,
   FoldPress,
   inOrder,
+  theFoldOf,
   ItemMark,
   ItemRow,
-  ownerKey,
-  ownerWords,
-  Progress,
   progressOf,
   refusedPressWords,
-  stepsWaitingOnTheOwner,
   switchTheChecklistsWindow,
   theseMoved,
   useMovedRows,
+  useTheFoldsReading,
   whatTheRowDraws,
   withOpened,
   type DrawnLine,
   type RefusedPress,
 } from '../components/ChecklistParts.tsx'
 /**
- * `#/checklists` — everybody's checklists, a person's and every agent's, in one project or every project;
- * `#/checklists/<id>` is the same page with one checklist opened.
+ * `#/checklists` — everybody's checklists, a person's and every agent's, in one project or every project.
  *
- * LOOK B, by point 1 of a decision: a table grouped by project or by owner, with a switch between
- * the two and counts at the head of each group. A checklist opens beside the
- * table on a wide screen. The page has no section of the reader's own checklists or of what waits on
- * them, because the window at the top right shows those; the page also holds the switch that hides
- * that window.
+ * DESIGN E, as decided: one section for each person who owns a checklist. The reader's own section comes first and is
+ * always open; then each secretary's, each other agent's and each other person's, each group by name. In a section the
+ * checklists lie open as cards side by side, and on a narrow screen the cards stack. Another person's section is
+ * folded to their name and the number of their items still to do; it opens by itself when one of its items waits on
+ * the reader. The reader's own section has the press that makes a new checklist.
  *
- * It is filtered by whose checklist it is and by project. Every word about a checklist is the door's
- * own reading: the counts and the owner's name. The order, what is not finished first and what is finished folded
- * under it, is the one the window draws too, from ChecklistParts.tsx.
+ * A card shows the items not finished at once, folds the finished ones under them, and ends in a row that adds an item
+ * (ChecklistSections.tsx). The presses on an item are those it had before: the box, "Mark done" with the evidence
+ * picker, the standing press, a refused press's words, opening the item. A row that moved when the page read again
+ * takes no press for one second.
+ *
+ * `#/checklists/<id>` is the same page with that checklist's card marked: its section opens and the card is brought into
+ * view. The card is drawn even when the project chosen does not hold it, as decided. The page also holds the switch
+ * that shows or hides the window at the top right.
  */
-
-type Whose = 'everyone' | 'mine' | (string & {})
 
 /**
- * THE READER'S FILTERS OUTLIVE OPENING A CHECKLIST. Opening one is a new address, and the page is drawn
- * again for it; without this the list beside it went back to the project on screen and to
- * everybody's checklists. Kept for this tab only.
+ * THE READER'S CHOICE OF PROJECT OUTLIVES A NEW ADDRESS. Following `#/checklists/<id>` draws the page again; without
+ * this it went back to every project. Kept for this tab only.
  */
-const kept: { choice: ProjectChoice | null; whose: Whose; groupBy: 'owner' | 'project' } = { choice: null, whose: 'everyone', groupBy: 'project' }
+const kept: { choice: ProjectChoice | null } = { choice: null }
 
 export function ChecklistsPage({ id }: { id?: string }) {
-  const [onScreen, setOnScreen] = useProjectChoice()
-  const choice = kept.choice ?? onScreen
+  // EVERY PROJECT UNTIL THE READER CHOOSES ONE HERE, as decided. The window counts each person's items in every
+  // project, so with no project chosen a person's count on the page is the count beside their name in the window.
+  const [choice, setShown] = useState<ProjectChoice>(() => kept.choice ?? EVERY_PROJECT)
   const setChoice = (one: ProjectChoice): void => {
     kept.choice = one
-    setOnScreen(one)
+    setShown(one)
   }
   const titles = useProjectTitles()
-  const [whose, setWhoseHere] = useState<Whose>(kept.whose)
-  const [groupBy, setGroupByHere] = useState<'owner' | 'project'>(kept.groupBy)
-  const setWhose = (one: Whose): void => {
-    kept.whose = one
-    setWhoseHere(one)
-  }
-  const setGroupBy = (one: 'owner' | 'project'): void => {
-    kept.groupBy = one
-    setGroupByHere(one)
-  }
-  const [everyone, reload] = useProjectAsync(() => api.listChecklistsAcross(choice, 'everyone'), [choice], { follows: { kinds: ['checklist'], atMostEveryMs: 5000 } })
-  // THE READER'S OWN, AS THE DOOR READS THEM: which checklists are "yours" is the door's answer, not a
-  // second guess at who is reading. Read in every project, because the opened checklist may be in a project the list
-  // is not showing, and its presses are drawn from this; the list keeps only those it shows.
-  const [mine] = useAsync(() => api.listChecklistsAcross(EVERY_PROJECT), [], { follows: { kinds: ['checklist'], atMostEveryMs: 5000 } })
+  const [everyone, reload] = useProjectAsync(() => api.listChecklistsAcross(choice, 'everyone', 'open'), [choice], { follows: { kinds: ['checklist'], atMostEveryMs: 5000 } })
+  // THE READER'S OWN, AS THE DOOR READS THEM: which checklists are "yours" is the door's answer, not a second guess at
+  // who is reading. Read in every project, because the addressed checklist may be in a project the page is not showing.
+  const [mine, reloadMine] = useAsync(() => api.listChecklistsAcross(EVERY_PROJECT, undefined, 'open'), [], { follows: { kinds: ['checklist'], atMostEveryMs: 5000 } })
   const [opened, reloadOpened] = useProjectAsync(() => (id === undefined ? Promise.resolve(null) : api.readChecklistAcross(id)), [id], { follows: id === undefined ? undefined : { records: [id] } })
+  const readAgain = (): void => {
+    reload()
+    reloadMine()
+    reloadOpened()
+  }
 
-  const controls = (
-    <div className="ckl-controls">
-      <span className="ckl-switch" role="group" aria-label={t('checklists.groupBy')}>
-        <span className="ckl-switch-label">{t('checklists.groupBy')}</span>
-        {(['project', 'owner'] as const).map((one) => (
-          <button key={one} type="button" className="ckl-switch-one" aria-pressed={groupBy === one} onClick={() => setGroupBy(one)}>
-            {t(one === 'owner' ? 'checklists.groupBy.owner' : 'checklists.groupBy.project')}
-          </button>
-        ))}
-      </span>
-      <WhoseChoice whose={whose} onChoose={setWhose} everyone={everyone} />
-      <ProjectChoiceControl choice={choice} onChoose={setChoice} titles={titles} />
-      <WindowSwitch />
-    </div>
-  )
-
-  const list =
+  const body =
     everyone.status === 'loading' || mine.status === 'loading' ? (
       <Loading what={t('checklists.loading')} />
     ) : everyone.status === 'error' ? (
       <ErrorNote message={everyone.message} fault={everyone.fault} retry={reload} />
     ) : mine.status === 'error' ? (
-      <ErrorNote message={mine.message} fault={mine.fault} retry={reload} />
+      <ErrorNote message={mine.message} fault={mine.fault} retry={reloadMine} />
     ) : (
-      <TheList
-        groupBy={groupBy}
+      <Sections
         reading={everyone.value}
-        mineIds={new Set(mine.value.checklists.map((one) => one.id))}
-        whose={whose}
+        mine={mine.value}
+        addressed={opened.status === 'ready' && opened.value !== null ? opened.value.checklist : null}
         titles={titles}
-        openedId={id}
-      />
-    )
-
-  const one =
-    opened.status === 'loading' ? (
-      <Loading what={t('checklists.loadingOne')} />
-    ) : opened.status === 'error' ? (
-      <ErrorNote message={opened.message} fault={opened.fault} />
-    ) : opened.value === null ? null : (
-      <OneChecklist
-        list={opened.value.checklist}
-        titles={titles}
-        yours={mine.status === 'ready' && mine.value.checklists.some((one) => one.id === id)}
-        onChanged={() => {
-          reloadOpened()
-          reload()
-        }}
+        marked={id}
+        project={choice === EVERY_PROJECT ? undefined : choice}
+        readAgain={readAgain}
       />
     )
 
   return (
     <div className="page ckl" data-opened={id === undefined ? 'no' : 'yes'}>
       <style href="mole-office-checklist-parts" precedence="default">{CHECKLIST_PARTS_CSS}</style>
+      <style href="mole-office-checklist-sections" precedence="default">{CHECKLIST_SECTIONS_CSS}</style>
       <style href="mole-office-checklists-page" precedence="default">{CHECKLISTS_PAGE_CSS}</style>
       <h1 className="ckl-title" data-title-is="its-label">{t('checklists.title')}</h1>
-      {controls}
-      {id !== undefined ? (
-        <div className="ckl-split">
-          <div className="ckl-split-list">{list}</div>
-          <div className="ckl-split-one">{one}</div>
-        </div>
-      ) : (
-        list
-      )}
+      <div className="ckl-controls">
+        <ProjectChoiceControl choice={choice} onChoose={setChoice} titles={titles} />
+        <WindowSwitch />
+      </div>
+      {opened.status === 'error' ? <ErrorNote message={opened.message} fault={opened.fault} retry={reloadOpened} /> : null}
+      {body}
     </div>
   )
 }
@@ -175,86 +134,103 @@ function WindowSwitch() {
   )
 }
 
-/** Whose checklists: everyone's, the reader's own, or one owner's, named from the checklists read. */
-function WhoseChoice({ whose, onChoose, everyone }: { whose: Whose; onChoose: (whose: Whose) => void; everyone: AsyncState<ChecklistsAcrossReply> }) {
-  const owners = new Map<string, string>()
-  if (everyone.status === 'ready') for (const list of everyone.value.checklists) owners.set(ownerKey(list), ownerWords(list))
-  return (
-    <label className="ckl-whose">
-      <span className="ckl-whose-label">{t('checklists.whose')}</span>
-      <select className="px-input ckl-select" value={whose} onChange={(event) => onChoose(event.target.value)}>
-        <option value="everyone">{t('checklists.whose.everyone')}</option>
-        <option value="mine">{t('checklists.whose.mine')}</option>
-        {[...owners].map(([key, words]) => (
-          <option key={key} value={key}>{words}</option>
-        ))}
-      </select>
-    </label>
-  )
-}
+// ============================================================================ the sections
 
-function TheList({
-  groupBy,
+function Sections({
   reading,
-  mineIds,
-  whose,
+  mine,
+  addressed,
   titles,
-  openedId,
+  marked,
+  project,
+  readAgain,
 }: {
-  groupBy: 'owner' | 'project'
   reading: ChecklistsAcrossReply
-  mineIds: ReadonlySet<string>
-  whose: Whose
+  mine: ChecklistsAcrossReply
+  /** The checklist `#/checklists/<id>` names, read on its own; null when there is none. */
+  addressed: ChecklistReading | null
   titles: ReadonlyMap<string, string>
-  openedId: string | undefined
+  marked: string | undefined
+  /** Where a new checklist is made: the project chosen, or the project on screen when every project is chosen. */
+  project: string | undefined
+  readAgain: () => void
 }) {
-  const shown = reading.checklists.filter((list) =>
-    whose === 'everyone' ? true : whose === 'mine' ? mineIds.has(list.id) : ownerKey(list) === whose,
+  const lists = useMemo(
+    () => (addressed === null || reading.checklists.some((list) => list.id === addressed.id) ? reading.checklists : [...reading.checklists, addressed]),
+    [reading, addressed],
   )
-  if (shown.length === 0) return <p className="ckl-says">{t('checklists.none')}</p>
-  return <TheTable shown={shown} groupBy={groupBy} titles={titles} openedId={openedId} />
-}
-
-// ============================================================================ the table
-
-function TheTable({ shown, groupBy, titles, openedId }: { shown: ChecklistReading[]; groupBy: 'owner' | 'project'; titles: ReadonlyMap<string, string>; openedId: string | undefined }) {
-  const groups = new Map<string, ChecklistReading[]>()
-  for (const list of shown) {
-    const key = groupBy === 'project' ? list.workspaceId : ownerKey(list)
-    groups.set(key, [...(groups.get(key) ?? []), list])
-  }
+  const own = useMemo(() => {
+    const ids = new Set(mine.checklists.map((list) => list.id))
+    return lists.filter((list) => ids.has(list.id))
+  }, [lists, mine])
+  const owners = useOwners(lists, own)
+  // THE SECTIONS THE READER OPENED OR FOLDED, against the way each is drawn at first.
+  const [toggled, setToggled] = useState<ReadonlySet<string>>(new Set())
+  // THE READING AN ADD'S REPLY HANDED BACK, for each checklist, until the page's own read comes back. The card shows the
+  // item the door stored at once.
+  const [replied, setReplied] = useState<ReadonlyMap<string, ChecklistReading>>(new Map())
+  useEffect(() => setReplied(new Map()), [lists])
+  // THE MARKED CARD IS BROUGHT INTO VIEW ONCE, when it is first drawn.
+  const broughtIntoView = useRef<string | null>(null)
+  useEffect(() => {
+    if (marked === undefined || broughtIntoView.current === marked) return
+    const card = document.querySelector('.cks-card[data-marked="yes"]')
+    if (card === null) return
+    broughtIntoView.current = marked
+    card.scrollIntoView({ block: 'nearest' })
+  })
+  const toggle = (key: string): void =>
+    setToggled((now) => {
+      const next = new Set(now)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
   return (
-    <div className="ckb" {...declaredAttributes({ surface: 'checklists.list' })}>
-      {[...groups].map(([key, lists]) => {
-        const open = lists.reduce((sum, list) => sum + list.counts.open, 0)
-        const waiting = stepsWaitingOnTheOwner(lists)
+    <div className="ckl-sections" {...declaredAttributes({ surface: 'checklists.list' })}>
+      {owners.map((owner) => {
+        const holdsMarked = owner.lists.some((list) => list.id === marked)
+        const open = owner.isTheReader || (owner.waiting || holdsMarked) !== toggled.has(owner.key)
         return (
-          <section key={key} className="ckb-group">
-            <h2 className="ckb-head">
-              <span className="ckb-head-name" data-holds-a-name="">
-                {groupBy === 'project' ? (titles.get(key) ?? key) : ownerWords(lists[0]!)}
-              </span>
-              <span className="ckb-head-counts">{t('checklists.groupCounts', {
-                  lists: lists.length === 1 ? t('checklists.listsOne') : t('checklists.lists', { n: lists.length }),
-                  counts: waiting === 0 ? t('checklists.countsNoneWaiting', { open }) : t('checklists.counts', { open, waiting }),
-                })}</span>
-            </h2>
-            <ul className="ckb-rows">
-              {lists.map((list) => (
-                <li key={list.id} data-current={list.id === openedId ? 'yes' : 'no'}>
-                  <RouteLink className="ckb-row" to={checklistsPath(list.id)}>
-                    <span className="ckb-row-title">{list.title}</span>
-                    <span className="ckb-row-who">
-                      {groupBy === 'project' ? ownerWords(list) : <ProjectName id={list.workspaceId} titles={titles} />}
-                    </span>
-                    <Progress list={list} />
-                    <span className="ckb-row-waiting" data-waiting={list.counts.waitingOnTheOwner > 0 ? 'yes' : 'no'}>
-                      {list.counts.waitingOnTheOwner > 0 ? t('checklists.state.waiting') + ` (${String(list.counts.waitingOnTheOwner)})` : ''}
-                    </span>
-                  </RouteLink>
-                </li>
-              ))}
-            </ul>
+          <section key={owner.key} className="ckl-section" data-owner={owner.key} data-open={open ? 'yes' : 'no'} data-reader={owner.isTheReader ? 'yes' : 'no'}>
+            {owner.isTheReader ? (
+              <div className="ckl-owner">
+                <h2 className="ckl-head" data-holds-a-name="">
+                  <span className="ckl-name">{owner.name}</span>
+                  <OpenCount owner={owner} />
+                </h2>
+                <NewChecklistPress project={project} onMade={readAgain} />
+              </div>
+            ) : (
+              <h2 className="ckl-head" data-holds-a-name="">
+                <button type="button" className="ckl-press" aria-expanded={open} onClick={() => toggle(owner.key)}>
+                  <span className="ckl-mark" aria-hidden="true">
+                    {open ? '▾' : '▸'}
+                  </span>
+                  <span className="ckl-name">{owner.name}</span>
+                  <OpenCount owner={owner} />
+                </button>
+              </h2>
+            )}
+            {open && owner.lists.length > 0 ? (
+              <div className="cks-cards">
+                {owner.lists.map((list) => (
+                  <PageCard
+                    key={list.id}
+                    list={replied.get(list.id) ?? list}
+                    atHand={addressed !== null && addressed.id === list.id ? addressed : null}
+                    titles={titles}
+                    yours={owner.isTheReader}
+                    marked={list.id === marked}
+                    onAdded={(after) => {
+                      setReplied((now) => new Map([...now, [after.id, after]]))
+                      readAgain()
+                    }}
+                    onChanged={readAgain}
+                  />
+                ))}
+              </div>
+            ) : null}
           </section>
         )
       })}
@@ -262,28 +238,39 @@ function TheTable({ shown, groupBy, titles, openedId }: { shown: ChecklistReadin
   )
 }
 
-// ============================================================================ one checklist
+// ============================================================================ one card
 
 /** A press on an item that the door refused, and whether that press asked for a standing item or an ordinary one. */
 type PageRefusal = RefusedPress & { standing: boolean }
 
-function OneChecklist({
+function PageCard({
   list,
+  atHand,
   titles,
   yours,
+  marked,
+  onAdded,
   onChanged,
 }: {
   list: ChecklistReading
+  /** The checklist read whole by its address, when this card is the one addressed, for its fold. */
+  atHand: ChecklistReading | null
   titles: ReadonlyMap<string, string>
   /** Whether the door reads this checklist as the reader's own. Only then are its items given presses. */
   yours: boolean
+  marked: boolean
+  onAdded: (after: ChecklistReading) => void
   onChanged: () => void
 }) {
-  // WHAT IS NOT FINISHED FIRST, and what is finished folded under it until the reader opens the fold.
-  const items = inOrder(list.items)
-  const unfinished = items.filter((item) => !isClosed(item.state))
-  const folded = items.filter((item) => isClosed(item.state))
+  // WHAT IS NOT FINISHED FIRST, and what is finished folded under it until the reader opens the fold. The list read holds
+  // only the items not finished, so the fold is drawn from the counts and its items from the checklist read whole.
+  const unfinished = inOrder(list.items).filter((item) => !isClosed(item.state))
+  const fold = theFoldOf(list)
   const [isOpen, setIsOpen] = useState(false)
+  const foldReading = useTheFoldsReading(list, isOpen, atHand)
+  const shownOpen = foldReading.status === 'ready' || foldReading.status === 'error'
+  const whole = foldReading.status === 'ready' ? foldReading.whole : list
+  const folded = foldReading.status === 'ready' ? inOrder(whole.items).filter((item) => isClosed(item.state)) : []
   // THE ITEMS OPENED, by `<checklist>/<item>`. Closed until the reader opens one.
   const [opened, setOpened] = useState<ReadonlySet<string>>(new Set())
   // EACH ITEM'S PRESS THAT THE DOOR REFUSED, by `<checklist>/<item>`, until the item is pressed again.
@@ -305,30 +292,33 @@ function OneChecklist({
   }
   // THE STANDING PRESS AND ITS REFUSAL ARE DRAWN INSIDE THE ITEM, so only an opened item draws them. The box and its
   // refusal stand under the row, open or not, as in the window.
-  const row = (item: ChecklistRequest): DrawnLine => {
+  const row = (item: ChecklistRequest, from: ChecklistReading = list): DrawnLine => {
     const key = `${list.id}/${item.id}`
     const open = opened.has(key)
-    return { key, draws: JSON.stringify([whatTheRowDraws(item, list, open), open ? [pressed(item), said(item)] : null, canMark(item), boxSaid(item)]) }
+    return { key, draws: JSON.stringify([whatTheRowDraws(item, from, open), open ? [pressed(item), said(item)] : null, canMark(item), boxSaid(item)]) }
   }
-  // WHAT THE OPENED CHECKLIST DRAWS FROM WHAT THE PAGE READ, line by line, top to bottom. The rows that moved when the page
-  // reads again are worked out from this alone (wave 13j round loop-9).
+  // WHAT THE CARD DRAWS FROM WHAT THE PAGE READ, line by line, top to bottom. The rows that moved when the page reads
+  // again are worked out from this alone (wave 13j round loop-9).
   const drawn: DrawnLine[] = [
-    { key: `${list.id}:heading`, draws: JSON.stringify([list.title, ownerWords(list), project, progressOf(list), countsWords(list)]) },
-    ...unfinished.map(row),
-    ...(folded.length === 0 ? [] : [{ key: `${list.id}:fold`, draws: JSON.stringify([folded.length, folded.some((item) => item.state === 'superseded'), isOpen]) }]),
-    ...(isOpen ? folded.map(row) : []),
+    { key: `${list.id}:heading`, draws: JSON.stringify([list.title, project, progressOf(list)]) },
+    ...unfinished.map((item) => row(item)),
+    ...(fold.count === 0 ? [] : [{ key: `${list.id}:fold`, draws: JSON.stringify([fold.count, fold.replaced, shownOpen]) }]),
+    ...folded.map((item) => row(item, whole)),
   ]
-  const moved = useMovedRows(drawn, [list, yours, project], list.id, (rows) => {
+  // THE PROJECTS' NAMES ARE DRAWN, BUT THEIR ARRIVAL IS NOT A READ AGAIN, as decided. Where no side bar has read them
+  // first, as at 390, they can come after the cards. Counted as a read again, they changed every heading line as the
+  // page opened, and every row of every card was marked as moved for a second, in a ring.
+  const moved = useMovedRows(drawn, [list, yours], list.id, (rows) => {
     setRefusals((now) => theseMoved(now, rows))
     setBoxRefusals((now) => theseMoved(now, rows))
   })
-  const drawItem = (item: ChecklistRequest) => {
+  const drawItem = (item: ChecklistRequest, from: ChecklistReading = list) => {
     const key = `${list.id}/${item.id}`
     return (
       <PageItem
         key={item.id}
         item={item}
-        list={list}
+        list={from}
         canMark={canMark(item)}
         boxSaid={boxSaid(item)}
         pressed={pressed(item)}
@@ -357,41 +347,28 @@ function OneChecklist({
     )
   }
   return (
-    <section className="ck1" {...declaredAttributes({ surface: 'checklists.open' })}>
-      {/* THE WAY BACK IS SHOWN ONLY WHERE THE LIST IS NOT BESIDE IT, on a narrow screen. */}
-      <RouteLink className="ck1-back" to={checklistsPath()}>
-        ← {t('checklists.back')}
-      </RouteLink>
-      <h2 className="ck1-title" data-title-is="its-label">{list.title}</h2>
-      <p className="ck1-where">
-        {ownerWords(list)} · <ProjectName id={list.workspaceId} titles={titles} />
-      </p>
-      <p className="ck1-progress">
-        <Progress list={list} />
-        <span className="ck1-counts" data-waiting={list.counts.waitingOnTheOwner > 0 ? 'yes' : 'no'}>
-          {countsWords(list)}
-        </span>
-      </p>
-      <ul className="ck1-items">{unfinished.map(drawItem)}</ul>
-      {folded.length === 0 ? null : (
+    <ChecklistCard list={list} titles={titles} marked={marked} onAdded={onAdded}>
+      <ul className="cks-items">{unfinished.map((item) => drawItem(item))}</ul>
+      {fold.count === 0 ? null : (
         <>
-          <FoldPress folded={folded} open={isOpen} onPress={() => setIsOpen((now) => !now)} />
-          {isOpen ? <ul className="ck1-items ckp-folded">{folded.map(drawItem)}</ul> : null}
+          <FoldPress fold={fold} open={shownOpen} busy={foldReading.status === 'waiting'} onPress={() => setIsOpen((now) => !now)} />
+          {foldReading.status === 'ready' ? <ul className="cks-items ckp-folded">{folded.map((item) => drawItem(item, whole))}</ul> : null}
+          {foldReading.status === 'error' ? <ErrorNote message={foldReading.message} fault={foldReading.fault} /> : null}
         </>
       )}
-    </section>
+    </ChecklistCard>
   )
 }
 
 /**
- * ONE ITEM ON THE CHECKLIST'S PAGE. On the reader's own checklist an open item has a left box: plain items tick
+ * ONE ITEM ON A CARD OF THE PAGE. On the reader's own checklist an open item has a left box: plain items tick
  * directly, and items of the evidence-or-words style open the picker under the row, which wave 14a brought on a
  * message. A standing item has no box. An open item also has a press under its facts, when it is
  * opened, that makes it standing, and a standing one has a press that makes it ordinary again (wave 13j round loop-6).
  * Only an open item: a standing item stays open or replaced only, and the door refuses `standing` on any other state. A
  * press the door refuses says why beside it, in the page's language where the door gave a code (round loop-8). Refused
  * because the checklist changed after the page read it, the page reads it again, and the words stay when the press has
- * gone. The page keeps the refusal, because it draws its words. For a second after the item's row moved as the page
+ * gone. The card keeps the refusal, because it draws its words. For a second after the item's row moved as the page
  * read again, its presses do nothing and say why (round loop-9).
  */
 function PageItem({
@@ -419,7 +396,7 @@ function PageItem({
   /** What the door's refusal of the standing press says now, or null when there is none. */
   said: string | null
   moved: boolean
-  /** Whether the item is opened, as the checklist keeps it. */
+  /** Whether the item is opened, as the card keeps it. */
   opened: boolean
   onOpened: (opened: boolean) => void
   onRefused: (refused: PageRefusal | null) => void
@@ -489,13 +466,13 @@ function PageItem({
       }
       inside={
         pressed || said !== null ? (
-          <span className="ck1-standing">
+          <span className="ckl-standing">
             {pressed ? (
               <Btn size="sm" variant="secondary" pending={busy} disabled={moved} reason={t('w13j.checklistMoved.reason')} onClick={() => void press()}>
                 {t(standing ? 'w13j.checklistStanding.unmake' : 'w13j.checklistStanding.make')}
               </Btn>
             ) : null}
-            {said === null ? null : <span className="ck1-refusal">{said}</span>}
+            {said === null ? null : <span className="ckl-refusal">{said}</span>}
           </span>
         ) : undefined
       }
@@ -514,7 +491,7 @@ function PageItem({
               onReadAgain={onChanged}
             />
           ) : boxSaid !== null ? (
-            <span className="ck1-refusal">{boxSaid}</span>
+            <span className="ckl-refusal">{boxSaid}</span>
           ) : null}
           {moved && pressedMoved ? (
             <span className="px-why ckw-moved-why" role="status">
@@ -530,18 +507,6 @@ function PageItem({
 export const CHECKLISTS_PAGE_CSS = `
 .ckl-title { margin: 0 0 var(--gut) 0; }
 .ckl-controls { display: flex; flex-wrap: wrap; gap: var(--pad) var(--gut); align-items: center; margin: 0 0 var(--gut) 0; }
-.ckl-whose { display: inline-flex; align-items: center; gap: var(--pad); flex-wrap: wrap; }
-.ckl-whose-label, .ckl-switch-label { color: var(--text-2); }
-.ckl-select { min-width: 12rem; max-width: 100%; }
-.ckl-switch { display: inline-flex; align-items: center; gap: 0; }
-.ckl-switch-label { margin-right: var(--pad); }
-.ckl-switch-one {
-  border: var(--border-w) solid var(--border-strong); background: var(--panel); color: var(--text);
-  padding: 4px 12px; min-height: 2rem; cursor: pointer; font: inherit;
-}
-.ckl-switch-one:first-of-type { border-radius: var(--radius-sm) 0 0 var(--radius-sm); }
-.ckl-switch-one:last-of-type { border-radius: 0 var(--radius-sm) var(--radius-sm) 0; border-left: none; }
-.ckl-switch-one[aria-pressed='true'] { background: var(--accent); color: var(--accent-text); font-weight: 600; }
 .ckl-window {
   display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; font: inherit; color: var(--text-2);
   background: var(--panel); border: var(--border-w) solid var(--border-strong); border-radius: var(--radius-sm); cursor: pointer;
@@ -552,49 +517,26 @@ export const CHECKLISTS_PAGE_CSS = `
 .ckl-window[aria-pressed='true'] { color: var(--text); border-color: var(--accent); }
 .ckl-says { margin: 0 0 var(--gut) 0; color: var(--text-2); max-width: var(--measure-in-box); }
 
-.ckb { display: flex; flex-direction: column; gap: var(--gut); min-width: 0; }
-.ckb-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px var(--gut); margin: 0 0 6px 0; font-size: var(--fs-3); }
-.ckb-head-counts { font-size: var(--fs-1); font-weight: 400; color: var(--text-2); }
-.ckb-rows { list-style: none; margin: 0; padding: 0; border: var(--border-w) solid var(--border); border-radius: var(--radius); background: var(--panel); }
-.ckb-rows > li + li { border-top: var(--border-w) solid var(--border); }
-.ckb-row {
-  display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr) auto minmax(0, 1.4fr); gap: 4px var(--gut);
-  align-items: center; padding: 10px var(--gut); color: var(--text); text-decoration: none; min-width: 0;
+.ckl-sections { display: flex; flex-direction: column; gap: var(--gut); min-width: 0; }
+.ckl-section { min-width: 0; }
+.ckl-owner { display: flex; flex-wrap: wrap; align-items: center; gap: var(--pad) var(--gut); margin: 0 0 var(--pad) 0; min-width: 0; }
+/* A HEADING THAT HOLDS A NAME IS DRAWN AS WRITTEN. */
+.ckl-head { margin: 0; min-width: 0; font-size: var(--fs-3); font-weight: 700; text-transform: none; letter-spacing: normal; }
+.ckl-section[data-reader='no'] > .ckl-head { border-bottom: var(--border-w) solid var(--border); }
+.ckl-section[data-reader='no'][data-open='yes'] > .ckl-head { margin: 0 0 var(--pad) 0; }
+/* THE READER'S OWN HEAD: the name, then the open count, spaced as in the other heads. A long name wraps and the count stays whole. */
+.ckl-owner > .ckl-head { display: flex; align-items: center; gap: 8px; }
+.ckl-press {
+  display: flex; align-items: center; gap: 8px; width: 100%; min-height: 2.5rem; padding: 0 4px; border: none; background: none;
+  color: var(--text); font: inherit; text-align: left; cursor: pointer;
 }
-.ckb-row:hover { background: var(--hover); }
-.ckb-rows > li[data-current='yes'] .ckb-row { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); }
-.ckb-row-title { font-weight: 600; overflow-wrap: anywhere; }
-.ckb-row-who { font-size: var(--fs-1); color: var(--text-2); min-width: 0; overflow-wrap: anywhere; }
-.ckb-row-waiting { font-size: var(--fs-1); color: var(--ask); font-weight: 600; }
-.ckl-split { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--gut); align-items: start; }
-.ckl-split .ckb-row { grid-template-columns: minmax(0, 1fr) auto; }
-.ckl-split .ckb-row-who, .ckl-split .ckb-row-waiting { grid-column: 1 / -1; }
-.ckl-split-one { border: var(--border-w) solid var(--border); border-radius: var(--radius); background: var(--panel); padding: var(--gut); min-width: 0; }
-/* BELOW 64rem THE OPENED CHECKLIST TAKES THE WIDTH and the list is reached by its way back; from 64rem the two stand side by side. */
-.ckl-split-list { display: none; }
-@media (min-width: 64rem) {
-  .ckl-split { grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); }
-  .ckl-split-list { display: block; }
-  .ckl-split-one { position: sticky; top: var(--gut); }
-  .ckl-split .ck1-back { display: none; }
-}
+.ckl-press:hover { background: var(--hover); }
+.ckl-mark { flex: none; width: 1rem; color: var(--text-2); }
+.ckl-name { min-width: 0; overflow-wrap: anywhere; }
+.ckl .cks-items .ckp-item[data-state='waiting on the owner'] { background: var(--ask-bg); border-radius: var(--radius-sm); padding-left: 8px; padding-right: 8px; }
+.ckl-standing { display: flex; flex-wrap: wrap; align-items: center; gap: 4px var(--gut); margin: 6px 0 2px 0; }
+.ckl-refusal { color: var(--st-failed); font-size: var(--fs-1); overflow-wrap: anywhere; }
 @media (max-width: 40rem) {
-  .ckl-whose { display: flex; width: 100%; }
-  .ckl-select { flex: 1 1 auto; min-height: 44px; }
-  .ckl-switch-one, .ckl-window { min-height: 44px; }
-  .ckb-row { grid-template-columns: minmax(0, 1fr) auto; }
-  .ckb-row-who, .ckb-row-waiting { grid-column: 1 / -1; }
-  .ckb-row-waiting[data-waiting='no'] { display: none; }
+  .ckl-window, .ckl-press { min-height: 44px; }
 }
-
-.ck1-back { display: inline-block; margin: 0 0 var(--pad) 0; }
-.ck1-title { margin: 0 0 4px 0; overflow-wrap: anywhere; }
-.ck1-where { margin: 0 0 var(--pad) 0; color: var(--text-2); font-size: var(--fs-2); display: flex; flex-wrap: wrap; gap: 0 4px; }
-.ck1-counts { font-size: var(--fs-1); color: var(--text-2); }
-.ck1-counts[data-waiting='yes'] { color: var(--ask); font-weight: 600; }
-.ck1-progress { display: flex; flex-wrap: wrap; gap: 4px var(--gut); align-items: center; margin: 0 0 var(--gut) 0; }
-.ck1-items { list-style: none; margin: 0; padding: 0; max-width: 56rem; }
-.ck1-items .ckp-item[data-state='waiting on the owner'] { background: var(--ask-bg); border-radius: var(--radius-sm); padding-left: 8px; padding-right: 8px; }
-.ck1-standing { display: flex; flex-wrap: wrap; align-items: center; gap: 4px var(--gut); margin: 6px 0 2px 0; }
-.ck1-refusal { color: var(--st-failed); font-size: var(--fs-1); overflow-wrap: anywhere; }
 `

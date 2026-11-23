@@ -68,7 +68,7 @@ export function KeepMyLine({ terminal }: { terminal: string }): React.ReactEleme
 
 function TheOffer({ reading, onKeep, onLeave }: { reading: TheLastLine; onKeep: (text: string) => void; onLeave: () => void }): React.ReactElement {
   if (reading.line === null) {
-    const why = reading.why === 'not-shown' ? t('terminals.keep.notShown') : reading.why === 'too-long' ? t('terminals.keep.tooLong') : t('terminals.keep.none')
+    const why = reading.why === 'not-shown' ? t('terminals.keep.notShownWord') : reading.why === 'too-long' ? t('terminals.keep.tooLongWord') : t('terminals.keep.none')
     return (
       <p className="tm-keep-says" role="status">
         {why}{' '}
@@ -83,8 +83,7 @@ function TheOffer({ reading, onKeep, onLeave }: { reading: TheLastLine; onKeep: 
     <div className="tm-keep-offer">
       <p className="tm-keep-heading">{t('terminals.keep.heading')}</p>
       <p className="tm-keep-line tm-mono">{text}</p>
-      {reading.looksLikeAKey ? <p className="tm-keep-explain tm-keep-key">{t('terminals.keep.looksLikeAKey')}</p> : null}
-      <p className="tm-keep-explain">{t('terminals.keep.explain')}</p>
+      {reading.looksLikeAKey ? <p className="tm-keep-key">{t('terminals.keep.looksLikeAKey')}</p> : null}
       <div className="tm-keep-presses">
         <Btn size="sm" variant="primary" onClick={() => onKeep(text)}>
           {t('terminals.keep.press')}
@@ -106,7 +105,6 @@ const KEEP_MY_LINE_CSS = `
 }
 .tm-keep-heading { margin: 0; font-weight: 600; color: var(--text); }
 .tm-keep-line { margin: 0; color: var(--text); white-space: pre-wrap; overflow-wrap: anywhere; }
-.tm-keep-explain { margin: 0; color: var(--text-2); font-size: 0.9em; }
-.tm-keep-key { color: var(--text); border-left: 3px solid var(--warn, var(--text-2)); padding-left: 0.5rem; }
+.tm-keep-key { margin: 0; font-size: 0.9em; color: var(--text); border-left: 3px solid var(--warn, var(--text-2)); padding-left: 0.5rem; }
 .tm-keep-presses { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 `

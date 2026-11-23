@@ -11,7 +11,7 @@ import { aPartTable } from '../part-tables.ts'
  * One row per role card and project; `project` is '' for the row that holds for every project. Each
  * cell has its value and, in the `_from` column beside it, where the value came from, as JSON read by
  * `readCastingCellSource` in src/shared/casting.ts, or NULL when the cell is empty. SINCE MIGRATION 0190
- * NOTHING READS OR WRITES IT: 0190 copied every row into `casting_rows` below and left this table as it was.
+ * NOTHING READS OR WRITES IT: 0190 copied every row into `casting_rows` and left this table as it was.
  */
 export const casting = aPartTable(sqliteTable('casting', {
   role: text('role').notNull(),
@@ -33,7 +33,7 @@ export const casting = aPartTable(sqliteTable('casting', {
 /**
  * EVERY CHANGE TO A CASTING ROW, append-only, migration 0189: who, when, the row before and after as
  * JSON, and the decisions the writer named. Since migration 0190 nothing reads or writes it: 0190 copied
- * every row, with its id, into `casting_row_changes` below.
+ * every row, with its id, into `casting_row_changes`.
  */
 export const castingChanges = aPartTable(sqliteTable('casting_changes', {
   id: integer('id').primaryKey({ autoIncrement: true }),

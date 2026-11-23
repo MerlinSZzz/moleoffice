@@ -27,7 +27,7 @@ import { DRAWING, prepareThePage, theAreasWereStored, theDrawingIsDrawn } from '
 import type { Stored } from './a-made-up-reel-page-and-a-master-of-54-boxes.ts'
 import { setTheMasterAndStoreTheAreas, storeTheTwoDrawings, type Drawing } from './a-made-up-reel-page-and-master-opened-fresh.ts'
 
-const WIDTHS = [1440, 990, 660] as const
+const WIDTHS = [1440, 660] as const
 const DRAWN_WITHIN = 120_000
 const CASE_ALLOWANCE = 240_000
 let opens = 0

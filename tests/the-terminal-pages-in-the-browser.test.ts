@@ -34,8 +34,8 @@
  *  11. With keeping on, the terminal view says so and names the note with how many lines it kept and left out; the
  *      switch turns keeping off and round 3's press comes back; the person's note shows each kept line, the count of lines
  *      left out and why, and deletes one line by its press (round 4, the coordinator's decision YLv8grhgilBV).
- *  12. In Normal mode the keeping block is the switch, one sentence and the note's link, and nothing else; the switch
- *      turns keeping off as in case 11. Developer mode still shows the whole block, round 11.
+ *  12. In Normal mode the keeping block is the switch and the note's link, and nothing else; the switch turns keeping
+ *      off as in case 11. Developer mode adds the note's counts, round 11.
  *      Photographed in English only, by the decision ENGLISH FIRST.
  *      MUTATION: KeepingWhatIType.tsx draws the whole block in Normal mode too: red.
  *  13. A kept line that looks like a key is kept, and the terminal view says so in one sentence that blocks nothing, in
@@ -53,7 +53,9 @@
  * office answers "off", not "not running". So a second server is started with startAServer and
  * MOLE_OFFICE_TERMINAL_HOLDER=on on a place with no holder, and a browser context of its own sends the
  * built page's API requests to that server (Playwright's route.continue with that server's address).
- * Every answer the page draws there is that real server's answer.
+ * Every answer the page draws there is that real server's answer. The second server is told that its dev
+ * server's page is the built page liveApp serves (MOLE_OFFICE_WEB_PORT and MOLE_OFFICE_WEB), because the
+ * requests it gets carry that page's Origin, and a server takes only its own office's pages.
  *
  * STAND-INS FOR THIS MACHINE'S PROGRAMS (wave 13u, round 3). Terminal management now carries the install press and
  * start at login. Both servers here get a folder first on PATH with a stand-in for each agent tool that prints a version,
@@ -291,7 +293,14 @@ beforeAll(async () => {
   downPlace = aPlace('td')
   mkdirSync(dirname(downPlace.log), { recursive: true, mode: 0o700 })
   writeFileSync(downPlace.log, `2026-10-04 04:59:59 an earlier line\n${LAST_WORD}\n`)
-  down = await startAServer(downPlace, undefined, { MOLE_OFFICE_TERMINAL_HOLDER: 'on', ...theStandInsEnvironment() })
+  // ITS DEV SERVER'S PAGE IS THE ONE THE BROWSER OPENS: the built page liveApp serves. That page's origin is the Origin
+  // of every request routed here, and a server takes an Origin only from a page of its own office.
+  down = await startAServer(downPlace, undefined, {
+    MOLE_OFFICE_TERMINAL_HOLDER: 'on',
+    MOLE_OFFICE_WEB_PORT: String(app.webPort),
+    MOLE_OFFICE_WEB: app.site,
+    ...theStandInsEnvironment(),
+  })
   downContext = await app.browser.newContext({ viewport: { width: 1440, height: 900 } })
   const theDownApi = new URL(down.api)
   const thePagesApiPort = String(app.apiPort)
@@ -396,18 +405,15 @@ describe('the terminal pages', () => {
     await visit(downPage, app.site, '/terminals')
     await downPage.locator('.tm-holder-down').waitFor({ state: 'visible' })
     expect(await downPage.locator('.tm-holder-headline').innerText()).toBe(t('terminals.holder.notRunning'))
-    // WHAT TO DO, AND THE PRESS THAT DOES IT (the coordinator's review, point 1); the raw detail is behind the developers' fold.
-    expect(await downPage.locator('.tm-holder-todo').innerText()).toContain(t('terminals.holder.whatToDo'))
+    // THE PRESS THAT STARTS IT (the coordinator's review, point 1); the holder's last line is behind the developers' fold.
     expect(await downPage.getByRole('button', { name: t('terminals.holder.start') }).count()).toBe(1)
     expect(await downPage.locator('.tm-holder-down .tm-holder-why').isVisible()).toBe(false)
     await downPage.locator('.tm-holder-down .tm-dev > summary').click()
     const why = await downPage.locator('.tm-holder-why').innerText()
-    expect(why).toContain(t('terminals.holder.says'))
-    expect(why).toContain('No terminal holder is running for this office')
     expect(why).toContain(t('terminals.holder.lastWord'))
     expect(why).toContain(LAST_WORD)
     expect(await downPage.locator('.tm-row').count()).toBe(0)
-    expect(await downPage.getByText(t('terminals.none')).count()).toBe(0)
+    expect(await downPage.getByText(t('terminals.noneOpen')).count()).toBe(0)
   }, 120_000)
 
   it("5. an agent's profile page shows its own terminal once, with its project's name, opens it, says when it has none, and refuses an open whose start folder is gone in its language", async () => {
@@ -425,7 +431,7 @@ describe('the terminal pages', () => {
     expect(await panel.nth(0).innerText()).toContain(t('terminals.state.running'))
     // ITS PROJECT BY NAME, as the sidebar shows it, and not by its key.
     expect(await panel.nth(0).locator('.tm-prof-project').innerText()).toBe('Default')
-    expect(await page.getByText(t('terminals.profile.noOwn')).count()).toBe(0)
+    expect(await page.getByText(t('terminals.profile.notListed')).count()).toBe(0)
     await panel.nth(0).locator('.tm-prof-press').click()
     await page.locator('.tm-view .xterm-rows').waitFor({ state: 'visible' })
     const rows = await until(() => theViewsRows(page), (text) => text.includes('agent-42'))
@@ -433,7 +439,7 @@ describe('the terminal pages', () => {
     expect(await page.locator('.tm-view-folder').innerText()).toContain(agentYard)
 
     await visit(page, site, `/who/agent/${idle.id}`)
-    await page.getByText(t('terminals.profile.noOwn')).waitFor({ state: 'visible' })
+    await page.getByText(t('terminals.profile.notListed')).waitFor({ state: 'visible' })
     await page.getByText(t('terminals.profile.noSummoned')).waitFor({ state: 'visible' })
     expect(await page.locator('.tm-prof-press').count()).toBe(0)
     expect(await page.getByRole('link', { name: t('terminals.profile.allTerminals') }).count()).toBe(1)
@@ -445,25 +451,13 @@ describe('the terminal pages', () => {
     expect(set.status, JSON.stringify(set.body)).toBe(200)
     rmSync(gone, { recursive: true })
     await page.getByRole('button', { name: t('terminals.agent.openPress') }).click()
-    const refused = page.locator('.tm-prof-note[role="alert"]')
+    const refused = page.locator('.tm-prof-line[role="alert"]')
     await refused.waitFor({ state: 'visible' })
     expect(await refused.innerText()).toBe(`${t('terminals.agent.openRefused')} ${t('server.terminalAgentStartFolderGone')}`)
     expect(await page.locator('.tm-prof-press').count()).toBe(0)
   }, 120_000)
 
-  it('6. at 390 wide, neither page scrolls sideways', async () => {
-    const { page, site } = theApp()
-    await page.setViewportSize({ width: 390, height: 844 })
-    await visit(page, site, '/terminals')
-    await page.locator('.tm-row').nth(2).waitFor({ state: 'visible' })
-    expect(await sideways(page), 'Terminal management').toBeLessThanOrEqual(1)
-    await visit(page, site, `/who/agent/${worker.id}`)
-    await page.locator('.tm-prof-press').first().waitFor({ state: 'visible' })
-    expect(await sideways(page), "the agent's profile page").toBeLessThanOrEqual(1)
-    await page.setViewportSize({ width: 1440, height: 900 })
-  }, 120_000)
-
-  it('7. every scene at four widths, both themes and both languages scrolls no page sideways, and is photographed when asked', async () => {
+  it('7. every scene at the widest and the narrowest width, in the light theme, scrolls no page sideways in English, still runs in Chinese, and is photographed when asked', async () => {
     const { page, site } = theApp()
     if (downPage === null) throw new Error('No page for the office without a holder.')
     const thePageWithNoHolder = downPage
@@ -643,7 +637,7 @@ describe('the terminal pages', () => {
       await visit(page, site, '/terminals', lang)
       await theRow(page, clay).locator('.tm-row-press').click()
       await page.locator('.tm-view .xterm-rows').waitFor({ state: 'visible' })
-      await page.locator('.tm-keeping-says[data-keeping="on"]').waitFor({ state: 'visible' })
+      await page.locator('.tm-keeping-switch[data-keeping="on"]').waitFor({ state: 'visible' })
       expect(await page.locator('.tm-keeping-switch input').isChecked()).toBe(true)
       expect(await page.locator('.tm-view .tm-keep').count()).toBe(0)
       // THE NOTE IS NAMED WITH ITS COUNTS: four kept, one left out, the one not shown; and the key-like line is said.
@@ -654,7 +648,7 @@ describe('the terminal pages', () => {
       expect(says).not.toContain('plain-words-for-a-password')
       await sweep(page, 'keeping-on', lang)
       await page.locator('.tm-keeping-switch input').click()
-      await page.locator('.tm-keeping-says[data-keeping="off"]').waitFor({ state: 'visible' })
+      await page.locator('.tm-keeping-switch[data-keeping="off"]').waitFor({ state: 'visible' })
       expect(await page.locator('.tm-keeping-switch input').isChecked()).toBe(false)
       await page.locator('.tm-view .tm-keep > .px-btn').waitFor({ state: 'visible' })
       expect((await keeping())['on']).toBe(false)
@@ -684,7 +678,7 @@ describe('the terminal pages', () => {
     expect((after.body['record'] as { data: Record<string, unknown> }).data['body']).toBe("export DB_PASSWORD=hunter2\necho fire them on monday\nread -s -p 'pw: ' x; echo; echo read-done")
   }, 300_000)
 
-  it("12. in Normal mode the keeping block is the switch, one sentence and the note's link; Developer mode keeps the whole block", async () => {
+  it("12. in Normal mode the keeping block is the switch and the note's link; Developer mode adds the note's counts", async () => {
     const { page, site, api } = theApp()
     const kiln = join(place.dir, 'kiln-room')
     mkdirSync(kiln)
@@ -696,26 +690,25 @@ describe('the terminal pages', () => {
 
     await visit(page, site, '/terminals', 'en', 'normal')
     await theRow(page, kiln).locator('.tm-row-press').click()
-    await page.locator('.tm-keeping-says[data-keeping="on"]').waitFor({ state: 'visible' })
-    expect(await theBlock()).toBe('Keep what I type here Lines you type here are kept in a note of yours; passwords and some other lines are left out. Open the note')
+    await page.locator('.tm-keeping-switch[data-keeping="on"]').waitFor({ state: 'visible' })
+    expect(await theBlock()).toBe('Keep what I type here Open the note')
     // AN ORDINARY LINE BRINGS NO WARNING (case 13 is the other side).
     expect(await page.locator('.tm-keeping-key').count()).toBe(0)
     await sweep(page, 'keeping-normal-on', 'en')
     await page.locator('.tm-keeping-switch input').click()
-    await page.locator('.tm-keeping-says[data-keeping="off"]').waitFor({ state: 'visible' })
+    await page.locator('.tm-keeping-switch[data-keeping="off"]').waitFor({ state: 'visible' })
     expect(await page.locator('.tm-keeping-switch input').isChecked()).toBe(false)
     expect((await keeping())['on']).toBe(false)
     await page.locator('.tm-view .tm-keep > .px-btn').waitFor({ state: 'visible' })
-    expect(await page.locator('.tm-view .tm-keeping-says').innerText()).toBe('Nothing you type here is kept. Open the note')
+    expect(await page.locator('.tm-view .tm-keeping-open').innerText()).toBe('Open the note')
     await sweep(page, 'keeping-normal-off', 'en')
 
     const on = await ask(api, `/api/terminals/${shell.id}/keeping`, { method: 'PUT', headers: AS_THE_PERSON, body: { on: true } })
     expect(on.status, JSON.stringify(on.body)).toBe(200)
     await visit(page, site, '/terminals', 'en', 'inspect')
     await theRow(page, kiln).locator('.tm-row-press').click()
-    await page.locator('.tm-keeping-says[data-keeping="on"]').waitFor({ state: 'visible' })
+    await page.locator('.tm-keeping-switch[data-keeping="on"]').waitFor({ state: 'visible' })
     const whole = await theBlock()
-    expect(whole).toContain('Keeping is on. Each line you type here is kept in a note of yours')
     expect(whole).toContain('Lines kept: 1. Lines left out: 0.')
   }, 300_000)
   it('13. a kept line that looks like a key is said in one sentence that blocks nothing, and round 3\'s press offers and keeps one', async () => {
@@ -741,7 +734,7 @@ describe('the terminal pages', () => {
 
     // ROUND 3'S PRESS, with keeping off: the key-like line is offered with the same warning, and kept.
     await page.locator('.tm-keeping-switch input').click()
-    await page.locator('.tm-keeping-says[data-keeping="off"]').waitFor({ state: 'visible' })
+    await page.locator('.tm-keeping-switch[data-keeping="off"]').waitFor({ state: 'visible' })
     await typeThroughTheDoor(api, shell.id, 'echo token=Zx81Ka92Lm03Pq74Rs65Tu56\r')
     // FOUR TIMES ON THE SCREEN: each typing shows the command and then its output.
     await until(() => theStreamsScreen(api, shell.id), (lines) => lines.join('\n').split('token=Zx81Ka92Lm03Pq74Rs65Tu56\n').length > 4, 10_000)

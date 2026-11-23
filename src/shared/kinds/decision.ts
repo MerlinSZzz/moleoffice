@@ -18,7 +18,9 @@
  * file and this one load each other. `DecisionHalf` stays in kind-common.ts.
  */
 import { commonFields, unionOf, type DecisionHalf, type KindSpec, type ShapeSpec } from './kind-common.ts'
+import { GOVERNS_FIELD } from '../governs.ts'
 import { theFourActs } from '../governance-acts.ts'
+import { thePageKindsInWords } from '../page-kinds-in-words.ts'
 
 /**
  * WHAT MAKES A DECISION A DECISION AND NOT AN OPINION. Five words, and absence is refused.
@@ -272,19 +274,21 @@ export const decisionKind: KindSpec = {
         example: ['Madeup100005'],
       },
       {
-        key: 'governs',
+        key: GOVERNS_FIELD,
         type: 'GovernedPlace[]',
         required: false,
         half: 'notes',
         description:
-          'WHAT THIS DECISION GOVERNS: the modules, flows, pipelines and files it applies to, filled when it is recorded. ' +
-          'Each entry names a record by id (`{"record": "<id>"}`) or a path in the repository (`{"path": "src/web/pages"}`). ' +
-          'Before an agent builds in a place it asks GET /api/decisions/governing?path=<file> or ?record=<id>, which ' +
-          'lists the decisions whose governs reaches it, so a decision with nothing here is one no such question finds. ' +
-          'A rule that holds everywhere governs no single place: leave it empty rather than list everything. ' +
-          'This is also what the decision CONCERNS, in the owner\'s words; there is no ' +
+          'WHAT THIS DECISION GOVERNS, THE RECORDS PART: the pages it applies to, each by id (`{"record": "<id>"}`), ' +
+          `${thePageKindsInWords()}. A rule that holds ` +
+          'everywhere names the whole project instead (`{"wholeProject": true}`), and that entry stands alone. Files go ' +
+          'in governsFiles, and what no page fits goes in nothingFits. Every door a decision is made through refuses one ' +
+          'that names no record, no whole project and nothing in nothingFits. Before an agent builds in a place it asks ' +
+          'GET /api/decisions/governing?path=<file> or ?record=<id>. A decision stored before the files part may still ' +
+          'hold a path here (`{"path": "src/web/pages"}`): it is read as a file, and no door takes a new one. ' +
+          'This is also what the decision CONCERNS, as the person calls it; there is no ' +
           'second field for it, and no limit on how many places it names.',
-        example: [{ record: 'kYp1Ds8WmQ2z' }, { path: 'src/web/pages/GovernancePage.tsx' }],
+        example: [{ record: 'kYp1Ds8WmQ2z' }],
       },
       {
         key: 'basis',
@@ -331,7 +335,10 @@ export const decisionKind: KindSpec = {
       option_taken: 're-texture the pads',
       option_index: 0,
       alternatives_rejected: ['swap to a dedicated planner service now'],
-      governs: [{ path: 'printer/profiles/pads.cfg' }],
+      // THE FILE IT IS ABOUT, AND THE PAGE THAT IS MISSING: no module holds the printer profiles yet, so the example
+      // says so in nothingFits rather than claiming the whole project for a rule about one file.
+      governsFiles: ['printer/profiles/pads.cfg'],
+      nothingFits: [{ missing: 'module', what: 'the printer profiles' }],
       replaces: [],
       decided_by: '<your own id or handle>',
       authority: 'reversible engineering judgement',
@@ -389,31 +396,75 @@ export const DECISION_SHAPES: Record<string, ShapeSpec> = {
    * ONE PLACE A DECISION GOVERNS. A decision says what it applies to, so an agent
    * about to build in a place can ask which decisions govern it (GET /api/decisions/governing).
    *
-   * A record OR a path, never both: a module, flow or pipeline is named by its id, and a file, folder or pattern by
-   * its path in the project's repository. The server checks that a named record is live, in the same project and
-   * of one of those three kinds (`assertTheGovernedPlacesAreReal` in src/server/lib/governs.ts).
+   * A record, the whole project, or a path stored before the files part: exactly one of the three. A page is named by
+   * its id. The server checks that a named record is live, in the same project and of a page kind
+   * (`assertTheGovernedPlacesAreReal` in src/server/lib/assert-the-governed-places-are-real.ts). The doors refuse a new
+   * path here and name governsFiles (src/server/lib/what-a-record-names.ts).
    */
   GovernedPlace: {
     name: 'GovernedPlace',
     description:
-      'One place a decision applies to: a module, flow or pipeline by its id in `record`, or a file, a folder or a ' +
-      'pattern by its path in `path`. Exactly one of the two.',
+      'One place a decision applies to: a page by its id in `record`, or the whole project with `wholeProject` true. ' +
+      'Exactly one. A decision stored before governsFiles may hold a path in `path`; no door takes a new one.',
     fields: [
       {
         key: 'record',
         type: 'string',
         required: false,
-        description: 'The id of a live module, flow or pipeline in the same project.',
+        description: `The id of a live page in the same project: ${thePageKindsInWords()}.`,
         example: 'kYp1Ds8WmQ2z',
+      },
+      {
+        key: 'wholeProject',
+        type: 'boolean',
+        required: false,
+        description: 'True when the decision holds everywhere in the project. This entry stands alone in governs.',
+        example: true,
       },
       {
         key: 'path',
         type: 'string',
         required: false,
         description:
-          'A path relative to the repository root, as a module claims one: a file, a folder (which covers every file ' +
-          'under it) or a pattern with * or **.',
+          'A path stored before governsFiles existed. It is read as a file. A new file goes in governsFiles, and the ' +
+          'doors refuse a new path here.',
         example: 'src/web/pages/GovernancePage.tsx',
+      },
+    ],
+  },
+
+  /**
+   * WHAT NO PAGE FITS, on a decision or a report (src/shared/kind-fields/decision-wave-13s.ts and report-wave-13s.ts).
+   * Its three fields are read: the missing kind and the words by the reminder that goes at once, and the nearest page
+   * by the choice of who receives it (src/server/lib/what-a-record-names.ts).
+   */
+  NothingFits: {
+    name: 'NothingFits',
+    description:
+      'A page the record should name and that does not exist yet: the kind of page that is missing, a few words on ' +
+      'what it would be, and the nearest live page where there is one.',
+    fields: [
+      {
+        key: 'missing',
+        type: 'string',
+        required: true,
+        description:
+          'The kind of page that is missing, such as module or flow, or "other" when no kind of page would fit.',
+        example: 'module',
+      },
+      {
+        key: 'what',
+        type: 'string',
+        required: true,
+        description: 'A few words on what the missing page would be.',
+        example: 'the printer profiles',
+      },
+      {
+        key: 'nearest',
+        type: 'string',
+        required: false,
+        description: 'The id of the nearest live page in the same project, when there is one.',
+        example: 'kYp1Ds8WmQ2z',
       },
     ],
   },

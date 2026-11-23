@@ -13,7 +13,7 @@
  * 6. A stored value that is not 0, 1 or nothing is not read as off or on: the reading refuses it.
  *
  * WHERE THE RULES LIVE: src/server/lib/related-tests-first.ts (the one reader and writer) and
- * src/server/api/related-tests-first.ts (who may switch it). The merge tool's side is in tests/the-merger-suite.test.ts.
+ * src/server/api/related-tests-first.ts (who may switch it).
  */
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'

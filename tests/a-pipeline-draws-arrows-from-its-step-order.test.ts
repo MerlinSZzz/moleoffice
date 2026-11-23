@@ -17,14 +17,14 @@
  *
  * The test writes each `feeds` row straight into its own throwaway database, as an import would
  * leave it. POST /api/links writes one too since round 216, and
- * tests/a-feeds-link-is-written-between-two-steps.test.ts proves that door. The page reads it through
+ * tests/a-feeds-link-is-written-between-steps-and-modules.test.ts proves that door. The page reads it through
  * `GET /api/links`, the one bulk link read.
  *
  * MUTATION, after a control run: in PipelineFlow.tsx, layoutFlow draws no order edges when the
  * pipeline stores none. Cases 1 and 3 go red, and case 2 stays green.
  *
- * PICTURES: only when TEST_SHOTS names a folder. Every pipeline is photographed at 1440, 990, 660
- * and 390, in light and dark, in English and Chinese.
+ * PICTURES: only when TEST_SHOTS names a folder. Every pipeline is photographed at 1440 and 390,
+ * in light, in English and Chinese.
  */
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
@@ -36,10 +36,11 @@ import { testShots, TEST_SHOTS, photographWithNothingOver } from './where-shots-
 import { theWordAPageDraws } from './words-waiting-for-translation.ts'
 
 const LANGUAGES = ['en', 'zh'] as const
-const LOOKS = ['light', 'dark'] as const
-const WIDTHS = [1440, 990, 660, 390] as const
+const LOOKS = ['light'] as const
+const WIDTHS = [1440, 390] as const
 
-const ORDER_LEGEND = 'g7b.PipelineFlow.a_lighter_line_is_the_order_the'
+// CRITERION CHANGE, as decided: the legend line is the name "step order" beside its mark, not a sentence.
+const ORDER_LEGEND = 'pipelineFlow.legend.stepOrder'
 const ORDER_HOVER = 'g7b.PipelineFlow.the_next_step_in_the_stored_order'
 
 let db: TestDb

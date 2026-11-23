@@ -27,7 +27,7 @@ import type { FastifyInstance } from 'fastify'
 
 import { apiApp, freshDb, type TestDb } from './helpers.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
-import { theRuntimeWordsSaid } from '../src/shared/participants.ts'
+import { whatTheOfficeDoesForAHarnessWithNoAdapter } from '../src/shared/participants.ts'
 
 let t: TestDb
 let app: FastifyInstance
@@ -229,20 +229,22 @@ describe('a session says it is answering as an agent', () => {
     expect(reply.json().error).toContain('No durable agent in this installation has the handle')
   })
 
-  it('refuses a runtime word this product has no adapter for', async () => {
+  it('holds a runtime word this product has no adapter for, stores it as written, and says the office cannot start it', async () => {
     const reply = await hold(sessionRecord, 'some-other-tool')
 
-    expect(reply.statusCode).toBe(400)
-    // READ FROM THE ONE PLACE THE WORDS ARE DECLARED, for the same reason the refusal itself now
-    // reads it: a copy of the list here would keep this green while the refusal went out of date.
-    expect(reply.json().error).toContain(theRuntimeWordsSaid())
+    expect(reply.statusCode).toBe(201)
+    const said = reply.json() as { hold: { runtime: string }; cannotStart: string | null }
+    expect(said.hold.runtime).toBe('some-other-tool')
+    // READ FROM THE ONE PLACE THE SENTENCE IS MADE, so a copy here cannot stay green while the answer goes out of date.
+    expect(said.cannotStart).toBe(whatTheOfficeDoesForAHarnessWithNoAdapter('some-other-tool'))
   })
 })
 
 describe('the heartbeat', () => {
   it('moves the heartbeat and leaves everything else on the hold alone', async () => {
     const first = (await hold(sessionRecord)).json() as { hold: { id: string; claimedAt: string; lastHeardAt: string } }
-    await letTimePass(1100)
+    const second = Math.floor(Date.now() / 1000)
+    while (Math.floor(Date.now() / 1000) === second) await letTimePass(10)
 
     const reply = await app.inject({
       method: 'POST',

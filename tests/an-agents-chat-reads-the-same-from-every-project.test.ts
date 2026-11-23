@@ -8,7 +8,7 @@
  * had recorded its duties in this project, and another department's agent showed other duties too. The chat is the
  * message centre's own and belongs to no project, so what it shows of an agent is the same from every project.
  *
- * WHAT IS MEASURED: two agents' chats, each opened from both projects, at 1440, 990, 660 and 390 in both themes. One is a
+ * WHAT IS MEASURED: two agents' chats, each opened from both projects, at 1440 in the light theme. One is a
  * secretary held by a live session, as the live office's secretary is. The other is a supervisor the secretary's duties name, with its own
  * conversation in its own project. In the conversation's heading: the dot's colour, the presence word, the duty line, the
  * personal line and the "Working on" line. At 1440, where the contact list is beside the conversation, the contact row's
@@ -145,7 +145,7 @@ async function whatOneChatShows(page: Page, who: keyof typeof ids, project: stri
   return seen
 }
 
-for (const width of [1440, 990, 660, 390]) for (const theme of ['light', 'dark'] as const) it(`shows each agent the same from both projects at ${width} in ${theme}`, async () => {
+for (const width of [1440]) for (const theme of ['light'] as const) it(`shows each agent the same from both projects at ${width} in ${theme}`, async () => {
   const seen: Record<string, Record<string, Awaited<ReturnType<typeof whatOneChatShows>>>> = { keeper: {}, supervisor: {} }
   for (const project of PROJECTS) {
     const both = await whatTheChatsShow(project, width, theme)

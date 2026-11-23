@@ -282,14 +282,30 @@ async function refusedAndNothingChanged(press: APress, who: string, words: strin
 function theFourCases(one: ADoor): void {
   describe(one.door, () => {
     let press: APress
+    let openedAgent: AReply | undefined
+    const sendForCase = async (headers: Record<string, string>): Promise<AReply> => {
+      const done = await send(press, headers)
+      if ((one.door === 'terminals.open-an-agent' || one.door === 'terminals.bring-back') && done.status === 201) openedAgent = done
+      return done
+    }
     beforeAll(async () => {
       press = await one.make()
+    }, 60_000)
+    afterEach(async () => {
+      if (openedAgent === undefined) return
+      const terminal = openedAgent.body.terminal as TerminalReading
+      const session = String(openedAgent.body.session)
+      await readTheStream(api, terminal.id, PERSON, events => events.some(e => JSON.stringify(e.data).includes('STAND-IN claude ARGS')))
+      const closed = await call('POST', `/api/terminals/${terminal.id}/close`, PERSON, {})
+      expect(closed.status, closed.raw).toBe(200)
+      await until(() => t.api.getRecord(session)!.data['state'], state => state !== 'running')
+      openedAgent = undefined
     }, 60_000)
 
     it('1: with no grant and a may-press row, follows the door’s own permission', async () => {
       answer(one.door, 'may-press')
       if (one.ownKey) {
-        const read = await send(press, as(UNRAISED))
+        const read = await sendForCase(as(UNRAISED))
         expect(read.status, read.raw).toBeLessThan(300)
         return
       }
@@ -299,7 +315,7 @@ function theFourCases(one: ADoor): void {
 
     it('2: granted, with no row, refuses in the check’s words naming the door', async () => {
       if (one.ownKey) {
-        const done = await send(press, as(RAISED))
+        const done = await sendForCase(as(RAISED))
         expect(done.status, done.raw).toBeLessThan(300)
         return
       }
@@ -310,7 +326,7 @@ function theFourCases(one: ADoor): void {
     it('3: with the row at kept, says it is this office’s answer', async () => {
       answer(one.door, 'kept')
       if (one.ownKey) {
-        const done = await send(press, as(RAISED))
+        const done = await sendForCase(as(RAISED))
         expect(done.status, done.raw).toBeLessThan(300)
         return
       }
@@ -323,7 +339,7 @@ function theFourCases(one: ADoor): void {
       const before = await press.state()
       const changes = theLast('changes')
       const presses = theLast('presses_for_the_person')
-      const done = await send(press, as(RAISED))
+      const done = await sendForCase(as(RAISED))
       expect(done.status, `${one.door}: ${done.raw}`).toBeLessThan(300)
       if (one.ownKey || operationNamed(one.door)?.effect === 'read') {
         expect(pressesSince(presses), `${one.door} is a read, and it wrote a press row`).toEqual([])

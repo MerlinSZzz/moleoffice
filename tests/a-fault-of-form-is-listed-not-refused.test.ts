@@ -11,7 +11,7 @@
  * WHAT IS CLAIMED
  * ---------------------------------------------------------------------------------------
  *
- *   1. For each of the ten rules, R1 to R10, at "remind": the first sealing write by the run's own key is reminded, the
+ *   1. For each of the eleven rules, R1 to R11, at "remind": the first sealing write by the run's own key is reminded, the
  *      reminder names the rule's item as certain, its `refuses` list is empty, and the office's line does not say
  *      "refuses the seal" for it. The same write sent again seals: the reply is 200 and the run's state is `finished`.
  *      The before-the-seal row's stopped count, read through GET /api/office/gates, is the same after the seal as before
@@ -26,7 +26,8 @@
  *        R8  a run with no doing line;
  *        R9  a run not linked about the refusal that still stands on the latest earlier ended run of its agent; with two
  *            such runs, only the latest is asked for;
- *        R10 a report the run filed that is linked about no run.
+ *        R10 a report the run filed that is linked about no run;
+ *        R11 a report the run filed that is linked about no page and has no nothingFits entry.
  *   2. A records seal whose carried record has no short forms is reminded and seals at "remind" on the second write.
  *   3. A launcher-shaped finish sent by the starter's key with `remindBeforeTheSeal: false`, over a fault of form, seals
  *      at once.
@@ -179,11 +180,15 @@ async function aRun(title: string, options: { agent?: string; doing?: string | n
 
 let reportsFiled = 0
 
+/** The made-up module every report here is about, filed at the first report that asks for it. */
+let thePage: string | undefined
+
 /**
  * A report the run's agent files in the run's own session, as a round files its report. By default it is complete,
- * lists every chapter, says the audit table is left for the merge queue, is linked about the run and has its label.
+ * lists every chapter, says the audit table is left for the merge queue, is linked about the run and about a page, and
+ * has its label. `page: false` leaves out the link to the page.
  */
-function aReport(run: ARun, options: { leaveOut?: string[]; linked?: boolean; label?: boolean } = {}): string {
+function aReport(run: ARun, options: { leaveOut?: string[]; linked?: boolean; page?: boolean; label?: boolean } = {}): string {
   reportsFiled += 1
   const data: Record<string, unknown> = {
     for: 'The supervisor of the made-up round',
@@ -200,6 +205,10 @@ function aReport(run: ARun, options: { leaveOut?: string[]; linked?: boolean; la
     actor: { type: 'agent', id: run.agent, sessionId: run.id },
   }).id
   if (options.linked !== false) t.api.createLink({ fromId: id, toId: run.id, type: 'about', actor: THE_PERSONS_ACTOR })
+  if (options.page !== false) {
+    thePage ??= t.api.createRecord({ workspaceId: 'default', kind: 'module', title: 'Synthetic module the reports are about', origin: 'fixture', data: {}, actor: THE_PERSONS_ACTOR }).id
+    t.api.createLink({ fromId: id, toId: thePage, type: 'about', actor: THE_PERSONS_ACTOR })
+  }
   if (options.label !== false) aLabelFor(id)
   return id
 }
@@ -456,6 +465,12 @@ describe('each fault of form is listed before the seal, not refused', () => {
     const loose = aReport(run, { linked: false })
     await theFaultIsListed(run, `report:${loose}:about-a-run`, loose)
   })
+
+  it('1, R11: a report the run filed that is linked about no page and has no nothingFits entry', async () => {
+    const run = await aRun('Synthetic run that filed a report about no page')
+    const loose = aReport(run, { page: false })
+    await theFaultIsListed(run, `report:${loose}:about-a-page`, loose)
+  })
 })
 
 describe('whose seal is listed, and the block that still refuses', () => {
@@ -559,7 +574,7 @@ describe('the items that never refuse', () => {
     const reminder = (first.json() as { beforeTheSeal: TheReminderInAReply }).beforeTheSeal
     const keys = reminder.items.filter((one) => one.mechanical !== true).map((one) => one.key)
     expect(keys).toContain('copied:tests/made-up.test.ts')
-    expect(keys).toContain('test:tests/made-up.test.ts')
+    expect(keys).not.toContain('test:tests/made-up.test.ts')
     expect(reminder.refuses).toEqual([])
     const said = String(t.api.getRecord(reminder.line)!.data['saidInFull'] ?? t.api.getRecord(reminder.line)!.data['body'])
     expect(said).not.toContain('refuses the seal]')
@@ -589,6 +604,7 @@ describe('the one list, pure', () => {
     certain('run:doing', 'run'),
     certain('run:O1:refusal', 'run'),
     certain('report:R2:about-a-run', 'report'),
+    certain('report:R2:about-a-page', 'report'),
   ]
   const A_MIGRATION_ITEM = certain('migration:tests/made-up.test.ts:1:bare-prefix', 'migration')
   const A_SECOND_MIGRATION_ITEM = certain('migration:tests/made-up-two.test.ts:1:bare-prefix', 'migration')

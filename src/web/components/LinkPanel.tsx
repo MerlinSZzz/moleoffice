@@ -59,7 +59,6 @@ import {
   Absence,
   Btn,
   ErrorNote,
-  Explain,
   Field,
   GateMark,
   IncompleteMark,
@@ -543,10 +542,8 @@ function TitleField({
   onChange: (next: string) => void
   knownTitles: readonly TitleOption[]
 }) {
-  const inspect = useInspect()
   const base = useId()
   const id = `${base}-c`
-  const hintId = `${base}-h`
   const listId = `${base}-l`
   // THE SUGGESTIONS ARE DRAWN WHEN THE BOX IS FIRST USED, and stay drawn. A browser shows a datalist only to a box that
   // has the focus, so nobody sees the list sooner. Drawn with the form, the 116,300 or so titles of the made-up office
@@ -563,7 +560,6 @@ function TitleField({
         id={id}
         list={listId}
         value={value}
-        aria-describedby={inspect ? hintId : undefined}
         placeholder={t('record.links.titleExample')}
         onFocus={() => setUsed(true)}
         onChange={(e) => onChange(e.target.value)}
@@ -579,13 +575,6 @@ function TitleField({
           ? knownTitles.map((one) => <option key={one.id} value={one.value} label={one.note ?? undefined} />)
           : null}
       </datalist>
-      {/* A storage note, and it answers a question only somebody who knows there IS a stored
-          direction can ask. In normal mode the form takes a title and a word and says so. */}
-      {inspect ? (
-        <span className="px-hint" id={hintId}>
-          {t('record.links.reverseNote')}
-        </span>
-      ) : null}
     </div>
   )
 }
@@ -737,24 +726,13 @@ export function waitingNote(links: readonly GatedLink[]): string | null {
 }
 
 /**
- * How many of the links on this record nobody has confirmed, as one sentence.
+ * How many of the links on this record nobody has confirmed, as a count.
  *
- * Written out here rather than assembled in the markup because the awkward cases are the SMALL
- * ones, and a record with a single inferred link is the common case rather than a corner: "1 of
- * these 1 links was worked out" is the sentence a count-everything rule writes when it is not
- * looking. `waitingNote` above is written out for the same reason and the two now agree about it.
- *
- * Null when nothing was inferred, so the caller draws no disclosure at all — a fold that opens onto
- * "none of them" is a dead end.
+ * Null when nothing was inferred, so the caller draws no line at all.
  */
 export function inferredNote(inferred: number, total: number): string | null {
   if (inferred <= 0) return null
-  if (total === 1) return t('record.links.oneInferred')
-  if (inferred === total) {
-    return t('record.links.allInferred', { n: total })
-  }
-  if (inferred === 1) return t('record.links.someInferred', { n: 1, total })
-  return t('record.links.someInferred', { n: inferred, total })
+  return t('record.links.notConfirmed', { n: inferred, total })
 }
 
 export function LinkPanel({
@@ -841,25 +819,9 @@ export function LinkPanel({
         }
       >
         {waiting === null ? null : <p className="lp-waiting">{waiting}</p>}
-        {/* THE COUNT IS THE FACT AND THE CONVENTION IS THE EXPLANATION, so they are drawn as two
-            different things. How many of the links below nobody has confirmed is about THIS record
-            and stays on screen; what a dashed edge means is about the app, is read once, and is
-            behind the same `Explain` every other surface now uses for exactly this. Before this
-            pass the whole thing was one permanent paragraph, which made this panel the only place
-            left in the product that explained itself by default. */}
-        {inferredSaid === null ? null : (
-          <div className="lp-inferred">
-            <Explain declares={{ surface: null }} meaning={inferredSaid} opens={t('record.links.dashMeaning')}>
-              {/* The count clause that used to open this sentence is the line above it now, so
-                  saying it twice would be the whole point of the fold undone. What is left is the
-                  half a reader cannot work out for themselves, and "that" still points at the sentence
-                  directly above it. */}
-              <p className="lp-note">
-                {t('record.links.dashed')}
-              </p>
-            </Explain>
-          </div>
-        )}
+        {/* THE COUNT IS THE FACT, about THIS record, and it stays on screen. The dashed edge and the
+            inferred mark on each row say which links it counts. */}
+        {inferredSaid === null ? null : <p className="lp-inferred">{inferredSaid}</p>}
 
         {/* THE OUTGOING/INCOMING SPLIT IS A STORAGE FACT, AND EVERY ROW ALREADY SAYS WHICH WAY IT
             READS. The server sends `label` as the phrase from THIS record's point of view, so an
@@ -873,10 +835,10 @@ export function LinkPanel({
         {inspect ? (
           <>
             <h3 className="lp-group" data-title-is="its-label">
-              {t('record.links.outgoing')} <span className="lp-group-note">{t('record.links.outgoingNote')}</span>
+              {t('record.links.outgoing')}
             </h3>
             {outgoing.length === 0 ? (
-              <Absence word={t('record.links.noOutgoing')} />
+              <Absence word={t('absence.none')} />
             ) : (
               <LinkRows
                 recordId={recordId}
@@ -891,10 +853,10 @@ export function LinkPanel({
             )}
 
             <h3 className="lp-group" data-title-is="its-label">
-              {t('record.links.incoming')} <span className="lp-group-note">{t('record.links.incomingNote')}</span>
+              {t('record.links.incoming')}
             </h3>
             {incoming.length === 0 ? (
-              <Absence word={t('record.links.noIncoming')} />
+              <Absence word={t('absence.none')} />
             ) : (
               <LinkRows
                 recordId={recordId}
@@ -912,7 +874,7 @@ export function LinkPanel({
           // ITS WORDS, NOT A DASH (wave 13k round 34). With the sentence only on the tooltip and for a
           // screen reader, an opened links panel drew a lone "—", which a reviewer read as broken (review
           // in 3Zgf2lTGanJw). The three empty answers here say what they mean, quietly, as words.
-          <Absence word={t('record.links.none')} />
+          <Absence word={t('absence.none')} />
         ) : (
           <LinkRows
             recordId={recordId}
@@ -951,7 +913,6 @@ export const LINK_CSS = `
   font-weight: 600;
   color: var(--text);
 }
-.lp-group-note { font-size: var(--fs-1); font-weight: 400; color: var(--text-3); }
 
 .lp-list { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 /* THE GROUP OF ONE RELATION'S ROWS DRAWS NO BOX. It exists to say which relation the rows inside
@@ -985,18 +946,15 @@ export const LINK_CSS = `
   line-height: var(--lh-body);
   color: var(--text);
 }
-.lp-note {
+/* How many of the links nobody has confirmed: a count about this record. */
+.lp-inferred {
   margin: 0 0 var(--pad);
   padding: 0 var(--pad);
-  font-size: var(--fs-1);
+  min-width: 0;
+  font-size: var(--fs-2);
   line-height: var(--lh-body);
-  color: var(--text-3);
+  color: var(--text-2);
 }
-
-/* The fold that holds what a dashed edge means. It takes the gap the paragraph it replaced had, and
-   the note inside it drops its own inset, because Explain already sets one. */
-.lp-inferred { margin: 0 0 var(--pad); min-width: 0; }
-.px-explain-body > .lp-note { margin: 0; padding: 0; }
 
 .lp-add { display: flex; flex-direction: column; gap: var(--pad); margin-top: var(--gut); min-width: 0; }
 .lp-add-line {

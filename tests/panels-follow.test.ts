@@ -926,10 +926,9 @@ describe('the machine surface draws what nobody claims, louder than an orphan', 
     expect(html).toContain('kill -TERM -3302496')
   })
 
-  it('says nobody can be blamed for it, which is what makes it worse than an orphan', () => {
+  it('says nobody claims it, and never that a session left it', () => {
     const html = surface(sp.readOrphansPayload(orphansPayload()).unclaimed)
     expect(html).toContain(t('g6a.sessions.nobodyClaimsIt', { value1: ' · pid 3302512', value2: ', process group 3302496' }))
-    expect(html).toContain('No session registered these resources, so their ownership is unknown.')
     // Never the orphan row's sentence: there is no session to have left it.
     expect(html).not.toContain('left by')
   })

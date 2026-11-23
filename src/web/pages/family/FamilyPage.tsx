@@ -178,10 +178,7 @@ function ProjectFamilyPage({ surface }: { surface: ProjectSurface }) {
       {state.status === 'loading' ? <Loading label={label(surface)} rows={6} /> : null}
 
       {state.status === 'error' ? (
-        <ErrorNote message={state.message} fault={state.fault} retry={reload}>
-          <span className="fam-what">
-            {t('g7a.family.failedRead')}</span>
-        </ErrorNote>
+        <ErrorNote message={state.message} fault={state.fault} retry={reload} />
       ) : null}
 
       {state.status === 'ready'

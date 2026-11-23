@@ -1,0 +1,23 @@
+{
+  "why": "An act on a decision that a department rests on, and a secretary taking a department away while it rests on a decision it may not rest on (wave 13s, departments step 1b). This test's office files no department. tests/a-departments-decisions-stay-while-it-stands.test.ts meets the first refusal through its doors, cases 1 to 9, and tests/departments-are-records-of-their-own.test.ts meets the second, case 11.",
+  "refusals": [
+    {
+      "code": "departmentsRestOnTheDecision",
+      "status": 409,
+      "english": "Test: the made-up decision made-up-decision is not deleted while the made-up department made-up-department rests on it. Nothing was written.",
+      "values": {
+        "decision": "made-up-decision",
+        "resting": "made-up-department"
+      }
+    },
+    {
+      "code": "departmentTakenAwayOnADecisionItMayNotRestOn",
+      "status": 400,
+      "english": "Test: the made-up department made-up-department rests on the made-up decision made-up-decision, which a department may not rest on now, so it is not taken away. Nothing was written.",
+      "values": {
+        "department": "made-up-department",
+        "decision": "made-up-decision"
+      }
+    }
+  ]
+}

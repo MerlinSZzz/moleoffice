@@ -72,7 +72,8 @@ import {
 } from './records.ts'
 import { thePersonIsProved } from '@shared/the-person-proved.ts'
 import { PanelError } from './panel-error.ts'
-import { whatSupersedes } from './replaced-decisions.ts'
+import { theSubjectsAForkIsLinkedTo, whatSupersedes } from './replaced-decisions.ts'
+import { thePagesARecordIsAbout, whatTheOfficeSendsItGoverns } from './what-a-record-names.ts'
 
 /** The most characters the person's own words may hold, in a fill-in box or beside a choice. */
 export const ANSWER_WORDS_MAX = 4000
@@ -493,11 +494,21 @@ export function sendAnswers(reportId: string, press: ThePress, workspaceId: stri
                     'No earlier answer to this question stands as a decision, and the question is about no decision that stands.',
                 }
               : {}),
+            // WHAT IT GOVERNS: what the decisions it replaces named, else the pages the report is about and the pages the
+            // proposal it settles is linked to, else a nothingFits entry that says so (lib/what-a-record-names.ts).
+            ...whatTheOfficeSendsItGoverns({
+              said: undefined,
+              workspaceId: report.workspaceId,
+              replaced: one.replaces.map((id) => getRecord(id)?.data),
+              pages: [...thePagesARecordIsAbout(report.id, report.workspaceId), ...(one.settles === null ? [] : theSubjectsAForkIsLinkedTo(one.settles.id))],
+              whyNoPage: 'The person answered a question in a report that is about no page, and the question named no page either.',
+            }),
           },
           workspaceId: report.workspaceId,
           actor,
           links,
           mustSayWhatItReplaces: true,
+          mustSayWhatItGoverns: true,
           door,
           // NEITHER LIST OF TITLES ALREADY FILED. Only the decision's id is kept, and the send door's answer names neither.
           namesWhatIsAlreadyFiled: false,

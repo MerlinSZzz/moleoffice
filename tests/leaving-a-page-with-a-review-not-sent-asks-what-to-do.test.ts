@@ -4,8 +4,8 @@
  * LEAVING A PAGE WHOSE REVIEW HOLDS COMMENTS NOT SENT ASKS SEND, KEEP OR DISCARD, AND EACH ANSWER DOES WHAT IT SAYS.
  *
  * The owner's fourth detail for wave 13r round 15 (record 9BZZVKQxWV9Z): leaving the page by the app's own navigation, a
- * change of the address's hash, asks a question. It names how many comments the review holds and who Send sends them
- * to, and offers Send, Keep and Discard. `LeaveQuestion` in src/web/components/agent/ReviewBar.tsx draws it.
+ * change of the address's hash, asks a question. It names how many comments the review holds and their recipient,
+ * and offers Send, Keep and Discard. `LeaveQuestion` in src/web/components/agent/ReviewBar.tsx draws it.
  *
  * Each answer is checked on the server, not on the page: Keep leaves the review collecting with its comment, Discard
  * deletes the comment so it is no longer in the review, Send leaves the review no longer collecting, and Stay keeps
@@ -22,10 +22,12 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { mkdirSync } from 'node:fs'
+import { createI18n } from '../src/shared/i18n.ts'
 import { en } from '../src/shared/words/en.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { liveApp, waitForThePage, type LiveApp } from './helpers.ts'
 
+const { t } = createI18n('en')
 const HEADERS = {
   'content-type': 'application/json',
   'x-mole-office-workspace': 'default',
@@ -98,7 +100,7 @@ describe('leaving a page whose review holds a comment not sent', () => {
       }
       try {
         await leave(about)
-        await question().getByText(en['review.leave.to'].replace('{name}', 'Kiln Keeper'), { exact: true }).waitFor()
+        await question().getByText(t('review.leave.recipient', { name: 'Kiln Keeper' }), { exact: true }).waitFor()
         if (changed === 'count') await ask('POST', '/api/records', { kind: 'message', title: 'Made-up focus comment', data: {
           body: 'Measure the other shelf as well.',
           target: { target: { kind: 'record', recordId: about, workspaceId: 'default' }, place: { at: 'surface' } },
@@ -112,7 +114,7 @@ describe('leaving a page whose review holds a comment not sent', () => {
         await app.page.evaluate(() => window.dispatchEvent(new Event('focus')))
         await answered
         if (changed === 'count') await question().getByRole('button', { name: en['review.b.send'].other.replace('{n}', '2'), exact: true }).waitFor({ timeout: 10_000 })
-        if (changed === 'recipient') await question().getByText(en['review.leave.to'].replace('{name}', 'Glaze Reader'), { exact: true }).waitFor({ timeout: 10_000 })
+        if (changed === 'recipient') await question().getByText(t('review.leave.recipient', { name: 'Glaze Reader' }), { exact: true }).waitFor({ timeout: 10_000 })
         if (changed === 'state') await question().getByText('Abandoned', { exact: true }).waitFor({ timeout: 10_000 })
         expect(reads, 'one changed list causes one detail read').toBe(1)
         const quiet = app.page.waitForResponse(r => new URL(r.url()).pathname === '/api/reviews' && r.request().method() === 'GET')
@@ -135,12 +137,11 @@ describe('leaving a page whose review holds a comment not sent', () => {
     const path = `**/api/reviews/${review}/send`
     try {
       await leave(about)
-      await question().getByText(en['review.leave.to'].replace('{name}', 'Kiln Keeper'), { exact: true }).waitFor()
+      await question().getByText(t('review.leave.recipient', { name: 'Kiln Keeper' }), { exact: true }).waitFor()
       await app.page.route(path, route => route.abort('failed'))
       await question().getByRole('button', { name: en['review.b.send'].one.replace('{n}', '1'), exact: true }).click()
       await expect.poll(async () => (await ask<Detail>('GET', `/api/reviews/${review}`)).review.state).toBe('collected')
       await question().getByText('Collecting finished', { exact: true }).waitFor({ timeout: 10_000 })
-      expect(await question().getByText(en['review.leave.keepSays'], { exact: true }).count()).toBe(0)
       expect(app.page.url()).toContain(`#/r/${about}`)
       const shots = process.env['REVIEW_QUESTION_SHOTS']
       if (shots) {
@@ -166,7 +167,7 @@ describe('leaving a page whose review holds a comment not sent', () => {
       const { about, review } = await aReview(`Made-up kiln question, changed ${changed}`)
       try {
       await leave(about)
-      await question().getByText(en['review.leave.to'].replace('{name}', 'Kiln Keeper'), { exact: true }).waitFor()
+      await question().getByText(t('review.leave.recipient', { name: 'Kiln Keeper' }), { exact: true }).waitFor()
       if (changed === 'count') {
         await ask('POST', '/api/records', { kind: 'message', title: 'Made-up second comment', data: {
           body: 'The right shelf needs measuring too.',
@@ -177,12 +178,12 @@ describe('leaving a page whose review holds a comment not sent', () => {
         await ask('POST', `/api/reviews/${review}/recipient`, { recipient: { kind: 'agent', agentId: other } })
       } else await ask('POST', `/api/reviews/${review}/abandon`)
       await question().getByRole('button', { name: en['review.b.send'].one.replace('{n}', '1'), exact: true }).click()
-      await question().getByText('Nothing was sent. The review changed after this question was shown. Its current count, recipient and state are shown here.', { exact: true }).waitFor({ timeout: 10_000 })
+      await question().getByText(t('review.b.changedNothingSent'), { exact: true }).waitFor({ timeout: 10_000 })
       expect(app.page.url()).toContain(`#/r/${about}`)
       const now = await ask<Detail>('GET', `/api/reviews/${review}`)
       expect(now.review.state).toBe(changed === 'state' ? 'abandoned' : 'collecting')
       if (changed === 'count') await question().getByRole('button', { name: en['review.b.send'].other.replace('{n}', '2'), exact: true }).waitFor()
-      if (changed === 'recipient') await question().getByText(en['review.leave.to'].replace('{name}', 'Glaze Reader'), { exact: true }).waitFor()
+      if (changed === 'recipient') await question().getByText(t('review.leave.recipient', { name: 'Glaze Reader' }), { exact: true }).waitFor()
       if (changed === 'state') await question().getByText('Abandoned', { exact: true }).waitFor()
       const shots = process.env['REVIEW_QUESTION_SHOTS']
       if (shots && changed === 'count') {
@@ -204,11 +205,11 @@ describe('leaving a page whose review holds a comment not sent', () => {
     }, 120_000)
   }
 
-  it('names how many comments and who Send sends them to', async () => {
+  it('names how many comments and their recipient', async () => {
     const { about } = await aReview('The kiln schedule, named')
     await leave(about)
     await question().getByText(en['review.leave.count'].one.replace('{n}', '1'), { exact: true }).waitFor()
-    await question().getByText(en['review.leave.to'].replace('{name}', 'Kiln Keeper'), { exact: true }).waitFor()
+    await question().getByText(t('review.leave.recipient', { name: 'Kiln Keeper' }), { exact: true }).waitFor()
     expect(app.page.url()).toContain(`#/r/${about}`)
     // DRAWN OVER THE PAGE, with the review column shut: its sheet once came only with the column, and without it the
     // question sat unstyled in the page's flow.

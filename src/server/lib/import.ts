@@ -221,7 +221,8 @@ import { AGENT_OWNER_BACKFILL } from '../db/agent-owners-migration.ts'
 import { validateRegistryAliasRows, registryAliasMigrationWhen, REGISTRY_ALIAS_ARCHIVE_VERSION, REGISTRY_ALIAS_MIGRATION_SLUG, readRegistryAliases } from './registry-aliases/index.ts'
 import { THE_MIGRATION_TAG as CASTING_LABEL_MIGRATION } from '../db/casting-labels-migration.ts'
 import { THE_MIGRATIONS_FOLDER } from '../../config/settings.mjs'
-import { acceptHistoryBytes, FIRST_HISTORY_BYTES_VERSION, HISTORY_BYTES_REFUSALS, HISTORY_BYTES_VERSION, HistoryBytesRefused, historyText, keepStoredHistoryText, type HistoryBytesEnvelope } from './registry-aliases/history-bytes.ts'
+import { acceptHistoryBytes, APageNotReadRowByRow, digestOf, FIRST_HISTORY_BYTES_VERSION, HISTORY_BYTES_REFUSALS, HISTORY_BYTES_VERSION, HistoryBytesRefused, historyDigest, historyTextsOf, keepStoredHistoryDigests, readAPage, type APage } from './registry-aliases/history-bytes.ts'
+import { linesOf, regionsOf, theTextBetween, type APlaceInAFile, type ExportRegion, type UnparsedJsonBlock } from './export-grammar.ts'
 import { takeIdentityCensus, theRowNamed, type AStampAt, type AnIdentityAt } from './registry-aliases/census.ts'
 import { everyAgentAStoredNameAnswersTo } from './registry-aliases/remint-map.ts'
 import { readFileSync, readdirSync, statSync } from 'node:fs'
@@ -247,6 +248,7 @@ import { nowStamp, parseLocalStamp } from '@shared/time.ts'
 import { BLOCK_KIND, blockIdsOf } from '@shared/blocks.ts'
 import { GATE_FAULT_RULES, GATE_KINDS, gateFault, progressOf, type GateKind } from '@shared/work.ts'
 import { checkNodeIntent, checkScopeIntent } from '@shared/presentation.ts'
+import type Database from 'better-sqlite3'
 import { sqlite } from '../db/client.ts'
 import * as schema from '../db/schema.ts'
 // The three names the governance rule is written in, borrowed rather than restated: which link
@@ -470,6 +472,34 @@ function sameValue(a: unknown, b: unknown): boolean {
   return keys.every((key) => key in right && sameValue(left[key], right[key]))
 }
 
+/**
+ * HOW LONG A VALUE IS BEFORE IT IS READ AGAIN WHEN ASKED FOR, rather than held: the length of its text, in bytes in a
+ * file and in characters in the store. An export can be larger than the heap, and nearly all of it is in values longer
+ * than this, so holding only the shorter ones keeps a small entry per row and not the row's bytes.
+ */
+const READ_AGAIN_FROM = 1024
+
+/**
+ * A value of a row that is read again each time it is asked for, by `again`, and not held. `again` checks that what it
+ * reads is what the first reading read, and throws when it is not. A value written to the column replaces the reading.
+ */
+function readAgainWhenAsked(values: Record<string, unknown>, column: string, again: () => unknown): void {
+  Object.defineProperty(values, column, {
+    enumerable: true,
+    configurable: true,
+    get: again,
+    set(this: Record<string, unknown>, value: unknown) {
+      Object.defineProperty(this, column, { value, writable: true, enumerable: true, configurable: true })
+    },
+  })
+}
+
+/** Rows joined as `{ ...a, ...b }` joins them, the later winning, with no value read: one read again stays so. */
+function copyOf(...rows: Record<string, unknown>[]): Record<string, unknown> {
+  const descriptors = Object.assign(Object.create(null) as PropertyDescriptorMap, ...rows.map((row) => Object.getOwnPropertyDescriptors(row)))
+  return Object.defineProperties({}, descriptors)
+}
+
 // ------------------------------------------------------- an archive that predates a column
 
 /**
@@ -554,7 +584,10 @@ const MAY_BE_ABSENT: Readonly<Record<string, readonly string[]>> = {
   // TAGS, migration 0344: "NULL means that person has made no tags." An archive written before them is an
   // honest archive of a database where nobody had made or chosen, so a row it INSERTS gets NULL, and a row
   // already stored keeps what it holds. Counted in the plan's notes, below.
-  people: [...ADDRESS_AS_FIELDS, ...ADDRESS_AS_SETTER_FIELDS, 'language', 'officeOwner', 'chatLabels', 'chatLayout', 'agentTags'],
+  // THE MODE A PERSON STARTS IN, migration 0354: "NULL is a person made before this migration, who has been using the
+  // office in Normal mode and keeps it." An archive written before it holds only such people, so a row it INSERTS gets
+  // NULL, and a row already stored keeps what it holds. Counted in the plan's notes, below.
+  people: [...ADDRESS_AS_FIELDS, ...ADDRESS_AS_SETTER_FIELDS, 'language', 'officeOwner', 'chatLabels', 'chatLayout', 'agentTags', 'startingMode'],
   // HOW A KEY PROVED A WRITE, migration 0178. See ABSENT_PROVED_BY_RULE below.
   // AND THE ORDER THE LOG WAS APPENDED IN, migration 0194. See `appendOrderOfTheInserts` below: an
   // archive written before 0194 does not carry it, so the order is rebuilt and the notes say so.
@@ -591,6 +624,10 @@ const MAY_BE_ABSENT: Readonly<Record<string, readonly string[]>> = {
   workspaces: ['packageInspection', 'masterPipeline'],
   // A pre-label archive says nothing about these cells. Existing values must survive its silence.
   casting_rows: ['labels', 'labelsFrom', 'outUntil', 'outUntilFrom'],
+  // WHEN THIS OFFICE BEGAN TO KEEP THE HAND-OVERS OF AN AGENT'S OWNER, migration 0356: "NULL means the code that keeps
+  // them has not started on this database yet." An archive written before it is an archive of such a database, so a row
+  // it INSERTS gets NULL, and a row already stored keeps its moment. Counted in the plan's notes, below.
+  installation: ['ownerChangesSince'],
 }
 
 /** The published sentence for rule 1 and rule 2 above. One wording, quoted rather than retyped. */
@@ -673,6 +710,74 @@ function bump(counts: Record<string, number>, region: string): void {
   counts[region] = (counts[region] ?? 0) + 1
 }
 
+// ============================================================================ the words of seven refusals
+
+/*
+ * THE WORDS OF SEVEN REFUSALS, EXPORTED SO A TEST READS THEM FROM HERE and not from a copied sentence. Each was moved
+ * here whole from the one place that makes that refusal, which now calls it, and no word of any of them changed.
+ */
+
+/** A second row with the key of a row already read, and where the first one is. */
+export function aSecondRowClaiming(region: AuthoredRegion, key: string, first: { path: string; line: number }): string {
+  return (
+    `a second ${region} row claiming ${PRIMARY_KEY[region]?.join(' + ')} = ${key}; the first is at ` +
+    `${first.path}:${first.line}. Two files describing one row is two answers, and there is no rule for picking one.`
+  )
+}
+
+/** A row that carries a JSON document, in a file with no block for that document. */
+export function aRowWithoutItsDocument(region: AuthoredRegion, column: string): string {
+  return (
+    `this ${region} row has no \`\`\`json mole-office ${region}.${column}\`\`\` block. It is always written, ` +
+    'even when it is empty, because an absent document and an empty one are different facts.'
+  )
+}
+
+/** A link whose end names a record that is neither in the archive nor in the database. */
+export function aLinkEndThatIsNowhere(end: 'fromId' | 'toId', id: string): string {
+  return (
+    `this link's \`${end}\` is ${JSON.stringify(id)}, and no record with that id is in this archive or in the database. ` +
+    'Both ends of a link must exist — a soft-deleted record still counts, because it still has a row. The usual ' +
+    'cause is a record file that was deleted or renumbered.'
+  )
+}
+
+/** A stored change row the archive gives other values: the columns that differ, and the first one's two values. */
+export function aRewrittenChangeRow(key: string, differing: readonly string[], stored: unknown, archived: unknown): string {
+  return (
+    `change row ${key} is already stored and this archive gives it a different ${differing.join(', ')} ` +
+    `(stored ${JSON.stringify(stored)}, archive ${JSON.stringify(archived)}). ` +
+    'The change log is append-only history: it is what makes a deleted record recoverable, and rewriting it is ' +
+    'not a merge. Restore the line, or import into an empty database.'
+  )
+}
+
+/** A revision held in part that cannot be put back together, after the words its reading threw. */
+export function aRevisionHeldInPart(message: string): string {
+  return `${message} The archive holds this revision only in part, so it cannot be read whole.`
+}
+
+/** A revision whose row says one content hash, and whose content hashes to another. */
+export function aRevisionWhoseHashDisagrees(id: string, recordId: string, said: unknown, hash: string): string {
+  return (
+    `revision ${id} of record ${recordId} says its content hash is ` +
+    `${JSON.stringify(said)}, and the kind, title, summary, data and deletedAt written on the ` +
+    `same row hash to ${JSON.stringify(hash)}. The token is what says which content this revision holds, so a ` +
+    `row where the two disagree says two different things about one moment. It is also the only field the ` +
+    `import reads to decide whether a record's newest revision still describes the record, so a wrong one ` +
+    `leaves a stale ledger unrepaired or repairs one that was already true. Fix the hash or the content.`
+  )
+}
+
+/** A revision whose number is not a whole number counting from 1. */
+export function aRevisionNumberThatIsNotOne(seq: unknown): string {
+  return (
+    `this revision says its number is ${JSON.stringify(seq)}, and a revision number is a whole number counting ` +
+    `from 1. It is what "the revision before this one" is worked out from, so a number that is not one leaves ` +
+    `the record's history in no order at all.`
+  )
+}
+
 // ============================================================================ reading the archive
 
 /** One row as it was found: the values, and where they came from so a message can point at them. */
@@ -685,8 +790,8 @@ interface ArchiveRow {
 
 /** Everything read out of the files, before anything has been checked against the database. */
 interface Archive {
-  /** Every JSON history_bytes envelope, in the order of the files that hold them. */
-  historyBytes: HistoryBytesEnvelope[]
+  /** Every JSON history_bytes envelope, as a page read row by row, and the file it was read from, in the files' order. */
+  historyBytes: { page: APage; file: string }[]
   rows: Map<AuthoredRegion, ArchiveRow[]>
   manifest: { fields: Record<string, unknown>; path: string; line: number } | null
   migrations: { fields: Record<string, unknown>; path: string; line: number }[]
@@ -713,14 +818,16 @@ const READING_AIDS = new Set(['README.md', 'INDEX.md'])
 /**
  * Every `.md` file under the root, parsed, with a broken file recorded rather than thrown.
  *
- * ONE BAD FILE MUST NOT HIDE THE OTHER NINE. `parseExportFile` throws on the first problem in a
+ * ONE BAD FILE MUST NOT HIDE THE OTHER NINE. The grammar throws on the first problem in a
  * file, which is right — a half-parsed file is not a file — but a person fixing a hand-edited
  * archive should see every broken file in one run instead of finding them one command at a time.
  * So the throw is caught per file. Within one file only the first problem is reported, and the
  * message says which line it is on.
+ *
+ * Each file is read a line at a time by `readAFile`, so no file is held whole and no long value is held at all.
  */
-function readFiles(root: string): { files: { path: string; regions: ReturnType<typeof parseExportFile>['regions'] }[]; refusals: ImportRefusal[] } {
-  const files: { path: string; regions: ReturnType<typeof parseExportFile>['regions'] }[] = []
+function readFiles(root: string): { files: { path: string; full: string; regions: ARegionKept[] }[]; refusals: ImportRefusal[] } {
+  const files: { path: string; full: string; regions: ARegionKept[] }[] = []
   const refusals: ImportRefusal[] = []
   const visit = (dir: string): void => {
     for (const entry of readdirSync(dir, { withFileTypes: true }).sort((a, b) => byCodeUnit(a.name, b.name))) {
@@ -735,7 +842,7 @@ function readFiles(root: string): { files: { path: string; regions: ReturnType<t
       const rel = relative(root, full).split(sep).join('/')
       if (READING_AIDS.has(rel)) continue
       try {
-        files.push({ path: rel, regions: parseExportFile(readFileSync(full, 'utf8'), rel).regions })
+        files.push({ path: rel, full, regions: readAFile(full, rel) })
       } catch (err) {
         if (err instanceof ExportFormatError) refusals.push({ path: err.path, line: err.line, problem: bareMessage(err) })
         else refusals.push({ path: rel, line: 0, problem: `this file could not be read: ${(err as Error).message}` })
@@ -750,6 +857,134 @@ function readFiles(root: string): { files: { path: string; regions: ReturnType<t
 function bareMessage(err: ExportFormatError): string {
   const prefix = `${err.path}:${err.line} — `
   return err.message.startsWith(prefix) ? err.message.slice(prefix.length) : err.message
+}
+
+/**
+ * A region as the import keeps it. A field or JSON region is as the grammar gave it, except that a value longer than
+ * READ_AGAIN_FROM is read again from the file when asked for: a field's, in its place in `fields`, and a JSON block's,
+ * by `readAgain`, with `json` left undefined. A history_bytes block is a page, as acceptance needs it.
+ */
+type ARegionKept = (ExportRegion & { readAgain?: () => unknown }) | { name: string; kind: 'page'; line: number; page: APage }
+
+/** The JSON blocks the grammar gives unparsed, to be read a row at a time. */
+const PAGES: ReadonlySet<string> = new Set(['history_bytes'])
+
+/** What `tracked` saw of the lines read since a region was last kept: where each fence and each long line is. */
+interface WhatWasSeen {
+  /** The number of the line read last. */
+  number: number
+  /** By line number, each line that starts with a fence: where it starts, and where the line after it starts. */
+  fences: Map<number, { start: number; after: number }>
+  /**
+   * By line number, each line longer than READ_AGAIN_FROM that holds a `: `: where it starts, where what follows its
+   * first `: ` starts, and where its newline is. Only numbers are kept, never the line's text.
+   */
+  long: Map<number, { start: number; from: number; end: number }>
+}
+
+/** The lines `linesOf` gives, passed on unchanged, with where each fence and each line longer than READ_AGAIN_FROM is. */
+function* tracked(lines: Iterable<string>, place: APlaceInAFile, seen: WhatWasSeen): Generator<string> {
+  let start = place.offset
+  for (const line of lines) {
+    const end = place.offset
+    seen.number += 1
+    if (line.startsWith('```')) seen.fences.set(seen.number, { start, after: end })
+    else if (end - start > READ_AGAIN_FROM) {
+      // A field line is `key: <JSON value>`, its key before the first `: `, as the grammar reads it. A field line is
+      // never a file's last line, so `end` is after its newline. What is found here is used only for a line inside a
+      // fields block, and its value is checked against the grammar's when it is read again.
+      const at = line.indexOf(': ')
+      if (at > 0) seen.long.set(seen.number, { start, from: start + Buffer.byteLength(line.slice(0, at + 2)), end: end - 1 })
+    }
+    start = end
+    yield line
+  }
+}
+
+/**
+ * One file's regions, read a line at a time. Only the region being read is held whole, and of the regions kept, no
+ * value longer than READ_AGAIN_FROM: such a value is read again from the file each time it is asked for. The regions
+ * are kept until the file ends, so a file the grammar refuses gives none, as it did.
+ */
+function readAFile(full: string, rel: string): ARegionKept[] {
+  const place: APlaceInAFile = { offset: 0, line: 1 }
+  const seen: WhatWasSeen = { number: 0, fences: new Map(), long: new Map() }
+  const regions: ARegionKept[] = []
+  for (const region of regionsOf(tracked(linesOf(full, place), place, seen), rel, { unparsed: PAGES })) {
+    if (region.kind === 'unparsed json') regions.push({ name: region.name, kind: 'page', line: region.line, page: aPageIn(region, full, rel, place) })
+    else if (region.kind === 'json') regions.push(aJsonRegionKept(region, full, rel, seen))
+    else {
+      readLongFieldsAgain(region, full, rel, seen)
+      regions.push(region)
+    }
+    seen.fences.clear()
+    seen.long.clear()
+  }
+  return regions
+}
+
+/**
+ * A history_bytes block read a row at a time. A block the row reader cannot follow is read whole by the grammar, as
+ * every file was, so it is refused at the line and in the words it was refused in. JSON the grammar reads and the row
+ * reader cannot follow is refused, never read some other way.
+ */
+function aPageIn(block: UnparsedJsonBlock, full: string, rel: string, place: APlaceInAFile): APage {
+  try {
+    return readAPage(block.body, { path: rel, line: block.line }, place)
+  } catch (err) {
+    if (!(err instanceof APageNotReadRowByRow)) throw err
+    parseExportFile(readFileSync(full, 'utf8'), rel)
+    throw new Error(`the history_bytes block at line ${String(block.line)} is JSON, and the reader of its rows cannot follow it, so it is not read.`)
+  }
+}
+
+/** A JSON region, kept whole when its block is short, and otherwise read again from the file when asked for. */
+function aJsonRegionKept(region: ExportRegion, full: string, rel: string, seen: WhatWasSeen): ARegionKept {
+  const { name, line } = region
+  const open = seen.fences.get(line)
+  const close = seen.fences.get(seen.number)
+  if (open === undefined || close === undefined) throw new Error(`the fences of the \`${name}\` block at line ${String(line)} were not found where the grammar found them.`)
+  // The block's text is its lines joined by newlines: from the line after the opening fence to the newline before the closing one.
+  const from = open.after
+  const to = close.start - 1
+  if (to - from <= READ_AGAIN_FROM) return region
+  const digest = digestOf(JSON.stringify(region.json))
+  return { name, kind: 'json', line, fields: region.fields, json: undefined, readAgain: () => aValueReadAgain(full, rel, line, from, to, digest, `the \`${name}\` block`) }
+}
+
+/**
+ * Each value of a fields region whose line is longer than READ_AGAIN_FROM, made one that is read again when asked for.
+ * The line's key is read again from the file too, since only numbers were kept: a key the region does not hold leaves
+ * its value held, and a key read wrongly is caught by the check of the value read again.
+ */
+function readLongFieldsAgain(region: ExportRegion, full: string, rel: string, seen: WhatWasSeen): void {
+  for (const [number, long] of seen.long) {
+    if (number <= region.line || number >= seen.number) continue
+    const key = theTextBetween(full, long.start, long.from - 2)
+    if (!Object.hasOwn(region.fields, key)) continue
+    const digest = digestOf(JSON.stringify(region.fields[key]))
+    const { from, end } = long
+    readAgainWhenAsked(region.fields, key, () => aValueReadAgain(full, rel, number, from, end, digest, `the value of \`${key}\``))
+  }
+}
+
+/**
+ * A value read again from the bytes of a file, checked to be the value the first reading read: the same JSON, by its
+ * digest. A value that is not is thrown, so the import writes nothing.
+ */
+function aValueReadAgain(full: string, rel: string, line: number, from: number, to: number, digest: string, what: string): unknown {
+  let value: unknown
+  let read = false
+  try {
+    value = JSON.parse(theTextBetween(full, from, to)) as unknown
+    read = true
+  } catch {
+    read = false
+  }
+  if (!read || digestOf(JSON.stringify(value)) !== digest) {
+    throw new Error(`${rel}:${String(line)} — ${what} read again is not the one the first reading checked, so the import writes nothing.`)
+  }
+  return value
 }
 
 /** The refusal of a second envelope in an archive of the first capability, which has one. */
@@ -785,15 +1020,15 @@ function collectRows(files: ReturnType<typeof readFiles>['files']): Archive {
   }
 
   for (const file of files) {
-    /** JSON documents found in this file, by the column they belong to. */
-    const documents = new Map<string, { value: unknown; line: number; count: number }>()
+    /** JSON documents found in this file, by the column they belong to. A long one is read again when asked for. */
+    const documents = new Map<string, { value: unknown; readAgain: (() => unknown) | undefined; line: number; count: number }>()
     const envelopes: { region: AuthoredRegion; values: Record<string, unknown>; line: number }[] = []
 
     for (const region of file.regions) {
-      if (region.name === 'history_bytes') {
+      if (region.kind === 'page' || region.name === 'history_bytes') {
         // How many envelopes an archive may hold depends on its capability, which is read from the manifest later.
-        if (region.kind !== 'json') refusals.push({path:file.path,line:region.line,problem:'A history_bytes envelope must be a JSON block.'})
-        else historyBytes.push({value:region.json,path:file.path,line:region.line})
+        if (region.kind !== 'page') refusals.push({path:file.path,line:region.line,problem:'A history_bytes envelope must be a JSON block.'})
+        else historyBytes.push({page:region.page,file:file.full})
         continue
       }
       if (region.name === 'manifest') {
@@ -829,7 +1064,7 @@ function collectRows(files: ReturnType<typeof readFiles>['files']): Archive {
           continue
         }
         const already = documents.get(owner.column)
-        documents.set(owner.column, { value: region.json, line: region.line, count: (already?.count ?? 0) + 1 })
+        documents.set(owner.column, { value: region.json, readAgain: region.readAgain, line: region.line, count: (already?.count ?? 0) + 1 })
         continue
       }
 
@@ -906,18 +1141,12 @@ function collectRows(files: ReturnType<typeof readFiles>['files']): Archive {
       }
       continue
     }
-    const values = { ...envelope.values }
+    const values = copyOf(envelope.values)
     let broken = false
     for (const column of columnsOf(envelope.region).jsonBlocks) {
       const found = documents.get(column)
       if (found === undefined) {
-        refusals.push({
-          path: file.path,
-          line: envelope.line,
-          problem:
-            `this ${envelope.region} row has no \`\`\`json mole-office ${envelope.region}.${column}\`\`\` block. It is always written, ` +
-            'even when it is empty, because an absent document and an empty one are different facts.',
-        })
+        refusals.push({ path: file.path, line: envelope.line, problem: aRowWithoutItsDocument(envelope.region, column) })
         broken = true
         continue
       }
@@ -926,7 +1155,8 @@ function collectRows(files: ReturnType<typeof readFiles>['files']): Archive {
         broken = true
         continue
       }
-      values[column] = found.value
+      if (found.readAgain !== undefined) readAgainWhenAsked(values, column, found.readAgain)
+      else values[column] = found.value
       documents.delete(column)
     }
     for (const [column, found] of documents) {
@@ -1056,27 +1286,56 @@ function typeProblem(region: AuthoredRegion, column: string, value: unknown, fac
 
 // ============================================================================ reading the database
 
-/** Every stored row of a region, keyed by its primary key, with JSON columns already parsed. */
+/**
+ * Every stored row of a region, keyed by its primary key, with JSON columns already parsed.
+ *
+ * The rows are read one at a time. A text longer than READ_AGAIN_FROM outside the key is not held: it is read again by
+ * the row's key each time it is asked for, after the reading of the rows has ended, and checked to be the text read
+ * first. A text that is not is thrown, so the import writes nothing.
+ */
 function storedRows(region: AuthoredRegion): Map<string, Record<string, unknown>> {
   const facts = COLUMNS[region] ?? new Map<string, ColumnFacts>()
   const tsOf = new Map<string, string>()
   for (const [tsName, column] of facts) tsOf.set(column.sql, tsName)
   const jsonBlocks = new Set<string>(columnsOf(region).jsonBlocks)
+  const keyColumns = PRIMARY_KEY[region] ?? []
+  const keySql = keyColumns.map((tsName) => facts.get(tsName)?.sql ?? tsName)
+  /** A column's value as the import compares it, from the stored text or number. */
+  const asCompared = (tsName: string, value: unknown): unknown => {
+    const column = facts.get(tsName)
+    if (column?.dataType === 'boolean') return value === null ? null : Boolean(value)
+    if (column?.dataType === 'json' || jsonBlocks.has(tsName)) return parseStored(value)
+    return value ?? null
+  }
+  /** By SQL column, the statement that reads one stored value again by the row's key, prepared when first asked for. */
+  const again = new Map<string, Database.Statement>()
+  const readAgain = (sqlName: string, tsName: string, by: readonly unknown[], digest: string) => (): unknown => {
+    let statement = again.get(sqlName)
+    if (statement === undefined) {
+      statement = sqlite.prepare(`SELECT "${sqlName}" AS value FROM ${region} WHERE ${keySql.map((name) => `"${name}" IS ?`).join(' AND ')}`)
+      again.set(sqlName, statement)
+    }
+    const found = statement.get(...by) as { value: unknown } | undefined
+    if (typeof found?.value !== 'string' || digestOf(found.value) !== digest) {
+      throw new Error(`The stored ${region} row ${by.map(String).join(' · ')}: ${tsName} read again is not what was read first, so the import writes nothing.`)
+    }
+    return asCompared(tsName, found.value)
+  }
 
   const out = new Map<string, Record<string, unknown>>()
-  for (const raw of sqlite.prepare(`SELECT * FROM ${region}`).all() as Record<string, unknown>[]) {
+  for (const raw of sqlite.prepare(`SELECT * FROM ${region}`).iterate() as IterableIterator<Record<string, unknown>>) {
+    const by = keySql.map((name) => raw[name])
     const row: Record<string, unknown> = {}
     for (const [sqlName, value] of Object.entries(raw)) {
       const tsName = tsOf.get(sqlName)
       // A column in the file that the schema does not declare cannot be compared, because nothing
       // says what it means. tests/schema-tables.test.ts is what reports that; it is skipped here.
       if (tsName === undefined) continue
-      const column = facts.get(tsName)
-      if (column?.dataType === 'boolean') row[tsName] = value === null ? null : Boolean(value)
-      else if (column?.dataType === 'json' || jsonBlocks.has(tsName)) row[tsName] = parseStored(value)
-      else row[tsName] = value ?? null
+      if (typeof value === 'string' && value.length > READ_AGAIN_FROM && !keyColumns.includes(tsName)) {
+        readAgainWhenAsked(row, tsName, readAgain(sqlName, tsName, by, digestOf(value)))
+      } else row[tsName] = asCompared(tsName, value)
     }
-    keepStoredHistoryText(String(region),row,raw)
+    keepStoredHistoryDigests(String(region),row,raw)
     out.set(keyOf(region, row), row)
   }
   return out
@@ -1103,10 +1362,13 @@ function parseStored(value: unknown): unknown {
 
 // ============================================================================ the plan
 
-/** One statement the transaction will run, kept as data so the plan can be read before it is run. */
+/**
+ * One statement the transaction will run, kept as data so the plan can be read before it is run. Its values are worked
+ * out by `params` when it runs, so a long value is read again then and not held from the plan to the write.
+ */
 interface Write {
   sql: string
-  params: unknown[]
+  params: () => unknown[]
 }
 
 /**
@@ -1224,7 +1486,7 @@ function buildPlan(root: string): { plan: ImportPlan; writes: Write[] } {
   if (strictHistoryBytes && !readable) refusals.push({path:'MANIFEST.md',line:0,problem:HISTORY_BYTES_REFUSALS.unsupported})
   if(readable) {
     const extra=byteCapability===FIRST_HISTORY_BYTES_VERSION ? archive.historyBytes.slice(1) : []
-    for(const envelope of extra) refusals.push({path:envelope.path,line:envelope.line,problem:ONE_ENVELOPE})
+    for(const envelope of extra) refusals.push({path:envelope.page.path,line:envelope.page.line,problem:ONE_ENVELOPE})
     if(archive.historyBytes.length===0) refusals.push({path:'MANIFEST.md',line:0,problem:'The required history bytes envelope is missing.'})
     else if(extra.length===0) try {acceptHistoryBytes(archive.historyBytes,byteCapability,archive.rows)} catch(error) {
       if(!(error instanceof HistoryBytesRefused)) throw error
@@ -1249,13 +1511,7 @@ function buildPlan(root: string): { plan: ImportPlan; writes: Write[] } {
       const key = keyOf(region, row.values)
       const already = seen.get(key)
       if (already !== undefined) {
-        refusals.push({
-          path: row.path,
-          line: row.line,
-          problem:
-            `a second ${region} row claiming ${PRIMARY_KEY[region]?.join(' + ')} = ${key}; the first is at ` +
-            `${already.path}:${already.line}. Two files describing one row is two answers, and there is no rule for picking one.`,
-        })
+        refusals.push({ path: row.path, line: row.line, problem: aSecondRowClaiming(region, key, already) })
         continue
       }
       seen.set(key, row)
@@ -1340,12 +1596,29 @@ function buildPlan(root: string): { plan: ImportPlan; writes: Write[] } {
       notes.push(`${unsaidProjects.length} workspaces row(s) say nothing about the project's master pipeline or whether its handed-back package points are inspected, because the archive was written before migrations 0338 and 0345 added them. ${unsaidProjects.length - kept} new row(s) are inserted with a null wherever the archive says nothing, and ${kept} existing row(s) keep what is stored.`)
     }
   }
+  // Archives before migration 0354 say nothing about the mode a person starts in, because every person then started in
+  // Normal mode.
+  {
+    const unsaid = [...(byKey.get('people') ?? new Map<string, ArchiveRow>())].filter(([, row]) => !('startingMode' in row.values))
+    if (unsaid.length > 0) {
+      const kept = unsaid.filter(([key]) => stored['people']?.has(key)).length
+      notes.push(`${unsaid.length} people row(s) say nothing about the mode the person starts in, because the archive was written before migration 0354. ${unsaid.length - kept} new row(s) are inserted with no starting mode, which is read as Normal mode, and ${kept} existing row(s) keep what is stored.`)
+    }
+  }
   // Archives before migration 0351 say nothing about a value a revision stores once, because no revision did then.
   {
     const unsaid = [...(byKey.get('revisions') ?? new Map<string, ArchiveRow>())].filter(([, row]) => !('parts' in row.values))
     if (unsaid.length > 0) {
       const kept = unsaid.filter(([key]) => stored['revisions']?.has(key)).length
       notes.push(`${unsaid.length} revisions row(s) say nothing about a value stored once, because the archive was written before migration 0351, when every revision held its data whole. ${unsaid.length - kept} new row(s) are inserted with parts null, which says the same, and ${kept} existing row(s) keep what is stored.`)
+    }
+  }
+  // Archives before migration 0356 say nothing about when this office began to keep the hand-overs of an agent's owner.
+  {
+    const unsaid = [...(byKey.get('installation') ?? new Map<string, ArchiveRow>())].filter(([, row]) => !('ownerChangesSince' in row.values))
+    if (unsaid.length > 0) {
+      const kept = unsaid.filter(([key]) => stored['installation']?.has(key)).length
+      notes.push(`${unsaid.length} installation row(s) say nothing about when this office began to keep the hand-overs of an agent's owner, because the archive was written before migration 0356. ${unsaid.length - kept} new row(s) are inserted with no such moment, so their page says it was not recorded, and ${kept} existing row(s) keep what is stored.`)
     }
   }
   // Archives before migration 0181 say nothing about how anybody wishes to be addressed.
@@ -1407,7 +1680,7 @@ function buildPlan(root: string): { plan: ImportPlan; writes: Write[] } {
   /** The ids parked on a staging title, so the collision check is about exactly those and no others. */
   const parked: string[] = []
   // A FRESH OFFICE'S OWN ROW GOES BEFORE ANYTHING IS INSERTED, and before its picture, which it holds by a foreign key.
-  for (const gone of givesWay) writes.push({ sql: `DELETE FROM ${gone.region} WHERE id = ?`, params: [gone.key] })
+  for (const gone of givesWay) writes.push({ sql: `DELETE FROM ${gone.region} WHERE id = ?`, params: () => [gone.key] })
 
   for (const region of EXPORTED_REGIONS) {
     const incoming = byKey.get(region) ?? new Map<string, ArchiveRow>()
@@ -1423,7 +1696,7 @@ function buildPlan(root: string): { plan: ImportPlan; writes: Write[] } {
     const replaced = region === 'conversation_reads' ? [...readsLeftOut.heldHere].sort(byCodeUnit) : []
     for (const key of replaced) {
       rows.push({ region, key, action: 'delete', columns: [], path: '' })
-      writes.push({ sql: 'DELETE FROM conversation_reads WHERE id = ?', params: [key] })
+      writes.push({ sql: 'DELETE FROM conversation_reads WHERE id = ?', params: () => [key] })
     }
     for (const gone of givesWay) if (gone.region === region) rows.push({ region, key: gone.key, action: 'delete', columns: [], path: '' })
     for (const [key, row] of inOrder) {
@@ -1443,7 +1716,7 @@ function buildPlan(root: string): { plan: ImportPlan; writes: Write[] } {
         rows.push({ region, key, action: 'insert', columns: [], path: row.path })
         writes.push(insertStatement(region, row.values))
         if (region === 'agents' && !('ownerId' in row.values)) {
-          writes.push({ sql: `${AGENT_OWNER_BACKFILL} AND id = ?`, params: [key] })
+          writes.push({ sql: `${AGENT_OWNER_BACKFILL} AND id = ?`, params: () => [key] })
         }
         continue
       }
@@ -1842,8 +2115,9 @@ function differingColumns(region: AuthoredRegion, incoming: Record<string, unkno
     // A STORED ROW KEEPS ITS PLACE IN THE CHANGE LOG'S ORDER. See `appendOrderOfTheInserts`: the
     // place is a fact about the database the row is in, and moving it would reorder rows already read.
     if (region === 'changes' && column === 'appendOrder') continue
-    const original=historyText(incoming,column)
-    if (original!==undefined ? original!==historyText(current,column) : !sameValue(incoming[column] ?? null,current[column] ?? null)) out.push(column)
+    // An original text is compared by its digest, so neither text is held.
+    const original=historyDigest(incoming,column)
+    if (original!==undefined ? original!==historyDigest(current,column) : !sameValue(incoming[column] ?? null,current[column] ?? null)) out.push(column)
   }
   return out
 }
@@ -1864,8 +2138,8 @@ function checkAliasImport(byKey:Map<AuthoredRegion,Map<string,ArchiveRow>>,store
     const before=stored[table]?.get(key)
     if(!before) continue
     for(const column of ['data','provedHolder']) {
-      const original=historyText(row.values,column)
-      if(original!==undefined && original!==historyText(before,column)) refusals.push({path:row.path,line:row.line,problem:'An import cannot replace the original JSON bytes of stored historical evidence.'})
+      const original=historyDigest(row.values,column)
+      if(original!==undefined && original!==historyDigest(before,column)) refusals.push({path:row.path,line:row.line,problem:'An import cannot replace the original JSON bytes of stored historical evidence.'})
     }
   }
 }
@@ -2752,14 +3026,7 @@ function checkReferences(
     for (const end of ['fromId', 'toId'] as const) {
       const id = String(row.values[end])
       if (recordIds.has(id)) continue
-      refusals.push({
-        path: row.path,
-        line: row.line,
-        problem:
-          `this link's \`${end}\` is ${JSON.stringify(id)}, and no record with that id is in this archive or in the database. ` +
-          'Both ends of a link must exist — a soft-deleted record still counts, because it still has a row. The usual ' +
-          'cause is a record file that was deleted or renumbered.',
-      })
+      refusals.push({ path: row.path, line: row.line, problem: aLinkEndThatIsNowhere(end, id) })
     }
   }
 
@@ -2969,11 +3236,7 @@ function checkAppendOnly(changes: Map<string, ArchiveRow>, stored: Map<string, R
     refusals.push({
       path: row.path,
       line: row.line,
-      problem:
-        `change row ${key} is already stored and this archive gives it a different ${differing.join(', ')} ` +
-        `(stored ${JSON.stringify(current[differing[0] ?? ''] ?? null)}, archive ${JSON.stringify(row.values[differing[0] ?? ''] ?? null)}). ` +
-        'The change log is append-only history: it is what makes a deleted record recoverable, and rewriting it is ' +
-        'not a merge. Restore the line, or import into an empty database.',
+      problem: aRewrittenChangeRow(key, differing, current[differing[0] ?? ''] ?? null, row.values[differing[0] ?? ''] ?? null),
     })
   }
 }
@@ -3196,7 +3459,15 @@ function checkRevisionHashes(revisions: Map<string, ArchiveRow>, refusals: Impor
   // refused here rather than written.
   const byNumber = new Map<string, StoredRevisionData>()
   for (const { values } of revisions.values()) {
-    byNumber.set(`${String(values['recordId'])}\u0000${String(values['seq'])}`, { data: values['data'] as Record<string, unknown>, parts: values['parts'] })
+    // Read from the row when asked for, so a long value read again from the archive is not held for every revision.
+    byNumber.set(`${String(values['recordId'])}\u0000${String(values['seq'])}`, {
+      get data() {
+        return values['data'] as Record<string, unknown>
+      },
+      get parts() {
+        return values['parts']
+      },
+    })
   }
   for (const row of revisions.values()) {
     const values = row.values
@@ -3209,7 +3480,7 @@ function checkRevisionHashes(revisions: Map<string, ArchiveRow>, refusals: Impor
         (recordId, seq) => byNumber.get(`${recordId}\u0000${String(seq)}`),
       )
     } catch (error) {
-      refusals.push({ path: row.path, line: row.line, problem: `${(error as Error).message} The archive holds this revision only in part, so it cannot be read whole.` })
+      refusals.push({ path: row.path, line: row.line, problem: aRevisionHeldInPart((error as Error).message) })
       continue
     }
     const hash = versionOf(
@@ -3225,13 +3496,7 @@ function checkRevisionHashes(revisions: Map<string, ArchiveRow>, refusals: Impor
     refusals.push({
       path: row.path,
       line: row.line,
-      problem:
-        `revision ${String(values['id'])} of record ${String(values['recordId'])} says its content hash is ` +
-        `${JSON.stringify(values['contentHash'])}, and the kind, title, summary, data and deletedAt written on the ` +
-        `same row hash to ${JSON.stringify(hash)}. The token is what says which content this revision holds, so a ` +
-        `row where the two disagree says two different things about one moment. It is also the only field the ` +
-        `import reads to decide whether a record's newest revision still describes the record, so a wrong one ` +
-        `leaves a stale ledger unrepaired or repairs one that was already true. Fix the hash or the content.`,
+      problem: aRevisionWhoseHashDisagrees(String(values['id']), String(values['recordId']), values['contentHash'], hash),
     })
   }
 }
@@ -3337,14 +3602,7 @@ function checkRevisionNumbers(
   for (const row of incoming.values()) {
     const seq = row.values['seq']
     if (typeof seq === 'number' && Number.isInteger(seq) && seq >= 1) continue
-    refusals.push({
-      path: row.path,
-      line: row.line,
-      problem:
-        `this revision says its number is ${JSON.stringify(seq)}, and a revision number is a whole number counting ` +
-        `from 1. It is what "the revision before this one" is worked out from, so a number that is not one leaves ` +
-        `the record's history in no order at all.`,
-    })
+    refusals.push({ path: row.path, line: row.line, problem: aRevisionNumberThatIsNotOne(seq) })
   }
 
   // A STAMP THAT IS NOT A STAMP IS REFUSED, for the same reason and by principle B. `at` says when
@@ -3663,7 +3921,10 @@ function keepTheLedgerTrue(
       noLedger.push(id)
       continue
     }
-    const final: Record<string, unknown> = { ...(storedRecords.get(id) ?? {}), ...(incomingRecords.get(id)?.values ?? {}) }
+    // The two rows joined without reading them, so a long value is read only where it is asked for, and again when written.
+    const storedRow = storedRecords.get(id) ?? {}
+    const incomingRow = incomingRecords.get(id)?.values ?? {}
+    const final = copyOf(storedRow, incomingRow)
     const data = final['data']
     if (typeof data !== 'object' || data === null || Array.isArray(data)) {
       // ONLY AN UPDATE IS COUNTED HERE. The note this list produces says a revision could not be
@@ -3673,13 +3934,16 @@ function keepTheLedgerTrue(
       continue
     }
     const newest = history.reduce((a, b) => (b.seq > a.seq ? b : a))
-    const content = contentOf({
-      kind: String(final['kind']),
-      title: String(final['title']),
-      summary: final['summary'] === undefined || final['summary'] === null ? null : String(final['summary']),
-      data: data as Record<string, unknown>,
-      deletedAt: final['deletedAt'] === undefined || final['deletedAt'] === null ? null : String(final['deletedAt']),
-    })
+    /** The content the record is left holding, worked out from the two rows each time it is asked for. */
+    const contentNow = (row: Record<string, unknown>, rowData: Record<string, unknown>): ReturnType<typeof contentOf> =>
+      contentOf({
+        kind: String(row['kind']),
+        title: String(row['title']),
+        summary: row['summary'] === undefined || row['summary'] === null ? null : String(row['summary']),
+        data: rowData,
+        deletedAt: row['deletedAt'] === undefined || row['deletedAt'] === null ? null : String(row['deletedAt']),
+      })
+    const content = contentNow(final, data as Record<string, unknown>)
     const hash = versionOf(content)
     if (hash === newest.contentHash) continue
 
@@ -3710,7 +3974,12 @@ function keepTheLedgerTrue(
         kind: content.kind,
         title: content.title,
         summary: content.summary,
-        data: content.data,
+        // Worked out again when the revision is written, so the data is not held until then. It was checked above to
+        // be an object, and each long value in it is checked, when read again, to be what was read here.
+        get data() {
+          const again = copyOf(storedRow, incomingRow)
+          return contentNow(again, again['data'] as Record<string, unknown>).data
+        },
         deletedAt: content.deletedAt,
         op: 'restore',
         actorType: 'system',
@@ -3790,10 +4059,14 @@ function insertStatement(region: AuthoredRegion, values: Record<string, unknown>
   const sqlNames = columns.map((c) => facts.get(c)?.sql ?? c)
   return {
     sql: `INSERT INTO ${region} (${sqlNames.join(', ')}) VALUES (${columns.map(() => '?').join(', ')})`,
-    params: columns.map((column) => {
-      const value = region === 'agents' && column === 'runKeysOnly' && !(column in values) ? 0 : values[column]
-      return historyText(values,column) ?? bindable(region, column, value)
-    }),
+    params: () => {
+      const texts = historyTextsOf(values)
+      return columns.map((column) => {
+        const text = texts?.[column]
+        if (text !== undefined && text !== null) return text
+        return bindable(region, column, region === 'agents' && column === 'runKeysOnly' && !(column in values) ? 0 : values[column])
+      })
+    },
   }
 }
 
@@ -3821,7 +4094,16 @@ function updateStatement(
     // The WHERE takes the row's CURRENT key, not the incoming one. They are equal by construction —
     // a row is matched on its primary key and nothing else — and reading it from the stored row
     // makes that impossible to get wrong later. `key` is here for the message a failure would carry.
-    params: [...columns.map((column) => historyText(values,column) ?? bindable(region, column, values[column])), ...pk.map((column) => current[column] ?? null)],
+    params: () => {
+      const texts = historyTextsOf(values)
+      return [
+        ...columns.map((column) => {
+          const text = texts?.[column]
+          return text !== undefined && text !== null ? text : bindable(region, column, values[column])
+        }),
+        ...pk.map((column) => current[column] ?? null),
+      ]
+    },
   }
 }
 
@@ -3833,9 +4115,15 @@ function updateStatement(
  * This is the answer to "no silent data loss": a person can see every row that would change and
  * every column that would move before anything moves. It is also what `GET /api/import` serves and
  * what the CLI prints when it is run without `--apply`.
+ *
+ * THE PLAN IS BUILT INSIDE A TRANSACTION THAT ONLY READS, so it reads one moment of the store, as `applyImport`'s does.
+ * A stored value longer than READ_AGAIN_FROM is read again by its key when a check asks for it, and checked against the
+ * digest of its first reading. With no transaction, another process that writes such a value between the two readings
+ * makes the dry run throw, for no fault of the export. The transaction is deferred, so it takes no write lock, and in
+ * WAL mode it holds back no writer.
  */
 export function planImport(root: string = exportRoot()): ImportPlan {
-  return buildPlan(root).plan
+  return sqlite.transaction((): ImportPlan => buildPlan(root).plan).deferred()
 }
 
 /**
@@ -3872,7 +4160,7 @@ export function applyImport(root: string = exportRoot()): ImportReport {
           run = (...params: never[]) => statement.run(...params)
           prepared.set(write.sql, run)
         }
-        run(...(write.params as never[]))
+        run(...(write.params() as never[]))
       }
       readRegistryAliases(sqlite)
       // Old archives have no submission baseline. Keep imported finishes explicitly historical.
@@ -3880,11 +4168,15 @@ export function applyImport(root: string = exportRoot()): ImportReport {
       // replaces kept the old rule after 13n's round Q changed it (problem zv-Z5SMF_bst), and so listed a crashed
       // run with an agent-said close. There is no json_valid test: `checkDataIsJson` refuses an archive's session row
       // that SQLite does not read as JSON, and since 0277's index no such row can be written to the table at all.
+      // The rows are read one at a time, and only the ids of the finished ones are kept, because nothing else may run on
+      // the connection while the reading is open.
+      const legacy = sqlite.prepare('INSERT OR IGNORE INTO legacy_unsealed_runs (run_id) VALUES (?)')
+      const finished: string[] = []
       const unsealed = sqlite
         .prepare("SELECT id, data FROM records WHERE kind = 'session' AND json_extract(data, '$.sealedTip') IS NULL AND id NOT IN (SELECT run_id FROM submission_baselines)")
-        .all() as { id: string; data: string }[]
-      const legacy = sqlite.prepare('INSERT OR IGNORE INTO legacy_unsealed_runs (run_id) VALUES (?)')
-      for (const run of unsealed) if (aRunSaysItIsFinished(JSON.parse(run.data) as Record<string, unknown>)) legacy.run(run.id)
+        .iterate() as IterableIterator<{ id: string; data: string }>
+      for (const run of unsealed) if (aRunSaysItIsFinished(JSON.parse(run.data) as Record<string, unknown>)) finished.push(run.id)
+      for (const id of finished) legacy.run(id)
     } finally {
       for (const one of capture) sqlite.exec(one.sql)
     }

@@ -47,10 +47,11 @@ import { dirname, join, resolve } from 'node:path'
 // renderers, the exporter and the server's reader of the export all hold one declaration and two
 // copies of one interface cannot drift. G5 put the record-to-chapter mapping there for the same
 // reason: the page and the exporter read the same records through the same reading.
-import type { OfficeChapter } from '../shared/office-rules.ts'
+import type { ARecordAsRead, OfficeChapter } from '../shared/office-rules.ts'
+import { chaptersFromRecords } from '../shared/office-rules.ts'
 export type { OfficeChapter as CodeChapter, OfficeRule as CodeRule } from '@shared/office-rules.ts'
 import type { RulesFile } from './runtimes/adapter.ts'
-import type { TheSelectedChapters } from '@shared/chapter-edit.ts'
+import type { ChapterContent, SelectedChapter, TheSelectedChapters } from '@shared/chapter-edit.ts'
 import { chapterWithContent, contentOfChapter, problemsWithAChapter, SHIPPED_CHAPTER_NUMBERS } from '../shared/chapter-check.ts'
 import { whatGuardedGitSays } from '../config/guarded-git.mjs'
 import { THE_DEFAULT_REGULATIONS_FILE } from '../server/lib/read-the-default-regulations.ts'
@@ -127,6 +128,62 @@ export function chaptersSelectedForRun(answer: unknown, checkout: string): Offic
     if (problems.length > 0) throw new Error(`GET /api/office-regulations/chapters: ${problems.join(' ')}`)
   }
   return chapters
+}
+
+/** An answer of GET /api/office-regulations/chapters that cannot be exported or given to a round. `notes` are the lines about each chapter, when the answer was read that far. */
+export class TheChaptersAnswerCannotBeUsed extends Error {
+  readonly notes: string[] | null
+  constructor(message: string, notes: string[] | null) {
+    super(message)
+    this.notes = notes
+  }
+}
+
+/** The chapters an answer of GET /api/office-regulations/chapters gives, with the selection codeOfLawText names and a line about each chapter not stored. */
+export interface TheChaptersOfAnAnswer {
+  chapters: OfficeChapter[]
+  selection: Pick<SelectedChapter, 'n' | 'inUse' | 'notUsed'>[]
+  notes: string[]
+}
+
+/**
+ * ONE READING OF THE CHAPTERS ANSWER, for tools/rules-chapters.mjs and for a round's start.
+ *
+ * It throws TheChaptersAnswerCannotBeUsed when the answer has no chapter list or record list, when a chapter cannot be
+ * read, when a chapter's content differs from its record, and when a chapter fails the chapter check. The words say
+ * what was wrong and nothing about what the caller then does: the export adds that nothing was written.
+ */
+export function chaptersOfTheAnswer(body: unknown, door: string, checkout: string): TheChaptersOfAnAnswer {
+  const answer = body as { chapters?: unknown; records?: unknown } | null
+  if (typeof answer !== 'object' || answer === null || !Array.isArray(answer.chapters) || !Array.isArray(answer.records)) throw new TheChaptersAnswerCannotBeUsed(`GET ${door} answered no selected chapter records.`, null)
+  const isObject = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null
+  const isReadable = (one: unknown): boolean => {
+    if (!isObject(one) || typeof one.n !== 'number' || (one.inUse !== 'stored' && one.inUse !== 'shipped' && one.inUse !== 'none')) return false
+    if (one.inUse === 'shipped' && (!isObject(one.notUsed) || !Array.isArray(one.notUsed.records) || !Array.isArray(one.notUsed.problems))) return false
+    return one.inUse === 'none' || (isObject(one.chapter) && Array.isArray(one.chapter.rules))
+  }
+  // chapterFromRecord uses a record's id, title and summary as they are, so each record's shape is read here first.
+  const isARecordAsRead = (one: unknown): one is ARecordAsRead =>
+    isObject(one) && typeof one.id === 'string' && typeof one.kind === 'string' && typeof one.title === 'string' && (one.summary === null || typeof one.summary === 'string')
+  if (!answer.chapters.every(isReadable) || !answer.records.every(isARecordAsRead)) throw new TheChaptersAnswerCannotBeUsed(`GET ${door} answered chapters or records that cannot be read.`, null)
+  const selected = answer.chapters as SelectedChapter[]
+  const notes: string[] = []
+  for (const chapter of selected) {
+    if (chapter.inUse === 'shipped') notes.push(`Chapter ${String(chapter.n)} uses shipped neutral English, with no Chinese. Stored records not used: ${chapter.notUsed!.records.join(', ')}. ${chapter.notUsed!.problems.join(' ')}`)
+    if (chapter.inUse === 'none') notes.push(`Chapter ${String(chapter.n)}: this office holds none. It is not exported.`)
+  }
+  const chapters = chaptersFromRecords(answer.records).sort((a, b) => a.n - b.n)
+  const english = (chapter: ChapterContent) => ({ label: chapter.label, title: chapter.title, conclusion: chapter.conclusion, rules: chapter.rules.map(({ id, heading, text }) => ({ id, heading, text })) })
+  for (const chapter of selected) {
+    const record = chapters.find(one => one.n === chapter.n)
+    if (chapter.inUse === 'none' ? record !== undefined : record === undefined || JSON.stringify(english(contentOfChapter(record))) !== JSON.stringify(english(chapter.chapter!))) throw new TheChaptersAnswerCannotBeUsed(`GET ${door} gave chapter ${String(chapter.n)} conflicting content.`, notes)
+  }
+  const numbers = selected.map(chapter => chapter.n)
+  for (const chapter of chapters) {
+    const problems = problemsWithAChapter(chapter.n, contentOfChapter(chapter), chapters, checkout, undefined, true, numbers)
+    if (problems.length > 0) throw new TheChaptersAnswerCannotBeUsed(`GET ${door}: ${problems.join(' ')}`, notes)
+  }
+  return { chapters, selection: selected.map(({ n, inUse, notUsed }) => ({ n, inUse, notUsed })), notes }
 }
 
 /**

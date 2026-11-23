@@ -57,7 +57,7 @@ export const THE_DOOR_OF: Readonly<Record<AFieldOnlyItsDoorWrites, string>> = {
   closedUnchecked: 'POST /api/checks/<run>/closed-unchecked',
   released: 'the check door, POST /api/checks/<run>,',
   refused: 'the check door, POST /api/checks/<run>, and the office when the worker finishes again after a refusal,',
-  needsNoCheck: "when it files a run for a secretary's design/-only merge entry",
+  needsNoCheck: "when it files a run for a secretary's design/-only merge entry, at a seal while its checks are switched off, or at its start while its checks are switched off",
   endedWithItsMergeEntry: "on a merge entry's check-again run when that check refuses and the entry bounces",
   confirmed: 'the confirm door, POST /api/checks/<run>/confirm,',
   remindedBeforeTheSeal: 'when the reminder before the seal fires, and at the seal',

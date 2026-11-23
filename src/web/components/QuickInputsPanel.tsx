@@ -5,7 +5,8 @@
  * (src/shared/quick-inputs.ts is the contract and says the rules).
  *
  * The list is one row in the office's database, read and written through `GET/POST /api/office/quick-inputs`. Only the
- * person may change it, so a caller the door refuses is shown the door's own sentence in place of the box.
+ * person may change it, so a caller the door refuses is shown "read only" in place of the box, as decided, and the door's
+ * own sentence only in Developer mode.
  *
  * ---------------------------------------------------------------------------------------
  * WHAT THE PANEL SAYS ABOUT WHO WROTE THE LIST
@@ -33,13 +34,8 @@ import { settingsControlWord } from '@shared/settings-declaration.ts'
 import { useId, useState } from 'react'
 
 import { content, t } from '@shared/i18n.ts'
-import {
-  ONE_QUICK_INPUT_EVERY_MS,
-  THE_LONGEST_QUICK_INPUT,
-  THE_MOST_QUICK_INPUTS,
-  type WhatTheQuickInputListDoorSays,
-} from '@shared/quick-inputs.ts'
-import { Btn, ErrorNote, Loading, Panel, useAsync } from './ui.tsx'
+import type { WhatTheQuickInputListDoorSays } from '@shared/quick-inputs.ts'
+import { Btn, ErrorNote, Loading, Panel, ServerNote, useAsync } from './ui.tsx'
 import { TieredPress } from './TieredPress.tsx'
 import { api, getActor, type ParticipantForThePage, type WebActor } from '../api.ts'
 import { useLanguage } from '../lib/language.ts'
@@ -49,8 +45,6 @@ import { whatARefusalSays } from '../lib/terminals.ts'
 
 /** The stamp migration 0272 writes the office's starting list with (the contract's `setBy` comment). */
 const THE_STARTING_LIST_STAMP = { kind: 'migration', id: '0272' } as const
-
-const MINUTE_MS = 60 * 1000
 
 /**
  * THE ROW'S KIND, AS A KIND THE PAGE CHOOSES WORDS FOR. `writeTheRow` stamps the actor type the request proved
@@ -80,7 +74,7 @@ function theWriterInWords(setBy: { kind: string; id: string }, reader: WebActor,
 function whoWroteIt(said: WhatTheQuickInputListDoorSays, reader: WebActor, known: readonly ParticipantForThePage[] | null): string[] {
   const { reading, setBy, setAt } = said
   const at = setAt === null ? null : stampToTheMinute(setAt)
-  if (setBy === null) return reading.state === 'none' ? [] : [t('quickInputs.setByNobody')]
+  if (setBy === null) return reading.state === 'none' ? [] : [t('quickInputs.state.setByUnknown')]
   if (reading.state === 'set' && setBy.kind === THE_STARTING_LIST_STAMP.kind && setBy.id === THE_STARTING_LIST_STAMP.id) {
     return at === null ? [t('quickInputs.fromStart')] : [t('quickInputs.fromStart'), t('quickInputs.writtenAt', { at })]
   }
@@ -145,7 +139,6 @@ function QuickInputs({
   // WHO THE OFFICE KNOWS, so a writer other than the reader can be named by name (the address card's own reader).
   const [everybody] = useAsync(readParticipantsOnce, [])
   const boxId = useId()
-  const helpId = useId()
   const current = said.reading.state === 'set' ? said.reading.inputs : null
   const [text, setText] = useState(() => (current ?? []).join('\n'))
   const [fault, setFault] = useState<string | null>(null)
@@ -172,13 +165,16 @@ function QuickInputs({
 
   return (
     <div className="qin">
-      <p className="qin-lead">{t('quickInputs.what', { minutes: String(ONE_QUICK_INPUT_EVERY_MS / MINUTE_MS) })}</p>
-      <p className="qin-lead">{t('quickInputs.onlySlash')}</p>
-
       <section className="qin-now" aria-label={t('quickInputs.listNow')} data-testid="quick-inputs-now">
         <p className="qin-key">{t('quickInputs.listNow')}</p>
-        {/* THE ABSENCE SENTENCE IS THE DOOR'S OWN (`says`), not a copy of it kept here. */}
-        {current === null ? (said.says === null ? null : <p className="qin-state">{content(said.says)}</p>) : <TheInputs inputs={current} />}
+        {current === null ? (
+          <>
+            <p className="qin-state">{t('absence.none')}</p>
+            <ServerNote text={said.says} />
+          </>
+        ) : (
+          <TheInputs inputs={current} />
+        )}
         {whoWroteIt(
           said,
           getActor(),
@@ -191,9 +187,10 @@ function QuickInputs({
       </section>
 
       {said.refusal !== null ? (
-        <p className="qin-refuse" role="alert">
-          {content(said.refusal)}
-        </p>
+        <>
+          <p className="qin-state">{t('settingsState.readOnly')}</p>
+          <ServerNote text={said.refusal} />
+        </>
       ) : (
         <div className="qin-form">
           <label className="qin-label" htmlFor={boxId}>
@@ -208,15 +205,11 @@ function QuickInputs({
             spellCheck={false}
             autoCapitalize="off"
             autoCorrect="off"
-            aria-describedby={helpId}
             onChange={(event) => {
               setText(event.target.value)
               if (stored !== null) onEdited()
             }}
           />
-          <p id={helpId} className="qin-state">
-            {t('quickInputs.boxHelp', { most: String(THE_MOST_QUICK_INPUTS), longest: String(THE_LONGEST_QUICK_INPUT) })}
-          </p>
           <div className="qin-presses">
             <Btn variant="primary" size="sm" onClick={save} pending={busy} disabled={lines.length === 0} reason={t('quickInputs.saveEmpty')}>
               {t(settingsControlWord('settings.quickinputs', 'quickInputs.save'))}
@@ -268,7 +261,7 @@ function QuickInputs({
 /** The panel's own rules. Every value is a token, so a preset swap re-skins it with everything else. */
 const QUICK_INPUTS_CSS = `
 .qin { display: flex; flex-direction: column; gap: var(--pad); min-width: 0; }
-.qin-lead, .qin-state { margin: 0; max-width: var(--measure-in-box); font: var(--fs-1)/var(--lh-body) var(--font-ui); color: var(--text-2); overflow-wrap: anywhere; }
+.qin-state { margin: 0; max-width: var(--measure-in-box); font: var(--fs-1)/var(--lh-body) var(--font-ui); color: var(--text-2); overflow-wrap: anywhere; }
 .qin-key, .qin-label { margin: 0; font: 600 var(--fs-1)/var(--lh-tight) var(--font-ui); color: var(--text); overflow-wrap: anywhere; }
 .qin-now, .qin-form, .qin-stored { display: flex; flex-direction: column; gap: calc(var(--pad) / 2); min-width: 0; }
 .qin-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; max-width: var(--measure-in-box); min-width: 0; }

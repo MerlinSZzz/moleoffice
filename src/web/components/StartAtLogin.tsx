@@ -3,23 +3,25 @@
 /**
  * START AT LOGIN, ON TERMINAL MANAGEMENT AND ON SETTINGS. Wave 13u, round 3, piece H9.
  *
- * Whether a systemd user unit starts the office when the person logs in, one press to turn it on or off, and the
- * sentence that says a start at login is not a start at boot. The doors are src/server/api/start-at-login.ts, and
- * src/config/start-at-login.mjs says what the unit is.
+ * Whether a systemd user unit starts the office when the person logs in, and one press to turn it on or off. The doors
+ * are src/server/api/start-at-login.ts, and src/config/start-at-login.mjs says what the unit is.
  *
  * LINGERING IS SHOWN, NOT PRESSED. Whether their user lingers decides whether the office starts at boot and outlives their
  * logout. It is a setting of their login on the whole computer, and turning it on can ask for an administrator, so the
- * panel says in plain words whether the office outlives their logout.
+ * panel draws a short word for whether the office outlives their logout, and only while it is on.
  *
- * IN PLAIN WORDS (wave 13u, round 7): what it does, and what pressing changes, with no systemd, unit or lingering. Every
- * command and the name of every setting are drawn in Developer mode only, because nothing a person must do is a command.
- * Where the last start failed or the office stops at logout, the plain view says the next step: that Developer mode
- * shows how (round 7b). What happens at logout is said as a fact only while it is on (round 7b).
+ * SHORT STATE WORDS, as decided: where it stands, whether the last start failed and what happens at logout, with no
+ * systemd, unit or lingering. Every command and the name of every setting are drawn in Developer mode only, because
+ * nothing a person must do is a command.
  *
  * ON A MAC (round 10): only where to set it, the "Open at login" item of the menu-bar menu. Never on or off.
  *
- * ON WINDOWS (wave 13t, round W12): where to set it, the same item of the menu of the icon in the notification area,
- * and that signing out of Windows stops the office. Never on or off.
+ * ON WINDOWS (wave 13t, round W12): only where to set it, the same item of the menu of the icon in the notification
+ * area. Never on or off.
+ *
+ * IN AN APPIMAGE (wave 13t): that start at login is not available there and the .deb install has it. Never on or off.
+ * While a unit a press wrote is there, the card says so as well and draws the press Off, which removes it. It never
+ * draws the press On there.
  *
  * ON SETTINGS TOO (wave 13t, round W18c): Terminal management is a developer page, and Normal mode does not show it, so
  * on Linux a person in Normal mode had no way to the press. StartAtLoginPanel draws the same card in a Settings panel
@@ -54,37 +56,40 @@ function pressStartAtLogin(on: boolean): Promise<StartAtLoginDone> {
   })
 }
 
-/** The one sentence for where things stand. */
+/** The short word for where things stand. */
 function theStateWords(reading: StartAtLoginReading): string {
-  if (reading.systemd === 'not linux') return t('startAtLogin.state.notLinux')
-  if (reading.unit === 'not ours') return t('startAtLogin.state.notOurs')
-  if (reading.systemd === 'no answer') return t('startAtLogin.state.noSystemd')
-  if (reading.startsAtLogin === true) return t(reading.unit === 'out of date' ? 'startAtLogin.state.onOutOfDate' : 'startAtLogin.state.on')
-  if (reading.startsAtLogin === false) return t('startAtLogin.state.off')
-  return t('startAtLogin.state.unknown')
+  if (reading.systemd === 'not linux') return t('startAtLogin.word.notLinux')
+  if (reading.unit === 'not ours') return t('startAtLogin.word.notOurs')
+  if (reading.systemd === 'no answer') return t('settingsState.unavailable')
+  if (reading.startsAtLogin === true) return t(reading.unit === 'out of date' ? 'startAtLogin.word.onOutOfDate' : 'settingsState.on')
+  if (reading.startsAtLogin === false) return t('shortcuts.off')
+  return t('settingsState.notKnown')
 }
 
-/** What happens at logout. Said as a fact only while it is on; while it is off or not known, said as what "on" would do. */
-function theAfterLogoutWords(reading: StartAtLoginReading): WordKey {
-  if (reading.linger === null) return 'startAtLogin.afterLogout.unknown'
-  const on = reading.startsAtLogin === true
-  if (reading.linger === 'yes') return on ? 'startAtLogin.afterLogout.keeps' : 'startAtLogin.afterLogout.keepsIfOn'
-  return on ? 'startAtLogin.afterLogout.stops' : 'startAtLogin.afterLogout.stopsIfOn'
+/** What happens at logout, as a fact, and only while it is on; null while it is off or not known. */
+function theAfterLogoutWords(reading: StartAtLoginReading): WordKey | null {
+  if (reading.startsAtLogin !== true) return null
+  if (reading.linger === null) return 'startAtLogin.afterLogout.notKnown'
+  return reading.linger === 'yes' ? 'startAtLogin.afterLogout.keepsRunning' : 'startAtLogin.afterLogout.stopsAtLogout'
 }
 
-/** Where the window's own login item sets it, on a Mac and on Windows, in the words drawn; null where the press here sets it. */
+/**
+ * Where the window's own login item sets it, on a Mac and on Windows, or that the .deb install has it, in an AppImage,
+ * in the words drawn; null where the press here sets it.
+ */
 function whereTheWindowSetsIt(reading: StartAtLoginReading): WordKey[] | null {
   if (reading.setInTheMenuBar) return ['startAtLogin.mac.where']
-  if (reading.setInTheTray) return ['startAtLogin.windows.where', 'startAtLogin.windows.signOut']
+  if (reading.setInTheTray) return ['startAtLogin.windows.where']
+  if (reading.fromAnAppImage) return ['startAtLogin.appImage.where']
   return null
 }
 
-/** What their press did, in their language. */
+/** What their press did, as a short word in their language. */
 function whatThePressDid(done: StartAtLoginDone): WordKey {
-  if (done.turned === 'on') return 'startAtLogin.done.on'
-  if (done.turned === 'already on') return done.wrote.length > 0 ? 'startAtLogin.done.rewritten' : 'startAtLogin.done.alreadyOn'
-  if (done.turned === 'off') return 'startAtLogin.done.off'
-  return 'startAtLogin.done.alreadyOff'
+  if (done.turned === 'on') return 'settingsState.turnedOn'
+  if (done.turned === 'already on') return done.wrote.length > 0 ? 'settingsState.written' : 'settingsState.unchanged'
+  if (done.turned === 'off') return 'settingsState.turnedOff'
+  return 'settingsState.unchanged'
 }
 
 /** The card on Settings, in the panel Normal mode draws. */
@@ -125,6 +130,7 @@ export function StartAtLogin({ inAPanel = false }: { inAPanel?: boolean }): Reac
   const reading = state.status === 'ready' ? state.value : null
   const where = reading === null ? null : whereTheWindowSetsIt(reading)
   const mayPress = reading !== null && reading.systemd === 'answers' && reading.unit !== 'not ours'
+  const afterLogout = reading !== null && reading.systemd === 'answers' ? theAfterLogoutWords(reading) : null
   const busyWhy = busy ? t('startAtLogin.busy') : undefined
   return (
     <section className={inAPanel ? 'sal sal-in-a-panel' : 'sal'} aria-labelledby={inAPanel ? undefined : 'sal-heading'}>
@@ -132,12 +138,11 @@ export function StartAtLogin({ inAPanel = false }: { inAPanel?: boolean }): Reac
         {START_AT_LOGIN_CSS}
       </style>
       {inAPanel ? null : <h2 className="sal-heading" id="sal-heading">{t('startAtLogin.heading')}</h2>}
-      {where === null ? <p className="sal-what">{t('startAtLogin.loginNotBoot')}</p> : null}
       {state.status === 'loading' ? <Loading what={t('startAtLogin.loading')} rows={1} /> : null}
       {state.status === 'error' ? <ErrorNote message={state.message} fault={state.fault ?? null} label={t('startAtLogin.unread')} retry={readAgain} /> : null}
-      {/* ON A MAC AND ON WINDOWS, WHERE AND NOTHING ELSE (round 10, wave 13u's condition in message Ux__34vHQle1;
-          on Windows, round W12, with the sign-out sentence): the window's own login item sets it and the server does
-          not read it, so the card never says on or off and has no press. */}
+      {/* ON A MAC AND ON WINDOWS, WHERE AND NOTHING ELSE (round 10; on Windows, round W12): the window's own login
+          item sets it and the server does not read it, so the card never says on or off and has no press. In an
+          AppImage the same, the card says the .deb install has it, but for a unit a press wrote (below). */}
       {where !== null && reading !== null ? (
         <>
           {where.map((key) => (
@@ -150,14 +155,23 @@ export function StartAtLogin({ inAPanel = false }: { inAPanel?: boolean }): Reac
               {reading.says}
             </p>
           ) : null}
+          {/* A UNIT A PRESS WROTE, IN AN APPIMAGE: the press Off removes it and keeps a copy. Never the press On. */}
+          {reading.fromAnAppImage && (reading.unit === 'current' || reading.unit === 'out of date') ? (
+            <>
+              <p className="sal-said">{t('startAtLogin.appImage.unitLeft')}</p>
+              <div className="sal-presses">
+                <Btn onClick={() => press(false)} disabled={busy} reason={busyWhy}>
+                  {t(settingsControlWord('settings.startatlogin', 'startAtLogin.turnOff'))}
+                </Btn>
+              </div>
+            </>
+          ) : null}
         </>
       ) : reading === null ? null : (
         <>
           <p className="sal-said">{theStateWords(reading)}</p>
-          {reading.activeWord === 'failed' ? <p className="sal-said">{t('startAtLogin.failed')}</p> : null}
-          {reading.activeWord === 'failed' && !developer ? <p className="sal-what">{t('startAtLogin.next.failed')}</p> : null}
-          {reading.systemd !== 'answers' ? null : <p className="sal-said">{t(theAfterLogoutWords(reading))}</p>}
-          {reading.systemd === 'answers' && reading.linger === 'no' && !developer ? <p className="sal-what">{t('startAtLogin.next.stops')}</p> : null}
+          {reading.activeWord === 'failed' ? <p className="sal-said">{t('startAtLogin.word.lastStartFailed')}</p> : null}
+          {afterLogout === null ? null : <p className="sal-said">{t(afterLogout)}</p>}
           {/* THE OFFICE'S OWN SENTENCE, THE SETTINGS BY NAME AND THE COMMANDS, for developers, behind their fold as on the
               rest of Terminal management. */}
           {developer ? (
@@ -181,9 +195,6 @@ export function StartAtLogin({ inAPanel = false }: { inAPanel?: boolean }): Reac
                 <p className="sal-said">{t('startAtLogin.linger.unknown', { user: reading.user })}</p>
               )}
             </details>
-          ) : null}
-          {mayPress ? (
-            <p className="sal-what">{t(reading.startsAtLogin === true ? 'startAtLogin.press.whenOn' : 'startAtLogin.press.whenOff')}</p>
           ) : null}
           {mayPress ? (
             <div className="sal-presses">
@@ -227,13 +238,12 @@ const START_AT_LOGIN_CSS = `
 }
 .sal-in-a-panel { margin: 0; padding: 0; border: 0; background: none; }
 .sal-heading { margin: 0; font-size: var(--fs-2); }
-.sal-what, .sal-said {
+.sal-said {
   margin: 0;
   max-width: var(--measure-in-box);
   font: var(--fs-1)/var(--lh-read) var(--font-ui);
   overflow-wrap: anywhere;
 }
-.sal-what { color: var(--text-2); }
 .sal-said { color: var(--text); }
 .sal-dev { color: var(--text-2); }
 .sal-dev > summary { cursor: pointer; font-size: 0.9em; }

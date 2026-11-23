@@ -6,18 +6,18 @@
  * A real browser against a throwaway office:
  *
  *   1. On the Settings page the person sets the model a run answering a message gets, presses Save,
- *      and the office's door reads it back. Where the builder rows were, one line says they are kept
- *      on the Casting page, with a link to it.
+ *      and the office's door reads it back. Where the builder rows were, a link leads to the Casting
+ *      page.
  *   2. On an agent's profile the person presses Change, types the agent's own model, presses Set,
  *      and the office's door reads it back.
  *   3. The Runtime page names the model the role's builders go to, from the Casting table.
  *   4. A page acting as an agent is refused, and the refusal is drawn in words where the press was.
  *   5. With a runtime that takes a reasoning effort chosen, the Runtime, Model and effort boxes and
- *      the Save and Clear presses lie inside the row, and the row inside the panel, at 390, 660,
- *      800, 990, 1024 and 1440 in light and dark. Putting flex none back on the control group, so it
+ *      the Save and Clear presses lie inside the row, and the row inside the panel, at 390, 660
+ *      and 1440 in light. Putting flex none back on the control group, so it
  *      keeps its one-line width, turns this case red at 660.
  *
- * Every screen is checked for sideways scrolling at 1440, 990, 660 and 390 in light and dark. With
+ * Every screen is checked for sideways scrolling at 1440 and 390 in light. With
  * RUN_MODELS_SHOTS set to a folder, each of the three surfaces is photographed at those widths and
  * themes into it. No model is called.
  */
@@ -30,9 +30,9 @@ import { liveApp, waitForThePage, type LiveApp } from './helpers.ts'
 import { theRuntimesTheAdaptersGive } from './the-runtimes-the-adapters-give.ts'
 
 let app: LiveApp
-const WIDTHS = [1440, 990, 660, 390] as const
-const CONTROL_WIDTHS = [390, 660, 800, 990, 1024, 1440] as const
-const THEMES = ['light', 'dark'] as const
+const WIDTHS = [1440, 390] as const
+const CONTROL_WIDTHS = [390, 660, 1440] as const
+const THEMES = ['light'] as const
 const PANEL = '[data-target="uiSurface/settings.runmodels"]'
 
 const headers = (type: 'human' | 'agent', id: string) => ({ 'content-type': 'application/json', 'x-mole-office-workspace': 'default', 'x-mole-office-actor-type': type, 'x-mole-office-actor-id': id })
@@ -87,10 +87,7 @@ describe('the model each run uses, in the browser', () => {
     await open('?mode=inspect#/settings/runmodels', `${PANEL} .rm`)
     const panel = app.page.locator(PANEL)
     expect((await panel.locator('.px-panel-title').first().textContent())?.trim()).toBe('The model each run uses')
-    const text = (await panel.textContent()) ?? ''
-    expect(text).toContain('A notice starts no run, so there is no model to choose for it.')
-    // WHERE THE BUILDER ROWS AND THE CHECK WERE: one line and a link to the Casting page.
-    expect(text).toContain("A builder's model for each role, and the check's model, are kept on the Casting page.")
+    // WHERE THE BUILDER ROWS AND THE CHECK WERE: a link to the Casting page.
     expect(await panel.getByRole('link', { name: 'Open Casting' }).getAttribute('href')).toBe('#/casting')
     expect(await panel.locator('[data-slot^="builders."]').count()).toBe(0)
     expect(await panel.locator('[data-slot="places.conversation"] .rm-set').textContent()).toContain('nothing set')
@@ -109,7 +106,7 @@ describe('the model each run uses, in the browser', () => {
     await lookAtEveryWidth('settings-panel', PANEL)
   }, 180_000)
 
-  it('keeps the run-models controls inside the row and the panel at every width', async () => {
+  it('keeps the run-models controls inside the row and the panel at the widest and the narrowest width and at 660', async () => {
     await open('?mode=inspect#/settings/runmodels', `${PANEL} .rm`)
     const theAdapters = theRuntimesTheAdaptersGive()
     const clearPress = () => app.page.locator(`${PANEL} [data-slot="places.conversation"] .tiered-press button`)

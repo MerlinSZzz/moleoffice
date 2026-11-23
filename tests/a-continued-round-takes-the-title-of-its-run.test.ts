@@ -51,7 +51,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { thePortsATestKeepsOff } from '../tools/live-office-ports.mjs'
 import { thePatterns } from '../tools/merge-tool/owner-content.mjs'
 import { THE_MODELS_START_VALUES } from '../src/config/model-efforts.mjs'
-import { LEGACY_ROUND_CHAPTERS, writeRoundStartRules } from './round-chapters-fixture.ts'
+import { LEGACY_ROUND_CHAPTERS, theMadeUpOfficesAnswer, writeRoundStartRules } from './round-chapters-fixture.ts'
 import { FAKE_DOCKER } from './sandbox-stand-ins.ts'
 import { A_RUN_GIVEN_NO_TITLE, aRunWithNoTitleARoundCanTakeWords, THE_FACTS_VARIABLE, theFactsAStartIsGiven, writeInstance } from '../tools/sandbox-common.mjs'
 
@@ -117,7 +117,10 @@ beforeAll(async () => {
     res.setHeader('content-type', 'application/json')
     const id = req.url?.split('/').pop() ?? ''
     const run = runs.get(id)
-    if (req.url === '/api/participants') {
+    if (req.method === 'GET' && theMadeUpOfficesAnswer(req.url ?? '') !== null) {
+      // THE TWO DOORS A ROUND'S START READS ITS RULES FROM, answered as an office that holds no chapter and no regulation.
+      res.end(JSON.stringify(theMadeUpOfficesAnswer(req.url ?? '')))
+    } else if (req.url === '/api/participants') {
       res.end(JSON.stringify({ agents: [{ id: agent, handle: agent, name: agent, record: 'synthetic-agent-record' }] }))
     } else if (req.method === 'GET' && req.url?.startsWith('/api/office/run-models/for/')) {
       const query = new URL(req.url, 'http://synthetic.invalid').searchParams

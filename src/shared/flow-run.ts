@@ -17,6 +17,7 @@
 
 import { PLAN_ENDINGS } from './planning-flow.ts'
 import type { ParticipantRef } from './participants.ts'
+import { THE_SUPERVISOR, THE_WORKER } from './roles.ts'
 
 /** The record kind. With an underscore, like `merge_entry` and `sealed_tip`. */
 export const FLOW_RUN_KIND = 'flow_run'
@@ -200,6 +201,56 @@ export type EnteredFlowEndsOn = (typeof ENTERED_FLOW_ENDS_ON)[number]
 /** How a flow run that an agent entered ended: the planning flow's two endings, or an ending event of the flow. */
 export const FLOW_RUN_ENDINGS = [...PLAN_ENDINGS, ...FLOW_ENDING_EVENTS] as const
 export type FlowRunEnding = (typeof FLOW_RUN_ENDINGS)[number]
+
+/**
+ * THE STARTS A FLOW MAY LIST IN ITS `starts_on`, AS THE STARTS IT FOLLOWS. The office reads one of them from a run that
+ * names no flow of its own, when it files the run's flow run:
+ *   1. a run with no `extra.purpose`, for an agent that holds the supervisor card;
+ *   2. the same, for an agent that holds the worker card;
+ *   3. a run whose `extra.purpose` is one of `A_CHECKS_PURPOSES`;
+ *   4. a run whose `extra.purpose` is `A_LANDINGS_PURPOSE`, with neither `pinOnly` nor `checkResolution` in `extra`.
+ * Any other run starts as none of them. A word here holds no quote mark, because a kind's type string quotes each one.
+ */
+export const FLOW_STARTING_EVENTS = [`a ${THE_SUPERVISOR} run starts`, `a ${THE_WORKER} run starts`, 'a check starts', 'a landing on main starts'] as const
+export type FlowStartingEvent = (typeof FLOW_STARTING_EVENTS)[number]
+
+/** The purposes the office files a check run with: a check, and a check filed again by the merge queue. */
+export const A_CHECKS_PURPOSES = ['inspection', 'reinspection'] as const
+
+/** The purpose the merge queue files a landing run with. */
+export const A_LANDINGS_PURPOSE = 'merge'
+
+/** The sentence a flow run carries when two or more live flows of the run's project list the start it was read as. */
+export function noFlowSeveralListTheStart(start: FlowStartingEvent, flows: readonly string[]): string {
+  return `This run named no flow. Its start, "${start}", is listed by ${String(flows.length)} flows: ${[...flows].sort().join(', ')}, so the office named none of them.`
+}
+
+/**
+ * THE START AND FLOWS OF THE SENTENCE ABOVE, OR NULL WHEN THE VALUE IS NOT THAT SENTENCE.
+ *
+ * The writer sorts the flows, so a sentence is read only when writing its parts again gives back the whole value. A
+ * start that is not one of the starts the office reads, another count, or words around it are not that sentence.
+ */
+export function theStartAndFlowsOfANoFlowSentence(value: unknown): { start: FlowStartingEvent; flows: string[] } | null {
+  if (typeof value !== 'string') return null
+  const prefix = 'This run named no flow. Its start, "'
+  const middle = '", is listed by '
+  const tail = ', so the office named none of them.'
+  if (!value.startsWith(prefix) || !value.endsWith(tail)) return null
+  const inside = value.slice(prefix.length, value.length - tail.length)
+  const listedAt = inside.indexOf(middle)
+  if (listedAt === -1) return null
+  const start = inside.slice(0, listedAt)
+  if (!(FLOW_STARTING_EVENTS as readonly string[]).includes(start)) return null
+  const afterMiddle = inside.slice(listedAt + middle.length)
+  const countAt = afterMiddle.indexOf(' flows: ')
+  if (countAt === -1) return null
+  const count = afterMiddle.slice(0, countAt)
+  const flows = afterMiddle.slice(countAt + ' flows: '.length).split(', ')
+  if (flows.length === 0 || flows.some((one) => one === '') || String(flows.length) !== count) return null
+  const read = { start: start as FlowStartingEvent, flows: [...flows].sort() }
+  return noFlowSeveralListTheStart(read.start, read.flows) === value ? read : null
+}
 
 /** One item of one checklist, by the checklist's id and the item's id in it. */
 export interface TheItemOfAFlow {

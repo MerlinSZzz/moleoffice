@@ -57,6 +57,7 @@ import { theHandbooksOnAFlow, type HandbooksAReaderMayRead } from './handbooks.t
 import type { AMessageReader } from './messages.ts'
 import { allLinks, listRecords, versionOf } from './records.ts'
 import { isRetired } from '../db/is-retired.ts'
+import { isReplaced } from '../db/is-replaced.ts'
 
 /** One flow as the steward reads it, with its problems attached. */
 export interface FlowInventoryRow {
@@ -221,13 +222,7 @@ export interface FlowPageAsked {
   nextAt: (offset: number) => string
 }
 
-/**
- * WHETHER A LIVE FLOW SUPERSEDES THIS ONE (wave 13p round 40). A flow superseded only by a deleted flow is current. The
- * link may be filed in either end's project, so it is found by its ends and not by its project.
- */
-const isReplaced = sql`EXISTS (SELECT 1 FROM links l JOIN records n ON n.id = l.from_id
-  WHERE l.to_id = ${records.id} AND l.type = 'supersedes' AND n.kind = 'flow' AND n.deleted_at IS NULL)`
-
+export { isReplaced } from '../db/is-replaced.ts'
 export { isRetired } from '../db/is-retired.ts'
 
 /** Whether the page folds a flow: a live flow supersedes it, or it is retired. */

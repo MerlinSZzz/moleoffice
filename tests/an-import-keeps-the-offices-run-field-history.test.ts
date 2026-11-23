@@ -8,16 +8,14 @@ import Fastify, { type FastifyInstance } from 'fastify'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { THE_TEST_OFFICES_OWNER } from './a-page-of-a-test-office.ts'
 import { freshDb, type TestDb } from './helpers.ts'
-import { NEEDS_NO_CHECK, ENDED_WITH_ITS_MERGE_ENTRY } from '../src/shared/releasing.ts'
+import { NEEDS_NO_CHECK } from '../src/shared/releasing.ts'
 
 const person = { type: 'human', id: THE_TEST_OFFICES_OWNER.id } as const
 const office = { type: 'agent', id: 'mole-office/the-api-server' } as const
 const headers = { 'x-mole-office-workspace': 'default', 'x-mole-office-actor-type': 'human', 'x-mole-office-actor-id': THE_TEST_OFFICES_OWNER.id }
 const fields = [
   { field: NEEDS_NO_CHECK, value: { decision: 'synthetic-decision', at: '2026-09-26 09:00:00', because: 'Synthetic office mark.' },
-    refusal: "The office writes needsNoCheck when it files a run for a secretary's design/-only merge entry. Nothing was written." },
-  { field: ENDED_WITH_ITS_MERGE_ENTRY, value: { entry: 'synthetic-entry', at: '2026-09-26 09:00:00', because: 'Synthetic office ending.' },
-    refusal: "The office writes endedWithItsMergeEntry on a merge entry's check-again run when that check refuses and the entry bounces. Nothing was written." },
+    refusal: "The office writes needsNoCheck when it files a run for a secretary's design/-only merge entry, at a seal while its checks are switched off, or at its start while its checks are switched off. Nothing was written." },
 ] as const
 let t: TestDb
 let app: FastifyInstance

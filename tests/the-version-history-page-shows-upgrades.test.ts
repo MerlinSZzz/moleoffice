@@ -119,6 +119,13 @@
  * the two links' addresses and in the Developer details, never in the words.
  * WHY: the owner reads that a receipt or a report was filed, and must be able to open it from the
  * row without copying an id.
+ *
+ * OLD: a sentence under the heading said what the page lists; a first handoff, a release that owes
+ * nothing, a notice edited later and each Developer notice state drew a sentence that also explained
+ * itself; an empty history drew "No upgrade announcements yet".
+ * NEW: no sentence stands under the heading; those rows draw short state lines, each read from its
+ * key; an empty history draws the state word "none".
+ * WHY: as decided, explanatory text is taken off the pages, and an absence is a short state word.
  */
 import { beforeAll, describe, expect, it } from 'vitest'
 import { createElement } from 'react'
@@ -357,9 +364,9 @@ describe('the page says what happened while its read is in each state', () => {
     // RESTORE: preserve ApiError.fault in the older-page error conversion.
   })
 
-  it('says when no upgrade announcements have been filed', async () => {
+  it('draws the state word "none" when no upgrade announcement has been filed', async () => {
     const html = await drawContent({ status: 'ready', value: historyPage([], null) })
-    expect(html).toContain('No upgrade announcements yet')
+    expect(html).toContain(`<p class="vh-empty">${t('absence.none')}</p>`)
   })
 })
 
@@ -384,7 +391,7 @@ describe('announced attempts keep the outcome written by the server', () => {
     const row = { ...COMPLETED, kind: 'first-handoff', baselineTag: null, fromCommit: 'a'.repeat(40), toCommit: 'a'.repeat(40),
       fromRepository: '/fixture/development', toRepository: '/fixture/stable', outcome: 'handed-off' } as unknown as HistoryRow
     const html = await drawContent({ status: 'ready', value: historyPage([row], null) })
-    expect(html).toContain('First handoff completed. The stable checkout serves the same code; no feature changed.')
+    expect(html).toContain(t('versionHistoryPage.handedOff'))
     expect(html).not.toContain('The upgrade completed.')
     const inspect = await drawContentInDeveloperMode({ status: 'ready', value: historyPage([row], null) })
     expect(inspect).toContain('No previous stable release')
@@ -433,7 +440,7 @@ describe('Normal mode gives the reader the six release facts', () => {
     expect(html).toContain(COMPLETED.toCommit.slice(0, 9))
     expect(html).not.toContain(COMPLETED.fromCommit)
     expect(html).not.toContain(COMPLETED.toCommit)
-    expect(html).toContain(t('w13q.upgrades.noticeChangedShort').replace(/'/g, '&#x27;'))
+    expect(html).toContain(t('versionHistoryPage.editedLater').replace(/'/g, '&#x27;'))
     // RESTORE: show a short plain notice-state line while keeping the first recorded notice intact.
 
     // CONTROL: there is one message link, to the announcement, with a useful label.
@@ -485,7 +492,7 @@ describe('the original notice stays visible when the current notice changes or d
       ...COMPLETED, notices: { before: 'changed', after: 'unchanged' },
     }
     const html = await drawContent({ status: 'ready', value: historyPage([row], null) })
-    expect(html).toContain(t('w13q.upgrades.noticeChangedShort').replace(/'/g, '&#x27;'))
+    expect(html).toContain(t('versionHistoryPage.editedLater').replace(/'/g, '&#x27;'))
     expect(html).toContain(LONG_NOTICE)
   })
 
@@ -497,20 +504,20 @@ describe('the original notice stays visible when the current notice changes or d
     expect(html).toContain(LONG_NOTICE)
     // Specific mutation: label a deleted or unavailable notice as edited later.
     // RED: this precise false statement is forbidden for both states.
-    expect(html).not.toContain(t('w13q.upgrades.noticeChangedShort').replace(/'/g, '&#x27;'))
+    expect(html).not.toContain(t('versionHistoryPage.editedLater').replace(/'/g, '&#x27;'))
     // RESTORE: keep the accurate changed notice behind Developer's folded event details.
   })
 
   it.each([
-    ['unchanged', 'Current notice still matches the recorded notice.'],
-    ['changed', 'Current notice has changed. This page keeps the notice as originally recorded.'],
-    ['deleted', 'Current notice was deleted. This page keeps the notice as originally recorded.'],
-    ['missing', 'Current notice is missing. This page keeps the notice as originally recorded.'],
-  ] as const)('keeps the server-reported %s state inside Developer mode', async (state, sentence) => {
+    ['unchanged', 'w13q.upgrades.noticeUnchanged'],
+    ['changed', 'versionHistoryPage.noticeChanged'],
+    ['deleted', 'versionHistoryPage.noticeDeleted'],
+    ['missing', 'versionHistoryPage.noticeMissing'],
+  ] as const)('keeps the server-reported %s state inside Developer mode', async (state, key) => {
     const row: HistoryRow = { ...COMPLETED, notices: { before: state, after: 'unchanged' } }
     const html = await drawContentInDeveloperMode({ status: 'ready', value: historyPage([row], null) })
     const disclosure = html.match(/<details class="vh-recorded-details">[\s\S]*?<\/details>/)?.[0] ?? ''
-    expect(disclosure).toContain(sentence)
+    expect(disclosure).toContain(t(key))
   })
 })
 
@@ -712,7 +719,7 @@ describe('an emergency release says so, with its follow-up receipt and its repor
     const html = await draw(rows.notOwed)
     expect(html).toContain('Emergency release')
     expect(html).toContain('Upgrade failed and the baseline was restored')
-    expect(html).toContain('This release did not go in, so it owes no follow-up receipt and no report.')
+    expect(html).toContain(t('versionHistoryPage.owesNothing'))
     expect(html).not.toContain('Follow-up test receipt:')
     expect(html).not.toContain('Report:')
   })

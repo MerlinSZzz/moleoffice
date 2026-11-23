@@ -85,7 +85,7 @@ afterAll(async () => {
  * an asset's, and the file is read from the upload's own `path` rather than guessed: the server
  * names where it put the bytes beside this test's database, in the format it stored them.
  */
-async function putAPictureOnJamie(): Promise<string> {
+async function putAPictureOnWren(): Promise<string> {
   const sent = await fetch(`${app.api}/api/participants/person/${THE_PERSON}/avatar`, {
     method: 'POST',
     headers: AS_THE_OWNER,
@@ -164,7 +164,7 @@ async function waitForTheChosenPictureToDraw(): Promise<void> {
 
 describe('a broken copy in the browser is asked for again', () => {
   it('recovers the chosen picture on the next page load, with no routing', async () => {
-    const file = await putAPictureOnJamie()
+    const file = await putAPictureOnWren()
     expect(existsSync(file), 'the uploaded picture is not where the upload answer said it was').toBe(true)
     const whole = cutTheFileShort(file)
 
@@ -198,7 +198,7 @@ describe('a broken copy in the browser is asked for again', () => {
 
 describe('a retry that is broken too falls back as before', () => {
   it('keeps the file cut short, ends on the drawn picture, and asks again exactly once', async () => {
-    const file = await putAPictureOnJamie()
+    const file = await putAPictureOnWren()
     const whole = cutTheFileShort(file)
 
     // page.on('request') does not turn the browser cache off, which routing does. This is the count
@@ -270,7 +270,7 @@ describe('the recovered picture is looked at', () => {
       const { mkdirSync } = await import('node:fs')
       mkdirSync(shots, { recursive: true })
 
-      const file = await putAPictureOnJamie()
+      const file = await putAPictureOnWren()
       const whole = cutTheFileShort(file)
       await openTheProfileAFresh()
       await waitForThePicture('drawn')

@@ -106,12 +106,11 @@ describe('a person makes a theme of their own in the Themes panel of the Looks t
       expect(await row(look).count(), look).toBe(1)
       expect(await row(look).getByRole('button', { name: say('settingsPanel.ownThemes.copy') }).count(), look).toBe(0)
     }
-    expect(await tab.innerText()).toContain(say('settingsPanel.ownThemes.looksAreNotCopied'))
     for (const theme of THEMES) {
       expect(await row(theme.id).getByRole('button', { name: say('settingsPanel.ownThemes.copy') }).count(), theme.id).toBe(1)
       expect(await row(theme.id).getByRole('button', { name: say('settingsPanel.ownThemes.change') }).count(), theme.id).toBe(0)
     }
-    expect(await tab.innerText()).toContain(say('settingsPanel.ownThemes.noneYet'))
+    expect(await tab.locator('.owth-says').innerText()).toBe(say('absence.none'))
     await expectTheInUseWordsToRead(tab)
 
     // COPY. The office keeps the copy at once, unchanged, and the panel opens it to be changed.
@@ -150,7 +149,7 @@ describe('a person makes a theme of their own in the Themes panel of the Looks t
       expect(words).toContain(say('settingsPanel.ownThemes.ratio', { ratio: ratioWords(measurement.ratio), floor: measurement.floor }))
       expect(words).toContain(say(howToFixIt(failing), { fg: measurement.pair.fg, bg: measurement.pair.bg }))
     }
-    expect(await editor.innerText()).toContain(say('settingsPanel.ownThemes.checkFails', { failing: answer.failing.length, all: READABILITY_PAIRS.length }))
+    expect(await editor.innerText()).toContain(say('settingsPanel.ownThemes.checkFailsCount', { failing: answer.failing.length, all: READABILITY_PAIRS.length }))
 
     // SAVE IS REFUSED by the office, with the reader's sentences, and nothing is written.
     const refused = readTheLook({ chosen: afterCopy!.chosen, own: [faint] })
@@ -190,6 +189,6 @@ describe('a person makes a theme of their own in the Themes panel of the Looks t
     expect(await theLookTheOfficeKeeps()).toEqual({ chosen: SOURCE.id, own: [] })
     await page.waitForFunction((id) => document.documentElement.getAttribute('data-theme') === id, SOURCE.id, { timeout: 10_000 })
     expect(await row(copy.id).count()).toBe(0)
-    expect(await tab.innerText()).toContain(say('settingsPanel.ownThemes.noneYet'))
+    expect(await tab.locator('.owth-says').innerText()).toBe(say('absence.none'))
   }, 240_000)
 })

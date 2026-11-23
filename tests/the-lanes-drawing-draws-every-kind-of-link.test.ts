@@ -91,7 +91,7 @@ import {
   type MadeUpOffice,
   type TheDrawing,
 } from './a-made-up-office-drawn-in-lanes.ts'
-import { DEVELOPER, openInTheDeveloperView, theDeveloperLines } from './a-pipeline-page-in-the-developer-view.ts'
+import { openInTheDeveloperView, theDeveloperLines } from './a-pipeline-page-in-the-developer-view.ts'
 
 let app: LiveApp
 let office: MadeUpOffice
@@ -222,7 +222,7 @@ it('criterion 1: the link the drawing cannot draw is named in the developer view
   expect(drawing.drawnLinks, 'the link to the idea is not drawn at rest').not.toContain(linkId)
   expect([...namedForASelection(drawing)], 'the link to the idea is not drawn for a selection').not.toContain(linkId)
   expect(drawing.paths.map((path) => path.link), 'the link to the idea has no line').not.toContain(linkId)
-  await app.page.locator(DEVELOPER).first().waitFor({ timeout: 10_000 })
+  await app.page.locator('[data-to-developers]').first().waitFor({ timeout: 10_000 })
   const naming = (await theDeveloperLines(app.page)).filter((line) => line.words.includes(TITLES.idea))
   expect(naming.map((line) => line.key), 'the developer view names the link not drawn, with its far end’s title, once').toEqual(['lanesInput.linkNotDrawn'])
 

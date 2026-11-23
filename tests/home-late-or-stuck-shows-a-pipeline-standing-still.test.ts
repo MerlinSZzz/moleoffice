@@ -51,6 +51,8 @@ it('draws a pipeline whose unfinished steps are all paused in Late or stuck, sta
     await app.page.reload()
     await waitForThePage(app.page, 30_000)
     const late = app.page.locator('[data-home-section="late"]')
+    // Late or stuck is one number, and pressing it opens its list.
+    await late.locator('summary').click({ timeout: 20_000 })
     const still = words['homeWords.pipelineStill'] as { other: string }
     const sentence = still.other.replace('{n}', '2')
     const row = late.locator('.hm-alarm-row', { hasText: 'Made-up lantern making' })

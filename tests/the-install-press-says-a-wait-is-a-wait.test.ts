@@ -6,8 +6,9 @@
  * Installing agent tools waits for the readiness signatures of every secretary (src/server/lib/readiness.ts). The
  * press is the person's signature, and the door answers 409 with the code readinessWaits. Round 13's panel drew that
  * 409 as "The tools could not be installed.", which was false: the signature was recorded and the install was waiting.
- * The panel now reads the code, says the signature is recorded, names who has not signed, says the install starts by
- * itself on the last signature, and links to the checklist. A refusal stays a refusal.
+ * The panel now reads the code, draws "Waiting for signatures", names who has not signed, and links to the checklist.
+ * A refusal stays a refusal. (Test change, as decided: the panel draws no explanation, so the sentences saying the
+ * signature is recorded and that the install starts by itself are gone, and the state is that short line.)
  *
  * MUTATIONS, each after a control run, restored byte for byte, named in the commit that adds this file:
  *   (h) theChecklistThePressWaitsFor answers null for every reply: the first case goes red.
@@ -17,6 +18,7 @@ import { createElement as h } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { beforeAll, describe, expect, it } from 'vitest'
 import type { AReadinessChecklist } from '../src/server/lib/readiness.ts'
+import { t } from '../src/shared/i18n.ts'
 import { en } from '../src/shared/words/en.ts'
 import { localStamp } from '../src/shared/time.ts'
 
@@ -76,10 +78,9 @@ describe('the install press tells a wait from a refusal', () => {
     expect(panel.theChecklistThePressWaitsFor(new Error('Example: no reply'))).toBeNull()
   })
 
-  it('says the signature is recorded, who it waits for, that it starts by itself, and links to the checklist', () => {
+  it('says it waits for signatures, who it waits for, and links to the checklist', () => {
     const drawn = renderToStaticMarkup(h(panel.TheInstallWaits, { id: 'example-checklist' }))
-    expect(drawn).toContain(asDrawn(en['harnesses.waiting.signed']))
-    expect(drawn).toContain(asDrawn(en['harnesses.waiting.byItself']))
+    expect(drawn).toContain(asDrawn(t('harnesses.state.waitingForSignatures')))
     expect(drawn).toContain('href="#/readiness/example-checklist"')
     expect(drawn).not.toContain(asDrawn(en['harnesses.installRefused']))
     const who = renderToStaticMarkup(h(panel.TheSignersStillToSign, { checklist: aWaitingInstall() }))

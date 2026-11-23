@@ -219,6 +219,9 @@ ordinary target, and a valid link wholly inside retained artifact storage.
 3. Before downtime, clone the exact target detached with independent Git storage,
    install locked dependencies with npm ci, build the web page and every plugin,
    and retain verified exact copies of the previous dependencies and built pages.
+   After npm ci the upgrade fetches Electron's binary with the electron package's
+   own install.js and checks that the binary path.txt names is in dist. It stops
+   if path.txt or that binary is missing.
    Preparation has private home/cache/settings and an explicit private SQLite copy.
    Migrate this copy with the built target before its release check, await the
    bounded command and then checkpoint it. It is never the actual rollback image.

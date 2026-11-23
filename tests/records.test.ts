@@ -545,17 +545,15 @@ describe('discharging an obligation', () => {
 })
 
 /**
- * The seed script lives in scripts/, but the only thing worth asserting about it is a records
- * invariant — running it twice must not duplicate anything — so its test lives here rather
- * than in a file of its own.
+ * The seed script lives in scripts/. That running it twice duplicates nothing is held by
+ * tests/seed.test.ts, which runs it twice on a database of its own.
  *
- * Importing scripts/seed.ts runs the seed once; that is deliberate, it is a script. Calling
- * the exported seed() again is the second run.
+ * Importing scripts/seed.ts runs the seed once; that is deliberate, it is a script.
  */
 describe('the seed script', () => {
   /**
    * THE SEED NEEDS A DATABASE NOBODY HAS WRITTEN IN. It refuses to add its fixture content to a
-   * database that already holds authored records, wherever they are filed, so these three cases
+   * database that already holds authored records, wherever they are filed, so these two cases
    * keep their own start. The block runs after the one before it has closed, and hands the file's
    * own office back when it ends.
    */
@@ -584,24 +582,6 @@ describe('the seed script', () => {
       actorType: 'agent',
       actorId: 'claude-code',
     })
-  })
-
-  it('is idempotent: a second run creates nothing new', async () => {
-    const mod = await import('../scripts/seed.ts')
-
-    const afterFirst = {
-      records: t.api.listRecords({ workspaceId: WORKSPACE, includeDeleted: true }).map((r) => r.title).sort(),
-      changes: t.api.listChanges({ workspaceId: WORKSPACE, limit: 1000 }).length,
-    }
-    expect(afterFirst.records.length).toBeGreaterThan(5)
-
-    const second = mod.seed()
-
-    expect(second.created).toBe(0)
-    expect(second.updated).toBe(0)
-    expect(t.api.listRecords({ workspaceId: WORKSPACE, includeDeleted: true }).map((r) => r.title).sort()).toEqual(afterFirst.records)
-    // No new change rows either: an idempotent run is genuinely a no-op, not a rewrite.
-    expect(t.api.listChanges({ workspaceId: WORKSPACE, limit: 1000 })).toHaveLength(afterFirst.changes)
   })
 
   it('produces the content the checkpoint review expects', async () => {

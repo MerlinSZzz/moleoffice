@@ -52,7 +52,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { localStamp } from '../src/shared/time.ts'
 import type { AnAnswerAboutADoor } from '../src/shared/what-the-grant-carries.ts'
-import { A_TESTS_REASON_FOR_THE_PERSON, apiApp, freshDb, FOR_THE_PERSON, thePersonsKeyHeader, type TestDb } from './helpers.ts'
+import { A_SLEEP_TIME, A_TESTS_REASON_FOR_THE_PERSON, apiApp, freshDb, FOR_THE_PERSON, thePersonsKeyHeader, type TestDb } from './helpers.ts'
 
 const RAISED = 'grant-secretary'
 const UNRAISED = 'plain-secretary'
@@ -302,6 +302,7 @@ describe('six person-only doors ask what the grant carries', () => {
       const proposed = await call('POST', '/api/residents/proposals', as(who), {
         agentId: ids.get(candidate),
         because: 'It has done steady work here for weeks.',
+        sleepTime: A_SLEEP_TIME,
       })
       expect(proposed.status, proposed.raw).toBe(201)
       return String(proposed.body.proposal?.id ?? '')

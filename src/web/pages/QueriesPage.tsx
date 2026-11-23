@@ -126,7 +126,7 @@ import { t } from '@shared/i18n.ts'
  *                 produced it, and nobody else does.
  *
  * ---------------------------------------------------------------------------------------
- * WHAT THE SERVER ACTUALLY COMPUTES (src/server/lib/records.ts)
+ * WHAT THE SERVER ACTUALLY COMPUTES (src/server/lib/records/queries.ts)
  * ---------------------------------------------------------------------------------------
  *   unconsumed  every live record of kind claim, module or idea that is not the TARGET of any
  *               `consumes` link. Other kinds are not considered: a task or an obligation is
@@ -137,21 +137,21 @@ import { t } from '@shared/i18n.ts'
  *
  * The scope notes on the page below are copied from those two rules on purpose: an unscoped
  * "nothing is broken" is a claim the page cannot support. THE COPY IS THE DEFECT THIS REPOSITORY
- * IS NAMED FOR and it is not fixed here: `unconsumed()` in src/server/lib/records.ts filters on the
- * literal list `['claim', 'module', 'idea']`, and this file names the same three. Changing one
- * leaves the other wrong with nothing failing. `UNCONSUMED_KINDS` below is at least the only place
- * the browser says it — the three sentences that used to spell the kinds out separately all read
- * it — but the fix is for the server to export its filter and for this file to import it, which is
- * another owner's file. Reported rather than worked around.
+ * IS NAMED FOR and it is not fixed here: `unconsumed()` in src/server/lib/records/queries.ts
+ * filters on its own named list, `UNCONSUMED_OVER`, of claim, module and idea, and this file names
+ * the same three. Changing one leaves the other wrong with nothing failing. `UNCONSUMED_KINDS`
+ * below is at least the only place the browser says it — the three sentences that used to spell
+ * the kinds out separately all read it — but the fix is for the server to export its filter and
+ * for this file to import it, which is another owner's file. Reported rather than worked around.
  */
 
-import { LINK_TYPES, type LinkType, type PanelRecord, type RecordKind } from '@shared/types.ts'
+import { type PanelRecord, type RecordKind } from '@shared/types.ts'
 import { api, type UnmetItem } from '../api.ts'
 import { pathFor, recordPath, RouteLink } from '../components/router.tsx'
 import {
   Empty,
   ErrorNote,
-  Explain,
+  Hint,
   Loading,
   OriginMark,
   Panel,
@@ -173,7 +173,7 @@ import { useProjectAsync } from '../lib/project-async.ts'
  */
 import { famCols } from './family/rows.tsx'
 import { useInspect } from '../lib/mode.ts'
-import { kindWord, linkWord } from '../lib/words.ts'
+import { kindWord } from '../lib/words.ts'
 /**
  * ONE READING OF "what state word does this record store", shared with the records archive.
  *
@@ -192,8 +192,9 @@ import { stateOf } from './RecordsPage.tsx'
  *
  * It used to be typed out in three separate sentences here — the visible line, `the question` and
  * `what it does not cover` — so a fourth kind becoming a result meant finding all three. There is
- * still a fourth copy, and it is the one that matters: `unconsumed()` in src/server/lib/records.ts
- * filters on the same three literals. See the note at the head of this file.
+ * still a fourth copy, and it is the one that matters: `unconsumed()` in
+ * src/server/lib/records/queries.ts filters on the same three kinds, in its list `UNCONSUMED_OVER`.
+ * See the note at the head of this file.
  */
 const UNCONSUMED_KINDS = ['claim', 'module', 'idea'] as const satisfies readonly RecordKind[]
 
@@ -276,19 +277,6 @@ function RowRight({
 // ============================================================================ shared bits
 
 /**
- * The link vocabulary, COUNTED rather than typed out.
- *
- * The visible line said "the eleven types" and the paragraph behind it said "and seven more".
- * There are thirteen. `resolves` and `about` were added to `LINK_TYPES` and both sentences went on
- * describing the vocabulary as it used to be — no type error, no failing test, and the page
- * confidently wrong about the one table it exists to advertise. Both numbers are read from that
- * table now, and the four named in the paragraph are checked against it by the compiler.
- */
-const LEDE_LINK_TYPES = ['consumes', 'produces', 'blocks', 'measures'] as const satisfies readonly LinkType[]
-const LINK_TYPE_COUNT = Object.keys(LINK_TYPES).length
-const LINK_TYPES_UNNAMED = LINK_TYPE_COUNT - LEDE_LINK_TYPES.length
-
-/**
  * The grid both lists are laid on, from the one declaration every list of records reads.
  *
  * It was `'0 minmax(0, 1fr) auto'` on one list here — the first column closed outright — and
@@ -309,39 +297,6 @@ const QUERY_COLS = famCols('fit-content(40%)')
 // "query" IS HOW THIS PAGE IS COMPUTED, and the address was deliberately renamed from `queries` to
 // `missing` for exactly that reason — router.tsx argues the case. The permission to keep a stored
 // word is for addresses, not for a caption a person reads. Finding 29, 19 August 2026.
-
-/**
- * The four things a reader needs before a list of titles means anything.
- *
- * `scope` is the one that is easy to skip and the one that matters most: every count on this
- * page is the answer to a narrower question than its heading suggests, and a reader who does
- * not know the narrowing will read "0" as "nothing is wrong anywhere".
- *
- * It is drawn inside `Explain`, not instead of it: the disclosure holds this whole block, so the
- * four keys and their four answers are the same elements they always were, one press away.
- */
-function QueryNotes({ asks, why, act, scope }: { asks: React.ReactNode; why: React.ReactNode; act: React.ReactNode; scope: React.ReactNode }) {
-  return (
-    <dl className="qp-explain">
-      <div className="qp-explain-row">
-        <dt className="qp-explain-key">{t('dev.queries.theQuestion')}</dt>
-        <dd className="qp-explain-val">{asks}</dd>
-      </div>
-      <div className="qp-explain-row">
-        <dt className="qp-explain-key">{t('dev.queries.whyItMatters')}</dt>
-        <dd className="qp-explain-val">{why}</dd>
-      </div>
-      <div className="qp-explain-row">
-        <dt className="qp-explain-key">{t('dev.queries.whatToDo')}</dt>
-        <dd className="qp-explain-val">{act}</dd>
-      </div>
-      <div className="qp-explain-row">
-        <dt className="qp-explain-key">{t('dev.queries.whatItDoesNotCover')}</dt>
-        <dd className="qp-explain-val qp-scope">{scope}</dd>
-      </div>
-    </dl>
-  )
-}
 
 // ============================================================================ unconsumed
 
@@ -388,9 +343,9 @@ export function UnconsumedPanel({ records, counted = 0 }: { records: PanelRecord
     <Panel titleIs="label" declares={{ surface: 'queries.unconsumed' }}
       title={t('dev.queries.resultsNothingIsUsing')}
       // THE QUERY'S OWN NAME, TO SOMEBODY WHO WANTS IT. `unconsumed` is the name of a function in
-      // src/server/lib/records.ts, and it was drawn as an eyebrow directly above a title that says
-      // the same thing in English. A Normal reader gets the English; a developer gets the handle
-      // that will find the code.
+      // src/server/lib/records/queries.ts, and it was drawn as an eyebrow directly above a title
+      // that says the same thing in English. A Normal reader gets the English; a developer gets the
+      // handle that will find the code.
       {...(inspect ? { kind: t('dev.queries.unusedKind') } : {})}
       /**
        * QUIET, AND THAT IS THE WHOLE DIFFERENCE BETWEEN THE TWO QUERIES ON THIS PAGE.
@@ -421,31 +376,10 @@ export function UnconsumedPanel({ records, counted = 0 }: { records: PanelRecord
             </span>
           )}
           <Tag tone="quiet">{t('dev.queries.recordCount', { n: records.length })}</Tag>
+          <Hint>{t('dev.queries.countedKinds', { kinds: UNCONSUMED_KINDS.map((kind) => kindWord(kind).text).join(t('dev.queries.separator')) })}</Hint>
         </>
       }
     >
-      {/* WHAT IS LEFT IN FRONT OF THE ROWS IS THE LIMIT ON THE COUNT, AND NOTHING ELSE.
-          It used to open "No `consumes` link points at these, counted over claim, module and idea
-          records only" — a sentence whose first half is how the query is implemented and whose
-          second half is what the number means. The first half is one press away, in `the question`;
-          the second half cannot be, because a reader who does not know the narrowing reads a count
-          of 0 as "nothing is wrong anywhere". So the visible line is the qualifier alone. */}
-      <Explain declares={{ surface: 'queries.unconsumed.limit' }}
-        meaning={t('dev.queries.countedKinds', { kinds: UNCONSUMED_KINDS.map((kind) => kindWord(kind).text).join(t('dev.queries.separator')) })}
-        opens={t('dev.queries.notesOpen')}
-        holds={{ count: 4, what: t('dev.queries.notesHold') }}
-      >
-        <QueryNotes
-          asks={t('dev.queries.unusedQuestion')}
-          why={t('dev.queries.unusedReason')}
-          act={t('dev.queries.unusedAct', { consumes: linkWord('consumes', 'forward', inspect ? 'inspect' : 'normal').text })}
-          scope={t('dev.queries.unusedScope', {
-            kinds: UNCONSUMED_KINDS.map((kind) => kindWord(kind).text).join(t('dev.queries.separator')),
-            task: kindWord('task').text, obligation: kindWord('obligation').text,
-          })}
-        />
-      </Explain>
-
       {records.length === 0 ? (
         <Empty
           /* IN AN EMPTY PROJECT THIS WAS DRAWN IN BOLD AS IF IT WERE GOOD NEWS: "Everything that
@@ -456,7 +390,7 @@ export function UnconsumedPanel({ records, counted = 0 }: { records: PanelRecord
           message={
             counted === 0
               ? t('dev.queries.nothingYet')
-              : t('dev.queries.allUsed')
+              : t('absence.none')
           }
           action={
             // `pathFor`, not "/records" typed out: FLAT_ROUTES in router.tsx is the only place the
@@ -501,7 +435,7 @@ export function UnconsumedPanel({ records, counted = 0 }: { records: PanelRecord
  */
 export function unmetMeta(item: UnmetItem): string {
   if (item.missingTitle === '(unknown)') {
-    return t('dev.queries.missingUnknown', {})
+    return t('queriesPage.missingNotInTheDatabase')
   }
   // What to do about it is the panel's own "what to do" note, one press away, where it is fuller
   // and names the Restore button. On the row it was the same instruction once per row.
@@ -521,37 +455,19 @@ export function UnmetPanel({ items }: { items: UnmetItem[] }) {
       tone="broken"
       // One row is one broken link, not one record: a record that consumes two missing things
       // is two rows, and calling that "1 record" would undercount the work.
-      actions={<Tag tone="quiet">{t('dev.queries.brokenCount', { n: items.length })}</Tag>}
+      actions={
+        <>
+          <Tag tone="quiet">{t('dev.queries.brokenCount', { n: items.length })}</Tag>
+          <Hint>{t('dev.queries.onlyWhatARecordSaysItUses')}</Hint>
+        </>
+      }
     >
-      {/* THE LIMIT ON THE ANSWER, AND NOTHING ELSE. The line here used to be "One row is one
-          `consumes` link that no longer lands on a record" — the query's own implementation, read
-          once and furniture for ever after; it is one press away, in `the question`, where it says
-          the same thing at length. What replaces it is the clause an empty list cannot do without:
-          this checks ONE link type, so "0 broken links" is not an all-clear about the graph. */}
-      {/* NOT THE LINK TYPE IN MONOSPACE. It read "Only `consumes` links are checked" — the stored
-          word, set in a face that says it is not English, on the visible line of the page. What the
-          reader needs is the narrowing, and it can be said: this checks only what a record says it
-          USES. The type itself is named in the fold and in Developer mode's reading of a link. */}
-      <Explain declares={{ surface: 'queries.unmet.limit' }}
-        meaning={<>{t('dev.queries.onlyWhatARecordSaysItUses')}</>}
-        opens={t('dev.queries.notesOpen')}
-        holds={{ count: 4, what: t('dev.queries.notesHold') }}
-      >
-        <QueryNotes
-          asks={t('dev.queries.missingQuestion', { consumes: linkWord('consumes', 'forward', inspect ? 'inspect' : 'normal').text })}
-          why={t('dev.queries.missingReason')}
-          act={t('dev.queries.missingAct')}
-          scope={t('dev.queries.missingScope', { consumes: linkWord('consumes', 'forward', inspect ? 'inspect' : 'normal').text,
-            others: ['blocks', 'measures', 'part_of'].map((type) => linkWord(type, 'forward', inspect ? 'inspect' : 'normal').text).join(t('dev.queries.separator')) })}
-        />
-      </Explain>
-
       {items.length === 0 ? (
         // NOBODY ACTS ON THIS, so it is not bold and it is not two sentences. The qualifier is on
         // the visible line above, where it belongs: it is what stops a count of nought being read
         // as an all-clear about every link in the project.
         <Empty
-          message={t('dev.queries.nothingIsWaitingOnAMissingRecord')}
+          message={t('absence.none')}
           action={
             <RouteLink to="/" className="qp-link">{t('dev.queries.backToWhatNeedsYouToday')}</RouteLink>
           }
@@ -615,9 +531,7 @@ export function QueriesPage() {
       {state.status === 'loading' ? <Loading label={t('dev.queries.theLinkQueries')} rows={4} /> : null}
 
       {state.status === 'error' ? (
-        <ErrorNote message={state.message} fault={state.fault} retry={reload}>
-          <span className="qp-note">{t('dev.queries.neitherListIsCachedThisIsA')}</span>
-        </ErrorNote>
+        <ErrorNote message={state.message} fault={state.fault} retry={reload} />
       ) : null}
 
       {state.status === 'ready' ? (
@@ -637,55 +551,8 @@ export function QueriesPage() {
           list belongs. The same arrangement `PageFoot` gives every family page. */}
       <footer className="qp-foot">
         <UnmarkedRowsNote what={t('dev.queries.result')} />
-        <AboutTheseQueries />
       </footer>
     </div>
-  )
-}
-
-/**
- * WHAT A TYPED LINK BUYS — AT THE FOOT, BEHIND A CONTROL, AND NOT ONE WORD OF IT IS GONE.
- *
- * ---------------------------------------------------------------------------------------
- * WHY IT MOVED OFF THE TOP OF THE PAGE
- * ---------------------------------------------------------------------------------------
- *
- * This page opened on four sentences about how Mole Office works before a single result: "Both lists are
- * derived from links, not stored", then a panel saying "One row is one `consumes` link that no
- * longer lands on a record", then one saying "No `consumes` link points at these, counted over
- * claim, module and idea records only". Three of the four are the queries' own implementation, and
- * an implementation is read carefully once and skipped for the next two hundred visits. Default
- * space belongs to the answer.
- *
- * So the argument for typing links at all — which is genuinely worth reading, and which nothing
- * else in the product writes down — comes AFTER the two lists rather than in front of them, and it
- * opens on a press. The derived-not-stored fact is inside it, whole: neither list is stored
- * anywhere, both are counted from the links every time the page loads.
- *
- * IT IS A PLAIN `<details>` AND NOT AN `Explain`, and that is the point rather than a shortcut.
- * `Explain` keeps one line of MEANING permanently visible, which is exactly right where the fold
- * holds something a reader has to know before reading the rows — and exactly wrong here, because
- * the one line this block could show is the commentary that was removed. The same shape the
- * attention panel's "Why the other 156 are not on this list" already uses: a quiet summary that
- * names what it holds, at the foot, under the answer.
- */
-function AboutTheseQueries() {
-  const inspect = useInspect()
-  return (
-    <details className="qp-about">
-      <summary className="qp-about-sum">{t('dev.queries.allLinks', { n: LINK_TYPE_COUNT })}</summary>
-      <div className="qp-about-body">
-        <p className="qp-lede">
-          {t('dev.queries.linkIntro')}
-          {LEDE_LINK_TYPES.map((type, index) => <span key={type}>
-            {index === 0 ? null : t('dev.queries.separator')}
-            <code>{linkWord(type, 'forward', inspect ? 'inspect' : 'normal').text}</code>
-          </span>)}
-          {t('dev.queries.linkRest', { n: LINK_TYPES_UNNAMED })}
-        </p>
-        <p className="qp-lede">{t('dev.queries.neitherListIsStoredAnywhereBothAre')}</p>
-      </div>
-    </details>
   )
 }
 
@@ -719,80 +586,6 @@ const QUERIES_CSS = `
 
 .qp-foot { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 
-.qp-lede {
-  margin: 0;
-  font-size: var(--fs-3);
-  line-height: var(--lh-read);
-  color: var(--text-2);
-  max-width: var(--measure-in-box);
-}
-/* THE MONOSPACE STEP-DOWN, AND IT IS SCOPED TO THIS PAGE.
-   A mono face at the same px reads a size larger than the UI face beside it, so a code span inside
-   a sentence takes .94em. That is the one deliberate off-scale size on this page and it is why
-   Missing and unused measures 13.2px and 15px alongside the 13/14/16/19/32 of the type scale.
-   IT USED TO REACH THE WHOLE APP. Two of these selectors named ui.tsx's own classes with nothing in
-   front of them, and React hoists this sheet into the head and leaves it there — so a reader who
-   opened Missing and unused and then went to any other page took this rule with them, and a page
-   drew differently depending on which page had been visited first. Scoped to this page's own class, it is its
-   page's own business again. */
-.qp-lede code, .qp-explain code, .qp .px-explain-meaning code, .qp .px-empty code {
-  font-family: var(--font-mono);
-  font-size: .94em;
-}
-
-/* The four notes now live inside the Explain fold, which draws the box, the fill and the padding
-   around them. So this block carries NO box of its own any more: a bordered, filled panel inside
-   another bordered, filled panel reads as two things, and it was one. What is left here is the
-   shape of the four rows and the capped measure. */
-.qp-explain {
-  margin: 0;
-  /* Capped, because the values inside are already capped at the reading measure: without this
-     the block's fill runs to 1400px with text down the left third, which reads as a mistake. */
-  max-width: 56rem;
-  display: flex;
-  flex-direction: column;
-  gap: var(--pad);
-  min-width: 0;
-}
-.qp-explain-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 2px;
-  min-width: 0;
-}
-/* Two columns as soon as the panel is wide enough to give the labels a column of their own.
-   A container query, not a media query: this block sits in a half-width panel on the home
-   grid one day and full width the next, and only the panel knows which. */
-@container panel (min-width: 34rem) {
-  .qp-explain-row { grid-template-columns: 11rem minmax(0, 1fr); gap: var(--gut); align-items: baseline; }
-}
-.qp-explain-key {
-  font-size: var(--fs-1);
-  font-weight: 600;
-  letter-spacing: .06em;
-  text-transform: uppercase;
-  color: var(--text-3);
-  line-height: var(--lh-tight);
-}
-.qp-explain-val {
-  margin: 0;
-  min-width: 0;
-  font-size: var(--fs-2);
-  line-height: var(--lh-body);
-  color: var(--text);
-  max-width: var(--measure-in-box);
-}
-/* The limits of the answer, set quieter than the answer itself but never hidden. */
-.qp-scope { color: var(--text-2); }
-
-.qp-note {
-  margin: 0;
-  font-size: var(--fs-1);
-  line-height: var(--lh-body);
-  color: var(--text-3);
-  max-width: var(--measure-in-box);
-}
-
 /* ---- A RESULT ROW IS READ, NOT DECODED.
    Measured at 1440 on 2026-08-12: 112 of this page's 153 leaf text nodes were set below 13px, and
    the biggest single group of them was the row summary -- one full sentence per row at --fs-1, in
@@ -813,31 +606,6 @@ const QUERIES_CSS = `
    chip off the edge. It is right-aligned by the component sheet and the stamp is drawn LAST, so
    the stamp's edge is the straight column down the page. See RowRight. */
 .qp .px-row-right { font-size: var(--fs-2); flex-wrap: wrap; row-gap: 2px; }
-
-/* ---- the argument for typing links, at the foot.
-   The same quiet fold the attention panel closes with, and deliberately not a second Explain:
-   what this holds is worth reading once, so nothing of it stands open.
-   NO BACKTICKS IN THIS BLOCK -- it is a template literal, and one closes the string. */
-.qp-about { margin-top: var(--pad); }
-.qp-about-sum {
-  display: flex; align-items: center; gap: 6px;
-  min-height: var(--row-h);
-  padding: 4px var(--pad);
-  color: var(--text-3);
-  font: var(--fs-1)/var(--lh-body) var(--font-ui);
-  cursor: pointer;
-  list-style: none;
-}
-.qp-about-sum::-webkit-details-marker { display: none; }
-.qp-about-sum::after { content: "▾"; }
-.qp-about[open] > .qp-about-sum::after { content: "▴"; }
-.qp-about-sum:hover { color: var(--text); }
-.qp-about-sum:focus-visible { outline: var(--border-w) solid var(--focus); outline-offset: var(--border-w); }
-.qp-about-body {
-  padding: 0 var(--pad) var(--pad);
-  display: flex; flex-direction: column; gap: var(--pad);
-  min-width: 0;
-}
 
 /* A record with no summary says so, in the same voice the records list uses for the same absence. */
 .qp-nosummary { font-style: italic; }

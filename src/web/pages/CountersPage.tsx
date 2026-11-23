@@ -279,7 +279,7 @@ function CounterFacts({
       </p>
 
       {counter.lastFiring === null ? (
-        <p className="cnt-last"><Absence /></p>
+        <p className="cnt-last"><Absence tier="told-apart" looked word={t('g7a.counters.notFiredYet')} /></p>
       ) : (
         <p className="cnt-last">
           <SaysWhen says="g7a.counters.lastWhen"><Stamp at={counter.lastFiring.at} /></SaysWhen>
@@ -290,9 +290,7 @@ function CounterFacts({
       {/* A PAUSED COUNTER IS DUE AT NO TIME: the server still works out when its timer comes round, but it does not fire
           until somebody resumes it, so the line says that instead of a time (the check of wave 13q's round 33c,
           NmoFCJwXX463, found it drawn as 现在下次触发). */}
-      {counter.nextDue === null ? null : counter.paused !== null ? (
-        <p className="cnt-nextdue">{t('g7a.counters.dueWhilePaused')}</p>
-      ) : (
+      {counter.nextDue === null || counter.paused !== null ? null : (
         <p className="cnt-nextdue">
           {dueWords === null ? (
             <time dateTime={counter.nextDue.at}>{t('g7a.counters.dueNow')}</time>
@@ -343,7 +341,7 @@ function TriggerLine({ trigger }: { trigger: TriggerReading }) {
       {trigger.holdsNow ? <span className="cnt-holding">{t('g7a.counters.holds')}</span> : null}
       {quiet === null ? null : quiet.since === null || quiet.since === undefined ? (
         <span className="cnt-quiet-unknown">
-          {t('g7a.counters.unknownQuiet')}</span>
+          {t('countersPage.quietSinceNotRecorded')}</span>
       ) : (
         <span className="cnt-quiet-since">
           {t('g7a.counters.quietSince')} <Stamp at={quiet.since} />
@@ -551,7 +549,7 @@ function CounterPresses({ counter, project, onChanged }: { counter: CounterReadi
         counter.paused === null
           ? await api.pauseCounter(counter.id, because, project)
           : await api.resumeCounter(counter.id, because, project)
-      setSaid(t(counter.paused === null ? 'g7a.counters.pauseSaved' : 'g7a.counters.resumeSaved', { title: counter.title }))
+      setSaid(t(counter.paused === null ? 'countersPage.pauseSaved' : 'g7a.counters.resumeSaved', { title: counter.title }))
       setBecause('')
       onChanged?.()
     } catch (err) {

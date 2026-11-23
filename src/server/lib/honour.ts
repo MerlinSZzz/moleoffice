@@ -708,13 +708,23 @@ export function differencesWithTheHonourThisReaderMaySee<D extends { path: strin
 }
 
 /**
- * RECORDS AS THIS READER MAY SEE THEIR HONOUR READING: each session record's `data.honour` put through
- * `theHonourThisReaderMaySee`, the hidden messages asked about once for the whole list. Every other
+ * WHETHER THE HONOUR FILTER MAY CHANGE A RECORD OF THIS KIND FOR THIS READER: only a record of a kind it changes, which
+ * today is a session, and only for a reader who does not read every message. This is the one place that rule is worked
+ * out. `recordsWithTheHonourThisReaderMaySee` below and the search's stored-body read
+ * (`theRecordsAsStoredThatSay`, src/server/api/search.ts) both read it, so a kind the filter learns to change is looked
+ * in again and counted by the search without a second edit.
+ */
+export function theHonourMayChangeARecordOfThisKindForThisReader(kind: string, reader: AMessageReader): boolean {
+  return !reader.readsEveryMessage && kind === 'session'
+}
+
+/**
+ * RECORDS AS THIS READER MAY SEE THEIR HONOUR READING: each record the honour filter may change, whose `data.honour` is
+ * there, put through `theHonourThisReaderMaySee`, the hidden messages asked about once for the whole list. Every other
  * record, and every other field, is handed back as it came.
  */
 export function recordsWithTheHonourThisReaderMaySee<T extends { kind: string; data: Record<string, unknown> }>(rows: readonly T[], reader: AMessageReader): T[] {
-  if (reader.readsEveryMessage) return [...rows]
-  const holding = rows.filter((one) => one.kind === 'session' && one.data[THE_HONOUR_KEY] !== undefined)
+  const holding = rows.filter((one) => theHonourMayChangeARecordOfThisKindForThisReader(one.kind, reader) && one.data[THE_HONOUR_KEY] !== undefined)
   if (holding.length === 0) return [...rows]
   const seen = theHonourThisReaderMaySee(holding.map((one) => one.data[THE_HONOUR_KEY]), reader)
   const byRow = new Map(holding.map((one, at) => [one, seen[at]]))

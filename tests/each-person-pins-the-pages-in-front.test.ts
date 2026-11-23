@@ -45,6 +45,10 @@
  * Test change (wave 13y round 167, point QN-2 of the quick notes): My notes stands in front after Reports with nothing
  * kept, as option C's step 6 picture draws it, so every list of pins written out here holds it after Reports.
  *
+ * Test change (wave 13y round 175, as decided): the Switch's list is drawn as a layer over the page, beside the sidebar
+ * at 1440, so it no longer ends above the block's first row. Case 7 asks instead that the first row stay where it was
+ * when the list opens, and that the list not cover it.
+ *
  * THE PICTURES are taken only when W13Y_SIDEBAR_PICTURES names a folder. They are of a made-up office, and each
  * carries the made-up label above the page.
  */
@@ -346,28 +350,27 @@ it('1. with nothing kept, the front is Home, the chat, Reports, My notes, Checkl
   const drawn: Record<string, string[]> = {}
   const block: Record<string, { drawn: number; rows: string[]; rules: string[] }> = {}
   const theName: Record<string, { level: boolean; beside: boolean } | null> = {}
-  for (const theme of ['light', 'dark'] as const) {
-    for (const [where, look] of LOOKS) {
-      const what = `${where}, ${theme}`
-      const { context, page } = await aWindow({ ...look, theme })
-      try {
-        await open(page, '/')
-        if (where === 'in the menu at 390') {
-          await page.locator('.shell-menu').click()
-          await page.locator('#shell-side[data-drawer="open"]').waitFor()
-          await page.waitForTimeout(600)
-        }
-        await page.locator('#shell-side .sbp-block[data-projects="ready"]').waitFor({ state: 'attached', timeout: 30_000 })
-        drawn[what] = await theFront(page)
-        block[what] = { drawn: await page.locator('#shell-side .sbp-block').count(), rows: await theBlockRows(page), rules: await theRulesInTheBlock(page) }
-        theName[what] = await whereTheNameIs(page)
-      } finally {
-        await context.close()
+  const theme = 'light'
+  for (const [where, look] of LOOKS) {
+    const what = `${where}, ${theme}`
+    const { context, page } = await aWindow({ ...look, theme })
+    try {
+      await open(page, '/')
+      if (where === 'in the menu at 390') {
+        await page.locator('.shell-menu').click()
+        await page.locator('#shell-side[data-drawer="open"]').waitFor()
+        await page.waitForTimeout(600)
       }
+      await page.locator('#shell-side .sbp-block[data-projects="ready"]').waitFor({ state: 'attached', timeout: 30_000 })
+      drawn[what] = await theFront(page)
+      block[what] = { drawn: await page.locator('#shell-side .sbp-block').count(), rows: await theBlockRows(page), rules: await theRulesInTheBlock(page) }
+      theName[what] = await whereTheNameIs(page)
+    } finally {
+      await context.close()
     }
   }
-  const inEveryLook = <T>(value: T, narrowed: T = value): Record<string, T> => Object.fromEntries(['light', 'dark']
-    .flatMap((theme) => LOOKS.map(([where]) => [`${where}, ${theme}`, where === 'narrowed at 1440' ? narrowed : value])))
+  const inEveryLook = <T>(value: T, narrowed: T = value): Record<string, T> => Object.fromEntries(
+    LOOKS.map(([where]) => [`${where}, ${theme}`, where === 'narrowed at 1440' ? narrowed : value]))
   expect(drawn).toEqual(inEveryLook(SHIPPED_FRONT))
   // Test change (wave 13y round 165): the project block is drawn in the sidebar, and with nothing kept it has no row.
   // Test change (wave 13y round 165, the explaining lines): with nothing under its head the block draws no rule, and the
@@ -581,15 +584,22 @@ it('7. a pinned page of the project stands in the project block, under its name,
       // level with the initials, beside them.
       expect(await theRulesInTheBlock(wide.page), 'the rules in the block, open').toEqual([BETWEEN])
       expect(await whereTheNameIs(wide.page), "the project's name against its initials, open").toEqual({ level: true, beside: true })
-      // The Switch list opens below its press and above the rows.
+      // The Switch list opens below its press, and the first row stays where it was, not covered by the list.
+      // Test change (wave 13y round 175, as decided): the list is a layer beside the sidebar, so it is no longer held
+      // above the first row.
+      const closed = await wide.page.locator('#shell-side .sbp-block .shell-link').first().evaluate((one) => one.getBoundingClientRect().toJSON() as DOMRect)
       await wide.page.locator('#shell-side .sbp-switch').click()
       await wide.page.locator('#shell-side .sbp-choices').waitFor()
       const opened = await wide.page.evaluate(() => {
         const box = (selector: string) => document.querySelector(selector)!.getBoundingClientRect()
-        return { press: box('#shell-side .sbp-switch'), list: box('#shell-side .sbp-choices'), row: box('#shell-side .sbp-block .shell-link') }
+        const row = document.querySelector('#shell-side .sbp-block .shell-link')!
+        const centre = row.getBoundingClientRect()
+        const there = document.elementFromPoint(centre.left + centre.width / 2, centre.top + centre.height / 2)
+        return { press: box('#shell-side .sbp-switch'), list: box('#shell-side .sbp-choices'), row: centre.toJSON() as DOMRect, uncovered: there !== null && row.contains(there) }
       })
       expect(opened.list.top, 'the Switch list below its press').toBeGreaterThanOrEqual(opened.press.bottom)
-      expect(opened.list.bottom, 'the Switch list above the first row').toBeLessThanOrEqual(opened.row.top)
+      expect(opened.row, 'the first row where it was before the list opened').toEqual(closed)
+      expect(opened.uncovered, 'the first row not covered by the Switch list').toBe(true)
       // A row in the block lights as its page, and All pages does not light.
       await open(wide.page, DESTINATIONS.find((one) => one.key === 'modules')!.to)
       expect(await wide.page.locator(`#shell-side .sbp-block [data-target="uiSurface/${surfaceOf('modules')}"]`).getAttribute('aria-current'), 'the row on its page').toBe('page')

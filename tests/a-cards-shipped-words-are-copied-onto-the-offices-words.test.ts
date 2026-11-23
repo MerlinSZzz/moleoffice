@@ -79,7 +79,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import type { FastifyInstance, InjectOptions } from 'fastify'
 
-import { FOR_THE_PERSON, apiApp, freshDb, thePersonsKeyHeader, type TestDb } from './helpers.ts'
+import { FOR_THE_PERSON, apiApp, freshDb, thePersonsKeyHeader, type TestDb, governsTheWholeProject } from './helpers.ts'
 import { THE_TEST_OFFICES_SECRETARY } from './a-page-of-a-test-office.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { whoTheCardReportsTo, type RoleCard, type RolesDeclaration } from '../src/shared/roles.ts'
@@ -385,7 +385,7 @@ describe('a change after the copy', () => {
       to: [{ kind: 'agent', id: A_SUPERVISOR }],
     }, 409)
     await file(AS_THE_PERSON, 'decision', 'MADE-UP: the cards say more', {
-      replaces: [],
+      ...governsTheWholeProject(), replaces: [],
       decided_by: 'the owner',
       authority: 'the owner said so',
       authority_reference: message,
@@ -556,7 +556,7 @@ describe('who presses', () => {
       to: [{ kind: 'agent', id: SECRETARY }],
     }, 409)
     await file(AS_THE_PERSON, 'decision', 'MADE-UP: the supervisor card is copied again', {
-      replaces: [],
+      ...governsTheWholeProject(), replaces: [],
       decided_by: 'the owner',
       authority: 'the owner said so',
       authority_reference: message,

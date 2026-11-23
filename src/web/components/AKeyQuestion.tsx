@@ -25,8 +25,10 @@
  * name, so the person can tell it is not something they typed, and Send anyway sends it (problem UioLZafhORc4).
  */
 import { useCallback, useRef, useState, type ReactElement } from 'react'
+import { settingsPath } from '@shared/addresses.ts'
 import { t } from '@shared/i18n.ts'
 import { theKeyReminder, theWordsOfAMessage, whereAMessageHoldsAKey, type AKeyReminder } from '@shared/message-keys.ts'
+import { RouteLink } from './router.tsx'
 
 /**
  * What a page is about to send: the words typed, the file names of the pictures with them, and for a comment the place it is
@@ -158,6 +160,9 @@ export function KeyQuestion({ question, onChangeIt }: { question: AKeyQuestion; 
         {KEY_QUESTION_CSS}
       </style>
       <p className="px-key-question-says">{theKeyQuestionSays(asking)}</p>
+      <p className="px-key-question-where">
+        {t('keyQuestion.keyPage')} <RouteLink to={settingsPath('settings.codingtools')}>{t('keyQuestion.toTheCodingTools')}</RouteLink>
+      </p>
       {question.draftChanged !== null ? <p className="px-key-question-changed">{theDraftChangeSays(question.draftChanged)}</p> : null}
       <div className="px-key-question-acts">
         <button
@@ -195,6 +200,8 @@ const KEY_QUESTION_CSS = `
   border: var(--border-w) solid var(--ask); border-radius: var(--radius);
 }
 .px-key-question-says { margin: 0; font: var(--fs-1)/var(--lh-tight) var(--font-ui); overflow-wrap: anywhere; }
+.px-key-question-where { margin: 0; font: var(--fs-1)/var(--lh-tight) var(--font-ui); color: var(--text-2); overflow-wrap: anywhere; }
+.px-key-question-where a { color: var(--accent); }
 .px-key-question-changed { margin: 0; font: 600 var(--fs-1)/var(--lh-tight) var(--font-ui); overflow-wrap: anywhere; }
 .px-key-question-acts { display: flex; flex-wrap: wrap; gap: 6px; }
 .px-key-question-acts button {

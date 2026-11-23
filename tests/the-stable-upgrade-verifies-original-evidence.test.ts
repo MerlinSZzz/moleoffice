@@ -122,6 +122,24 @@ function saveResult(): void {
   writeFileSync(result.output, `Made-up method output.\n${JSON.stringify(result.answer)}\n`)
 }
 
+function artifactsWithSkippedCases(): WholeSuiteReceipt {
+  const expected = ['tests/one.test.ts', 'tests/two.test.ts']
+  writeFileSync(paths.log, 'Made-up cloud output. No tests were executed.\n')
+  writeJson(paths.manifest, expected.map((file) => ({ file: join(clone, file) })))
+  writeJson(paths.report, { success: true, numTotalTests: 3, numPassedTests: 1, numFailedTests: 0, numPendingTests: 2, numTodoTests: 0,
+    numTotalTestSuites: 2, numPassedTestSuites: 2, numFailedTestSuites: 0, numPendingTestSuites: 0,
+    testResults: [
+      { name: join(clone, expected[0]!), status: 'passed', assertionResults: [{ fullName: 'Made-up assertion in tests/one.test.ts', status: 'passed' }] },
+      { name: join(clone, expected[1]!), status: 'passed', assertionResults: [
+        { fullName: 'Made-up skipped assertion b', status: 'skipped' },
+        { fullName: 'Made-up skipped assertion a', status: 'skipped' },
+      ] },
+    ] })
+  result = { code: 0, answer: { ran: true, code: 0, commit, phase: 'test', buildExitCode: 0, suiteExitCode: 0, wallSec: 1, workers: 1, files: 2, failed: [] }, output: join(attempt, 'door-output.log') }
+  saveResult()
+  return receiptFromArtifacts({ repository, commit, tree, clone, paths, result, startedAt: '2026-10-13 10:00:00', endedAt: '2026-10-13 10:01:00' })
+}
+
 async function filed(data: WholeSuiteReceipt = artifacts('green')) {
   // Each answer is asked only for the field read here, so a receipt longer than the default reply is filed too.
   const created = await officeRequest({ method: 'POST', path: '/api/records', body: { kind: 'whole_suite_receipt', title: `Made-up original suite receipt ${++fixtureNumber}`, data }, fields: ['record.id'] })
@@ -502,6 +520,20 @@ it('rebuilds a worker-crash receipt with the crash field when stored, and the ol
   }
 })
 
+it('verifies a receipt that names its skipped cases, and rebuilds an older receipt without that field', async () => {
+  const data = artifactsWithSkippedCases()
+  expect(data.skippedCases).toEqual({ count: 2, cases: [
+    { file: 'tests/two.test.ts', name: 'Made-up skipped assertion a' },
+    { file: 'tests/two.test.ts', name: 'Made-up skipped assertion b' },
+  ] })
+  const input = await filed(data)
+  expect((await verify(input)).receipt).toEqual(data)
+  const older = { ...artifacts('green') }
+  delete older.skippedCases
+  const oldInput = await filed(older as WholeSuiteReceipt)
+  expect(await verifyOriginalReceiptEvidence(oldInput, { officeRequest })).toMatchObject({ receipt: older, complete: true, green: true })
+})
+
 it('takes a version 2 receipt whose file red beside others was green alone, and rebuilds that run alone from its own files', async () => {
   const data = artifactsWithARunAlone('green')
   expect(data).toMatchObject({ version: 2, failedFiles: ['tests/one.test.ts'], aloneRuns: [{ file: 'tests/one.test.ts', outcome: 'green', exitCode: 0 }], errorsOutsideTests: 0 })
@@ -706,5 +738,81 @@ describe('a receipt whose run carried files over', () => {
       await expect(verifies(input), `nothing carried, with ${kept === undefined ? 'no carried-over.json' : JSON.stringify(kept)}`).resolves.toMatchObject({ receipt: data, complete: true, green: true })
       expect(calls, 'no receipt before is read').toEqual(twoGets(input))
     }
+  })
+})
+
+/**
+ * A RECEIPT WITH TESTS MISSING READS INCOMPLETE IN THE VERIFIER. Case 6, and the verifier's half of case 7, of
+ * tests/a-receipt-with-tests-missing-reads-incomplete-everywhere.test.ts. The verifier answers, for the receipt it
+ * rebuilt, the outcome wholeSuiteReceiptOutcome gives; complete exactly when that outcome is not incomplete; and green by
+ * wholeSuiteReceiptIsGreen. The guard's half is at the end of tests/main-suite-fix-records.test.ts. Both halves pin each
+ * receipt to the same function and the same word, so the guard and the verifier agree on every receipt both can be given.
+ * The verifier cannot be given three of cases 1 to 4 and 8. Case 2's failed build that carries suite evidence, with
+ * whole coverage or not: the producer never writes one, and the parse refuses it. Case 4's suite that exited 0 with an
+ * artifact missing: the producer's rebuilt receipt keeps every artifact, so the stored one differs from it and is refused.
+ * Case 8's complete receipt with no suite exit: the producer always writes the suite exit after a build that exited 0.
+ * Case 10 writes the verifier's answer as it was before the outcome moved into wholeSuiteReceiptOutcome, so a past
+ * upgrade's kept outcome reads the same when it is checked again.
+ */
+describe('a receipt with tests missing reads incomplete in the verifier', () => {
+  // Read by name, so this criterion compiles before the export is there.
+  const outcomeModule = '../src/shared/whole-suite-receipt.ts'
+  let wholeSuiteReceiptOutcome: (data: unknown) => string
+  let wholeSuiteReceiptIsGreen: (data: unknown) => boolean
+  beforeAll(async () => {
+    ({ wholeSuiteReceiptOutcome, wholeSuiteReceiptIsGreen } = await import(outcomeModule) as { wholeSuiteReceiptOutcome: typeof wholeSuiteReceiptOutcome; wholeSuiteReceiptIsGreen: typeof wholeSuiteReceiptIsGreen })
+  })
+
+  /** A made-up whole run in which the build exited 0 and the suite exited 1, and the manifest's one test file was never seen. */
+  function aSuiteWithItsTestMissing(): WholeSuiteReceipt {
+    writeFileSync(paths.log, 'Made-up cloud output. No tests were executed.\n')
+    writeJson(paths.manifest, [{ file: join(clone, 'tests/one.test.ts') }])
+    writeJson(paths.report, { success: false, numTotalTests: 0, numPassedTests: 0, numFailedTests: 0, numPendingTests: 0, numTodoTests: 0,
+      numTotalTestSuites: 0, numPassedTestSuites: 0, numFailedTestSuites: 0, numPendingTestSuites: 0, testResults: [] })
+    result = { code: 1, answer: { ran: true, code: 1, commit, phase: 'test', buildExitCode: 0, suiteExitCode: 1, wallSec: 1, workers: 1, files: 0, failed: [] }, output: join(attempt, 'door-output.log') }
+    saveResult()
+    return receiptFromArtifacts({ repository, commit, tree, clone, paths, result, startedAt: '2026-10-13 10:00:00', endedAt: '2026-10-13 10:01:00' })
+  }
+  /** A made-up failed build as the producer writes it: only its log, and no suite files beside it. */
+  function aFailedBuild(): WholeSuiteReceipt {
+    for (const path of [paths.reads, paths.report, paths.manifest, join(attempt, 'alone')]) rmSync(path, { recursive: true, force: true })
+    writeFileSync(paths.log, 'Made-up cloud output of a failed build. No tests were executed.\n')
+    result = { code: 17, answer: { ran: true, code: 17, commit, phase: 'build', buildExitCode: 17, wallSec: 1, workers: 1, files: 0, failed: [] }, output: join(attempt, 'door-output.log') }
+    saveResult()
+    return receiptFromArtifacts({ repository, commit, tree, clone, paths, result, startedAt: '2026-10-13 10:00:00', endedAt: '2026-10-13 10:01:00' })
+  }
+  /** Files the receipt, verifies it while its files are on disk, and answers the verifier's outcome. */
+  async function theVerifierReads(data: WholeSuiteReceipt, name: string): Promise<string> {
+    const verified = await verifyOriginalReceiptEvidence(await filed(data), { officeRequest })
+    expect(verified.receipt, name).toEqual(data)
+    expect(verified.outcome, `${name}: the outcome wholeSuiteReceiptOutcome reads`).toBe(wholeSuiteReceiptOutcome(data))
+    expect(verified.complete, `${name}: complete is every outcome but incomplete`).toBe(verified.outcome !== 'incomplete')
+    expect(verified.green, `${name}: green is the one rule's green`).toBe(wholeSuiteReceiptIsGreen(data))
+    return verified.outcome
+  }
+
+  it('6. reads a receipt whose build exited 0 and whose suite exited 1, with its one test file never seen, as incomplete', async () => {
+    const data = aSuiteWithItsTestMissing()
+    expect(data).toMatchObject({ buildExitCode: 0, suiteExitCode: 1, failedFiles: [], failedTests: [], coverage: { expectedCount: 1, observedCount: 0, missing: ['tests/one.test.ts'], unexpected: [] } })
+    expect(await theVerifierReads(data, "the problem's case")).toBe('incomplete')
+  })
+
+  it('7. reads each receipt of cases 1 to 4 and 8 it can be given as wholeSuiteReceiptOutcome reads it', async () => {
+    // Each receipt is verified before the next one's files are written over it.
+    expect(await theVerifierReads(aSuiteWithItsTestMissing(), "1, the problem's case")).toBe('incomplete')
+    expect(await theVerifierReads(artifacts('green'), '3, version 1 with no failures')).toBe('green')
+    expect(await theVerifierReads(artifacts('red'), '3, version 1 with a failed file')).toBe('red')
+    expect(await theVerifierReads(artifactsWithARunAlone('green'), '3, version 2 with every run alone green')).toBe('green')
+    expect(await theVerifierReads(artifactsWithARunAlone('red'), '3, version 2 with a run alone not green')).toBe('red')
+    // Last, because it takes the suite's files away.
+    expect(await theVerifierReads(aFailedBuild(), '2, a failed build as the producer writes it, with only its log')).toBe('build-failed')
+  })
+
+  it('10. reads a receipt with partial coverage as not complete and incomplete, as it read before', async () => {
+    // Green, red and build-failed are pinned the same way above, by value: "reads a packed read record ...", "reads a
+    // receipt longer than the default reply ..." and "reads a build-failed receipt ...".
+    const data = artifacts('partial')
+    expect(data).toMatchObject({ buildExitCode: 0, suiteExitCode: 0, coverage: { expectedCount: 2, observedCount: 1, missing: ['tests/two.test.ts'], unexpected: [] } })
+    expect(await verifyOriginalReceiptEvidence(await filed(data), { officeRequest })).toMatchObject({ receipt: data, complete: false, green: false, outcome: 'incomplete' })
   })
 })

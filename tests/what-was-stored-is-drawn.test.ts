@@ -48,12 +48,14 @@ import type { ContextReading } from '../src/server/lib/agents.ts'
 import { readinessOf } from '../src/shared/readiness.ts'
 import type { FoundMember, ReviewDetail, ReviewMember, ReviewView } from '../src/server/lib/reviews.ts'
 import type { PanelRecord } from '../src/shared/types.ts'
+import { createI18n } from '../src/shared/i18n.ts'
 
 type Bar = typeof import('../src/web/components/agent/ReviewBar.tsx')
 type Api = typeof import('../src/web/api.ts')
 type Page = typeof import('../src/web/pages/RecordPage.tsx')
 type Who = typeof import('../src/web/components/agent/Recipients.tsx')
 
+const { t } = createI18n('en')
 let bar: Bar
 let api: Api
 let page: Page
@@ -228,11 +230,11 @@ describe('what Mole Office made of a comment is on the screen beside the comment
     expect(html).toContain('standardise on aluminium')
   })
 
-  it('says why a read review kept nothing beside one comment, in the server sentence', () => {
+  it('says a read review kept nothing beside one comment, as a state word', () => {
     const says =
       'The words of this comment live in a conversation, which has no place to keep a reading beside them.'
     const html = opened(member({ interpretation: null }), { wasRead: true, without: says })
-    expect(html).toContain('The words of this comment live in a conversation')
+    expect(html).toContain(t('review.pane.reading.nothing'))
     // And it does not claim a reading exists.
     expect(html).not.toContain('Change this reading')
   })

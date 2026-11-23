@@ -24,8 +24,8 @@ MOLE_OFFICE_SESSION in the environment. The office's address comes from --api, o
 MOLE_OFFICE_API in the environment. Neither the handle nor the address has a default: a default
 would be one office's own name and port, and a message sent to the wrong office, or as the wrong
 agent, is worse than none. When one is missing the script says which, sends nothing and exits 2.
-A key, when the agent holds one, is read from the file MOLE_AGENT_KEY_FILE names, or from MOLE_AGENT_KEY, and
-sent on x-mole-office-key; it is never printed and never taken from a flag. With both set, or a key file that breaks
+A key is read from MOLE_AGENT_KEY_FILE or MOLE_AGENT_KEY, or from this run's office tool configuration, and
+sent on x-mole-office-key; it is never printed and never taken from a flag. Without a key nothing is sent. With both set, or a key file that breaks
 a rule of the_agent_key below, the script says why, sends nothing and exits 2. --slot marks a secretary's
 scheduled broadcast with the slot the office's reminder named. It prints
 the HTTP status and the new record's id, and then the send id (see below). When the office stored the
@@ -174,6 +174,84 @@ def the_agent_key(env, nothing, uid=os.getuid() if hasattr(os, "getuid") else No
         os.close(fd)
 
 
+A_KIT_TOOL_HOLDS_NO_KEY = ("This tool holds no key, so it sent nothing. Set MOLE_AGENT_KEY_FILE to the full path of "
+                           "the file holding your agent key (register-myself.mjs --key-file writes one), or run this "
+                           "tool in your run's own terminal, which holds your run's key.")
+
+
+def the_no_key_line(why, env):
+    """The same refusal as agent-key.mjs, with the configuration path replaced by its variable name."""
+    path = env.get("MOLE_OFFICE_TOOL_CONFIGURATION")
+    if path:
+        why = why.replace(path, "named by MOLE_OFFICE_TOOL_CONFIGURATION")
+    return f"{A_KIT_TOOL_HOLDS_NO_KEY} The run's key was not used: {why}."
+
+
+def the_runs_key(env, agent, session, uid=os.getuid() if hasattr(os, "getuid") else None, system=sys.platform):
+    """Mirror theRunsKeyFromItsOfficeToolFile, including its checks and reasons, on every system."""
+    path = env.get("MOLE_OFFICE_TOOL_CONFIGURATION")
+    if not isinstance(path, str) or path == "":
+        return None, "MOLE_OFFICE_TOOL_CONFIGURATION names no office tool configuration"
+    named = f"the office tool configuration {path}"
+    try:
+        file = os.lstat(path)
+    except OSError:
+        return None, f"{named} is not there"
+    if not stat.S_ISREG(file.st_mode):
+        return None, f"{named} is not a plain file"
+    if uid is not None and file.st_uid != uid:
+        return None, f"{named} belongs to another user"
+    if file.st_mode & 0o077:
+        return None, f"{named} may be read or written by others than its owner (mode {file.st_mode & 0o777:o})"
+    try:
+        with open(path, encoding="utf-8", errors="replace") as source:
+            configuration = json.load(source, parse_constant=lambda _value: (_ for _ in ()).throw(ValueError()))
+    except (OSError, ValueError, UnicodeError):
+        return None, f"{named} does not read as JSON"
+    def prop(obj, name):
+        return obj.get(name) if isinstance(obj, dict) else None
+    office = prop(prop(prop(configuration, "mcpServers"), "mole_office"), "env")
+    if not isinstance(office, (dict, list)):
+        reason = "it holds no office tool"
+    else:
+        # JavaScript's String(undefined), used by the node reader when the property is absent.
+        def word(name):
+            if not isinstance(office, dict) or name not in office:
+                return "undefined"
+            value = office[name]
+            if value is None:
+                return "null"
+            if isinstance(value, bool):
+                return str(value).lower()
+            if isinstance(value, dict):
+                return "[object Object]"
+            if isinstance(value, list):
+                return ",".join(str(x) for x in value)
+            return str(value)
+        if not isinstance(agent, str) or agent == "" or prop(office, "MOLE_OFFICE_AGENT") != agent:
+            reason = f"it names the agent {word('MOLE_OFFICE_AGENT')}, not this one ({agent or 'none'})"
+        elif not isinstance(session, str) or session == "" or prop(office, "MOLE_OFFICE_SESSION") != session:
+            reason = f"it names the run {word('MOLE_OFFICE_SESSION')}, not this one ({session or 'none'})"
+        else:
+            key = prop(office, "MOLE_AGENT_KEY")
+            if isinstance(key, str) and key != "":
+                return key, None
+            reason = "it holds no key"
+    return None, f"{named} is not this run's own: {reason}"
+
+
+def the_key_a_kit_tool_sends(env, agent, session, names, nothing):
+    """Take the agent's key first, then the matching run's key, or explain why neither was used."""
+    key = the_agent_key(env, nothing)
+    if key is not None:
+        return key, None
+    missing = [name for name, value in ((names["agent"], agent), (names["session"], session))
+               if not isinstance(value, str) or value == ""]
+    if missing:
+        return None, f"{' and '.join(missing)} {'is' if len(missing) == 1 else 'are'} not set, so the run's office tool file was not read"
+    return the_runs_key(env, agent, session)
+
+
 # THE SCRIPT'S OWN SENTENCE AFTER A 409 THAT STORED THE MESSAGE, printed after the office's sentence saying where the
 # message went. tests/the-send-tool-says-a-409-message-is-stored.test.ts reads it from this file.
 STORED_ON_A_409_SAYS = ("The message is stored and waits for its addressee: it was not delivered now, and it must not be "
@@ -274,6 +352,16 @@ def main() -> int:
         lead = {"target": {"kind": "record", "recordId": a.lead[0],
                            "workspaceId": a.lead[1] if len(a.lead) == 2 else a.workspace},
                 "place": {"at": "surface"}}
+    try:
+        key, why = the_key_a_kit_tool_sends(os.environ, a.handle, a.session,
+                                             {"agent": "--as or MOLE_OFFICE_AGENT", "session": "--session or MOLE_OFFICE_SESSION"},
+                                             "Nothing was sent.")
+    except ValueError as refused:
+        print(refused, file=sys.stderr)
+        return 2
+    if key is None:
+        print(the_no_key_line(why, os.environ), file=sys.stderr)
+        return 2
     with open(a.body_file, encoding="utf-8") as f:
         body = f.read().strip()
     send_id = a.send_id if a.send_id else secrets.token_hex(12)
@@ -300,13 +388,7 @@ def main() -> int:
         headers["x-mole-office-session"] = a.session
     if a.purpose:
         headers["x-mole-office-purpose"] = a.purpose
-    try:
-        key = the_agent_key(os.environ, "Nothing was sent.")
-    except ValueError as refused:
-        print(refused, file=sys.stderr)
-        return 2
-    if key is not None:
-        headers["x-mole-office-key"] = key
+    headers["x-mole-office-key"] = key
     payload = {"kind": "message", "title": a.title, "data": data}
     req = urllib.request.Request(
         a.api.rstrip("/") + "/api/records", method="POST",

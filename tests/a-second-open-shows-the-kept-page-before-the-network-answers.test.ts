@@ -9,8 +9,9 @@
  *
  * WHAT THIS FILE HOLDS. A record's page is opened once and read in full. It is then opened again, in a
  * new tab of the same browser (nothing in memory: only IndexedDB carries it), with the record's own door
- * held back for several seconds. The record's title is drawn while that request has still not answered,
- * and the re-read strip says "Refreshing…" beside it. When the door answers, the title is still there.
+ * held back until the case has read the page, and never longer than HELD_BACK_MS. The record's title is
+ * drawn while that request has still not answered, and the re-read strip says "Refreshing…" beside it.
+ * When the door answers, the title is still there.
  *
  * MUTATION: in `useAsync` (src/web/components/ui.tsx) the kept answer is never looked up. Red: the
  * second open draws the title only after the held-back door answers.
@@ -25,7 +26,7 @@ import { liveApp, waitForThePage, type LiveApp } from './helpers.ts'
 let app: LiveApp
 let id = ''
 const TITLE = 'Conveyor belt tension readings, kept from the last open'
-/** How long the record's own door is held back on the second open. */
+/** The longest the record's own door is held back on the second open. The case lets it go once it has read the page. */
 const HELD_BACK_MS = 6_000
 
 const AS_THE_OWNER = {
@@ -73,10 +74,15 @@ describe('a second open of a page', () => {
 
     const second = await app.context.newPage()
     let answered = false
+    let release!: () => void
+    const released = new Promise<void>((resolve) => {
+      release = resolve
+      setTimeout(resolve, HELD_BACK_MS)
+    })
     await second.route(
       (url) => url.pathname === `/api/records/${id}`,
       async (route) => {
-        await new Promise((resolve) => setTimeout(resolve, HELD_BACK_MS))
+        await released
         await route.continue()
         answered = true
       },
@@ -88,6 +94,7 @@ describe('a second open of a page', () => {
     expect(answered, `the title was drawn ${String(drawnAfter)} ms after the open, before the record's door answered`).toBe(false)
     expect(await second.locator('.px-reread-what').first().textContent({ timeout: 2_000 })).toBe(t('frameFiles.reread.refreshing'))
 
+    release()
     await waitForThePage(second, 60_000)
     expect(answered).toBe(true)
     expect(await second.locator('.rp-title').first().textContent()).toContain(TITLE)

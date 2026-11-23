@@ -12,9 +12,8 @@
  * Such a refusal opens no group, so its stored shape has no `group`, and the readings of a refusal say why there is
  * none rather than naming one.
  *
- * WHAT IS NOT PROVED HERE. That the office writes the ending with the bounce, and that the check door opens no group,
- * are proved against the real doors in tests/merge-state-machine.test.ts. This file is the pure reading in
- * src/shared/releasing.ts. Every value here is synthetic.
+ * WHAT IS NOT PROVED HERE: that the office writes the ending with the bounce, and that the check door opens no group.
+ * This file is the pure reading in src/shared/releasing.ts. Every value here is synthetic.
  */
 import { describe, expect, it } from 'vitest'
 import { sayInEnglish } from '../src/shared/i18n.ts'

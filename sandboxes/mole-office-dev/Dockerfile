@@ -11,7 +11,7 @@
 #     the host's node_modules (better-sqlite3, rolldown, esbuild, TypeScript 7) load unchanged.
 #   - Node 22, because chapter 9 says Node 22 and because node_modules is the host checkout's own,
 #     mounted read-only: it was installed by the host's Node 22. NODE_VERSION is the host's exact
-#     version; tests/sandbox-template.test.ts fails when the host's Node major and this one part.
+#     version; a test of this template fails when the host's Node major and this one part.
 #   - Chromium for Playwright 1.62.1, installed here because the host has no browser cache to
 #     mount (~/.cache/ms-playwright is gone). 1.62.1 wants chromium and headless-shell revision
 #     1234 and ffmpeg 1011 (node_modules/playwright-core/browsers.json); the installer of the same
@@ -27,7 +27,10 @@
 #     measurement, message wyeoXtfY-6hT). In 2.1.278 `--model opus` resolved to claude-opus-5, so
 #     sandboxed runs registered as Opus 5.5 ran on Opus 5, and `--model claude-opus-5-5` answered
 #     "Claude Code 2.1.278 does not support this model; version 2.1.280 or newer is required".
-#   - python3, minimal and with no pip: acceptance finding 3. design/agents/kit/send-message.py is a
+#     CLAUDE CODE WAS RAISED TO 2.1.323, the host's version, on 20 November 2026. The API refuses
+#     claude-fable-5-2 below 2.1.290, answering "Claude Code 2.1.281 does not support this model;
+#     version 2.1.290 or newer is required".
+#   - python3, minimal and with no pip: acceptance finding 3. tools/kit/send-message.py is a
 #     Python script and needs an interpreter inside the sandbox to run at all.
 #   - GTK 3, a D-Bus session bus and the virtual display, for the window.
 #   - make, because `npm ci` runs node-gyp for better-sqlite3 although nothing is compiled (the layer before explains why).
@@ -52,7 +55,7 @@ ARG NODE_VERSION=22.23.2
 ARG PLAYWRIGHT_VERSION=1.62.1
 ARG CODEX_VERSION=0.159.2
 ARG OPENCODE_VERSION=1.18.31
-ARG CLAUDE_CODE_VERSION=2.1.281
+ARG CLAUDE_CODE_VERSION=2.1.323
 ARG DSH_VERSION=0.1.5-rc.2
 
 LABEL mole-office.sandbox-template="mole-office-dev"
@@ -113,7 +116,7 @@ RUN cd /opt/dsh \
  && dsh --version | grep -F "${DSH_VERSION}" \
  && test -d /opt/dsh/node_modules/@deepseek-ai/dsh-sandbox-local
 
-# PYTHON3, MINIMAL, NO PIP: acceptance finding 3. design/agents/kit/send-message.py needs only the
+# PYTHON3, MINIMAL, NO PIP: acceptance finding 3. tools/kit/send-message.py needs only the
 # standard library (argparse, json, urllib), which the plain `python3` package carries; `python3-pip`
 # and `python3-venv` are not installed, because nothing in this image installs a Python package.
 # This is its own layer, after the other package installs, so adding it does not cost a rebuild of Node,
@@ -243,9 +246,9 @@ COPY keep-alive /usr/local/lib/mole-office/keep-alive
 CMD ["/usr/local/lib/mole-office/keep-alive"]
 
 # A TEMPLATE THAT BUILDS ON THIS IMAGE names the stage below as its build target, with two build arguments: its own name,
-# for the label, and the apt packages it adds (sandboxes/ai-news-studio is the first). One Dockerfile rather than a
-# second, which would drift from this one (invariant 9; message u-m7uwp20rnM). With either argument empty the stage
-# refuses to build, rather than make an image that says it is a template it is not.
+# for the label, and the apt packages it adds. One Dockerfile rather than a second, which would drift from this one
+# (invariant 9; message u-m7uwp20rnM). With either argument empty the stage refuses to build, rather than make an image
+# that says it is a template it is not.
 FROM mole-office-dev AS with-extra-packages
 ARG TEMPLATE_NAME
 ARG EXTRA_APT_PACKAGES

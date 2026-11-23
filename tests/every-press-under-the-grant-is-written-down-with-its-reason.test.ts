@@ -36,7 +36,7 @@ import { THE_PERSON } from '../src/shared/person.ts'
 import { setWordLanguage } from '../src/shared/i18n.ts'
 import { THE_DOORS_THE_LIST_NAMES } from '../src/shared/what-the-grant-carries-words.ts'
 import { THE_TEST_OFFICES_SECRETARY } from './a-page-of-a-test-office.ts'
-import { apiApp, freshDb, thePersonsKeyHeader, type TestDb } from './helpers.ts'
+import { apiApp, freshDb, thePersonsKeyHeader, type TestDb, governsTheWholeProject } from './helpers.ts'
 
 type ProfileModule = typeof import('../src/web/pages/ProfilePage.tsx')
 
@@ -127,7 +127,7 @@ async function aDecisionForThePerson(title: string, reason: string): Promise<str
     ...forThePerson(reason),
     kind: 'decision',
     title,
-    data: { replaces: [], decided_by: 'the owner', authority: 'the owner said so', because: 'Because they said so.' },
+    data: { ...governsTheWholeProject(), replaces: [], decided_by: 'the owner', authority: 'the owner said so', because: 'Because they said so.' },
   })
   expect(done.status, done.said).toBe(201)
   return String((done.body['record'] as { id: string }).id)

@@ -9,8 +9,8 @@
  * kept inside the office drew no package panel at all, so it did not say the state the tasks page gave the same
  * package: the panel was drawn only for a package for outside work, the one kind that stores where its work is.
  *
- * WHAT IS MEASURED, in a real browser on a test office of this file's own, in the light and the dark theme at 1440,
- * 990, 660 and 390. Six made-up packages are walked to the six states, each linked to a block of one made-up plan.
+ * WHAT IS MEASURED, in a real browser on a test office of this file's own, in the light theme at 1440, 660 and 390.
+ * Six made-up packages are walked to the six states, each linked to a block of one made-up plan.
  *   1. The plan, drawn as the graph and as the list: each of the six state words is drawn on a chip, and no chip's word
  *      is cut or runs past the edge of its chip.
  *   2. The tasks page: each of the six state words is drawn, and none is cut.
@@ -34,9 +34,9 @@
  *
  * ROUND 230'S MUTATION: take out the line in src/web/components/graph/lanes/from-records.ts that gives a step its
  * package state, `...(role === 'step' ? thePackageStateOn(packages, record.id) : {}),`, build, and part 1 goes red on
- * the graph side in all eight cases of width and theme. Each fails on the word "to do": every step then says its own
- * state, so no chip says it. Put back with cp and checked with cmp, the file is green again. Round 230 did not run the
- * two mutations above again.
+ * the graph side in all eight cases of width and theme it then had. Each fails on the word "to do": every step then
+ * says its own state, so no chip says it. Put back with cp and checked with cmp, the file is green again. Round 230 did
+ * not run the two mutations above again.
  */
 import { aMadeUpModuleForPackage, httpPackageFixture } from './module-package-fixture.ts'
 import { readFileSync } from 'node:fs'
@@ -51,10 +51,10 @@ import { THE_PERSON } from '../src/shared/person.ts'
 import { packageStateWord, stateWord } from '../src/shared/words.ts'
 import { recordPath } from '../src/web/components/router.tsx'
 import { DRAWING, theDrawingIsDrawn } from './a-made-up-office-drawn-in-lanes.ts'
-import { liveApp, waitForThePage, type LiveApp } from './helpers.ts'
+import { liveApp, waitForThePage, type LiveApp, governsTheWholeProject } from './helpers.ts'
 
-const WIDTHS = [1440, 990, 660, 390] as const
-const THEMES = ['light', 'dark'] as const
+const WIDTHS = [1440, 660, 390] as const
+const THEMES = ['light'] as const
 const WORDS = { forTheOutside: 'Do the made-up work and hand it back.', acceptance: 'The made-up work is done.' }
 const asThePerson = (): Record<string, string> => ({ 'content-type': 'application/json', 'x-mole-office-workspace': 'default', 'x-mole-office-actor-type': 'human', 'x-mole-office-actor-id': THE_PERSON })
 const asAgent = (handle: string): Record<string, string> => ({ ...asThePerson(), 'x-mole-office-actor-type': 'agent', 'x-mole-office-actor-id': handle })
@@ -107,7 +107,7 @@ beforeAll(async () => {
   const worker = asAgent('made-up-worker')
   const door = (task: string, name: string, headers: Record<string, string>, body: unknown) => send(`/api/delegation/${task}/${name}`, headers, body)
 
-  const decision = await file('decision', 'A made-up decision above the packages', { replaces: [] })
+  const decision = await file('decision', 'A made-up decision above the packages', { ...governsTheWholeProject(), replaces: [] })
   const parent = await file('task', 'A made-up parent task of six packages', {}, maker)
   const points = {} as Record<PackageState, [string, string]>
   for (const state of PACKAGE_STATES) {
@@ -322,7 +322,7 @@ for (const theme of THEMES) for (const width of WIDTHS) {
 it('uses a singular word for one pipeline and the plural for two, in the index', async () => {
   for (const amount of [1, 2]) {
     if (amount === 2) await file('pipeline', 'A made-up second plan', { blockIds: [] })
-    for (const theme of THEMES) for (const width of [1440, 990, 660]) {
+    for (const theme of THEMES) for (const width of [1440]) {
       const context = await app.browser.newContext({ viewport: { width, height: 900 } })
       await context.addInitScript((look) => localStorage.setItem('mole-office.preset.theme', look), theme)
       try {

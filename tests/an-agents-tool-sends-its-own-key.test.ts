@@ -13,13 +13,16 @@
  *     key, and the actor it names is MOLE_OFFICE_AGENT (or the tool's --actor flag, when given). The
  *     office refuses a key sent under another agent's name, so a made-up tool name would be refused.
  *   - With no MOLE_AGENT_KEY, every request names the actor the tool named before keys, and carries
- *     no key. The session hook is the one exception: it sends the office's key, as it did before.
+ *     no key. The session hook sends the agent's own key or the run's key whenever it holds one. A
+ *     session that names an agent and holds neither sends the name alone and says so once. The office's
+ *     key is the hook's last resort only for a session that names no agent and holds no key, on a
+ *     computer with no entry key file (none is in this test's folder), and it says so once in its start lines.
  *
  * The key is built in one place, anAgentsToolHeaders in tools/sandbox-common.mjs. Taking the key out
  * of that function turns the "with a key" cases red.
  */
 import { spawn } from 'node:child_process'
-import { copyFileSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, copyFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { createServer, type IncomingHttpHeaders, type Server } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { join } from 'node:path'
@@ -54,8 +57,8 @@ beforeAll(async () => {
   scratch = aTestDatabaseFolder('an-agents-tool-sends-its-key')
   home = join(scratch, 'home')
   mkdirSync(home, { recursive: true })
-  // THE OFFICE'S KEY FILE, made up, beside a made-up database path, so the hook's fallback to the
-  // office's key can be seen. keysPathFrom in src/config/settings.mjs puts it beside the database.
+  // THE OFFICE'S KEY FILE, made up, beside a made-up database path, so a hook that sent the office's
+  // key would be seen sending it. keysPathFrom in src/config/settings.mjs puts it beside the database.
   mkdirSync(join(scratch, 'db'), { recursive: true })
   writeFileSync(join(scratch, 'db', 'keys.json'), JSON.stringify({ office: OFFICE_KEY }))
   // A CHECKOUT OUTSIDE THE TEMPORARY DIRECTORY, because the guard asks the office about a delete only
@@ -181,9 +184,9 @@ const CASES: readonly Case[] = [
     withoutAKey: 'mole-office/the-world-sweep',
   },
   {
-    name: 'tools/guard/main-world-guard.mjs',
+    name: 'for-agents/main-world-guard.mjs',
     run: {
-      ...node(tool('guard/main-world-guard.mjs'), '--agent', 'made-up-guarded-agent'),
+      ...node(join(REPO, 'for-agents', 'main-world-guard.mjs'), '--agent', 'made-up-guarded-agent'),
       stdin: '<guard payload>',
     },
     withoutAKey: 'made-up-guarded-agent',
@@ -228,36 +231,109 @@ describe('an agent’s tool sends the agent’s own key, under the agent’s own
   }
 })
 
-describe('the session hook sends the agent’s own key first, and the office’s key only when there is none', () => {
+describe("the session hook sends the agent's own key or the run's key, and the office's only when it holds neither", () => {
   const hook: Run = {
     ...node(tool('session-hook.mjs'), 'start'),
     stdin: JSON.stringify({ session_id: 'made-up-conversation', hook_event_name: 'SessionStart' }),
   }
   const hookIn = (): Run => ({ ...hook, cwd: home })
+  // A KEY FILE AND A RUN'S OFFICE TOOL CONFIGURATION, both made up here and kept from other users, as
+  // register-myself.mjs --key-file and the launcher write them. A key file holds 64 hexadecimal characters.
+  const AGENT_FILE_KEY = 'f00d'.repeat(16)
+  const RUN = 'made-up-run-for-a-key-test'
+  const RUN_KEY = 'made-up-run-key-not-a-real-one'
+  let keyFile: string
+  let toolConfiguration: string
 
-  it('with MOLE_AGENT_KEY and a named agent, the agent’s key goes under that agent', async () => {
-    const got = await run(hookIn(), theEnvironment({ MOLE_AGENT_KEY: AGENT_KEY, MOLE_OFFICE_AGENT: AGENT }))
+  beforeAll(() => {
+    // IN EVERY CASE THE OFFICE'S KEY FILE IS IN PLACE AND READABLE, so a case that sees no office key is not
+    // one where the hook found none to send.
+    const officeKeys = JSON.parse(readFileSync(join(scratch, 'db', 'keys.json'), 'utf8')) as { office?: unknown }
+    expect(officeKeys.office, 'the office key file is not in place').toBe(OFFICE_KEY)
+    keyFile = join(scratch, 'agent-key')
+    writeFileSync(keyFile, `${AGENT_FILE_KEY}\n`, { mode: 0o600 })
+    chmodSync(keyFile, 0o600)
+    toolConfiguration = join(scratch, 'office-tool.json')
+    writeFileSync(
+      toolConfiguration,
+      JSON.stringify({ mcpServers: { mole_office: { env: { MOLE_OFFICE_AGENT: AGENT, MOLE_OFFICE_SESSION: RUN, MOLE_AGENT_KEY: RUN_KEY } } } }),
+      { mode: 0o600 },
+    )
+    chmodSync(toolConfiguration, 0o600)
+  })
+
+  /** The environment of a hook case: as every run's, and with no key of the shell that runs this test. */
+  function theHooksEnvironment(extra: Record<string, string>): Record<string, string> {
+    const env = theEnvironment({})
+    for (const name of ['MOLE_AGENT_KEY_FILE', 'MOLE_OFFICE_TOOL_CONFIGURATION']) delete env[name]
+    return { ...env, ...extra }
+  }
+
+  /** How many times the output names the variable the hook's last-resort line tells the person to set. */
+  const timesTheKeyFileIsNamed = (output: string): number => output.split('MOLE_AGENT_KEY_FILE').length - 1
+  /** Whether the output shows the office's key or the path of its key file. */
+  const showsTheOfficesKey = (output: string): boolean => output.includes(OFFICE_KEY) || output.includes(join(scratch, 'db', 'keys.json'))
+
+  it("with MOLE_AGENT_KEY and a named agent, the agent's key goes under that agent", async () => {
+    const got = await run(hookIn(), theHooksEnvironment({ MOLE_AGENT_KEY: AGENT_KEY, MOLE_OFFICE_AGENT: AGENT }))
     for (const headers of namingAnActor(got, 'the session hook')) {
       expect(headers[ACTOR], got.output).toBe(AGENT)
       expect(headers[KEY] === AGENT_KEY, 'the hook did not send the agent key').toBe(true)
     }
   }, 60_000)
 
-  it('with no MOLE_AGENT_KEY, the office’s key goes under the agent, as before', async () => {
-    const got = await run(hookIn(), theEnvironment({ MOLE_OFFICE_AGENT: AGENT }))
+  it("with MOLE_AGENT_KEY_FILE and a named agent, the key in that file goes under the agent", async () => {
+    const got = await run(hookIn(), theHooksEnvironment({ MOLE_AGENT_KEY_FILE: keyFile, MOLE_OFFICE_AGENT: AGENT }))
     for (const headers of namingAnActor(got, 'the session hook')) {
       expect(headers[ACTOR], got.output).toBe(AGENT)
-      expect(headers[KEY] === OFFICE_KEY, 'the hook did not send the office key').toBe(true)
+      expect(headers[KEY] === AGENT_FILE_KEY, 'the hook did not send the key in the key file').toBe(true)
     }
+    expect(got.output.includes(AGENT_FILE_KEY), 'the hook printed the key').toBe(false)
+  }, 60_000)
+
+  it("with the run's key in the office tool configuration for this agent and run, that key goes under the agent", async () => {
+    const got = await run(
+      hookIn(),
+      theHooksEnvironment({ MOLE_OFFICE_TOOL_CONFIGURATION: toolConfiguration, MOLE_OFFICE_AGENT: AGENT, MOLE_OFFICE_SESSION: RUN }),
+    )
+    for (const headers of namingAnActor(got, 'the session hook')) {
+      expect(headers[ACTOR], got.output).toBe(AGENT)
+      expect(headers[KEY] === RUN_KEY, "the hook did not send the run's key").toBe(true)
+    }
+    expect(got.output.includes(RUN_KEY), 'the hook printed the key').toBe(false)
+  }, 60_000)
+
+  it('with neither key and an agent named, the name goes alone, with no key and never the office’s, and the hook says so once', async () => {
+    const { aNamedAgentWithoutAKeyLine } = await import('../src/config/the-entrys-agent.mjs')
+    const got = await run(hookIn(), theHooksEnvironment({ MOLE_OFFICE_AGENT: AGENT }))
+    for (const headers of namingAnActor(got, 'the session hook')) {
+      expect(headers[ACTOR], got.output).toBe(AGENT)
+      expect(headers[KEY] === undefined, 'the hook sent a key under a name that holds none').toBe(true)
+    }
+    expect(got.output.split(aNamedAgentWithoutAKeyLine(AGENT)).length - 1, `the hook did not say once that it sent the name alone:\n${got.output}`).toBe(1)
+    expect(timesTheKeyFileIsNamed(got.output), `the hook took its last resort though it names an agent:\n${got.output}`).toBe(0)
+    expect(showsTheOfficesKey(got.output), "the hook printed the office's key or its file's path").toBe(false)
+  }, 60_000)
+
+  it('with MOLE_AGENT_KEY and no agent named, no request carries a key, under the hook’s own name', async () => {
+    const got = await run(hookIn(), theHooksEnvironment({ MOLE_AGENT_KEY: AGENT_KEY }))
+    for (const headers of namingAnActor(got, 'the session hook')) {
+      expect(headers[ACTOR], got.output).toBe(THE_SESSION_HOOK_ID)
+      expect(headers[KEY] === undefined, 'the hook sent a key under a name that is not its holder’s').toBe(true)
+    }
+    expect(timesTheKeyFileIsNamed(got.output), `the hook took its last resort though it holds a key:\n${got.output}`).toBe(0)
   }, 60_000)
 
   // THE HOOK'S OWN NAME, which no agent can register. MUTATION: put 'claude-code' back as the name the hook falls back
   // to in for-agents/session-hook.mjs, and this case goes red.
-  it('with MOLE_AGENT_KEY and no agent named, the office’s key goes under the hook’s own name', async () => {
-    const got = await run(hookIn(), theEnvironment({ MOLE_AGENT_KEY: AGENT_KEY }))
+  it("with neither key and no agent named, as in the person's own session, the office's key goes under the hook’s own name, and the hook says so once", async () => {
+    const got = await run(hookIn(), theHooksEnvironment({}))
     for (const headers of namingAnActor(got, 'the session hook')) {
       expect(headers[ACTOR], got.output).toBe(THE_SESSION_HOOK_ID)
-      expect(headers[KEY] === OFFICE_KEY, 'the hook did not send the office key').toBe(true)
+      expect(headers[KEY] === OFFICE_KEY, "the hook did not send the office's key").toBe(true)
     }
+    expect(got.output, "the hook did not say that it used the office's key").toContain("with the office's key, as its last resort")
+    expect(timesTheKeyFileIsNamed(got.output), `the hook did not say once how to get a key:\n${got.output}`).toBe(1)
+    expect(showsTheOfficesKey(got.output), "the hook printed the office's key or its file's path").toBe(false)
   }, 60_000)
 })

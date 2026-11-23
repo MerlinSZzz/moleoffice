@@ -5,8 +5,8 @@
  * backup can be larger than that, and the move, the bootstrap and the upgrade hashed them whole. Each file here is
  * sparse: its size is past 2^31 bytes, only a few bytes in it are written, and it costs no disk. Each digest is
  * compared with the digest a stream reads, the way the bootstrap already hashed a file.
- * A pass over 2 GiB of unwritten bytes took about 0.65 s on this machine on 20 October 2026, so each test names its
- * own budget instead of the runner's five seconds.
+ * A pass over 2 GiB of unwritten bytes took about 0.65 s on this machine on 20 October 2026, so each test over 2 GiB
+ * names its own budget instead of the runner's five seconds.
  */
 import { afterEach, expect, it } from 'vitest'
 import { createHash } from 'node:crypto'
@@ -35,13 +35,21 @@ async function streamedHash(file: string, encoding: 'base64' | 'hex') {
   return digest.digest(encoding)
 }
 
-it('hashes a file over 2 GiB to the digest a stream reads, in both encodings the move uses', async () => {
+it('hashes a file over 2 GiB to the base64 digest a stream reads', async () => {
   const folder = mkdtempSync(join(tmpdir(), 'hash-past-2-gib-')); folders.push(folder)
   const file = join(folder, 'sparse.bin')
   writeFileSync(file, 'bytes written at the start'); makeItSparse(file)
   expect(hashFile(file)).toBe(await streamedHash(file, 'base64'))
-  expect(hashFile(file, 'hex')).toBe(await streamedHash(file, 'hex'))
 }, 60_000)
+
+// The move also hashes its env file, a small one, with 'hex'. A small file shows that hashFile passes the encoding on;
+// a hex digest past 2 GiB is the lock guard's case below.
+it("hashes a small file to the hex digest a stream reads when it is asked for 'hex'", async () => {
+  const folder = mkdtempSync(join(tmpdir(), 'hash-hex-')); folders.push(folder)
+  const file = join(folder, 'small.bin')
+  writeFileSync(file, 'bytes written for the hex digest')
+  expect(hashFile(file, 'hex')).toBe(await streamedHash(file, 'hex'))
+})
 
 // The lock guard observes the database before and after the lock. The move, the bootstrap and the upgrade call it
 // after the office has stopped, so a throw there leaves the office down.

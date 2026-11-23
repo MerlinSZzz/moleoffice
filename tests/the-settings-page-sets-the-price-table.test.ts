@@ -8,7 +8,7 @@
  * ---------------------------------------------------------------------------------------
  *
  *   1. The panel lists the model a usage receipt names, by its exact name, with empty price boxes,
- *      and says no table is set.
+ *      and its state word says no table is set.
  *   2. A price typed into those boxes and saved is what the server holds afterwards. The save is
  *      waited for by its own answer, and then the server is read, not the boxes.
  *   3. The Usage page then draws an estimate in the table's currency, and no longer draws the
@@ -23,7 +23,8 @@
 import { mkdirSync } from 'node:fs'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
-import { theNoPriceTableSentence, thePriceUnitSentence } from '../src/shared/price-table.ts'
+import { t } from '../src/shared/i18n.ts'
+import { theNoPriceTableSentence } from '../src/shared/price-table.ts'
 import { freshDb, liveApp, waitForThePage, type LiveApp, type TestDb } from './helpers.ts'
 import { historicalSession } from './synthetic-submission-fixtures.ts'
 
@@ -76,7 +77,9 @@ describe('the price table is set on the Settings page', () => {
     // THE CONTROL: no table yet, and the receipt's model is offered by its exact name, unpriced.
     const unpriced = live.page.locator(`${PANEL} [data-testid="price-table-unpriced"] [data-model="model-one"]`)
     await unpriced.waitFor({ timeout: 30_000 })
-    expect(await live.page.locator(PANEL).innerText()).toContain(theNoPriceTableSentence())
+    // Test change (as decided, the panel draws no explanation): the state is the word "not set", where it was the
+    // sentence saying no table is set.
+    expect(await live.page.locator(`${PANEL} .ptb-state`).allInnerTexts()).toContain(t('settingsState.notSet'))
 
     await live.page.locator(`${PANEL} .ptb-currency input`).fill('GBP')
     await unpriced.getByLabel('Input price for model-one', { exact: true }).fill('3')
@@ -102,14 +105,14 @@ describe('the price table is set on the Settings page', () => {
     await openTheSettings()
     await live.page.locator(`${PANEL} [data-testid="price-table-priced"] [data-model="model-one"]`).waitFor()
     await live.page.locator(`${PANEL} [data-testid="price-table-set-by"]`).waitFor()
-    expect(await live.page.locator(PANEL).innerText()).not.toContain(theNoPriceTableSentence())
+    expect(await live.page.locator(`${PANEL} .ptb-state`).allInnerTexts()).not.toContain(t('settingsState.notSet'))
   }, 180_000)
 
   it('the Usage page then draws the estimate in the table currency', async () => {
     await live.page.goto(`${live.site}/#/agent-use`, { waitUntil: 'domcontentloaded' })
     await waitForThePage(live.page, 60_000)
     const totals = live.page.getByTestId('receipt-totals')
-    await totals.getByText(thePriceUnitSentence()).waitFor({ timeout: 30_000 })
+    await totals.getByText('0.00195 GBP').first().waitFor({ timeout: 30_000 })
     const words = await totals.innerText()
     // (100 + 200) * 3 + 1000 * 0.3 + 50 * 15 = 1950 over one million tokens.
     expect(words).toContain('0.00195 GBP')

@@ -11,6 +11,8 @@
  *   3. the naming of the agent who takes the dead letters;
  *   4. the choice of who is reminded about a project's modules;
  *   5. the merges-only switch and how many checks run at once, the related tests first, and the office's load ranges.
+ * The stale fork bases door asks the gate through the same function as the merges-only door, `whoMayChangeIt` in
+ * src/server/api/checks-in-merges-only.ts, so the merges-only row asks that wiring for both and it has no row here.
  *
  * AT OFF, AN AGENT PROVED BY ITS OWN KEY MAY ALSO ACT, and what it wrote names it. The gate counts it as a request it
  * would have stopped. A caller that no key proves to be a registered agent is still refused, is not counted, and is
@@ -405,15 +407,6 @@ theCases({
   thePerson: true,
   aSecretary: true,
   make: async () => ({ method: 'POST', url: '/api/office/checks-in-merges-only', body: { checksAtOnce: 2 + (++presses % 2), because: BECAUSE }, writes: { setting: 'checks-at-once' } }),
-})
-
-theCases({
-  gate: 'who-changes-the-merge-and-check-switches',
-  door: 'office.set-stale-fork-bases',
-  asksTheGrant: false,
-  thePerson: true,
-  aSecretary: true,
-  make: async () => ({ method: 'PUT', url: '/api/office/stale-fork-bases', body: { bases: [String(++presses % 10).repeat(40)], because: BECAUSE }, writes: { setting: 'stale-fork-bases' } }),
 })
 
 theCases({

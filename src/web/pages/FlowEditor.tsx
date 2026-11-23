@@ -244,7 +244,6 @@ function TheEditor({ flow: read, titles }: { flow: FlowRead | null; titles: Read
       }}
     >
       <h1 className="flw-title" data-title-is="its-label">{flow === null ? t('flowEditor.titleNew') : t('flowEditor.titleEdit', { title: content(flow.title) })}</h1>
-      <p className="flw-note">{t('flowEditor.nothingWritten')}</p>
 
       {state.facts === null ? null : (
         <TheFacts facts={state.facts} titles={titles} lacksAt={lacksAt} refusedAt={refusedAt} onChange={(facts) => setState((was) => ({ ...was, facts }))} />
@@ -253,7 +252,6 @@ function TheEditor({ flow: read, titles }: { flow: FlowRead | null; titles: Read
       {flow === null ? null : (
         <section className="fle-cause" data-lacking={lacksAt({ at: 'cause' }).some((lack) => lack.what === 'cause') ? 'yes' : 'no'}>
           <h2 className="flw-h2">{t('flowEditor.cause')}</h2>
-          <p className="flw-note">{t('flowEditor.causeHelp')}</p>
           {state.cause === null ? (
             <RecordPicker
               label={t('flowEditor.causePick')}
@@ -279,7 +277,7 @@ function TheEditor({ flow: read, titles }: { flow: FlowRead | null; titles: Read
 
       <section className="fle-stages">
         <h2 className="flw-h2">{t('flowEditor.stages')}</h2>
-        {state.stages.length === 0 ? <p className="flw-says">{t('flowEditor.noStages')}</p> : null}
+        {state.stages.length === 0 ? <p className="flw-says">{t('absence.none')}</p> : null}
         <ol className="fle-list">
           <li className="fle-add">
             <button type="button" className="fle-add-press" onClick={() => addAt(0)}>
@@ -530,7 +528,7 @@ function OpenStage({
       <div className="fle-field" data-lacking={lacking('sources')} role="group" aria-label={t('flowEditor.field.sources')}>
         <span className="fle-label">{t('flowEditor.field.sources')}</span>
         {stage.sources.length === 0 ? (
-          <p className="flw-note">{t('flowEditor.noSources')}</p>
+          <p className="flw-note">{t('absence.none')}</p>
         ) : (
           <ul className="fle-sources">
             {stage.sources.map((id) => (
@@ -584,11 +582,11 @@ function Going({
       </p>
       <dl className="fle-going-reasons">
         <dt>{t('flowEditor.goingWhy')}</dt>
-        <dd>{why === null || why.trim() === '' ? <span className="fle-none">{t('flows.reasons.noWhy')}</span> : content(why)}</dd>
+        <dd>{why === null || why.trim() === '' ? <span className="fle-none">{t('word.notRecorded')}</span> : content(why)}</dd>
         <dt>{t('flowEditor.goingSources')}</dt>
         <dd>
           {sources.length === 0 ? (
-            <span className="fle-none">{t('flows.reasons.noSources')}</span>
+            <span className="fle-none">{t('absence.none')}</span>
           ) : (
             <ul className="fle-sources">
               {sources.map((id) => (

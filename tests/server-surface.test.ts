@@ -36,7 +36,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { FastifyInstance } from 'fastify'
 import { apiApp, freshDb, one, type TestDb } from './helpers.ts'
-import { type ApiIndex, type ApiRoute } from '../src/server/api/kinds.ts'
+import { endpointsDescribedTwice, type ApiIndex, type ApiRoute } from '../src/server/api/kinds.ts'
 import { localStamp, parseLocalStamp } from '../src/shared/time.ts'
 
 type ResourcesLib = typeof import('../src/server/lib/resources.ts')
@@ -519,9 +519,25 @@ describe('every endpoint the server registers says what it is for', () => {
     ).toEqual([])
   })
 
-
-
-
+  it('describes each endpoint once, beside its route or in the map, never both', () => {
+    // BACK SINCE 23 NOVEMBER 2026, after a cut on 17 November that took it for a case catching no real fault.
+    // The fault it catches happened in between: a commit gave POST /api/records a sentence beside its route.
+    // GET /api serves that sentence in place of the route's line in ROUTE_NOTES, so agents reading GET /api
+    // lost the block limit and the meaning of the envelope summary, and only two tests that read those words
+    // noticed. This case names the route at the commit that does it.
+    expect(
+      endpointsDescribedTwice(listRoutes()),
+      'these endpoints carry a note beside the route AND have a line in ROUTE_NOTES; one of the two is prose ' +
+        'nobody serves and nobody will correct',
+    ).toEqual([])
+    // And the check is a check: GET /api/health has a line in the map, so a route claiming to
+    // describe itself as well is the collision this reports.
+    expect(
+      endpointsDescribedTwice([
+        { method: 'GET', path: '/api/health', note: 'a second sentence', operation: 'runtime.health', reach: 'remote' },
+      ]),
+    ).toEqual(['GET /api/health'])
+  })
 })
 
 // ============================================== 1. a fresh seed leaves nothing for the migration

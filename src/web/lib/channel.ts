@@ -83,7 +83,8 @@ import { HOME_HEADER, HOME_MOVED_HEADER } from '../../config/visit-headers.mjs'
 import { PROGRAM_HEADER } from '@shared/messages.ts'
 import { theWorldThatAnswered, WORLD_HEADER } from './world.ts'
 import { makeBroadcast } from './store.ts'
-import { whereRequestsGo } from './visiting.ts'
+import { whatARequestCarries, whereRequestsGo } from './visiting.ts'
+import { theHoldOnThisRequest } from './the-device-half.ts'
 import { joinTheStream, whatWasMissed, type HowThisTabListens, type MissedWhileConnecting, type StreamState, type WhyEventsWereLost } from './onestream.ts'
 
 /**
@@ -356,9 +357,13 @@ function holdTheStream(options: Parameters<Parameters<typeof joinTheStream>[1]>[
     const stop = (): void => control.abort()
     options.stop.addEventListener('abort', stop)
     try {
-      const res = await fetch(whereRequestsGo(`/api/events?${query.toString()}`), {
-        headers,
-        credentials: 'include',
+      // THE HEADER HALF GOES ON THE REQUEST, NOT IN THE STREAM'S NAME above, which is shared between tabs. On a trip
+      // neither half goes (`whatARequestCarries`).
+      const events = `/api/events?${query.toString()}`
+      const heldByAPress = theHoldOnThisRequest()
+      if (heldByAPress !== undefined) await heldByAPress
+      const res = await fetch(whereRequestsGo(events), {
+        ...whatARequestCarries(events, headers),
         signal: control.signal,
       })
       // THE WORLD CHECK, ON THE STREAM'S FIRST REPLY. `theWorldThatAnswered` announces the
@@ -414,6 +419,9 @@ function holdTheStream(options: Parameters<Parameters<typeof joinTheStream>[1]>[
  * changes to records may have been missed, only what follows records reads them (wave 13y round 146).
  */
 function missedWhileConnecting(what: Exclude<MissedWhileConnecting, false>): void {
+  // A READ ASKED AFTER THIS IS NOT ANSWERED BY ONE ASKED BEFORE IT, as for an event handed or lost. A read still out
+  // from the page's load may hold what the server had before the change this tab may have missed.
+  aChangeWasHeard()
   if (hidden()) {
     // A HIDDEN TAB READS WHEN IT IS SHOWN, as it does when events were lost, so nothing is read that
     // nobody can see.
@@ -440,10 +448,10 @@ function missedWhileConnecting(what: Exclude<MissedWhileConnecting, false>): voi
 async function mayHaveMissed(ms: number): Promise<MissedWhileConnecting> {
   const query = new URLSearchParams({ [CONNECTION_TAG_PARAM]: MY_CONNECTION, [CONNECTING_FOR_PARAM]: String(Math.ceil(ms)) })
   try {
-    const res = await fetch(whereRequestsGo(`/api/events/state?${query.toString()}`), {
-      headers: moleOfficeHeaders(),
-      credentials: 'include',
-    })
+    const state = `/api/events/state?${query.toString()}`
+    const heldByAPress = theHoldOnThisRequest()
+    if (heldByAPress !== undefined) await heldByAPress
+    const res = await fetch(whereRequestsGo(state), whatARequestCarries(state, moleOfficeHeaders()))
     if (!res.ok) return true
     const said = (await res.json()) as { whileConnecting?: { reached: number | null; byName?: Record<string, number> | null } | null }
     const reached = said.whileConnecting?.reached

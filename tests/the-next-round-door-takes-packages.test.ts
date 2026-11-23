@@ -23,7 +23,7 @@ import { theWordsNamingTheFolder } from '../src/config/sandbox-folder.mjs'
 import { THE_MESSAGE_WORKER_ID } from '../src/shared/participants.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 import type { TheNextRound } from '../src/shared/next-round.ts'
-import { apiApp, freshDb, type TestDb } from './helpers.ts'
+import { apiApp, freshDb, type TestDb, governsTheWholeProject } from './helpers.ts'
 
 const CHECKOUT = fileURLToPath(new URL('..', import.meta.url)).replace(/\/$/, '')
 const A_MADE_UP_OFFICE_KEY = randomBytes(32).toString('hex')
@@ -97,7 +97,7 @@ const asOne = (handle: string): Record<string, string> => asAgent(handle, agents
 
 /** A record filed through the records door, by the person unless another is named. */
 async function file(kind: string, title: string, data: Record<string, unknown> = {}, headers: Record<string, string> = AS_THE_PERSON): Promise<string> {
-  const r = await call('POST', '/api/records', headers, { kind, title, data: kind === 'decision' ? { replaces: [], ...data } : data })
+  const r = await call('POST', '/api/records', headers, { kind, title, data: kind === 'decision' ? { ...governsTheWholeProject(), replaces: [], ...data } : data })
   expect(r.status, JSON.stringify(r.body)).toBe(201)
   return String(r.body['record'].id)
 }

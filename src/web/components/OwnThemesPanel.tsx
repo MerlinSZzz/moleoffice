@@ -28,7 +28,7 @@ import { themeById, themeName, THEMES, type Theme } from '@shared/themes.ts'
 import { useLanguage } from '../lib/language.ts'
 import { keepTheLook, useTheLookInTheOffice } from '../lib/the-look.ts'
 import { choosePreset, themeChoiceName, usePresets } from './PresetBar.tsx'
-import { Loading, Panel } from './ui.tsx'
+import { Loading, Panel, ServerNote } from './ui.tsx'
 
 /** The word of one of this panel's controls, as the Settings declaration names it. */
 function word(key: string): string {
@@ -43,14 +43,6 @@ const GROUP_NAMES: Readonly<Record<EditGroup, WordKey>> = {
   shape: 'settingsPanel.ownThemes.group.shape',
   modules: 'settingsPanel.ownThemes.group.modules',
   controls: 'settingsPanel.ownThemes.group.controls',
-}
-
-const GROUP_SAYS: Readonly<Record<EditGroup, WordKey>> = {
-  colour: 'settingsPanel.ownThemes.groupSays.colour',
-  type: 'settingsPanel.ownThemes.groupSays.type',
-  shape: 'settingsPanel.ownThemes.groupSays.shape',
-  modules: 'settingsPanel.ownThemes.groupSays.modules',
-  controls: 'settingsPanel.ownThemes.groupSays.controls',
 }
 
 /** A theme's values as custom properties on one element. `color-scheme` is a property of its own. */
@@ -95,7 +87,8 @@ export function OwnThemesPanel() {
   if (office.status === 'elsewhere') {
     return (
       <Panel titleIs="label" declares={{ surface: 'settings.ownthemes' }} title={title}>
-        <p>{t('settingsPanel.ownThemes.elsewhere', { because: content(office.because) })}</p>
+        <p>{t('settingsState.notRead')}</p>
+        <ServerNote text={office.because} />
       </Panel>
     )
   }
@@ -121,12 +114,10 @@ export function OwnThemesPanel() {
       <Panel titleIs="label" declares={{ surface: 'settings.ownthemes' }} title={title}>
         {css}
         <div className="owth">
-          <p>{t('settingsPanel.ownThemes.startAgainSays')}</p>
-          <ul className="owth-why">
-            {office.why.map((sentence) => (
-              <li key={sentence}>{content(sentence)}</li>
-            ))}
-          </ul>
+          <p>{t('settingsPanel.ownThemes.state.lookNotRead')}</p>
+          {office.why.map((sentence) => (
+            <ServerNote key={sentence} text={sentence} />
+          ))}
           <button type="button" className="owth-button" disabled={busy} onClick={() => void keep({ chosen: showing, own: [] }, t('settingsPanel.ownThemes.saved', { name: themeChoiceName(showing) }), false)}>
             {word('settingsPanel.ownThemes.startAgain')}
           </button>
@@ -181,11 +172,9 @@ export function OwnThemesPanel() {
       {css}
       <div className="owth">
         <h3 className="owth-heading">{t('settingsPanel.ownThemes.looks')}</h3>
-        <p className="owth-says">{t('settingsPanel.ownThemes.looksAreNotCopied')}</p>
         <ul className="owth-list">{LOOKS.map((id) => row(id, themeChoiceName(id), {}, null))}</ul>
 
         <h3 className="owth-heading">{t('settingsPanel.ownThemes.shipped')}</h3>
-        <p className="owth-says">{t('settingsPanel.ownThemes.shippedIsCopyOnly')}</p>
         <ul className="owth-list">
           {THEMES.map((theme) => {
             const name = themeName(theme, wordLanguage())
@@ -195,7 +184,7 @@ export function OwnThemesPanel() {
 
         <h3 className="owth-heading">{t('settingsPanel.ownThemes.own')}</h3>
         <p className="owth-says">
-          {look.own.length === 0 ? t('settingsPanel.ownThemes.noneYet') : t('settingsPanel.ownThemes.howMany', { n: look.own.length, most: MOST_OWN_THEMES })}
+          {look.own.length === 0 ? t('absence.none') : t('settingsPanel.ownThemes.howMany', { n: look.own.length, most: MOST_OWN_THEMES })}
         </p>
         {look.own.length === 0 ? null : (
           <ul className="owth-list">
@@ -323,7 +312,7 @@ function Editor({ saved, busy, said, save, rename, remove }: {
           {EDIT_GROUPS.map((group) => (
             <details key={group} className="owth-group" data-group={group}>
               <summary>
-                <span className="owth-group-name">{t(GROUP_NAMES[group])}</span> <span className="owth-says">{t(GROUP_SAYS[group])}</span>
+                <span className="owth-group-name">{t(GROUP_NAMES[group])}</span>
               </summary>
               <div className="owth-values">
                 {NAMES_IN_EACH_GROUP[group].map((one) => (
@@ -377,7 +366,6 @@ function ValueRow({ name, value, busy, change }: { name: StyleName; value: strin
 function Preview({ values }: { values: Readonly<Record<StyleName, string>> }) {
   return (
     <div className="owth-preview" style={asStyle(values)} role="group" aria-label={t('settingsPanel.ownThemes.preview')}>
-      <p className="owth-preview-says">{t('settingsPanel.ownThemes.previewSays')}</p>
       <div className="owth-preview-panel">
         <p className="owth-preview-heading">{t('settingsPanel.ownThemes.previewHeading')}</p>
         <p className="owth-preview-body">{t('settingsPanel.ownThemes.previewBody')}</p>
@@ -421,7 +409,7 @@ function Check({ theme }: { theme: OwnTheme }) {
         <p className="owth-passes">{t('settingsPanel.ownThemes.checkPasses', { all })}</p>
       ) : (
         <>
-          <p className="owth-fails">{t('settingsPanel.ownThemes.checkFails', { failing: answer.failing.length, all })}</p>
+          <p className="owth-fails">{t('settingsPanel.ownThemes.checkFailsCount', { failing: answer.failing.length, all })}</p>
           <ul className="owth-pairs">
             {answer.failing.map((failing) => {
               const { measurement } = failing
@@ -503,7 +491,6 @@ const OWN_THEMES_CSS = `
 .owth-well { width: 32px; height: 24px; padding: 0; border: 1px solid var(--border); background: none; flex: none; }
 .owth-unsaved { color: var(--text-2); }
 .owth-preview { padding: 10px; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; font-family: var(--font-sans); }
-.owth-preview-says { margin: 0 0 6px; font-size: var(--fs-1); color: var(--text-3); }
 .owth-preview-panel { padding: 10px; background: var(--panel); border: var(--border-w) solid var(--border); border-radius: var(--look-radius); box-shadow: var(--elev-1); }
 .owth-preview-panel p { margin: 0 0 6px; }
 .owth-preview-heading { font-family: var(--font-head); font-weight: var(--heading-weight); color: var(--panel-head-ink); font-size: var(--fs-3); }
@@ -522,5 +509,4 @@ const OWN_THEMES_CSS = `
 .owth-pair[data-passes="false"] { padding: 4px 6px; border-left: 3px solid var(--st-failed); background: var(--st-failed-bg); }
 .owth-pair-mark { flex: none; width: 32px; text-align: center; border: 1px solid var(--border); border-radius: 3px; font-weight: 600; }
 .owth-passing > summary { cursor: pointer; color: var(--text-2); }
-.owth-why { margin: 0; padding-left: 1.2em; color: var(--text); }
 `

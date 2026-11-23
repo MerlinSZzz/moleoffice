@@ -39,6 +39,15 @@ function theTrimmedPart(body: string, part: AMarkedPart, from: number, to: numbe
 }
 
 /**
+ * THE WORDS A SELECTION CHOSE: the selected run, in either direction and inside the body, trimmed of the spaces at
+ * either end. Null when the selection holds no word. Marking and unmarking take their run from here, and so does the
+ * cursor the box is given back after a flag is chosen.
+ */
+export function theChosenRun(body: string, from: number, to: number): CharacterRun | null {
+  return trimmed(body, Math.max(0, Math.min(from, to)), Math.min(body.length, Math.max(from, to)))
+}
+
+/**
  * MARK THE SELECTED WORDS WITH ONE FLAG, cutting back every part the new run overlaps and splitting a part the run
  * lands inside. The new part is the selected run trimmed of the spaces at either end. Null when the selection holds no
  * word a person can see, which is what a selection of spaces is.
@@ -51,7 +60,7 @@ export function markedPartsOverTheChosenWords(
   flag: AFlagToMarkWith,
   mintId: () => string,
 ): AMarkedPart[] | null {
-  const held = trimmed(body, Math.max(0, Math.min(from, to)), Math.min(body.length, Math.max(from, to)))
+  const held = theChosenRun(body, from, to)
   if (held === null) return null
   const kept: AMarkedPart[] = []
   for (const part of parts) {
@@ -82,7 +91,7 @@ export function unmarkedOverTheChosenWords(
   to: number,
   parts: readonly AMarkedPart[],
 ): AMarkedPart[] {
-  const held = trimmed(body, Math.max(0, Math.min(from, to)), Math.min(body.length, Math.max(from, to)))
+  const held = theChosenRun(body, from, to)
   if (held === null) return [...parts]
   const kept: AMarkedPart[] = []
   for (const part of parts) {

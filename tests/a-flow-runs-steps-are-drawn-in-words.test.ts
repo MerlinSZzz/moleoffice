@@ -47,6 +47,15 @@
  * WAVE 13X ROUND 1, problem 9ins56T_7GC5: the office's own why for a step somebody did by hand was written inline in
  * the server writer, so the page could not tell it from a person's words and drew it in English on a Chinese page.
  *  13. whyByHand draws the constant as it was written again → the by-hand-why case red in Chinese.
+ *
+ * LINE 13R, A FLOW RUN WHOSE START SEVERAL FLOWS LIST: the office stores a sentence naming the start and the flows, and
+ * the panel used to draw the stock "This run named no flow." for it. A reader in src/shared/flow-run.ts reads the
+ * sentence back into its start and sorted flow ids. The panel draws the start, the count and a link to each flow by its
+ * title, in the reader's language; a noFlow value the reader cannot read is drawn as it was written.
+ *  14. the panel draws flowRunSteps.noFlowNamed for the several-flows sentence → the several-flows cases red.
+ *  15. the reader accepts a sentence whose start is not a starting event → the reader's null case red.
+ *  16. an unreadable noFlow text is drawn as flowRunSteps.noFlowNamed → the unreadable case red.
+ *  17. the links are left out → the several-flows cases red.
  */
 import { createElement as h } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
@@ -55,7 +64,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 // The page component asks for the office's id, and a page with no server behind it cannot read it: the
 // test office's page module registers the test office's id.
 import './a-page-of-a-test-office.ts'
-import { FLOW_RUN_KIND, NO_FLOW_NAMED, OFFICE_STEP_DOES, OFFICE_STEP_DONE_BY_HAND_WHY, OFFICE_STEP_ENDED_RESULT, OFFICE_STEP_LANDED_COMMIT, OFFICE_STEP_LANDED_NO_REASON, OFFICE_STEP_SEALED_TIP, OFFICE_STEP_SUPERSEDED_BY, OFFICE_STEP_VERDICT_REFUSED_STATUS } from '../src/shared/flow-run.ts'
+import { FLOW_RUN_KIND, FLOW_STARTING_EVENTS, NO_FLOW_NAMED, OFFICE_STEP_DOES, OFFICE_STEP_DONE_BY_HAND_WHY, OFFICE_STEP_ENDED_RESULT, OFFICE_STEP_LANDED_COMMIT, OFFICE_STEP_LANDED_NO_REASON, OFFICE_STEP_SEALED_TIP, OFFICE_STEP_SUPERSEDED_BY, OFFICE_STEP_VERDICT_REFUSED_STATUS, noFlowSeveralListTheStart, theStartAndFlowsOfANoFlowSentence } from '../src/shared/flow-run.ts'
 import { chineseWords, englishWords } from '../src/shared/words/joined.ts'
 import type { PanelRecord } from '../src/shared/types.ts'
 import type { ParticipantsReply } from '../src/web/api.ts'
@@ -66,6 +75,7 @@ type Mode = typeof import('../src/web/lib/mode.ts')
 let shown: StepsModule
 let i18n: I18n
 let mode: Mode
+let recordPath: typeof import('../src/web/components/router.tsx')['recordPath']
 let en: Record<string, string>
 let zh: Record<string, string>
 
@@ -80,6 +90,7 @@ beforeAll(async () => {
   shown = await import('../src/web/components/FlowRunSteps.tsx')
   i18n = await import('../src/shared/i18n.ts')
   mode = await import('../src/web/lib/mode.ts')
+  ;({ recordPath } = await import('../src/web/components/router.tsx'))
   en = (await import('../src/shared/words/en.ts')).en as unknown as Record<string, string>
   zh = (await import('../src/shared/words/zh.ts')).zh as unknown as Record<string, string>
 })
@@ -264,6 +275,69 @@ describe("a flow run's steps on its page", () => {
       expect(markup, language).toMatch(new RegExp(`<span style="white-space:nowrap"><a [^>]*>${open}</a></span>`))
     }
     i18n.setWordLanguage('en')
+  })
+
+  it('reads the several-flows sentence back into its start and its sorted flows', () => {
+    for (const start of FLOW_STARTING_EVENTS) {
+      const two = ['synthetic-flow-b', 'synthetic-flow-a']
+      expect(theStartAndFlowsOfANoFlowSentence(noFlowSeveralListTheStart(start, two))).toEqual({
+        start,
+        flows: ['synthetic-flow-a', 'synthetic-flow-b'],
+      })
+      const three = ['synthetic-flow-c', 'synthetic-flow-a', 'synthetic-flow-b']
+      expect(theStartAndFlowsOfANoFlowSentence(noFlowSeveralListTheStart(start, three))).toEqual({
+        start,
+        flows: ['synthetic-flow-a', 'synthetic-flow-b', 'synthetic-flow-c'],
+      })
+    }
+    const aStart = FLOW_STARTING_EVENTS[0]
+    const notAStartingEvent = noFlowSeveralListTheStart(aStart, ['synthetic-flow-b', 'synthetic-flow-a']).replace(
+      aStart,
+      'a made-up start',
+    )
+    for (const unreadable of [NO_FLOW_NAMED, '', notAStartingEvent, null, 42, {}]) {
+      expect(theStartAndFlowsOfANoFlowSentence(unreadable), String(unreadable)).toBeNull()
+    }
+  })
+
+  it('names the flows that listed a run\'s start, with one link per flow, in both languages', () => {
+    const theCheckStart = FLOW_STARTING_EVENTS.find((one) => one.includes('check'))!
+    const flows = ['synthetic-flow-b', 'synthetic-flow-a']
+    const record = aRecord({
+      run: 'synthetic-run',
+      noFlow: noFlowSeveralListTheStart(theCheckStart, flows),
+      stepsTaken: [],
+    })
+    const sentence = (words: Record<string, string>): string => {
+      const template = words['flowRunSteps.severalFlowsListTheStart']
+      const startWord = words[`record.option.flow_run.startedAs.${theCheckStart.replaceAll(' ', '_')}`]
+      expect(template, 'the several-flows word').toEqual(expect.any(String))
+      expect(startWord, 'the start word').toEqual(expect.any(String))
+      return template!.replace('{start}', startWord!).replace('{count}', '2')
+    }
+
+    for (const language of ['en', 'zh'] as const) {
+      i18n.setWordLanguage(language)
+      const words = (language === 'en' ? englishWords() : chineseWords()) as unknown as Record<string, string>
+      const expected = sentence(words)
+      const markup = renderToStaticMarkup(h(shown.FlowRunSteps, { record, participants: PARTICIPANTS }))
+      const text = markup.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+      expect(text, language).toContain(expected)
+      expect(text.replace(expected, ''), language).not.toContain(words['flowRunSteps.noFlowNamed'])
+      for (const id of flows) expect(markup, language).toContain(`href="#${recordPath(id)}"`)
+    }
+    i18n.setWordLanguage('en')
+  })
+
+  it('draws a noFlow value the reader cannot read as it was written', () => {
+    const written = 'A made-up sentence that no office wrote.'
+    i18n.setWordLanguage('en')
+    const words = englishWords() as unknown as Record<string, string>
+    const text = drawn(aRecord({ run: 'synthetic-run', noFlow: written, stepsTaken: [] }))
+    expect(text).toContain(written)
+    expect(text, 'the stock no-flow sentence was drawn for a sentence the office wrote').not.toContain(
+      words['flowRunSteps.noFlowNamed'],
+    )
   })
 
   it('draws nothing on a record that is not a flow run', () => {

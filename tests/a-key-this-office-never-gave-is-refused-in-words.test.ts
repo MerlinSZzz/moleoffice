@@ -23,8 +23,10 @@
  * and it is answered as it was before this file.
  *
  * WHAT IS NOT A KEY THIS OFFICE NEVER GAVE, and is answered as before: a key the office gave and then
- * revoked, a waiting credential's token, a key in the cookie, a request no listener carried, and any key in
- * a test world, which is a copy of the office with its key rows emptied.
+ * revoked, a waiting credential's token, a key in the old cookie, a request no listener carried, and any key in
+ * a test world, which is a copy of the office with its key rows emptied. The old cookie is no key at all: a browser now
+ * proves itself with two halves, a cookie half and a header half, and a key joined from two halves is checked as a key
+ * in the header is.
  *
  * Every key here is made up, or is the one this scratch office's registration answered. None is printed.
  *
@@ -35,13 +37,14 @@
  * (a) In `refuseAKeyThisOfficeNeverGave`, return at the top. (a) and (e) go red.
  * (b) In the same function, throw the refusal with the key appended to its words. (a) and (e) go red.
  * (c) In `theHashOfAHeaderKeyNoKeyFileOrRowHolds`, ask `heldKeyByHash` for the row. (h) goes red.
- * (d) In the same function, read the key from the cookie as well as the header. (j) goes red.
+ * (d) In the same function, read the key from the old cookie as well as the header. (j) goes red.
  * (e) In `refuseAKeyThisOfficeNeverGave`, delete the waiting credential's return. (i) goes red.
  * (f) In the same function, delete `if (arrivalOf(req) === undefined) return`. (k) goes red.
  * (g) In the same function, delete the test world's return. (l) goes red.
  * (h) In `theHashOfAHeaderKeyNoKeyFileOrRowHolds`, delete the key file's return. (d) and (f) go red.
  * (i) In the same function, answer the hash whatever the rows hold. (c), (g) and (h) go red.
  * (j) In the same function, answer a hash for a request with no key header. (b), (f) and (j) go red.
+ * (m) In the same function, read the header key only, and not the key the two halves join to. (e2) goes red.
  */
 
 import { randomBytes } from 'node:crypto'
@@ -54,13 +57,16 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { THE_TEST_OFFICES_OWNER } from './a-page-of-a-test-office.ts'
 import { apiApp, freshDb, type TestDb } from './helpers.ts'
 import { forgetTheWorldsOwnAuthority } from '../src/server/lib/worldauthority.ts'
-import { KEY_COOKIE, KEY_HEADER } from '../src/config/key-header.mjs'
+import { DEVICE_HALF_COOKIE, DEVICE_HALF_HEADER, KEY_COOKIE, KEY_HEADER } from '../src/config/key-header.mjs'
 
 /** Made-up values. Nothing here is, or was ever, a key any office issued. */
 const A_MADE_UP_PERSON_KEY = randomBytes(32).toString('hex')
 const A_MADE_UP_OFFICE_KEY = randomBytes(32).toString('hex')
 const A_KEY_NO_OFFICE_GAVE = 'made-up-key-no-office-ever-gave'
 const A_KEY_GIVEN_AND_REVOKED = 'made-up-key-given-and-then-revoked'
+/** Two made-up halves. The key they join to was never given by any office. */
+const A_COOKIE_HALF_NO_OFFICE_GAVE = 'made-up-cookie-half-no-office-gave'
+const A_HEADER_HALF_NO_OFFICE_GAVE = 'made-up-header-half-no-office-gave'
 
 const WORKER = 'a-worker-with-its-own-key'
 
@@ -185,6 +191,16 @@ describe('once the key window is closed', () => {
     const title = 'A keyed note after the close'
     expect(await writeANote(title, { ...THE_WORKER, [KEY_HEADER]: theWorkersKey })).toEqual({ status: 201, error: '', written: 1 })
   })
+
+  it('(e2) refuses a write with two halves whose joined key this office never gave, in the same words, and writes nothing', async () => {
+    const title = 'A note with two halves no office gave'
+    const answer = await writeANote(title, {
+      ...THE_WORKER,
+      cookie: `${DEVICE_HALF_COOKIE}=${A_COOKIE_HALF_NO_OFFICE_GAVE}`,
+      [DEVICE_HALF_HEADER]: A_HEADER_HALF_NO_OFFICE_GAVE,
+    })
+    expect(answer).toEqual({ status: 401, error: await theRefusal(), written: 0 })
+  })
 })
 
 describe('what is not a key this office never gave is answered as before', () => {
@@ -200,8 +216,8 @@ describe('what is not a key this office never gave is answered as before', () =>
     expect(await refusedAsNeverGiven(answer), answer.error).toBe(false)
   })
 
-  it('(j) a key this office never gave, in the cookie, which a browser cannot take back', async () => {
-    const answer = await writeANote('A note with a wrong key in the cookie', { ...THE_WORKER, cookie: `${KEY_COOKIE}=${A_KEY_NO_OFFICE_GAVE}` })
+  it('(j) a key this office never gave, in the old cookie, which is no key any more and is not read', async () => {
+    const answer = await writeANote('A note with a wrong key in the old cookie', { ...THE_WORKER, cookie: `${KEY_COOKIE}=${A_KEY_NO_OFFICE_GAVE}` })
     expect(await refusedAsNeverGiven(answer), answer.error).toBe(false)
   })
 

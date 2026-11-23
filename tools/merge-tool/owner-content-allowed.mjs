@@ -347,6 +347,22 @@ export const NEW_FILES_THAT_MAY_SHIP = Object.freeze([
     why: "A picture of a made-up office that the getting-started report carries, taken by tests/the-first-entry-shows-the-way-in.test.ts. It shows no person's or agent's own content.",
   },
   {
+    file: 'public/getting-started/en/right-click-box.png',
+    why: "A picture of a made-up office that the getting-started report carries, taken by tests/the-first-entry-shows-the-way-in.test.ts. It shows no person's or agent's own content.",
+  },
+  {
+    file: 'public/getting-started/zh/the-embassy-in-the-list.png',
+    why: "A picture of a made-up office that the getting-started report carries, taken by tests/the-first-entry-shows-the-way-in.test.ts. It shows no person's or agent's own content.",
+  },
+  {
+    file: 'public/getting-started/zh/an-agent-asking-at-the-embassy.png',
+    why: "A picture of a made-up office that the getting-started report carries, taken by tests/the-first-entry-shows-the-way-in.test.ts. It shows no person's or agent's own content.",
+  },
+  {
+    file: 'public/getting-started/zh/right-click-box.png',
+    why: "A picture of a made-up office that the getting-started report carries, taken by tests/the-first-entry-shows-the-way-in.test.ts. It shows no person's or agent's own content.",
+  },
+  {
     file: 'public/mole-loading/mole.svg',
     why: "The loading mole that the page shows while the office starts, drawn in vector shapes from the owner's logo and moved by public/mole-loading/player.js from src/web/index.html. It is a drawing and holds no person's or agent's own content.",
   },

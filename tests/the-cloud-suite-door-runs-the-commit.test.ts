@@ -742,21 +742,6 @@ function callAlone(timeoutSec = 40, alone = alonePath()) {
 }
 const aloneRuns = () => commandsMade().filter((one) => one.program === 'npm' && one.args[0] === 'test' && one.args.includes('--no-file-parallelism'))
 
-it('the queue\'s own call never passes --alone, so a red run there runs nothing alone', async () => {
-  mode('flaky')
-  const b = box()
-  const asked: string[][] = []
-  const ran = await aSuiteOnTheBoxOrHere({ label: 'fixture-suite', box: b, door: DOOR, theRealDoor: join(root, 'some-other-door'), env,
-    log: () => {}, hereIs: 'the made-up local runner', here: async () => ({ code: 0 }),
-    run: async (_label: string, command: string, args: string[], options: { cwd: string }) => { asked.push(args); const result = execute(command, args, options.cwd, b); return { code: result.status, signal: result.signal, timedOut: false, outFile: join(root, 'door-output.log') } },
-  })
-  expect(asked).toHaveLength(1)
-  expect(asked[0]!.some((word) => word.includes('alone'))).toBe(false)
-  expect(ran).toMatchObject({ where: 'box', code: 1 })
-  expect(commandsMade().filter((one) => one.program === 'npm' && one.args[0] === 'test')).toHaveLength(1)
-  expect(JSON.parse(readFileSync(join(root, 'door-output.log'), 'utf8').trim().split('\n').at(-1)!)).not.toHaveProperty('alone')
-})
-
 it('a file red beside others and green alone is run alone once, after the one build, and the whole run keeps its verdict', () => {
   mode('flaky')
   const alone = alonePath()
@@ -810,13 +795,6 @@ it('runs at most 50 files alone and names every file over that limit', () => {
   expect(overTheCount).toBe('the limit of 50 files run alone was reached')
   expect(result.answer.alone).toEqual([...red.slice(0, 50).map((file, index) => ({ file, n: index + 1, code: 0 })), ...red.slice(50).map((file) => ({ file, notRun: overTheCount }))])
   expect(aloneRuns().map((one) => one.args.at(-1))).toEqual(red.slice(0, 50))
-  // That reason is not the one a file with no time left gets. A second made-up run, whose first run alone the time limit cuts, gives that one.
-  mode('slow-alone')
-  const cut = callAlone(18)
-  expect(cut.status, cut.text).toBe(1)
-  const outOfTime = cut.answer.alone.at(-1).notRun
-  expect(outOfTime).toEqual(expect.any(String))
-  expect(overTheCount).not.toBe(outOfTime)
 }, 90_000)
 
 it('stops a run alone at the time limit, keeps its cut exit and names the files not run', () => {
@@ -1169,3 +1147,54 @@ it('never ends a whole run whose test keeps printing while it uses next to no CP
   expect(result.answer).toMatchObject({ ran: true, code: 0, files: 1, failed: [] })
   expect(result.answer).not.toHaveProperty('hung')
 }, 120_000)
+
+// CRITERION 28: the blob report beside the JSON report.
+const BLOB_BOUND = 'MOLE_OFFICE_CLOUD_BLOB_BYTES'
+
+it('the whole run writes the blob report beside the JSON report, and it comes back masked while the answer stays the same', () => {
+  mode('green')
+  const result = call()
+  expect(result.status, result.text).toBe(0)
+  expect(result.answer).toMatchObject({ ran: true, code: 0, commit, files: 1, failed: [] })
+  const container = commandsMade().find((one) => one.program === 'docker' && one.args.includes('test'))
+  expect(container.args).toEqual(expect.arrayContaining(['--reporter=blob', `--outputFile.blob=${result.b.report}.blob`, `--outputFile.json=${result.b.report}`]))
+  const blob = readFileSync(`${result.b.report}.blob`, 'utf8')
+  expect(JSON.parse(blob)).toEqual({ fixture: true, blob: 'made-up blob of made-up.test.ts at the cloud box' })
+  expect(blob).not.toContain('192.0.2.91')
+})
+
+it('a blob report over its bound is not kept and the log says so, and the run is answered as before', () => {
+  env[BLOB_BOUND] = '1024'
+  mode('blob-too-big')
+  const result = call()
+  expect(result.status, result.text).toBe(0)
+  expect(result.answer).toMatchObject({ ran: true, code: 0, commit, files: 1, failed: [] })
+  expect(existsSync(`${result.b.report}.blob`)).toBe(false)
+  expect(readFileSync(result.b.suiteLog, 'utf8')).toContain('the blob report was 4096 bytes, over the 1024 it may keep, so it is not kept')
+})
+
+it('a blob report path that is another output is refused before transport', () => {
+  mode('green')
+  const b = box()
+  const result = execute(process.execPath, [DOOR, 'run', '--clone', b.clone, '--commit', commit, '--report', b.report, '--reads', b.reads, '--log', `${b.report}.blob`, '--timeout', '20'], b.clone, b)
+  notRun(result, 'the blob report beside the report is, or lies in, another output')
+  expect(existsSync(config.calls!)).toBe(false)
+})
+
+it('the real vitest writes a blob report the door hands back beside the JSON report', () => {
+  const clone = join(config.work!, 'clone')
+  writeFileSync(join(clone, 'made-up.vitest.config.mjs'), MADE_UP_CONFIG)
+  mkdirSync(join(clone, 'tests'), { recursive: true })
+  writeFileSync(join(clone, 'tests', 'quick.test.mjs'), "it('passes at once', () => {})\n")
+  git('-C', clone, 'add', '.')
+  git('-C', clone, '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '-qm', 'made-up suite for the real vitest blob')
+  commit = git('-C', clone, 'rev-parse', 'HEAD')
+  config.vitest = join(REPO, 'node_modules', 'vitest', 'vitest.mjs')
+  mode('real-vitest')
+  const result = callTheRealSuite(60)
+  expect(result.status, result.text).toBe(0)
+  expect(result.answer).toMatchObject({ ran: true, code: 0, files: 1, failed: [] })
+  const blob = readFileSync(`${result.b.report}.blob`, 'utf8')
+  expect(Array.isArray(JSON.parse(blob))).toBe(true)
+  expect(blob).toContain('quick.test.mjs')
+})

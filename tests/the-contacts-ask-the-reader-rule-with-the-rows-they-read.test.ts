@@ -91,9 +91,16 @@ it("answers an agent's contacts as the reader's rule asked alone does, reading n
   expect(mayRead.map((one) => one.id)).not.toContain(notMine)
 
   const contacts = traced(() => theContactsOfOneReader(me, reader))
-  expect(contacts.answer.pool).toEqual(mayRead)
+  // EACH POOL ENTRY HOLDS ONLY THE FIELDS THE CONTACTS READ, so after the ids in order it is compared with the same whole
+  // entry cut to its own keys, a routed entry's symbol among them.
+  const cutTo = (entry: object, keysOf: object): object => Object.fromEntries(Reflect.ownKeys(keysOf).map((key) => [key, Reflect.get(entry, key)]))
+  const pool = contacts.answer.pool
+  expect(pool.map((one) => one.id)).toEqual(mayRead.map((one) => one.id))
+  expect(pool).toEqual(mayRead.map((one, i) => cutTo(one, pool[i] ?? {})))
   expect(contacts.answer.contacts).toEqual(contactsFor(me, registered, EVERY_PROJECT, mayRead, everyAgentById()))
-  expect(theContactsOfOneReader(me).pool, 'with no reader every message of the part is used').toEqual(whole)
+  const withNoReader = theContactsOfOneReader(me).pool
+  expect(withNoReader.map((one) => one.id), 'with no reader every message of the part is used').toEqual(whole.map((one) => one.id))
+  expect(withNoReader).toEqual(whole.map((one, i) => cutTo(one, withNoReader[i] ?? {})))
 
   const theRulesOwnRead = new Set(traced(() => thePartiesOfMany(['no record has this id'])).ran.map(asOneRead))
   const theDeliveryRead = new Set(traced(() => theDeliveryRowsOf([sent], me)).ran.map(asOneRead))

@@ -1,7 +1,7 @@
 // Copyright © 2026 Zhengyang Shen
 // Licensed under the MIT License. See LICENSE.
 import { useState } from 'react'
-import { content, t } from '@shared/i18n.ts'
+import { t } from '@shared/i18n.ts'
 import { isMoleOffice } from '@shared/participants.ts'
 import { THE_PERSON } from '@shared/person.ts'
 import type { AStarterChange, AStarterMove, WhoAnswersForAnAgent } from '@shared/agent-starter.ts'
@@ -9,6 +9,7 @@ import { ApiError, moleOfficeRequest } from '../api.ts'
 import { useLanguage } from '../lib/language.ts'
 import { readParticipantsOnce } from '../lib/oneread.ts'
 import { Btn, ErrorNote, Loading, Panel, drawnDayWithTime, theRefusalInWords } from './ui.tsx'
+import { AgentPicker } from './agent/AgentPicker.tsx'
 import { useProjectAsync } from '../lib/project-async.ts'
 
 export function starterPressBody(to?: string, because?: string, atOnce = false): { withdraw: true } | { to: string; because: string; atOnce?: true } {
@@ -59,7 +60,7 @@ export function AgentStarterMove({ agentId }: { agentId: string }): React.ReactE
     <style href="mole-office-starter-move" precedence="default">{`
       .starter-line { margin: .45rem 0; overflow-wrap: anywhere; }
       .starter-field { display: flex; flex-direction: column; gap: .25rem; margin: .6rem 0; }
-      .starter-field input, .starter-field select, .starter-field textarea { max-width: 32rem; width: 100%; box-sizing: border-box; }
+      .starter-field input, .starter-field textarea { max-width: 32rem; width: 100%; box-sizing: border-box; }
       .starter-actions { display: flex; flex-wrap: wrap; gap: .5rem; margin: .6rem 0; }
     `}</style>
     {reading.status === 'loading' ? <Loading what={t('starterMove.title')} rows={1} /> : reading.status === 'error' ? <ErrorNote message={reading.message} fault={reading.fault} label={t('starterMove.title')} retry={refresh} /> : <>
@@ -74,11 +75,19 @@ export function AgentStarterMove({ agentId }: { agentId: string }): React.ReactE
         </div>
       </> : !open ? <div className="starter-actions"><Btn onClick={() => setOpen(true)}>{t('starterMove.change')}</Btn></div> : <>
         {participants.status === 'loading' ? <Loading what={t('starterMove.to')} rows={1} /> : participants.status === 'error' ? <ErrorNote message={participants.message} fault={participants.fault} label={t('starterMove.to')} retry={refreshParticipants} /> : <>
-          <label className="starter-field">{t('starterMove.to')}<select value={to} onChange={(e) => { setTo(e.target.value); setPreview(null) }}>
-            <option value="">{t('starterMove.choose')}</option>
-            <option value={THE_PERSON}>{t('starterMove.person')}</option>
-            {participants.value.agents.filter((one) => !one.retired && one.id !== agentId && !isMoleOffice({ kind: 'agent', id: one.id }) && one.id !== currentStarterId).sort((a, b) => a.name.localeCompare(b.name)).map((one) => <option key={one.id} value={one.id}>{content(one.name)} ({one.handle})</option>)}
-          </select></label>
+          {/* NO RETIRED AGENT IS OFFERED: the starter door refuses one, so the picker's press that shows them is not drawn. */}
+          <AgentPicker
+            className="starter-field"
+            label={t('starterMove.to')}
+            candidates={[
+              { kind: 'person', id: THE_PERSON, name: t('starterMove.person') },
+              ...participants.value.agents
+                .filter((one) => !one.retired && one.id !== agentId && !isMoleOffice({ kind: 'agent', id: one.id }) && one.id !== currentStarterId)
+                .map((one) => ({ kind: 'agent' as const, id: one.id })),
+            ]}
+            chosen={to}
+            onChoose={(value) => { setTo(value); setPreview(null) }}
+          />
           <div className="starter-actions"><Btn disabled={!to.trim()} reason={t('starterMove.nameRequired')} pending={busy} onClick={() => void readPreview()}>{t('starterMove.preview')}</Btn></div>
         </>}
         {preview && <>

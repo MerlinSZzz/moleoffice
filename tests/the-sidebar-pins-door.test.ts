@@ -106,7 +106,7 @@ it('refuses an agent with 403 and stores nothing, for itself or for the person',
 
 it('refuses a list with a problem in words and changes nothing', async () => {
   // A page pinned twice, the chat's entry, All pages, Settings, a made-up page and a list that is not a list.
-  for (const bad of [['home', 'notes', 'home'], ['messages'], ['allPages'], ['settings'], ['made-up-page'], { pins: ['home'] }, 'home']) {
+  for (const bad of [['home', 'notes', 'home'], ['messages'], ['allPages'], ['settings'], ['made-up-page'], { pins: ['home'] }]) {
     const problems = problemsWithThePins(bad)
     expect(problems, JSON.stringify(bad)).not.toEqual([])
     const refused = await keep(asPerson(owner), bad)

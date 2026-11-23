@@ -5,13 +5,15 @@
  *
  * Every agent, alias and value here is made up, in a throwaway office.
  *
- * MUTATIONS, after a control run, for the three positions read as a stamp behind their pair and the two short-form
- * positions kept as actor pairs. All four are in identity-positions.ts. Give BundleExporter.actorId back its actor-pair
- * parse, and the map-key case and the freed-handle case go red. Leave BundleExporter.actorId a stamp with no pair, and
- * two cases go red: the map-key case, because a human exporter and an exporter with no type are read, and the case that
- * blocks a change row whose path or kind cannot be typed, because a change to the exporter's id alone is read with no
- * type beside it. Give SessionOpenedBy.id back its actor-pair parse, and the freed-handle case goes red. Read
- * ShortForm.by as a stamp, and the old-system-name case goes red. The other cases name no mutation here.
+ * MUTATIONS, after a control run, for the five positions read as a stamp behind their pair and for the office's old
+ * system name in a short form's writer. The first four are in identity-positions.ts. Give BundleExporter.actorId back
+ * its actor-pair parse, and the map-key case and the freed-handle case go red. Leave BundleExporter.actorId a stamp with
+ * no pair, and two cases go red: the map-key case, because a human exporter and an exporter with no type are read, and
+ * the case that blocks a change row whose path or kind cannot be typed, because a change to the exporter's id alone is
+ * read with no type beside it. Give SessionOpenedBy.id back its actor-pair parse, and the freed-handle case goes red.
+ * Give ShortForm.by or ReportParts.by back its actor-pair parse, and the freed-handle short-form case and the
+ * old-system-name case go red. The last is in historical-reader.ts: read a short form's writer stored under the old
+ * system name as any other stamp, and the old-system-name case goes red. The other cases name no mutation here.
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { type DeclaredType } from '../src/shared/kinds.ts'
@@ -33,6 +35,16 @@ function reaches(node: DeclaredType, name: string): boolean {
   if (node.kind === 'array' || node.kind === 'record') return reaches(node.of, name)
   if (node.kind === 'either') return node.options.some(option => reaches(option.node, name))
   return false
+}
+/** A retired agent whose id is also the handle of a newer, live agent. Returns that string. */
+function aFreedHandle(): string {
+  const db = t.client.sqlite, freed = 'synthetic-freed', at = '2026-01-01 00:00:00'
+  const asset = db.prepare('INSERT INTO assets (id, kind, origin, mime, created_at) VALUES (?, ?, ?, ?, ?)')
+  for (const id of ['synthetic-asset-c', 'synthetic-asset-d']) asset.run(id, 'avatar', 'default', 'image/svg+xml', at)
+  const insert = db.prepare('INSERT INTO agents (id, name, handle, avatar_asset_id, created_at, retired) VALUES (?, ?, ?, ?, ?, ?)')
+  insert.run(freed, 'Synthetic legacy', freed, 'synthetic-asset-c', at, 1)
+  insert.run('SyntheticMint1', 'Synthetic minted', freed, 'synthetic-asset-d', '2026-01-03 00:00:00', 0)
+  return freed
 }
 function holdsAnOpenBag(node: DeclaredType): boolean {
   if (node.kind === 'open') return true
@@ -104,12 +116,7 @@ describe('reading the identities in one record', () => {
     expect(pressed(alias)).toEqual({ found: [], blocks: [{ path, reason: 'cannot-tell', why: expect.any(String) }] })
   })
   it('blocks the exporter, the agent asked to check and a run\'s opener where a retired agent\'s id is a minted agent\'s handle', async () => {
-    const db = t.client.sqlite, freed = 'synthetic-freed', at = '2026-01-01 00:00:00'
-    const asset = db.prepare('INSERT INTO assets (id, kind, origin, mime, created_at) VALUES (?, ?, ?, ?, ?)')
-    for (const id of ['synthetic-asset-c', 'synthetic-asset-d']) asset.run(id, 'avatar', 'default', 'image/svg+xml', at)
-    const insert = db.prepare('INSERT INTO agents (id, name, handle, avatar_asset_id, created_at, retired) VALUES (?, ?, ?, ?, ?, ?)')
-    insert.run(freed, 'Synthetic legacy', freed, 'synthetic-asset-c', at, 1)
-    insert.run('SyntheticMint1', 'Synthetic minted', freed, 'synthetic-asset-d', '2026-01-03 00:00:00', 0)
+    const db = t.client.sqlite, freed = aFreedHandle(), at = '2026-01-01 00:00:00'
     const { theAgentsAStampCouldName } = await import('../src/server/lib/registry-aliases/stamps.ts')
     expect([...theAgentsAStampCouldName(db, freed)].sort()).toEqual(['SyntheticMint1', freed].sort())
     const { readRecordIdentities } = await reader()
@@ -118,7 +125,19 @@ describe('reading the identities in one record', () => {
     expect(readRecordIdentities(db, 'session', { checkAlso: { items: ['Synthetic question'], by: { actorType: 'agent', actorId: freed }, at } })).toEqual(cannotTell('data.checkAlso.by.actorId'))
     expect(readRecordIdentities(db, 'session', { extra: { openedBy: { type: 'agent', id: freed } } })).toEqual(cannotTell('data.extra.openedBy.id'))
   })
-  it('reads a short form and report parts an agent wrote under the old system name as actor pairs, with no block', async () => {
+  it('blocks a short form and report parts whose writer is a handle a retired agent\'s id and a minted agent share', async () => {
+    const db = t.client.sqlite, freed = aFreedHandle(), at = '2026-01-01 00:00:00', madeFrom = { seq: 1, contentHash: 'synthetic' }
+    const { readRecordIdentities } = await reader()
+    const shortForms = { label: { text: 'Synthetic label', madeFrom, writtenBy: 'agent', at, by: freed }, parts: { madeFrom, writtenBy: 'agent', at, by: freed, parts: [] } }
+    expect(readRecordIdentities(db, 'report', { shortForms })).toEqual({
+      found: [],
+      blocks: [
+        { path: 'data.shortForms.label.by', reason: 'cannot-tell', why: expect.any(String) },
+        { path: 'data.shortForms.parts.by', reason: 'cannot-tell', why: expect.any(String) },
+      ],
+    })
+  })
+  it('passes over a short form and report parts an agent wrote under the old system name, with no block', async () => {
     const db = t.client.sqlite, at = '2026-01-01 00:00:00', madeFrom = { seq: 1, contentHash: 'synthetic' }
     const { SYSTEM_ACTOR_IDS_RENAMED } = await import('../src/shared/renamed-words.ts')
     const oldName = SYSTEM_ACTOR_IDS_RENAMED[0]!.from
@@ -126,13 +145,7 @@ describe('reading the identities in one record', () => {
     expect(theAgentsAStampCouldName(db, oldName).size).toBe(0)
     const { readRecordIdentities } = await reader()
     const shortForms = { label: { text: 'Synthetic label', madeFrom, writtenBy: 'agent', at, by: oldName }, parts: { madeFrom, writtenBy: 'agent', at, by: oldName, parts: [] } }
-    expect(readRecordIdentities(db, 'report', { shortForms })).toEqual({
-      found: [
-        { path: 'data.shortForms.label.by', as: 'value', stored: oldName, canonical: oldName, site: 'ShortForm.by', parse: 'actor-pair' },
-        { path: 'data.shortForms.parts.by', as: 'value', stored: oldName, canonical: oldName, site: 'ReportParts.by', parse: 'actor-pair' },
-      ],
-      blocks: [],
-    })
+    expect(readRecordIdentities(db, 'report', { shortForms })).toEqual({ found: [], blocks: [] })
   })
   it('blocks instead of guessing, and never searches outside the declared types', async () => {
     await fileSyntheticAlias(t)

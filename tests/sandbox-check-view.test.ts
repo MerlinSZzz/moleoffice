@@ -200,7 +200,8 @@ describe('a private container view per check', () => {
     expect(readFileSync(started.descriptor.out, 'utf8')).toBe('own work\n')
   })
 
-  it.each([['none', 'none'], ['bridge', 'bridge'], ['default', 'bridge']])("passes no host name off the host's network, on %s, as before", async (mode, passed) => {
+  // None and bridge take the same branches, so bridge is not run here; default is, because docker is handed bridge for it.
+  it.each([['none', 'none'], ['default', 'bridge']])("passes no host name off the host's network, on %s, as before", async (mode, passed) => {
     onTheNetwork(mode)
     const started = await launch()
     await completed(started)

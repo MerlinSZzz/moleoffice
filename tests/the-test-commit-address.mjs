@@ -11,8 +11,7 @@
  * back to the default. Every merge tool test that lands an entry was then refused by the gate.
  *
  * They commit here instead: at a documentation domain under .example (RFC 2606), which is not the placeholder
- * and reaches nobody. A test that means a commit at the placeholder, as the gate's own criterion
- * (tests/the-commit-address-gate.test.ts) does, builds that address from the declared default and not from here.
+ * and reaches nobody. A test that means a commit at the placeholder builds that address from the declared default and not from here.
  */
 
 /** The domain every test repository commits at. */

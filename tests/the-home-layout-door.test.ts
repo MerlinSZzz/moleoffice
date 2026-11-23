@@ -5,13 +5,16 @@
  * person asking, and PUT /api/home-layout keeps a new one. Each person's layout is one runtime_settings
  * row named for that person, as the sidebar keeps its arrangement, and each change is written to the
  * changes table. Only the person writes their own row: an agent's write is refused and stores nothing.
+ * The layout keeps the hidden parts and the projects Home shows, and a row kept in an older shape still
+ * reads, with nothing it held lost and nothing refused.
  */
 import { afterEach, beforeEach, expect, it } from 'vitest'
 import type { FastifyInstance } from 'fastify'
 import { apiApp, freshDb, type TestDb } from './helpers.ts'
 import { THE_TEST_OFFICES_OWNER } from './a-page-of-a-test-office.ts'
 import {
-  HOME_LAYOUT_A, HOME_LAYOUT_B, HOME_LAYOUT_C, THE_KEPT_LAYOUT_IS_NOT_JSON, homeLayoutSettingName, problemsWithTheHomeLayout,
+  HOME_LAYOUT_A, HOME_LAYOUT_B, HOME_LAYOUT_C, THE_KEPT_LAYOUT_IS_NOT_JSON, applyMenuMove, chooseTheProject, homeLayoutSettingName,
+  problemsWithTheHomeLayout, theHomeLayoutReadIn,
 } from '../src/shared/home-layout.ts'
 
 let db: TestDb, app: FastifyInstance
@@ -27,7 +30,7 @@ async function read(headers: Record<string, string>) {
   const reply = await app.inject({ url: '/api/home-layout', headers })
   expect(reply.statusCode, reply.body).toBe(200)
   // Every plain answer says whether a permission narrowed it, and this one is never narrowed.
-  const { narrowedByPermission, ...answer } = reply.json() as { layout: unknown; kept: string; problems: string[]; narrowedByPermission: unknown }
+  const { narrowedByPermission, ...answer } = reply.json() as { layout: unknown; kept: string; problems: string[]; filledIn: string[]; narrowedByPermission: unknown }
   expect(narrowedByPermission).toBeNull()
   return answer
 }
@@ -42,13 +45,13 @@ function changes() {
 const stored = () => JSON.stringify({ rows: rows(), changes: changes() })
 
 it('keeps a layout for the person who sends it, and a second person keeps one of their own', async () => {
-  expect(await read(asPerson(owner))).toEqual({ layout: HOME_LAYOUT_A, kept: 'nothing-kept', problems: [] })
+  expect(await read(asPerson(owner))).toEqual({ layout: HOME_LAYOUT_A, kept: 'nothing-kept', problems: [], filledIn: [] })
   const first = await keep(asPerson(owner), HOME_LAYOUT_B)
   expect(first.statusCode, first.body).toBe(200)
   expect(first.json()).toMatchObject({ layout: HOME_LAYOUT_B, written: true })
-  expect(await read(asPerson(owner))).toEqual({ layout: HOME_LAYOUT_B, kept: 'kept', problems: [] })
+  expect(await read(asPerson(owner))).toEqual({ layout: HOME_LAYOUT_B, kept: 'kept', problems: [], filledIn: [] })
   // The second person has kept nothing yet, and sees A whatever the first one kept.
-  expect(await read(asPerson(SECOND_PERSON))).toEqual({ layout: HOME_LAYOUT_A, kept: 'nothing-kept', problems: [] })
+  expect(await read(asPerson(SECOND_PERSON))).toEqual({ layout: HOME_LAYOUT_A, kept: 'nothing-kept', problems: [], filledIn: [] })
   expect((await keep(asPerson(SECOND_PERSON), HOME_LAYOUT_C)).statusCode).toBe(200)
   expect((await read(asPerson(owner))).layout).toEqual(HOME_LAYOUT_B)
   expect((await read(asPerson(SECOND_PERSON))).layout).toEqual(HOME_LAYOUT_C)
@@ -101,16 +104,48 @@ it('refuses a layout with a problem in words and changes nothing', async () => {
 it('draws A from a kept row it cannot read, says that it could not read it, and leaves the row as it was', async () => {
   const name = homeLayoutSettingName(owner)
   db.client.sqlite.prepare('INSERT INTO runtime_settings (name, value) VALUES (?, ?)').run(name, 'made-up words that are not a layout')
-  expect(await read(asPerson(owner))).toEqual({ layout: HOME_LAYOUT_A, kept: 'unreadable', problems: [THE_KEPT_LAYOUT_IS_NOT_JSON] })
+  expect(await read(asPerson(owner))).toEqual({ layout: HOME_LAYOUT_A, kept: 'unreadable', problems: [THE_KEPT_LAYOUT_IS_NOT_JSON], filledIn: [] })
 
-  const missing = { band: [], first: ['needs'], second: [] }
-  db.client.sqlite.prepare('UPDATE runtime_settings SET value = ? WHERE name = ?').run(JSON.stringify(missing), name)
+  const broken = { band: [], first: ['needs', 'made-up-part'], second: [] }
+  db.client.sqlite.prepare('UPDATE runtime_settings SET value = ? WHERE name = ?').run(JSON.stringify(broken), name)
   const answer = await read(asPerson(owner))
   expect(answer.layout).toEqual(HOME_LAYOUT_A)
   expect(answer.kept).toBe('unreadable')
-  expect(answer.problems).toEqual(problemsWithTheHomeLayout(missing))
+  expect(answer.problems).toEqual(theHomeLayoutReadIn(broken).problems)
   expect(answer.problems).not.toEqual([])
-  expect(rows()).toEqual([{ name, value: JSON.stringify(missing) }])
+  expect(rows()).toEqual([{ name, value: JSON.stringify(broken) }])
   // The second person's own Home is untouched by the first person's broken row.
-  expect(await read(asPerson(SECOND_PERSON))).toEqual({ layout: HOME_LAYOUT_A, kept: 'nothing-kept', problems: [] })
+  expect(await read(asPerson(SECOND_PERSON))).toEqual({ layout: HOME_LAYOUT_A, kept: 'nothing-kept', problems: [], filledIn: [] })
+})
+
+it('reads a row kept in the older shape into today\'s, with every part it held where it was, and keeps the new shape at the next move', async () => {
+  const name = homeLayoutSettingName(owner)
+  const old = { band: ['agents'], first: ['schedule'], second: ['needs'] }
+  db.client.sqlite.prepare('INSERT INTO runtime_settings (name, value) VALUES (?, ?)').run(name, JSON.stringify(old))
+  const answer = await read(asPerson(owner))
+  const readIn = theHomeLayoutReadIn(old)
+  expect(answer).toEqual({ layout: readIn.layout, kept: 'kept', problems: [], filledIn: readIn.filledIn })
+  expect(readIn.filledIn).not.toEqual([])
+  expect(problemsWithTheHomeLayout(answer.layout)).toEqual([])
+  // Reading writes nothing: the row is as it was until the person moves something.
+  expect(rows()).toEqual([{ name, value: JSON.stringify(old) }])
+  // Keeping the layout as read writes it in today's shape, even with no move, because the row was in the older one.
+  const same = await keep(asPerson(owner), readIn.layout)
+  expect(same.statusCode, same.body).toBe(200)
+  expect(same.json()).toMatchObject({ layout: readIn.layout, written: true })
+  expect(JSON.parse(rows()[0]!.value)).toEqual(readIn.layout)
+  expect(await read(asPerson(owner))).toEqual({ layout: readIn.layout, kept: 'kept', problems: [], filledIn: [] })
+})
+
+it('keeps the hidden parts and one chosen project for the person, and the second person still sees every project', async () => {
+  const chosen = chooseTheProject(applyMenuMove(HOME_LAYOUT_B, 'agents', 'hidden'), 'made-up-project')
+  const kept = await keep(asPerson(owner), chosen)
+  expect(kept.statusCode, kept.body).toBe(200)
+  expect(await read(asPerson(owner))).toEqual({ layout: chosen, kept: 'kept', problems: [], filledIn: [] })
+  expect((await read(asPerson(owner))).layout).toMatchObject({ project: 'made-up-project', hidden: [...HOME_LAYOUT_B.hidden, 'agents'] })
+  expect((await read(asPerson(SECOND_PERSON))).layout).toEqual(HOME_LAYOUT_A)
+  // A layout with no project is refused by the door, which keeps only a whole layout.
+  const { project: _left, ...noProject } = chosen
+  expect((await keep(asPerson(owner), noProject)).statusCode).toBe(400)
+  expect((await read(asPerson(owner))).layout).toEqual(chosen)
 })

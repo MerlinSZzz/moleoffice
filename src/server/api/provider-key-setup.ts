@@ -2,8 +2,7 @@
 // Licensed under the MIT License. See LICENSE.
 import type { FastifyInstance, FastifyRequest } from 'fastify'
 import { z } from 'zod'
-import { originsAPageMayBeOn, settings } from '../../config/settings.mjs'
-import { mayAPageOnThisOriginRead } from '../../config/what-a-page-may-read.mjs'
+import { aPageThatIsNotThisOfficesSentIt } from '../lib/an-origin-that-is-not-this-office.ts'
 import { actorFrom } from '../lib/http.ts'
 import { thePersonIsProved } from '@shared/the-person-proved.ts'
 import { PanelError } from '../lib/panel-error.ts'
@@ -16,8 +15,8 @@ const bodyShape = z.strictObject({
   customName: z.string().max(100).optional(), prefix: z.string().max(100).optional(), min: z.number().int().min(1).max(4096).optional(),
 })
 const trialShape = z.strictObject({ provider: z.string().min(1).max(100) })
-function permitted(req: FastifyRequest): void {
-  if (!mayAPageOnThisOriginRead(req.headers.origin, originsAPageMayBeOn(settings()))) throw new PanelError('This page cannot change keys from this origin.', 403)
+export function permitted(req: FastifyRequest): void {
+  if (aPageThatIsNotThisOfficesSentIt(req)) throw new PanelError('This page cannot change keys from this origin.', 403)
   const actor = actorFrom(req)
   if (!thePersonIsProved(actor) || actor.signedItem !== undefined) throw new PanelError('Only the person may add or test a provider key.', 403)
 }

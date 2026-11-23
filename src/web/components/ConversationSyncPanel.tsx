@@ -22,7 +22,7 @@ import type { ConversationLine, ConversationSyncReply, ConversationSyncState } f
 import { isAgentRuntime, RUNTIME_WORDS } from '@shared/participants.ts'
 import { useCallback, useEffect, useState } from 'react'
 import { api, errorMessage, faultOf, getActor, type Fault } from '../api.ts'
-import { Btn, ErrorNote, Loading, Panel, Tag, type TagTone } from './ui.tsx'
+import { Btn, ErrorNote, Loading, Panel, ServerNote, Tag, type TagTone } from './ui.tsx'
 
 /** What the panel knows about the sync at one moment. */
 export interface ConversationSyncReading {
@@ -123,9 +123,9 @@ function TheReading({
 }) {
   return (
     <div className="csp">
-      <p className="csp-line">{t(reply.enabled ? 'conversation.sync.on' : 'conversation.sync.off')}</p>
-      {reply.enabled ? null : <p className="csp-note">{t('conversation.sync.noOptIn')}</p>}
-      {reply.lastOutcome === null ? null : <p className="csp-note">{reply.lastOutcome.says}</p>}
+      <p className="csp-line">{t(reply.enabled ? 'conversation.sync.state.on' : 'conversation.sync.state.off')}</p>
+      {reply.lastOutcome === null ? null : <p className="csp-note">{t('conversation.sync.state.last', { at: reply.lastOutcome.at, synced: reply.lastOutcome.synced })}</p>}
+      {reply.lastOutcome === null ? null : <ServerNote text={reply.lastOutcome.says} />}
 
       {person ? (
         <div className="csp-presses">
@@ -144,13 +144,11 @@ function TheReading({
             </Btn>
           )}
         </div>
-      ) : reply.enabled ? (
-        <p className="csp-note">{t('conversation.sync.personOnly')}</p>
       ) : null}
 
       {reply.enabled ? (
         reply.conversations.length === 0 ? (
-          <p className="csp-note">{t('conversation.sync.none')}</p>
+          <p className="csp-note">{t('conversation.sync.state.none')}</p>
         ) : (
           <ul className="csp-list">
             {reply.conversations.map((line) => {

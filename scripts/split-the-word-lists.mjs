@@ -52,9 +52,6 @@ export const JOINED = /\bjoinWordLists\(/
  */
 export const TESTS_THAT_READ_THE_LISTS_AS_FILES = [
   { file: 'tests/word-list-files.ts', reads: "the folder, for en.ts or zh.ts and every part beside it by name; since wave 13j's round 41 the tests that read a list's text read it through this", afterTheSplit: 'unaffected' },
-  { file: 'tests/merge-carry-rule.test.ts', reads: "the path src/shared/words/en.ts as a name the merge queue judges by line, never the file; en.ts stays at that path as the joiner", afterTheSplit: 'unaffected' },
-  { file: 'tests/the-merge-tool-joins-list-files-round-22.test.ts', reads: "the path src/shared/words/en.ts as the name of a list file the merge queue joins, with synthetic text the test writes; it never reads the real list (wave 13v round 22)", afterTheSplit: 'unaffected' },
-  { file: 'tests/the-merger.test.ts', reads: "the paths en.ts and zh.ts, with two wave anchors, for synthetic lists it writes into its own scratch repository; it never reads the real lists", afterTheSplit: 'unaffected' },
   { file: 'tests/a-trace-naming-no-record-is-asked-once-round-33.test.ts', reads: "the paths en.ts and zh.ts as two strings in a synthetic check's trace; it never reads the lists (wave 13v round 33)", afterTheSplit: 'unaffected' },
   { file: 'tests/a-standard-change-is-one-of-four-kinds.test.ts', reads: "the paths en.ts and zh.ts as changed paths it hands to the rule for a standard change, which judges a path and never opens it; it never reads the lists (wave 13r round G)", afterTheSplit: 'unaffected' },
 ]

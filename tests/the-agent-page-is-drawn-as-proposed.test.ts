@@ -5,8 +5,8 @@
  * answers as recommended. The page is ProfilePage.tsx for an agent; the raise and the card are
  * TheirCard.tsx; the end of a raise is chosen in RaiseEndChoice.tsx.
  *
- * In a browser, against a test office of this file's own, with the browser paired as the person (the person's key as the cookie a
- * paired browser holds). The browser's clock stands at 09:00 tomorrow on this process's clock, which is the office's
+ * In a browser, against a test office of this file's own, with the browser paired as the person (the two halves the pairing
+ * press gives a browser). The browser's clock stands at 09:00 tomorrow on this process's clock, which is the office's
  * clock too: the test server and the browser are started from this process and read the same zone.
  *
  * ---------------------------------------------------------------------------------------
@@ -61,6 +61,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import type { BrowserContext, Page } from 'playwright'
 
 import { liveApp, thePersonsKeyHeader, waitForThePage, type LiveApp } from './helpers.ts'
+import { carryThePairing, pairTheContext, type APairedContext } from './a-paired-context.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { localStamp } from '../src/shared/time.ts'
 import { thePress } from '../src/shared/the-press.ts'
@@ -96,6 +97,8 @@ const ELSEWHERE = /^Asia\//.test(OFFICE) ? 'America/New_York' : 'Asia/Tokyo'
 
 let live: LiveApp
 let key = ''
+/** The pairing the person's browser was given, carried into each context of its own. */
+let paired: APairedContext | undefined
 
 /** A folder to photograph the agent page's live parts into (case 10), or nothing. */
 const SHOTS = process.env.W13K_AGENT_PARTS_SHOTS
@@ -123,10 +126,16 @@ async function theRaiseHeld(): Promise<{ until: string | null } | null> {
   return reply.theCardTheyHold.elevation.holding
 }
 
+/** Give a context of its own the pairing of the person's browser: its cookie half and the header half its pages read. */
+async function pairedAsThePersonsBrowser(context: BrowserContext): Promise<void> {
+  if (paired === undefined) throw new Error('the person’s browser was not paired before this context')
+  await carryThePairing(live.context, context, paired)
+}
+
 /** A paired page of its own, its clock standing at `at`, on `zone` when one is named. */
 async function aPage(at: number, zone?: string): Promise<{ page: Page; context: BrowserContext }> {
   const context = await live.browser.newContext({ viewport: { width: 1440, height: 1000 }, ...(zone === undefined ? {} : { timezoneId: zone }) })
-  await context.addCookies([{ name: 'mole-office-key', value: key, domain: '127.0.0.1', path: '/' }])
+  await pairedAsThePersonsBrowser(context)
   const page = await context.newPage()
   await page.clock.setFixedTime(at)
   return { page, context }
@@ -160,7 +169,7 @@ beforeAll(async () => {
   key = thePersonsKeyHeader(join(live.dir, 'keys.json'))['x-mole-office-key'] as string
   const started = await call('/api/agents/started', 'POST', { handle: 'wren', name: 'Wren', role: 'secretary' })
   expect(started.status, JSON.stringify(started.json)).toBe(201)
-  await live.context.addCookies([{ name: 'mole-office-key', value: key, domain: '127.0.0.1', path: '/' }])
+  paired = await pairTheContext(live.context, live.api)
   await live.page.clock.setFixedTime(tomorrowAtNine)
 }, 180_000)
 
@@ -317,7 +326,7 @@ describe('the agent page, drawn as the owner’s decision took it', () => {
       const row = card.locator('.tc-card-all a[href="#/roles"]')
       await expect.poll(() => row.count(), { ...SETTLES, message: 'one row opens the Role cards page' }).toBe(1)
       await expect.poll(() => row.textContent(), SETTLES).toBe(
-        lang === 'en' ? 'What the secretary card doesIts duties and how it works, on the Role cards page' : '秘书角色卡做什么它的职责和工作方式，在角色卡页面上',
+        lang === 'en' ? 'What the secretary card does' : '秘书角色卡做什么',
       )
       await row.click()
       await expect.poll(() => page.url(), SETTLES).toContain('#/roles')
@@ -326,15 +335,15 @@ describe('the agent page, drawn as the owner’s decision took it', () => {
 
   it('9: its live terminal and the way back stand under its terminals, and with no run of it each says so in one sentence', async () => {
     const page = live.page
-    await openTheAgent(page, 'en', '[data-target="uiSurface/profile.wayback"] .al-back-says')
+    await openTheAgent(page, 'en', '[data-target="uiSurface/profile.wayback"] .al-back-state')
     const pane = '[data-target="uiSurface/profile.pane"]'
     const wayBack = '[data-target="uiSurface/profile.wayback"]'
-    await page.locator(`${pane} .al-why`).waitFor({ timeout: 30_000 })
+    await page.locator(`${pane} .al-state`).waitFor({ timeout: 30_000 })
     const [terminals, itsPane, back] = [await topOf(page, '[data-target="uiSurface/profile.terminals"]'), await topOf(page, pane), await topOf(page, wayBack)]
     expect(terminals, 'the terminals stand above the live terminal').toBeLessThan(itsPane)
     expect(itsPane, 'the live terminal stands above the way back').toBeLessThan(back)
-    await expect.poll(() => page.locator(`${pane} .al-why`).textContent(), SETTLES).toBe(EN('server.paneNoRun'))
-    await expect.poll(() => page.locator(`${wayBack} .al-back-says`).textContent(), SETTLES).toBe(EN('agentLive.back.noRun'))
+    await expect.poll(() => page.locator(`${pane} .al-state`).textContent(), SETTLES).toBe(EN('agentLive.pane.noRun'))
+    await expect.poll(() => page.locator(`${wayBack} .al-back-state`).textContent(), SETTLES).toBe(EN('agentLive.back.noRunWord'))
     expect(await page.locator('[data-target="uiSurface/profile.steps"]').count(), 'no steps: it has no run in a sandbox').toBe(0)
   })
 
@@ -343,11 +352,11 @@ describe('the agent page, drawn as the owner’s decision took it', () => {
     for (const theme of ['light', 'dark'] as const) for (const width of [1440, 990, 660, 390]) {
       const context = await live.browser.newContext({ viewport: { width, height: 1000 }, colorScheme: theme })
       try {
-        await context.addCookies([{ name: 'mole-office-key', value: key, domain: '127.0.0.1', path: '/' }])
+        await pairedAsThePersonsBrowser(context)
         await context.addInitScript(`localStorage.setItem('mole-office.preset.theme', '${theme}')`)
         const page = await context.newPage()
         await page.clock.setFixedTime(tomorrowAtNine)
-        await openTheAgent(page, 'en', '[data-target="uiSurface/profile.wayback"] .al-back-says')
+        await openTheAgent(page, 'en', '[data-target="uiSurface/profile.wayback"] .al-back-state')
         await page.waitForTimeout(800)
         await page.screenshot({ path: join(SHOTS!, `agent-page-live-parts-${width}-${theme}-en.png`), fullPage: true })
       } finally {

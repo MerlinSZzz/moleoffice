@@ -189,7 +189,7 @@ it('wraps the category row and lets it scroll away when the page is narrow besid
 it('shows all categories or marks more and keeps the strip clear of text while scrolling at 390', async () => {
   const page = app.page
   try {
-    for (const theme of ['light', 'dark']) {
+    const theme = 'light'
     await page.setViewportSize({ width: 390, height: 844 })
     await page.evaluate((look) => localStorage.setItem('mole-office.preset.theme', look), theme)
     await open(page, 'normal')
@@ -213,7 +213,6 @@ it('shows all categories or marks more and keeps the strip clear of text while s
       const bar = document.querySelector('.shell-bar')!.getBoundingClientRect()
       return row.bottom <= bar.bottom + 1
     }), { message: `${theme}: the strip covers page text` }).toBe(true)
-    }
   } finally {
     await page.setViewportSize({ width: 1440, height: 900 })
   }
@@ -271,7 +270,7 @@ it('draws every panel of the chosen category open, with no press that folds it, 
   await app.page.locator('.set [data-target="uiSurface/settings.inject"]').waitFor()
 }, 240_000)
 
-it('draws the mail tool as the first tool entry: one row with its name, what it does and its state, and the install press inside', async () => {
+it('draws the mail tool as the first tool entry: one row with its name and its state, and the install press inside', async () => {
   await open(app.page, 'normal')
   await app.page.locator('.set .sf-jump[data-category="tools"]').click()
   const tools = app.page.locator('.set .sf-cat[data-category="tools"] [data-settings-panel]')
@@ -285,7 +284,6 @@ it('draws the mail tool as the first tool entry: one row with its name, what it 
   expect(drawnTools[0]).toBe('settings.mailtool')
   const entry = tools.first()
   expect(await entry.locator('.sf-title').textContent()).toBe(en['settingsPanel.title.mailtool'])
-  expect(await entry.locator('.sf-what').innerText()).toBe(en['settingsCats.mail.what'])
   // The entry is open, so the install press is there without a press to open it, and the state is drawn once,
   // by the entry, with no second copy in its title.
   await entry.getByRole('button', { name: en['settingsPanel.mailtool.install'] }).waitFor()

@@ -6,6 +6,20 @@ import { workspaces } from './workspaces.ts'
 
 const existingArchive = { existingArchive: true } as const
 
+/**
+ * A REQUEST FOR ONE PRESS: AN AGENT ASKS THE PERSON TO AGREE TO ONE KNOWN ACT, added by migration 0206. It
+ * stands on the person's decision, in wave 13n round 45.
+ *
+ * THE ROW HOLDS NO COMMAND AND NO TEXT THAT RUNS. `act` names one of the known acts in src/server/lib/one-press.ts,
+ * and `inputs` holds that act's fixed inputs, checked there before the row is written. The person's press runs the
+ * act the office has for that name, with those inputs. Nothing an agent wrote is run.
+ *
+ * ITS OWN TABLE AND NOT A RECORD, so no record door can file, change or delete one. Only the doors in
+ * src/server/api/one-press.ts write it: an agent files it, the person agrees or refuses, and its asker withdraws it.
+ *
+ * `state` is `waiting`, `done`, `could-not`, `refused` or `withdrawn`. `could-not` is the person agreed and the act
+ * could not run; `outcome` then says why, and `done` says what it did.
+ */
 export const onePressRequests = aPartTable(sqliteTable(
   'one_press_requests',
   {

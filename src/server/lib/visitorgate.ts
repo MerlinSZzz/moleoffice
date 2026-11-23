@@ -51,8 +51,9 @@
 
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 
-import { operationNamed } from '@shared/ops.ts'
+import { operationNamed, theActAGateAsksAbout } from '@shared/ops.ts'
 import {
+  actRefusedToVisitorsRefusal,
   endedRefusal,
   expiredRefusal,
   noSuchCredentialRefusal,
@@ -167,6 +168,7 @@ function thisActWrites(operation: string | null): boolean {
  *      exactly the thing the person must be able to see.
  *   4. **May it work?** Pending, ended, or run out: each is refused with its own sentence, naming the
  *      credential, and the request is written down as refused.
+ *      So is a working credential asking for an act no visitor may ask for, with that act's own sentence.
  *   5. **Otherwise** the request is written down as answered and goes on.
  */
 export function checkTheCredentialOn(req: FastifyRequest, reply: FastifyReply): void {
@@ -185,11 +187,14 @@ export function checkTheCredentialOn(req: FastifyRequest, reply: FastifyReply): 
   const mismatch = mismatchOn(credential, factsOn(req))
 
   // Clause 4.
-  const refusal = whyThisCredentialMayNotWork(credential) ?? whatAMismatchDoesToTheRequest(mismatch)
+  const operation = operationOf(req)
+  const refusal =
+    whyThisCredentialMayNotWork(credential) ??
+    whyAVisitorMayNotAskThis(credential, operation) ??
+    whatAMismatchDoesToTheRequest(mismatch)
 
   // Clause 5. Written down either way, because trusted visitors are counted and supervised: the person sees the refused attempts as
   // well as the answered ones.
-  const operation = operationOf(req)
   recordARequestUnder(credential.id, {
     method: req.method,
     route: req.routeOptions?.url ?? req.url,
@@ -230,6 +235,19 @@ export function whyThisCredentialMayNotWork(credential: VisitorCredential): stri
   // should say they ended it, which is the fact they acted on, rather than that its month was up.
   if (hasRunOut(credential)) return expiredRefusal(credential)
   return null
+}
+
+/**
+ * WHY A VISITOR MAY NOT ASK FOR THIS ACT, in one sentence, or null because it may.
+ *
+ * Read off the act's own `refusedToVisitors` mark in src/shared/ops.ts, through the act a gate asks about, so a
+ * check of an act is refused wherever the act is. A route that declared no act is not refused here.
+ */
+function whyAVisitorMayNotAskThis(credential: VisitorCredential, operation: string | null): string | null {
+  if (operation === null) return null
+  const act = theActAGateAsksAbout(operation)
+  if (act?.refusedToVisitors === undefined) return null
+  return actRefusedToVisitorsRefusal(credential, act.refusedToVisitors)
 }
 
 /**

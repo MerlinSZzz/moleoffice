@@ -388,8 +388,9 @@ describe('the check on a run names the agents it stores by their handles', () =>
     expect(drawn).toContain('inspects-with-an-id refused to release this run')
     expect(drawn).toContain('inspects-with-an-id released this run')
     expect(drawn).toContain('It then reported to supervises-with-an-id.')
+    // As decided in November 2026, the press that closes the run has no sentence above it: this waiting line is the
+    // one place the page names who may confirm.
     expect(drawn).toContain('Waiting for agent supervises-with-an-id to confirm the report.')
-    expect(drawn).toContain('This run is waiting for supervises-with-an-id to confirm the report.')
     expect(drawn).not.toContain(inspector)
     expect(drawn).not.toContain(supervisor)
   })

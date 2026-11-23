@@ -38,9 +38,11 @@ import {
   theMoverIsAlive,
   theDriveOfAPlace,
   theMoverLogPath,
+  theRefusalInEnglish,
   whereTheDataIs,
   whyAMoveThereIsRefused,
   type ADriveReading,
+  type AMoveRefusal,
 } from '../../config/the-data-folder-move.mjs'
 import { THIS_PLATFORM } from '../../config/the-paths-of-a-system.mjs'
 import type { DataFolderConfirmed, DataFolderMoveStarted, DataFolderReading, TheMarkInTheReading } from '../../shared/data-folder.ts'
@@ -71,8 +73,8 @@ const READ_NOTE =
   'WHERE THE OFFICE KEEPS ITS DATA ON THIS COMPUTER, the state of the last move, and whether this caller may press. ' +
   'The folder, the database and who chose the folder are answered from this computer\'s `.env` and environment, the ' +
   'mark from the per-user folder, and the two presses from the same check they will ask. With `?to=<place>` it also ' +
-  'answers whether a move there would be refused, with the sentence. Any caller on this computer may read it, and it ' +
-  'changes nothing.'
+  'answers whether a move there would be refused, with the refusal\'s code, its values and its English. Any caller on ' +
+  'this computer may read it, and it changes nothing.'
 
 const MOVE_NOTE =
   'MOVE THE OFFICE\'S DATA FOLDER TO ANOTHER PLACE ON THIS COMPUTER. Only the proved person may press, or a secretary ' +
@@ -95,7 +97,7 @@ const theMovePress = z.object({ to: z.string().min(1).max(10_000) }).strict()
 const theReadingQuestion = z.strictObject({ to: z.string().max(10_000).optional() })
 
 /** A refusal of these doors, with its code, so the page draws it in its own language. */
-function aRefusal(code: DataFolderRefusalCode, sentence: string, status: number, values: Record<string, string> = {}): PanelError {
+function aRefusal(code: DataFolderRefusalCode, sentence: string, status: number, values: Record<string, string | number> = {}): PanelError {
   return new PanelError(sentence, status, undefined, undefined, undefined, { code, values } as CodedRefusal)
 }
 
@@ -141,8 +143,11 @@ export interface TheWaysToMove {
   markPath: () => string
   /** Every agent run the office started that is still at work. */
   runsAtWork: () => ALiveRun[]
-  /** Why a move to a place is refused, or null when it may go on. On Windows the answer waits for the drive's type. */
-  whyRefused: (to: string) => string | null | Promise<string | null>
+  /**
+   * Why a move to a place is refused, as the mover's code and values, or null when it may go on. On Windows the answer
+   * waits for the drive's type.
+   */
+  whyRefused: (to: string) => AMoveRefusal | null | Promise<AMoveRefusal | null>
   /** Start the mover, in a group of its own. */
   startTheMover: (input: { to: string; cwd: string; logPath: string; env: NodeJS.ProcessEnv }) => TheMoversProcess
   /** How long the door waits for the mark to name the mover at work. */
@@ -169,7 +174,7 @@ export function theRealWaysToMove(session: string, workspaceId: string): TheWays
     markPath: () => theMoveMarkPath(),
     runsAtWork: () => theLiveRuns().pausable,
     whyRefused: (to) => {
-      const ask = (drive: ADriveReading): string | null =>
+      const ask = (drive: ADriveReading): AMoveRefusal | null =>
         whyAMoveThereIsRefused(
           to,
           theFactsOfAMove(to, readStartAtLogin({ home: theHomeDirectory(), office: theOfficeThisServerIs() }), undefined, drive),
@@ -238,11 +243,6 @@ export function theMoveStartingWords(): string {
   )
 }
 
-/** Why a move is refused: the mover's own check's sentence. */
-export function theMoveRefusedWords(why: string): string {
-  return why
-}
-
 /** Why the mover ended before the door saw it at work, with the end of its log. */
 export function theMoverEndedWords(log: string): string {
   return `The data folder mover ended before this door saw it at work, so no move was seen to start. Its log ends: ${log}`
@@ -256,9 +256,13 @@ export function theMoverNotSeenWords(group: string, log: string): string {
   )
 }
 
-/** Why the confirm is refused: the mover's own check's sentence. */
-export function theNothingToConfirmWords(why: string): string {
-  return why
+/**
+ * A place's check as the reading answers it: the refusal's English, code and values, or all three null when the move
+ * would go on.
+ */
+function theCheckAnswered(to: string, refusal: AMoveRefusal | null): NonNullable<DataFolderReading['wouldRefuse']> {
+  if (refusal === null) return { to, why: null, code: null, values: null }
+  return { to, why: theRefusalInEnglish(refusal), code: refusal.code, values: refusal.values }
 }
 
 /** What the move press says once the mark names the mover alive. */
@@ -408,9 +412,7 @@ export async function dataFolderRoutes(app: FastifyInstance): Promise<void> {
         theCallerIsThePerson,
         mayMove,
         mayConfirm,
-        ...(question.to === undefined
-          ? {}
-          : { wouldRefuse: { to: question.to, why: await ways.whyRefused(question.to) } }),
+        ...(question.to === undefined ? {} : { wouldRefuse: theCheckAnswered(question.to, await ways.whyRefused(question.to)) }),
       }
     },
   )
@@ -447,7 +449,7 @@ export async function dataFolderRoutes(app: FastifyInstance): Promise<void> {
         // THE MOVER'S OWN CHECK, asked while the office still runs. The same function the mover asks, so the door and the
         // mover cannot disagree about a place.
         const refusal = await ways.whyRefused(body.to)
-        if (refusal !== null) throw aRefusal('dataFolderMoveRefused', theMoveRefusedWords(refusal), 409, { why: refusal })
+        if (refusal !== null) throw aRefusal(refusal.code, theRefusalInEnglish(refusal), 409, refusal.values)
         const markPath = ways.markPath()
         const logPath = theMoverLogPath(markPath)
         const before = readTheMoveMark(markPath)
@@ -504,10 +506,10 @@ export async function dataFolderRoutes(app: FastifyInstance): Promise<void> {
       // THE DATABASE THIS SERVER OPENED, read from the module that opened the file and not from the settings: a running
       // SQLite connection holds the file it opened, whatever the `.env` has said since.
       const opened = database().path
-      // ONLY THE MARK'S OWN REFUSALS are answered as nothing to confirm. A fault after them, such as a mark that
-      // cannot be written, comes through as the fault it is.
+      // ONLY THE MARK'S OWN REFUSALS are answered as refusals, each with the mover's code and values. A fault after them,
+      // such as a mark that cannot be written, comes through as the fault it is.
       const done = confirmTheMove(thisOfficesWays?.markPath() ?? theMoveMarkPath(), opened)
-      if ('refused' in done) throw aRefusal('dataFolderNothingToConfirm', theNothingToConfirmWords(done.refused), 409, { why: done.refused })
+      if ('refused' in done) throw aRefusal(done.refused.code, theRefusalInEnglish(done.refused), 409, done.refused.values)
       return {
         removed: done.removed,
         kept: done.kept,

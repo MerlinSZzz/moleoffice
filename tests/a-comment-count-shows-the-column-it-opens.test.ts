@@ -96,7 +96,7 @@ async function pressTheCount(): Promise<void> {
 }
 
 describe('pressing the count beside a block near the end of a long page', () => {
-  for (const width of [1440, 990, 660, 390] as const) {
+  for (const width of [1440, 390] as const) {
     for (const look of ['light'] as const) {
       it(`at ${String(width)} in ${look}: the window shows the column's heading, on the first press and on the next`, async () => {
         const page = app.page

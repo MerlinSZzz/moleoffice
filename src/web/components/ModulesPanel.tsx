@@ -78,7 +78,7 @@ import { progressOf } from '@shared/work.ts'
  */
 import { moduleCondition, parseModule, type ModuleCondition } from './ModuleView.tsx'
 import { pathFor, recordPath } from './router.tsx'
-import { Absence, Explain, OriginMark, Row, StoredState, Tag } from './ui.tsx'
+import { Absence, OriginMark, Row, StoredState, Tag } from './ui.tsx'
 
 // ---------------------------------------------------------------------------- the rule
 
@@ -208,16 +208,6 @@ export function ModulesPanel({ records, changes, cap = MODULES_SHOWN, inspect = 
       <style href="mole-office-modules" precedence="default">
         {MODULES_CSS}
       </style>
-      {/* THE RULE, IN INSPECT ONLY. It is a claim about which modules were chosen, so it is exact
-          and it is checkable — it is simply not what the reader of a home page is deciding from. */}
-      {inspect ? (
-        <div className="mp-rule">
-          <Explain declares={{ surface: 'home.modules.rule' }} meaning={t('home.moduleRule')} opens={t('home.moduleOpens')}>
-            <p className="mp-note">{t('home.moduleMeaning', { changes: changes.length, cap })}</p><p className="mp-note">{t('home.moduleCondition')}</p>
-          </Explain>
-        </div>
-      ) : null}
-
       {pick.shown.length === 0 ? (
         // TWO DIFFERENT FACTS, AND THE READER HAS TO TELL THEM APART. "There are no modules at all"
         // and "there are modules and none of them is on this list" look identical as a blank, and
@@ -306,9 +296,6 @@ function ModuleRow({ reading, inspect }: { reading: ModuleReading; inspect: bool
 // ---------------------------------------------------------------------------- styles
 
 export const MODULES_CSS = `
-/* The rule sits above the rows and gives back the padding of whatever it is placed in. Inspect
-   only -- see the note on ModulesPanel. */
-.mp-rule { margin: 0 0 var(--gut); }
 .mp-note {
   margin: 0;
   max-width: var(--measure-in-box);

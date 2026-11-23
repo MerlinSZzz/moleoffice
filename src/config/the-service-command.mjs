@@ -109,7 +109,7 @@ import { homedir } from 'node:os'
 import { createRequire } from 'node:module'
 import { closeSync, mkdirSync, openSync, readSync, realpathSync, statSync, writeFileSync, writeSync } from 'node:fs'
 import { basename, dirname, resolve } from 'node:path'
-import { ENV_FILE, REPO_ROOT, SHUTDOWN_LIMIT_MS, STARTED_BY_THE_SERVICE_COMMAND, THE_COMMAND_ENTRY, THE_INSTALL, canonicalDatabasePath, howToStart, isTheProgramRun, pairingWords, readSettingHere, settings, theInstallsNode, theInstallsNodeInALine, theStableCheckoutNamedIn } from './settings.mjs'
+import { ENV_FILE, REPO_ROOT, SHUTDOWN_LIMIT_MS, STARTED_BY_THE_SERVICE_COMMAND, THE_COMMAND_ENTRY, THE_INSTALL, canonicalDatabasePath, howToStart, isTheProgramRun, pairingWords, readSettingHere, serviceLockPathFrom, settings, theDatabaseTheStableCheckoutNames, theInstallsNode, theInstallsNodeInALine, theStableCheckoutNamedIn } from './settings.mjs'
 import { spoolAGateMet } from './gate-count-spool.mjs'
 import { whyAnUpgradeKeepsTheOfficeClosed } from './the-upgrade-mark.mjs'
 import {
@@ -126,6 +126,7 @@ import {
   whyADataFolderMoveKeepsTheOfficeClosed,
 } from './the-data-folder-move.mjs'
 import { whyAStartMayNotMakeTheDatabase } from './may-a-start-make-the-database.mjs'
+import { settingsFolder } from './systems/the-settings-folder-removal.mjs'
 import { THE_BUILT_PAGE, missingWebBuild } from './the-built-page.mjs'
 import { theOfficeToolEnvironment } from './the-office-tool-environment.mjs'
 import { theAnswerInWords, theWorldTheDeclarationNames, whatAnswersForThisOffice } from './the-self-check.mjs'
@@ -133,10 +134,12 @@ import { readTheServiceLock, theProcessReading, whoHoldsTheLock } from './the-se
 import { STAND_IN_HEADER } from './stand-in-header.mjs'
 import { theProcessReader, theRowIsAboutThisProcess } from './process-reader.mjs'
 import { commandLineOf, parentOf, theProcessAt } from './session-process.mjs'
+import { howAPathMeets, theStableCheckoutFolder } from './sandbox-folder.mjs'
+import { THE_TEST_MARK, THE_TEST_RUN_FLAG, carriesTheTestMark, theProcessNumberIn } from './the-test-mark.mjs'
 import { theSystemFor, thisSystem } from './systems/the-system.mjs'
 import { readTheGroupItsParentNames, A_STOP_REQUEST_IS_ANSWERED_WITHIN_MS } from './systems/windows-groups.mjs'
 import { localStampOf } from './stopped-run-cause.mjs'
-import { HOLDER_START_WAIT_MS, askTheHolder, startATerminalHolder, theTerminalHolderFolder, theTerminalHolderLog, theTerminalHolderSocket } from './the-terminal-holder.mjs'
+import { HOLDER_START_WAIT_MS, NO_HOLDER_LISTENS_ON_A_PATH_THIS_LONG, askTheHolder, startATerminalHolder, theTerminalHolderFolder, theTerminalHolderLog, theTerminalHolderSocket } from './the-terminal-holder.mjs'
 import { THE_TERMINAL_HOLDER } from './own-rows.mjs'
 import { watchForTheLoginService } from './the-login-watch.mjs'
 
@@ -573,9 +576,11 @@ export async function startTheHolder(service) {
  * be read. It answers undefined when this start started no holder.
  *
  * @param {ReturnType<typeof theService>} service
+ * @param {string[]} [tie] the arguments that tie the holder to the test run (theTieToTheTestRun), none unless `start`
+ *   hands them on
  * @returns {Promise<TheHolderThisStartStarted | { pid: number, why: string } | undefined>}
  */
-async function startTheHolderAndReadIt(service) {
+async function startTheHolderAndReadIt(service, tie = []) {
   /**
    * SAY WHY NO HOLDER STARTED, here and in the holder's own log, whose last line the office shows the
    * person on the terminal pages and in the self-check. The log is written only when it can be; when it
@@ -616,7 +621,8 @@ async function startTheHolderAndReadIt(service) {
   /** @type {{ command: string, args: string[], environment: Record<string, string> }} */
   let how
   try {
-    how = howToStart('holder')
+    const holder = howToStart('holder')
+    how = { ...holder, args: [...holder.args, ...tie] }
   } catch (err) {
     noHolder(`${err instanceof Error ? err.message : String(err)} No terminal holder was started.`)
     return
@@ -980,6 +986,109 @@ function theStopLine() {
 }
 
 /**
+ * WHY A START THAT CARRIES THE TEST SUITE'S MARK MAY NOT GO ON, in one sentence, or null when it may, or carries no mark.
+ *
+ * A marked start ties every process it starts to the test run the mark names (theTieToTheTestRun), so each of them ends
+ * when that run ends, however it ended. So the mark must name a process that is running and can be read, or an office
+ * started now could not end with it. And the office must not be the live one: the mark never ties the live office to a
+ * test run. The live office is the one in the stable checkout (theStableCheckoutFolder). Its database is any of four:
+ * the one that checkout's settings name; anything inside that checkout; when this checkout's settings pair it with that
+ * same stable checkout, this checkout's canonical database; and a database whose service lock names that checkout. The
+ * stable checkout may have no .env, and the live server may take its database from its service's environment. The lock
+ * is then the only one of the four that sees the live office. A lock that cannot be read is refused in a sentence of its
+ * own. A checkout or a database is compared as written and as it is on disk (howAPathMeets), so a link to either counts
+ * as the thing it links to. A malformed mark is not quoted.
+ *
+ * It is asked before anything is stopped or started, through whyThisMarkedStartMayNotGoOn: first in `start`, and in
+ * `restart` once the shape is decided. For the ordinary start, the only one that can take the paired branch of `start`,
+ * it is also asked about what that branch would put in place. Without the mark it reads nothing.
+ *
+ * @param {{ checkout: string, databasePath: string }} office the checkout the office would run from, and the database
+ *   it would open
+ * @returns {string | null}
+ */
+export function whyAMarkedStartMayNotGoOn({ checkout, databasePath }) {
+  if (!carriesTheTestMark(process.env)) return null
+  const marked = `This start carries the test suite's mark ${THE_TEST_MARK}`
+  const untied = 'so nothing was started or stopped: an office started now could not end with the test run that asked for it.'
+  const pid = theProcessNumberIn(process.env[THE_TEST_MARK])
+  if (pid === null) return `${marked}, but its value is not a process number, ${untied}`
+  /** @type {import('./process-reader.mjs').ProcessAt} */
+  let at
+  try {
+    at = theProcessReader().processAt(pid)
+  } catch (err) {
+    return `${marked}, but it names process ${String(pid)}, which could not be read (${err instanceof Error ? err.message : String(err)}), ${untied}`
+  }
+  if (at.here && at.unreadable !== undefined) return `${marked}, but it names process ${String(pid)}, which could not be read (${at.unreadable}), ${untied}`
+  // A zombie is not running, as the lock reads it: the same reading, handed on, so the process is read once.
+  if (!theProcessAt(pid, { processAt: () => at }).here) return `${marked}, but it names process ${String(pid)}, which is not running, ${untied}`
+  const live = 'so nothing was started or stopped: the mark never ties the live office to a test run.'
+  const home = homedir()
+  const stable = theStableCheckoutFolder(home)
+  const how = howAPathMeets(checkout, stable)
+  if (how !== null) return `${marked}, but the checkout it would run from, ${checkout}, ${how} the stable checkout ${stable}, ${live}`
+  const named = theDatabaseTheStableCheckoutNames(home)
+  const paired = theStableCheckoutNamedIn(ENV_FILE)
+  const opensTheLiveDatabase = `${marked} and would open the live office's database ${databasePath}, ${live}`
+  if (
+    (named !== null && howAPathMeets(databasePath, named) === 'is') ||
+    howAPathMeets(databasePath, stable) !== null ||
+    (paired !== null && howAPathMeets(paired, stable) === 'is' && howAPathMeets(databasePath, canonicalDatabasePath()) === 'is')
+  ) {
+    return opensTheLiveDatabase
+  }
+  // THE SERVICE LOCK BESIDE THE DATABASE, for a live office whose database only its service's environment names. Whether
+  // the lock's process still runs is not asked: a live office that crashed leaves its lock, and its database is still the
+  // live one. A lock that cannot be read is not taken as no lock, as the lock module never takes it.
+  const lockPath = serviceLockPathFrom({ MOLE_OFFICE_DB: databasePath })
+  const lock = readTheServiceLock(lockPath)
+  if (lock.state === 'unreadable') {
+    return (
+      `${marked}, but the service lock beside its database, ${lockPath}, could not be read (${lock.why}), so nothing was ` +
+      "started or stopped: without that lock Mole Office cannot tell whether the database is the live office's."
+    )
+  }
+  // A lock written before the lock recorded its checkout names none, and says nothing about the stable checkout.
+  if (lock.state === 'read' && typeof lock.lock.checkout === 'string' && howAPathMeets(lock.lock.checkout, stable) === 'is') return opensTheLiveDatabase
+  return null
+}
+
+/**
+ * WHY THIS MARKED START OR RESTART MAY NOT GO ON: whyAMarkedStartMayNotGoOn for the checkout and database it names, and,
+ * for the ordinary start, for what the paired branch of `start` would put in place of them, so that is refused before
+ * the terminal holder starts and before a restart stops anything. That is the stable checkout this checkout's settings
+ * name and this checkout's canonical database. Whether that stable checkout is there is not asked here: a named stable
+ * checkout that is missing is refused by the paired branch in its own words, as before. Null when it may go on, or
+ * carries no mark.
+ *
+ * @param {ReturnType<typeof theService>} service
+ * @param {{ checkout: string, databasePath: string } | null} asStopped the shape a restart starts again, or null for
+ *   the ordinary start
+ * @returns {string | null}
+ */
+function whyThisMarkedStartMayNotGoOn(service, asStopped) {
+  const asked = whyAMarkedStartMayNotGoOn({ checkout: asStopped?.checkout ?? REPO_ROOT, databasePath: asStopped?.databasePath ?? service.databasePath })
+  if (asked !== null || asStopped !== null || !carriesTheTestMark(process.env)) return asked
+  const named = theStableCheckoutNamedIn(ENV_FILE)
+  return named === null ? null : whyAMarkedStartMayNotGoOn({ checkout: named, databasePath: canonicalDatabasePath() })
+}
+
+/**
+ * THE ARGUMENTS THAT TIE A PROCESS THIS START STARTS TO THE TEST RUN ITS MARK NAMES: THE_TEST_RUN_FLAG with the mark's
+ * process number, or none when this start carries no mark, so an unmarked start's arguments are as they were. Asked
+ * only after whyAMarkedStartMayNotGoOn has let the start go on, which refuses a mark that is not a process number.
+ *
+ * @returns {string[]}
+ */
+function theTieToTheTestRun() {
+  if (!carriesTheTestMark(process.env)) return []
+  const pid = theProcessNumberIn(process.env[THE_TEST_MARK])
+  if (pid === null) throw new Error(`The test suite's mark ${THE_TEST_MARK} is not a process number, and the start went on without asking whyAMarkedStartMayNotGoOn.`)
+  return [`${THE_TEST_RUN_FLAG}=${String(pid)}`]
+}
+
+/**
  * START THE SERVICE, or find the one already running.
  *
  * @param {ReturnType<typeof theService>} service
@@ -991,6 +1100,13 @@ function theStopLine() {
  *   its checkout (theOfficeToolEnvironment, src/config/the-office-tool-environment.mjs).
  */
 async function start(service, asStopped = null) {
+  // A START THAT CARRIES THE TEST SUITE'S MARK goes on only when its processes can end with that test run, and never on
+  // the live office, the paired branch's checkout and database included.
+  const untied = whyThisMarkedStartMayNotGoOn(service, asStopped)
+  if (untied !== null) {
+    process.stderr.write(`${untied}\n`)
+    return EXIT.FAILED
+  }
   // A STABLE UPGRADE THAT CLOSED THIS DATABASE AND DID NOT FINISH leaves a mark beside it. Nothing starts, the terminal
   // holder included, and the sentence says which upgrade and the command that goes on (src/config/the-upgrade-mark.mjs).
   const marked = whyAnUpgradeKeepsTheOfficeClosed(asStopped?.databasePath ?? service.databasePath, theStableCheckoutNamedIn(ENV_FILE), undefined)
@@ -1011,7 +1127,8 @@ async function start(service, asStopped = null) {
     process.stderr.write(`${missing}\n`)
     return EXIT.FAILED
   }
-  const startedHolder = asStopped === null ? await startTheHolderAndReadIt(service) : undefined
+  const tie = theTieToTheTestRun()
+  const startedHolder = asStopped === null ? await startTheHolderAndReadIt(service, tie) : undefined
   const stand = await whereThingsStand(service)
   if (stand.lock === 'held' && stand.answer.ours) {
     say(
@@ -1082,10 +1199,13 @@ async function start(service, asStopped = null) {
   // named relative to that checkout, which is the folder it starts in, as every other start names it. So the
   // next stop finds it as the second word even when the checkout's path has a space.
   const node = theInstallsNode()
-  const server =
+  const shape =
     asStopped === null
       ? howToStart('server')
       : { command: node.program, args: [SERVE_DEV, '--built', '--prepared'], environment: node.environment }
+  // A MARKED START ENDS WITH ITS TEST RUN: the server is told so in the plain shape, and serve-dev in its own, which ends
+  // its server by its own stop, so that server is not told.
+  const server = { ...shape, args: [...shape.args, ...tie] }
   // IN A GROUP OF ITS OWN, AS THE SYSTEM LAYER STARTS ONE: a process group on Linux and the Mac, as before the layer,
   // and a Job Object on Windows. Both ways name node by its whole path, which a start in a Job Object needs.
   const how = thisSystem().groups.howToStartInItsOwnGroup({
@@ -1416,6 +1536,11 @@ export async function endTheTerminalHolder(service, tell = say, started = null) 
     }
     if (code === 'refused') {
       tell(`${why} So no terminal holder was stopped.`)
+      return EXIT.OK
+    }
+    // A PATH TOO LONG FOR A UNIX SOCKET was not asked, and no holder can be listening on it: no holder runs.
+    if (code === 'too-long') {
+      tell(`${why} ${NO_HOLDER_LISTENS_ON_A_PATH_THIS_LONG} No terminal holder was stopped.`)
       return EXIT.OK
     }
     return left(why)
@@ -1873,6 +1998,13 @@ async function restart(service) {
       port: stand.held.port,
     }
   }
+  // A RESTART THAT CARRIES THE TEST SUITE'S MARK is asked before the stop, with the shape it would start again: the
+  // ordinary start after the stop may take the paired branch, so that is asked too.
+  const untied = whyThisMarkedStartMayNotGoOn(service, asStopped)
+  if (untied !== null) {
+    process.stderr.write(`${untied}\n`)
+    return EXIT.FAILED
+  }
   const stopped = await stop(service, { keepTheHolder: true })
   if (stopped !== EXIT.OK) {
     say('Nothing was started, because the service was not stopped.')
@@ -2017,6 +2149,7 @@ const USAGE = [
   '  data-folder where            print the data folder, then who chose it',
   '  data-folder choose <place>   record the data folder for a first install',
   '  data-folder move <place>     move the data folder, stopping and starting the office',
+  '  settings-folder remove       remove the settings folder, keeping every data folder in it',
   'The database, the port, the lock and the log come from .env and the environment, as for the server.',
 ].join('\n')
 
@@ -2027,6 +2160,7 @@ const USAGE = [
 export async function main(args) {
   const [what, ...rest] = args
   if (what === 'data-folder') return dataFolder(rest)
+  if (what === 'settings-folder') return settingsFolder(rest, { EXIT, USAGE })
   if (rest.length > 0 || what === undefined) {
     process.stderr.write(`${USAGE}\n`)
     return EXIT.USAGE

@@ -13,6 +13,7 @@ import { route } from '../lib/route.ts'
 import { parse } from '../lib/parse.ts'
 import { PanelError } from '../lib/panel-error.ts'
 import { workspaceOf } from '../lib/workspaces.ts'
+import { thePageKindsInWords } from '../../shared/page-kinds-in-words.ts'
 import { decisionsGoverning, theGovernsCheck } from '../lib/governs.ts'
 
 const governingQuery = z.strictObject({
@@ -29,7 +30,9 @@ export async function governsRoutes(app: FastifyInstance): Promise<void> {
       'decision.governing',
       'remote',
       'WHICH DECISIONS GOVERN A PLACE: ask with exactly one of `path` (a file, folder or glob of the repository) or ' +
-        '`record` (a module, flow or pipeline). Newest first; `replacedBy` names what replaced a decision, and ' +
+        '`record` (the id of ' +
+        thePageKindsInWords() +
+        '). Newest first; `replacedBy` names what replaced a decision, and ' +
         '`notPlaced` counts the decisions that say nothing in `governs` and so could not be asked. `secondLevel=show` ' +
         'adds what each decision was based on.',
     ),
@@ -65,8 +68,8 @@ export async function governsRoutes(app: FastifyInstance): Promise<void> {
       'remote',
       'WHAT THE NIGHTLY CHECK OF `governs` FINDS: decisions with nothing in governs, two live decisions naming one ' +
         'file where the newer does not say it replaces the older, and replaced decisions that work made after the ' +
-        'replacement still cites. `sharingNoFile` counts the pairs that share only a module, flow or pipeline, which ' +
-        'are not listed. It reminds and never blocks.',
+        'replacement still cites. `sharingNoFile` counts the pairs that share only a page, which are not listed. It ' +
+        'reminds and never blocks.',
     ),
     async (req) => {
       parse(z.strictObject({}), req.query, 'The governs check takes no options:')

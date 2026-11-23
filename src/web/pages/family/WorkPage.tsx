@@ -136,14 +136,12 @@ export const WORK_TITLE_MIN = '10rem'
  * NAMED AFTER WHAT THE READER GETS, not after the mechanism: "By level" is the grouped list, and
  * "One list" is the table (report n9Mjk3c_sJRu, block b-13).
  */
-export const WORK_VIEW_WORDS: Readonly<Record<WorkView, { label: string; title: string }>> = {
+export const WORK_VIEW_WORDS: Readonly<Record<WorkView, { label: string }>> = {
   levels: {
     get label(): string { return t('g7a.work.levels') },
-    get title(): string { return t('g7a.work.levelsHint') },
   },
   flat: {
     get label(): string { return t('workPage.oneList') },
-    get title(): string { return t('workPage.oneListHint') },
   },
 }
 
@@ -561,9 +559,7 @@ export function WorkPage({
 
       {state.status === 'loading' ? <Loading label={t('g7a.work.loading')} rows={8} /> : null}
       {state.status === 'error' ? (
-        <ErrorNote message={state.message} fault={state.fault} retry={reload}>
-          <span className="wk-note">{t('g7a.work.failedRead')}</span>
-        </ErrorNote>
+        <ErrorNote message={state.message} fault={state.fault} retry={reload} />
       ) : null}
       {state.status === 'ready' ? <WorkList reply={state.value[0]} projects={state.value[1]} now={now} /> : null}
     </>
@@ -740,7 +736,6 @@ export function WorkList({
                     key={option}
                     type="button"
                     aria-pressed={option === view}
-                    title={WORK_VIEW_WORDS[option].title}
                     onClick={() => setView(option)}
                   >
                     {WORK_VIEW_WORDS[option].label}

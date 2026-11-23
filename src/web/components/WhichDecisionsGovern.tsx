@@ -3,9 +3,10 @@
 /**
  * WHICH DECISIONS GOVERN A PLACE, ON THE DECISIONS PAGE.
  *
- * A reader writes a path, or the id of a module, flow or pipeline, and the page asks GET /api/decisions/governing.
- * The answer is drawn as the server gives it: newest first, each decision with how its `governs` reaches the place,
- * and a replaced one marked with what replaced it. Nothing is worked out here.
+ * A reader writes a path, or the id of a page, and the page asks GET /api/decisions/governing. The answer is drawn as
+ * the server gives it: newest first, each decision with how its `governs` reaches the place, and a replaced one marked
+ * with what replaced it. Nothing is worked out here. A way the office inferred from a module's stated claims has a word
+ * of its own, so it is never read as a module claiming the place.
  *
  * THE FORM OPENS ON A PRESS. The Decisions page is read, and a page being read draws no box or dropdown until somebody
  * presses for one, so the form sits in a fold that is shut on arrival.
@@ -15,7 +16,7 @@
  */
 import { useState } from 'react'
 import { t } from '@shared/i18n.ts'
-import type { WhichDecisionsGovern } from '../../server/lib/governs.ts'
+import type { HowItGoverns, WhichDecisionsGovern } from '../../server/lib/governs.ts'
 import { api } from '../api.ts'
 import { useInspect } from '../lib/mode.ts'
 import { recordPath, RouteLink } from './router.tsx'
@@ -48,7 +49,7 @@ export function WhichDecisionsGovernAPlace() {
   return (
     <Panel titleIs="label" declares={{ surface: 'decisions.governing' }} title={t('decisions.governing.title')} rank={1}>
       <details className="dg-fold">
-        <summary className="dg-open">{t('decisions.governing.open')}</summary>
+        <summary className="dg-open">{t(LOOKUP_WORDS.open)}</summary>
         <form
           className="dg-ask"
           onSubmit={(event) => {
@@ -61,8 +62,8 @@ export function WhichDecisionsGovernAPlace() {
               value={by}
               onChange={setBy}
               options={[
-                { value: 'path', label: t('decisions.governing.by.path') },
-                { value: 'record', label: t('decisions.governing.by.record') },
+                { value: 'path', label: t(LOOKUP_WORDS.byPath) },
+                { value: 'record', label: t(LOOKUP_WORDS.byRecord) },
               ]}
             />
           </Field>
@@ -93,7 +94,7 @@ function TheAnswer({ answer, inspect }: { answer: WhichDecisionsGovern; inspect:
   return (
     <div className="dg-answer" data-found={String(answer.decisions.length)}>
       {answer.decisions.length === 0 ? (
-        <Absence say title={t('decisions.governing.none')} />
+        <Absence say title={t('absence.none')} />
       ) : (
         <ol className="dg-list">
           {answer.decisions.map((one) => (
@@ -106,21 +107,17 @@ function TheAnswer({ answer, inspect }: { answer: WhichDecisionsGovern; inspect:
               )}
               <ul className="dg-how">
                 {one.how.map((how, i) => (
-                  <li key={i}>
-                    {how.reaches === 'claims-it'
-                      ? t('decisions.governing.reaches.claims-it', { module: how.module.title })
-                      : t(REACHES_WORDS[how.reaches], { place: 'path' in how.place ? how.place.path : how.place.record })}
-                  </li>
+                  <li key={i}>{howItReachesInWords(how)}</li>
                 ))}
               </ul>
             </li>
           ))}
         </ol>
       )}
-      <p className="dg-note">{t('decisions.governing.notPlaced', { n: answer.notPlaced.count, of: answer.notPlaced.of })}</p>
+      <p className="dg-state">{t('decisions.governing.unplaced', { n: answer.notPlaced.count, of: answer.notPlaced.of })}</p>
       {answer.couldNotRead.length === 0 ? null : (
-        <p className="dg-note dg-unread">
-          {t('decisions.governing.modulesUnread')}
+        <p className="dg-state dg-unread">
+          {t('decisions.governing.modulesNotRead')}
           {inspect ? <span className="dg-detail"> {answer.couldNotRead.join(' ')}</span> : null}
         </p>
       )}
@@ -135,6 +132,24 @@ const REACHES_WORDS = {
   'inside-it': 'decisions.governing.reaches.inside-it',
 } as const
 
+/** The words of the fold that say what can be looked up, named in full so each is read where it is used. */
+export const LOOKUP_WORDS = {
+  open: 'decisions.governing.open',
+  byPath: 'decisions.governing.by.path',
+  byRecord: 'decisions.governing.by.record',
+} as const
+
+/** The words of the inferred way: the module, the claim it states, and the file, folder or pattern that claim holds. */
+export const INFERRED_REACH_WORD = 'w13s.governing.reaches.inferred'
+
+/** How one entry of a decision reaches the place asked about, in the reader's words. */
+export function howItReachesInWords(how: HowItGoverns): string {
+  const place = 'path' in how.place ? how.place.path : how.place.record
+  if (how.reaches === 'claims-it') return t('decisions.governing.reaches.claims-it', { module: how.module.title })
+  if (how.reaches === 'inferred') return t(INFERRED_REACH_WORD, { place, module: how.module.title, claim: how.claim })
+  return t(REACHES_WORDS[how.reaches], { place })
+}
+
 const CSS = `
 .dg-open { cursor: pointer; color: var(--text-2); }
 .dg-ask { margin-top: var(--gut); display: flex; flex-wrap: wrap; gap: var(--gut); align-items: end; }
@@ -145,5 +160,5 @@ const CSS = `
 .dg-row { overflow-wrap: anywhere; }
 .dg-replaced { display: block; color: var(--text-2); }
 .dg-how { margin: 2px 0 0; padding-left: 1.2em; color: var(--text-2); }
-.dg-note { color: var(--text-2); margin: var(--gut) 0 0; }
+.dg-state { color: var(--text-2); margin: var(--gut) 0 0; }
 `

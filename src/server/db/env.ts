@@ -194,7 +194,7 @@ export function databasePath(): string {
  * word is a fact about their `.env`, and a reader that quietly fell back to the built-in default
  * would hide it. `maxAvatarBytes` in lib/avatars.ts has said this since part 2a.
  */
-function wholeNumberSetting(name: string, least: 0 | 1 = 1): number {
+export function wholeNumberSetting(name: string, least: 0 | 1 = 1): number {
   const said = settingValue(name)
   const n = Number(said)
   if (!Number.isInteger(n) || n < least) {

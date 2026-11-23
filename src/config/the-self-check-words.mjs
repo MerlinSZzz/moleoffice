@@ -142,6 +142,7 @@ export const SELF_CHECK_WORDS = Object.freeze({ en: EN, zh: ZH })
  * @property {(said: string) => string} couldNotOpen the office answered but its page did not load in the window (problem Pc5buYWGRfzy)
  * @property {(said: string) => string} couldNotPair the office refused the window's read or press of its pairing door, so the window did not open it
  * @property {(said: string) => string} couldNotReachPairing nothing answered the window's read or press of the office's pairing door, so the window did not open it
+ * @property {string} theWindowsDeviceName the name the window gives itself when it pairs, which the office lists among its credentials
  * @property {string} noNode
  * @property {(path: string) => string} noShippedNode
  * @property {string} trayOpen
@@ -268,6 +269,7 @@ export const WINDOW_WORDS = Object.freeze({
     couldNotOpen: (said) => `The office answered, but its page did not load in this window. The window said: ${said}`,
     couldNotPair: (said) => `The office answered, but it did not pair this window, so the window has not opened it. The reason given: ${said}`,
     couldNotReachPairing: (said) => `The window could not reach the office to pair with it, so it has not opened the office. The window said: ${said}`,
+    theWindowsDeviceName: "This computer's Mole Office window",
     noNode: "The window cannot start the office: no program called node was found on this computer's PATH.",
     noShippedNode: (path) => `The window cannot start the office: the Node this installation carries is missing at ${path}.`,
     trayOpen: 'Open Mole Office',
@@ -382,6 +384,7 @@ export const WINDOW_WORDS = Object.freeze({
     couldNotOpen: (said) => `办公室有回应，但它的页面没有在这个窗口里打开。窗口说：${said}`,
     couldNotPair: (said) => `办公室有回应，但它没有和这个窗口配对，所以窗口没有打开它。给出的原因：${said}`,
     couldNotReachPairing: (said) => `窗口没能连上办公室来和它配对，所以窗口没有打开办公室。窗口说：${said}`,
+    theWindowsDeviceName: '这台电脑的 Mole Office 窗口',
     noNode: '窗口没法启动办公室：在这台电脑的 PATH 里没有找到叫 node 的程序。',
     noShippedNode: (path) => `窗口没法启动办公室：这个安装自带的 Node 不在 ${path}。`,
     trayOpen: '打开 Mole Office',
@@ -435,11 +438,11 @@ export const WINDOW_WORDS = Object.freeze({
       unknownStanding: (stored) => `这个窗口不认识的类型（${stored || '没有给出'}）`,
     },
     sandboxOff: {
-      heading: '这个窗口没有用 Chromium 的沙盒运行',
-      why: '它启动时带了 --no-sandbox。如果这台电脑不允许使用沙盒，Mole Office 的 AppImage 会自己这样做。',
-      risk: '沙盒能让出错的网页碰不到电脑的其他部分。没有沙盒，Mole Office 也能用，但没那么安全。',
+      heading: '这个窗口没有用 Chromium 的沙箱运行',
+      why: '它启动时带了 --no-sandbox。如果这台电脑不允许使用沙箱，Mole Office 的 AppImage 会自己这样做。',
+      risk: '沙箱能让出错的网页碰不到电脑的其他部分。没有沙箱，Mole Office 也能用，但没那么安全。',
       todo:
-        '要打开沙盒，管理这台电脑的人可以做两件事中的一件：加一个 AppArmor 配置，允许放 Mole Office 的那个文件夹里的程序使用用户命名空间；或者允许所有程序使用用户命名空间，在 Ubuntu 上就是把 kernel.apparmor_restrict_unprivileged_userns 设为 0。然后重新启动 Mole Office。',
+        '要打开沙箱，管理这台电脑的人可以做两件事中的一件：加一个 AppArmor 配置，允许放 Mole Office 的那个文件夹里的程序使用用户命名空间；或者允许所有程序使用用户命名空间，在 Ubuntu 上就是把 kernel.apparmor_restrict_unprivileged_userns 设为 0。然后重新启动 Mole Office。',
     },
     keptStopping: {
       title: 'Mole Office：页面一再停止',

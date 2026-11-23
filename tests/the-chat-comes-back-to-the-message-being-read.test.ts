@@ -14,7 +14,8 @@
  *  1. Another conversation and back comes back to the place.
  *  2. Each conversation keeps its own place: two conversations read at two places each come back to their own.
  *  3. Closing the chat and opening it again comes back to the place: closed beside the page, and closed in its own
- *     window and opened beside the page.
+ *     window, opened there again by its button, and put beside the page by the window's own press. The button opens
+ *     the chat the way the page last had it, before the way kept on the person's row.
  *  4. Another page and back comes back to the place: the chat page draws it, and Home's window draws it again after.
  *  5. A reload comes back to the place, two pages above the newest message.
  *  6. A conversation never opened lands at its newest message, and one left at its newest message comes back to its
@@ -276,6 +277,10 @@ async function readTwoPagesUpAndReload(page: Page, filmed = false): Promise<{ wo
 
 beforeAll(async () => {
   app = await liveApp({ name: 'the-chat-comes-back', viewport: { width: 1440, height: 1000 }, workspace: 'default' })
+  // THE PERSON LAST HAD THE CHAT BESIDE THE PAGE, so the button opens it there from shut, as these cases expect. The
+  // chat opens the way the person last had it, and the corner window when nothing is kept.
+  const beside = await fetch(`${app.api}/api/participants/person/${THE_PERSON}`, { method: 'PATCH', headers: PERSON, body: JSON.stringify({ chatOpensAs: 'split' }) })
+  expect(beside.status, await beside.clone().text()).toBe(200)
   for (const agent of AGENTS) {
     const filed = await fetch(`${app.api}/api/records`, { method: 'POST', headers: PERSON, body: JSON.stringify({ kind: 'agent', title: agent.name, data: { handle: agent.handle, runtime: 'claude-code', state: 'active' } }) })
     expect(filed.status, await filed.clone().text()).toBe(201)
@@ -345,15 +350,21 @@ it('comes back to the place after the chat is closed beside the page and opened 
   }
 }, 180_000)
 
-it('comes back to the place after the chat is closed in its own window and opened beside the page', async () => {
+it('comes back to the place after the chat is closed in its own window, opened there again, and put beside the page', async () => {
   const { context, page } = await aWindow(false, 'yes')
   try {
     await drawn(page, KILN, '.px-chat[data-where="corner"]')
     await wheel(page, -1_200)
     const looking = await theRowInTheMiddle(page)
     await closeTheChat(page)
+    // THE BUTTON OPENS THE CHAT THE WAY THIS PAGE LAST HAD IT, in its own window, and not the way kept on the person's
+    // row. So the chat goes beside the page by the press its own window has for that, as a person puts it there.
     await openTheChat(page, KILN)
-    expect(await page.locator('.px-chat[data-where="split"]').count(), 'the chat did not open beside the page').toBe(1)
+    expect(await page.locator('.px-chat[data-where="corner"]').count(), 'the chat button did not open the chat in its own window, the way this page last had it').toBe(1)
+    await page.click('.px-chat[data-where="corner"] .px-chat-beside')
+    await page.locator('.px-chat[data-where="split"]').waitFor({ timeout: 30_000 })
+    expect(await page.locator('.px-chat[data-where="split"]').count(), 'the chat did not go beside the page').toBe(1)
+    await drawn(page, KILN)
     await backAt(page, looking)
   } finally {
     await context.close()

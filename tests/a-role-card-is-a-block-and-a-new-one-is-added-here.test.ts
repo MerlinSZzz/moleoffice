@@ -38,19 +38,21 @@
  *
  * THE NEW WORDING: POST /api/roles/cards refuses every write, 410, with "Role cards are no longer
  * written here. Add an office role on the Role cards page, where it takes effect at once. Nothing
- * was written." It writes nothing. The Role cards page draws its own sentence above the cards that
- * door wrote, in the page's language: "Role cards are no longer written here. Add an office role
- * above; it takes effect at once." The cards stay and are drawn as before, each carrying "Nothing
- * enforces this card, because the old door wrote it. To make a role Mole Office enforces, add it
- * above as an office role." The old form (TheForm in src/web/pages/RoleCardNewPage.tsx) and its call
- * (api.writeARoleCard) are gone.
+ * was written." It writes nothing. The cards stay and are drawn as before under their heading, each
+ * carrying the short state "Nothing enforces this card." The old form (TheForm in
+ * src/web/pages/RoleCardNewPage.tsx) and its call (api.writeARoleCard) are gone.
  *
- * WHY THE DOOR AND THE PAGE DO NOT SAY THE SAME WORDS. The page's reader is already on the Role
- * cards page, so "above" names the add block they can see. The door's caller is not on the page, so
- * the door names the page to go to and adds "Nothing was written." (8NsXCjJEaqQR item 3).
- * GET /api/roles answers each old card's note in the door's own words for the same reason (the
- * inspector's note on run JtwB8_PFtSv2), so the card on the page is held to the page's words key
- * here, and the door's sentence is held in tests/the-role-cards-page-says-where-a-role-is-added-now.test.ts.
+ * UNTIL NOVEMBER 2026 the page drew a sentence above those cards, "Role cards are no longer written
+ * here. Add an office role above; it takes effect at once.", and each card's line went on "because
+ * the old door wrote it. To make a role Mole Office enforces, add it above as an office role." Both
+ * were taken off the page with the explanations, as decided: the add block above the cards is where
+ * a role is added.
+ *
+ * WHY THE DOOR AND THE PAGE DO NOT SAY THE SAME WORDS. The door's caller is not on the page, so the
+ * door names the page to go to and adds "Nothing was written." GET /api/roles answers each old
+ * card's note in the door's own words for the same reason, so the card on the page is held to the
+ * page's words key here, and the door's sentence is held in
+ * tests/the-role-cards-page-draws-the-cards-the-old-door-wrote.test.ts.
  * WHY the change at all: such a card took effect nowhere, and an office role added on the Role cards
  * page takes effect at once. The first answer had the sentence point to
  * Settings, because the secretary's recommendation assumed added cards lived there. They do not, so the secretary
@@ -65,7 +67,7 @@
  *   make `AddBlock` render nothing → the add-block cases go red.
  *   make `cardsMadeIn` in src/server/api/roles.ts return [] → the stored-card cases go red.
  *   let POST /api/roles/cards write again → the door's case goes red.
- *   take the sentence off the page → the sentence case goes red.
+ *   draw the door's sentence on the page → the heading case goes red.
  */
 
 import { createElement as h } from 'react'
@@ -229,8 +231,6 @@ describe('the block that makes a card', () => {
 /** What the door says to every write, whole. The page does not draw these words: its caller is on the page. */
 const THE_DOOR_SAYS =
   'Role cards are no longer written here. Add an office role on the Role cards page, where it takes effect at once. Nothing was written.'
-/** What the page says above those cards: its own sentence, whose "above" is the add block the reader can see. */
-const THE_PAGE_SAYS = 'Role cards are no longer written here. Add an office role above; it takes effect at once.'
 
 /** Every role card in the database, and every change row, so a refusal that wrote anything is seen. */
 function stored(): { cards: number; changes: number } {
@@ -260,7 +260,7 @@ describe('a card written in the product before its door was switched off', () =>
     expect(html).toContain('chronicler')
     expect(html).toContain(rp.ROLES_WORDS.written)
     // AND THE ONE LINE SAYING NOTHING ENFORCES IT, on the card itself, in the page's own words.
-    expect(html).toContain(sayInEnglish('addedRoles.nothingEnforcesAnOldCard'))
+    expect(html).toContain(sayInEnglish('addedRoles.notEnforced'))
   })
 
   it('is not read by the enforcement, and this is the measurement rather than the claim', async () => {
@@ -277,16 +277,13 @@ describe('a card written in the product before its door was switched off', () =>
     expect(refused.body).toContain('supervisor')
   })
 
-  it('is drawn under the sentence that says where a role is added now', async () => {
+  it("is drawn under its heading, and the page never draws the door's sentence", async () => {
     const html = drawn(await theRoles(), null)
     const heading = html.indexOf(rp.ROLES_WORDS.madeHere)
-    const sentence = html.indexOf(THE_PAGE_SAYS)
     const firstCard = html.indexOf('chronicler', heading)
     expect(heading, 'the list of cards written here has no heading').toBeGreaterThan(-1)
-    expect(sentence, 'the page does not say where a role is added now').toBeGreaterThan(heading)
-    expect(sentence, 'the sentence is not above the first card written here').toBeLessThan(firstCard)
-    // ONCE, and without the door's last sentence: nobody pressed anything here, so nothing was refused.
-    expect(html.split(THE_PAGE_SAYS).length - 1).toBe(1)
+    expect(firstCard, 'the card written here is not under its heading').toBeGreaterThan(heading)
+    // Nobody pressed anything here, so nothing was refused.
     expect(html).not.toContain(THE_DOOR_SAYS)
   })
 })

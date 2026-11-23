@@ -100,7 +100,7 @@ it('accepts Flows into Developer and into Office, and lets it come back to All p
   }
   const developer = await app.inject({ method: 'POST', url: '/api/sidebar/preview', payload: { arrangement: moved('developer') } })
   expect(developer.json().problems).toEqual([])
-  expect(developer.json().reminders).toContain('Flows will be in Developer. Normal mode will not show it.')
+  expect(developer.json().reminders).toContain('Office flows will be in Developer. Normal mode will not show it.')
   const intoDeveloper = await apply(moved('developer'))
   expect(intoDeveloper.statusCode, intoDeveloper.body).toBe(200)
   expect((await read()).arrangement.groups.find(group => group.key === 'developer')!.keys).toContain('flows')

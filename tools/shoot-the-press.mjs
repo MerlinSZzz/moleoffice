@@ -8,10 +8,12 @@
  *
  * `tools/review.mjs` photographs every page from a seeded corpus, and that seed holds no agent, so
  * it holds no card waiting on the person. This is the small companion: point it at one route on a
- * running app, and it takes the four widths and the two themes the drawing chapter asks for.
+ * running app, and it takes four widths and the two themes the drawing chapter asked for until 18 November 2026.
  *
- * The widths are 1440, 990, 660 and 390, which are the three layout bands cut by the 60rem and
- * 40rem breakpoints plus both edges. It writes PNGs only; it starts and stops nothing.
+ * The widths are 1440, 990, 660 and 390. When this tool was written, on 14 September 2026, they were the three
+ * layout bands cut by the 60rem and 40rem breakpoints, plus both edges. `src/web` has two more `rem` breakpoints
+ * since, at 64rem and 80rem, and tools/review.mjs takes 1200 for the band between them; this tool does not.
+ * It writes PNGs only; it starts and stops nothing.
  */
 import { chromium } from 'playwright'
 import { mkdirSync } from 'node:fs'

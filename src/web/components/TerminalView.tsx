@@ -34,10 +34,11 @@ import { FitAddon } from '@xterm/addon-fit'
 import '@xterm/xterm/css/xterm.css'
 import { t } from '@shared/i18n.ts'
 import type { TerminalReading, TypedFrom } from '@shared/terminals.ts'
-import { Btn } from './ui.tsx'
+import { Btn, ServerNote } from './ui.tsx'
 import { terminalStateWord, theCommandLine } from './TerminalParts.tsx'
 import { useLanguage } from '../lib/language.ts'
 import { KeepingWhatIType } from './KeepingWhatIType.tsx'
+import { RightClickSwitch } from './RightClickSwitch.tsx'
 import { TypedFromPanel } from './TypedFromPanel.tsx'
 import { aTypist, closeTheTerminal, readTheTerminal, resizeTheTerminal, whatARefusalSays } from '../lib/terminals.ts'
 
@@ -92,6 +93,19 @@ function thePagesTheme(): ITheme {
 function thePagesFont(): string {
   const mono = theVariable(getComputedStyle(document.documentElement), '--font-mono')
   return mono === undefined ? CJK_FALLBACK : `${mono}, ${CJK_FALLBACK}`
+}
+
+/**
+ * THE WORDS OF THE ROW UNDER A POINT OF THE PAGE, as the terminal holds them, or nothing off its rows. A right-click
+ * never lands on a drawn row, because xterm's rows take no pointer, so the row is found by the point's height on
+ * xterm's screen, which is the rows one under another from its top.
+ */
+function theRowAt(term: Terminal, x: number, y: number): string {
+  const screen = term.element?.querySelector('.xterm-screen')?.getBoundingClientRect()
+  if (screen === undefined || x < screen.left || x >= screen.right || y < screen.top || y >= screen.bottom) return ''
+  const buffer = term.buffer.active
+  const row = Math.floor(((y - screen.top) / screen.height) * term.rows)
+  return buffer.getLine(buffer.viewportY + row)?.translateToString(true) ?? ''
 }
 
 /** The parts of xterm 6.0.0's CompositionHelper that `sendEachCommittedWordOnce` reads and replaces. */
@@ -374,16 +388,6 @@ export function TerminalView({ terminal, onPutAway, onClosed, heading, canFit = 
     closeTheTerminal(id).then(() => closedNow(), refused(t('terminals.view.actionRefused')))
   }
 
-  const exit = current.exit
-  const endedWords =
-    current.state !== 'ended'
-      ? null
-      : exit === null
-        ? t('terminals.state.endedNoCode')
-        : exit.signal !== null && exit.signal !== 0
-          ? t('terminals.view.endedBySignal', { signal: exit.signal })
-          : t('terminals.view.ended', { code: exit.code })
-
   return (
     <section className="tm-view" aria-label={t('terminals.view.label')}>
       <style href="mole-office-terminal-view" precedence="default">
@@ -413,6 +417,15 @@ export function TerminalView({ terminal, onPutAway, onClosed, heading, canFit = 
         <Btn size="sm" onClick={() => xterm.current !== null && pasteInto(xterm.current)}>
           {t('terminals.view.paste')}
         </Btn>
+        {/* WHAT A RIGHT-CLICK IN THE TERMINAL DOES: its own copy and paste, or Mole Office's box about the
+            words selected in it, or with none selected, about the row under the pointer. xterm keeps both
+            itself, so they are read from it. */}
+        <RightClickSwitch
+          region={box}
+          selected={() => xterm.current?.getSelection() ?? ''}
+          wordsAt={(x, y) => (xterm.current === null ? '' : theRowAt(xterm.current, x, y))}
+          ownWords={t('terminals.view.rightClickOwn')}
+        />
         {canFit ? (
           <Btn size="sm" onClick={fit}>
             {t('terminals.view.fit')}
@@ -436,15 +449,15 @@ export function TerminalView({ terminal, onPutAway, onClosed, heading, canFit = 
       {reading.kind === 'gone' || reading.kind === 'failed' ? (
         <div className="tm-view-says tm-view-broken" role="status">
           <p>
-            {reading.kind === 'gone' ? t('terminals.view.gone') : t('terminals.view.failed')}{' '}
-            <span className="tm-mono">{reading.kind === 'gone' ? reading.says : reading.sentence}</span>
+            {reading.kind === 'gone' ? t('terminals.view.gone') : t('terminals.view.failed')}
+            {reading.kind === 'failed' ? <> <span className="tm-mono">{reading.sentence}</span></> : null}
           </p>
+          {reading.kind === 'gone' ? <ServerNote text={reading.says} /> : null}
           <Btn size="sm" onClick={() => setReadNumber((n) => n + 1)}>
             {t('terminals.view.readAgain')}
           </Btn>
         </div>
       ) : null}
-      {endedWords === null ? null : <p className="tm-view-says" role="status">{endedWords}</p>}
       {notice === null ? null : (
         <p className="tm-view-says tm-view-notice" role="status">
           {notice.word}
@@ -454,7 +467,6 @@ export function TerminalView({ terminal, onPutAway, onClosed, heading, canFit = 
       <div className="tm-view-box" data-reading={reading.kind}>
         <div ref={box} className="tm-view-screen" role="group" aria-label={t('terminals.view.label')} />
       </div>
-      <p className="tm-view-keys">{t('terminals.view.keys')}</p>
       {/* WHERE ITS TYPING CAME FROM, as the stream sends it, by point (d) of a decision, in round
           14. */}
       {typedFrom === null ? null : <TypedFromPanel typedFrom={typedFrom} />}
@@ -504,5 +516,4 @@ export const TERMINAL_VIEW_CSS = `
 .tm-view-box[data-reading='reading'] { visibility: hidden; height: 2rem; }
 .tm-view-screen { width: 100%; height: 100%; overflow: auto; }
 .tm-view-screen .xterm { display: inline-block; }
-.tm-view-keys { margin: 0; color: var(--text-3); font-size: 0.85em; }
 `

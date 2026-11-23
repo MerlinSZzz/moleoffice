@@ -4,6 +4,7 @@ import { settingsControlWord } from '@shared/settings-declaration.ts'
 import { SHIPPED_SIDEBAR, SIDEBAR_CAPTION_KEYS, type SidebarArrangement } from '@shared/sidebar-arrangement.ts'
 import { sidebarReading, useSidebarArrangement } from '../lib/sidebar-arrangement.ts'
 import { useSidebarPins, type SidebarPinsReading } from '../lib/sidebar-pins.ts'
+import { useReportsCount } from '../lib/report-count.ts'
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
 import { usePanelPresence } from '../lib/motion.ts'
@@ -12,7 +13,7 @@ import { THE_NARROW_FROM, THE_WIDE_FROM } from '../lib/the-shell-width.ts'
 import { useLoadingLight } from '../lib/waiting-light.ts'
 import { content, t, wordLanguage } from '@shared/i18n.ts'
 import { useLanguage } from '../lib/language.ts'
-import { PROJECTS_CHANGED } from './ProjectsPanel.tsx'
+import { PROJECTS_CHANGED, suggestedProjectId } from './ProjectsPanel.tsx'
 import { PLUGINS_CHANGED } from './PluginSwitches.tsx'
 import { pluginWordsIn } from '@shared/plugins.ts'
 import { SURFACES, RAIL_WORD_KEYS, type SurfaceId } from '@shared/surfaces.ts'
@@ -21,11 +22,12 @@ import { PRODUCT_NAME } from '@shared/product.ts'
 import { avatarUrlFor, defaultAvatarAssetId, moleOfficeId } from '@shared/participants.ts'
 import { KIND_FAMILIES, familyOf, type KindFamily } from '@shared/work.ts'
 import { RECORD_KINDS, type RecordKind } from '@shared/types.ts'
-import { api, getActor, setActor, subscribeActor, type AttentionHome, type WebActor } from '../api.ts'
+import { api, errorMessage, getActor, moleOfficeRequest, setActor, subscribeActor, type AttentionHome, type WebActor } from '../api.ts'
 import { needsSomebodyNow, type KeyValueStore } from '../lib/attention.ts'
 import { railCount, type WaitingReply } from '../lib/waiting.ts'
 import { OPEN_THE_QUICK_SEARCH } from '../lib/shortcuts.ts'
 import { openAQuickNote, theKeyOnThePress } from '../lib/open-a-quick-note.ts'
+import { openTheWebPageForm } from '../lib/web-page.ts'
 import { theBrowsersStore } from '../lib/store.ts'
 import {
   setWorkspace,
@@ -35,7 +37,7 @@ import {
   type WorkspaceSight,
   type WorkspaceWarning,
 } from '../lib/workspace.ts'
-import { DEFAULT_WORKSPACE } from '@shared/workspaces.ts'
+import { DEFAULT_WORKSPACE, workspaceIdFault, type Workspace } from '@shared/workspaces.ts'
 import type { WorkspacesReply } from '../../server/api/workspaces.ts'
 import { projectName } from './projects.tsx'
 import { categoryOfPage, categoryPath, countersPath, familyPath, horizonsPath, pathFor, pluginPagePath, RouteLink, shelvedPath, toolsetPath, type CategoryKey, type Route } from './router.tsx'
@@ -79,6 +81,7 @@ export type IconName =
   | 'findings'
   | 'ideas'
   | 'notes'
+  | 'writingBoard'
   | 'links'
   | 'package'
   | 'components'
@@ -349,6 +352,18 @@ export const DESTINATIONS: readonly Destination[] = [
     rail: true,
   },
   {
+    key: 'knowledge',
+    surface: 'rail.knowledge',
+    get label() { return t(RAIL_WORD_KEYS['rail.knowledge']) },
+    to: pathFor('knowledge'),
+    page: 'knowledge',
+    icon: 'package',
+    everyProject: true,
+    get what() { return t('knowledge.intro') },
+    badge: null,
+    rail: true,
+  },
+  {
     key: 'pipeline',
     surface: 'rail.pipeline',
     get label() { return t(RAIL_WORD_KEYS['rail.pipeline']) },
@@ -430,7 +445,8 @@ export const DESTINATIONS: readonly Destination[] = [
     page: 'myNotes',
     // EVERY QUICK NOTE IS READ ON MY NOTES (wave 13y round 167), so a note's own page marks this row and not Reports.
     kind: 'quick_note',
-    icon: 'notes',
+    // A NOTE'S OWN ICON, the writing board, beside the report icon of Reports.
+    icon: 'writingBoard',
     everyProject: true,
     get what() { return t('nav.what.myNotes') },
     badge: null,
@@ -993,6 +1009,7 @@ export const PAGE_TITLES: Readonly<Record<Route['name'], string>> = {
   get resources() { return rowName('resources') },
   get checklists() { return rowName('checklists') },
   get flows() { return rowName('flows') },
+  get knowledge() { return rowName('knowledge') },
   get shelved() { return rowName('shelved') },
   get agents() { return rowName('agents') },
   get agentsCategory() { return t('nav.group.agents') },
@@ -1046,6 +1063,8 @@ export const PAGE_TITLES: Readonly<Record<Route['name'], string>> = {
   get toolset() { return rowName('toolset') },
   get honourBoard() { return rowName('honourBoard') },
   get board() { return rowName('board') },
+  // THE DEPARTMENTS PAGE HAS NO ROW: the board leads to it, so it is named by its own heading's key.
+  get departments() { return t('departments.title') },
   get gates() { return rowName('gates') },
   get officeControls() { return rowName('officeControls') },
   // THE SIDEBAR'S ARRANGEMENT HAS NO ROW, so it is named by its own heading's key, as the pages above are.
@@ -1056,6 +1075,9 @@ export const PAGE_TITLES: Readonly<Record<Route['name'], string>> = {
   get incident() { return t('unlistedWords.page.incident') },
   // A PLUGIN'S PAGE IS HEADED BY ITS MANIFEST'S TITLE, which this table cannot know, so the phone bar says what it is.
   get plugin() { return t('pluginPage.title') },
+  // A KEY PAGE IS HEADED BY ITS TOOL'S NAME, which the office declares and this table cannot know.
+  get setUpATool() { return t('setUpATool.title') },
+  get file() { return t('filePage.title') },
   get unknown() { return t('unlistedWords.page.unknown') },
 }
 
@@ -1257,6 +1279,14 @@ const ICON_PATHS: Readonly<Record<IconName, React.ReactNode>> = {
       <path d="M8.5 12.5h7M8.5 16h4" />
     </>
   ),
+  // A NOTE'S OWN ICON: a writing board, held by three rings at its top, unlike the report's page with its corner folded.
+  writingBoard: (
+    <>
+      <rect x="5" y="5.5" width="14" height="15" rx="1.5" />
+      <path d="M9 3.5v4M12 3.5v4M15 3.5v4" />
+      <path d="M8.5 12h7M8.5 15.5h5" />
+    </>
+  ),
   module: (
     <>
       <rect x="3.5" y="4.5" width="17" height="15" rx="2" />
@@ -1376,7 +1406,7 @@ const ICON_PATHS: Readonly<Record<IconName, React.ReactNode>> = {
 
 export function Icon({ name }: { name: IconName }) {
   return (
-    <svg className="shell-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+    <svg className="shell-ico" data-icon={name} viewBox="0 0 24 24" aria-hidden="true" focusable="false">
       {ICON_PATHS[name]}
     </svg>
   )
@@ -1603,12 +1633,17 @@ function projectFaults(sight: WorkspaceSight, workspaces: AsyncState<WorkspacesR
 }
 
 /**
- * THE PROJECT BLOCK. Proposal vVPo6PUlGNB- block b-4.
+ * THE PROJECT BLOCK.
  *
  * It stands in the sidebar below the pages in front and above All pages, on every page, and names the project: its
  * initials in a square, the Switch, and its name in bold, which opens the project's own page. What is wrong with the
- * project is said under them. The Switch press opens the list of projects DOWNWARD, inside the block and above the
- * rows, with the one being read ticked; a press on another chooses it and closes the list. Nothing here opens upward.
+ * project is said under them. The Switch press opens the list of projects DOWNWARD, as a layer over the page, with the
+ * one being read ticked; a press on another chooses it and closes the list. The list stays in the block in the page and
+ * takes no room there, so opening it moves no row and scrolls nothing. The list ends with New project, which opens the
+ * form for making a project in its place; a project made there is chosen and the list closes. New project, or its form,
+ * stays whole at the list's foot, and the projects above it scroll in their own part. Where the foot does not fit under
+ * the press, the list moves up only as far as the foot needs, and in the menu it may then cover the press. It still
+ * closes then: a press on any project, the ticked one too, Make, or closing the menu.
  *
  * Its rows are the pages of the project the person pinned, in their order, and with none pinned it draws none: the
  * project's pages are listed on All pages. Narrowed, the block is its initials, which widen the sidebar, and its rows
@@ -1626,6 +1661,8 @@ function ProjectBlock({ sight, workspaces, collapsed, onExpand, opened, rows }: 
   const switchPress = useRef<HTMLButtonElement>(null)
   useLoadingLight(switchPress, choosing && !collapsed ? workspaces.status : 'gone', 2)
   const choicesPresent = usePanelPresence(choosing && !collapsed)
+  const choicesBox = useRef<HTMLDivElement>(null)
+  useTheListAtItsPress(choicesBox, switchPress, choicesPresent)
   const faults = projectFaults(sight, workspaces)
   const name = projectCaption(sight)
   const initials = sight.named ? projectInitials(name) : name
@@ -1655,7 +1692,7 @@ function ProjectBlock({ sight, workspaces, collapsed, onExpand, opened, rows }: 
       ) : (
         // THE LIST IS ALWAYS IN THE PAGE AND HIDDEN UNTIL THE PRESS OPENS IT, so what it offers is
         // one reading whether it is open or not.
-        <div className="sbp-choices" id={listId} hidden={!choicesPresent} data-motion-closing={choicesPresent && (!choosing || collapsed) ? 'yes' : undefined} aria-hidden={!choosing || collapsed ? true : undefined} inert={!choosing || collapsed ? true : undefined}>
+        <div ref={choicesBox} className="sbp-choices" id={listId} hidden={!choicesPresent} data-motion-closing={choicesPresent && (!choosing || collapsed) ? 'yes' : undefined} aria-hidden={!choosing || collapsed ? true : undefined} inert={!choosing || collapsed ? true : undefined}>
           <ul className="sbp-choice-list" aria-label={t('sidebarProject.choices')}>
             {choices.map((choice) => (
               <li key={choice.id}>
@@ -1671,15 +1708,131 @@ function ProjectBlock({ sight, workspaces, collapsed, onExpand, opened, rows }: 
               </li>
             ))}
           </ul>
+          {/* NEW PROJECT ENDS THE LIST. It is drawn anew each time the list opens or closes, so closing the list closes
+              the form and forgets what was typed. */}
+          <div className="sbp-new-end">
+            <NewProject key={choosing && !collapsed ? 'open' : 'shut'} onMade={() => {
+              setChoosing(false)
+              window.dispatchEvent(new Event(PROJECTS_CHANGED))
+            }} />
+          </div>
         </div>
       )}
       {faults.map((warning, index) => <ShortWarning key={index} warning={warning} />)}
       {faults.length > 0 && sight.id !== DEFAULT_WORKSPACE ? (
         <button type="button" className="shell-project-out" onClick={() => setWorkspace(DEFAULT_WORKSPACE)}>{t('nav.defaultProject')}</button>
       ) : null}
-      {opened === undefined ? null : <p className="shell-opened" role="status">{t('nav.readingProject', { name })}</p>}
+      {opened === undefined ? null : <p className="shell-opened" role="status">{t('nav.readingName', { name })}</p>}
       {rows}
     </section>
+  )
+}
+
+/** How far the Switch's list stands from its press, and from the window's edges. */
+const LIST_GAP = 4
+const LIST_EDGE = 8
+
+/**
+ * WHERE THE SWITCH'S LIST STANDS, set from its press as the list opens, and again whenever anything scrolls, the window
+ * changes size, or the list's foot changes height while it is open (wave 13y round 175, as decided). At the desk it
+ * stands beside the sidebar, over the page, so it covers no row. In the menu it lies over the menu. It is as wide as the
+ * block at both, and ends inside the window.
+ *
+ * Its foot is New project, or the form New project opens, and the foot is never cut off: the projects above it scroll
+ * in their own part. The list's top is just below the press when the foot and the first project fit between the press
+ * and the window's foot. When they do not, the list moves up only as far as they need, so its foot ends inside the
+ * window, and in the menu it may then cover the press. The foot changes height when the form opens, closes or draws
+ * another line, and the list is placed again each time.
+ *
+ * placePopup in ui.tsx is not used here, because it lifts a popup that does not fit above its point whole, and this
+ * list moves up only as far as its foot needs and scrolls its projects instead.
+ */
+function useTheListAtItsPress(list: React.RefObject<HTMLDivElement | null>, press: React.RefObject<HTMLButtonElement | null>, present: boolean): void {
+  useLayoutEffect(() => {
+    const layer = list.current
+    if (!present || layer === null) return
+    const projects = layer.querySelector<HTMLElement>('.sbp-choice-list')
+    const foot = layer.querySelector<HTMLElement>('.sbp-new-end')
+    if (projects === null || foot === null) return
+    const place = (): void => {
+      const from = press.current
+      const block = layer.closest('.sbp-block')
+      const side = layer.closest('.shell-side')
+      if (from === null || block === null || side === null) return
+      const blockBox = block.getBoundingClientRect()
+      const left = window.matchMedia(THE_NARROW_FROM).matches ? blockBox.left : side.getBoundingClientRect().right + LIST_GAP
+      // The width is set first, so the heights below are read at the width the list is drawn at.
+      layer.style.left = `${String(left)}px`
+      layer.style.width = `${String(blockBox.width)}px`
+      // The least the list shows: its border and padding, its first project, and its foot with the gap above the foot.
+      const own = getComputedStyle(layer)
+      const frame = layer.offsetHeight - layer.clientHeight + parseFloat(own.paddingTop) + parseFloat(own.paddingBottom)
+      const first = projects.firstElementChild instanceof HTMLElement ? projects.firstElementChild.offsetHeight : 0
+      const end = foot.offsetTop + foot.offsetHeight - projects.offsetTop - projects.offsetHeight
+      const least = Math.min(frame + first + end, window.innerHeight - 2 * LIST_EDGE)
+      const top = Math.max(Math.min(from.getBoundingClientRect().bottom + LIST_GAP, window.innerHeight - LIST_EDGE - least), LIST_EDGE)
+      layer.style.top = `${String(top)}px`
+      layer.style.maxHeight = `${String(window.innerHeight - LIST_EDGE - top)}px`
+    }
+    place()
+    const footHeight = new ResizeObserver(place)
+    footHeight.observe(foot)
+    window.addEventListener('scroll', place, true)
+    window.addEventListener('resize', place)
+    return () => {
+      footHeight.disconnect()
+      window.removeEventListener('scroll', place, true)
+      window.removeEventListener('resize', place)
+    }
+  }, [list, press, present])
+}
+
+/**
+ * NEW PROJECT, AT THE END OF THE SWITCH'S LIST. The press opens the form for making a project in its place: the name,
+ * Make and Cancel. The form checks the name as the door does, says the stored id only in developer mode, and files
+ * the project through POST /api/workspaces. A project made here is chosen at once.
+ */
+function NewProject({ onMade }: { onMade: () => void }) {
+  const mode = useMode()
+  const [open, setOpen] = useState(false)
+  const [name, setName] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [refused, setRefused] = useState<string | null>(null)
+  const id = suggestedProjectId(name)
+  const fault = name.trim() === '' ? null : workspaceIdFault(id)
+  async function make() {
+    setBusy(true)
+    setRefused(null)
+    try {
+      const made = await moleOfficeRequest<Workspace>('/api/workspaces', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ id, title: name.trim() }),
+      })
+      setOpen(false)
+      setName('')
+      onMade()
+      setWorkspace(made.id)
+    } catch (err) { setRefused(errorMessage(err)) }
+    finally { setBusy(false) }
+  }
+  if (!open) return (
+    <button type="button" className="sbp-new" onClick={() => setOpen(true)}>
+      <span className="sbp-new-square" aria-hidden="true">+</span>
+      <span>{t('sidebarProject.newProject')}</span>
+    </button>
+  )
+  return (
+    <form className="sbp-new-form" onSubmit={(event) => { event.preventDefault(); void make() }}>
+      <label htmlFor="sbp-new-name">{t('sidebarProject.newProjectName')}</label>
+      <input id="sbp-new-name" value={name} autoFocus onChange={(event) => setName(event.target.value)} placeholder={t('nav.exampleName')} />
+      {name.trim() === '' ? null : fault === null ? (mode === 'inspect' ? <p>{t('nav.storedAs', { id })}</p> : null)
+        : <p role="status">{t('nav.nameForCreation')}</p>}
+      <div className="sbp-new-presses">
+        <button type="submit" disabled={busy || name.trim() === '' || fault !== null}>{t(busy ? 'nav.making' : 'nav.make')}</button>
+        <button type="button" onClick={() => { setOpen(false); setRefused(null) }}>{t('nav.cancel')}</button>
+      </div>
+      {refused === null ? null : <p role="status">{t('nav.makeFailed')}{mode === 'inspect' ? ` ${refused}` : null}</p>}
+    </form>
   )
 }
 
@@ -1707,7 +1860,7 @@ function ChatEntry({ onClose }: { onClose: () => void }) {
  * comes carries the re-read mark, as every reading of `useProjectAsync` does.
  */
 export function useChecklistsWaiting(projectId: string, asked: boolean): number | null {
-  const [checklists] = useProjectAsync(() => asked ? api.listChecklistsAcross(projectId, 'everyone') : Promise.resolve(null), [projectId, asked], { follows: { kinds: ['checklist'], atMostEveryMs: 5000 } })
+  const [checklists] = useProjectAsync(() => asked ? api.listChecklistsAcross(projectId, 'everyone', 'open') : Promise.resolve(null), [projectId, asked], { follows: { kinds: ['checklist'], atMostEveryMs: 5000 } })
   return checklists.status === 'ready' && checklists.value !== null ? stepsWaitingOnTheOwner(checklists.value.checklists) : null
 }
 
@@ -1864,6 +2017,7 @@ export function Sidebar({
   const drawerPresent = usePanelPresence(open)
   const sidebar = useSidebarArrangement()
   const pins = useSidebarPins()
+  const reportsCountShown = useReportsCount()
   const projectPins = theProjectPins(pins.pins)
   const mode = useMode()
   const theKey = theKeyOnThePress()
@@ -2058,6 +2212,14 @@ export function Sidebar({
               }}><span className="shell-ico-box"><Icon name="pen" /></span>
               <span className="shell-label" {...DRAWS_THE_NAME}>{t('nav.newNote')}</span>
               {theKey === null ? null : <kbd className="shell-key">{theKey}</kbd>}</button>
+            {/* WEB PAGE opens the form that asks for an address and where it goes. In the window the window draws the page;
+                in a browser the form says so and opens a new tab (components/WebPage.tsx). */}
+            <button type="button" className="shell-link shell-web-page" {...declaredAttributes({ surface: 'rail.webpage' })}
+              onClick={() => {
+                onClose()
+                window.setTimeout(() => openTheWebPageForm(), 0)
+              }}><span className="shell-ico-box"><Icon name="links" /></span>
+              <span className="shell-label" {...DRAWS_THE_NAME}>{t('nav.webPage')}</span></button>
           </div>
 
           {/* THE LIST SCROLLS ON ITS OWN AND THE FOOT STAYS. */}
@@ -2073,7 +2235,7 @@ export function Sidebar({
                 {theFront(pins.pins).map((entry) => entry.chat ? <ChatEntry key="chat" onClose={onClose} /> : (
                   <li key={entry.destination.key}><NavRow declares={{ surface: entry.destination.surface }} destination={entry.destination}
                     page={page} familyOnPage={familyOnPage} {...(recordOnScreen === undefined ? {} : { recordOnScreen })}
-                    reply={reply} waiting={waitingReply} wordsWaiting={wordsCount} checklistsWaiting={checklistsCount} /></li>
+                    reply={reply} waiting={waitingReply} wordsWaiting={wordsCount} checklistsWaiting={checklistsCount} reportsCountShown={reportsCountShown} /></li>
                 ))}
               </ul>
               <ProjectBlock sight={sight} workspaces={workspaces} collapsed={collapsed} onExpand={expand} opened={opened} rows={projectPins.length === 0 ? null : (
@@ -2081,7 +2243,7 @@ export function Sidebar({
                   {projectPins.map((destination) => (
                     <li key={destination.key}><NavRow declares={{ surface: destination.surface }} destination={destination}
                       page={page} familyOnPage={familyOnPage} {...(recordOnScreen === undefined ? {} : { recordOnScreen })}
-                      reply={reply} waiting={waitingReply} wordsWaiting={wordsCount} checklistsWaiting={checklistsCount} /></li>
+                      reply={reply} waiting={waitingReply} wordsWaiting={wordsCount} checklistsWaiting={checklistsCount} reportsCountShown={reportsCountShown} /></li>
                   ))}
                 </ul>
               )} />
@@ -2162,15 +2324,19 @@ export interface RowReadings {
   waiting: WaitingReply | null
   wordsWaiting: number | null
   checklistsWaiting: number | null
+  /** Whether the person chose to see how many reports are unread. With this off, the Reports row draws none. */
+  reportsCountShown: boolean
 }
 
 /**
  * THE COUNT A ROW DRAWS, worked out here once for the sidebar's entries and for the rows of All pages, or null
- * while its reading is not there. A count of nought draws no mark.
+ * while its reading is not there. A count of nought draws no mark. The unread report count is hidden unless the
+ * person turned it on.
  */
-export function rowCount(destination: Destination, { reply, waiting, wordsWaiting, checklistsWaiting }: RowReadings): number | null {
+export function rowCount(destination: Destination, { reply, waiting, wordsWaiting, checklistsWaiting, reportsCountShown }: RowReadings): number | null {
   const badge = destination.badge
   if (badge === null) return null
+  if (badge.of === 'reports' && !reportsCountShown) return null
   if (badge.of === 'waiting') return waiting === null ? null : railCount(waiting)
   if (badge.of === 'yourWords') return wordsWaiting
   if (badge.of === 'checklists') return checklistsWaiting
@@ -2187,6 +2353,7 @@ function NavRow({
   waiting,
   wordsWaiting,
   checklistsWaiting,
+  reportsCountShown,
 }: {
 
   declares: Declares
@@ -2202,9 +2369,11 @@ function NavRow({
   wordsWaiting: number | null
 
   checklistsWaiting: number | null
+
+  reportsCountShown: boolean
 }) {
   const mark = markFor(destination, page, familyOnPage, recordOnScreen)
-  const count = rowCount(destination, { reply, waiting, wordsWaiting, checklistsWaiting })
+  const count = rowCount(destination, { reply, waiting, wordsWaiting, checklistsWaiting, reportsCountShown })
 
   return (
     <a
@@ -2337,6 +2506,7 @@ export const SIDEBAR_CSS = `
 .shell-chat { width: 100%; text-align: left; }
 .shell-quick-search { width: 100%; text-align: left; }
 .shell-new-note { width: 100%; text-align: left; }
+.shell-web-page { width: 100%; text-align: left; }
 .shell-new-note[data-key] { grid-template-columns: 18px minmax(0, 1fr) auto; }
 .shell-key { color: var(--text-3); font-family: var(--font-mono); font-size: var(--fs-1); font-weight: 600; letter-spacing: normal; white-space: nowrap; }
 .shell-side-inner > * { flex-shrink: 0; }
@@ -2512,9 +2682,10 @@ export const SIDEBAR_CSS = `
   gap: 4px 6px;
   padding: 0 4px 6px;
 }
-/* THE RULE UNDER THE HEAD stands only over something drawn under it: the rows, the Switch list, or a line about the
-   projects. With nothing under the head, the block draws no rule. */
-.sbp-head:has(~ :not([hidden])) { border-bottom: var(--border-w) solid color-mix(in srgb, var(--accent) 35%, transparent); }
+/* THE RULE UNDER THE HEAD stands only over something drawn under it: the rows or a line about the projects. With
+   nothing under the head, the block draws no rule. The Switch list is not counted: it is a layer over the page and
+   takes no room under the head, and a rule drawn as it opened would move every row below by its width. */
+.sbp-head:has(~ :not([hidden], .sbp-choices)) { border-bottom: var(--border-w) solid color-mix(in srgb, var(--accent) 35%, transparent); }
 /* THE INITIALS, THE NAME AND THE SWITCH stand in one row, the name level with the initials. When the name's longest
    word does not fit beside Switch, Switch goes onto a line of its own under the name, at the right. */
 .sbp-square {
@@ -2575,13 +2746,29 @@ export const SIDEBAR_CSS = `
 .sbp-switch[aria-expanded="true"] { background: var(--hover); }
 .sbp-switch:disabled { color: var(--text-3); cursor: default; background: var(--panel); }
 .sbp-choices[hidden] { display: none; }
+/* THE SWITCH LIST IS A LAYER OVER THE PAGE (wave 13y round 175, as decided). It stays in the block in the page and takes
+   no room there, so opening it, or the form in it, moves no row and scrolls nothing. Its place, width and greatest
+   height are set from its press while it is open (useTheListAtItsPress, above). It is a column: the projects scroll in
+   their own part, and New project or its form below them keeps its height, so it is never cut off. Only a foot taller
+   than the window scrolls the list itself. At the desk the sidebar's column is raised over the page while the list is
+   open, because the list stands over the page beside it and the page comes later. It is raised over the review tray as
+   well. The tray is held across the window's foot at the popover level and comes later too. In a short window the list
+   reaches into it, and a press on a project there would land on the tray. */
 .sbp-choices {
+  position: fixed;
+  z-index: var(--z-popover);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 4px;
   border: var(--border-w) solid var(--border-strong);
   border-radius: var(--radius-sm);
   background: var(--panel);
+  box-shadow: var(--elev-2);
 }
-.sbp-choice-list { display: flex; flex-direction: column; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.shell-side-inner:has(.sbp-choices:not([hidden])) { z-index: var(--z-project-list); }
+.sbp-choice-list { display: flex; flex-direction: column; flex: 0 1 auto; gap: 2px; min-height: 0; overflow-y: auto; overscroll-behavior: contain; margin: 0; padding: 0; list-style: none; }
 .sbp-choice {
   display: grid;
   grid-template-columns: 24px minmax(0, 1fr) auto;
@@ -2598,6 +2785,8 @@ export const SIDEBAR_CSS = `
 }
 .sbp-choice:hover { background: var(--hover); color: var(--text); }
 .sbp-choice[aria-current] { background: var(--accent-soft); color: var(--text); font-weight: 700; }
+/* The ring sits inside the press, so the projects' part, which scrolls, does not cut it off. */
+.sbp-choice:focus-visible { outline-offset: calc(-1 * var(--focus-w)); }
 .sbp-choice-square {
   display: inline-flex;
   align-items: center;
@@ -2613,6 +2802,59 @@ export const SIDEBAR_CSS = `
 .sbp-choice[aria-current] .sbp-choice-square { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
 .sbp-tick { color: var(--accent); font-weight: 700; }
 .sbp-choices-wait { margin: 0; padding: 0 6px; font-size: var(--fs-1); color: var(--text-3); }
+/* NEW PROJECT, below a line under the projects. It keeps its height in the list's column, and its form keeps to the
+   list's width, so it fits the narrow menu. */
+.sbp-new-end { flex: none; margin-top: 4px; padding-top: 4px; border-top: var(--border-w) solid var(--border); }
+.sbp-new {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  align-items: center;
+  gap: var(--pad);
+  width: 100%;
+  min-height: var(--row-h);
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  color: var(--text-2);
+  font-size: var(--fs-1);
+  font-weight: 600;
+  text-align: left;
+}
+.sbp-new:hover { background: var(--hover); color: var(--text); }
+.sbp-new-square {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-sm);
+  border: var(--border-w) dashed var(--border-strong);
+  font-weight: 700;
+}
+.sbp-new-form { display: flex; flex-direction: column; gap: 6px; min-width: 0; padding: 2px 6px; font-size: var(--fs-1); }
+.sbp-new-form label { font-weight: 600; }
+.sbp-new-form input {
+  min-width: 0;
+  width: 100%;
+  min-height: var(--row-h);
+  padding: 2px 6px;
+  border: var(--border-w) solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--text);
+}
+.sbp-new-form p { margin: 0; color: var(--text-3); overflow-wrap: anywhere; }
+.sbp-new-form [role="status"] { color: var(--st-failed); }
+.sbp-new-presses { display: flex; flex-wrap: wrap; gap: 6px; }
+.sbp-new-presses button {
+  min-height: var(--row-h);
+  padding: 2px var(--pad);
+  border: var(--border-w) solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--panel);
+  font-weight: 600;
+}
+.sbp-new-presses button:hover { background: var(--hover); }
+.sbp-new-presses button:disabled { color: var(--text-3); cursor: not-allowed; background: var(--panel); }
 .sbp-block .shell-link[aria-current] { background: var(--accent-soft); }
 
 /* THE FOOT: fixed at the bottom; the list above it scrolls. Nothing in it opens. */
@@ -2914,6 +3156,9 @@ export const SIDEBAR_CSS = `
   .shell-close,
   .sbp-switch,
   .sbp-choice,
+  .sbp-new,
+  .sbp-new-form input,
+  .sbp-new-presses button,
   .sbp-look-press,
   .sbp-shut-down {
     min-height: 44px;

@@ -13,7 +13,7 @@
  */
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import type { Page } from 'playwright'
-import { liveApp, waitForThePage, type LiveApp } from './helpers.ts'
+import { liveApp, waitForThePage, type LiveApp, governsTheWholeProject } from './helpers.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { localStamp } from '../src/shared/time.ts'
 import { createI18n } from '../src/shared/i18n.ts'
@@ -34,7 +34,7 @@ async function post(path: string, body: unknown, headers: Record<string, string>
 beforeAll(async () => {
   app = await liveApp({ name: 'r33-seven-things', workspace: 'default', viewport: { width: 1440, height: 1000 } })
   await post('/api/agents/started', { handle: 'test-kite-keeper', name: 'Test kite keeper' })
-  decisionId = (await post('/api/records', { kind: 'decision', title: 'Test: mend the tail with tape', data: { option_taken: 'Test: tape', because: 'A made-up reason.', replaces: [] } })).record.id
+  decisionId = (await post('/api/records', { kind: 'decision', title: 'Test: mend the tail with tape', data: { option_taken: 'Test: tape', because: 'A made-up reason.', ...governsTheWholeProject(), replaces: [] } })).record.id
   await post('/api/counters', { title: 'Test kite flights', counts: 'Flights of the test kite.', mayAdd: { anyone: false, who: [{ kind: 'agent', id: 'test-kite-keeper' }] }, triggers: [{ kind: 'every', hours: 552 }], action: { kind: 'task', title: 'Test look at the flights' } }, KEEPER)
   // A COUNTER THAT IS DUE WITH ONE TRIGGER: a count of 1, so no reason to wait follows its due
   // time, and nothing else ends that sentence.

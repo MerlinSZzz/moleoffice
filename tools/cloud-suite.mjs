@@ -34,6 +34,16 @@ const QUIET_SPELL_SEC = 2700
 const QUIET_CPU_SHARE = 100
 /** A test's shorter quiet spell, read only under the test mark, as tools/sandbox.mjs reads a wait a test may shorten. */
 const A_SHORTER_QUIET_SPELL = 'MOLE_OFFICE_CLOUD_QUIET_SPELL_SECONDS'
+/**
+ * THE BLOB REPORT (criterion 28): the whole run also writes vitest's blob report, `<report>.blob` beside the JSON report,
+ * because the JSON report's file times start at a file's first case and leave out its start (its beforeAll). The blob
+ * travels with the other outputs, and the answer does not read it. One over this many bytes is not kept, and the run
+ * is answered as before.
+ */
+const BLOB_KEEPS_AT_MOST = 256 * 1024 * 1024
+/** A test's smaller bound for the blob, read only under the test mark. */
+const A_SMALLER_BLOB_BOUND = 'MOLE_OFFICE_CLOUD_BLOB_BYTES'
+const theBlobBeside = (report) => `${report}.blob`
 const quote = (word) => `'${String(word).replaceAll("'", "'\\''")}'`
 const no = (reason) => { throw new Error(reason) }
 
@@ -99,7 +109,7 @@ function maskRunAloneReportText(text, host, user) {
   return maskReportText(text, host, user)
 }
 
-const artifactPaths = (run) => [run.report, run.reads, run.log, ...(run.manifest === undefined ? [] : [run.manifest]), ...(run.alone === undefined ? [] : [run.alone]), run.journals]
+const artifactPaths = (run) => [run.report, run.reads, run.log, ...(run.manifest === undefined ? [] : [run.manifest]), ...(run.alone === undefined ? [] : [run.alone]), run.journals, run.blob]
 
 /** A file named relative to the clone: no leading slash, and no empty, `.` or `..` part. */
 const aCleanPathInside = (file) => typeof file === 'string' && file !== '' && !file.startsWith('/') && file.split('/').every((part) => part !== '' && part !== '.' && part !== '..')
@@ -111,6 +121,11 @@ const aCleanPathInside = (file) => typeof file === 'string' && file !== '' && !f
 function theAloneOrder(red, carriedOver) {
   const first = carriedOver.filter((file) => red.includes(file))
   return [...first, ...red.filter((file) => !first.includes(file)).sort()]
+}
+
+function theBlobBound() {
+  const smaller = Number(carriesTheTestMark() ? process.env[A_SMALLER_BLOB_BOUND] : undefined)
+  return Number.isInteger(smaller) && smaller > 0 && smaller < BLOB_KEEPS_AT_MOST ? smaller : BLOB_KEEPS_AT_MOST
 }
 
 function aQuietSpellATestMayShorten() {
@@ -151,12 +166,16 @@ function argumentsOf(words) {
   // The startup journals (criterion 22) go in the folder beside the log. Like the log, it may lie inside the clone.
   const journals = theJournalsBeside(log)
   if (within(clone, journals) || [report, reads, log, manifest, alone].some((path) => path !== undefined && (within(journals, path) || within(path, journals)))) no('the startup journals folder beside the log must be separate from the clone and the other outputs')
+  // The blob report (criterion 28) lies beside the report, so it is refused where it would be, or lie in, another output.
+  // It comes after the journals' check, so a report that check refuses is refused in its words.
+  const blob = theBlobBeside(report)
+  if ([reads, log, manifest, alone, journals].some((path) => path !== undefined && within(blob, path))) no('the blob report beside the report is, or lies in, another output')
   // A test's shorter interval, never a longer one. The queue's door and the periodic suite never pass it, so a real run is
   // read every BOX_SAMPLED_EVERY_SEC.
   const sampled = options['--box-sampled-every']
   if (sampled !== undefined && (!/^[1-9][0-9]*$/u.test(sampled) || Number(sampled) > BOX_SAMPLED_EVERY_SEC)) no('the box sample interval must be a whole number of seconds above 0')
   if (!lstatSync(clone).isDirectory()) no('the local clone is not a directory')
-  return { clone, report, reads, log, ...(manifest === undefined ? {} : { manifest }), ...(alone === undefined ? {} : { alone }), ...(carriedOver === undefined ? {} : { carriedOver }), journals, commit: options['--commit'], seconds, ...(sampled === undefined ? {} : { sampledEverySec: Number(sampled) }) }
+  return { clone, report, reads, log, ...(manifest === undefined ? {} : { manifest }), ...(alone === undefined ? {} : { alone }), ...(carriedOver === undefined ? {} : { carriedOver }), journals, blob, commit: options['--commit'], seconds, ...(sampled === undefined ? {} : { sampledEverySec: Number(sampled) }) }
 }
 
 /** lstat refuses links; O_NOFOLLOW and fstat also check the file actually opened. Never source runner.env. */
@@ -365,7 +384,7 @@ function watchTheWholeRun(state, group, container, log, report, reads, quietSec,
 
 /** The only shell here runs on the box. Local spawn always takes an argument array. */
 function remoteScript(action, run, runner, token, secondsLeft = run.seconds, sampledEverySec = BOX_SAMPLED_EVERY_SEC) {
-  const outputPaths = ['"$report"', '"$reads"', '"$log"', ...(run.manifest === undefined ? [] : ['"$manifest"']), ...(run.alone === undefined ? [] : ['"$alone"']), '"$journals"'].join(' ')
+  const outputPaths = ['"$report"', '"$reads"', '"$log"', ...(run.manifest === undefined ? [] : ['"$manifest"']), ...(run.alone === undefined ? [] : ['"$alone"']), '"$journals"', '"$blob"'].join(' ')
   const filter = `const {isIP}=require('node:net'); const maskText=${maskText.toString()}; const host=${JSON.stringify(runner.host)}; const user=${JSON.stringify(runner.user)}; require('node:readline').createInterface({input:process.stdin}).on('line',line=>console.log(maskText(line,host,user)));`
   const preface = `# cloud-suite: ${action}
 set -eu
@@ -377,6 +396,7 @@ log=${quote(run.log)}
 ${run.manifest === undefined ? '' : `manifest=${quote(run.manifest)}`}
 ${run.alone === undefined ? '' : `alone=${quote(run.alone)}`}
 journals=${quote(run.journals)}
+blob=${quote(run.blob)}
 run_home=${quote(join(dirname(run.clone), `.cloud-home-${token}`))}
 container=${quote(`mole-cloud-${token}`)}
 cache="$HOME/.cache/mole-office/cloud-suite"
@@ -547,7 +567,7 @@ if ! flock -n 9; then
   exit 75
 fi
 mkdir "$state" || fail 'the cloud box could not make its run state folder'
-export clone report reads log ${run.manifest === undefined ? '' : 'manifest'} ${run.alone === undefined ? '' : 'alone'} journals run_home container cache state repository
+export clone report reads log ${run.manifest === undefined ? '' : 'manifest'} ${run.alone === undefined ? '' : 'alone'} journals blob run_home container cache state repository
 cleanup_remote() (
 ${cleanupBody}
 )
@@ -642,8 +662,16 @@ if [ "$code" -eq 0 ]; then
   sampler=$!
   # The watch reads this marker (criterion 27): only the whole run's npm test is watched.
   touch "$state/suite-running"
-  if run_logged env ${suiteEnvironment} npm test -- "--maxWorkers=$workers" --reporter=default --reporter=json "--outputFile.json=$report"; then code=0; else code=$?; fi
+  if run_logged env ${suiteEnvironment} npm test -- "--maxWorkers=$workers" --reporter=default --reporter=json "--outputFile.json=$report" --reporter=blob "--outputFile.blob=$blob"; then code=0; else code=$?; fi
   rm -f -- "$state/suite-running"
+  # THE BLOB REPORT (criterion 28) is kept only within its bound; one over it is removed here and said in the log.
+  if [ -f "$blob" ]; then
+    blob_bytes=$(stat -c %s -- "$blob")
+    if [ "$blob_bytes" -gt ${theBlobBound()} ]; then
+      rm -f -- "$blob"
+      printf 'cloud-suite: the blob report was %s bytes, over the %s it may keep, so it is not kept\\n' "$blob_bytes" ${theBlobBound()} >>"$log"
+    fi
+  fi
   kill "$sampler" 2>/dev/null || true
   wait "$sampler" || true
 ${aloneRuns}

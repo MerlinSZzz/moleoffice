@@ -14,7 +14,9 @@
  *   - a bare name in each folder of the terminal's PATH, in order;
  *   - a path that is not a full one in the terminal's folder;
  *   - a full path that has no ending PATHEXT names, with each ending.
- * The environment's names are read in any case, as Windows reads them.
+ * The environment's names are read in any case, as Windows reads them. The terminal's search path is read by the
+ * Windows system's `theSearchPathIn` in ./the-system.mjs, the one reader of a search path in src/. So an environment
+ * that holds it under two spellings with different values is refused there, and nothing is looked for.
  *
  * What is found is started by its ending. An .exe or .com is handed to node-pty by its full path, with its arguments
  * unchanged. A .cmd or .bat runs through the terminal's %ComSpec%, on the line `theWayToStart` in ../runtimes.mjs
@@ -67,7 +69,7 @@ export function howWindowsStartsACommand(command, args, folder, env, isThere = e
   if (full && STARTED_AS_THEY_ARE.includes(win32.extname(command).toLowerCase())) return { command, args: [...args] }
   const system = { platform: 'win32', pathext: theValueOf(env, 'PATHEXT'), comspec: theValueOf(env, 'ComSpec'), isThere }
   const bare = !/[\\/]/u.test(command)
-  const found = whereIsThisTool(bare || full ? command : win32.join(folder, command), theValueOf(env, 'PATH'), system)
+  const found = whereIsThisTool(bare || full ? command : win32.join(folder, command), env, system)
   if (found === null) {
     const where = bare ? "in each folder of the terminal's PATH" : full ? 'at that path' : `in the terminal's folder, ${folder}`
     throw new Error(

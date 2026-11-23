@@ -401,7 +401,7 @@ describe('a shut down while the office waits for its update leaves no terminal h
     if (decision.serve || decision.update === undefined) throw new Error(`the start check did not offer an update: ${decision.serve ? decision.report : decision.refusal}`)
     const backups = join(dirname(t.file), 'backups')
     mkdirSync(backups, { recursive: true })
-    const offer = { file: t.file, holds: decision.update.holds, wouldWrite: decision.update.wouldWrite, backups }
+    const offer = { file: t.file, holds: decision.update.holds, wouldWrite: decision.update.wouldWrite, measuredOn: decision.update.measuredOn, backups }
     const port = Number(process.env['MOLE_OFFICE_PORT'])
     const said: string[] = []
     vi.spyOn(console, 'log').mockImplementation((line: unknown) => {

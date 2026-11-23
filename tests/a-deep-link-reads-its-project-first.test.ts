@@ -20,9 +20,13 @@
  *      Hz0sA-l6YmpY, found in the phone bar on the way to this one).
  *
  * THE WAIT IS MADE CERTAIN, NOT LUCKY: the list's reply is held in the browser for two seconds.
+ *
+ * NO MODE IS STORED EITHER. Each context comes from `aContextThatStoresNoMode` (tests/helpers.ts stores
+ * Normal mode in every other one), so the page opens in the person's starting mode. A test office's
+ * person starts in Developer mode, so both cases are read in Developer mode.
  */
 import { afterAll, beforeAll, expect, it } from 'vitest'
-import { deleteTheCopiedDefaultChapters, deleteTheFiledCardWords, liveApp, type LiveApp } from './helpers.ts'
+import { aContextThatStoresNoMode, deleteTheCopiedDefaultChapters, deleteTheCopiedDefaultFlows, deleteTheFiledCardWords, liveApp, type LiveApp } from './helpers.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { DEFAULT_WORKSPACE } from '../src/shared/workspaces.ts'
 import { createI18n } from '../src/shared/i18n.ts'
@@ -53,6 +57,7 @@ beforeAll(async () => {
   // The default chapters a fresh office copies at its first start (wave 13s round 7) are module records
   // this test did not file, and it counts or draws modules, so it deletes them first.
   await deleteTheCopiedDefaultChapters(app.api)
+  await deleteTheCopiedDefaultFlows(app.api)
   // The five role card text records a fresh office files at its first start (wave 13w round 3) are records
   // of the default project this test did not file, and it counts that project's records, so they go too.
   await deleteTheFiledCardWords(app.api)
@@ -86,8 +91,9 @@ afterAll(async () => {
 })
 
 it('asks nothing about the record until its project is chosen, and then asks only that project', async () => {
-  // A NEW CONTEXT, so nothing is stored and the browser starts on the default project.
-  const context = await app.browser.newContext({ viewport: { width: 1440, height: 1000 } })
+  // A NEW CONTEXT, so nothing is stored: the browser starts on the default project, in the person's
+  // starting mode.
+  const context = await aContextThatStoresNoMode(app.browser, { viewport: { width: 1440, height: 1000 } })
   try {
     const page = await context.newPage()
     let listAnswered = false
@@ -123,7 +129,7 @@ it('asks nothing about the record until its project is chosen, and then asks onl
 
 it('draws the short mark in the phone bar while the list is read, never the project\'s id', async () => {
   const en = createI18n('en')
-  const context = await app.browser.newContext({ viewport: { width: 390, height: 900 } })
+  const context = await aContextThatStoresNoMode(app.browser, { viewport: { width: 390, height: 900 } })
   try {
     const page = await context.newPage()
     let release: () => void = () => undefined

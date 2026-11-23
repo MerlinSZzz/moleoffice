@@ -65,12 +65,15 @@ import type { UsageReceipt } from '../shared/usage-receipts.ts'
  * IT STARTS ONE RUN PER MESSAGE AND RESUMES BY THE PROVIDER'S ID. Whether a run should instead be
  * kept alive between messages is a cost question and it is the owner's; section 7.5 of the
  * acceptance document names it as one to put to the owner. Per-message is what is built meanwhile.
+ *
+ * THE PROGRAM EACH RUN STARTS, AND ITS VERSION, are read from the whole environment the run is given
+ * (`theProgramThatRan` in ./runtimes/os.ts), so on Windows a search path held as `Path` is found.
  */
 
 import { closeSync, existsSync, fstatSync, mkdirSync, openSync, readFileSync, readSync, realpathSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 
-import { THE_MESSAGE_WORKER_ID, theRuntimeWordsSaid, whyTheOfficeCannotStartThisRuntime } from '@shared/participants.ts'
+import { aHarnessWithNoAdapter, THE_MESSAGE_WORKER_ID, theRuntimeWordsSaid, whyTheOfficeCannotStartThisRuntime } from '@shared/participants.ts'
 import { readStoredWord } from '@shared/i18n.ts'
 import { clockStamp, type ClockStamp } from '@shared/time.ts'
 import { stateWord } from '@shared/words.ts'
@@ -99,6 +102,7 @@ import { FAKE_INSPECTION_TOOL_SETTING, InspectionAdapter } from './runtimes/insp
 import { theSeatWaitsIn } from '../config/a-checks-seat-wait.mjs'
 import { A_MERGE_TOOL_RUNS_RECEIPT, MergeAdapter } from './runtimes/merge.ts'
 import { A_ROUND_LAUNCHER_RUNS_RECEIPT, RoundAdapter, type RoundLauncherEnding } from './runtimes/round.ts'
+import { HostWorkerAdapter } from './runtimes/host-worker.ts'
 import type { MergeToolEnding } from '../config/merge-tool.mjs'
 import type { MessageHold } from '../config/gates.mjs'
 import { WORLD_HEADER, parseWorldHeader } from '../config/world-header.mjs'
@@ -376,7 +380,7 @@ interface Waiting {
    * The check to start; `only` and `needsJudgment` make it a scoped check (sandbox v1, piece P7).
    * `model` is the model the office chose for the check (criterion U2), absent when it chose none.
    */
-  inspection?: { run: string; checkout: string | null; only?: string[]; needsJudgment?: { path: string; why: string }[]; model?: string; waits?: string; pace: ThePaceOfACheck }
+  inspection?: { run: string; checkout: string | null; only?: string[]; needsJudgment?: { path: string; why: string }[]; model?: string; waits?: string; pace: ThePaceOfACheck; readingOnly?: boolean }
   messageId: string
   inheritedFromCopy?: boolean
   workspaceId: string
@@ -792,6 +796,9 @@ export function whyNotNow(
       ? { because: `The check is queued until one of the ${settings.runs} runs ends.`, gate: 'worker-runs' }
       : null
   }
+  // A HARNESS THE OFFICE HAS NO ADAPTER FOR: nothing is started, and its messages wait for its own waiter.
+  const harness = aHarnessWithNoAdapter(one.runtime)
+  if (harness !== null) return { because: readStoredWord('devWords.runtime.noAdapterNoRun', { handle: one.handle, runtime: harness }) }
   if (one.runtime === null) {
     return {
       because: `Nobody set a runtime word on ${one.handle}'s registry row, so there is no tool to start. Set it to ` +
@@ -1052,7 +1059,7 @@ export async function onePass(
    */
   // A gate choice ends on every read. This pass asks the office to remove and record the ended choices once.
   await runOutTheGateChoices(settings)
-  let checksOnly: { machine: { loadOneMinute: number | null; freeBytes: number | null }; checksAtOnce: number } | null = null
+  let checksOnly: { machine: { loadOneMinute: number | null; freeBytes: number | null }; checksAtOnce: number; onlyIncluded: boolean } | null = null
   /** No check may start this pass, for one of the reasons said once above; the pass still picks up, closes and stops. */
   let noCheckMayStart = false
   if (settings.mergesOnly === true) {
@@ -1071,7 +1078,9 @@ export async function onePass(
       // THE PROJECTS IT IS ON FOR, named in the same reading; null is every project. A worker of a project it does not name
       // starts no check, as with the switch off. A reading without a list or null there is not read as either.
       const projects = control.body?.['projects']
-      if (on && (typeof checksAtOnce !== 'number' || !Number.isInteger(checksAtOnce) || checksAtOnce < 1)) {
+      const chosenOff = typeof control.body?.['on'] === 'boolean' && control.body?.['nobodyChose'] === false && control.body?.['inspectorAnswerLines'] === true &&
+        (!on || (Array.isArray(projects) && !projects.includes(settings.workspace)))
+      if ((on || chosenOff) && (typeof checksAtOnce !== 'number' || !Number.isInteger(checksAtOnce) || checksAtOnce < 1)) {
         sayOnceWhyNoCheckStarts(`Merges-only mode: whether checks run could not be read, so no check was started: the reading's limits.checksAtOnce is ${JSON.stringify(checksAtOnce ?? null)}, not a whole number of 1 or more.`)
         noCheckMayStart = true
       } else if (on && projects !== null && !(Array.isArray(projects) && projects.every((one) => typeof one === 'string' && one !== ''))) {
@@ -1080,7 +1089,7 @@ export async function onePass(
       } else if (
         // WHETHER A CHECK OF THIS PROJECT STARTS is the reading the office makes when it queues one, so the sentence a run
         // stores then and what this pass does cannot disagree (@shared/whether-a-check-would-start.ts).
-        !whetherAnOfficeWouldStartACheck('merges-only', () => ({ on, nobodyChose: control.body?.['nobodyChose'] === true, projects: on ? (projects as string[] | null) : null }), settings.workspace).starts
+        !chosenOff && !whetherAnOfficeWouldStartACheck('merges-only', () => ({ on, nobodyChose: control.body?.['nobodyChose'] === true, projects: on ? (projects as string[] | null) : null }), settings.workspace).starts
       ) {
         if (on) {
           const named = (projects as string[]).length === 0 ? 'no projects' : (projects as string[]).join(', ')
@@ -1095,6 +1104,7 @@ export async function onePass(
             freeBytes: typeof machine?.freeBytes === 'number' ? machine.freeBytes : null,
           },
           checksAtOnce: checksAtOnce as number,
+          onlyIncluded: chosenOff,
         }
       }
     }
@@ -1416,7 +1426,7 @@ export async function onePass(
   const checksStartedThisPass = new Map<string, number>()
   const seen = new Set<string>()
   const allQueued: Pick<Waiting, 'messageId' | 'to'>[] = []
-  let page: string | null = checksOnly === null ? '/api/worker/queue?page=1' : '/api/worker/queue?only=checks&markDelivered=1'
+  let page: string | null = checksOnly === null ? '/api/worker/queue?page=1' : checksOnly.onlyIncluded ? '/api/worker/queue?only=checks' : '/api/worker/queue?only=checks&markDelivered=1'
   while (page !== null) {
     const queue = await ask(settings, page)
     if (!queue.ok) {
@@ -1434,7 +1444,7 @@ export async function onePass(
     // the delivery itself, where its sender and the office read it. It stays queued, so the next pass tries it again. It is
     // in `held` and not `failed`, because it is a standing state and not something this pass did: counted as failed, one
     // delivery that keeps failing would keep every pass at the short wait.
-    const failedInTheQueue = takeOnce((queue.body?.['failed'] ?? []) as (Pick<Waiting, 'messageId' | 'to'> & { because: string })[])
+    const failedInTheQueue = checksOnly?.onlyIncluded ? [] : takeOnce((queue.body?.['failed'] ?? []) as (Pick<Waiting, 'messageId' | 'to'> & { because: string })[])
     for (const one of failedInTheQueue) {
       await sayItIsHeld(settings, one, one.because)
       report.held.push({ messageId: one.messageId, because: one.because })
@@ -1446,7 +1456,7 @@ export async function onePass(
     // IN MERGES-ONLY MODE WITH CHECKS ON, ONLY THE CHECKS ARE LOOKED AT, and the asks for a check of a run already settled,
     // which the explicit queue reading marks delivered once and names with their reason. Every other row is left as
     // it is: no held sentence, no mark, exactly as with no worker at all.
-    const waiting = checksOnly === null ? everyoneWaiting : everyoneWaiting.filter((one) => one.inspection !== undefined || one.askOfASettledRun === true)
+    const waiting = checksOnly === null ? everyoneWaiting : checksOnly.onlyIncluded ? everyoneWaiting.filter((one) => one.inspection?.readingOnly === true) : everyoneWaiting.filter((one) => one.inspection !== undefined || one.askOfASettledRun === true)
     allQueued.push(...waiting, ...failedInTheQueue)
     const startWith: WorkerSettings = checksOnly === null ? settings : { ...settings, checksInMergesOnly: true }
     // THE CHECKS THIS PASS STARTED IN EACH LANE, which the office's count of the last hour was read too early to hold.
@@ -1553,6 +1563,7 @@ export async function onePass(
         report.held.push({ messageId: one.messageId, because })
         continue
       }
+      if (checksOnly?.onlyIncluded && complete.inspection?.readingOnly !== true) continue
       const read = await ask(settings, `/api/records/${one.messageId}`)
       const held = read.body?.['record'] as { data?: Record<string, unknown> } | undefined
       const words = held?.data?.['body']
@@ -2528,7 +2539,7 @@ export async function startOne(
     })
     if (!probing.ok) throw new Error(`The version probe could not be recorded: ${refusalIn(probing.text)}`)
   }
-  const ran = startupWitness === null ? theProgramThatRan(adapter.command, settings.env['PATH']) : await theGatedProgramThatRan(adapter.command, settings.env['PATH'], startupWitness, async group => {
+  const ran = startupWitness === null ? theProgramThatRan(adapter.command, settings.env) : await theGatedProgramThatRan(adapter.command, settings.env, startupWitness, async group => {
     const recorded = await ask(settings, `/api/records/${session}`, { method: 'PATCH', body: { dataPatch: { extra: { startupGroup: group } } } })
     if (!recorded.ok) throw new Error(`${sayInEnglish('startupGate.noGroup')} ${refusalIn(recorded.text)}`)
     // Once the callback returns the gate can execute outside code; recovery checks its group.
@@ -2670,7 +2681,7 @@ export async function startOne(
 
 
   /**
-   * WHAT THIS AGENT ALREADY KNOWS, WRITTEN BESIDE THE RUN. Criterion H3.
+   * WHAT THIS AGENT ALREADY KNOWS, WRITTEN INSIDE THE RUN'S FOLDER. Criterion H3.
    *
    * The text is built on the server, where the notes and the records are, and this only writes the
    * file: the worker holds no database path and no view about what an agent knows.
@@ -2679,11 +2690,13 @@ export async function startOne(
    * reach the agent; refusing to answer it because a folder could not be read would be losing the
    * work over the bundle. What is never done is naming a file that is not there.
    */
-  const knowsPath = join(settings.outputRoot, session, 'what-this-agent-knows.md')
+  const knowsFolder = join(cwd, '.logs', 'agent-knows', session)
+  const knowsPath = join(knowsFolder, 'what-this-agent-knows.md')
   const gathered = await ask(settings, `/api/handles/${encodeURIComponent(one.handle)}/knows`)
   const bundle = gathered.ok ? ((gathered.body?.['text'] as string | undefined) ?? null) : null
   if (bundle !== null) {
     try {
+      mkdirSync(knowsFolder, { recursive: true })
       writeFileSync(knowsPath, bundle, 'utf8')
       knows = { path: knowsPath, say: String(gathered.body?.['notesSay'] ?? '') }
     } catch {
@@ -2730,7 +2743,7 @@ export async function startOne(
       // The Kimi adapter builds its conversation id out of this; nothing else reads it.
       session,
       agent: one.handle,
-      key: one.inspection ? null : runKey,
+      key: runKey,
       prompt: one.inspection ? '' : promptFor({
         agent: one.handle,
         workspace: settings.workspace,
@@ -3279,7 +3292,7 @@ async function startTheMergeTool(
   const cwd = settings.checkout
   const cannot = adapter.whyItCannotStart(cwd)
   if (cannot !== null) return { ok: false, because: cannot }
-  const ran = theProgramThatRan(adapter.command, settings.env['PATH'])
+  const ran = theProgramThatRan(adapter.command, settings.env)
   const fake = adapter.fakeScript()
   const filed = await ask(settings, '/api/records', {
     method: 'POST',
@@ -3383,8 +3396,7 @@ async function startTheMergeTool(
  *
  * So each open container row of the run is released here with force, before the run is closed. The door asks for its
  * sentence back for a container it can describe, and is sent it. tools/sandbox-common.mjs reads the same sentence for
- * the launcher (releaseThroughTheLedger), and tests/a-stopped-merge-tools-containers-are-released-before-it-ends.test.ts
- * goes red here if the door's words change. A 409 says the row or the container changed since it was read, so it is
+ * the launcher (releaseThroughTheLedger). A 409 says the row or the container changed since it was read, so it is
  * closed or gone already, and it is not a failure here, as in closeAMergeToolRun. Answers what could not be released,
  * in a sentence, or null when no container row of the run is left open.
  */
@@ -3638,11 +3650,11 @@ async function startALauncher(
   want: ALauncherToStart,
 ): Promise<{ ok: true; wrapper: string } | { ok: false; because: string }> {
   const What = `${want.what.charAt(0).toUpperCase()}${want.what.slice(1)}`
-  const adapter = new RoundAdapter(settings.env)
+  let adapter = new RoundAdapter(settings.env)
   const cwd = settings.checkout
   const cannot = adapter.whyItCannotStart(cwd)
   if (cannot !== null) return { ok: false, because: `${What} was not started: ${cannot}` }
-  const ran = theProgramThatRan(adapter.command, settings.env['PATH'])
+  const ran = theProgramThatRan(adapter.command, settings.env)
   const fake = adapter.fakeScript()
   const filed = await ask(settings, '/api/records', {
     method: 'POST',
@@ -3674,9 +3686,17 @@ async function startALauncher(
   }
   const starting = await ask(settings, want.starting.path, { method: 'POST', body: { ...want.starting.body, wrapper } })
   const answer = starting.body?.[want.worker === undefined ? 'round' : 'workerRun'] as
-    | { handle: string; runtime: string; model: string; instance: string; sandboxes: string; brief: string; verb?: 'worker' | 'exec'; worktree?: string | null; cutFrom?: string | null; tip?: string | null; clone?: string | null; paths?: string[] | null; images?: string[] | null; selection?: CastingSelection | null }
+    | { agentId?: string; handle: string; runtime: string; model: string; instance?: string; sandboxes?: string; place?: unknown; brief: string; verb?: 'worker' | 'exec'; worktree?: string | null; cutFrom?: string | null; tip?: string | null; clone?: string | null; paths?: string[] | null; images?: string[] | null; selection?: CastingSelection | null }
     | undefined
   if (!starting.ok || answer === undefined) return neverStarted(`The office did not start ${want.what}: ${refusalIn(starting.text)}`)
+  if (answer.place !== undefined) {
+    adapter = new HostWorkerAdapter(settings.env)
+    const hostCannot = adapter.whyItCannotStart(cwd)
+    if (hostCannot !== null) return neverStarted(hostCannot)
+    const named = await ask(settings, `/api/records/${wrapper}`, { method: 'PATCH', body: { dataPatch: { doing: `starting ${want.of}, with the host launcher; this run runs no model` } } })
+    if (!named.ok) return neverStarted(`The host launcher run could not be named: ${refusalIn(named.text)}`)
+  }
+  if (answer.place === undefined && (answer.instance === undefined || answer.sandboxes === undefined)) return neverStarted('The office answered no sandbox for this launcher.')
   const outputPath = outputPathFor(settings, wrapper)
   mkdirSync(join(settings.outputRoot, wrapper), { recursive: true })
   // THE LAUNCHER WRITES WITH THE OFFICE'S KEY, as this worker does, under this worker's name. With none, it would be
@@ -3695,7 +3715,8 @@ async function startALauncher(
     }
     handle = adapter.start({
       session: wrapper, cwd, api: settings.api, workspace: settings.workspace, outputPath, key: office.key,
-      instance: answer.instance, sandboxes: answer.sandboxes, handle: answer.handle, brief: answer.brief, model: answer.model, runtime: answer.runtime,
+      instance: answer.instance ?? '', sandboxes: answer.sandboxes ?? '', handle: answer.handle, brief: answer.brief, model: answer.model, runtime: answer.runtime,
+      ...(answer.place === undefined ? {} : { place: answer.place, ...(answer.agentId === undefined ? {} : { agentId: answer.agentId }), ...(settingValue('MOLE_OFFICE_COMMIT_EMAIL', settings.env) === null ? {} : { commitAddress: settingValue('MOLE_OFFICE_COMMIT_EMAIL', settings.env)! }) }),
       // A next round continues the run it follows, named. A worker run's verb is the office's answer: `exec` with the
       // worker's own worktree for dsh and OpenCode. So is the commit the launcher files the run at: the commit its
       // worktree is cut from when the worktree is not there yet, and the commit it stands at when it is. So are the
@@ -3718,7 +3739,7 @@ async function startALauncher(
       ...(command === undefined ? {} : { command }),
     })
   } catch (err) {
-    const says = `The sandbox launcher could not be started: ${(err as Error).message}`
+    const says = `The ${answer.place === undefined ? 'sandbox' : 'host'} launcher could not be started: ${(err as Error).message}`
     await closeALauncherRun(settings, { ...closing, handle: null, ledgerRow: null }, { ok: false, says })
     return { ok: false, because: says }
   }
@@ -3729,7 +3750,7 @@ async function startALauncher(
       sessionRecordId: wrapper,
       type: 'process',
       key: String(handle.pid),
-      detail: `the sandbox launcher starting ${want.of}`,
+      detail: `the ${answer.place === undefined ? 'sandbox' : 'host'} launcher starting ${want.of}`,
       startedByTheProduct: true,
       ...(world === null ? {} : { world }),
     },
@@ -3737,7 +3758,7 @@ async function startALauncher(
   if (!held.ok && adapter.alive(handle)) {
     // A PROCESS NO LIST HOLDS IS STOPPED, for the reason `startOne` gives.
     adapter.stop(handle)
-    const says = withHowItWasEnded(`The sandbox launcher was started and could not be registered, so it was stopped again: ${held.text.slice(0, 300)}`, handle)
+    const says = withHowItWasEnded(`The ${answer.place === undefined ? 'sandbox' : 'host'} launcher was started and could not be registered, so it was stopped again: ${held.text.slice(0, 300)}`, handle)
     await closeALauncherRun(settings, { ...closing, handle, ledgerRow: null }, { ok: false, says })
     return { ok: false, because: says }
   }
@@ -3747,7 +3768,7 @@ async function startALauncher(
     handle,
     ledgerRow: held.ok ? ((held.body?.['resource'] as { id?: string } | undefined)?.id ?? null) : null,
   })
-  process.stdout.write(`The sandbox launcher started ${want.of}, as launcher run ${wrapper}.\n`)
+  process.stdout.write(`The ${answer.place === undefined ? 'sandbox' : 'host'} launcher started ${want.of}, as launcher run ${wrapper}.\n`)
   return { ok: true, wrapper }
 }
 
@@ -3765,7 +3786,7 @@ async function closeALauncherRun(
   const forAWorker = round.worker !== undefined
   const told = await ask(settings, `/api/worker/${forAWorker ? 'worker-runs' : 'rounds'}/${encodeURIComponent(round.run)}/ended`, {
     method: 'POST',
-    body: { ...(forAWorker ? { agent: round.worker } : {}), wrapper: round.wrapper, ok: ending.ok, says: ending.says.slice(0, 2000) },
+    body: { ...(forAWorker ? { agent: round.worker, ...(ending.beforeRuntime === true ? { beforeRuntime: true } : {}) } : {}), wrapper: round.wrapper, ok: ending.ok, says: ending.says.slice(0, 2000) },
   })
   // A REFUSAL IN THE 400s IS AN ANSWER: the ask is failed, or is not this launcher's any more. Anything else is tried again.
   if (!told.ok && (told.status < 400 || told.status >= 500)) {
@@ -4214,6 +4235,8 @@ async function theVisitThisRunNeeds(
       why: `a run answering the message ${one.messageId}`,
     },
   })
+  // The office decides whether this home is its own; this separate worker can ask it only over HTTP.
+  if (registered.ok && registered.body?.['atHome'] === true) return { home: here, visit: null }
   const visit = (registered.body?.['visit'] as { id?: string } | undefined)?.id ?? null
   return { home, visit }
 }

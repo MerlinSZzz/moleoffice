@@ -14,8 +14,7 @@
  * WHAT THIS FILE PROVES:
  * 1. A choice saved through the settings door is used at once, with no restart, over the environment: by the office's
  *    readers, by the merge tool's own read in a program of its own, and by the fix-round programs, which pass this
- *    process's environment. An environment a caller builds is still its own, and opens no database. The hand-on of a
- *    conflict itself is tests/the-office-asks-a-supervisor-to-resolve.test.ts's, case 8.
+ *    process's environment. An environment a caller builds is still its own, and opens no database.
  * 2. With no saved choice, a line in .env wins over the default, and with no line the default is used. A saved choice
  *    wins over .env, and taking it away gives .env back. The .env here is a made-up file handed to the shared reader,
  *    because each switch's own function reads this checkout's .env.

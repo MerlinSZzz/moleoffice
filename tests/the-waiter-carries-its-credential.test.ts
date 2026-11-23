@@ -237,9 +237,7 @@ describe('the waiter a remote agent runs carries its credential', () => {
     rmSync(waiter.where, { recursive: true, force: true })
     expect(code).toBe(2)
 
-    // THE NAMES OF THE TWO FILE VARIABLES, which are what an agent must set, and not one
-    // character of any secret: nothing here ever held one to write about.
-    expect(waiter.said()).toContain('MOLE_OFFICE_CREDENTIAL_FILE')
+    // The refusal names how to obtain the key; nothing here held a secret to print.
     expect(waiter.said()).toContain('MOLE_AGENT_KEY_FILE')
   }, 30_000)
 

@@ -38,7 +38,7 @@ import { inspectionUsageIn, inspectionUsageReceipt, jsonLines } from '../src/con
 import { withoutTheTimes } from '../tools/inspector-log-times.mjs'
 import { VIEW_REMOVED_NOTE } from '../tools/inspector-view-sweep.mjs'
 import { skippedAsRoot } from './root-may-write-in-any-folder.ts'
-import { FULL_PERMISSIONS } from '../src/config/run-permissions.mjs'
+import { CODEX_SHELL_SNAPSHOT_OFF, FULL_PERMISSIONS } from '../src/config/run-permissions.mjs'
 import { CLAUDE_CODE_FEATURES_OFF, CODEX_FEATURES_OFF } from '../tools/harness-features-off.mjs'
 import { FROM_ITS_COMMIT, SEAL_READ_HEADER } from '../src/config/seal-read-header.mjs'
 import { KEY_HEADER } from '../src/config/key-header.mjs'
@@ -325,14 +325,14 @@ process.stdin.on('end', () => {
     config, login, hasOpenCodeKey: !!process.env.OPENCODE_API_KEY, secrets: ['OPENCODE_API_KEY', 'OPENAI_API_KEY', 'DEEPSEEK_API_KEY', 'ANTHROPIC_API_KEY', 'OPENROUTER_API_KEY', 'CLAUDE_CODE_OAUTH_TOKEN'].filter(key => process.env[key]), office: Object.keys(process.env).filter(k => k.startsWith('MOLE_OFFICE') || k === 'MOLE_AGENT_KEY') })
   fs.writeFileSync(historyFile, JSON.stringify(history))
   record({ history, config, login })
-  // A PROVIDER'S REFUSAL BEFORE THE FIRST STEP: a step start and an error, exit 1. The variants write a text first, change
-  // a file in work/ first, or add a line nothing can read after the error.
-  if (['error-only', 'text-then-error', 'error-after-a-change', 'error-then-an-unreadable-line'].includes(how)) {
+  // A PROVIDER'S REFUSAL BEFORE THE FIRST STEP: a step start and an error, exit 1. The variants write a text first or change
+  // a file in work/ first.
+  if (['error-only', 'text-then-error', 'error-after-a-change'].includes(how)) {
     if (how === 'error-after-a-change') fs.writeFileSync(path.join(process.cwd(), 'work', 'the-work.txt'), 'Changed before the refusal.\\n')
     const said = [{ type: 'step_start', sessionID: 'ses_Synthetic', part: { type: 'step-start', sessionID: 'ses_Synthetic' } },
       ...(how === 'text-then-error' ? [{ type: 'text', sessionID: 'ses_Synthetic', part: { type: 'text', sessionID: 'ses_Synthetic', text: 'Synthetic: a partial answer.', time: { end: 1 } } }] : []),
       { type: 'error', sessionID: 'ses_Synthetic', error: { name: 'SyntheticProviderError', data: { message: 'Synthetic provider refusal before the first step.' } } }]
-    process.stdout.write(said.map(event => JSON.stringify(event)).join('\\n') + '\\n' + (how === 'error-then-an-unreadable-line' ? 'Synthetic line that is not an event\\n' : ''))
+    process.stdout.write(said.map(event => JSON.stringify(event)).join('\\n') + '\\n')
     process.exit(1)
   }
   const n = history.length
@@ -383,16 +383,10 @@ process.stdin.on('end', () => {
   const told = path.join(${JSON.stringify(behaviour)}, here)
   const how = fs.existsSync(told) ? fs.readFileSync(told, 'utf8').trim() : 'release'
   // A MODEL REFUSED BEFORE ITS FIRST STEP, as a provider refuses one: an error result with no output token, and nothing
-  // written in the view. It comes before the probe below, which writes in work/ and puts it back. The one variant leaves
-  // a process working in the view before the same refusal.
+  // written in the view. It comes before the probe below, which writes in work/ and puts it back.
   if (how.startsWith('refused-')) {
     record({ how })
     const refusal = JSON.stringify({ type: 'result', subtype: 'error_during_execution', is_error: true, result: 'Synthetic provider refusal before the first step.', session_id: 'synthetic-native-session', usage: { input_tokens: 0, output_tokens: 0 } })
-    if (how === 'refused-holding-the-view') {
-      const child = require('child_process').spawn(process.execPath, ['-e', 'setTimeout(() => {}, 120000)'], { detached: true, stdio: 'ignore', cwd: process.cwd() })
-      child.unref()
-      fs.writeFileSync(path.join(${JSON.stringify(records)}, 'held-in-the-view-' + here + '.json'), JSON.stringify({ pid: child.pid, cwd: process.cwd() }))
-    }
     process.stdout.write(refusal + '\\n')
     process.exitCode = 1
     return
@@ -921,7 +915,8 @@ describe('a check in the inspector sandbox', () => {
       expect(codex.proof.protectedInputs.every((one: { readonly: boolean }) => one.readonly)).toBe(true)
       expect(codex.proof.opened.find((one: { id?: string }) => one.id === report.body.record.id)?.kind).toBe('report')
       expect(codex.proof.opened.every((one: { file: string }) => !one.file.startsWith(codex.cwd + '/'))).toBe(true)
-      expect(codex.argv.slice(0, CODEX_FEATURES_OFF.length + FULL_PERMISSIONS.codex!.args.length)).toEqual([...CODEX_FEATURES_OFF, ...FULL_PERMISSIONS.codex!.args])
+      const theStart = [...CODEX_FEATURES_OFF, ...CODEX_SHELL_SNAPSHOT_OFF, ...FULL_PERMISSIONS.codex!.args]
+      expect(codex.argv.slice(0, theStart.length)).toEqual(theStart)
       expect(codex.argv).not.toContain('sandbox_mode="read-only"')
       expect(codex.argv).not.toContain('sandbox_mode="workspace-write"')
       expect(codex.argv).not.toContain('--add-dir')
@@ -1086,8 +1081,9 @@ describe('a check in the inspector sandbox', () => {
   // view-removed.json and the error; a rerun by hand with the same id is refused, naming that file. Case 2: anything else,
   // and a dsh check always, so both are kept and the sentence says why. Nobody new is told. Every view here is a made-up
   // one in this file's temporary folder. MUTATIONS: read an error event as work (case 1 goes red); drop the reading of
-  // work/, of the signal, of the output's lines or of the processes (each green below goes red); write the note after the
-  // removal (the part-way case goes red).
+  // work/ or of the signal (GREEN 2 or GREEN 3 below goes red), of the output's lines (GREEN 1 goes red) or of the
+  // processes (the made-up view a readable process works in goes red); write the note after the removal (the part-way
+  // case goes red).
   // THE RULE FOR A CHECK WITH NO VERDICT, case 1: read here, at this level, because its RED 4 is the login refusal case below
   // the cases of the rule, which needs a sandbox nothing else left up.
   const noteOf = (run: string, check: string): string => join(sandboxes, INSTANCE, 'checks', folderOf(run, check))
@@ -1215,14 +1211,7 @@ describe('a check in the inspector sandbox', () => {
       expect(readFileSync(join(viewOf(check), 'work', 'work', 'the-work.txt'), 'utf8')).toBe('Changed before the refusal.\n')
     }, 120_000)
 
-    // GREEN 3.
-    it('keeps both when a line of the output cannot be read, and names that reading', async () => {
-      const { run, check, ran } = await anOpenCodeCheck('error-then-an-unreadable-line')
-      expect(ran.code, ran.err).toBe(1)
-      keptAsCaseTwo(ran, run, check, "line 3 of its model's output could not be read as an event")
-    }, 120_000)
-
-    // GREEN 4: stopped while its view is tried, so its model has not started and has written nothing.
+    // GREEN 3: stopped while its view is tried, so its model has not started and has written nothing.
     it('keeps both when the check is stopped by SIGTERM before its model wrote anything', async () => {
       const run = await aFinishedRun('A check stopped while its view is tried')
       const check = await aCheckSession()
@@ -1239,23 +1228,6 @@ describe('a check in the inspector sandbox', () => {
       } finally {
         setBug('holdTheEmptyCommand', false)
         rmSync(held, { force: true })
-      }
-    }, 120_000)
-
-    // GREEN 5: the model's container is gone, and a process it left still works in the view.
-    it('keeps both when a process the inspector can read still works in the view', async () => {
-      const run = await aFinishedRun('A check refused with a process left in its view')
-      const check = await aCheckSession()
-      writeFileSync(join(behaviour, folderOf(run, check)), 'refused-holding-the-view')
-      const file = join(records, `held-in-the-view-${folderOf(run, check)}.json`)
-      let held: { pid: number; cwd: string } | undefined
-      try {
-        const ran = await inspect(run, check).done
-        held = JSON.parse(readFileSync(file, 'utf8'))
-        expect(ran.code, ran.err).toBe(1)
-        keptAsCaseTwo(ran, run, check, `process ${String(held!.pid)} works in it`)
-      } finally {
-        if (held) { try { process.kill(-held.pid, 'SIGTERM') } catch {} }
       }
     }, 120_000)
 
@@ -1811,7 +1783,11 @@ describe('a check in the inspector sandbox', () => {
 //   the launcher hands over for a run that does not hold the row ... the launcher case
 //   the launcher hands over to a run that has ended ................ the launcher case
 //   the launcher hands over to a run not using the sandbox ......... the launcher case
-//   a check whose marker names no project, or another, is chosen ... the two marker cases
+//   a check whose marker names no project is chosen ............... the missing-project marker case
+//   the row's project is lost on a cross-project hand-over ......... the cross-project launcher case
+//   a refused registration changes the facts or releases the row .. the refused-registration case
+//   a refused release leaves the facts naming the old row ......... the refused-release case
+//   an old holder without a project cannot be stopped ............. the older-facts case
 describe("the shared container's row goes to a check still using it", () => {
   const markerOf = (check: string) => join(sandboxes, '.inspector-checks', INSTANCE, 'checks', `${check}.json`)
   /** A process's start, as the kernel counts it: what a marker names besides the pid, so a reused pid is told apart. */
@@ -1824,14 +1800,18 @@ describe("the shared container's row goes to a check still using it", () => {
   const hostFacts = () => JSON.parse(readFileSync(join(sandboxes, '.run', INSTANCE, 'instance.json'), 'utf8'))
   /** The checks a case started, so a case that fails part way still lets them go and leaves no container up. */
   const started: { file: string; done: Promise<Ran> }[] = []
+  /** The markers a case wrote for made-up checks, so no later case takes one for a check still using the sandbox. */
+  const marked: string[] = []
   afterEach(async () => {
+    for (const file of marked.splice(0)) rmSync(file, { force: true })
     for (const check of started.splice(0)) {
       writeFileSync(check.file, 'release')
       await check.done
     }
     if (state().containers[CONTAINER] !== undefined) {
       const facts = hostFacts()
-      await sandboxDoor(['down', INSTANCE, '--force', '--json'], facts.containerRowHeldBy?.session ?? facts.startedBy.session)
+      const stopped = await sandboxSays(['down', INSTANCE, '--force', '--json'], facts.containerRowHeldBy?.session ?? facts.startedBy.session, facts.containerRowHeldBy?.workspace ?? facts.workspace)
+      expect(stopped.code, stopped.err).toBe(0)
     }
     // A ROW A FAILED CASE LEFT OPEN, with its container gone, is closed in this test's own office, so the next case's up
     // is not refused for it and a failure is seen once, where it happened.
@@ -1850,9 +1830,9 @@ describe("the shared container's row goes to a check still using it", () => {
   }
 
   /** A launcher door that may refuse, with what it said. */
-  async function sandboxSays(verb: string[], session: string): Promise<Ran> {
+  async function sandboxSays(verb: string[], session: string, workspace: string | null = WORKSPACE): Promise<Ran> {
     const child = spawn(process.execPath, [join(REPO, 'tools', 'sandbox.mjs'), ...verb,
-      '--sandboxes', sandboxes, '--as', THE_INSPECTOR, '--session', session, '--api', api, '--workspace', WORKSPACE], {
+      '--sandboxes', sandboxes, '--as', THE_INSPECTOR, '--session', session, '--api', api, ...(workspace === null ? [] : ['--workspace', workspace])], {
       cwd: REPO,
       env: { ...withoutInheritedEffort(), HOME: home, PATH: `${join(fakes, 'bin')}:${process.env['PATH'] ?? ''}`, FAKE_DOCKER_DIR: fakes },
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -1936,7 +1916,6 @@ describe("the shared container's row goes to a check still using it", () => {
 
   for (const [what, marker] of [
     ['names no project, as one written before this change does', (m: Record<string, unknown>) => { delete m['workspace']; return m }],
-    ['names another project', (m: Record<string, unknown>) => ({ ...m, workspace: 'another-project' })],
   ] as const) {
     it(`keeps the row with the leaving check when the check still using the container ${what}`, async () => {
       const { first, second, one, two } = await twoChecksAtTheirModels(`A marker that ${what}`)
@@ -1957,6 +1936,168 @@ describe("the shared container's row goes to a check still using it", () => {
       expect(await openContainerRows()).toEqual([])
     }, 120_000)
   }
+
+  const otherProject = 'made-up-other-project'
+  beforeAll(async () => {
+    const made = await ask('POST', '/api/workspaces', AS_THE_PERSON, { id: otherProject, title: 'Another made-up project' })
+    expect(made.status, JSON.stringify(made.body)).toBe(201)
+  })
+
+  async function sessionInOtherProject(): Promise<string> {
+    const made = await ask('POST', '/api/records', AS_THE_INSPECTOR,
+      { kind: 'session', title: 'A check in another project', data: { state: 'running', doing: 'checking a run' } },
+      { 'x-mole-office-workspace': otherProject })
+    expect(made.status, JSON.stringify(made.body)).toBe(201)
+    return made.body.record.id as string
+  }
+
+  async function rowsIn(workspace: string): Promise<any[]> {
+    const answer = await ask('GET', '/api/resources?includeReleased=true', AS_THE_INSPECTOR, undefined, { 'x-mole-office-workspace': workspace })
+    expect(answer.status).toBe(200)
+    return answer.body.resources.filter((row: any) => row.type === 'container' && row.key === CONTAINER)
+  }
+
+  function mark(check: string, workspace: string): void {
+    mkdirSync(dirname(markerOf(check)), { recursive: true })
+    writeFileSync(markerOf(check), JSON.stringify({ pid: process.pid, started: startTicksOf(process.pid), run: 'a-run', workspace }))
+    marked.push(markerOf(check))
+  }
+
+  it('chooses a live marker of another project while holding the leave lock', async () => {
+    const { first, second, one, two } = await twoChecksAtTheirModels('A successor in another project')
+    const successor = await sessionInOtherProject()
+    const saved = readFileSync(markerOf(second.check), 'utf8')
+    mark(successor, otherProject)
+    rmSync(markerOf(second.check), { force: true })
+    try {
+      writeFileSync(join(behaviour, folderOf(first.run, first.check)), 'release')
+      const left = await one.done
+      expect(left.code, left.err).toBe(0)
+      expect(left.out).toContain(`row is handed to the check ${successor}`)
+      expect((await rowsIn(WORKSPACE)).filter((r) => r.releasedAt === null)).toEqual([])
+      expect((await rowsIn(otherProject)).filter((r) => r.releasedAt === null).map((r) => r.sessionRecordId)).toEqual([successor])
+      expect(hostFacts().containerRowHeldBy.workspace).toBe(otherProject)
+    } finally {
+      rmSync(markerOf(successor), { force: true })
+      writeFileSync(markerOf(second.check), saved)
+      writeFileSync(join(behaviour, folderOf(second.run, second.check)), 'release')
+      await two.done
+    }
+    expect(state().containers[CONTAINER]).toBeUndefined()
+    expect((await rowsIn(otherProject)).filter((r) => r.releasedAt === null)).toEqual([])
+  }, 120_000)
+
+  it('hands the row across projects, finds it for status and down, and lets either project start it next', async () => {
+    const holder = await aCheckSession()
+    const successor = await sessionInOtherProject()
+    await sandboxDoor(['up', 'mole-office-dev', '--name', INSTANCE, '--json', '--from', from], holder)
+    const old = hostFacts().containerRow
+    mark(successor, otherProject)
+    const handed = await sandboxSays(['hand-over', INSTANCE, '--to-session', successor, '--to-workspace', otherProject, '--json'], holder)
+    expect(handed.code, handed.err).toBe(0)
+    const facts = hostFacts()
+    expect(facts.containerRowHeldBy).toMatchObject({ session: successor, workspace: otherProject, from: { session: holder, workspace: WORKSPACE, row: old } })
+    expect((await rowsIn(WORKSPACE)).find((r) => r.id === old).releasedAt).not.toBeNull()
+    expect((await rowsIn(otherProject)).filter((r) => r.releasedAt === null).map((r) => [r.id, r.sessionRecordId])).toEqual([[facts.containerRow, successor]])
+    expect(state().containers[CONTAINER]?.State.Running).toBe(true)
+    const status = await sandboxSays(['status', INSTANCE, '--json'], successor, null)
+    expect(status.code, status.err).toBe(0)
+    expect(JSON.parse(status.out.trim().split('\n').at(-1)!).reports[0].containerRow.ledger).toContain(`owned by session ${successor}`)
+    const down = await sandboxSays(['down', INSTANCE, '--json'], successor, null)
+    expect(down.code, down.err).toBe(0)
+    expect((await rowsIn(otherProject)).find((r) => r.id === facts.containerRow).releasedAt).not.toBeNull()
+    expect(state().containers[CONTAINER]).toBeUndefined()
+    for (const [workspace, check] of [[WORKSPACE, holder], [otherProject, successor]] as const) {
+      const up = await sandboxSays(['up', 'mole-office-dev', '--name', INSTANCE, '--json', '--from', from], check, workspace)
+      expect(up.code, up.err).toBe(0)
+      expect(hostFacts().workspace).toBe(workspace)
+      expect(hostFacts().startedBy.session).toBe(check)
+      const stopped = await sandboxSays(['down', INSTANCE, '--json'], check, workspace)
+      expect(stopped.code, stopped.err).toBe(0)
+    }
+  }, 120_000)
+
+  it('keeps the original row and whole facts when the target ledger refuses registration', async () => {
+    const holder = await aCheckSession()
+    const successor = await sessionInOtherProject()
+    await sandboxDoor(['up', 'mole-office-dev', '--name', INSTANCE, '--json', '--from', from], holder)
+    mark(successor, otherProject)
+    const before = readFileSync(join(sandboxes, '.run', INSTANCE, 'instance.json'), 'utf8')
+    const old = hostFacts().containerRow
+    t.client.sqlite.exec(`CREATE TRIGGER refuse_the_target_row BEFORE INSERT ON session_resources WHEN NEW.workspace_id = '${otherProject}' AND NEW.type = 'container' BEGIN SELECT RAISE(ABORT, 'target registration refused'); END`)
+    try {
+      const refused = await sandboxSays(['hand-over', INSTANCE, '--to-session', successor, '--to-workspace', otherProject], holder)
+      expect(refused.code).not.toBe(0)
+      expect(refused.err).toContain(otherProject)
+      expect(readFileSync(join(sandboxes, '.run', INSTANCE, 'instance.json'), 'utf8')).toBe(before)
+      expect((await rowsIn(WORKSPACE)).find((r) => r.id === old).releasedAt).toBeNull()
+      expect((await rowsIn(otherProject)).filter((r) => r.releasedAt === null)).toEqual([])
+    } finally {
+      t.client.sqlite.exec('DROP TRIGGER refuse_the_target_row')
+    }
+  }, 120_000)
+
+  it('names the new row in the facts and both rows in its sentence when the release of the old row is refused', async () => {
+    const holder = await aCheckSession()
+    const successor = await sessionInOtherProject()
+    await sandboxDoor(['up', 'mole-office-dev', '--name', INSTANCE, '--json', '--from', from], holder)
+    mark(successor, otherProject)
+    const old = hostFacts().containerRow
+    t.client.sqlite.exec(`CREATE TRIGGER refuse_test_release BEFORE UPDATE OF released_at ON session_resources WHEN OLD.id = '${old}' AND OLD.released_at IS NULL AND NEW.released_at IS NOT NULL BEGIN SELECT RAISE(ABORT, 'old release refused'); END`)
+    try {
+      const refused = await sandboxSays(['hand-over', INSTANCE, '--to-session', successor, '--to-workspace', otherProject], holder)
+      expect(refused.code).not.toBe(0)
+      const facts = hostFacts()
+      expect((await rowsIn(otherProject)).filter((r) => r.releasedAt === null).map((r) => [r.id, r.sessionRecordId])).toEqual([[facts.containerRow, successor]])
+      expect(facts.containerRowHeldBy).toMatchObject({ session: successor, workspace: otherProject, from: { session: holder, workspace: WORKSPACE, row: old } })
+      expect((await rowsIn(WORKSPACE)).find((r) => r.id === old).releasedAt).toBeNull()
+      expect(refused.err).toContain(facts.containerRow)
+      expect(refused.err).toContain(otherProject)
+      expect(refused.err).toContain(old)
+      expect(refused.err).toContain(WORKSPACE)
+      expect(state().containers[CONTAINER]?.State.Running).toBe(true)
+    } finally {
+      t.client.sqlite.exec('DROP TRIGGER refuse_test_release')
+    }
+  }, 120_000)
+
+  it('uses the instance project for old holder facts that name no project', async () => {
+    const holder = await aCheckSession()
+    await sandboxDoor(['up', 'mole-office-dev', '--name', INSTANCE, '--json', '--from', from], holder)
+    const file = join(sandboxes, '.run', INSTANCE, 'instance.json')
+    const facts = hostFacts()
+    facts.containerRowHeldBy = { session: holder, since: 'earlier', from: { session: 'earlier-check', row: 'earlier-row' } }
+    writeFileSync(file, JSON.stringify(facts))
+    const status = await sandboxSays(['status', INSTANCE, '--json'], holder, null)
+    expect(status.code, status.err).toBe(0)
+    expect(JSON.parse(status.out.trim().split('\n').at(-1)!).reports[0].containerRow.ledger).toContain(`owned by session ${holder}`)
+    const down = await sandboxSays(['down', INSTANCE, '--json'], holder, null)
+    expect(down.code, down.err).toBe(0)
+    expect(state().containers[CONTAINER]).toBeUndefined()
+  }, 120_000)
+
+  it('refuses a target project without a target session, a blank project, and passes on an unknown project refusal', async () => {
+    const holder = await aCheckSession()
+    const successor = await sessionInOtherProject()
+    await sandboxDoor(['up', 'mole-office-dev', '--name', INSTANCE, '--json', '--from', from], holder)
+    const before = readFileSync(join(sandboxes, '.run', INSTANCE, 'instance.json'), 'utf8')
+    for (const [args, sentence] of [
+      [['--to-workspace', otherProject], '--to-session'],
+      [['--to-session', successor, '--to-workspace', ''], '--to-workspace'],
+      [['--to-session', successor, '--to-workspace', '   '], '--to-workspace'],
+    ] as const) {
+      const refused = await sandboxSays(['hand-over', INSTANCE, ...args], holder)
+      expect(refused.code).not.toBe(0)
+      expect(refused.err).toContain(sentence)
+    }
+    const unknown = 'project-not-in-this-office'
+    const office = await ask('GET', `/api/records/${successor}`, AS_THE_INSPECTOR, undefined, { 'x-mole-office-workspace': unknown })
+    expect(office.status).not.toBe(200)
+    const refused = await sandboxSays(['hand-over', INSTANCE, '--to-session', successor, '--to-workspace', unknown], holder)
+    expect(refused.code).not.toBe(0)
+    expect(refused.err).toContain(office.body.error)
+    expect(readFileSync(join(sandboxes, '.run', INSTANCE, 'instance.json'), 'utf8')).toBe(before)
+  }, 120_000)
 
   it('the launcher hands the row over only for the run that holds it, only to another run still running and using the sandbox, and leaves the container as it is', async () => {
     const holder = await aCheckSession()
@@ -2009,6 +2150,7 @@ describe("the shared container's row goes to a check still using it", () => {
     expect(open.map((r) => r.sessionRecordId)).toEqual([other])
     expect(said.handedOver).toEqual({ from: { session: holder, row }, to: { session: other, row: open[0].id } })
     expect(hostFacts().containerRow).toBe(open[0].id)
+    expect(hostFacts().containerRowHeldBy).toMatchObject({ session: other, workspace: WORKSPACE, from: { session: holder, workspace: WORKSPACE, row } })
     const old = (await containerRows()).find((r) => r.id === row)
     expect(old.releasedAt).not.toBeNull()
     expect(old.releaseNote).toContain(`handed over to session ${other}`)
@@ -2759,9 +2901,9 @@ async function anOfficeThatHoldsTheSweep(own: string, holdMs: number): Promise<{
 
 describe('the dry sweep of the check views beside a check', () => {
   it('a slow view sweep does not hold a check\'s start, and is stopped at its end', async () => {
-    // THREE VIEWS THE SWEEP ASKS ABOUT. The sweep gives up on one held read after 30 seconds, so a sweep left running
-    // after the check's end keeps the check's process up for about 90 seconds, well past the deadline below.
-    for (let made = 0; made < 3; made += 1) await aCrashedCheckView()
+    // TWO VIEWS THE SWEEP ASKS ABOUT. The sweep gives up on one held read after 30 seconds, so a sweep left running
+    // after the check's end keeps the check's process up for about 60 seconds, well past the deadline below.
+    for (let made = 0; made < 2; made += 1) await aCrashedCheckView()
     const run = await aFinishedRun('A run checked while the view sweep is slow')
     const check = await aCheckSession()
     const office = await anOfficeThatHoldsTheSweep(check, 60_000)

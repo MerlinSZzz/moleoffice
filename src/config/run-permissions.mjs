@@ -40,6 +40,23 @@
  * with `DSH_PERMISSION_MODE=danger-full-access` would otherwise hand it to every worker it starts.
  *
  * ---------------------------------------------------------------------------------------
+ * A RUN WHOSE FILES THIS OFFICE DOES NOT CARRY IS NOT STARTED
+ * ---------------------------------------------------------------------------------------
+ *
+ * It was decided that a run told to start a file that is not there is refused, not started without it. So when the
+ * guard is mounted, the rule first asks whether each of the guard's files for that tool is there. A missing one throws,
+ * naming each, and nothing is started.
+ *
+ * WHAT AN INSTALL CARRIES. An install carries the guard and its OpenCode plugin, each built into one file in its
+ * for-agents folder (THE_GUARDS_BUILT_FILES in ./settings.mjs), so a Claude Code, Codex or OpenCode run it starts finds
+ * them, and the refusal is left for an install that lost one. An install carries no dsh hooks file, because that file
+ * is in tools/; there the dsh guard reads as not mounted, so nothing is asked and a dsh run is not widened.
+ *
+ * The office tool server is not asked. It was decided that only the guard's files are asked, because only the launcher
+ * in tools/ puts the server in a command, and that launcher is carried wherever the server is. The adapters ask this
+ * rule for every run and never name the server, so asking for it would refuse runs that never use it.
+ *
+ * ---------------------------------------------------------------------------------------
  * WHAT "FULL" IS FOR EACH TOOL, MEASURED ON 22 SEPTEMBER 2026
  * ---------------------------------------------------------------------------------------
  *
@@ -72,11 +89,11 @@
  * ignores root -c overrides for exec (GX23T1MQs-aZ; inspector's vtuzjBniM_iu).
  */
 
-import { lstatSync, readFileSync } from 'node:fs'
+import { existsSync, lstatSync, readFileSync } from 'node:fs'
 import { isAbsolute, join } from 'node:path'
 import { REPO_ROOT, theInstallsNode } from './settings.mjs'
-import { theGuardOn } from './main-world-guard.mjs'
-import { theAgentKey } from './agent-key-reader.mjs'
+import { THE_DSH_HOOKS, THE_GUARD, THE_OPENCODE_PLUGIN, theGuardOn } from './main-world-guard.mjs'
+import { THE_AGENT_KEY, theAgentKey } from './agent-key-reader.mjs'
 
 /** The variable `tools/sandbox-start.mjs` sets for every process it starts in a sandbox. */
 export const IN_A_SANDBOX = 'SANDBOX_DIR'
@@ -96,8 +113,30 @@ export const OFFICE_MCP_ENV_VARS = Object.freeze([
  */
 export const THE_RUN_OUTPUT = 'MOLE_OFFICE_RUN_OUTPUT'
 
-/** What Codex's env_vars forwards to office_request: the office's names, and the two its seal receipt reads. */
-export const CODEX_OFFICE_MCP_ENV_VARS = Object.freeze([...OFFICE_MCP_ENV_VARS, THE_RUN_OUTPUT, 'CODEX_HOME'])
+/**
+ * What Codex's env_vars forwards to office_request: the office's names, the name of the agent's own key file, and the
+ * two its seal receipt reads. An agent started outside the office on the person's press is given its key file's path
+ * alone (theAgentsStartOutside in src/server/lib/terminal-agents.ts), and a Codex keeps only the names this list
+ * holds (src/config/the-environment-a-codex-gets.mjs).
+ */
+export const CODEX_OFFICE_MCP_ENV_VARS = Object.freeze([...OFFICE_MCP_ENV_VARS, THE_AGENT_KEY.file, THE_RUN_OUTPUT, 'CODEX_HOME'])
+
+/** The Codex feature that writes a shell snapshot, by its name under [features] in config.toml. */
+export const CODEX_SHELL_SNAPSHOT_FEATURE = 'shell_snapshot'
+
+/**
+ * CODEX WRITES NO SHELL SNAPSHOT. Codex 0.159.2 writes its commands' environment, values included, to
+ * CODEX_HOME/shell_snapshots, and a killed run leaves the file there, so a run key in that environment would stay on
+ * disk. Measured on 0.159.2 after exec, for the problem of a Codex run that keeps its shell's environment on disk:
+ * with this switch no snapshot folder is made, and commands still run. Five places read it. aCommandsOfficeTool
+ * below, and the Codex runtime in src/worker/runtimes/codex.ts, put it after exec. The codex branch of
+ * withTheHarnessFeaturesOff in src/server/lib/terminal-agents.ts, and aCommandWithTheHarnessFeaturesOff in
+ * tools/harness-features-off.mjs, put it before a subcommand. tools/codex-in-a-sandbox.mjs, the codex the sandbox
+ * helper puts first on PATH, puts it in front of every argument, so a Codex started inside a shell's words gets it too.
+ * tools/harness-features-off.mjs also sets the feature false in a run's home config.toml, for a Codex started inside
+ * a shell's words.
+ */
+export const CODEX_SHELL_SNAPSHOT_OFF = Object.freeze(['-c', `features.${CODEX_SHELL_SNAPSHOT_FEATURE}=false`])
 
 /**
  * RJradfGfKxlq: the variable naming a Claude Code run's office tool configuration, for the run's own hooks. It holds the
@@ -274,7 +313,7 @@ export function aCommandsOfficeTool(command, env, { plainEnv = false, startsRuns
     // (measured 30 September 2026, IcgsA-OGvbzL). Any future exclude list must include MOLE_AGENT_KEY too.
     ...(codexKeepsTheKeyFromItsShell(command, startsRuns) ? ['-c', 'shell_environment_policy.exclude=["MOLE_AGENT_KEY"]'] : []),
     // Measured on 0.159.2 (f_hnh472ssVM): with this switch no snapshot folder is made, and commands still run.
-    '-c', 'features.shell_snapshot=false',
+    ...CODEX_SHELL_SNAPSHOT_OFF,
   ]
   // GX23T1MQs-aZ / IcgsA-OGvbzL: measured on Codex 0.159.2, exec starts this MCP server
   // only with overrides after exec. Find the first word that is neither an option nor its value:
@@ -549,6 +588,33 @@ function theCodexProgramAt(command) {
 export const RUNTIMES_WITH_A_FULL_FORM = Object.freeze(Object.keys(FULL_PERMISSIONS))
 
 /**
+ * THE GUARD'S FILES, BY RUNTIME WORD: what a run whose guard is mounted is told to start. Every mount names the guard
+ * itself, OpenCode's names its plugin as well, and dsh's its hooks file (src/config/main-world-guard.mjs).
+ *
+ * @type {Readonly<Record<string, readonly string[]>>}
+ */
+const THE_GUARDS_FILES = Object.freeze({
+  'claude-code': Object.freeze([THE_GUARD]),
+  codex: Object.freeze([THE_GUARD]),
+  opencode: Object.freeze([THE_OPENCODE_PLUGIN, THE_GUARD]),
+  dsh: Object.freeze([THE_DSH_HOOKS, THE_GUARD]),
+})
+
+/**
+ * The guard's files a run of `runtime` would be told to start that are not there, in the order it would be told them.
+ * A guard that is not mounted asks for none.
+ *
+ * @param {string} runtime
+ * @param {GuardAnswer} guard
+ * @param {(path: string) => boolean} isThere
+ * @returns {string[]}
+ */
+function theFilesARunWouldMiss(runtime, guard, isThere) {
+  const told = guard.mounted ? (THE_GUARDS_FILES[runtime] ?? []) : []
+  return told.filter((file) => !isThere(file))
+}
+
+/**
  * @typedef {object} Permissions
  * @property {boolean} full Whether the run gets its tool's full permissions.
  * @property {string[]} args What to put on the tool's command line, right after the program's name.
@@ -582,12 +648,26 @@ export function theSandboxIn(env) {
  * the one it was built with, and a tool passes its own. `guard` is `theGuardOn(runtime, command)`
  * for the command the run is started with, read by the launcher that built it.
  *
+ * FIRST, WHEN THE GUARD IS MOUNTED, THE GUARD'S FILES THE RUN WOULD BE TOLD TO START (see the header). When one is not
+ * there it throws, naming each one, and nothing is started. An install carries every one of them except dsh's hooks
+ * file, and without that file dsh's guard is not mounted. The office tool server is not asked: only the launcher in
+ * tools/ puts it in a command, and that launcher is carried wherever the server is.
+ *
  * @param {string} runtime
  * @param {Record<string, string | undefined>} env
  * @param {GuardAnswer} [guard]
+ * @param {(path: string) => boolean} [isThere] Whether a file is there; existsSync, or a test's own answer.
  * @returns {Permissions}
  */
-export function thePermissionsARunGets(runtime, env, guard = NOT_READ_FOR_THE_GUARD) {
+export function thePermissionsARunGets(runtime, env, guard = NOT_READ_FOR_THE_GUARD, isThere = existsSync) {
+  const missing = theFilesARunWouldMiss(runtime, guard, isThere)
+  if (missing.length > 0) {
+    const named = missing.length === 1 ? missing[0] : `${missing.slice(0, -1).join(', ')} and ${missing.at(-1)}`
+    throw new Error(
+      `A ${runtime} run would be told to start ${named}, and this office does not carry ${missing.length === 1 ? 'it' : 'them'} ` +
+        'yet. Nothing was started.',
+    )
+  }
   const form = FULL_PERMISSIONS[runtime]
   if (form === undefined) {
     return {

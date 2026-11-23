@@ -1,7 +1,6 @@
 # done: every file on this list calls the owner by no pronoun
 tests/a-citizens-page-draws-the-card-it-holds.test.ts
 tests/a-closed-unchecked-run-says-who-when-and-why-in-the-browser.test.ts
-tests/a-closed-unchecked-run-stays-out-of-the-merge-queue.test.ts
 tests/a-comment-is-drawn-beside-the-words.test.ts
 tests/a-cutfrom-naming-the-runs-own-branch-falls-back-to-main.test.ts
 tests/a-derived-panel-says-which-record-it-is-about.test.ts
@@ -24,8 +23,6 @@ tests/a-run-superseded-by-a-later-run-on-the-same-branch.test.ts
 tests/a-runs-settlements-are-written-only-by-their-doors.test.ts
 tests/a-runs-verdicts-are-written-only-by-their-doors.test.ts
 tests/a-secretary-acting-for-the-person.test.ts
-tests/a-stalled-landing-can-be-asked-again.test.ts
-tests/a-test-that-could-not-run-is-not-red.test.ts
 tests/a-worker-run-is-settled-by-the-merged-wave-that-holds-it.test.ts
 tests/absence-weight.test.ts
 tests/agent-conversations-designed-again.test.ts

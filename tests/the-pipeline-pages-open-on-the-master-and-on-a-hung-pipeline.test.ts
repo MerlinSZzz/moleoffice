@@ -14,10 +14,10 @@
  *      link's own word for that end, and the other step's title opens that step.
  *   4. A pipeline's page is in three parts, in this order: its summary at the top, the drawing, and its own body text
  *      at the bottom, one paragraph for each paragraph stored.
- *   5. `#/project-graph` draws no key strip and no source-map line under the drawing. Its body text says both, right
- *      after the lead and before the first lane: how to read the drawing, and what the source map door answered in
- *      this office. Wave 13u round 217: a picture carries no small
- *      print.
+ *   5. `#/project-graph` draws no key strip and no source-map line under the drawing. Its body text says what the
+ *      source map door answered in this office, right after the heading and before the first lane. Wave 13u round
+ *      217: a picture carries no small print. CRITERION CHANGE, as decided: the lead and the sentences on how to read
+ *      the drawing are gone, and the source map's absence is a short state word.
  *   6. `#/project-graph` draws each step once. A step that a drawn pipeline lists is not drawn again as a loose step.
  *
  * Pictures are taken only when TEST_SHOTS names a folder: the canvas with its step links, four widths, both themes.
@@ -203,7 +203,7 @@ describe('the pipeline pages and the project canvas', () => {
     expect(await page.locator('[data-pipeline-part="context"] .pp-own-words').allTextContents()).toEqual(CONTEXT)
   })
 
-  it('5. say how to read the project graph and what the source map gave in its body text, with no key strip and no line under it', async () => {
+  it('5. say what the source map gave in its body text, with no key strip and no line under it', async () => {
     // WHAT THIS OFFICE'S GRAPH SAYS ABOUT ITS SOURCE INDEX, and then what the source map door answers, asked as the page
     // asks them. A project with no index has no map yet, so the page says that and asks the coverage door nothing; a
     // project that has one and whose door fails says the map could not be read; a project that has one and whose door
@@ -215,15 +215,10 @@ describe('the pipeline pages and the project canvas', () => {
     const map = door.ok ? ((await door.json()) as { coverage: { totalFiles: number; claimedFiles: number; unclaimedFiles: number } }).coverage : null
     const coverage =
       graphReply.sourceIndexBuilt === false
-        ? sayInEnglish('projectGraph.coverage.none')
+        ? sayInEnglish('projectGraph.coverage.noMap')
         : map === null
-          ? sayInEnglish('projectGraph.coverage.failed')
+          ? sayInEnglish('projectGraph.coverage.notRead')
           : `${sayInEnglish('projectGraph.coverage', { total: map.totalFiles, claimed: map.claimedFiles, n: map.totalFiles })} ${sayInEnglish('projectGraph.coverage.unclaimed', { n: map.unclaimedFiles })}`
-    const key = [
-      sayInEnglish('projectGraph.legend.future'),
-      sayInEnglish('projectGraph.legend.present'),
-      sayInEnglish('projectGraph.legend.canvas'),
-    ].join(' ')
 
     // The first lane is drawn once the page's read has answered, so nothing below is asked of a page still loading.
     await open('/project-graph', '.gph-lane')
@@ -233,15 +228,14 @@ describe('the pipeline pages and the project canvas', () => {
       expect(await page.locator('.gph-legend').count(), `${level}: no key strip`).toBe(0)
       expect(await page.locator('.gph-coverage').count(), `${level}: no source-map line under the drawing`).toBe(0)
       expect(await page.getByText(sayInEnglish('projectGraph.legend')).count(), `${level}: no "${sayInEnglish('projectGraph.legend')}"`).toBe(0)
-      expect(((await page.locator('[data-graph-says="key"]').textContent()) ?? '').trim(), `${level}: the key in the body`).toBe(key)
       expect(((await page.locator('[data-graph-says="coverage"]').textContent()) ?? '').trim(), `${level}: ${doorSaid}`).toBe(coverage)
       const order = await page.evaluate(() => {
-        const says = document.querySelector('[data-graph-says="key"]')
+        const says = document.querySelector('[data-graph-says="coverage"]')
         const first = document.querySelector('.gph-lane, .gph-zone')
         if (says === null || first === null) return 'a part is missing'
         return (says.compareDocumentPosition(first) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0 ? 'before' : 'after'
       })
-      expect(order, `${level}: the key comes before the first lane or zone`).toBe('before')
+      expect(order, `${level}: the source-map line comes before the first lane or zone`).toBe('before')
     }
   })
 

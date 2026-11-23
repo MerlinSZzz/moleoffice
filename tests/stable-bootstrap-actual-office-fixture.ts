@@ -9,7 +9,7 @@ import { basename, dirname, join, resolve, sep } from 'node:path'
 import { createServer } from 'node:net'
 import { setTimeout as delay } from 'node:timers/promises'
 import Database from 'better-sqlite3'
-import { commandThatStopsWithItsOwner, freshDb } from './helpers.ts'
+import { commandThatStopsWithItsOwner, freshDb, governsTheWholeProject } from './helpers.ts'
 import { THE_TEST_OFFICES_OWNER } from './a-page-of-a-test-office.ts'
 import { localStamp, theClockZone } from '../src/shared/time.ts'
 import { THE_TEST_MARK } from '../src/config/the-test-mark.mjs'
@@ -22,7 +22,7 @@ import { PLUGINS_FOLDER, PLUGIN_MANIFEST_FILE, PLUGIN_ID } from '../src/shared/p
 import { ACTUAL_OFFICE_SKIPPED, askedForTheActualOffice, theFoldersThisFileMakes } from './stable-bootstrap-test-folder.ts'
 
 const root = resolve(import.meta.dirname, '..')
-const toolNames = ['stable/bootstrap-stable.mjs', 'stable/stable-bootstrap-transaction.mjs', 'stable/stable-bootstrap-support.mjs', 'stable/stable-bootstrap-storage.mjs', 'stable/stable-bootstrap-processes.mjs', 'stable/stable-bootstrap-execution.mjs', 'stable/stable-bootstrap-transport.mjs', 'stable/stable-bootstrap-launcher.mjs', 'stable/stable-bootstrap-words.mjs', 'stable/stable-service-settings.mjs', 'independent-storage.mjs', 'stable/stable-upgrade-transaction.mjs', 'database-holders.mjs']
+const toolNames = ['stable/bootstrap-stable.mjs', 'stable/stable-bootstrap-transaction.mjs', 'stable/stable-bootstrap-support.mjs', 'stable/stable-bootstrap-storage.mjs', 'stable/stable-bootstrap-processes.mjs', 'stable/stable-bootstrap-execution.mjs', 'stable/stable-bootstrap-transport.mjs', 'stable/stable-bootstrap-launcher.mjs', 'stable/stable-bootstrap-words.mjs', 'stable/stable-service-settings.mjs', 'independent-storage.mjs', 'stable/stable-upgrade-transaction.mjs', 'stable/electrons-binary.mjs', 'database-holders.mjs']
 const owned: Array<{ child?: ChildProcess; pid: number; startTime: string; pgid: number; leader: string; order: number }> = []
 const fixtures = theFoldersThisFileMakes()
 const previousKey = process.env.MOLE_AGENT_KEY
@@ -309,7 +309,7 @@ export async function prepareAndAuthorize(f: Awaited<ReturnType<typeof actualBoo
   const owner = JSON.parse(readFileSync(answer, 'utf8'))
   const title = `Synthetic original owner stop decision ${f.config.candidateTag}`
   const scope = { version: 1, action: 'stop-serve-dev-for-first-handoff', candidateTag: f.config.candidateTag, tree: f.config.targetTree, from: { commit: f.config.targetCommit, repository: f.dev, database: f.database, port: f.config.servicePort }, to: { commit: f.config.targetCommit, repository: f.stable, database: f.database, port: f.config.servicePort } }
-  const decision = await f.officeRequest({ method: 'POST', path: '/api/records', body: { kind: 'decision', title, data: { decided_by: THE_TEST_OFFICES_OWNER.id, authority: 'the owner said so', because: 'Explicit synthetic fixture stop words after original preparation.', replaces: [], extra: { stableBootstrapStop: scope } }, warrant: { saidBy: THE_TEST_OFFICES_OWNER.id, words, where: `message:${owner.id}`, when: owner.at, for: [title] } } })
+  const decision = await f.officeRequest({ method: 'POST', path: '/api/records', body: { kind: 'decision', title, data: { decided_by: THE_TEST_OFFICES_OWNER.id, authority: 'the owner said so', because: 'Explicit synthetic fixture stop words after original preparation.', ...governsTheWholeProject(), replaces: [], extra: { stableBootstrapStop: scope } }, warrant: { saidBy: THE_TEST_OFFICES_OWNER.id, words, where: `message:${owner.id}`, when: owner.at, for: [title] } } })
   expect(decision.status, decision.body).toBe(201)
   const id = JSON.parse(decision.body).record.id, original = await f.object(`/api/records/${id}/revisions/1`)
   return { ...f.config, prepared: prepared.result.prepared, stopAuthority: { kind: 'owner-decision', decision: { id, seq: 1, contentHash: original.contentHash } } }

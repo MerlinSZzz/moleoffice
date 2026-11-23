@@ -26,7 +26,7 @@ import type { RecordKind } from '@shared/types.ts'
 import type { RecordRegionSource } from '@shared/regions.ts'
 import { useEffect, useRef, useState } from 'react'
 import { content, t, type WordKey } from '@shared/i18n.ts'
-import { kindWord, linkWord } from '@shared/words.ts'
+import { kindWord } from '@shared/words.ts'
 import { useCopy } from '../lib/copy.ts'
 import {
   ITEM_STATES,
@@ -41,24 +41,8 @@ import {
   type Change,
 } from '@shared/types.ts'
 import { KIND_SPECS, MODULE_STATES, completenessOf, type ModuleState } from '@shared/kinds.ts'
-/**
- * THE FOUR LIFECYCLE WORDS AS A READER WOULD SAY THEM.
- *
- * The module list already draws these four as headings — "Being worked on", "Put down on purpose",
- * "Good enough for now", "Out of use" — and this panel drew the stored spellings in monospace, so
- * one product had two vocabularies for one field and only one of them was English. This is that
- * vocabulary in lower case, for the middle of a sentence.
- *
- * KEYED ON `ModuleState`, so a fifth word added to MODULE_STATES does not compile until somebody
- * has said what it means to a person.
- */
-const MODULE_SAID: Readonly<Record<ModuleState, WordKey>> = {
-  active: 'moduleView.moduleSaid.active',
-  paused: 'moduleView.moduleSaid.paused',
-  stable: 'moduleView.moduleSaid.stable',
-  retired: 'moduleView.moduleSaid.retired',
-}
-import { reportReading, type ReportRow } from '@shared/attention.ts'
+import type { ReportRow } from '@shared/attention.ts'
+import type { ARelatedRow, RelatedAnswer } from '../../server/lib/related.ts'
 import { PROGRESS, progressOf, type Progress } from '@shared/work.ts'
 import { faultOf, api, errorMessage } from '../api.ts'
 import type { RecordImplementationReply } from '../../server/api/implementation.ts'
@@ -74,6 +58,7 @@ import { useInspect } from '../lib/mode.ts'
  */
 import { ReportLine } from './AttentionPanel.tsx'
 import { ModuleSource } from './ModuleSource.tsx'
+import { ChecklistItemsHere, RelatedList } from './RelatedHere.tsx'
 import { recordPath } from './router.tsx'
 
 /**
@@ -104,13 +89,11 @@ import {
   Absence,
   Btn,
   ErrorNote,
-  Explain,
   Field,
   Hint,
   IncompleteMark,
   Loading,
   Panel,
-  PROGRESS_WORDS,
   Row,
   Select,
   StateChip,
@@ -126,6 +109,7 @@ import { useProjectAsync } from '../lib/project-async.ts'
 import { sectionsOf, titleHere } from './sections.ts'
 import type { Declares } from './declares.ts'
 import {
+  CHECKLISTS_ABOUT_KEY,
   CLAIMED_SOURCE_KEY,
   READING_MATTER_KEY,
   REPORTS_ABOUT_KEY,
@@ -836,7 +820,7 @@ function StandingPanel({
               which is what separates this row from the derived one beneath it; it survives as
               "you choose this". */}
           <h3 className="mv-stand-head">
-            {t('moduleView.standing.head')} <span className="mv-stand-note">{t('moduleView.standing.youChoose')}</span>
+            {t('moduleView.standing.head')}
           </h3>
           {lifecycle === null ? (
             <>
@@ -847,34 +831,19 @@ function StandingPanel({
                     from the checklist whether it did. Two rows on one panel must not disagree. */}
                 <StoredState state={null} progress={null} />
               </p>
-              {/* The vocabulary is read once and skipped for every visit afterwards, so it folds.
-                  What stays visible is the part that is a fact about THIS record: nobody chose,
-                  and no word arrives by itself. */}
-              <Explain declares={{ surface: null }}
-                meaning={t('moduleView.standing.noDefault')}
-                opens={t('moduleView.standing.theFour')}
-              >
-                {/* THE FOUR IN PLAIN WORDS, NOT FOUR STORED WORDS IN MONOSPACE. The stored spelling
-                    is what Developer mode is for and is on every module tag already. `MODULE_SAID`
-                    is keyed on MODULE_STATES, so a fifth word does not compile until somebody has
-                    said what it means to a reader. */}
-                <p className="mv-note">{MODULE_STATES.map((word) => t(MODULE_SAID[word])).join(' · ')}</p>
-              </Explain>
             </>
           ) : (
             <>
               <p className="mv-stand-line">
                 <StoredState state={lifecycle} progress={progress} />
               </p>
-              {progress === null ? null : <p className="mv-note">{t('moduleView.standing.itMeans', { meaning: PROGRESS_WORDS[progress] })}</p>}
             </>
           )}
         </section>
 
         <section className="mv-stand">
           <h3 className="mv-stand-head">
-            {t('moduleView.condition.head')}{' '}
-            <span className="mv-stand-note">{t('moduleView.condition.headNote')}</span>
+            {t('moduleView.condition.head')} <Hint>{t('moduleView.condition.headNote')}</Hint>
           </h3>
           <p className="mv-stand-line">
             {/* No chip. A chip is what a stored word wears everywhere in this app, and this word
@@ -896,18 +865,14 @@ function StandingPanel({
               </Tag>
             ) : null}
           </p>
-          <p className="mv-note">
-            {condition.because}
-            {/* The tail used to be "— the panel at the top of the page names them", which described
-                where a rank-0 alarm panel on the same page is. The count and its consequence for
-                this arithmetic are the parts a reader cannot see. */}
-            {uncounted > 0 ? (
-              <>
-                {t('moduleView.condition.uncountedGap')}
-                {t('moduleView.condition.uncounted', { n: uncounted })}
-              </>
-            ) : null}
-          </p>
+          {condition.tally.length === 0 && uncounted === 0 ? null : (
+            <p className="mv-note">
+              {[
+                ...condition.tally.map((entry) => progressCount(entry.progress, entry.n)),
+                ...(uncounted > 0 ? [t('moduleView.condition.notCounted', { n: uncounted })] : []),
+              ].join(t('moduleView.condition.countGap'))}
+            </p>
+          )}
         </section>
       </div>
     </Panel>
@@ -968,44 +933,37 @@ function PathRow({ path }: { path: PathRef }) {
 // ============================================================================ reports about this
 
 /**
- * The reports written ABOUT this module, and how many of them have been deleted.
+ * The reports written ABOUT this module or its parts, and how many of them have been deleted.
  *
- * WHAT A REPORT IS ABOUT IS A LINK AND NEVER A FIELD, so this is read from the links on the
- * module's own record: an incoming `about` link from a record of kind `report`. Nothing here parses
- * a title or guesses a subject, and there is no second stored copy that could disagree with the
- * link — that is the whole reason the report kind has no `about` field.
+ * WHAT A REPORT IS ABOUT IS A LINK AND NEVER A FIELD, and the related door (GET /api/records/:id/related) reads those
+ * links: an `about` link from a report to the module, to a sub-module at any depth, or to a run of one of them. Nothing
+ * here parses a title or guesses a subject. Each row says which part it came through, and carries the report's own
+ * reading by `reportReading`, the reader Home uses, so who it is for and whether it has been read are on the row.
  *
- * EACH REPORT IS THEN READ IN FULL, one request each, because who it is for and whether it has been
- * read live in the report's own `data` and a link projection carries only id, kind and title. There
- * are usually one or two; a module with fifty reviews would be a different problem and does not
- * exist. The full subject list comes off the report's OWN outgoing `about` links, so a report about
- * two things says so on the page of either.
+ * ONE REQUEST, NOT ONE PER REPORT. The door reads the reports and their subjects, and this reader asks it once.
  *
- * A DELETED REPORT IS COUNTED, NEVER DROPPED. Its link comes back `broken`, and a page that quietly
- * showed one fewer row would be hiding the fact that somebody deleted a review.
+ * A DELETED REPORT IS COUNTED, NEVER DROPPED. The door counts it, and a page that quietly showed one fewer row would be
+ * hiding the fact that somebody deleted a review.
  */
-export interface ReportsAboutRead {
-  rows: ReportRow[]
-  /** Reports pointed at this module whose record has been deleted. Reported, never hidden. */
+export interface TheRelatedReports {
+  /** The door's answer as it came: what it matched, what it left for a later page and what it could not read. */
+  answer: RelatedAnswer
+  rows: (ARelatedRow & { report: ReportRow })[]
+  /** Reports about this module or its parts whose record has been deleted. Reported, never hidden. */
   deleted: number
 }
 
-export async function readReportsAbout(moduleId: string): Promise<ReportsAboutRead> {
-  const detail = await api.getRecord(moduleId)
-  const pointed = detail.links.filter(
-    (link) => link.type === 'about' && link.isBacklink && link.other.kind === 'report',
-  )
-  const live = pointed.filter((link) => !link.broken)
-  const reports = await Promise.all(live.map((link) => api.getRecord(link.other.id)))
-  const rows = reports.map((reply) =>
-    reportReading(
-      reply.record,
-      reply.links
-        .filter((link) => link.type === 'about' && !link.isBacklink && !link.broken)
-        .map((link) => ({ recordId: link.other.id, title: link.other.title })),
-    ),
-  )
-  return { rows, deleted: pointed.length - live.length }
+export async function readTheRelatedReports(id: string): Promise<TheRelatedReports> {
+  const answer = await api.related(id, { kind: 'reports' })
+  // THE DOOR COUNTS A DELETED REPORT AND READS EACH LIVE ONE. An answer without either is not the door's answer for
+  // reports, and it is refused here rather than drawn as no deleted reports or as a row with no reading.
+  const deleted = answer.deletedLeftOut
+  if (deleted === null) throw new Error('The related door did not count the deleted reports.')
+  const rows = answer.rows.map((row) => {
+    if (row.report === undefined) throw new Error(`The related door sent report ${row.id} without its reading.`)
+    return { ...row, report: row.report }
+  })
+  return { answer, rows, deleted }
 }
 
 /**
@@ -1020,43 +978,40 @@ export async function readReportsAbout(moduleId: string): Promise<ReportsAboutRe
  * WHY THE TWO EMPTY STATES ARE DRAWN DIFFERENTLY, AND THEY MUST STAY THAT WAY. There are two ways
  * this panel can have no rows and they are not the same fact. Either Mole Office could not ask — the
  * view was mounted without the record id — or it asked and nobody has written one. The first is
- * broken wiring a person has to fix, so it keeps a whole sentence. The second is ordinary and quiet
- * now: a short mark that says nobody has written one, with the sentence on its tooltip.
+ * broken wiring a person has to fix, so it keeps a whole sentence. The second is ordinary and quiet:
+ * the related list's none word.
  *
  * WHAT A REPORT IS MOVED BEHIND THE HELP MARK. The empty state used to spend three sentences
  * explaining what a report is and how one gets here. That explanation is true whether or not the
  * panel is empty, so it belongs on the panel and not in the hole.
  *
- * IT IS NOT A MODULE'S PANEL, IT IS A RECORD'S. `subjectId` is any record and `what` is the plain
- * noun for it, so the pipeline page mounts the same panel with `what="pipeline"` and the campaign
- * page — which is a pipeline — gets it with them. That is one word of generality and it is there
- * for a measured reason: three pages needing this and each writing its own would be three wordings
- * of "nobody has said whether you have read it", free to disagree.
+ * IT IS A MODULE'S PANEL. `subjectId` is the module and `what` is the plain noun for it. The pipeline page does not
+ * mount it: that page draws ReportsScope, the short list the reports page narrows to the pipeline, which reads the same
+ * walk of the pipeline's parts as the related door.
  */
 export function ReportsAbout({
   declares,
   subjectId,
   what,
+  fold,
 }: {
   /** Which section of the subject this panel draws — `section.reportsAbout`, from its caller. */
   declares: Declares
   subjectId?: string
   what: string
+  /** How many rows are drawn before the rest go behind a press. Without it, every row is drawn. */
+  fold?: number
 }) {
   const [state, reload] = useProjectAsync(
-    async () => (subjectId === undefined ? null : await readReportsAbout(subjectId)),
+    async () => (subjectId === undefined ? null : await readTheRelatedReports(subjectId)),
     [subjectId],
   )
+  const folded = fold ?? Number.POSITIVE_INFINITY
 
   return (
     <Panel declares={declares}
       title={titleHere(what as RecordKind, REPORTS_ABOUT_KEY)}
       rank={2}
-      actions={
-        <Hint label={t('moduleView.reportsAbout.hintLabel')}>
-          <p>{t('moduleView.reportsAbout.hint', { what: kindWord(what).text, about: linkWord('about', 'forward').text })}</p>
-        </Hint>
-      }
     >
       {subjectId === undefined ? (
         /* NOBODY HAS LOOKED, WHICH IS NOT THE SAME AS THERE BEING NONE — the fifth invariant, in
@@ -1067,41 +1022,71 @@ export function ReportsAbout({
            IT IS WORDS RATHER THAN AN ALARM, on purpose. What is missing is one line where this view
            is mounted, not a fault in the subsystem, and a red box on every module page would say the
            subsystem is broken. The sentence says exactly what is missing and what it is not. */
-        <Absence
-          tier="must-act-on"
-          sentence={
-            <>
-              <b>{t('moduleView.reportsAbout.notLookedLead')}</b>{' '}
-              {t('moduleView.reportsAbout.notLookedBody', { what: content(kindWord(what).text) })}
-            </>
-          }
-        />
+        <Absence tier="told-apart" looked={false} title={t('moduleView.reportsAbout.notLookedLead')} />
       ) : state.status === 'loading' ? (
         <Loading label={t('moduleView.reportsAbout.loading', { what: kindWord(what).text })} rows={1} />
       ) : state.status === 'error' ? (
-        <ErrorNote message={state.message} fault={state.fault} retry={reload} />
+        <RelatedList reading={{ status: 'error', message: state.message, fault: state.fault }} fold={folded} retry={reload} />
       ) : state.value === null ? null : (
-        <>
-          {state.value.rows.length === 0 ? (
-            <Absence
-              tier="told-apart"
-              looked
-              word={t('moduleView.reportsAbout.none')}
-              title={t('moduleView.reportsAbout.noneTitle', { what: kindWord(what).text })}
-            />
-          ) : (
-            <ul className="att-rep-list">
-              {state.value.rows.map((row) => (
-                <ReportLine key={row.key} row={row} onMarkedRead={reload} />
-              ))}
-            </ul>
-          )}
-          {state.value.deleted === 0 ? null : (
-            <p className="mv-note">
-              {t('moduleView.reportsAbout.deleted', { n: state.value.deleted, what: kindWord(what).text })}
-            </p>
-          )}
-        </>
+        <RelatedList
+          reading={{ status: 'ready', value: { ...state.value.answer, rows: state.value.rows } }}
+          fold={folded}
+          drawRow={(row) =>
+            row.report === undefined ? null : (
+              <ul className="att-rep-list">
+                <ReportLine row={row.report} onMarkedRead={reload} />
+              </ul>
+            )
+          }
+          retry={reload}
+        />
+      )}
+    </Panel>
+  )
+}
+
+/**
+ * THE CHECKLISTS ABOUT THIS MODULE OR ITS PARTS, beside the reports and the decisions about it.
+ *
+ * A checklist is about the module when one of its items links the module, a sub-module at any depth or a run of one of
+ * them. The related door reads them, and each row draws the checklist's title and only those items, with each item's
+ * mark and words, as the checklists page draws an item. The empty states are the reports panel's, for its reasons.
+ */
+export function ChecklistsAbout({
+  declares,
+  subjectId,
+  what,
+  fold,
+}: {
+  /** Which section of the subject this panel draws — `section.checklistsAbout`, from its caller. */
+  declares: Declares
+  subjectId?: string
+  what: string
+  /** How many rows are drawn before the rest go behind a press. Without it, every row is drawn. */
+  fold?: number
+}) {
+  const [state, reload] = useProjectAsync(
+    async () => (subjectId === undefined ? null : await api.related(subjectId, { kind: 'checklists' })),
+    [subjectId],
+  )
+  const title = titleHere(what as RecordKind, CHECKLISTS_ABOUT_KEY)
+  const folded = fold ?? Number.POSITIVE_INFINITY
+  return (
+    <Panel declares={declares} title={title} rank={2}>
+      {subjectId === undefined ? (
+        // NOBODY HAS LOOKED, for the reason the reports panel above gives.
+        <Absence tier="told-apart" looked={false} title={t('moduleView.reportsAbout.notLookedLead')} />
+      ) : state.status === 'loading' ? (
+        <Loading label={title} rows={1} />
+      ) : state.status === 'error' ? (
+        <RelatedList reading={{ status: 'error', message: state.message, fault: state.fault }} fold={folded} retry={reload} />
+      ) : state.value === null ? null : (
+        <RelatedList
+          reading={{ status: 'ready', value: state.value }}
+          fold={folded}
+          drawRow={(row) => <ChecklistItemsHere row={row} />}
+          retry={reload}
+        />
       )}
     </Panel>
   )
@@ -1239,9 +1224,6 @@ export function ClaimedSourceRead({
               </li>
             ))}
           </ul>
-          <p className="mv-note">
-            {t('pageWords.ModuleView.claimSubject', { n: stored.length })}{t('pageWords.ModuleView.003')}<code>claims</code>{t('pageWords.ModuleView.004')}{' '}
-            <code>npm run db:migrate</code>{t('pageWords.ModuleView.005')}{t('pageWords.ModuleView.claimObject', { n: stored.length })}{t('pageWords.ModuleView.006')}</p>
         </>
       )}
 
@@ -1281,21 +1263,6 @@ export function ClaimedSourceRead({
           title={t('pageWords.ModuleView.009')}
         />
       )}
-
-      {/* Stored-not-resolved is the load-bearing half, so it is the line that stays on screen; what
-          does resolve them belongs behind the press. */}
-      {total === 0 ? null : (
-        <Explain
-          declares={{ surface: null }}
-          meaning={
-            <>{t('pageWords.ModuleView.010')}<strong>{t('pageWords.ModuleView.011')}</strong>{t('pageWords.ModuleView.012')}</>
-          }
-          opens={t('pageWords.ModuleView.013')}
-        >
-          <p className="mv-note">
-            <strong>{t('record.section.whereItLives')}</strong>{t('pageWords.ModuleView.014')}</p>
-        </Explain>
-      )}
     </Panel>
   )
 }
@@ -1310,6 +1277,7 @@ export function ModuleView({
   relations,
   editable,
   onSave,
+  fold,
 }: {
   data: Record<string, unknown>
   /**
@@ -1363,6 +1331,11 @@ export function ModuleView({
    * their own change over theirs: a list sent whole from this copy would undo what they wrote in it.
    */
   onSave: (change: Record<string, unknown>, again: (theirs: Record<string, unknown>) => Record<string, unknown>) => Promise<void>
+  /**
+   * How many rows the reports and checklists lists draw before the rest go behind a press. The record page passes
+   * its `OPEN_LOOPS_DRAWN`, so these lists fold where the decisions beside them fold. Without it, every row is drawn.
+   */
+  fold?: number
 }) {
   const parsed = parseModule(data)
 
@@ -1438,11 +1411,7 @@ export function ModuleView({
       <ProblemPanel problems={parsed.problems} />
 
       {saveError ? (
-        <ErrorNote message={saveError.message} fault={saveError.fault}>
-          <span className="mv-note">
-            {t('moduleView.parts.saveErrorNote')}
-          </span>
-        </ErrorNote>
+        <ErrorNote message={saveError.message} fault={saveError.fault} />
       ) : null}
 
       {/* Context first. It is the one paragraph that says why any of the rest exists, and it is
@@ -1506,7 +1475,9 @@ export function ModuleView({
           is the question somebody opens a module to answer, and a review is what they read once
           they care. It does not touch the curated summary: that says where the subsystem stands
           now, and a report is about a day and stays as it was written. */}
-      <ReportsAbout declares={section(REPORTS_ABOUT_KEY)} subjectId={moduleId} what="module" />
+      <ReportsAbout declares={section(REPORTS_ABOUT_KEY)} subjectId={moduleId} what="module" fold={fold} />
+      {/* AND THE CHECKLISTS ABOUT IT AND ITS PARTS, read by the same door, folded at the same number. */}
+      <ChecklistsAbout declares={section(CHECKLISTS_ABOUT_KEY)} subjectId={moduleId} what="module" fold={fold} />
 
       <Panel declares={section('parts')}
         title={titleHere('module', 'parts')}
@@ -1570,14 +1541,6 @@ export function ModuleView({
                 )}
               </section>
             ))}
-            {editable ? null : (
-              // That the record is deleted is already the rank-0 banner at the top of the page and
-              // the `deleted` tag beside its kind. What is not visible anywhere else is that these
-              // chips have stopped being controls, and what brings them back.
-              <p className="mv-note">
-                {t('moduleView.parts.readOnlyNote')}
-              </p>
-            )}
           </div>
         )}
       </Panel>
@@ -1599,7 +1562,6 @@ export function ModuleView({
           field is declared in src/shared/sections.ts and changing it is that file's business. */}
       <Panel declares={section(READING_MATTER_KEY)}
         title={titleHere('module', READING_MATTER_KEY)}
-        kind={t('moduleView.summary.kind')}
         actions={
           parsed.blocks.length > 0 ? (
             <span className="mv-count num">
@@ -1631,9 +1593,7 @@ export function ModuleView({
           // "Nothing beyond the paragraph above yet" was the visible content saying itself: the
           // paragraph is on screen and nothing follows it. What a reader cannot see is what KIND of
           // thing could follow, so that is the half that stays.
-          <p className="mv-note">
-            {t('moduleView.summary.noBlocksYet')}
-          </p>
+          <Absence word={t('absence.none')} title={t('moduleView.summary.noBlocksYet')} />
         ) : (
           // The sentence itself comes from SummaryBlocks, which prints it in the other case, so the
           // two cannot say it differently. It is on the tooltip now rather than on the page, which
@@ -1647,26 +1607,15 @@ export function ModuleView({
           paths has no `section.paths` in its region tree, so `sectionsOf` hands back see-through
           here and the press goes on up to the record. A target on the empty box would name a
           region the server would answer `gone` about, under a heading a reader is looking at. */}
-      <Panel declares={section('paths')} title={titleHere('module', 'paths')} kind={t('moduleView.paths.kind')}>
+      <Panel declares={section('paths')} title={titleHere('module', 'paths')}>
         {parsed.paths.length === 0 ? (
           <Absence word={t('moduleView.paths.none')} title={t('moduleView.paths.noneTitle')} />
         ) : (
-          <>
-            <ul className="mv-paths">
-              {parsed.paths.map((p) => (
-                <PathRow key={p.id} path={p} />
-              ))}
-            </ul>
-            {/* Inside the non-empty branch: a module with no paths was being given three sentences
-                about paths it does not have, under an empty panel.
-
-                THE NOTE ABOUT THE MISSING "open" LINK IS GONE. It was a paragraph explaining a
-                control that is not there, which nobody notices is not there. The copy button on
-                every row is what a person came here to press. */}
-            <p className="mv-note">
-              {t('moduleView.paths.onDiskBefore')}<strong>{t('moduleView.paths.notCopied')}</strong>{t('moduleView.paths.onDiskAfter')}
-            </p>
-          </>
+          <ul className="mv-paths">
+            {parsed.paths.map((p) => (
+              <PathRow key={p.id} path={p} />
+            ))}
+          </ul>
         )}
       </Panel>
 
@@ -1862,7 +1811,7 @@ function knownShape(name: string, value: unknown): React.ReactElement | null {
           <span className="mv-shape-says">{BEARER_WORDS[bearer] ?? t('pageWords.ModuleView.expression02', { bearer: String(bearer) })}</span>
         </span>
         {what === null ? (
-          <span className="mv-field-null">{t('pageWords.ModuleView.019')}</span>
+          <span className="mv-field-null">{t('word.notRecorded')}</span>
         ) : (
           <p className="mv-prose wrap-anywhere">{what}</p>
         )}
@@ -1887,7 +1836,7 @@ function knownShape(name: string, value: unknown): React.ReactElement | null {
           <StateChip state="todo" label={t('pageWords.ModuleView.expression03', { value1: String(obj['since']) })} readOnly />
           {/* Open-ended is the common and honest case, and saying so beats an empty space that
               reads as though somebody forgot. */}
-          <span className="mv-shape-says">{untilWords ?? t('pageWords.ModuleView.expression04')}</span>
+          <span className="mv-shape-says">{untilWords ?? t('sheet.pause.openEnded')}</span>
         </span>
         {why === null ? null : <p className="mv-prose wrap-anywhere">{why}</p>}
       </div>
@@ -1991,11 +1940,7 @@ function LinkRow({
         }
         title={link.other.title}
         href={link.broken ? undefined : `#${recordPath(link.other.id)}`}
-        meta={
-          link.broken
-            ? `“${link.other.title}” was deleted. The link is kept.`
-            : (link.other.summary ?? undefined)
-        }
+        meta={link.broken ? undefined : (link.other.summary ?? undefined)}
         right={
           <>
             {link.broken ? (
@@ -2061,7 +2006,6 @@ function AddLinkForm({
       <Field
         label={t('record.links.title')}
         error={error ?? undefined}
-        hint={t('moduleView.links.reverseHint')}
       >
         <TextInput value={title} onChange={setTitle} placeholder={t('record.links.titleExample')} />
       </Field>
@@ -2151,8 +2095,7 @@ export function LinksPanel({
           </span>
         }
       >
-        <h3 className="mv-group">{t('pageWords.ModuleView.025')}<span className="mv-group-note">{t('record.links.outgoingNote')}</span>
-        </h3>
+        <h3 className="mv-group">{t('pageWords.ModuleView.025')}</h3>
         {outgoing.length === 0 ? (
           <Absence word="none" title={t('record.links.noOutgoing')} />
         ) : (
@@ -2169,8 +2112,7 @@ export function LinksPanel({
           </div>
         )}
 
-        <h3 className="mv-group">{t('pageWords.ModuleView.026')}<span className="mv-group-note">{t('record.links.incomingNote')}</span>
-        </h3>
+        <h3 className="mv-group">{t('pageWords.ModuleView.026')}</h3>
         {incoming.length === 0 ? (
           <Absence word="none" title={t('record.links.noIncoming')} />
         ) : (
@@ -2187,11 +2129,7 @@ export function LinksPanel({
           </div>
         )}
 
-        {editable ? (
-          <AddLinkForm fromId={recordId} knownTitles={knownTitles} onChanged={onChanged} />
-        ) : (
-          <p className="mv-note">{t('moduleView.links.restoreBeforeAdding')}</p>
-        )}
+        {editable ? <AddLinkForm fromId={recordId} knownTitles={knownTitles} onChanged={onChanged} /> : null}
       </Panel>
     </>
   )
@@ -2349,13 +2287,6 @@ const MODULE_CSS = `
   color: var(--text-2);
   display: flex; align-items: baseline; gap: var(--gut); flex-wrap: wrap;
 }
-.mv-stand-note {
-  font-size: var(--fs-1);
-  font-weight: 400;
-  letter-spacing: 0;
-  text-transform: none;
-  color: var(--text-3);
-}
 .mv-stand-line { margin: 0; display: flex; align-items: center; gap: var(--pad); flex-wrap: wrap; min-width: 0; }
 /* NO CHIP, and no border that could be mistaken for one: a chip is what a stored word wears in
    this app. The condition is set in the body face at full contrast and carries its tag beside it. */
@@ -2494,13 +2425,6 @@ const MODULE_CSS = `
   display: flex; align-items: baseline; gap: var(--gut); flex-wrap: wrap;
 }
 .mv-group:first-child { margin-top: 0; }
-.mv-group-note {
-  font-size: var(--fs-1);
-  font-weight: 400;
-  letter-spacing: 0;
-  text-transform: none;
-  color: var(--text-3);
-}
 .mv-links { display: flex; flex-direction: column; }
 .mv-link { min-width: 0; }
 

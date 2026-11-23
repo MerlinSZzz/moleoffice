@@ -106,6 +106,17 @@ export interface Operation {
    * refuses. Those gates read `gatedAs` through `theActAGateAsksAbout`, and nothing else does.
    */
   readonly gatedAs?: string
+  /**
+   * AN ACT A VISITOR MAY NOT ASK FOR, AND THE REST OF THE SENTENCE IT IS REFUSED WITH.
+   *
+   * A visitor's request for this act is refused with 403 before its door is reached. The sentence names
+   * the credential first, and this text is the rest of it: what the visitor may not do here, and why.
+   *
+   * It is read by the visitor check in src/server/lib/visitorgate.ts, and nothing else reads it.
+   *
+   * ABSENT MEANS A VISITOR MAY ASK, which is every operation that does not carry it.
+   */
+  readonly refusedToVisitors?: string
 }
 
 /**
@@ -152,6 +163,9 @@ const OPERATION_METADATA = {
   'project.master-pipeline': { live: true, effect: 'read' },
   'project.set-master-pipeline': { live: true, effect: 'write' },
   'project.board': { live: true, effect: 'read' },
+  // THE BOARD'S PEOPLE AND PACKAGES: who acts on each line now, under whom, and the line's packages counted by state.
+  // A reading of its own, and not the board's, because the fourth tab reads it only when it is chosen. A read.
+  'project.people-and-packages': { live: true, effect: 'read' },
   // THE BIG MAP'S DICTIONARY (package BV, point BV-6): a file or a module in, its block, module and owning line out.
   'map.dictionary': { live: true, effect: 'read' },
   // ONE FLOW, AND A PAGE OF ITS RUNS. They are what the Flows page opens, in wave 13p round 33.
@@ -227,12 +241,17 @@ const OPERATION_METADATA = {
   // THE REPORTS PAGE'S LIST: reports and notes of every project, grouped and paged. Its own name and not
   // `record.list`: that one answers one project's records of every kind (problem nYadrL5AnC-A).
   'record.reports-and-notes': { live: true, effect: 'read' },
+  'record.report-stars': { live: true, effect: 'read' },
+  'record.set-report-star': { live: true, effect: 'write' },
   // MY NOTES: the quick notes of every project, searched, counted and paged. A name of its own, as the Reports page has.
   'record.my-notes': { live: true, effect: 'read' },
   // THE NOTE ADD TO NOTE GOES INTO: the one the reader last wrote in, among the notes My notes lists for them.
   'record.my-notes-last-written-in': { live: true, effect: 'read' },
   'record.read': { live: true, effect: 'read' },
   'record.context': { live: true, effect: 'read' },
+  // WHAT IS RELATED TO A MODULE OR A PIPELINE AT EVERY DEPTH: its decisions, reports and checklists. Its own name and not
+  // `record.context`: that one reads one record's own loops and decisions, and this one walks its parts.
+  'record.related': { live: true, effect: 'read' },
   // THE OTHER RECORDS AND LINKS ONE RECORD PAGE DRAWS. Its own name and not `record.list`: that one
   // answers every live record, and this one answers the few a page about one record reads, so a
   // measurement can tell how often the whole listing is still asked for.
@@ -394,6 +413,9 @@ const OPERATION_METADATA = {
   'machine.access': { live: true, effect: 'read' },
   'source.read': { live: true, effect: 'read' },
   'source.index': { live: true, effect: 'write' },
+  // A TICKET FOR ONE FILE, SEC-2 item 3: an address a browser's own load opens one file with. It is a write because
+  // it puts the ticket into the app's book, though the book is in memory and no row is written.
+  'source.ticket': { live: true, effect: 'write' },
   // THE DIRECTORIES A PREVIEW MAY READ, for one project. ITS OWN NAME AND NOT `source.read`:
   // `source.read` is the bytes of one file, and this is the fence around them, which the Settings
   // page draws. A measurement that folded the two together could not tell a read of a file from a
@@ -536,6 +558,7 @@ const OPERATION_METADATA = {
   'resident.wake': { live: true, effect: 'write' },
   'resident.sleep.postpone': { live: true, effect: 'write' },
   'resident.sleep.time': { live: true, effect: 'write' },
+  'resident.package.reminder.every': { live: true, effect: 'write' },
   'resident.named': { live: true, effect: 'write' },
 
   // THE ONE MESSAGE POOL. `message.conversation` is a read that writes when a person reads it, and it
@@ -619,6 +642,15 @@ const OPERATION_METADATA = {
   'report-file.unnamed': { live: true, effect: 'read' },
   'storage.categories': { live: true, effect: 'read' },
   'report-file.named-inside': { live: true, effect: 'read' },
+  // A REPORT'S PAGE PRINTED AS A PDF by the app's own window program. A read, though it is a POST:
+  // it stores nothing, and the temporary folder it prints in is gone before it answers. A visitor
+  // may not ask for it, because each print starts a program on this office's computer.
+  'report-pdf.print': {
+    live: true,
+    effect: 'read',
+    refusedToVisitors:
+      "a visitor may not print a PDF here, because each print starts a program on this office's computer. This request was refused and nothing was printed.",
+  },
 
   // GROUPS: A CONVERSATION WITH SEVERAL SUBSCRIBERS (M11). Opening one and adding a member each
   // write a line as Mole Office itself, so both are writes for two reasons rather than one.
@@ -660,6 +692,12 @@ const OPERATION_METADATA = {
   'delegation.check': { live: true, effect: 'write' },
   // Accept or return the points of the hand-back.
   'delegation.accept': { live: true, effect: 'write' },
+  // Record an evidenced self-completion or reopening.
+  'delegation.selfComplete': { live: true, effect: 'write' },
+  // Record a planned audit verdict.
+  'delegation.audit': { live: true, effect: 'write' },
+  // Read calculated child progress.
+  'delegation.progress': { live: true, effect: 'read' },
   'delegation.package': { live: true, effect: 'write' },
   // A PERSON'S TAKE (criterion F16, points 3 and 4). Its own name and not `delegation.package`
   // again: packaging writes the bundle and the words for an outside reader, and a take is a
@@ -794,6 +832,8 @@ const OPERATION_METADATA = {
   // THE PERSON'S TYPING KEPT WITH NO PRESS (round 4): each terminal's switch, and the note its lines go in.
   'terminals.keeping': { live: true, effect: 'read' },
   'terminals.set-keeping': { live: true, effect: 'write' },
+  // THE NAME, THE GROUP AND THE TAGS THE PERSON GIVES A TERMINAL, kept in the holder with it.
+  'terminals.name': { live: true, effect: 'write' },
   // STARTING THE TERMINAL HOLDER FROM THE PAGE (round 3; the review of round 2, point 1).
   'terminals.start-holder': { live: true, effect: 'write' },
   // RESTARTING IT FROM SETTINGS (round 23): it ends every terminal the holder holds.
@@ -802,6 +842,17 @@ const OPERATION_METADATA = {
   // installers. Both are the person's only (src/server/api/terminal-harnesses.ts).
   'harnesses.list': { live: true, effect: 'read' },
   'harnesses.install': { live: true, effect: 'write' },
+  // SETTING UP AN AGENT TOOL (wave 13u round 242): whether it is signed in, as its own status says; its key given to its
+  // own login on standard input; and its own account sign-in started. The key and the sign-in are the person's only; the
+  // reading is the person's, or a secretary's under the person's grant where this office's list allows it.
+  'harnesses.signed-in': { live: true, effect: 'read' },
+  'harnesses.key': { live: true, effect: 'write' },
+  'harnesses.sign-in': { live: true, effect: 'write' },
+  // THE CODE A SIGN-IN PAGE SHOWED, given to the sign-in the office started for that press (round 242). The person's only.
+  'harnesses.sign-in-code': { live: true, effect: 'write' },
+  // THE SET UP PRESS (wave 13u round 242): the person's ask to set up one agent tool, written as his message to the
+  // secretary the office picks. The person's only.
+  'harnesses.set-up': { live: true, effect: 'write' },
   // START AT LOGIN (wave 13u, round 3, piece H9): the person's read of whether a systemd user unit starts the office at their
   // login, and their press that turns it on or off (src/server/api/start-at-login.ts).
   'office.start-at-login': { live: true, effect: 'read' },
@@ -818,6 +869,9 @@ const OPERATION_METADATA = {
   'office.set-sandbox-memory-cap': { live: true, effect: 'write' },
   // An agent opened in a terminal by the person's press (wave 13u round 3, src/server/api/terminal-agents.ts).
   'terminals.open-an-agent': { live: true, effect: 'write' },
+  // THE NEW AGENT DIALOG'S CREATE: the person makes an agent and opens it in a terminal, the office's own or one outside
+  // (src/server/api/new-agent.ts).
+  'agent.make-a-new-agent': { live: true, effect: 'write' },
   // THE WAY BACK (wave 13u round 10): the command that brings an agent's newest run back, and the person's press that runs it.
   'terminals.way-back': { live: true, effect: 'read' },
   'terminals.bring-back': { live: true, effect: 'write' },
@@ -966,6 +1020,10 @@ const OPERATION_METADATA = {
   'office.sidebar-pins': { live: true, effect: 'read' },
   // Only the person keeps their own pages in front, with the change written down beside it.
   'office.set-sidebar-pins': { live: true, effect: 'write' },
+  // Each person reads whether they see how many reports are unread, kept in their own row.
+  'office.report-count': { live: true, effect: 'read' },
+  // Only the person chooses it, with the change written down beside it.
+  'office.set-report-count': { live: true, effect: 'write' },
   'office.word-table': { live: true, effect: 'read' },
   'office.word-history': { live: true, effect: 'read' },
   'office.set-word': { live: true, effect: 'write' },
@@ -1103,6 +1161,9 @@ const OPERATION_METADATA = {
   // offered there and names the Embassy; only `office.pair` is kept on this machine.
   'office.pairing': { live: true, effect: 'read' },
   'office.pair': { live: true, effect: 'write' },
+  // THE MOVE OF THE OLD COOKIE, SEC-2 item 7: a browser that sent the old cookie, which held a whole key, moves once to
+  // two halves. Its own name, because how many browsers moved is a fact apart from how many were paired.
+  'office.move-pairing': { live: true, effect: 'write' },
   // THE OFFICE'S OWN KEYS, AND EACH RUNTIME'S OWN ASKED READ-ONLY. Criterion U2. Three names: a
   // read of what is set, the person's write of one of the office's own, and the person's press that
   // tests one with a call that costs nothing. The test is a POST that changes nothing, so its effect
@@ -1163,10 +1224,13 @@ const OPERATION_METADATA = {
 
   'office.set-sandbox-login': { live: true, effect: 'write' },
   'office.clear-sandbox-login': { live: true, effect: 'write' },
+  'office.test-sandbox-login': { live: true, effect: 'write' },
   // THE SAME ENTRY, FOR CODEX AND OPENCODE. F15 point 5: the other runtimes get the
   // entry above too. The plan is a read; the write is its
   // own name for the same reason `office.install-entry` is — the directory it writes is not one a
   // count of record creations answers anything about.
+  // THE STATE OF THIS COMPUTER'S ENTRY KEY, read by the Settings entry when it is drawn. It writes nothing.
+  'office.install-entry.this-computers-key': { live: true, effect: 'read' },
   'office.install-entry.other-runtimes.plan': { live: true, effect: 'read' },
   'office.install-entry.other-runtimes.write': { live: true, effect: 'write' },
 
@@ -1420,6 +1484,8 @@ const OPERATION_METADATA = {
   'conversation.sync-run': { live: true, effect: 'write' },
   'conversation.read': { live: true, effect: 'read' },
   'conversation.restore': { live: true, effect: 'write' },
+  'conversation.export-look': { live: true, effect: 'read' },
+  'conversation.export': { live: true, effect: 'read' },
   'answer.keep': { live: true, effect: 'write' },
   'answer.send': { live: true, effect: 'write' },
   // COUNTERS AND TIMED TRIGGERS. Criteria CT1 to CT7.
@@ -1493,6 +1559,23 @@ const OPERATION_METADATA = {
   // of `tool_uses` since wave 13s round 33), and `toolset.uses` is one run's uses read back.
   // `toolset.confirm` is the person confirming a proposed category, which files the person's decision.
   // The sixth, `toolset.files`, reads named test file results and catches over local dates.
+  'knowledge.query': { live: true, effect: 'read' },
+  'knowledge.counts': { live: true, effect: 'read' },
+  'knowledge.ratings': { live: true, effect: 'write' },
+  'knowledge.queryCategories': { live: true, effect: 'read' },
+  'knowledge.search': { live: true, effect: 'read' },
+  'knowledge.categories': { live: true, effect: 'read' },
+  'knowledge.categoryCreate': { live: true, effect: 'write' },
+  'knowledge.categoryMove': { live: true, effect: 'write' },
+  'knowledge.categoryRead': { live: true, effect: 'read' },
+  'knowledge.create': { live: true, effect: 'write' },
+  'knowledge.read': { live: true, effect: 'read' },
+  'knowledge.edit': { live: true, effect: 'write' },
+  'knowledge.confirm': { live: true, effect: 'write' },
+  'knowledge.refuse': { live: true, effect: 'write' },
+  'knowledge.bookmark': { live: true, effect: 'write' },
+  'knowledge.attach': { live: true, effect: 'write' },
+  'knowledge.detach': { live: true, effect: 'write' },
   'toolset.list': { live: true, effect: 'read' },
   'toolset.read': { live: true, effect: 'read' },
   'toolset.use': { live: true, effect: 'write' },
@@ -1504,6 +1587,21 @@ const OPERATION_METADATA = {
   'secretaries.duties': { live: true, effect: 'read' },
   'secretaries.agent-duties': { live: true, effect: 'read' },
   'secretaries.set-duties': { live: true, effect: 'write' },
+  // THE DEPARTMENTS OF THIS PROJECT (wave 13s round 281): the tree, one department with its history, and the writes,
+  // which only the person or a secretary on the person's words may make.
+  'departments.list': { live: true, effect: 'read' },
+  'departments.create': { live: true, effect: 'write' },
+  'departments.one': { live: true, effect: 'read' },
+  'departments.write': { live: true, effect: 'write' },
+  // THE KEY ITEMS OF A PROJECT (wave 13s round 281): the list of one project or of every project, one key item with the
+  // estimates it has carried, and the writes, which only the person or a secretary writing as itself may make.
+  'key-items.list': { live: true, effect: 'read' },
+  'key-items.create': { live: true, effect: 'write' },
+  'key-items.one': { live: true, effect: 'read' },
+  'key-items.change': { live: true, effect: 'write' },
+  'key-items.place': { live: true, effect: 'write' },
+  'key-items.close': { live: true, effect: 'write' },
+  'key-items.reopen': { live: true, effect: 'write' },
   // ONE LINE'S BACKLOG (wave 13s round 142): the backlog items of one line, in the line's order.
   'backlog.line': { live: true, effect: 'read' },
   // THE PROJECT'S PROGRESS (wave 13s round 235): its points and inside briefs counted from the records, nothing stored.
@@ -1537,6 +1635,8 @@ const OPERATION_METADATA = {
   'agent-rename.list': { live: true, effect: 'read' },
   'agent-rename.approve': { live: true, effect: 'write' },
   'agent-rename.refuse': { live: true, effect: 'write' },
+  // AN AGENT'S OWNER HAND-OVERS (wave 13s round 281): every hand-over the owner door kept, newest first.
+  'agent-owner-change.list': { live: true, effect: 'read' },
   // ONE PROJECT'S OWN RULES (the design-first build of wave 13s's requirements): a review of one design, by anybody
   // proved; the reviewer is written from the key, and the judge says whose review counts. The project's own chapter is
   // read and previewed by anybody, and written only by the person or a secretary of that project with its own key.
@@ -1557,6 +1657,16 @@ const OPERATION_METADATA = {
   'design-reminder.judge': { live: true, effect: 'write' },
   'design-reminder.miss': { live: true, effect: 'write' },
   'project.rules.design-reminders': { live: true, effect: 'read' },
+  // THE FOUR FIGURES THE HOME PAGE LACKS (wave 13s round 281): packages per line, packages done per day, each package's
+  // time to live, and the whole suite's minutes. Reads only.
+  'figures.packages-by-line': { live: true, effect: 'read' },
+  'figures.packages-done': { live: true, effect: 'read' },
+  'figures.time-to-live': { live: true, effect: 'read' },
+  'figures.suite-minutes': { live: true, effect: 'read' },
+  // HIS DECISIONS, for home's two figures of them (wave 13s round 281). A read only.
+  'figures.my-decisions': { live: true, effect: 'read' },
+  // THE PIPELINES THAT STAND STILL, for home's Late or stuck (wave 13s round 281). A read only.
+  'pipeline.standing-still': { live: true, effect: 'read' },
 } as const satisfies Record<OperationName, Omit<Operation, 'name'>>
 
 /** Names come from the plain list; effects and gate metadata stay in code. */

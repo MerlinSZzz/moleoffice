@@ -23,8 +23,9 @@
  *
  * A sweep of a stale world is worse than no sweep. It produces numbers, the numbers look like
  * measurements, and they are measurements of code nobody has any more. So `tools/zoom-sweep.mjs`,
- * `tools/dup-keys.mjs`, `tools/press-census.mjs` and `tools/review.mjs` import `refuseAStaleWorld`
- * below and stop before they measure anything.
+ * `tools/dup-keys.mjs` and `tools/press-census.mjs` import `refuseAStaleWorld` below and stop before
+ * they measure anything. `tools/review.mjs` asks through `askAboutFreshness` and `whyNotToMeasure`
+ * and throws instead, so that it still stops the servers it started.
  *
  * ---------------------------------------------------------------------------------------
  * IT ASKS THE SERVER. IT DOES NOT WORK THE ANSWER OUT ITSELF.

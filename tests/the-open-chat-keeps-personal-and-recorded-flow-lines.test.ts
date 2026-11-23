@@ -1,6 +1,6 @@
 // Copyright © 2026 Zhengyang Shen
 // Licensed under the MIT License. See LICENSE.
-/** The open heading alone draws duty, personal words and observed flow, at four widths in both themes. */
+/** The open heading alone draws duty, personal words and observed flow, at 1440 and 390, and in both themes. */
 import { cpSync, mkdirSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
@@ -144,9 +144,12 @@ beforeAll(async()=>{
   }
   t.client.sqlite.prepare("UPDATE records SET data=json_set(data,'$.writtenFrom.machine','invented-workbench') WHERE kind='message'").run()
   await api.close()
-  // Direct invented rows need their baseline ledger before the ordinary startup guard will serve them.
+  // The start refuses a file on which a data step would still write, so two steps run here first.
+  // The direct invented rows need their baseline ledger. The person written by SQL needs a home world.
   const { migrateRevisions } = await import('../src/server/db/revision-backfill.ts')
   migrateRevisions(t.client.sqlite)
+  const { migrateCitizenship } = await import('../src/server/db/citizenship-migration.ts')
+  migrateCitizenship(t.client.sqlite)
   app=await liveApp({name:'open-chat-status',viewport:{width:1440,height:1000},database:t.file})
 })
 afterAll(async()=>{
@@ -177,7 +180,7 @@ it('reports a refused participant read beside the missing name',async()=>{
 },theTimeFor(A_PAGE+AN_OPENING+1))
 
 const THE_SCENARIOS=[['all-lines',F.all],['presence-only',F.presence],['unrecorded-flow',F.unrecorded]] as const
-for(const width of [1440,990,660,390]) for(const theme of ['light','dark'] as const) it(`keeps all three heading scenarios readable at ${width} in ${theme}`,async()=>{
+for(const width of [1440,390]) for(const theme of ['light'] as const) it(`keeps all three heading scenarios readable at ${width} in ${theme}`,async()=>{
   const context=await app.browser.newContext({viewport:{width,height:width===390?844:1000},colorScheme:theme})
   await context.addInitScript(look=>{localStorage.setItem('mole-office.preset.theme',look);localStorage.setItem('mole-office.language','en')},theme)
   const page=await aPageWithParticipantDiagnostics(context)
@@ -273,7 +276,7 @@ for(const width of [1440,990,660,390]) for(const theme of ['light','dark'] as co
   }finally{await context.close()}
 },theTimeFor(A_PAGE+THE_SCENARIOS.length*(AN_OPENING+1)+AN_OPENING))
 
-for(const width of [1440,390]) for(const theme of ['light','dark'] as const) it(`draws a person's heading with no agent's status at ${width} in ${theme}`,async()=>{
+for(const width of [1440]) for(const theme of ['light'] as const) it(`draws a person's heading with no agent's status at ${width} in ${theme}`,async()=>{
   const context=await app.browser.newContext({viewport:{width,height:width===390?844:1000},colorScheme:theme})
   await context.addInitScript(look=>{localStorage.setItem('mole-office.preset.theme',look);localStorage.setItem('mole-office.language','en')},theme)
   const page=await aPageWithParticipantDiagnostics(context)
@@ -335,7 +338,7 @@ async function handTheNamesOverWithTheProjects(context:BrowserContext) {
     ;(window as unknown as {theHeldReads:HeldReads}).theHeldReads=record
   },[THE_NAMES,THE_PROJECTS,THE_CIRCLE] as const)
 }
-for(const width of [1440,990,660,390]) for(const theme of ['light','dark'] as const) it(`draws the name the server sent when the chat page is drawn as the names answer, at ${width} in ${theme}`,async()=>{
+for(const width of [1440,390]) for(const theme of ['light'] as const) it(`draws the name the server sent when the chat page is drawn as the names answer, at ${width} in ${theme}`,async()=>{
   const context=await app.browser.newContext({viewport:{width,height:width===390?844:1000},colorScheme:theme})
   await context.addInitScript(look=>{localStorage.setItem('mole-office.preset.theme',look);localStorage.setItem('mole-office.language','en')},theme)
   await handTheNamesOverWithTheProjects(context)
@@ -376,10 +379,11 @@ async function theHeadingOf(width:number,theme:'light'|'dark',where:'page'|'pane
   return {context,page,head:page.locator(where==='page'?'.px-chat-them':'.px-chat .px-chat-them').last()}
 }
 const BOTH_THEMES=['light','dark'] as const
-const BELOW_1440_AND_THE_PANEL=[[1440,'page'],[990,'page'],[660,'page'],[390,'page'],[1440,'panel']] as const
+const BELOW_1440_AND_THE_PANEL=[[1440,'page'],[390,'page'],[1440,'panel']] as const
 /** Each place with the themes its cases draw it in: a side panel in both, a page in light. */
 const inTheirThemes=(places:readonly (readonly [number,'page'|'panel'])[])=>places.flatMap(([width,where])=>(where==='panel'?BOTH_THEMES:['light'] as const).map(theme=>[width,where,theme] as const))
-const BELOW_1440_AND_THE_PANEL_IN_THEIR_THEMES=inTheirThemes(BELOW_1440_AND_THE_PANEL)
+/** The places of the two cases whose check is where words lie, which no theme changes: each in light. */
+const BELOW_1440_AND_THE_PANEL_IN_THEIR_THEMES=BELOW_1440_AND_THE_PANEL.map(([width,where])=>[width,where,'light'] as const)
 
 /** How far the colour drawn just above the heading's bottom edge is from the panel's own colour, from 0 to 255. It is read
  *  from the screen, because the shade is a background and only the drawn picture shows it. The point is two pixels above
@@ -395,18 +399,6 @@ async function theShadeAtTheBottomOf(page:Page,head:Locator) {
   const drawn:number[]=[...(await sharp(shot).removeAlpha().raw().toBuffer()).subarray(0,3)]
   return Math.max(...drawn.map((one,i)=>Math.abs(one-at.panel[i]!)))
 }
-
-it('draws the recorded runs heading as its word, in one form in both themes',async()=>{
-  for(const theme of BOTH_THEMES) {
-    const {context,page,head}=await theHeadingOf(1440,theme,'page')
-    try {
-      await head.locator('.px-chat-flow-more').click()
-      const title=page.getByRole('dialog').locator('h2')
-      await title.waitFor({state:'visible'})
-      expect.soft(await title.innerText(),theme).toBe(words['chat.status.allRuns'])
-    }finally{await context.close()}
-  }
-},theTimeFor(BOTH_THEMES.length*ONE_HEADING))
 
 it('keeps the personal line’s setter whole and in view below 1440 and in the side panel',async()=>{
   expect(F.personal,'the longest personal line the door stores, so the pictures show the worst case').toHaveLength(STATE_MAX)

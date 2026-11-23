@@ -3,30 +3,38 @@
 /**
  * WHAT EACH DECISION GOVERNS, AND WHICH DECISIONS GOVERN A PLACE.
  *
- * A decision's `governs` lists the modules, flows, pipelines and files it applies to (the `GovernedPlace` shape in
+ * A decision names the pages and the files it applies to: its `governs` and its `governsFiles` (the shapes in
  * src/shared/kinds/decision.ts, read by `theGovernedPlaces` in src/shared/governs.ts). This file works out:
  *   - `assertTheGovernedPlacesAreReal` refuses a write whose named record is missing, deleted, in another project or
  *     of another kind;
  *   - `decisionsGoverning` answers "which decisions govern this file or this record", newest first, with the
- *     replaced ones marked;
+ *     replaced ones marked. Asked for a module, it also lists a decision whose files the module's stated claims hold,
+ *     as inferred (`theClaimHolds`). That reading is worked out when it is asked and stored nowhere;
  *   - `theGovernsCheck` lists, for one project, the decisions with nothing in governs, the pairs of live decisions
- *     naming one file where the newer does not say it replaces the older, and the replaced decisions that new work
- *     still cites. Pairs that share only a module, flow or pipeline are counted and not listed, and so are pairs on
- *     one file that a `coexists_with` link says both stand. It reminds and never blocks: nothing here refuses a write.
+ *     naming one file where the newer does not say it replaces the older, the replaced decisions that new work still
+ *     cites, and the files of a decision that no module states. Pairs that share only a page are counted and not
+ *     listed, and so are pairs on one file that a `coexists_with` link says both stand. It reminds and never blocks:
+ *     nothing here refuses a write.
  */
 import { and, eq, inArray, isNull, sql } from 'drizzle-orm'
 import { pathCovers } from '@shared/paths.ts'
-import { theGovernedPlaces, tidyGovernedPath as tidy, type GovernedPlace } from '@shared/governs.ts'
+import { GOVERNS_FIELD, theGovernedPlaces, tidyGovernedPath as tidy, type GovernedPlace } from '@shared/governs.ts'
+import { GOVERNS_FILES_FIELD, NOTHING_FITS_FIELD, PAGE_KINDS, theNothingFitsEntries } from '@shared/what-a-record-names.ts'
 import { kindWord } from '@shared/words.ts'
 import { SYSTEM_LINES } from '@shared/groups.ts'
 import { moleOffice } from '@shared/participants.ts'
-import { db } from '../db/client.ts'
+import { db, sqlite } from '../db/client.ts'
 import { readInPieces } from '../db/in-pieces.ts'
 import { links, records } from '../db/schema.ts'
 import { type Actor } from './records.ts'
 import { PanelError } from './panel-error.ts'
 import { REPLACES_FIELD, readTheReplacements, replacedDecisionIds, theLineOfReplacements, whatSupersedes, type AReplacement, type TheReplacements } from './replaced-decisions.ts'
-import { moduleFor } from './sourceindex.ts'
+import { allModuleClaims, claimsOf, moduleFor } from './sourceindex.ts'
+import { indexStatus } from './index-status.ts'
+import { listIndexedFiles } from './list-indexed-files.ts'
+import { getRecord } from './records/reading.ts'
+import { type ResolvedClaim } from '@shared/types.ts'
+import { thePageKindsInWords } from '@shared/page-kinds-in-words.ts'
 import { theModuleReminderSecretaries } from './module-reminder-secretaries.ts'
 import { writeASystemLineToOne } from './groups.ts'
 import { theOneAgent } from './stale-records.ts'
@@ -110,6 +118,92 @@ export type HowItGoverns =
   | { place: GovernedPlace; reaches: 'covers-it' }
   | { place: GovernedPlace; reaches: 'inside-it' }
   | { place: GovernedPlace; reaches: 'claims-it'; module: { id: string; title: string } }
+  /**
+   * INFERRED: the entry is a file, folder or pattern, and one of the module's stated claims holds it (`theClaimHolds`).
+   * `claim` is that claim, as the module wrote it. Worked out when asked; nothing is stored for it.
+   */
+  | { place: GovernedPlace; reaches: 'inferred'; module: { id: string; title: string }; claim: string }
+
+/**
+ * A WILDCARD, as `pathCovers` and `filesMatching` in src/shared/paths.ts tell a pattern from a path: a star or a
+ * question mark.
+ */
+const A_WILDCARD = /[*?]/
+
+/** The folder a pattern names before its first wildcard: `src/feeder` for `src/feeder/*.ts`, empty for `*.ts`. */
+function theFolderBeforeTheWildcard(pattern: string): string {
+  const before = pattern.slice(0, Math.max(0, pattern.search(A_WILDCARD)))
+  const cut = before.lastIndexOf('/')
+  return cut < 0 ? '' : before.slice(0, cut)
+}
+
+/**
+ * DOES ONE STATED CLAIM OF A MODULE HOLD ONE FILE ENTRY OF A DECISION? The rule of the inferred way:
+ *   - an entry equal to the claim is held;
+ *   - a file the source index lists is held when the claim's matched files hold it;
+ *   - a folder, or a path the index does not list, is held when the claim covers it (`pathCovers`, whole segments);
+ *   - a pattern is held when the folder before its first wildcard is the claim or lies inside it, so `src/feeder/*.ts`
+ *     is held by `src/feeder`, and `src/**` by no claim narrower than `src`. A pattern is not compared with a pattern.
+ * So an entry wider than the claim is not held. Whether the claim is stated, and not a guess, is the caller's.
+ */
+export function theClaimHolds(claim: Pick<ResolvedClaim, 'pattern' | 'matched'>, entry: string, indexed: ReadonlySet<string>): boolean {
+  const path = tidy(entry)
+  const pattern = tidy(claim.pattern)
+  if (path === '' || pattern === '') return false
+  if (path === pattern) return true
+  if (indexed.has(path)) return claim.matched.includes(path)
+  const written = (one: string): { path: string; asWritten: string } => ({ path: one, asWritten: one })
+  if (!A_WILDCARD.test(path)) return pathCovers(written(pattern), written(path)) === 'yes'
+  if (A_WILDCARD.test(pattern)) return false
+  const folder = theFolderBeforeTheWildcard(path)
+  return folder !== '' && (folder === pattern || pathCovers(written(pattern), written(folder)) === 'yes')
+}
+
+/** One module's stated claims, matched against the source index, as the inferred way reads them. */
+interface TheStatedClaims {
+  module: { id: string; title: string }
+  claims: ResolvedClaim[]
+  indexed: ReadonlySet<string>
+}
+
+/**
+ * The claim of one module that holds an entry, or null. When more than one does, the longest pattern is taken, and
+ * then the first by its words, so one entry reaches the module one way.
+ */
+function theClaimHolding(stated: TheStatedClaims, entry: string): string | null {
+  const holding = stated.claims
+    .filter((claim) => claim.problem === null && theClaimHolds(claim, entry, stated.indexed))
+    .map((claim) => claim.pattern)
+    .sort((a, b) => b.length - a.length || a.localeCompare(b))
+  return holding[0] ?? null
+}
+
+/** Why nothing could be inferred when the project's source index was never built. */
+const NO_INDEX_TO_INFER_FROM =
+  "Which decisions are inferred from this module's files was not worked out: the project's source index has never been " +
+  'built, so the files its claims hold are not known. POST /api/source/reindex builds it.'
+
+/**
+ * THE STATED CLAIMS OF THE RECORD ASKED ABOUT, when it is a live module of this project, matched against the source
+ * index. Null when nothing can be inferred: not a module, a module that states no claim, or claims that cannot be read,
+ * and for the last `couldNotRead` gets a sentence saying why. A module that states no claim needs no index.
+ */
+function theStatedClaimsOf(workspaceId: string, recordId: string, couldNotRead: string[]): TheStatedClaims | null {
+  const record = getRecord(recordId)
+  if (record === null || record.kind !== 'module' || record.workspaceId !== workspaceId || record.deletedAt != null) return null
+  const before = claimsOf(record, [])
+  if (before.problem !== null) {
+    couldNotRead.push(`Which decisions are inferred from this module's files was not worked out: ${before.problem}`)
+    return null
+  }
+  if (before.claims.length === 0) return null
+  if (indexStatus(workspaceId) === null) {
+    couldNotRead.push(NO_INDEX_TO_INFER_FROM)
+    return null
+  }
+  const indexed = listIndexedFiles(workspaceId).map((file) => file.path)
+  return { module: { id: record.id, title: record.title }, claims: claimsOf(record, indexed).claims, indexed: new Set(indexed) }
+}
 
 export interface AGoverningDecision {
   id: string
@@ -138,7 +232,9 @@ export interface WhichDecisionsGovern {
  *
  * For a path, an entry reaches it when it names the same path, names a folder or a pattern that covers it, lies inside
  * it (the path asked is a folder), or names a module whose claims hold the path. For a record, an entry reaches it
- * when it names that record. Replaced decisions are listed, marked with what replaced them.
+ * when it names that record, and, for a module, when it is a file one of the module's stated claims holds: that way
+ * is `inferred`, and it is listed after the entries that name the module. Replaced decisions are listed, marked with
+ * what replaced them.
  */
 export function decisionsGoverning(
   workspaceId: string,
@@ -147,6 +243,8 @@ export function decisionsGoverning(
 ): WhichDecisionsGovern {
   const decisions = theLiveDecisions(workspaceId)
   const couldNotRead: string[] = []
+  // THE MODULE'S STATED CLAIMS, read once and before the decisions, and only when a record is asked about.
+  const stated = 'record' in asked ? theStatedClaimsOf(workspaceId, asked.record, couldNotRead) : null
 
   const claimers = new Map<string, { id: string; title: string }>()
   if ('path' in asked) {
@@ -165,12 +263,19 @@ export function decisionsGoverning(
   // THE REPLACEMENTS ARE READ ONCE, when the first decision that reaches the place is found, and not once for each.
   let replacements: TheReplacements | undefined
   for (const decision of decisions) {
-    const places = theGovernedPlaces(decision.data['governs'])
-    if (places.length === 0) notPlaced += 1
+    // THE TWO PARTS, the old paths in governs read as files. A whole-project decision is placed, and no path finds it.
+    const read = theGovernedPlaces(decision.data[GOVERNS_FIELD], decision.data[GOVERNS_FILES_FIELD])
+    const places = read.places
+    if (places.length === 0 && !read.wholeProject) notPlaced += 1
+    for (const one of read.skipped) couldNotRead.push(`Decision ${decision.id}: ${one.at} ${one.why}, so that entry is not matched.`)
     const how: HowItGoverns[] = []
     for (const place of places) {
       if ('record' in asked) {
         if ('record' in place && place.record === asked.record) how.push({ place, reaches: 'names-it' })
+        else if ('path' in place && stated !== null) {
+          const claim = theClaimHolding(stated, place.path)
+          if (claim !== null) how.push({ place, reaches: 'inferred', module: stated.module, claim })
+        }
         continue
       }
       if ('record' in place) {
@@ -215,14 +320,114 @@ export interface TheGovernsCheck {
   nothingInGoverns: ADecisionNamed[]
   /** Two live, unreplaced decisions naming one file, where the newer does not name the older in `replaces`. */
   overlapping: { newer: ADecisionNamed; older: ADecisionNamed; both: string }[]
-  /** How many more such pairs share a module, flow or pipeline and name no file in common. They are not listed. */
+  /** How many more such pairs share a page and name no file in common. They are not listed. */
   sharingNoFile: number
   /** How many more pairs name one file and are joined by a `coexists_with` link, which says both stand. They are not listed. */
   bothStand: number
   /** Replaced decisions that work recorded after their replacement still cites. */
   stillCited: { replaced: ADecisionNamed; replacedBy: ADecisionNamed; citedBy: { id: string; kind: string; title: string; how: 'link' | 'authority_reference' }[] }[]
+  /**
+   * Live reports filed outside a run that are linked about no live page and hold no nothingFits entry, newest first. A
+   * report filed in a run is left to that run's finish, which holds it (./before-the-seal-rules.ts).
+   */
+  reportsNamingNothing: ADecisionNamed[]
+  /**
+   * Live reports linked about no live page whose stored nothingFits is not a list, so whether a page fits them was not
+   * read. They are in neither list above, and `notCompared` says so. Newest first.
+   */
+  reportsNotRead: ADecisionNamed[]
+  /**
+   * For each live, unreplaced decision, the files it names that no module's stated claim holds (`theClaimHolds`), so
+   * no module's page lists it as inferred. Newest first. Empty, with a line in `notCompared`, when the claims cannot be
+   * read.
+   */
+  filesNoModuleStates: { decision: string; title: string; files: string[] }[]
   /** What this check does not compare, so an empty list is not read as "none". */
   notCompared: string[]
+}
+
+/**
+ * THE REPORTS FILED OUTSIDE A RUN THAT NAME NO PAGE. Outside a run is a create row of the change log that carries no run.
+ * A report with no create row cannot be placed, so it is counted apart and the check says so. One statement.
+ *
+ * A STORED nothingFits THAT IS NOT A LIST IS NOT READ, and it does not stop the check. The shape check refuses one at
+ * the door, so only a row written below it holds one. Such a report is named in `notRead`, whichever way it was filed,
+ * and it is in neither of the other two answers.
+ */
+function theReportsNamingNothing(workspaceId: string): { named: ADecisionNamed[]; notPlaced: number; notRead: ADecisionNamed[] } {
+  const where = `$.${NOTHING_FITS_FIELD}`
+  const rows = sqlite
+    .prepare(
+      'SELECT r.id AS id, r.title AS title, r.created_at AS createdAt, json_extract(r.data, ?) AS nothingFits, ' +
+        'json_type(r.data, ?) AS nothingFitsType, ' +
+        "(SELECT MIN(c.session_id IS NULL) FROM changes c WHERE c.record_id = r.id AND c.op = 'create') AS outside, " +
+        "EXISTS (SELECT 1 FROM links l JOIN records p ON p.id = l.to_id WHERE l.from_id = r.id AND l.type = 'about' AND l.inferred = 0 " +
+        'AND p.kind IN (SELECT value FROM json_each(?)) AND p.deleted_at IS NULL) AS aboutAPage ' +
+        "FROM records r WHERE r.kind = 'report' AND r.workspace_id = ? AND r.deleted_at IS NULL",
+    )
+    .all(where, where, JSON.stringify(PAGE_KINDS), workspaceId) as {
+    id: string
+    title: string
+    createdAt: string
+    nothingFits: string | null
+    nothingFitsType: string | null
+    outside: number | null
+    aboutAPage: number
+  }[]
+  // ABSENT OR NULL IS NO ENTRY, A LIST IS READ, AND ANYTHING ELSE IS NOT READ.
+  const unread = (row: (typeof rows)[number]): boolean =>
+    row.nothingFitsType !== null && row.nothingFitsType !== 'null' && row.nothingFitsType !== 'array'
+  const theEntries = (row: (typeof rows)[number]): unknown =>
+    row.nothingFitsType === 'array' && row.nothingFits !== null ? JSON.parse(row.nothingFits) : null
+  const aboutNoPage = rows.filter((row) => row.aboutAPage === 0)
+  const namesNothing = aboutNoPage.filter((row) => !unread(row) && theNothingFitsEntries(theEntries(row)).length === 0)
+  return {
+    named: namesNothing.filter((row) => row.outside === 1).map(named).sort(newestFirst),
+    notPlaced: namesNothing.filter((row) => row.outside === null).length,
+    notRead: aboutNoPage.filter(unread).map(named).sort(newestFirst),
+  }
+}
+
+/** Why the files no module states were not worked out when the project's source index was never built. */
+const NO_INDEX_FOR_THE_FILES =
+  "Which files of a decision no module states was not worked out: the project's source index has never been built."
+
+/**
+ * THE FILES OF EACH LIVE DECISION THAT NO MODULE'S STATED CLAIM HOLDS, by the inferred way's own rule (`theClaimHolds`),
+ * so the check lists exactly what no module page lists as inferred. When the source index was never built, or a
+ * module's claims cannot be counted, nothing is listed and `notCompared` gets a line saying why.
+ */
+function theFilesNoModuleStates(workspaceId: string, live: readonly DecisionRow[], notCompared: string[]): TheGovernsCheck['filesNoModuleStates'] {
+  const withFiles = live
+    .map((row) => ({ row, files: theGovernedPlaces(row.data[GOVERNS_FIELD], row.data[GOVERNS_FILES_FIELD]).files }))
+    .filter((one) => one.files.length > 0)
+  if (withFiles.length === 0) return []
+  if (indexStatus(workspaceId) === null) {
+    notCompared.push(NO_INDEX_FOR_THE_FILES)
+    return []
+  }
+  const paths = listIndexedFiles(workspaceId).map((file) => file.path)
+  const modules = allModuleClaims(workspaceId, paths)
+  const unreadable = modules.filter((one) => one.problem !== null)
+  if (unreadable.length > 0) {
+    notCompared.push(
+      `Which files of a decision no module states was not worked out: the claims of ${String(unreadable.length)} ` +
+        `module${unreadable.length === 1 ? '' : 's'} cannot be counted. ${unreadable[0]!.problem!}`,
+    )
+    return []
+  }
+  const indexed = new Set(paths)
+  const claims = modules.flatMap((one) => one.claims).filter((claim) => claim.problem === null)
+  return withFiles
+    .map((one) => ({
+      decision: one.row.id,
+      title: one.row.title,
+      createdAt: one.row.createdAt,
+      files: one.files.filter((file) => !claims.some((claim) => theClaimHolds(claim, file, indexed))),
+    }))
+    .filter((one) => one.files.length > 0)
+    .sort((a, b) => newestFirst({ createdAt: a.createdAt, id: a.decision }, { createdAt: b.createdAt, id: b.decision }))
+    .map(({ decision, title, files }) => ({ decision, title, files }))
 }
 
 export { named } from './assert-the-governed-places-are-real.ts'
@@ -264,13 +469,19 @@ export function theGovernsCheck(workspaceId: string): TheGovernsCheck {
   const lines = theLinesOfReplacement(workspaceId, decisions, replacements)
   const live = decisions.filter((one) => !lines.has(one.id))
 
-  const nothingInGoverns = live.filter((one) => theGovernedPlaces(one.data['governs']).length === 0).map(named).sort(newestFirst)
+  const nothingInGoverns = live
+    .filter((one) => {
+      const read = theGovernedPlaces(one.data[GOVERNS_FIELD], one.data[GOVERNS_FILES_FIELD])
+      return read.places.length === 0 && !read.wholeProject
+    })
+    .map(named)
+    .sort(newestFirst)
 
   // ONLY LIVE DECISIONS ARE PAIRED. A decision that names an older one in `replaces` is linked as replacing it when it is
   // written, so the older is no longer live, and a newer one that says it replaces the older is never listed.
   // ONLY A PAIR NAMING ONE FILE IS LISTED (the coordinator, message g88FHyAlaxiE). Decisions on one module mostly
-  // add to each other, and `replaces` would retire the whole older one, so a pair that shares only a module, flow or
-  // pipeline is counted instead.
+  // add to each other, and `replaces` would retire the whole older one, so a pair that shares only a page is counted
+  // instead.
   // A PAIR ON ONE FILE THAT BOTH STAND IS COUNTED AND NOT LISTED (wave 13j round loop-4). Two decisions on one file
   // are often two rules of one brief, and the only link that quieted such a pair, `supersedes`, retired the older. A
   // `coexists_with` link between the two says neither replaces the other, and it retires neither.
@@ -278,7 +489,9 @@ export function theGovernsCheck(workspaceId: string): TheGovernsCheck {
   const standing = theDecisionsThatBothStand(live)
   let sharingNoFile = 0
   let bothStand = 0
-  const placed = live.map((one) => ({ row: one, places: theGovernedPlaces(one.data['governs']) })).filter((one) => one.places.length > 0)
+  const placed = live
+    .map((one) => ({ row: one, places: theGovernedPlaces(one.data[GOVERNS_FIELD], one.data[GOVERNS_FILES_FIELD]).places }))
+    .filter((one) => one.places.length > 0)
   for (let i = 0; i < placed.length; i += 1) {
     for (let j = i + 1; j < placed.length; j += 1) {
       const [x, y] = [placed[i]!, placed[j]!]
@@ -304,6 +517,25 @@ export function theGovernsCheck(workspaceId: string): TheGovernsCheck {
   }
   stillCited.sort((a, b) => newestFirst(a.replaced, b.replaced))
 
+  const reports = theReportsNamingNothing(workspaceId)
+  const notCompared = [
+    'Two patterns are not compared with each other: whether they share a file is not worked out.',
+    'A decision naming a module and one naming a file that module claims are not counted as governing one thing.',
+    ...(reports.notPlaced > 0
+      ? [
+          `${String(reports.notPlaced)} reports that name no page have no create row in the change log, so whether a run filed ` +
+            'them is not known, and they are not listed.',
+        ]
+      : []),
+    ...(reports.notRead.length > 0
+      ? [
+          `${String(reports.notRead.length)} report${reports.notRead.length === 1 ? '' : 's'} linked about no page ` +
+            `${reports.notRead.length === 1 ? 'holds' : 'hold'} a nothingFits that is not a list, so whether a page fits ` +
+            `${reports.notRead.length === 1 ? 'it' : 'them'} was not read. They are in reportsNotRead and not in reportsNamingNothing.`,
+        ]
+      : []),
+  ]
+  const filesNoModuleStates = theFilesNoModuleStates(workspaceId, live, notCompared)
   return {
     workspaceId,
     nothingInGoverns,
@@ -311,10 +543,10 @@ export function theGovernsCheck(workspaceId: string): TheGovernsCheck {
     sharingNoFile,
     bothStand,
     stillCited,
-    notCompared: [
-      'Two patterns are not compared with each other: whether they share a file is not worked out.',
-      'A decision naming a module and one naming a file that module claims are not counted as governing one thing.',
-    ],
+    reportsNamingNothing: reports.named,
+    reportsNotRead: reports.notRead,
+    filesNoModuleStates,
+    notCompared,
   }
 }
 
@@ -403,8 +635,12 @@ export function theGovernsCheckLine(check: TheGovernsCheck, whatWasDone: string)
     `The governs check for ${check.workspaceId}: ${String(check.nothingInGoverns.length)} decisions with nothing in governs, ` +
     `${String(check.overlapping.length)} pairs governing one thing without one replacing the other, ` +
     (check.bothStand > 0 ? `${String(check.bothStand)} more pairs naming one file that are linked as both standing, ` : '') +
-    (check.sharingNoFile > 0 ? `${String(check.sharingNoFile)} more pairs sharing only a module, flow or pipeline, ` : '') +
-    `${String(check.stillCited.length)} replaced decisions still cited by later work. ${whatWasDone}`
+    (check.sharingNoFile > 0 ? `${String(check.sharingNoFile)} more pairs sharing only a page, ` : '') +
+    `${String(check.stillCited.length)} replaced decisions still cited by later work. ` +
+    (check.reportsNamingNothing.length > 0
+      ? `${String(check.reportsNamingNothing.length)} reports filed outside a run name no page and say no page fits them. `
+      : '') +
+    whatWasDone
   )
 }
 
@@ -438,8 +674,11 @@ function quoted(one: { id: string; title: string }): string {
   return `"${one.title}" (${one.id})`
 }
 
-/** The message to the secretary: the three counts, the first few of each list, and how to ask the lookup. */
-function theNightlyMessage(check: TheGovernsCheck): string {
+/**
+ * The message to the secretary: the three counts, the first few of each list, and how to ask the lookup. Exported so a
+ * test reads its words from here.
+ */
+export function theNightlyMessage(check: TheGovernsCheck): string {
   const parts = [
     `The nightly governs check found work in ${check.workspaceId}. You are the secretary named for this project.`,
     `${String(check.nothingInGoverns.length)} decisions with nothing in governs` +
@@ -452,18 +691,28 @@ function theNightlyMessage(check: TheGovernsCheck): string {
         ? ` ${String(check.bothStand)} more pairs naming one file are linked as decisions that both stand: they are counted and not listed.`
         : '') +
       (check.sharingNoFile > 0
-        ? ` ${String(check.sharingNoFile)} more pairs share only a module, flow or pipeline: they are counted and not listed.`
+        ? ` ${String(check.sharingNoFile)} more pairs share only a page: they are counted and not listed.`
         : ''),
     `${String(check.stillCited.length)} replaced decisions that later work still cites` +
       (check.stillCited.length > 0
         ? `: ${theFirstFew(check.stillCited, (one) => `${quoted(one.replaced)}, replaced by ${quoted(one.replacedBy)}, cited by ${theFirstFew(one.citedBy, quoted)}`)}.`
         : '.'),
+    ...(check.reportsNamingNothing.length > 0
+      ? [
+          `${String(check.reportsNamingNothing.length)} reports filed outside a run are linked about no page and say no page fits them: ` +
+            `${theFirstFew(check.reportsNamingNothing, quoted)}. Link each about the page it is about, or add a nothingFits entry to it.`,
+        ]
+      : []),
     `GET /api/decisions/governs-check in ${check.workspaceId} answers every one of them. ` +
-      'GET /api/decisions/governing with path=<a file or folder> or record=<a module, flow or pipeline id> answers which decisions govern one place.',
+      `GET /api/decisions/governing with path=<a file or folder> or record=<the id of ${thePageKindsInWords()}> answers ` +
+      'which decisions govern one place.',
     'Mole Office says this at most once a night, and it blocks nothing.',
   ]
   return parts.join(' ')
 }
+
+/** What the nightly line says was done when every list is empty. Exported so a test reads the words from here. */
+export const NOTHING_FOR_THE_NIGHTLY_REMINDER = 'No reminder sent: all four lists are empty.'
 
 /**
  * THE NIGHTLY CHECK FOR ONE PROJECT, AND ITS ONE MESSAGE. When a list is not empty, the one secretary reminded about
@@ -476,8 +725,8 @@ function theNightlyMessage(check: TheGovernsCheck): string {
 export function sendTheGovernsCheck(workspaceId: string, now: Date, by: Actor): string {
   const check = theGovernsCheck(workspaceId)
   const line = (whatWasDone: string): string => theGovernsCheckLine(check, whatWasDone)
-  if (check.nothingInGoverns.length + check.overlapping.length + check.stillCited.length === 0) {
-    return line('No reminder sent: all three lists are empty.')
+  if (check.nothingInGoverns.length + check.overlapping.length + check.stillCited.length + check.reportsNamingNothing.length === 0) {
+    return line(NOTHING_FOR_THE_NIGHTLY_REMINDER)
   }
   // THE ONE READING OF WHO IS REMINDED, the same one the Settings page shows and the 14-day reminder reads (invariant 9).
   const secretaries = theModuleReminderSecretaries()

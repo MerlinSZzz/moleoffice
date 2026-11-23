@@ -43,6 +43,8 @@
  *   8. The worker's finish wakes the supervisor. The finish is sealed, and sw-boss is the worker's starter, so the seal's
  *      notice and the no-inspector notice go to sw-boss, and the second of them wakes it. The child-finished line is
  *      not written a second time: one finish, one notice, in tellTheParentAChildFinished.
+ *      sw-boss is registered with no role and holds no supervisor card, so the owner's decision of 12 November 2026,
+ *      which leaves out only a worker's starter that holds the supervisor card, does not reach it.
  *      The worker writes sw-boss a FEATURE READY: line first, because the office asks for a sandbox round's check
  *      only when a whole feature is done (src/server/lib/how-a-round-ended.ts).
  *   9. The launcher's command line is the sandbox launcher's worker command with --parent, under the message worker's
@@ -163,7 +165,7 @@ import { onePass, type WatchingARound, type WorkerSettings } from '../src/worker
 import { RoundAdapter, THE_LAUNCHER_ASKS_AS, theCommandTakesNoImage } from '../src/worker/runtimes/round.ts'
 import { theAgentsWorktree, theCloneNamed } from '../tools/sandbox-common.mjs'
 import { aMadeUpSandboxRepo } from './a-made-up-sandbox-repo.ts'
-import { apiApp, freshDb, type TestDb } from './helpers.ts'
+import { apiApp, freshDb, type TestDb, governsTheWholeProject } from './helpers.ts'
 
 const CHECKOUT = fileURLToPath(new URL('..', import.meta.url)).replace(/\/$/, '')
 const A_MADE_UP_OFFICE_KEY = randomBytes(32).toString('hex')
@@ -638,7 +640,7 @@ describe('1. the ask is refused, in words, and nothing is written', () => {
     expect(r.body['error']).toContain('No probability is set for worker in every row, and the Casting table has no marked row to take.')
     expect(dataOf(bossRun)['workerRuns']).toBeUndefined()
     // THE PERSON CASTS THE WORKER CARD: a program, a model and an effort, each from a made-up decision.
-    const decided = await call('POST', '/api/records', AS_THE_PERSON, { kind: 'decision', title: 'The test casts the worker card', data: { replaces: [] } })
+    const decided = await call('POST', '/api/records', AS_THE_PERSON, { kind: 'decision', title: 'The test casts the worker card', data: { ...governsTheWholeProject(), replaces: [] } })
     expect(decided.status, JSON.stringify(decided.body)).toBe(201)
     const decision = String(decided.body['record'].id)
     const cast = await call('POST', '/api/casting/worker', AS_THE_PERSON, {
@@ -1797,6 +1799,7 @@ describe('16. the paths a worker names: the ask keeps them, and the start gives 
 
   beforeAll(async () => {
     await started('sw-pathed', asOne('sw-boss'))
+    await started('sw-pathed-written', asOne('sw-boss'))
     sandbox = aSandbox('sw-paths-sandbox')
     asking = await aSupervisorsRun(sandbox, 'A made-up supervisor run of sw-boss whose worker names paths')
   })
@@ -1882,6 +1885,18 @@ describe('16. the paths a worker names: the ask keeps them, and the start gives 
     }
     expect(() => real.commandFor({ ...common, model: A_CAST_MODEL, runtime: 'claude-code', follows: 'a-run', paths: PATHS })).toThrow("The sandbox launcher's round command takes no --with-path.")
   })
+
+  it('takes a change of its doing line and a finish after its ask kept the paths', async () => {
+    const run = await aSupervisorsRun(sandbox, 'A made-up supervisor run of sw-boss that is written after an ask that names paths', CHECKOUT, sandbox.head)
+    const r = await ask('sw-pathed-written', asAgent('sw-boss', run.key, run.id), { brief: sandbox.brief, ...CHOICE, paths: PATHS })
+    expect(r.status, JSON.stringify(r.body)).toBe(202)
+    expect(theWorkerRunOf(run.id, 'sw-pathed-written')?.paths).toEqual(PATHS)
+    const patched = await call('PATCH', `/api/records/${run.id}`, asAgent('sw-boss', run.key, run.id), { dataPatch: { doing: 'A made-up line written after an ask that names paths' } })
+    expect(patched.status, JSON.stringify(patched.body)).toBe(200)
+    const finished = await finish(run.id)
+    expect(finished.status, JSON.stringify(finished.body)).toBe(200)
+    expect(theWorkerRunOf(run.id, 'sw-pathed-written')?.paths).toEqual(PATHS)
+  })
 })
 
 describe('17. the images a codex worker is given: the ask keeps them, the start gives them as --image, and the worker’s run keeps them', () => {
@@ -1917,7 +1932,7 @@ describe('17. the images a codex worker is given: the ask keeps them, the start 
 
   beforeAll(async () => {
     door = await import('../src/server/lib/worker-runs.ts')
-    for (const handle of ['sw-imaged', 'sw-imaged-there', 'sw-imaged-gone']) await started(handle, asOne('sw-boss'))
+    for (const handle of ['sw-imaged', 'sw-imaged-there', 'sw-imaged-gone', 'sw-imaged-written']) await started(handle, asOne('sw-boss'))
     sandbox = aSandbox('sw-images-sandbox')
     asking = await aSupervisorsRun(sandbox, 'A made-up supervisor run of sw-boss whose codex worker is given images')
   })
@@ -2035,5 +2050,17 @@ describe('17. the images a codex worker is given: the ask keeps them, the start 
       command: ['opencode', 'run', 'a made-up brief'],
     })).toThrow(theCommandTakesNoImage('exec'))
     expect(() => real.commandFor({ ...common, model: A_CAST_MODEL, runtime: 'claude-code', follows: 'a-run', images: IMAGES })).toThrow(theCommandTakesNoImage('round'))
+  })
+
+  it('takes a change of its doing line and a finish after its ask kept the images', async () => {
+    const run = await aSupervisorsRun(sandbox, 'A made-up supervisor run of sw-boss that is written after an ask that names images', CHECKOUT, sandbox.head)
+    const r = await ask('sw-imaged-written', asAgent('sw-boss', run.key, run.id), { brief: sandbox.brief, ...CHOICE, images: IMAGES })
+    expect(r.status, JSON.stringify(r.body)).toBe(202)
+    expect(theWorkerRunOf(run.id, 'sw-imaged-written')?.images).toEqual(IMAGES)
+    const patched = await call('PATCH', `/api/records/${run.id}`, asAgent('sw-boss', run.key, run.id), { dataPatch: { doing: 'A made-up line written after an ask that names images' } })
+    expect(patched.status, JSON.stringify(patched.body)).toBe(200)
+    const finished = await finish(run.id)
+    expect(finished.status, JSON.stringify(finished.body)).toBe(200)
+    expect(theWorkerRunOf(run.id, 'sw-imaged-written')?.images).toEqual(IMAGES)
   })
 })

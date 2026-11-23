@@ -3,7 +3,7 @@
 /**
  * THE GOVERNS CHECK LISTS A PAIR ONLY WHEN BOTH DECISIONS NAME ONE FILE. The coordinator's call for wave 13y round
  * 12, with the reading in message g88FHyAlaxiE: paths are compared as before (equal, or one covers the other); a pair
- * that shares only a module, flow or pipeline is counted and not listed.
+ * that shares only a page is counted and not listed.
  *
  * On 9 October 2026 a secretary filled governs for 70 release decisions, and the check listed 781 pairs, almost all
  * of them decisions on one module that add to each other. `replaces` cannot quiet them, because it retires the whole older one.

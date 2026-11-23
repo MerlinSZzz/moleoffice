@@ -245,10 +245,9 @@ export interface ContextReading {
 
 // ---------------------------------------------------------------------------- the evidence ladder
 
-// WHICH RUNTIME WORDS NAME AN AGENT TOOL. `isAServerProcess` below asks it, and it is the same
-// list the agent record kind is checked against, so what the picker offers and what a choice can
-// mint cannot come apart.
-import { isAgentRuntime } from '@shared/participants.ts'
+// WHICH RUNTIME WORDS NAME ONE OF THE OFFICE'S OWN PROCESSES. `isAServerProcess` below asks it. The
+// agent record kind takes every other word, so what the picker offers a choice can mint.
+import { THE_OFFICES_OWN_PROCESS_WORDS } from '@shared/participants.ts'
 
 // The ranking vocabulary moved to @shared/types.ts, for the reason stated there. Imported so this
 // module can use it, and re-exported so every importer of this module is unaffected.
@@ -893,16 +892,15 @@ function everySessionIn(workspaceId: string): PanelRecord[] {
  * written to. On a copy of the owner's database the first six rows offered were all of them, and
  * the one durable agent was fifth. Problem `TXUeeKcpTVI4`.
  *
- * CHOOSING ONE WROTE NOTHING AND SAID SO IN THE NAME OF A DATABASE FIELD: "data.runtime must be one
- * of: claude-code, codex, opencode, but it is the string "mole-office"". That refusal comes from
- * minting the durable agent the choice needs — `identityForAddressedRun` in lib/records/addressed-run.ts copies
- * the run's runtime word onto the agent it makes, and the agent kind takes only the three.
+ * SO THE TEST HERE IS READ FROM THE RECORD rather than from the title. A run filed with one of the
+ * runtime words the office files for its own processes (`THE_OFFICES_OWN_PROCESS_WORDS`) has no
+ * agent behind it, so there is nothing a person could do with the choice and it is not offered.
+ * `startedByMoleOffice` is asked as well, because it is the plainest statement that Mole Office
+ * started the process itself, and the message worker carries it.
  *
- * SO THE TEST HERE IS THE SAME FACT THAT REFUSAL IS ABOUT, and it is read from the record rather
- * than from the title. A run whose stored runtime word is present and is not one of the three
- * cannot be given a durable identity, so there is nothing a person could do with the choice and it
- * is not offered. `startedByMoleOffice` is asked as well, because it is the plainest statement that
- * Mole Office started the process itself, and the message worker carries it.
+ * A RUN OF A HARNESS THE OFFICE HAS NO ADAPTER FOR IS STILL OFFERED. Any harness's word is taken on
+ * the agent kind, so `identityForAddressedRun` in lib/records/addressed-run.ts can copy that word
+ * onto the agent it makes. Such a run used to be dropped here as if it were the office's own.
  *
  * A RUN THAT NAMES NO RUNTIME IS STILL OFFERED. Absent means nobody said, and minting works for it:
  * the runtime is left off the agent rather than guessed. Dropping those would take real runs off
@@ -914,7 +912,7 @@ function everySessionIn(workspaceId: string): PanelRecord[] {
 function isAServerProcess(record: PanelRecord): boolean {
   if (record.data['startedByMoleOffice'] === true) return true
   const runtime = record.data['runtime']
-  return typeof runtime === 'string' && runtime !== '' && !isAgentRuntime(runtime)
+  return typeof runtime === 'string' && THE_OFFICES_OWN_PROCESS_WORDS.includes(runtime)
 }
 
 /**

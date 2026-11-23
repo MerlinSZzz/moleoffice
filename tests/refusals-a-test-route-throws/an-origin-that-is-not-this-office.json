@@ -1,0 +1,11 @@
+{
+  "why": "A request whose Origin is not one of this office's own pages (wave 13s, line 13s, SEC-2). It is refused only when a listener carried the request: this test reaches every door by inject, which no listener carries, so no door here can meet it. tests/one-list-of-this-offices-origins.test.ts meets it through the listeners, in cases 1, 3 to 6 and 8.",
+  "refusals": [
+    {
+      "code": "originIsNotThisOffice",
+      "status": 403,
+      "english": "Test: a page that is not one of this office's own sent this request.",
+      "values": {}
+    }
+  ]
+}

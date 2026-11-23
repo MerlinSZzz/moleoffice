@@ -6,6 +6,26 @@ import { workspaces } from './workspaces.ts'
 
 const existingArchive = { existingArchive: true } as const
 
+/**
+ * WHO READ A CONVERSATION THEY WERE NOT PART OF, WHICH ONE, FROM WHICH SIDE, AND WHEN.
+ *
+ * Criterion M12 gives a person with the owner row the right to read a conversation between two
+ * agents, from either side, and says the read is recorded. It was recorded on `api_calls`, which is
+ * traffic and is pruned: an untraced row there is deleted after fourteen days with no summary kept,
+ * and the browser sends no trace, so after a fortnight nothing said the read had happened.
+ * Migration 0119 adds this table and its header carries the whole account.
+ *
+ * NOT THE SAME FACT AS THE `api_calls` ROW. That row says a request arrived and is deleted when the
+ * traffic it belongs to stops being counted. This row says a person read a conversation and is kept.
+ *
+ * ONE ROW FOR EACH READER IN EACH CONVERSATION IN EACH PROJECT: the newest read, which is the
+ * reader's read point, in wave 13s round 64.
+ * Until then every read was a row of its own, and the table grew by about 130,000 rows a day while
+ * every reader of it asked only for the newest. A newer read replaces the row, migration 0278 folded
+ * the older ones away, and its unique index holds the rule. The project is part of the key because a
+ * page narrowed to one project asks for the newest read in that project. Criterion M12 is met by the
+ * newest row, which says who read, which conversation, from which side and when.
+ */
 export const conversationReads = aPartTable(sqliteTable(
   'conversation_reads',
   {

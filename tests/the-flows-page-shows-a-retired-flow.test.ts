@@ -16,7 +16,7 @@
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import type { Locator } from 'playwright'
 import { THE_PERSON } from '../src/shared/person.ts'
-import { liveApp, waitForThePage, type LiveApp } from './helpers.ts'
+import { deleteTheCopiedDefaultFlows, liveApp, waitForThePage, type LiveApp } from './helpers.ts'
 import { createI18n } from '../src/shared/i18n.ts'
 import { testShots } from './where-shots-go.ts'
 
@@ -77,6 +77,7 @@ async function photograph(name: string, look: string, on: Locator): Promise<void
 
 beforeAll(async () => {
   app = await liveApp({ name: 'flows-retired', viewport: { width: 1440, height: 1000 }, workspace: 'default' })
+  await deleteTheCopiedDefaultFlows(app.api)
   await app.context.addInitScript(() => {
     localStorage.setItem('mole-office.preset.theme', new URLSearchParams(location.search).get('look') ?? 'light')
   })
@@ -98,15 +99,16 @@ it('1. counts the replaced and the retired apart, and the open fold says why a f
     await open('/flows', look)
     const page = app.page
     await page.locator('.flw-count').waitFor({ timeout: 30_000 })
-    expect(await page.locator('.flw-count').textContent()).toContain('1 flow · 1 replaced · 1 retired')
-    const press = page.getByRole('button', { name: 'Show the 2 replaced or retired flows', exact: true })
+    expect(await page.locator('.flw-count').textContent()).toContain('1 office flow · 1 replaced · 1 retired')
+    const press = page.getByRole('button', { name: 'Show the 2 replaced or retired office flows', exact: true })
     expect(await press.getAttribute('aria-expanded')).toBe('false')
     expect(await page.getByText(WHY).count(), 'a retired flow is drawn before the press').toBe(0)
 
     await press.click()
     const rows = page.locator('.flw-group[data-group="replaced"] .flw-replaced-row')
     await rows.first().waitFor({ timeout: 30_000 })
-    expect(await page.locator('.flw-group[data-group="replaced"] .flw-note').textContent()).toBe(en.t('flows.replaced.noteWithRetired'))
+    // CRITERION CHANGE, as decided: the group no longer opens with a sentence on what it holds.
+    expect(await page.locator('.flw-group[data-group="replaced"] .flw-note').count()).toBe(0)
     expect(await rows.locator('.flw-row-title').allTextContents()).toEqual(['Test: minding the kiln key', 'Test: the old way to fire'])
     const retired = rows.first()
     expect(await retired.locator('.flw-retired').textContent()).toBe(`Retired: ${WHY} In its place: ${line} · retired on 2026-10-11 by a test potter`)
@@ -114,7 +116,7 @@ it('1. counts the replaced and the retired apart, and the open fold says why a f
     expect(await retired.locator('.flw-replaced-by').count(), 'no flow replaced it').toBe(0)
     expect(await rows.nth(1).locator('.flw-replaced-by').textContent()).toContain('Replaced by')
     expect(await rows.nth(1).locator('.flw-retired').count()).toBe(0)
-    expect(await page.getByRole('button', { name: 'Hide the replaced and retired flows', exact: true }).getAttribute('aria-expanded')).toBe('true')
+    expect(await page.getByRole('button', { name: 'Hide the replaced and retired office flows', exact: true }).getAttribute('aria-expanded')).toBe('true')
     await photograph('flows-retired-open', look, page.locator('.flw-group[data-group="replaced"]'))
   }
 }, 600_000)

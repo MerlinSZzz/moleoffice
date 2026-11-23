@@ -336,10 +336,12 @@ export function asTheOnlyThisOfficeDoor<T>(write: () => T): T {
  * chapter, renumbers one, takes one out of its kind, or adds, removes, renames or reorders a rule. Asked on both paths,
  * so a restored revision and a raised secretary's applied change meet it too. The one write let through without either
  * is the office's own copy of the default chapters into a fresh office, under `asTheOfficesCopyOfTheDefaults`.
+ * It also covers the office's own copy of the default flows (lib/default-flows.ts), and there it lets a create through
+ * the flow step reasons check without stage reasons or sources.
  */
 export let theOfficeIsCopyingItsDefaults = false
 
-/** Run one write as the office's copy of the default chapters (lib/default-regulations.ts), which needs no decision. */
+/** Run one write as the office's copy of the default chapters (lib/default-regulations.ts) or flows (lib/default-flows.ts), which needs no decision. */
 export function asTheOfficesCopyOfTheDefaults<T>(write: () => T): T {
   const before = theOfficeIsCopyingItsDefaults
   theOfficeIsCopyingItsDefaults = true

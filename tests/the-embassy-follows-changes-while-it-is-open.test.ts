@@ -32,7 +32,7 @@ import type { Page } from 'playwright'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { whoPath } from '../src/web/components/router.tsx'
 import { EMBASSY_WORDS } from '../src/web/pages/EmbassyPage.tsx'
-import { liveApp, thePersonsKeyHeader, type LiveApp } from './helpers.ts'
+import { A_SLEEP_TIME, liveApp, thePersonsKeyHeader, type LiveApp } from './helpers.ts'
 import { listening, notReloaded, open as openIn, type HeardOffice } from './a-page-that-hears-changes.ts'
 import { putTheMadeUpLabelIn } from './the-made-up-label-above-the-page.ts'
 
@@ -149,7 +149,7 @@ beforeAll(async () => {
   // THE ROW IS FOUND BY THE REGISTRY ID ITS NAME LEADS TO, which is not the handle.
   proposed = (await idOf('made-up-wren')) ?? ''
   expect(proposed).not.toBe('')
-  proposal = String((await send('POST', '/api/residents/proposals', { agentId: 'made-up-wren', because: 'A made-up reason: Wren keeps the kiln notes.' }, asAnAgent('made-up-secretary')))['proposal'].id)
+  proposal = String((await send('POST', '/api/residents/proposals', { agentId: 'made-up-wren', because: 'A made-up reason: Wren keeps the kiln notes.', sleepTime: A_SLEEP_TIME }, asAnAgent('made-up-secretary')))['proposal'].id)
   // A VISIT THAT IS UNDER WAY BEFORE THE PAGE OPENS, for the leaving half of case 4.
   await aVisit('made-up-leaving-visitor', 'reading the made-up kiln plan')
 }, 300_000)
@@ -240,7 +240,7 @@ it.runIf(film)('6. films the Embassy following an ask, a resident and a visitor,
   const page = await context.newPage()
   await started('made-up-heron', 'A made-up agent Heron', 'worker')
   const second = (await idOf('made-up-heron')) ?? ''
-  const secondProposal = String((await send('POST', '/api/residents/proposals', { agentId: 'made-up-heron', because: 'A made-up reason: Heron keeps the shelf plan.' }, asAnAgent('made-up-secretary')))['proposal'].id)
+  const secondProposal = String((await send('POST', '/api/residents/proposals', { agentId: 'made-up-heron', because: 'A made-up reason: Heron keeps the shelf plan.', sleepTime: A_SLEEP_TIME }, asAnAgent('made-up-secretary')))['proposal'].id)
   const trip = await aVisit('made-up-filmed-visitor', 'reading the made-up firing schedule')
   try {
     await openIn(heard(), page, '/embassy', '[data-target$="embassy.citizens"]')

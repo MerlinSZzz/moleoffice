@@ -211,7 +211,13 @@ export interface ChecklistReading {
   title: string
   owner: ParticipantRef
   ownerName: string
+  /** Every item, or with `?items=open` on the list door only the items not done or replaced, in the order stored. */
   items: ChecklistRequest[]
+  /**
+   * EACH FINISHED ITEM, done or replaced, by its id and who added it, in the order stored. Present only when the list
+   * door was asked with `?items=open`, which leaves these items out of `items`.
+   */
+  finishedItems?: ChecklistFinishedItem[]
   counts: ChecklistCounts
   /**
    * THE FLOWS THE OWNER IS IN THROUGH THIS CHECKLIST: one for each item that stands for a flow somebody entered, read
@@ -233,6 +239,12 @@ export interface ChecklistReading {
   presses: ChecklistPress[]
   version: string
   updatedAt: string
+}
+
+/** A finished item in a list read with `?items=open`: its id, and who added it when that was recorded. */
+export interface ChecklistFinishedItem {
+  id: string
+  addedBy?: ParticipantRef
 }
 
 /** One press under the grant a checklist mark names, and the reason its row holds, or null where it holds none. */

@@ -10,15 +10,14 @@
  * tests/a-permanent-resident-sleeps-and-is-named.test.ts.
  *
  * WHAT IS MEASURED, each drawn with renderToStaticMarkup from a reading written here, with no server:
- *   1. the chat's line: "Asleep since", "Last slept … ago", and nothing for a resident with no sleep recorded or for a
- *      non-resident;
- *   2. the profile's Sleep place: heartbeat, now, last sleep ended, compactions, and the postponed sleeps, said to be
- *      sent to nobody;
+ *   1. the chat's line: "Asleep since" while a resident is asleep, and nothing for an awake resident, with or without a
+ *      last sleep, or for a non-resident;
+ *   2. the profile's Sleep place: heartbeat, now, last sleep ended, compactions, and the postponed sleeps;
  *   3. the naming place: the press for the person only, and "Chosen" once it is said;
  *   4. the proposal's criterion list: each part met, not met, not reported, and the area.
  *
- * MUTATION (after a green control run, then restored; logs in .logs/r46-page-*): `sleepLineWords` in
- * src/web/components/SleepLine.tsx no longer says "Last slept" → case 1 goes red.
+ * MUTATION, not yet run: `sleepLineWords` in src/web/components/SleepLine.tsx says "Last slept" again for an awake
+ * resident → case 1 goes red. The change that wrote this case ran no tests.
  *
  * OLD (wave 13s round 113): the cases ran on the real clock in the machine's zone. Run at 04:23 winter time on 25
  * October 2026, case 1's sleep three hours before was written 01:23, a time the clocks show twice that night. It was
@@ -27,7 +26,12 @@
  * the real time.
  * WHY: a test that reads the real time passes or fails by the hour it is run at.
  * MUTATION (round 113, after a control run, then restored): `sleepLineWords` says how long ago the line is drawn, not
- * the last sleep → case 1 goes red.
+ * the last sleep → case 1 went red. Case 1 no longer draws a last sleep, so it cannot catch this mutation now.
+ *
+ * OLD: the chat's line said how long ago an awake resident last slept, and when it sleeps.
+ * NEW: the chat's line says only that a resident is asleep. An awake resident has no line in the chat. The profile's
+ * Sleep place still says when its last sleep ended (case 2).
+ * WHY: the chat shows whether a resident is asleep where it shows presence. The rest of its sleep is on the profile.
  *
  * OLD (wave 13y round 111): a resident with no sleep recorded had the chat's line "No sleep recorded".
  * NEW: it has no line in the chat. The profile's Sleep place still says "No sleep recorded" (case 2).
@@ -109,6 +113,7 @@ function aReading(over: Partial<OneResidentReading['resident']>): OneResidentRea
       decisionId: 'test-decision',
       confirmedBy: { kind: 'person', id: 'test-owner' },
       factsAtProposal: null,
+      homeWorldIsThisOffice: null,
       retired: false,
       retiredAt: null,
       successor: null,
@@ -124,13 +129,12 @@ function aReading(over: Partial<OneResidentReading['resident']>): OneResidentRea
 }
 
 describe('the chat’s line beside a resident', () => {
-  it('1: says asleep since or last slept how long ago, and nothing for a resident with no sleep recorded or for a non-resident', () => {
+  it('1: says asleep since while it sleeps, and nothing for an awake resident, with or without a last sleep, or for a non-resident', () => {
     const threeHoursAgo = localStamp(new Date(Date.now() - 3 * 3600_000))
-    const asleep = strip(renderToStaticMarkup(h(line.SleepLine, { reading: { residentSleep: { asleepSince: threeHoursAgo, lastSleptAt: null, wakesAt: null, sleepTime: null } } })))
-    expect(asleep).toMatch(/^Asleep since /)
-    const slept = renderToStaticMarkup(h(line.SleepLine, { reading: { residentSleep: { asleepSince: null, lastSleptAt: threeHoursAgo, wakesAt: null, sleepTime: null } } }))
-    expect(slept).toContain('data-sleep="slept"')
-    expect(strip(slept)).toMatch(/^Last slept .*3/)
+    const asleep = renderToStaticMarkup(h(line.SleepLine, { reading: { residentSleep: { asleepSince: threeHoursAgo, lastSleptAt: null, wakesAt: null, sleepTime: null } } }))
+    expect(asleep).toContain('data-sleep="asleep"')
+    expect(strip(asleep)).toMatch(/^Asleep since /)
+    expect(renderToStaticMarkup(h(line.SleepLine, { reading: { residentSleep: { asleepSince: null, lastSleptAt: threeHoursAgo, wakesAt: null, sleepTime: null } } }))).toBe('')
     expect(renderToStaticMarkup(h(line.SleepLine, { reading: { residentSleep: { asleepSince: null, lastSleptAt: null, wakesAt: null, sleepTime: null } } }))).toBe('')
     expect(renderToStaticMarkup(h(line.SleepLine, { reading: {} }))).toBe('')
     expect(renderToStaticMarkup(h(line.SleepLine, { reading: undefined }))).toBe('')
@@ -160,7 +164,6 @@ describe('the Sleep place on the profile', () => {
     expect(said).toContain('Compactions its runs reported 7')
     expect(said).toContain('1 postponed sleep')
     expect(said).toContain('Test: a deadline tonight.')
-    expect(said).toContain('A postponed sleep is shown here and sent to nobody.')
 
     const quiet = strip(renderToStaticMarkup(h(sleep.TheResidentSleep, { reading: aReading({}), thePerson: true, onChanged: () => {} })))
     expect(quiet).toContain('No session has ever held its handle')

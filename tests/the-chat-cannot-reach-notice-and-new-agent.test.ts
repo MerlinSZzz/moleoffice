@@ -20,8 +20,8 @@
  *   2. M116: a send to that agent leaves the offer to start a new agent, once, beside the notice;
  *      a send to an agent that is answering leaves none.
  *   3. M115: exactly one New agent button is drawn in the panel's own header, and pressing it
- *      opens the same chooser the right-click menu draws, listing the agents nothing is answering
- *      as.
+ *      opens the new agent dialog, which makes a new agent. It lists no agent already in the
+ *      office: the right-click menu is where an agent nothing is answering as is started again.
  *   4. H3 and M125: when a session holds the handle and answers, the words drawn under the name
  *      are "Handle holding".
  *
@@ -57,6 +57,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { theResizeIsDrawn, fakeTranscript, liveApp, waitForThePage, type LiveApp, thePersonsKeyHeader } from './helpers.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { CANNOT_REACH_WORDS, CHAT_WORDS } from '../src/shared/messages.ts'
+import { t } from '../src/shared/i18n.ts'
 import { openTheChat } from './open-the-chat.ts'
 
 let app: LiveApp
@@ -158,11 +159,11 @@ beforeAll(async () => {
   await anAgent(REACHABLE, REACHABLE_NAME)
   await anAgentThatAnswers(REACHABLE)
   // ONE MESSAGE WAITING FOR THE UNREACHABLE AGENT, so the press that starts one has something to
-  // start it for and the chooser has an agent to list.
+  // start it for, and the new agent dialog has an agent it must not list.
   // THE UNHELD 409 (decision 60sbc5I-bwKx); the letter is still queued for the agent, which is what this fixture needs.
   await thePersonSays(UNREACHABLE, 'Can you read the loquat logs for me?', 409)
   // AND ONE CONVERSATION WITH THE AGENT THAT ANSWERS, so it has a contact row to open. Its message
-  // reaches the run, so this one is not queued and the chooser does not offer it.
+  // reaches the run, so this one is not queued and nothing offers to start it.
   await thePersonSays(REACHABLE, 'Are you answering?')
 }, 240_000)
 
@@ -298,7 +299,7 @@ describe('criterion M116: the offer comes back beside the notice', () => {
 })
 
 describe('criteria M115 and M122: one New agent press, beside the Agent heading', () => {
-  it('is drawn once, beside Agent, with none in the panel header, and opens the chooser', async () => {
+  it('is drawn once, beside Agent, with none in the panel header, and opens the new agent dialog', async () => {
     await openTheContacts()
 
     // THE HEADER ONE IS GONE. Criterion M122 moved the press criterion M115 put in the panel's own
@@ -316,15 +317,16 @@ describe('criteria M115 and M122: one New agent press, beside the Agent heading'
     expect((await buttons[0]?.textContent())?.trim()).toBe(CANNOT_REACH_WORDS.newAgent)
 
     await buttons[0]?.click()
-    await app.page.waitForSelector('.px-chat-new-agent-ask', { timeout: 20_000 })
-    await app.page.waitForSelector('.px-start-agent-here .px-start-agent', { timeout: 20_000 })
+    await app.page.waitForSelector('.px-new-agent-dialog', { timeout: 20_000 })
+    expect((await app.page.textContent('.px-new-agent-dialog-heading'))?.trim()).toBe(t('chat.contact.newAgent'))
 
-    const chooser = (await app.page.textContent('.px-chat-new-agent-ask')) ?? ''
-    expect(chooser, 'the chooser does not list the agent nothing is answering as').toContain(UNREACHABLE_NAME)
-    expect(chooser, 'the chooser lists an agent that is answering').not.toContain(REACHABLE_NAME)
+    const dialog = (await app.page.textContent('.px-new-agent-dialog')) ?? ''
+    expect(dialog, 'the dialog lists the agent nothing is answering as').not.toContain(UNREACHABLE_NAME)
+    expect(dialog, 'the dialog lists an agent that is answering').not.toContain(REACHABLE_NAME)
+    expect(await app.page.$$('.px-new-agent-dialog .px-start-agent'), 'the dialog draws a press that starts an agent already here').toHaveLength(0)
 
-    await app.page.click('.px-chat-new-agent-close')
-    await app.page.waitForFunction(() => document.querySelector('.px-chat-new-agent-ask') === null, { timeout: 20_000 })
+    await app.page.click('.px-new-agent-dialog-cancel')
+    await app.page.waitForFunction(() => document.querySelector('.px-new-agent-dialog') === null, { timeout: 20_000 })
   }, 120_000)
 })
 

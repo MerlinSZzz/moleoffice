@@ -12,8 +12,8 @@
  * WHAT IS MEASURED, in a real browser on a test office of this file's own:
  *   1. The sidebar's press opens the quick search with the focus in its field: open, narrowed, and from the menu at
  *      390. Escape closes it and gives the focus back to the press.
- *   2. The key f opens it on Home, on a record's page, on Settings and on All pages once the focus has left All pages'
- *      field. In a text box f is typed there, and nothing opens.
+ *   2. Alt and X opens it on Home, on a record's page, on Settings and on All pages once the focus has left All
+ *      pages' field. The key f alone opens nothing. In a text box f is typed there, and Alt and X opens nothing.
  *   3. A pasted id opens its record's page, and a record in another project opens in that project.
  *   4. Words find the pages whose names hold them, without case: the same pages, in the same order, that All pages
  *      draws, the plugin's page among them, and then Settings, which stands at the sidebar's foot and not on All pages.
@@ -181,9 +181,9 @@ async function theFocusIsInTheField(page: Page): Promise<boolean> {
   return page.locator(FIELD).evaluate((field) => document.activeElement === field)
 }
 
-/** Open the quick search with its key, from wherever the focus is now. */
+/** Open the quick search with its key, Alt and X, from wherever the focus is now. */
 async function openByTheKey(page: Page): Promise<void> {
-  await page.keyboard.press('f')
+  await page.keyboard.press('Alt+KeyX')
   await page.locator(QUICK).waitFor({ timeout: 10_000 })
 }
 
@@ -261,11 +261,15 @@ it('1. the sidebar press opens the quick search, open, narrowed and from the men
   }
 }, 180_000)
 
-it('2. the key f opens the quick search on every kind of page, and in a text box f is typed', async () => {
+it('2. Alt and X opens the quick search on every kind of page, f alone opens nothing, and in a text box nothing opens', async () => {
   const { context, page } = await aWindow()
   try {
     for (const address of ['/', recordPath(kelp, 'note'), pathFor('settings')]) {
       await open(page, address)
+      // F ALONE IS NO SHORTCUT.
+      await page.keyboard.press('f')
+      await page.waitForTimeout(400)
+      expect(await page.locator(QUICK).count(), `${address}: the quick search after f alone`).toBe(0)
       await openByTheKey(page)
       expect(await theFocusIsInTheField(page), `${address}: the focus in the field`).toBe(true)
       // In its own field f is typed, as in any text box.
@@ -274,15 +278,18 @@ it('2. the key f opens the quick search on every kind of page, and in a text box
       await page.keyboard.press('Escape')
       await page.locator(QUICK).waitFor({ state: 'detached', timeout: 10_000 })
     }
-    // ALL PAGES opens with the focus in its own field, so f is typed there; with the focus gone, f opens the quick search.
+    // ALL PAGES opens with the focus in its own field, so f is typed there and Alt and X opens nothing; with the focus
+    // gone, Alt and X opens the quick search.
     await open(page, pathFor('allPages'))
     const allPagesField = page.locator('#main input[type="search"]')
     await allPagesField.waitFor({ timeout: 30_000 })
     await allPagesField.focus()
     await page.keyboard.press('f')
     expect(await allPagesField.inputValue(), "f typed in All pages' field").toBe('f')
+    await page.keyboard.press('Alt+KeyX')
     await page.waitForTimeout(400)
-    expect(await page.locator(QUICK).count(), "the quick search after f in All pages' field").toBe(0)
+    expect(await page.locator(QUICK).count(), "the quick search after f and Alt+X in All pages' field").toBe(0)
+    expect(await allPagesField.inputValue(), "nothing more typed in All pages' field").toBe('f')
     await page.locator('#main h1').click()
     await openByTheKey(page)
     expect(await theFocusIsInTheField(page), 'All pages: the focus in the field').toBe(true)

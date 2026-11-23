@@ -24,11 +24,15 @@
  * AND THE TRUE WARNING STILL FIRES. The warning exists for a real mismatch: a reply sent under the
  * project on screen that says it answered about another one. The second case makes that happen by
  * rewriting the reply's `current`, and asks for the warning.
+ *
+ * NO MODE IS STORED EITHER. Each context comes from `aContextThatStoresNoMode` (tests/helpers.ts stores
+ * Normal mode in every other one), so the page opens in the person's starting mode. A test office's
+ * person starts in Developer mode, so both cases are read in Developer mode.
  */
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { Route } from 'playwright'
-import { liveApp, type LiveApp } from './helpers.ts'
+import { aContextThatStoresNoMode, liveApp, type LiveApp } from './helpers.ts'
 import { theProjectIdOnScreen, waitForTheProjects } from './switch-the-project.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { DEFAULT_WORKSPACE } from '../src/shared/workspaces.ts'
@@ -90,8 +94,8 @@ afterAll(async () => {
 
 describe('the frame judges the project list against the project it was asked under', () => {
   it('draws no false warning when a fresh browser opens straight at a record of another project', async () => {
-    // A NEW CONTEXT, so nothing is stored and the browser starts on "default".
-    const context = await app.browser.newContext({ viewport: { width: 1440, height: 1000 } })
+    // A NEW CONTEXT, so nothing is stored: the browser starts on "default", in the person's starting mode.
+    const context = await aContextThatStoresNoMode(app.browser, { viewport: { width: 1440, height: 1000 } })
     try {
       const page = await context.newPage()
 
@@ -148,7 +152,7 @@ describe('the frame judges the project list against the project it was asked und
   }, 120_000)
 
   it('still warns when a reply sent under the project on screen says it answered about another', async () => {
-    const context = await app.browser.newContext({ viewport: { width: 1440, height: 1000 } })
+    const context = await aContextThatStoresNoMode(app.browser, { viewport: { width: 1440, height: 1000 } })
     try {
       const page = await context.newPage()
 

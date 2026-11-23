@@ -226,8 +226,11 @@ export interface TheFactsAtTheEnd {
   commits: number | { couldNotRead: string }
   /** Reports linked `about` the run. */
   reportsAboutTheRun: string[]
-  /** Reports this run filed that are not linked about it, each with the record it is linked to instead, if any. */
-  reportsElsewhere: { report: string; linkedTo: string | null }[]
+  /**
+   * Reports this run filed that are not linked about it, each with the record it is linked to instead, if any.
+   * `theRunLinksToIt` is there only when an about link goes the other way, from the run to the report.
+   */
+  reportsElsewhere: { report: string; linkedTo: string | null; theRunLinksToIt?: true }[]
   /** The run's newest message to its starter, or null when it wrote none. */
   lastMessage: { id: string; body: string } | null
   /** The folder the run was filed in, and the folder it names now. */
@@ -270,8 +273,11 @@ export function whyTheRoundEndedWithoutASeal(facts: TheFactsAtTheEnd): AReasonFo
         : {
             why: 'no-report',
             says:
-              `No report is linked about the run. It filed report ${elsewhere.report}, which is linked ` +
-              `${elsewhere.linkedTo === null ? 'to nothing' : `to ${elsewhere.linkedTo}`} instead, so nothing waiting on the run sees it.`,
+              elsewhere.theRunLinksToIt === true
+                ? `No report is linked about the run. It filed report ${elsewhere.report}, and the about link between them goes the ` +
+                  'other way, from the run to the report, so nothing waiting on the run sees it.'
+                : `No report is linked about the run. It filed report ${elsewhere.report}, which is linked ` +
+                  `${elsewhere.linkedTo === null ? 'to nothing' : `to ${elsewhere.linkedTo}`} instead, so nothing waiting on the run sees it.`,
             names: elsewhere.report,
           },
     )

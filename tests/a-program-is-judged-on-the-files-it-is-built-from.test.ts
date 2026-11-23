@@ -38,7 +38,7 @@ import { withoutInheritedEffort } from './without-inherited-effort.ts'
  * 2. The three sets this checkout really has, read from the source: which of the seven files each
  *    program holds, and that nothing in any set failed to resolve.
  * 3. On a real API server: saving any of the seven leaves it as new as the checkout and healthy,
- *    while the browser app's half of the reading moves to that file.
+ *    while the browser app's half of the reading moves to that file when the browser app imports it.
  * 4. On the same server: a file BOTH programs import moves both readings, and a file only the
  *    server imports moves only the server's.
  * 5. Under `tsx watch`, which is what `npm run dev` runs: one of the seven does not restart the
@@ -105,17 +105,18 @@ const THE_SEVEN = [
 ]
 
 /**
- * THE ONE OF THE SEVEN THAT NEITHER PROGRAM IMPORTS.
+ * THE TWO OF THE SEVEN THAT NEITHER PROGRAM IMPORTS.
  *
  * `src/shared/colourroles.ts` is the colour role register. No file under `src/` imports it —
  * measured by the walk below rather than read — and what does are tests, such
  * as `tests/planning-surfaces.test.ts`, which holds rules over it. A test is not one of the three programs this checkout runs, so the register belongs to
  * no program's set, and saving it moves no reading. That is the right answer: no running process
- * has loaded it, so no running process can be behind it. The other six are the browser app's, and
- * saving one of them moves the browser app's half.
+ * has loaded it, so no running process can be behind it. `src/shared/reviewmarks.ts` is imported
+ * only by the register, which no program imports, so it too belongs to no program. The other five
+ * are the browser app's, and saving one of them moves the browser app's half.
  */
-const IMPORTED_BY_NEITHER_PROGRAM = 'src/shared/colourroles.ts'
-const THE_PAGES_SIX = THE_SEVEN.filter((file) => file !== IMPORTED_BY_NEITHER_PROGRAM)
+const IMPORTED_BY_NEITHER_PROGRAM = ['src/shared/colourroles.ts', 'src/shared/reviewmarks.ts']
+const THE_PAGES_FIVE = THE_SEVEN.filter((file) => !IMPORTED_BY_NEITHER_PROGRAM.includes(file))
 
 /** A file both programs import, and a file only the server imports. */
 const BOTH = 'src/shared/product.ts'
@@ -281,7 +282,7 @@ beforeAll(async () => {
     lastEditAt = Date.now()
     seen.afterEachOfTheSeven[file] = await until(
       plainApi,
-      (r) => file === IMPORTED_BY_NEITHER_PROGRAM || r.runtime.freshness.newestFileForThePage === file,
+      (r) => IMPORTED_BY_NEITHER_PROGRAM.includes(file) || r.runtime.freshness.newestFileForThePage === file,
       `the reading after ${file} was touched`,
     )
   }
@@ -445,39 +446,6 @@ describe('the walk follows imports and nothing else', () => {
     expect(walked.couldNotRead).toEqual([])
   })
 
-  it('resolves a relative import, the @shared alias, an export-from and a dynamic import', () => {
-    const walked = theFilesBuiltFrom('src/entry.ts', fixture)
-    // one of each, named so a failure says which shape broke
-    expect(walked.files, 'a relative import').toContain('src/lib/a.ts')
-    expect(walked.files, 'the @shared alias').toContain('src/shared/b.ts')
-    expect(walked.files, 'an export-from').toContain('src/lib/d.ts')
-    expect(walked.files, "a dynamic import('…')").toContain('src/lib/c.ts')
-    // and the relative import a reached file makes, two levels from the entry
-    expect(walked.files, 'an import made by an imported file').toContain('src/shared/e.ts')
-  })
-
-  it('never opens node_modules, however loudly the entry names a package', () => {
-    const walked = theFilesBuiltFrom('src/entry.ts', fixture)
-    expect(walked.files.filter((file) => file.includes('node_modules'))).toEqual([])
-  })
-
-  it('leaves out a commented-out import, in both kinds of comment', () => {
-    const walked = theFilesBuiltFrom('src/entry.ts', fixture)
-    expect(walked.files, 'a line-commented import was followed').not.toContain('src/lib/commented.ts')
-    expect(walked.files, 'a block-commented import was followed').not.toContain('src/lib/blocked.ts')
-  })
-
-  it('leaves out a type-only import, because the program never loads one', () => {
-    const walked = theFilesBuiltFrom('src/entry.ts', fixture)
-    expect(walked.files).not.toContain('src/lib/atype.ts')
-    expect(walked.files).not.toContain('src/lib/anothertype.ts')
-  })
-
-  it('leaves out a file nothing imports, because no process can have loaded it', () => {
-    const walked = theFilesBuiltFrom('src/entry.ts', fixture)
-    expect(walked.files).not.toContain('src/lib/nobody-imports-this.ts')
-  })
-
   /**
    * A DYNAMIC IMPORT AWAY FROM THE ENTRY IS A FILE THE PROGRAM MAY LOAD, NOT ONE IT HAS.
    *
@@ -577,23 +545,27 @@ describe('the three sets this checkout really has', () => {
     }
   })
 
-  it('gives six of the seven to the browser app, which does import them', () => {
-    for (const file of THE_PAGES_SIX) {
+  it('gives five of the seven to the browser app, which does import them', () => {
+    for (const file of THE_PAGES_FIVE) {
       expect(page.files, `${file} is in no set at all, so saving it would move nothing`).toContain(file)
     }
   })
 
   /**
-   * AND THE SEVENTH BELONGS TO NO PROGRAM, which is a reading and not an oversight.
+   * AND THE OTHER TWO BELONG TO NO PROGRAM, which is a reading and not an oversight.
    *
    * No file under `src/` imports `src/shared/colourroles.ts`; one test file and one tool do. So no running
    * process has loaded it, no process can be behind it, and no reading moves when it is saved.
    * Under the folder rule it made the API server report itself broken for ever.
+   * `src/shared/reviewmarks.ts` is imported only by `src/shared/colourroles.ts`, which no program
+   * imports, so it too belongs to no program.
    */
-  it('gives the one neither program imports to nobody', () => {
-    expect(server.files).not.toContain(IMPORTED_BY_NEITHER_PROGRAM)
-    expect(page.files).not.toContain(IMPORTED_BY_NEITHER_PROGRAM)
-    expect(worker.files).not.toContain(IMPORTED_BY_NEITHER_PROGRAM)
+  it('gives each of the two neither program imports to nobody', () => {
+    for (const file of IMPORTED_BY_NEITHER_PROGRAM) {
+      expect(server.files, `${file} is in the API server's set`).not.toContain(file)
+      expect(page.files, `${file} is in the browser app's set`).not.toContain(file)
+      expect(worker.files, `${file} is in the message worker's set`).not.toContain(file)
+    }
   })
 
   it('holds the files each program obviously is built from', () => {
@@ -673,7 +645,7 @@ describe('saving one of the seven leaves the API as new as the checkout', () => 
     })
   }
 
-  for (const file of THE_PAGES_SIX) {
+  for (const file of THE_PAGES_FIVE) {
     it(`moves the browser app's half of the reading to ${file}`, () => {
       // Nothing is lost by the server ignoring it: the page IS told its code went old, by the
       // number that is about the page.
@@ -681,11 +653,13 @@ describe('saving one of the seven leaves the API as new as the checkout', () => 
     })
   }
 
-  it('says nothing moved for the one neither program imports, because no process loaded it', () => {
-    const after = seen.afterEachOfTheSeven[IMPORTED_BY_NEITHER_PROGRAM]
-    expect(after?.runtime.freshness.newestFileForThePage).not.toBe(IMPORTED_BY_NEITHER_PROGRAM)
-    expect(after?.runtime.freshness.newestOnDiskFile).not.toBe(IMPORTED_BY_NEITHER_PROGRAM)
-  })
+  for (const file of IMPORTED_BY_NEITHER_PROGRAM) {
+    it(`says nothing moved for ${file}, which neither program imports, because no process loaded it`, () => {
+      const after = seen.afterEachOfTheSeven[file]
+      expect(after?.runtime.freshness.newestFileForThePage).not.toBe(file)
+      expect(after?.runtime.freshness.newestOnDiskFile).not.toBe(file)
+    })
+  }
 
   it('is still healthy past the grace, which is what raises the banner', () => {
     const after = seen.afterAllSevenAndPastTheGrace

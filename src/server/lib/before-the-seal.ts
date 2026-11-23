@@ -49,12 +49,17 @@ import { basename, dirname, join } from 'node:path'
 import { isDeepStrictEqual } from 'node:util'
 import { and, eq, isNull, sql } from 'drizzle-orm'
 import { gatePosition } from '../../config/settings.mjs'
+import { actorFrom } from './http.ts'
+import { runForQuery } from '../knowledge/library.ts'
+import { ratingReminder } from '../knowledge/ratings.ts'
+import { KNOWLEDGE_WORDS } from '@shared/words/en-wave-13u.ts'
 import { gateMet, gateMetOnceTheWriteIsTakenBack, gateLookedAgain } from './gate-counts.ts'
 import { db, sqlite } from '../db/client.ts'
 import { saysStillGoing } from '../../config/still-going.mjs'
 import { recordIncompleteness } from '@shared/kinds.ts'
 import { isARecordId } from '@shared/messages.ts'
 import { readRefusal } from '@shared/releasing.ts'
+import { NOTHING_FITS_FIELD, PAGE_KINDS, theNothingFitsEntries } from '@shared/what-a-record-names.ts'
 import { records, STORED_FIELDS } from '../db/schema.ts'
 import { SYSTEM_LINES } from '@shared/groups.ts'
 import { moleOffice } from '@shared/participants.ts'
@@ -123,7 +128,7 @@ import {
   type RecordPatch,
 } from './records.ts'
 import { PanelError } from './panel-error.ts'
-import { theMarkOfAUseLine } from './toolset.ts'
+import { aStoredProof, theMarkOfAUseLine } from './toolset.ts'
 import { captureGit, runSubmitsWork, theBaseARunNames, theBranchASealReadsOff } from './sealed-tip.ts'
 import {
   aFinishingPassRuns,
@@ -138,6 +143,7 @@ import {
   type AGitReadingFor,
 } from './a-finish-reads-git-apart.ts'
 import type { ACarriedGitFacts, AGitFactsAsk } from './the-seal-read-apart-thread.ts'
+import { theOwnCommitsAskOf, theOwnCommitsJudged, theRunsOwnCommitsRead, type AnOwnCommitsAsk } from './a-runs-own-commits.ts'
 import { versionOf } from './version.ts'
 import { theAgentARunServes } from './the-agent-a-run-serves.ts'
 import { delegationColumn } from './delegation.ts'
@@ -167,10 +173,21 @@ function theCommitsOf(
   cutFrom: string | null,
   startedMs: number | null,
   capture: typeof captureGit,
+  own?: AnOwnCommitsAsk,
 ): { git: TheRunsCommitsCarried | { couldNotRead: string }; head: string | null } {
   // ANY GIT FAILURE IS SAID IN `notChecked` and the reminder is still given. The seal reads git again and refuses for itself.
   try {
     const { forkBase, commit: head } = capture(directory, cutFrom, [])
+    // A RUN WHOSE FILING COMMIT THE OFFICE READ is judged on its own commits that are not carried, as its seal counts them.
+    // One moved to another repository is judged as a run with no filing commit is, as its seal is read (choice 6), so a
+    // refusal that came before the run's own commits were counted still comes first.
+    const read = own === undefined ? null : theRunsOwnCommitsRead(own)
+    if (read !== null && !('otherRepository' in read)) {
+      if ('unread' in read) return { git: { couldNotRead: read.unread }, head: null }
+      if ('noBase' in read) return { git: { couldNotRead: read.noBase }, head: null }
+      const judged = new Set(theOwnCommitsJudged(read).map((one) => one.commit))
+      return { git: theCommitsCarriedReadWith((...args) => git(directory, ...args), forkBase, head, startedMs, judged), head }
+    }
     return { git: theCommitsCarriedReadWith((...args) => git(directory, ...args), forkBase, head, startedMs), head }
   } catch (err) {
     return { git: { couldNotRead: err instanceof Error ? err.message : String(err) }, head: null }
@@ -182,10 +199,12 @@ function theCommitsOf(
  * write names when the office would look at the other worktrees too, and whether the copied test words are read. Null
  * when the run names no working directory, so there is no git to read.
  */
-export function theGitFactsAskOf(run: PanelRecord, look: { tip: string | null } | undefined, copied: boolean): AGitFactsAsk | null {
+export function theGitFactsAskOf(run: PanelRecord, look: { tip: string | null } | undefined, copied: boolean, fromStart = false): AGitFactsAsk | null {
   const directory = typeof run.data['workingDirectory'] === 'string' ? run.data['workingDirectory'] : null
   if (directory === null) return null
-  return { directory, cutFrom: theBaseARunNames(run.data), startedMs: whenTheRunStarted(run), look: look ?? null, kind: theSubmissionProposedBy(run), copied }
+  const cutFrom = theBaseARunNames(run.data)
+  const own = fromStart ? null : theOwnCommitsAskOf(run.id, run.data, cutFrom)
+  return { directory, cutFrom, startedMs: whenTheRunStarted(run), look: look ?? null, kind: theSubmissionProposedBy(run), copied, ...(own === null ? {} : { own }) }
 }
 
 /** Whether the facts of `ask` look at the other worktrees, once its commits were read as `read` holds them. */
@@ -199,7 +218,7 @@ function theFactsLookElsewhere(ask: AGitFactsAsk, read: Pick<ACarriedGitFacts, '
  * seal-read thread asks it with its own `capture`, so one walk of a tree serves the facts and the seal.
  */
 export function theGitFactsReadNow(ask: AGitFactsAsk, capture: typeof captureGit = captureGit): ACarriedGitFacts {
-  const read = theCommitsOf(ask.directory, ask.cutFrom, ask.startedMs, capture)
+  const read = theCommitsOf(ask.directory, ask.cutFrom, ask.startedMs, capture, ask.own)
   const elsewhere = theFactsLookElsewhere(ask, read) && !('couldNotRead' in read.git) && read.head !== null
     ? theOtherWorktreesCarrying(ask.directory, read.head, read.git.commits.length, ask.cutFrom, ask.startedMs, ask.look?.tip ?? null)
     : undefined
@@ -224,6 +243,7 @@ export async function theGitFactsReadHere(ask: AGitFactsAsk, capture: typeof cap
  */
 export const aGitReadingFor: AGitReadingFor = (have, read, want) => {
   if (have.directory !== want.directory || have.cutFrom !== want.cutFrom) return null
+  if (JSON.stringify(have.own ?? null) !== JSON.stringify(want.own ?? null)) return null
   if (have.startedMs !== want.startedMs && !theSameOwnCommitsFrom(have.startedMs, want.startedMs, read)) return null
   if (want.copied && !have.copied) return null
   const { elsewhere, copiedTestLiterals, ...commits } = read
@@ -373,8 +393,7 @@ function theOtherReportsCalled(reports: readonly PanelRecord[]): Record<string, 
 function theNamedTestsUsedBy(run: PanelRecord): StoredToolUse[] {
   const rows = sqlite.prepare('SELECT seq, at, tool, said, actor_type AS actorType, actor_id AS actorId, moved_at AS movedAt, proof FROM tool_uses WHERE run_id = ? AND seq < ? ORDER BY seq').all(run.id, Number.MAX_SAFE_INTEGER) as { seq: number; at: string; tool: string; said: string; actorType: string | null; actorId: string | null; movedAt: string | null; proof: string | null }[]
   return rows.flatMap((one): StoredToolUse[] => {
-    const proof = one.proof
-    if (proof !== null && proof !== 'matches' && proof !== 'none' && proof !== 'does not match') throw new PanelError(`A use row holds the proof answer ${JSON.stringify(proof)}, which the use door never writes.`, 500)
+    const proof = aStoredProof(one.proof)
     if (one.tool !== 'named-tests') return []
     return [{ seq: one.seq, at: one.at, tool: one.tool, said: one.said, by: one.actorType === null || one.actorId === null ? null : { type: one.actorType, id: one.actorId }, movedAt: one.movedAt, proof, mark: theMarkOfAUseLine(proof) }]
   })
@@ -560,18 +579,26 @@ function theEarlierRefusalOf(run: PanelRecord): TheFactsBeforeTheSeal['earlierRe
 }
 
 /**
- * EACH REPORT FILED IN THE RUN, and whether it is linked `about` a run. Filed in the run is what the check reads: a
- * create row of the change log that carries the run (`theRecordsFiledInTheRun` in ./inspection.ts).
+ * EACH REPORT FILED IN THE RUN, whether it is linked `about` a run, whether it is linked `about` a live page, and whether
+ * it holds a nothingFits entry. Filed in the run is what the check reads: a create row of the change log that carries the
+ * run (`theRecordsFiledInTheRun` in ./inspection.ts). One statement reads both kinds of link, so the count of
+ * statements does not grow with the reports.
  */
 function theReportsFiledIn(run: PanelRecord): NonNullable<TheFactsBeforeTheSeal['reportsFiled']> {
   const ids = [...theRecordsFiledInTheRun(run.id)]
   const held = getRecordsWithIds(ids)
-  const about = new Set((sqlite.prepare("SELECT l.from_id AS id FROM links l JOIN records r ON r.id = l.to_id WHERE l.from_id IN (SELECT value FROM json_each(?)) AND l.type = 'about' AND l.inferred = 0 AND l.from_id <> l.to_id AND r.kind = 'session'").all(JSON.stringify(ids)) as { id: string }[]).map((row) => row.id))
+  const linked = new Map((sqlite.prepare(
+    "SELECT l.from_id AS id, MAX(r.kind = 'session') AS run, MAX(r.kind IN (SELECT value FROM json_each(?)) AND r.deleted_at IS NULL) AS page " +
+      "FROM links l JOIN records r ON r.id = l.to_id WHERE l.from_id IN (SELECT value FROM json_each(?)) AND l.type = 'about' AND l.inferred = 0 " +
+      'AND l.from_id <> l.to_id GROUP BY l.from_id',
+  ).all(JSON.stringify(PAGE_KINDS), JSON.stringify(ids)) as { id: string; run: number; page: number }[]).map((row) => [row.id, row]))
   return ids.map((id) => held.get(id) ?? null)
     .filter((one): one is PanelRecord => one !== null && one.deletedAt === null && one.kind === 'report')
     .map((report) => ({
       id: report.id,
-      aboutARun: about.has(report.id),
+      aboutARun: linked.get(report.id)?.run === 1,
+      aboutAPage: linked.get(report.id)?.page === 1,
+      namesNothingFits: theNothingFitsEntries(report.data[NOTHING_FITS_FIELD]).length > 0,
     }))
 }
 
@@ -611,8 +638,8 @@ function thePackagesTheRunHolds(run: PanelRecord): NonNullable<TheFactsBeforeThe
  * With `look`, the tip a sealing write names or null, the office also looks at the repository's other worktrees
  * (`theOtherWorktreesCarrying`) when it read the working directory itself and the run seals a branch.
  */
-export function theFactsBeforeTheSealOf(run: PanelRecord, git?: TheFactsBeforeTheSeal['git'], look?: { tip: string | null }): TheFactsBeforeTheSeal {
-  const ask = git === undefined ? theGitFactsAskOf(run, look, false) : null
+export function theFactsBeforeTheSealOf(run: PanelRecord, git?: TheFactsBeforeTheSeal['git'], look?: { tip: string | null }, fromStart = false): TheFactsBeforeTheSeal {
+  const ask = git === undefined ? theGitFactsAskOf(run, look, false, fromStart) : null
   return theFactsWith(run, git, ask === null ? null : theGitFactsReadNow(ask))
 }
 
@@ -639,9 +666,9 @@ async function theFactsReadApart(req: FastifyRequest, run: PanelRecord, look: { 
  * THE FACTS AT THE WRITE, inside a finishing write's pass: the git the thread read for the pass, and everything else read
  * here. Null outside a pass, where the caller reads them as it always did.
  */
-function theFactsAtTheWrite(run: PanelRecord, look: { tip: string | null } | undefined, copied: boolean): TheFactsBeforeTheSeal | null {
+function theFactsAtTheWrite(run: PanelRecord, look: { tip: string | null } | undefined, copied: boolean, fromStart = false): TheFactsBeforeTheSeal | null {
   if (!aFinishingPassRuns()) return null
-  const ask = theGitFactsAskOf(run, look, copied)
+  const ask = theGitFactsAskOf(run, look, copied, fromStart)
   return theFactsWith(run, undefined, ask === null ? null : theGitFactsAtTheWrite(ask, aGitReadingFor))
 }
 
@@ -823,7 +850,13 @@ export async function theReminderBeforeTheSealOf(
   const migrations = theItemsNoSealPasses(items, { branch })
   const refusing = items.filter((one) => migrations.includes(one) || (position === 'block' && anItemBlockJudges(one)))
   const refuses = refusing.map((one) => ({ key: one.key, rule: whyItRefuses(one) }))
-  const says = whatTheReminderSays(items, refusing.length)
+  let knowledge: string | null = null
+  try {
+    if (asked !== undefined && runForQuery(actorFrom(asked.req), run.workspaceId) === run.id) knowledge = ratingReminder(run.id)
+  } catch (err) {
+    knowledge = KNOWLEDGE_WORDS.ratingReminderUnreadable(err instanceof Error ? err.message : String(err))
+  }
+  const says = whatTheReminderSays(items, refusing.length) + (knowledge === null ? '' : ` ${knowledge}`)
   const purpose = thePurposeOfARound(run)
   const design = whatADesignReminderWouldSay(run)
   if (items.length > 0) gateMet('before-the-seal', position)
@@ -875,10 +908,16 @@ export async function theReminderBeforeTheSealOf(
  * reminder's items were not kept or git cannot be read now, because then an item missing from what is found would say
  * nothing about the run.
  */
-async function whatTheSealFound(req: FastifyRequest, run: PanelRecord, items: ANamedItem[] | null, sealedTip: string): Promise<AtTheSeal> {
+async function whatTheSealFound(req: FastifyRequest, run: PanelRecord, beforeSeal: PanelRecord, afterSeal: string | null, items: ANamedItem[] | null, sealedTip: string): Promise<AtTheSeal> {
   // NO TIP: the seal took the working directory's HEAD, and refused a named tip that differed from it. `sealedTip` is the
   // seal record's id, not a commit.
-  return { at: localStamp(new Date()), sealedTip, ...(await whatIsFoundOfTheNamedItems(req, run, items, null, 'what the seal found')) }
+  // THE RUN IS ASKED AS IT WAS BEFORE THIS SEAL, naming the seal before it or none. Its own commits are then judged as the
+  // seal judged them; asked with this seal, every commit the seal holds would be read as carried by it.
+  // The seal also stores an end HEAD. Restore the end the write judged, so the question matches its reading and does
+  // not substitute the new end for a prior boundary (or for the HEAD the write was about to seal).
+  const { sealedTip: _sealed, endHead: _end, ...rest } = run.data
+  const before = { ...run, data: { ...rest, ...(afterSeal === null ? {} : { sealedTip: afterSeal }), ...(beforeSeal.data['endHead'] === undefined ? {} : { endHead: beforeSeal.data['endHead'] }) } }
+  return { at: localStamp(new Date()), sealedTip, ...(await whatIsFoundOfTheNamedItems(req, before, items, null, 'what the seal found')) }
 }
 
 /**
@@ -1027,12 +1066,14 @@ function aCertainNamedItemRefusesTheSeal(items: readonly ANamedItem[]): PanelErr
  * GIT IT CANNOT READ REFUSES NO MIGRATION ITEM HERE. There is no reading to judge, and the seal itself refuses
  * unreadable git.
  */
-export function refuseTheSealOverAFault(run: PanelRecord): void {
+export function refuseTheSealOverAFault(run: PanelRecord, filedFinished = false): void {
   // INSIDE A FINISHING WRITE (./a-finish-reads-git-apart.ts) the checks the reminder left are asked again, on the tree the
   // seal reads. The seal's own git is asked only where the seal stands, after every guard of the write.
   if (aFinishingPassRuns()) theChecksLeftForTheWrite(run)
   if (!theSealSealsABranch(run)) return
-  const facts = theFactsAtTheWrite(run, undefined, false) ?? theFactsBeforeTheSealOf(run)
+  // A run filed finished has no boundary before its work. Only its facts use the earlier start-based reading; the
+  // seal's own-commit refusals still use its filing HEAD.
+  const facts = theFactsAtTheWrite(run, undefined, false, filedFinished) ?? theFactsBeforeTheSealOf(run, undefined, undefined, filedFinished)
   const items = theItemsNoSealPasses(whatAnInspectorWouldMostLikelyRefuse(facts).items, { branch: true })
   if (items.length === 0) return
   throw gateMetOnceTheWriteIsTakenBack(aMigrationItemRefusesTheSeal(items), () => gateMet('before-the-seal', 'block'))
@@ -1090,10 +1131,10 @@ export async function keepWhatTheSealDidWithTheReminder(
     const held = readRemindedBeforeTheSeal(sealed.data[REMINDED_BEFORE_THE_SEAL])
     const line = held !== null && held.reminded && held.afterSeal === afterSeal ? null : theLineThatReminded(before, afterSeal)
     if (held !== null && held.reminded && held.afterSeal === afterSeal) {
-      value = { ...held, atTheSeal: await whatTheSealFound(req, sealed, held.items, sealedTip) }
+      value = { ...held, atTheSeal: await whatTheSealFound(req, sealed, before, afterSeal, held.items, sealedTip) }
     } else if (line !== null) {
       // REMINDED, AND WHAT IT NAMED WAS NOT KEPT: the line is there and the field is not, or holds an earlier seal's.
-      value = { reminded: true, at: getRecord(line)?.createdAt ?? 'unknown', afterSeal, line, chapters: null, items: null, atTheSeal: await whatTheSealFound(req, sealed, null, sealedTip) }
+      value = { reminded: true, at: getRecord(line)?.createdAt ?? 'unknown', afterSeal, line, chapters: null, items: null, atTheSeal: await whatTheSealFound(req, sealed, before, afterSeal, null, sealedTip) }
     } else {
       const because = requestsWithTheGateOff.has(req) ? 'theGateIsOff' : why.launcherAskedForNone ? 'theLauncherAskedForNone' : why.noAgent ? 'noAgent' : !theRunsOwnRequest(req, before) ? 'notTheRunsOwnKey' : 'unknown'
       value = { reminded: false, at: localStamp(new Date()), sealedTip, because }

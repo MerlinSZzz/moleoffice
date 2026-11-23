@@ -14,9 +14,9 @@ import { OfficeMap, releaseMapSurfaces } from './map-view.ts'
 import { labelWait } from './nameplates.ts'
 import { SlicedBuild } from './layout-index.ts'
 import { OwnedBuild } from './owned-build.ts'
-import { ContactWalks, idleMotionForMap, occupiedBodies, browserClock, DEFAULT_MOLE_SCALE, type IdleActor, type IdleStanding, type MovingContact } from './walks.ts'
+import { ContactWalks, idleMotionForMap, occupiedBodies, browserClock, DEFAULT_MOLE_SCALE, sittingSpacing, type IdleActor, type IdleStanding, type MovingContact } from './walks.ts'
 import { chooseIdleOuting, contactPlace, idleStays } from './idle-places.ts'
-import { idleOutingsOn, outingChances } from './idle-outings.ts'
+import { idleOutingsOn, outingChances, sittingChances } from './idle-outings.ts'
 import type { IdleRoute } from './idle-route.ts'
 import { asleepReading, type AsleepReading } from './asleep-reading.ts'
 import { idleEligible } from './mole-state.ts'
@@ -75,16 +75,46 @@ deferStart(window, () => {
   const overview = element('section', '', 'map-overview'), mapTools = element('div', '', 'map-tools')
   const mapStatus = element('p', words.en.waiting, 'small-note'), motionStatus = element('p', '', 'small-note')
   const namesNote = label('p', 'namesLeftOut', 'small-note'); namesNote.hidden = true
-  const zoomOut = button('zoomOut', () => map?.scale(.8)), zoomIn = button('zoomIn', () => map?.scale(1.25)), fit = button('fit', () => map?.fit())
-  const locate = button('locate', () => { if (selected) { map?.cancelFollow(); map?.locate(selected) } })
+  const view = element('div', '', 'map-viewport'); view.tabIndex = 0; view.setAttribute('role', 'region')
+  const help = label('p', 'controls', 'small-note'); help.id = 'map-help'; view.setAttribute('aria-describedby', help.id)
+  let fitted = false, fittedWidth = 0, fittedHeight = 0
+  function refit(): void {
+    if (!map) return
+    map.fit(); fittedWidth = view.clientWidth; fittedHeight = view.clientHeight
+  }
+  /** The map frame ends at or above the window's bottom edge. It takes the room below its own top,
+   * up to its design height; when that room is too small to use, it keeps the design height and the
+   * page reveals it, so the whole frame is in the window and the page below it scrolls. */
+  function fitFrameToWindow(): void {
+    if (view.hidden) return
+    const top = view.getBoundingClientRect().top + window.scrollY
+    const design = Math.min(760, Math.max(420, window.innerHeight * .66))
+    const room = window.innerHeight - top
+    const height = room >= 240 ? Math.min(design, room) : Math.min(design, window.innerHeight)
+    if (!(Math.abs(Number.parseFloat(view.style.height) - height) < .5)) {
+      view.style.height = `${Math.max(0, height)}px`
+      if (fitted) refit()
+    }
+  }
+  let frameRevealed = false
+  /** Bring the frame fully into the window once, or when Fit asks again. It scrolls only when some
+   * of the frame is outside the window, so a frame already in view does not move the page. */
+  function revealFrame(force = false): void {
+    if (view.hidden || frameRevealed && !force) return
+    frameRevealed = true
+    const box = view.getBoundingClientRect(), below = box.bottom - window.innerHeight
+    if (below > 0) window.scrollBy(0, below)
+    else if (box.top < 0) window.scrollBy(0, box.top)
+  }
+  const zoomOut = button('zoomOut', () => { fitted = false; map?.scale(.8) }), zoomIn = button('zoomIn', () => { fitted = false; map?.scale(1.25) }), fit = button('fit', () => { fitFrameToWindow(); fitted = !!map; refit(); revealFrame(true) })
+  const locate = button('locate', () => { if (selected) { fitted = false; map?.cancelFollow(); map?.locate(selected) } })
   const follow = button('follow', () => {
     if (!selected) return
+    fitted = false
     if (quiet || current?.context?.reducedMotion) { map?.locate(selected); return }
     following = !following; map?.setFollow(following ? selected : null); updateControls()
   })
   const waveButton = button('wavePreview', () => { wave = wave === selected ? null : selected; updateScene(); updateControls() })
-  const view = element('div', '', 'map-viewport'); view.tabIndex = 0; view.setAttribute('role', 'region')
-  const help = label('p', 'controls', 'small-note'); help.id = 'map-help'; view.setAttribute('aria-describedby', help.id)
   mapTools.append(zoomOut, zoomIn, fit, locate, follow, waveButton)
   overview.append(label('h2', 'map'), mapTools, view, mapStatus, namesNote, help)
   const talkDetails = element('details'), talkSummary = label('summary', 'talkView'), walkNotes = element('div')
@@ -115,6 +145,19 @@ deferStart(window, () => {
   content.append(listPanel, detailPanel)
   const peoplePanel = element('section', '', 'people-hub')
   app.replaceChildren(header, controls, status, artStatus, count, presenceCount, legend, overview, talkDetails, roomDetails, preview, content, peoplePanel)
+  fitFrameToWindow()
+  // Observe only the material that can move the frame, and the frame itself for width changes.
+  const frameSize = new ResizeObserver(() => {
+    if (closed) return
+    fitFrameToWindow()
+    if (fitted && (view.clientWidth !== fittedWidth || view.clientHeight !== fittedHeight)) refit()
+  })
+  for (const node of [header, controls, status, artStatus, count, presenceCount, legend, mapTools, overview.firstElementChild!]) frameSize.observe(node, { box: 'border-box' })
+  frameSize.observe(view)
+  view.addEventListener('wheel', event => { if (event.deltaY) fitted = false }, { passive: true })
+  view.addEventListener('keydown', event => { if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', '+', '=', '-'].includes(event.key)) fitted = false })
+  view.addEventListener('pointermove', event => { if (event.buttons) fitted = false })
+  view.addEventListener('scroll', () => { if (view.scrollLeft !== 0 || view.scrollTop !== 0) fitted = false })
 
   const geometry = new GeometryClient(() => blobWorker(new URL(workerFile, document.baseURI).href), () => { updateScene(); updateRoomList(); updateMotion() })
   const occupied = (except: string, standing: readonly IdleStanding[] = []): Rect[] | null => {
@@ -132,7 +175,7 @@ deferStart(window, () => {
     const home = map?.drawnFigure(occupant.key), body = map?.motionBounds(occupant.key), point = actors.find(actor => actor.id === occupant.key)?.point
     return home && body ? [{ id: occupant.key, out: !!point, rect: translateBody(body, point ?? home) }] : []
   })
-  let contactPoints: MovingContact[] = [], idlePoints: MovingContact[] = []
+  let contactPoints: MovingContact[] = [], idlePoints: MovingContact[] = [], sittingFailedKey = ''
   const displayMotion = () => map?.animate(talkDetails.open ? contactPoints : idlePoints)
   const waitAtSeat = (id: string, points: readonly Point[]) => {
     const layout = geometry.snapshot().layout
@@ -160,10 +203,10 @@ deferStart(window, () => {
   () => {
     // A planned outing whose route fails moves nobody and shows nothing, as nobody asked for it.
     const hooks = screenTestHooks(); if (hooks) hooks.idleDebug = { ...(hooks.idleDebug as object | undefined), state: idle.snapshot() }
-  }, outingChances(screenTestHooks()?.idleSeed), waitAtSeat)
+  }, outingChances(screenTestHooks()?.idleSeed), waitAtSeat, sittingChances(screenTestHooks()?.idleSeed))
 
   function resetScene(): void {
-    idle.update({ enabled: false, agents: [], places: [] }); walks.clear(); map?.dispose(); map = null; modelLayout = ''; following = false; wave = null; namesNote.hidden = true
+    idle.update({ enabled: false, agents: [], places: [] }); walks.clear(); map?.dispose(); map = null; modelLayout = ''; following = false; wave = null; namesNote.hidden = true; frameRevealed = false; fitted = false
   }
   function boundaryFor(snapshot: BridgeSnapshot): void {
     const next = JSON.stringify([snapshot.generation, snapshot.context])
@@ -218,12 +261,20 @@ deferStart(window, () => {
     // where it is, its moles would jump back to their desks.
     const homeward = idleMayRun && !idleEnabled && idlePoints.length > 0
     if (!homeward && (!idleEnabled || !selectedIdle.length)) map?.clearIdleLooks()
-    const posesReady = idleEnabled && selectedIdle.length > 0 && !!map?.readyIdleLooks(selectedIdle.map(agent => agent.id), updateMotion)
+    const sittingKey = JSON.stringify([idle.destinationOffset, selectedIdle.map(agent => agent.id)])
+    const wantsSitting = selectedIdle.length === 2 && idle.wantsToSit && sittingFailedKey !== sittingKey
+    let posesReady = idleEnabled && selectedIdle.length > 0 && !!map?.readyIdleLooks(selectedIdle.map(agent => agent.id), updateMotion, wantsSitting)
+    const sitting = wantsSitting && posesReady ? map?.readyIdleSitting(selectedIdle.map(agent => agent.id), updateMotion) : 'loading'
+    if (wantsSitting && sitting === 'failed') {
+      sittingFailedKey = sittingKey
+      posesReady = !!map?.readyIdleLooks(selectedIdle.map(agent => agent.id), updateMotion)
+    }
+    const sittingReady = wantsSitting && sitting === 'ready'
     const bodies = selectedIdle.map(agent => selectedBodies.get(agent.id)).filter((body): body is Rect => !!body)
     const furniture = map?.motionFurnitureSnapshot()
     // Places near the selected group, on the walkable floors and obstacles the worker's route search
     // uses, not on the drawing layout, which leaves them out; with none, the turn is refused and recorded.
-    const ready = boundsKnown && posesReady && !!furniture && !!ground && bodies.length === selectedIdle.length
+    const ready = boundsKnown && posesReady && (!wantsSitting || sitting !== 'loading') && !!furniture && !!ground && bodies.length === selectedIdle.length
     const paperClearAt = (points: readonly { x: number; y: number }[], groupBodies: readonly Rect[], blockers: readonly Rect[]): boolean => {
       if (points.length !== 2) return true
       const playBodies = points.map((point, i) => translateBody(groupBodies[i]!, point))
@@ -231,7 +282,9 @@ deferStart(window, () => {
     }
     const walkers = ready ? selectedIdle.map((agent, i) => ({ id: agent.id, foot: agent.foot, body: bodies[i]!, station: map?.ownStation(agent.id) })) : []
     const blockers = ready ? [...others, ...furniture!, ...ground!.obstacles] : []
-    const outing = ready ? chooseIdleOuting(ground!, walkers, blockers, point => !!map?.pointVisible(point), idle.destinationOffset, paperClearAt) : null
+    const outing = ready ? sittingReady && bodies.length === 2
+      ? chooseIdleOuting(ground!, walkers, blockers, point => !!map?.pointVisible(point), idle.destinationOffset, undefined, sittingSpacing(bodies[0]!, bodies[1]!))
+      : chooseIdleOuting(ground!, walkers, blockers, point => !!map?.pointVisible(point), idle.destinationOffset, paperClearAt) : null
     // The moles of the group that do not set out, each with its reason, worked out as the outing works it out.
     const stays = ready ? idleStays(ground!, walkers, blockers) : undefined
     const places = outing?.places ?? []
@@ -239,7 +292,7 @@ deferStart(window, () => {
     const playBodies = places.map((point, i) => translateBody(selectedBodies.get(outing!.walkers[i]!)!, point))
     const playBlockers = places.length === 2 && furniture && ground ? [...others, ...playBodies, ...furniture, ...ground.obstacles] : []
     const paperBlocked = places.length === 2 && !!map ? map.paperBlockers(places[0]!, playBlockers) : null
-    const paper = places.length === 2 && !!furniture && !!ground && !!map?.paperClear(places[0]!, playBlockers)
+    const paper = !sittingReady && places.length === 2 && !!furniture && !!ground && !!map?.paperClear(places[0]!, playBlockers)
     // The reason a shared paper is or is not drawn, for the test hook and the capture's own
     // close-up check: its whole arc must be clear of every body, piece of furniture and obstacle.
     const paperReason = {
@@ -253,7 +306,7 @@ deferStart(window, () => {
     // Where the outing meets, the facility of its room or why at none. With no outing planned there is no meeting.
     const meeting = outing?.meeting
     const debug = screenTestHooks(); if (debug) debug.idleDebug = { idleEnabled, posesReady, boundsKnown, selectedIdle, places, walkers: outing?.walkers, meeting, stays, furniture: furniture?.length, paper: paperReason, state: idle.snapshot() }
-    if (!homeward) idle.update({ enabled: idleEnabled, agents: eligible, places, walkers: outing?.walkers, refusal: ready && !outing ? 'no-place' : undefined, paper, occupancy: (model?.occupants ?? []).flatMap(occupant => { const point = map?.drawnPoint(occupant.key); return point ? [point] : [] }) })
+    if (!homeward) idle.update({ enabled: idleEnabled, agents: eligible, places, walkers: outing?.walkers, refusal: ready && !outing ? 'no-place' : undefined, paper, sittingReady, occupancy: (model?.occupants ?? []).flatMap(occupant => { const point = map?.drawnPoint(occupant.key); return point ? [point] : [] }) })
     walks.setEnabled(motionEnabled && talkDetails.open && healthy && furnitureReady)
     if (current?.views.talk.data?.withdrawn.more) walks.clear()
     motionStatus.textContent = current?.context?.reducedMotion ? t().reduced : quiet ? t().quietNote : `${t().contactCount}: ${contactCount}`
@@ -341,13 +394,15 @@ deferStart(window, () => {
       selectListed(); updateControls(); return
     }
     view.hidden = false
-    if (!map) map = new OfficeMap(view, pin, inspect, () => { walks.recheck(); updateMotion() }, () => { following = false; updateControls() }, selectAgents, { namesChanged: leftOut => { namesNote.hidden = !leftOut }, layoutDrawn: () => { followDrawnLayout(); walks.recheck(); updateMotion() } })
+    fitFrameToWindow()
+    if (!map) { map = new OfficeMap(view, pin, inspect, () => { walks.recheck(); updateMotion() }, () => { following = false; updateControls() }, selectAgents, { namesChanged: leftOut => { namesNote.hidden = !leftOut }, layoutDrawn: () => { followDrawnLayout(); walks.recheck(); updateMotion() } }); revealFrame() }
     map.update(layout, model, { project, search, language: current.context.language, theme: current.context.theme, selected, workAvailable: current.views.work.data !== null, still: quiet || current.context.reducedMotion, wave, online: onlineState(), asleep: asleepState().ids, asleepMadeUp: asleepState().from === 'picture' }, pack)
     followDrawnLayout()
     updateMotion()
     walks.recheck()
     showMapStatus(geometry.snapshot().status === 'loading' ? t().mapLoading : '')
     updateControls()
+    fitFrameToWindow()
   }
   /** Contact walks belong to the layout they were drawn in. The map may draw a new one later than it is
    * given, when the trips underway end, so walks end when the drawn layout changes, not the given one. */
@@ -482,6 +537,7 @@ deferStart(window, () => {
     })
     // The note stands only while some agent on the map has no loaded pair of facts.
     legend.replaceChildren(...legendNodes, ...model === null || model.occupants.some(one => !coherentFacts(one)) ? [element('span', t().partialFacts)] : [])
+    fitFrameToWindow()
     peoplePanel.replaceChildren(element('h2', t().people), element('p', model === null ? t().unavailable : searchContacts(model.people, search).map(one => one.name || one.handle).join(', ') || (search ? t().noContactsFound : t().noContacts)))
     yield
     // Each refresh is its own turn; one large list or room change no longer shares a
@@ -535,13 +591,13 @@ deferStart(window, () => {
   })
   const close = (): void => {
     if (closed) return
-    closed = true; rendering.cancel(); warming.cancel(); preparing.cancel(); visibility.disconnect(); idle.dispose(); walks.dispose(); map?.dispose(); map = null; geometry.dispose(); connection.dispose(); packs.release()
+    closed = true; rendering.cancel(); warming.cancel(); preparing.cancel(); visibility.disconnect(); frameSize.disconnect(); idle.dispose(); walks.dispose(); map?.dispose(); map = null; geometry.dispose(); connection.dispose(); packs.release()
     document.removeEventListener('visibilitychange',updateMotion)
     pack = null; model = null; current = null; models.clear()
     releaseDetailCanvas(); releaseMapSurfaces()
-    window.removeEventListener('pagehide', close); window.removeEventListener('unload', close); window.removeEventListener('keydown', escape); app.replaceChildren()
+    window.removeEventListener('pagehide', close); window.removeEventListener('unload', close); window.removeEventListener('keydown', escape); window.removeEventListener('resize', fitFrameToWindow); app.replaceChildren()
   }
   const escape = (event: KeyboardEvent): void => { if (event.key === 'Escape') { following = false; map?.setFollow(null); updateControls() } }
-  window.addEventListener('keydown', escape)
+  window.addEventListener('keydown', escape); window.addEventListener('resize', fitFrameToWindow)
   window.addEventListener('pagehide', close); window.addEventListener('unload', close)
 })

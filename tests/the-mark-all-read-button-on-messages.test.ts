@@ -46,7 +46,7 @@
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import { liveApp, waitForThePage, type LiveApp } from './helpers.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
-import { DELIVERY } from '../src/shared/messages.ts'
+import { DELIVERY, MESSAGES_PAGE } from '../src/shared/messages.ts'
 import { t } from '../src/shared/i18n.ts'
 
 let app: LiveApp
@@ -210,7 +210,10 @@ it('with a filter on, marks every unread message the filter keeps, on every page
 
   await openThePage()
   await app.page.click('.px-ms-narrow-open')
-  await app.page.locator('.px-ms-filters select').nth(0).selectOption({ label: 'Gauge Z' })
+  // THE SENDER IS CHOSEN IN ITS AGENT PICKER: its name typed in the search box, then its row pressed.
+  const sender = app.page.locator('.px-ms-filters .px-ms-sender')
+  await sender.getByLabel(MESSAGES_PAGE.bySender).fill('Gauge Z')
+  await sender.locator('button.agp-row:has(.agp-name:text-is("Gauge Z"))').click()
   const press = app.page.locator('.px-ms-mark-all .px-btn')
   await expect.poll(async () => await press.textContent(), { timeout: 20_000 }).toBe(t('messages.unread.markAll', { n: 60, count: '60' }))
   await press.click()

@@ -16,7 +16,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { FastifyInstance } from 'fastify'
 
-import { apiApp, freshDb, theAnswerToAWriteInATestOffice, type TestDb } from './helpers.ts'
+import { apiApp, freshDb, theAnswerToAWriteInATestOffice, type TestDb, governsTheWholeProject } from './helpers.ts'
 import { HUMAN_ONLY_KINDS } from '../src/shared/types.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { checkSubtraction, type LeftOutCounts, type LeftOutGroup } from '../src/shared/disclosure.ts'
@@ -192,7 +192,7 @@ describe('one read briefs an arriving agent', () => {
       await post('/api/records', {
         kind: 'decision',
         title: `A decision the owner made, number ${String(n)}`,
-        data: { replaces: [], option_taken: `option ${String(n)}`, decided_by: THE_PERSON },
+        data: { ...governsTheWholeProject(), replaces: [], option_taken: `option ${String(n)}`, decided_by: THE_PERSON },
       })
     }
     const { brief } = await readBrief()
@@ -309,7 +309,7 @@ describe('one read briefs an arriving agent', () => {
       await post('/api/records', {
         kind: 'decision',
         title: `A decision with far too much written about it ${String(n)}`,
-        data: { option_taken: paragraph, replaces: [] },
+        data: { option_taken: paragraph, ...governsTheWholeProject(), replaces: [] },
       })
     }
     const addedOwnerMessageIds: string[] = []

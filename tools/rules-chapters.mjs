@@ -57,11 +57,12 @@ import {
   CHAPTERS_SOURCE,
   CODE_SOURCE,
   RULES_SOURCE,
+  chaptersOfTheAnswer,
   codeOfLawText,
+  TheChaptersAnswerCannotBeUsed,
   withChapterPointers,
 } from '../src/worker/rules.ts'
 import { problemsWithAChapter, contentOfChapter } from '../src/shared/chapter-check.ts'
-import { chaptersFromRecords } from '../src/shared/office-rules.ts'
 import {
   theDefaultSetFromRecords,
   whichTwinsHaveNoChineseFrom,
@@ -106,28 +107,26 @@ async function chapterRecords() {
   const answer = await fetch(`${API}${door}`, { headers: HEADERS, signal: AbortSignal.timeout(15_000) })
   if (!answer.ok) throw new Error(`GET ${door} answered ${String(answer.status)}. Nothing was written. ${SENT.why === null ? '' : `No key was sent, because the environment holds none and ${SENT.why}. `}${String(await answer.text()).slice(0, 600)}`)
   const body = await answer.json()
-  if (!Array.isArray(body.chapters) || !Array.isArray(body.records)) throw new Error(`GET ${door} answered no selected chapter records. Nothing was written.`)
-  if (typeof body.says === 'string' && body.says !== '') process.stdout.write(body.says + '\n')
-  for (const chapter of body.chapters) {
-    if (chapter.inUse === 'shipped') process.stdout.write(`Chapter ${String(chapter.n)} uses shipped neutral English, with no Chinese. Stored records not used: ${chapter.notUsed.records.join(', ')}. ${chapter.notUsed.problems.join(' ')}\n`)
-    if (chapter.inUse === 'none') process.stdout.write(`Chapter ${String(chapter.n)}: this office holds none. It is not exported.\n`)
+  // THE READING IS chaptersOfTheAnswer in src/worker/rules.ts, which a round's start reads the same answer with. Its notes
+  // are printed when the answer was read that far, as before, and a refusal here also says that nothing was written.
+  const says = notes => {
+    if (typeof body.says === 'string' && body.says !== '') process.stdout.write(body.says + '\n')
+    for (const note of notes) process.stdout.write(note + '\n')
   }
-  const chapters = chaptersFromRecords(body.records).sort((a, b) => a.n - b.n)
-  const english = chapter => ({ label: chapter.label, title: chapter.title, conclusion: chapter.conclusion, rules: chapter.rules.map(({ id, heading, text }) => ({ id, heading, text })) })
-  for (const chapter of body.chapters) {
-    const record = chapters.find(one => one.n === chapter.n)
-    if (chapter.inUse === 'none' ? record !== undefined : record === undefined || JSON.stringify(english(contentOfChapter(record))) !== JSON.stringify(english(chapter.chapter))) throw new Error(`GET ${door} gave chapter ${String(chapter.n)} conflicting content. Nothing was written.`)
+  let read
+  try {
+    read = chaptersOfTheAnswer(body, door, CHECKOUT)
+  } catch (error) {
+    if (!(error instanceof TheChaptersAnswerCannotBeUsed)) throw error
+    if (error.notes !== null) says(error.notes)
+    throw new Error(`${error.message} Nothing was written.`)
   }
-  // A chapter may have any number the office selected: the shipped ones and the role chapters'.
-  const numbers = body.chapters.map(chapter => chapter.n)
-  for (const chapter of chapters) {
-    const problems = problemsWithAChapter(chapter.n, contentOfChapter(chapter), chapters, CHECKOUT, undefined, true, numbers)
-    if (problems.length > 0) throw new Error(`GET ${door}: ${problems.join(' ')} Nothing was written.`)
-  }
+  says(read.notes)
   theRecords = body.records
   theSelection = body.chapters
-  return chapters
+  return read.chapters
 }
+
 let theRecords = []
 let theSelection = []
 const chapters = await chapterRecords()

@@ -64,7 +64,7 @@ import {
   type Actor,
 } from './records.ts'
 import { resolveSessionRef } from './resolve-session-ref.ts'
-import { now } from '@shared/now.ts'
+import { clockStamp } from '@shared/time.ts'
 import { PanelError } from './panel-error.ts'
 import { TOOL_KIND } from '@shared/tool-kind.ts'
 import { said } from './refuse-a-restore-that-would-share-a-slug.ts'
@@ -583,7 +583,10 @@ export function writeAUse(input: {
 
   const run = ref.recordId
   assertMayWriteAUseOn(run, input.actor)
-  const use: ToolUse = { at: now(), tool: input.tool, said: line }
+  // THE STAMP AND ITS MOMENT FROM ONE READING OF THE CLOCK (`at_instant`, migration 0358): on the night the clocks go
+  // back the stamp alone cannot say which pass of the hour from 01:00 the use was made in.
+  const reading = clockStamp()
+  const use: ToolUse = { at: reading.stamp, tool: input.tool, said: line }
   const proof = input.proof === undefined
     ? null
     : whatAUseLinesProofShows(input.proof.sent, input.proof.keysHash, { session: asked, tool: body.tool, said: body.said, files: body.files ?? null, tree: body.tree ?? null })
@@ -593,8 +596,8 @@ export function writeAUse(input: {
     const seq = (sqlite.prepare('SELECT coalesce(max(seq), 0) + 1 AS seq FROM tool_uses WHERE run_id = ?').get(run) as { seq: number }).seq
     const useId = anOfficeId()
     sqlite
-      .prepare('INSERT INTO tool_uses (id, workspace_id, run_id, seq, at, tool, said, actor_type, actor_id, moved_at, proof) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?)')
-      .run(useId, stored.workspaceId, run, seq, use.at, use.tool, use.said, input.actor.type, input.actor.id, proof)
+      .prepare('INSERT INTO tool_uses (id, workspace_id, run_id, seq, at, tool, said, actor_type, actor_id, moved_at, proof, at_instant) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)')
+      .run(useId, stored.workspaceId, run, seq, use.at, use.tool, use.said, input.actor.type, input.actor.id, proof, reading.instant)
     if (body.files !== undefined && body.tree !== undefined) {
       const insertFile = sqlite.prepare('INSERT INTO test_file_runs (id, workspace_id, use_id, file, result, seconds, test_file_hash, tree_commit, tree_change) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
       for (const file of body.files) {
@@ -607,7 +610,7 @@ export function writeAUse(input: {
 }
 
 /** A row's proof as the door stored it. Anything else stored there is a broken assumption, and the read fails loudly. */
-function aStoredProof(stored: string | null): StoredToolUse['proof'] {
+export function aStoredProof(stored: string | null): StoredToolUse['proof'] {
   if (stored === null || stored === 'matches' || stored === 'none' || stored === 'does not match') return stored
   throw new PanelError(`A use row holds the proof answer ${JSON.stringify(stored)}, which the use door never writes.`, 500)
 }
@@ -754,11 +757,14 @@ export function confirmACategory(input: {
           decided_by: THE_OWNER,
           authority: 'the owner said so',
           source: `The confirmation of the tool category ${row.id}, through POST /api/toolset/categories/${row.id}/confirm.`,
+          // IT GOVERNS THE CATEGORY IT CONFIRMS, a page of its own (lib/what-a-record-names.ts).
+          governs: [{ record: row.id }],
         },
         actor: input.actor,
         ...(input.writtenFrom === undefined ? {} : { writtenFrom: input.writtenFrom }),
         links: [{ type: 'about', toId: row.id }],
         mustSayWhatItReplaces: true,
+        mustSayWhatItGoverns: true,
         door: `POST /api/toolset/categories/${row.id}/confirm`,
       }).record
     } catch (err) {

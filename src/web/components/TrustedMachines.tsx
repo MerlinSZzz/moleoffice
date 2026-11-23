@@ -9,15 +9,15 @@
  *
  * The trusted machines and addresses could not be set in Settings or on the worlds page.
  * The secretary decided: the machines this office trusts belong to the installation and not to a
- * person's preferences, so the list is SET on the world's page and Settings SHOWS it with a link.
+ * person's preferences, so Settings SHOWS the list with a link. Design C of early idea B9 moved
+ * where it is SET from the world's page to the person's own card, beside their browsers.
  *
  * Both draw this component. `presses` is what tells them apart, and it is a prop rather than two
  * components because a second read-only copy would be one list of machines drawn from two places,
  * drifting the first time somebody changed one — the ninth invariant.
  *
- * WHAT THE LIST DECIDES IS THE SERVER'S SENTENCE. `says` comes back in the reply and is drawn as it
- * arrived. A page that wrote its own would be a second answer to "what does trusting a machine do",
- * and this one is easy to get wrong in a way a reader cannot check: it refuses nothing today.
+ * WHAT THE LIST DECIDES IS THE SERVER'S SENTENCE. `says` comes back in the reply. As decided, the
+ * panel draws no explanation, so it draws neither that sentence nor one of its own.
  */
 
 import { settingsControlWord } from '@shared/settings-declaration.ts'
@@ -28,7 +28,8 @@ import { faultOf, api, errorMessage } from '../api.ts'
 import { useLanguage } from '../lib/language.ts'
 import { TieredPress } from './TieredPress.tsx'
 import { Absence, Btn, ErrorNote, TextArea } from './ui.tsx'
-import { RouteLink, pathFor } from './router.tsx'
+import { RouteLink, whoPath } from './router.tsx'
+import { THE_PERSON } from '@shared/person.ts'
 import type { HowAMachineIsTrusted, TrustedMachine, WhatTheOfficeTrusts } from '@shared/trustedmachines.ts'
 
 /** Every word this component draws that is not read off the reply. */
@@ -71,7 +72,7 @@ export const TRUSTED_WORDS = {
    * the shape docs/UX-CONTRACT.md calls a failed fix: a paragraph explaining what the arrangement
    * should say by itself. The press says it now, and there is nothing left to explain.
    */
-  get setOn(): string { return t(settingsControlWord('settings.trusted', 'settingsPanel.trusted.setOn')) },
+  get setOn(): string { return t(settingsControlWord('settings.trusted', 'w13s.trusted.setOnYourCard')) },
   /** The address the environment named, said where one is. */
   get bound(): string { return t('settingsPanel.trusted.bound') },
 }
@@ -90,7 +91,7 @@ export function TrustedMachines({
   onChanged,
 }: {
   said: WhatTheOfficeTrusts
-  /** True on the world's page, where the list is set. False in Settings, which shows it. */
+  /** True on the person's card, where the list is set. False in Settings, which shows it. */
   presses: boolean
   onChanged: () => void
 }) {
@@ -100,7 +101,6 @@ export function TrustedMachines({
       <style href="mole-office-trusted-machines" precedence="default">
         {TRUSTED_CSS}
       </style>
-      <p className="tm-says">{t('settingsPanel.trusted.says')}</p>
       {said.boundByTheEnvironment === null ? null : (
         <p className="tm-bound">
           <span className="tm-key">{TRUSTED_WORDS.bound}</span>
@@ -111,7 +111,7 @@ export function TrustedMachines({
           told nothing: they are told where to go and taken there in one press. */}
       {presses ? null : (
         <p className="tm-elsewhere">
-          <RouteLink to={pathFor('worlds')}>{TRUSTED_WORDS.setOn}</RouteLink>
+          <RouteLink to={whoPath('person', THE_PERSON)}>{TRUSTED_WORDS.setOn}</RouteLink>
         </p>
       )}
 
@@ -288,7 +288,6 @@ function AddOne({ onChanged }: { onChanged: () => void }) {
  * NO BACKTICK ANYWHERE IN HERE, comments included: this is a template literal inside a .tsx file.
  */
 const TRUSTED_CSS = `
-.tm-says { margin: 0 0 var(--pad); color: var(--text-2); font: var(--fs-1)/var(--lh-read) var(--font-ui); }
 .tm-bound, .tm-elsewhere { margin: 0 0 var(--pad); font-size: var(--fs-1); color: var(--text-2); }
 .tm-list { list-style: none; margin: 0 0 var(--pad); padding: 0; display: grid; gap: var(--pad); }
 .tm-row {

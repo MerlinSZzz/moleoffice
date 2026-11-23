@@ -11,14 +11,13 @@
  * WHAT IT DRAWS
  * ---------------------------------------------------------------------------------------
  *
- * What the presses do, behind a fold, because they make the person's tool key and start and stop a service; the tool as it
- * stands; the presses; what a press did; and, while the tool runs, its own settings (MailToolSettings), which ask the
+ * The tool as it stands; the presses; what a press did; and, while the tool runs, its own settings (MailToolSettings), which ask the
  * tool itself on this computer. Where it answers and its secret come from their own door's answer and are kept nowhere
  * else.
  *
  * ON ANOTHER DEVICE the tool cannot be reached, and the install presses act on the office's computer, so neither is
- * drawn. The panel says where the tool runs and draws its settings read through the office, with their own presses,
- * which the office passes on to the tool.
+ * drawn. The panel draws its settings read through the office, with their own presses, which the office passes on to
+ * the tool.
  *
  * EVERY WORD IS FROM THE WORD LISTS, IN THEIR LANGUAGE. The tool's state and what the press did are drawn from the reply's
  * fields, not from the server's sentence, because the panel is drawn in normal mode, where every word on Settings is
@@ -45,7 +44,7 @@ import { useLanguage } from '../lib/language.ts'
 import { useInspect } from '../lib/mode.ts'
 import { onTheToolsComputer, whereTheToolIs } from '../lib/the-mail-tool.ts'
 import { MailToolSettings } from './MailToolSettings.tsx'
-import { Btn, drawnDay, drawnDayWithTime, ErrorNote, Explain, Loading, parseStamp, useAsync } from './ui.tsx'
+import { Btn, drawnDay, drawnDayWithTime, ErrorNote, Loading, parseStamp, useAsync } from './ui.tsx'
 
 /**
  * HOW OFTEN AND HOW MANY TIMES THE PANEL LOOKS AGAIN FOR THE TOOL'S PAGE: every quarter of a second, twenty times, so
@@ -73,7 +72,6 @@ function FromAnotherDevice() {
       <style href="mole-office-install-the-mail-tool" precedence="default">
         {INSTALL_THE_MAIL_TOOL_CSS}
       </style>
-      <p className="imt-said">{t('settingsPanel.mailtool.throughTheOffice.lead')}</p>
       <MailToolSettings throughTheOffice />
     </div>
   )
@@ -95,7 +93,7 @@ function OnTheToolsComputer() {
   // because it may have just started the tool.
   const looked = useRef(0)
   const waitingForThePage =
-    state.status === 'ready' && state.refreshing !== true && theWordFor(state.value) === 'settingsPanel.mailtool.state.noPageYet'
+    state.status === 'ready' && state.refreshing !== true && theWordFor(state.value) === 'settingsPanel.mailtool.state.starting'
   useEffect(() => {
     if (!waitingForThePage || looked.current >= LOOK_FOR_THE_PAGE_AT_MOST) return undefined
     const timer = setTimeout(() => {
@@ -170,11 +168,6 @@ function OnTheToolsComputer() {
       <style href="mole-office-install-the-mail-tool" precedence="default">
         {INSTALL_THE_MAIL_TOOL_CSS}
       </style>
-      {/* WHAT THE PRESS DOES, BEHIND A FOLD: the panel itself is the tool's state, the press and the way to its page, and
-          the words about it are there for whoever opens them (docs/UX-CONTRACT.md 8.10). */}
-      <Explain declares={{ surface: null }} meaning={t('settingsPanel.mailtool.meaning')} opens={t('settingsPanel.mailtool.opens')}>
-        <p className="imt-what">{t('settingsPanel.mailtool.what')}</p>
-      </Explain>
       {state.status === 'loading' ? (
         <Loading what={t('settingsPanel.mailtool.loading')} />
       ) : state.status === 'error' ? (
@@ -203,7 +196,7 @@ function OnTheToolsComputer() {
           </Btn>
         )}
       </div>
-      {keyTakenBack ? <p className="imt-said">{t('settingsPanel.mailtool.key.takenBack')}</p> : null}
+      {keyTakenBack ? <p className="imt-said">{t('settingsPanel.mailtool.key.takenBackState')}</p> : null}
       {fault === null ? null : <ErrorNote message={fault.message} fault={fault.fault} label={t(fault.title)} />}
       {said === null ? null : <p className="imt-said">{t(whatThePressDid(said))}</p>}
       {said !== null && developer ? (
@@ -213,7 +206,7 @@ function OnTheToolsComputer() {
       ) : null}
       {turnedOff === null ? null : (
         <p className="imt-said">
-          {t(turnedOff.service === 'turned off' ? 'settingsPanel.mailtool.done.turnedOff' : 'settingsPanel.mailtool.done.alreadyOff')}
+          {t(turnedOff.service === 'turned off' ? 'settingsPanel.mailtool.done.nowOff' : 'settingsPanel.mailtool.done.unchanged')}
         </p>
       )}
       {turnedOff !== null && developer ? (
@@ -228,13 +221,13 @@ function OnTheToolsComputer() {
 
 /** The tool as it stands, in the words of the lists: the same order of questions the server's own sentence asks. */
 export function theWordFor(tool: TheMailTool): WordKey {
-  if (tool.unit === 'not the press’s') return 'settingsPanel.mailtool.state.notOurs'
+  if (tool.unit === 'not the press’s') return 'settingsPanel.mailtool.state.anotherFile'
   if (tool.unit === 'not installed') return 'settingsPanel.mailtool.state.notInstalled'
   // TURNED OFF BY THEIR PRESS: stopped, and not started at their login.
-  if (tool.enabled === false && tool.running !== true) return 'settingsPanel.mailtool.state.off'
-  if (tool.keyWorks !== true) return 'settingsPanel.mailtool.state.keyBroken'
-  if (tool.running !== true) return 'settingsPanel.mailtool.state.stopped'
-  return tool.page === null ? 'settingsPanel.mailtool.state.noPageYet' : 'settingsPanel.mailtool.state.running'
+  if (tool.enabled === false && tool.running !== true) return 'settingsPanel.mailtool.state.isOff'
+  if (tool.keyWorks !== true) return 'settingsPanel.mailtool.state.keyFails'
+  if (tool.running !== true) return 'settingsPanel.mailtool.state.notRunning'
+  return tool.page === null ? 'settingsPanel.mailtool.state.starting' : 'settingsPanel.mailtool.state.running'
 }
 
 /** Which press is running, in the words of the lists: a press waits while the other runs, and says why. */
@@ -245,20 +238,14 @@ function busyWords(busy: null | 'install' | 'disable' | 'take-back'): string | u
 
 /** What their press did, in the words of the lists. */
 function whatThePressDid(done: TheMailToolInstalled): WordKey {
-  if (done.keyMade) return 'settingsPanel.mailtool.done.installed'
+  if (done.keyMade) return 'settingsPanel.mailtool.done.nowInstalled'
   if (done.service === 'started') return 'settingsPanel.mailtool.done.started'
-  return done.service === 'restarted' ? 'settingsPanel.mailtool.done.restarted' : 'settingsPanel.mailtool.done.nothing'
+  return done.service === 'restarted' ? 'settingsPanel.mailtool.done.restarted' : 'settingsPanel.mailtool.done.unchanged'
 }
 
 /** The component's own rules. Every value is a token, and there is no backtick anywhere in here. */
 const INSTALL_THE_MAIL_TOOL_CSS = `
 .imt-stack { display: flex; flex-direction: column; align-items: flex-start; gap: var(--pad); min-width: 0; }
-.imt-what {
-  margin: 0;
-  max-width: var(--measure-in-box);
-  color: var(--text-2);
-  font: var(--fs-1)/var(--lh-read) var(--font-ui);
-}
 .imt-said {
   margin: 0;
   max-width: var(--measure-in-box);

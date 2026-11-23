@@ -82,17 +82,20 @@ interface Capture {
 
 /**
  * THE ONE COMMAND A STAND-IN RUNS, in the shell its program gives it: it reads the file the shell names while the run
- * is alive, then runs tools/run-named-tests.mjs with a stand-in vitest, and writes what it saw.
+ * is alive, then runs tools/run-named-tests.mjs with a stand-in vitest, and writes what it saw. IT READS ITS PATHS FROM
+ * THE FILE BESIDE IT, which each start writes (theStandInIsTold), and not from its environment: a Codex is given only
+ * the names its list keeps (src/config/the-environment-a-codex-gets.mjs), and none of this test's own names is on it.
  */
 const SHELL = String.raw`
 const fs = require('fs'), path = require('path'), { spawnSync } = require('child_process')
 module.exports = function runOneCommand(program, shellEnv) {
+  const told = JSON.parse(fs.readFileSync(path.join(__dirname, 'told.json'), 'utf8'))
   const values = Object.values(shellEnv)
   // THE TWO KEYS ARE READ FROM A FILE, so that no variable of the test's own holds one.
-  const keys = JSON.parse(fs.readFileSync(process.env.WORKER_KEYS, 'utf8'))
+  const keys = JSON.parse(fs.readFileSync(told.keys, 'utf8'))
   const where = shellEnv[${JSON.stringify(OFFICE_TOOL_CONFIGURATION)}] ?? null
   const there = where !== null && fs.existsSync(where)
-  const work = fs.mkdtempSync(path.join(process.env.WORKER_SCRATCH, 'named-'))
+  const work = fs.mkdtempSync(path.join(told.scratch, 'named-'))
   fs.mkdirSync(path.join(work, 'tests'))
   fs.writeFileSync(path.join(work, 'tests', 'one.test.ts'), "test('x', () => {})\n")
   const vitest = path.join(work, 'stand-in-vitest.mjs')
@@ -101,7 +104,7 @@ module.exports = function runOneCommand(program, shellEnv) {
     'writeFileSync(out.slice(18), JSON.stringify({ testResults: [{ name: ' + JSON.stringify(path.join(work, 'tests', 'one.test.ts')) + ", status: 'passed' }] }))\n")
   const toolEnv = { ...shellEnv }
   delete toolEnv.MOLE_OFFICE_API_ROOT
-  const ran = spawnSync(process.execPath, [path.join(process.env.WORKER_REPO, 'tools', 'run-named-tests.mjs'), '--root', work, '--vitest', vitest, 'tests/one.test.ts'],
+  const ran = spawnSync(process.execPath, [path.join(told.repo, 'tools', 'run-named-tests.mjs'), '--root', work, '--vitest', vitest, 'tests/one.test.ts'],
     { cwd: work, env: toolEnv, encoding: 'utf8' })
   const capture = {
     program, names: Object.keys(shellEnv),
@@ -113,12 +116,15 @@ module.exports = function runOneCommand(program, shellEnv) {
     configuration: there ? JSON.parse(fs.readFileSync(where, 'utf8')) : null,
     said: String(ran.stdout) + String(ran.stderr), exited: ran.status,
   }
-  fs.writeFileSync(process.env.WORKER_CAPTURE + '.part', JSON.stringify(capture))
-  fs.renameSync(process.env.WORKER_CAPTURE + '.part', process.env.WORKER_CAPTURE)
+  fs.writeFileSync(told.capture + '.part', JSON.stringify(capture))
+  fs.renameSync(told.capture + '.part', told.capture)
 }
 `
 
-/** The stand-in Codex: its shell policy's exclude list, read from its own arguments, is taken out of the command's shell. */
+/**
+ * The stand-in Codex: its shell policy's exclude list, read from its own arguments, is taken out of the command's shell.
+ * `theShell`, the path of the command's module, is written into its text (beforeAll).
+ */
 const CODEX = String.raw`
 const argv = process.argv.slice(2)
 const excluded = []
@@ -128,15 +134,15 @@ argv.forEach((word, at) => {
 })
 const shellEnv = { ...process.env }
 for (const name of excluded) delete shellEnv[name]
-require(process.env.WORKER_SHELL)('codex', shellEnv)
+require(theShell)('codex', shellEnv)
 process.stdout.write(JSON.stringify({ type: 'thread.started', thread_id: 'synthetic-thread' }) + '\n')
 `
 
-/** The stand-in dsh: MOLE_AGENT_KEY is taken out of the command, as dsh's own filter is said to do. */
+/** The stand-in dsh: MOLE_AGENT_KEY is taken out of the command, as dsh's own filter is said to do. `theShell` as for Codex. */
 const DSH = String.raw`
 const shellEnv = { ...process.env }
 delete shellEnv.MOLE_AGENT_KEY
-require(process.env.WORKER_SHELL)('dsh', shellEnv)
+require(theShell)('dsh', shellEnv)
 `
 
 /**
@@ -182,8 +188,9 @@ beforeAll(async () => {
   writeFileSync(startersFile, JSON.stringify({ mcpServers: { mole_office: { env: {
     MOLE_OFFICE_AGENT: 'synthetic-starter', MOLE_OFFICE_SESSION: starterSession, MOLE_OFFICE_WORKSPACE: 'default', MOLE_OFFICE_API: 'http://127.0.0.1:9', MOLE_AGENT_KEY: starterKey,
   } } } }), { mode: 0o600 })
-  writeFileSync(join(dir, 'bin', 'codex'), `#!${process.execPath}\n${CODEX}`, { mode: 0o755 })
-  writeFileSync(join(dir, 'bin', 'dsh'), `#!${process.execPath}\n${DSH}`, { mode: 0o755 })
+  const theShell = `const theShell = ${JSON.stringify(join(dir, 'shell.cjs'))}\n`
+  writeFileSync(join(dir, 'bin', 'codex'), `#!${process.execPath}\n${theShell}${CODEX}`, { mode: 0o755 })
+  writeFileSync(join(dir, 'bin', 'dsh'), `#!${process.execPath}\n${theShell}${DSH}`, { mode: 0o755 })
   symlinkSync(join(dir, 'bin', 'dsh'), join(dir, 'dsh/npm/node_modules/.bin/dsh'))
   office = createServer(async (req, res) => {
     let text = ''
@@ -245,6 +252,11 @@ afterAll(async () => {
   rmSync(root, { recursive: true, force: true })
 })
 
+/** Tells the command's module where this start's capture goes and where the rest is, in the file beside it. */
+function theStandInIsTold(capturePath: string) {
+  writeFileSync(join(dir, 'told.json'), JSON.stringify({ capture: capturePath, repo: REPO, scratch: join(dir, 'scratch'), keys: join(dir, 'the-keys.json') }))
+}
+
 /**
  * The real helper, started as tools/sandbox.mjs worker starts it in the container (`filed`), or with --run for a run
  * filed before (`existing`). It answers what the stand-in program saw, the run's launch details, and the run's label.
@@ -260,6 +272,7 @@ async function started(runtime: 'codex' | 'dsh', options: { existing?: boolean; 
         ...(runtime === 'dsh' ? ['--brief', join(dir, 'briefs', 'brief.md')] : [])]
   // A dsh worker's command is run-agent.sh, which the helper chooses itself; a dsh round named with --run says dsh's own.
   const command = runtime === 'dsh' && !options.existing ? [] : runtime === 'dsh' ? ['dsh', '--profile', 'office', join(dir, 'briefs', 'brief.md')] : ['codex', 'exec', '--json', '-m', model, '--', 'a synthetic brief']
+  theStandInIsTold(capturePath)
   const child = spawn(process.execPath, [
     'tools/sandbox-start.mjs', '--in-background', '--instance', dir, '--cwd', worktree,
     '--as', 'synthetic-starter', '--session', starterSession, '--workspace', 'default', '--api', api,
@@ -277,8 +290,6 @@ async function started(runtime: 'codex' | 'dsh', options: { existing?: boolean; 
     SANDBOX_DSH_NATIVE_READER: syntheticDshReader(join(root, 'reader')),
     PATH: join(dir, 'bin') + ':' + process.env['PATH'],
     TMPDIR: join(dir, 'tmp'),
-    WORKER_CAPTURE: capturePath, WORKER_SHELL: join(dir, 'shell.cjs'), WORKER_REPO: REPO, WORKER_SCRATCH: join(dir, 'scratch'),
-    WORKER_KEYS: join(dir, 'the-keys.json'),
   }, join(dir, 'a-private-tmp')) })
   let out = ''
   let err = ''

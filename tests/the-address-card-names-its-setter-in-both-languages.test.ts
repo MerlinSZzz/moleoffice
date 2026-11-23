@@ -125,7 +125,7 @@ it('names every setter path in English and Chinese, with the stored local stamp 
   }
 }, 240_000)
 
-it('keeps the four stored values exact while translating titles, labels and empty parts at every width and look', async () => {
+it('keeps the four stored values exact while translating titles, labels and empty parts, at 1440, 990 and 660 in the light look', async () => {
   profilePatch = null
   await set('person', THE_PERSON)
   await set('agent', worker.id, worker.headers)

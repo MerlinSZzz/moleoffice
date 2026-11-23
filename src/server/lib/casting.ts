@@ -74,6 +74,7 @@ import { nowStamp, theClockZone } from '@shared/time.ts'
 import { theLimitsOn, type CastingLimits } from '@shared/casting-roll.ts'
 import { THE_WORKER } from '@shared/roles.ts'
 import { sqlite } from '../db/client.ts'
+import { theAgentsOfAHarnessWithNoAdapter } from '../db/list-participants.ts'
 import { theCastingLabels, theLabelIdsNamed, theLastNamesOf } from './casting-labels.ts'
 import { theDrawsOfEachLabel, theLimitsNow } from './casting-roll.ts'
 import { participantForActor } from './participant-for-actor.ts'
@@ -227,6 +228,7 @@ export function theCastingTable(): CastingReading {
     labels,
     rules: CASTING_LABEL_RULES,
     officeTimeZone: theClockZone(),
+    harnesses: theAgentsOfAHarnessWithNoAdapter(),
   }
 }
 

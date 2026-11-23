@@ -18,7 +18,7 @@ const headers = (actor = person as { type: string; id: string }) => ({
 })
 const fields = [
   { field: NEEDS_NO_CHECK, value: { decision: 'synthetic-decision', at: '2026-09-26 09:00:00', because: 'Synthetic office mark.' },
-    refusal: "The office writes needsNoCheck when it files a run for a secretary's design/-only merge entry. Nothing was written." },
+    refusal: "The office writes needsNoCheck when it files a run for a secretary's design/-only merge entry, at a seal while its checks are switched off, or at its start while its checks are switched off. Nothing was written." },
   { field: ENDED_WITH_ITS_MERGE_ENTRY, value: { entry: 'synthetic-entry', at: '2026-09-26 09:00:00', because: 'Synthetic office ending.' },
     refusal: "The office writes endedWithItsMergeEntry on a merge entry's check-again run when that check refuses and the entry bounces. Nothing was written." },
 ] as const

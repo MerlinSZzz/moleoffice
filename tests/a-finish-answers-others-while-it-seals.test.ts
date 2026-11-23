@@ -107,7 +107,7 @@ it('answers another request while the actual seal capture reads the tree', async
   const finished = await finishWithEachWalkHeld(await aRun('Another run to finish'))
   expect(finished.status, finished.body).toBe(200)
   // THE READS THE LINE NAMES, in order: one walk each, and the seal's is the one that held a question of the seal.
-  const reads = [...finished.line.matchAll(/the git read apart after pass \d+, for (\d+) of the facts and (\d+) of the seal [\d.]+ ms, waited on another thread while the server answered other requests/g)]
+  const reads = [...finished.line.matchAll(/the git read apart after pass \d+, for (\d+) of the facts and (\d+) of the seal(?:, and \d+ of the commits past the cut)?(?:, and \d+ of the run's own commits)? [\d.]+ ms, waited on another thread while the server answered other requests/g)]
   expect(reads, finished.line).toHaveLength(finished.answered.length)
   const theSeals = reads.flatMap((one, at) => (Number(one[2]) > 0 ? [at] : []))
   expect(theSeals.length, `no read held the seal's question: ${finished.line}`).toBeGreaterThan(0)

@@ -144,7 +144,7 @@ async function theReceiptFieldsOfTheOffice(io) {
   if (!Array.isArray(fields) || fields.some((one) => !object(one) || typeof one.key !== 'string')) fail('The office did not describe the fields of its receipt kind. No receipt was filed.')
   const added = ['aloneRuns', 'errorsOutsideTests'].filter((key) => fields.some((one) => one.key === key))
   if (added.length === 1) fail(`The office's receipt kind declares ${added[0]} without the other field version 2 adds. No receipt was filed.`)
-  return { allowsVersion2: added.length === 2, allowsWorkerCrashes: fields.some((one) => one.key === 'workerCrashes') }
+  return { allowsVersion2: added.length === 2, allowsWorkerCrashes: fields.some((one) => one.key === 'workerCrashes'), allowsSkippedCases: fields.some((one) => one.key === 'skippedCases') }
 }
 
 async function releaseSeat(io, seat) {
@@ -232,7 +232,7 @@ function artifact(name, path) {
  * door answer lists the runs alone, each read from its own files by aloneRunsFrom. The whole run's facts are the same
  * in both versions.
  */
-export function receiptFromArtifacts({ repository, commit, tree, clone, paths, result, startedAt, endedAt, allowsVersion2 = false, allowsWorkerCrashes = true, carriedOver = [] }) {
+export function receiptFromArtifacts({ repository, commit, tree, clone, paths, result, startedAt, endedAt, allowsVersion2 = false, allowsWorkerCrashes = true, namesSkippedCases = true, carriedOver = [] }) {
   const said = result.answer
   if (!object(said) || said.ran !== true || said.commit !== commit || said.code !== result.code || !Number.isInteger(said.code) || said.code < 0 || said.code > 255) fail('The cloud result does not identify the requested commit and its actual exit. No receipt was filed.')
   if (!Number.isInteger(said.buildExitCode) || said.buildExitCode < 0 || said.buildExitCode > 255) fail('The cloud result has no original build exit. No receipt was filed.')
@@ -266,6 +266,7 @@ export function receiptFromArtifacts({ repository, commit, tree, clone, paths, r
   const failedFiles = []
   const failedTests = []
   const workerCrashes = []
+  const skippedCases = []
   let assertions = 0
   let failedAssertions = 0
   let passedAssertions = 0
@@ -288,6 +289,12 @@ export function receiptFromArtifacts({ repository, commit, tree, clone, paths, r
       unfinishedAssertions += pending
     }
     todoAssertions += row.assertionResults.filter((test) => test.status === 'todo').length
+    const skippedHere = row.assertionResults.filter((test) => ['skipped', 'disabled'].includes(test.status))
+    if (!workerExit) skippedHere.push(...row.assertionResults.filter((test) => test.status === 'pending'))
+    for (const test of skippedHere) {
+      if (typeof test.fullName !== 'string' || test.fullName.trim() === '') fail('A skipped test has no recorded name. No receipt was filed.')
+      skippedCases.push({ file, name: test.fullName })
+    }
     for (const test of failures) {
       if (typeof test.fullName !== 'string' || test.fullName.trim() === '') fail('A failed test has no recorded name. No receipt was filed.')
       failedTests.push({ file, name: test.fullName })
@@ -309,6 +316,10 @@ export function receiptFromArtifacts({ repository, commit, tree, clone, paths, r
   if (carriedOver.length > 0 && JSON.stringify(said.carriedOverFirst) !== JSON.stringify(first)) fail(`The cloud door did not put first in its runs alone exactly the carried-over files that are red again (${first.length > 0 ? first.join(', ') : 'none'}). No receipt was filed.`)
   if (allowsWorkerCrashes && workerCrashes.length > 0) data.workerCrashes = workerCrashes.sort((a, b) => a.file.localeCompare(b.file))
   data.failedTests = failedTests.filter((test, index) => failedTests.findIndex((one) => one.file === test.file && one.name === test.name) === index).sort((a, b) => a.file.localeCompare(b.file) || a.name.localeCompare(b.name))
+  if (namesSkippedCases) {
+    const sorted = skippedCases.sort((a, b) => a.file.localeCompare(b.file) || a.name.localeCompare(b.name))
+    data.skippedCases = { count: report.numPendingTests, ...(report.numPendingTests === 0 ? {} : { cases: sorted.slice(0, 200) }), ...(report.numPendingTests > 200 ? { notListed: report.numPendingTests - 200 } : {}) }
+  }
   data.coverage = { expectedCount: expected.length, observedCount: observed.length, missing: expected.filter((file) => !observed.includes(file)), unexpected: observed.filter((file) => !expected.includes(file)) }
   data.artifacts.push(artifact('manifest', paths.manifest), artifact('report', paths.report), artifact('reads', paths.reads))
   if (allowsVersion2 && said.alone !== undefined && data.failedFiles.length > 0) {
@@ -355,6 +366,15 @@ function carriedWords(carried, ranFirst, suiteRan) {
 
 function workerCrashWords(crashes) {
   return crashes?.length > 0 ? ` Worker exited unexpectedly. ${crashes.map((crash) => `${crash.file}: ${crash.unfinishedTests} tests never finished`).join('; ')}.` : ''
+}
+
+function skippedCaseWords(skippedCases, namesCases = true) {
+  if (skippedCases === undefined || typeof skippedCases.count !== 'number' || skippedCases.count === 0) return ''
+  const first = ` ${skippedCases.count} test case${skippedCases.count === 1 ? ' was' : 's were'} skipped, which leaves the receipt neither red nor incomplete.`
+  if (!namesCases) return first + ' This office has no skippedCases field, so the receipt does not name them; the original hashed report does.'
+  return first + (skippedCases.notListed === undefined
+    ? ' The receipt names each by file and name.'
+    : ` The receipt names the first 200 by file and name, and ${skippedCases.notListed} more are only counted.`)
 }
 
 /**
@@ -582,14 +602,16 @@ async function runOriginalSuiteOnce(options, supplied = {}, repair = null) {
     save(stateFile, { version: 1, lastStartedAtMs: startedMs, pending: { attempt, commit, step: 'validating original artifacts' }, ...kept })
     const endedAt = localStamp(new Date(io.clock()))
     const said = result.answer
-    const fields = said.phase === 'test' && said.code !== 0 ? await theReceiptFieldsOfTheOffice(io) : { allowsVersion2: false, allowsWorkerCrashes: false }
+    const fields = said.phase === 'test' ? await theReceiptFieldsOfTheOffice(io) : { allowsVersion2: false, allowsWorkerCrashes: false, allowsSkippedCases: false }
     const allowsVersion2 = said.alone !== undefined && fields.allowsVersion2
     const data = receiptFromArtifacts({ repository: config.repository, commit, tree, clone, paths, result, startedAt, endedAt, allowsVersion2, carriedOver: carried.files })
     const ranFirst = theCarriedFirst(carried.files, data.failedFiles ?? [])
     const carriedSays = carriedWords(carried, ranFirst, data.failedFiles !== undefined)
     const crashes = workerCrashWords(data.workerCrashes)
-    const shared = said.filesShareAProcess === true ? ' Test files shared processes in this run, because MOLE_OFFICE_TEST_FILES_SHARE_A_PROCESS was on.' : ''
     if (!fields.allowsWorkerCrashes) delete data.workerCrashes
+    const skipped = skippedCaseWords(data.skippedCases, fields.allowsSkippedCases)
+    if (!fields.allowsSkippedCases) delete data.skippedCases
+    const shared = said.filesShareAProcess === true ? ' Test files shared processes in this run, because MOLE_OFFICE_TEST_FILES_SHARE_A_PROCESS was on.' : ''
     // The answer names what each red file did alone even when the receipt is version 1 and keeps none of it.
     const runsAlone = said.alone === undefined ? undefined : data.aloneRuns ?? (data.failedFiles?.length > 0 ? aloneRunsFrom({ said, clone, paths, failedFiles: data.failedFiles, first: ranFirst }) : [])
     save(join(attempt, 'receipt.json'), data)
@@ -609,7 +631,7 @@ async function runOriginalSuiteOnce(options, supplied = {}, repair = null) {
     const fixture = carriesTheTestMark(options.env ?? process.env)
     // The office answers with the whole record, so the filing reads as long an answer as every receipt-evidence read.
     // The three calls after it answer with the new revision's header, the short forms and the link, so none carries the receipt.
-    const filed = await request(io, 'POST', '/api/records', { kind: RECEIPT_KIND, title: `${fixture ? 'Fixture: ' : ''}Whole suite on main at ${commit}`, summary: (fixture ? 'Made-up cloud evidence from a contract test, filed only in its throwaway office.' : `The cloud box reported the original build result for main ${commit}. The receipt keeps any suite result and manifest coverage it returned.`) + packingSays + shared + crashes + carriedSays, data }, THE_LONGEST_RECEIPT_REPLY)
+    const filed = await request(io, 'POST', '/api/records', { kind: RECEIPT_KIND, title: `${fixture ? 'Fixture: ' : ''}Whole suite on main at ${commit}`, summary: (fixture ? 'Made-up cloud evidence from a contract test, filed only in its throwaway office.' : `The cloud box reported the original build result for main ${commit}. The receipt keeps any suite result and manifest coverage it returned.`) + packingSays + shared + crashes + skipped + carriedSays, data }, THE_LONGEST_RECEIPT_REPLY)
     const id = filed.record?.id
     if (typeof id !== 'string' || id === '' || filed.record.kind !== RECEIPT_KIND) fail(`The office did not identify the filed receipt. Its filing is unverified; recovery data is at ${attempt}.`)
     save(stateFile, { version: 1, lastStartedAtMs: startedMs, pending: { attempt, commit, receipt: id, step: 'writing its label' }, ...kept })
@@ -628,7 +650,7 @@ async function runOriginalSuiteOnce(options, supplied = {}, repair = null) {
     const why = data.failedFiles?.length > 0 && data.version === 1 ? (runsAlone === undefined ? ' The cloud door returned no runs alone, so the receipt is version 1.' : ' This office takes only version 1 of the receipt, so its runs alone are not in it.') : ''
     const named = alone === undefined ? [] : [['green', 'green alone'], ['red', 'red alone'], ['noResult', 'no result alone'], ['notRun', 'not run alone']].filter(([key]) => alone[key].length > 0).map(([key, words]) => `${words}: ${alone[key].join(', ')}`)
     const olderCrashField = crashes !== '' && !fields.allowsWorkerCrashes ? ' This office has no workerCrashes field; the receipt names the crash in its summary and keeps the original hashed report and log.' : ''
-    const says = `${fixture ? 'Fixture receipt' : 'Receipt'} ${id} records main ${commit}: ${verdict}.${why}${crashes}${olderCrashField}${named.length > 0 ? ` The red files, each run alone: ${named.join('; ')}.` : ''}${packingSays}${carriedSays} Main and the office were not moved.`
+    const says = `${fixture ? 'Fixture receipt' : 'Receipt'} ${id} records main ${commit}: ${verdict}.${why}${crashes}${olderCrashField}${skipped}${named.length > 0 ? ` The red files, each run alone: ${named.join('; ')}.` : ''}${packingSays}${carriedSays} Main and the office were not moved.`
     // alone is absent when the door returned no runs alone; nothing is put in its place.
     return alone === undefined
       ? { status: 'filed', receipt: id, green, commit, attempt, carried: { ...carried, ranFirst }, says }

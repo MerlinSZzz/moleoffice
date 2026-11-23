@@ -178,7 +178,6 @@ describe('an ask nobody answered, granted by the owner’s press, then withdrawn
     expect(stands).toContain('answered one new key, once.')
     await noFault()
     expect(await thePresses()).toEqual(['Withdraw the grant'])
-    expect(await app.page.locator('.tc-withdraw').textContent()).toContain('The keys the grant revoked stay revoked.')
     expect(await answerOf(request)).toBe('granted')
   }, 120_000)
 

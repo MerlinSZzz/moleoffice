@@ -7,12 +7,15 @@
  * An id taken for a key is now a false reminder rather than a refusal, so each case below that said "stored" now also
  * says "with no reminder", and the case that said "refused" says "reminded".
  *
- * On 5 October 2026 tests/one-merge-tool-per-entry.test.ts went red at the write that finishes a run: 400
+ * On 5 October 2026 a test of the merge tool went red at the write that finishes a run: 400
  * messageHoldsPasswordAfterP, the piece beginning "-pha", 12 characters long (message oA4sCtt5CeIZ). The write
  * that seals a run also writes the run-sealed notice to the run's starter, and the notice's body is "Run <run id>
  * sealed". It was written under the finishing agent's name, so the key door judged it as that agent's words. A record id
  * is 12 characters of letters, digits, - and _, so about 1 in 4,096 begins with -p, which is the shape of a password
  * glued to -p. The whole finish was refused.
+ *
+ * The owner's decision of 12 November 2026 leaves a worker's supervisor out of the seal notice; a line's own round
+ * still proves that a seal notice is written as the office.
  *
  * Two changes, and each has its own case here:
  *   · the notice is written as the office (src/server/lib/sealed-tip.ts), because every word of it is a fact the office
@@ -28,10 +31,12 @@
  * WHAT IS MEASURED, AND THE MUTATION THAT TURNS IT RED
  * ---------------------------------------------------------------------------------------
  *
- *   · a run whose id begins with -p is finished by its own agent, the seal is stored and the starter is told.
+ *   · a worker run whose id begins with -p is finished by its own agent and sealed without telling its supervisor.
+ *     MUTATION: whyAWorkersSupervisorIsNotTold (src/server/lib/inspection.ts) answers null always. Red.
+ *   · a line's own round whose id begins with -p is finished by its own agent and sealed.
  *     CONTROL on main before this change: refused with 400 messageHoldsPasswordAfterP.
- *     MUTATION: undo both changes. Red. Undoing only one leaves it green, because either change alone is enough.
- *   · the notice is written under the office's name, in the change log.
+ *     MUTATION: undo both changes. Red.
+ *   · that round's run-sealed notice is written under the office's name, in the change log.
  *     MUTATION: write it with the finishing agent's actor again (sealed-tip.ts). Red.
  *   · an agent's message quoting an existing record id that begins with -p is stored, with a full stop after the id.
  *     MUTATION: call whereAMessageHoldsAKey without anExistingId (src/server/lib/message-keys.ts). Red.
@@ -81,6 +86,8 @@ beforeAll(async () => {
   expect(starter.statusCode, starter.body).toBe(201)
   const worker = await app.inject({ method: 'POST', url: '/api/agents/started', headers: asAgent(STARTER), payload: { handle: WORKER, name: 'Synthetic worker', role: 'worker', workArea: ['src'] } })
   expect(worker.statusCode, worker.body).toBe(201)
+  const round = await app.inject({ method: 'POST', url: '/api/agents/started', headers: asAgent(STARTER), payload: { handle: 'pid-round', name: 'Synthetic round', role: 'supervisor', workArea: ['src'] } })
+  expect(round.statusCode, round.body).toBe(201)
 
   mkdirSync('.logs', { recursive: true })
   root = mkdtempSync(join(process.cwd(), '.logs', 'dash-p-id-'))
@@ -106,7 +113,7 @@ afterAll(async () => {
 describe('a run whose id begins with -p', () => {
   let RUN = ''
 
-  it('is finished by its own agent, its seal is stored, and its starter is told', async () => {
+  it('is finished by its own agent and sealed without telling its supervisor', async () => {
     dashP.on = true
     const filed = await app.inject({
       method: 'POST',
@@ -127,13 +134,20 @@ describe('a run whose id begins with -p', () => {
     const told = t.client.sqlite
       .prepare("SELECT id FROM records WHERE kind = 'message' AND json_extract(data, '$.aboutRun') = ? AND json_extract(data, '$.body') = ?")
       .all(RUN, `Run ${RUN} sealed`) as { id: string }[]
-    expect(told, 'the starter was not told of the seal').toHaveLength(1)
+    expect(told, 'the supervisor was told of the seal').toEqual([])
   })
 
-  it('has its run-sealed notice written under the office\'s name', () => {
+  it('has a line’s own run-sealed notice written under the office\'s name', async () => {
+    dashP.on = true
+    const filed = await app.inject({ method: 'POST', url: '/api/records', headers: asAgent('pid-round'), payload: { kind: 'session', title: 'Synthetic line round', data: { state: 'running', servingAgent: 'pid-round', workingDirectory: root, cutFrom: 'main' } } })
+    dashP.on = false
+    expect(filed.statusCode, filed.body).toBe(201)
+    const round = (filed.json() as { record: { id: string } }).record.id
+    const finished = await app.inject({ method: 'PATCH', url: `/api/records/${round}`, headers: asAgent('pid-round'), payload: { dataPatch: { state: 'finished', tip } } })
+    expect(finished.statusCode, finished.body).toBe(200)
     const notice = t.client.sqlite
       .prepare("SELECT id FROM records WHERE kind = 'message' AND json_extract(data, '$.aboutRun') = ? AND json_extract(data, '$.body') = ?")
-      .get(RUN, `Run ${RUN} sealed`) as { id: string } | undefined
+      .get(round, `Run ${round} sealed`) as { id: string } | undefined
     expect(notice).toBeDefined()
     const wrote = t.client.sqlite.prepare("SELECT actor_type, actor_id FROM changes WHERE record_id = ? AND op = 'create'").get(notice!.id)
     expect(wrote).toEqual({ actor_type: 'agent', actor_id: 'mole-office/the-api-server' })

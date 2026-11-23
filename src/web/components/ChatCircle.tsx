@@ -60,7 +60,7 @@ import { t } from '@shared/i18n.ts'
 import { settingsControlWord } from '@shared/settings-declaration.ts'
 import { BackToNotChosen } from './BackToNotChosen.tsx'
 import { api, errorMessage, getActor } from '../api.ts'
-import { whereRequestsGo } from '../lib/visiting.ts'
+import { theCrossOriginOfALoad, whereRequestsGo } from '../lib/visiting.ts'
 import { useLanguage } from '../lib/language.ts'
 import { readTheChatAgain } from './Chat.tsx'
 import { ErrorNote, Panel, useAsync } from './ui.tsx'
@@ -195,6 +195,7 @@ export function ChatCirclePanel() {
                 <img
                   className="ccl-face-img"
                   src={whereRequestsGo(circlePictureUrl(one.name))}
+                  crossOrigin={theCrossOriginOfALoad()}
                   alt={CIRCLE_PANEL_WORDS.pictureName(one.name)}
                   width={48}
                   height={48}

@@ -2,19 +2,19 @@
 // Licensed under the MIT License. See LICENSE.
 /**
  * THE PRESSES THAT PUT A PERMANENT RESIDENT TO SLEEP, WAKE IT, AND POSTPONE ITS SLEEP. They stand beside "last slept",
- * on the resident's profile and in the chat, for those who may press them, by a decision of wave 13k,
- * round 47.
+ * on the resident's profile only, for those who may press them, by a decision of wave 13k,
+ * round 47. The chat draws none of them.
  *
  * WHO MAY PRESS WHICH, as the doors in src/server/api/residents.ts allow and no further, so no press is drawn that the
  * door would always refuse:
  *
- *   · Sleep and Wake: the person, or the resident itself with its own key. The same two set a secretary's sleep time,
+ *   · Sleep and Wake: the person, or the resident itself with its own key. The same two set a resident's sleep time,
  *     which ResidentSleep.tsx draws beside these presses.
  *   · Postpone a sleep: the resident itself only, with a reason it writes, while it is awake, or while the sleep the
- *     office began at its sleep time goes on, a time each secretary sets for itself. A sleep begun
+ *     office began at its sleep time goes on, a time each resident sets for itself. A sleep begun
  *     by a press is ended by waking.
  *
- * ITS OWN FILE, so the chat imports it and nothing else of the resident pages.
+ * ITS OWN FILE, drawn by the profile's Sleep place (ResidentSleep.tsx) and by nothing else.
  */
 import { t } from '@shared/i18n.ts'
 import { useState } from 'react'
@@ -24,7 +24,7 @@ import { Btn, ErrorNote, TextArea } from './ui.tsx'
 
 /** Which presses this reader may have, read from who is looking. */
 export interface WhoMayPress {
-  /** The person, or the resident itself: Sleep and Wake, and a secretary's sleep time. */
+  /** The person, or the resident itself: Sleep and Wake, and a resident's sleep time. */
   sleepAndWake: boolean
   /** The resident itself: Postpone a sleep. */
   postpone: boolean

@@ -34,7 +34,11 @@
  *      path; a root that is a link; one of the three folders that is a link; a link inside a folder; a folder missing;
  *      a fourth thing in the root; a request that does not name the four checks, or names one it does not know; a
  *      result file that is there; and a map that is not a staged map;
- *   7. at a limit of 1 ms every check is false, and its line says it was not run.
+ *   7. at a limit of 1 ms every check is false, and its line says it was not run;
+ *   8. given a heap of HEAP_MB, smaller than each of three trees that hold made-up pages beside the export, it ends 0
+ *      with the verdict it gives on the small root, and its peak resident memory is at most its peak on the small root
+ *      plus the bytes of one tree. With one page of export-2 changed and its size kept, it gives the verdict it gives
+ *      today, and names that page alone. Wave 13s round 281.
  *
  * Three-run proof, using this whole file each time:
  *   node tools/run-named-tests.mjs tests/the-export-after-the-remint-is-verified.test.ts
@@ -61,7 +65,9 @@
  *  10. in export-verification.ts, in whatEachRunMayBecome, delete the line that adds each kept pair: the short form's
  *      page, whose content hash the pass changed, is named, and cases 1 to 5 go red;
  *  11. in export-verification.ts, put `mayBecome.has(before)` in place of `mayBecome.get(before)?.has(after) === true`:
- *      an old id may become any other run, and case 2 goes red.
+ *      an old id may become any other run, and case 2 goes red;
+ *  12. in export-verification.ts, have `theTreeOf` read each file's bytes as it lists it, and keep them in a map the
+ *      tree holds: the verifier holds every tree whole, and case 8 goes red.
  * Restore each file with cp after each change, check it with cmp, and run the command again for green.
  * Every id, name, note, page and alias here is made up, in a throwaway office. Each command is given only PATH, LANG, a
  * made-up home in the test's own folder and MOLE_OFFICE_DB, so it reads no settings file of anybody's.
@@ -70,7 +76,7 @@ import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { chmodSync, copyFileSync, cpSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
 import { dirname, join, relative, resolve } from 'node:path'
-import { fileURLToPath, URL } from 'node:url'
+import { fileURLToPath, pathToFileURL, URL } from 'node:url'
 import Database from 'better-sqlite3'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { readClosedVerificationResult } from '../tools/stable/closed-upgrade-verification.mjs'
@@ -82,6 +88,11 @@ import { freshDb, type TestDb } from './helpers.ts'
 const REPO = resolve(fileURLToPath(new URL('..', import.meta.url)))
 const VERIFIER = join(REPO, 'tools', 'verify-the-export.mjs')
 const CHECKS = ['history-pages', 'participants', 'aliases', 'second-export']
+/** The heap the verifier is given in case 8, in MiB. Each tree there is larger. */
+const HEAP_MB = 192
+/** How many made-up pages case 8 puts in each tree, and the bytes of each. */
+const PAGES = 320
+const PAGE_BYTES = 1024 * 1024
 
 // THE MADE-UP AGENTS. A legacy id could be a handle; a minted one is 12 of the mint's characters, one a handle may not hold.
 const LEGACY = 'legacy-heron'
@@ -245,6 +256,8 @@ interface Asked {
   within?: string
   root?: string
   map?: string
+  /** What node is given before the verifier. */
+  node?: string[]
 }
 /** THE VERIFIER on one request for one case, from the checkout, with MOLE_OFFICE_DB naming a file nothing makes. */
 function verified(c: ACase, asked: Asked = {}): Verified {
@@ -253,7 +266,7 @@ function verified(c: ACase, asked: Asked = {}): Verified {
   const request = { version: 1, phase: asked.phase ?? 'target', commit: COMMIT, repository: REPO, database: base.after, snapshot: base.snapshot, servicePort: 1, checks: CHECKS, stateSha256: STATE, ...asked.over }
   writeFileSync(requestFile, JSON.stringify(request))
   const untouched = join(c.at, `no-database-${String(n)}.db`)
-  const it = ran([VERIFIER, '--within', asked.within ?? '60000', '--map', asked.map ?? base.map, '--root', asked.root ?? c.root, requestFile, result], untouched)
+  const it = ran([...(asked.node ?? []), VERIFIER, '--within', asked.within ?? '60000', '--map', asked.map ?? base.map, '--root', asked.root ?? c.root, requestFile, result], untouched)
   return { ...it, request, result, untouched }
 }
 
@@ -265,6 +278,32 @@ const onlyThisFails = (name: string) => Object.fromEntries(CHECKS.map((check) =>
 /** The lines that name a difference, each under its check's line. */
 const theDifferences = (out: string) => out.split('\n').filter((line) => line.startsWith('  '))
 const theResultOf = (file: string) => JSON.parse(readFileSync(file, 'utf8')) as { checks: Record<string, boolean> }
+
+/**
+ * A TEST STAND-IN, loaded before the verifier: as the process ends, it writes the most memory the process held at once,
+ * in bytes, into the file `to`.
+ */
+function aPeakWriter(to: string): string {
+  const at = `${to}.mjs`
+  writeFileSync(at, [
+    "import { writeFileSync } from 'node:fs'",
+    `process.on('exit', () => writeFileSync(${JSON.stringify(to)}, String(process.resourceUsage().maxRSS * 1024)))`,
+  ].join('\n'))
+  return pathToFileURL(at).href
+}
+const thePeakIn = (file: string) => Number(readFileSync(file, 'utf8'))
+
+/** A made-up page of PAGE_BYTES bytes, which no export wrote. */
+function aMadeUpPage(n: number): string {
+  const line = `Made-up words of page ${String(n)}, for a verifier measured against its heap; nothing here is real.\n`
+  return `# A made-up page ${String(n)}\n\n${line.repeat(Math.ceil(PAGE_BYTES / line.length))}`.slice(0, PAGE_BYTES)
+}
+
+/** The bytes of every file under a folder. */
+const theBytesUnder = (folder: string) =>
+  readdirSync(folder, { recursive: true, withFileTypes: true })
+    .filter((entry) => entry.isFile())
+    .reduce((sum, entry) => sum + statSync(join(entry.parentPath, entry.name)).size, 0)
 
 /** The text of one file of an export, changed in place. */
 function changed(file: string, change: (text: string) => string): void {
@@ -424,4 +463,44 @@ describe('the export of the store after the re-mint', () => {
     for (const name of CHECKS) expect(run.stdout).toMatch(new RegExp(`^${name}: FAILED in [0-9]+ ms\\. Not run: the verifier's limit of 1 ms was reached before it started\\.$`, 'm'))
     expect(theResultOf(run.result).checks).toEqual(Object.fromEntries(CHECKS.map((name) => [name, false])))
   })
+
+  it(`8. given a heap of ${String(HEAP_MB)} MiB, smaller than each tree, gives the verdicts it gives on a small root, and holds no tree whole`, () => {
+    // THE HEAP FLAG ALONE CANNOT FAIL A VERIFIER THAT READS EVERY TREE WHOLE. The verifier of round 171 held each file as
+    // a Buffer, and a Buffer's bytes are kept outside the V8 heap, which is all that --max-old-space-size bounds. So it
+    // passes under that flag with trees far larger than the heap. Its peak resident memory counts those bytes. So this
+    // case compares that peak on the large root with the peak on a small root, which is the same export without the
+    // made-up pages, plus the bytes of one tree. A verifier that holds the three trees cannot stay under that. One that
+    // holds one file of each side at a time can.
+    const heap = [`--max-old-space-size=${String(HEAP_MB)}`]
+    const small = aCase()
+    const onTheSmall = verified(small, { node: [...heap, '--import', aPeakWriter(join(small.at, 'peak'))] })
+    expect(onTheSmall.status, onTheSmall.stdout + onTheSmall.stderr).toBe(0)
+    const large = aCase()
+    const page = (n: number) => `revisions/made-up-pages-larger-than-the-heap/${String(n)}.md`
+    for (const tree of [large.mirrorBefore, large.first, large.second]) {
+      mkdirSync(join(tree, 'revisions', 'made-up-pages-larger-than-the-heap'), { recursive: true })
+      for (let n = 1; n <= PAGES; n++) writeFileSync(join(tree, page(n)), aMadeUpPage(n))
+    }
+    const oneTree = theBytesUnder(large.first)
+    expect(oneTree).toBeGreaterThan(HEAP_MB * 1024 * 1024)
+    const onTheLarge = verified(large, { within: '300000', node: [...heap, '--import', aPeakWriter(join(large.at, 'peak'))] })
+    expect(onTheLarge.status, onTheLarge.stdout + onTheLarge.stderr).toBe(0)
+    expect(theLinesOf(onTheLarge.stdout)).toEqual(theLinesOf(onTheSmall.stdout))
+    expect(theLinesOf(onTheLarge.stdout)).toEqual(onlyThisFails('none'))
+    expect(theDifferences(onTheLarge.stdout)).toEqual([])
+    expect(theResultOf(onTheLarge.result).checks).toEqual(theResultOf(onTheSmall.result).checks)
+    const [peakOnTheLarge, peakOnTheSmall] = [thePeakIn(join(large.at, 'peak')), thePeakIn(join(small.at, 'peak'))]
+    expect(peakOnTheLarge, `${String(peakOnTheSmall)} bytes at most on the small root, and ${String(oneTree)} in one tree`).toBeLessThanOrEqual(peakOnTheSmall + oneTree)
+    // ONE PAGE CHANGED IN THE MIDDLE, with its size kept, so only its bytes tell it from export-1's.
+    const one = page(PAGES / 2)
+    changed(join(large.second, one), (text) => {
+      const at = text.length / 2
+      return `${text.slice(0, at)}${text[at] === 'X' ? 'Y' : 'X'}${text.slice(at + 1)}`
+    })
+    const onTheChanged = verified(large, { within: '300000', node: heap })
+    expect(onTheChanged.status, onTheChanged.stdout + onTheChanged.stderr).toBe(1)
+    expect(theLinesOf(onTheChanged.stdout)).toEqual(onlyThisFails('second-export'))
+    expect(theDifferences(onTheChanged.stdout)).toEqual([`  export-2/${one}: holds other bytes than export-1/${one}.`])
+    expect(theResultOf(onTheChanged.result).checks).toEqual(Object.fromEntries(CHECKS.map((name) => [name, name !== 'second-export'])))
+  }, 600_000)
 })

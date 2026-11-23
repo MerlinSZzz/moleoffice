@@ -1,5 +1,0 @@
-2026-10-08 01:09:35 merge entry hWTDEGrJQLBM (git) is testing; lane /srv/mole-office; workdir /srv/mole-office-cache/merge-queue/hWTDEGrJQLBM
-2026-10-08 01:09:49 tested with merge entries be6wb4AnQNGn, 26z3ZMJAfjEz in one suite, on the bus's tree 40bb5e2495a04271ed836adbdf36d96203c51c6b
-2026-10-08 02:12:30 main moved from 4b6580caf16dd466bb750099e87c09cca29f0454 to 13c7308e4a72bd175e656ceb3d8cccd3c71e9b85 by fast-forward
-2026-10-08 02:12:50 the office decided: Merged: the main world is at 13c7308e4a72bd175e656ceb3d8cccd3c71e9b85. The receipt is on the entry and on run yfnrQVuVac3A.
-2026-10-08 02:12:50 the office answered: the entry is now merged

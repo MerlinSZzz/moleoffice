@@ -30,7 +30,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import type { FastifyInstance } from 'fastify'
 
-import { apiApp, freshDb, type TestDb } from './helpers.ts'
+import { apiApp, freshDb, type TestDb, governsTheWholeProject } from './helpers.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 import type { Change } from '../src/shared/types.ts'
 
@@ -99,7 +99,9 @@ beforeEach(async () => {
     payload: {
       kind: 'decision',
       title: 'Keep the port as it is',
-      data: { replaces: [], option_taken: 'a — keep it', because: 'it has worked for a month', decided_by: THE_OWNER },
+      data: {
+        ...governsTheWholeProject(),
+        replaces: [], option_taken: 'a — keep it', because: 'it has worked for a month', decided_by: THE_OWNER },
     },
   })
   expect(made.statusCode, made.body).toBe(201)

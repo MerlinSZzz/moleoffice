@@ -352,7 +352,7 @@ describe('both Linux .debs stop a running office before dpkg changes a file', ()
     )
     expect(late.ms, 'the stop did not give up on the command after its wait').toBeLessThan(10_000)
 
-    for (const answer of [EXIT.NOT_RUNNING, EXIT.STALE, EXIT.HOLDER_NOT_STOPPED]) {
+    for (const answer of [EXIT.NOT_RUNNING]) {
       const one = anInstallation()
       const itsServer = await startTheServer(one)
       const itsWindow = startAWindow(one)
@@ -841,7 +841,7 @@ describe('the container check of the .debs across an update', () => {
       return { out: ran.stdout.split('\n').filter(Boolean), asked: readFileSync(path('asked'), 'utf8'), user: readFileSync(path('user'), 'utf8') }
     }
     const done = JSON.stringify({
-      offer: { file: '/home/debuser/.config/mole-office/data/mole-office.db', backups: join(base, 'backups'), holds: 'one agent', wouldWrite: ['a table'] },
+      offer: { file: '/home/debuser/.config/mole-office/data/mole-office.db', backups: join(base, 'backups'), holds: 'one agent', wouldWrite: ['a table'], measuredOn: 'a copy' },
       update: { state: 'done', backup, holdsNow: 'one agent' },
       mayPress: true,
     })

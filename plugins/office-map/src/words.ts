@@ -3,10 +3,15 @@
 import type { ReadFailure } from './contracts.ts'
 import type { GeometryFailure } from './geometry-client.ts'
 
+/** The compact role marks are paired here so both languages use the same role vocabulary. */
+export const roleMarks: Record<string, { en: string; zh: string }> = {
+  worker: { en: 'Wo', zh: '工' }, inspector: { en: 'In', zh: '检' },
+  secretary: { en: 'Se', zh: '秘' }, supervisor: { en: 'Su', zh: '主' },
+}
+
 /** New words go in English only and wait for the translation round, so Chinese shows these in English until then. */
 const awaitingTranslation = {
   asleepUnread: 'Who is asleep could not be read, so nobody is drawn asleep.',
-  asleepPlate: 'Asleep',
 } as const
 
 export const words = {
@@ -25,7 +30,7 @@ export const words = {
     onlineUnread: 'Who is online could not be read, so every agent is drawn.',
     asleepNoPlace: 'Asleep agents with no place left: {count}.',
     asleepMadeUp: 'Made up for a picture: who is asleep was set by a picture tool, not read from the office.',
-    madeUpSleep: 'Made-up sleep', ...awaitingTranslation,
+    madeUpSleep: 'Made-up sleep', asleepPlate: 'Asleep', ...awaitingTranslation,
     refresh: 'Refresh', pause: 'Pause reads', resume: 'Resume reads', all: 'Whole office',
     filter: 'Project', search: 'Find a person', loading: 'Reading', ready: 'Last read', stale: 'Stale · last read',
     unavailable: 'Unavailable', permission: 'Access refused. The previous reading has been cleared.',
@@ -78,7 +83,7 @@ export const words = {
     onlineUnread: '无法读取谁在线，所以画出了每一个智能体。',
     asleepNoPlace: '没有睡觉位置的智能体：{count} 个。',
     asleepMadeUp: '图片专用虚构内容：谁在睡觉由图片工具设定，不是从办公室读取的。',
-    madeUpSleep: '虚构睡眠', ...awaitingTranslation,
+    madeUpSleep: '虚构睡眠', asleepPlate: '睡着了', ...awaitingTranslation,
     refresh: '刷新', pause: '暂停读取', resume: '恢复读取', all: '整个办公室',
     filter: '项目', search: '查找成员', loading: '正在读取', ready: '上次读取', stale: '已过时 · 上次读取',
     unavailable: '不可用', permission: '访问被拒绝，已清除之前的数据。',

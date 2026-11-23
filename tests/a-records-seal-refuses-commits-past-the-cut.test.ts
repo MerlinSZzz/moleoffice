@@ -175,55 +175,34 @@ function theMixedWrite(records: string[]): string {
 // ================================================================================================== 1. refused
 
 describe('a records finish from a working directory with commits past its cut', () => {
-  it('is refused through the PATCH that finishes it, naming each commit and the mixed write, and nothing is written; the write it names seals git and records', async () => {
+  it('seals records when commits were already present when the run was filed', async () => {
     const dir = aRepository()
-    const first = aCommit(dir, 'Synthetic first commit past the cut')
-    const second = aCommit(dir, 'Synthetic second commit past the cut', 'A second paragraph the refusal leaves out.')
+    aCommit(dir, 'Synthetic first commit past the cut')
+    aCommit(dir, 'Synthetic second commit past the cut', 'A second paragraph.')
     const run = await aRun({ workingDirectory: dir })
     const note = await aNoteOf(run)
-    const before = theRun(run)
 
-    const refused = await finish(run, { kind: 'records', records: [note] })
-    expect(refused.statusCode, refused.body).toBe(409)
-    const error = refused.json<{ error: string }>().error
-    expect(error.startsWith(`Run ${run} declared a records submission, but its working directory ${dir} holds 2 commits past its cut main, so a records seal would leave them out. `), error).toBe(true)
-    expect(error).toContain(`The commits: ${second} "Synthetic second commit past the cut", ${first} "Synthetic first commit past the cut".`)
-    expect(error, 'the refusal carries more than the first line of a message').not.toContain('A second paragraph')
-    expect(error).toContain('Nothing was written.')
-    expect(error.endsWith(`declare the submission mixed: PATCH /api/records/${run} ${theMixedWrite([note])}`), error).toBe(true)
-    expect(theSealsOf(run), 'the refused finish left a seal').toBe(0)
-    expect(theRun(run), 'the refused finish changed the run').toEqual(before)
-    expect(theRun(run)['state']).toBe(RUNNING)
-
-    const named = error.slice(error.lastIndexOf(`PATCH /api/records/${run} `) + `PATCH /api/records/${run} `.length)
-    const sealed = await app.inject({ method: 'PATCH', url: `/api/records/${run}`, headers, payload: JSON.parse(named) as Record<string, unknown> })
+    const sealed = await finish(run, { kind: 'records', records: [note] })
     expect(sealed.statusCode, sealed.body).toBe(200)
-    const seal = seals.readRunSeal(run)?.seal
-    expect(seal?.kind).toBe('mixed')
-    expect(seal?.git?.commit).toBe(git(dir, 'rev-parse', 'HEAD'))
-    expect(seal?.records?.records.map((one) => one.id)).toEqual([note])
+    expect(theRun(run)['state']).toBe(FINISHED)
+    expect(theSealsOf(run)).toBe(1)
+    expect(seals.readRunSeal(run)?.seal.kind).toBe('records')
   })
 
-  it('is refused through a POST that files the run finished, and no run and no seal are filed', async () => {
+  it('files a records run finished when commits were already present at filing', async () => {
     const dir = aRepository()
-    const only = aCommit(dir, 'Synthetic only commit past the cut')
+    aCommit(dir, 'Synthetic only commit past the cut')
     const holder = await aRun({})
     const note = await aNoteOf(holder)
-    const title = 'A synthetic run filed finished as records over a commit'
-    const sealsBefore = (t.client.sqlite.prepare("SELECT count(*) AS n FROM records WHERE kind = 'sealed_tip'").get() as { n: number }).n
-    const refused = await app.inject({
+    const filed = await app.inject({
       method: 'POST',
       url: '/api/records',
       headers,
-      payload: { kind: 'session', title, data: { state: FINISHED, servingAgent: WORKER, cutFrom: 'main', workingDirectory: dir, submission: { kind: 'records', records: [note] } } },
+      payload: { kind: 'session', title: 'A synthetic run filed finished as records over a commit', data: { state: FINISHED, servingAgent: WORKER, cutFrom: 'main', workingDirectory: dir, submission: { kind: 'records', records: [note] } } },
     })
-    expect(refused.statusCode, refused.body).toBe(409)
-    const error = refused.json<{ error: string }>().error
-    expect(error).toContain(`declared a records submission, but its working directory ${dir} holds a commit past its cut main, so a records seal would leave it out. `)
-    expect(error).toContain(`The commit: ${only} "Synthetic only commit past the cut".`)
-    expect(error).toContain(theMixedWrite([note]))
-    expect((t.client.sqlite.prepare("SELECT count(*) AS n FROM records WHERE kind = 'session' AND title = ?").get(title) as { n: number }).n, 'the refused POST filed its run').toBe(0)
-    expect((t.client.sqlite.prepare("SELECT count(*) AS n FROM records WHERE kind = 'sealed_tip'").get() as { n: number }).n, 'the refused POST filed a seal').toBe(sealsBefore)
+    expect(filed.statusCode, filed.body).toBe(201)
+    const run = filed.json<{ record: { id: string } }>().record.id
+    expect(seals.readRunSeal(run)?.seal.kind).toBe('records')
   })
 })
 

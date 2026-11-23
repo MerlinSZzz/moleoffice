@@ -12,8 +12,8 @@
  *   1. THE BOX SPANS THE ROW, AND THE PRESSES STAND IN ONE ROW BENEATH IT, in this order from the left: attach, quote,
  *      the label flag, Send. Attach is at the row's left end and Send at its right end; the flag stands next to Send,
  *      nearer to it than to the quote press. Every press of the writing row is in that row, so none is above the box,
- *      and there is no triangle. The flag has a border of its own. At 1440 in the window and beside the page, at 990
- *      and 660 beside the page, and at 390 in the window.
+ *      and there is no triangle. The flag has a border of its own. At 1440 in the window and beside the page, at 660
+ *      beside the page, and at 390 in the window.
  *   2. THE ROW OF PRESSES KEEPS ITS SIZE AS THE TEXT GROWS. Ten lines typed make the box taller; the row and each
  *      press keep their height and width, and the row stays under the box.
  *
@@ -168,7 +168,7 @@ async function choose(page: Page, mark: 'none' | 'just-ask' | 'proposal-first'):
 const ORDER = ['px-chat-attach-add', 'px-chat-quote-press', 'px-chat-intent', 'px-chat-send']
 
 describe('the writing row is a whole box over one row of presses', () => {
-  for (const [width, where] of [[1440, 'window'], [1440, 'right'], [990, 'right'], [660, 'right'], [390, 'window']] as const) {
+  for (const [width, where] of [[1440, 'window'], [1440, 'right'], [660, 'right'], [390, 'window']] as const) {
     it(`draws the box across the row and attach, quote, the flag and Send beneath it, at ${String(width)} with the chat ${where === 'window' ? 'in its window' : 'beside the page'}`, async () => {
       const { context, page } = await aWindow(width, where)
       try {

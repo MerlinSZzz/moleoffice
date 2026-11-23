@@ -408,7 +408,7 @@ describe('the collecting state is drawn two ways, and the words are in the colum
     const listed = (await (await fetch(`${api}/api/reviews?state=collecting`)).json()) as { reviews: { id: string }[] }
     const id = listed.reviews[0]?.id
     if (id === undefined) throw new Error('no review is collecting, so this test would prove nothing')
-    const finished = await fetch(`${api}/api/reviews/${encodeURIComponent(id)}/finish-collecting`, { method: 'POST' })
+    const finished = await fetch(`${api}/api/reviews/${encodeURIComponent(id)}/finish-collecting`, { method: 'POST', headers: { 'x-mole-office-workspace': WORKSPACE } })
     expect(finished.ok, await finished.text()).toBe(true)
     await page.evaluate((reviewId) => {
       window.localStorage.setItem('mole-office.review', `shut|||${reviewId}|default`)

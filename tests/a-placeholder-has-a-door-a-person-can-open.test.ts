@@ -30,6 +30,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 import type { FastifyInstance } from 'fastify'
 import { createElement as h } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
+import { t } from '../src/shared/i18n.ts'
 import { THE_TEST_OFFICES_OWNER } from './a-page-of-a-test-office.ts'
 import { apiApp, freshDb, type TestDb } from './helpers.ts'
 import { RESTRICTION_MARKS, withoutHueOfRestriction } from './restriction-helpers.ts'
@@ -43,18 +44,18 @@ let PROJECT = 'default'
 let HUMAN: Record<string, string>
 let caseNumber = 0
 
-let t: TestDb
+let db: TestDb
 let app: FastifyInstance
 
 beforeAll(async () => {
-  t = await freshDb()
+  db = await freshDb()
   app = (await apiApp()).app
   await app.ready()
 }, 60_000)
 
 afterAll(async () => {
   await app.close()
-  t.close()
+  db.close()
 })
 
 beforeEach(async () => {
@@ -151,7 +152,7 @@ describe('a result that rests on a placeholder says what it may not be used to c
     expect(said).toContain(RESTRICTION_MARKS['stops_final.active']!.word)
     expect(said).not.toContain('stops_final')
     // AND WHERE IT CAME FROM.
-    expect(said).toContain('This record is what it is about.')
+    expect(said).toContain(t('g2d.restrictions.reach.direct'))
   })
 
   it('says what could not be checked, so a short answer cannot read as a complete one', async () => {
@@ -162,9 +163,7 @@ describe('a result that rests on a placeholder says what it may not be used to c
     const html = renderToStaticMarkup(
       h(mod.RestrictionsHere, { recordId: result, reading, onJudged: () => {} } as never),
     )
-    // The sentence is the reply's own. It is behind a press, which is where a fold belongs, so this
-    // reads the markup rather than the drawn text.
-    expect(strip(html)).toContain(reading.couldNotCheck[0]!.because.slice(0, 40))
+    expect(text(html)).toContain(t('g2d.restrictions.state.notChecked', { what: reading.couldNotCheck[0]!.what }))
   })
 
   it('draws a harmless one differently from a production-blocking one, and not in colour', async () => {
@@ -220,13 +219,13 @@ describe('a result that rests on a placeholder says what it may not be used to c
     const html = renderToStaticMarkup(
       h(mod.RestrictionsHere, { recordId: idle, reading, onJudged: () => {} } as never),
     )
-    expect(text(html)).toContain('No placeholder or fallback was found that limits this record.')
+    expect(text(html)).toContain(t('g2d.restrictions.state.none'))
     // NOT A PANEL. A panel saying nothing on every record in the corpus is furniture, and furniture
     // stops being read.
     expect(strip(html)).not.toContain('px-panel')
-    // AND WHAT COULD NOT BE CHECKED IS STILL ONE PRESS AWAY. "Nothing restricts this" and "nobody
-    // could look" must not read the same.
-    expect(strip(html)).toContain(reading.couldNotCheck[0]!.because.slice(0, 40))
+    // AND WHAT COULD NOT BE CHECKED IS STILL DRAWN. "Nothing restricts this" and "nobody could look"
+    // must not read the same.
+    expect(text(html)).toContain(t('g2d.restrictions.state.notChecked', { what: reading.couldNotCheck[0]!.what }))
   })
 })
 

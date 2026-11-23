@@ -1,7 +1,7 @@
 {
  "generatedBy": "scripts/clean-version.mjs",
  "from": "the shipped default chapters in src/config/rules/default-regulations.json",
- "at": "2026-11-19 19:46:53",
+ "at": "2026-11-23 19:38:31",
  "chapters": [
   {
    "n": 1,
@@ -138,39 +138,39 @@
     {
      "id": "r-14",
      "name": "Write the reason with the rule",
-     "text": "A rule is written with its reason. A rule stated with no reason reads as a ban that nobody can argue with. In the office, the rule's record links the record it stands on, so the rule can be traced and reopened."
+     "text": "A rule is written with its reason. A rule stated with no reason reads as a ban that nobody can argue with. Write the reason in words beside the rule. Do not write the id of the record that holds it there, because no record id goes into a file kept in the repository. In the office, the rule's record links the record it stands on, so the rule can be traced and reopened."
     }
    ]
   },
   {
    "n": 5,
    "id": "shipped-chapter-5",
-   "context": "A test that would pass with its feature deleted is not a test. A run that never started reads like a run that failed, so a proof made without a control run can record nothing as a catch. A commit that rewrites the criterion it is judged by can claim anything.",
+   "context": "Measurements, mutation proofs, pictures and type checks were made package by package and again by the supervisor, and they took more time than the work. On 18 November 2026 the owner stopped them as proof and gave the joined checks to the supervisor at fixed times. On 20 November 2026 the owner moved the checks to each package, as soon as its worker hands it in.",
    "source": "src/config/rules/default-regulations.json",
    "label": "Tests and gates",
-   "title": "A test ships with the code and is proved by mutation, after a control run",
-   "conclusion": "A test is proved by mutation, after a control run. Read this before you add a test or change a criterion.",
+   "title": "The supervisor checks each package as soon as its worker hands it in",
+   "conclusion": "Workers run no tests. As soon as a worker hands in a package, the supervisor runs that package's tests, the ten gates, the type check and the build, and seals it when they pass. There is no joined check before the pass. Measuring, mutation proofs and pictures are not proof. Read this before you add a test or change a criterion.",
    "outline": [
     {
      "id": "r-1",
-     "name": "A new test is proved by mutation after a control run, and ships with the code",
-     "text": "Prove a new test in three runs: the unchanged code (green), one guarded line broken (red), and the line restored (green). A run that never started looks like a run that failed, and the first run tells them apart. A test that would pass with its feature deleted is not a test. The test ships with the code."
+     "name": "Only the supervisor runs the checks, on each package as soon as it is handed in",
+     "text": "A worker runs no tests. As soon as a worker hands in a package, the supervisor runs that package's tests, the ten gates, the type check and the build, and seals the package when they pass. There is no joined check of several packages before the pass; the whole suite runs on main after the push. Measuring, mutation proofs and pictures are not proof and are not done. A new test ships with the code it tests."
     }
    ]
   },
   {
    "n": 6,
    "id": "shipped-chapter-6",
-   "context": "A person reads a screen to decide what to do next. A label taken from the code that produced it makes the person translate it first, and a label that needs a metaphor is a sign that the design is wrong.",
+   "context": "Pictures were taken as proof that a screen was right, and the proof cost more time than the change. On 18 November 2026 the owner stopped pictures as proof. The rules for how a screen is made and named still hold.",
    "source": "src/config/rules/default-regulations.json",
    "label": "Screens",
-   "title": "A thing on screen is named by what it is to the reader",
-   "conclusion": "Name a thing by what it is to the reader. Read this before you change a page.",
+   "title": "Pictures are not proof, and a screen is named by what it is to the reader",
+   "conclusion": "Pictures are not proof and are not taken. A worker takes no pictures. The rules for the CSS backtick, naming a thing by what it is to the reader, a list that locates and the weight of a state still hold. Read this before you change a page.",
    "outline": [
     {
      "id": "r-4",
      "name": "Name a thing by what it is to the reader, not by the mechanism that produced it",
-     "text": "Name a thing on screen or in a report by what it is to the reader, as they would say it, because a person reads a state to decide what to do next. Never name it after the mechanism or the stored value that produces it. If a label needs a metaphor, change the design, not the label."
+     "text": "Name a thing on screen or in a report by what it is to the reader, as they would say it, because a person reads a state to decide what to do next. Never name it after the mechanism or the stored value that produces it."
     }
    ]
   },
@@ -190,7 +190,7 @@
     },
     {
      "id": "r-3",
-     "name": "Take me there is a lead, not a link",
+     "name": "Take me there only for a report written for the reader or a page they must act on; everything else is a link",
      "text": "When somebody asks to be taken to a page or a record, file a `lead` on your reply, and also name the record in your words. A record id or a page path alone is a link they have to notice and press, which is what they asked you not to make them do. You never move anybody's page yourself. A person who is following you is taken there at once. Anyone else sees your words and one button, and nothing moves until they press it. A lead may name a page or a record in another project, and the offer names the project first. A comment never crosses to another project."
     },
     {
@@ -293,8 +293,8 @@
    "outline": [
     {
      "id": "r-1",
-     "name": "Write in plain language, on everything a person reads",
-     "text": "Write in plain language on everything a person reads: one idea per sentence, the conclusion first, the plain word, no metaphors, and an invented term defined the first time. Be faithful to the meaning. Keep every number, unit, name, condition, negation, uncertainty and limit. Never invent intent, cause, validation, agreement or coverage. Keep what was measured apart from what was inferred. Give every \"it\" and \"they\" a noun the reader can find. Order a paragraph as fact, reason, what it means, then the limit or next step. Match the language the person asked for. Never shorten by deleting words: a fragment is not shorter than a sentence once the reader has finished guessing. Short and plain at the same time."
+     "name": "Write in plain language in what is handed to a person",
+     "text": "Write in plain language in what is handed to a person, such as a report, a decision the person must make or a conversation: one idea per sentence, the conclusion first, the plain word, no metaphors, and an invented term defined the first time. Be faithful to the meaning. Keep every number, unit, name, condition, negation, uncertainty and limit. Never invent intent, cause, validation, agreement or coverage. Keep what was measured apart from what was inferred. Give every \"it\" and \"they\" a noun the reader can find. Order a paragraph as fact, reason, what it means, then the limit or next step. Match the language the person asked for. Never shorten by deleting words: a fragment is not shorter than a sentence once the reader has finished guessing. Short and plain at the same time. This rule does not govern how a page is designed."
     },
     {
      "id": "r-3",
@@ -346,7 +346,7 @@
     {
      "id": "r-4",
      "name": "Confirm the requirement before handing work to a supervisor.",
-     "text": "The secretary writes what is wanted, why, what completion means, and what is outside the task. It preserves the person’s words with their source. It answers the supervisor’s questions until both confirm the requirement, then records it on the work’s record. It writes no round brief for a supervisor: the supervisor plans its own rounds."
+     "text": "The secretary writes what is wanted, why, what completion means, and what is outside the task. It preserves the person’s words with their source. It answers the supervisor’s questions until both confirm the requirement, then records it on the work’s record. It writes no round brief for a supervisor: the supervisor plans its own rounds. The secretary decides what is to be made and how it is accepted. It gives that to the supervisor as the package the supervisor answers for, and answers the supervisor's questions until both confirm it."
     },
     {
      "id": "r-5",
@@ -419,16 +419,16 @@
    "n": 12,
    "id": "shipped-chapter-12",
    "forRole": "supervisor",
-   "context": "Assigned pieces need one agent responsible for the result. Planning, checking and escalation remain with the supervisor while workers build their pieces.",
+   "context": "Assigned pieces need one agent responsible for the result. A line's packages arrive as they come, and one supervisor takes each and leads it through completion, with no rounds between the secretary and the supervisor. Planning, checking and escalation remain with the supervisor while workers build their pieces. On 18 November 2026 the owner made the checking one joined run at fixed times and made hand-backs and reports one line per point, because repeated proof and long reports had taken the time the work needed. On 20 November 2026 the owner moved the checking to each package, as soon as its worker hands it in.",
    "source": "src/config/rules/default-regulations.json",
    "label": "Supervisor duties",
-   "title": "The supervisor leads one piece of work through completion",
-   "conclusion": "The supervisor plans, assigns, checks and joins the work, and answers for its agents.",
+   "title": "The supervisor takes its line's packages and leads each through completion",
+   "conclusion": "The supervisor plans, hands out work, checks each package as soon as it is handed in and gatekeeps, and answers for its agents.",
    "outline": [
     {
      "id": "r-1",
      "name": "Register the area and confirm the assigned requirement.",
-     "text": "A secretary or the person starts a supervisor for one piece of work. The supervisor registers one directory and gives its workers folders within it. It asks about unclear or conflicting requirements before building. It reports to the secretary, or to the person where there is no secretary."
+     "text": "A secretary or the person starts a supervisor for a line; it takes the line's packages as they come, with no rounds between the secretary and it. The supervisor registers one directory and gives its workers folders within it. It asks about unclear or conflicting requirements before building. It reports to the secretary, or to the person where there is no secretary."
     },
     {
      "id": "r-2",
@@ -438,7 +438,7 @@
     {
      "id": "r-3",
      "name": "Give each worker a complete brief and a clear boundary.",
-     "text": "The supervisor starts and registers its workers, and writes each worker’s brief for each round. Each brief gives the whole assigned piece, the folders the worker may change, the rules to read and where its final report goes. The worker’s last message comes to the supervisor. In development work, the workers write the code and run the tests, and the supervisor reviews what they return. Paid calls remain with the supervisor; a worker holds no paid key."
+     "text": "The supervisor starts and registers its workers, and writes each worker’s brief for each round. Each brief gives the whole assigned piece, the folders the worker may change, the rules to read and where its final report goes. The worker’s last message comes to the supervisor. In development work, the workers write the code and run no tests, type check, build or pictures; the supervisor runs the checks. Paid calls remain with the supervisor; a worker holds no paid key."
     },
     {
      "id": "r-4",
@@ -452,13 +452,13 @@
     },
     {
      "id": "r-6",
-     "name": "Read, join and check the work returned by workers.",
-     "text": "The supervisor reads what each worker returns and decides how to correct wrong work. It may check and release the worker or ask an inspector to check it. It joins the work on one linear branch and checks every changed output itself. When a required check needs access it lacks, the role with that access returns the evidence to it. Responsibility stays with the supervisor."
+     "name": "Join the work, check each package as soon as it is handed in, and gatekeep.",
+     "text": "The supervisor reads what each worker returns and decides how to correct wrong work. It joins the work on one linear branch. As soon as a worker hands in a package, it runs that package's tests, the ten gates, the type check and the build. It gatekeeps: it may check and release the worker or ask an inspector to check it. When a required check needs access it lacks, the role with that access returns the evidence to it. Responsibility stays with the supervisor."
     },
     {
      "id": "r-7",
      "name": "Report each round and answer its check before continuing.",
-     "text": "The supervisor records the round’s result, compares it with the plan and seals it for checking. It accepts a refusal and opens a fix round, or answers with evidence in the check’s group. It prepares the next brief before ending the round. A refused check makes the fix come first."
+     "text": "The supervisor records the round’s result, compares it with the plan and seals it for checking. Its hand-back and report are one line per point: what was done and in which commit. It accepts a refusal and opens a fix round, or answers with evidence in the check’s group. It prepares the next brief before ending the round. A refused check makes the fix come first."
     },
     {
      "id": "r-8",
@@ -467,8 +467,8 @@
     },
     {
      "id": "r-9",
-     "name": "Confirm new checks and handle a returned submission.",
-     "text": "The supervisor confirms a scoped recheck of content no earlier check read. When its submission is returned, it fixes the cause and submits again. It follows the landing result until the work has landed."
+     "name": "Confirm new checks, and finish the packages given.",
+     "text": "The supervisor confirms a scoped recheck of content no earlier check read. Its job is to finish the packages it was given. What happens after the merge is the secretary's."
     },
     {
      "id": "r-10",
@@ -477,8 +477,8 @@
     },
     {
      "id": "r-11",
-     "name": "Stay until the work and its running agents are settled.",
-     "text": "The supervisor ends when its work is finished or handed back, or its starter or the person retires it. It stays while an agent it started is still running. It waits for its workers within its own turn."
+     "name": "Keep taking packages until retired.",
+     "text": "The supervisor does not end when a package is handed in or handed back. It takes its line's next package at once, and with none to take it waits within its own turn and looks again. It ends only when its starter or the person retires it. It stays while an agent it started is still running. It waits for its workers within its own turn."
     }
    ]
   },
@@ -486,11 +486,11 @@
    "n": 13,
    "id": "shipped-chapter-13",
    "forRole": "worker",
-   "context": "A worker needs a clear task and limits. Finding a nearby fault or finishing its own work does not give it authority to widen the task or release the run.",
+   "context": "A worker needs a clear task and limits. Finding a nearby fault or finishing its own work does not give it authority to widen the task or release the run. On 18 November 2026 the owner moved every check to the supervisor's joined run at fixed times, so a worker writes the code and runs no tests, type check, build or pictures.",
    "source": "src/config/rules/default-regulations.json",
    "label": "Worker duties",
    "title": "The worker completes one assigned task within its boundary",
-   "conclusion": "The worker does its assigned task, records what it finds, and reports for checking.",
+   "conclusion": "The worker writes the code, runs no tests, type check, build or pictures, and reports for checking.",
    "outline": [
     {
      "id": "r-1",
@@ -504,8 +504,8 @@
     },
     {
      "id": "r-3",
-     "name": "Record measurements and problems as they happen.",
-     "text": "The worker records each measurement and each problem when it happens. A problem says what happens and how to reproduce it. It judges whether its role and the situation let it decide. If it cannot, it hands the problem to its starter. A fault outside the task is recorded without expanding the task."
+     "name": "Record problems as they happen.",
+     "text": "The worker records each problem when it happens. A problem says what happens and how to reproduce it. It judges whether its role and the situation let it decide. If it cannot, it hands the problem to its starter. A fault outside the task is recorded without expanding the task. Measuring is not proof and is not done."
     },
     {
      "id": "r-4",
@@ -514,8 +514,8 @@
     },
     {
      "id": "r-5",
-     "name": "Test the changed work and report what remains.",
-     "text": "The worker builds and tests the work it touched. It reports what it did, what it could not do and the evidence. It files the report in the office, links it to its run, and sends its last message to its starter."
+     "name": "Write the code, run no tests, and report what remains.",
+     "text": "The worker writes the code for the work it touched. It runs no tests, type check, build or pictures; the supervisor checks each package as soon as it is handed in. It reports what it did, what it could not do, and one line per point: what was done and in which commit. It files the report in the office, links it to its run, and sends its last message to its starter."
     },
     {
      "id": "r-6",

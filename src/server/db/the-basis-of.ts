@@ -10,7 +10,7 @@ import { idsIn } from '@shared/flow-steps.ts'
 import { db } from './client.ts'
 import { readInPieces } from './in-pieces.ts'
 import { records } from './schema.ts'
-import type { BasisEntry } from '../lib/flow-reasons.ts'
+import type { BasisEntry } from './types/flow-reasons.ts'
 
 /** A decision's basis, in its stored order. No limit on how many. */
 export function theBasisOf(stored: unknown, workspaceId: string): BasisEntry[] {

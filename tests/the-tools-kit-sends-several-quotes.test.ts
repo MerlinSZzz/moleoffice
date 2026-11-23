@@ -165,7 +165,7 @@ describe('the message script in tools/kit', () => {
 
     const sent = await sendMessage(
       [WS, `person:${THE_PERSON}`, 'Two places', bodyFile, '--as', sender, '--api', api, '--quote', b, 'the glaze crazed', '--quote', a],
-      only({}),
+      only({ MOLE_AGENT_KEY: 'made-up-key-for-the-stand-in' }),
     )
     expect(sent.code, sent.printed).toBe(0)
     expect(kept).toHaveLength(1)
@@ -190,7 +190,7 @@ describe('the message script in tools/kit', () => {
     const sent = await sendMessage(
       [WS, 'another-agent', 'Ids with dashes', bodyFile, '--as', 'the-sender', '--api', api,
         '--quote', '--Xy3fGh_jklm', '--quote', '-AbCd3fGh_jk', 'the words in it', '--lead', '-LeAd3fGh_jk'],
-      only({}),
+      only({ MOLE_AGENT_KEY: 'made-up-key-for-the-stand-in' }),
     )
     expect(sent.code, sent.printed).toBe(0)
     const body = JSON.parse(kept[0]?.body ?? '{}') as { data: Record<string, unknown> }
@@ -212,7 +212,7 @@ describe('the message script in tools/kit', () => {
     const joined = await sendMessage(
       [WS, 'another-agent', 'Joined ids', bodyFile, '--as', 'the-sender', '--api', api,
         '--quote=-AbCd3fGh_jk', 'the words in it', '--quote=--Xy3fGh_jklm'],
-      only({}),
+      only({ MOLE_AGENT_KEY: 'made-up-key-for-the-stand-in' }),
     )
     expect(joined.code, joined.printed).toBe(0)
     const body = JSON.parse(kept[0]?.body ?? '{}') as { data: Record<string, unknown> }

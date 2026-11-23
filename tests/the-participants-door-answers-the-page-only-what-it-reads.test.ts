@@ -39,6 +39,7 @@ const DRAWN_OF_A_PARTICIPANT = [
   'record', // src/web/components/agent/TalkBox.tsx carryTheShownRecipient
   'addressAs', // src/web/components/ResidentProposals.tsx ResidentProposals
   'themes', // src/web/lib/the-look.ts readThePersonsLook
+  'startingMode', // src/web/lib/starting-mode.ts takeTheStartingMode
 ]
 const PERSON = { 'x-mole-office-workspace': 'default', 'x-mole-office-actor-type': 'human', 'x-mole-office-actor-id': THE_PERSON }
 let t: TestDb

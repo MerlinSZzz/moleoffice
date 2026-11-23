@@ -23,7 +23,8 @@
  *   a person's message in the idle line's words, one has nothing, and one has an idle line deleted in the database by
  *   hand. The office's own door refuses to delete a notice from the office, so the last is not a state the office
  *   makes, but the read has always left a deleted message out.
- * - The read gives back each of the five lines, to the agent it was written to, with its stamp, when the tick asks it.
+ * - The read gives back each of the five lines, to the agent it was written to, with its stamp and the moment the record
+ *   door kept beside that stamp (`data.writtenTime.instant`), when the tick asks it.
  * - SQLite plans the read from the index of when a record last changed, from a day before the watcher started, with
  *   the values bound to it, and finds each line's delivery rows by the message's id. The plan is read from SQLite
  *   itself, as tests/the-reminders-and-the-decisions-find-their-rows-by-id.test.ts reads it.
@@ -126,15 +127,16 @@ it("the idle reminder reads the office's lines from who wrote them, and says the
   // THE SAME AGENTS ARE REMINDED, AND THE SAME ARE LEFT ALONE.
   expect([...reminded].sort(), 'the agents reminded that they are idle').toEqual([otherWords, byAPerson, untold, deleted].map((one) => one.handle).sort())
 
-  // THE READ IS SEEN, and gives back each line the office said to the agent it said it to, with its stamp.
+  // THE READ IS SEEN, and gives back each line the office said to the agent it said it to, with its stamp and its moment.
   const ofIdleLines = reads.filter((one) => one.values.includes(IDLE))
   expect(ofIdleLines.length, 'the reads of the idle lines the office has already said').toBeGreaterThan(0)
   const stampOf = (id: string): string => (t.client.sqlite.prepare('SELECT created_at AS at FROM records WHERE id = ?').get(id) as { at: string }).at
-  const written = [...toldBy].map(([line, agent]) => `${agent} ${stampOf(line)}`).sort()
+  const momentOf = (id: string): unknown => ((t.api.getRecord(id)!.data as Record<string, unknown>)['writtenTime'] as { instant?: unknown } | undefined)?.instant
+  const written = [...toldBy].map(([line, agent]) => `${agent} ${stampOf(line)} ${String(momentOf(line))}`).sort()
   for (const one of ofIdleLines) {
     expect(Array.isArray(one.rows), `the rows of: ${one.sql.slice(0, 200)}`).toBe(true)
     const found = (one.rows as unknown[]).map((row) => (Array.isArray(row) ? row : Object.values(row as object)).join(' '))
-    expect(found.sort(), 'each agent and the stamp of the line it was told').toEqual(written)
+    expect(found.sort(), 'each agent, and the stamp and the moment of the line it was told').toEqual(written)
   }
 
   // THE PLAN: the records changed since a day before the watcher started, from the index of when a record last changed,

@@ -95,12 +95,22 @@ let sequence = 0
 /** The record of AGENT, as the office registered it. */
 let agentRecord = ''
 
-/** What a stand-in program writes down: the words it was started with, and the window in its environment. */
+/**
+ * What a stand-in program writes down: the words it was started with, and the window in its environment. IT READS
+ * WHERE TO WRITE FROM THE FILE BESIDE IT, which each start writes (theStandInIsTold), and not from its environment: a
+ * Codex is given only the names its list keeps (src/config/the-environment-a-codex-gets.mjs).
+ */
 interface Seen { argv: string[]; window: string | null }
 const STAND_IN = `#!${process.execPath}
-require('fs').writeFileSync(process.env.SEEN_FILE, JSON.stringify({ argv: process.argv.slice(2), window: process.env.${VARIABLE} ?? null }))
+const fs = require('fs'), path = require('path')
+fs.writeFileSync(fs.readFileSync(path.join(__dirname, 'seen-file'), 'utf8'), JSON.stringify({ argv: process.argv.slice(2), window: process.env.${VARIABLE} ?? null }))
 process.stdout.write('{}')
 `
+
+/** Tells the stand-ins in `bin` where this start's words go. Each start is awaited before the next. */
+function theStandInIsTold(bin: string, seenFile: string) {
+  writeFileSync(join(bin, 'seen-file'), seenFile)
+}
 
 beforeAll(async () => {
   t = await freshDb()
@@ -165,11 +175,12 @@ async function aHostStart(runtime: 'claude-code' | 'codex' | 'opencode', model: 
   const args = runtime === 'claude-code' ? ['-p', 'Synthetic: a made-up message.', '--output-format', 'json', ...(model === null ? [] : ['--model', model]), ...claudeCodeGuard(AGENT)]
     : runtime === 'codex' ? ['exec', '-m', model ?? 'gpt-6.1-sol', 'Synthetic: a made-up message.'] : ['run', 'Synthetic: a made-up message.']
   const command = runtime === 'claude-code' ? 'claude' : runtime
+  theStandInIsTold(join(root, 'bin'), seenFile)
   const said = vi.spyOn(console, 'error').mockImplementation(() => {})
   try {
     const handle = await startModelRun({ runtime, commandFor: () => ({ command, args }) },
       { session: label, agent: AGENT, cwd: root, api: asksTheOffice ? api : '', workspace: WORKSPACE, outputPath: join(root, `${label}.out`) },
-      { PATH: `${join(root, 'bin')}:${process.env['PATH'] ?? ''}`, HOME: root, SEEN_FILE: seenFile, ...from })
+      { PATH: `${join(root, 'bin')}:${process.env['PATH'] ?? ''}`, HOME: root, ...from })
     await until(() => existsSync(seenFile) && existsSync(handle.exitCodePath!), `the stand-in ${command} to finish`)
     return { seen: JSON.parse(readFileSync(seenFile, 'utf8')) as Seen, words: handle.startWords ?? '' }
   } finally { said.mockRestore() }
@@ -392,9 +403,10 @@ describe('a Claude Code run in a sandbox', () => {
    */
   async function aSandboxStart(env: Record<string, string> = {}) {
     const seenFile = join(dir, `sandbox-${String(++sequence)}.json`)
+    theStandInIsTold(join(dir, 'bin'), seenFile)
     writeFileSync(join(dir, 'state.json'), JSON.stringify({ containers: {
       'synthetic-container': { Id: 'synthetic-container', State: { Running: true }, Mounts: [], Config: { Env: [
-        `HOME=${join(dir, 'home')}`, `SEEN_FILE=${seenFile}`, `TMPDIR=${join(dir, 'tmp')}`,
+        `HOME=${join(dir, 'home')}`, `TMPDIR=${join(dir, 'tmp')}`,
         'CLAUDE_CODE_OAUTH_TOKEN=synthetic-login-for-the-stand-in-only',
       ] } },
     }, calls: [], bugs: {} }))
@@ -482,7 +494,8 @@ describe('a Claude Code run the dispatch worker starts', () => {
     await asThePerson(`/api/agent/threads/${thread}/messages`, { intent: 'discuss', body: 'Synthetic: a made-up message.', recipient })
     const run = ((await asThePerson(`/api/agent/threads/${thread}/dispatch`))['runs'] as { id: string }[])[0]!.id
     // A made-up HOSTNAME, since the worker names itself by it in what it prints.
-    const env: NodeJS.ProcessEnv = { ...withoutInheritedEffort(), HOME: root, HOSTNAME: 'synthetic-host', PATH: `${join(root, 'bin')}:${process.env['PATH'] ?? ''}`, SEEN_FILE: seenFile }
+    theStandInIsTold(join(root, 'bin'), seenFile)
+    const env: NodeJS.ProcessEnv = { ...withoutInheritedEffort(), HOME: root, HOSTNAME: 'synthetic-host', PATH: `${join(root, 'bin')}:${process.env['PATH'] ?? ''}` }
     for (const name of [THE_SANDBOX_VARIABLE, VARIABLE, HOST, SANDBOX]) delete env[name]
     const child = spawn(process.execPath, ['tools/agent-worker.mjs', '--once', '--api', served, '--model', model, '--limit', '20000'],
       { env: { ...env, ...from }, stdio: ['ignore', 'pipe', 'pipe'] })

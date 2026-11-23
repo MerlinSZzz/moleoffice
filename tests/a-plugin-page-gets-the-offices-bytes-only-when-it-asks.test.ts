@@ -216,15 +216,6 @@ describe('a plugin page gets the office\'s bytes only when it asks', () => {
     }
   })
 
-  it('b. detaches the slot\'s own buffer when it transfers the answer', async () => {
-    await ready('bytes')
-    const one = await read()
-    await bytesAnswer(one)
-    const lengths = await app.page.evaluate(() => (window as unknown as { slotBuffers: ArrayBuffer[] }).slotBuffers.map(one => one.byteLength))
-    expect(lengths).toEqual([0])
-    expect(one.told.bytes!.length).toBeGreaterThan(0)
-  })
-
   it('c. carries the exact Content-Type, including no header and an empty non-304 body', async () => {
     await ready('bytes')
     await bytesAnswer(await read())

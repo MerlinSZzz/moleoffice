@@ -21,7 +21,8 @@
  * knows of no used-up slot until Go refuses one.
  *
  *   node tools/provider-router.mjs serve --sandboxes <dir> [--api <address>]   run the router
- *   node tools/provider-router.mjs unit --sandboxes <dir>                      print the user unit's text
+ *   node tools/provider-router.mjs unit --sandboxes <dir>                      print the user unit's text, naming the
+ *                                                                              office mole-office-stable.service serves
  *
  * The router is used only while MOLE_OFFICE_PROVIDER_ROUTER is on: every office door it asks refuses while it is off.
  * Nothing here installs, enables or starts the unit; the person does that by hand when the key layer goes live.
@@ -542,7 +543,15 @@ async function main(args) {
     return 2
   }
   if (command === 'unit') {
-    process.stdout.write(theProviderRouterUnit({ node: process.execPath, router: fileURLToPath(import.meta.url), sandboxes: resolve(sandboxes) }))
+    // The office the unit names is read from the stable unit and checked with that office, by the module install.mjs
+    // uses, so the printed unit is the one install writes. Imported here, so serve loads none of it.
+    const { theOfficeTheRouterServes } = await import('./key-router/the-office-the-router-serves.mjs')
+    const served = await theOfficeTheRouterServes()
+    if (served.office === null) {
+      process.stderr.write(`No unit was printed: ${served.says}.\n`)
+      return 1
+    }
+    process.stdout.write(theProviderRouterUnit({ node: process.execPath, router: fileURLToPath(import.meta.url), sandboxes: resolve(sandboxes), office: served.office }))
     return 0
   }
   loadEnvFileIntoProcess(ENV_FILE)

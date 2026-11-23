@@ -49,7 +49,6 @@ import { recordPath } from '../router.tsx'
 import {
   Absence,
   Empty,
-  Explain,
   GateMark,
   LinkMark,
   NoStateMark,
@@ -157,14 +156,14 @@ function EdgeLine({ edge, out, other }: { edge: GraphEdge; out: boolean; other: 
       <span className="gx-edge-other">{other}</span>
       {edge.gate === null ? null : <GateMark gate={edge.gate} />}
       {edge.reading?.at === 'unstated' ? (
-        <span className="gx-edge-note">{t('g7b.Outline.nobody_has_said_how_much_this_blocks')}</span>
+        <span className="gx-edge-note">{t('g7b.Canvas.nobody_said_how_much')}</span>
       ) : null}
       {edge.reading?.at === 'unreadable' ? <span className="gx-edge-note">{edge.reading.problem}</span> : null}
       {edge.reading?.at === 'not-served' ? (
         <span className="gx-edge-note">{t('g7b.Outline.this_reply_did_not_carry_the_gate')}</span>
       ) : null}
       {edge.broken && edge.relation === 'needs' ? (
-        <span className="gx-edge-note">{t('g7b.Outline.the_step_this_waits_on_is_unavailable')}</span>
+        <span className="gx-edge-note">{t('g7b.Canvas.broken')}</span>
       ) : null}
     </li>
   )
@@ -191,18 +190,6 @@ function AttachedRow({ item }: { item: Attachment }) {
         {item.gate === null ? null : <GateMark gate={item.gate} />}
       </span>
       <span className="gx-attached-through">{item.through}</span>
-      <span className="gx-attached-why">
-        {item.source === 'attention-rule' ? (
-          <>
-            <b>{t('g7b.Outline.why_it_needs_a_person')}</b> {item.because}
-            {item.onFirstScreen ? t('g7b.Outline.it_is_on_the_first_screen_of') : t('g7b.Outline.the_attention_list_holds_it_back_into')}
-          </>
-        ) : (
-          <>
-            <b>{t('g7b.Outline.why_it_is_here')}</b> {item.because}
-          </>
-        )}
-      </span>
     </li>
   )
 }
@@ -309,21 +296,11 @@ export function Outline({ graph }: { graph: StructureGraph }) {
         </section>
       )}
 
-      <Explain declares={{ surface: 'structure.order' }}
-        meaning={
-          <span>{t('g7b.Outline.everything_a_step_waits_on_is_printed')}</span>
-        }
-        opens={t('g7b.Outline.how_this_order_is_worked_out')}
-      >
-        <p className="gx-prose">{t('g7b.Outline.the_order_is_the_recorded_dependencies_and')}</p>
-        <p className="gx-prose">{t('g7b.Outline.every_module_and_every_pipeline_below_is')}<b>{t('g7b.Outline.no_state_field')}</b>{t('g7b.Outline.that_is_an_answer_rather_than_a')}</p>
-        {cyclic.length === 0 ? null : (
-          <p className="gx-prose">
-            <b>{t('g7b.Outline.nodes_could_not_be_ordered', { n: cyclic.length })}</b>{' '}
-            {t('g7b.Outline.because_the_recorded_dependencies_run_in_a')}
-          </p>
-        )}
-      </Explain>
+      {cyclic.length === 0 ? null : (
+        <p className="gx-prose">
+          <b>{t('g7b.Outline.nodes_could_not_be_ordered', { n: cyclic.length })}</b>
+        </p>
+      )}
 
       <div className="gx-rows">
         {order.map((node) => (

@@ -51,6 +51,7 @@ import { afterAll, beforeAll, beforeEach, expect, it, vi } from 'vitest'
 
 import { THE_LONGEST_AN_EXPORT_TAKES_MS, theServedOfAnOpenCodeRun } from '../src/config/runtime-served.mjs'
 import { theWayToStart, type TheSystem, whereIsThisTool } from '../src/config/runtimes.mjs'
+import { theEnvironmentACodexGets } from '../src/config/the-environment-a-codex-gets.mjs'
 import { freshDb, type TestDb } from './helpers.ts'
 
 /**
@@ -145,14 +146,19 @@ it('1. the Codex key read finds codex.cmd and starts it through cmd.exe, hidden'
   const path = aFolderHolding('codex', ['codex.cmd'])
   starts.prints = 'Logged in using ChatGPT\n'
 
-  const said = withThePath(path, () => res.theProbeForThisPlatform('win32').whatAnAgentToolSaysAboutItsKey!('codex', WINDOWS))
+  // A Codex is started with only the names its list keeps, out of the environment this start saw.
+  let theNamesItKeeps: Record<string, string> = {}
+  const said = withThePath(path, () => {
+    theNamesItKeeps = theEnvironmentACodexGets(process.env)
+    return res.theProbeForThisPlatform('win32').whatAnAgentToolSaysAboutItsKey!('codex', WINDOWS)
+  })
 
   const where = win32.join(path, 'codex.cmd')
   expect(starts.seen).toEqual([
     {
       command: CMD_EXE,
       args: ['/d', '/s', '/v:off', '/c', `""${where}" "login" "status""`],
-      options: { encoding: 'utf8', ...THE_KEY_READS_LIMITS, windowsVerbatimArguments: true, windowsHide: true },
+      options: { encoding: 'utf8', ...THE_KEY_READS_LIMITS, env: theNamesItKeeps, windowsVerbatimArguments: true, windowsHide: true },
     },
   ])
   expect(said.state).toBe('set')
@@ -178,7 +184,7 @@ it('2. the OpenCode key read finds opencode.cmd and starts it through cmd.exe, h
 it('3. the read of what an OpenCode run was served starts the opencode.cmd it is handed through cmd.exe, hidden', () => {
   const path = aFolderHolding('opencode-export', ['opencode.cmd'])
   // What the OpenCode adapter hands the read is the program it found.
-  const where = whereIsThisTool('opencode', path, WINDOWS)
+  const where = whereIsThisTool('opencode', { PATH: path }, WINDOWS)
   expect(where).toBe(win32.join(path, 'opencode.cmd'))
   starts.prints = JSON.stringify({ info: {}, messages: [{ info: { role: 'assistant', providerID: 'zhipuai', modelID: 'glm-5' } }] })
   const env = { PATH: path }

@@ -35,7 +35,7 @@
 
 import { THE_TEST_OFFICES_OWNER, THE_TEST_OFFICES_SECRETARY } from './a-page-of-a-test-office.ts'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
-import { apiApp, freshDb, liveApp, thePersonsKeyHeader, waitForThePage, FOR_THE_PERSON, FOR_THE_PERSON_IN_THE_QUERY, type TestDb } from './helpers.ts'
+import { apiApp, freshDb, liveApp, thePersonsKeyHeader, waitForThePage, FOR_THE_PERSON, FOR_THE_PERSON_IN_THE_QUERY, type TestDb, governsTheWholeProject } from './helpers.ts'
 
 type Built = Awaited<ReturnType<typeof apiApp>>
 
@@ -86,7 +86,7 @@ async function aSettledChangeSet(title: string): Promise<string> {
   const decision = await ask('POST', '/api/records', { ...PERSON_NAME, ...thePersonsKeyHeader() }, {
     kind: 'decision',
     title: 'Yes, as written',
-    data: { replaces: [], decided_by: 'the owner', authority: 'the owner said so', because: 'It is right.' },
+    data: { ...governsTheWholeProject(), replaces: [], decided_by: 'the owner', authority: 'the owner said so', because: 'It is right.' },
   })
   expect(decision.status, decision.said).toBe(201)
   const settled = await ask('POST', '/api/links', { ...PERSON_NAME, ...thePersonsKeyHeader() }, { fromId: decision.body['record'].id, toId: proposal.body['record'].id, type: 'derived_from' })

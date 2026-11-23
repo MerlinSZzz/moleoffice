@@ -192,6 +192,16 @@ export const THE_ENTRIES = Object.freeze([
     text: LATOS_LINE.text,
     why: `The copy of public/fonts/lato/OFL.txt in the built page. ${LATOS_LINE.why}`,
   },
+  {
+    key: "pdf.js's worker, copied as it is",
+    file: /^dist\/web\/assets\/pdf\.worker\.min-[A-Za-z0-9_-]+\.mjs$/,
+    patterns: ['P2', 'P3'],
+    why:
+      "The PDF reader's worker, which Vite copies byte for byte from node_modules/pdfjs-dist/build/pdf.worker.min.mjs into the " +
+      'built page. A copied file carries no module mark, so its lines are read as its own, and the entry for other packages\' ' +
+      'code does not cover it. It is another package\'s code, as its authors wrote it: the home folder of the file system it ' +
+      'keeps in memory, and a string of its code that has the shape of an address. Nothing in it is the owner\'s.',
+  },
 ])
 
 /** A file of built code, which may hold comments and strings. */

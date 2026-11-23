@@ -13,13 +13,14 @@
  *     region `<block>.path`, and no element on the page answered to that name.
  *
  * WHAT THIS FILE HOLDS, in a real browser on a fresh test office of its own:
- *   - an ordinary press on an image block shows the picture large, at 1440, 990, 660 and 390; Escape
+ *   - an ordinary press on an image block shows the picture large, at 1440, 990 and 390; Escape
  *     closes it, and so does a press outside the picture;
  *   - a right-click on a picture, and a press on it in the "Ask agent" mode, open the talk box about
  *     the picture, and the talk box does not say "Not on this page";
  *   - a file block whose file is a picture shows a small one beside its name and its open press, and
  *     pressing that opens it large; a file that is not a picture shows no small picture. In the
- *     current drawing a PDF is drawn by FileShownHere, so its press is "Show it here" and it saves beside it.
+ *     current drawing a PDF is drawn by FileShownHere, so its press is "Show it here", its Open link
+ *     goes to the office's own page for the file, and it saves beside them.
  *
  * AND, SINCE ROUND 12 (the secretary's review of round 11's pictures, report NswdOyB8lM-U):
  *   - a file block that still draws an open link says "Open the file" in the page's language:
@@ -233,7 +234,7 @@ async function theLargePicture(alt: string): Promise<{ width: number; height: nu
 }
 
 describe('pressing a picture in a report (problem T3yQblhc2A28)', () => {
-  it.each(WIDTHS)('opens it at %i, fitted where that shows it larger and at full size where it would not, and Escape, Close and a press outside close it', async (width) => {
+  it.each([1440, 990, 390] as const)('opens it at %i, fitted where that shows it larger and at full size where it would not, and Escape, Close and a press outside close it', async (width) => {
     await openTheReport(width)
     const small = await drawnPicture(ONE)
     const smallBox = await small.boundingBox()
@@ -387,11 +388,12 @@ describe('pressing a picture in a report (problem T3yQblhc2A28)', () => {
     await app.page.keyboard.press('Escape')
     await expect.poll(() => app.page.locator(LARGE).count()).toBe(0)
     // A FILE THAT IS NOT A PICTURE DRAWS NO SMALL PICTURE. In the current drawing a PDF is a shown kind:
-    // its press is the Show press, its Save link sits beside it, and it has no Open link.
+    // its press is the Show press, and its Open link to the office's own page for the file and its
+    // Save link sit beside it, as a Word document's do.
     const other = app.page.locator('figure.sb-file').filter({ hasText: 'test-notes.pdf' })
     expect(await other.locator('.sb-file-show').count()).toBe(1)
     expect(await other.locator('.sb-file-save').count()).toBe(1)
-    expect(await other.locator('.sb-file-open').count()).toBe(0)
+    expect(await other.locator('.sb-file-open').count()).toBe(1)
     expect(await other.locator('.sb-file-preview').count()).toBe(0)
   }, 120_000)
 

@@ -1,15 +1,14 @@
 // Copyright © 2026 Zhengyang Shen
 // Licensed under the MIT License. See LICENSE.
 /**
- * WHAT HOME'S AGENTS AT WORK MAY ASK THE ROSTER DOOR FOR, shared by the door and the page so the two cannot disagree.
+ * HOW MANY AGENTS ONE ASK OF THE DOING LINES MAY NAME, shared by the door and its tests so the two cannot disagree.
  *
- * Round 31b of wave 13k: a group Home opens reads the doing lines of its own agents,
- * `GET /api/working?shape=home&doing=<id>,<id>` (src/server/api/working.ts). The door refuses more ids than this
- * at once, and the page asks a larger group in reads of at most this many (src/web/components/home/AgentGroups.tsx).
+ * `GET /api/working?shape=home&doing=<id>,<id>` (src/server/api/working.ts) answers what the runs serving those agents
+ * say they are doing. Any reader of the API may ask it. Home does not, because each row of its roster already names the
+ * run serving the agent. The door refuses more ids than this at once.
  *
- * A HUNDRED, because a group on an office of the live shape holds about thirty agents (tests/an-office-of-the-live-shape.ts)
- * and the person's largest starter had about forty, so one opening is one read; and a hundred ids of twelve letters is a
- * query of about 1.3 KB, well inside what a browser and the server take in one line.
+ * A HUNDRED, because the person's largest starter had about forty agents, so one ask names all of them; and a hundred
+ * ids of twelve letters is a query of about 1.3 KB, well inside what a browser and the server take in one line.
  */
 export const DOING_ASKED_AT_ONCE = 100
 

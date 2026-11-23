@@ -170,6 +170,8 @@ export const NO_SELECTION_SAYS = {
   rowNamesNoModel: (row: number) => `Casting row ${String(row)} names no model, so there is no selection.`,
   rowNamesNoProgram: (row: number) => `Casting row ${String(row)} names a model and no program, so there is no selection.`,
   rowHasNoNative: (row: number) => `Casting row ${String(row)} has no native selection data, so there is no selection.`,
+  // A NULL RUNTIME HERE IS A RUN THAT NOTHING NAMES A PROGRAM FOR. An agent whose record names a harness the office has
+  // no adapter for never comes here: its answer is the sentence that the harness chooses its model itself.
   rowForAnotherProgram: (row: number, program: string, runtime: string | null) =>
     `Casting row ${String(row)} is for ${runtimeShownName(program)}, and this run is on ` +
     `${runtime === null ? 'a program nothing names' : runtimeShownName(runtime)}, so there is no selection.`,
@@ -179,7 +181,7 @@ export const NO_SELECTION_SAYS = {
 /**
  * WHY AN ANSWER WITH NO SELECTION HAS NONE. `row` is the row the selection would have come from, or null;
  * `cast` is the row in force, which is still the row to name when nothing else would give a selection.
- * Only called when no hold, ambiguity or refusal already says why.
+ * Only called when no hold, ambiguity or refusal already says why, and never for a harness that chooses its model itself.
  */
 function whyThereIsNoSelection(
   model: string | null,
@@ -405,6 +407,14 @@ export interface TheModelARunGetsSaid {
   said: DevSaying[] | null
 }
 
+/**
+ * THE HARNESS THAT CHOOSES THIS RUN'S MODEL AND EFFORT ITSELF, or null: the agent's record names a harness the office has
+ * no adapter for, and the run goes to it. The model's part and the effort's part of an answer both ask this.
+ */
+function theHarnessThatChooses(own: ReturnType<typeof theModelOnTheAgentRecord>, runtime: string | null): string | null {
+  return own !== null && own.harness !== null && runtime === own.harness ? own.harness : null
+}
+
 function modelAnswer(
   asked: Asked,
   own: ReturnType<typeof theModelOnTheAgentRecord>,
@@ -440,6 +450,11 @@ function modelAnswer(
     runtime = asked.runtime
     runtimeSays = `This run was asked for on ${runtime}.`
     runtimeSaid = saying('runtimeAskedFor', { runtime })
+  } else if (own !== null && own.harness !== null) {
+    // A HARNESS THE OFFICE HAS NO ADAPTER FOR IS THE RUN'S, and no other runtime is put in its place.
+    runtime = own.harness
+    runtimeSays = "The agent's own record names it."
+    runtimeSaid = saying('runtimeOnTheAgentRecord', {})
   } else if (asked.place === 'builder' && own !== null && own.runtime !== null) {
     runtime = own.runtime
     runtimeSays = "The agent's own record names it."
@@ -462,6 +477,13 @@ function modelAnswer(
     runtimeSaid = saying('runtimeNobodyNamesABuilders', {})
   }
   const said = { runtimeSays, runtimeSaid: [runtimeSaid] }
+
+  // ---- a harness the office has no adapter for chooses its model itself
+  const chooses = theHarnessThatChooses(own, runtime)
+  if (chooses !== null) {
+    const chosenThere = saying('modelChosenInTheHarness', { runtime: chooses })
+    return { runtime: chooses, model: null, variant: null, from: 'none', says: inEnglish(chosenThere), ...said, said: [chosenThere] }
+  }
 
   // ---- a runtime the message worker passes no model to
   if (asked.place === 'conversation' && runtime !== null && !isIn(THE_WORKER_GIVES.aModelTo, runtime)) {
@@ -698,6 +720,10 @@ function answer(
   let effortsRow: Pick<CastingRow, 'id' | 'cells' | 'native' | 'selectionRevision'> | { rolled: number } | null = null
   const effortSaid: DevSaying[] = []
   const theRunIsRefused = asked.model == null && selected.refused !== undefined
+  // A HARNESS THE OFFICE HAS NO ADAPTER FOR CHOOSES ITS EFFORT TOO, where the caller names no model. The office gives it
+  // none, the owner's rule is not read for it, and the answer says no effort sentence: the model's part already says the
+  // office gives that harness nothing, and a sentence about the owner's effort would not hold for it.
+  const theHarnessChooses = asked.model == null && theHarnessThatChooses(own, selected.runtime) !== null
   if (own?.variant != null && own.modelIsFor === selected.runtime && isTheRunsModel(own.model)) {
     effort = own.variant
     effortFrom = 'the agent'
@@ -717,7 +743,7 @@ function answer(
     effortFrom = 'Casting'
     effortsRow = theOneNamed
     effortSaid.push(saying('effortFromTheNamedRow', { effort, row: String(theOneNamed.id), name: model! }))
-  } else {
+  } else if (!theHarnessChooses) {
     effort = theOwnersEffort(forEffort)
     effortFrom = effort === null ? 'none' : "the owner's rule"
     if (ambiguous === undefined && cast?.cells.model.value != null && forEffort !== null && !names(cast, forEffort) && !theLauncherIsGiven(cast, forEffort)) {
@@ -781,16 +807,18 @@ function answer(
         }
   }
   // WHY THERE IS NO SELECTION, where no hold, ambiguity or refusal already says why. The row it names is the one the
-  // selection would have come from; with no model at all it is the row in force, if any.
+  // selection would have come from; with no model at all it is the row in force, if any. A harness the office has no
+  // adapter for is left out too: the model's part already says the harness chooses its model itself, and the reason
+  // for a runtime that takes no model would say the office answers its messages, which it does not.
   const noSelection =
-    selection === null && held === undefined && ambiguous === undefined && selected.refused === undefined
+    selection === null && held === undefined && ambiguous === undefined && selected.refused === undefined && !theHarnessChooses
       ? whyThereIsNoSelection(model, selected.runtime, card, cast, theSelectionRow, asked.place)
       : undefined
   const modelSaid = asked.model == null ? selected.said : [saying('modelNamedByCaller', { model: model! })]
   // A MODEL THE CALLER NAMES IS THE MODEL, so a Codex refusal applies only where the caller names none.
   const { refused, ...answered } = selected
   return { ...answered, ...(refused === undefined || asked.model != null ? {} : {refused}), ...(selection === null ? {} : {selection}), ...(held === undefined ? {} : {held}), ...(ambiguous === undefined ? {} : {ambiguous}), ...(noSelection === undefined ? {} : {noSelection}), ...(namedCasting === undefined ? {} : { casting: namedCasting }), ...(kept === undefined ? {} : { kept }), model, variant: asked.place === 'check' ? effort : selected.variant, from: asked.model == null ? selected.from : 'the caller', effort, effortFrom,
-    says: `${asked.model == null ? selected.says : inEnglish(saying('modelNamedByCaller', { model: model! }))} ${allInEnglish(effortSaid)}${held === undefined ? '' : ` ${held.says}`}${ambiguous === undefined ? '' : ` ${ambiguous.says}`}`,
+    says: `${asked.model == null ? selected.says : inEnglish(saying('modelNamedByCaller', { model: model! }))}${effortSaid.length === 0 ? '' : ` ${allInEnglish(effortSaid)}`}${held === undefined ? '' : ` ${held.says}`}${ambiguous === undefined ? '' : ` ${ambiguous.says}`}`,
     // The hold's sentence has no code, so a held answer has none, and a page draws `says` as it came.
     said: modelSaid === null || held !== undefined ? null : [...modelSaid, ...effortSaid, ...(ambiguousSaid === null ? [] : [ambiguousSaid])] }
 }
@@ -936,7 +964,7 @@ export function anAgentsRunModel(agentId: string, env: NodeJS.ProcessEnv = merge
   const store = theStore().settings
   return {
     agentId,
-    runtime: own?.runtime ?? null,
+    runtime: own?.harness ?? own?.runtime ?? null,
     model: own?.model ?? null,
     variant: own?.variant ?? null,
     builder: withoutRuntimeSays(answer({ place: 'builder', agentId, role: null, runtime: null, project: null }, store, env)),

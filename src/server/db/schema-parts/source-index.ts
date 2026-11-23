@@ -5,6 +5,13 @@ import { aPartTable } from '../part-tables.ts'
 
 const existingDerived = { existingDerived: true } as const
 
+/**
+ * Which scan produced the rows in `source_files`. One row per workspace.
+ *
+ * DERIVED, and apart from `source_files` so that a rebuild can be atomic: the file rows and the
+ * stamp describing them are written in one transaction, and nothing can read a fresh file list
+ * under a stale build time.
+ */
 export const sourceIndex = aPartTable(sqliteTable(
   'source_index',
   {

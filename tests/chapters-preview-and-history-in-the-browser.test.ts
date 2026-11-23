@@ -8,6 +8,9 @@ import { freshDb, liveApp, waitForThePage, type LiveApp, type TestDb } from './h
 import { THE_TEST_OFFICES_OWNER } from './a-page-of-a-test-office.ts'
 import { putTheMadeUpLabelIn } from './the-made-up-label-above-the-page.ts'
 import type { AChapterPreview, TheSelectedChapters } from '../src/shared/chapter-edit.ts'
+import { createI18n } from '../src/shared/i18n.ts'
+
+const en = createI18n('en').t
 
 let app: LiveApp, db: TestDb, brokenId: string
 const headers = { 'content-type': 'application/json', 'x-mole-office-workspace': 'default', 'x-mole-office-actor-type': 'human', 'x-mole-office-actor-id': THE_TEST_OFFICES_OWNER.id }
@@ -81,7 +84,9 @@ it('edits and restores by presses, photographs every state, repairs an unusable 
   await editor().getByLabel('Chinese text for r-1', { exact: true }).fill('')
   await preview()
   expect(await editor().locator('[data-chapter-preview] [role="alert"]').count()).toBe(1)
-  expect(await editor().getByRole('button', { name: 'Apply chapter', exact: true }).isDisabled()).toBe(true)
+  // A preview that names a problem keeps Preview as the one press: Apply is not drawn until a preview passes.
+  expect(await editor().getByRole('button', { name: en('chapterEdit.apply'), exact: true }).count()).toBe(0)
+  expect(await editor().getByRole('button', { name: en('chapterEdit.preview'), exact: true }).count()).toBe(1)
   await editor().getByLabel('Chinese text for r-1', { exact: true }).fill('虚构的第一条浏览器规则。')
   await preview()
   expect(await editor().locator('[data-chapter-preview]').innerText()).toContain('Made-up first browser rule.')
@@ -134,7 +139,7 @@ it('edits and restores by presses, photographs every state, repairs an unusable 
     await picture(editor().locator('[data-chapter-form]'), 'edit', width, theme)
     await editor().getByLabel('English title', { exact: true }).fill('')
     await preview()
-    expect(await editor().getByRole('button', { name: 'Apply chapter', exact: true }).isDisabled()).toBe(true)
+    expect(await editor().getByRole('button', { name: en('chapterEdit.apply'), exact: true }).count()).toBe(0)
     expect(await editor().locator('[data-chapter-preview] [role="alert"]').count()).toBe(1)
     await picture(editor().locator('[data-chapter-preview]'), 'problem', width, theme)
     await editor().getByLabel('English title', { exact: true }).fill(shippedOriginal.title)

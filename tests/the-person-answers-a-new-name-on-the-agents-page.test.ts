@@ -45,6 +45,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { t } from '../src/shared/i18n.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { liveApp, theResizeIsDrawn, thePersonsKeyHeader, type LiveApp, waitForThePage } from './helpers.ts'
+import { pairTheContext } from './a-paired-context.ts'
 import { testShots, TEST_SHOTS } from './where-shots-go.ts'
 
 const PICTURES = (process.env[TEST_SHOTS] ?? '') !== ''
@@ -152,7 +153,7 @@ beforeAll(async () => {
   page.on('pageerror', (error) => pageErrors.push(error.message))
   page.on('console', (message) => { if (message.type() === 'error') pageErrors.push(message.text()) })
   person = thePersonsKeyHeader(join(app.dir, 'keys.json'))
-  await app.context.addCookies([{ name: 'mole-office-key', value: person['x-mole-office-key']!, domain: '127.0.0.1', path: '/' }])
+  await pairTheContext(app.context, app.api)
   const reply = await call('POST', '/api/agents/started', asPerson(), { handle: 'sec-test', name: 'Test secretary Sable', role: 'secretary' })
   secretary = { id: String(reply['agent'].id), key: String(reply['whatToGiveIt']?.key) }
 }, 300_000)

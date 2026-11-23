@@ -38,7 +38,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import Fastify, { type FastifyInstance } from 'fastify'
 import { AGENT_AUTHORITIES, THE_OWNER } from '../src/shared/kinds.ts'
 import { THE_TEST_OFFICES_OWNER } from './a-page-of-a-test-office.ts'
-import { freshDb, type TestDb } from './helpers.ts'
+import { freshDb, governsTheWholeProject, type TestDb } from './helpers.ts'
 
 /** The project this case files into, made fresh so a count of decisions sees only its own. */
 let HERE = 'default'
@@ -91,7 +91,14 @@ const write = async (data: unknown, headers = AS_AGENT): Promise<{ statusCode: n
     method: 'POST',
     url: '/api/records',
     headers,
-    payload: { kind: 'decision', title: 'Position control for the handover', data: data !== null && typeof data === 'object' && !Array.isArray(data) ? { replaces: [], ...(data as Record<string, unknown>) } : data },
+    payload: {
+      kind: 'decision',
+      title: 'Position control for the handover',
+      data:
+        data !== null && typeof data === 'object' && !Array.isArray(data)
+          ? { ...governsTheWholeProject(), replaces: [], ...(data as Record<string, unknown>) }
+          : data,
+    },
   })
 
 describe('a decision with no authority is refused to every agent', () => {

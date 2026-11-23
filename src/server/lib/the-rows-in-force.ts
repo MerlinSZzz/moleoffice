@@ -8,7 +8,7 @@
  * That file imports it back where it still uses it and re-exports it, so its export surface is unchanged.
  */
 
-import { theRowTheToolsTake, type CastingRow } from '@shared/casting.ts'
+import { theRowsOfTheScopeInForce, type CastingRow } from '@shared/casting.ts'
 import { sqlite } from '../db/client.ts'
 import { rowOf } from './a-casting-by-id.ts'
 import type { Held } from './casting.ts'
@@ -16,13 +16,10 @@ import type { Held } from './casting.ts'
 /**
  * THE ROWS THE DEFAULT ROUTER ROLLS ACROSS for a role and a project: every row of the scope whose marked row the tools
  * take, by the same rule, so the roll and the marked row are read from one scope. None when the table marks no row.
+ * The scope is worked out by `theRowsOfTheScopeInForce` (src/shared/casting.ts), which the new agent dialog reads too.
  */
 export function theRowsInForce(role: string, project: string | null): CastingRow[] {
-  const rows = rowsOfRole(role)
-  const taken = theRowTheToolsTake(rows, project)
-  if (taken === null) return []
-  const scope = taken.scope === 'the project' ? project : null
-  return rows.filter((row) => row.project === scope)
+  return theRowsOfTheScopeInForce(rowsOfRole(role), project)?.rows ?? []
 }
 export function rowsOfRole(role: string): CastingRow[] {
   let statement = ROWS_OF_ROLE.get(sqlite)

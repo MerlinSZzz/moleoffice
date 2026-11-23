@@ -88,15 +88,24 @@ async function checkEntry(entry: 'sidebar' | 'menu', action: 'done' | 'back', bl
     const scope = popup === undefined ? page.locator('[data-quick-note-beside]') : popup.locator('main.qn-page')
     await scope.locator('.qn-note').waitFor({ timeout: 30_000 })
     const press = scope.getByRole('button', { name: action === 'done' ? t('quickNote.done') : new RegExp(t('quickNote.back')) })
+    const behind = new URL(page.url()).hash
     if (popup !== undefined) {
       const closed = popup.waitForEvent('close', { timeout: 10_000 })
       const clicked = press.click({ noWaitAfter: true }).catch((error: unknown) => { if (!popup.isClosed()) throw error })
       await Promise.all([closed, clicked])
+    } else if (action === 'back') {
+      // TEST CHANGE (point NU-3 of the notes after the person's use of 21 November): Back in a note floating over a page
+      // used to close the note and take the page to My notes, and this read the page's address as #/my-notes and the My
+      // notes heading on the page. Back now shows My notes inside the note's own window, and the page behind it stays
+      // where it was, so this reads the heading inside the window and the page's address as it was before the press.
+      await press.click()
+      await scope.getByRole('heading', { name: t('myNotes.title'), exact: true }).waitFor({ timeout: 10_000 })
+      expect(new URL(page.url()).hash, 'the page behind the note stays where it was').toBe(behind)
     } else {
       await press.click()
       await scope.waitFor({ state: 'detached', timeout: 10_000 })
     }
-    if (action === 'back') {
+    if (action === 'back' && popup !== undefined) {
       await expect.poll(() => new URL(page.url()).hash, { timeout: 10_000 }).toBe('#/my-notes')
       await page.getByRole('heading', { name: t('myNotes.title'), exact: true }).waitFor()
     }
@@ -124,7 +133,9 @@ describe('note navigation', () => {
       const floating = page.locator('[data-quick-note-beside]')
       if (await floating.count() > 0) {
         await floating.getByRole('button', { name: new RegExp(t('quickNote.back')) }).click()
-        await floating.waitFor({ state: 'detached' })
+        // TEST CHANGE (point NU-3): this waited for the floating note to close. Back now shows My notes inside it, so
+        // this waits for the My notes heading there, and the page behind is still My notes, where the note was opened.
+        await floating.getByRole('heading', { name: t('myNotes.title'), exact: true }).waitFor()
         await expect.poll(() => new URL(page.url()).hash).toBe('#/my-notes')
         await go(page, quickNotePath(noteId))
       }

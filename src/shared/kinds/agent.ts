@@ -10,7 +10,7 @@
  * still imports the kind, AGENT_STATES and AgentState from kinds.ts.
  *
  * THIS FILE IMPORTS `commonFields` AND `unionOf` AND THE `KindSpec` AND `ShapeSpec` TYPES FROM
- * ./kind-common.ts, `AGENT_RUNTIMES`, `LANGUAGES` AND `THE_RUNTIMES_THE_OFFICE_DISPATCHES` FROM
+ * ./kind-common.ts, `LANGUAGES`, `RUNTIME_WORD_MAX` AND `THE_RUNTIMES_THE_OFFICE_DISPATCHES` FROM
  * ../participants.ts, `theRuntimesTheWorkerGives` FROM ../what-a-runtime-passes-on.ts, `RUNGS`
  * FROM ../detail.ts AND `HOW_A_CARD_WAS_CHOSEN` FROM ../roles.ts. `AGENT_STATES`,
  * `AgentState` AND THE PASSED_AN_EFFORT LINES MOVED HERE WITH THE KIND, because its `state` and
@@ -19,7 +19,7 @@
  * out of ../kinds.ts, with their comments and text unchanged.
  */
 import { commonFields, unionOf, type KindSpec, type ShapeSpec } from './kind-common.ts'
-import { AGENT_RUNTIMES, LANGUAGES, THE_RUNTIMES_THE_OFFICE_DISPATCHES } from '../participants.ts'
+import { LANGUAGES, RUNTIME_WORD_MAX, THE_RUNTIMES_THE_OFFICE_DISPATCHES } from '../participants.ts'
 import { theRuntimesTheWorkerGives } from '../what-a-runtime-passes-on.ts'
 import { RUNGS } from '../detail.ts'
 // THE THREE WORDS FOR WHO CHOSE A CARD. Criterion P75; ../roles.ts is the only place they live, and
@@ -71,17 +71,16 @@ export const agentKind: KindSpec = {
       },
       {
         key: 'runtime',
-        type: unionOf(AGENT_RUNTIMES),
+        type: 'string',
         required: false,
         description:
-          'WHICH RUNTIME SERVES IT, and it is one of the three this product has an adapter for. Absent is a real ' +
-          'answer and means nothing has said, which is drawn as "Runtime not set" rather than guessed at. A worker ' +
-          'asking for one runtime is shown these agents in their own group instead of silently skipping them. ' +
-          'Records written before this became a checked list carry other words, "codex-cli" among them. Those are ' +
-          'left exactly as they were written, and the registry says nothing about which runtime serves them.',
+          `WHICH HARNESS SERVES IT, by its own name: claude-code, codex, workbuddy or any other. Any harness's word is ` +
+          `taken and stored as written, up to ${String(RUNTIME_WORD_MAX)} characters. The list of adapters decides only ` +
+          'what the office can start itself: for a word on it the worker can start a run, and for any other word the ' +
+          'agent is served by its own waiter and the office starts nothing for it. Absent is a real answer and means ' +
+          'nothing has said, which is drawn as "Runtime not set" rather than guessed at.',
         refusal:
-          'a runtime word is one this product has an adapter for, and the worker picks the adapter from this ' +
-          'field. A word nobody declared would pick none',
+          "a runtime word is the name of the harness serving this agent, written as text. Any harness's word is taken",
         example: 'claude-code',
       },
       {
@@ -373,6 +372,9 @@ export const agentKind: KindSpec = {
         'says to retire it instead, which leaves the inbox alone.',
       'whether anybody is listening as this agent right now is NEVER stored on it. It is worked out from the ' +
         'requests this server is holding open, so it cannot be a stale copy of a process that has died.',
+      `the runtime word, when it is there, is not blank and is at most ${String(RUNTIME_WORD_MAX)} characters long. ` +
+        "Any harness's word is taken; the hold door takes the same words, so an agent can hold the heartbeat in the " +
+        'harness its record names.',
     ],
     example: { handle: 'round-ten', runtime: 'claude-code', state: 'active' },
 }

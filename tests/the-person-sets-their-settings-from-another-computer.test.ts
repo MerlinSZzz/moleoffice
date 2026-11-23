@@ -25,8 +25,8 @@
  *   5. A door that is not encrypted is not widened, even for the person's key: the private network's proxy and a door on the
  *      private network's own address are encrypted, and nothing else is (`anEncryptedDoor`). A real request with the person's
  *      key, stamped as if it had arrived on a home network's door, is not let through (`thePersonMayAskFromThere`).
- *   6. The widening is declared on those six doors, the four push doors, the thirteen doors of the person's own decisions
- *      the nine terminal doors, the private sign-in doors, and the read of the mail tool's own
+ *   6. The widening is declared on those seven doors, the four push doors, the thirteen doors of the person's own decisions
+ *      the ten terminal doors, the private sign-in doors, and the read of the mail tool's own
  *      settings through the office and the three presses that change them, and on no other, so it cannot
  *      spread by a copied declaration. The terminal doors joined on point (d) of a decision, wave 13u round 14: from
  *      another computer, with their key, the person reads, types into, resizes and closes a terminal, and the view's
@@ -315,10 +315,11 @@ describe('the person, from their other computer', () => {
   // mostly not this computer
   // (tests/a-summons-tells-every-device-the-person-allowed.test.ts). AND THE
   // THIRTEEN DOORS OF THE PERSON'S OWN DECISIONS, BY A DECISION: the person's decisions are theirs wherever they make
-  // them (tests/the-person-makes-their-decisions-from-another-computer.test.ts). AND THE NINE
-  // TERMINAL DOORS, BY POINT (D) OF A DECISION: the doors one terminal's view asks, and not the press that opens a
-  // terminal or the one that starts the holder.
-  it('6: is declared on the six settings doors, the four push doors, the thirteen doors of the person\'s decisions, the nine terminal doors, the private sign-in doors and the mail tool\'s settings read and changed through the office, and on no other', () => {
+  // them (tests/the-person-makes-their-decisions-from-another-computer.test.ts). AND THE TEN
+  // TERMINAL DOORS, BY POINT (D) OF A DECISION: the doors one terminal's view asks, the one reading of several terminals
+  // beside one terminal's stream, and not the press that opens a terminal, the one that starts the holder or the one
+  // that names a terminal.
+  it('6: is declared on the seven settings doors, the four push doors, the thirteen doors of the person\'s decisions, the ten terminal doors, the private sign-in doors and the mail tool\'s settings read and changed through the office, and on no other', () => {
     const declared = routes()
       .filter((one) => one.keptHere?.thePersonMayFromAnotherComputer === true)
       .map((one) => `${one.method} ${one.path}`)
@@ -343,6 +344,7 @@ describe('the person, from their other computer', () => {
       'POST /api/office/push/test',
       'POST /api/office/sandbox-logins/clear',
       'POST /api/office/sandbox-logins/set',
+      'POST /api/office/sandbox-logins/test',
       'POST /api/office/trusted-machines/:id/remove',
       'POST /api/office/visitors/:id/end',
       'POST /api/participants/agent/:id/retire',
@@ -355,6 +357,7 @@ describe('the person, from their other computer', () => {
       'GET /api/terminals/:id/keeping',
       'GET /api/terminals/:id/last-line',
       'GET /api/terminals/:id/stream',
+      'GET /api/terminals/stream',
       'POST /api/terminals/:id/close',
       'POST /api/terminals/:id/input',
       'POST /api/terminals/:id/keep-my-line',

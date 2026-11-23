@@ -20,8 +20,9 @@
  * characters. The reader then has a broken sentence and no way to know what was after it.
  *
  * The honest one is a SHORT FORM OF ITS OWN, built from the structured fields the server sends
- * beside its prose — `ground`, `origin`, `pickUp.answer` — with every sentence one press away. That
- * is what these tests hold the composer to.
+ * beside its prose — `ground`, `origin`, `pickUp.answer`. That is what these tests hold the composer
+ * to. As decided, the server's sentences are not drawn behind a press any more; the reply still
+ * carries them.
  *
  * ---------------------------------------------------------------------------------------
  * THE FOUR THINGS THAT COULD GO WRONG WITHOUT ANYTHING FAILING
@@ -32,8 +33,7 @@
  * 2. `unknown` worded as `no`. "Mole Office could not find out whether this can be picked up" turning
  *    into "needs a new run" is a guess with a confident face on it, and it sends somebody off to
  *    start an agent that has never heard of the work.
- * 3. A sentence dropped rather than folded. Shortening a screen by deleting what would not fit is
- *    the failure this whole redesign is meant to avoid.
+ * 3. A mark that changes what a person should do left off the row, so it is not seen at all.
  * 4. An agent's answer drawn as a question addressed to nobody, and unpointable.
  *
  * ---------------------------------------------------------------------------------------
@@ -48,7 +48,7 @@
  * test. The exact wording of a label is one of those: `it("says which of the five reasons")` pins
  * the reason a person reads, and if somebody finds better words for it, this test is the thing to
  * change and not the words. What is NOT in that category, and must not be weakened, is every
- * assertion below that a sentence is still reachable and that `unknown` is not drawn as `no`.
+ * assertion below that `unknown` is not drawn as `no`.
  */
 
 import { createElement as h } from 'react'
@@ -373,7 +373,7 @@ describe('the short vocabulary is total over the server unions', () => {
 
 // ============================================================================ the picker
 
-describe('the picker lists agents in three lines and keeps every sentence', () => {
+describe('the picker lists agents in three lines', () => {
   const drawn = (over: Partial<RecipientsAnswer> = {}) =>
     render(
       h(recipients.RecipientPicker, {
@@ -384,9 +384,6 @@ describe('the picker lists agents in three lines and keeps every sentence', () =
         reviewOn: false,
       }),
     )
-
-  /** Everything above the fold. The rows are drawn before it; the sentences are inside it. */
-  const rows = (html: string) => html.split('<details')[0] ?? ''
 
   it('draws no paragraph of provenance on a row', () => {
     // THE OWNER'S COMPLAINT, AS AN ASSERTION. A row used to carry the reason, the other reasons, how
@@ -401,10 +398,10 @@ describe('the picker lists agents in three lines and keeps every sentence', () =
         }),
       ],
     })
-    expect(rows(html)).not.toContain('change log')
-    expect(rows(html)).not.toContain('It also wrote to the report')
-    expect(rows(html)).not.toContain('not on this machine')
-    expect(rows(html)).not.toContain('fixture content')
+    expect(html).not.toContain('change log')
+    expect(html).not.toContain('It also wrote to the report')
+    expect(html).not.toContain('not on this machine')
+    expect(html).not.toContain('fixture content')
   })
 
   it('still says on the row the two things that change what a person should do', () => {
@@ -419,32 +416,11 @@ describe('the picker lists agents in three lines and keeps every sentence', () =
     })
     // A run that cannot be picked up, and a record that is not a real run. Both refuse or redirect
     // the send, so neither may be something a reader has to open something to find out.
-    expect(rows(html)).toContain('Needs a new run')
-    expect(rows(html)).toContain('Not a real run')
+    expect(html).toContain('Needs a new run')
+    expect(html).toContain('Not a real run')
   })
 
-  it('keeps every sentence the server sent, behind one press', () => {
-    // SHORTENING BY DELETING IS THE FAILURE THIS WHOLE REDESIGN IS AGAINST. The archive stays
-    // complete; only the tracking layer gets small.
-    const html = drawn({
-      connected: [
-        candidate({
-          alsoWhy: ['It also wrote to the report on 16 August.'],
-          originNote: 'This session record is fixture content. It is not a real run.',
-          origin: 'fixture',
-          pickUp: { answer: 'no', why: 'transcript-gone', because: 'The transcript is not on this machine.' },
-        }),
-      ],
-    })
-    expect(html).toContain(THE_SENTENCE)
-    expect(html).toContain('It also wrote to the report on 16 August.')
-    expect(html).toContain('This session record is fixture content.')
-    expect(html).toContain('The transcript is not on this machine.')
-    // And the rule that produced the ranking, which used to be the only thing behind the fold.
-    expect(html).toContain('Five things count, strongest first.')
-  })
-
-  it('writes out the unranked agents too, so nothing on the list is unexplained', () => {
+  it('draws the unranked agents too, each with its short marks', () => {
     const html = drawn({
       recent: [
         candidate({
@@ -455,7 +431,8 @@ describe('the picker lists agents in three lines and keeps every sentence', () =
         }),
       ],
     })
-    expect(html).toContain('Nothing says which tool this was.')
+    expect(html).toContain('Some other run')
+    expect(html).toContain('Not known')
   })
 })
 
@@ -465,22 +442,19 @@ describe('what the composer draws beside the To control', () => {
   const reading = (over: Partial<RecipientCandidate> = {}, withName = true) =>
     render(h(recipients.RecipientReading, { candidate: candidate(over), withName }))
 
-  it('is the reason line, and the reason line is what opens the sentences', () => {
-    // THIS IS WHAT KEEPS IT TO THREE LINES. The short line is the fold's own summary rather than a
-    // line with a separate press underneath it saying the same thing again.
+  it('is the reason line', () => {
+    // THIS IS WHAT KEEPS IT TO THREE LINES. The short line is the reason, and the server's sentence
+    // is not drawn, as decided.
     const html = reading()
-    expect(html).toContain('<details')
-    expect(html).toContain('why this agent')
-    const summary = html.slice(html.indexOf('<summary'), html.indexOf('</summary>'))
-    expect(summary).toContain('Created this ·')
-    expect(summary).not.toContain('change log')
+    expect(html).toContain('Created this ·')
+    expect(html).not.toContain('change log')
   })
 
-  it('leaves the pick-up mark outside the fold, because it decides whether Send works at all', () => {
+  it('draws the pick-up mark on the screen, because it decides whether Send works at all', () => {
     const html = reading({
       pickUp: { answer: 'no', why: 'transcript-gone', because: 'The transcript is not on this machine.' },
     })
-    expect(html.indexOf('Needs a new run')).toBeGreaterThan(html.indexOf('</details>'))
+    expect(html).toContain('Needs a new run')
   })
 
   it('leaves the name off when the control above already carries it', () => {

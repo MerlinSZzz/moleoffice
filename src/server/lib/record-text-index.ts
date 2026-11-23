@@ -16,7 +16,8 @@
  * question. Leaving letters out keeps more records, never fewer.
  *
  * Each function gives the ids of the records it keeps, which the caller reads by id. It gives undefined when it cannot
- * narrow at all, or when it keeps more than `AT_MOST_READ_BY_ID`, and the caller then reads every record, as before.
+ * narrow at all, or when it keeps more than its bound, by default `AT_MOST_READ_BY_ID`, and the caller then reads every
+ * record, as before.
  *
  * tests/one-index-of-the-records-text-serves-search-and-named-inside.test.ts proves the list over every code point
  * with this SQLite, and proves on random records in many scripts that the search finds nothing the index left out.
@@ -32,6 +33,9 @@ import { db } from '../db/client.ts'
  * read. A read of one project that is not given ids walks every row of the project or of a kind: 35 ms at least, and
  * 93 to 170 ms with no kind. So 2,000 records cost at most about 4.4 ms a read. For a common word the index kept 92,885
  * records for, reading them by id took 2,027 ms for eleven projects, and walking the projects took 1,847 ms.
+ *
+ * A caller may give a larger number of its own. The named-inside door does, with its measure beside it in
+ * src/server/api/reportfiles.ts.
  */
 export const AT_MOST_READ_BY_ID = 2000
 
@@ -76,16 +80,17 @@ function quoted(piece: string): string {
 }
 
 /**
- * The ids of the records whose index entry the query matches, or undefined when there are more than `AT_MOST_READ_BY_ID`.
+ * The ids of the records whose index entry the query matches, or undefined when there are more than `atMost`, by
+ * default `AT_MOST_READ_BY_ID`.
  *
  * Asked as a join, the index is read first and each key as the index gives it, so the read stops at the number. Asked
  * with IN, SQLite made the list of every record the index keeps before it read one key. For a common word the index
  * kept 92,885 records for, on the made-up office at the 22 October scale, that was 16.7 ms against 0.5 ms.
  */
-function theRecordsMatching(query: string): string[] | undefined {
+function theRecordsMatching(query: string, atMost = AT_MOST_READ_BY_ID): string[] | undefined {
   const kept = db.all<{ id: string }>(sql`SELECT k.record_id AS id FROM record_text JOIN record_text_keys k ON k.n = record_text.rowid
-    WHERE record_text MATCH ${query} LIMIT ${AT_MOST_READ_BY_ID + 1}`)
-  return kept.length > AT_MOST_READ_BY_ID ? undefined : kept.map((one) => one.id)
+    WHERE record_text MATCH ${query} LIMIT ${atMost + 1}`)
+  return kept.length > atMost ? undefined : kept.map((one) => one.id)
 }
 
 /**
@@ -110,9 +115,10 @@ export function theRecordsThatMaySay(needle: string): string[] | undefined {
 
 /**
  * THE RECORDS THAT COULD HOLD ANY ONE OF THESE TEXTS AS WRITTEN, or undefined when one of them cannot be asked. A text
- * shorter than three letters cannot.
+ * shorter than three letters cannot. It gives undefined as well when it keeps more than `atMost` records, by default
+ * `AT_MOST_READ_BY_ID`.
  */
-export function theRecordsThatMayHoldOneOf(texts: readonly string[]): string[] | undefined {
+export function theRecordsThatMayHoldOneOf(texts: readonly string[], atMost = AT_MOST_READ_BY_ID): string[] | undefined {
   const asked: string[] = []
   for (const text of texts) {
     const letters = [...text]
@@ -122,5 +128,5 @@ export function theRecordsThatMayHoldOneOf(texts: readonly string[]): string[] |
     asked.push(`(${[...pieces].map(quoted).join(' AND ')})`)
   }
   if (asked.length === 0) return undefined
-  return theRecordsMatching(asked.join(' OR '))
+  return theRecordsMatching(asked.join(' OR '), atMost)
 }

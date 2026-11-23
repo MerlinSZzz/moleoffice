@@ -29,12 +29,12 @@
  * THE WAKE RUNS NO SQL, AND THAT IS THE WHOLE POINT
  * ---------------------------------------------------------------------------------------
  *
- * `tellTheWaitersFor` is called from `writeTheDeliveries` in src/server/lib/messages.ts, which both
- * record write paths call INSIDE their transaction, and better-sqlite3 is synchronous. So the wake
- * may do exactly one thing: resolve a promise and return. It runs no SQL. The woken handler does
- * its own read afterwards, once the transaction has committed. A read from inside the wake would
- * either join the transaction it was woken by or run before that transaction committed, and either
- * one is a hold that answers with a state the database does not yet have.
+ * `tellTheWaitersFor` is called from `writeTheDeliveries` in src/server/lib/messages.ts inside the
+ * write's transaction. better-sqlite3 is synchronous. The wake waits for that write through
+ * `whenStored` in src/server/db/told-when-stored.ts. It runs once the outermost transaction commits,
+ * so a write that is rolled back wakes nobody. The wake does exactly one thing: it resolves a
+ * promise and returns. It runs no SQL. The woken handler does its own read afterwards. Keeping SQL
+ * in the handler leaves the wake responsible only for notification.
  *
  * ---------------------------------------------------------------------------------------
  * THE COST ACCEPTED, SAID OUT LOUD
@@ -48,6 +48,7 @@
  */
 
 import type { ParticipantRef } from '@shared/participants.ts'
+import { whenStored } from '../db/told-when-stored.ts'
 import { onlyChecking } from './only-checking.ts'
 
 /**
@@ -141,10 +142,14 @@ export function registerAWaiter(agentId: string): HeldWait {
 export function tellTheWaitersFor(recipients: readonly ParticipantRef[]): void {
   // A CHECK OF A WRITE WAKES NOBODY: the delivery rows it wrote are taken back (lib/only-a-check.ts).
   if (onlyChecking()) return
-  for (const who of recipients) {
-    if (who.kind !== 'agent') continue
-    const set = held.get(who.id)
-    if (set === undefined) continue
-    for (const waiter of [...set]) waiter.wake()
-  }
+  // A rolled-back write would wake a request for a delivery that is not there. For a stored write,
+  // the wake comes at the same moment as before because a wake only resolves a promise.
+  whenStored(() => {
+    for (const who of recipients) {
+      if (who.kind !== 'agent') continue
+      const set = held.get(who.id)
+      if (set === undefined) continue
+      for (const waiter of [...set]) waiter.wake()
+    }
+  })
 }

@@ -177,7 +177,7 @@ function theStoredDecision(): AStoredDecision | null {
  * EVERY SECRETARY THAT CAN TAKE THE NOTICES, FIRST APPOINTED FIRST: by the time its agent was registered, then by id.
  * The secretaries are the un-retired holders of the secretary card that the secretariat names.
  */
-function theSecretariesInTheOrderAppointed(): AUsageNoticeChoice[] {
+export function theSecretariesInTheOrderAppointed(): AUsageNoticeChoice[] {
   const ids = theSecretaries().map((one) => one.id)
   if (ids.length === 0) return []
   return sqlite.prepare(`SELECT id, handle, name FROM agents WHERE id IN (${ids.map(() => '?').join(', ')}) ORDER BY created_at, id`).all(...ids) as AUsageNoticeChoice[]

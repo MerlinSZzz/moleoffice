@@ -54,6 +54,9 @@ import { claudeUsage } from './usage.ts'
  * hook (`claudeCodeGuard` in src/config/main-world-guard.mjs, which also says how each other runtime mounts it).
  * `theGuardOn('claude-code', …)` reads the command back, and that answer is the marker a run's permission flags are set
  * by. Since the guard is on every run this adapter builds, every run it builds on the host is given the flag.
+ *
+ * ITS PROGRAM IS LOOKED UP IN THE WHOLE ENVIRONMENT IT WAS GIVEN, through `whereItIs` in ./os.ts, so on Windows a
+ * search path held as `Path` is found.
  */
 
 import { createHash } from 'node:crypto'
@@ -128,7 +131,7 @@ export class ClaudeCodeAdapter implements RuntimeAdapter {
   ) {}
 
   whereItIs(): string | null {
-    return whereItIs(this.command, this.from['PATH'])
+    return whereItIs(this.command, this.from)
   }
 
   /**

@@ -107,15 +107,12 @@ import { ROLE_CARD_WORDS_KIND } from '../db/the-words-records-of-each-card.ts'
 import { roleNameOf } from '../db/the-words-records-of-each-card.ts'
 import { everyCard } from './check-the-card-words.ts'
 import { theWordsRecords } from './the-card-in-the-offices-words.ts'
+import type { TheWordsRecord } from '../db/types/card-words.ts'
 
 export { ROLE_CARD_WORDS_KIND } from '../db/the-words-records-of-each-card.ts'
 
 function theOffice(): Actor { return { type: 'system', id: moleOffice().id } }
-/** One card's words record: its id and what it holds. */
-export interface TheWordsRecord {
-  id: string
-  data: Readonly<Record<string, unknown>>
-}
+export type { TheWordsRecord } from '../db/types/card-words.ts'
 
 /** What one start did, in words. */
 export interface WhatTheFilingDid {

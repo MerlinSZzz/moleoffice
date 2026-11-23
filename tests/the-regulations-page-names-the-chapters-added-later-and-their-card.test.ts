@@ -130,8 +130,8 @@ describe('a role chapter filed after the office copied the default set', () => {
     const date = dayInThePageLanguage(new Date(parseLocalStamp(at)!), true)
     for (const withTheChapterDoor of [false, true]) {
       const html = await thePage(withTheChapterDoor)
-      expect(html, `with the chapter door: ${String(withTheChapterDoor)}`).toContain(word('regulationsPage.copiedFromTheDefaultsAndAddedLater', { n: 1, numbers: String(N), date }))
-      expect(html, `with the chapter door: ${String(withTheChapterDoor)}`).not.toContain(word('regulationsPage.copiedFromTheDefaults', { date }))
+      expect(html, `with the chapter door: ${String(withTheChapterDoor)}`).toContain(word('regulationsPage.copiedAndAddedLater', { n: 1, numbers: String(N), date }))
+      expect(html, `with the chapter door: ${String(withTheChapterDoor)}`).not.toContain(word('regulationsPage.copiedAtTheStart', { date }))
     }
   })
 

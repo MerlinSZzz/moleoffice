@@ -9,6 +9,8 @@
  * from records.ts. This file reads `assertMayShapeTheFuture` from ./governance-guards.ts inside a
  * function body only; every other name comes from the file where it lives.
  */
+import { refuseOrdinaryKnowledgeWrite } from '../../knowledge/guard.ts'
+import { KNOWLEDGE_WORKSPACE } from '@shared/knowledge/constants.ts'
 import { db, sqlite } from '../../db/client.ts'
 import { whereALinkWithAMessageIsFiled } from '../../db/message-centre-migration.ts'
 import { links, records, revalidations } from '../../db/schema.ts'
@@ -25,19 +27,18 @@ import { type Actor } from './actor.ts'
 import { LINKS_THAT_REPLACE_A_FORK, PROPOSAL_KIND, theForkIsAlreadySettled, theOtherAnswersToThisFork } from './fork-settled.ts'
 import { assertMayReplaceAFork, assertMaySettleFork, forkIsTheOwnersToSettle, humanMadeThisLink, linkTakesThisForkOffTheQueue } from './fork-settling.ts'
 import { checkGate, resolveGateStage } from './link-gates.ts'
-import { allLinks } from './link-readers.ts'
 import { actsForThePerson } from './own-words.ts'
 import { nothingWrittenSentence } from './patching.ts'
 import { checkLinkKinds } from './planning-guards.ts'
-import { listRecords } from './reading.ts'
+import { listRecordsWithDataAs, onlyTheseFieldsOf } from './reading.ts'
 import { checkRestrictionLinks, checkTheForkBehindARestriction, RESTRICTION_KIND_SET } from './restrictions.ts'
 import { ARRIVAL_IS_NOT_A_CLAIM, arrivalDetail, isSomebodyMoleOfficeCannotPlace, ONE_PERSON_AND_THE_NAME_IS_ITS_OWN, strangerDetail } from './served-doors.ts'
 import { describeStoredGate, readLinkGate, sameGate } from './stored-link-gates.ts'
-import { type CarriedData } from '@shared/blocks.ts'
+import { blockIdsOf, type CarriedData } from '@shared/blocks.ts'
 // The one reader of containment, and the two questions a `part_of` write has to ask before it is
 // written. Pure, and shared with the browser: see the head of that file for why the three stores
 // are read in one place. `createLink` in records/links.ts asks both.
-import { CONTAINMENT_LINK, hasParentAlready, wouldMakeCycle } from '@shared/containment.ts'
+import { CONTAINMENT_LINK, type ContainmentContext, type ContainmentLink, hasParentAlready, wouldMakeCycle } from '@shared/containment.ts'
 import { DECISION_KIND } from '@shared/decision-kind.ts'
 import { named } from '@shared/named.ts'
 import { now } from '@shared/now.ts'
@@ -45,7 +46,7 @@ import { THE_PERSON } from '@shared/person.ts'
 import { thePersonIsProved } from '@shared/the-person-proved.ts'
 import { LINK_TYPES, type LinkType, RESOLVES_PROPOSAL } from '@shared/types.ts'
 import { type Gate } from '@shared/work.ts'
-import { and, eq, inArray, or } from 'drizzle-orm'
+import { and, eq, inArray, or, sql } from 'drizzle-orm'
 
 // ---------------------------------------------------------------------------- links
 
@@ -69,6 +70,7 @@ export function refuseCrossWorkspaceLink(
   type: LinkType,
 ): void {
   if (from.workspaceId === to.workspaceId) return
+  if (type === 'relates_to' && from.kind === 'knowledge_bookmark' && to.kind === 'knowledge_entry' && to.workspaceId === KNOWLEDGE_WORKSPACE && from.workspaceId !== KNOWLEDGE_WORKSPACE) return
   // ONE FLOW REPLACING ANOTHER MAY CROSS PROJECTS. The Flows page stands every
   // project's flows together, and a general flow in one project replaces a department's old one in
   // another. The link is filed in the newer flow's project, and the old flow's own page still reads it by its id.
@@ -143,6 +145,7 @@ export function createLink(input: {
   const from = both.find((r) => r.id === fromId)
   const to = both.find((r) => r.id === toId)
   if (from === undefined || to === undefined) throw bothEndsMustExist()
+  if (from.kind === 'knowledge_bookmark' || to.kind === 'knowledge_bookmark') refuseOrdinaryKnowledgeWrite('knowledge_bookmark')
   refuseCrossWorkspaceLink(from, to, type)
   assertMaySettleFork(from, to, type, actor)
   // AND THE OTHER TWO WAYS OUT OF THE SAME QUEUE, asked here beside the settling link because all
@@ -248,10 +251,8 @@ export function createLink(input: {
     // Deleted records included. Deleting never removes anything here, so a deleted parent still
     // holds its part — and a refusal that ignored it would be followed by a link the reader cannot
     // see the other end of. `hasParentAlready` says in words when the parent it names is deleted.
-    const context = {
-      records: listRecords({ workspaceId: from.workspaceId, includeDeleted: true }),
-      links: allLinks(from.workspaceId),
-    }
+    // The checks are handed only the links, pipelines and records they read, so that a link does not load the whole project.
+    const context = whatTheContainmentChecksRead(fromId, toId, from.workspaceId)
     const loop = wouldMakeCycle(fromId, toId, context)
     if (loop.refuse) throw new PanelError(loop.sentence, 409)
     const second = hasParentAlready(fromId, context)
@@ -304,6 +305,64 @@ export function createLink(input: {
     return writeRevalidationRows(to.id, from.workspaceId)
   })()
   return revalidation === null ? { id } : { id, revalidation }
+}
+
+/**
+ * WHAT `wouldMakeCycle` AND `hasParentAlready` READ, AND NOTHING ELSE OF THE PROJECT.
+ *
+ * The two checks read three things, all through `indexOf` in @shared/containment.ts:
+ *   - the project's `part_of` links, the same rows `allLinks` gives, of that one type, since `indexOf` skips the rest;
+ *   - every pipeline of the project, deleted ones too, with its `blockIds`, because a pipeline's stored order is the
+ *     second parent store (`pipelinesByBlock` in @shared/blocks.ts);
+ *   - of each record the two walks reach, its id, kind, title and whether it is deleted: a refusal names a record by
+ *     its title and id, parents are put in order by title, then id, and a deleted parent is said in words.
+ *
+ * WHICH RECORDS THE WALKS REACH is worked out from the links and the pipelines alone, since only they say what holds
+ * what: every holder of `fromId` or `toId` in either store, then every holder of those, until no new id comes. That
+ * reaches as far as the stores go, so it reaches as far as `MAX_CONTAINMENT_DEPTH` and past a loop in the stored data
+ * without stating either limit a second time. It also reaches some records the walks never ask about, which changes
+ * no answer: a record that is not a pipeline is looked up only by its id.
+ *
+ * THE SAME PROJECT RULE AS `listRecords`, deleted records included: the records are read with `ids` through
+ * `listRecordsWithDataAs`, which asks `theRecordsListed`. An id the read does not find, a record in another project or
+ * no record at all, is not handed in, so the walk stops there and the link is refused as not checked, as before.
+ */
+function whatTheContainmentChecksRead(fromId: string, toId: string, workspaceId: string): ContainmentContext {
+  const partOfLinks: ContainmentLink[] = db
+    .select({ id: links.id, fromId: links.fromId, toId: links.toId, type: links.type })
+    .from(links)
+    .where(and(eq(links.workspaceId, workspaceId), eq(links.type, CONTAINMENT_LINK)))
+    .all()
+  const pipelines = listRecordsWithDataAs({ workspaceId, kind: 'pipeline', includeDeleted: true }, onlyTheseFieldsOf(['blockIds']))
+
+  const holders = new Map<string, string[]>()
+  const holds = (partId: string, holderId: string): void => {
+    const known = holders.get(partId)
+    if (known === undefined) holders.set(partId, [holderId])
+    else known.push(holderId)
+  }
+  for (const link of partOfLinks) holds(link.fromId, link.toId)
+  for (const pipeline of pipelines) for (const blockId of blockIdsOf(pipeline)) holds(blockId, pipeline.id)
+
+  const reached = new Set<string>([fromId, toId])
+  let level = [...reached]
+  while (level.length > 0) {
+    const next: string[] = []
+    for (const id of level) {
+      for (const holderId of holders.get(id) ?? []) {
+        if (reached.has(holderId)) continue
+        reached.add(holderId)
+        next.push(holderId)
+      }
+    }
+    level = next
+  }
+
+  // A pipeline is already read with its `blockIds`, so it is not read a second time without them.
+  const pipelineIds = new Set(pipelines.map((pipeline) => pipeline.id))
+  const others = [...reached].filter((id) => !pipelineIds.has(id))
+  const walked = others.length === 0 ? [] : listRecordsWithDataAs({ workspaceId, includeDeleted: true, ids: others }, sql<string>`'{}'`)
+  return { records: [...pipelines, ...walked], links: partOfLinks }
 }
 
 /**
@@ -557,6 +616,7 @@ export function deleteLink(id: string, actor: Actor, workspaceId: string): void 
     .where(inArray(records.id, [l.fromId, l.toId]))
     .all()
   for (const end of ends) {
+    if (end.kind === 'knowledge_bookmark') refuseOrdinaryKnowledgeWrite(end.kind)
     assertMayShapeTheFuture({ id: end.id, kind: end.kind, title: end.title }, 'unlink', actor)
   }
   // AND THE FORK GUARD, WHICH THIS ROUTE ASKED NOTHING OF UNTIL 27 AUGUST 2026. Three of the

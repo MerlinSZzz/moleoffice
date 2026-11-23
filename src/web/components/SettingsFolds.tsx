@@ -193,9 +193,9 @@ export function SettingsPanelBlock({ surface, title, children }: { surface: stri
 }
 
 /**
- * THE MAIL TOOL'S ENTRY, THE FIRST OF THE TOOLS CATEGORY: the tool's name, what it does in one line, and under them
- * InstallTheMailTool, which draws the state, the presses that install it and turn it off, and the tool's own
- * settings (MailToolSettings). The state is read once, there.
+ * THE MAIL TOOL'S ENTRY, THE FIRST OF THE TOOLS CATEGORY: the tool's name, and under it InstallTheMailTool, which
+ * draws the state, the presses that install it and turn it off, and the tool's own settings (MailToolSettings). The
+ * state is read once, there.
  */
 export function MailToolEntry({ title, children }: { title: string; children: ReactNode }) {
   useLanguage()
@@ -206,7 +206,6 @@ export function MailToolEntry({ title, children }: { title: string; children: Re
     <section className="sf-panel sf-tool" id={panelAnchor(surface)} data-settings-panel={surface} {...declaredAttributes({ surface: 'settings.mailtool' })}>
       <h3 className="sf-head" data-title-is="its-label">
         <span className="sf-title" {...DRAWS_THE_NAME}>{title}</span>
-        <span className="sf-what">{t('settingsCats.mail.what')}</span>
       </h3>
       <div className="sf-body">{children}</div>
     </section>

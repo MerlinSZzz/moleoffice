@@ -61,7 +61,6 @@ tests/import-roundtrip.test.ts
 tests/in-a-test-world-its-starter-and-the-secretary-hold-the-owners-authority.test.ts
 tests/kind-can-change.test.ts
 tests/kind-change-and-plain-replies.test.ts
-tests/merge-queue-doors.test.ts
 tests/message-durability.test.ts
 tests/no-door-arms-the-start-up-gate.test.ts
 tests/one-message-door.test.ts
@@ -95,8 +94,6 @@ tests/the-guard-reads-who-recorded-a-decision.test.ts
 tests/the-inbox-door-reads-the-actor-handle.test.ts
 tests/the-incident-page-reads-as-a-scene.test.ts
 tests/the-machine-names-settings-entry-and-change-lines.test.ts
-tests/the-merge-tool-closes-entry-ended-runs.test.ts
-tests/the-next-worker-follows-the-merge-tool-not-its-commands.test.ts
 tests/the-note-is-written.test.ts
 tests/the-orphans-door-sends-only-what-the-running-column-reads.test.ts
 tests/the-over-door-writes-its-line-when-nothing-recorded-the-sender.test.ts

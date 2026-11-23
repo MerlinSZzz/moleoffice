@@ -17,6 +17,8 @@
  *      checked first. A line saying a folder was not checked this time is not a check.
  *   4. Folders that records name are kept at every start, and still every folder gets its turn: over 7 starts, 7 such
  *      folders are each asked about 5 times.
+ *   5. The pause is 2 s unless a test sets SWEEP_PAUSE_MS_FOR_A_TEST in the process's environment, and a pause it sets
+ *      is never under 0.25 s.
  *
  * The folders here are a stopped run's: a finished or crashed run's folder goes without the two slow doors, and any other
  * ended run's is still asked about at them.
@@ -102,6 +104,23 @@ describe('the scratch sweep is gentle on the office', () => {
     for (let i = 1; i < asks.length; i++) {
       expect(asks[i]!.at - asks[i - 1]!.answered, `${asks[i]!.path} was asked too soon after ${asks[i - 1]!.path}`).toBeGreaterThanOrEqual(2_000)
     }
+  })
+
+  it('pauses 2 s unset, and as a test\'s SWEEP_PAUSE_MS_FOR_A_TEST says but never under 0.25 s', async () => {
+    const pauses = async (variable: string | undefined): Promise<number[]> => {
+      if (variable === undefined) delete process.env['SWEEP_PAUSE_MS_FOR_A_TEST']
+      else process.env['SWEEP_PAUSE_MS_FOR_A_TEST'] = variable
+      try {
+        rmSync(temp, { recursive: true, force: true }); mkdirSync(temp); asks = []
+        for (const run of ['wait_run_001', 'wait_run_002']) aFolder(run)
+        await sweep()
+        return [...new Set(asks.slice(1).map((one, i) => one.at - asks[i]!.answered))]
+      } finally { delete process.env['SWEEP_PAUSE_MS_FOR_A_TEST'] }
+    }
+    expect(await pauses(undefined)).toEqual([2_000])
+    expect(await pauses('500')).toEqual([500])
+    expect(await pauses('100')).toEqual([250])
+    expect(await pauses('none')).toEqual([2_000])
   })
 
   it('asks the two slow doors about 5 folders at most, and says of each other one that it was not checked this time', async () => {

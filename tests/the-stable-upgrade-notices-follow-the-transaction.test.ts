@@ -15,7 +15,7 @@ import { processIdentity } from '../tools/stable/stable-upgrade-transaction.mjs'
 import { askTheOffice } from '../tools/office-request.mjs'
 import { readTheOfficesId, verifyNoticeReply } from '../tools/stable/stable-upgrade-notices.mjs'
 import { aMadeUpWordCounter } from './made-up-upgrade-words.ts'
-import { aRefusedListenEnds, heldPort } from './stable-upgrade-fixture.ts'
+import { aMadeUpElectronPackage, aRefusedListenEnds, heldPort } from './stable-upgrade-fixture.ts'
 import { THE_MIGRATIONS_FOLDER } from '../src/config/settings.mjs'
 
 const root = resolve(import.meta.dirname, '..')
@@ -84,7 +84,9 @@ async function authenticatedFixture(owner = process.pid) {
   write(join(dev, 'package/vite.cjs'), "#!/usr/bin/env node\nconst{mkdirSync,writeFileSync}=require('node:fs');const at=process.argv.indexOf('--outDir');if(at<0)process.exit(1);const dir=process.argv[at+1];mkdirSync(dir,{recursive:true});writeFileSync(dir+'/index.html','synthetic compiled page');")
   write(join(dev, 'package/tsc.cjs'), "#!/usr/bin/env node\nif(!process.argv.includes('--noEmit'))process.exit(1);")
   run(dev, 'tar', ['-czf', 'dependency.tgz', 'package']); rmSync(join(dev, 'package'), { recursive: true })
-  write(join(dev, 'package.json'), JSON.stringify({ name: 'synthetic-notice-service', version: '1.0.0', type: 'module', dependencies: { 'notice-fixture-dependency': 'file:dependency.tgz' }, scripts: { typecheck: 'tsc --noEmit', build: 'node build.mjs', start: 'node --import tsx src/server/index.ts', 'db:migrate': 'node migrate.mjs' } }))
+  // The upgrade runs electron's install.js after npm ci, so the made-up office carries the made-up electron package.
+  const electron = aMadeUpElectronPackage(dev)
+  write(join(dev, 'package.json'), JSON.stringify({ name: 'synthetic-notice-service', version: '1.0.0', type: 'module', dependencies: { 'notice-fixture-dependency': 'file:dependency.tgz', ...electron }, scripts: { typecheck: 'tsc --noEmit', build: 'node build.mjs', start: 'node --import tsx src/server/index.ts', 'db:migrate': 'node migrate.mjs' } }))
   write(join(dev, 'build.mjs'), `import{mkdirSync,writeFileSync,readFileSync}from'node:fs';mkdirSync('dist/web',{recursive:true});writeFileSync('dist/web/index.html',readFileSync('version.txt'));`)
   write(join(dev, 'migrate.mjs'), `import{createRequire}from'node:module';const require=createRequire(import.meta.url);const Database=require('better-sqlite3');const db=new Database(process.env.MOLE_OFFICE_DB);db.exec("CREATE TABLE upgraded_fixture(value TEXT);INSERT INTO upgraded_fixture VALUES ('target')");db.close();`)
   write(join(dev, 'tools/serve-dev.mjs'), `import{spawn}from'node:child_process';import{theSupervisorsStartupIsDone}from${JSON.stringify(join(root, 'src/config/supervisor-startup-done.mjs'))};const child=spawn(process.execPath,['--import','tsx','src/server/index.ts','--stop-with-pid='+process.pid],{detached:true,stdio:'inherit',env:process.env});child.on('exit',code=>process.exit(code??1));process.on('SIGTERM',()=>{try{process.kill(-child.pid,'SIGTERM')}catch{}});console.log(theSupervisorsStartupIsDone(process.pid,Number(process.env.MOLE_OFFICE_PORT)));`)

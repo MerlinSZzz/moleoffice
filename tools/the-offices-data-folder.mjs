@@ -15,10 +15,7 @@
  * which have no business reading the office's settings.
  */
 import { homedir } from 'node:os'
-import { existsSync } from 'node:fs'
-import { join, resolve } from 'node:path'
-import { canonicalDatabasePath, databaseDirectoryFrom, databasePathFrom, envFileValues, readSetting } from '../src/config/settings.mjs'
-import { theStableCheckoutFolder } from '../src/config/sandbox-folder.mjs'
+import { canonicalDatabasePath, databaseDirectoryFrom, databasePathFrom, theDatabaseTheStableCheckoutNames } from '../src/config/settings.mjs'
 import { howAPathMeets } from './sandbox-common.mjs'
 
 /**
@@ -33,9 +30,8 @@ import { howAPathMeets } from './sandbox-common.mjs'
 export function theOfficesDataFolders(env = process.env) {
   const databases = new Set([canonicalDatabasePath()])
   databases.add(databasePathFrom(env))
-  const stable = theStableCheckoutFolder(homedir())
-  const stableEnv = join(stable, '.env')
-  if (existsSync(stableEnv)) databases.add(resolve(stable, String(readSetting('MOLE_OFFICE_DB', envFileValues(stableEnv)).value)))
+  const stable = theDatabaseTheStableCheckoutNames(homedir())
+  if (stable !== null) databases.add(stable)
   return [...new Set([...databases].map((database) => databaseDirectoryFrom(database)))]
 }
 

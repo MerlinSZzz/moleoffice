@@ -116,7 +116,8 @@ async function open(hash: string, theme: 'light' | 'dark'): Promise<void> {
   await page.goto(`${app.site}/#/${hash}`, { timeout: 60_000 })
   await page.reload({ timeout: 60_000 })
   await waitForThePage(page, 60_000)
-  await page.waitForTimeout(2500)
+  // The page has drawn something: the module drawing's canvas or a pipeline's lanes.
+  await page.locator(`.gx-canvas-wrap[data-shows="1"], ${DRAWING}`).first().waitFor({ timeout: 60_000 })
 }
 
 for (const theme of ['light'] as const) {
@@ -128,7 +129,7 @@ for (const theme of ['light'] as const) {
       expect(await page.locator('.gx-canvas-wrap').count(), 'the canvas is gone when List is pressed').toBe(0)
       await page.getByRole('button', { name: 'Graph', exact: true }).first().click()
       await page.waitForSelector('.gx-canvas-wrap[data-shows="1"]', { timeout: 60_000 })
-      await page.waitForTimeout(1500)
+      await page.locator('.gx-card').first().waitFor({ timeout: 30_000 }).catch(() => undefined)
       expect(await page.locator('.gx-card').count(), 'Graph brings the cards back').toBeGreaterThan(0)
     }, 180_000)
   })

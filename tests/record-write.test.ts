@@ -41,12 +41,14 @@ import {
   type FieldSpec,
 } from '../src/shared/kinds.ts'
 import { ITEM_STATES, RECORD_KINDS, type PanelRecord, type RecordKind } from '../src/shared/types.ts'
+import { createI18n } from '../src/shared/i18n.ts'
 
 type RecordPage = typeof import('../src/web/pages/RecordPage.tsx')
 type Ui = typeof import('../src/web/components/ui.tsx')
 
 let rp: RecordPage
 let ui: Ui
+const en = createI18n('en').t
 
 beforeAll(async () => {
   // These modules reach api.ts and router.tsx, which touch window while they are being evaluated.
@@ -351,7 +353,7 @@ describe('data.due, which is three different facts', () => {
 
 // ============================================================================ where it stops
 
-describe('a shape too big for one box says so instead of half-writing it', () => {
+describe('a shape too big for one box is marked as having none, instead of half-writing it', () => {
   /**
    * `consequence` carries the only safety mark in the product and `paused` carries a PauseUntil
    * inside it. Half a nested object is a hard refusal on the write path, so a box that could only
@@ -378,11 +380,11 @@ describe('a shape too big for one box says so instead of half-writing it', () =>
         onChanged: () => {},
       }),
     )
-    // THE SENTENCE SAYS WHAT KIND OF SHAPE IT IS AND THE ROW SAYS WHICH ONE. It used to read "a
+    // THE ROW SAYS THERE IS NO BOX, AND THE DECLARED TYPE SAYS WHICH SHAPE. It used to read "a
     // Consequence, an object with its own fields … It takes bearer, what", and the same sentence
     // is drawn in Normal mode under a field being changed (problem 2E5-mceErAZI). The declared type
     // is this developer-mode panel's to show, beside the key.
-    expect(markup).toContain('a group of fields that belong together')
+    expect(markup).toContain(en('g2b.field.noBox'))
     expect(markup).toContain('<code class="fw-type">Consequence</code>')
     expect(markup).not.toContain('bearer, what')
     // Said once, at the foot, rather than once per row with the same record id in it.

@@ -16,6 +16,9 @@
  * the last one stored, so a note changed in another window is refused rather than written over, and the note says so
  * and offers both ways on.
  *
+ * IT ASKS FOR ITS TITLE, in a field at its head that each save reads. Left empty, the field shows as a hint the title
+ * the note's words give it, and that is the title saved. Two notes may be given the same title.
+ *
  * "SAVED" IS SAID ONLY OF WHAT THE OFFICE ANSWERED. Until the answer comes the foot says the note is being saved. A
  * save the office refused says why, with a press to send it again.
  *
@@ -25,11 +28,13 @@
  */
 import { useEffect, useRef, useState, type MutableRefObject, type ReactNode } from 'react'
 import { t, type WordKey } from '@shared/i18n.ts'
-import type { QuickNoteColour, QuickNotePage as WrittenFrom, QuickNotePart } from '@shared/kinds/quick-note.ts'
+import { A_NOTE_HOLDS_TAGS, A_TAG_HOLDS, quickNoteTagsOf, type QuickNoteColour, type QuickNotePage as WrittenFrom, type QuickNotePart } from '@shared/kinds/quick-note.ts'
 import { stampInZone, theClockZone } from '@shared/time.ts'
 import { ApiError, api, errorMessage, faultOf, type Fault } from '../api.ts'
 import { useLanguage } from '../lib/language.ts'
 import { theTitleFollowsTheWords, titleOf } from '../lib/quick-note-title.ts'
+import { aTagFrom, theColourOfATag, type ATagRefused } from '../lib/note-tags.ts'
+import { LabelColourStyle } from './chat/LabelColours.tsx'
 import { QuickNoteSheet, aNewPartId, thePlaceInView, type APlaceForFiles, type QuickNoteTool } from './QuickNoteSheet.tsx'
 import { aPartFrom } from './quick-note-files.ts'
 import { QUICK_NOTE_COLOURS } from './quick-note-colours.ts'
@@ -45,7 +50,28 @@ const A_CLOSING_PAGE_CARRIES = 60_000
 /** How far apart files added together are placed, one below another, in pixels of the sheet. */
 const FILES_ARE_APART = 12
 
-export type FlushQuickNote = () => Promise<{ ok: boolean; id: string | null }>
+/**
+ * Keep what is not kept yet, and say whether it was kept. `waitAtMost` bounds the wait for a save underway, in
+ * milliseconds: a save that has not ended by then answers that it was not kept, while it goes on.
+ */
+export type FlushQuickNote = (waitAtMost?: number) => Promise<{ ok: boolean; id: string | null }>
+
+/** Whether a save underway ends before the deadline. With no deadline it is waited for however long it takes. */
+async function endsBy(save: Promise<void>, deadline: number | null): Promise<boolean> {
+  if (deadline === null) {
+    await save
+    return true
+  }
+  let timer = 0
+  const late = new Promise<false>((resolve) => {
+    timer = window.setTimeout(() => resolve(false), Math.max(0, deadline - Date.now()))
+  })
+  try {
+    return await Promise.race([save.then(() => true), late])
+  } finally {
+    window.clearTimeout(timer)
+  }
+}
 
 export interface QuickNoteProps {
   /**
@@ -87,10 +113,14 @@ type Reading = { state: 'reading' } | { state: 'failed'; reason: string; fault: 
 interface Kept {
   id: string | null
   version: string | null
+  /**
+   * THE PROJECT THE NOTE IS KEPT IN, once the office has said it, which every later read and save of the note names, and
+   * the sheet asks the note's pictures in. The file door serves a file named by a record in the project it is asked in.
+   */
+  project: string | null
   parts: QuickNotePart[]
   title: string | null
-  /** Whether the title is made from the note's first words at each save. False once it was given some other way. */
-  titleFollowsTheWords: boolean
+  tags: string[]
 }
 
 /** The parts as the office keeps them: words with nothing in them are not kept. */
@@ -113,17 +143,19 @@ export function QuickNote({ id, writtenFrom: startedFrom, filed, titled, flushRe
   const [colour, setColour] = useState<QuickNoteColour>('ink')
   const [writing, setWriting] = useState<string | null>(null)
   const [keptPaths, setKeptPaths] = useState<ReadonlySet<string>>(new Set())
-  // THE PROJECT THE NOTE IS KEPT IN, once the office has said it. A note opened from another project's page, or moved
-  // to another project, has its pictures asked for there: the file door serves a file named by a record in the project
-  // it is asked in.
-  const [project, setProject] = useState<string | undefined>(undefined)
   const [saving, setSaving] = useState<Saving>({ state: 'nothing' })
   const [undoable, setUndoable] = useState(0)
   const [adding, setAdding] = useState<Adding>({ now: null, refused: [] })
 
   const sheet = useRef<HTMLDivElement>(null)
   const latest = useRef<QuickNotePart[]>(parts)
-  const kept = useRef<Kept>({ id: id ?? null, version: null, parts: [], title: null, titleFollowsTheWords: true })
+  const kept = useRef<Kept>({ id: id ?? null, version: null, project: null, parts: [], title: null, tags: [] })
+  // THE NOTE'S TAGS, as the person has given them, which each save reads.
+  const [tags, setTags] = useState<string[]>([])
+  const tagsNow = useRef<string[]>([])
+  // THE TITLE THE PERSON GAVE, as the field at the note's head holds it, and empty while the note takes its words' title.
+  const [naming, setNaming] = useState('')
+  const named = useRef('')
   const undo = useRef<QuickNotePart[][]>([])
   const timer = useRef<number | null>(null)
   const out = useRef(false)
@@ -145,19 +177,27 @@ export function QuickNote({ id, writtenFrom: startedFrom, filed, titled, flushRe
   /** Draw what the office keeps of a note, and build the next save on it. */
   const holdTheStored = (record: { id: string; workspaceId: string; title: string; data: Record<string, unknown> }, version: string) => {
     const stored = Array.isArray(record.data['parts']) ? (record.data['parts'] as QuickNotePart[]) : []
-    kept.current = { id: record.id, version, parts: stored, title: record.title, titleFollowsTheWords: theTitleFollowsTheWords(record.title, stored) }
+    const storedTags = quickNoteTagsOf(record.data)
+    kept.current = { id: record.id, version, project: record.workspaceId, parts: stored, title: record.title, tags: storedTags }
+    tagsNow.current = storedTags
+    setTags(storedTags)
+    // A TITLE ITS WORDS DID NOT GIVE IT is one it was given, and the field shows it.
+    named.current = theTitleFollowsTheWords(record.title, stored) ? '' : record.title
+    setNaming(named.current)
     latest.current = stored
     setParts(stored)
     setTitle(record.title)
     setWrittenFrom((record.data['from_page'] as WrittenFrom | undefined) ?? null)
-    setProject(record.workspaceId)
     setKeptPaths(pathsIn(stored))
   }
 
-  const readTheNote = (noteId: string) => {
+  /** The project to name when the note is read or saved: the one the office keeps it in, or the switcher's until it has said. */
+  const inItsProject = (): { workspaceId?: string } => (kept.current.project === null ? {} : { workspaceId: kept.current.project })
+
+  const readTheNote = (noteId: string, project = inItsProject()) => {
     setReading({ state: 'reading' })
     api
-      .getRecord(noteId)
+      .getRecord(noteId, project)
       .then((reply) => {
         if (!here.current) return
         if (reply.record.kind !== 'quick_note') {
@@ -170,13 +210,28 @@ export function QuickNote({ id, writtenFrom: startedFrom, filed, titled, flushRe
         setReading({ state: 'ready' })
       })
       .catch((err: unknown) => {
-        if (here.current) setReading({ state: 'failed', reason: errorMessage(err), fault: faultOf(err) })
+        if (!here.current) return
+        const fault = faultOf(err)
+        // A NOTE KEPT IN ANOTHER PROJECT is read again there, once, when the office's refusal names this note and its
+        // project. A note opened by its address while another project is open is still the person's own note.
+        const there = fault?.elsewhere ?? null
+        if (there !== null && there.recordId === noteId && project.workspaceId === undefined) {
+          readTheNote(noteId, { workspaceId: there.workspaceId })
+          return
+        }
+        setReading({ state: 'failed', reason: errorMessage(err), fault })
       })
   }
 
   useEffect(() => {
     if (id !== undefined) readTheNote(id)
   }, [])
+
+  /** The title a save keeps: the one the person gave, or the one the note's words give while the field is empty. */
+  const theTitleToKeep = (toKeep: readonly QuickNotePart[]): string => {
+    const given = named.current.trim()
+    return given === '' ? titleOf(toKeep) : given
+  }
 
   /** Send what is not kept yet. `leaving` says the page is being hidden or closed, so the save must outlive it. */
   const send = (leaving = false): void => {
@@ -191,26 +246,36 @@ export function QuickNote({ id, writtenFrom: startedFrom, filed, titled, flushRe
     const changeTarget = now.id !== null && now.version !== null ? { id: now.id, version: now.version } : null
     if (now.id !== null && changeTarget === null) return
     const toKeep = partsToKeep(latest.current)
-    const newTitle = now.titleFollowsTheWords ? titleOf(toKeep) : now.title
+    const newTitle = theTitleToKeep(toKeep)
+    const newTags = tagsNow.current
+    const sameTags = JSON.stringify(newTags) === JSON.stringify(now.tags)
     // A NEW NOTE IS FILED ONLY WHEN IT HOLDS SOMETHING, and a kept note is sent only when it changed.
     if (now.id === null && toKeep.length === 0) return
-    if (now.id !== null && JSON.stringify(toKeep) === JSON.stringify(now.parts) && newTitle === now.title) return
+    if (now.id !== null && JSON.stringify(toKeep) === JSON.stringify(now.parts) && newTitle === now.title && sameTags) return
     out.current = true
     saveFailed.current = false
     if (here.current) setSaving({ state: 'saving' })
     const write =
       changeTarget === null
         ? api
-            .fileAQuickNote({ title: newTitle ?? titleOf(toKeep), data: { parts: toKeep, ...(startedFrom === undefined ? {} : { from_page: startedFrom }) } })
+            .fileAQuickNote({
+              title: newTitle,
+              data: { parts: toKeep, ...(newTags.length === 0 ? {} : { tags: newTags }), ...(startedFrom === undefined ? {} : { from_page: startedFrom }) },
+            })
             .then((reply) => {
-              kept.current = { ...kept.current, id: reply.record.id, version: reply.version }
-              if (here.current) setProject(reply.record.workspaceId)
+              kept.current = { ...kept.current, id: reply.record.id, version: reply.version, project: reply.record.workspaceId }
               if (here.current) tell.current.filed?.(reply.record.id)
             })
         : api
             .changeAQuickNote(
               changeTarget.id,
-              { ...(newTitle === now.title || newTitle === null ? {} : { title: newTitle }), parts: toKeep, ifVersion: changeTarget.version },
+              {
+                ...(newTitle === now.title ? {} : { title: newTitle }),
+                parts: toKeep,
+                ...(sameTags ? {} : { tags: newTags }),
+                ifVersion: changeTarget.version,
+                ...(now.project === null ? {} : { workspaceId: now.project }),
+              },
               leaving,
             )
             .then((reply) => {
@@ -218,7 +283,7 @@ export function QuickNote({ id, writtenFrom: startedFrom, filed, titled, flushRe
             })
     pending.current = write
       .then(() => {
-        kept.current = { ...kept.current, parts: toKeep, title: newTitle }
+        kept.current = { ...kept.current, parts: toKeep, title: newTitle, tags: newTags }
         if (!here.current) return
         setTitle(newTitle)
         setKeptPaths(pathsIn(toKeep))
@@ -247,20 +312,24 @@ export function QuickNote({ id, writtenFrom: startedFrom, filed, titled, flushRe
   // A pop-out waits for files and every save already underway, including edits made during a save.
   useEffect(() => {
     if (flushRef === undefined) return
-    const flush: FlushQuickNote = async () => {
+    const flush: FlushQuickNote = async (waitAtMost) => {
+      const deadline = waitAtMost === undefined ? null : Date.now() + waitAtMost
       if (reading.state !== 'ready') return { ok: true, id: kept.current.id }
       if (stopped.current) return { ok: false, id: kept.current.id }
       while (filesActive.current > 0) await new Promise<void>((resolve) => fileWaiters.current.push(resolve))
       for (;;) {
         const now = kept.current
         const toKeep = partsToKeep(latest.current)
-        const newTitle = now.titleFollowsTheWords ? titleOf(toKeep) : now.title
-        const unchanged = now.id === null ? toKeep.length === 0 : JSON.stringify(toKeep) === JSON.stringify(now.parts) && newTitle === now.title
+        const newTitle = theTitleToKeep(toKeep)
+        const unchanged =
+          now.id === null
+            ? toKeep.length === 0
+            : JSON.stringify(toKeep) === JSON.stringify(now.parts) && newTitle === now.title && JSON.stringify(tagsNow.current) === JSON.stringify(now.tags)
         if (unchanged && pending.current === null) return { ok: true, id: now.id }
         if (pending.current === null) send()
         const waiting = pending.current
         if (waiting === null) return { ok: false, id: kept.current.id }
-        await waiting
+        if (!(await endsBy(waiting, deadline))) return { ok: false, id: kept.current.id }
         if (saveFailed.current || stopped.current) return { ok: false, id: kept.current.id }
       }
     }
@@ -378,6 +447,28 @@ export function QuickNote({ id, writtenFrom: startedFrom, filed, titled, flushRe
       <style href="mole-office-quick-note" precedence="default">{CSS}</style>
       {reading.state === 'ready' ? (
         <>
+          <label className="qn-naming">
+            <span className="qn-naming-word">{t('quickNote.titleField')}</span>
+            <input
+              className="qn-title-field"
+              type="text"
+              value={naming}
+              placeholder={titleOf(partsToKeep(parts))}
+              onChange={(event) => {
+                named.current = event.target.value
+                setNaming(event.target.value)
+                soon()
+              }}
+            />
+          </label>
+          <NoteTags
+            tags={tags}
+            change={(next) => {
+              tagsNow.current = next
+              setTags(next)
+              soon()
+            }}
+          />
           <Tools
             tool={tool}
             setTool={setTool}
@@ -395,7 +486,7 @@ export function QuickNote({ id, writtenFrom: startedFrom, filed, titled, flushRe
               const own = kept.current.id
               if (own === null) return
               api
-                .getRecord(own)
+                .getRecord(own, inItsProject())
                 .then((reply) => {
                   kept.current = { ...kept.current, version: reply.version, parts: [] }
                   stopped.current = false
@@ -412,7 +503,7 @@ export function QuickNote({ id, writtenFrom: startedFrom, filed, titled, flushRe
             tool={tool}
             colour={colour}
             kept={keptPaths}
-            project={project}
+            project={kept.current.project ?? undefined}
             record={kept.current.id ?? undefined}
             writing={writing}
             setWriting={setWriting}
@@ -476,14 +567,15 @@ function wordsAround(key: WordKey, name: string, inside: ReactNode): ReactNode {
 
 /** Where the note is kept, and the page it was written from when it was written from one. */
 function WhereItIsKept({ filed, writtenFrom }: { filed: boolean; writtenFrom: WrittenFrom | null }) {
+  if (!filed && writtenFrom === null) return null
   const myNotes = <strong>{t('quickNote.myNotes')}</strong>
   return (
     <p className="qn-where">
-      {wordsAround(filed ? 'quickNote.keptIn' : 'quickNote.notKeptYet', 'myNotes', myNotes)}
+      {filed ? wordsAround('quickNote.keptIn', 'myNotes', myNotes) : null}
       {writtenFrom === null ? null : (
         <>
-          {' · '}
-          {wordsAround('quickNote.writtenFrom', 'page', <RouteLink to={writtenFrom.address.replace(/^#/u, '')}>{writtenFrom.name}</RouteLink>)}
+          {filed ? ' · ' : null}
+          {wordsAround('quickNote.writtenFrom', 'page', <RouteLink to={writtenFrom.address.replace(/^#/u, '')} title={writtenFrom.name}>{writtenFrom.name}</RouteLink>)}
         </>
       )}
     </p>
@@ -502,6 +594,81 @@ function SavingSays({ saving, again }: { saving: Saving; again: () => void }) {
         {t('quickNote.saveAgain')}
       </Btn>
     </span>
+  )
+}
+
+/** What the note says when typed words make no tag. Empty words make none and say nothing. */
+const A_TAG_REFUSED: Record<Exclude<ATagRefused, 'empty'>, () => string> = {
+  long: () => t('quickNote.tagTooLong', { n: A_TAG_HOLDS }),
+  twice: () => t('quickNote.tagTwice'),
+  full: () => t('quickNote.tagsFull', { n: A_NOTE_HOLDS_TAGS }),
+}
+
+/**
+ * THE NOTE'S TAGS AND THE FIELD A TAG IS ADDED IN, under its title. Each tag is a filled label in the colour worked out
+ * from its letters, the colour it has on My notes too. Enter or a comma adds what was typed, and so does leaving the
+ * field.
+ */
+function NoteTags({ tags, change }: { tags: readonly string[]; change: (next: string[]) => void }) {
+  const [typed, setTyped] = useState('')
+  const [refused, setRefused] = useState<ATagRefused | null>(null)
+  const add = () => {
+    const made = aTagFrom(typed, tags)
+    if ('refused' in made) {
+      setRefused(made.refused)
+      return
+    }
+    setRefused(null)
+    setTyped('')
+    change([...tags, made.tag])
+  }
+  return (
+    <div className="qn-tags" role="group" aria-label={t('quickNote.tags')}>
+      <LabelColourStyle />
+      <span className="qn-naming-word">{t('quickNote.tags')}</span>
+      {tags.length === 0 ? null : (
+        <ul className="qn-tag-list">
+          {tags.map((tag) => (
+            <li key={tag} className="qn-tag px-label-ink" data-colour={theColourOfATag(tag)}>
+              <span className="qn-tag-word">{tag}</span>
+              <button
+                type="button"
+                className="qn-tag-off"
+                aria-label={t('quickNote.removeTag', { tag })}
+                title={t('quickNote.removeTag', { tag })}
+                onClick={() => change(tags.filter((one) => one !== tag))}
+              >
+                <span aria-hidden="true">×</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <input
+        className="qn-tag-field"
+        type="text"
+        value={typed}
+        placeholder={t('quickNote.addATag')}
+        aria-label={t('quickNote.addATag')}
+        onChange={(event) => {
+          setTyped(event.target.value)
+          setRefused(null)
+        }}
+        onKeyDown={(event) => {
+          if (event.key !== 'Enter' && event.key !== ',') return
+          event.preventDefault()
+          add()
+        }}
+        onBlur={() => {
+          if (typed.trim() !== '') add()
+        }}
+      />
+      {refused === null || refused === 'empty' ? null : (
+        <span className="qn-tag-refused" role="status">
+          {A_TAG_REFUSED[refused]()}
+        </span>
+      )}
+    </div>
   )
 }
 
@@ -630,6 +797,44 @@ const ICONS = {
 
 const CSS = `
 .qn-note { display: flex; flex-direction: column; height: 100%; min-height: 0; background: var(--bg); color: var(--text); container-type: inline-size; }
+.qn-naming {
+  display: flex; align-items: center; gap: 8px; padding: 6px 12px; border-bottom: var(--border-w) solid var(--border);
+  background: var(--panel);
+}
+.qn-naming-word { color: var(--text-2); font-size: var(--fs-1); }
+.qn-title-field {
+  flex: 1; min-width: 0; min-height: 32px; box-sizing: border-box; padding: 0 8px; font: inherit; font-weight: 600;
+  color: var(--text); background: var(--bg); border: var(--border-w) solid var(--border-strong); border-radius: var(--radius-sm);
+}
+.qn-title-field::placeholder { color: var(--placeholder); font-weight: 400; }
+.qn-title-field:focus-visible { outline: 2px solid var(--text); outline-offset: -2px; }
+/* A NOTE'S TAGS, under its title, each a filled label in the colour worked out from its letters, drawn as the chat's
+   flags are. */
+.qn-tags {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; padding: 6px 12px;
+  border-bottom: var(--border-w) solid var(--border); background: var(--panel);
+}
+.qn-tag-list { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; margin: 0; padding: 0; list-style: none; }
+.qn-tag {
+  display: inline-flex; align-items: center; gap: 2px; min-width: 0; min-height: 26px; padding: 0 2px 0 8px;
+  font-size: var(--fs-1); font-weight: 600; overflow-wrap: anywhere;
+  border: var(--border-w) solid var(--label-ink); border-radius: var(--radius-sm); background: var(--label-soft);
+  color: var(--label-words);
+}
+.qn-tag-off {
+  min-width: 24px; min-height: 24px; padding: 0; border: 0; border-radius: 50%;
+  background: transparent; color: inherit; font: inherit; cursor: pointer;
+}
+.qn-tag-off:hover { background: var(--hover); }
+.qn-tag-off:focus-visible { outline: 2px solid var(--text); outline-offset: -2px; }
+.qn-tag-field {
+  flex: 1 1 120px; min-width: 0; max-width: 220px; min-height: 28px; box-sizing: border-box; padding: 0 8px;
+  font: inherit; font-size: var(--fs-1); color: var(--text); background: var(--bg);
+  border: var(--border-w) solid var(--border-strong); border-radius: var(--radius-sm);
+}
+.qn-tag-field::placeholder { color: var(--placeholder); }
+.qn-tag-field:focus-visible { outline: 2px solid var(--text); outline-offset: -2px; }
+.qn-tag-refused { flex-basis: 100%; font-size: var(--fs-1); color: var(--text-2); }
 .qn-tools {
   display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: var(--border-w) solid var(--border);
   background: var(--panel); flex-wrap: wrap;
@@ -665,11 +870,17 @@ const CSS = `
 .qn-view-controls button:hover { background: var(--panel-2); }
 .qn-view-controls button[aria-pressed='true'] { background: var(--panel-2); box-shadow: inset 0 0 0 1px var(--text); }
 .qn-view-controls button:focus-visible { outline: 2px solid var(--text); outline-offset: -2px; }
-.qn-paper {
-  position: relative; touch-action: none; cursor: crosshair;
+/* THE PAPER STANDS OUT OF THE SHEET'S FLOW, at its top left. A box in the flow is scrolled over at its size before its
+   zoom as well as after it, so a sheet zoomed out scrolled past what is drawn. Out of the flow, only its zoomed size
+   counts. */
+.qn-paper { position: absolute; left: 0; top: 0; touch-action: none; cursor: crosshair; }
+/* THE DOTS ARE ON THE GROUND, which grows with the sheet in every direction; the sheet places it and sets where its dots
+   start, so they stay at the same points of the sheet. */
+.qn-ground {
+  position: absolute;
   /* THE DOTS ARE FAINT, so words written over them stay easy to read: the light theme's border is as dark as its text. */
   background-image: radial-gradient(circle, color-mix(in srgb, var(--text) 15%, var(--panel)) 1px, transparent 1.2px);
-  background-size: 24px 24px; background-position: 12px 12px;
+  background-size: 24px 24px;
 }
 .qn-sheet[data-tool='eraser'] .qn-paper { cursor: cell; }
 .qn-sheet[data-tool='box'] .qn-words, .qn-sheet[data-tool='line'] .qn-words { cursor: inherit; }
@@ -690,7 +901,7 @@ const CSS = `
   display: block; width: 100%; margin: 0; padding: 0; border: 0; outline: none; resize: none; overflow: hidden;
   font: inherit; line-height: inherit; color: var(--text); background: transparent;
 }
-.qn-field::placeholder { color: var(--text-3); }
+.qn-field::placeholder { color: var(--placeholder); }
 .qn-box {
   position: absolute; display: flex; align-items: center; justify-content: center; padding: 6px 8px; box-sizing: border-box;
   border: 2px solid var(--text); border-radius: var(--radius-sm); background: var(--panel); text-align: center; cursor: text;
@@ -700,22 +911,28 @@ const CSS = `
 .qn-box .qn-field { text-align: center; }
 .qn-box .qn-written, .qn-box .qn-field { min-width: 0; flex-shrink: 0; overflow-wrap: anywhere; }
 .qn-box .qn-written { width: 100%; }
-.qn-resize-box {
+.qn-resize-box, .qn-resize-added {
   position: absolute; right: -2px; bottom: -2px; width: 24px; height: 24px; padding: 0;
   border: 0; background: transparent; cursor: nwse-resize; touch-action: none;
 }
-.qn-resize-box::after {
+.qn-resize-box::after, .qn-resize-added::after {
   content: ''; position: absolute; right: 4px; bottom: 4px; width: 7px; height: 7px;
   border-right: 2px solid var(--text); border-bottom: 2px solid var(--text);
 }
-.qn-resize-box:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+.qn-resize-box:focus-visible, .qn-resize-added:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
 .qn-file { position: absolute; margin: 0; display: flex; align-items: center; justify-content: center; border: var(--border-w) solid var(--border); background: var(--panel-2); }
 .qn-file img, .qn-file video { width: 100%; height: 100%; object-fit: contain; }
 /* A FILM'S FRAME PUTS THE PLAYER ABOVE THE LINK THAT SAVES THE FILM WHOLE, both inside the size the film was given. */
 .qn-file[data-type="video"] { flex-direction: column; align-items: stretch; gap: 4px; padding: 4px; }
 .qn-file[data-type="video"] video { flex: 1 1 0; min-height: 0; }
 .qn-file-wait { margin: 0; padding: 8px; font-size: var(--fs-1); color: var(--text-2); }
-.qn-added { position: absolute; padding: 8px 10px; border: var(--border-w) solid var(--border-strong); border-radius: var(--radius-sm); background: var(--panel); }
+.qn-added {
+  position: absolute; display: flex; flex-direction: column; padding: 8px 10px;
+  border: var(--border-w) solid var(--border-strong); border-radius: var(--radius-sm); background: var(--panel);
+}
+/* WHAT AN ADDED PART HOLDS SCROLLS INSIDE ITS FRAME when the person has made the frame smaller than that, so the frame
+   keeps the size it was given and its corner stays where it is. */
+.qn-added-inside { flex: 1 1 auto; min-height: 0; overflow: auto; }
 .qn-added-from { margin: 0 0 6px; font-size: var(--fs-1); color: var(--text-2); }
 .qn-reading { padding: 16px; color: var(--text-2); }
 .qn-adding, .qn-refused { margin: 0; padding: 6px 12px; border-top: var(--border-w) solid var(--border); font-size: var(--fs-1); }
@@ -723,12 +940,14 @@ const CSS = `
 .qn-refused { color: var(--st-failed); }
 .qn-refused p { margin: 0; }
 .qn-foot {
-  display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 6px 12px; min-height: 32px; box-sizing: border-box;
+  display: flex; align-items: center; gap: 12px; padding: 6px 12px; min-height: 32px; box-sizing: border-box;
   border-top: var(--border-w) solid var(--border); font-size: var(--fs-1); color: var(--text-2);
 }
-/* THE FOOT WRAPS RATHER THAN CUTS, so the name of the page a note was written from is read whole in a narrow window. */
-.qn-where { flex: 1 1 180px; min-width: 0; margin: 0; overflow-wrap: anywhere; }
-.qn-saving { margin-left: auto; white-space: nowrap; }
+/* THE FOOT IS ONE LINE IN EVERY NOTE, so a small note gives it no more than a line. A page name too long for the line
+   is cut, and its link holds the whole name, which a pointer held over it shows. A refusal alone may take more lines,
+   so what the office said is read whole. */
+.qn-where { flex: 1 1 auto; min-width: 0; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.qn-saving { flex: none; margin-left: auto; white-space: nowrap; }
 .qn-saving[data-refused='1'] { flex: 1 1 180px; color: var(--st-failed); white-space: normal; }
 /* A NARROW NOTE SHOWS ITS TOOLS AS ICONS, by the width of its own box, so a note beside a wide page is drawn as in the small window. */
 @container (max-width: 560px) {

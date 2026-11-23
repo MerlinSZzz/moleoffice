@@ -184,6 +184,16 @@ export function theSandboxWayBack({ instance, handle, continues, folder, session
 const textOf = (value) => (typeof value === 'string' && value.trim() !== '' ? value : null)
 const bagOf = (value) => (typeof value === 'object' && value !== null && !Array.isArray(value) ? value : null)
 
+/** @param {Record<string, unknown>} data The run's data. @returns {string | null} Its recorded conversation. */
+export function theConversationOfTheRun(data) {
+  return textOf(data['providerSession']) ?? textOf(bagOf(bagOf(data['extra'])?.['discovered'])?.['externalId'])
+}
+
+/** @param {Record<string, unknown>} data The run's data. @returns {Record<string, unknown> | null} Its sandbox. */
+export function theSandboxOfTheRun(data) {
+  return bagOf(data['sandbox'])
+}
+
 /**
  * THE WAY BACK TO ONE SESSION RECORD.
  *
@@ -199,9 +209,9 @@ export function theWayBackOf(session) {
   const data = session.data
   const stamp = bagOf(bagOf(data['extra'])?.['discovered'])
   const runtime = textOf(data['runtime']) ?? textOf(stamp?.['tool'])
-  const sessionId = textOf(data['providerSession']) ?? textOf(stamp?.['externalId'])
+  const sessionId = theConversationOfTheRun(data)
   const folder = textOf(data['workingDirectory'])
-  const sandbox = bagOf(data['sandbox'])
+  const sandbox = theSandboxOfTheRun(data)
 
   if (runtime === null) return { way: 'none', runtime, because: 'Nobody recorded which program this run used.' }
   if (runtime !== 'claude-code' && runtime !== 'codex' && runtime !== 'opencode') {

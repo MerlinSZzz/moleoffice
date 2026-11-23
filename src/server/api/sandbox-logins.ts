@@ -7,16 +7,22 @@
  *   GET  /api/office/sandbox-logins         each login the sandbox templates declare, set or not set
  *   POST /api/office/sandbox-logins/set     the person sets one, pasted into the Settings page
  *   POST /api/office/sandbox-logins/clear   the person clears one
+ *   POST /api/office/sandbox-logins/test    the person tests one with its provider (lib/sandbox-login-tests.ts)
  *
- * ALL THREE STAY ON THIS MACHINE, EXCEPT FOR THE PERSON FROM THEIR OTHER COMPUTER: proved with a paired device's key and over
- * an encrypted door, the person may do all three from there, and a login set or cleared that way
+ * ALL FOUR STAY ON THIS MACHINE, EXCEPT FOR THE PERSON FROM THEIR OTHER COMPUTER: proved with a paired device's key and over
+ * an encrypted door, the person may do all four from there, and a login set or cleared that way
  * is said to the person as a line from the office. The file is on this computer, the sandboxes that read it run here, and setting a
  * login writes it; so each is `local` with `acts-on-this-machine`, as the office's own key doors are. Setting and
  * clearing are the person's own acts: an agent may read which names are set, and may not put a login into the file
  * or take one out.
  *
  * NO REPLY CARRIES A VALUE. The reading is names, runtime words, booleans and sentences, and `value` in the set
- * request is the only place a login travels. It is written and dropped.
+ * request is the only place a login travels to the office. It is written and dropped. The test press sends one login
+ * out, in one request to its provider's own address, and its reply is only what the provider's answer was read as.
+ *
+ * THE TEST PRESS IS THE PERSON'S ALONE. A secretary may set or clear a login for them, and may not test one: a test
+ * sends the login off this computer. Its guard is `thePersonPressedItThemselves` and nothing else, so neither a raise,
+ * the person's words nor the owner's authority in a test world opens it.
  */
 import type { FastifyInstance, FastifyRequest } from 'fastify'
 import { z } from 'zod'
@@ -24,7 +30,7 @@ import { z } from 'zod'
 import { PRIVATE_LOGIN_ROUTES, type PrivateLoginReason } from '@shared/private-sandbox-login.ts'
 import type { PrivateLoginRefusalCode } from '@shared/refusal-codes.ts'
 import { enWave13q } from '@shared/words/en-wave-13q.ts'
-import type { SandboxLogins } from '@shared/sandbox-logins.ts'
+import type { SandboxLoginTested, SandboxLogins } from '@shared/sandbox-logins.ts'
 import { actorWithTheWordsItActsOn, takesNoInput, theWordsInTheBody } from '../lib/http.ts'
 import { parse } from '../lib/parse.ts'
 import { theSecretaryActingForThePerson, writeDownAnActUnderTheRaise, type Actor } from '../lib/records.ts'
@@ -40,6 +46,7 @@ import { PrivateLoginError } from '../../config/private-sandbox-login.mjs'
 import { route } from '../lib/route.ts'
 import { theActKeptHere } from '../lib/reach.ts'
 import { clearASandboxLogin, setASandboxLogin, theSandboxLogins } from '../lib/sandbox-logins.ts'
+import { forgetTheTestOf, testASandboxLogin } from '../lib/sandbox-login-tests.ts'
 import { workspaceOf } from '../lib/workspaces.ts'
 import { warrantBody } from './records.ts'
 // THE LINE TO THE PERSON WHEN A SETTING IS CHANGED FROM THEIR OTHER COMPUTER OR BY A SECRETARY
@@ -73,6 +80,18 @@ const CLEAR_NOTE =
   'leaves the secrets file and every other line stays. The person\'s own act, or a secretary\'s for them on their words ' +
   '(a warrant whose `for` names office.clear-sandbox-login) or under their raise. The reply is ' +
   'the whole reading.'
+
+const TEST_NOTE =
+  'Test one of the sandboxes\' logins with its provider. Body {"name": a name the templates declare}. The login is sent ' +
+  'once, in its one header, to its provider\'s own address in the provider router\'s table, and is never returned. The ' +
+  'reply is {name, outcome, status, resetsAt, balances, creditChecked, readAt, fromAnEarlierPress}: outcome is works, ' +
+  'refused, limit, no-clear-answer or no-test-known. A press inside 30 s of the last one for the name answers that ' +
+  'result again and sends nothing. Only the person, pressing it themselves; a secretary is refused, raised or carrying ' +
+  'their words.'
+
+const testBody = z.strictObject({
+  name: z.string().min(1).max(128),
+})
 
 const setBody = z.strictObject({
   name: z.string().min(1).max(128),
@@ -156,6 +175,7 @@ export async function sandboxLoginRoutes(app: FastifyInstance): Promise<void> {
     const body = parse(setBody, req.body ?? {}, 'The login to set')
     const wasSet = theSandboxLogins().names.some((one) => one.name === body.name && one.set)
     const logins = setASandboxLogin(body.name, body.value)
+    forgetTheTestOf(body.name)
     const what = `The sandboxes' login ${body.name} was set`
     // SET OR NOT SET, AND NEVER THE VALUE, on the change row the person's words or their raise earn.
     writeDownAnActUnderTheRaise(actor, { setting: 'sandbox-logins', field: `the sandboxes' login ${body.name}`, before: wasSet ? 'set' : 'not set', after: 'set', workspaceId: workspaceOf(req) })
@@ -174,10 +194,37 @@ export async function sandboxLoginRoutes(app: FastifyInstance): Promise<void> {
     const body = parse(clearBody, req.body ?? {}, 'The login to clear')
     const wasSet = theSandboxLogins().names.some((one) => one.name === body.name && one.set)
     const logins = clearASandboxLogin(body.name)
+    forgetTheTestOf(body.name)
     const what = `The sandboxes' login ${body.name} was cleared`
     writeDownAnActUnderTheRaise(actor, { setting: 'sandbox-logins', field: `the sandboxes' login ${body.name}`, before: wasSet ? 'set' : 'not set', after: 'not set', workspaceId: workspaceOf(req) })
     sayItWasChangedFromAnotherComputer(req, what)
     sayASecretaryChangedItForThem(req, actor, what)
     return logins
+  })
+
+  app.post('/office/sandbox-logins/test', route('office.test-sandbox-login', 'local', {
+    because: 'acts-on-this-machine',
+    act: "Sending one login from the sandboxes' secrets file on this computer to its provider",
+    thePersonMayFromAnotherComputer: true,
+  }, TEST_NOTE), async (req, reply): Promise<SandboxLoginTested> => {
+    // ON EVERY REPLY, A REFUSAL TOO, as the private sign-in doors do: a result about the person's login is kept by no
+    // cache and sent on as no referrer.
+    reply.header('cache-control', 'no-store').header('pragma', 'no-cache').header('referrer-policy', 'no-referrer')
+    const actor = actorFrom(req)
+    if (!thePersonPressedItThemselves(actor)) {
+      throw new PanelError(
+        theRefusalForSomebodyNotProvedThePerson(whatThisRequestShowed(actor, req), {
+          refused: `${theActKeptHere(req)} is the owner's own press`,
+          nothingWasDone: 'Nothing was sent.',
+          whoMay:
+            'The owner tests a sandbox login on the Settings page, pressing it themselves. A test sends the login to its ' +
+            'provider, so no agent may press it, and a secretary may not press it for the owner, on their words or under ' +
+            'their raise.',
+        }),
+        403,
+      )
+    }
+    const body = parse(testBody, req.body ?? {}, 'The login to test')
+    return await testASandboxLogin(actor, body.name, workspaceOf(req))
   })
 }

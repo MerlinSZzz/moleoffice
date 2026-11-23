@@ -327,8 +327,9 @@ describe('the review pane on a phone', () => {
     const drawn = await waitUntil(whatThePaneDraws, (now) => now.rowsDrawn === COMMENTS.length)
     expect(drawn.rowsDrawn).toBe(COMMENTS.length)
     expect(drawn.sideways).toBe(0)
-    const shown = await waitUntil(pressesShown, (now) => JSON.stringify(now) === JSON.stringify({ Change: 1, Fold: 1, Send: 1 }))
-    expect(shown, 'the tray lost one of its presses').toEqual({ Change: 1, Hide: 1, Send: 1 })
+    const everyPress = { Change: 1, Hide: 1, Send: 1 }
+    const shown = await waitUntil(pressesShown, (now) => JSON.stringify(now) === JSON.stringify(everyPress))
+    expect(shown, 'the tray lost one of its presses').toEqual(everyPress)
   }, 180_000)
 })
 

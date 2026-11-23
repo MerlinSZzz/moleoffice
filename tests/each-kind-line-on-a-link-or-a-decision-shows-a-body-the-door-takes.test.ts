@@ -31,7 +31,7 @@ import type { FastifyInstance } from 'fastify'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { THE_PERSON } from '../src/shared/person.ts'
-import { apiApp, freshDb, type TestDb } from './helpers.ts'
+import { apiApp, freshDb, type TestDb, governsTheWholeProject } from './helpers.ts'
 
 const AGENT = 'kinds-reader'
 
@@ -167,7 +167,8 @@ describe('each line in the kinds on making a link shows a body the link door tak
       disallowed_claims: ['that the camera count works'],
       severity: 'limits_claims',
     })
-    const ran = await filed('/api/records', { kind: 'decision', title: 'The camera count ran again', data: { replaces: [], because: 'The camera came back.' } })
+    const ran = await filed('/api/records', { kind: 'decision', title: 'The camera count ran again', data: {
+      ...governsTheWholeProject(), replaces: [], because: 'The camera came back.' } })
     await linked(filledIn(bodies[0]!, { '<the record showing the canonical method ran>': ran, '<this record>': instead }))
   })
 

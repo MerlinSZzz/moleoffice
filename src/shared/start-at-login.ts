@@ -10,8 +10,9 @@
 
 /** Whether the office starts at the person's login, as systemd says. Every answer systemd does not give is null. */
 export interface StartAtLoginReading {
-  /** Whether systemd answers for the person's login: `not linux` on any other system. */
-  systemd: 'answers' | 'no answer' | 'not linux'
+  /** Whether systemd answers for the person's login: `not linux` on any other system, and `not asked` when the office
+   *  runs from an AppImage. */
+  systemd: 'answers' | 'no answer' | 'not linux' | 'not asked'
   /** On a Mac: the window's "Open at login" item in the menu-bar menu sets it, and the server cannot read it, so it says
    *  where and never on or off. False everywhere else. */
   setInTheMenuBar: boolean
@@ -19,6 +20,9 @@ export interface StartAtLoginReading {
    *  it, and the server does not read it, so it says where and never on or off. Signing out of Windows stops the office.
    *  False everywhere else. */
   setInTheTray: boolean
+  /** On Linux, when the office runs from an AppImage: start at login is not available there, and the .deb install has
+   *  it, so the server says that and never on or off, and asks systemd nothing. False everywhere else. */
+  fromAnAppImage: boolean
   /** The unit's file: none, the press's own for this office as it is now, the press's own for another, or not the press's. */
   unit: 'none' | 'current' | 'out of date' | 'not ours'
   unitPath: string

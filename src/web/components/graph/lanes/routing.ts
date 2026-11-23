@@ -129,13 +129,20 @@ class RouteSpace {
   }
 }
 let routeSpace: RouteSpace | null = null;
+// The free and moved passes use the same walls, although their pins and earlier routes differ. Keep only the
+// wall-neighbor grids, which those passes read but never modify, and bound the memory held by the worker.
+let nearWalls: { geometry: string; grids: Map<string, Uint8Array>; bytes: number } | null = null;
+const NEAR_WALLS_LIMIT = 32 * 1024 * 1024;
 const DX = [1, 0, -1, 0];
 const DY = [0, 1, 0, -1];
 // What routeAll had kept just after it routed one line: the line, the cells of every route so far, the routes, the
 // words, the crowded words and the lines let go. It is kept for each line put first or given priority, while every
 // line before it was too.
 type Routed = { id: string; used: [Uint8Array, Uint8Array]; routes: [string, Point[]][]; pills: [string, Rect][]; crowded: string[]; loose: any[] };
-function routeAll(drawnLinks: DrawnLink[], endRect: (id: string) => Rect, rects: RouteRects, layout: RouteLayout, bands: Rect[], before: any = null, pins: any = null, finalPass = false, wordPriority: ReadonlySet<string> = new Set(), fixedRoutes: Map<string, Point[]> = new Map(), fixedPills: Map<string, Rect> = new Map(), firstWords: ReadonlySet<string> = new Set(), steps: Routed[] | null = null) {
+// Obstacle grids before earlier lines' pills and the two ends are added, shared only by attempts of one call.
+type AttemptWalls = { grids: Map<DrawnLink, Map<number, Uint8Array>>; bytes: number };
+const ATTEMPT_WALLS_LIMIT = 32 * 1024 * 1024;
+function routeAll(drawnLinks: DrawnLink[], endRect: (id: string) => Rect, rects: RouteRects, layout: RouteLayout, bands: Rect[], before: any = null, pins: any = null, finalPass = false, wordPriority: ReadonlySet<string> = new Set(), fixedRoutes: Map<string, Point[]> = new Map(), fixedPills: Map<string, Rect> = new Map(), firstWords: ReadonlySet<string> = new Set(), steps: Routed[] | null = null, attemptWalls: AttemptWalls | null = null) {
   const routeCost = before ? { ...rects.routeCost, apart: 1500, ownSide: 1500 } : rects.routeCost;
   const x0 = -ROUTE_ROOM;
   const y0 = -ROUTE_ROOM;
@@ -192,6 +199,8 @@ function routeAll(drawnLinks: DrawnLink[], endRect: (id: string) => Rect, rects:
     const by0 = Math.min(...bands.map((b) => b.y));
     fill(outside, { x: bx0, y: by0, w: Math.max(...bands.map((b) => b.x + b.w)) - bx0, h: Math.max(...bands.map((b) => b.y + b.h)) - by0 }, 0, 0);
   } else outside.fill(0);
+  const under = new Uint8Array(N);
+  for (const r of rects.under ?? []) fill(under, r, 2, 1);
   const LEAVE: Record<string, number> = { top: 3, bottom: 1, left: 2, right: 0 };
   const ARRIVE: Record<string, number> = { top: 1, bottom: 3, left: 0, right: 2 };
   const atPin = (pin: EndPin & { at: number; side: Side }, i: number, j: number) => pin.side === "top" || pin.side === "bottom" ? i === Math.floor((pin.at - x0) / CELL) : j === Math.floor((pin.at - y0) / CELL);
@@ -206,6 +215,11 @@ function routeAll(drawnLinks: DrawnLink[], endRect: (id: string) => Rect, rects:
     return link.type === 'blocks' && left && right && left !== right && Math.abs(a.y + a.h / 2 - b.y - b.h / 2) < 1;
   };
   const hasAlignedCrossArea = drawnLinks.some(alignedAcrossAreas);
+  const canReuseNear = !before && !rects.wordSizes?.size && !rects.under?.length && !fixedPills.size;
+  if (canReuseNear) {
+    const geometry = JSON.stringify([layout, [...rects.cards], rects.words, rects.areas.map((a) => [a.rect, a.framed, a.head, [...a.ids], a.node.x, a.node.y, a.node.w, a.node.h, a.node.tint, a.node.nested, a.node.area.derivedTiers]), hasAlignedCrossArea]);
+    if (nearWalls?.geometry !== geometry) nearWalls = { geometry, grids: new Map(), bytes: 0 };
+  }
   const order = [...drawnLinks].sort((p, q) => {
     const first = Number(firstWords.has(q.id)) - Number(firstWords.has(p.id));
     if (first) return first;
@@ -273,46 +287,56 @@ function routeAll(drawnLinks: DrawnLink[], endRect: (id: string) => Rect, rects:
     for (let k = 4 * fours.length; k < marked; k++) if (horizontal[k]) nearIt(k);
     // A cell is outside the room when its centre's column or its row is: a row outside is blocked whole, and every
     // other row is given the columns outside.
-    const blocked = new Uint8Array(N);
-    const outsideColumns = new Uint8Array(cols);
-    for (let i = 0; i < cols; i++) {
-      const x = x0 + (i + 0.5) * CELL;
-      const tight = before && rects.fitRoom !== undefined && room === rects.fitRoom;
-      const leftRoom = tight ? room + 10 : room;
-      const rightRoom = tight ? Math.max(0, room - 10) : room;
-      if (x < -leftRoom || x > layout.W + rightRoom) outsideColumns[i] = 1;
-    }
-    for (let j = 0; j < rows; j++) {
-      const y = y0 + (j + 0.5) * CELL;
-      if (y < -(room === rects.fitRoom ? ROUTE_ROOM - CELL : room) || y > layout.H + (room === rects.fitRoom ? ROUTE_ROOM - CELL : room)) blocked.fill(1, j * cols, (j + 1) * cols);
-      else blocked.set(outsideColumns, j * cols);
-    }
-    for (const [id, r] of rects.cards) if (id !== link.from && id !== link.to) fill(blocked, r, KEEP_CLEAR, 1);
-    // A visible area unrelated to both ends is an obstacle, including its tint bleed.
-    for (const a of rects.areas) {
-      if ((!a.framed && !a.node.tint) || a.head === link.from || a.head === link.to || a.ids.has(link.from) || a.ids.has(link.to)) continue;
-      fill(blocked, a.node.tint && !a.framed ? bandRect(a.node, layout.W) : a.rect, KEEP_CLEAR, 1);
-    }
-    for (const r of rects.words) fill(blocked, r, 2, 1);
-    for (const r of pills.values()) fill(blocked, r, 2, 1);
-    for (const a of rects.areas) {
-      if (!a.framed) continue;
-      if (a.head === link.from || a.head === link.to) continue;
-      if (a.ids.has(link.from) || a.ids.has(link.to)) continue;
-      fill(blocked, a.rect, KEEP_CLEAR, 1);
-    }
-    const lane = !hasAlignedCrossArea && rects.areas.find((a) => !a.node.nested && !a.node.area.derivedTiers && a.ids.has(link.from) && a.ids.has(link.to));
-    if (lane) {
-      // Every cell outside the lane's cells is blocked: each row above or below them whole, and the columns beside them.
-      const [i0, i1, j0, j1] = cellsOf(lane.rect, 0);
+    const heldWalls = attemptWalls?.grids.get(link)?.get(room);
+    const blocked = heldWalls ? heldWalls.slice() : new Uint8Array(N);
+    if (!heldWalls) {
+      const outsideColumns = new Uint8Array(cols);
+      for (let i = 0; i < cols; i++) {
+        const x = x0 + (i + 0.5) * CELL;
+        const tight = before && rects.fitRoom !== undefined && room === rects.fitRoom;
+        const leftRoom = tight ? room + 10 : room;
+        const rightRoom = tight ? Math.max(0, room - 10) : room;
+        if (x < -leftRoom || x > layout.W + rightRoom) outsideColumns[i] = 1;
+      }
       for (let j = 0; j < rows; j++) {
-        if (!(j >= j0 && j <= j1 && i0 <= i1)) blocked.fill(1, j * cols, (j + 1) * cols);
-        else {
-          blocked.fill(1, j * cols, j * cols + i0);
-          blocked.fill(1, j * cols + i1 + 1, (j + 1) * cols);
+        const y = y0 + (j + 0.5) * CELL;
+        if (y < -(room === rects.fitRoom ? ROUTE_ROOM - CELL : room) || y > layout.H + (room === rects.fitRoom ? ROUTE_ROOM - CELL : room)) blocked.fill(1, j * cols, (j + 1) * cols);
+        else blocked.set(outsideColumns, j * cols);
+      }
+      for (const [id, r] of rects.cards) if (id !== link.from && id !== link.to) fill(blocked, r, KEEP_CLEAR, 1);
+      // A visible area unrelated to both ends is an obstacle, including its tint bleed.
+      for (const a of rects.areas) {
+        if ((!a.framed && !a.node.tint) || a.head === link.from || a.head === link.to || a.ids.has(link.from) || a.ids.has(link.to)) continue;
+        fill(blocked, a.node.tint && !a.framed ? bandRect(a.node, layout.W) : a.rect, KEEP_CLEAR, 1);
+      }
+      for (const r of rects.words) fill(blocked, r, 2, 1);
+      for (const a of rects.areas) {
+        if (!a.framed) continue;
+        if (a.head === link.from || a.head === link.to) continue;
+        if (a.ids.has(link.from) || a.ids.has(link.to)) continue;
+        fill(blocked, a.rect, KEEP_CLEAR, 1);
+      }
+      const lane = !hasAlignedCrossArea && rects.areas.find((a) => !a.node.nested && !a.node.area.derivedTiers && a.ids.has(link.from) && a.ids.has(link.to));
+      if (lane) {
+        // Every cell outside the lane's cells is blocked: each row above or below them whole, and the columns beside them.
+        const [i0, i1, j0, j1] = cellsOf(lane.rect, 0);
+        for (let j = 0; j < rows; j++) {
+          if (!(j >= j0 && j <= j1 && i0 <= i1)) blocked.fill(1, j * cols, (j + 1) * cols);
+          else {
+            blocked.fill(1, j * cols, j * cols + i0);
+            blocked.fill(1, j * cols + i1 + 1, (j + 1) * cols);
+          }
         }
       }
+      if (attemptWalls && attemptWalls.bytes + N <= ATTEMPT_WALLS_LIMIT) {
+        let rooms = attemptWalls.grids.get(link);
+        if (!rooms) attemptWalls.grids.set(link, rooms = new Map());
+        rooms.set(room, blocked.slice());
+        attemptWalls.bytes += N;
+      }
     }
+    // Pills only add walls, so adding them after the lane restriction gives the same grid.
+    for (const r of pills.values()) fill(blocked, r, 2, 1);
     const goal = new Uint8Array(N);
     fill(goal, to, -1, 1);
     const start = new Uint8Array(N);
@@ -326,8 +350,6 @@ function routeAll(drawnLinks: DrawnLink[], endRect: (id: string) => Rect, rects:
       fill(ownSide[1], { x: r.x - KEEP_CLEAR, y: r.y, w: KEEP_CLEAR, h: r.h }, 0, 1);
       fill(ownSide[1], { x: r.x + r.w, y: r.y, w: KEEP_CLEAR, h: r.h }, 0, 1);
     }
-    const under = new Uint8Array(N);
-    for (const r of rects.under ?? []) fill(under, r, 2, 1);
     const withoutWordWalls = blocked.slice();
     // Whether a walk of single steps from the cells beside the start, the cells a search starts from, reaches the end
     // through cells the walls leave open. A search steps only so, so when no walk reaches the end no search does.
@@ -360,13 +382,22 @@ function routeAll(drawnLinks: DrawnLink[], endRect: (id: string) => Rect, rects:
     if (before && room === 0 && !reaches(withoutWordWalls, false)) continue;
     for (const r of rects.under ?? []) fill(blocked, r, 2, 1);
     fill(blocked, to, -1, 0);
-    const near = new Uint8Array(N);
-    for (let j = 0; j < rows; j++)
-      for (let i = 0; i < cols; i++) {
-        const k = j * cols + i;
-        if (blocked[k]) continue;
-        if (i > 0 && blocked[k - 1] || i < cols - 1 && blocked[k + 1] || j > 0 && blocked[k - cols] || j < rows - 1 && blocked[k + cols]) near[k] = 1;
+    const nearKey = canReuseNear ? JSON.stringify([link.from, link.to, from, to, room]) : null;
+    let near = nearKey === null ? undefined : nearWalls!.grids.get(nearKey);
+    if (!near) {
+      near = new Uint8Array(N);
+      for (let j = 0; j < rows; j++)
+        for (let i = 0; i < cols; i++) {
+          const k = j * cols + i;
+          if (blocked[k]) continue;
+          if (i > 0 && blocked[k - 1] || i < cols - 1 && blocked[k + 1] || j > 0 && blocked[k - cols] || j < rows - 1 && blocked[k + cols]) near[k] = 1;
+        }
+      if (nearKey !== null && nearWalls!.bytes + near.byteLength <= NEAR_WALLS_LIMIT) {
+        nearWalls!.grids.set(nearKey, near);
+        nearWalls!.bytes += near.byteLength;
       }
+    }
+    const nearForCost = near;
     const [ga, gb] = cellOf(to.x, to.y);
     const [gc, gd] = cellOf(to.x + to.w, to.y + to.h);
     const h = (i: number, j: number) => Math.max(0, ga - i, i - gc) + Math.max(0, gb - j, j - gd);
@@ -380,7 +411,7 @@ function routeAll(drawnLinks: DrawnLink[], endRect: (id: string) => Rect, rects:
     const costCell = (k: number) => {
       costed[k] = costEpoch;
       for (let axis = 0; axis < 2; axis++) {
-        const nearCost = near[k] ? COST.near : 0;
+        const nearCost = nearForCost[k] ? COST.near : 0;
         let ahead = 1 + nearCost;
         let turned = 1 + COST.bend + nearCost;
         let bar = 0;
@@ -407,8 +438,8 @@ function routeAll(drawnLinks: DrawnLink[], endRect: (id: string) => Rect, rects:
             break;
           }
         }
-        const x = centre(k % cols, Math.floor(k / cols)).x;
         if (before && rects.fitRoom !== undefined && axis === 1) {
+          const x = x0 + (k % cols + 0.5) * CELL;
           const outside = x < 0 || x > layout.W;
           let tooClose = !!nearRest[k] || outside && !!used[1][k];
           const i = k % cols;
@@ -995,9 +1026,10 @@ function answerRouteCalls(scope: RouteScope, kept = new Map<number, RoutesKept>(
           let failure: unknown;
           // Each attempt after a failure gives one more line priority, so it may start where the one before stood.
           const steps: Routed[] = [];
+          const attemptWalls: AttemptWalls = { grids: new Map(), bytes: 0 };
           for (let attempt = 0; attempt < 8; attempt++) {
             try {
-              const next = routeAll(call.links, endRect, call.rects, call.layout, call.bands, before, call.pins, call.finalPass, priority, new Map(), new Map(), new Set(call.rects.wordFirst ?? []), steps);
+              const next = routeAll(call.links, endRect, call.rects, call.layout, call.bands, before, call.pins, call.finalPass, priority, new Map(), new Map(), new Set(call.rects.wordFirst ?? []), steps, attemptWalls);
               if (!initial || next.crowded.length < initial.crowded.length) initial = next;
               break;
             } catch (error) {

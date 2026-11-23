@@ -68,6 +68,7 @@ import { whereIsTheWebApp } from './where-is-the-api.mjs'
 import { waitForThePage } from './the-page-is-ready.mjs'
 import { anAgentsToolHeaders } from './sandbox-common.mjs'
 import { localStamp } from '../src/shared/time.ts'
+import { SHOWN_FILE_SEGMENT, theShownFileKind } from '../src/shared/shown-file.ts'
 import { fetchAFullList } from './a-full-list-read.mjs'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
@@ -91,6 +92,8 @@ function theAddressSource() {
 const workFile = join(root, 'src', 'shared', 'work.ts')
 // WHERE A PARTICIPANT'S PAGE ADDRESS IS DECLARED. Read, never typed here: see `profileSegmentFrom`.
 const profileFile = join(root, 'src', 'shared', 'profile.ts')
+// WHERE THE KEY PAGE'S ADDRESS AND WAYS ARE DECLARED.
+const setUpFile = join(root, 'src', 'shared', 'setting-up-a-tool.ts')
 
 const args = process.argv.slice(2)
 const arg = (name, fallback) => {
@@ -538,6 +541,19 @@ async function main() {
   // page; the address is what a person types, and this tool measures it like every other page.
   pages.push({ name: 'who holds each card', route: 'roleCensus', address: '#/roles/who-holds-them' })
 
+  // A KEY PAGE. One way stands for all five, which draw the same page with other words.
+  const setUpSource = readFileSync(setUpFile, 'utf8')
+  const setUpSegment = segmentFrom(setUpSource, 'SET_UP_SEGMENT', setUpFile, 'a key page')
+  const firstWay = setUpSource.match(/export const SET_UP_WAYS\s*=\s*\[\s*\{\s*tool:\s*'([^']+)',\s*way:\s*'([^']+)'/)
+  if (firstWay === null) {
+    throw new Error(`Could not find the first SET_UP_WAYS entry in ${setUpFile}; teach this tool the new shape.`)
+  }
+  pages.push({
+    name: 'a key page',
+    route: 'setUpATool',
+    address: `#/${encodeURIComponent(setUpSegment)}/${encodeURIComponent(firstWay[1])}/${encodeURIComponent(firstWay[2])}`,
+  })
+
   /**
    * ONE VISITING AGENT'S CREDENTIAL. Criteria P24 to P29.
    *
@@ -643,11 +659,67 @@ async function main() {
     })
   }
 
+  // ONE FILE A RECORD NAMES, ON THE OFFICE'S OWN PAGE FOR IT, `#/file/<record>/<path>`. A report's file block leads there
+  // from its Open press. For a Word document, a text file or a Markdown file the page draws the file's words as its own
+  // text, so one of those three is what is measured. Found rather than written: the records above are read whole, so
+  // their own top-level file blocks are in them, and the file door is asked each block's type with metadata=1, which
+  // reads no file bytes. A block counts only as FilePage's `theFileBlock` counts it: type file, with a string path, id
+  // and name, so the tool asks about the same blocks the page reads. Which kind a file is comes from the door's type
+  // through `theShownFileKind`, the shared list of kinds drawn as words, never from the file's name. When no block is
+  // one of the three, the page is named as unreachable, with how many blocks were asked and how many got no type.
+  let aShownFile
+  let fileBlocksAsked = 0
+  let fileBlocksUnanswered = 0
+  for (const record of [...records].sort((a, b) => a.incompleteCount - b.incompleteCount)) {
+    const blocks = Array.isArray(record.data?.blocks) ? record.data.blocks : []
+    for (const block of blocks) {
+      if (
+        block?.type !== 'file' ||
+        typeof block.path !== 'string' ||
+        typeof block.id !== 'string' ||
+        typeof block.name !== 'string'
+      ) {
+        continue
+      }
+      fileBlocksAsked++
+      const said = await fetch(
+        `${API}/api/file?path=${encodeURIComponent(block.path)}&record=${encodeURIComponent(record.id)}&metadata=1`,
+        { headers: { 'X-Mole-Office-Workspace': WORKSPACE, ...WHO } },
+      )
+        .then((r) => (r.ok ? r.json() : null))
+        .catch(() => null)
+      if (typeof said?.type !== 'string') {
+        fileBlocksUnanswered++
+        continue
+      }
+      if (theShownFileKind(said.type) !== null) {
+        aShownFile = { record: record.id, path: block.path }
+        break
+      }
+    }
+    if (aShownFile !== undefined) break
+  }
+  if (aShownFile === undefined) {
+    unreachable.push(
+      fileBlocksAsked === 0
+        ? `file — workspace "${WORKSPACE}" holds no record with a file block, so there is no file page to measure. ` +
+            `File a report with a Word, text or Markdown file and run this again.`
+        : `file — none of the ${fileBlocksAsked} file blocks in workspace "${WORKSPACE}" is a Word, text or Markdown ` +
+            `file, so there is no file page to measure. The file door gave no type for ${fileBlocksUnanswered} of them.`,
+    )
+  } else {
+    pages.push({
+      name: 'a file page',
+      route: 'file',
+      address: `#/${SHOWN_FILE_SEGMENT}/${encodeURIComponent(aShownFile.record)}/${encodeURIComponent(aShownFile.path)}`,
+    })
+  }
+
   // EVERY PAGE THE ROUTER DECLARES, OR A NAMED REASON WHY NOT. See `coverageAgainstTheRouter`.
   const coverage = coverageAgainstTheRouter(routerSource, pages)
   if (coverage.extra.length > 0) {
     throw new Error(
-      `This tool is measuring pages the \`Route\` union in ${routerFile} does not declare: ` +
+      `This tool is measuring pages the \`Route\` union in ${addressesFile} does not declare: ` +
         `${coverage.extra.join(', ')}. Either the router changed shape or this list is wrong; ` +
         `teach this tool the new shape rather than measuring an address nothing serves.`,
     )
@@ -655,7 +727,7 @@ async function main() {
   const unexplained = coverage.missed.filter((name) => !unreachable.some((line) => line.startsWith(`${name} —`)))
   if (unexplained.length > 0) {
     throw new Error(
-      `The \`Route\` union in ${routerFile} declares ${unexplained.length} page(s) this tool never ` +
+      `The \`Route\` union in ${addressesFile} declares ${unexplained.length} page(s) this tool never ` +
         `measures and cannot explain: ${unexplained.join(', ')}. A page nobody measures for type size ` +
         `and contrast is a page this gate does not cover. Teach this tool how to reach it rather than ` +
         `letting it quietly go unseen.`,

@@ -24,6 +24,7 @@ let app: FastifyInstance
 let place: Place
 let api = ''
 let agentTerminal = ''
+let agentSession = ''
 let manualTerminal = ''
 let targetId = ''
 const keys = new Map<string, string>()
@@ -46,6 +47,15 @@ async function call(method: 'GET' | 'POST', url: string, headers: Record<string,
   return { status: reply.statusCode, body }
 }
 const open = (headers: Record<string, string>, agent = 'terminal-reader-target', more: Record<string, unknown> = {}) => call('POST', '/api/terminals/agents', headers, { agent, ...more })
+/** Each successful opening case starts after the preceding opening has ended. */
+const openForTheSecretary = () => open(as('terminal-reader-secretary'), 'terminal-reader-open-target')
+async function closeAfterTheCase(opened: { body: Record<string, unknown> }) {
+  const terminal = opened.body['terminal'] as TerminalReading
+  const session = String(opened.body['session'])
+  await readTheStream(api, terminal.id, person, events => events.some(e => JSON.stringify(e.data).includes('HANDLE HOLD ')))
+  expect((await call('POST', `/api/terminals/${terminal.id}/close`, person, {})).status).toBe(200)
+  await until(() => t.api.getRecord(session)!.data['state'], state => state !== 'running')
+}
 const reads = [
   '/api/terminals',
   '/api/terminals/agents/terminal-reader-target/pane',
@@ -88,7 +98,7 @@ setInterval(() => undefined, 1 << 30)
   bound.rememberWhatThisProcessBound(app.server)
   api = `http://127.0.0.1:${String((app.server.address() as AddressInfo).port)}`
   Object.assign(person, thePersonsKeyHeader(join(dirname(t.file), 'keys.json')))
-  for (const [handle, role] of [['terminal-reader-secretary', 'secretary'], ['terminal-reader-other', 'secretary'], ['terminal-reader-supervisor', 'supervisor'], ['terminal-reader-worker', 'worker'], ['terminal-reader-target', 'worker'], ['terminal-reader-key-target', 'worker'], ['terminal-reader-no-folder', 'worker']] as const) {
+  for (const [handle, role] of [['terminal-reader-secretary', 'secretary'], ['terminal-reader-other', 'secretary'], ['terminal-reader-supervisor', 'supervisor'], ['terminal-reader-worker', 'worker'], ['terminal-reader-target', 'worker'], ['terminal-reader-open-target', 'worker'], ['terminal-reader-key-target', 'worker'], ['terminal-reader-no-folder', 'worker']] as const) {
     const registered = await call('POST', '/api/agents/started', person, { handle, name: handle, role, runtime: 'claude-code' })
     expect(registered.status, JSON.stringify(registered.body)).toBe(201)
     keys.set(handle, String((registered.body['whatToGiveIt'] as { key: string }).key))
@@ -97,10 +107,11 @@ setInterval(() => undefined, 1 << 30)
   targetId = ids.get('terminal-reader-target')!
   const startFolder = join(place.dir, 'work')
   mkdirSync(startFolder)
-  for (const id of [targetId, ids.get('terminal-reader-key-target')!]) expect((await call('POST', `/api/participants/agent/${id}/start-folder`, person, { startFolder, because: 'A synthetic agent start folder.' })).status).toBe(200)
+  for (const id of [targetId, ids.get('terminal-reader-open-target')!, ids.get('terminal-reader-key-target')!]) expect((await call('POST', `/api/participants/agent/${id}/start-folder`, person, { startFolder, because: 'A synthetic agent start folder.' })).status).toBe(200)
   const opened = await open(person)
   expect(opened.status, JSON.stringify(opened.body)).toBe(201)
   agentTerminal = (opened.body['terminal'] as TerminalReading).id
+  agentSession = String(opened.body['session'])
   const manual = await call('POST', '/api/terminals', person, { folder: place.dir, command: '/bin/sh' })
   expect(manual.status).toBe(201)
   manualTerminal = (manual.body['terminal'] as TerminalReading).id
@@ -120,33 +131,28 @@ afterAll(async () => {
 
 describe('the secretary uses its own key at agent terminal doors', () => {
   it('finds the newest run in the office holder and reads its existing stream without a tmux view', async () => {
-    const opened = await open(as('terminal-reader-secretary'))
-    expect(opened.status, JSON.stringify(opened.body)).toBe(201)
-    const terminal = opened.body['terminal'] as TerminalReading
     const found = await call('GET', reads[1]!, as('terminal-reader-secretary'))
-    expect(found).toMatchObject({ status: 200, body: { state: 'shown', run: { id: opened.body['session'] }, pane: null, view: { id: terminal.id } } })
+    expect(found).toMatchObject({ status: 200, body: { state: 'shown', run: { id: agentSession }, pane: null, view: { id: agentTerminal } } })
     const shown = await call('POST', reads[1]!, person, {})
-    expect(shown).toMatchObject({ status: 200, body: { opened: false, pane: null, view: { id: terminal.id } } })
-    const read = await readTheStream(api, terminal.id, as('terminal-reader-secretary'))
+    expect(shown).toMatchObject({ status: 200, body: { opened: false, pane: null, view: { id: agentTerminal } } })
+    const read = await readTheStream(api, agentTerminal, as('terminal-reader-secretary'))
     expect(read.status, read.refusal).toBe(200)
     expect(read.events[0]?.event).toBe('screen')
   })
 
   it('does not show an older held terminal as the screen of a newer run', async () => {
-    const opened = await open(person)
     const newer = t.api.createRecord({ kind: 'session', workspaceId: DEFAULT_WORKSPACE, title: 'A newer synthetic run', data: { state: 'running', servingAgent: 'terminal-reader-target', servingAgentId: targetId, runtime: 'claude-code', sandbox: { folder: place.dir } }, actor: { type: 'human', id: THE_PERSON } })
     // The timestamps have one-second precision. Give the newer fixture a strict ordering within this scratch database.
     t.client.sqlite.prepare('UPDATE records SET created_at = ? WHERE id = ?').run('2099-01-01 00:00:00', newer.id)
     try {
       const found = await call('GET', reads[1]!, person)
       expect(found).toMatchObject({ status: 200, body: { state: 'sandbox', run: { id: newer.id }, view: null } })
-      expect(JSON.stringify(found.body)).not.toContain((opened.body['terminal'] as TerminalReading).id)
+      expect(JSON.stringify(found.body)).not.toContain(agentTerminal)
     } finally { t.client.sqlite.prepare('UPDATE records SET deleted_at = created_at WHERE id = ?').run(newer.id) }
   })
 
   it('does not accept a held-screen binding from a different holder generation', async () => {
-    const opened = await open(person)
-    const session = String(opened.body['session'])
+    const session = agentSession
     const row = t.api.getRecord(session)!
     const data = structuredClone(row.data)
     const extra = data['extra'] as { inATerminal: { holder: { pid: number } } }
@@ -159,7 +165,7 @@ describe('the secretary uses its own key at agent terminal doors', () => {
   })
 
   it('lets a secretary close its own agent terminal and records that secretary as the closer', async () => {
-    const opened = await open(as('terminal-reader-secretary'))
+    const opened = await openForTheSecretary()
     expect(opened.status, JSON.stringify(opened.body)).toBe(201)
     const terminal = opened.body['terminal'] as TerminalReading
     const session = String(opened.body['session'])
@@ -174,11 +180,12 @@ describe('the secretary uses its own key at agent terminal doors', () => {
   })
 
   for (const handle of ['terminal-reader-other', 'terminal-reader-supervisor', 'terminal-reader-worker']) it(`refuses ${handle} closing another secretary's agent terminal`, async () => {
-    const opened = await open(as('terminal-reader-secretary'))
+    const opened = await openForTheSecretary()
     const terminal = opened.body['terminal'] as TerminalReading
     expect(await call('POST', `/api/terminals/${terminal.id}/close`, as(handle), {})).toMatchObject({ status: 403, body: { code: 'terminalsOnlyThePerson' } })
     const listed = await call('GET', '/api/terminals', person)
     expect((listed.body['terminals'] as TerminalReading[]).some(one => one.id === terminal.id)).toBe(true)
+    await closeAfterTheCase(opened)
   })
 
   it('keeps the person-opened agent terminal and a manual terminal from the secretary', async () => {
@@ -186,7 +193,7 @@ describe('the secretary uses its own key at agent terminal doors', () => {
   })
 
   it('opens in the recorded folder and attributes both terminal and run to the secretary', async () => {
-    const opened = await open(as('terminal-reader-secretary'))
+    const opened = await openForTheSecretary()
     expect(opened.status, JSON.stringify(opened.body)).toBe(201)
     expect((opened.body['terminal'] as TerminalReading).who).toEqual({ kind: 'agent', id: ids.get('terminal-reader-secretary') })
     const record = t.api.getRecord(String(opened.body['session']))!
@@ -194,6 +201,7 @@ describe('the secretary uses its own key at agent terminal doors', () => {
     expect(record.data['doing']).toContain('terminal-reader-secretary')
     expect(record.data['doing']).not.toContain('opened by the person')
     expect((opened.body['terminal'] as TerminalReading).folder).toBe(join(place.dir, 'work'))
+    await closeAfterTheCase(opened)
   })
 
   it('mints a starter-proved run key that really holds its handle, leaks no key, and revokes it at terminal close', async () => {
@@ -219,10 +227,11 @@ describe('the secretary uses its own key at agent terminal doors', () => {
     const rows = t.client.sqlite.prepare('SELECT id, mint_proved_by FROM held_keys WHERE whose_id = ? AND revoked_at IS NULL').all(secretaryId) as { id: string; mint_proved_by: string | null }[]
     t.client.sqlite.prepare("UPDATE held_keys SET mint_proved_by = 'no-key' WHERE whose_id = ? AND revoked_at IS NULL").run(secretaryId)
     try {
-      const opened = await open(as('terminal-reader-secretary'))
+      const opened = await openForTheSecretary()
       expect(opened.status, JSON.stringify(opened.body)).toBe(201)
       expect(opened.body['key']).toMatchObject({ given: false })
       expect((opened.body['terminal'] as TerminalReading).envNames).not.toContain('MOLE_AGENT_KEY')
+      await closeAfterTheCase(opened)
     } finally {
       for (const row of rows) t.client.sqlite.prepare('UPDATE held_keys SET mint_proved_by = ? WHERE id = ?').run(row.mint_proved_by, row.id)
     }

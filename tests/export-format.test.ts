@@ -45,7 +45,8 @@ import { dirname, join, relative, sep } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { getTableColumns } from 'drizzle-orm'
 import { freshDb, one, type TestDb } from './helpers.ts'
-import { ARCHIVED_TABLES, everyPartTable } from '../src/server/db/schema.ts'
+import { ARCHIVED_TABLES } from '../src/server/db/schema.ts'
+import { everyPartTable } from '../src/server/db/every-part-table.ts'
 
 type ExportLib = typeof import('../src/server/lib/export.ts')
 type PresentationLib = typeof import('../src/server/lib/presentation.ts')
@@ -452,7 +453,16 @@ describe('it carries the things a text format usually loses', () => {
     // Literally in the bytes, so a person reading the file sees the words rather than escape sequences.
     const text = files().get(`records/module/${String(made['gripper'])}.md`) ?? ''
     expect(text).toContain('夹具标定')
-    expect(text).not.toContain('\\u59b9')
+    // IN THE FRONT MATTER ITSELF, and not only in the heading. The file's `# title` heading holds the title as well,
+    // so the line above would still pass if the field lines were escaped.
+    expect(text).toContain('title: "夹具标定"')
+    expect(text).toContain('summary: "把 effort 值标定成实际夹持力"')
+    // AND NO CHARACTER OF THE TITLE AS AN ESCAPE, in either case of hex digit. Each escape is worked out from the
+    // character, so the check names the characters the fixture holds.
+    for (const character of '夹具标定') {
+      const escape = `\\u${(character.codePointAt(0) ?? 0).toString(16).padStart(4, '0')}`
+      expect(text.toLowerCase(), `${character} is written as the escape ${escape}`).not.toContain(escape)
+    }
   })
 
   it('a block, called by its own name', () => {

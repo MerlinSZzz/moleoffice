@@ -131,12 +131,6 @@ describe('the section says what the office keeps', () => {
     expect(await theFolderFacts(), 'the folder of copied files is not drawn').toContain(
       '2 files and 1 folder of copied files, 2.5 KB',
     )
-    // AND WHAT A BACKUP IS, said above it, names the files it carries: all three folders since problem
-    // 9AwaBTTDUh6H's sentence (uploaded pictures joined the other two on 27 September 2026). Normal mode draws it in
-    // one short line since wave 13y round 121, and developer mode the whole of it.
-    await openTheSettings('inspect')
-    const lead = await app.page.$eval('[data-target="uiSurface/settings.whatiskept"]', (one) => one.textContent ?? '')
-    expect(lead).toContain('report files, message pictures and uploaded pictures')
   }, 120_000)
 
   it('draws a list of what was left out as a list, not as one more backup file', async () => {

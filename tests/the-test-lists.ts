@@ -216,12 +216,15 @@ function callsLiveApp(source: string): boolean {
 /**
  * Does this file's own source start Electron?
  *
- * `_electron.launch(` is how Playwright starts Electron, and nothing else in this checkout starts
- * it. As with `liveApp(`, the call is what counts: the word in a comment with no bracket after it
- * does not.
+ * `_electron.launch(` is how Playwright starts Electron. As with `liveApp(`, the call is what counts:
+ * the word in a comment with no bracket after it does not. A file that imports `PRINT_A_PAGE_SWITCH`
+ * from src/desktop/print-a-page.mjs starts Electron too: the switch is there to start the window
+ * program in its print mode, as the PDF door does. The import is what counts, so the name in a
+ * comment does not.
  */
 function launchesElectron(source: string): boolean {
-  return /\b_electron\s*\.\s*launch\s*\(/.test(source)
+  return /\b_electron\s*\.\s*launch\s*\(/.test(source) ||
+    /\bimport\s*\{[^}]*\bPRINT_A_PAGE_SWITCH\b[^}]*\}\s*from\s*['"][^'"]*\/src\/desktop\/print-a-page\.mjs['"]/.test(source)
 }
 
 /** Does this file import one of the three shared scanners that read the whole tree? */
@@ -410,9 +413,6 @@ const NAMED_SOURCE_WALKERS: readonly NamedSourceWalker[] = [
     file: 'the-inspector-builds-and-runs-its-model-in-a-sandbox.test.ts',
     walks: 'runs tools/the-inspector.mjs',
   },
-  { file: 'the-merger.test.ts', walks: 'runs tools/the-merger.mjs' },
-  { file: 'the-merger-bus.test.ts', walks: 'runs tools/the-merger.mjs' },
-  { file: 'the-merger-suite.test.ts', walks: 'runs tools/the-merger.mjs' },
 
   // -------- tests that walk the SQL files under drizzle/
   { file: 'migration.test.ts', walks: 'walks drizzle/ for the migration files and journal entries' },

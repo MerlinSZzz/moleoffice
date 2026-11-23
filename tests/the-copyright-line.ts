@@ -8,7 +8,7 @@
  * tests/the-owners-copyright-line.ts is the allowance's one place and re-exports everything here. This
  * module holds the part that needs no file of the owner's content, because the merge queue's owner-content gate
  * (tools/merge-tool/owner-content-allowed.mjs) imports it, and the merge tool may read the office settings only through
- * arguments.mjs and office-keeper.mjs (tests/the-merge-tool-reaches-the-office-only-through-two-modules.test.ts).
+ * arguments.mjs and office-keeper.mjs.
  *
  * The holder is not written here. It is read from LICENSE, which carries the line.
  *

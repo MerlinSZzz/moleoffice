@@ -430,13 +430,6 @@ describe('6. migration 0349', () => {
     expect(migrateInPlace(s.db, partialMigrations(index + 1)).castingLabels).toEqual({ ran: true, labels: 1, hard: 0, simple: 1, rowsWritten: 2 * 1 + 2 * 1 })
     expect(s.db.prepare('SELECT name FROM casting_labels ORDER BY id').pluck().all()).toEqual(['simple'])
   })
-
-  it('gives hard and simple their recorded meanings', () => {
-    // The words are the data step's own; this case only pins which label each one is.
-    const [hard, simple] = THE_FIRST_LABELS
-    expect(hard.meaning).toMatch(/^Handling a lot of connected context or planning/)
-    expect(simple.meaning).toMatch(/^Mechanical work/)
-  })
 })
 
 describe("7. the table's reading", () => {

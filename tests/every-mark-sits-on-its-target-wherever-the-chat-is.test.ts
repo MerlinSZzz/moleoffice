@@ -212,9 +212,16 @@ function besideItsBlock(circle: Box, owner: Box): boolean {
   return inTheMargin || aboveTheCorner
 }
 
-/** Put the pointer in the middle of an element, having first put it somewhere else. */
+/**
+ * Put the pointer in the middle of an element, having first put it somewhere else. Bring the element into
+ * the window before its box is read, because the report may be scrolled so that the paragraph is above the
+ * window. That scroll hides no mark left behind: the Regions box and point mode's outline are drawn on the
+ * element itself, and pointAt is used only by those two steps, after the frame and the circles are already
+ * checked.
+ */
 async function pointAt(page: Page, selector: string): Promise<{ x: number; y: number }> {
   await page.mouse.move(2, 2)
+  await page.locator(selector).first().scrollIntoViewIfNeeded()
   const at = await page.locator(selector).first().boundingBox()
   if (at === null) throw new Error(`nothing is drawn for ${selector}`)
   const middle = { x: at.x + Math.min(60, at.width / 2), y: at.y + at.height / 2 }

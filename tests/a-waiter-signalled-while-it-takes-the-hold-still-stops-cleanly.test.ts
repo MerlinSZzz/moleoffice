@@ -13,12 +13,13 @@ import { spawn } from 'node:child_process'
 import type { AddressInfo } from 'node:net'
 import { setTimeout as pause } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
+import { dirname } from 'node:path'
 
 import type { FastifyInstance } from 'fastify'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 
 import { THE_PERSON } from '../src/shared/person.ts'
-import { apiApp, freshDb, type TestDb } from './helpers.ts'
+import { apiApp, freshDb, aTestAgentsKeyEnvironment, type TestDb } from './helpers.ts'
 
 const HANDLE = 'signal-during-hold'
 const AS_THE_OWNER = {
@@ -30,6 +31,7 @@ const AS_THE_OWNER = {
 let t: TestDb
 let app: FastifyInstance
 let api = ''
+let keyEnv: NodeJS.ProcessEnv = {}
 let waiter: ReturnType<typeof startTheWaiter> | undefined
 let holdWasWritten = false
 let signalled = false
@@ -57,7 +59,7 @@ function startTheWaiter(session: string) {
       fileURLToPath(new URL('../tools/hold-the-handle.mjs', import.meta.url)),
       '--agent', HANDLE, '--session', session, '--api', api, '--workspace', 'default',
     ],
-    { detached: true, env: { ...process.env, MOLE_OFFICE_HANDLE_BEAT_SECONDS: '1' } },
+    { detached: true, env: { ...keyEnv, MOLE_OFFICE_HANDLE_BEAT_SECONDS: '1' } },
   )
   // detached gives this child its own process group. Every signal uses the group recorded here.
   const pgid = child.pid
@@ -91,10 +93,7 @@ beforeAll(async () => {
   })
   await app.listen({ host: '127.0.0.1', port: 0 })
   api = `http://127.0.0.1:${String((app.server.address() as AddressInfo).port)}`
-  await post('/api/records', {
-    kind: 'agent', title: 'Signal during hold',
-    data: { handle: HANDLE, runtime: 'claude-code', state: 'active' },
-  })
+  keyEnv = await aTestAgentsKeyEnvironment(app, HANDLE, dirname(t.file))
 })
 
 afterAll(async () => {

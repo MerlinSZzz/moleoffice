@@ -1,9 +1,8 @@
 // Copyright © 2026 Zhengyang Shen
 // Licensed under the MIT License. See LICENSE.
 /**
- * THIS OFFICE'S LIST OF WHAT THE GRANT CARRIES HOLDS AT THREE MORE PLACES THAT ASK THE CHECK: APPLYING A SETTLED CHANGE
- * SET, MARKING A CHECKLIST ITEM DONE WITH NO EVIDENCE, AND MOVING A MERGE ENTRY TO THE FRONT OF ITS LANE. Wave 13s
- * round 67.
+ * THIS OFFICE'S LIST OF WHAT THE GRANT CARRIES HOLDS AT TWO MORE PLACES THAT ASK THE CHECK: APPLYING A SETTLED CHANGE
+ * SET, AND MARKING A CHECKLIST ITEM DONE WITH NO EVIDENCE. Wave 13s round 67.
  *
  * Each place asks `aRaiseCarriesIt` (src/server/lib/records.ts) after its own ways of letting the act through. That
  * asks `mayPressForThePerson`, which reads this office's row for the door before the card's answer. Each place is
@@ -11,18 +10,15 @@
  *   - applying a change set is POST /api/planning/proposals/:id/apply, operation `plan.write`, asked in the route
  *     itself (src/server/api/planning.ts);
  *   - marking an item done with no evidence is PATCH /api/checklists/:id/items/:item, operation
- *     `checklist.changeItem`, asked in `thePersonsOwnDone` (src/server/lib/checklists.ts);
- *   - moving an entry to the front is POST /api/merge-queue/:id/first, operation `merge.first`, asked in
- *     `mayMoveAnEntryFirst` (src/server/lib/merge-state-machine.ts).
- * The card's answer for all three doors is may-press: none is on `elevation.neverPresses` or `askFirst`.
+ *     `checklist.changeItem`, asked in `thePersonsOwnDone` (src/server/lib/checklists.ts).
+ * The card's answer for both doors is may-press: none is on `elevation.neverPresses` or `askFirst`.
  *
  * AT EACH PLACE IT HOLDS:
  *   - where this office's row says `kept`, the secretary is refused 403 in the check's own words, and nothing is
  *     written: the place's own record is unchanged, and `changes` and `presses_for_the_person` gain no row;
  *   - where the row says `may-press`, the secretary is let through, and what it wrote names the grant;
  *   - a check that comes after the grant still refuses, and writes nothing: a change set nobody settled is not
- *     applied, a checklist that changed since it was read is not written, and an entry that is final, or that was
- *     moved already, is not moved.
+ *     applied, and a checklist that changed since it was read is not written.
  *
  * Every agent and record here is made up for the test, in a fresh test database.
  *
@@ -45,24 +41,29 @@
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
-import { THE_MESSAGE_WORKER_ID } from '../src/shared/participants.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 import type { Actor } from '../src/server/lib/records.ts'
 import { THE_TEST_OFFICES_SECRETARY } from './a-page-of-a-test-office.ts'
-import { A_TESTS_REASON_FOR_THE_PERSON, apiApp, freshDb, FOR_THE_PERSON, FOR_THE_PERSON_IN_THE_QUERY, thePersonsKeyHeader, type TestDb } from './helpers.ts'
+import {
+  A_TESTS_REASON_FOR_THE_PERSON,
+  apiApp,
+  freshDb,
+  FOR_THE_PERSON,
+  FOR_THE_PERSON_IN_THE_QUERY,
+  thePersonsKeyHeader,
+  type TestDb,
+  governsTheWholeProject,
+} from './helpers.ts'
 
 let t: TestDb
 let app: Awaited<ReturnType<typeof apiApp>>
 let list: typeof import('../src/server/lib/what-the-grant-carries.ts')
-let entryDoor: typeof import('../src/server/lib/merge-entry-door.ts')
 let grant = ''
 
 const SECRETARY = THE_TEST_OFFICES_SECRETARY.handle
 const WORKSPACE = 'default'
 /** Who sets this office's row in this file: the person, as the door that sets it would name them. */
 const THE_PERSON_SETTING_IT: Actor = { type: 'human', id: THE_PERSON }
-/** The Mole Office writer the merge queue writes its entries as. */
-const THE_OFFICE: Actor = { type: 'agent', id: THE_MESSAGE_WORKER_ID }
 
 let asThePerson: Record<string, string> = {}
 let asTheSecretary: Record<string, string> = {}
@@ -122,7 +123,6 @@ beforeAll(async () => {
   app = await apiApp()
   await app.app.ready()
   list = await import('../src/server/lib/what-the-grant-carries.ts')
-  entryDoor = await import('../src/server/lib/merge-entry-door.ts')
   asThePerson = {
     'x-mole-office-workspace': WORKSPACE,
     'x-mole-office-actor-type': 'human',
@@ -169,7 +169,7 @@ describe('applying a settled change set, POST /api/planning/proposals/:id/apply'
     const decision = await ask('POST', '/api/records', asThePerson, {
       kind: 'decision',
       title: 'Yes, as written',
-      data: { replaces: [], decided_by: 'the owner', authority: 'the owner said so', because: 'It is right.' },
+      data: { ...governsTheWholeProject(), replaces: [], decided_by: 'the owner', authority: 'the owner said so', because: 'It is right.' },
     })
     expect(decision.status, decision.said).toBe(201)
     const link = await ask('POST', '/api/links', asThePerson, { fromId: decision.body['record'].id, toId: id, type: 'derived_from' })
@@ -296,85 +296,5 @@ describe('marking a checklist item done with no evidence, PATCH /api/checklists/
     expect(await theVersionOf(checklist)).toBe(version)
     expect(theStoredRecord(checklist)).toEqual(stored)
     expect(theRowCounts()).toEqual(before)
-  })
-})
-
-describe('moving a merge entry to the front of its lane, POST /api/merge-queue/:id/first', () => {
-  const because = 'A test moves it first.'
-
-  /** A merge entry in the shape the queue writes, written as the queue writes it. Synthetic. */
-  function anEntry(name: string, state: 'judged' | 'merged'): string {
-    return entryDoor.asTheMergeQueue(() =>
-      t.api.createRecord({
-        kind: 'merge_entry',
-        title: `Synthetic merge entry ${name}`,
-        workspaceId: WORKSPACE,
-        actor: THE_OFFICE,
-        origin: 'fixture',
-        data: {
-          run: `synthetic-run-${name}`,
-          seal: { id: `synthetic-seal-${name}`, hash: `synthetic-hash-${name}` },
-          changeset: { adapter: 'files', root: `/synthetic/lane-${name}`, operations: [] },
-          state,
-          submittedBy: { kind: 'agent', id: `synthetic-submitter-${name}` },
-        },
-      }),
-    ).id
-  }
-
-  function theMoveOn(entry: string): Record<string, unknown> | undefined {
-    return (JSON.parse(theStoredRecord(entry).data) as { movedFirst?: Record<string, unknown> }).movedFirst
-  }
-
-  it('keeps merge.first: the secretary is refused in the check\'s own words, and nothing is written', async () => {
-    list.setThisOfficesAnswer('merge.first', 'kept', THE_PERSON_SETTING_IT)
-    const entry = anEntry('kept', 'judged')
-    const before = theRowCounts()
-    const stored = theStoredRecord(entry)
-
-    const refused = await ask('POST', `/api/merge-queue/${entry}/first`, asTheSecretary, { ...FOR_THE_PERSON, because })
-    expect(refused.status, refused.said).toBe(403)
-    expect(refused.said).toContain(keptWords('merge.first'))
-
-    expect(theMoveOn(entry)).toBeUndefined()
-    expect(theStoredRecord(entry)).toEqual(stored)
-    expect(theRowCounts()).toEqual(before)
-  })
-
-  it('lets the secretary move it where the row says may-press, and the move names the grant', async () => {
-    list.setThisOfficesAnswer('merge.first', 'may-press', THE_PERSON_SETTING_IT)
-    const entry = anEntry('pressed', 'judged')
-    const from = theRowCounts().presses
-
-    const moved = await ask('POST', `/api/merge-queue/${entry}/first`, asTheSecretary, { ...FOR_THE_PERSON, because })
-    expect(moved.status, moved.said).toBe(200)
-    expect(theMoveOn(entry)).toMatchObject({ because, underARaise: grant })
-
-    expect(theElevationsOn(entry).at(-1) ?? '').toContain(grant)
-    expect(thePressesAfter(from)).toEqual([{ grant_id: grant, operation: 'merge.first', agent_id: SECRETARY, reason: A_TESTS_REASON_FOR_THE_PERSON }])
-  })
-
-  it('still refuses an entry that is final, and one moved already, under may-press, and writes nothing', async () => {
-    list.setThisOfficesAnswer('merge.first', 'may-press', THE_PERSON_SETTING_IT)
-
-    const final = anEntry('final', 'merged')
-    const beforeTheFinal = theRowCounts()
-    const storedFinal = theStoredRecord(final)
-    const notInALine = await ask('POST', `/api/merge-queue/${final}/first`, asTheSecretary, { ...FOR_THE_PERSON, because })
-    expect(notInALine.status, notInALine.said).toBe(409)
-    expect(notInALine.said).toContain('which is final, so it is in no line to move up in')
-    expect(theStoredRecord(final)).toEqual(storedFinal)
-    expect(theRowCounts()).toEqual(beforeTheFinal)
-
-    const once = anEntry('once', 'judged')
-    const first = await ask('POST', `/api/merge-queue/${once}/first`, asTheSecretary, { ...FOR_THE_PERSON, because })
-    expect(first.status, first.said).toBe(200)
-    const beforeTheSecond = theRowCounts()
-    const storedOnce = theStoredRecord(once)
-    const again = await ask('POST', `/api/merge-queue/${once}/first`, asTheSecretary, { ...FOR_THE_PERSON, because })
-    expect(again.status, again.said).toBe(409)
-    expect(again.said).toContain('It cannot be moved again. Nothing was written.')
-    expect(theStoredRecord(once)).toEqual(storedOnce)
-    expect(theRowCounts()).toEqual(beforeTheSecond)
   })
 })

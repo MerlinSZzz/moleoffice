@@ -219,22 +219,8 @@ export function StaleClaimsPanel({
         </span>
       }
     >
-      <Explain
-        asks={
-          <>{t('pageWords.SourcePage.002')}<b>{t('pageWords.SourcePage.003')}</b>{t('pageWords.SourcePage.004')}</>
-        }
-        why={t('sourcePage.staleClaims.why')}
-        act={t('sourcePage.staleClaims.act')}
-      />
-
       {stale.length === 0 ? (
-        <Empty
-          message={
-            <>
-              <b>{t('sourcePage.staleClaims.emptyLead')}</b> {t('sourcePage.staleClaims.emptyBody')}
-            </>
-          }
-        />
+        <Empty message={t('absence.none')} />
       ) : (
         stale.map((claim) => (
           <Row
@@ -247,7 +233,7 @@ export function StaleClaimsPanel({
             meta={
               (claim.repository === undefined ? '' : `${t('sourceRepo.in', { name: claim.repository.name })} · `) +
               (claim.problem === null
-                ? `claimed by “${claim.moduleTitle}”, and nothing on disk matches it. Almost always a rename: the code moved and the claim stayed where it was.`
+                ? `claimed by “${claim.moduleTitle}”, and nothing on disk matches it.`
                 : `claimed by “${claim.moduleTitle}”. ${claim.problemCode
                     ? t(`moduleSource.claim.${claim.problemCode}`)
                     : `This claim ${claim.problem}${/[.!?]$/.test(claim.problem) ? '' : '.'}`}`)
@@ -291,25 +277,8 @@ export function UnclaimedPanel({
         </span>
       }
     >
-      <Explain
-        asks={
-          <>{t('pageWords.SourcePage.006')}<b>{t('pageWords.SourcePage.007')}</b>{t('pageWords.SourcePage.008')}</>
-        }
-        why={t('sourcePage.unclaimed.why')}
-        act={
-          <>{t('pageWords.SourcePage.009')}<b>{t('g2b.impl.addCode')}</b>{t('pageWords.SourcePage.010')}</>
-        }
-      />
-
       {coverage.unclaimed.length === 0 ? (
-        <Empty
-          message={
-            <>
-              <b>{t('sourcePage.unclaimed.emptyLead')}</b>{' '}
-              {t('sourcePage.unclaimed.emptyBody', { n: coverage.totalFiles })}
-            </>
-          }
-        />
+        <Empty message={t('absence.none')} />
       ) : (coverage.repositories ?? null) !== null ? (
         // An answer from a server older than wave 13s round 23 carries no `repositories`: it did not count by repository.
         <UnclaimedInEachRepository entries={coverage.repositories ?? []} />
@@ -321,8 +290,7 @@ export function UnclaimedPanel({
             <span className="num">{groups.length}</span>{t('pageWords.SourcePage.directoryWord', { n: groups.length })}.
           </p>
           {unclaimed.length === coverage.unclaimed.length ? null : (
-            <p className="sp-note sp-note-bad">
-              {coverage.unclaimed.length - unclaimed.length}{t('pageWords.SourcePage.014')}</p>
+            <p className="sp-note sp-note-bad">{t('sourcePage.unlisted', { n: coverage.unclaimed.length - unclaimed.length })}</p>
           )}
           <DirList groups={groups} />
         </>
@@ -369,7 +337,7 @@ export function CoverageInEachRepository({ entries }: { entries: readonly Covera
   return (
     <div className="sp-repos">
       <p className="sp-note">
-        <strong>{t('sourceRepo.heading')}</strong> {t('sourceRepo.totalsAreSums')}
+        <strong>{t('sourceRepo.heading')}</strong>
       </p>
       <ul className="sp-repo-list">
         {entries.map((entry) =>
@@ -421,17 +389,14 @@ export function ModuleClaimsPanel({
         </span>
       }
     >
-      <p className="sp-lede">{t('pageWords.SourcePage.016')}{claimless > 0 ? (
-          <>
-            {' '}
-            <b>
-              {t('pageWords.SourcePage.claimlessCount', { n: claimless })}</b>
-          </>
-        ) : null}
-      </p>
+      {claimless > 0 ? (
+        <p className="sp-lede">
+          <b>{t('pageWords.SourcePage.claimlessCount', { n: claimless })}</b>
+        </p>
+      ) : null}
 
       {coverage.modules.length === 0 ? (
-        <Empty message={t('sourcePage.moduleClaims.noModules')} />
+        <Empty message={t('absence.none')} />
       ) : (
         coverage.modules.map((module) => (
           <Row
@@ -445,7 +410,7 @@ export function ModuleClaimsPanel({
               (module.problem !== null
                 ? module.problem
                 : module.claims.length === 0
-                  ? 'claims nothing — no code is stated for this module, so none of the repository is attributed to it'
+                  ? 'claims nothing'
                   : `${plural(module.claims.length, 'claim')} · ${module.claims
                       .map((c) => (c.repository === undefined ? c.pattern : `${c.pattern} (${t('sourceRepo.in', { name: c.repository.name })})`))
                       .join(', ')}`) +
@@ -461,7 +426,7 @@ export function ModuleClaimsPanel({
             right={
               <span className="sp-modright">
                 {module.claims.some((c) => c.matched.length === 0) ? (
-                  <Tag tone="warn" title={t('pageWords.SourcePage.020')}>
+                  <Tag tone="warn">
                     {plural(module.claims.filter((c) => c.matched.length === 0).length, 'stale')}
                   </Tag>
                 ) : null}
@@ -514,10 +479,7 @@ export function IndexPanel({
       }
     >
       <div className="sp-search">
-        <Field
-          label={t('pageWords.SourcePage.022')}
-          hint={t('sourcePage.search.hint')}
-        >
+        <Field label={t('pageWords.SourcePage.022')}>
           <TextInput
             value={query}
             onChange={setQuery}
@@ -540,20 +502,10 @@ export function IndexPanel({
       </div>
 
       {files.length === 0 ? (
-        <Empty
-          message={
-            <>
-              <b>{t('sourcePage.allFiles.emptyLead')}</b>{' '}
-              {t('sourcePage.allFiles.emptyBody', { root: content(stamp.root) })}
-            </>
-          }
-        />
+        <Empty message={t('absence.none')} />
       ) : matches.length === 0 ? (
         <Empty
-          message={
-            <>{t('pageWords.SourcePage.025')}{query.trim()}{t('pageWords.SourcePage.026')}{' '}
-              <span className="num">{files.length}</span>{t('pageWords.SourcePage.027')}</>
-          }
+          message={t('absence.none')}
           action={
             <Btn size="sm" onClick={() => setQuery('')}>{t('g7a.records.clearSearch')}</Btn>
           }
@@ -621,32 +573,6 @@ function DirList({
   )
 }
 
-/**
- * The three things a reader needs before a list of paths means anything.
- *
- * The Queries page has the same block with a fourth row for scope. It is not imported from there
- * because it is a private function of that file, which belongs to another agent this phase; when
- * somebody owns both, these should become one component rather than two that can drift.
- */
-function Explain({ asks, why, act }: { asks: React.ReactNode; why: React.ReactNode; act: React.ReactNode }) {
-  return (
-    <dl className="sp-explain">
-      <div className="sp-explain-row">
-        <dt className="sp-explain-key">{t('pageWords.SourcePage.030')}</dt>
-        <dd className="sp-explain-val">{asks}</dd>
-      </div>
-      <div className="sp-explain-row">
-        <dt className="sp-explain-key">{t('pageWords.SourcePage.031')}</dt>
-        <dd className="sp-explain-val">{why}</dd>
-      </div>
-      <div className="sp-explain-row">
-        <dt className="sp-explain-key">{t('dev.queries.whatToDo')}</dt>
-        <dd className="sp-explain-val">{act}</dd>
-      </div>
-    </dl>
-  )
-}
-
 // ============================================================================ the page
 
 export function SourcePage() {
@@ -692,16 +618,12 @@ export function SourcePage() {
 
       <header className="sp-head">
         <h1 className="sp-title">{t('pageWords.SourcePage.032')}</h1>
-        <p className="sp-lede sp-lede-top">{t('pageWords.SourcePage.033')}<b>{t('pageWords.SourcePage.034')}</b>{t('pageWords.SourcePage.035')}<b>{t('pageWords.SourcePage.036')}</b>{t('pageWords.SourcePage.037')}</p>
-        <p className="sp-lede">{t('pageWords.SourcePage.038')}<b>{t('kind.claim')}</b>{t('pageWords.SourcePage.039')}</p>
       </header>
 
       {state.status === 'loading' ? <Loading label={t('moduleSource.panel.loading')} rows={5} /> : null}
 
       {state.status === 'error' ? (
-        <ErrorNote message={state.message} fault={state.fault} retry={reload}>
-          <span className="sp-note">{t('sourcePage.error.nothingInstead')}</span>
-        </ErrorNote>
+        <ErrorNote message={state.message} fault={state.fault} retry={reload} />
       ) : null}
 
       {/* The report outlives the panel that shows it, so it is still on screen after the reload
@@ -821,10 +743,6 @@ function IndexFacts({
             size="sm"
             pending={rebuild.busy}
             onClick={rebuild.run}
-            title={
-              t('pageWords.SourcePage.expression02') +
-              t('pageWords.SourcePage.expression03')
-            }
           >{t('pageWords.SourcePage.042')}</Btn>
         </div>
       </div>
@@ -900,9 +818,7 @@ function ReportList({ label, paths }: { label: string; paths: string[] }) {
         ))}
       </ul>
       {paths.length > SHOWN ? (
-        <span className="sp-note">{t('pageWords.SourcePage.054')}{paths.length - SHOWN}{t('pageWords.SourcePage.055')}{' '}
-          <code>POST /api/source/reindex</code>.
-        </span>
+        <span className="sp-note">{t('sourcePage.report.more', { n: paths.length - SHOWN })}</span>
       ) : null}
     </div>
   )
@@ -937,7 +853,6 @@ const PAGE_CSS = `
   color: var(--text-2);
   max-width: var(--measure);
 }
-.sp-lede-top { font-size: var(--fs-3); }
 .sp-lede code { font-family: var(--font-mono); font-size: .94em; }
 .sp-note {
   margin: 0;
@@ -1016,45 +931,6 @@ const PAGE_CSS = `
   line-height: var(--lh-body);
   color: var(--text-2);
 }
-
-/* ---------------------------------------------------------------- explanation block
-   The same quiet slab the Queries page puts above its two lists: a rail rather than a border, so
-   it reads as an introduction to the rows below rather than as a second result. */
-.sp-explain {
-  margin: 0 0 var(--gut);
-  max-width: 56rem;
-  padding: var(--pad) var(--pad) var(--pad) var(--pad-lg);
-  border-left: var(--rail) solid var(--accent-soft);
-  background: var(--panel-2);
-  border-radius: var(--radius);
-  display: flex;
-  flex-direction: column;
-  gap: var(--pad);
-  min-width: 0;
-}
-.sp-explain-row { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; min-width: 0; }
-/* A container query, not a media query: this panel is full width today and could be half a grid
-   tomorrow, and only the panel knows which. */
-@container panel (min-width: 34rem) {
-  .sp-explain-row { grid-template-columns: 11rem minmax(0, 1fr); gap: var(--gut); align-items: baseline; }
-}
-.sp-explain-key {
-  font-size: var(--fs-1);
-  font-weight: 600;
-  letter-spacing: .06em;
-  text-transform: uppercase;
-  color: var(--text-3);
-  line-height: var(--lh-tight);
-}
-.sp-explain-val {
-  margin: 0;
-  min-width: 0;
-  font-size: var(--fs-2);
-  line-height: var(--lh-body);
-  color: var(--text);
-  max-width: var(--measure);
-}
-.sp-explain code { font-family: var(--font-mono); font-size: .94em; }
 
 /* ---------------------------------------------------------------- search */
 .sp-search {

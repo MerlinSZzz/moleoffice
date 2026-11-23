@@ -8,6 +8,12 @@ import { workspaces } from './workspaces.ts'
 const existingArchive = { existingArchive: true } as const
 
 
+/**
+ * A READINESS CHECKLIST: ONE OPERATION ON ONE TARGET, WAITING FOR THOSE IT AFFECTS TO SIGN. Migration 0252, in
+ * wave 13u round 13, by two of the person's decisions. The
+ * rule is in src/server/lib/readiness.ts; only its doors
+ * write these rows.
+ */
 export const readinessChecklists = aPartTable(sqliteTable(
   'readiness_checklists',
   {

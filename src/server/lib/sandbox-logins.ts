@@ -180,19 +180,52 @@ function writeWhole(path: string, lines: string[]): void {
   renameSync(next, path)
 }
 
-/** The declared name and its file, or the refusal for a name nothing declares. */
-function aDeclaredName(name: string, home: string): { path: string; hostFile: string } {
+/** The declared name and its file, or the refusal for a name nothing declares. `nothing` ends each refusal. */
+function aDeclaredName(name: string, home: string, nothing = 'Nothing was changed.'): { path: string; hostFile: string } {
   const declared = theDeclaration()
   if (declared.hostFile === null) {
-    throw new PanelError(`${theSandboxLogins(home).says} Nothing was changed.`, 409)
+    throw new PanelError(`${theSandboxLogins(home).says} ${nothing}`, 409)
   }
   if (!declared.names.some((one) => one.name === name)) {
     throw new PanelError(
       `${JSON.stringify(name)} is not a login the sandbox templates declare (${declared.names.map((one) => one.name).join(', ')}). A name ` +
-        'nothing reads would be a secret kept for nobody. Nothing was changed.',
+        `nothing reads would be a secret kept for nobody. ${nothing}`,
     )
   }
   return { path: onThisMachine(declared.hostFile, home), hostFile: declared.hostFile }
+}
+
+/**
+ * THE LINE THAT GIVES A DECLARED NAME ITS VALUE, or the refusal for a name nothing declares or the file does not set.
+ * When the file was edited by hand and gives the name twice, the last line is the one read: when docker reads an env
+ * file, a later line replaces an earlier one. That was measured with docker 29.2.1 on 23 Nov 2026, also when the
+ * earlier line is empty. A line with no value, `NAME=` and nothing after it, is skipped, as the launcher skips it.
+ */
+function theLineThatSetsIt(name: string, home: string): string {
+  const { path, hostFile } = aDeclaredName(name, home, 'Nothing was sent.')
+  const line = theLines(path).filter((one) => givesAValue(one, name)).at(-1)
+  if (line === undefined) {
+    throw new PanelError(`The sandboxes' login ${name} is not set in ${hostFile}, so there is nothing to test. Nothing was sent.`, 409)
+  }
+  return line
+}
+
+/**
+ * WHETHER THE TEST PRESS MAY TEST THIS NAME: it answers nothing, and refuses a name the templates do not declare (400)
+ * and a declared name the file does not set (409). The press asks it before it asks whether a test is known for the
+ * name, so a name with no test is refused the same way.
+ */
+export function aSandboxLoginThatIsSet(name: string, home: string = theOwnersHome()): void {
+  theLineThatSetsIt(name, home)
+}
+
+/**
+ * THE VALUE OF ONE DECLARED LOGIN THAT IS SET, FOR THE TEST PRESS ALONE. lib/sandbox-login-tests.ts is the one module
+ * that imports it, and it puts the value only into the one request to the login's provider. No door imports it, and
+ * no reply, log line or sentence carries what it returns.
+ */
+export function theSandboxLoginToTest(name: string, home: string = theOwnersHome()): string {
+  return theLineThatSetsIt(name, home).slice(name.length + 1)
 }
 
 /**

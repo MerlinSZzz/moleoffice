@@ -176,13 +176,14 @@ describe('a saved bus cap over its bound, and a test-worker count under its leas
     expect(one(all, 'MOLE_OFFICE_WORKER_RUNS')).toMatchObject({ chosen: null, storedButRefused: null })
   })
 
-  it('draws the notice at four widths in both themes', async () => {
+  it('draws the notice at 390 and 1440 in the light theme', async () => {
     resetSavedValues(OVER)
     const folder = process.env.W13R_FIX_NUMBERS_SHOTS
     if (folder) mkdirSync(folder, { recursive: true })
     const page = app.page
     // Two widths, where the claims are: 390 for overflow and 1440 for the notice's shape.
-    for (const width of WIDTHS) for (const theme of ['light', 'dark']) {
+    for (const width of WIDTHS) {
+      const theme = 'light'
       await page.setViewportSize({ width, height: 1100 })
       await load(page, `${app.site}/?lang=en&mode=inspect&look=${theme}#/settings/officecontrols`)
       await expect.poll(() => page.locator('html').getAttribute('data-theme')).toBe(theme)

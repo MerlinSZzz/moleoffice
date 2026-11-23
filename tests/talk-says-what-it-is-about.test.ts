@@ -191,13 +191,12 @@ describe('the recipient list on a plan line nobody has tracked', () => {
       }),
     )
 
-  it('says the line is not tracked as work, in the words the server used', () => {
-    // THE ANSWER THE PERSON NEEDS, AND IT WAS NOWHERE ON THE SCREEN. The server has always sent
-    // this sentence; nothing drew it. Without it the panel says only that nothing is ranked, which
-    // reads as Mole Office failing rather than as Mole Office answering.
+  it('says the line is not tracked as work, as a short state', () => {
+    // THE ANSWER THE PERSON NEEDS. Without it the panel says only that nothing is ranked, which
+    // reads as Mole Office failing rather than as Mole Office answering. The server's sentence is
+    // not drawn, as decided; the state is.
     const html = drawn(untrackedPlanLine())
-    expect(html).toContain('This line is not tracked as work yet')
-    expect(html).toContain('Nothing Mole Office holds can connect an agent to it')
+    expect(html).toContain('Not tracked as work yet')
   })
 
   it('never tells a person they pointed at nothing when they pointed at something', () => {
@@ -206,20 +205,18 @@ describe('the recipient list on a plan line nobody has tracked', () => {
     const html = drawn(untrackedPlanLine())
     // THE PANEL SAYS WHAT IT FOUND, IN THE SCREEN'S OWN WORDS. The server used to send
     // `You pointed at a line of the plan “…”` and this drew it; the reply now sends a code and the
-    // sentence behind it, so the page carries the four-word answer and the sentence is under the
-    // pointer for anybody who wants it.
+    // sentence behind it, and the page carries the short answer alone.
     expect(html).toContain('Not tracked as work yet')
-    expect(html).toContain('there is no record for a run to have touched')
     expect(html, 'a row denied the request the panel above it describes').not.toContain(
       'You did not point at anything',
     )
   })
 
   it('keeps the reason a run is on the ranked list, which is about the run and not the request', () => {
-    // The rule is not "drop the sentence". A ranked run's sentence says what THAT RUN did to the
-    // thing you pointed at, nothing else says it, and it stays.
+    // A ranked run's reason says what THAT RUN did to the thing you pointed at, nothing else says
+    // it, and it stays, as the row's short reason line.
     const html = drawn({ ...untrackedPlanLine(), connected: [candidate()] })
-    expect(html).toContain('It filed this report on 15 August.')
+    expect(html).toContain('Created this')
   })
 
   it('still says when a run that is merely recent was last active', () => {

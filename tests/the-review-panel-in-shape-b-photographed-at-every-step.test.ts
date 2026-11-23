@@ -191,9 +191,8 @@ it.skipIf(!process.env['TEST_SHOTS'])('photographs the panel at every step of on
         await writeAComment(second, lang, look, lang === 'zh' ? '编造的评论：第二次烧窑用了多久？' : 'Made-up comment: how long was the second firing?')
         // THE BOX HAS SHOWN WHO IT WILL CARRY, BEFORE START REVIEW IS PRESSED. The box picks the page's writer through
         // the ranking, and Start review stores the shown recipient only once that read has answered; pressed before it
-        // answers, nothing is carried and the review falls back to the page's writer, whose leave sentence is the other
-        // one (review.leave.toTheWriter, since commit 31d49924b changed ReviewBar.tsx). The drawn name is the visible
-        // state that says the ranking has answered, so the question below is the chosen-recipient one on every run.
+        // answers, nothing is carried and the review falls back to the page's writer. The drawn name is the visible
+        // state that says the ranking has answered.
         await app.page.locator('.px-talk .px-talk-to-btn').getByText(WRITER.name, { exact: true }).waitFor({ timeout: 30_000 })
         await app.page.locator('.px-talk').getByRole('button', { name: t('talk.startReview'), exact: true }).click()
         await app.page.getByText(t('talk.state.reviewStarted'), { exact: true }).waitFor({ timeout: 30_000 })
@@ -201,7 +200,7 @@ it.skipIf(!process.env['TEST_SHOTS'])('photographs the panel at every step of on
         await app.page.evaluate(() => { location.hash = '#/records' })
         const question = app.page.locator('[data-part="leave-question"]')
         await question.waitFor({ timeout: 30_000 })
-        await question.getByText(t('review.leave.to', { name: WRITER.name }), { exact: true }).waitFor()
+        await question.getByText(t('review.leave.recipient', { name: WRITER.name }), { exact: true }).waitFor()
         // ON TOP OF THE COMMENT BOX, which is still open from Start review: the question's corner is the question's.
         expect(await question.evaluate((box) => box.contains(document.elementFromPoint(box.getBoundingClientRect().left + 8, box.getBoundingClientRect().top + 8))), 'something is drawn over the question').toBe(true)
         await shoot('leave-question', width, look, lang)

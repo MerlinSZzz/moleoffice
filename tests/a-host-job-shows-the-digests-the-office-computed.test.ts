@@ -56,7 +56,7 @@ import { A_KEY_SHOWN_AS, askTheOffice } from '../tools/office-request.mjs'
 import { runOnce } from '../tools/run-the-host-jobs.mjs'
 import { THE_TEST_OFFICES_SECRETARY } from './a-page-of-a-test-office.ts'
 import { aTestDatabaseFolder } from './a-test-folder.ts'
-import { apiApp, freshDb, type TestDb } from './helpers.ts'
+import { apiApp, freshDb, type TestDb, governsTheWholeProject } from './helpers.ts'
 
 /** Made-up keys, written before the server is built. */
 const A_MADE_UP_OFFICE_KEY = randomBytes(32).toString('hex')
@@ -202,7 +202,9 @@ beforeAll(async () => {
   const decided = await send('POST', '/api/records', AS_THE_PERSON, {
     kind: 'decision',
     title: 'The office runs a registered stand-in host tool',
-    data: { replaces: [], option_taken: 'register the stand-in', because: 'this test office needs it', decided_by: THE_OWNER, authority: 'the owner said so', authority_reference: words.body.record.id },
+    data: {
+      ...governsTheWholeProject(),
+      replaces: [], option_taken: 'register the stand-in', because: 'this test office needs it', decided_by: THE_OWNER, authority: 'the owner said so', authority_reference: words.body.record.id },
   })
   expect(decided.status, decided.text.slice(0, 300)).toBe(201)
   theDecision = decided.body.record.id

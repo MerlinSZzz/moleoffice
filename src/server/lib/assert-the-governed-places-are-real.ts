@@ -8,7 +8,9 @@
  */
 
 import { inArray } from 'drizzle-orm'
-import { theGovernedPlaces } from '@shared/governs.ts'
+import { GOVERNS_FIELD, theGovernedPlaces } from '@shared/governs.ts'
+import { thePageKindsInWords } from '@shared/page-kinds-in-words.ts'
+import { PAGE_KINDS } from '@shared/what-a-record-names.ts'
 import { kindWord } from '@shared/words.ts'
 import { db } from '../db/client.ts'
 import { readInPieces } from '../db/in-pieces.ts'
@@ -18,12 +20,12 @@ import type { DecisionRow, ADecisionNamed } from './governs.ts'
 
 /**
  * A WRITE'S NAMED RECORDS ARE THERE. Called on every write of a decision's data that carries `governs`, after the
- * shape check. A record that is missing, deleted, in another project or not a module, flow or pipeline is refused
- * with the reason, and nothing is written.
+ * shape check. A record that is missing, deleted, in another project or not of a page kind is refused with the reason,
+ * and nothing is written.
  */
 export function assertTheGovernedPlacesAreReal(data: unknown, workspaceId: string): void {
   if (data === null || typeof data !== 'object' || Array.isArray(data)) return
-  const named = theGovernedPlaces((data as Record<string, unknown>)['governs']).flatMap((place) => ('record' in place ? [place.record] : []))
+  const named = theGovernedPlaces((data as Record<string, unknown>)[GOVERNS_FIELD]).records
   if (named.length === 0) return
   // IN PIECES (src/server/db/in-pieces.ts): `governs` comes from the request body, and nothing caps how many records it
   // names. The rows go into a map by id, so the order of the pieces does not matter.
@@ -46,8 +48,9 @@ export function assertTheGovernedPlacesAreReal(data: unknown, workspaceId: strin
   }
   if (wrong.length === 0) return
   throw new PanelError(
-    `data.governs names records a decision cannot govern: ${wrong.join('; ')}. A record in governs is a live module, ` +
-      `flow or pipeline in the same project; a file or folder goes in \`path\` instead. Nothing was written.`,
+    `data.${GOVERNS_FIELD} names records a decision cannot govern: ${wrong.join('; ')}. A record in governs is a live page in ` +
+      `the same project: ${thePageKindsInWords()}. A file goes in governsFiles. What no page fits goes in nothingFits. ` +
+      `Nothing was written.`,
     400,
     undefined,
     undefined,
@@ -55,8 +58,8 @@ export function assertTheGovernedPlacesAreReal(data: unknown, workspaceId: strin
     { code: 'governsNamesRecordsItCannotGovern', values: {} },
   )
 }
-/** The kinds a decision may name in `governs[].record`. */
-export const GOVERNED_KINDS = ['module', 'flow', 'pipeline'] as const
+/** The kinds a decision may name in `governs[].record`: the page kinds (src/shared/what-a-record-names.ts). */
+export const GOVERNED_KINDS = PAGE_KINDS
 export function named(row: Pick<DecisionRow, 'id' | 'title' | 'createdAt'>): ADecisionNamed {
   return { id: row.id, title: row.title, createdAt: row.createdAt }
 }

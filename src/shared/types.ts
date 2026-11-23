@@ -61,6 +61,12 @@ import { STILL_GOING_STATES as THE_STILL_GOING_STATES, saysStillGoing } from '..
 
 /** Every kind of thing Mole Office stores. Adding one here is most of the work of adding a type. */
 export const RECORD_KINDS = [
+  'knowledge_entry',
+  'knowledge_category',
+  'knowledge_bookmark',
+  'knowledge_change',
+  'knowledge_query',
+  'knowledge_rating',
   'whole_suite_receipt',
   'sealed_tip',
   // ONE CHANGESET WAITING TO BE CARRIED INTO THE MAIN WORLD, and where it has got to. Sandbox v1,
@@ -322,6 +328,7 @@ export const RECORD_KINDS = [
   // ONE ASK FOR A REGISTERED HOST TOOL, AND WHAT CAME OF IT. Only the host-job doors write it
   // (src/server/lib/host-jobs.ts); src/shared/host-jobs.ts holds its fields and words.
   'host_job',
+  'pack',
   // A COUNTER AND ITS TIMED TRIGGERS: what it counts, who may add to it, what makes it fire and what
   // it does then. Criteria CT1 to CT10 of design/counters/ACCEPTANCE.md: Mole Office gains
   // counters.
@@ -381,6 +388,14 @@ export const RECORD_KINDS = [
   // ONE REMINDER OF A MISSING REVIEWED DESIGN, OR ONE MISS, and its judgement. Part 6 of the same build.
   // ./design-reminders.ts holds its closed lists; KIND_SPECS.design_reminder its fields.
   'design_reminder',
+  // ONE DEPARTMENT OF A PROJECT: its names, what it does, its codes, the department above it, its supervisor and its
+  // state. Step 1 of departments and posts, wave 13s round 281. ./departments.ts holds its lists; KIND_SPECS.department
+  // its fields; src/server/lib/grant/departments.ts guards it.
+  'department',
+  // ONE KEY ITEM OF A PROJECT: its title, its place in the order, its progress and an estimate of the time left. Point
+  // HD-2c of home as a data dashboard, wave 13s round 281. ./key-items.ts holds its lists and read shapes;
+  // KIND_SPECS.key_item its fields; src/server/lib/key-items.ts writes and reads it.
+  'key_item',
 ] as const
 
 export type RecordKind = (typeof RECORD_KINDS)[number]
@@ -641,18 +656,23 @@ export const LINK_TYPES = {
       'between two decisions. Not `supersedes`, which retires the older one, and not `relates_to`, which says ' +
       'nothing about whether both stand.',
   },
-  // WHAT MOVES FROM ONE STEP OF A PIPELINE TO ANOTHER.
-  // The pipeline page and the big map have read it since the `carries` column was added, and until now
-  // nothing but a test could write one. `checkLinkKinds` in src/server/lib/records/planning-guards.ts refuses any end but a block, and
+  // WHAT MOVES FROM ONE BLOCK OR MODULE TO ANOTHER.
+  // The pipeline page and the big map have read it between two blocks since the `carries` column was added. It joins
+  // blocks and modules, a block or a module at each end, so that a person or an outside part drawn as a module is
+  // joined to its boxes by a link that says what it does; with no lanes stored, the master's Boxes level draws those.
+  // `checkLinkKinds` in src/server/lib/records/planning-guards.ts refuses any end but a block or a module, and still
   // only this type may carry `carries`, the names of what moves.
   feeds: {
     forward: 'feeds',
     reverse: 'fed by',
     symmetric: false,
     description:
-      'The step a flow leaves, to the step it reaches: two blocks, drawn as an arrow between them on the pipeline ' +
-      'page and the big map. It may carry `carries`, a list of {out, in?} naming what moves, in the writer\'s own ' +
-      'words. Not `blocks`, which says one step waits for the other, and not `implements`, which runs from a module.',
+      'The block or module a flow leaves, to the block or module it reaches: blocks and modules, a block or a module ' +
+      'at each end. Between two blocks it is drawn as an arrow on the pipeline page and the big map. With no lanes ' +
+      'stored for the master pipeline, its Boxes level also draws the modules it joins to the boxes, and the link ' +
+      'between them. Only this link may carry `carries`, a list of {out, in?} naming what moves, in the writer\'s ' +
+      'own words. Not `blocks`, which says one step waits for the other, and not `implements`, which says a module ' +
+      'carries out a step.',
   },
 } as const
 

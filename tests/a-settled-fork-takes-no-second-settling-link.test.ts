@@ -52,7 +52,7 @@ import { THE_TEST_OFFICES_OWNER } from './a-page-of-a-test-office.ts'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import Fastify, { type FastifyInstance } from 'fastify'
 import { RESOLVES_PROPOSAL } from '../src/shared/types.ts'
-import { freshDb, type TestDb } from './helpers.ts'
+import { freshDb, type TestDb, governsTheWholeProject } from './helpers.ts'
 
 const AS_THE_PERSON = {
   'x-mole-office-actor-type': 'human',
@@ -215,7 +215,7 @@ describe('the decisions that replace the standing one still settle the same fork
       payload: {
         kind: 'decision',
         title: 'Move to force control, filed by hand',
-        data: { because: 'A sensor arrives next week.', replaces: [first] },
+        data: { because: 'A sensor arrives next week.', ...governsTheWholeProject(), replaces: [first] },
         links: [{ type: RESOLVES_PROPOSAL, toId: fork }],
       },
     })

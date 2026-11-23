@@ -34,6 +34,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { createElement as h } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { KIND_SPECS } from '../src/shared/kinds.ts'
+import { sayInEnglish } from '../src/shared/i18n.ts'
 // The fork reading moved to shared code so that GET /api/needs-you and this page cannot disagree
 // about whether an agent picked an option — Home badged the one fork whose agent refused to choose
 // as having a recommendation. Imported from where it now lives rather than re-exported from the
@@ -491,12 +492,12 @@ describe('a decision that has been settled stays readable on the record it settl
     expect(taken.slice(0, taken.indexOf('</li>')), 'the taken option is not the standing decision’s').toContain('a personal space')
   })
 
-  it('says the caller did not load the decision, which is not the same as there being none', async () => {
+  it('draws not read when the caller did not load the decision, and not recorded when none settled it', async () => {
     const { gov } = await boot()
     const missing = strip(renderToStaticMarkup(h(gov.ProposalGovernance, settled({ settledBy: undefined }))))
-    expect(missing).toContain('was not loaded with this panel')
+    expect(missing).toContain(`>${sayInEnglish('governance.notRead')}<`)
     const none = strip(renderToStaticMarkup(h(gov.ProposalGovernance, settled({ settledBy: [] }))))
-    expect(none).toContain('nothing says which decision settled it')
+    expect(none).toContain(`>${sayInEnglish('word.notRecorded')}<`)
   })
 })
 
@@ -591,9 +592,9 @@ describe('what a change set would do, in one line', () => {
 /**
  * THE OTHER HALF OF tests/record-page.test.ts's "one list in normal mode".
  *
- * That file asserts the split and the storage notes are ABSENT. On its own, that assertion is
- * satisfied by having deleted them, which is the failure this pass was told not to commit: nothing
- * is destroyed and nothing becomes unreachable. This is the half that says they are still there.
+ * That file asserts the split is ABSENT in normal mode. On its own, that assertion is satisfied by
+ * having deleted it, so this is the half that says the split and the press that undoes a join are
+ * still there in Developer mode.
  */
 describe('what the links panel keeps for a reader who asks for it', () => {
   const rec = () => record('problem', { symptom: 'the arm keeps moving' })
@@ -618,17 +619,14 @@ describe('what the links panel keeps for a reader who asks for it', () => {
     },
   ]
 
-  it('has the split, the storage notes and the way to undo a join, one switch away', async () => {
+  it('has the split and the way to undo a join, one switch away', async () => {
     const { page } = await boot({ mode: 'inspect' })
     const html = strip(
       renderToStaticMarkup(h(page.RecordDetail, detailProps(rec(), { detailLinks: both }) as never)),
     )
     expect(html).toContain('Outgoing')
-    expect(html).toContain('stored here')
     expect(html).toContain('Incoming')
-    expect(html).toContain('stored on their side')
     expect(html).toContain('Unlink')
-    expect(html).toContain('The reverse direction is never stored')
   })
 
   it('offers no way to undo a join in the reading path', async () => {

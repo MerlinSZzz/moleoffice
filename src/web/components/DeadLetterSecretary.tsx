@@ -20,9 +20,10 @@ import { settingsControlWord } from '@shared/settings-declaration.ts'
 import type { OfficeDeadLetterSecretaryReply } from '../api.ts'
 import { api, errorMessage, faultOf, type Fault } from '../api.ts'
 import { useLanguage } from '../lib/language.ts'
-import { ErrorNote, Loading, Panel, Select, useAsync } from './ui.tsx'
+import { ErrorNote, Hint, Loading, Panel, useAsync } from './ui.tsx'
 import { DeadLetterThresholdsControl } from './DeadLetterThresholds.tsx'
 import { SettingChangedLine } from './SettingChangedLine.tsx'
+import { AgentPicker } from './agent/AgentPicker.tsx'
 
 export function DeadLetterSecretaryPanel() {
   useLanguage()
@@ -30,7 +31,7 @@ export function DeadLetterSecretaryPanel() {
   if (state.status === 'loading') return <Loading what={t('deadLetterSecretary.loading')} />
   if (state.status === 'error') return <ErrorNote message={state.message} fault={state.fault} />
   return (
-    <Panel titleIs="label" declares={{ surface: 'settings.deadletters' }} title={t('settingsPanel.title.deadletters')}>
+    <Panel titleIs="label" declares={{ surface: 'settings.deadletters' }} title={t('settingsPanel.title.deadletters')} actions={<Hint>{t('deadLetterSecretary.whatADeadLetterIs')}</Hint>}>
       <style href="mole-office-dead-letter-secretary" precedence="default">
         {DEAD_LETTER_SECRETARY_CSS}
       </style>
@@ -83,36 +84,25 @@ function DeadLetterSecretary({ first }: { first: OfficeDeadLetterSecretaryReply 
       })
   }
 
-  const options = [
-    { value: '', label: t(settingsControlWord('settings.deadletters', 'deadLetterSecretary.pickNobody')) },
-    // EACH BY ITS NAME ALONE (wave 13n round 33), or by its handle where its row holds no name. The handle is added
-    // beside a name only where two of them carry the same name, so the two can still be told apart.
-    ...reading.mayBeNamed.map((one) => {
-      const name = one.name.trim() === '' ? one.handle : one.name
-      const shared = reading.mayBeNamed.filter((other) => other.name === one.name).length > 1
-      return { value: one.id, label: shared && name !== one.handle ? `${name} (${one.handle})` : name }
-    }),
-  ]
+  const fixed = [{ value: '', name: t(settingsControlWord('settings.deadletters', 'deadLetterSecretary.pickNobody')) }]
+  // THE SECRETARIES THE DOOR OFFERS, each by its name, or by its handle where its row holds no name. The name stays
+  // alone in its own part of the row, and every row draws its handle beside it, so two secretaries of one name can
+  // still be told apart.
+  const candidates = reading.mayBeNamed.map((one) => ({ kind: 'agent' as const, id: one.id, name: one.name.trim() === '' ? one.handle : one.name }))
 
   return (
     <div className="dls">
-      {/* WHAT A DEAD LETTER IS, said first, then where the ones that end with them go. Then who is named,
-          and the picker. The list of what happens to each kind of letter was taken out in wave 13y's
-          round 121. */}
-      <p className="dls-what-is">{t('deadLetterSecretary.whatADeadLetterIs')}</p>
-      <p className="dls-what-is">{t('deadLetterSecretary.ownerRoute')}</p>
-      {reading.named === null ? null : <p className="dls-who-acts">{t('deadLetterSecretary.noticeRole')}</p>}
       <p className="dls-state" data-named={reading.named === null ? 'nobody' : reading.named.id}>
         {theState(reading)}
       </p>
-      {reading.mayBeNamed.length === 0 ? (
-        <p className="dls-none">{t('deadLetterSecretary.nobodyQualifies', { act: content(reading.act) })}</p>
-      ) : null}
       <div className="dls-pick">
-        <label className="dls-field">
-          <span>{t(settingsControlWord('settings.deadletters', 'deadLetterSecretary.pick'))}</span>
-          <Select value={chosen} onChange={setChosen} options={options} aria-label={t(settingsControlWord('settings.deadletters', 'deadLetterSecretary.pick'))} />
-        </label>
+        <AgentPicker
+          label={t(settingsControlWord('settings.deadletters', 'deadLetterSecretary.pick'))}
+          candidates={candidates}
+          chosen={chosen}
+          onChoose={setChosen}
+          fixed={fixed}
+        />
         <button className="dls-button" type="button" disabled={busy || chosen === (reading.named?.id ?? '')} onClick={save}>
           {t(settingsControlWord('settings.deadletters', 'deadLetterSecretary.save'))}
         </button>
@@ -127,14 +117,9 @@ function DeadLetterSecretary({ first }: { first: OfficeDeadLetterSecretaryReply 
 const DEAD_LETTER_SECRETARY_CSS = `
 .dls { display: flex; flex-direction: column; gap: var(--pad); min-width: 0; }
 .dls-state { margin: 0; max-width: var(--measure-in-box); overflow-wrap: anywhere; font: 600 var(--fs-1)/var(--lh-body) var(--font-ui); color: var(--text); }
-.dls-none { margin: 0; max-width: var(--measure-in-box); overflow-wrap: anywhere; font: var(--fs-1)/var(--lh-body) var(--font-ui); color: var(--text-2); }
 .dls-pick { display: flex; flex-wrap: wrap; align-items: end; gap: var(--pad); min-width: 0; }
-.dls-field { display: flex; flex-direction: column; gap: 4px; min-width: 0; max-width: 100%; color: var(--text-2); font: 600 var(--fs-1)/var(--lh-tight) var(--font-ui); }
-.dls-field .px-select { max-width: 100%; }
 .dls-button, .dlt-button { min-height: var(--row-h); max-width: 100%; padding: 2px var(--pad); border: var(--border-w) solid var(--border-strong); border-radius: var(--radius-sm); background: var(--panel); color: var(--text); box-shadow: var(--button-shadow); font: var(--button-weight) var(--fs-1)/var(--lh-tight) var(--font-ui); cursor: pointer; overflow-wrap: anywhere; }
 .dls-button:hover:not(:disabled), .dlt-button:hover:not(:disabled) { background: var(--hover); }
 .dls-button:focus-visible, .dlt-button:focus-visible { outline: var(--focus-w) solid var(--focus); outline-offset: var(--focus-offset); }
 .dls-button:disabled, .dlt-button:disabled { cursor: default; opacity: .6; }
-.dls-what-is { margin: 0; max-width: var(--measure-in-box); overflow-wrap: anywhere; font: var(--fs-1)/var(--lh-body) var(--font-ui); color: var(--text-2); text-wrap: pretty; }
-.dls-who-acts { margin: 0; max-width: var(--measure-in-box); overflow-wrap: anywhere; font: var(--fs-1)/var(--lh-body) var(--font-ui); color: var(--text-2); text-wrap: pretty; }
 `

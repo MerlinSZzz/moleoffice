@@ -1,15 +1,12 @@
 // Copyright © 2026 Zhengyang Shen
 // Licensed under the MIT License. See LICENSE.
 /**
- * THE WAITER SENDS THE AGENT'S OWN KEY UNDER THE AGENT'S OWN HANDLE, AND THE OFFICE'S KEY ONLY WHEN
- * THE AGENT HOLDS NONE. Keys wave piece 3, the waiter part, which a decision called for.
+ * THE WAITER SENDS THE AGENT'S OWN KEY UNDER THE AGENT'S OWN HANDLE, AND REFUSES WITH NO KEY.
  *
  * `tools/hold-the-handle.mjs` builds who it asks as, and the agent's key, through `anAgentsToolHeaders`
  * in tools/sandbox-common.mjs. With MOLE_AGENT_KEY set, that key goes on x-mole-office-key and the
- * actor header names the waiter's own handle. With none, the office's own key goes instead, read
- * from the key file beside the database, as the waiter did before. The hold door refuses a request a
- * listener carried with no key, so this fallback is what keeps the secretary's waiter holding its handle
- * until the secretary has a key of its own.
+ * actor header names the waiter's own handle. With neither an agent key nor a run key, it asks nothing,
+ * even when the office's key file is present.
  *
  * HOW IT IS SEEN. The waiter is started as a real child process and pointed at a listener of this
  * file's own. The listener writes down the headers of each hold request and hands the request to the
@@ -83,10 +80,12 @@ async function aRegisteredAgentWithASession(handle: string): Promise<string> {
 }
 
 /** Start the waiter for this handle and session; `agentKey` null means MOLE_AGENT_KEY is not set. */
-function startTheWaiter(handle: string, session: string, agentKey: string | null): { said: () => string } {
+function startTheWaiter(handle: string, session: string, agentKey: string | null): { said: () => string; ended: Promise<number | null> } {
   const env: Record<string, string | undefined> = { ...process.env, MOLE_OFFICE_HANDLE_BEAT_SECONDS: '1' }
   delete env.MOLE_AGENT_KEY
   delete env.MOLE_OFFICE_AGENT
+  delete env.MOLE_AGENT_KEY_FILE
+  delete env.MOLE_OFFICE_TOOL_CONFIGURATION
   if (agentKey !== null) env.MOLE_AGENT_KEY = agentKey
   const child = spawn(
     process.execPath,
@@ -97,7 +96,7 @@ function startTheWaiter(handle: string, session: string, agentKey: string | null
   let printed = ''
   child.stdout?.on('data', (chunk) => (printed += String(chunk)))
   child.stderr?.on('data', (chunk) => (printed += String(chunk)))
-  return { said: () => printed }
+  return { said: () => printed, ended: new Promise(resolve => child.on('close', resolve)) }
 }
 
 async function until(what: () => boolean, within = 30_000): Promise<boolean> {
@@ -159,15 +158,12 @@ describe('the waiter proves who it is', () => {
     expect(seen.status, waiter.said()).toBe(201)
   }, 60_000)
 
-  it("sends the office's key, as before, when the agent holds none, and the hold is taken", async () => {
+  it('refuses without an agent or run key before asking for a hold', async () => {
     const handle = 'keyless-waiter'
     const session = await aRegisteredAgentWithASession(handle)
     const waiter = startTheWaiter(handle, session, null)
-    const answered = (): (typeof holds)[number] | undefined => holds.find((one) => one.handle === handle && one.status !== 0)
-    expect(await until(() => answered() !== undefined), waiter.said()).toBe(true)
-    const seen = answered()!
-    expect(seen.headers['x-mole-office-actor-id']).toBe(handle)
-    expect(seen.headers[KEY_HEADER] === theOfficesKey(), "the hold did not carry the office's key").toBe(true)
-    expect(seen.status, waiter.said()).toBe(201)
+    expect(await waiter.ended).toBe(2)
+    expect(waiter.said()).toContain('MOLE_AGENT_KEY_FILE')
+    expect(holds.filter(one => one.handle === handle)).toEqual([])
   }, 60_000)
 })

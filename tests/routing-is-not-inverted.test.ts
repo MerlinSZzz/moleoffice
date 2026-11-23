@@ -357,14 +357,14 @@ describe('a deleted run is drawn as one', () => {
     }
   }
 
-  it('says on the row that nothing can be sent to it', () => {
+  it('says on the row that it is deleted', () => {
     const reading = picker.shortReading(deletedCandidate(), Date.parse('2026-08-19T10:00:00'))
-    expect(reading.deleted).toBe('Deleted — nothing can be sent to it')
+    expect(reading.deleted).toBe('Deleted')
 
     const drawn = renderToStaticMarkup(
       h(picker.RecipientReading, { candidate: deletedCandidate(), withName: true }),
     )
-    expect(drawn).toContain('Deleted — nothing can be sent to it')
+    expect(drawn).toContain('Deleted')
   })
 
   it('says nothing about deletion for a run that is still there', () => {
@@ -416,7 +416,7 @@ describe('a deleted run is drawn as one', () => {
       },
     }
     // It is still the only connected agent, so it is still what is offered — nothing is hidden —
-    // and the row it is drawn on now says nothing can be sent to it.
+    // and the row it is drawn on now says it is deleted.
     expect(picker.strongestCandidate(answer)?.sessionId).toBe('gone')
 
     // With a reachable connected agent beside it, that one is what the composer proposes.

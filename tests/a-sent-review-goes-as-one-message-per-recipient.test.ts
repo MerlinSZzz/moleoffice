@@ -179,7 +179,8 @@ async function membersOf(reviewId: string): Promise<{ id: string; state: string 
 
 /** Wait until the wall clock's second has moved on. */
 async function aSecondLater(): Promise<void> {
-  await new Promise((done) => setTimeout(done, 1050))
+  const second = Math.floor(Date.now() / 1000)
+  while (Math.floor(Date.now() / 1000) === second) await new Promise((done) => setTimeout(done, 10))
 }
 
 /**

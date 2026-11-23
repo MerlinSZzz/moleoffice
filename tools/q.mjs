@@ -74,6 +74,12 @@ const slug = (label ?? args[0].replace(/[^a-z0-9]+/gi, '-')).slice(0, 40)
 // first's log (item 2b of wave 13n). The name still starts <label>-<moment>, so a listing sorts by time.
 const logPath = join('.logs', `${slug}-${fileNameStamp(new Date())}-${randomBytes(4).toString('hex')}.log`)
 const log = createWriteStream(logPath)
+// A log that cannot be written must not stop q before its digest. With no listener, the stream's 'error' would end q at
+// once with a stack trace. The first error is kept here, and the close handler says it after the digest.
+let logFailed = null
+log.on('error', (error) => {
+  logFailed ??= error
+})
 
 /**
  * What is worth printing from a command that SUCCEEDED. One line from a test run beats ten, and a
@@ -124,7 +130,6 @@ for (const stream of [child.stdout, child.stderr]) {
 
 child.on('close', (exitCode) => {
   const code = couldNotStart ? 127 : exitCode
-  log.end()
   const seconds = ((Date.now() - started) / 1000).toFixed(1)
   // ANSI is what made `tsc --noEmit | grep "error TS"` print nothing on a broken tree, which fooled
   // two agents in one session. Strip it here so the patterns above match what a reader would see.
@@ -166,5 +171,14 @@ child.on('close', (exitCode) => {
   // repository's first rule broken by the tool built to serve it.
   const kept = shown.filter((l) => clean.includes(l)).length
   console.log(`  [${kept === clean.length ? 'all' : `${kept} of`} ${clean.length} lines · full output: ${logPath}]`)
-  process.exit(code ?? 1)
+  // q EXITS ONLY WHEN THE LOG HOLDS EVERYTHING. log.end() returns before the stream has written what it still holds,
+  // and process.exit() does not wait for it, so a run of 213 lines once left a log of 20. The callback comes when the
+  // last write is done, or with an error if the stream failed. A stream that failed before this point answers only
+  // that it was destroyed, so the error kept by the listener above is the one said. Then q says the log is not whole
+  // and still exits with the command's own code, because every caller reads that code as the command's result.
+  log.end((error) => {
+    const failed = logFailed ?? error
+    if (failed) console.error(`q.mjs could not write the full output to ${logPath}: ${failed.message}. That log is not whole.`)
+    process.exit(code ?? 1)
+  })
 })

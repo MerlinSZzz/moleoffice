@@ -117,6 +117,16 @@ async function reviewIn(workspaceId: string, about: string): Promise<Made> {
     data: { body: 'first line\nsecond line' },
     actor: HUMAN,
   })
+  // THE AGENT THE RUN WORKED AS. A comment addressed to a run that answers as no agent is refused before it is
+  // stored, and nothing is made up for it, so the run names one in `ranAs`. Only the person with their key may file a
+  // session for an agent.
+  const agent = source.api.createRecord({
+    workspaceId,
+    kind: 'agent',
+    title: `${about} · the agent that run worked as`,
+    data: { handle: `the-run-in-${workspaceId}`, state: 'active', runtime: 'claude-code' },
+    actor: HUMAN,
+  })
   const session = source.api.createRecord({
     workspaceId,
     kind: 'session',
@@ -124,6 +134,7 @@ async function reviewIn(workspaceId: string, about: string): Promise<Made> {
     data: {
       state: 'idle',
       runtime: 'claude-code',
+      ranAs: [{ workspaceId, agentId: agent.id }],
       // What discovery stamps on a session record; `stampOf` in lib/sessions.ts is its one reader,
       // and a session Mole Office has no id for is refused at dispatch by name.
       extra: {
@@ -144,7 +155,7 @@ async function reviewIn(workspaceId: string, about: string): Promise<Made> {
         },
       },
     },
-    actor: HUMAN,
+    actor: { type: 'human', id: THE_TEST_OFFICES_OWNER.id, provedBy: 'the-person-key' },
   })
 
   const thread = agents.createThread({ workspaceId, title: `${about} · read again`, mode: 'review' }, HUMAN)
@@ -455,10 +466,10 @@ describe('a project archive restores its conversations beside a project it says 
  */
 describe('a project archive never says a project\'s own conversations belong to nobody', () => {
   it('does not call the agent tables person-level', async () => {
-    const schema = await import('../src/server/db/schema.ts')
+    const { PERSON_LEVEL_TABLES } = await import('../src/server/db/authored-table-of.ts')
     for (const table of ['agent_threads', 'agent_messages', 'agent_runs']) {
       expect(
-        [...schema.PERSON_LEVEL_TABLES],
+        [...PERSON_LEVEL_TABLES],
         `${table} is reported as belonging to no project, and a project archive would say so in words`,
       ).not.toContain(table)
     }
@@ -484,10 +495,10 @@ describe('a project archive never says a project\'s own conversations belong to 
     // NOT VACUOUS. Without this, the three assertions above could pass because `absenceLine` had
     // stopped writing that sentence at all, and the archive would then say nothing where it used to
     // say something true.
-    const schema = await import('../src/server/db/schema.ts')
+    const { PERSON_LEVEL_TABLES } = await import('../src/server/db/authored-table-of.ts')
     const text = textOf(scoped)
-    expect(schema.PERSON_LEVEL_TABLES.length).toBeGreaterThan(0)
-    const said = schema.PERSON_LEVEL_TABLES.filter((table) => text.includes(`carries no \`${table}\` rows AT ALL`))
+    expect(PERSON_LEVEL_TABLES.length).toBeGreaterThan(0)
+    const said = PERSON_LEVEL_TABLES.filter((table) => text.includes(`carries no \`${table}\` rows AT ALL`))
     expect(said.length, 'no page of this archive says where the person-level rows went').toBeGreaterThan(0)
   })
 })

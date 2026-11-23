@@ -19,7 +19,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { apiApp, freshDb, type TestDb } from './helpers.ts'
 import { FAKE_DF, FAKE_FREE, FAKE_DU, FAKE_DEVCONTAINER, FAKE_DOCKER, startsOf, theFakeMachine, theFakeState } from './sandbox-stand-ins.ts'
 import { THE_OPENCODE_DATABASE_VARIABLE, theDeclaredSecrets as declaredSecrets } from '../tools/sandbox-common.mjs'
-import { FULL_PERMISSIONS } from '../src/config/run-permissions.mjs'
+import { CODEX_SHELL_SNAPSHOT_OFF, FULL_PERMISSIONS } from '../src/config/run-permissions.mjs'
 import { CODEX_FEATURES_OFF } from '../tools/harness-features-off.mjs'
 
 const REPO = fileURLToPath(new URL('..', import.meta.url))
@@ -395,7 +395,7 @@ describe('exec --isolated', () => {
       permissions: { deny: expect.arrayContaining(['Agent', 'Task', 'Workflow', 'ListAgents', 'SendMessage']) },
     })
     expect(readdirSync(join(itsHome, '.codex'))).toEqual(['config.toml'])
-    expect(readFileSync(join(itsHome, '.codex', 'config.toml'), 'utf8')).toBe('[features]\nmulti_agent = false\nmulti_agent_v2 = false\n')
+    expect(readFileSync(join(itsHome, '.codex', 'config.toml'), 'utf8')).toBe('[features]\nmulti_agent = false\nmulti_agent_v2 = false\nshell_snapshot = false\n')
     const sandboxEnv = (theFakeState(fakes).containers[`mole-office-sandbox-${NAME}`] as unknown as { Config: { Env: string[] } }).Config.Env
     const sandboxHome = (sandboxEnv.find((line) => line.startsWith('HOME=')) ?? '').slice('HOME='.length)
     expect(sandboxHome, 'the sandbox names no home of its own').toMatch(/\/home$/)
@@ -662,8 +662,8 @@ describe('exec --isolated', () => {
     expect(command[0]).toBe(codex)
     const exec = command.indexOf('exec')
     expect(exec, 'the handoff has no exec subcommand').toBeGreaterThan(0)
-    // Codex's switch that turns its subagents off comes first (tools/harness-features-off.mjs), then the permissions.
-    const given = [...CODEX_FEATURES_OFF, ...FULL_PERMISSIONS.codex!.args]
+    // Codex's switches that turn its subagents and its shell snapshot off come first (tools/harness-features-off.mjs), then the permissions.
+    const given = [...CODEX_FEATURES_OFF, ...CODEX_SHELL_SNAPSHOT_OFF, ...FULL_PERMISSIONS.codex!.args]
     expect(command.slice(1, exec), 'the switch and the shared permission arguments are not between the program and exec').toEqual(given)
 
     // AND THE COMMAND RAN WITH THEM: the stand-in records the argv it was executed with.

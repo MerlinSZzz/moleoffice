@@ -163,6 +163,17 @@ export function keptAnswer<T>(name: string, workspace?: string): { value: T; at:
   return held === undefined ? undefined : { value: held.value as T, at: held.at }
 }
 
+/** Every project this name is kept in for who is looking now, the most recently read first. */
+export function keptInEveryProject<T>(name: string): { workspace: string; value: T; at: number }[] {
+  const who = whoIsLooking()
+  const found: { workspace: string; value: T; at: number }[] = []
+  for (const [key, held] of memory) {
+    if (!key.startsWith(`${who}\n`) || !key.endsWith(`\n${name}`)) continue
+    found.push({ workspace: key.slice(who.length + 1, key.length - name.length - 1), value: held.value as T, at: held.at })
+  }
+  return found.sort((a, b) => b.at - a.at)
+}
+
 /**
  * KEEP AN ANSWER at the place worked out when its read STARTED. A read that started for somebody
  * else (the writer was changed while it was out) is not kept: it was read for them.

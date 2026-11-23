@@ -5,6 +5,8 @@ import { resolve } from 'node:path'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import { freshDb, liveApp, waitForThePage, type LiveApp, type TestDb } from './helpers.ts'
 import { SHIPPED_CHAPTER_NUMBERS } from '../src/shared/chapter-check.ts'
+import { sayInEnglish } from '../src/shared/i18n.ts'
+import { theWordAPageDraws } from './words-waiting-for-translation.ts'
 
 let app: LiveApp, db: TestDb
 const unsupported: string[] = []
@@ -46,7 +48,7 @@ it('names every unsupported record to both readers in the page language at 1440 
     const notice = app.page.locator('[data-unsupported-chapters]')
     expect(await notice.count()).toBe(1)
     expect(await notice.getAttribute('role')).toBe('status')
-    expect(await notice.innerText()).toContain('These stored chapter records have numbers this release does not have. The office is not using them.')
+    expect(await notice.innerText()).toContain(sayInEnglish('regulationsPage.notInUse'))
     for (const id of unsupported) expect(await notice.getByRole('link', { name: id, exact: true }).getAttribute('href')).toContain(id)
     expect(await notice.getByRole('link').count()).toBe(2)
     expect(await notice.evaluate(node => Boolean(node.compareDocumentPosition(document.querySelector('.ofc-read')!) & Node.DOCUMENT_POSITION_FOLLOWING))).toBe(true)
@@ -58,12 +60,11 @@ it('names every unsupported record to both readers in the page language at 1440 
     }
   }
   await open(390, 'light', 'zh')
-  expect(await app.page.locator('[data-unsupported-chapters]').innerText()).toContain('这些已存储的章节记录使用了此版本不支持的编号。办公室未使用这些记录。')
-  expect(await app.page.locator('[data-unsupported-chapters]').innerText()).not.toContain('These stored chapter records')
+  expect(await app.page.locator('[data-unsupported-chapters]').innerText()).toContain(theWordAPageDraws('zh', 'regulationsPage.notInUse'))
   await app.page.evaluate(() => localStorage.setItem('mole-office.actor', JSON.stringify({ type: 'agent', id: 'made-up-reader' })))
   await open(390, 'light')
   const notice = app.page.locator('[data-unsupported-chapters]')
   expect(await notice.getByRole('link').count()).toBe(2)
-  expect(await notice.innerText()).toContain('The office is not using them.')
+  expect(await notice.innerText()).toContain(sayInEnglish('regulationsPage.notInUse'))
   expect(await app.page.locator('.ce').getByRole('button', { name: /Edit chapter|Restore/ }).count()).toBe(0)
 }, 120_000)

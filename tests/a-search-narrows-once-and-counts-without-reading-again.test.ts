@@ -139,10 +139,12 @@ describe('a search', () => {
     })
     // The office's other project holds what the agent searched for, so the search read more than one list of messages.
     expect(answer!.elsewhere.map((one) => one.workspaceId), 'the projects elsewhere that say it').toEqual([ELSEWHERE])
-    // ONE STATEMENT OF THE NARROWING STANDS FOR ALL OF IT: the read of the messages the reader sent, through the index of
-    // the sender, which `theMessagesAReaderCouldBeAPartyTo` runs once each time it is worked out.
+    // TWO STATEMENTS OF THE NARROWING STAND FOR ALL OF IT. For an agent reader, `theMessagesAReaderCouldBeAPartyTo`
+    // reads, in one statement, the stored senders that could be one of the reader's names with white space around it.
+    // Then it looks up the reader's own messages. Both statements go through the index of the sender, once each time
+    // the narrowing is worked out. So a narrowing worked out twice would show 4.
     const narrowings = ran.filter((one) => one.sql.includes('records_message_sent_by_idx'))
-    expect(narrowings, 'the times the narrowing was worked out').toHaveLength(1)
+    expect(narrowings, 'the statements of the narrowing, worked out once').toHaveLength(2)
   })
 
   it('2. counts the records it searched without reading more rows when the project holds more records that do not say it', async () => {

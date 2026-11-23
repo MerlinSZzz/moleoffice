@@ -23,7 +23,7 @@
 import { readFileSync } from 'node:fs'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
-import { apiApp, freshDb, type TestDb, theAnswerToAWriteInATestOffice } from './helpers.ts'
+import { apiApp, freshDb, type TestDb, theAnswerToAWriteInATestOffice, governsTheWholeProject } from './helpers.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { theRoleCardsFile } from '../src/server/lib/roles.ts'
 import type { BuiltServer } from '../src/server/index.ts'
@@ -75,7 +75,7 @@ function inTheirName(reference: string): Record<string, unknown> {
     kind: 'decision',
     title: 'The kiln fires on Friday',
     data: {
-      replaces: [],
+      ...governsTheWholeProject(), replaces: [],
       decided_by: 'the owner',
       authority: 'the owner said so',
       authority_reference: reference,

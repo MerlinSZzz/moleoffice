@@ -36,7 +36,7 @@ import { content, t, type WordKey } from '@shared/i18n.ts'
 import type { PriceTable as StoredPriceTable } from '@shared/price-table.ts'
 import type { ReceiptUsage } from '@shared/usage-receipts.ts'
 import type { WhatThePriceTableDoorSays } from '../../server/lib/price-table.ts'
-import { ErrorNote, Loading, Panel, useAsync } from './ui.tsx'
+import { ErrorNote, Hint, Loading, Panel, ServerNote, useAsync } from './ui.tsx'
 import { useProjectAsync } from '../lib/project-async.ts'
 import { TieredPress } from './TieredPress.tsx'
 import { SETTINGS_NARROW } from './SettingsFolds.tsx'
@@ -84,7 +84,7 @@ export function PriceTablePanel() {
   const [table, readAgain] = useAsync(() => api.priceTable(), [])
   const [usage] = useProjectAsync(() => api.usageAgents() as Promise<UsageReply>, [])
   return (
-    <Panel titleIs="label" declares={{ surface: 'settings.prices' }} title={t('settingsPanel.title.prices')}>
+    <Panel titleIs="label" declares={{ surface: 'settings.prices' }} title={t('settingsPanel.title.prices')} actions={<Hint>{t('settingsPanel.prices.unit')}</Hint>}>
       <style href="mole-office-price-table" precedence="default">
         {PRICE_TABLE_CSS}
       </style>
@@ -193,16 +193,16 @@ function PriceTable({
 
   return (
     <div className="ptb">
-      {/* THE UNIT AND THE NO-TABLE SENTENCE are the shared sentences the door sends, said in the page's language. */}
-      <p className="ptb-lead">{t('settingsPanel.prices.unit')}</p>
-      {said.says !== null ? <p className="ptb-state">{t('settingsPanel.prices.noTable')}</p> : null}
+      {said.says !== null ? <p className="ptb-state">{t('settingsState.notSet')}</p> : null}
+      <ServerNote text={said.says} />
       {said.setAt !== null && said.setBy !== null ? (
         <p className="ptb-state" data-testid="price-table-set-by">
           {t('settingsPanel.prices.setBy', { id: said.setBy.id, at: said.setAt })}
           {said.authority !== null ? ` ${t('settingsPanel.prices.authority', { authority: said.authority })}` : null}
         </p>
       ) : null}
-      {said.refusal !== null ? <p className="ptb-refuse">{said.refusal}</p> : null}
+      {said.refusal !== null ? <p className="ptb-state">{t('settingsState.readOnly')}</p> : null}
+      <ServerNote text={said.refusal} />
 
       <label className="ptb-currency">
         <span className="ptb-key">{t(settingsControlWord('settings.prices', 'settingsPanel.prices.currency'))}</span>
@@ -247,7 +247,7 @@ function PriceTable({
       {/* The runs whose receipt names no model, or that carry no receipt, are one row on the Usage
           page, which says why they are not priced. Here there is nothing to price for them. */}
       {Array.isArray(receiptModels) && named.every((model) => model === null) ? (
-        <p className="ptb-state">{t('settingsPanel.prices.noModelNamed')}</p>
+        <p className="ptb-state">{t('absence.none')}</p>
       ) : null}
 
       <div className="ptb-presses">
@@ -281,7 +281,7 @@ function PriceTable({
 /** The panel's own rules. Every value is a token, so a preset swap re-skins it with everything else. */
 const PRICE_TABLE_CSS = `
 .ptb { display: flex; flex-direction: column; gap: var(--pad); min-width: 0; }
-.ptb-lead, .ptb-state { margin: 0; max-width: var(--measure-in-box); font: var(--fs-1)/var(--lh-body) var(--font-ui); color: var(--text-2); }
+.ptb-state { margin: 0; max-width: var(--measure-in-box); font: var(--fs-1)/var(--lh-body) var(--font-ui); color: var(--text-2); }
 .ptb-refuse {
   margin: 0; max-width: var(--measure-in-box); padding: 2px var(--pad);
   color: var(--st-failed); background: var(--st-failed-bg);

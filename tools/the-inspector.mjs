@@ -144,7 +144,8 @@ import { DSH_FEATURES_OFF, aCommandWithTheHarnessFeaturesOff } from './harness-f
 import { projectKey, theTextOfTheTranscript, theTranscriptOfTheSession } from './dsh-hooks/served.mjs'
 import { theKeyReminder, whereAMessageHoldsAKey } from '../src/shared/message-keys.ts'
 import { withoutTheProvider } from '../src/config/model-efforts.mjs'
-import { FULL_PERMISSIONS } from '../src/config/run-permissions.mjs'
+import { aCommandsProgram, aRuntimeIsCodex, FULL_PERMISSIONS } from '../src/config/run-permissions.mjs'
+import { theEnvironmentACodexGets } from '../src/config/the-environment-a-codex-gets.mjs'
 import { KEY_HEADER } from '../src/config/key-header.mjs'
 import { STAND_IN_HEADER } from '../src/config/stand-in-header.mjs'
 import { FROM_ITS_COMMIT, SEAL_READ_HEADER } from '../src/config/seal-read-header.mjs'
@@ -172,6 +173,9 @@ import { stopAnUnpairedStableStart } from '../src/config/the-office-tool-environ
  */
 const THE_SERVED_DATABASE = process.env['MOLE_OFFICE_DB']
 delete process.env['MOLE_OFFICE_DB']
+// The verdict alone uses the check run's key; no child process receives it.
+const THE_CHECK_RUN_KEY = process.env['MOLE_AGENT_KEY']
+delete process.env['MOLE_AGENT_KEY']
 
 /**
  * THE OFFICE'S OWN KEY, beside the database this tool was started with, or why there is none. Read per request: the
@@ -1298,7 +1302,7 @@ async function askAndHear(path, body, { quiet = false, workspace = undefined, me
   const started = performance.now()
   let reply, said
   const request = {
-    method, headers: { ...HEADERS, ...(workspace === undefined ? {} : { 'x-mole-office-workspace': workspace }), ...headers, ...theOfficeKeyHeader() },
+    method, headers: { ...HEADERS, ...(workspace === undefined ? {} : { 'x-mole-office-workspace': workspace }), ...theOfficeKeyHeader(), ...headers },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   }
   // THE STAND-IN'S 503 IS ASKED AGAIN, within OFFICE_BACK_MS from the first. It answers for the dev supervisor while no
@@ -3161,8 +3165,10 @@ process.on('exit', () => {
 function runClaudeOnTheHost(prompt, given) {
   return new Promise((done) => {
     // THE CALLER'S ENVIRONMENT LESS THE OFFICE'S VARIABLES AND EVERY KEY, as the sandbox gives it (problem YjMHEkMQkjAX),
-    // and the effort the office named, as the flag gives it (wave 13v round 27).
-    const env = { ...theModelsEnvironmentOnTheHost(process.env), ...given.env }
+    // and the effort the office named, as the flag gives it (wave 13v round 27). A check on Codex gets only the names its
+    // list keeps (src/config/the-environment-a-codex-gets.mjs), as the last step.
+    const whole = { ...theModelsEnvironmentOnTheHost(process.env), ...given.env }
+    const env = aRuntimeIsCodex(RUNTIME) || aCommandsProgram(given.command).isCodex ? theEnvironmentACodexGets(whole) : whole
     const child = spawn(given.command[0], given.command.slice(1), { cwd: WHERE, env, stdio: ['pipe', 'pipe', 'pipe'] })
     child.stdin.on('error', (e) => {
       done({ ok: false, why: `The prompt could not be written to the ${RUNTIME} command: ${e.message}` })
@@ -3526,7 +3532,7 @@ const judging = {
 // and a scoped check or one handed paths to judge is the inspector's. A release ends the check with no model. Any other
 // answer sends it the ordinary way, and why is said in what the verdict read.
 const THE_DECLARED_KIND = reads.submission?.seal.kind === 'git' ? reads.submission.seal.standard : undefined
-if (THE_DECLARED_KIND !== undefined && !chosen.dry) {
+if (THE_DECLARED_KIND !== undefined && !chosen.dry && reads.readingOnly !== true) {
   if (chosen.only !== null || NEEDS_JUDGMENT !== null) {
     notAStandardRelease =
       ` The seal declares a standard change of the kind ${String(THE_DECLARED_KIND)}, and this check ` +
@@ -4041,7 +4047,8 @@ async function theVerdictIsPosted() {
     if (!THE_REMINDERS_GIVEN.has(says)) process.stdout.write(`${says}\n`)
     THE_REMINDERS_GIVEN.add(says)
   }
-  return askAndHear(`/api/checks/${chosen.run}`, body)
+  const key = THE_CHECK_RUN_KEY
+  return askAndHear(`/api/checks/${chosen.run}`, body, { headers: reads.readingOnly === true && typeof key === 'string' && key !== '' ? { [KEY_HEADER]: key } : {} })
 }
 
 /** THE VERDICT AS IT IS POSTED: the model's verdict, and beside it what this tool read and what the model's run wrote. */

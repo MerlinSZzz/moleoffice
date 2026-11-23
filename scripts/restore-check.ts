@@ -86,7 +86,7 @@ import { REMOVED_MARK } from '../src/config/what-a-copy-must-not-carry.mjs'
 // them. schema.ts and its parts declare tables and open nothing; a part's fill imports its writer
 // only when it is called.
 import { getTableConfig } from 'drizzle-orm/sqlite-core'
-import { everyPartTable } from '../src/server/db/schema.ts'
+import { everyPartTable } from '../src/server/db/every-part-table.ts'
 import type { PartTable } from '../src/server/db/part-tables.ts'
 
 // ============================================================================ what is compared
@@ -161,7 +161,7 @@ const THE_FIXED_COMPARISONS = [
   'visitor credentials without token hashes',
   // Wave 5. The only comparison here that is not scoped by project, because the planning tables it
   // reads have no project — a plan is a person-level overlay across workspace-owned work.
-  // How many of them there are is PERSON_LEVEL_TABLES in db/schema.ts and is not counted here.
+  // How many of them there are is PERSON_LEVEL_TABLES in db/authored-table-of.ts and is not counted here.
   'the plan',
   // The other half of planning, and person-level for the same reason: a plan is writing, and a
   // plan spans projects. It is its own comparison because the words are the thing being proved,
@@ -736,6 +736,8 @@ export interface SnapPerson {
   /** When the chat circle shows, and how the chat opens (migration 0340). Null on either means never chosen. */
   chatButtonStays: string | null
   chatOpensAs: string | null
+  /** The mode the office opens in for this person until they choose one (migration 0354). Null means Normal mode. */
+  startingMode: string | null
   /** The person's own message labels, as stored JSON (migration 0341). Null means nobody made one. */
   chatLabels: string | null
   /** The person's own settings for the two shipped flags and 'No mark', as stored JSON (migration 0346). Null means nobody changed one. */
@@ -1043,6 +1045,12 @@ export interface SnapInstallation {
    * reading of the queue, and a message written in between would wait for a press. NULL means the rule has not run.
    */
   otherProjectsMessagesSince: string | null
+  /**
+   * WHEN THIS OFFICE BEGAN TO KEEP THE HAND-OVERS OF AN AGENT'S OWNER. Wave 13s round 281, added by 0356. Compared
+   * because nothing can recreate a moment: a restore that dropped it would take a new one at the next start, and the
+   * page would say the list began after hand-overs it holds. NULL means the code that keeps them has not started.
+   */
+  ownerChangesSince: string | null
 }
 
 /** One visit: a citizen of one world working in another, and what they came to do. */
@@ -1214,6 +1222,8 @@ export interface SnapHandleHold {
   runtime: string
   claimedAt: string
   lastHeardAt: string
+  /** The same moment as `lastHeardAt` with its offset, or null on a row written before migration 0358. */
+  lastHeardInstant: string | null
   releasedAt: string | null
   releasedBecause: string | null
 }
@@ -1268,6 +1278,8 @@ export interface SnapToolUse {
   movedAt: string | null
   /** What the use door found when it checked the line's proof that tools/use-line.mjs sent it, migration 0300, or null. */
   proof: string | null
+  /** The same moment as `at` with its offset, or null on a row written before migration 0358. */
+  atInstant: string | null
 }
 
 /** One file observation on a tool use, migration 0279. The use supplies the run and time. */
@@ -1431,7 +1443,7 @@ export interface SnapMessageDelivery {
  * One conversation with an agent, as stored.
  *
  * IT IS THE ONLY ONE OF THE THREE THAT SAYS WHICH PROJECT IT IS ABOUT. A comment and a run belong to
- * the project their conversation names, which is why `WORKSPACE_COLUMN` in db/schema.ts answers for
+ * the project their conversation names, which is why `WORKSPACE_COLUMN` in db/authored-table-of.ts answers for
  * those two with this table rather than with a column of their own.
  */
 /**
@@ -2844,6 +2856,7 @@ export async function buildSnapshot(now: number): Promise<Snapshot> {
       chatTextSize: (row['chat_text_size'] as string | null) ?? null,
       chatButtonStays: (row['chat_button_stays'] as string | null) ?? null,
       chatOpensAs: (row['chat_opens_as'] as string | null) ?? null,
+      startingMode: (row['starting_mode'] as string | null) ?? null,
       chatLabels: (row['chat_labels'] as string | null) ?? null,
       shippedFlags: (row['shipped_flags'] as string | null) ?? null,
       themes: (row['themes'] as string | null) ?? null,
@@ -2997,6 +3010,7 @@ export async function buildSnapshot(now: number): Promise<Snapshot> {
     checksInMergesOnly: (row['checks_in_merges_only'] as number | null) ?? null,
     staleForkBases: (row['stale_fork_bases'] as string | null) ?? null,
     otherProjectsMessagesSince: (row['other_projects_messages_since'] as string | null) ?? null,
+    ownerChangesSince: (row['owner_changes_since'] as string | null) ?? null,
   }))
   const officeWorlds: SnapWorld[] = byKey(
     (sqlite.prepare('SELECT * FROM worlds').all() as Record<string, unknown>[]).map((row) => ({
@@ -3109,6 +3123,7 @@ export async function buildSnapshot(now: number): Promise<Snapshot> {
       runtime: row['runtime'] as string,
       claimedAt: row['claimed_at'] as string,
       lastHeardAt: row['last_heard_at'] as string,
+      lastHeardInstant: (row['last_heard_instant'] as string | null) ?? null,
       releasedAt: (row['released_at'] as string | null) ?? null,
       releasedBecause: (row['released_because'] as string | null) ?? null,
     })),
@@ -3195,6 +3210,7 @@ export async function buildSnapshot(now: number): Promise<Snapshot> {
       actorId: (row['actor_id'] as string | null) ?? null,
       movedAt: (row['moved_at'] as string | null) ?? null,
       proof: (row['proof'] as string | null) ?? null,
+      atInstant: (row['at_instant'] as string | null) ?? null,
     })),
     (one) => one.id,
   )
@@ -5915,6 +5931,7 @@ export async function fillThePartTables(): Promise<string[]> {
   await import('../src/server/lib/the-provider-table.ts')
   await import('../src/server/lib/agent-names.ts')
   await import('../src/server/lib/keyrouter/provider-router.ts')
+  await import('../src/server/lib/agent-owner-changes.ts')
   const notes: string[] = []
   for (const table of everyPartTable()) {
     if (table.says.restore === 'not in this proof') continue
@@ -6544,7 +6561,7 @@ export async function fillEmptyTables(scratch: string): Promise<{ notes: string[
   const theHeir = anAgent('restore-check-heir', 'Restore check · the successor')
   const byItsOwnKey = (handle: string, id: string) => ({ type: 'agent' as const, id: handle, provedBy: 'an-agent-key' as const, keyHolder: id })
   const proposal = residents.proposeAResident(
-    { agentId: theResident, because: 'Filed by the restore check, so a residency is in the archive.' },
+    { agentId: theResident, because: 'Filed by the restore check, so a residency is in the archive.', sleepTime: { startsAt: '03:00', minutes: 60 } },
     byItsOwnKey('restore-check-secretary', theSecretary),
     'default',
   )
@@ -6594,7 +6611,7 @@ export async function fillEmptyTables(scratch: string): Promise<{ notes: string[
     }).id,
   )
   const theSleepersProposal = residents.proposeAResident(
-    { agentId: theSleeper, because: 'Filed by the restore check, so a sleep time is in the archive.' },
+    { agentId: theSleeper, because: 'Filed by the restore check, so a sleep time is in the archive.', sleepTime: { startsAt: '04:00', minutes: 60 } },
     byItsOwnKey('restore-check-secretary', theSecretary),
     'default',
   )
@@ -6628,7 +6645,7 @@ export async function fillEmptyTables(scratch: string): Promise<{ notes: string[
   const theGrant = elevations.aGrant({ endsWhen: 'when you say', until: null, by: owner, reason: 'Given by the restore check, so a press for the person is in the archive.' })
   records.throughTheCardDoor(() => records.patchRecord(theSecretaryRecord.id, { dataPatch: { elevation: elevations.asStored([theGrant]) } }, actor))
   const toDecline = residents.proposeAResident(
-    { agentId: theReader, because: 'Filed by the restore check, so a press for the person can decline it.' },
+    { agentId: theReader, because: 'Filed by the restore check, so a press for the person can decline it.', sleepTime: { startsAt: '05:00', minutes: 60 } },
     byItsOwnKey('restore-check-secretary', theSecretary),
     'default',
   )
@@ -7031,6 +7048,24 @@ export async function fillEmptyTables(scratch: string): Promise<{ notes: string[
     },
     actor,
   })
+  // AND THE RUN SAYS WHICH AGENT IT WORKED AS: an agent record in this project, named in the run's `ranAs` for this
+  // project. A comment addressed to a run that names no agent is refused before anything is written, and two of the
+  // comments below are addressed to this run. The door used to make this agent from the run's title, at the first of
+  // them, and then write the run's `ranAs`. It is filed and bound here in that same order, so the corpus holds as many
+  // rows, revisions and change rows as it did then, and both writes are before the anchors below.
+  const theAgentTheRunWorkedAs = records.createRecord({
+    workspaceId: DEFAULT_WORKSPACE,
+    kind: 'agent',
+    title: 'Restore check · the agent the addressed run worked as',
+    summary: 'Filed by the restore check, so that the run the review is addressed to answers as an agent.',
+    data: { handle: 'restore-check-addressed-run', state: 'active', runtime: 'claude-code' },
+    actor,
+  })
+  records.patchRecord(
+    recipient.id,
+    { dataPatch: { ranAs: [{ workspaceId: DEFAULT_WORKSPACE, agentId: theAgentTheRunWorkedAs.id }] } },
+    actor,
+  )
 
   const filedRecord = records.getRecord(filed.recordId)
   if (filedRecord === null || filedRecord.summary === null) {

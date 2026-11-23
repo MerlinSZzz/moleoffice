@@ -321,12 +321,7 @@ function SharedResources({ findings }: { findings: readonly FindingOut[] }) {
           {shared.map((finding) => (
             <li className="im-row im-row-thin" key={finding.rowId}>
               <code className="wrap-anywhere">{finding.path}</code>
-              <span
-                className="im-count num"
-                title={t('g2b.impl.alsoSuggestedTitle')}
-              >
-                {finding.alsoSuggestedFor}
-              </span>
+              <span className="im-count num">{finding.alsoSuggestedFor}</span>
             </li>
           ))}
         </ul>
@@ -391,7 +386,6 @@ function DeleteARelationship({
             size="sm"
             variant="ghost"
             onClick={() => setConfirming(true)}
-            title={t('g2b.impl.deleteTitle')}
           >
             {t('g2b.impl.delete')}
           </Btn>
@@ -483,7 +477,6 @@ function OneRepository({
                     variant="ask"
                     pending={accepting === row.rowId}
                     onClick={() => onAccept(row.rowId)}
-                    title={t('g2b.impl.acceptTitle')}
                   >
                     {t('g2b.impl.accept')}
                   </Btn>
@@ -512,12 +505,7 @@ function OneRepository({
       {held.disagreements.length === 0 ? null : (
         <div className="im-group">
           <div className="im-group-head">
-            <span
-              className="im-heading"
-              title={t('g2b.impl.alreadyStatedTitle')}
-            >
-              {t('g2b.impl.alreadyStated')}
-            </span>
+            <span className="im-heading">{t('g2b.impl.alreadyStated')}</span>
             <span className="im-count num">{held.disagreements.length}</span>
           </div>
           <ul className="im-list">
@@ -564,12 +552,7 @@ function WhatWasLeftOut({
   return (
     <div className="im-cut">
       <span className="im-heading">{t('g2b.impl.leftOut')}</span>
-      <span
-        className="im-count num"
-        title={t('g2b.impl.leftOutTitle')}
-      >
-        {reply.counts.leftOut}
-      </span>
+      <span className="im-count num">{reply.counts.leftOut}</span>
       {/* THE BUCKET WORD IS MACHINERY. `budget`/`page` is the disclosure shape's own vocabulary and
           it says nothing to a reader that the count and the press beside it do not already say. The
           count, the meaning on its tooltip and the way to the rest are what a person needs; which
@@ -726,11 +709,7 @@ export function AddCodeForm({
     return (
       <Absence
         tier="must-act-on"
-        sentence={
-          <span title={t('g2b.impl.noRepositoryTitle')}>
-            {t('g2b.impl.noRepository')}
-          </span>
-        }
+        sentence={t('g2b.impl.noRepository')}
         action={
           <RouteLink to={pathFor('settings')} className="im-to-settings">
             {t('g2b.impl.registerOne')}

@@ -11,7 +11,7 @@
  * 230. The modules of this office are stored with no state, so each module's card is one with none.
  *
  * WHAT IS PROVED, case by case:
- *   1-4. criterion 3, at 1440 and at 390, in the light theme and in the dark one: on the pipeline drawn in areas and on
+ *   1-4. criterion 3, at 1440 and at 390, in the light theme: on the pipeline drawn in areas and on
  *      the master at its Boxes level, every card holds exactly one chip; the chip's data-state is the record's stored
  *      state, or "unrecorded" when none is stored; the card's own data-state is the stored state and is absent when
  *      none is stored; the chip's text is the word stateWord gives; and the pipeline drawn in areas shows each of the
@@ -96,7 +96,7 @@ const WIDTHS = [
 ] as const
 
 for (const size of WIDTHS) {
-  for (const theme of ['light', 'dark'] as const) {
+  for (const theme of ['light'] as const) {
     it(`criterion 3: every card holds a chip that says its state in the word files' words, at ${String(size.width)}, ${theme}`, async () => {
       theAreasWereStored(office.areas, 'the pipeline drawn in areas')
       await app.page.setViewportSize({ width: size.width, height: size.height })

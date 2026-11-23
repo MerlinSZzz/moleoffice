@@ -8,7 +8,7 @@
  */
 
 import { asAgent } from './read-participant.ts'
-import type { RegisteredAgent } from '../lib/participants.ts'
+import type { RegisteredAgent } from './types/participants.ts'
 import { sqlite } from './client.ts'
 
 /**

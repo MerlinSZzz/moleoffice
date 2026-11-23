@@ -12,6 +12,7 @@
 import { quickNoteTitleOf, type QuickNoteColour, type QuickNotePart } from '@shared/kinds/quick-note.ts'
 import { t } from '@shared/i18n.ts'
 import { holdsADrawing } from '@shared/my-notes.ts'
+import { theTitleFollowsTheWords } from '../lib/quick-note-title.ts'
 
 /** Room left around the drawing, in the note's own units, so a stroke at the edge is not cut. */
 const ROOM = 8
@@ -104,6 +105,16 @@ export function theFirstWordsOf(parts: readonly QuickNotePart[]): { title: strin
     }
   }
   return { title: quickNoteTitleOf(parts), after: lines.slice(1).join(' ') }
+}
+
+/**
+ * WHAT A NOTE'S CARD SAYS: a title the person gave the note, with all of its first words after it, or else its first
+ * words as above. A title is one the person gave when the note's words do not give it, by the rule the note saves by.
+ */
+export function theCardWordsOf(title: string, parts: readonly QuickNotePart[]): { title: string | null; after: string } {
+  const words = theFirstWordsOf(parts)
+  if (theTitleFollowsTheWords(title, parts)) return words
+  return { title, after: [words.title ?? '', words.after].filter((one) => one !== '').join(' ') }
 }
 
 /** The small picture of a note's drawing, as an SVG that fills the width it is given. Nothing when nothing is drawn. */

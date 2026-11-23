@@ -10,6 +10,9 @@ import { setFixtureOwner } from './agent-owner-fixture.ts'
  *      and its starter gets exactly one waking line about the run. A later write on the run adds no second line.
  *   2. A sandbox round whose launcher writes `commandEnded`, with a commit and a report linked to another record, gets the
  *      no-report reason naming that report.
+ *  2b. A sandbox round whose only about link to its report goes from the run to the report gets the no-report reason
+ *      saying the link goes the other way. The real fault: a run's account said its report "is linked to nothing",
+ *      though the run had linked it, because only links from the report were read.
  *   3. A run not started in a sandbox is left alone: no account and no line.
  *   4. `howTheRoundEnded` sent through the record door is refused, on a patch and on a create, and nothing is written.
  *   5. A sandbox round sealed after its last message to its starter set only a condition ("If main has moved, I will not
@@ -314,6 +317,35 @@ describe('a round that ends without a seal', () => {
     expect(account.reasons).toEqual([expect.objectContaining({ why: 'no-report', names: reportId })])
     expect(account.whatToDo).toContain(`"fromId":"${reportId}","toId":"${run.id}"`)
     expect(linesAbout(run.id, 'A round ended without a seal')).toHaveLength(1)
+  })
+
+  it('2b: an about link from the run to its report is named as going the other way, not as a report linked to nothing', async () => {
+    // THE REAL FAULT. A run filed its report with no link and then linked itself about the report. The account said the
+    // report "is linked to nothing", which the starter could not square with the link it saw. The run makes no commit, so
+    // no patch log is read here and the reader's temporary folder is not looked for.
+    const run = await aRun({ sandbox: true, commit: false })
+    const report = await app.inject({
+      method: 'POST', url: '/api/records', headers: asTheRun(run.id, run.key),
+      payload: { kind: 'report', title: 'Synthetic report the run links about itself the wrong way',
+        data: { chaptersRead: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], blocks: [{ id: 'b1', type: 'text', text: 'A made-up report.' }] } },
+    })
+    expect(report.statusCode, report.body.slice(0, 400)).toBe(201)
+    const reportId = (report.json() as { record: { id: string } }).record.id
+    const linked = await app.inject({ method: 'POST', url: '/api/links', headers: asTheRun(run.id, run.key), payload: { fromId: run.id, toId: reportId, type: 'about' } })
+    expect(linked.statusCode, linked.body.slice(0, 400)).toBe(201)
+    const ended = await app.inject({ method: 'PATCH', url: `/api/records/${run.id}`, headers: AS_THE_OFFICE_WORKER, payload: { dataPatch: { detail: 'Synthetic: ended.', commandEnded: { at: '2026-11-23 10:47:42', code: 0 } } } })
+    expect(ended.statusCode, ended.body.slice(0, 600)).toBe(200)
+    await waitForTheAccount(run.id)
+    const account = theAccountOf(run.id)
+    if (account === null || account.sealed) throw new Error(`no unsealed account: ${JSON.stringify(account)}`)
+    expect(account.reasons.map((one) => one.why)).toEqual(['no-commits', 'no-report'])
+    expect(account.reasons.find((one) => one.why === 'no-report')).toEqual({
+      why: 'no-report',
+      says:
+        `No report is linked about the run. It filed report ${reportId}, and the about link between them goes the other way, ` +
+        'from the run to the report, so nothing waiting on the run sees it.',
+      names: reportId,
+    })
   })
 
   it('3: a run not started in a sandbox is left alone', async () => {

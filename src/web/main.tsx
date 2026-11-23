@@ -82,6 +82,7 @@ async function start(root: HTMLElement): Promise<void> {
   const { readPageWords, listenForWordChoices } = await import('./lib/word-settings.ts')
   const { readSidebarArrangement, listenForSidebarChoices } = await import('./lib/sidebar-arrangement.ts')
   const { readSidebarPins, listenForPinsOfWhoeverReads } = await import('./lib/sidebar-pins.ts')
+  const { readReportsCount, listenForReportsCountOfWhoeverReads } = await import('./lib/report-count.ts')
   const { loadMoleOfficeId } = await import('./lib/mole-office.ts')
   const { api } = await import('./api.ts')
   const { MOLE_OFFICE_HANDLE } = await import('@shared/participants.ts')
@@ -91,7 +92,7 @@ async function start(root: HTMLElement): Promise<void> {
   // The office's row belongs to the installation, not to a project, so the read names the default project. A browser
   // that remembers a project the server no longer holds still starts, and its bar says the project is not listed.
   // Asked again a few times when Windows did not say in time who sent them (src/web/lib/windows-did-not-say.ts).
-  try { await askAgainWhileWindowsIsSlow(() => Promise.all([readPageWords(), readSidebarArrangement(), readSidebarPins(), loadMoleOfficeId(() => api.participant('agent', MOLE_OFFICE_HANDLE, DEFAULT_WORKSPACE))]), root) }
+  try { await askAgainWhileWindowsIsSlow(() => Promise.all([readPageWords(), readSidebarArrangement(), readSidebarPins(), readReportsCount(), loadMoleOfficeId(() => api.participant('agent', MOLE_OFFICE_HANDLE, DEFAULT_WORKSPACE))]), root) }
   catch (error) {
     if(thisBrowserNeedsPairing()){await drawPairing(root);return}
     window.moleBoot?.cancel()
@@ -102,6 +103,7 @@ async function start(root: HTMLElement): Promise<void> {
   listenForWordChoices()
   listenForSidebarChoices()
   listenForPinsOfWhoeverReads()
+  listenForReportsCountOfWhoeverReads()
   // THE WINDOW'S NEW QUICK NOTE. Said only in the standalone window, and only when this build has the
   // note page, so the window offers the note and its key only for an office that has the page.
   const { parseRoute } = await import('@shared/addresses.ts')
@@ -113,6 +115,9 @@ async function start(root: HTMLElement): Promise<void> {
   // is drawn in Greek from the start.
   const { theWordsAskedFor } = await import('./lib/language.ts')
   await theWordsAskedFor()
+  // THE MODE THE PERSON STARTS IN, for a browser that has stored no mode. It reads who this browser writes as, so it
+  // loads only after the owner; it does not hold the first drawing (src/web/lib/starting-mode.ts).
+  await import('./lib/starting-mode.ts')
   // WHAT THE PAGES SHOWED LAST TIME, read from the browser's IndexedDB before the first drawing, so a
   // page reopened draws it at once (src/web/lib/pagecache.ts). Who is looking is known only now, after
   // the owner. A browser slow to answer is not waited for longer than this; the pages then read as

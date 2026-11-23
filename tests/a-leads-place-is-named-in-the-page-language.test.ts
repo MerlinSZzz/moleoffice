@@ -134,13 +134,13 @@ describe('the place a lead goes is named in the page language', () => {
     const drawing = aLeadTo({ kind: 'page', route: '/pipeline/TEoKg5mV7egP' } as Target)
     // Before round 29 this was '页面 /pipeline/TEoKg5mV7egP'.
     expect(inAChineseBrowser(() => whereALeadGoes(drawing, '', 'default', (id) => id, { read: HANDOVER, developer: false }))).toBe(
-      '流程 Handover v2 的图',
+      '流水线 Handover v2 的图',
     )
     expect(inAChineseBrowser(() => whereALeadGoes(drawing, '', 'default', (id) => id, NOTHING_READ))).toBe(
-      '一个流程的图，这里不知道它的标题',
+      '一个流水线的图，这里不知道它的标题',
     )
     expect(inAChineseBrowser(() => whereALeadGoes(drawing, '', 'default', (id) => id, { read: HANDOVER, developer: true }))).toBe(
-      '流程 Handover v2 的图（/pipeline/TEoKg5mV7egP）',
+      '流水线 Handover v2 的图（/pipeline/TEoKg5mV7egP）',
     )
     const plan = inAChineseBrowser(() => whereALeadGoes(aLeadTo(anExampleOf('plan')), '', 'default', (id) => id, NOTHING_READ))
     expect(plan).toContain('计划')

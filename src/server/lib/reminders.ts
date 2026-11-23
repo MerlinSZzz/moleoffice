@@ -94,10 +94,10 @@ import { join } from 'node:path'
 import { db, sqlite } from '../db/client.ts'
 import { readInPieces } from '../db/in-pieces.ts'
 import { records, messageDelivery, ONE_KIND_WRITTEN_OUT, STORED_FIELDS, theKindOfARowFoundById, theProjectOfARowFoundById } from '../db/schema.ts'
-import { and, eq, inArray, isNull, sql } from 'drizzle-orm'
+import { and, eq, inArray, isNull, sql, type SQL, type SQLWrapper } from 'drizzle-orm'
 import { moleOffice, type ParticipantRef } from '@shared/participants.ts'
 import { REPO_ROOT } from '../../config/settings.mjs'
-import { localStamp, parseAnyStamp } from '@shared/time.ts'
+import { anInstantNamesItsStamp, localStamp, momentOfAStampAndItsInstant, parseAnyStamp } from '@shared/time.ts'
 import { SYSTEM_LINES } from '@shared/groups.ts'
 import { SANDBOX_RUN_REMINDER } from '../../config/launcher-notices.mjs'
 import { idleReminderHours, replyReminderMinutes } from './env.ts'
@@ -150,10 +150,10 @@ import {
 // Problem `2G9jNsuJwJf4`. The file says what a holding row is and
 // where the list of what is running comes from.
 import { closeTheHoldingRowsOfWorldsThatAreGone } from './isolated-worlds.ts'
-import { closeTheOwnRowsWhoseProcessIsGone, closeTheRunningRowsWhoseDirectoryIsGone, closeTheRunsWhoseSandboxContainerStopped, theProcessesTheOwnRowsCloseReads, theSandboxContainerReadingsForAPass } from './own-rows.ts'
+import { closeTheOwnRowsWhoseProcessIsGone, closeTheRunningRowsWhoseDirectoryIsGone, closeTheRunsWhoseSandboxContainerStopped, closeTheSandboxRunsWhoseLauncherEnded, theProcessesTheOwnRowsCloseReads, theSandboxContainerReadingsForAPass } from './own-rows.ts'
 import { theFieldsOfEverySession, theSessionIdsWhere } from './session-fields.ts'
 import { saysStillGoing } from '../../config/still-going.mjs'
-import { theNewestUsesOf } from './newest-use.ts'
+import { theNewestUsesWithTheirMomentsOf } from './newest-use.ts'
 import { theRecordsThatMayHoldOneOf } from './record-text-index.ts'
 import { endDispatchesWhoseWorkerIsGone, theProcessesTheGoneDispatchCheckReads } from './gone-dispatch-workers.ts'
 import { osProbe, readFirst } from './resources.ts'
@@ -183,6 +183,38 @@ function inMs(stamp: unknown): number | null {
   if (typeof stamp !== 'string' || stamp.trim() === '') return null
   const at = parseAnyStamp(stamp)
   return at === null ? null : at.getTime()
+}
+
+/** The shapes of an instant `clockStamp` writes, as GLOB patterns: seconds, then milliseconds or none, then Z or an offset. */
+const THE_SHAPES_OF_AN_INSTANT = ['Z', '.[0-9][0-9][0-9]Z', '[-+][0-9][0-9]:[0-9][0-9]', '.[0-9][0-9][0-9][-+][0-9][0-9]:[0-9][0-9]']
+  .map((end) => `'[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9]${end}'`)
+
+/**
+ * WHETHER AN INSTANT NAMES THE STAMP BESIDE IT, TESTED BY SQLITE: the test `anInstantNamesItsStamp` in src/shared/time.ts
+ * makes, so a grouped reading follows the rule of `momentOfAStampAndItsInstant` and no row is read in JavaScript. The
+ * instant has one of the shapes above, and its first 19 characters are the stamp with T for the space. SQLite's
+ * `replace` changes every space where `String.replace` changes the first, and the two tests agree all the same: those 19
+ * characters of an instant of these shapes hold one T and no space, so a stamp with more than one space fails both. It
+ * is NULL when the instant is NULL, and `CASE WHEN` reads NULL as false.
+ */
+function anInstantNamesItsStampInSQLite(stamp: SQLWrapper, instant: SQL): SQL {
+  const shaped = sql.join(THE_SHAPES_OF_AN_INSTANT.map((shape) => sql`${instant} GLOB ${sql.raw(shape)}`), sql` OR `)
+  return sql`((${shaped}) AND substr(${instant}, 1, 19) = replace(${stamp}, ' ', 'T'))`
+}
+
+/**
+ * THE MOMENT A STAMP NAMES, READ WITH ITS INSTANT BY SQLITE, AS MILLISECONDS, or NULL when the instant does not name the
+ * stamp or cannot be read. So a grouped `max` can take the latest moment. The moment is the instant's second in its
+ * offset, with the milliseconds left out, as `momentOfAStampAndItsInstant` gives it: SQLite's `julianday()` is handed the
+ * first 19 characters and what follows the milliseconds, Z or the offset, and reads that as its moment in UTC, as
+ * `Date.parse` does. It would read a bare number as a count of days, so it is asked only after the shape is tested. It is
+ * looser than `momentOfAnInstant` only on words no clock writes: it takes a day past the end of its month and the hour
+ * 24, and gives NULL for an offset of more than fourteen hours.
+ */
+function theMomentInSQLiteOf(stamp: SQLWrapper, instant: SQL): SQL<number | null> {
+  const theZone = sql`CASE WHEN substr(${instant}, 20, 1) = '.' THEN substr(${instant}, 24) ELSE substr(${instant}, 20) END`
+  const theSecond = sql`julianday(substr(${instant}, 1, 19) || ${theZone})`
+  return sql<number | null>`CASE WHEN ${anInstantNamesItsStampInSQLite(stamp, instant)} THEN CAST(round((${theSecond} - 2440587.5) * 86400000) AS INTEGER) END`
 }
 
 /**
@@ -263,6 +295,17 @@ function inUTF8Order(one: string, other: string): number {
  * `identityOf` answers which agent each run serves, from every agent's identity read once. With one statement for each
  * run and group, and every agent built for the loop that sends, the idle step ran 3,585 statements a pass on a made-up
  * office of the live size; with these, 1,371.
+ *
+ * EACH ACTIVITY'S STAMP IS READ WITH THE MOMENT KEPT BESIDE IT, by the rule of `momentOfAStampAndItsInstant` in
+ * src/shared/time.ts: a message's `writtenTime`, a run's `filedTime` and `lastOutputTime`, and a use's `at_instant`
+ * (migration 0358). On the night the clocks go back a stamp alone reads the second pass of the hour from 01:00 as the
+ * first, so an agent that sent a message at 01:10 winter time was reminded half an hour later. The moment is read only
+ * when it names the stamp beside it, so a stamp changed alone is read from its words. Each message reading gives two
+ * values for each agent: the latest stamp of the messages whose moment does not name it, kept as SQLite's `max` keeps it
+ * and read as before, and the latest of the moments that do, which SQLite works out by the same rule
+ * (`theMomentInSQLiteOf`). A run gives its stamps the same way, grouped here, and a use gives its stamp or its moment. The
+ * newest activity is the latest of all of them, as milliseconds. A moment that names its stamp and cannot be read gives
+ * nothing, as a stamp that cannot be read gives nothing.
  */
 function activityPerAgent(since: number, identityOf: TheIdentityOf): { newest: Map<string, number>; unreadable: { id: string; createdAt: string }[] } {
   const fromTheDayBefore = localStamp(new Date(since - 24 * 3_600_000))
@@ -272,17 +315,22 @@ function activityPerAgent(since: number, identityOf: TheIdentityOf): { newest: M
   const ofKind = (kind: 'message' | 'session') => sql`+${records.kind} = ${kind}`
   const office = moleOffice().id
   const perAgent = new Map<string, number>()
-  const keep = (who: unknown, at: unknown): void => {
-    const ms = inMs(at)
+  const keepTheMoment = (who: unknown, ms: number | null): void => {
     if (typeof who !== 'string' || who === '' || ms === null) return
     const held = perAgent.get(who)
     if (held === undefined || ms > held) perAgent.set(who, ms)
   }
+  const keep = (who: unknown, at: unknown): void => keepTheMoment(who, inMs(at))
+  // A MESSAGE WHOSE MOMENT NAMES ITS STAMP GIVES ITS MOMENT, and any other gives its stamp: one written before its moment
+  // was kept, and one whose stamp was changed alone.
+  const writtenTime = sql`json_extract(${records.data}, '$.writtenTime.instant')`
+  const theLatestStampWithNoMoment = sql<string | null>`max(CASE WHEN ${anInstantNamesItsStampInSQLite(records.createdAt, writtenTime)} THEN NULL ELSE ${records.createdAt} END)`
+  const theLatestMoment = sql<number | null>`max(${theMomentInSQLiteOf(records.createdAt, writtenTime)})`
   // RECEIVED: a delivery row naming the agent, on a message the office did not write. A CROSS JOIN, because SQLite keeps
   // the order of one: the messages are read first and cut by their stamp, and only theirs are looked up among the
   // delivery rows. Joined the other way, every agent's delivery row looked its message up first, 39 ms against 14.
   for (const row of db
-    .select({ who: messageDelivery.recipientId, at: sql<string>`max(${records.createdAt})` })
+    .select({ who: messageDelivery.recipientId, at: theLatestStampWithNoMoment, moment: theLatestMoment })
     .from(records)
     .crossJoin(messageDelivery)
     .where(
@@ -299,11 +347,12 @@ function activityPerAgent(since: number, identityOf: TheIdentityOf): { newest: M
     .groupBy(messageDelivery.recipientId)
     .all()) {
     keep(row.who, row.at)
+    keepTheMoment(row.who, row.moment)
   }
   // SENT: a message whose sender is an agent — its own answers are filed under its name. The
   // office's own sends are excluded, for the reason at the top.
   for (const row of db
-    .select({ who: sql<string>`json_extract(${records.data}, '$.sentBy.id')`, at: sql<string>`max(${records.createdAt})` })
+    .select({ who: sql<string>`json_extract(${records.data}, '$.sentBy.id')`, at: theLatestStampWithNoMoment, moment: theLatestMoment })
     .from(records)
     .where(
       and(
@@ -317,6 +366,7 @@ function activityPerAgent(since: number, identityOf: TheIdentityOf): { newest: M
     .groupBy(sql`json_extract(${records.data}, '$.sentBy.id')`)
     .all()) {
     keep(row.who, row.at)
+    keepTheMoment(row.who, row.moment)
   }
   // THE MESSAGES NEITHER READING COULD READ, oldest first.
   const unreadable = db
@@ -337,7 +387,9 @@ function activityPerAgent(since: number, identityOf: TheIdentityOf): { newest: M
   // THE RUNS ARE READ PLAINLY AND GROUPED HERE, and the same rows are the changed runs asked about for their uses below.
   // Grouped by SQLite, the sorter copied each run's whole record: on a made-up office of the live size that reading took
   // 52 to 67 ms, and the same rows read plainly 18 ms. Each group keeps the stamp SQLite's `max` would keep
-  // (`theLaterInSQLitesOrder`), so a group whose stamps are written two ways counts the same one as before.
+  // (`theLaterInSQLitesOrder`), so a group whose stamps are written two ways counts the same one as before. A run's stamp
+  // is kept only when the moment beside it does not name it, and the group keeps the latest of the moments that do, as
+  // milliseconds.
   const aRunThatNamesItsAgent = sql`json_extract(${records.data}, '$.servingAgent') IS NOT NULL`
   const changedRuns = db
     .select({
@@ -346,25 +398,38 @@ function activityPerAgent(since: number, identityOf: TheIdentityOf): { newest: M
       agentId: sql<unknown>`json_extract(${records.data}, '$.servingAgentId')`,
       at: records.createdAt,
       output: sql<unknown>`json_extract(${records.data}, '$.lastOutputAt')`,
+      filedTime: sql<unknown>`json_extract(${records.data}, '$.filedTime.instant')`,
+      outputTime: sql<unknown>`json_extract(${records.data}, '$.lastOutputTime.instant')`,
     })
     .from(records)
     .where(and(changedSince, ofKind('session'), isNull(records.deletedAt), aRunThatNamesItsAgent))
     .all()
-  const groups = new Map<string, { handle: unknown; agentId: unknown; at: unknown; output: unknown }>()
+  const groups = new Map<string, { handle: unknown; agentId: unknown; at: unknown; output: unknown; moment: number | null }>()
+  const theLaterMoment = (one: number | null, other: number | null): number | null => (one === null ? other : other === null ? one : Math.max(one, other))
+  // A stamp whose moment does not name it is not read here: it goes to its group's stamp, and is read below.
+  const readWithItsGroup = (): null => null
   for (const run of changedRuns) {
+    const at = anInstantNamesItsStamp(run.at, run.filedTime) ? null : run.at
+    const output = anInstantNamesItsStamp(run.output, run.outputTime) ? null : run.output
+    const moment = theLaterMoment(
+      momentOfAStampAndItsInstant(run.at, run.filedTime, readWithItsGroup),
+      momentOfAStampAndItsInstant(run.output, run.outputTime, readWithItsGroup),
+    )
     // THE KEY TELLS A NUMBER FROM THE SAME DIGITS AS TEXT, as SQLite's grouping does.
     const key = JSON.stringify([run.handle, run.agentId])
     const held = groups.get(key)
-    if (held === undefined) groups.set(key, { handle: run.handle, agentId: run.agentId, at: run.at, output: run.output })
+    if (held === undefined) groups.set(key, { handle: run.handle, agentId: run.agentId, at, output, moment })
     else {
-      held.at = theLaterInSQLitesOrder(held.at, run.at)
-      held.output = theLaterInSQLitesOrder(held.output, run.output)
+      held.at = theLaterInSQLitesOrder(held.at, at)
+      held.output = theLaterInSQLitesOrder(held.output, output)
+      held.moment = theLaterMoment(held.moment, moment)
     }
   }
   for (const group of groups.values()) {
     const who = theAgentARunServes({ servingAgent: group.handle, servingAgentId: group.agentId }, identityOf)?.id ?? null
     keep(who, group.at)
     keep(who, group.output)
+    keepTheMoment(who, group.moment)
   }
   // ITS RUNS' USES OF TOOLS (wave 13s round 33b, message IatdjoGLajNS). A use is one row of `tool_uses` and moves
   // nothing on the run's record, not even updated_at, so the cut above cannot find a run that has only used tools. The
@@ -392,15 +457,24 @@ function activityPerAgent(since: number, identityOf: TheIdentityOf): { newest: M
       .all(),
   )
   serves(changedRuns)
-  for (const [run, at] of theNewestUsesOf(servedBy.keys())) keep(servedBy.get(run), at)
+  for (const [run, use] of theNewestUsesWithTheirMomentsOf(servedBy.keys())) {
+    keepTheMoment(servedBy.get(run), momentOfAStampAndItsInstant(use.at, use.atInstant, inMs))
+  }
   return { newest: perAgent, unreadable }
 }
 
 // ============================================================================ what has been said already
 
+/** One office line already said to an agent: its stamp, and the moment kept beside it, null when none was kept. */
+interface TheIdleLineSaid {
+  at: string
+  instant: unknown
+}
+
 /**
  * THE OFFICE LINES ALREADY WRITTEN TO EACH AGENT with one exact wording, as their stamps by the
- * agent's registry id. They are read beside the delivery rows, so the reader and the writer agree
+ * agent's registry id, each with the moment the record door kept beside its stamp (`data.writtenTime`), or null on a line
+ * written before it kept one. `theIdleReminderIsDue` reads the moment only when it names the stamp. They are read beside the delivery rows, so the reader and the writer agree
  * about who a line reached.
  *
  * ONE READING FOR EVERY AGENT, NOT ONE PER AGENT. A tick asks this for each agent past its idle
@@ -416,8 +490,8 @@ function activityPerAgent(since: number, identityOf: TheIdentityOf): { newest: M
  * minute once the first agents were past their hour. The rows read grow with the time since the start, and are never
  * more than every message changed in that time.
  */
-function officeLinesSaidToEachAgent(line: string, since: number): Map<string, string[]> {
-  const out = new Map<string, string[]>()
+function officeLinesSaidToEachAgent(line: string, since: number): Map<string, TheIdleLineSaid[]> {
+  const out = new Map<string, TheIdleLineSaid[]>()
   const fromTheDayBefore = localStamp(new Date(since - 24 * 3_600_000))
   // THE MESSAGES CHANGED SINCE THE CUT ARE FOUND FIRST, THROUGH `records_updated_idx`, and only their delivery rows are
   // read, by the message's id. Joined from the delivery rows, SQLite took every delivery row to an agent and looked its
@@ -425,7 +499,8 @@ function officeLinesSaidToEachAgent(line: string, since: number): Map<string, st
   // round 36). The index is named, so a missing index is an error and not a slow read. CROSS JOIN keeps that order.
   // A MESSAGE WHOSE DATA IS NOT VALID JSON IS NOT REACHED, as it was not when these lines were found through the index of
   // who wrote a message: the writer is read through `json_valid` first, and the body only from a message the office wrote.
-  for (const one of db.all<{ to: string; at: string }>(sql`SELECT ${messageDelivery.recipientId} AS "to", ${records.createdAt} AS at
+  for (const one of db.all<{ to: string; at: string; instant: unknown }>(sql`SELECT ${messageDelivery.recipientId} AS "to", ${records.createdAt} AS at,
+    json_extract(${records.data}, '$.writtenTime.instant') AS instant
     FROM ${records} INDEXED BY records_updated_idx
     CROSS JOIN ${messageDelivery} ON ${messageDelivery.messageId} = ${records.id}
     WHERE ${and(
@@ -436,9 +511,10 @@ function officeLinesSaidToEachAgent(line: string, since: number): Map<string, st
       sql`CASE WHEN ${STORED_FIELDS.messageSentById(records.data)} = ${moleOffice().id} THEN json_extract(${records.data}, '$.body') = ${line} AND json_extract(${records.data}, '$.sentBy.kind') = 'agent' END`,
       eq(messageDelivery.recipientKind, 'agent'),
     )}`)) {
+    const said = { at: one.at, instant: one.instant }
     const held = out.get(one.to)
-    if (held === undefined) out.set(one.to, [one.at])
-    else held.push(one.at)
+    if (held === undefined) out.set(one.to, [said])
+    else held.push(said)
   }
   return out
 }
@@ -841,7 +917,7 @@ function theIdleReminderIsDue(
   activity: ReadonlyMap<string, number>,
   now: number,
   watchingSince: number,
-  idleLinesSaidTo: (agentId: string) => readonly string[],
+  idleLinesSaidTo: (agentId: string) => readonly TheIdleLineSaid[],
   unreadableAt: number | null,
   idleTime: () => number,
 ): boolean {
@@ -856,8 +932,10 @@ function theIdleReminderIsDue(
   // one written before it, and reading it as after can only under-remind — the spell is taken as
   // already reminded — never repeat, which is the direction the person's step 3 chooses. The reverse reading
   // would re-send a reminder whenever activity and tick shared a second.
-  for (const at of idleLinesSaidTo(agent.id)) {
-    const written = inMs(at)
+  // A LINE'S STAMP IS READ WITH THE MOMENT KEPT BESIDE IT, by the one rule each activity is read by: the moment only when
+  // it names the stamp.
+  for (const said of idleLinesSaidTo(agent.id)) {
+    const written = momentOfAStampAndItsInstant(said.at, said.instant, inMs)
     if (written !== null && written >= newest) return false
   }
   return true
@@ -903,6 +981,10 @@ function theStartersOfARunningRun(identityOf: TheIdentityOf): ReadonlySet<string
  * for `ONE_LONG_RUN_LINE_EVERY`, and the next line names every run that became due in that time and still says running.
  * Each run is named once. The lines are the memory of both: a line names its runs in `extra.longRuns`, and the wait counts
  * from the newest line's own stamp (`theLongRunLinesSaid`).
+ *
+ * A RUN ITS STARTER HAS CLOSED IS NOT NAMED. Closing a run stores when and why it ended and leaves its work state as it
+ * was, so a closed run can still say running. The step reads a run as open the way `listAttachments` in attachments.ts
+ * does in SQL: no `closedAt` is stored.
  */
 function sendTheLongSandboxRunRemindersThatAreDue(now: Date): string[] {
   const at = now.getTime()
@@ -911,7 +993,7 @@ function sendTheLongSandboxRunRemindersThatAreDue(now: Date): string[] {
     .select({ id: records.id, workspaceId: records.workspaceId, createdAt: records.createdAt, data: records.data })
     .from(records)
     // THROUGH THE INDEX OF RUNNING RUNS (`STORED_FIELDS.sessionIsRunning`), so the few running rows are read and not every one.
-    .where(and(eq(records.kind, 'session'), isNull(records.deletedAt), sql`${STORED_FIELDS.sessionIsRunning(records.data)} = 1`, sql`json_extract(${records.data}, '$.sandbox') IS NOT NULL`))
+    .where(and(eq(records.kind, 'session'), isNull(records.deletedAt), sql`${STORED_FIELDS.sessionIsRunning(records.data)} = 1`, sql`json_extract(${records.data}, '$.sandbox') IS NOT NULL`, sql`json_extract(${records.data}, '$.closedAt') IS NULL`))
     .all()
     .map((run) => ({ ...run, filed: inMs(run.createdAt) }))
     .filter((run): run is typeof run & { filed: number } => run.filed !== null && run.filed <= dueBy)
@@ -1087,6 +1169,10 @@ export interface RemindersPass {
   sandboxContainerRowsClosed: string[]
   /** Runs whose sandbox container could not be checked, with each reason. */
   sandboxContainerProblems: string[]
+  /** Runs closed after their sandbox launcher's process group ended, across every project. */
+  sandboxLauncherRowsClosed: string[]
+  /** Runs whose sandbox launcher could not be read, with each reason. */
+  sandboxLauncherProblems: string[]
   /** Secretaries reminded before their broadcast slot. */
   broadcastsReminded: string[]
   /** Secretaries told once that their broadcasts are paused by the unanswered rule. */
@@ -1283,6 +1369,8 @@ function theStepsOfAPass(
     directoryGoneRowsClosed: [],
     sandboxContainerRowsClosed: [],
     sandboxContainerProblems: [],
+    sandboxLauncherRowsClosed: [],
+    sandboxLauncherProblems: [],
     broadcastsReminded: [],
     broadcastsPaused: [],
     broadcastsWithNoReport: [],
@@ -1316,8 +1404,8 @@ function theStepsOfAPass(
     // THE IDLE LINES ALREADY SAID, read once for every agent and only when an agent first needs them.
     // A line this loop writes goes to one agent, and that agent has already been judged, so the one
     // reading answers every later agent exactly as a fresh reading would.
-    let idleLinesSaid: Map<string, string[]> | null = null
-    const idleLinesSaidTo = (agentId: string): readonly string[] => {
+    let idleLinesSaid: Map<string, TheIdleLineSaid[]> | null = null
+    const idleLinesSaidTo = (agentId: string): readonly TheIdleLineSaid[] => {
       idleLinesSaid ??= officeLinesSaidToEachAgent(SYSTEM_LINES.youHaveBeenIdle('').line, since)
       return idleLinesSaid.get(agentId) ?? []
     }
@@ -1496,7 +1584,7 @@ function theStepsOfAPass(
     )
   })
   // Read the sandbox first, so its observed stop is recorded before another closer finds only a missing process or directory.
-  // A RUN FILED BETWEEN THIS STEP AND THE TWO CLOSERS AFTER IT is not among the ids they are given, so they read it at
+  // A RUN FILED BETWEEN THIS STEP AND THE CLOSERS AFTER IT is not among the ids they are given, so they read it at
   // the next pass.
   const stillGoingIdsByProject = new Map<string, string[]>()
   theSteps.push(() => step('the sandbox containers', () => {
@@ -1508,6 +1596,21 @@ function theStepsOfAPass(
       const closed = closeTheRunsWhoseSandboxContainerStopped({ workspaceId: project.id, now, actor: theOffice(), readContainer, sessionIds })
       report.sandboxContainerRowsClosed.push(...closed.closed)
       report.sandboxContainerProblems.push(...closed.problems)
+    }
+  }))
+  /**
+   * AND THE SANDBOX RUNS WHOSE LAUNCHER'S PROCESS GROUP HAS ENDED, IN EVERY PROJECT. A sandbox container outlives
+   * the run working in it, so the container closer alone leaves a run saying it is going after its command ended.
+   * A run whose launcher still lives, whose liveness cannot be read, or which is another computer's run is left as
+   * it is; the second is named in the report.
+   */
+  theSteps.push(() => step('the ended sandbox launchers', () => {
+    for (const project of listWorkspaces()) {
+      const closed = closeTheSandboxRunsWhoseLauncherEnded({
+        workspaceId: project.id, now, actor: theOffice(), sessionIds: stillGoingIdsByProject.get(project.id),
+      })
+      report.sandboxLauncherRowsClosed.push(...closed.closed)
+      report.sandboxLauncherProblems.push(...closed.problems)
     }
   }))
   /**
@@ -1613,6 +1716,9 @@ export function startTheReminders(workspaceId: string, log: (line: string) => vo
       const { finishTheRoundAccountsLeftAtAStop } = await import('./how-a-round-ended.ts')
       finishTheRoundAccountsLeftAtAStop()
       log('The office looked for round accounts still waiting for git after a start.')
+      const { closeWaitingRunsWhileChecksAreOff } = await import('./close-waiting-checks-when-off.ts')
+      const checksOff = await closeWaitingRunsWhileChecksAreOff()
+      log(`The office closed ${String(checksOff.closed.length)} waiting runs and skipped ${String(checksOff.skipped.length)} at its start while checks were off: ${[...checksOff.closed, ...checksOff.skipped].map((one) => `${one.run}: ${one.why}`).join('; ') || 'none'}.`)
     } catch (err) {
       roundAccountsChecked = false
       log(`The office could not look for incomplete round accounts: ${err instanceof Error ? err.message : String(err)}`)
@@ -1653,6 +1759,12 @@ export function startTheReminders(workspaceId: string, log: (line: string) => vo
         done.sandboxContainerProblems.length === 0
           ? null
           : `sandbox containers could not be checked: ${done.sandboxContainerProblems.join('; ')}`,
+        done.sandboxLauncherRowsClosed.length === 0
+          ? null
+          : `runs marked crashed because their sandbox launcher's process group ended: ${theClosedRowsSaidForTheLog(done.sandboxLauncherRowsClosed)}`,
+        done.sandboxLauncherProblems.length === 0
+          ? null
+          : `sandbox launchers could not be read: ${done.sandboxLauncherProblems.join('; ')}`,
         done.broadcastsReminded.length === 0
           ? null
           : `a broadcast reminder to ${done.broadcastsReminded.join(', ')}`,

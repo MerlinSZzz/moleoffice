@@ -65,7 +65,6 @@ import type { Allocation } from '../src/shared/planning.ts'
 import type { PanelRecord } from '../src/shared/types.ts'
 import type { PlanGraphEdge, PlanGraphNode, PlanGraphReply } from '../src/server/api/plan-graph.ts'
 import { THE_TEST_OFFICES_OWNER } from './a-page-of-a-test-office.ts'
-import { englishWords } from '../src/shared/words/joined.ts'
 
 type PlanGraphModule = typeof import('../src/web/components/graph/PlanGraph.tsx')
 
@@ -374,9 +373,6 @@ describe('what is above the drawing', () => {
     const inspect = await boot('?mode=inspect')
     const deep = renderToStaticMarkup(h(inspect.PlanGraphView, { reply: reply() }))
     expect(deep, 'the paragraph became unreachable rather than moving').toContain('THE SERVER PARAGRAPH')
-    // THE WORDS SAY WHAT THIS DRAWING DOES: it stores no card's place, so every place is worked out
-    // on every draw.
-    expect(deep).toContain(englishWords()['g8.graph.layoutDerivedExceptWhereSomebodyMovedACard'])
   })
 
   it('says the period once, not three times, and says what is on the plane rather than what it read', async () => {
@@ -408,16 +404,15 @@ describe('what is above the drawing', () => {
     expect(deep.slice(deep.indexOf('pg-where'), deep.indexOf('pg-switch'))).toContain('2026-W33')
   })
 
-  it('gives the key a line sample for every family, which is the one thing it never covered', async () => {
+  it('draws a line for every family in the key, with its name', async () => {
     const pg = await boot()
     const { LINK_FAMILIES, LINE_FAMILY_STYLE } = await import('../src/web/components/graph/lines.ts')
     const markup = renderToStaticMarkup(h(pg.Legend))
     for (const family of LINK_FAMILIES) {
       const style = LINE_FAMILY_STYLE[family]
+      // CRITERION CHANGE, as decided: the key no longer says what a line means, in a tooltip or
+      // anywhere else. It names the line and draws it.
       expect(markup, `the key has no sample for "${style.label}"`).toContain(style.label)
-      // What the line MEANS is the entry's own tooltip. It is still here; it is no longer a clause
-      // set beside the name in the space a reader is trying to read the drawing in.
-      expect(markup, `the key dropped what "${style.label}" means`).toContain(style.note)
       // DRAWN, NOT DESCRIBED: a real stroke in this family's own drawing, not a word for it.
       expect(markup, `"${style.label}" is named in the key and not drawn in it`).toContain(
         `data-family="${family}"`,
@@ -442,17 +437,18 @@ describe('what is above the drawing', () => {
    * THE OWNER'S FIRST NOTE ON THIS PAGE, AS A TEST.
    *
    * *"'future direction — planned, not adopted' is bad, it is too much for a block or type
-   * description"*. A key entry names a thing. Anything longer is an explanation, and an explanation
-   * belongs behind the entry rather than beside it.
+   * description"*. A key entry names a thing. Anything longer is an explanation, and the key draws
+   * none.
    *
    * The measure is deliberately crude and deliberately strict: at most two words of visible text
    * per entry, and no dash joining two clauses. The old key fails on both counts, five times.
    */
-  it('gives every key entry a name of one or two words, and puts the meaning in its tooltip', async () => {
+  it('gives every key entry a name of one or two words, and no tooltip', async () => {
     const pg = await boot()
     const { LINK_FAMILIES } = await import('../src/web/components/graph/lines.ts')
     const markup = renderToStaticMarkup(h(pg.Legend))
-    const entries = [...markup.matchAll(/<li[^>]*>(.*?)<\/li>/gs)].map((found) =>
+    const items = [...markup.matchAll(/<li[^>]*>(.*?)<\/li>/gs)]
+    const entries = items.map((found) =>
       (found[1] ?? '')
         .replace(/<svg.*?<\/svg>/gs, '')
         .replace(/<[^>]+>/g, ' ')
@@ -476,12 +472,11 @@ describe('what is above the drawing', () => {
       expect(words.length, `"${entry}" is longer than two words`).toBeLessThanOrEqual(2)
       expect(words.length, `"${entry}" has no name at all`).toBeGreaterThan(0)
     }
-    // NOTHING WAS DELETED. Every entry carries its explanation in a tooltip a press or a hover
-    // away — ONE PER ENTRY, which is the claim, so it is counted against the entries themselves
-    // rather than against a number typed here.
-    expect([...markup.matchAll(/title="/g)], 'an entry in the key explains itself nowhere').toHaveLength(
-      entries.length,
-    )
+    // CRITERION CHANGE, as decided: the explanations behind the entries are gone, so no entry of the
+    // key, and nothing inside one, carries a title.
+    for (const [at, item] of items.entries()) {
+      expect(item[0], `the key entry "${entries[at]}" carries a tooltip`).not.toContain('title=')
+    }
   })
 
   /**
@@ -506,16 +501,17 @@ describe('what is above the drawing', () => {
     }
   })
 
-  it('keeps what is left out as a count in first-glance space, with the reasons one press away', async () => {
+  it('keeps what is left out as a count in first-glance space, with each kind listed under it', async () => {
     // USER.md's fifth invariant outranks the density test: a number that could not count everything
     // still says so. The audit asked for this list to move to Inspect; the COUNT stays.
     const pg = await boot()
     const markup = renderToStaticMarkup(h(pg.PlanGraphView, { reply: reply() }))
     expect(markup).toContain('139')
     expect(markup).toContain('records in this project are not on this drawing')
-    expect(markup).toContain('what is left out and why')
-    // The reasons themselves are behind the fold, not deleted.
-    expect(markup).toContain('A session is not one of the kinds this drawing calls work.')
+    expect(markup).toContain('session records beside something drawn here')
+    expect(markup).toContain('other records in')
+    // The server's reasons are drawn in developer mode only.
+    expect(markup).not.toContain('A session is not one of the kinds this drawing calls work.')
   })
 })
 
@@ -539,7 +535,7 @@ describe('a list is drawn as a list', () => {
     // so a browser had nothing to number, and each reason ran into the next.
     expect(markup, 'the reasons are still an unmarked list').toContain('<ol class="pg-omitted">')
     expect(markup).toContain('pg-omitted-what')
-    expect(markup).toContain('pg-omitted-why')
+    expect(markup).toContain('A session is not one of the kinds this drawing calls work.')
     // And what is in it is one item per reason, each with its own words.
     const list = /<ol class="pg-omitted">([\s\S]*?)<\/ol>/.exec(markup)
     expect(list, 'the numbered list of reasons is never closed').not.toBeNull()

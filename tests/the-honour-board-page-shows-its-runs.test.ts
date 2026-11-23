@@ -7,12 +7,16 @@
  * WHAT IS PROVED, in a test office with a made-up project and made-up runs
  * ---------------------------------------------------------------------------------------
  *
- *   1. The rail's Agents group opens `#/honour-board`. Under the heading, one line says what the reading
- *      read and how long it took, with the same record count the door gives, and one line says the threshold.
+ *   1. The rail's Agents group opens `#/honour-board`. Under the heading, one line draws how many records the
+ *      reading read and how long it took, with the same record count the door gives. No threshold line is drawn.
  *   2. The exemplary runs stand newest first, each with its agent, the model it started with, its signals
- *      with their evidence as links, its conditions or the words that none were recorded, and its brief.
+ *      with their evidence as links, its conditions or "not recorded", and its brief.
  *   3. The noted runs are folded. A closed fold holds no run; opened, it shows them.
- *   4. The weekly table has one line for each model and temperature band, and says what it counts by.
+ *   4. The weekly table has one line for each model and temperature band, and no line above it on what it counts by.
+ *
+ * Before, the page drew a sentence on what the reading did not do, a sentence on what the threshold means, a sentence
+ * on what the table counts by, and a sentence when no conditions were recorded. It draws the figures and a short state
+ * word now, as decided, and this file reads each word from its key.
  *
  * Pictures are taken only when TEST_SHOTS names a folder: four widths, both themes, with the fold open.
  *
@@ -22,6 +26,7 @@
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
+import { sayInEnglish } from '../src/shared/i18n.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { liveApp, thePersonsKeyHeader, waitForThePage, type LiveApp } from './helpers.ts'
 import { waitForTheProjects } from './switch-the-project.ts'
@@ -93,15 +98,15 @@ async function open(width = 1440, theme = 'light'): Promise<void> {
 }
 
 describe('the honour board page', () => {
-  it('is a row of the Agents group, and says under its heading what the reading read and the threshold', async () => {
+  it('is a row of the Agents group, and draws under its heading how many records the reading read, and no threshold line', async () => {
     await open()
     const page = app.page
     expect(await page.locator('h1.hb-title').textContent()).toBe('Honour board')
-    const cost = (await page.locator('.hb-cost').textContent()) ?? ''
-    expect(cost).toMatch(/^Read \d+ records in \d+ ms\. No session was opened and no model was asked\.$/)
+    const [records, ms] = ((await page.locator('.hb-cost').getAttribute('data-honour-cost')) ?? '').split(' ').map(Number)
+    expect(await page.locator('.hb-cost').textContent()).toBe(sayInEnglish('honourBoardPage.readCost', { records: records!, ms: ms! }))
     const door = await call('GET', '/api/honour-board?standing=exemplary')
-    expect(Number(/^Read (\d+)/.exec(cost)![1])).toBe(door.cost.records)
-    expect(await page.locator('.hb-threshold').textContent()).toBe('A run that earned 2 or more of the five signals is exemplary. A run that earned one is noted.')
+    expect(records).toBe(door.cost.records)
+    expect(await page.locator('.hb-threshold').count()).toBe(0)
     // Test change (wave 13y round 165): the Agents group's rows are listed on All pages now.
     await page.evaluate(() => { location.hash = '#/all-pages' })
     await page.locator('#main .ap-group[data-group="agents"]').waitFor({ timeout: 30_000 })
@@ -117,7 +122,7 @@ describe('the honour board page', () => {
     expect(await newest.locator('.hb-facts dd').first().textContent()).toBe('Example worker (made up)')
     expect(await newest.locator('.hb-signal-name').allTextContents()).toEqual(['Corrected its brief', 'Found a real defect outside its brief', 'Needed no rework'])
     expect(await newest.locator('a.hb-evidence-link').first().getAttribute('href')).toContain('EXAMPLE-EVIDENCE-3')
-    expect(await newest.locator('.hb-absent').first().textContent()).toBe('nobody recorded the conditions of this run')
+    expect(await newest.locator('.hb-absent').first().textContent()).toBe(sayInEnglish('g6a.common.notRecorded'))
     expect(await newest.locator(`a[href*="${brief}"]`).count()).toBe(1)
     const older = exemplary.nth(1)
     expect(await older.locator('.hb-conditions').textContent()).toContain('Model served: not reported')
@@ -136,12 +141,10 @@ describe('the honour board page', () => {
     expect(await fold.locator('.hb-row').evaluateAll((all) => all.map((one) => one.getAttribute('data-honour-run')))).toEqual([runs['N2'], runs['N1']])
   })
 
-  it('counts the signals by the model each run was started with, in one table, and says so', async () => {
+  it('counts the signals by the model each run was started with, in one table', async () => {
     await open()
     const page = app.page
-    expect(await page.locator('.hb-counts-by').textContent()).toBe(
-      'Counted by the model each run was started with. The model the provider served is on 0 of 4 runs read, and a temperature is reported on 0 of 4.',
-    )
+    expect(await page.locator('.hb-counts-by').count()).toBe(0)
     const lines = await page.locator('.hb-table tbody tr').evaluateAll((all) => all.map((row) => [...row.children].map((cell) => cell.textContent)))
     expect(lines).toEqual([
       ['example-model-a', 'not reported', '2', '3', '1', '1', '2', '3', '1', '1'],

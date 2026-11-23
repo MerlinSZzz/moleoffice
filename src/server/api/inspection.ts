@@ -1,5 +1,6 @@
 // Copyright © 2026 Zhengyang Shen
 // Licensed under the MIT License. See LICENSE.
+import { inspectorAnswersRun } from '../lib/inspector-answers-lines.ts'
 import { legacyUnsealedInventory, readRunSeal } from '../lib/sealed-tip.ts'
 /**
  * THE CHECK, OVER HTTP.
@@ -95,7 +96,7 @@ import {
   type HowASealIsRead,
 } from '../lib/inspection.ts'
 import {
-  ONLY_THE_INSPECTOR_JUDGES_PACKAGES, assertTheInspectorOfTheRun, checkThePackage, thePackagesThisRunHandedBack, thePointsThatDoNotHold,
+  ONLY_THE_INSPECTOR_JUDGES_PACKAGES, answerTheInspectedPackage, assertTheInspectorOfTheRun, checkThePackage, thePackagesThisRunHandedBack, thePointsThatDoNotHold,
   theVerdictsPackagesLack, whatAVerdictsPackagesLack, type AVerdictsPackage,
 } from '../lib/delegation.ts'
 import { aCheckOfHandedBackPackages, onlyThePointsAreListed, theListedFaultsWith } from '../../config/verdict-kinds.mjs'
@@ -521,18 +522,20 @@ const theHandLanding = z
       .trim()
       .min(1, { error: 'recording a hand-landing says why, in one sentence.' })
       .max(600),
+    repository: z.string().trim().min(1).max(200).optional(),
   })
   .strict()
 
 const LANDED_BY_HAND_NOTE =
   'RECORD THAT A RELEASED RUN\'S CONTENT REACHED MAIN BY HAND, NOT THROUGH THE MERGE QUEUE. ' +
-  'Body {"commit":"<the commit on main>","because":"<one sentence>"}. Only the person, or ' +
+  'Body {"commit":"<the commit on main>","because":"<one sentence>","repository":"<id or name, only as below>"}. Only the person, or ' +
   'whoever holds the secretary card. The office checks, before writing anything: the run was released and confirmed ' +
   'and has no hand-landing yet; no merge entry of it merged or is still in the queue, and its entries name one git ' +
   'lane; the commit is in that lane\'s checkout and main (its HEAD) holds it; and git finds each of the run\'s ' +
   'commits in it, by the superseded door\'s proofs (ancestor, the same patches, the same changed lines). Then it ' +
   'writes theCheck.landedByHand and nothing else, and the run\'s sentence says where its content went. It adds no ' +
-  'standing. 403 for any other caller, 409 naming what is wrong, and nothing is written.'
+  'standing. The body may name a registered repository by id or name only when the run was never submitted as a git entry and the project has more than one registered repository with a checkout, and is refused anywhere else. ' +
+  '403 for any other caller, 409 naming what is wrong, and nothing is written.'
 
 const SUPERSEDE_NOTE =
   'CLOSE A RUN AS SUPERSEDED BY A LATER RUN: one on the same branch, or one that was checked and merged and ' +
@@ -788,6 +791,7 @@ export async function inspectionRoutes(app: FastifyInstance): Promise<void> {
       // sentence saying which of the two that is.
       whatTheCheckWouldRead: whatItWouldRead,
       whatTheCheckWouldReadSays: whatItWouldRead?.says ?? NOBODY_HAS_ASSEMBLED_ONE,
+      readingOnly: reads.readingOnly,
       workspaceId,
     }
   })
@@ -906,7 +910,7 @@ export async function inspectionRoutes(app: FastifyInstance): Promise<void> {
     const workspaceId = workspaceOf(req)
     const asked = parse(whichRun, req.params, 'The run whose content reached main by hand')
     const body = parse(theHandLanding, req.body, 'The commit and why')
-    const written = recordAHandLanding({ runId: asked.run, workspaceId, commit: body.commit, because: body.because, actor: actorFrom(req) })
+    const written = recordAHandLanding({ runId: asked.run, workspaceId, commit: body.commit, because: body.because, repository: body.repository, actor: actorFrom(req) })
     void reply.code(201)
     return { ...written, workspaceId }
   })
@@ -941,6 +945,7 @@ export async function inspectionRoutes(app: FastifyInstance): Promise<void> {
     const parts = thePartsOf(req, 'check.answer')
     const workspaceId = workspaceOf(req)
     const asked = parse(whichRun, req.params, 'The run to answer about')
+    let theVerdictTransactionFailed = false
     // BEFORE ANYTHING ABOUT THE RUN IS READ: a verdict comes with a key (A_VERDICT above).
     refuseAnActWithNoKey(req, A_VERDICT)
     // A REFUSAL FROM HERE ON IS A CHECK WHOSE ANSWER THE DOOR WOULD NOT TAKE, and it goes on the run's flow run
@@ -949,7 +954,7 @@ export async function inspectionRoutes(app: FastifyInstance): Promise<void> {
     try {
       return await answerTheCheck()
     } catch (error) {
-      if (!(error instanceof PanelError) || error.status < 400 || error.status >= 500 || error.status === 404) throw error
+      if (theVerdictTransactionFailed || !(error instanceof PanelError) || error.status < 400 || error.status >= 500 || error.status === 404) throw error
       const recorded = parts.part('the refusal recorded on the flow run', () => recordAVerdictRefused(
         asked.run,
         actorFrom(req),
@@ -972,17 +977,25 @@ export async function inspectionRoutes(app: FastifyInstance): Promise<void> {
       if (body.verdict === 'released' && body.decisions?.some((one) => !one.holds || !one.authorityFits)) {
         throw new PanelError('A release cannot include a decision that does not hold or whose authority does not fit. Nothing was written.', 400)
       }
-      const actor = actorFrom(req)
+      const readingOnly = inspectorAnswersRun(asked.run, workspaceId)
+      const actor = readingOnly ? actorFrom(req, { proveOwnRun: true }) : actorFrom(req)
+      if (readingOnly && (actor.ownKeyRun === undefined || actor.ownKeyRun !== actor.sessionId)) {
+        throw new PanelError('The inspector must send this verdict with the check run’s own key. Nothing was written.', 403)
+      }
       // THE SEAL IS READ ONCE, ON A THREAD OF ITS OWN, from its sealed commit, and used here and in `releaseOrRefuse`,
       // which each read it before (the-seal-read-apart.ts). The refusals are asked again after it, because a request
       // answered meanwhile may have changed what they read.
       const how: HowASealIsRead = { theSealFromItsCommit: true }
       const readApart = await parts.waited('the seal read on its own thread', () => theSealReadApart(asked.run, theWayASealIsVerified(how)))
       parts.part('the refusals again after the seal was read', theRefusals)
+      if (readingOnly !== inspectorAnswersRun(asked.run, workspaceId)) {
+        throw new PanelError('The hand-back or line setting changed while the check was being read. Read the check again. Nothing was written.', 409)
+      }
       // ONE AND TWO, AND THE RUN IS ONE A VERDICT CAN END: the refusals the eligibility door already gave
       // before the check started, asked again now that the verdict has come. The seal is read from its sealed commit
       // here and in `releaseOrRefuse`, because the next round may have moved the run's folder on during the check.
       const { me, inspector, isTheInspector, theChecker } = parts.part('who answers the check', () => whoAnswersTheCheck(asked.run, workspaceId, actor, { ...how, readApart }))
+      if (readingOnly && !isTheInspector) throw new PanelError('This hand-back needs its inspector’s judgement. Nothing was written.', 403)
 
       // THREE. A REFUSAL IS THE INSPECTOR'S ACT. A starter that is not satisfied does not release and
       // says so to its own agent; it does not need a group holding itself twice. The refusal, the
@@ -1036,7 +1049,7 @@ export async function inspectionRoutes(app: FastifyInstance): Promise<void> {
       if (!isTheInspector || inspector === null) {
         if (body.packages !== undefined) throw new PanelError(ONLY_THE_INSPECTOR_JUDGES_PACKAGES, 400)
       } else {
-        const waiting = thePackagesThisRunHandedBack(asked.run, workspaceId)
+        const waiting = thePackagesThisRunHandedBack(asked.run, workspaceId, readingOnly)
         ofPackages = aCheckOfHandedBackPackages(waiting)
         const given = body.packages ?? []
         if (waiting.packages.length > 0 || given.length > 0) {
@@ -1059,7 +1072,8 @@ export async function inspectionRoutes(app: FastifyInstance): Promise<void> {
 
       // ONE TRANSACTION FOR THE VERDICT AND EACH PACKAGE'S CHECK, so neither is kept without the other. The verdict is
       // written first: the release reads what the inspector changed after the assembly, and a package's check is not that.
-      const checked = parts.part('the release or the refusal', () => sqlite.transaction(() => {
+      const checked = parts.part('the release or the refusal', () => {
+        try { return sqlite.transaction(() => {
         const written = releaseOrRefuse({
           runId: asked.run,
           workspaceId,
@@ -1086,9 +1100,16 @@ export async function inspectionRoutes(app: FastifyInstance): Promise<void> {
             ...(listing.listed === undefined ? {} : { listed: listing.listed }),
           },
         })
-        for (const one of theirPackages?.given ?? []) checkThePackage({ taskId: one.task, workspaceId, actor, points: one.points })
+        for (const one of theirPackages?.given ?? []) {
+          checkThePackage({ taskId: one.task, workspaceId, actor, points: one.points })
+          if (readingOnly) answerTheInspectedPackage({ taskId: one.task, workspaceId, actor, run: asked.run })
+        }
         return written
-      })())
+        })() } catch (error) {
+          if (readingOnly) theVerdictTransactionFailed = true
+          throw error
+        }
+      })
       // THE MERGE QUEUE HEARS THE VERDICT. Sandbox v1, piece P7: an entry pinned on this run's seal is
       // judged by a release and bounced by a refusal, and an entry waiting on a scoped check of this
       // run goes on to testing or bounces. It is asked here, after the verdict is on the run, because
@@ -1144,6 +1165,7 @@ export async function inspectionRoutes(app: FastifyInstance): Promise<void> {
     const ordinary = (why: string): never => {
       throw new PanelError(`${why} Nothing was written.`, 409)
     }
+    if (inspectorAnswersRun(asked.run, workspaceId)) ordinary('This hand-back needs a reading-only check, so it goes the ordinary way.')
     if (body.read.only !== undefined || body.read.needsJudgment !== undefined) {
       ordinary('A standard release reads the whole seal, and this one names scoped paths or paths to judge, so it goes the ordinary way.')
     }

@@ -5,8 +5,8 @@
  *
  * Round 136 made two settings: which secretary takes the usage notices of the sandboxes' Claude login, and what the
  * notice at 80% of its seven days says to do, with the usage decision those words come from. They could be read and set
- * only through their doors. This panel puts them on the Settings page, one row each. Each row says what is set now and
- * why, and the person changes it with a press.
+ * only through their doors. This panel puts them on the Settings page, one row each. Each row draws what is set now in
+ * short state words, and the person changes it with a press.
  *
  * Round 140, item 79d: the person picks the usage decision with a press and never types its id. The row lists the ten
  * newest decisions of every project, newest first, each by its title and date with a press "Choose", and a press "Show
@@ -17,14 +17,15 @@
  * two different seconds, so that the first is stamped first, and made-up decisions: an older one, then one more than
  * the list shows at first, in a later second, then the one the words come from, in a second later still:
  *   1. the panel is in the Chat category straight after Module reminders, and drawn in normal mode;
- *   2. with nothing set, each row draws the sentence its door's reading says, no reason, and no change; the picker's
- *      first option is "The first secretary appointed", then the two secretaries, first appointed first;
+ *   2. with nothing set, each row draws the state words of its door's reading, no reason, and no change; the door offers
+ *      the two secretaries first appointed first; the picker's first row is "The first secretary appointed", then the
+ *      two secretaries, under the agent pickers' order of names (the agent pickers point);
  *   6. the row lists the ten newest decisions of every project, newest first, each with its title, its date and a
  *      press, as GET /api/records reads them; "Show 10 more" adds the next ten;
  *   3. a press chooses the second secretary: the row draws what the door now reads, and says who changed it;
  *   4. words with no full stop at the end, and a decision chosen from the list with a press, are set with a press: the
  *      door holds the words exactly as typed and the decision's id and title, its sentence names the title and not the
- *      id, and the row draws that sentence, with a link to the decision;
+ *      id, and the row draws the title and the words, with a link to the decision;
  *   5. "Set nothing" takes the words away: the door reads nothing set, and so does the row;
  *   7. the older decision is not in the list, and is found by a word of its title and chosen with a press: the door
  *      holds it;
@@ -60,6 +61,7 @@
 
 import { afterAll, beforeAll, expect, it } from 'vitest'
 
+import { t } from '../src/shared/i18n.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { englishWords } from '../src/shared/words/joined.ts'
 import { DECISIONS_AT_A_TIME } from '../src/web/components/UsageNotices.tsx'
@@ -119,6 +121,7 @@ interface AReading {
   inForce: Record<string, unknown>
   stored?: string | null
   says: string
+  mayBeChosen?: { id: string; handle: string; name: string }[]
 }
 
 const whoTakesThem = async (): Promise<AReading> => (await call('GET', '/api/office/usage-notice-secretary')) as unknown as AReading
@@ -179,11 +182,11 @@ async function openThePanel(width = 1440, look = 'light', language = 'en'): Prom
 
 const textOf = async (selector: string): Promise<string> => (await app.page.locator(selector).innerText()).trim()
 
-/** Waits until the row's state is the sentence the door's reading says now. */
-async function theRowSays(row: string, says: string): Promise<void> {
+/** Waits until the row's state is the state words of what the door reads now. */
+async function theRowIs(row: string, words: string): Promise<void> {
   await app.page.waitForFunction(
     ({ selector, expected }) => document.querySelector(selector)?.textContent?.trim() === expected,
-    { selector: `${row} .usn-state`, expected: says },
+    { selector: `${row} .usn-state`, expected: words },
     { timeout: 15_000 },
   )
 }
@@ -268,7 +271,7 @@ beforeAll(async () => {
   }
   expect(stamps[0]! < stamps[1]!, `the second secretary is stamped after the first: ${stamps.join(', ')}`).toBe(true)
   const aDecision = async (title: string): Promise<string> =>
-    ((await call('POST', '/api/records', { kind: 'decision', title, data: { replaces: [] } })) as { record: { id: string } }).record.id
+    ((await call('POST', '/api/records', { kind: 'decision', title, data: { governs: [{ wholeProject: true }], replaces: [] } })) as { record: { id: string } }).record.id
   older = await aDecision(OLDER_TITLE)
   await theNextSecond()
   for (let n = 1; n <= BETWEEN; n++) await aDecision(`A made-up decision, number ${String(n)}`)
@@ -298,15 +301,18 @@ it('2: with nothing set, each row draws what its door reads, no reason and no ch
   await openThePanel()
   const who = await whoTakesThem()
   expect(who.inForce['from']).toBe('the first secretary appointed')
-  expect(await textOf(`${WHO} .usn-state`)).toBe(who.says)
+  expect(await textOf(`${WHO} .usn-state`)).toBe(`${SECRETARIES[0][1]} · ${t('usageNotices.state.firstAppointed')}`)
   const what = await whatItSays()
   expect(what.inForce).toEqual({ from: 'not set' })
-  expect(await textOf(`${WHAT} .usn-state`)).toBe(what.says)
+  expect(await textOf(`${WHAT} .usn-state`)).toBe(t('settingsState.notSet'))
   for (const row of [WHO, WHAT]) {
     expect(await app.page.locator(`${row} .usn-because`).count()).toBe(0)
     expect(await textOf(`${row} .scl-line`)).toBe(en['settingsPanel.changed.none'])
   }
-  const offered = (await app.page.locator(`${WHO} select option`).allInnerTexts()).map((one) => one.trim())
+  expect(who.mayBeChosen?.map((one) => one.handle), 'the door does not offer the secretaries first appointed first').toEqual(SECRETARIES.map(([handle]) => handle))
+  // THE PICKER'S ROWS, once its search box is pressed: the choice that names nobody, then the secretaries by name.
+  await app.page.locator(WHO).getByLabel(en['usageNotices.panel.pick'], { exact: true }).click()
+  const offered = (await app.page.locator(`${WHO} .agp .agp-row .agp-name`).allInnerTexts()).map((one) => one.trim())
   expect(offered).toEqual([en['usageNotices.panel.pickNobody'], ...SECRETARIES.map(([, name]) => name)])
 }, 120_000)
 
@@ -333,13 +339,14 @@ it.skipIf(!process.env['TEST_SHOTS'])('photographs the panel with nothing set', 
 it('3: a press chooses the second secretary, and the row draws what the door now reads', async () => {
   await openThePanel()
   const second = idOf[SECRETARIES[1][0]]!
-  await app.page.locator(`${WHO} select`).selectOption(second)
+  await app.page.locator(WHO).getByLabel(en['usageNotices.panel.pick'], { exact: true }).fill(SECRETARIES[1][0])
+  await app.page.locator(`${WHO} .agp button.agp-row[data-value="${second}"]`).click()
   await app.page.locator(`${WHO} .usn-button[data-press="choose"]`).click()
   await theChangeLineNamesAChange(WHO)
   const who = await whoTakesThem()
   expect(who.stored).toBe(second)
   expect(who.inForce['from']).toBe('set here')
-  await theRowSays(WHO, who.says)
+  await theRowIs(WHO, `${SECRETARIES[1][1]} · ${t('settingsState.chosenHere')}`)
 }, 120_000)
 
 it('4: words with no full stop and a decision chosen from the list are set with a press, and the row names the decision by its title', async () => {
@@ -355,7 +362,7 @@ it('4: words with no full stop and a decision chosen from the list are set with 
   expect(what.inForce).toEqual({ from: 'set here', whatToDo: WORDS, decision, title: DECISION_TITLE })
   expect(what.says).toContain(DECISION_TITLE)
   expect(what.says).not.toContain(decision)
-  await theRowSays(WHAT, what.says)
+  await theRowIs(WHAT, t('usageNotices.state.decisionSet', { title: DECISION_TITLE, whatToDo: WORDS }))
   expect(await app.page.locator(`${WHAT} .usn-link a[href*="${decision}"]`).count()).toBe(1)
 }, 120_000)
 
@@ -369,7 +376,7 @@ it('5: "Set nothing" takes the words away, and the row draws what the door now r
   await app.page.waitForFunction((selector) => document.querySelector(selector) === null, `${WHAT} a[href*="${decision}"]`, { timeout: 15_000 })
   const what = await whatItSays()
   expect(what.inForce).toEqual({ from: 'not set' })
-  await theRowSays(WHAT, what.says)
+  await theRowIs(WHAT, t('settingsState.notSet'))
 }, 120_000)
 
 it('7: a decision older than the list is found by a word of its title and chosen with a press, and the door holds it', async () => {
@@ -384,5 +391,5 @@ it('7: a decision older than the list is found by a word of its title and chosen
   await app.page.locator(`${WHAT} .usn-link a[href*="${older}"]`).waitFor({ timeout: 15_000 })
   const what = await whatItSays()
   expect(what.inForce).toEqual({ from: 'set here', whatToDo: WORDS, decision: older, title: OLDER_TITLE })
-  await theRowSays(WHAT, what.says)
+  await theRowIs(WHAT, t('usageNotices.state.decisionSet', { title: OLDER_TITLE, whatToDo: WORDS }))
 }, 120_000)

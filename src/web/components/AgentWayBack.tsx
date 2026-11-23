@@ -84,14 +84,14 @@ export function AgentWayBack({ agentId }: { agentId: string }): React.ReactEleme
     if (run === null || way.way === 'none') {
       return (
         <>
-          <p className="al-line al-back-says">{run === null ? t('agentLive.back.noRun') : t('agentLive.back.none')}</p>
+          <p className="al-line al-back-state">{run === null ? t('agentLive.back.noRunWord') : t('agentLive.back.noneWord')}</p>
           {developer}
         </>
       )
     }
     return (
       <>
-        <p className="al-line al-back-says">{way.way === 'sandbox' ? t('agentLive.back.sandbox') : t('agentLive.back.host')}</p>
+        {way.way === 'sandbox' ? <p className="al-line al-back-state">{t('agentLive.back.inItsSandbox')}</p> : null}
         <div className="al-command">
           <code className="tm-mono">{way.command}</code>
           <Btn size="sm" onClick={() => copy(way.command)}>
@@ -152,7 +152,7 @@ export function AgentWayBack({ agentId }: { agentId: string }): React.ReactEleme
 }
 
 const AGENT_WAY_BACK_CSS = `
-.al-back-says { margin-bottom: 0.4rem; }
+.al-back-state { margin-bottom: 0.4rem; }
 .al-command { display: flex; gap: 0.5rem; align-items: flex-start; min-width: 0; margin-bottom: 0.4rem; }
 .al-command code {
   flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; word-break: break-all; padding: 0.35rem 0.5rem;

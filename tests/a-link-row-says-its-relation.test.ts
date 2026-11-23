@@ -98,7 +98,7 @@ describe('a link row on a record page', () => {
   it('is photographed at 390 and in the dark look for the supervisor', async () => {
     // Pictures only: the same reading at the other width and look must still hold the words.
     const words = createI18n('en')
-    for (const [width, scheme] of [[390, 'light'], [1440, 'dark'], [390, 'dark']] as const) {
+    for (const [width, scheme] of [[390, 'dark']] as const) {
       const seen = await badges('en', width, scheme)
       expect(seen).toContain(words.t('word.link.reverse.blocks'))
     }

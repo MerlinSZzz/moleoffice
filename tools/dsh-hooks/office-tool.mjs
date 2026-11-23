@@ -6,7 +6,8 @@
  * IcgsA-OGvbzL: messages hX_qDiISkTCp, xu5mbrN9ucmN and t_YPyiwf07YJ add Codex's MCP adapter.
  * Step 2 takes the key out of the shell of a Codex worker that starts nothing, once step 1 is proven on a real worker.
  */
-import { askTheOffice, A_REFUSED_WRITE, aWrite, OFFICE_REQUEST, THE_LONGEST_WAIT_MS, officeRequestDefinition, renderOfficeAnswer } from '../office-request.mjs'
+import { askTheOffice, answerWithFields, A_REFUSED_WRITE, aWrite, OFFICE_REQUEST, THE_LONGEST_WAIT_MS, officeRequestDefinition, renderOfficeAnswer, validateRequestFields } from '../office-request.mjs'
+import { aReportFileRead, theFileAskedFor, theRequestWithTheFile, theStoredFileCompared } from '../office-mcp.mjs'
 export { askTheOffice, whereTheRequestGoes, withoutKeys, theRunsIdentity, A_KEY_SHOWN_AS, OFFICE_REQUEST, THE_METHODS, THE_LONGEST_REPLY, THE_LONGEST_WAIT_MS } from '../office-request.mjs'
 
 /** @typedef {import('../office-request.mjs').ARequest} ARequest */
@@ -35,7 +36,18 @@ export function theOfficeRequestTool({ defineTool, fetchImpl = fetch, env = proc
       render: renderOfficeAnswer,
     },
     async execute(/** @type {ARequest} */ args, /** @type {any} */ exec) {
-      return askTheOffice({ ...args, fields: args.fields === undefined ? 'short' : args.fields }, { fetchImpl, env: withTheSessionOf(exec, env) })
+      const fromFile = theFileAskedFor(args)
+      const options = { fetchImpl, env: withTheSessionOf(exec, env) }
+      if (fromFile === null) return askTheOffice({ ...args, fields: args.fields === undefined ? 'short' : args.fields }, options)
+      const fields = validateRequestFields(args.fields === undefined ? 'short' : args.fields, args.method)
+      // THE FILE IS READ HERE FROM ITS PATH, SO ITS BYTES NEVER PASS THROUGH THE MODEL.
+      const read = await aReportFileRead(fromFile, options)
+      const answer = await askTheOffice(theRequestWithTheFile(args, read), { ...options, longestReply: Number.MAX_SAFE_INTEGER })
+      const comparison = theStoredFileCompared(answer, fromFile, read)
+      const shown = answerWithFields(answer, fields, args.method)
+      if (comparison === null) return shown
+      if (!comparison.matches) throw new Error(comparison.words)
+      return { ...shown, added: comparison.words }
     },
     finalizeContent: withTheWordsOnARefusedWrite,
   })

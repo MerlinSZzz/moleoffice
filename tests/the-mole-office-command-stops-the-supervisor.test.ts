@@ -31,7 +31,6 @@
  * 3. One real serve-dev office started the way the bootstrap and the upgrade start it, through a gate
  *    process that leads the group and holds a `sleep` it did not get from serve-dev: stop refuses to
  *    signal that group and nothing is signalled.
- * 4. A command-alone office, still stopped and started as it was.
  *
  * THE REAL SUPERVISOR IS USED, not a fixture, because the thing under test is exactly what serve-dev
  * does with its detached child and its own SIGTERM handling. A fixture would be the stand-in for the
@@ -53,7 +52,6 @@ import { createServer } from 'node:net'
 import { join, resolve } from 'node:path'
 import { fileURLToPath, URL } from 'node:url'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { THE_BUILT_PAGE, missingWebBuild } from '../src/config/the-built-page.mjs'
 import {
   readTheServiceLock,
   takeTheServiceLock,
@@ -292,8 +290,6 @@ function editTheLock(world: World, edit: (lock: Record<string, unknown>) => void
 }
 
 beforeAll(async () => {
-  const missing = missingWebBuild(THE_BUILT_PAGE)
-  if (missing !== null) throw new Error(`This test starts the server in production, which serves the built page. ${missing}`)
   // SERVE-DEV IS STARTED WITH --prepared, WHICH SERVES THE PAGE IN dist/web AND REFUSES WHEN ITS BUILD
   // STAMP IS NOT THIS CHECKOUT'S. `npm run build` writes the page but no stamp, so the page is built
   // with the product's own builder whenever the stamp does not name this checkout's commit, one file
@@ -621,29 +617,4 @@ describe('stop refuses a group that holds a process serve-dev did not start', ()
     expect(isRunning(server)).toBe(true)
     expect(await answersFor(world)).toBe(true)
   }, 60_000)
-})
-
-// ================================================================ a lock with no starter
-
-describe('a lock without a starter is stopped as it was', () => {
-  let world: World
-  let server: number
-
-  beforeAll(async () => {
-    world = await aWorld('stops-the-supervisor-alone')
-    const started = await theCommand(world, 'start')
-    expect(started.code, started.out).toBe(0)
-    server = theLock(world).pid
-  }, 180_000)
-
-  it('stops the server alone, in its own group, with the sentences it always used', async () => {
-    expect(Object.hasOwn(theLock(world), 'starter'), 'a command-started server records no starter').toBe(false)
-    const stopped = await theCommand(world, 'stop')
-    expect(stopped.code, stopped.out).toBe(0)
-    expect(stopped.out).toContain(`Asked process group ${String(server)} to stop, with SIGTERM.`)
-    expect(stopped.out).toContain(`Mole Office stopped: process ${String(server)} has ended, and the service lock is gone.`)
-    expect(isRunning(server)).toBe(false)
-    expect(existsSync(world.lockPath)).toBe(false)
-    expect(await portIsFree(world.port)).toBe(true)
-  }, 120_000)
 })

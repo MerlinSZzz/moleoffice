@@ -9,7 +9,7 @@
  */
 
 import { sqlite } from './client.ts'
-import type { SessionRunRow } from '../lib/elevation.ts'
+import type { SessionRunRow } from './types/elevation.ts'
 
 /**
  * WHICH RUN A WRITE CAME OUT OF, when the office started that run for an agent, or null.

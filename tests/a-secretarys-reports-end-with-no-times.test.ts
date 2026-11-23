@@ -21,7 +21,7 @@
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { FastifyInstance } from 'fastify'
-import { apiApp, freshDb, type TestDb } from './helpers.ts'
+import { apiApp, freshDb, type TestDb, governsTheWholeProject } from './helpers.ts'
 import { localStamp, parseStoredStamp } from '../src/shared/time.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { readStoredWord } from '../src/shared/i18n.ts'
@@ -137,7 +137,8 @@ beforeAll(async () => {
     data: { body: 'A made-up template for this test.' },
     actor: { type: 'human', id: THE_PERSON },
   }).id
-  const made = await post('/api/records', { kind: 'decision', title: 'Made-up: these reports stop', data: { option_taken: 'Made-up: stop them', because: 'A made-up reason.', replaces: [] } })
+  const made = await post('/api/records', { kind: 'decision', title: 'Made-up: these reports stop', data: { option_taken: 'Made-up: stop them', because: 'A made-up reason.',
+    ...governsTheWholeProject(), replaces: [] } })
   expect(made.code, JSON.stringify(made.said).slice(0, 300)).toBe(201)
   decision = (made.said as { record: { id: string } }).record.id
   leftAloneBefore = broadcast.theBroadcastScheduleOf(idOf[LEFT]!)

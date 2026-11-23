@@ -27,7 +27,7 @@
  * 5. A person may inject without limit.
  * 6. The person can switch injecting off for every agent, on the Settings page (criterion M91), and
  *    a refused inject says which of the two refusals it met. The agent's profile says whether agents
- *    may inject and where the switch is, and carries no press of its own.
+ *    may inject and links to the switch, and carries no press of its own.
  *
  * ---------------------------------------------------------------------------------------
  * MUTATION, RUN AT THE MERGE COMMIT 300ea432 ON 8 SEPTEMBER 2026
@@ -326,7 +326,7 @@ describe('the person can switch injecting off for every agent', () => {
     expect(fine.status, fine.said).toBe(201)
   })
 
-  it('draws the state and where the switch is on the profile page, and no press', async () => {
+  it('draws the state and a link to the switch on the profile page, and no press', async () => {
     await app.page.goto(`${app.site}/#/who/agent/${shouter}`, { timeout: 60_000 })
     await waitForThePage(app.page, 60_000)
     await app.page.waitForSelector('.inject-state', { timeout: 30_000 })
@@ -334,8 +334,8 @@ describe('the person can switch injecting off for every agent', () => {
     // THE PANEL IS FOUND BY THE MARK IT DECLARES, which is `data-target` and carries the surface
     // id: that is the one spelling of a key in this product, and the same string a comment on the
     // panel would carry.
-    const panel = await app.page.$eval('[data-target*="profile.inject"]', (el) => el.textContent ?? '')
-    expect(panel).toContain(INJECT_WORDS.whereItIsSet)
+    const goes = await app.page.$eval('[data-target*="profile.inject"] a', (el) => el.getAttribute('href') ?? '')
+    expect(goes).toContain('settings')
     expect(await app.page.$$('[data-target*="profile.inject"] button')).toHaveLength(0)
     expect(await app.page.$$('[data-target*="profile.inject"] [role="switch"]')).toHaveLength(0)
   }, 120_000)

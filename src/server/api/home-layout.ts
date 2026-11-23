@@ -31,9 +31,10 @@ export async function homeLayoutRoutes(app: FastifyInstance): Promise<void> {
     const problems = problemsWithTheHomeLayout(parsed.data.layout)
     if (problems.length > 0) refuse(problems.join(' '))
     const sent = parsed.data.layout as HomeLayout
-    const layout: HomeLayout = { band: [...sent.band], first: [...sent.first], second: [...sent.second] }
+    const layout: HomeLayout = { band: [...sent.band], first: [...sent.first], second: [...sent.second], hidden: [...sent.hidden], project: sent.project }
     const row = theKeptHomeLayoutRow(actor.id), before = theLayoutInTheRow(row)
-    if (before.kept === 'kept' && JSON.stringify(before.layout) === JSON.stringify(layout)) return { layout, written: false }
+    // A ROW READ IN FROM AN OLDER SHAPE IS WRITTEN AGAIN, even when it draws the same, so the row holds today's shape.
+    if (before.kept === 'kept' && before.filledIn.length === 0 && JSON.stringify(before.layout) === JSON.stringify(layout)) return { layout, written: false }
     const name = homeLayoutSettingName(actor.id)
     // A row Home could not read is written down whole, so the write loses nothing of it.
     const was = { layout: before.layout, kept: before.kept, ...(before.kept === 'unreadable' ? { unreadableRow: row } : {}) }

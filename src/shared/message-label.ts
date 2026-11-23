@@ -18,8 +18,12 @@
  * when it is read: the list may have changed since, and the message keeps the label it was sent with.
  */
 
-/** The colours a label may have, in the order the page offers them. Each is drawn in a colour of the theme. */
-export const LABEL_COLOURS = ['grey', 'red', 'amber', 'green', 'blue', 'purple'] as const
+/**
+ * The colours a label may have, in the order the page offers them. The first six are each drawn in a colour of the
+ * theme. Pink, light blue, orange and forest green are the colours the shipped flags are drawn in, and a person's own
+ * label may take them too. Forest green is a colour of its own beside green, so the fourth shipped flag has one.
+ */
+export const LABEL_COLOURS = ['grey', 'red', 'amber', 'green', 'blue', 'purple', 'pink', 'light-blue', 'orange', 'forest-green'] as const
 export type LabelColour = (typeof LABEL_COLOURS)[number]
 
 /** The longest word a label may have, in characters. A label is drawn on the flag beside Send, where room is short. */

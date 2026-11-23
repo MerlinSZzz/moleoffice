@@ -3,7 +3,7 @@
 /**
  * A PERSON KEEPS THEIR OWN SETTINGS FOR EVERY FLAG (wave 14d, DB-3).
  *
- * The two flags the office ships and the menu's 'No mark' entry are one kind of thing with the person's own flags:
+ * The four flags the office ships and the menu's 'No mark' entry are one kind of thing with the person's own flags:
  * each has a name, a description, an instruction for the agent, a short word, a flag colour and a words colour. Their
  * settings for the shipped ones are on their own row, and a thing left out is its default. An own flag's four new
  * things are beside its word and colour in `chat_labels`.
@@ -11,15 +11,16 @@
  * WHAT THIS FILE PROVES:
  *   (a) a name the person gives a shipped flag is the name the button, the menu and the bubble show.
  *   (b) the instruction the office hands over is the person's, on every hand-over that carries the message.
- *   (c) the description shows in the menu under the flag's name, and nowhere when it is not set.
+ *   (c) the description shows in the menu under the flag's name: the person's own, or the office's for a shipped flag
+ *       they left as it is, and the office's is not kept as theirs. 'No mark' and an own flag with none show no line.
  *   (d) a flag's colours are drawn on the flag and its words, readable in both themes.
  *   (e) an own flag with no instruction is handed over by its word only.
  *   (f) a message with no flag is handed over byte for byte as it was before flags existed.
- *   (g) a name too long, an empty name, a two-line instruction, a colour outside the six, and an agent's write are
+ *   (g) a name too long, an empty name, a two-line instruction, a colour outside the ten, and an agent's write are
  *       each refused with nothing written.
  *   (h) an export carries the settings.
  *   (i) a message stores only its own label's word and colour; the four things are refused there.
- *   (j) the office's defaults, and a message marked none, are unchanged.
+ *   (j) the office's defaults, each shipped flag in its own colour, and a message marked none, unchanged.
  */
 
 import type { Page } from 'playwright'
@@ -34,6 +35,7 @@ import {
   type MessageLabelEntry,
 } from '../src/shared/message-label.ts'
 import { readShippedFlags, theFlagsOf, whatTheLabelAsks, whatTheMarkAsks, type StoredShippedFlags } from '../src/shared/intent-mark.ts'
+import { t } from '../src/shared/i18n.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { whyTheChangeIsRefused } from '../src/shared/why-the-change-is-refused.ts'
 import { enWave13n } from '../src/shared/words/en-wave-13n.ts'
@@ -133,12 +135,39 @@ afterAll(async () => {
 }, 60_000)
 
 describe('the person\'s flags', () => {
-  it('(j) with nothing changed, every shipped flag and No mark reads as the office always read it', () => {
+  it('(j) with nothing changed, every shipped flag and No mark reads as the office ships it', () => {
     const flags = theFlagsOf(null, null)
-    expect(flags.shipped.map((one) => one.name)).toEqual([enWave13n['message.intent.name.justAsk'], enWave13n['message.intent.name.proposalFirst']])
-    expect(flags.shipped.map((one) => one.instruction)).toEqual([enWave13n['message.intent.justAsk'], enWave13n['message.intent.proposalFirst']])
-    expect(flags.shipped.map((one) => one.shortWord)).toEqual([enWave13y['chat.intent.short.justAsk'], enWave13y['chat.intent.short.proposalFirst']])
-    expect(flags.shipped.every((one) => one.colour === 'blue' && one.wordsColour === 'blue')).toBe(true)
+    expect(flags.shipped.map((one) => one.name)).toEqual([
+      enWave13n['message.intent.name.justAsk'],
+      enWave13n['message.intent.name.proposalFirst'],
+      enWave13y['message.intent.name.align'],
+      enWave13y['message.intent.name.giveOptions'],
+    ])
+    expect(flags.shipped.map((one) => one.instruction)).toEqual([
+      enWave13n['message.intent.justAsk'],
+      enWave13n['message.intent.proposalFirst'],
+      enWave13y['message.intent.align'],
+      enWave13y['message.intent.giveOptions'],
+    ])
+    expect(flags.shipped.map((one) => one.description)).toEqual([
+      t('chat.intent.description.justAsk'),
+      t('chat.intent.description.proposalFirst'),
+      t('chat.intent.description.align'),
+      t('chat.intent.description.giveOptions'),
+    ])
+    expect(flags.noMark.description).toBeNull()
+    expect(flags.shipped.map((one) => one.shortWord)).toEqual([
+      enWave13y['chat.intent.short.justAsk'],
+      enWave13y['chat.intent.short.proposalFirst'],
+      enWave13y['chat.intent.short.align'],
+      enWave13y['chat.intent.short.giveOptions'],
+    ])
+    expect(Object.fromEntries(flags.shipped.map((one) => [one.id, [one.colour, one.wordsColour]]))).toEqual({
+      'just-ask': ['pink', 'pink'],
+      'proposal-first': ['light-blue', 'light-blue'],
+      align: ['orange', 'orange'],
+      'give-options': ['forest-green', 'forest-green'],
+    })
     expect(flags.noMark.name).toBe(enWave13n['chat.intent.name.none'])
     expect(flags.noMark.instruction).toBeNull()
   })
@@ -153,7 +182,7 @@ describe('the person\'s flags', () => {
     expect(await readParticipant()).toMatchObject({ shippedFlags: SETTINGS })
     const flags = theFlagsOf(SETTINGS, null)
     expect(flags.shipped[0]).toMatchObject({ name: 'Answer plainly', description: 'Answer only, in plain words.', shortWord: 'Plain', colour: 'purple', wordsColour: 'green' })
-    expect(flags.shipped[1]).toMatchObject({ name: 'Plan it first', description: null, colour: 'amber', wordsColour: 'red' })
+    expect(flags.shipped[1]).toMatchObject({ name: 'Plan it first', description: t('chat.intent.description.proposalFirst'), colour: 'amber', wordsColour: 'red' })
     expect(flags.noMark.name).toBe('Nothing at all')
   })
 
@@ -257,7 +286,7 @@ describe('the person\'s flags', () => {
     )
   })
 
-  it('(g) a name too long, an empty name, a two-line instruction, a colour outside the six, and an agent are refused', async () => {
+  it('(g) a name too long, an empty name, a two-line instruction, a colour outside the ten, and an agent are refused', async () => {
     // THE SENTENCE EACH REFUSAL GIVES IS READ FROM THE ONE STRICT READING, never copied here. The door adds
     // "Nothing was written." after it, so the answer must hold the reading's sentence.
     const refusalOf = (value: unknown): string => {
@@ -286,7 +315,7 @@ describe('the person\'s flags', () => {
     const twoLineWord = { 'proposal-first': { shortWord: 'One\nTwo' } }
     const shortTwoLines = await changeSaying(AS_THE_OWNER, twoLineWord)
     expect(await theError(shortTwoLines, 400)).toContain(refusalOf(twoLineWord))
-    expect((await changeSaying(AS_THE_OWNER, { 'just-ask': { colour: 'pink' } })).status).toBe(400)
+    expect((await changeSaying(AS_THE_OWNER, { 'just-ask': { colour: 'teal' } })).status).toBe(400)
     expect((await changeSaying(AS_THE_OWNER, { none: { name: 'No mark', instruction: 'Nothing' } })).status).toBe(400)
     // AN AGENT MAY NOT WRITE A PERSON'S OWN SETTINGS: the sentence is the one rule that refuses it.
     const notTheirs = whyTheChangeIsRefused('messageLink', { kind: 'person', id: THE_PERSON }, { kind: 'agent', id: 'made-up-flagger' })
@@ -325,6 +354,15 @@ describe('the person\'s flags', () => {
       expect(await row.locator('.chlab-field[data-field="description"] input').inputValue()).toBe(SETTINGS['just-ask']!.description)
       expect(await row.locator('[data-colour-for="flag"] .chlab-colour[aria-pressed="true"]').getAttribute('data-colour')).toBe(SETTINGS['just-ask']!.colour)
       expect(await row.locator('[data-colour-for="words"] .chlab-colour[aria-pressed="true"]').getAttribute('data-colour')).toBe(SETTINGS['just-ask']!.wordsColour)
+      // (c) A SHIPPED FLAG WITH NO DESCRIPTION OF THE PERSON'S shows the office's in its box, and a save keeps it as the
+      // office's: nothing is stored for it, so a later change of the office's words reaches the person.
+      const plan = page.locator('[data-settings-panel="settings.chatlabels"] .chlab-one[data-kind="shipped"][data-flag="proposal-first"]')
+      expect(await plan.locator('.chlab-field[data-field="description"] input').inputValue()).toBe(t('chat.intent.description.proposalFirst'))
+      await plan.locator('.chlab-save').click()
+      await page.locator('[data-settings-panel="settings.chatlabels"] .chlab-say').waitFor({ timeout: 15_000 })
+      const keptPlan = ((await readParticipant()).shippedFlags as StoredShippedFlags | undefined)?.['proposal-first']
+      expect(keptPlan).toMatchObject({ name: SETTINGS['proposal-first']!.name })
+      expect(keptPlan?.description).toBeUndefined()
 
       await goTo(page, '/')
       await page.evaluate(([event, key]) => window.dispatchEvent(new CustomEvent(event, { detail: key })), [OPEN_AT, participantKey({ kind: 'agent', id: agentId })] as const)
@@ -360,7 +398,7 @@ describe('the person\'s flags', () => {
       expect(await mark.textContent()).toBe('Answer plainly')
       expect(await mark.getAttribute('data-colour')).toBe(ask.colour)
 
-      // (a, c) SET BACK TO THE DEFAULT: today's name again, and the description cleared shows no line.
+      // (a, c) SET BACK TO THE DEFAULT: today's name again, and the office's description under it again.
       expect(await change(AS_THE_OWNER, { 'just-ask': {} })).toBe(200)
       await page.reload({ timeout: 60_000 })
       await waitForThePage(page, 60_000)
@@ -369,7 +407,7 @@ describe('the person\'s flags', () => {
       await page.locator('.px-menu').waitFor({ timeout: 15_000 })
       const reset = page.locator('.px-menu .px-menu-item', { hasText: enWave13n['message.intent.name.justAsk'] })
       await reset.waitFor({ timeout: 15_000 })
-      expect(await reset.locator('.px-chat-intent-line-what').count()).toBe(0)
+      expect(await reset.locator('.px-chat-intent-line-what').textContent()).toBe(t('chat.intent.description.justAsk'))
       await reset.click()
       expect(await page.locator('.px-chat-write .px-chat-intent-word').textContent()).toBe(enWave13y['chat.intent.short.justAsk'])
 
@@ -389,6 +427,8 @@ describe('the person\'s flags', () => {
       await page.locator('.px-chat-write .px-chat-intent').click()
       await page.locator('.px-menu').waitFor({ timeout: 15_000 })
       expect(await page.locator('.px-menu .px-menu-item', { hasText: 'Old own name' }).count()).toBe(0)
+      // (c) AN OWN FLAG WITH NO DESCRIPTION shows no line under its name.
+      expect(await page.locator('.px-menu .px-menu-item', { hasText: 'Own name' }).locator('.px-chat-intent-line-what').count()).toBe(0)
       await page.locator('.px-menu .px-menu-item', { hasText: 'Own name' }).click()
       expect(await page.locator('.px-chat-write .px-chat-intent-word').textContent()).toBe('Own name')
       await page.fill('.px-chat-write textarea', 'Made-up words under an own renamed flag.')

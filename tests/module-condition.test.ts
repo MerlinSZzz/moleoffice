@@ -30,6 +30,7 @@ import { createElement as h } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { MODULE_STATES } from '../src/shared/kinds.ts'
+import { t } from '../src/shared/i18n.ts'
 import type { ModulePart } from '../src/shared/types.ts'
 
 type MV = typeof import('../src/web/components/ModuleView.tsx')
@@ -140,7 +141,6 @@ describe('a module with nothing to count says so', () => {
   it('does not derive a confident condition from an empty record, on the page', () => {
     const html = render({ context: 'why it exists' })
     expect(html).toContain('nothing to work it out from')
-    expect(html).toContain('there is nothing to work a condition out from')
     // The four confident answers must be nowhere near a module with no checklist.
     for (const phrase of ['not begun', 'work under way', 'every item finished', 'something stopped short']) {
       expect(html, `an empty module was given the condition "${phrase}"`).not.toContain(phrase)
@@ -165,7 +165,10 @@ describe('the condition is named as derived, and never as stored', () => {
     expect(html).not.toContain('derived, not stored')
     expect(renderInspect(gripper)).toContain('derived, not stored')
     expect(html).toContain('worked out from the parts below')
-    expect(html).toContain('Worked out from 3 checklist items in 1 part')
+    // THE COUNTS, one for each state the items are in, read in the page's own words.
+    for (const progress of [t('g2b.progress.finished'), t('g2b.progress.stopped_short'), t('g2b.progress.in_flight')]) {
+      expect(html).toContain(t('moduleView.condition.progressCount', { n: 1, progress }))
+    }
     // "Nobody wrote this" used to be a third sentence under the arithmetic. It is carried by the
     // tag beside the phrase and by the tag's tooltip, which is where the words below come from --
     // so the page still says nobody wrote it, in one place instead of two. THE TAG IS IN DEVELOPER
@@ -188,7 +191,7 @@ describe('the condition is named as derived, and never as stored', () => {
 
   it('admits what it could not read rather than counting it silently', () => {
     const html = render({ parts: [part('Shape', ['done'])], summaryBlocks: 7 })
-    expect(html).toContain('could not be read at all')
+    expect(html).toContain(t('moduleView.condition.notCounted', { n: 1 }))
   })
 
   /**
@@ -209,12 +212,12 @@ describe('the condition is named as derived, and never as stored', () => {
       parts: [{ id: 'p1', name: 'Shape', items: [{ id: 'i1', text: 'Print it', state: 'finished' }] }],
     })
     // It was counted, as todo, which is what the arithmetic says.
-    expect(html).toContain('Worked out from 1 checklist item in 1 part: 1 not started')
+    expect(html).toContain(t('moduleView.condition.progressCount', { n: 1, progress: t('g2b.progress.not_started') }))
     // And the substitution is named at the top of the page, in the alarm panel, not swallowed.
     expect(html).toContain('drawn as &quot;todo&quot; until it is fixed')
     // So the standing panel must not also claim it reached no count.
     expect(html, 'the panel counted the item and then said it was counted in nothing').not.toContain(
-      'counted in none of the above',
+      t('moduleView.condition.notCounted', { n: 1 }),
     )
   })
 
@@ -226,29 +229,20 @@ describe('the condition is named as derived, and never as stored', () => {
       parts: [{ id: 'p1', name: 'Shape', items: [{ id: 'i1', text: 'Print it', state: 'finished' }] }],
     })
     expect(html).toContain('2 things in this record could not be read')
-    expect(html).toContain('1 thing in this record could not be read at all, so it is counted in none of the above')
+    expect(html).toContain(t('moduleView.condition.notCounted', { n: 1 }))
   })
 })
 
 // ============================================================================ the lifecycle beside it
 
 describe('the lifecycle is the other fact, and absent is an answer', () => {
-  it('says nobody wrote one, and does not pick a default', () => {
+  it('draws no state when nobody wrote one, and does not pick a default', () => {
     const html = render({ context: 'c', parts: [part('Shape', ['done'])] })
     // The long form of this -- "Nobody has written a lifecycle word for this module" -- is on the
     // state panel at the top of the same page (RecordPage.tsx, pinned in tests/record-page.test.ts).
-    // Here it is the short form under a head that already reads "written by a person".
-    expect(html).toContain('Nobody has chosen one')
-    expect(html).toContain('there is no default')
-    // The four are still on the page, named by the fold that holds them rather than printed under
-    // every module. A fold that did not name them would be hiding the vocabulary. THEY ARE NOT THE
-    // STORED SPELLINGS IN MONOSPACE any more — "posture" is a metaphor a reader has to be taught
-    // and `active`/`paused` are the database's words. Finding 19, 19 August 2026.
-    expect(html).toContain('the four you can choose')
+    // Here it is the empty-slot chip and nothing else. The stored spellings are never drawn in
+    // monospace: `active`/`paused` are the database's words. Finding 19, 19 August 2026.
     expect(html).not.toContain('posture')
-    for (const said of ['being worked on', 'put down on purpose', 'good enough for now', 'out of use']) {
-      expect(html).toContain(said)
-    }
     for (const word of MODULE_STATES) expect(html).not.toContain(`<code>${word}</code>`)
     // Not one stored-word chip on the page: the empty-slot chip is what an unwritten lifecycle
     // wears, and `active` must not appear as though somebody had chosen it.
@@ -263,9 +257,8 @@ describe('the lifecycle is the other fact, and absent is an answer', () => {
     // the contract sends to Inspect -- and the record page's stored-fields panel lists it there.
     // What must not be lost is the distinction from the counted column beside it, and that is what
     // is asserted: the stored word wears the chip every stored state word in this app wears.
-    // "you choose this", which is what "written by a person" became: the head above it now reads
-    // "Where you stand on this" rather than "Lifecycle — our posture toward this subsystem".
-    expect(html).toContain('you choose this')
+    // The head above it reads "Where you stand on this" rather than "Lifecycle — our posture toward
+    // this subsystem".
     expect(html).toContain('Where you stand on this')
     expect(html).toContain('data-progress="finished"')
     expect(html).toContain('stable')

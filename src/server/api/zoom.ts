@@ -224,6 +224,11 @@ const writeBody = z.strictObject({
     .optional(),
 })
 
+/** The create door supplies the source revision after filing the record. */
+export const createShortFormsBody = writeBody.omit({ madeFrom: true }).extend({
+  madeFrom: z.never({ error: 'On a create the office names the revision the forms were made from. Nothing was stored.' }).optional(),
+})
+
 const rowsBody = z.strictObject({
   recordIds: z
     .array(z.string().min(1, { error: 'each id is the id of one record' }), {
@@ -329,7 +334,8 @@ export async function zoomRoutes(app: FastifyInstance): Promise<void> {
       'record.short-forms-write',
       'remote',
       'Write shorter forms of one record. Body {"madeFrom":{"seq":4,"contentHash":"…"},"forms":{"label":"…",' +
-        '"gist":"…"}}. LEVELS 4, 5 AND 6 ARE WRITTEN TOGETHER, BY PART, under `forms.parts`: an array of ' +
+        '"gist":"…"}}. A record create may carry these forms in its top-level `shortForms`; the office names their source revision. ' +
+        'LEVELS 4, 5 AND 6 ARE WRITTEN TOGETHER, BY PART, under `forms.parts`: an array of ' +
         '{"id":"p-1","heading":"…","text30":"…","text120":"…","covers":["b-1","b-2"]}, one entry per part of the ' +
         'record, in the order they are drawn. WHICH BLOCKS THOSE ARE IS THE KIND\'S OWN FIELD, read off the ' +
         'declaration and never assumed: a report keeps them in `blocks` and a module in `summaryBlocks`, and ' +

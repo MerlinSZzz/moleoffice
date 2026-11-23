@@ -52,7 +52,7 @@
 import { THE_TEST_OFFICES_OWNER } from './a-page-of-a-test-office.ts'
 import type { FastifyInstance } from 'fastify'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { apiApp, freshDb, type TestDb } from './helpers.ts'
+import { apiApp, freshDb, type TestDb, governsTheWholeProject } from './helpers.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 
 let t: TestDb
@@ -310,21 +310,24 @@ describe('an agent that wrote under its handle still owns it when it comes back 
     // true names for itself after the mint and is believed for either.
     const byItsName = await post(
       '/api/records',
-      { kind: 'decision', title: 'Poll the gripper every 200 ms', data: { replaces: [], decided_by: WANDERER.handle, authority: 'a measurement', because: '37% of runs dropped the part at 2 s.' } },
+      { kind: 'decision', title: 'Poll the gripper every 200 ms', data: {
+        ...governsTheWholeProject(), replaces: [], decided_by: WANDERER.handle, authority: 'a measurement', because: '37% of runs dropped the part at 2 s.' } },
       asAgent(WANDERER.id),
     )
     expect(byItsName.code, byItsName.said).toBe(201)
 
     const byItsId = await post(
       '/api/records',
-      { kind: 'decision', title: 'Poll the wrist camera every 200 ms', data: { replaces: [], decided_by: WANDERER.id, authority: 'a measurement', because: 'The same measurement, on the camera.' } },
+      { kind: 'decision', title: 'Poll the wrist camera every 200 ms', data: {
+        ...governsTheWholeProject(), replaces: [], decided_by: WANDERER.id, authority: 'a measurement', because: 'The same measurement, on the camera.' } },
       asAgent(WANDERER.handle),
     )
     expect(byItsId.code, byItsId.said).toBe(201)
 
     const somebodyElse = await post(
       '/api/records',
-      { kind: 'decision', title: 'Signed with another agent’s name', data: { replaces: [], decided_by: BYSTANDER.handle, authority: 'a measurement', because: 'Not this agent’s to sign.' } },
+      { kind: 'decision', title: 'Signed with another agent’s name', data: {
+        ...governsTheWholeProject(), replaces: [], decided_by: BYSTANDER.handle, authority: 'a measurement', because: 'Not this agent’s to sign.' } },
       asAgent(WANDERER.id),
     )
     expect(somebodyElse.code, 'an agent signed a decision in another agent’s name').toBe(403)
@@ -437,7 +440,8 @@ describe('a stored stamp that names two agents is answered no rather than resolv
     // either, and a governance write fails closed where the two readings disagree.
     const refused = await post(
       '/api/records',
-      { kind: 'decision', title: 'Signed with a name two agents answer to', data: { replaces: [], decided_by: 'twin', authority: 'a measurement', because: 'The name settles nothing.' } },
+      { kind: 'decision', title: 'Signed with a name two agents answer to', data: {
+        ...governsTheWholeProject(), replaces: [], decided_by: 'twin', authority: 'a measurement', because: 'The name settles nothing.' } },
       asAgent(TWIN_TWO.id),
     )
     expect(refused.code, 'a decision was signed with a name that means two agents').toBe(403)

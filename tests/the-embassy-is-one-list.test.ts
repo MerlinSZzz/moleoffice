@@ -234,13 +234,13 @@ describe('the Embassy reply', () => {
     expect(row?.act).toBe('confirm')
     expect(drawn(before), 'the Embassy shows the pending visitor').toContain('keyless-worker')
     // ITS CARD OFFERS ONLY WHAT THE SERVER WILL DO. The confirm above was refused, so the card draws no press to let it
-    // in, and says what the credential's own page says: it came from a copy without its key, and the visitor must ask
-    // again. Seen in round 25's pictures: the card said it could join once let in, over a press the server refuses.
+    // in, and draws the state the credential's own page names it by: no token works under it. Seen in round 25's
+    // pictures: the card said it could join once let in, over a press the server refuses. Before, the card drew the
+    // credential page's sentence on a copy without its key; the page draws its state word instead now, as decided.
     const alone = drawn({ ...before, visitors: before.visitors.filter((one) => one.id === keyless) })
     const { CREDENTIAL_WORDS } = await import('../src/web/pages/CredentialPage.tsx')
     expect(alone, 'the keyless card offers a press the server refuses').not.toContain(ep.EMBASSY_WORDS.confirm)
-    expect(alone).not.toContain(ep.EMBASSY_WORDS.waitingSays(ep.EMBASSY_WORDS.agent))
-    expect(alone).toContain(CREDENTIAL_WORDS.tokenRemoved)
+    expect(alone).toContain(CREDENTIAL_WORDS.tokenRemovedStanding)
     expect(alone, 'the owner can still refuse it').toContain(ep.EMBASSY_WORDS.refuse)
     // AND IT IS DRAWN ONCE. Its row asks to come in, by the rule the card reads, so the list below does not draw it
     // again as an ordinary visitor. Seen in the same pictures: it was in both places.
@@ -293,16 +293,15 @@ describe('the Embassy page', () => {
   /**
    * THE TWO PRESSES MOVED OUT OF THE LIST ON 8 SEPTEMBER 2026, criterion P78. P74 put a waiting
    * credential in the one list with the presses on its row; P78 puts it in a block above the list.
-   * The presses and the sentence are the same and the place is not, so these two cases moved with them.
+   * The presses are the same and the place is not, so these two cases moved with them. Before, the
+   * block also drew a sentence on what confirming means; the page draws no sentence on what a press
+   * does now, as decided.
    */
   it('puts both presses in the block above the list, not on a row in it', async () => {
     const page = drawn(await embassy())
     expect(page, 'the block').toContain(ep.EMBASSY_WORDS.asking)
     expect(page).toContain(ep.EMBASSY_WORDS.confirm)
     expect(page).toContain(ep.EMBASSY_WORDS.refuse)
-    expect(page, 'and says what confirming means').toContain(
-      ep.EMBASSY_WORDS.waitingSays(ep.EMBASSY_WORDS.agent),
-    )
   })
 
   it('draws no block and no press while nothing is waiting', async () => {

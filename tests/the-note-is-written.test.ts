@@ -42,6 +42,9 @@ import { beforeAll, describe, expect, it } from 'vitest'
 import { TARGET_KINDS, targetSpec, type Target, type TargetKind } from '../src/shared/targets.ts'
 import type { Mark } from '../src/server/lib/agents.ts'
 import { THE_TEST_OFFICES_OWNER } from './a-page-of-a-test-office.ts'
+import { createI18n } from '../src/shared/i18n.ts'
+
+const { t } = createI18n('en')
 
 type Api = typeof import('../src/web/api.ts')
 type Recipients = typeof import('../src/web/components/agent/Recipients.tsx')
@@ -164,7 +167,7 @@ describe('a comment is written down as a note, and nobody has to be named', () =
 
   it('still refuses to SEND with nobody chosen, because sending to nobody is not a thing', () => {
     const words = 'The mast moved, and this paragraph does not say so.'
-    expect(talk.whyNotSendIt(words, null)).toBe('Say who this is for. Mole Office will not pick one for you.')
+    expect(talk.whyNotSendIt(words, null)).toBe(t('talk.sayWhoFirst'))
     expect(talk.whyNotSendIt('', null)).toBe('Write what you want to say first.')
     // THE CHOOSER IS THE CHAT'S OWN CONTACTS, criterion W4: a person or a registered agent, never a
     // session. With one chosen and words written, the send goes.
@@ -359,7 +362,7 @@ describe('the comments somebody has written and nobody has sent', () => {
     expect(drawn).toContain('the mast moved')
     expect(drawn).toContain('Block of a report')
     // NOT A WARNING. No recipient chosen is the ordinary state of a comment somebody has just written.
-    expect(drawn).toContain('No recipient chosen. The comment stays written down.')
+    expect(drawn).toContain(t('review.pane.read.nobodyChosen'))
     expect(drawn).toContain('Choose a recipient')
   })
 })

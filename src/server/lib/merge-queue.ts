@@ -73,7 +73,7 @@ import { db, sqlite } from '../db/client.ts'
 import { records } from '../db/schema.ts'
 import { gateMet, gateMetOnceTheWriteIsTakenBack } from './gate-counts.ts'
 import { asTheMergeQueue } from './merge-entry-door.ts'
-import { theAgentOfARun, theCheckAskedFor, whatTheCheckWouldRead, writeAMessage, type TheCheckTheOfficeAskedFor } from './inspection.ts'
+import { theAgentOfARun, theCheckAskedFor, theOfficeNameOf, whatTheCheckWouldRead, writeAMessage, type TheCheckTheOfficeAskedFor } from './inspection.ts'
 import { THE_OFFICE } from './the-office.ts'
 import { theOneAgentAStringNames } from './agent-references.ts'
 import { participantForActor } from './participant-for-actor.ts'
@@ -1244,6 +1244,15 @@ function theChangesetToStore(
   }
 }
 
+/**
+ * THE NAME A SENTENCE GIVES ONE PARTICIPANT IT HOLDS BY ID, which a person reads: an agent's office name, read from the one
+ * row the stored string names. A person, and a string no single agent row answers, are shown as stored.
+ */
+export function theOfficeNameOrAsStored(who: ParticipantRef): string {
+  const row = who.kind === 'agent' ? theOneAgentAStringNames(sqlite, who.id) : null
+  return row === null ? who.id : theOfficeNameOf(row)
+}
+
 /** The same run agent and recorded starter for the end notice and the round-open reading. */
 export function theAgentAndStarterOfAnEntry(entry: Pick<MergeEntryReading, 'run'>) {
   const run = getRecord(entry.run)
@@ -1262,12 +1271,12 @@ export function whoIsToldOfAnEntrysEnd(entry: MergeEntryReading): { to: Particip
   if (entry.takeBackOf !== undefined) return whoIsToldOfATakeBack(entry)
   const { agent, starter } = theAgentAndStarterOfAnEntry(entry)
   const to = entryEndRecipients({ agent: agent === null ? null : { ...agent, startedBy: starter }, submittedBy: entry.submittedBy }, stored => theOneAgentAStringNames(sqlite, stored)?.id ?? stored)
-  // The message goes to each agent's registry id, and the sentence names each by its handle. A stored
+  // The message goes to each agent's registry id, and the sentence names each by its office name. A stored
   // string that leads to no single agent is shown as it is.
   const says =
     to.length === 0
       ? 'Nobody could be told: the run names no live agent, no starter is recorded, and the submitter is not an agent.'
-      : `Told ${to.map((one) => theOneAgentAStringNames(sqlite, one.id)?.handle ?? one.id).join(', ')}.` + (agent !== null && agent.retired === true ? ` The agent ${agent.handle} is retired, so its starter is told in its place.` : '')
+      : `Told ${to.map(theOfficeNameOrAsStored).join(', ')}.` + (agent !== null && agent.retired === true ? ` The agent ${theOfficeNameOf(agent)} is retired, so its starter is told in its place.` : '')
   return { to, says }
 }
 
@@ -1973,7 +1982,7 @@ export function submitASecretarysDesignEntry(input: { workspaceId: string; submi
   const needsNoCheck: NeedsNoCheck = {
     decision: NO_CHECK_OF_A_SECRETARYS_ENTRY,
     at: nowStamp(),
-    because: `The office filed this run for ${row.handle}'s design/-only merge entry on ${branch}, and such an entry needs no check.`,
+    because: `The office filed this run for ${theOfficeNameOf(row)}'s design/-only merge entry on ${branch}, and such an entry needs no check.`,
   }
   return sqlite.transaction(() => {
     const run = asTheDoorOf(NEEDS_NO_CHECK, () => sealingTheArea([THE_SECRETARYS_FOLDER], () =>
@@ -1990,7 +1999,7 @@ export function submitASecretarysDesignEntry(input: { workspaceId: string; submi
           workingDirectory: folder,
           cutFrom: read.forkBase,
           doing:
-            `The office filed this run for a secretary's design/-only merge entry, which needs no check: ${row.handle} submitted the branch ${branch} ` +
+            `The office filed this run for a secretary's design/-only merge entry, which needs no check: ${theOfficeNameOf(row)} submitted the branch ${branch} ` +
             `at ${read.commit} from ${folder}, and the office sealed its design/ files. Nobody ran it.`,
           extra: { purpose: SECRETARY_DOCUMENTS },
           [NEEDS_NO_CHECK]: needsNoCheck,
@@ -2611,20 +2620,45 @@ function theToolsOwnRows(workspaceId: string, session: string): Parameters<typeo
 }
 
 /**
- * THE LAST TOOL RUN'S OWN PROCESS ROW, WHILE THAT PROCESS IS STILL RUNNING, or null because it is not.
+ * WHAT THE LAST TOOL RUN'S OWN PROCESS ROW READS NOW: running, not running, or not known.
  *
  * Asked of the ledger's own reading, which compares the start time it wrote down, so a pid given to
- * another program since reads as gone. A released row is not asked: a restart releases only rows whose
- * process it found gone, and a person's release stops the group. Five readers: `mergesForTheWorker` leaves
- * the entry off its `wanted` list, and `recordMergeToolStarted` refuses a start that gets past that list.
- * In src/server/lib/worker.ts, `runServing`, `whyThisRunWasCutOff` and `workerRuns` ask it whether a run
- * the office started is still going.
+ * another program since reads as gone. It is the reading a release of the row takes too (`livenessOf` in
+ * lib/resources.ts), so the list of runs a pause would pause and the release cannot say two things of one
+ * row. A released row is not asked: a restart releases only rows whose process it found gone, and a
+ * person's release stops the group. A run with no row of its own is not running, as before.
+ *
+ * `not known` is not a polite way of saying gone. On Windows it is what a row reads when its starter has
+ * ended and the starter's Job Object cannot be read, and the program may still run. The list of runs a
+ * pause would pause (`theLiveRuns` in lib/pausing.ts) and the pause itself (`pauseTheRunsAtWork`) read all
+ * three states. Every other reader asks `theLastToolRunStillRuns` below.
+ */
+export type ALastToolRunsReading =
+  | { state: 'running'; row: ResourceReport; running: string }
+  | { state: 'not known'; row: ResourceReport; reason: string }
+  | { state: 'not running' }
+
+export function theLastToolRunsReading(workspaceId: string, tool: { session: string } | null): ALastToolRunsReading {
+  if (tool === null) return { state: 'not running' }
+  const own = theToolsOwnProcessRow(workspaceId, tool.session)
+  if (own === undefined || own.releasedAt !== null || own.liveness.state === 'gone') return { state: 'not running' }
+  if (own.liveness.state === 'unknown') return { state: 'not known', row: own, reason: own.liveness.reason }
+  return { state: 'running', row: own, running: own.liveness.detail }
+}
+
+/**
+ * THE LAST TOOL RUN'S OWN PROCESS ROW, WHILE THAT PROCESS IS STILL RUNNING, or null because it is not
+ * read running. A row whose reading cannot tell answers null here, as it always has.
+ *
+ * Read from `theLastToolRunsReading` above. `mergesForTheWorker` in src/server/lib/worker.ts leaves the
+ * entry off its `wanted` list, and `recordMergeToolStarted` below refuses a start that gets past that
+ * list. `theRunRowServing`, `whyThisRunWasCutOff` and `theRunsInFlight` in src/server/lib/worker.ts, and
+ * `aStartersLetterToAnEndedWorker` and `checkpointPage` in src/server/lib/worker-delivery/letters.ts, ask
+ * it whether a run the office started is still going.
  */
 export function theLastToolRunStillRuns(workspaceId: string, tool: { session: string } | null): { row: ResourceReport; running: string } | null {
-  if (tool === null) return null
-  const own = theToolsOwnProcessRow(workspaceId, tool.session)
-  if (own === undefined || own.releasedAt !== null || own.liveness.state !== 'alive') return null
-  return { row: own, running: own.liveness.detail }
+  const reading = theLastToolRunsReading(workspaceId, tool)
+  return reading.state === 'running' ? { row: reading.row, running: reading.running } : null
 }
 
 /** The office started the merge tool for this entry. One tool run owns an entry until it ends. */

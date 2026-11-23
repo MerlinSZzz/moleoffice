@@ -139,9 +139,14 @@ export function whyThisPairIsRefused(slot: RunModelSlot, pair: unknown, gives: T
  * WHY AN AGENT'S OWN MODEL CANNOT BE STORED, or null because it can.
  *
  * An agent's own model is for the runtime its record names, so an agent whose record names none
- * cannot be given one: nothing would say which runtime the name was written for.
+ * cannot be given one: nothing would say which runtime the name was written for. An agent of a
+ * harness the office has no adapter for (`harness`) cannot be given one either, because that
+ * harness chooses its model itself and the office starts no run of it.
  */
-export function whyAnAgentsModelIsRefused(runtime: string | null, model: string, variant: string | null, gives: TheRuntimesTheWorkerGives): string | null {
+export function whyAnAgentsModelIsRefused(runtime: string | null, model: string, variant: string | null, gives: TheRuntimesTheWorkerGives, harness: string | null = null): string | null {
+  if (harness !== null) {
+    return `This agent runs in ${harness}, a harness the office has no adapter for. That harness chooses its model itself, so the office keeps none for it. Nothing was written.`
+  }
   if (runtime === null) return "This agent's record names no runtime, so a model cannot be tied to one. Nothing was written."
   if (model.trim() === '') return 'Name a model. Nothing was written.'
   if (variant !== null) {
@@ -237,7 +242,8 @@ export type NoSelectionReason = (typeof NO_SELECTION_REASONS)[number]
 /**
  * WHY A RUN GOT NO SELECTION: the reason, the Casting row it is about when one is, and one plain sentence.
  * Present only on an answer with no `selection` and none of `held`, `ambiguous` or `refused`, which say their
- * own reasons. A message run's answer keeps its own `kept` sentence.
+ * own reasons. An answer for a harness the office has no adapter for has none either: its `says` already says the
+ * harness chooses its model itself. A message run's answer keeps its own `kept` sentence.
  */
 export interface TheNoSelection {
   reason: NoSelectionReason
@@ -278,7 +284,10 @@ export interface TheModelARunGets {
    */
   refused?: string
   effortFrom?: EffortSource
-  /** Why this answer has no selection, when it has none and no hold, ambiguity or refusal says why. */
+  /**
+   * Why this answer has no selection, when it has none and no hold, ambiguity or refusal says why. Left out for a harness
+   * that chooses its model itself.
+   */
   noSelection?: TheNoSelection
   /** Which layer the model came from. */
   from: RunModelLayer
@@ -337,7 +346,7 @@ export interface RunModelsReading {
 /** One agent's own model, as its profile shows it. */
 export interface AnAgentsRunModel {
   agentId: string
-  /** The runtime its record names, or null. */
+  /** The runtime its record names, or null. A harness the office has no adapter for is named by its own word. */
   runtime: string | null
   /** The model its record names, or null because none is set. */
   model: string | null

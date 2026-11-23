@@ -244,7 +244,7 @@ it('7: both tool envelopes route to the id of an agent whose handle differs', as
   const releases: { path: string; body: unknown }[] = []
   let ended: { code: number; outcome: string } | undefined
   const malformed = new Function('ask', 'process', 'writeThenExit', `return (async () => {
-    const AGENT = 'identity-route', SESSION = 'session-route', held = { body: { hold: {} } }
+    const AGENT = 'identity-route', SESSION = 'session-route', AGAIN = false, held = { body: { hold: {} } }
     let lettingGo = false, leaving = false, takingHold = true, stopAfterHold = null
     ${source.slice(releaseStart, releaseEnd)}
     ${source.slice(guardStart, guardEnd)}

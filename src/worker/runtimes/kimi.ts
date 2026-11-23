@@ -176,6 +176,9 @@ import { kimiUsage } from './usage.ts'
  * OpenRouter, reached by pointing `KIMI_BASE_URL` at it — the same program and the same adapter,
  * a different endpoint and a different billing account. Nothing here says a Moonshot-served run
  * behaves identically. That empty account is problem 8YffJbtvKiaN and it is the owner's to settle.
+ *
+ * ITS PROGRAM IS LOOKED UP IN THE WHOLE ENVIRONMENT IT WAS GIVEN, through `whereItIs` in ./os.ts, so on Windows a
+ * search path held as `Path` is found.
  */
 
 import { KIMI_SETTINGS, readSetting } from '../../config/settings.mjs'
@@ -307,7 +310,7 @@ export class KimiAdapter implements RuntimeAdapter {
   constructor(private readonly from: NodeJS.ProcessEnv = process.env) {}
 
   whereItIs(): string | null {
-    return whereItIs(this.command, this.from['PATH'])
+    return whereItIs(this.command, this.from)
   }
 
   /**

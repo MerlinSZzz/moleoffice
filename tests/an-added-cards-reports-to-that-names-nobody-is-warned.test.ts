@@ -184,7 +184,7 @@ describe('an added card whose reports-to words name nobody', () => {
     expect(await app.page.locator('.fw-form .px-hint-body').textContent()).toBe(hint)
   })
 
-  it('draws the preview and the block at four widths and in both themes', async () => {
+  it('draws the preview and the block at the widest and the narrowest width in the light theme', async () => {
     const folder = process.env.W13R_REPORTS_TO_SHOTS
     if (folder) mkdirSync(folder, { recursive: true })
     // LIGHT ONLY, at 1440 and 390. Fitting the preview and the block does not depend on the theme.

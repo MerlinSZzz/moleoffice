@@ -933,7 +933,7 @@ export function Chart({ spec }: { spec: ChartSpec }) {
           ) : null}
           {chart.dropped > 0 ? (
             <p className="pxc-note" role="status">
-              {t('sheet.chart.dropped', { n: chart.dropped })}
+              {t('sheet.chart.droppedDescription', { n: chart.dropped })}
             </p>
           ) : null}
           <DataTable c={chart} />

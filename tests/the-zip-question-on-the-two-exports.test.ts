@@ -20,7 +20,9 @@
  *   3. THE FILES ANSWER DOWNLOADS A ZIP whose name is `exportFileName(title, n)`, the shared naming
  *      function the server uses, and whose export entry records the files that went.
  *   4. THE PAGE SAYS THE COUNTS the manifest answered with: how many files went, how many named
- *      files were not on disk, and how many were left out.
+ *      files were not on disk, and how many were left out. It draws the zip's name on a row of its
+ *      own, under the label that says the browser was handed it, and no sentence holds the name.
+ *      When the browser will not take the file, there is no such row.
  *   5. EACH PRESS HAS ITS OWN ANSWER, and it goes back to the text answer after it is pressed. A
  *      choice made on one kept bundle does not travel to another.
  *   6. THE COUNTS ARE ABOUT THE FILES THE SERVER REALLY WENT WITH. The bundle names one stored
@@ -35,6 +37,7 @@
  *   send withFiles with the text answer, or add `files` to the entry  -> case 2
  *   name the download from anything but exportFileName               -> case 3
  *   draw no counts, or draw the wrong three numbers                  -> case 4
+ *   name the zip in a sentence, or draw its row when none was handed -> case 4
  *   keep one answer for every row, or keep it after the press        -> case 5
  *   lose a file the server went with                                 -> case 6
  *
@@ -53,7 +56,7 @@ import type { Locator, Page } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { liveApp, type LiveApp } from './helpers.ts'
 import { exportFileName } from '../src/shared/zip-export/manifest.ts'
-import { t } from '../src/shared/i18n.ts'
+import { t, type WordKey } from '../src/shared/i18n.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 
 let app: LiveApp
@@ -183,6 +186,20 @@ async function pressForDownload(button: Locator): Promise<{ name: string; bytes:
   return { name: download.suggestedFilename(), bytes: readFileSync(path) }
 }
 
+/** Each row drawn here under the label that says the browser was handed a file: the tag and text of its value. */
+async function theHandedRows(where: Locator): Promise<{ tag: string; value: string }[]> {
+  return where.locator('dl.code-rows dt').evaluateAll(
+    (terms, label) =>
+      terms
+        .filter((term) => term.textContent === label)
+        .map((term) => {
+          const value = term.nextElementSibling?.firstElementChild ?? null
+          return { tag: value?.tagName ?? 'none', value: value?.textContent ?? '' }
+        }),
+    t('frameFiles.row.handed' as WordKey),
+  )
+}
+
 /** The three counts the page says, read from the word list rather than typed here. */
 function countsSentence(included: number, missing: number, leftOut: number): string {
   return t('zipExport.said', {
@@ -245,6 +262,8 @@ describe('the Bundles page asks, and the text answer is the default', () => {
     expect(got.name).toBe(exportFileName('The bench handover', 1))
     const said = (await row.locator('.bx-said').textContent()) ?? ''
     expect(said).toContain(countsSentence(1, 0, 0))
+    expect(await theHandedRows(row), 'the zip is not on a row of its own').toEqual([{ tag: 'CODE', value: got.name }])
+    expect(said, 'a sentence holds the zip').not.toContain(got.name)
 
     const exports = await exportsOf(bundleWithFiles)
     expect(exports.length).toBe(1)
@@ -299,6 +318,8 @@ describe("a task's package asks, and the files answer downloads the zip", () => 
     expect(got.name).toBe(exportFileName('Fit the bench clamp', 2))
     const said = (await form.locator('.tpp-done').last().textContent()) ?? ''
     expect(said).toContain(countsSentence(1, 0, 0))
+    expect(await theHandedRows(form), 'the zip is not on a row of its own').toEqual([{ tag: 'CODE', value: got.name }])
+    expect(said, 'a sentence holds the zip').not.toContain(got.name)
 
     const exports = await exportsOf(bundleId)
     expect(exports.length).toBe(2)
@@ -338,5 +359,6 @@ describe("a task's package asks, and the files answer downloads the zip", () => 
     await form.getByRole('button', { name: t('zipExport.makeTheZip') }).click()
     await form.locator('.tpp-done').waitFor({ state: 'visible' })
     expect(await form.locator('.tpp-done').last().textContent()).toBe(t('frameFiles.clipboard.noFile'))
+    expect(await theHandedRows(form), 'a row says the browser was handed the zip').toEqual([])
   }, 120_000)
 })

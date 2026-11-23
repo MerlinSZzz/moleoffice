@@ -62,7 +62,7 @@ export function ReReadStrip({ project }: { project: string }) {
       <div className="px-reread" data-says={failed ? 'failed' : 'refreshing'} data-another-project={another ? '' : undefined}>
         {another ? (
           <p className="px-reread-another">
-            <strong>{t('frameFiles.reread.anotherProject', { project: content(project) })}</strong> {t('frameFiles.reread.anotherProjectKept')}
+            <strong>{t('frameFiles.reread.anotherProject', { project: content(project) })}</strong>
           </p>
         ) : null}
         {marks.refreshing > 0 ? (

@@ -136,8 +136,12 @@ function theNumberOfChecklists(): number {
 }
 
 const refusalOf = (body: Record<string, unknown>): string => String(body['error'] ?? body['message'] ?? '')
+const sandbox = process.env.SANDBOX_DIR
 
 beforeAll(async () => {
+  // NO SANDBOX_DIR WHILE THIS FILE PRESSES INSTALL, because the office refuses every install press inside a sandbox,
+  // before the gate this file is about. It is put back after.
+  delete process.env.SANDBOX_DIR
   delete process.env.MOLE_OFFICE_WORLD_STARTED_BY
   delete process.env.MOLE_OFFICE_WORLD_SECRETARIES
   t = await freshDb()
@@ -159,6 +163,7 @@ beforeAll(async () => {
 }, 60_000)
 
 afterAll(async () => {
+  if (sandbox !== undefined) process.env.SANDBOX_DIR = sandbox
   delete process.env.MOLE_OFFICE_WORLD_STARTED_BY
   forgetTheWorldsOwnAuthority()
   await app.close()

@@ -84,5 +84,11 @@ it('does not reopen a chat closed before its contact answers',async()=>{
     await page.keyboard.press('Escape');await expect.poll(()=>page.locator('.px-chat').count()).toBe(0)
     release();await page.waitForTimeout(500)
     expect(await page.locator('.px-chat').count()).toBe(0)
+    // AND THE ANSWER CHANGED NOTHING IN IT. An answer taken in while the chat is closed chooses its contact without
+    // opening the panel, so the chat is opened again: it shows its contact rows, and no conversation is chosen or drawn.
+    await openTheChat(page)
+    expect(await page.locator('.px-chat-them').count(),'the late answer chose its contact while the chat was closed').toBe(0)
+    await page.locator('.px-chat-contact').filter({hasText:contact.name}).waitFor({timeout:30_000})
+    expect(await page.locator('.px-chat-said .px-chat-one').filter({hasText:words}).count()).toBe(0)
   }finally{release();await page.unrouteAll({behavior:'wait'});await context.close()}
 },120_000)

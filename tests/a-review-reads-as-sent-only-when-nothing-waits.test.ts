@@ -95,11 +95,17 @@ async function file(kind: string, title: string, data: Record<string, unknown> =
   return (res.json() as { record: { id: string } }).record.id
 }
 
-/** A session record carrying what discovery stamps on one, with a transcript at `logPath`. */
-function aSession(title: string, externalId: string, logPath: string): Promise<string> {
+/**
+ * A session record carrying what discovery stamps on one, with a transcript at `logPath`. It says which agent it
+ * worked as, an agent record in this project named in its `ranAs`, because a comment addressed to a run that names no
+ * agent is refused before anything is written, and every case that files a run here sends to it.
+ */
+async function aSession(title: string, externalId: string, logPath: string): Promise<string> {
+  const agentId = await file('agent', externalId, { handle: externalId, state: 'active', runtime: 'claude-code' })
   return file('session', title, {
     state: 'idle',
     runtime: 'claude-code',
+    ranAs: [{ workspaceId: WORKSPACE, agentId }],
     extra: {
       discovered: {
         tool: 'claude-code',

@@ -64,7 +64,6 @@ import { homedir, hostname, userInfo } from 'node:os'
 import { join, resolve } from 'node:path'
 import { fileURLToPath, URL } from 'node:url'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { THE_BUILT_PAGE, missingWebBuild } from '../src/config/the-built-page.mjs'
 import { readTheServiceLock } from '../src/config/the-service-lock.mjs'
 import { theProcessAt } from '../src/config/session-process.mjs'
 import { databaseIdentity } from '../src/config/database-identity.mjs'
@@ -318,8 +317,6 @@ function theEnvironmentOf(pid: number): Record<string, string> {
 }
 
 beforeAll(async () => {
-  const missing = missingWebBuild(THE_BUILT_PAGE)
-  if (missing !== null) throw new Error(`This test starts the server in production, which serves the built page. ${missing}`)
   await theCheckoutsPageBuiltAtThisCommit()
 }, 300_000)
 

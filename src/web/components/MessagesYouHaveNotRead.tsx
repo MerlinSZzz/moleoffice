@@ -114,7 +114,7 @@ export function MessagesYouHaveNotRead({ rows, inspect }: { rows: readonly Waiti
       actions={<span className="dq-count">{t('decisionsAsks.count', { n: rows.length })}</span>}
     >
       {rows.length === 0 ? (
-        <Absence say title={t('decisionsAsks.none')} />
+        <Absence word={t('absence.none')} />
       ) : (
         <ul className="da-rows">
           {rows.map((row) => {
@@ -126,7 +126,7 @@ export function MessagesYouHaveNotRead({ rows, inspect }: { rows: readonly Waiti
                   {content(row.title)}
                 </button>
                 <span className="da-cues">
-                  {name === null ? <Absence title={t('decisions.actorUnknown')} /> : <span className="da-from">{t('decisionsAsks.from', { name: content(name) })}</span>}
+                  {name === null ? <Absence word={t('decisionsAsks.fromUnknown')} /> : <span className="da-from">{t('decisionsAsks.from', { name: content(name) })}</span>}
                   {row.since === null ? null : <Stamp at={row.since} />}
                   {inspect ? <code className="gq-raw">{row.id}</code> : null}
                 </span>

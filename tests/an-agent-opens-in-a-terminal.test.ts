@@ -24,8 +24,8 @@
  *      key window is open, so a wrong key is answered too, and only the row can say which key arrived.) The session
  *      record carries the runtime, folder, agent, conversation id, terminal and holder. Its profile reads "In a terminal".
  *   4. Without the person's key the agent opens with no key, and the answer says so. A codex agent's only arguments
- *      are its switch. Closing its terminal ends its run, and the end carries a usage receipt saying why a fresh Codex
- *      run's holds no numbers (wave 13s round 40).
+ *      are its switch and the snapshot switch. Closing its terminal ends its run, and the end carries a usage receipt
+ *      saying why a fresh Codex run's holds no numbers (wave 13s round 40).
  *   5. The holder is stopped by its group and a new one started: the claude agent opens again as
  *      `claude --resume <uuid>`, after the switch, with a new key that works, its record names the new terminal and
  *      holder, and the person gets one message naming it, and naming the kimi agent whose folder was removed as not
@@ -72,6 +72,7 @@ import {
 } from './terminal-holder-stand.ts'
 import { theOfficesOwnIdIn, thePersonsKeyHeader } from './helpers.ts'
 import { CLAUDE_CODE_FEATURES_OFF, CODEX_FEATURES_OFF } from '../src/config/harness-features-off.mjs'
+import { CODEX_SHELL_SNAPSHOT_OFF } from '../src/config/run-permissions.mjs'
 
 let place: Place
 let server: ScratchServer
@@ -292,11 +293,11 @@ describe('an agent in a terminal', () => {
     expect((opened.body['key'] as { given: boolean; says: string }).given).toBe(false)
     expect((opened.body['key'] as { says: string }).says).toContain('cannot hold its handle until it has a key')
     const terminal = opened.body['terminal'] as Listed
-    expect(terminal.args).toEqual([...CODEX_FEATURES_OFF])
+    expect(terminal.args).toEqual([...CODEX_FEATURES_OFF, ...CODEX_SHELL_SNAPSHOT_OFF])
     expect(terminal.envNames).not.toContain('MOLE_AGENT_KEY')
     expect(opened.body['providerSession']).toBeNull()
     const screen = (await theStandInsScreen(terminal.id)).join('\n')
-    expect(screen).toContain(`STAND-IN codex ARGS ${JSON.stringify(CODEX_FEATURES_OFF)}`)
+    expect(screen).toContain(`STAND-IN codex ARGS ${JSON.stringify([...CODEX_FEATURES_OFF, ...CODEX_SHELL_SNAPSHOT_OFF])}`)
     expect(screen).toContain('KEY unset LENGTH 0')
     const session = String(opened.body['session'])
     expect(theRecord(session).data['providerSession']).toBeUndefined()

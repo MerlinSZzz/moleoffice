@@ -7,6 +7,7 @@ import { DEFAULT_UPLOAD_POLICY, destinationWarningBytes, type Destination, type 
 import { STORAGE_CATEGORIES } from '@shared/storage/categories.ts'
 import type { DestinationSettingsReply } from '../../server/lib/storage/destinations.ts'
 import { api, ApiError, errorMessage, type Fault } from '../api.ts'
+import { CodeRows } from '../lib/code-rows.tsx'
 import { useLanguage } from '../lib/language.ts'
 import { Panel, Loading, ErrorNote, theRefusalInWords, useAsync } from './ui.tsx'
 const w=(key:string)=>t(`storageDestinations.${key}` as WordKey)
@@ -16,12 +17,6 @@ type Draft={name:string;kind:Destination['kind'];path:string;endpoint:string;buc
 function draft(limit:number,destination?:Destination):Draft {
   const target=destination?.target
   return {name:destination?.name??'',kind:destination?.kind??'folder',path:target&&'path'in target?target.path:'',endpoint:target&&'endpoint'in target?target.endpoint:'',bucket:target&&'bucket'in target?target.bucket:'',region:target&&'region'in target?target.region:'',prefix:target&&'prefix'in target?target.prefix:'',host:target&&'host'in target?target.host:'',user:target&&'user'in target?target.user:'',port:target&&'port'in target?String(target.port):'22',policy:{...(destination?.policy??DEFAULT_UPLOAD_POLICY)},limitMB:String((destination?.limitBytes??limit)/1_000_000),enabled:destination?.enabled??true}
-}
-function KeptIn({file,exists}:{file:string;exists:boolean}){
-  const said=t((exists?'storageDestinations.credentialsKeptIn':'storageDestinations.credentialsWouldBeKeptIn') as WordKey,{file})
-  const at=said.indexOf(file)
-  if(at<0)return <>{said}</>
-  return <>{said.slice(0,at)}<code>{file}</code>{said.slice(at+file.length)}</>
 }
 export function StorageDestinationsPanel(){
   useLanguage()
@@ -52,7 +47,7 @@ function Destinations({first}:{first:DestinationSettingsReply}){
     <style href="storage-destinations" precedence="default">{CSS}</style>
     <p className="set-say">{w('intro')}</p>
     <div data-storage-credentials className="sd-where">
-      {reading.credentials.file===null?null:<p className="set-say"><KeptIn file={reading.credentials.file} exists={reading.credentials.exists}/></p>}
+      {reading.credentials.file===null?null:<CodeRows rows={[{label:'storageDestinations.row.credentialsFile',value:reading.credentials.file,...(reading.credentials.exists?{}:{state:'storageDestinations.row.notMadeYet' as const})}]}/>}
       {reading.credentials.file===null?null:<p className="set-say">{reading.credentials.from==='templates'?w('fromTemplates'):w('fromDataFolder')}</p>}
       {reading.credentials.modeSaysWhoMayRead?null:<p data-storage-mode-cannot-tell className="set-say">{w('modeCannotTell')}</p>}
       {reading.credentials.refused===null?null:<p data-storage-credentials-refused role="alert" className="set-say sd-refused">{theRefusalInWords(reading.credentials.refused.message,reading.credentials.refused)} {w('credentialsUnusable')}</p>}

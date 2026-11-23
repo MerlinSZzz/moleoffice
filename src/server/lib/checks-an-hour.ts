@@ -15,7 +15,7 @@ import { realpathSync } from 'node:fs'
 import { CHECKS_AN_HOUR_SETTING, whyACheckWaitsItsTurn, type ThePaceOfACheck } from '@shared/checks-an-hour.ts'
 import type { ParticipantRef } from '@shared/participants.ts'
 import type { PanelRecord } from '@shared/types.ts'
-import { localStamp } from '@shared/time.ts'
+import { localStamp, momentOfAStoredStamp } from '@shared/time.ts'
 import { CHECKS_AN_HOUR_BOUNDS, mergedEnvironment, gatePosition } from '../../config/settings.mjs'
 import { sqlite } from '../db/client.ts'
 import { theCheckAskedFor, whoHoldsTheSecretaryCard, writeAMessage } from './inspection.ts'
@@ -57,19 +57,34 @@ export function theLaneOfACheckOf(
 }
 
 /**
- * HOW MANY CHECKS STARTED IN EACH LANE IN THE LAST HOUR, in every project: every check session filed in that hour, by the
- * lane of the run it checked. A check whose run gives no lane is in no lane's count. The newest merge entries of the runs
+ * HOW MANY CHECKS STARTED IN EACH LANE IN THE LAST HOUR, in every project: every check session whose start is at most an
+ * hour before now, by the lane of the run it checked. A check's start is the moment of the `startedAt` stored when it started,
+ * read with the clock observation stored beside it, or, when it has no `startedAt`, the moment of its `created_at`. A
+ * stamp that names two moments, in the hour the clocks go back, gives no moment, and that check is counted, because
+ * nobody can tell it is old. A check whose run gives no lane is in no lane's count. The newest merge entries of the runs
  * are read in one query for each project.
  */
 export function theChecksStartedInTheLastHour(): Map<string, number> {
-  const since = localStamp(new Date(Date.now() - AN_HOUR_MS))
-  // UPDATED_AT FIRST, because it has the index and a session is never updated before it is created.
-  const rows = sqlite
+  const now = Date.now()
+  // BY UPDATED_AT ALONE, because it has the index and a session is never updated before it is created. TWO HOURS AND NOT
+  // ONE, because the clocks can go back an hour: a check started in the last hour can then carry a stamp up to an hour
+  // earlier than the stamp of an hour ago. Which of these started in the hour is read from each one's moment below.
+  const since = localStamp(new Date(now - 2 * AN_HOUR_MS))
+  const candidates = sqlite
     .prepare(
-      "SELECT workspace_id AS workspaceId, json_extract(data, '$.extra.inspectionRun') AS run FROM records WHERE updated_at >= @since " +
-        "AND +kind = 'session' AND created_at >= @since AND json_extract(data, '$.extra.purpose') = 'inspection'",
+      "SELECT workspace_id AS workspaceId, json_extract(data, '$.extra.inspectionRun') AS run, created_at AS createdAt, " +
+        "json_extract(data, '$.startedAt') AS startedAt, json_extract(data, '$.startedTime') AS startedTime FROM records " +
+        "WHERE updated_at >= @since AND +kind = 'session' AND json_extract(data, '$.extra.purpose') = 'inspection'",
     )
-    .all({ since }) as { workspaceId: string; run: unknown }[]
+    .all({ since }) as { workspaceId: string; run: unknown; createdAt: string; startedAt: unknown; startedTime: unknown }[]
+  const rows = candidates.filter((row) => {
+    // `startedTime` IS AN OBJECT, so the query hands it back as JSON text.
+    const moment =
+      typeof row.startedAt === 'string'
+        ? momentOfAStoredStamp(row.startedAt, typeof row.startedTime === 'string' ? (JSON.parse(row.startedTime) as unknown) : null)
+        : momentOfAStoredStamp(row.createdAt, null)
+    return moment === null || now - moment <= AN_HOUR_MS
+  })
   const runsOf = new Map<string, Set<string>>()
   for (const row of rows) {
     if (typeof row.run !== 'string' || row.run === '') continue

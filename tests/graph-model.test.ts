@@ -1390,14 +1390,13 @@ describe('the reading layer, which is the composition a phone gets', () => {
     expect(html).toContain('重印 v3 #4')
   })
 
-  it('says a module has no state word rather than working one out of its checklist', () => {
+  it('marks a module that has no state word rather than working one out of its checklist', () => {
     const html = draw(build())
-    // On every row as a mark, and ONCE in words. The sentence used to be printed beside every mark,
+    // On every row as a mark. The sentence used to be printed beside every mark,
     // which at 390px was three lines of the same words on each row and pushed the record's own title
     // off the first screen.
+    // CRITERION CHANGE, as decided: the fold that said it once in words is gone, so only the mark is read.
     expect(html).toContain('No state field')
-    expect(html).toContain(en['g7b.Outline.that_is_an_answer_rather_than_a'])
-    expect(html.split(en['g7b.Outline.that_is_an_answer_rather_than_a']).length - 1).toBe(1)
   })
 
   it('says plainly when a `blocks` link is unqualified, so it can never read as a hard gate', () => {
@@ -1406,8 +1405,8 @@ describe('the reading layer, which is the composition a phone gets', () => {
         links: [link({ linkId: 'L1', fromId: 'm-twin', toId: 'm-egm', type: 'blocks', gate: { at: 'unstated' } })],
       }),
     )
-    expect(html).toContain(en['g7b.Outline.nobody_has_said_how_much_this_blocks'])
-    expect(html).toContain(`<span class="gx-edge-note">${en['g7b.Outline.nobody_has_said_how_much_this_blocks']}</span>`)
+    // CRITERION CHANGE, as decided: the note is a short state word now, not a sentence.
+    expect(html).toContain(`<span class="gx-edge-note">${en['g7b.Canvas.nobody_said_how_much']}</span>`)
   })
 
   it('prints every node, so nothing on the canvas is missing from the phone', () => {

@@ -6,8 +6,9 @@
  *
  * A decision, of 22 September 2026, says one guard, the same policy for every runtime, is mounted into each runtime's
  * pre-execution hook, and a runtime in the main world runs with full permissions only when the guard is
- * mounted. The policy is `tools/guard/policy.mjs`; the hook that runs it is
- * `tools/guard/main-world-guard.mjs`. This file says how each runtime is told to call that hook, and `theGuardOn` reads
+ * mounted. The policy is `for-agents/main-world-guard-policy.mjs`; the hook that runs it is
+ * `for-agents/main-world-guard.mjs`. An install carries the hook built, with the policy compiled into it. This file says where the hook and
+ * its OpenCode plugin are, how each runtime is told to call that hook, and `theGuardOn` reads
  * a command line back to say whether it was — that answer is the marker the permission flags are set by, so it is read
  * off the command itself and cannot drift from it.
  *
@@ -33,13 +34,30 @@ import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
-import { REPO_ROOT, backupsDirectoryFrom, databasePathFrom, keysPathFrom, mergedEnvironment, theInstallsNode } from './settings.mjs'
+import {
+  REPO_ROOT,
+  THE_FOR_AGENTS_FOLDER,
+  THE_GUARDS_BUILT_FILES,
+  backupsDirectoryFrom,
+  databasePathFrom,
+  keysPathFrom,
+  mergedEnvironment,
+  theInstallsNode,
+} from './settings.mjs'
 
-/** The hook every runtime calls, in the checkout the office runs from. */
-export const THE_GUARD = resolve(REPO_ROOT, 'tools', 'guard', 'main-world-guard.mjs')
+const [THE_HOOKS_FILE, THE_PLUGINS_FILE] = THE_GUARDS_BUILT_FILES
 
-/** The OpenCode plugin that calls the same hook. */
-export const THE_OPENCODE_PLUGIN = resolve(REPO_ROOT, 'tools', 'guard', 'opencode-plugin.mjs')
+/** The hook every runtime calls, in the checkout or the install the office runs from. */
+export const THE_GUARD = resolve(REPO_ROOT, THE_FOR_AGENTS_FOLDER, THE_HOOKS_FILE)
+
+/** The OpenCode plugin that calls the same hook, beside it. */
+export const THE_OPENCODE_PLUGIN = resolve(REPO_ROOT, THE_FOR_AGENTS_FOLDER, THE_PLUGINS_FILE)
+
+/**
+ * THE END OF THE HOOK'S PATH THAT A HOOKS FILE NAMES. The dsh bridge's hooks file names the hook below the plugin's
+ * own root, so `theDshHooksCarryTheGuard` reads this end of the path, and not THE_GUARD.
+ */
+export const THE_GUARDS_TAIL = `${THE_FOR_AGENTS_FOLDER}/${THE_HOOKS_FILE}`
 
 /** The dsh bridge's hooks file, which the office profile mounts. */
 export const THE_DSH_HOOKS = resolve(REPO_ROOT, 'tools', 'dsh-hooks', 'hooks.json')
@@ -50,7 +68,7 @@ export const THE_DSH_HOOKS = resolve(REPO_ROOT, 'tools', 'dsh-hooks', 'hooks.jso
  *
  * IT IS NOT A MOLE OFFICE SETTING, so its name does not start with MOLE_OFFICE_: it is one run's
  * value, written by the adapter for that run, and `envFor` lets no MOLE_OFFICE_ name into a run's
- * environment from an adapter. `tools/guard/opencode-plugin.mjs` spells the same name, because it
+ * environment from an adapter. `for-agents/opencode-plugin.mjs` spells the same name, because it
  * imports nothing it does not need; tests/the-guard-is-mounted-on-every-runtime.test.ts runs the
  * plugin through this constant, so the two cannot differ without a red.
  */
@@ -155,7 +173,8 @@ function preToolUseCommands(config) {
 }
 
 /**
- * Whether the dsh hooks file mounts the guard.
+ * Whether the dsh hooks file mounts the guard: whether a PreToolUse hook in it names the hook's path, read as
+ * THE_GUARDS_TAIL. Any other hooks file does not mount it.
  * @param {string} [file] @returns {{ mounted: boolean, because: string }}
  */
 export function theDshHooksCarryTheGuard(file = THE_DSH_HOOKS) {
@@ -166,10 +185,10 @@ export function theDshHooksCarryTheGuard(file = THE_DSH_HOOKS) {
   } catch (error) {
     return { mounted: false, because: `${file} is not JSON: ${error instanceof Error ? error.message : String(error)}` }
   }
-  const found = preToolUseCommands(config).some((c) => c.includes('tools/guard/main-world-guard.mjs'))
-  return found
-    ? { mounted: true, because: `${file} names tools/guard/main-world-guard.mjs as a PreToolUse hook.` }
-    : { mounted: false, because: `${file} has no PreToolUse hook naming tools/guard/main-world-guard.mjs.` }
+  const commands = preToolUseCommands(config)
+  return commands.some((c) => c.includes(THE_GUARDS_TAIL))
+    ? { mounted: true, because: `${file} names ${THE_GUARDS_TAIL} as a PreToolUse hook.` }
+    : { mounted: false, because: `${file} has no PreToolUse hook naming ${THE_GUARDS_TAIL}.` }
 }
 
 /**

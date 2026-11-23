@@ -34,6 +34,11 @@
  * A fourth case proves item 2 of the build: the office's own sweep reads a run that went quiet still
  * saying `running` and writes the cause the hook never got to write. Its mutation is the same
  * dropped transcript read.
+ *
+ * A fifth case proves the time both readers store: the instant `clockStamp` writes, local
+ * wall-clock with its offset, in winter and in both moments of the hour the clocks go back, and
+ * null for words that name no moment. The first case checks the same for the measured line. Its
+ * mutation is to store the line's own words again.
  */
 
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
@@ -42,8 +47,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { freshDb, type TestDb } from './helpers.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
-import { localStamp } from '../src/shared/time.ts'
-import { theStopCauseInTheTranscript, thePatchThatClosesARun } from '../src/config/stopped-run-cause.mjs'
+import { clockStamp, localStamp } from '../src/shared/time.ts'
+import { theStopCauseAtTheEndOfTheTranscript, theStopCauseInTheTranscript, thePatchThatClosesARun } from '../src/config/stopped-run-cause.mjs'
 
 type RemindersLib = typeof import('../src/server/lib/reminders.ts')
 
@@ -161,9 +166,8 @@ function officeNotices(cause?: string): Record<string, unknown>[] {
 
 describe('M94, the end of a session writes why it stopped', () => {
   it('a limit in the transcript becomes closedBecause with the cause words and the state crashed', () => {
-    const transcript = aTranscript([
-      theLimitLine("You've hit your session limit · resets 7:10pm (Europe/London)", 'rate_limit', 429),
-    ])
+    const theLine = theLimitLine("You've hit your session limit · resets 7:10pm (Europe/London)", 'rate_limit', 429)
+    const transcript = aTranscript([theLine])
     const run = aRun('a long run', {
       state: 'running',
       lastOutputAt: localStamp(at(-TEN_MINUTES)),
@@ -177,6 +181,11 @@ describe('M94, the end of a session writes why it stopped', () => {
     expect(cause.kind).toBe('session-limit')
     expect(cause.said).toContain("You've hit your session limit")
     expect(cause.resetsAt).toBe('7:10pm (Europe/London)')
+    // THE TIME IS STORED AS LOCAL WALL-CLOCK WITH ITS OFFSET, the instant `clockStamp` writes, and not in the
+    // transcript line's own UTC words. The reader that looks only at the last line stores the same time.
+    const theLinesTime = (theLine as { timestamp: string }).timestamp
+    expect(cause.at).toBe(clockStamp(() => theLinesTime).instant)
+    expect(theStopCauseAtTheEndOfTheTranscript(transcript)?.at).toBe(cause.at)
     t.api.patchRecord(run, { dataPatch: thePatchThatClosesARun(cause, R0, 'other') }, HUMAN)
 
     const record = t.api.getRecord(run)!
@@ -188,7 +197,7 @@ describe('M94, the end of a session writes why it stopped', () => {
     // Claude Code's own SessionEnd reason word is kept, because `closedHow` holds one of five words.
     expect(String(record.data.detail)).toContain('other')
     // The stop cause is the session's own field, and the old copy in `extra` is not written beside it.
-    expect(record.data.stopCause).toMatchObject({ kind: 'session-limit' })
+    expect(record.data.stopCause).toMatchObject({ kind: 'session-limit', at: cause.at })
     expect((record.data.extra as Record<string, unknown>)['stopCause']).toBeUndefined()
   })
 
@@ -203,6 +212,29 @@ describe('M94, the end of a session writes why it stopped', () => {
     const cause = theStopCauseInTheTranscript(transcript)
     expect(cause?.kind).toBe('quota')
     expect(cause?.resetsAt).toBeNull()
+  })
+
+  it('the time is stored with the offset in force at its moment, and words that name no moment are null', () => {
+    const said = "You've hit your session limit · resets 7:10pm (Europe/London)"
+    /** The time each reader stores for one limit line carrying these words as its timestamp. */
+    const theTimeStoredFor = (timestamp: unknown): unknown => {
+      const transcript = aTranscript([{ ...(theLimitLine(said, 'rate_limit', 429) as Record<string, unknown>), timestamp }])
+      const inTheTail = theStopCauseInTheTranscript(transcript)
+      expect(inTheTail, String(timestamp)).not.toBeNull()
+      // BOTH READERS STORE THE SAME TIME, worked out in one place.
+      expect(theStopCauseAtTheEndOfTheTranscript(transcript)?.at, String(timestamp)).toBe(inTheTail?.at)
+      return inTheTail?.at
+    }
+    // WINTER, BOTH MOMENTS OF THE HOUR THE CLOCKS GO BACK IN EUROPE/LONDON IN 2026, AND A TIME GIVEN WITH ITS OFFSET:
+    // each is the instant `clockStamp` writes, and the two moments of the repeated hour stay two.
+    for (const instant of ['2026-12-01T09:00:00.000Z', '2026-10-25T00:30:00.000Z', '2026-10-25T01:30:00.000Z', '2026-09-11T17:55:08+01:00']) {
+      expect(theTimeStoredFor(instant), instant).toBe(clockStamp(() => instant).instant)
+    }
+    expect(theTimeStoredFor('2026-10-25T00:30:00.000Z')).not.toBe(theTimeStoredFor('2026-10-25T01:30:00.000Z'))
+    // WORDS THAT NAME NO MOMENT ARE NOT A TIME: a time with no zone, a day that does not exist, and a number.
+    for (const words of ['2026-09-11 16:55:08', '2026-02-30T10:00:00.000Z', 1789145708628]) {
+      expect(theTimeStoredFor(words), String(words)).toBeNull()
+    }
   })
 })
 

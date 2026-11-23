@@ -14,6 +14,8 @@
  * the same way it was: refuse, and name what does exist.
  */
 
+import { KNOWLEDGE_WORKSPACE } from '@shared/knowledge/constants.ts'
+import { KNOWLEDGE_WORDS } from '@shared/words/en-wave-13u.ts'
 import type { FastifyRequest } from 'fastify'
 import { and, count, eq, isNull, ne, sql } from 'drizzle-orm'
 import { db } from '../db/client.ts'
@@ -110,6 +112,7 @@ export function workspaceOf(req: FastifyRequest): string {
  * the `decision` kind, which is a person's judgement, and this is a filing cabinet.
  */
 export function createWorkspace(input: { id: string; title: string; note?: string | null }): Workspace {
+  if (input.id === KNOWLEDGE_WORKSPACE) throw new PanelError(KNOWLEDGE_WORDS.onlyProject, 400)
   const fault = workspaceIdFault(input.id)
   if (fault !== null) throw new PanelError(fault)
   const titleFault = workspaceTitleFault(input.title)
@@ -168,6 +171,7 @@ export function renameWorkspace(
   input: { title?: string; note?: string | null; reviewLevel?: ReviewLevel | null; packageInspection?: boolean },
 ): Workspace {
   const found = getWorkspace(id)
+  if (id === KNOWLEDGE_WORKSPACE) throw new PanelError(KNOWLEDGE_WORDS.onlyProject, 400)
   if (id === MESSAGE_CENTRE) {
     throw new PanelError(
       `"${MESSAGE_CENTRE}" is the office's message centre, where every message is kept, and not a project. Nothing was ` +

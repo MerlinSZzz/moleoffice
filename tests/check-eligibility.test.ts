@@ -90,7 +90,11 @@ function run(extra: Record<string, unknown> = {}) {
     data: { ...data, state: 'running' },
   })
   db.client.sqlite.prepare('INSERT INTO legacy_unsealed_runs VALUES (?)').run(made.id)
-  db.client.sqlite.prepare('UPDATE records SET data = ? WHERE id = ?').run(JSON.stringify(data), made.id)
+  // THE STORED DATA IS KEPT, and only the fields this run means to set are written over it. The record door writes what
+  // no caller may send, such as the moment it filed the run at, and a rewrite that dropped it would leave the run's
+  // newest revision holding more than the run: a server started on this database then refuses to serve until a
+  // migration writes a catch-up revision for each such run.
+  db.client.sqlite.prepare('UPDATE records SET data = ? WHERE id = ?').run(JSON.stringify({ ...made.data, ...data }), made.id)
   return made.id
 }
 
@@ -323,7 +327,8 @@ describe('the note on a run that runs no model', () => {
     })
     const check = theStoredCheck(id)
     expect(check.eligibility.missing.map((one) => one.fact)).toEqual(['workerServed', 'registeredArea', 'noInspector'])
-    expect(check.says).toBe(noCheckSays(check.eligibility.missing, sayInEnglish))
+    expect(check.says).toBe(
+      'No check was asked for: a run serving a registered worker is missing; a registered work area is unknown; a target with no inspector role or purpose in its history is unknown. Name the registered worker this run serves. Register the worker’s work area. Submit the worker’s run; an inspector’s own run cannot be checked.')
     expect(check.says).toContain(WORKER_SERVED_ACT)
     expect(check.says).toContain(REGISTERED_AREA_ACT)
     expect(check.eligibility.nextAct).toBe(noCheckWords(check.eligibility.missing, sayInEnglish).nextAct)
@@ -350,6 +355,8 @@ import { TWELVE_ID_CHARACTERS } from '../src/shared/messages.ts'
 import { theCheckBeganAsking, theCheckFinishedAsking } from '../src/config/a-checks-seat-wait.mjs'
 import { aCommandWithTheHarnessFeaturesOff } from '../tools/harness-features-off.mjs'
 import { THE_YESES_OPTIONS, theYesesOptionsAreIgnored } from '../src/config/inspection-ending.mjs'
+import { aCommandsProgram, aRuntimeIsCodex } from '../src/config/run-permissions.mjs'
+import { theEnvironmentACodexGets } from '../src/config/the-environment-a-codex-gets.mjs'
 
 /**
  * EVERY NAME THE INSPECTOR IMPORTS, read from its own import lines, with the module each comes from. The case runs the
@@ -468,6 +475,9 @@ describe('the actual manual tool before worktree and model allocation', () => {
       // THE SWITCH THAT TURNS THE HARNESS'S OWN SUBAGENTS AND WORKFLOWS OFF (tools/harness-features-off.mjs), which the
       // tool puts onto the model's command: the real one, which only reads the command it is given.
       aCommandWithTheHarnessFeaturesOff,
+      // THE CODEX TEST AND THE CODEX'S ENVIRONMENT, which the tool reads as it starts the model: the real ones, which only
+      // read the runtime, the command and the environment they are given, so this boundary still reads no file.
+      aCommandsProgram, aRuntimeIsCodex, theEnvironmentACodexGets,
       // THE TEST-BATCHES SEAT (tools/test-batch-seat.mjs) the check's model is started with. Bound to a stand-in that
       // answers no seat, so this boundary still asks no office and starts no process.
       TEST_BATCH_POOL,

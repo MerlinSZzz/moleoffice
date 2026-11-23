@@ -1,0 +1,30 @@
+-- EACH RECORD'S REVISIONS IN A PROJECT ARE COUNTED FROM AN INDEX, WITHOUT READING THE REVISION ROWS. Wave 13s round
+-- 281, package PG, point PG-1: the project graph answers within a second at the live office's size.
+--
+-- GET /api/project-graph (`readProjectGraph` in src/server/lib/project-graph.ts) counts each record's revisions in the
+-- project, its baselines among them, and its first and last `at`, in one statement grouped by the record. SQLite read
+-- every revision of the project by `revisions_workspace_at_idx`, then the row itself, and grouped them in a temporary
+-- tree. A row's `op` and `at` are stored after its data, so each row read meant every page of its data.
+--
+--   revisions_workspace_record_op_at_idx  every revision, by its project, then its record, its op and its `at`.
+--
+-- It holds every column the count asks for, in the order the count groups by, so the count reads the index alone and
+-- needs no temporary tree.
+--
+-- MEASURED TO FIND THE CAUSE, not as a proof, on a made-up office at the counts of 13 November 2026, with 210,000
+-- revisions in its project and pages of 4,096 bytes. The live server's log of 20 November counted 203,799 rows for this
+-- count, which took 86,439 ms there. On the made-up office the count alone, with the database's pages not in memory,
+-- took 1,030.5 ms and read 288,032 pages before, and 56.3 ms and 2,951 pages after. With them in memory, it took
+-- 265.7 ms before and 42.1 ms after. The index there is 2,951 pages, 12,087,296 bytes, about 58 a revision. It was
+-- built in 951 ms. What it adds to each revision written was not measured.
+--
+-- TWO READS IN RECORD ORDER KEEP THE INDEXES THEY HAD. The take-back listing's read of a problem's takeouts
+-- (src/server/lib/async-take-back.ts) and `theRuleThreeSignature` (src/server/lib/rulethree.ts) ask for revisions in
+-- record order, and SQLite would move both onto this index to skip the sort. The first term of each one's ORDER BY
+-- has a unary plus, so SQLite does not take that order from an index.
+-- tests/migration-0326-the-revisions-of-a-kind-are-found-by-index.test.ts holds both plans.
+--
+-- The index is not unique, and it changes no row.
+--
+-- ADDITIVE, AND IT REWRITES NOTHING. One CREATE INDEX statement and no UPDATE.
+CREATE INDEX IF NOT EXISTS `revisions_workspace_record_op_at_idx` ON `revisions` (`workspace_id`,`record_id`,`op`,`at`);

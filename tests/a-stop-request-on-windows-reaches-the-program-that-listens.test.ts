@@ -641,7 +641,7 @@ helper.stdout.on('data', (part) => {
       const sqlite = db.client.sqlite
       const backups = join(scratch, 'backups')
       mkdirSync(backups, { recursive: true })
-      const offer = { file: db.file, holds: 'a test office', wouldWrite: [], backups }
+      const offer = { file: db.file, holds: 'a test office', wouldWrite: [], measuredOn: 'this file' as const, backups }
       const { theReducedMode, theStopsNote } = await import('../src/server/lib/the-update.ts')
 
       // (a) THE WAITING OFFICE STOPS ON A REQUEST.

@@ -53,8 +53,14 @@ export const QUICK_NOTE_PEN_WIDTH = 2.5
 const ERASER_REACH = 10
 /** How far a press may move and still be a press rather than a stroke, in pixels. */
 const A_PRESS_MOVES_LESS_THAN = 4
-/** The space kept round the sheet's own edge, in pixels: where new words start, and the room past the last part. */
+/** The space kept round the sheet's own edge, in pixels of the sheet: where new words start. */
 const MARGIN = 20
+/**
+ * THE ROOM THE SHEET KEEPS PAST THE LAST PART, in pixels of the screen, so it is the same small margin at every zoom.
+ * Drawing near an edge grows the sheet by what the drawing passes it by and this much, and never by a part of the sheet.
+ * It is the margin at the sheet's own edge, so words drawn as wide as the sheet allows end where the sheet does.
+ */
+const ROOM_PAST_THE_LAST_PART = MARGIN
 /** How wide new words are at most, in pixels of the sheet, so a line of them stays easy to read in a wide window. */
 const NEW_WORDS_ARE_AT_MOST = 560
 /** The box a press makes with Box chosen, in pixels of the sheet: room for a few words on one line. */
@@ -63,6 +69,8 @@ const A_PRESSED_BOX = { width: 150, height: 64 }
 const A_BOX_IS_AT_LEAST = { width: 40, height: 28 }
 /** A resized box leaves room for one line of its words. */
 const A_RESIZED_BOX_IS_AT_LEAST = { width: 40, height: 40 }
+/** A resized added part leaves room for the line naming the page it came from, and is never narrower than words are drawn. */
+const A_RESIZED_ADDED_PART_IS_AT_LEAST = { width: 160, height: 40 }
 const ZOOM_MIN = 0.25
 const ZOOM_MAX = 4
 const ZOOM_STEP = 1.25
@@ -77,12 +85,21 @@ export function aNewPartId(type: QuickNotePart['type'], parts: readonly QuickNot
 }
 
 /**
- * HOW WIDE WORDS OR AN ADDED PART ARE DRAWN: as wide as they were placed, or narrower when the sheet has less room, so
- * words written in a wide window are not drawn past the small window's edge. They are never drawn narrower than 160
- * pixels. The width the note keeps is the one they were placed at.
+ * HOW WIDE WORDS OR AN ADDED PART NOBODY HAS RESIZED ARE DRAWN: as wide as they were placed, or narrower when the sheet
+ * has less room, so words written in a wide window are not drawn past the small window's edge. They are never drawn
+ * narrower than 160 pixels. The width the note keeps is the one they were placed at.
  */
 function drawnWidthOf(part: { x: number; width: number }, roomWidth: number): number {
   return Math.min(part.width, Math.max(160, Math.max(roomWidth, 200) - part.x - MARGIN))
+}
+
+/**
+ * HOW BIG AN ADDED PART IS DRAWN. Once the person has resized it, it holds a height, and it is drawn at the width and
+ * the height they dragged it to, in a window of any width. Until then it is as wide as drawnWidthOf says, and as tall
+ * as what it holds, so its height is undefined.
+ */
+function drawnSizeOfAdded(part: QuickNoteAdded, roomWidth: number): { width: number; height: number | undefined } {
+  return part.height === undefined ? { width: drawnWidthOf(part, roomWidth), height: undefined } : { width: part.width, height: part.height }
 }
 
 /** The rectangle a placed part covers on a sheet this wide, or null for a stroke or a line, placed by their points. */
@@ -92,10 +109,12 @@ function placeOf(part: QuickNotePart, roomWidth: number): { x: number; y: number
     case 'picture':
     case 'video':
       return { x: part.x, y: part.y, width: part.width, height: part.height }
+    // Words grow downwards as they are written, and an added part is as tall as it is drawn. The sheet measures the
+    // height of both, so only their top and width are placed here.
     case 'words':
-    case 'added':
-      // Words and an added part grow downwards as they are written, so only their top and width are kept.
       return { x: part.x, y: part.y, width: drawnWidthOf(part, roomWidth), height: 0 }
+    case 'added':
+      return { x: part.x, y: part.y, width: drawnSizeOfAdded(part, roomWidth).width, height: 0 }
     case 'stroke':
     case 'line':
       return null
@@ -187,15 +206,20 @@ function drawnBox(part: QuickNoteBox, heights: ReadonlyMap<string, number>): Qui
 
 /**
  * The drawn positions and reach on this sheet. Parts added from a page follow everything already on it, and so do words
- * kept with an added part, as whereWordsWithAnAddedPartGo says. `tops` holds the top each of those is drawn at.
+ * kept with an added part, as whereWordsWithAnAddedPartGo says. `tops` holds the top each of those is drawn at. `left`
+ * and `top` are 0, or below it where a part was drawn left of or above the sheet's first point.
  */
-function reachOf(parts: readonly QuickNotePart[], roomWidth: number, heights: ReadonlyMap<string, number> = new Map()): { right: number; bottom: number; tops: Map<string, number> } {
+function reachOf(parts: readonly QuickNotePart[], roomWidth: number, heights: ReadonlyMap<string, number> = new Map()): { left: number; top: number; right: number; bottom: number; tops: Map<string, number> } {
+  let leftmost = 0
+  let topmost = 0
   let right = 0
   let bottom = 0
   const tops = new Map<string, number>()
   for (const [i, part] of parts.entries()) {
     if (part.type === 'stroke') {
       const bounds = boundsOfStroke(part)
+      leftmost = Math.min(leftmost, bounds.left)
+      topmost = Math.min(topmost, bounds.top)
       right = Math.max(right, bounds.right)
       bottom = Math.max(bottom, bounds.bottom)
       continue
@@ -208,11 +232,13 @@ function reachOf(parts: readonly QuickNotePart[], roomWidth: number, heights: Re
     const follows = part.type === 'added' || withTheAdded
     const top = follows ? Math.max(place.y, bottom === 0 ? place.y : bottom + MARGIN) : place.y
     if (follows) tops.set(part.id, top)
+    leftmost = Math.min(leftmost, place.x)
+    topmost = Math.min(topmost, top)
     right = Math.max(right, place.x + place.width)
     const height = part.type === 'words' || part.type === 'added' ? (heights.get(part.id) ?? 0) : place.height
     bottom = Math.max(bottom, top + height)
   }
-  return { right, bottom, tops }
+  return { left: leftmost, top: topmost, right, bottom, tops }
 }
 
 /** The stored y is a starting position; the sheet draws added parts below earlier parts using their measured heights. */
@@ -257,18 +283,34 @@ function partsAt(clientX: number, clientY: number): string[] {
 function boxOver(startX: number, startY: number, endX: number, endY: number): { x: number; y: number; width: number; height: number } {
   const width = Math.max(A_BOX_IS_AT_LEAST.width, Math.abs(endX - startX))
   const height = Math.max(A_BOX_IS_AT_LEAST.height, Math.abs(endY - startY))
-  return { x: Math.max(0, endX < startX ? startX - width : startX), y: Math.max(0, endY < startY ? startY - height : startY), width, height }
+  return { x: endX < startX ? startX - width : startX, y: endY < startY ? startY - height : startY, width, height }
 }
 
 /** The parts with one box placed at another point. Its lines name the box and not a point, so they follow it. */
 function withTheBoxAt(parts: readonly QuickNotePart[], id: string, x: number, y: number): QuickNotePart[] {
-  return parts.map((part) => (part.id === id && part.type === 'box' ? { ...part, x: Math.max(0, x), y: Math.max(0, y) } : part))
+  return parts.map((part) => (part.id === id && part.type === 'box' ? { ...part, x, y } : part))
 }
 
-function withTheBoxSize(parts: readonly QuickNotePart[], id: string, width: number, height: number): QuickNotePart[] {
-  return parts.map((part) => part.id === id && part.type === 'box'
-    ? { ...part, width: Math.max(A_RESIZED_BOX_IS_AT_LEAST.width, width), height: Math.max(A_RESIZED_BOX_IS_AT_LEAST.height, height) }
-    : part)
+/** The parts with one box or one added part resized, never smaller than it may be. A box's lines follow its new edge. */
+function withTheSize(parts: readonly QuickNotePart[], id: string, width: number, height: number): QuickNotePart[] {
+  return parts.map((part) => {
+    if (part.id !== id) return part
+    if (part.type === 'box') return { ...part, width: Math.max(A_RESIZED_BOX_IS_AT_LEAST.width, width), height: Math.max(A_RESIZED_BOX_IS_AT_LEAST.height, height) }
+    if (part.type === 'added') return { ...part, width: Math.max(A_RESIZED_ADDED_PART_IS_AT_LEAST.width, width), height: Math.max(A_RESIZED_ADDED_PART_IS_AT_LEAST.height, height) }
+    return part
+  })
+}
+
+/**
+ * THE SIZE A RESIZE STARTS FROM: a box's own, and an added part's as it is drawn now, read from its frame. So an added
+ * part nobody has resized starts at the height of what it holds and at the width the room lets it be drawn.
+ */
+function sizeToResize(part: QuickNotePart, corner: Element): { width: number; height: number } | null {
+  if (part.type === 'box') return { width: part.width, height: part.height }
+  const frame = part.type === 'added' ? corner.closest<HTMLElement>('[data-part]') : null
+  if (frame === null) return null
+  const drawn = getComputedStyle(frame)
+  return { width: Math.round(parseFloat(drawn.width)), height: Math.round(parseFloat(drawn.height)) }
 }
 
 /** Where a picture or a film the person adds is placed on the sheet, and how wide it may be drawn there. */
@@ -287,8 +329,8 @@ export function thePlaceInView(sheet: HTMLElement): APlaceForFiles {
   const paperRect = paper.getBoundingClientRect()
   const scale = paperRect.width / paper.offsetWidth
   return {
-    x: Math.max(0, (sheetRect.left + sheet.clientLeft - paperRect.left) / scale) + MARGIN,
-    y: Math.max(0, (sheetRect.top + sheet.clientTop - paperRect.top) / scale) + MARGIN,
+    x: (sheetRect.left + sheet.clientLeft - paperRect.left) / scale + MARGIN,
+    y: (sheetRect.top + sheet.clientTop - paperRect.top) / scale + MARGIN,
     room: sheet.clientWidth / scale - MARGIN * 2,
   }
 }
@@ -345,6 +387,7 @@ export function QuickNoteSheet(props: QuickNoteSheetProps) {
   const [drawing, setDrawing] = useState<number[] | null>(null)
   const [shaping, setShaping] = useState<Shaping | null>(null)
   const [room, setRoom] = useState({ width: 0, height: 0 })
+  const [scrolled, setScrolled] = useState({ left: 0, top: 0 })
   const [heights, setHeights] = useState<ReadonlyMap<string, number>>(() => new Map())
   const [view, setView] = useState({ zoom: 1, x: 0, y: 0 })
   const [hand, setHand] = useState(false)
@@ -412,7 +455,8 @@ export function QuickNoteSheet(props: QuickNoteSheetProps) {
     changed(next)
   }
 
-  // THE SHEET IS AT LEAST AS BIG AS THE SPACE IT STANDS IN, and grows past it to hold every part with room to spare.
+  // THE SHEET IS AT LEAST AS BIG AS THE SPACE IT STANDS IN, as it is seen at any zoom, and grows past it only to hold
+  // every part with a small margin.
   useLayoutEffect(() => {
     const node = scroller.current
     if (node === null) return
@@ -446,11 +490,24 @@ export function QuickNoteSheet(props: QuickNoteSheetProps) {
   }, [parts, room.width, writing])
   // A BOX BEING MOVED IS DRAWN WHERE IT IS DRAGGED, with its lines, and is kept there only when the drag ends.
   const shown = shaping?.kind === 'move' ? withTheBoxAt(parts, shaping.id, shaping.x, shaping.y)
-    : shaping?.kind === 'resize' ? withTheBoxSize(parts, shaping.id, shaping.width, shaping.height) : parts
+    : shaping?.kind === 'resize' ? withTheSize(parts, shaping.id, shaping.width, shaping.height) : parts
   const drawn = shown.map((part) => part.type === 'box' ? drawnBox(part, heights) : part)
   const reach = reachOf(drawing === null ? drawn : [...drawn, { id: '', type: 'stroke', colour, width: QUICK_NOTE_PEN_WIDTH, points: drawing }], room.width, heights)
-  const width = Math.max(room.width, Math.ceil(reach.right + MARGIN))
-  const height = Math.max(room.height, Math.ceil(reach.bottom + MARGIN * 4))
+  // IN PIXELS OF THE SHEET, the window it stands in and the margin past its parts are each the size of the screen's
+  // divided by the zoom, so a zoom alone grows nothing and a drawing grows the sheet by as much at every zoom.
+  const past = ROOM_PAST_THE_LAST_PART / view.zoom
+  const width = Math.max(Math.floor((room.width - view.x) / view.zoom), Math.ceil(reach.right + past))
+  const height = Math.max(Math.floor((room.height - view.y) / view.zoom), Math.ceil(reach.bottom + past))
+  // THE SHEET GROWS IN EVERY DIRECTION. The ground under the parts covers every part, wherever it was drawn, and all of
+  // the sheet in view, however far it was moved or zoomed, so a press anywhere in view draws. Its far edges stop a pixel
+  // inside the view, so the ground alone never gives the sheet a scroll bar.
+  const seen = { x: (scrolled.left - view.x) / view.zoom, y: (scrolled.top - view.y) / view.zoom }
+  const ground = {
+    left: Math.min(reach.left - past, seen.x),
+    top: Math.min(reach.top - past, seen.y),
+    right: Math.max(width, seen.x + (room.width - 1) / view.zoom),
+    bottom: Math.max(height, seen.y + (room.height - 1) / view.zoom),
+  }
 
   /** A point of the screen, in pixels of the sheet. */
   const onSheet = (clientX: number, clientY: number): [number, number] => {
@@ -460,13 +517,12 @@ export function QuickNoteSheet(props: QuickNoteSheetProps) {
 
   /** New words where a press landed, as wide as the sheet allows, and the cursor in them. */
   const wordsAt = (x: number, y: number, aChange = true) => {
-    const left = Math.max(0, x)
     const words: QuickNoteWords = {
       id: aNewPartId('words', latest.current),
       type: 'words',
-      x: left,
-      y: Math.max(0, y),
-      width: drawnWidthOf({ x: left, width: NEW_WORDS_ARE_AT_MOST }, room.width),
+      x,
+      y,
+      width: drawnWidthOf({ x, width: NEW_WORDS_ARE_AT_MOST }, room.width),
       text: '',
     }
     if (aChange) aChangeBegins()
@@ -516,7 +572,7 @@ export function QuickNoteSheet(props: QuickNoteSheetProps) {
       // A DRAG DRAWS A BOX OVER THE DRAG, AND A PRESS MAKES ONE ROUND THE POINT PRESSED. Either opens to be written in.
       const place = now.moved
         ? boxOver(now.startX, now.startY, x, y)
-        : { x: Math.max(0, now.startX - A_PRESSED_BOX.width / 2), y: Math.max(0, now.startY - A_PRESSED_BOX.height / 2), ...A_PRESSED_BOX }
+        : { x: now.startX - A_PRESSED_BOX.width / 2, y: now.startY - A_PRESSED_BOX.height / 2, ...A_PRESSED_BOX }
       const box: QuickNoteBox = { id: aNewPartId('box', latest.current), type: 'box', ...place }
       aChangeBegins()
       change([...latest.current, box])
@@ -536,7 +592,7 @@ export function QuickNoteSheet(props: QuickNoteSheetProps) {
     if (now.kind === 'resize') {
       if (!now.moved) return
       aChangeBegins()
-      change(withTheBoxSize(latest.current, now.id, now.width + x - now.startX, now.height + y - now.startY))
+      change(withTheSize(latest.current, now.id, now.width + x - now.startX, now.height + y - now.startY))
       return
     }
     // A LINE IS DRAWN ONLY WHEN IT IS LET GO ON ANOTHER BOX.
@@ -578,7 +634,7 @@ export function QuickNoteSheet(props: QuickNoteSheetProps) {
       gesture.current = { kind: 'pan', pointer: event.pointerId, startX: event.clientX, startY: event.clientY, fromX: before.x, fromY: before.y }
       return
     }
-    const resize = event.target instanceof Element ? event.target.closest<HTMLElement>('[data-resize-box]') : null
+    const resize = event.target instanceof Element ? event.target.closest<HTMLElement>('[data-resize]') : null
     if (resize === null && aThingOfItsOwn(event.target)) return
     if (event.pointerType === 'touch') {
       touches.current.set(event.pointerId, [event.clientX, event.clientY])
@@ -599,10 +655,11 @@ export function QuickNoteSheet(props: QuickNoteSheetProps) {
     paper.current?.focus({ preventScroll: true })
     paper.current?.setPointerCapture(event.pointerId)
     if (resize !== null) {
-      const part = latest.current.find((one): one is QuickNoteBox => one.id === resize.dataset['resizeBox'] && one.type === 'box')
-      if (part !== undefined) {
+      const part = latest.current.find((one) => one.id === resize.dataset['resize'])
+      const size = part === undefined ? null : sizeToResize(part, resize)
+      if (part !== undefined && size !== null) {
         const [x, y] = onSheet(event.clientX, event.clientY)
-        gesture.current = { kind: 'resize', pointer: event.pointerId, id: part.id, startX: x, startY: y, width: part.width, height: part.height, moved: false }
+        gesture.current = { kind: 'resize', pointer: event.pointerId, id: part.id, startX: x, startY: y, ...size, moved: false }
       }
       return
     }
@@ -722,6 +779,7 @@ export function QuickNoteSheet(props: QuickNoteSheetProps) {
       ref={scroller}
       data-tool={tool}
       data-moving={hand || spaceHeld ? 'true' : undefined}
+      onScroll={(event) => setScrolled({ left: event.currentTarget.scrollLeft, top: event.currentTarget.scrollTop })}
       onPointerDown={(event) => {
         if (event.target !== event.currentTarget || event.pointerType === 'touch') return
         if (event.button === 1 || (event.button === 0 && (hand || space.current))) down(event)
@@ -752,8 +810,28 @@ export function QuickNoteSheet(props: QuickNoteSheetProps) {
         onPointerUp={up}
         onPointerCancel={up}
       >
+        <div
+          className="qn-ground"
+          aria-hidden="true"
+          style={{
+            left: ground.left,
+            top: ground.top,
+            width: ground.right - ground.left,
+            height: ground.bottom - ground.top,
+            backgroundPosition: `${String(12 - ground.left)}px ${String(12 - ground.top)}px`,
+          }}
+        />
         {shown.map((part, order) => part.type === 'added' ? (
-          <AddedDrawn key={part.id} part={part} order={order} roomWidth={room.width} top={reach.tops.get(part.id)} />
+          <AddedDrawn
+            key={part.id}
+            part={part}
+            order={order}
+            roomWidth={room.width}
+            top={reach.tops.get(part.id)}
+            aChangeBegins={aChangeBegins}
+            change={change}
+            latest={latest}
+          />
         ) : (
           <Part
             key={part.id}
@@ -838,7 +916,7 @@ function Part(props: PartProps): ReactNode {
     case 'video':
       return <FileDrawn part={part} order={order} kept={props.kept.has(part.path)} project={props.project} record={props.record} />
     case 'added':
-      return <AddedDrawn part={part} order={order} roomWidth={props.roomWidth} />
+      return <AddedDrawn {...props} part={part} />
   }
 }
 
@@ -933,22 +1011,39 @@ function BoxDrawn({ part, order, writing, setWriting, aChangeBegins, change, lat
       ) : (
         <div className="qn-written">{part.text === undefined ? null : renderMarkdown(part.text, `qn-${part.id}`, null, null, { lineBreaks: true })}</div>
       )}
-      <button
-        type="button"
-        className="qn-resize-box"
-        data-resize-box={part.id}
-        aria-label={t('quickNote.resizeBox')}
-        title={t('quickNote.resizeBox')}
-        onKeyDown={(event) => {
-          const dx = event.key === 'ArrowRight' ? 10 : event.key === 'ArrowLeft' ? -10 : 0
-          const dy = event.key === 'ArrowDown' ? 10 : event.key === 'ArrowUp' ? -10 : 0
-          if (dx === 0 && dy === 0) return
-          event.preventDefault()
-          aChangeBegins()
-          change(withTheBoxSize(latest.current, part.id, part.width + dx, part.height + dy))
-        }}
-      />
+      <ResizeCorner part={part} label={t('quickNote.resizeBox')} aChangeBegins={aChangeBegins} change={change} latest={latest} />
     </div>
+  )
+}
+
+/**
+ * THE CORNER A BOX OR AN ADDED PART IS RESIZED BY. A drag on it is the sheet's own gesture, which finds the part by the
+ * corner's mark. Each arrow key makes the part ten pixels wider, narrower, taller or shorter.
+ */
+function ResizeCorner({ part, label, aChangeBegins, change, latest }: {
+  part: QuickNoteBox | QuickNoteAdded
+  label: string
+  aChangeBegins: () => void
+  change: (next: QuickNotePart[]) => void
+  latest: { current: readonly QuickNotePart[] }
+}) {
+  return (
+    <button
+      type="button"
+      className={part.type === 'box' ? 'qn-resize-box' : 'qn-resize-added'}
+      data-resize={part.id}
+      aria-label={label}
+      title={label}
+      onKeyDown={(event) => {
+        const dx = event.key === 'ArrowRight' ? 10 : event.key === 'ArrowLeft' ? -10 : 0
+        const dy = event.key === 'ArrowDown' ? 10 : event.key === 'ArrowUp' ? -10 : 0
+        const size = dx === 0 && dy === 0 ? null : sizeToResize(part, event.currentTarget)
+        if (size === null) return
+        event.preventDefault()
+        aChangeBegins()
+        change(withTheSize(latest.current, part.id, size.width + dx, size.height + dy))
+      }}
+    />
   )
 }
 
@@ -1034,11 +1129,23 @@ function StoredFile({ part, alt, project, record }: { part: QuickNoteFile & { ty
   )
 }
 
-/** Something copied in from a page: placed and framed here, and drawn inside by QuickNoteAddedPart. */
-function AddedDrawn({ part, order, roomWidth, top = part.y }: { part: QuickNoteAdded; order: number; roomWidth: number; top?: number }) {
+/**
+ * Something copied in from a page: placed, framed and resized here, and drawn inside by QuickNoteAddedPart. What it
+ * holds scrolls inside its frame when the person has made it smaller than that.
+ */
+function AddedDrawn({ part, order, roomWidth, top = part.y, aChangeBegins, change, latest }: Pick<PartProps, 'aChangeBegins' | 'change' | 'latest'> & {
+  part: QuickNoteAdded
+  order: number
+  roomWidth: number
+  top?: number | undefined
+}) {
+  const size = drawnSizeOfAdded(part, roomWidth)
   return (
-    <section className="qn-added" data-part={part.id} style={{ left: part.x, top, width: drawnWidthOf(part, roomWidth), zIndex: order }}>
-      <QuickNoteAddedPart part={part} />
+    <section className="qn-added" data-part={part.id} style={{ left: part.x, top, width: size.width, height: size.height, zIndex: order }}>
+      <div className="qn-added-inside">
+        <QuickNoteAddedPart part={part} />
+      </div>
+      <ResizeCorner part={part} label={t('quickNote.resizeAdded')} aChangeBegins={aChangeBegins} change={change} latest={latest} />
     </section>
   )
 }

@@ -6,6 +6,21 @@ import { workspaces } from './workspaces.ts'
 
 const existingArchive = { existingArchive: true } as const
 
+/**
+ * WHAT AN AGENT IS WORKING ON, AND UNTIL WHEN. One row per claim, added by migration 0121.
+ *
+ * Criterion M13, which absorbs an earlier proposal. A claim says who is working, which run is
+ * doing it, and what is being worked on. A second live claim naming the same thing opens a group
+ * with both agents and the owner in it (M11), and the group's `about` column is what stops a second
+ * group being opened for the same overlap.
+ *
+ * `things` IS JSON AND NOT A SECOND TABLE. The migration's own header says why and what it costs:
+ * overlap is worked out over the live claims in TypeScript, which is a handful of rows, and a second
+ * table would make one claim two rows that can disagree about whether it exists.
+ *
+ * THERE IS NO EXPIRY COLUMN. A lease ends when its run ends, and how that is read is in
+ * src/server/lib/claims.ts. A number of minutes here would be a guess about how long work takes.
+ */
 export const workClaims = aPartTable(sqliteTable(
   'work_claims',
   {

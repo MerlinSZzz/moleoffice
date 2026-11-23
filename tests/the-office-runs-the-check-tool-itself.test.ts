@@ -198,7 +198,7 @@ describe('the office runs the check tool itself', () => {
     // ITS PACE UNDER THE HOURLY CAP, BY PART 2 OF A DECISION: this project registers no repository and the run has no
     // merge entry, so no lane can be told and the cap does not pace it.
     // tests/a-seventh-check-in-an-hour-waits-its-turn.test.ts proves the pace itself.
-    expect(job?.inspection).toEqual({ run: failedRun, checkout: worktree, pace: { notPaced: expect.stringContaining(`run ${failedRun}: it has no merge entry`) } })
+    expect(job?.inspection).toEqual({ run: failedRun, checkout: worktree, readingOnly: false, pace: { notPaced: expect.stringContaining(`run ${failedRun}: it has no merge entry`) } })
     expect(job?.nobodyIsAnsweringAsIt).toBeNull()
     expect((await record(failedMessage)).record.data['body']).not.toContain('RUN IT IN THE FOREGROUND')
     expect((await record(failedMessage)).record.data['toGroup']).toBe(group)

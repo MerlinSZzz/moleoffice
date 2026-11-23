@@ -5,7 +5,7 @@
  *
  * A FLAG IS ONE KIND, whether the office ships it or the person made it. It has a name, a description shown under the
  * name in the menu, an instruction handed to the agent with the message, a short word on the flag left of Send, a
- * colour the flag is drawn in, and a colour the words it marks are drawn in. The two shipped flags and the menu's
+ * colour the flag is drawn in, and a colour the words it marks are drawn in. The four shipped flags and the menu's
  * 'No mark' entry keep whatever the person changed in `shipped_flags` (migration 0346); their own flags are the entries
  * of `chat_labels` (migration 0341), each with the four new fields optional. The rules are in
  * src/shared/intent-mark.ts and src/shared/message-label.ts, and the office checks them.
@@ -22,7 +22,6 @@ import { useState } from 'react'
 import { t } from '@shared/i18n.ts'
 import {
   SHIPPED_FLAGS,
-  THE_SHIPPED_DEFAULT_COLOUR,
   theFlagsOf,
   type AFlagOfThePersons,
   type AStoredShippedFlag,
@@ -145,16 +144,10 @@ export function ChatLabelsPanel() {
         {CHAT_LABELS_CSS}
       </style>
       <div className="chlab">
-        <p className="chlab-what">{t('settingsPanel.chatFlags.what')}</p>
         {reply.status === 'loading' ? <Loading what={t('settingsPanel.chatLabels.loading')} /> : null}
         {reply.status === 'error' ? <ErrorNote message={reply.message} fault={reply.fault} /> : null}
         {reply.status === 'ready' ? (
           <>
-            {kept.unreadable === null ? null : (
-              <p className="chlab-what" role="alert">
-                {t('settingsPanel.chatLabels.unreadable')}
-              </p>
-            )}
             <h3 className="chlab-heading">{t('settingsPanel.chatFlags.shipped')}</h3>
             <div className="chlab-list" role="list" aria-label={t('settingsPanel.chatFlags.shipped')}>
               {shipped.map(({ flag, stored: held }) => (
@@ -197,7 +190,12 @@ export function ChatLabelsPanel() {
               />
             </div>
             <h3 className="chlab-heading">{t('settingsPanel.chatFlags.own')}</h3>
-            {own.length === 0 && kept.unreadable === null ? <p className="chlab-none">{t('settingsPanel.chatLabels.none')}</p> : null}
+            {kept.unreadable === null ? null : (
+              <p className="chlab-none" role="alert">
+                {t('settingsState.notRead')}
+              </p>
+            )}
+            {own.length === 0 && kept.unreadable === null ? <p className="chlab-none">{t('absence.none')}</p> : null}
             {own.length === 0 ? null : (
               <div className="chlab-list" role="list" aria-label={t('settingsPanel.chatFlags.own')}>
                 {own.map((flag, index) => (
@@ -276,11 +274,11 @@ function ShippedRow({ flag, held, defaults, busy, save, reset }: {
     const keptInstruction = instruction.trim()
     const keptShort = shortWord.trim()
     if (keptName !== '' && keptName !== defaults.name) next.name = keptName
-    if (keptDescription !== '') next.description = keptDescription
+    if (keptDescription !== '' && keptDescription !== defaults.description) next.description = keptDescription
     if (keptInstruction !== '' && keptInstruction !== defaults.instruction) next.instruction = keptInstruction
     if (keptShort !== '' && keptShort !== defaults.shortWord) next.shortWord = keptShort
-    if (colour !== THE_SHIPPED_DEFAULT_COLOUR) next.colour = colour
-    if (wordsColour !== (next.colour ?? THE_SHIPPED_DEFAULT_COLOUR)) next.wordsColour = wordsColour
+    if (colour !== defaults.colour) next.colour = colour
+    if (wordsColour !== (next.colour ?? defaults.colour)) next.wordsColour = wordsColour
     save(next, t('settingsPanel.chatFlags.saved', { name: keptName === '' ? defaults.name : keptName }))
   }
   return (
@@ -441,7 +439,7 @@ function ColourPresses({ for: forWhat, chosen, busy, label, choose }: { for: 'fl
  */
 const CHAT_LABELS_CSS = `
 .chlab { display: flex; flex-direction: column; gap: var(--pad); min-width: 0; }
-.chlab-what, .chlab-none, .chlab-say { margin: 0; max-width: var(--measure-in-box); overflow-wrap: anywhere; color: var(--text-2); font: var(--fs-1)/var(--lh-body) var(--font-ui); }
+.chlab-none, .chlab-say { margin: 0; max-width: var(--measure-in-box); overflow-wrap: anywhere; color: var(--text-2); font: var(--fs-1)/var(--lh-body) var(--font-ui); }
 .chlab-heading { margin: 0; color: var(--text-2); font: 700 var(--fs-1)/var(--lh-tight) var(--font-ui); text-transform: uppercase; letter-spacing: .04em; }
 .chlab-list { display: flex; flex-direction: column; gap: var(--pad); min-width: 0; }
 .chlab-one, .chlab-new { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--pad); min-width: 0; }

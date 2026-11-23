@@ -245,8 +245,12 @@ healthy API alone does not prove the required worker topology was restored.
 7. Real execution rereads the actual ordinary runtime and verifies its topology,
    database, source, artifacts and exact listeners before mutation. Persist and
    fsync each attempted mutation and its recovery paths before the action. Prepare
-   the locked worktree, npm ci, typecheck, stamped web and all plugin pages before
-   downtime. Keep exact original source/artifact identities and verified copies.
+   the locked worktree, npm ci, Electron's binary, typecheck, stamped web and all
+   plugin pages before downtime. After npm ci the bootstrap fetches Electron's
+   binary with the electron package's own install.js and checks it as the upgrade
+   checks it: the binary path.txt names must be in dist. Preparation stops if
+   path.txt or that binary is missing, and the original office serves on.
+   Keep exact original source/artifact identities and verified copies.
    No build or install is added to downtime or recovery.
 8. Both write-excluded checks remain: first the prepared target on a private
    database copy and scratch port, then the same target on the original database

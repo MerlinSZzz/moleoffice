@@ -379,7 +379,7 @@ type ScopeReader<K extends TargetKind> = (
  * so.
  *
  * A plan, a block on the week and a page belong to no project at all — `PERSON_LEVEL_TABLES` in
- * src/server/db/schema.ts says which tables those are — so they are never in ANOTHER project and
+ * src/server/db/authored-table-of.ts says which tables those are — so they are never in ANOTHER project and
  * this answers false for them. The two that do carry a project answer from where it is written
  * down: a record carries its own, and a message carries its thread's, one row along.
  */

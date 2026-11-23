@@ -149,6 +149,10 @@ beforeAll(async () => {
     body: JSON.stringify({ kind: 'agent', title: 'Builder Picture Waiter', data: { handle: 'builder-picture-waiter', runtime: 'claude-code', state: 'active' } }),
   })
   expect(keeper.status, await keeper.clone().text()).toBe(201)
+  // THE PERSON LAST HAD THE CHAT BESIDE THE PAGE, so the circle opens it there and the seam's away press puts it away.
+  // The chat opens the way the person last had it, and the corner window when nothing is kept.
+  const beside = await fetch(`${app.api}/api/participants/person/${THE_PERSON}`, { method: 'PATCH', headers: AS_THE_OWNER, body: JSON.stringify({ chatOpensAs: 'split' }) })
+  expect(beside.status, await beside.clone().text()).toBe(200)
 }, 240_000)
 
 afterAll(async () => {
@@ -344,7 +348,9 @@ describe('the settings offer the four, and the one the owner picks is stored', (
   it('keeps the saved choice during a refused save and returns to mole-at-the-sill after a saved reset', async () => {
     await app.page.goto(`${app.site}/#/settings/chatbutton`)
     await app.page.waitForSelector('.ccl-face[data-picture="two-moles-talking"][aria-pressed="true"]')
-    const reset = app.page.locator('.ccl-faces').locator('xpath=ancestor::section[1]').locator('.btnc').filter({ hasText: 'Back to not chosen' }).first()
+    // THE PICTURE'S OWN WAY BACK is the press drawn right after the four pictures. The panel draws one such press for each
+    // setting the person has chosen, all with the same words, and this person has chosen how the chat opens.
+    const reset = app.page.locator('.ccl-faces + .btnc').filter({ hasText: 'Back to not chosen' })
     expect(await reset.getAttribute('title')).toBe('If this change is saved, the button returns to mole at the sill.')
     let release!: () => void
     let arrived!: () => void

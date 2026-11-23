@@ -38,7 +38,7 @@ const BOXES = MASTER.blockPipelines.flatMap((block) => block.boxes)
 const BLOCK = MASTER.blockPipelines.find((block) => block.key === 'block-03')!
 const BLOCK_MODULES = [...new Set(MASTER.links.filter((link) => link.type === 'implements' && BLOCK.boxes.includes(link.to)).map((link) => link.from))]
 const LARGEST = MASTER.blockPipelines.reduce((a, b) => a.boxes.length >= b.boxes.length ? a : b)
-const WIDTHS = [1440, 990, 660] as const
+const WIDTHS = [1440, 660] as const
 // Block 08 takes minutes to draw; two minutes is room for any other page on a loaded machine.
 const BLOCK_DRAWN_WITHIN = 300_000
 const DRAWN_WITHIN = 120_000

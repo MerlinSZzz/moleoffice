@@ -5,9 +5,21 @@ import { basename, join } from 'node:path'
 import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { madeUpRound } from './round-chapters-fixture.ts'
 import { prepareRoundChapters, ROUND_CHAPTERS_POLICY_FILE, saveRoundChapters, THE_LEGACY_OFFICE_NOTE, THE_UNSAFE_TERRITORY_NOTICE, unknownKindNotice } from '../src/shared/round-chapters/delivery.ts'
-import { deliveredRoundBrief, readRoundChapters, roundChaptersGivenText, roundChaptersOutline, roundChaptersText, savedChaptersLine } from '../src/shared/round-chapters/manifest.ts'
+import { deliveredRoundBrief, readRoundChapters, roundChaptersGivenText, roundChaptersOutline, roundChaptersText, savedChaptersLine, THE_SAVED_SELECTION_HOLDS_TERRITORIES_IN_FULL } from '../src/shared/round-chapters/manifest.ts'
 import { freshDb } from './helpers.ts'
 import { NEXT_FILE, nextWhole, THE_FALLBACK_RULE, THE_PACK_REFUSAL, twoHeadings } from '../src/shared/round-start-pack.ts'
+
+/**
+ * A fallback saves TERRITORIES.md whole, for the check. When a heading names the sandbox, the round is still given only
+ * its line's own section, with the fallback rule when the file holds exactly one, and is told the saved file is whole.
+ */
+function expectOnlyTheOwnSectionGiven(delivered: string, rule: boolean) {
+  expect(delivered).toContain(THE_SAVED_SELECTION_HOLDS_TERRITORIES_IN_FULL)
+  expect(delivered).toContain('OWN FILE.')
+  expect(delivered).toContain('OWN DETAIL.')
+  expect(delivered).not.toContain('OTHER FILE.')
+  if (rule) expect(delivered).toContain(`${THE_FALLBACK_RULE}, for files not named: use history.`)
+}
 
 function round(task = '**The removal.** Then one code commit taking the paragraph out of manifest.ts. Nothing else changes.\n') {
   const f = madeUpRound()
@@ -143,7 +155,9 @@ describe('a round receives the rules its check reads', () => {
     for (const source of manifest.sources) expect(source.fullFile).toBe(true)
     expect(manifest.sources[2]!.text).toBe(text)
     expect(readRoundChapters(JSON.parse(JSON.stringify(manifest)))).toEqual(manifest)
-    expect(readFileSync(brief, 'utf8')).toContain(roundChaptersGivenText(manifest))
+    // With no heading naming the sandbox, no pack is made and the saved selection is given as it is.
+    if (variation === 'missing line') expect(readFileSync(brief, 'utf8')).toContain(roundChaptersGivenText(manifest))
+    else expectOnlyTheOwnSectionGiven(readFileSync(brief, 'utf8'), false)
   })
 
   it('refuses two headings for the sandbox and writes nothing', () => {
@@ -162,7 +176,8 @@ describe('a round receives the rules its check reads', () => {
     expect(manifest.fallback).toBe(true)
     expect(manifest.notice).toBe(THE_UNSAFE_TERRITORY_NOTICE)
     expect(manifest.sources.every(source => source.fullFile)).toBe(true)
-    expect(readFileSync(brief, 'utf8')).toContain(roundChaptersGivenText(manifest))
+    expect(manifest.sources[2]!.text).toBe(f.territories)
+    expectOnlyTheOwnSectionGiven(readFileSync(brief, 'utf8'), true)
   })
 
   it('keeps an unrecognized kind unrecognized and refuses a damaged declaration', () => {

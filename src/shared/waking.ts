@@ -83,7 +83,8 @@
  * untried, and what Mole Office uses today is still the background-command exit.
  */
 
-import { AGENT_RUNTIMES, type AgentRuntime } from './participants.ts'
+import { AGENT_RUNTIMES, isAgentRuntime, type AgentRuntime } from './participants.ts'
+import { readStoredWord } from './i18n.ts'
 
 /** The three acts a waiter can perform when a message arrives for the session it belongs to. */
 export const WAKING_ACTS = ['exit-and-be-invoked-again', 'send-it-to-the-session', 'print-it-and-stop'] as const
@@ -281,11 +282,18 @@ export const RUNTIMES_WITH_A_MEASUREMENT: readonly AgentRuntime[] = AGENT_RUNTIM
  * be reached even though OpenCode can be: the answer is then the same as Codex's, and the sentence
  * says which of the two reasons it is. A wrong act here is a message that reaches nobody, so the
  * two cases are kept apart rather than collapsed into "cannot be woken".
+ *
+ * A HARNESS WITH NO ROW HERE HAS NOT BEEN MEASURED. Any harness's word is taken, so the answer for one
+ * is "not known": the waiter prints the message and exits, and the sentence says nobody knows whether
+ * that reaches the session. It never says the session can or cannot be woken.
  */
 export function whatTheWaiterDoes(
-  runtime: AgentRuntime,
+  runtime: string,
   sendTo: string | null,
 ): { act: WakingAct; says: string } {
+  if (!isAgentRuntime(runtime)) {
+    return { act: 'print-it-and-stop', says: readStoredWord('devWords.waking.notMeasured', { runtime }) }
+  }
   const known = HOW_TO_WAKE[runtime]
   if (known.act !== 'send-it-to-the-session') return { act: known.act, says: known.says }
   if (sendTo === null) {

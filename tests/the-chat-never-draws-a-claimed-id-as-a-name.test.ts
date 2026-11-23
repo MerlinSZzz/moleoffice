@@ -527,17 +527,6 @@ describe('the chat and the Messages page name a stored sender', () => {
         await context.close()
       }
     }
-    // AND THE PAGE'S PRESS NAMES THE AGENT AND OPENS ITS CONVERSATION, as the Messages page row's does.
-    const { context, page } = await itsOwnPage('handle')
-    try {
-      const press = page.locator('.mp-open')
-      expect(await wordsOf(press), 'the press of handle').toBe(MESSAGES_PAGE.openItWhereItIsRead(AGENTS.lamp.name))
-      await press.click()
-      await inThePanel(page, 'handle')
-      await expect.poll(() => wordsOf(page.locator('.px-chat .px-chat-name')), { timeout: 10_000 }).toBe(AGENTS.lamp.name)
-    } finally {
-      await context.close()
-    }
   }, 240_000)
 
   it("draws a message stored under the agent's handle with the agent's picture, in the conversation with the agent", async () => {

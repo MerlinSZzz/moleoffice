@@ -13,6 +13,7 @@
     "^assets/tuft-actions-[A-Za-z0-9_-]{8}\\.js$",
     "^assets/tuft-action-(r1|c1|p2|seated|p1|c2|c4)-[A-Za-z0-9_-]{8}\\.png$",
     "^assets/(sleep-cast-assets|sleep-look-assets|pose-look-assets)-[A-Za-z0-9_-]{8}\\.js$",
-    "^assets/(fringe|bun|fan|crest|helmet|waves|part|beret|knit|raincoat|apron|bowtie|backpack|roll|flower|gardener|mapmaker|runner)-sleep-[A-Za-z0-9_-]{8}\\.png$"
+    "^assets/(fringe|bun|fan|crest|helmet|waves|part|beret|knit|raincoat|apron|bowtie|backpack|roll|flower|gardener|mapmaker|runner)-sleep-[A-Za-z0-9_-]{8}\\.png$",
+    "^assets/(sitting-look-assets-[A-Za-z0-9_-]{8}\\.js|(tuft|fringe|bun|fan|crest|helmet|waves|part|beret|knit|raincoat|apron|bowtie|backpack|roll|flower|gardener|mapmaker|runner)-sit(-mask)?-[A-Za-z0-9_-]{8}\\.png)$"
   ]
 }

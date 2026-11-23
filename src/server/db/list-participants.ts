@@ -4,6 +4,8 @@
  * `listParticipants` was moved byte for byte out of src/server/lib/participants.ts, with no change of behaviour.
  * `everyAgentsRuntime` was moved byte for byte out of src/server/lib/participants.ts, with no change of behaviour.
  * `theRuntimeOnTheNewestRecord` was moved byte for byte out of src/server/lib/participants.ts, with no change of behaviour.
+ * `theHarnessOnTheNewestRecord` is new here: the stored word itself, which `theRuntimeOnTheNewestRecord` narrows.
+ * `theAgentsOfAHarnessWithNoAdapter` is new here: the agents the Casting page and the runtime page list by harness.
  * `theRegistryListStatements` was moved byte for byte out of src/server/lib/participants.ts, with no change of behaviour.
  * `REGISTRY_LIST` was moved byte for byte out of src/server/lib/participants.ts, with no change of behaviour.
  * `THE_REGISTRYS_ORDER` was moved byte for byte out of src/server/lib/participants.ts, with no change of behaviour.
@@ -11,11 +13,11 @@
  */
 
 import { asAgent, asPerson } from './read-participant.ts'
-import type { RegisteredAgent, RegisteredPerson } from '../lib/participants.ts'
+import type { RegisteredAgent, RegisteredPerson } from './types/participants.ts'
 import { sqlite } from './client.ts'
 import { readInPieces } from './in-pieces.ts'
 import { NEWEST_RECORD_FIRST } from './the-model-on-the-agent-record.ts'
-import { declaredRuntimeOrNull } from '@shared/participants.ts'
+import { aHarnessWithNoAdapter, declaredRuntimeOrNull } from '@shared/participants.ts'
 
 /** Everything in both registries, for a page that draws them side by side. */
 export function listParticipants(): { people: RegisteredPerson[]; agents: RegisteredAgent[] } {
@@ -26,8 +28,10 @@ export function listParticipants(): { people: RegisteredPerson[]; agents: Regist
   return { people, agents }
 }
 /**
- * EVERY AGENT'S RUNTIME IN ONE READ, keyed by the agent's id: what `runtimeOfTheAgentRecord` answers for each, from the
- * same rows in the same order. An agent with no live record is absent, and reads as null, which is that reader's answer.
+ * EVERY AGENT'S RUNTIME WORD IN ONE READ, keyed by the agent's id: the word its newest live record names, as
+ * `theHarnessOnTheNewestRecord` reads it, from the same rows in the same order `runtimeOfTheAgentRecord` reads. Any
+ * harness's word is kept, so `asAgent` gives both the known word and the word as stored. An agent with no live record
+ * is absent, and reads as null, which is that reader's answer.
  *
  * `listParticipants` builds every agent, and it asked `runtimeOfTheAgentRecord` once per agent: 1,025 statements on an
  * office of 1,025 agents, for every one of the five sidebar reads that list the registry (wave 13x round 13).
@@ -46,13 +50,20 @@ export function everyAgentsRuntime(only?: readonly string[]): Map<string, string
   // Every row of one agent is in the piece that names it, so the first row of each agent is still its newest record.
   const rows = only === undefined ? read(null) : readInPieces(only, read)
   const out = new Map<string, string | null>()
-  for (const row of rows) if (!out.has(row.agent)) out.set(row.agent, theRuntimeOnTheNewestRecord(row))
+  for (const row of rows) if (!out.has(row.agent)) out.set(row.agent, theHarnessOnTheNewestRecord(row))
   return out
 }
-/** What the newest live record's stored runtime says, or null because there is no record or it names none. */
+/** What the newest live record's stored runtime says, or null because there is no record or it names no runtime with an adapter. */
 export function theRuntimeOnTheNewestRecord(row: { runtime?: unknown } | undefined): string | null {
-  if (row === undefined || row.runtime === null || row.runtime === undefined) return null
-  return declaredRuntimeOrNull(row.runtime)
+  return declaredRuntimeOrNull(theHarnessOnTheNewestRecord(row))
+}
+/**
+ * THE HARNESS THE NEWEST LIVE RECORD NAMES, as written and trimmed, or null because there is no record or it names none.
+ * Any harness's word is an answer here, whether or not this product has an adapter for it.
+ */
+export function theHarnessOnTheNewestRecord(row: { runtime?: unknown } | undefined): string | null {
+  if (row === undefined || typeof row.runtime !== 'string' || row.runtime.trim() === '') return null
+  return row.runtime.trim()
 }
 export function theRegistryListStatements(): { people: { all: () => unknown[] }; agents: { all: () => unknown[] }; these: { all: (ids: string) => unknown[] } } {
   const kept = REGISTRY_LIST.get(sqlite)
@@ -81,3 +92,20 @@ export const REGISTRY_LIST = new WeakMap<object, { people: { all: () => unknown[
  * index, and a retired agent shares its handle with the live one.
  */
 export const THE_REGISTRYS_ORDER = 'handle, rowid'
+
+/**
+ * EVERY AGENT, NOT RETIRED, WHOSE NEWEST LIVE RECORD NAMES A HARNESS THE OFFICE HAS NO ADAPTER FOR, by handle, with
+ * that harness's word. Its model is chosen in that harness, and the pages that show models list it so that it is not
+ * hidden for its harness.
+ */
+export function theAgentsOfAHarnessWithNoAdapter(): { handle: string; harness: string }[] {
+  const rows = sqlite.prepare('SELECT id, handle FROM agents WHERE retired = 0').all() as { id: string; handle: string }[]
+  const handles = new Map(rows.map((row) => [row.id, row.handle]))
+  return [...everyAgentsRuntime()]
+    .flatMap(([agent, word]) => {
+      const harness = aHarnessWithNoAdapter(word)
+      const handle = handles.get(agent)
+      return harness === null || handle === undefined ? [] : [{ handle, harness }]
+    })
+    .sort((one, two) => one.handle.localeCompare(two.handle))
+}

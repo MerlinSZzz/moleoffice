@@ -36,6 +36,7 @@ export const THE_START_STEPS = {
   openingTheDatabase: 'opening the database and loading the modules that reach it',
   theServiceClaim: 'the service claim',
   theTestCheck: 'the check that no test started this server',
+  theUsersPath: "reading the user's PATH",
   theMigrationsCheck: 'the migrations check',
   theFirstWrites: 'the owner, the GPU watcher, the usage prune, the check worktree sweep, the keys and the regulations',
   theRoutes: 'building the routes',

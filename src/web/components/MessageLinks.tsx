@@ -50,21 +50,10 @@ export const MESSAGE_LINK_PANEL_WORDS = {
   get place() { return t(settingsControlWord('settings.messagelinks', 'settingsPanel.links.place')) },
   /** The label whose value is the choice, for a reader nothing can be drawn for. */
   get showing() { return t('settingsPanel.links.showing') },
-  /**
-   * WHAT EACH CHOICE DRAWS, beside its press, so the example is never the only thing saying.
-   *
-   * A LABEL AND NOT A SENTENCE, which is what `docs/UX-CONTRACT.md` §8.10 asks of anything on a
-   * screen and what the two captions in the chat button's panel already are.
-   */
-  get label() { return t(settingsControlWord('settings.messagelinks', 'settingsPanel.links.label')) },
-  get title2() { return t(settingsControlWord('settings.messagelinks', 'settingsPanel.links.title2')) },
   /** The made-up name and id under each press, so the two choices can be compared at a glance. */
   get exampleLabel() { return t('settingsPanel.links.exampleLabel') },
   get exampleTitle() { return t('settingsPanel.links.exampleTitle') },
   exampleId: '#hUEy7xTi6amC',
-  /** What each layout does, beside its press. A label, for the reason the two above give. */
-  get ownLine() { return t(settingsControlWord('settings.messagelinks', 'settingsPanel.links.ownLine')) },
-  get inline() { return t(settingsControlWord('settings.messagelinks', 'settingsPanel.links.inline')) },
   /** The made-up sentence each layout is drawn inside, so the two can be compared at a glance. */
   get sentenceBefore() { return t('settingsPanel.links.sentenceBefore') },
   get sentenceAfter() { return t('settingsPanel.links.sentenceAfter') },
@@ -79,12 +68,6 @@ function exampleOf(level: MessageLinkLevel, inspect: boolean): string {
   return inspect ? `${name} ${content(MESSAGE_LINK_PANEL_WORDS.exampleId)}` : name
 }
 
-/** The sentence under each choice, by the word it belongs to. */
-const SAYS_OF: Readonly<Record<MessageLinkLevel, string>> = {
-  get label() { return MESSAGE_LINK_PANEL_WORDS.label },
-  get title() { return MESSAGE_LINK_PANEL_WORDS.title2 },
-}
-
 /** The name of each level on its press. The English is `MESSAGE_LINK_LEVEL_WORDS`, read by en.ts. */
 const LEVEL_WORD_KEY = {
   label: 'settingsPanel.links.level.label',
@@ -96,12 +79,6 @@ const LAYOUT_WORD_KEY = {
   'own-line': 'settingsPanel.links.layout.ownLine',
   inline: 'settingsPanel.links.layout.inline',
 } as const satisfies Readonly<Record<MessageLinkLayout, string>>
-
-/** The sentence under each layout, by the word it belongs to. */
-const LAYOUT_SAYS_OF: Readonly<Record<MessageLinkLayout, string>> = {
-  get 'own-line'() { return MESSAGE_LINK_PANEL_WORDS.ownLine },
-  get inline() { return MESSAGE_LINK_PANEL_WORDS.inline },
-}
 
 export function MessageLinksPanel() {
   useLanguage()
@@ -165,7 +142,7 @@ export function MessageLinksPanel() {
           <span className="mlk-value">
             {inspect
               ? t('settingsPanel.links.nobodyAnswersTo', { id: content(actor.id) })
-              : t('settingsPanel.links.nobodyAnswers')}
+              : t('absence.none')}
           </span>
         </p>
       ) : null}
@@ -189,7 +166,6 @@ export function MessageLinksPanel() {
                     examples are made up and both are marked as examples by being drawn here rather
                     than read from a record. */}
                 <span className="mlk-example">{exampleOf(which, inspect)}</span>
-                <span className="mlk-says">{SAYS_OF[which]}</span>
               </button>
             ))}
           </div>
@@ -231,7 +207,6 @@ export function MessageLinksPanel() {
                   </span>
                   {MESSAGE_LINK_PANEL_WORDS.sentenceAfter}
                 </span>
-                <span className="mlk-says">{LAYOUT_SAYS_OF[which]}</span>
               </button>
             ))}
           </div>
@@ -297,7 +272,6 @@ const CSS = `
   text-decoration: underline;
   overflow-wrap: anywhere;
 }
-.mlk-says { font-size: var(--fs-1); color: var(--text-3); }
 
 /* THE MADE-UP BUBBLE EACH LAYOUT IS DRAWN INSIDE. It is the width a chat bubble is, so the example
    wraps the way the real thing wraps. The rules under it are the two the panel itself uses, written

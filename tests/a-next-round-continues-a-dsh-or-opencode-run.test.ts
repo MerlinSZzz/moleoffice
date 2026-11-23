@@ -409,13 +409,13 @@ describe('the round takes the role’s Casting row for the run’s own program',
     expect(theKeptNextRound(r.run)?.['starting']).toMatchObject({ model: M.model, effort: M.effort })
   })
 
-  it('a codex round is refused in today’s words when no row in force casts codex', async () => {
-    const r = await theAskFor('codex', `codex-model-${randomUUID()}`, ROLE)
-    expect(r.status, JSON.stringify(r.body)).toBe(409)
-    const says =
-      `Casting row ${String(rows.marked)}, in force for ${ROLE}, casts claude-code with ${M.model}, ` +
-      `and the round continues run ${r.run} on codex, so it cannot take its model from that row.`
-    expect(r.body['error']).toBe(`${says} Nothing was written.`)
+  it('a codex round keeps its run when no row in force casts codex', async () => {
+    const model = `${made.providers.codex}/model-${randomUUID()}`
+    const r = await theAskFor('codex', model, ROLE)
+    expect(r.status, JSON.stringify(r.body)).toBe(202)
+    const says = `Casting row ${String(rows.marked)}, in force for ${ROLE}, casts claude-code, and no row in force casts codex, the run's program, so the round keeps runtime codex and model ${model} from run ${r.run}.`
+    expect(r.body['says']).toContain(says)
+    expect(theKeptNextRound(r.run)).toMatchObject({ row: null, model, unmatchedRow: { id: rows.marked, card: ROLE, program: 'claude-code' } })
   })
 
   it('an opencode round is refused in words when two rows in force cast opencode and neither casts the run’s model', async () => {
@@ -437,4 +437,25 @@ describe('the round takes the role’s Casting row for the run’s own program',
       expect(removed.status, JSON.stringify(removed.body)).toBe(200)
     }
   })
+  it('an opencode run continues when only claude-code rows are in force', async () => {
+    const removed = await call('DELETE', `/api/casting/rows/${String(rows.opencode)}`, asThePerson)
+    expect(removed.status, JSON.stringify(removed.body)).toBe(200)
+    try {
+      const model = `opencode-go/model-${randomUUID()}`
+      const asked = await theAskFor('opencode', model, ROLE)
+      expect(asked.status, JSON.stringify(asked.body)).toBe(202)
+      const says = `Casting row ${String(rows.marked)}, in force for ${ROLE}, casts claude-code, and no row in force casts opencode, the run's program, so the round keeps runtime opencode and model ${model} from run ${asked.run}.`
+      expect(asked.body['says']).toContain(says)
+      expect(theKeptNextRound(asked.run)).toMatchObject({ row: null, model, unmatchedRow: { id: rows.marked, card: ROLE, program: 'claude-code' } })
+      const wrapper = await aLauncherRun(asked.run)
+      const started = await call('POST', `/api/worker/rounds/${asked.run}/starting`, asTheWorker(), { wrapper })
+      const startSays = `Casting row ${String(rows.marked)}, in force for ${ROLE} when the round was asked for, casts claude-code, and no row in force casts opencode, the run's program, so the round keeps runtime opencode and model ${model} from run ${asked.run}.`
+      expect(started.status, JSON.stringify(started.body)).toBe(200)
+      expect(started.body['round']).toMatchObject({ runtime: 'opencode', model, modelSays: startSays })
+      expect(theKeptNextRound(asked.run)?.['starting']).toMatchObject({ model, modelSays: startSays })
+    } finally {
+      rows.opencode = await addARow('opencode', O.model, O.effort, { model: O.native, provider: O.provider, variant: null })
+    }
+  })
+
 })

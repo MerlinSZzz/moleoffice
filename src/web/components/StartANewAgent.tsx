@@ -37,18 +37,17 @@
  *
  * The press makes a mind that has never heard of the work and hands it their words. That is not
  * something to do on a stray click beside a name, and the dialogue is what the criterion asks for:
- * they are asked, and only their answer starts anything. The dialogue says what will happen and what
- * happens if they do not press, because the second is the question a person actually has.
+ * they are asked, and only their answer starts anything.
  */
 
 import { useRef, useState, useSyncExternalStore } from 'react'
 
-import { t } from '@shared/i18n.ts'
+import { content, t } from '@shared/i18n.ts'
 import { CANNOT_REACH_WORDS } from '@shared/messages.ts'
 
 import { api, errorMessage } from '../api.ts'
 import { hearAlways, useChannel, whenEventsWereLost, whenTheStreamCameBack } from '../lib/channel.ts'
-import { Overlay } from './ui.tsx'
+import { Overlay, ServerNote } from './ui.tsx'
 
 /**
  * Where the press is drawn, so each place can style it without a second component.
@@ -118,7 +117,7 @@ interface StartANewAgentProps {
    * OPENS THE NEW AGENT'S CONVERSATION, criterion M88: one confirmation, and then the conversation
    * follows by itself. It is called only when the press made a new agent, with that agent's handle.
    * It answers true when it opened the conversation, and the dialogue then closes. It answers false
-   * when it could not, and the dialogue then shows what the server said, which names the new agent.
+   * when it could not, and the dialogue then names the new agent.
    */
   follow?: (handle: string) => Promise<boolean>
 }
@@ -139,10 +138,12 @@ export function StartANewAgent({ agentId, handle, workspaceId, name, where, chec
   const [canConfirm, setCanConfirm] = useState(true)
   const [fault, setFault] = useState<string | null>(null)
   const [said, setSaid] = useState<string | null>(null)
+  const [serverSaid, setServerSaid] = useState<string | null>(null)
 
   const ask = async (): Promise<void> => {
     if (checkingNow.current) return
     setSaid(null)
+    setServerSaid(null)
     setFault(null)
     setCanConfirm(true)
     if (!checkBeforeAsking) {
@@ -180,15 +181,15 @@ export function StartANewAgent({ agentId, handle, workspaceId, name, where, chec
       }
       // A NEW AGENT WAS MADE: its conversation opens and the dialogue closes (criterion M88). The
       // new conversation's first line says where it came from. An empty handle means the server
-      // made no agent, and then its words below say why.
+      // made no agent.
       if (done.handle !== '' && follow !== undefined && (await followed(follow, done.handle))) {
         setAsking(false)
         return
       }
-      // WHAT THE SERVER SAID, WORD FOR WORD. It is the half of this a person cannot see: whether
-      // anything was actually waiting for the press. Writing our own sentence here would be this
-      // page claiming to know what the server did.
-      setSaid(done.says)
+      // WHAT THE SERVER DID, READ FROM ITS HANDLE: an empty one means nothing was waiting and no
+      // agent was made. The server's own sentence is kept for developer mode.
+      setSaid(done.handle === '' ? t('newAgentKeys.nothingToCarry') : t('newAgentKeys.madeAs', { handle: content(done.handle) }))
+      setServerSaid(done.says)
       onDone?.()
     } catch (err: unknown) {
       setFault(errorMessage(err))
@@ -227,11 +228,10 @@ export function StartANewAgent({ agentId, handle, workspaceId, name, where, chec
           >
             {!canConfirm ? null : <>
               <p className="px-start-agent-who">{CANNOT_REACH_WORDS.cannotReach(name)}</p>
-              <p className="px-start-agent-what">{CANNOT_REACH_WORDS.whatThePressDoes}</p>
-              <p className="px-start-agent-otherwise">{CANNOT_REACH_WORDS.whatHappensIfNobodyPresses}</p>
             </>}
             {fault === null ? null : <p className="px-start-agent-fault">{fault}</p>}
             {said === null ? null : <p className="px-start-agent-said">{said}</p>}
+            <ServerNote text={serverSaid} />
             <div className="px-start-agent-presses">
               {said !== null || !canConfirm ? null : (
                 <button
@@ -326,8 +326,6 @@ const START_AGENT_CSS = `
   box-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.35);
 }
 .px-start-agent-who { margin: 0 0 0.5rem; font-weight: 600; }
-.px-start-agent-what,
-.px-start-agent-otherwise { margin: 0 0 0.5rem; font-size: 0.85rem; color: var(--text-2); }
 .px-start-agent-fault { margin: 0 0 0.5rem; font-size: 0.85rem; color: var(--st-broken); }
 .px-start-agent-said { margin: 0 0 0.5rem; font-size: 0.85rem; }
 .px-start-agent-presses { display: flex; gap: 0.5rem; justify-content: flex-end; flex-wrap: wrap; }

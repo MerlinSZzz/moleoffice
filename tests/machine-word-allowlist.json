@@ -40,6 +40,10 @@
       "piece.kind",
       "piece.state"
     ],
+    "server/api/reportfiles.ts": [
+      "ended.get(record.id)!.state",
+      "ended.get(run)!.state"
+    ],
     "server/api/plan-graph.ts": [
       "kind"
     ],
@@ -127,6 +131,9 @@
     "server/index.ts": [
       "world.standing.kind"
     ],
+    "server/lib/a-host-that-is-not-this-office.ts": [
+      "kind"
+    ],
     "server/lib/adapters/claude-code.ts": [
       "line.kind"
     ],
@@ -138,12 +145,18 @@
       "state",
       "thread.state"
     ],
+    "server/lib/an-origin-that-is-not-this-office.ts": [
+      "kind"
+    ],
     "server/lib/annotations.ts": [
       "span.field"
     ],
     "server/lib/apply.ts": [
       "operation.field",
       "operation.kind"
+    ],
+    "server/lib/attention-thread-worker.ts": [
+      "kind"
     ],
     "server/lib/before-the-seal.ts": [
       "records.kind"
@@ -249,6 +262,9 @@
     "server/lib/records/blocked-by.ts": [
       "blocker.kind",
       "found.kind"
+    ],
+    "server/lib/records/change-log.ts": [
+      "changes.field"
     ],
     "server/lib/records/checklist-items.ts": [
       "kind",
@@ -447,6 +463,10 @@
       "from.field",
       "source.field"
     ],
+    "shared/results-at-a-level.ts": [
+      "WHY_IN_WORDS[one.why](record.kind)",
+      "kind"
+    ],
     "shared/targets.ts": [
       "kind"
     ],
@@ -489,6 +509,9 @@
       "segment.kind",
       "step.state"
     ],
+    "web/components/ReportsScope.tsx": [
+      "recordPath(row.id, row.kind)"
+    ],
     "web/components/SessionPanel.tsx": [
       "ORPHAN_WORDS[orphan.kind]",
       "UNCLAIMED_WORDS[resource.kind]",
@@ -497,9 +520,6 @@
     "web/components/SummaryBlocks.tsx": [
       "block.kind",
       "region.field"
-    ],
-    "web/components/TerminalView.tsx": [
-      "reading.kind === 'gone' ? reading.says : reading.sentence"
     ],
     "web/components/agent/Recipients.tsx": [
       "reading.record.kind"
@@ -541,13 +561,11 @@
     ],
     "web/pages/AgentsPage.tsx": [
       "RUN_STATE_WORDS[run.state]",
-      "THREAD_STATE_WORDS[thread.state]"
+      "THREAD_STATE_WORDS[thread.state]",
+      "THREAD_STATE_WORDS[thread.thread.state]"
     ],
     "web/pages/GovernancePage.tsx": [
       "waitingKind(row.kind, inspect)"
-    ],
-    "web/pages/HomePage.tsx": [
-      "recordPath(pipeline.record.id, pipeline.record.kind)"
     ],
     "web/pages/IncidentPage.tsx": [
       "SCENE_WORDS.state"
@@ -640,10 +658,17 @@
     ],
     "web/components/RevokeTheirKey.tsx": [
       "props.who.kind"
+    ],
+    "web/components/home/HomeKeyItems.tsx": [
+      "partDrawn('progress', progress.label, progress.state)"
+    ],
+    "server/lib/pack/make.ts": [
+      "kind"
     ]
   },
   "whyAValueReachesDrawnTextWithNothingReadingIt": {
     "server/lib/message-keys.ts": "The kind is message or report, because theRecordsAWriteNames returns before this line for every other kind, and both words read the same as their stored form. It is printed in the English line of the answer to a stored write, read by the program that wrote it, saying that the records its words name could not be read.",
+    "server/lib/an-origin-that-is-not-this-office.ts": "The kind is the kind of an Origin the Origin check refused, or of the world whose page sent it: loopback, number, name, null or unreadable from TheKindOfAnOrigin, or home, agent-made, test or remote from WORLD_KINDS. It is put into the one line the Origin check writes for each refusal, so the line names what was refused without holding the Origin itself. That line goes only to the server's log, for whoever reads that log. No page draws it and no answer carries it.",
     "shared/round-chapters/delivery.ts": "The round kind is a caller-declared policy key, printed exactly when a policy mapping is invalid. This is a configuration diagnostic, not a stored record kind or state being used as a page label.",
     "shared/round-chapters/manifest.ts": "The round kind is the caller-declared policy key in the saved reading manifest. The launcher and check print its exact value so the selected policy can be reviewed; it is not a record-kind or state label.",
     "shared/round-start-pack.ts": "The round-start pack is text for the agent that takes the round, and no page draws it. A delegation's parent kind (decision or task), a material's kind (decision, point, bundle or task) and the taker's kind (person or agent) are the delegation package's own stored words. The agent names them back to the delegation doors, so the stored word is the one it needs.",
@@ -651,6 +676,10 @@
     "server/db/schema-parts/agent-starter-changes.ts": "The state column is put into the SQL of the table's own check constraints and one partial index, which SQLite reads and no person does. Nothing here is drawn or sent in a reply.",
     "web/lib/add-to-a-note.ts": "The field is the name of the field a record keeps its blocks in, put into a regular expression that finds a block by its path. Nothing draws the expression or the text it is matched against.",
     "web/api-parts/records.ts": "The kind is a record kind the page names in its links read, put with a link type into the typeToKind word of the GET /api/links query. The door reads the word, and nothing draws the query.",
-    "web/components/RevokeTheirKey.tsx": "The kind is a participant's kind, agent or person, put with its id into the row word of the GET /api/office/embassy query, which asks for the one row whose keys the panel draws. The door reads the word, and nothing draws it."
+    "web/components/RevokeTheirKey.tsx": "The kind is a participant's kind, agent or person, put with its id into the row word of the GET /api/office/embassy query, which asks for the one row whose keys the panel draws. The door reads the word, and nothing draws it.",
+    "web/components/home/HomeKeyItems.tsx": "The value is the progress part's label, which keyItemProgress in the same file makes with t() from one of three entries of the table, filling in the percent, who set it and when for a percent somebody set.",
+    "server/lib/attention-thread-worker.ts": "The kind is the shape an attention ask named: whole, ranking, narrow, home, flow or full, or part with the name of its list. It is put into the one line the attention thread writes for a slow batch. That line goes through the port to the server's log. No page draws it.",
+    "server/lib/a-host-that-is-not-this-office.ts": "The kind is the kind of a Host the Host check refused: loopback, number, name or none, from TheKindOfAHost in the same file. It is put into the one line the Host check writes for each refusal. That line goes only to the server's log, for whoever reads that log. No page draws it.",
+    "server/lib/pack/make.ts": "The pack file name ends with the pack kind, whole or changes, as the manifest stores it; the restore reads that name back by its pattern, and it is a file name rather than a sentence."
   }
 }

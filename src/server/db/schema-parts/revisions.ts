@@ -240,5 +240,10 @@ export const revisions = aPartTable(sqliteTable(
      * keeps `revisions_workspace_at_idx`. Migration 0326, wave 13y.
      */
     kindWorkspaceSeqIdx: index('revisions_kind_workspace_seq_idx').on(t.kind, t.workspaceId, t.seq),
+    /**
+     * Each revision by its project, then its record, its op and its `at`: the project graph counts each record's
+     * revisions from it alone (`readProjectGraph` in src/server/lib/project-graph.ts). Migration 0353, wave 13s.
+     */
+    workspaceRecordOpAtIdx: index('revisions_workspace_record_op_at_idx').on(t.workspaceId, t.recordId, t.op, t.at),
   }),
 ), { existingArchive: true })

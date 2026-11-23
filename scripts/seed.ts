@@ -1042,6 +1042,14 @@ function upsertContent(spec: Seeded): PanelRecord {
   if (spec.kind === 'message' && !Object.hasOwn(wanted, 'writtenIn') && current.data['writtenIn'] !== undefined) {
     wanted = { ...wanted, writtenIn: current.data['writtenIn'] }
   }
+  // AND THE MOMENT THE OFFICE STAMPED IT AT, the sixth case: the record door writes a message's `writtenTime` and a
+  // run's `filedTime` at filing, in place of any value sent, and a spec cannot hold either. Left to itself, the second
+  // run would call every seeded message and run changed: the message rule refuses a change that drops the field, and
+  // a run's change would empty it.
+  const itsMoment = spec.kind === 'message' ? 'writtenTime' : spec.kind === 'session' ? 'filedTime' : null
+  if (itsMoment !== null && !Object.hasOwn(wanted, itsMoment) && current.data[itsMoment] !== undefined) {
+    wanted = { ...wanted, [itsMoment]: current.data[itsMoment] }
+  }
 
   // "Unchanged" is a statement about the content only. Deleted-ness has already been dealt with
   // above, so a restored record whose text happens to match is reported as restored, not as

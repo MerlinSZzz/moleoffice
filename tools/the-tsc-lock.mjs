@@ -108,6 +108,20 @@ export const cannotTakeTheTscLock = (/** @type {string} */ why) => `${THE_TSC_LO
 /** @param {string | undefined} value */
 const unset = (value) => value === undefined || value.trim() === ''
 
+/** The gate and lock paths inside a sandbox, or null outside one, so both readers name the same lock. */
+function theTscLockPaths() {
+  if (unset(process.env['SANDBOX_DIR'])) return null
+  const named = process.env[TSC_LOCK_FOLDER_VARIABLE]
+  const folder = named === undefined || unset(named) ? THE_DEFAULT_TSC_LOCK_FOLDER : named
+  return { gate: join(folder, THE_TSC_GATE), lock: join(folder, THE_TSC_LOCK) }
+}
+
+/** The descriptor that holds the sandbox's tsc lock, or null, so a restart can pass the shell's hold on. */
+export function theDescriptorThatHoldsTheTscLock() {
+  const paths = theTscLockPaths()
+  return paths === null ? null : aDescriptorThatHolds(paths.lock)
+}
+
 /**
  * TAKE THE TSC LOCK SHARED, through the gate, inside a sandbox, and answer how it is held and how it is let go.
  * `letGo()` closes the lock file once and says so; it does nothing when nothing was taken here, and nothing the second
@@ -119,11 +133,9 @@ const unset = (value) => value === undefined || value.trim() === ''
 export async function theTscLockShared(say = (words) => console.error(words)) {
   /** @param {(typeof HOW_THE_TSC_LOCK_IS_HELD)[keyof typeof HOW_THE_TSC_LOCK_IS_HELD]} held */
   const nothingTaken = (held) => ({ held, letGo: () => {} })
-  if (unset(process.env['SANDBOX_DIR'])) return nothingTaken(HOW_THE_TSC_LOCK_IS_HELD.outside)
-  const named = process.env[TSC_LOCK_FOLDER_VARIABLE]
-  const folder = named === undefined || unset(named) ? THE_DEFAULT_TSC_LOCK_FOLDER : named
-  const gate = join(folder, THE_TSC_GATE)
-  const lock = join(folder, THE_TSC_LOCK)
+  const paths = theTscLockPaths()
+  if (paths === null) return nothingTaken(HOW_THE_TSC_LOCK_IS_HELD.outside)
+  const { gate, lock } = paths
 
   const above = process.env[TSC_LOCK_HELD_BY_VARIABLE]
   if (above !== undefined && !unset(above)) {

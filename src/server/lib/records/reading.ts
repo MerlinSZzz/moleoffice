@@ -278,3 +278,13 @@ export function aProjectCountedWithoutMessageIds(workspaceId: string): number {
   return db.select({ n: sql<number>`count(*)` }).from(records)
     .where(and(filedInOrInTheViewOf(workspaceId), isNull(records.deletedAt))).get()?.n ?? 0
 }
+
+/**
+ * HOW MANY LIVE RECORDS ONE PROJECT HOLDS THAT ARE NOT MESSAGES, without reading the ids of its messages. It is for a
+ * count that finds a reader's messages another way. It asks what `aProjectCounted` asks for its `notMessages`, so the
+ * two give the same number.
+ */
+export function aProjectCountedLessItsMessages(workspaceId: string): number {
+  return db.select({ n: sql<number>`count(*)` }).from(records)
+    .where(and(eq(records.workspaceId, workspaceId), ne(records.kind, 'message'), isNull(records.deletedAt))).get()?.n ?? 0
+}

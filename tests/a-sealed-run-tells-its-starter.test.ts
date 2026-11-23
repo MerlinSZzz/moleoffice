@@ -8,9 +8,13 @@
  * in the same write as the seal (`sealFinishedRun` in src/server/lib/sealed-tip.ts). A refused finish
  * writes no seal and sends nothing. Where no starter can be named, nobody is told and the seal says why.
  *
+ * Case 1's starter is registered with no role, so it holds no supervisor card and is told, as a line's own round's starter is.
+ * The worker case registers a supervisor of its own, and that supervisor starts its worker.
+ * A worker's run tells its supervisor nothing, under the owner's decision of 12 November 2026.
  * Every agent, run and file here is made up for the test, in a fresh test database.
  *
  * MUTATIONS THIS FILE CATCHES:
+ *   - the new function answers null always -> the worker supervisor case red.
  *   - Delete the `writeASystemLineToOne` call in `sealFinishedRun`: the first case goes red.
  *   - Drop the tip from the sentence in `theSealInWords` (src/shared/groups.ts): the first case goes red.
  */
@@ -64,7 +68,7 @@ function aRun(title: string, servingAgent = 'seal-notice-worker'): string {
 beforeAll(async () => {
   t = await freshDb()
   app = (await apiApp()).app
-  const starter = await app.inject({ method: 'POST', url: '/api/agents/started', headers: asThePerson, payload: { handle: 'seal-notice-starter', name: 'Synthetic starter', role: 'supervisor', workArea: ['src'] } })
+  const starter = await app.inject({ method: 'POST', url: '/api/agents/started', headers: asThePerson, payload: { handle: 'seal-notice-starter', name: 'Synthetic starter', workArea: ['src'] } })
   expect(starter.statusCode, starter.body).toBe(201)
   const worker = await app.inject({ method: 'POST', url: '/api/agents/started', headers: asTheStarter, payload: { handle: 'seal-notice-worker', name: 'Synthetic worker', role: 'worker', workArea: ['src', 'tools', 'tests'] } })
   expect(worker.statusCode, worker.body).toBe(201)
@@ -121,6 +125,20 @@ describe('a sealed run tells its starter', () => {
     expect(seal.data['starterNotice']).toEqual({ to: { kind: 'agent', id: starterId } })
     const link = t.client.sqlite.prepare("SELECT 1 FROM links WHERE from_id = ? AND to_id = ? AND type = 'about'").get(said.id, sealId)
     expect(link, 'the message is not linked to the seal').toBeDefined()
+  })
+
+  it('tells a worker’s supervisor nothing and stores the reason on its seal', async () => {
+    const supervisor = await app.inject({ method: 'POST', url: '/api/agents/started', headers: asThePerson, payload: { handle: 'seal-notice-supervisor', name: 'Synthetic supervisor', role: 'supervisor', workArea: ['src'] } })
+    expect(supervisor.statusCode, supervisor.body).toBe(201)
+    const supervisorId = (JSON.parse(supervisor.body) as { agent: { id: string } }).agent.id
+    const asTheSupervisor = { ...asTheStarter, 'x-mole-office-actor-id': 'seal-notice-supervisor' }
+    const worker = await app.inject({ method: 'POST', url: '/api/agents/started', headers: asTheSupervisor, payload: { handle: 'seal-notice-new-worker', name: 'Synthetic new worker', role: 'worker', workArea: ['src', 'tools', 'tests'] } })
+    expect(worker.statusCode, worker.body).toBe(201)
+    const run = aRun('Synthetic worker run', 'seal-notice-new-worker')
+    t.api.patchRecord(run, { dataPatch: { state: 'finished', tip } }, person)
+    const sealId = t.api.getRecord(run)!.data['sealedTip'] as string
+    expect(theOfficesMessagesTo(supervisorId).filter((one) => one.aboutRun === run), 'the worker’s supervisor was told of the seal').toEqual([])
+    expect(t.api.getRecord(sealId)!.data['starterNotice']).toEqual({ because: "This run's agent is a worker that a line's supervisor started, and that supervisor is not told when the run is sealed or its check is held: the worker's own last message says the run ends, and a worker's run is not checked by itself." })
   })
 
   it('sends nothing when the finish is refused', () => {

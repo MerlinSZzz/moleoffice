@@ -55,7 +55,7 @@ import { chromium, type Browser, type Page } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { switchTheProject, theProjectIdOnScreen, waitForTheProjects } from './switch-the-project.ts'
 
-import { commandThatStopsWithItsOwner, apiServerArguments, anApiServerOfItsOwn, waitForItsOwnVite } from './helpers.ts'
+import { commandThatStopsWithItsOwner, apiServerArguments, anApiServerOfItsOwn, storeNormalModeWhereNothingIsStored, waitForItsOwnVite } from './helpers.ts'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
 
@@ -188,6 +188,7 @@ beforeAll(async () => {
 
   browser = await chromium.launch()
   page = await browser.newPage({ viewport: { width: 1440, height: 1000 } })
+  await storeNormalModeWhereNothingIsStored(page.context())
   page.on('pageerror', (err) => {
     throw new Error(`the page threw: ${err.message}`)
   })

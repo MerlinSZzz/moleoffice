@@ -62,7 +62,7 @@ import { THE_FOUR_KINDS, WHAT_A_KIND_IS, theListedFaultsSay } from '../src/confi
 import { aReleaseWithoutATraceSays } from '../src/shared/releasing.ts'
 import { THE_MESSAGE_WORKER_ID } from '../src/shared/participants.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
-import { apiApp, freshDb, type TestDb } from './helpers.ts'
+import { apiApp, freshDb, type TestDb, governsTheWholeProject } from './helpers.ts'
 
 /** Made-up keys, written beside the throwaway database before the server is built. */
 const A_MADE_UP_OFFICE_KEY = randomBytes(32).toString('hex')
@@ -124,7 +124,7 @@ async function register(handle: string, role: string, headers: Record<string, st
 }
 
 async function file(kind: string, title: string, data: Record<string, unknown> = {}, headers = asThePerson()): Promise<string> {
-  const reply = await app.inject({ method: 'POST', url: '/api/records', headers, payload: { kind, title, data: kind === 'decision' ? { replaces: [], ...data } : data } })
+  const reply = await app.inject({ method: 'POST', url: '/api/records', headers, payload: { kind, title, data: kind === 'decision' ? { ...governsTheWholeProject(), replaces: [], ...data } : data } })
   expect(reply.statusCode, reply.body).toBe(201)
   return String(reply.json().record.id)
 }

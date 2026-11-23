@@ -341,6 +341,14 @@ describe('writing a short form records which writer wrote it and when', () => {
     expect(unwritten.at).toBeNull()
   })
 
+  it('keeps the actor id as sent, and gives no name, when no registry row answers to the writer', async () => {
+    // THE WRITER IS NOT REGISTERED, so nothing finds a row for it. The stored id is the one the headers sent, as it
+    // was before forms were stored by registry id, and the reading gives no name rather than one it made up.
+    const level = at(await reading(), 'label')
+    expect(level.by).toBe(THE_WRITER['x-mole-office-actor-id'])
+    expect(level.byName, 'a name was given for a writer no registry row answers to').toBeNull()
+  })
+
   it('does not leave a second writer standing behind the first writer’s name', async () => {
     const again = await writeForms({ forms: { label: SECOND_LABEL } }, SOMEBODY_ELSE)
     expect(again.status, again.body).toBe(200)
@@ -600,5 +608,66 @@ describe('the sixth reading position is drawn from its own stored field', () => 
   it('leaves all seven reading positions on the ladder the control draws', () => {
     expect([...RUNGS]).toEqual(['label', 'title', 'gist', 'outline', 'sketch', 'digest', 'full'])
     expect(RUNGS.map((rung) => positionOf(rung))).toEqual([1, 2, 3, 4, 5, 6, 7])
+  })
+})
+
+// ============================================================ 8. a registered writer is stored by its id
+
+/**
+ * A REGISTERED AGENT THAT SENDS ITS HANDLE IS STORED BY ITS REGISTRY ID. A handle can be freed and given to another
+ * agent, so a stored handle can come to name two agents, and the reader of the stored forms then cannot tell which
+ * wrote them. The writers above are not registered, so nothing finds them and their id is kept as sent.
+ */
+describe('a short form written by a registered agent under its handle', () => {
+  const HANDLE = 'registered-form-writer'
+  const LONG_REPORT: SummaryBlock[] = [
+    {
+      id: 'b-rig',
+      type: 'text',
+      heading: 'What the rig showed',
+      text:
+        'Three of four printed mounts broke below the load the trials need. The jig was reset between pulls and the ' +
+        'load cell was zeroed each time, so the numbers can be compared with one another. The fourth mount held to ' +
+        'twenty-two newtons and had been printed at half the layer height, which was a mistake in the print queue ' +
+        'rather than a choice anybody made, and nobody has repeated it since. One sample is not a finding.',
+    },
+    { id: 'b-bolt', type: 'text', heading: 'What nobody has measured', text: 'The bolt circle of the aluminium mount was never measured.' },
+  ]
+  const ITS_PART = {
+    id: 'p-1',
+    heading: 'What the rig showed and what nobody measured',
+    text30: 'Most printed mounts broke on the rig, and the bolt circle of the aluminium mount was never measured.',
+    text120:
+      'Most of the printed mounts broke on the rig below the load the trials need, and nobody has measured the bolt ' +
+      'circle of the aluminium mount, so the part that might pass has never been checked.',
+    covers: ['b-rig', 'b-bolt'],
+  }
+
+  it('stores its registry id on the label and on the parts, and not the handle it sent', async () => {
+    const registered = await app.inject({ method: 'POST', url: '/api/agents/started', headers: HUMAN, payload: { handle: HANDLE, name: 'Registered Form Writer' } })
+    expect(registered.statusCode, registered.body).toBe(201)
+    const id = (registered.json() as { agent: { id: string } }).agent.id
+    expect(id, 'the registry id is the handle, so this case cannot tell the two apart').not.toBe(HANDLE)
+
+    const made = await app.inject({ method: 'POST', url: '/api/records', headers: HUMAN, payload: { kind: 'report', title: 'Wrist mount pull test, round nine', data: { blocks: LONG_REPORT } } })
+    expect(made.statusCode, made.body).toBe(201)
+    const recordId = (made.json() as { record: { id: string } }).record.id
+    const revisions = await app.inject({ method: 'GET', url: `/api/records/${recordId}/revisions`, headers: HUMAN })
+    const newest = [...(revisions.json() as { revisions: { seq: number; contentHash: string }[] }).revisions].sort((a, b) => b.seq - a.seq)[0]
+    expect(newest, 'the report has no revision for a short form to name').toBeDefined()
+
+    const asTheAgent = { 'x-mole-office-actor-type': 'agent', 'x-mole-office-actor-id': HANDLE, 'x-mole-office-workspace': WORKSPACE }
+    const wrote = await app.inject({
+      method: 'POST',
+      url: `/api/records/${recordId}/short-forms`,
+      headers: asTheAgent,
+      payload: { madeFrom: { seq: newest!.seq, contentHash: newest!.contentHash }, forms: { label: LABEL, parts: [ITS_PART] } },
+    })
+    expect(wrote.statusCode, wrote.body).toBe(200)
+
+    const read = await app.inject({ method: 'GET', url: `/api/records/${recordId}`, headers: HUMAN })
+    const forms = ((read.json() as { record: { data: Record<string, unknown> } }).record.data['shortForms'] ?? {}) as Record<string, Record<string, unknown>>
+    expect(forms['label']?.['by']).toBe(id)
+    expect(forms['parts']?.['by']).toBe(id)
   })
 })

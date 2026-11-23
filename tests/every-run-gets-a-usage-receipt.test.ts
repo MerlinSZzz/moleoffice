@@ -31,6 +31,11 @@
  * leaves the run as it was: the tools exit 1 with a sentence, the hooks exit 0 with a sentence on stderr, and the
  * launcher's cases in tests/sandbox-launcher.test.ts show a crashed run still recorded crashed with its receipt.
  *
+ * THE AGENT A NAMED RUN SERVES HOLDS A KEY OF ITS OWN, from the door that registers it, and every run of the session
+ * hook on a run the environment names is given it. A session that names an agent and holds no key of it sends the
+ * name alone, and the office lets no name alone change a run, so the receipt the hook writes there would be refused
+ * without the key.
+ *
  * ---------------------------------------------------------------------------------------
  * THE MUTATIONS THIS IS WRITTEN AGAINST, each after a control run (the report of wave 13p's round 26)
  * ---------------------------------------------------------------------------------------
@@ -244,6 +249,8 @@ let t: TestDb
 let app: FastifyInstance
 let api = ''
 let scratch = ''
+/** The key the office gave 'a-paying-run' when it was registered. The session hook on a named run is given it. */
+let payingRunsKey = ''
 
 beforeAll(async () => {
   t = await freshDb()
@@ -256,6 +263,8 @@ beforeAll(async () => {
   scratch = mkdtempSync(join(tmpdir(), 'mole-receipts-'))
   const registered = await app.inject({ method: 'POST', url: '/api/agents/started', headers: AS_THE_PERSON, payload: { handle: 'a-paying-run', name: 'A paying run' } })
   expect(registered.statusCode, registered.body).toBe(201)
+  payingRunsKey = String((registered.json() as { whatToGiveIt?: { key?: string } }).whatToGiveIt?.key ?? '')
+  expect(payingRunsKey, 'the registration gave the agent no key').not.toBe('')
 }, 60_000)
 
 afterAll(async () => {
@@ -464,7 +473,7 @@ describe("a secretary's session hook writes its running total at a stop, at most
     const atTheStop = (theRunOf(id).data as { usageReceipt?: UsageReceipt }).usageReceipt
     expect(atTheStop).toMatchObject({ inputTokens: 6, outputTokens: 9 })
     // THE END WRITES WHATEVER THE WINDOW SAYS: its readAt moves on, or a second stop written within the second shows it.
-    await new Promise((wait) => setTimeout(wait, 1100))
+    while (localStampOf(new Date()) === atTheStop?.readAt) await new Promise((wait) => setTimeout(wait, 20))
     await theHook('end', { session_id: id, transcript_path: transcript, cwd: process.cwd() })
     const receipt = (theRunOf(id).data as { usageReceipt?: UsageReceipt }).usageReceipt
     expect(receipt).toMatchObject({ inputTokens: 6, cachedInputTokens: 60, cacheCreationInputTokens: 600, outputTokens: 9, paidBy: `${PAID_BY_THE_LOGIN_IN}ANTHROPIC_API_KEY`, ranIn: RAN_ON_THE_HOST })
@@ -513,8 +522,9 @@ describe("a secretary's session hook writes its running total at a stop, at most
       anAnswer('msg_after', new Date(filed + 1_000), { input_tokens: 6, cache_read_input_tokens: 0, cache_creation_input_tokens: 0, output_tokens: 9 }),
     ].join('\n') + '\n')
     const theNamedHook = (mode: 'stop' | 'end') => new Promise<string>((done, fail) => {
-      const env = anEnvironment({ ANTHROPIC_API_KEY: 'not-a-real-key', MOLE_OFFICE_SESSION: run, MOLE_OFFICE_AGENT: 'a-paying-run' })
+      const env = anEnvironment({ ANTHROPIC_API_KEY: 'not-a-real-key', MOLE_OFFICE_SESSION: run, MOLE_OFFICE_AGENT: 'a-paying-run', MOLE_AGENT_KEY: payingRunsKey })
       delete env['TMUX_PANE']
+      delete env['MOLE_AGENT_KEY_FILE']
       const child = execFile(process.execPath, [HOOK, mode], { encoding: 'utf8', env }, (error, _stdout, stderr) => (error === null ? done(String(stderr)) : fail(error)))
       child.stdin?.end(JSON.stringify({ session_id: id, transcript_path: transcript, cwd: process.cwd() }))
     })
@@ -522,8 +532,9 @@ describe("a secretary's session hook writes its running total at a stop, at most
     expect(await theReceiptOf(run), said).toMatchObject({ inputTokens: 6, outputTokens: 9, paidBy: `${PAID_BY_THE_LOGIN_IN}ANTHROPIC_API_KEY` })
 
     const over = await aRun({ runtime: 'claude-code', state: 'paused' })
-    const env = anEnvironment({ ANTHROPIC_API_KEY: 'not-a-real-key', MOLE_OFFICE_SESSION: over, MOLE_OFFICE_AGENT: 'a-paying-run' })
+    const env = anEnvironment({ ANTHROPIC_API_KEY: 'not-a-real-key', MOLE_OFFICE_SESSION: over, MOLE_OFFICE_AGENT: 'a-paying-run', MOLE_AGENT_KEY: payingRunsKey })
     delete env['TMUX_PANE']
+    delete env['MOLE_AGENT_KEY_FILE']
     await new Promise<void>((done, fail) => {
       const child = execFile(process.execPath, [HOOK, 'end'], { encoding: 'utf8', env }, (error) => (error === null ? done() : fail(error)))
       child.stdin?.end(JSON.stringify({ session_id: `${id}-over`, transcript_path: transcript, cwd: process.cwd() }))
@@ -537,8 +548,9 @@ describe("a secretary's session hook writes its running total at a stop, at most
   // the first sentence left out (red); the second sentence left out (red).
   it('says on stderr, in its own sentence, why the receipt of a run the environment names was not written', async () => {
     const named = (run: string, more: Record<string, string> = {}) => {
-      const env = anEnvironment({ ANTHROPIC_API_KEY: 'not-a-real-key', MOLE_OFFICE_SESSION: run, MOLE_OFFICE_AGENT: 'a-paying-run', ...more })
+      const env = anEnvironment({ ANTHROPIC_API_KEY: 'not-a-real-key', MOLE_OFFICE_SESSION: run, MOLE_OFFICE_AGENT: 'a-paying-run', MOLE_AGENT_KEY: payingRunsKey, ...more })
       delete env['TMUX_PANE']
+      delete env['MOLE_AGENT_KEY_FILE']
       return env
     }
     const payload = (mode: string) => JSON.stringify({ session_id: `test-unread-${mode}-${Date.now()}`, transcript_path: join(scratch, 'none.jsonl'), cwd: process.cwd() })
@@ -614,7 +626,7 @@ describe('the receipt on a page', () => {
     const text = drawn(A_RECEIPT)
     expect(text).toContain('未报告')
     expect(text).toContain('CLAUDE_CODE_OAUTH_TOKEN 里的 Claude Code 登录')
-    expect(text).toContain('在沙盒 w13p 里')
+    expect(text).toContain('在沙箱 w13p 里')
     expect(text).toContain('OpenRouter：0.42 美元')
     expect(text).not.toContain('Paid by')
   })

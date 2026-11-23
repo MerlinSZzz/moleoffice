@@ -677,7 +677,8 @@ export interface DetailText {
   /** Only meaningful when `from` is `shortForm`. The two columns are the record, so they are current. */
   standing: ShortFormStanding
   /**
-   * WHICH AGENT OR PERSON WROTE THESE WORDS, by actor id, or null where nobody recorded one.
+   * WHICH AGENT OR PERSON WROTE THESE WORDS, by registry id, or null where nobody recorded one. Where no
+   * registry row was found, or the form was stored before writers were stored by id, it is the actor id.
    *
    * Null for the `title` and `summary` columns, which carry no writer of their own, and null on
    * every stored short form written before 2 September 2026. It is never derived from anything.

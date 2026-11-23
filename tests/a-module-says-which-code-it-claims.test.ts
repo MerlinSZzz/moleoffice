@@ -202,11 +202,9 @@ describe('a claim still sitting on the record is drawn, and said to be still on 
     expect(drawnText(html)).toContain('still stored on this record')
   })
 
-  it('says what moves it, rather than leaving a reader to work it out', () => {
+  it('does not also say it claims no code under a claim it has just drawn', () => {
     const html = draw({ status: 'ready', value: { ...theOwnersModule(), repositories: [] } }, ['src/gripper'])
-    expect(drawnText(html)).toContain('db:migrate')
-    // And it is not ALSO told that it claims no code, which would be the page contradicting itself
-    // one line under a claim it has just drawn.
+    // That would be the page contradicting itself one line under a claim it has just drawn.
     expect(html).not.toContain(THE_WORD)
   })
 

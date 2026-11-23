@@ -617,8 +617,14 @@ export type Place =
    * somebody's screen. `partWord` is the plural noun for whatever those things were.
    */
   | { at: 'across'; from: Span; to: Span; parts: number; partWord: string; cut?: true }
-  /** Words on screen that no stored string can be shown to hold. With `cut`, only the opening is kept. */
-  | { at: 'quote'; words: string; cut?: true }
+  /**
+   * Words on screen that no stored string can be shown to hold. With `cut`, only the opening is kept.
+   *
+   * `file` is the name the file was shown under when the words were selected in the office's reader of one file, and
+   * `page` is the page of a PDF they were on, counted from 1, only beside a file. The name is as it was shown at the
+   * moment of pointing, as the words are: a later rename of the file does not change it.
+   */
+  | { at: 'quote'; words: string; cut?: true; file?: string; page?: number }
   /** No selection. The run of stored text under the pointer, named by where that run starts. */
   | { at: 'run'; field: string; offset: number }
   /** Nothing under the pointer holds text. The thing itself is the whole answer. */

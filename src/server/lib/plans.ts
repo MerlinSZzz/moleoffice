@@ -212,6 +212,7 @@ import { getPlan } from './get-plan.ts'
 import { toPlan } from './get-plan.ts'
 import { linesOf } from '../db/lines-of.ts'
 import { toLine } from '../db/lines-of.ts'
+import type { PlanLine, LineRow } from '../db/types/plans.ts'
 
 /** A plan as a caller sees it. Every field is stored; nothing here is worked out. */
 export interface Plan {
@@ -236,37 +237,7 @@ export interface Plan {
   movedFromDraft: string | null
 }
 
-/** One line of a plan, exactly as stored. */
-export interface PlanLine {
-  id: string
-  planId: string
-  position: number
-  /** The words as typed. An empty string is a real line: a blank line is part of the writing. */
-  text: string
-  /** The record this line was filed as, or null because nobody has filed it. */
-  recordId: string | null
-  /**
-   * The writer's own note about this line, READ OUT OF `text`, or null because the line holds none.
-   *
-   * IT IS NOT STORED HERE AND NOT STORED IN A COLUMN. The note is a `{note: …}` group in the line's
-   * own words, so editing the words keeps it — which is exactly what it did not do while it was a
-   * column: saving an edited document matched rows by their exact text and re-inserted the changed
-   * ones with no remark, and nothing said a note had gone.
-   *
-   * Null when the line holds no note AND when it holds more than one, because Mole Office will not pick
-   * one of two things somebody wrote. Nothing is hidden either way: the words are in `text`.
-   */
-  remark: string | null
-  /**
-   * Every planning value written on this line, as typed, in order.
-   *
-   * PLANNING INTENT AND NOTHING ELSE. Nothing here has entered any total, any capacity or any
-   * record; `fileLineAsWork` is the one thing that moves a value out of the line.
-   */
-  planning: { key: PlanningKey; value: string }[]
-  updatedAt: string
-  updatedBy: string
-}
+export type { PlanLine, LineRow } from '../db/types/plans.ts'
 
 /**
  * A PLANNING VALUE READ BACK OUT OF THE PLACE PROMOTION PUT IT. Worked out on every read.
@@ -491,7 +462,6 @@ export interface PlanSummary {
 }
 
 export type PlanRow = typeof plansTable.$inferSelect
-export type LineRow = typeof planLines.$inferSelect
 
 export { toPlan } from './get-plan.ts'
 

@@ -40,7 +40,7 @@ import { THE_OWNER } from '../src/shared/kinds.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { THE_TEST_OFFICES_SECRETARY } from './a-page-of-a-test-office.ts'
 import { aTestDatabaseFolder } from './a-test-folder.ts'
-import { apiApp, freshDb, type TestDb } from './helpers.ts'
+import { apiApp, freshDb, type TestDb, governsTheWholeProject } from './helpers.ts'
 
 const REPO = fileURLToPath(new URL('..', import.meta.url))
 /** A session row id that no record has, so the ledger refuses the runner's row. */
@@ -124,7 +124,9 @@ beforeAll(async () => {
   const decided = await send('/api/records', AS_THE_PERSON, {
     kind: 'decision',
     title: 'The office registers a stand-in host tool',
-    data: { replaces: [], option_taken: 'register the stand-in', because: 'this test office needs one tool, so that a runner is started', decided_by: THE_OWNER, authority: 'the owner said so', authority_reference: words.body.record.id },
+    data: {
+      ...governsTheWholeProject(),
+      replaces: [], option_taken: 'register the stand-in', because: 'this test office needs one tool, so that a runner is started', decided_by: THE_OWNER, authority: 'the owner said so', authority_reference: words.body.record.id },
   })
   expect(decided.status, decided.text.slice(0, 300)).toBe(201)
   const registered = await send(

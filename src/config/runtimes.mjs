@@ -27,10 +27,21 @@
  * `dsh` is deliberately absent: it is a runtime a worker may be started on by the office's own tools
  * outside the message worker, not one the office dispatches. `installedTools` below answers for it
  * from the reason its caller gives, so the word is neither left out nor called a missing tool.
+ *
+ * ---------------------------------------------------------------------------------------
+ * THE SEARCH PATH IS READ FROM THE WHOLE ENVIRONMENT
+ * ---------------------------------------------------------------------------------------
+ *
+ * Every function here that looks a program up is handed the whole environment, not a search path a
+ * caller read out of it. The search path is read once, by `theSearchPathIn` of the system in
+ * ./systems/the-system.mjs. On Windows that is the one name that is PATH in any case, so an
+ * environment that holds it as `Path` finds its programs. On Linux and the Mac it is `PATH` alone.
  */
 
 import { existsSync } from 'node:fs'
 import { join, win32 } from 'node:path'
+import { theSystemFor } from './systems/the-system.mjs'
+import { isACopyOfTheSandboxCodex } from './the-sandbox-codex.mjs'
 
 /**
  * The program each runtime word runs.
@@ -89,20 +100,25 @@ function theNamesWindowsTries(command, pathext) {
  * Where a program is on this machine, or null because it is not installed.
  *
  * A command with a slash is a path and is looked at directly. A bare word is looked for in each
- * directory of `PATH`, in order, which is how the shell that starts the worker would find it. The
- * worker and the runtime page both answer through here, so they cannot disagree about which program
- * is on the machine.
+ * directory of the search path of `env`, in order, which is how the shell that starts the worker would
+ * find it. The worker and the runtime page both answer through here, so they cannot disagree about
+ * which program is on the machine.
  *
- * ON WINDOWS `PATH` is split at ";", a backslash makes a path too, and a name is looked for with each ending
+ * THE SEARCH PATH is read by `theSearchPathIn` of the system named by `system.platform`. On Windows it is
+ * the one name that is PATH in any case, and two such names with different values are refused there,
+ * before anything is looked up.
+ *
+ * ON WINDOWS the search path is split at ";", a backslash makes a path too, and a name is looked for with each ending
  * PATHEXT lists, so "node" finds node.exe and "claude" finds claude.cmd (report bknY4s0NBTAT, item 9). Linux
  * and the Mac look exactly as they did.
  *
  * @param {string} command
- * @param {string | undefined} path
+ * @param {Readonly<Record<string, string | undefined>>} env the environment the program would be started with
  * @param {TheSystem} [system] this machine unless a test names another
  * @returns {string | null}
  */
-export function whereIsThisTool(command, path, system = thisSystem()) {
+export function whereIsThisTool(command, env, system = thisSystem()) {
+  const path = theSystemFor(system.platform).theSearchPathIn(env)
   if (system.platform === 'win32') {
     const names = theNamesWindowsTries(command, system.pathext)
     if (/[\\/]/u.test(command)) return names.find((one) => system.isThere(one)) ?? null
@@ -116,10 +132,21 @@ export function whereIsThisTool(command, path, system = thisSystem()) {
     return null
   }
   if (command.includes('/')) return system.isThere(command) ? command : null
+  // THE SANDBOX'S OWN CODEX IS NO INSTALLED CODEX. tools/sandbox-start.mjs puts it first on the PATH of every command
+  // in a sandbox, and it only hands the start on to the next codex on PATH. So its path is the answer only when a real
+  // codex stands after it, and a start by that path still goes through it. Alone, it means Codex is not installed. A
+  // codex of the copy's size that cannot be read throws, because then nobody can tell whether Codex is installed.
+  /** @type {string | null} */
+  let theSandboxs = null
   for (const dir of (path ?? '').split(':')) {
     if (dir === '') continue
     const full = join(dir, command)
-    if (system.isThere(full)) return full
+    if (!system.isThere(full)) continue
+    if (command === THE_PROGRAM_FOR_RUNTIME.codex && isACopyOfTheSandboxCodex(full)) {
+      theSandboxs ??= full
+      continue
+    }
+    return theSandboxs ?? full
   }
   return null
 }
@@ -167,28 +194,28 @@ export function theWayToStart(program, args, system = thisSystem()) {
  * no adapter.
  *
  * @param {string} runtime
- * @param {string | undefined} path
+ * @param {Readonly<Record<string, string | undefined>>} env the environment the program would be started with
  * @returns {string | null}
  */
-export function whereItIsInstalled(runtime, path) {
+export function whereItIsInstalled(runtime, env) {
   const program = /** @type {Record<string, string | undefined>} */ (THE_PROGRAM_FOR_RUNTIME)[runtime]
-  return program === undefined ? null : whereIsThisTool(program, path)
+  return program === undefined ? null : whereIsThisTool(program, env)
 }
 
 /**
  * One answer per runtime word the registry allows: where it is, and what to say when there is
  * nothing to look for.
  *
- * @param {string | undefined} path
+ * @param {Readonly<Record<string, string | undefined>>} env the environment each program would be started with
  * @param {readonly string[]} words every runtime word an agent's row may declare
  * @param {(word: string) => string | null} whyNotDispatched the reason this word is not started from here, or null
  * @returns {{ runtime: string; where: string | null; says: string | null }[]}
  */
-export function installedTools(path, words, whyNotDispatched) {
+export function installedTools(env, words, whyNotDispatched) {
   return words.map((word) => {
     const said = whyNotDispatched(word)
     if (said !== null) return { runtime: word, where: null, says: said }
-    return { runtime: word, where: whereItIsInstalled(word, path), says: null }
+    return { runtime: word, where: whereItIsInstalled(word, env), says: null }
   })
 }
 

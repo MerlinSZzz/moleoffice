@@ -13,13 +13,19 @@
  * module's page or in its context reading said anything about a decision.
  *
  * ---------------------------------------------------------------------------------------
- * TWO WAYS A DECISION IS ABOUT SOMETHING, AND THE ROW SAYS WHICH
+ * FOUR WAYS A DECISION IS ABOUT SOMETHING, AND THE ROW SAYS WHICH
  * ---------------------------------------------------------------------------------------
  *
- * 1. **It is linked to it.** Somebody wrote a link between the decision and this record.
- * 2. **It settled a fork that is linked to it.** The fork was filed about this module, a decision
+ * 1. **It governs it.** The decision's own `governs` names this record.
+ * 2. **It is linked to it.** Somebody wrote a link between the decision and this record.
+ * 3. **It settled a fork that is linked to it.** The fork was filed about this module, a decision
  *    settled the fork, and the decision itself was never linked to the module. This is how nearly
  *    all of them arrive.
+ * 4. **It is inferred from its files.** For a module only: a file the decision governs lies in what
+ *    one of the module's stated claims holds (`theClaimHolds` in ./governs.ts). Nobody wrote that it is
+ *    about the module, so the row says it was inferred and names the file and the claim. It is worked
+ *    out when it is read and stored nowhere, and it is the weakest of the four: a decision reached
+ *    another way keeps that way.
  *
  * Measured on a copy of their corpus on 7 September 2026: 7 decisions are linked straight to a module
  * (6 `relates_to`, 1 `about`) and 69 proposals are linked `about` a module. So a reading that took
@@ -50,12 +56,15 @@ import { type BasisEntry } from './flow-reasons.ts'
 import { theBasisOf } from '../db/the-basis-of.ts'
 
 /**
- * How a decision came to be about this record, and a row says which. The third way, `governs it`, is the decision's
- * own word: its `governs` names this record, which a decision makes what it concerns. It is
- * the strongest of the three, so a decision that both governs a record and is linked to it is listed as
- * governing it.
+ * How a decision came to be about this record, and a row says which. `governs it` is the decision's own word: its
+ * `governs` names this record, which a decision makes what it concerns. It is the strongest, so a decision that both
+ * governs a record and is linked to it is listed as governing it. `inferred from its files` is the weakest: nobody
+ * wrote it, and the office worked it out from the module's stated claims.
  */
-export type HowItIsAbout = 'governs it' | 'linked to it' | 'settled a fork about it'
+export type HowItIsAbout = 'governs it' | 'linked to it' | 'settled a fork about it' | 'inferred from its files'
+
+/** The word of the inferred way, read by the related door and the page from here. */
+export const INFERRED_FROM_ITS_FILES: HowItIsAbout = 'inferred from its files'
 
 /** One decision about the record, with what a reader needs to open it. */
 export interface DecisionAbout {
@@ -68,6 +77,8 @@ export interface DecisionAbout {
   how: HowItIsAbout
   /** The fork this decision settled, when that is how it got here. Null when it was linked straight. */
   throughTheFork: { id: string; title: string } | null
+  /** Only on an inferred row: each file of the decision a stated claim of the module holds, and that claim. */
+  inferredFrom?: { file: string; claim: string }[]
   /** What the decision was based on, only when the reader asked for the second level. */
   basis?: BasisEntry[]
 }
@@ -77,6 +88,13 @@ export interface DecisionsAbout {
   about: string
   decisions: DecisionAbout[]
   note: string
+  /**
+   * What could not be read, in words, from the one reading of governs (`decisionsGoverning` in ./governs.ts): an entry
+   * of a decision it could not read, or why nothing could be inferred from this module's files. Empty means all was read.
+   */
+  couldNotRead: string[]
+  /** The ids of the decisions about this record that a later one replaced, which are not listed. The note counts them. */
+  replacedLeftOut: string[]
 }
 
 /** Every live record id on the other end of a link from or to this one, of one kind. */
@@ -169,7 +187,17 @@ export function decisionsAbout(input: { workspaceId: string; recordId: string; w
             return false
           })
 
-  for (const row of rowsFor(decisionsGoverning(workspaceId, { record: recordId }).decisions.map((one) => one.id))) {
+  // THE ONE READING OF GOVERNS, read once: the decisions that name this record, and, for a module, the ones inferred
+  // from their files.
+  const governing = decisionsGoverning(workspaceId, { record: recordId })
+  const naming = governing.decisions.filter((one) => one.how.some((way) => way.reaches === 'names-it'))
+  const inferred = new Map<string, { file: string; claim: string }[]>()
+  for (const one of governing.decisions) {
+    const from = one.how.flatMap((way) => (way.reaches === 'inferred' && 'path' in way.place ? [{ file: way.place.path, claim: way.claim }] : []))
+    if (from.length > 0) inferred.set(one.id, from)
+  }
+
+  for (const row of rowsFor(naming.map((one) => one.id))) {
     const when = whenItWasDecided(row)
     found.set(row.id, {
       id: row.id,
@@ -222,6 +250,21 @@ export function decisionsAbout(input: { workspaceId: string; recordId: string; w
     }
   }
 
+  for (const row of rowsFor([...inferred.keys()])) {
+    // A DECISION REACHED ANY OTHER WAY KEEPS THAT WAY: somebody wrote it, and the inferred way is worked out.
+    if (found.has(row.id)) continue
+    const when = whenItWasDecided(row)
+    found.set(row.id, {
+      id: row.id,
+      title: row.title,
+      decidedOn: when.day,
+      nobodyWroteWhen: when.nobodyWroteWhen,
+      how: INFERRED_FROM_ITS_FILES,
+      throughTheFork: null,
+      inferredFrom: inferred.get(row.id) ?? [],
+    })
+  }
+
   const sorted = [...found.values()].sort(
     (a, b) => b.decidedOn.localeCompare(a.decidedOn) || b.id.localeCompare(a.id),
   )
@@ -241,11 +284,14 @@ export function decisionsAbout(input: { workspaceId: string; recordId: string; w
           'here, and linking one is POST /api/links {"fromId":"<the decision>","toId":"' +
           `${recordId}","type":"about"}.`
         : `${String(decisions.length)} decision${decisions.length === 1 ? '' : 's'}, newest first. Each row says ` +
-          'how it is about this: its governs names this record, it is linked to it by somebody, or it was reached ' +
-          'through a fork that is linked to it. A decision that does none of these is not in this list.') +
+          'how it is about this: its governs names this record, it is linked to it by somebody, it was reached ' +
+          "through a fork that is linked to it, or a file it governs lies in this module's stated claims, which is " +
+          'inferred. A decision that does none of these is not in this list.') +
       (leftOut.size === 0
         ? ''
-        : ` ${String(leftOut.size)} decision${leftOut.size === 1 ? ' linked here was' : 's linked here were'} replaced by a later ` +
+        : ` ${String(leftOut.size)} decision${leftOut.size === 1 ? ' about this was' : 's about this were'} replaced by a later ` +
           'decision and not listed; each is on its own page, naming the one that replaced it.'),
+    couldNotRead: governing.couldNotRead,
+    replacedLeftOut: [...leftOut].sort(),
   }
 }

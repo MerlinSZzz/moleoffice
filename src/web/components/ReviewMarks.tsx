@@ -76,7 +76,6 @@ import { settingsControlWord } from '@shared/settings-declaration.ts'
 import { useState } from 'react'
 
 import { t } from '@shared/i18n.ts'
-import { REVIEW_MARK_STATES } from '@shared/reviewmarks.ts'
 import { Absence, Panel } from './ui.tsx'
 import {
   applyMarkColours,
@@ -142,10 +141,6 @@ export function ReviewMarksPanel() {
         <button type="button" className="rvm-reset" onClick={reset}>
           {t(settingsControlWord('settings.review', 'settingsPanel.marks.putBothBack'))}
         </button>
-        {/* WHAT IS NOT CONFIGURABLE, NAMED. Eight mark states, eight shapes, no hue between them. */}
-        <span className="rvm-note">
-          {t('settingsPanel.marks.shapes', { n: Object.keys(REVIEW_MARK_STATES).length })}
-        </span>
       </div>
       {/* WHAT IS NOT BUILT, NAMED, on the screen and not only in this file's header.
           THROUGH `Absence`, AT `must-act-on`, which is the tier ui.tsx names for an absence that is
@@ -159,7 +154,7 @@ export function ReviewMarksPanel() {
           and whoever builds it deletes both. */}
       <Absence
         tier="must-act-on"
-        sentence={t('settingsPanel.marks.notBuilt')}
+        sentence={t('settingsPanel.marks.notUsedYet')}
       />
       <SentMarksChoice />
     </Panel>
@@ -189,5 +184,4 @@ const MARKS_CSS = `
   font-size: var(--fs-1); font-weight: 600; cursor: pointer;
 }
 .rvm-reset:hover { background: var(--hover); }
-.rvm-note { font-size: var(--fs-1); color: var(--text-3); }
 `

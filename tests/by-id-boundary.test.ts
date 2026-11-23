@@ -536,6 +536,15 @@ const REFUSES: Probe[] = [
     url: (f) => `/api/records/${f.module}/context`,
   },
   {
+    // WHAT IS RELATED TO A MODULE OR A PIPELINE, read out of one project: the decisions, reports and checklists about it
+    // and about its parts at every depth. A caller standing in one project must not be handed another project's
+    // records by naming one of its modules.
+    route: 'GET /api/records/:id/related',
+    what: 'read the decisions, reports and checklists related to a module or a pipeline',
+    method: 'GET',
+    url: (f) => `/api/records/${f.module}/related?kind=decisions`,
+  },
+  {
     // THE RECORDS AND LINKS A RECORD PAGE DRAWS, read out of one project. A caller standing in one
     // project must not be handed another project's records by naming one of them.
     route: 'GET /api/records/:id/around',
@@ -1151,7 +1160,7 @@ const REFUSES: Probe[] = [
   // real entry needs a sealed run, which needs a git tree; the session is a record of this project that
   // is not an entry, which the doors refuse by name with 409 (and the worker's doors refuse the person
   // with 403 before that). Either proves the door FOUND the record in its project and got on with its
-  // own business. tests/merge-queue-doors.test.ts drives every door against real entries.
+  // own business.
   {
     route: 'GET /api/merge-queue/:id',
     what: 'one merge entry and what it waits on',
@@ -1686,6 +1695,20 @@ const REFUSES: Probe[] = [
     url: (f) => `/api/delegation/${f.module}/accept`,
     payload: () => ({ points: [{ pointId: 'a-point-from-across-the-project-line', answer: 'accepted' }] }),
   },
+  {
+    route: 'POST /api/delegation/:recordId/self-complete',
+    what: 'self-complete the points of an inside package',
+    method: 'POST',
+    url: (f) => `/api/delegation/${f.module}/self-complete`,
+    payload: () => ({ points: [{ pointId: 'a-point-from-across-the-project-line', answer: 'completed', evidence: 'Recorded.' }] }),
+  },
+  {
+    route: 'POST /api/delegation/:recordId/audit',
+    what: 'record an audit of an inside package',
+    method: 'POST',
+    url: (f) => `/api/delegation/${f.module}/audit`,
+    payload: () => ({ audit: 'an-audit', verdict: 'pass', evidence: 'Recorded.', words: 'Reviewed.' }),
+  },
   // A PACKAGE'S WORKERS, read by the task's id. The id is a task and a task belongs to one project, so
   // `recordInWorkspace` refuses one from another project by name and nothing is read. The door writes
   // nothing. The control, in the record's own project, is refused for being a module and not a task,
@@ -1695,6 +1718,12 @@ const REFUSES: Probe[] = [
     what: 'the workers one package was given',
     method: 'GET',
     url: (f) => `/api/delegation/${f.module}/workers`,
+  },
+  {
+    route: 'GET /api/delegation/:recordId/progress',
+    what: 'the progress of one package',
+    method: 'GET',
+    url: (f) => `/api/delegation/${f.module}/progress`,
   },
   // A CRITICISM OF ONE RECORD, FILED AND READ. Wave 13s, the criticism record. Both read the work through
   // `recordInWorkspace`, which refuses a record from another project by name, so a criticism is never filed about, and
@@ -1735,6 +1764,23 @@ const REFUSES: Probe[] = [
     url: (f) => `/api/conversations/${f.conversedRun}/restore`,
     payload: () => ({}),
   },
+  // ONE RUN'S CONVERSATION, LOOKED AT AND EXPORTED AS ONE FILE. Wave 13s, point C1A-2, the export slice. Both read the
+  // run in this project before anything else is read, so a run from another project is refused by name and no file of
+  // this machine is opened. The run is `conversedRun` again. It records no runtime of its own, so both controls are
+  // refused with 409 in the run's own project, before any conversation file is looked for.
+  {
+    route: 'GET /api/conversations/:run/export',
+    what: "look at what one run's conversation file would hold",
+    method: 'GET',
+    url: (f) => `/api/conversations/${f.conversedRun}/export`,
+  },
+  {
+    route: 'POST /api/conversations/:run/export',
+    what: "export one run's conversation as one file",
+    method: 'POST',
+    url: (f) => `/api/conversations/${f.conversedRun}/export`,
+    payload: () => ({ parts: { notebook: true, memory: true, space: true, address: true }, looked: true }),
+  },
   // ONE REVIEW OF ONE DESIGN. Wave 13s round 226, the design-first build. The id is a design, and a design belongs to one
   // project, so `recordInWorkspace` refuses one from another project by name before anything is written. The control,
   // in the record's own project, is refused for being a note and not a design, which is not a 404.
@@ -1768,6 +1814,58 @@ const REFUSES: Probe[] = [
     method: 'POST',
     url: (f) => `/api/runs/${f.note}/missed-design-reminder`,
     payload: () => ({ words: 'Missed from across the project line.' }),
+  },
+  // ONE DEPARTMENT, READ AND WRITTEN BY ITS OWN DOORS. Wave 13s round 281. A department belongs to one project, so
+  // `recordInWorkspace` refuses one from another project by name before the body is read or anything is written. Each
+  // control, in the note's own project, is refused with 400 for being a note and not a department.
+  {
+    route: 'GET /api/departments/:id',
+    what: 'read one department, its sub-departments and its history',
+    method: 'GET',
+    url: (f) => `/api/departments/${f.note}`,
+  },
+  {
+    route: 'PUT /api/departments/:id',
+    what: 'change one department as it will stand',
+    method: 'PUT',
+    url: (f) => `/api/departments/${f.note}`,
+    payload: () => ({ nameEn: 'A made-up department from across the project line' }),
+  },
+  // ONE KEY ITEM, READ, CHANGED, MOVED, CLOSED AND OPENED AGAIN BY ITS OWN DOORS. Wave 13s round 281. A key item belongs
+  // to one project, so `recordInWorkspace` refuses one from another project by name before the body is read, before who
+  // writes is checked, and before anything is written. Each control, in the note's own project, is refused with 400 for
+  // being a note and not a key item.
+  {
+    route: 'GET /api/key-items/:id',
+    what: 'read one key item and the history of its estimates',
+    method: 'GET',
+    url: (f) => `/api/key-items/${f.note}`,
+  },
+  {
+    route: 'PATCH /api/key-items/:id',
+    what: "change a key item's title, packages, progress or estimate",
+    method: 'PATCH',
+    url: (f) => `/api/key-items/${f.note}`,
+    payload: () => ({ hoursLeft: 5 }),
+  },
+  {
+    route: 'POST /api/key-items/:id/place',
+    what: 'move a key item in the order',
+    method: 'POST',
+    url: (f) => `/api/key-items/${f.note}/place`,
+    payload: () => ({ place: 1 }),
+  },
+  {
+    route: 'POST /api/key-items/:id/close',
+    what: 'close a key item',
+    method: 'POST',
+    url: (f) => `/api/key-items/${f.note}/close`,
+  },
+  {
+    route: 'POST /api/key-items/:id/reopen',
+    what: 'open a closed key item again',
+    method: 'POST',
+    url: (f) => `/api/key-items/${f.note}/reopen`,
   },
   // WHO A REVIEW GOES TO, AND DISCARDING WHAT IT HOLDS. Wave 13r round 15. Both take a review id and both write: one
   // says where somebody else's review sends its comments, the other deletes them. The recipient control names no
@@ -1826,7 +1924,25 @@ const ONE_PRESS_WHY =
   'in robotics with the header naming panelx: each answered 200, and the agreed act ran in robotics. An id nothing holds ' +
   'is answered 404 whichever project the header names.'
 
+/** Why a report can be starred from any project. */
+const REPORT_STARS_WHY =
+  'The id is a report the person stars on the Reports page, and that page reads every report and note in every project, ' +
+  'each row with the project it is in (GET /api/records/reports-and-notes in src/server/api/records.ts). ' +
+  'So the star door takes a report from any project, whichever project the header names. ' +
+  'Who may press is checked by the door: only the person, proved, sets or removes a star. ' +
+  "An id that is not a live report is answered 404, and the door answers with that person's own list of starred report ids, never with the report."
+
 const NOT_A_RECORD_BY_ID: { route: string; why: string }[] = [
+  { route: 'POST /api/knowledge/categories/:id/move', why: 'The id is a knowledge workspace category, shared with every project by the decision to share knowledge across projects. tests/knowledge-category-move.test.ts proves a project record cannot be reached here.' },
+  { route: 'GET /api/knowledge/categories/:id', why: 'The id is a knowledge workspace category, shared with every project by the decision to share knowledge across projects. tests/knowledge-entries-and-changes.test.ts proves a project record cannot be reached here.' },
+  { route: 'GET /api/knowledge/entries/:id', why: 'The id is a knowledge workspace entry, shared with every project by the decision to share knowledge across projects. tests/knowledge-entries-and-changes.test.ts proves a project record cannot be reached here.' },
+  { route: 'PATCH /api/knowledge/entries/:id', why: 'The id is a knowledge workspace entry, shared with every project by the decision to share knowledge across projects. tests/knowledge-entries-and-changes.test.ts proves a project record cannot be reached here.' },
+  { route: 'POST /api/knowledge/changes/:id/confirm', why: 'The id is a knowledge workspace change, shared with every project by the decision to share knowledge across projects. tests/knowledge-entries-and-changes.test.ts proves a project record cannot be reached here.' },
+  { route: 'POST /api/knowledge/changes/:id/refuse', why: 'The id is a knowledge workspace change, shared with every project by the decision to share knowledge across projects. tests/knowledge-entries-and-changes.test.ts proves a project record cannot be reached here.' },
+  { route: 'POST /api/knowledge/entries/:id/bookmarks', why: 'The id is a knowledge workspace entry, shared with every project by the decision to share knowledge across projects. tests/knowledge-entries-and-changes.test.ts proves a project record cannot be reached here.' },
+  { route: 'POST /api/knowledge/entries/:id/attachments', why: 'The id is a knowledge workspace entry, shared with every project by the decision to share knowledge across projects. tests/knowledge-on-flow-steps.test.ts proves a project record cannot be reached here.' },
+  { route: 'DELETE /api/knowledge/entries/:id/attachments', why: 'The id is a knowledge workspace entry, shared with every project by the decision to share knowledge across projects. tests/knowledge-on-flow-steps.test.ts proves a project record cannot be reached here.' },
+  { route: 'POST /api/knowledge/entries/:id/ratings', why: 'The id is a knowledge workspace entry, shared with every project by the decision to share knowledge across projects. tests/knowledge-ratings-and-counts.test.ts proves a project record cannot be reached here.' },
   { route: 'POST /api/agents/:id/owner', why: 'The id names an installation-wide agent registry row, not a project record.' },
   ...PRIVATE_LOGIN_ROUTES.filter(({ path }) => path.includes('/:attempt/')).map(({ method, path }) => ({
     route: `${method} /api${path}`,
@@ -1891,6 +2007,10 @@ const NOT_A_RECORD_BY_ID: { route: string; why: string }[] = [
   },
   {
     route: 'PUT /api/residents/:agentId/sleep-time',
+    why: RESIDENT_WHY,
+  },
+  {
+    route: 'PUT /api/residents/:agentId/package-reminder-every',
     why: RESIDENT_WHY,
   },
   {
@@ -2251,6 +2371,7 @@ const NOT_A_RECORD_BY_ID: { route: string; why: string }[] = [
     route: 'POST /api/one-press/:id/withdraw',
     why: ONE_PRESS_WHY,
   },
+  { route: 'PUT /api/records/report-stars/:id', why: REPORT_STARS_WHY },
   {
     route: 'GET /api/office/visitors/:id',
     why:
@@ -2502,6 +2623,14 @@ const NOT_A_RECORD_BY_ID: { route: string; why: string }[] = [
       'The id in the path IS a project, as in the two above. The board is read from the project\'s own master ' +
       'pipeline, and a project id naming no project is answered 404 with the master reader\'s coded refusal, ' +
       'whichever project the header names (wave 13u round 216, tests/the-project-board-counts-only-runs-that-act.test.ts).',
+  },
+  {
+    route: 'GET /api/projects/:project/people-and-packages',
+    why:
+      'The id in the path IS a project, as in the three above. The board\'s fourth tab reads it: the project\'s acting ' +
+      'runs and its packages, line by line. A project id naming no project is answered 404 with the master reader\'s ' +
+      'coded refusal, whichever project the header names (wave 13u round 242, ' +
+      'tests/the-people-and-packages-door-counts-each-line.test.ts).',
   },
   {
     route: 'GET /api/messages/between/:pair',
@@ -3021,6 +3150,26 @@ const NOT_A_RECORD_BY_ID: { route: string; why: string }[] = [
     route: 'PUT /api/terminals/:id/keeping',
     why: TERMINAL_WHY,
   },
+  // SETTING UP AN AGENT TOOL, wave 13u round 242, src/server/api/terminal-harnesses.ts.
+  ...['GET /api/harnesses/:id/signed-in', 'POST /api/harnesses/:id/key', 'POST /api/harnesses/:id/sign-in', 'POST /api/harnesses/:id/sign-in/code'].map((route) => ({
+    route,
+    why:
+      "The segment is an agent tool's id in the tools' own declaration (src/server/lib/harnesses.ts), such as codex, " +
+      'not a record id. The tool is installed on this machine for the person, not for one project, and only the ' +
+      'person, proved, may use these doors. They read no record and write none, so the same tool answers whichever ' +
+      'project the header names.',
+  })),
+  {
+    route: 'POST /api/harnesses/:id/set-up',
+    why:
+      "The segment is an agent tool's id in the tools' own declaration (src/server/lib/harnesses.ts), not a record id. " +
+      "The door reads no record by the segment. It writes the person's message to a secretary in the project the header " +
+      'names, and secretaries are registered for the whole office, so no project is asked of the segment.',
+  },
+  {
+    route: 'POST /api/terminals/:id/name',
+    why: TERMINAL_WHY,
+  },
   // A SECRETARY'S DUTIES, wave 13s round 92, src/server/api/secretary-duties.ts.
   ...['GET /api/secretaries/:agent/duties', 'PUT /api/secretaries/:agent/duties'].map((route) => ({
     route,
@@ -3030,6 +3179,14 @@ const NOT_A_RECORD_BY_ID: { route: string; why: string }[] = [
       'so another project\'s record is neither shown nor changed. The door answers and the one-job settings it ' +
       'shows beside the record are the installation\'s own, and are read live.',
   })),
+  // THE OWNER HAND-OVERS OF AN AGENT, wave 13s round 281, beside the owner door in src/server/api/agent-move.ts.
+  {
+    route: 'GET /api/participants/agent/:id/owner-changes',
+    why:
+      'The path names an agent by its registry id or handle, as the renames read beside it does. The read answers ' +
+      'that agent’s rows of agent_owner_changes, which belong to no project, with the name of each owner and of ' +
+      'each maker, and the moment the installation began to keep them. No record is named or read.',
+  },
 ]
 
 // ============================================================================ the harness

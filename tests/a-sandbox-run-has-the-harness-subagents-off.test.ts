@@ -84,12 +84,13 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it, onTestFinished } from 'vitest'
 import { thePortsATestKeepsOff } from '../tools/live-office-ports.mjs'
-import { LEGACY_ROUND_CHAPTERS, writeRoundStartRules } from './round-chapters-fixture.ts'
+import { LEGACY_ROUND_CHAPTERS, theMadeUpOfficesAnswer, writeRoundStartRules } from './round-chapters-fixture.ts'
 import { FAKE_DOCKER, withAPrivateTmpToSweep } from './sandbox-stand-ins.ts'
 import { syntheticDshReader } from './dsh-native-stand-in.ts'
 import { withoutInheritedEffort } from './without-inherited-effort.ts'
 import { THE_FACTS_VARIABLE, prepareClaudeRunHome, theFactsAStartIsGiven, writeInstance } from '../tools/sandbox-common.mjs'
 import { THE_MODELS_START_VALUES } from '../src/config/model-efforts.mjs'
+import { CODEX_SHELL_SNAPSHOT_FEATURE, CODEX_SHELL_SNAPSHOT_OFF } from '../src/config/run-permissions.mjs'
 import * as theOneList from '../src/config/harness-features-off.mjs'
 import { THE_STARTING_WORDS, THE_STARTING_WORDS_WITHOUT_THE_SWITCH, aCommandWithTheHarnessFeaturesOff, aRunnerGivesDshThePatch } from '../tools/harness-features-off.mjs'
 
@@ -169,15 +170,20 @@ beforeAll(async () => {
   writeFileSync(join(root, 'template', 'sandbox.json'), JSON.stringify({ template: 'synthetic' }))
   writeInstance(dir, facts())
   writeFileSync(join(dir, 'bin', 'docker'), FAKE_DOCKER, { mode: 0o755 })
+  // EACH STAND-IN READS WHERE TO WRITE FROM THE FILE BESIDE IT THAT IS NAMED FOR ITS PROGRAM, which each start writes
+  // (theStandInIsTold), and not from its environment: a Codex is given only the names its list keeps
+  // (src/config/the-environment-a-codex-gets.mjs). One file a program, because a case starts Claude Code and Codex at once.
   const program = `#!${process.execPath}
 const fs = require('fs')
+const path = require('path')
+const capture = fs.readFileSync(path.join(__dirname, path.basename(__filename) + '.capture-path'), 'utf8')
 const argv = process.argv.slice(2)
 // dsh reads each --patch file at its own start, and the run's scratch folder that holds one is removed when the run ends.
 const patches = argv.flatMap((word, at) => word === '--patch' ? [argv[at + 1]] : []).map(file => {
   try { return { file, text: fs.readFileSync(file, 'utf8'), pid: process.pid } }
   catch (error) { return { file, missing: error.code, pid: process.pid } }
 })
-fs.writeFileSync(process.env.FEATURES_CAPTURE, JSON.stringify({ argv, patches, pid: process.pid, stdin: fs.readFileSync(0, 'utf8'), allEnv: process.env }))
+fs.writeFileSync(capture, JSON.stringify({ argv, patches, pid: process.pid, stdin: fs.readFileSync(0, 'utf8'), allEnv: process.env }))
 process.stdout.write('{}')
 `
   for (const name of ['claude', 'codex', 'opencode', 'dsh']) {
@@ -187,7 +193,10 @@ process.stdout.write('{}')
   office = createServer(async (req, res) => {
     res.setHeader('content-type', 'application/json')
     const run = runs.get(req.url?.split('/').pop() ?? '')
-    if (req.url === '/api/participants') {
+    if (req.method === 'GET' && theMadeUpOfficesAnswer(req.url ?? '') !== null) {
+      // THE TWO DOORS A ROUND'S START READS ITS RULES FROM, answered as an office that holds no chapter and no regulation.
+      res.end(JSON.stringify(theMadeUpOfficesAnswer(req.url ?? '')))
+    } else if (req.url === '/api/participants') {
       res.end(JSON.stringify({ agents: [{ id: agent, handle: agent, name: agent, record: 'synthetic-agent-record' }] }))
     } else if (req.method === 'GET' && req.url?.startsWith('/api/office/run-models/for/')) {
       const query = new URL(req.url, 'http://synthetic.invalid').searchParams
@@ -250,6 +259,16 @@ afterAll(async () => {
   rmSync(root, { recursive: true, force: true })
 })
 
+/** The stand-in each runtime's start runs, by its program's name in the stand-ins' folder. */
+const THE_PROGRAM_OF: Record<string, string> = { 'claude-code': 'claude', codex: 'codex', opencode: 'opencode', dsh: 'dsh' }
+
+/** Tells the stand-in of `runtime` where this start's capture goes, in the file beside it. */
+function theStandInIsTold(runtime: string, capturePath: string) {
+  const program = THE_PROGRAM_OF[runtime]
+  if (program === undefined) throw new Error(`This test has no stand-in for the runtime ${runtime}.`)
+  writeFileSync(join(dir, 'bin', `${program}.capture-path`), capturePath)
+}
+
 /** A run of `runtime` started by the real helper, as the launcher starts it: what the program was started with. */
 async function launched(command: string[], runtime: string, env: Record<string, string | undefined> = {}, model = legacyModel, { plain = false } = {}) {
   const { code, err, label, capturePath } = await aStart(command, runtime, env, model, { plain })
@@ -269,6 +288,7 @@ async function aStart(command: string[], runtime: string, env: Record<string, st
     mkdirSync(handshake)
     writeFileSync(join(handshake, 'row.json'), '{"id":"synthetic-process"}')
   }
+  theStandInIsTold(runtime, capturePath)
   const child = spawn(process.execPath, [
     'tools/sandbox-start.mjs', '--in-background', '--instance', dir, '--cwd', worktree,
     '--as', 'synthetic-starter', '--session', 'synthetic-starter-session', '--workspace', 'default', '--api', api,
@@ -281,7 +301,7 @@ async function aStart(command: string[], runtime: string, env: Record<string, st
     MOLE_OFFICE_API: api, MOLE_AGENT_KEY: starterKey, SANDBOX_RUN_KEY: plain ? undefined : key, [THE_FACTS_VARIABLE]: theFactsAStartIsGiven(facts()),
     HOME: join(dir, 'home'), CLAUDE_CONFIG_DIR: join(dir, 'home'), CLAUDE_CODE_OAUTH_TOKEN: 'synthetic-login-for-the-stand-in-only',
     MOLE_OFFICE_COMMIT_EMAIL: 'synthetic@example.invalid', PATH: join(dir, 'bin') + ':' + process.env['PATH'],
-    FEATURES_CAPTURE: capturePath, TMPDIR: join(dir, 'tmp'), ...env,
+    TMPDIR: join(dir, 'tmp'), ...env,
   }, join(dir, 'a-private-tmp')) })
   let err = ''
   child.stderr.on('data', chunk => { err += String(chunk) })
@@ -291,9 +311,10 @@ async function aStart(command: string[], runtime: string, env: Record<string, st
 
 /** A worker or a round started by the real host launcher through the docker stand-in: the record it printed. */
 async function startedVerb(verb: 'worker' | 'round', brief: string, capturePath: string, runtime = 'claude-code') {
+  theStandInIsTold(runtime, capturePath)
   writeFileSync(join(dir, 'state.json'), JSON.stringify({ containers: {
     'synthetic-container': { Id: 'synthetic-container', State: { Running: true }, Mounts: [], Config: { Env: [
-      `HOME=${join(dir, 'home')}`, `FEATURES_CAPTURE=${capturePath}`, `TMPDIR=${join(dir, 'tmp')}`,
+      `HOME=${join(dir, 'home')}`, `TMPDIR=${join(dir, 'tmp')}`,
       'CLAUDE_CODE_OAUTH_TOKEN=synthetic-login-for-the-stand-in-only', 'DEEPSEEK_API_KEY=synthetic-deepseek-key-for-the-stand-in-only',
     ] } },
   }, calls: [], bugs: {} }))
@@ -390,7 +411,8 @@ describe('each runtime the launcher starts has the harness subagents and workflo
     const exec = argv.indexOf('exec')
     expect(exec, JSON.stringify(argv)).toBeGreaterThan(0)
     expect(theFeaturesCodexTurnsOff(argv)).toEqual(expect.arrayContaining(CODEX_SUBAGENT_FEATURES))
-    expect(argv.slice(0, theOneList.CODEX_FEATURES_OFF.length), 'the one list\'s switches, first').toEqual([...theOneList.CODEX_FEATURES_OFF])
+    // THE SANDBOX'S CODEX PUTS THE SNAPSHOT SWITCH IN FRONT (tools/codex-in-a-sandbox.mjs), and the one list's switches follow it.
+    expect(argv.slice(0, CODEX_SHELL_SNAPSHOT_OFF.length + theOneList.CODEX_FEATURES_OFF.length), 'the snapshot switch, then the one list\'s switches, first').toEqual([...CODEX_SHELL_SNAPSHOT_OFF, ...theOneList.CODEX_FEATURES_OFF])
     expect(argv.slice(exec)).toContain('a synthetic prompt')
   })
 
@@ -445,7 +467,7 @@ describe("the switch is in the run's home as well, whatever the command starts",
     const held = join(dir, 'home', '.codex', 'config.toml')
     mkdirSync(join(dir, 'home', '.codex'), { recursive: true })
     const projects = '[projects."/synthetic/repo"]\ntrust_level = "trusted"\n'
-    writeFileSync(held, `model = "synthetic"\n\n${projects}\n[features]\n# a synthetic comment\nshell_snapshot = true\nmulti_agent = true\n\n[tui]\nsynthetic = 1\n`)
+    writeFileSync(held, `model = "synthetic"\n\n${projects}\n[features]\n# a synthetic comment\nshell_snapshot = true\nsynthetic_feature = true\nmulti_agent = true\n\n[tui]\nsynthetic = 1\n`)
     const { allEnv } = await launched(['codex', 'exec', 'a synthetic prompt'], 'codex')
     expect(allEnv['CODEX_HOME']).toBeUndefined()
     const file = theFileCodexReads(allEnv)
@@ -453,7 +475,8 @@ describe("the switch is in the run's home as well, whatever the command starts",
     const text = readFileSync(file, 'utf8')
     const features = theTomlTable(text, 'features')
     for (const feature of [...CODEX_SUBAGENT_FEATURES, ...theOneList.CODEX_FEATURE_NAMES_OFF]) expect(features[feature], `${feature}:\n${text}`).toBe('false')
-    expect(features['shell_snapshot']).toBe('true')
+    expect(features[CODEX_SHELL_SNAPSHOT_FEATURE], text).toBe('false')
+    expect(features['synthetic_feature']).toBe('true')
     expect(text).toContain(projects)
     expect(text).toContain('# a synthetic comment\n')
     expect(text.startsWith('model = "synthetic"\n')).toBe(true)
@@ -529,7 +552,7 @@ describe("the home's files are written whole, and only when the switch is not al
     expect(kept).toEqual(JSON.parse(settingsBefore))
     expect(settingsAfter.startsWith(settingsBefore.replace(/\n\}\n$/, ',\n')), settingsAfter).toBe(true)
     // A config.toml with the lines it held and one [features] table after them.
-    expect(configAfter).toBe(`${configBefore}\n[features]\nmulti_agent = false\nmulti_agent_v2 = false\n`)
+    expect(configAfter).toBe(`${configBefore}\n[features]\nmulti_agent = false\nmulti_agent_v2 = false\nshell_snapshot = false\n`)
     // Each is a new file that took the old one's place, with the old one's mode, and nothing is left beside it.
     expect(seen.map(file => readFileSync(file, 'utf8')), 'a file was written again where it was').toEqual([settingsBefore, configBefore])
     expect([settingsFile(), configFile()].map(file => statSync(file).mode & 0o777)).toEqual([0o664, 0o664])

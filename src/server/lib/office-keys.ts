@@ -92,7 +92,6 @@ export function theRuntimesOwnKeys(): RuntimeKeyOnScreen[] {
       runtime: row.runtime,
       label: row.label,
       provider: row.provider,
-      means: row.means,
       state: answer.state,
       says: answer.says,
       asked: answer.asked,

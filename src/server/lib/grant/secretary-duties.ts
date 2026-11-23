@@ -28,7 +28,8 @@
  * The same refusals apply through /api/records and PUT /api/secretaries/<id>/duties.
  *
  * A decision the duties rest on is not deleted, and is not moved to another project without them, while they rest on it.
- * `checkNoDutiesRestOn` refuses both, called by `deleteRecord` in records.ts and by move.ts. It refuses the person too,
+ * `checkNoDutiesOrDepartmentsRestOn` refuses both, called by `deleteRecord` in records.ts and by move.ts, and asks the
+ * same of a department that rests on the decision, merged or not, from step 1b of departments. It refuses the person too,
  * and names the change of the duties that must come first, which only the writers above may make. Without it, duties
  * named a decision that was gone, and their next change was refused, even the person's. Way (a) of wave 13s round 100.
  * Round 101 adds three more acts on the decision. `patchRecord` refuses a change of its kind, or of `decided_by` away
@@ -48,12 +49,15 @@
  *
  * A live decision in the same project, replaced by no live decision, decided by "the owner", and given no mark by
  * `decisionsNotOnThePersonsOwnWords`: answer (a) to round 90's first question. The warrant's words must appear in
- * one of those decisions' words, or in the person's own message that decision cites.
+ * one of those decisions' words, or in the person's own message that decision cites. A department asks the same of the
+ * decisions it rests on: both guards ask it through `theDecisionsRestedOn` in grant/decisions-rested-on.ts.
  */
 import { isDeepStrictEqual } from 'node:util'
 
+import { DEPARTMENT_KIND } from '@shared/departments.ts'
 import { THE_OWNER } from '@shared/kinds.ts'
 import { isMoleOffice, MOLE_OFFICES_OWN_ROW_HOLDS_NO_CARD, type ParticipantRef } from '@shared/participants.ts'
+import { DEPARTMENTS_REST_ON_THE_DECISION, type CodedRefusal } from '@shared/refusal-codes.ts'
 import { A_ROW_WITH_NO_ROLE_READS_AS, mayBeElevated, THE_SUPERVISOR } from '@shared/roles.ts'
 import { isADoorTheListNames, whatThisDoorDoes } from '@shared/what-the-grant-carries-words.ts'
 import { sqlite } from '../../db/client.ts'
@@ -70,6 +74,8 @@ import { decisionsNotOnThePersonsOwnWords, isAWordOf, referenceOf, whoseRecordsA
 import { SECRETARY_DUTIES_KIND, isObject, theSecretaryNamedIn } from '@shared/secretary-duties-record.ts'
 import { holdsTheSecretaryCard } from '../holds-the-secretary-card-2.ts'
 import { theDutiesIn } from '../../db/the-duties-part-for.ts'
+import type { TheDuties, AnotherSecretarysArea, TheDutiesPart } from '../../db/types/secretary-duties.ts'
+import { theDecisionsRestedOn, type ADecisionRestedOn } from './decisions-rested-on.ts'
 
 export { SECRETARY_DUTIES_KIND }
 
@@ -90,17 +96,7 @@ const THE_LISTS = ['responsibleFor', 'lines', 'doors', 'reportsToThePerson'] as 
 /** How many SQL statements the brief's part reads. tests/secretary-duties.test.ts holds `theDutiesPartFor` to it. */
 export const THE_DUTIES_PART_READS_IN_STATEMENTS = 1
 
-/** One secretary's duties, as they are stored and as the binding writes them. */
-export interface TheDuties {
-  area: string
-  responsibleFor?: string[]
-  lines?: string[]
-  doors?: string[]
-  reportsToThePerson?: string[]
-  restsOn: string[]
-  /** The supervisors it answers for, each with the area the chat draws under that supervisor's name. */
-  supervisors?: { agent: ParticipantRef; area: string }[]
-}
+export type { TheDuties, AnotherSecretarysArea, TheDutiesPart } from '../../db/types/secretary-duties.ts'
 
 export { theDutiesIn } from '../../db/the-duties-part-for.ts'
 
@@ -135,9 +131,9 @@ function whoMayWrite(secretaryId: string): string {
   )
 }
 
-/** A refusal of the change as written, which says what to send instead. */
-function refuse(words: string, status = 400): PanelError {
-  return new PanelError(`${words} Nothing was written.`, status)
+/** A refusal of the change as written, which says what to send instead, with its code when it has one. */
+function refuse(words: string, status = 400, refusal?: CodedRefusal): PanelError {
+  return new PanelError(`${words} Nothing was written.`, status, undefined, undefined, undefined, refusal)
 }
 
 /** The words a decision holds, every string of every field that is its words, joined. */
@@ -369,73 +365,52 @@ export function theWayToTakeThemAway(act: ATakingAway, secretaryId: string, onto
   )
 }
 
-/** One decision's id, kind, project, data and whether it is deleted. */
-interface ADecisionRow {
-  id: string
-  kind: string
-  workspace_id: string
-  data: string | null
-  deleted_at: string | null
-}
-
 /**
  * EACH DECISION IN restsOn IS LIVE, IN THIS PROJECT, REPLACED BY NONE, DECIDED BY THE OWNER AND ON THE PERSON'S OWN
- * WORDS. Returns each with its data, for the check of the warrant's words. `takingAway` names the act and the secretary
- * when the duties are being taken away rather than written, so each refusal ends with what fits that act.
+ * WORDS: `theDecisionsRestedOn` in grant/decisions-rested-on.ts, which a department's guard asks too. Returns each with
+ * its data, for the check of the warrant's words. `takingAway` names the act and the secretary when the duties are being
+ * taken away rather than written, so each refusal ends with what fits that act.
  */
 function theDecisionsItRestsOn(
   workspaceId: string,
   ids: readonly string[],
   takingAway: { act: ATakingAway; secretaryId: string } | null = null,
-): { id: string; data: unknown }[] {
+): ADecisionRestedOn[] {
   const orForAWrite = (onto: string | null, write: string): string =>
     takingAway === null ? write : theWayToTakeThemAway(takingAway.act, takingAway.secretaryId, onto)
-  const rows = sqlite
-    .prepare(`SELECT id, kind, workspace_id, data, deleted_at FROM records WHERE id IN (${ids.map(() => '?').join(', ')})`)
-    .all(...ids) as ADecisionRow[]
-  const byId = new Map(rows.map((row) => [row.id, row]))
-  const out: { id: string; data: unknown }[] = []
-  for (const id of ids) {
-    const row = byId.get(id)
-    if (row === undefined || row.kind !== 'decision' || row.deleted_at !== null || row.workspace_id !== workspaceId) {
+  const read = theDecisionsRestedOn(workspaceId, ids)
+  if (read.fit) return read.decisions
+  const { id } = read
+  switch (read.fault) {
+    case 'notLive':
       throw refuse(
         `data.restsOn names ${id}, which is not a live decision in this project. ` +
           orForAWrite(null, "Name the person's decisions these duties rest on: GET /api/records?kind=decision lists them."),
       )
-    }
-    const standing = whatSupersedes(id)
-    if (standing !== null) {
+    case 'replaced':
       throw refuse(
-        `Decision ${id} ${WHY_DUTIES_ARE_REFUSED.replaced} The decision that stands in its place is ${standing.id} ` +
-          `("${standing.title}"). ${orForAWrite(standing.id, theWayToRestThemOn(standing.id))}`,
+        `Decision ${id} ${WHY_DUTIES_ARE_REFUSED.replaced} The decision that stands in its place is ${read.standing.id} ` +
+          `("${read.standing.title}"). ${orForAWrite(read.standing.id, theWayToRestThemOn(read.standing.id))}`,
       )
-    }
-    const data: unknown = row.data === null ? null : JSON.parse(row.data)
-    if (!isObject(data) || data['decided_by'] !== THE_OWNER) {
+    case 'notTheOwners':
       throw refuse(
         `Decision ${id} was not decided by "${THE_OWNER}". Duties rest only on the person's own decisions.` +
           (takingAway === null ? '' : ` ${theWayToTakeThemAway(takingAway.act, takingAway.secretaryId, null)}`),
       )
-    }
-    out.push({ id, data })
-  }
-  const marked = decisionsNotOnThePersonsOwnWords(out)
-  for (const one of out) {
-    if (marked.has(one.id)) {
+    case 'notOnThePersonsOwnWords':
       throw refuse(
-        `Decision ${one.id} was recorded in the person's name on words that are not the person's own, so duties may not ` +
+        `Decision ${id} was recorded in the person's name on words that are not the person's own, so duties may not ` +
           `rest on it. ${orForAWrite(null, "Ask the person to decide it themselves, or name a decision made on the person's own words.")}`,
       )
-    }
   }
-  return out
 }
 
 /**
  * THE WARRANT'S WORDS APPEAR IN ONE OF THE DECISIONS, or in the person's own message one of them cites. A cited record
- * counts only when `whoseRecordsAreThese` says it is the person's own message.
+ * counts only when `whoseRecordsAreThese` says it is the person's own message. A department's guard
+ * (src/server/lib/grant/departments.ts) asks the same of the decisions a department rests on.
  */
-function theWordsAreTheDecisions(said: string, decisions: readonly { id: string; data: unknown }[]): boolean {
+export function theWordsAreTheDecisions(said: string, decisions: readonly { id: string; data: unknown }[]): boolean {
   const words = asOneLine(said)
   if (words === '') return false
   if (decisions.some((one) => asOneLine(theWordsOf('decision', one.data)).includes(words))) return true
@@ -564,8 +539,8 @@ export function checkTheDutiesTakenAway(input: { workspaceId: string; data: unkn
 }
 
 /**
- * EACH ACT ON A DECISION THAT `checkNoDutiesRestOn` REFUSES, in its words: what the decision is not, what the act would
- * leave the duties resting on, and what to do once the duties are changed.
+ * EACH ACT ON A DECISION THAT `checkNoDutiesOrDepartmentsRestOn` REFUSES, in its words: what the decision is not, what
+ * the act would leave the duties or departments resting on, and what to do once they are changed.
  */
 export const THE_ACTS_ON_A_DECISION = {
   delete: {
@@ -626,13 +601,19 @@ export function theActThatWouldStrandTheDuties(
 }
 
 /**
- * A DECISION IS NOT DELETED, MOVED TO ANOTHER PROJECT, CHANGED INTO ANOTHER KIND OR TAKEN OFF THE PERSON WHILE DUTIES REST
- * ON IT. Asked of the person too, because the act on the decision does not change the duties, and only the person or the
- * secretary they name may. `goingWithIt` is the records a move carries along with the decision, so duties that move with
- * it are not asked here. `revoking` is the version whose revoke would make the change by putting back the one before it:
- * the refusal then ends with the order, the duties first and then the revoke, rather than with doing the change again.
+ * A DECISION IS NOT DELETED, MOVED TO ANOTHER PROJECT, CHANGED INTO ANOTHER KIND OR TAKEN OFF THE PERSON WHILE DUTIES OR A
+ * DEPARTMENT REST ON IT. Asked of the person too, because the act on the decision does not change what rests on it, and
+ * only the person or a secretary carrying the person's words may. A department that is merged and not deleted still
+ * rests on its decisions, so it is asked as a standing one is. `goingWithIt` is the records a move carries along with
+ * the decision, so duties and departments that move with it are not asked here. `revoking` is the version whose revoke
+ * would make the change by putting back the one before it: the refusal then ends with the order, what rests on the
+ * decision first and then the revoke, rather than with doing the change again.
+ *
+ * When only duties rest on it, the refusal is the duties' sentence, word for word, with no code. When a department does,
+ * the refusal names every department and duties with its door, and carries DEPARTMENTS_REST_ON_THE_DECISION, so a page
+ * can say it in English and in Chinese (wave 13s, step 1b of departments and posts).
  */
-export function checkNoDutiesRestOn(
+export function checkNoDutiesOrDepartmentsRestOn(
   decision: { id: string; title: string; workspaceId: string },
   verb: AnActOnADecision,
   goingWithIt: ReadonlySet<string> = new Set(),
@@ -641,31 +622,57 @@ export function checkNoDutiesRestOn(
   const resting = (
     sqlite
       .prepare(
-        `SELECT r.id AS id, r.title AS title, json_extract(r.data, '$.secretary.id') AS secretary
+        `SELECT r.id AS id, r.kind AS kind, r.title AS title, json_extract(r.data, '$.secretary.id') AS secretary
            FROM records r, json_each(r.data, '$.restsOn') e
-          WHERE r.workspace_id = ? AND r.kind = ? AND r.deleted_at IS NULL AND e.value = ?
+          WHERE r.workspace_id = ? AND r.kind IN (?, ?) AND r.deleted_at IS NULL AND e.value = ?
           ORDER BY r.id`,
       )
-      .all(decision.workspaceId, SECRETARY_DUTIES_KIND, decision.id) as { id: string; title: string; secretary: string }[]
+      .all(decision.workspaceId, SECRETARY_DUTIES_KIND, DEPARTMENT_KIND, decision.id) as {
+      id: string
+      kind: string
+      title: string
+      secretary: string | null
+    }[]
   ).filter((one) => !goingWithIt.has(one.id))
   if (resting.length === 0) return
-  const which = resting.map((one) => `${one.id} ("${one.title}"), the duties of the secretary ${one.secretary}`).join('; ')
-  const doors = resting.map((one) => `PUT /api/secretaries/${one.secretary}/duties`).join(', ')
+  const duties = resting.filter((one) => one.kind === SECRETARY_DUTIES_KIND)
+  const departments = resting.filter((one) => one.kind === DEPARTMENT_KIND)
+  const which = [
+    ...duties.map((one) => `${one.id} ("${one.title}"), the duties of the secretary ${String(one.secretary)}`),
+    ...departments.map((one) => `${one.id} ("${one.title}"), a department`),
+  ].join('; ')
+  const doors = [
+    ...duties.map((one) => `PUT /api/secretaries/${String(one.secretary)}/duties`),
+    ...departments.map((one) => `PUT /api/departments/${one.id}`),
+  ].join(', ')
   const act = THE_ACTS_ON_A_DECISION[verb]
-  throw refuse(
+  const onlyDuties = departments.length === 0
+  const words =
     `Decision ${decision.id} ("${decision.title}") is not ${act.isNot} ` +
-      `${WHY_DUTIES_ARE_REFUSED.restOnTheDecision} These duties name it in restsOn: ${which}. ${act.left}, and then even ` +
-      "the person's next change of them would be refused until it names a live decision of the person's here. Only the " +
-      "person, by their own press, or the secretary the duties name, with a warrant quoting the person's words, changes " +
-      `them. So change them first: ${doors}, with restsOn naming another of the person's decisions in this project. Or ` +
-      `take them away with DELETE /api/records/<their id>.` +
-      (verb === 'move' ? ` Or move them with the decision: add their ids to "also".` : '') +
-      (revoking === null
-        ? ` ${act.then}`
-        : ` Revoking version ${String(revoking)} would make that change, because it puts back version ` +
-          `${String(revoking - 1)}. ${WHY_DUTIES_ARE_REFUSED.changeThemThenRevokeTheAct}`),
-    409,
-  )
+    (onlyDuties
+      ? `${WHY_DUTIES_ARE_REFUSED.restOnTheDecision} These duties`
+      : "while a department or a secretary's duties rest on it. These") +
+    ` name it in restsOn: ${which}. ${act.left}, and then even ` +
+    "the person's next change of them would be refused until it names a live decision of the person's here. Only the " +
+    (onlyDuties
+      ? "person, by their own press, or the secretary the duties name, with a warrant quoting the person's words, changes them."
+      : "person, by their own press, or a secretary with a warrant quoting the person's words, changes them. Duties are " +
+        'changed only by the person or the secretary they name.') +
+    ` So change them first: ${doors}, with restsOn naming another of the person's decisions in this project. Or ` +
+    `take them away with DELETE /api/records/<their id>.` +
+    (verb === 'move' ? ` Or move them with the decision: add their ids to "also".` : '') +
+    (revoking === null
+      ? ` ${act.then}`
+      : ` Revoking version ${String(revoking)} would make that change, because it puts back version ` +
+        `${String(revoking - 1)}. ${WHY_DUTIES_ARE_REFUSED.changeThemThenRevokeTheAct}`) +
+    (!onlyDuties && (verb === 'revoke' || revoking !== null)
+      ? ' The same order holds for a department: change it or delete it first.'
+      : '')
+  if (onlyDuties) throw refuse(words, 409)
+  throw refuse(words, 409, {
+    code: DEPARTMENTS_REST_ON_THE_DECISION,
+    values: { decision: decision.id, resting: [...duties, ...departments].map((one) => one.id).join(', ') },
+  })
 }
 
 /**
@@ -684,23 +691,6 @@ export function theReplacedDecisionsTheyRestOn(data: unknown): Record<string, { 
 }
 
 // ============================================================================ the part of the brief
-
-/** Another secretary's duties, as the brief shows them: who, and the area line. */
-export interface AnotherSecretarysArea {
-  recordId: string
-  secretary: string
-  /** The agent's handle, or null because no agent has the registry id the record names. */
-  handle: string | null
-  area: string
-}
-
-/** The part of GET /api/brief that says what each secretary does. */
-export interface TheDutiesPart {
-  /** The reader's own duties in full, or null because no record names the reader. */
-  yours: (TheDuties & { recordId: string; secretary: string }) | null
-  others: AnotherSecretarysArea[]
-  note: string
-}
 
 export { theDutiesPartFor } from '../../db/the-duties-part-for.ts'
 

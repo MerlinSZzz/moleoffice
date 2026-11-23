@@ -5,12 +5,15 @@
  *
  *   GET  /api/terminals              every terminal the holder holds, and where the holder stands  (the person, secretary own key or grant)
  *   POST /api/terminals              open one: a command, in a folder (the person's home folder when none is named)  (the person or grant)
- *   GET  /api/terminals/:id/stream   read one: its screen now, then its output as it comes     (secretary own key for agent terminals; person or grant otherwise)
+ *                                    or the shell with a line a secretary prepared, never entered  (secretary words or grant)
+ *   GET  /api/terminals/:id/stream   read one: its screen now, then its output as it comes     (secretary own key for agent terminals and one it prepared while it runs; person or grant otherwise)
+ *   GET  /api/terminals/stream       read several in one reading, every event marked with its terminal  (each as its own stream)
  *   POST /api/terminals/:id/input    type into one: any keys, or one whole line from a secretary  (the person, words or grant)
  *   POST /api/terminals/:id/resize   give one a new size                                      (the person or grant)
  *   POST /api/terminals/:id/close    end one, and forget it                                   (the person or grant)
  *   POST /api/terminals/holder/restart  restart the holder, which ends every terminal it holds  (the person or grant)
  *   POST /api/terminals/:id/keep-my-line  keep its last line as a note                         (the person or grant)
+ *   POST /api/terminals/:id/name     give one a name, a group and tags, kept in the holder      (the person or grant)
  *
  * The terminals themselves are held by the terminal holder, a process of its own, so they keep running
  * while this server restarts (src/server/lib/terminals.ts says how the server reaches it).
@@ -32,9 +35,11 @@
  * ---------------------------------------------------------------------------------------
  *
  * The person types any keys. A secretary with its own key on this computer may read the list and
- * agent-bound terminal streams. Manual terminal streams remain the person's or the grant's where
- * the office's list carries reading. Other terminal mutations keep their person or grant guards.
- * Typing one whole line still requires written permission for that line or the grant, as described below.
+ * agent-bound terminal streams, and the stream of a terminal it prepared for the person while that terminal runs. Manual
+ * terminal streams remain the person's or the grant's where the office's list carries reading. One reading of several
+ * terminals asks for each the authority its own stream asks, and is refused whole when one is refused. Other terminal
+ * mutations, naming a terminal among them, keep their person or grant guards. Typing one whole line still requires
+ * written permission for that line or the grant, and so does preparing one, as described below.
  * No supervisor, worker or sandbox gains the secretary's authority. The socket's provenance is
  * checked because a sandbox can reach this computer's listener while carrying an agent's key.
  *
@@ -49,13 +54,23 @@
  * typing. Each line typed is written down without its text, and the typing sources name the secretary, never the person.
  * A secretary may never send keys as the person does, because the holder could not tell its keys from the person's.
  *
+ * A SECRETARY PREPARES A LINE FOR THE PERSON TO RUN. A secretary opens the shell for the person with one line typed in
+ * it, sent as `line` to the opening door. The office types the line and never an Enter, so the person runs it with their
+ * own Enter, changes it or clears it. The line holds no Enter, Tab, Escape or other key, by the one test of a key in
+ * src/config/a-control-character.mjs, and the holder tests it again and refuses it in its own words. With the owner's
+ * words, the words must name this folder and this exact line, and the secretary must have its own key. Without words,
+ * it is the grant, where this office's list says the grant carries opening a terminal. The list and the stream give the
+ * whole line and the secretary that prepared it, every page is told at once on GET /api/events which secretary prepared
+ * a terminal, and that secretary may read the terminal while it runs. The person sends no prepared line.
+ *
  * FROM ANOTHER COMPUTER, THE PERSON'S OWN KEY ONLY. This is point (d) of a decision, from wave 13u round
  * 14. The doors one
- * terminal's view asks (the list, reading, typing, resizing, closing, and the keeping doors) declare
+ * terminal's view asks (the list, reading, typing, resizing, closing, and the keeping doors), and one reading of several
+ * terminals beside one terminal's stream, declare
  * `thePersonMayFromAnotherComputer`, the widening of a decision: from another computer they answer only the
  * person's key itself, over an encrypted door (`thePersonMayAskFromThere` in lib/reach.ts), and every door still asks
- * the authority each door names. A secretary reads agent terminals on its own key only on this
- * computer. Opening a terminal and
+ * the authority each door names. A secretary reads agent terminals, and a terminal it prepared, on its own key only on
+ * this computer. Opening a terminal, naming one and
  * starting the holder stay on this computer. Every input is counted against where it came from, as the chat records where a message was written: the
  * level, the machine, the program and the account (lib/terminal-typed-from.ts). Each reader is sent those sources on
  * its stream, and reading, typing into or closing a terminal from another computer is said to the person.
@@ -76,15 +91,22 @@
 import { nothingWrittenSentence } from '../lib/records/patching.ts'
 import { statSync } from 'node:fs'
 import { isAbsolute } from 'node:path'
-import type { FastifyInstance, FastifyRequest } from 'fastify'
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { z } from 'zod'
-import { whatToTellAPageOnAnotherOrigin } from '../../config/what-a-page-may-read.mjs'
 import { HOME_MOVED_HEADER } from '../../config/visit-headers.mjs'
-import { originsAPageMayBeOn, settings } from '../../config/settings.mjs'
-import { THE_FIRST_SIZE, THE_LARGEST_SIDE } from '../../config/the-terminal-holder.mjs'
+import {
+  THE_FIRST_SIZE,
+  THE_LARGEST_SIDE,
+  THE_LONGEST_TERMINAL_GROUP,
+  THE_LONGEST_TERMINAL_NAME,
+  THE_LONGEST_TERMINAL_TAG,
+  THE_MOST_TAGS_ON_A_TERMINAL,
+} from '../../config/the-terminal-holder.mjs'
+import { A_CONTROL_CHARACTER } from '../../config/a-control-character.mjs'
 import { theHomeDirectory } from '../lib/adapters/index.ts'
 import { actorFrom, actorWithTheWordsItActsOn, theWordsInTheBody } from '../lib/http.ts'
 import { parse } from '../lib/parse.ts'
+import { theCorsHeadersOfAHijackedReply } from '../lib/an-origin-that-is-not-this-office.ts'
 import {
   aRaiseCarriesIt,
   assertThePersonIsProved,
@@ -95,7 +117,16 @@ import {
 } from '../lib/records.ts'
 import { thePersonIsProved } from '@shared/the-person-proved.ts'
 import { PanelError } from '../lib/panel-error.ts'
-import { THE_LONGEST_LINE_KEPT, TYPED_IN_TERMINAL, theCommandLine, whyThisLooksLikeASecret, type HolderState, type TheKeeping, type TheLastLine } from '@shared/terminals.ts'
+import {
+  THE_LONGEST_LINE_KEPT,
+  THE_MOST_TERMINALS_IN_ONE_READING,
+  TYPED_IN_TERMINAL,
+  theCommandLine,
+  whyThisLooksLikeASecret,
+  type HolderState,
+  type TheKeeping,
+  type TheLastLine,
+} from '@shared/terminals.ts'
 import { asListed } from '../lib/agent-pane.ts'
 import { closeTheTerminalAsSecretary, rememberTheKeepingOfTheAgentIn, whoOpensIt } from '../lib/terminal-agents.ts'
 import { takeTheLinesLater, theKeepingOf } from '../lib/terminal-keeping.ts'
@@ -107,6 +138,8 @@ import { restartTheHolder, startAHolderAsAPageDoes } from '../lib/the-holders-re
 import {
   aTerminalRefusal,
   askTheHolderFor,
+  nameATerminal,
+  openATerminalWithAPreparedLine,
   theEnvironmentATerminalGets,
   theHolder,
   theHolderState,
@@ -291,6 +324,165 @@ async function aSecretaryTypesALine(req: FastifyRequest, actor: Actor): Promise<
   )
 }
 
+/**
+ * What a secretary sends to open a terminal for the person with one line prepared in it: the line, the folder (the
+ * person's home folder when none is named), the size, the keeping, and the owner's words where it carries them. A
+ * prepared terminal opens the shell, so no command is sent.
+ */
+const preparePress = z
+  .object({
+    folder: z.string().min(1).optional(),
+    line: z.string(),
+    warrant: z.unknown().optional(),
+    cols: aSide.optional(),
+    rows: aSide.optional(),
+    keeping: z.boolean().optional(),
+  })
+  .strict()
+
+/**
+ * A SECRETARY OPENS A TERMINAL FOR THE PERSON WITH ONE LINE PREPARED IN IT, for the person to run with their own Enter.
+ * The door reached here because the body carries `line`. With the owner's words in the body, the words must name this
+ * folder and this exact line, as `terminals.open:` and JSON {folder, line}, and only a secretary with its own key may
+ * carry them. Without words, it is the grant, where this office's list says the grant carries opening a terminal. The
+ * person types their own lines, so a line from the person is refused, as is any other caller.
+ *
+ * The line is refused when it is empty or holds a key, by the one test of a key (src/config/a-control-character.mjs),
+ * and the holder tests it again. The office types the line and never an Enter. The act is written down before the
+ * answer, with the terminal and without the line's text, and a press under the grant is written beside it.
+ */
+async function aSecretaryPreparesATerminal(req: FastifyRequest, actor: Actor): Promise<TerminalReading> {
+  const words = theWordsInTheBody(req)
+  if (words === undefined ? !aRaiseCarriesIt(actor) : !aSecretaryWithItsOwnKey(actor)) {
+    // ONLY THE PERSON GETS PAST THE PERSON-ONLY REFUSAL, and the person types their own line into a terminal.
+    onlyThePerson(actor, theActKeptHere(req))
+    throw aTerminalRefusal(
+      'terminalPreparedLineFromThePerson',
+      'A line is prepared by a secretary for the person to run, and the person types their own line in the terminal. Nothing was opened.',
+      400,
+    )
+  }
+  if (words !== undefined) await assertATerminalAgentIsHere(req, actor)
+  const sent = (req.body ?? {}) as Record<string, unknown>
+  if (Object.hasOwn(sent, 'command') || Object.hasOwn(sent, 'args')) {
+    throw aTerminalRefusal(
+      'terminalPreparedLineWithACommand',
+      'A terminal with a prepared line opens the shell, so no command or arguments may be sent beside the line. Nothing was opened.',
+      400,
+    )
+  }
+  const body = parse(preparePress, sent, 'The terminal cannot be opened:')
+  const line = body.line
+  const folderAsked = body.folder ?? theHomeDirectory()
+  let acting = actor
+  if (words !== undefined) {
+    try {
+      acting = actorWithTheWordsItActsOn(req, words, `terminals.open:${JSON.stringify({ folder: folderAsked, line })}`)
+    } catch (err) {
+      if (!(err instanceof PanelError)) throw err
+      throw aTerminalRefusal('terminalPreparingWordsRefused', `${err.message} Nothing was opened.`, err.status)
+    }
+    if (!(acting.warrant !== undefined && theSecretaryActingForThePerson(acting))) {
+      throw aTerminalRefusal(
+        'terminalPreparingWordsRefused',
+        "Only the secretary, with its own key, may open a terminal with a line prepared in it on the person's words. Nothing was opened.",
+        403,
+      )
+    }
+  }
+  if (line === '' || A_CONTROL_CHARACTER.test(line)) {
+    throw aTerminalRefusal(
+      'terminalPreparedLineHasAKey',
+      'A prepared line is one line of text, with no Enter, Tab, Escape or other key in it, and it is not empty. Nothing was opened.',
+      400,
+    )
+  }
+  const folder = theFolder(folderAsked)
+  const env = theEnvironmentATerminalGets()
+  const shell = theShellOf(env)
+  if (shell.command === undefined || shell.command === '') {
+    throw new PanelError(`This server has no ${shell.variable} to open with the prepared line. Nothing was opened.`)
+  }
+  const by = whoOpensIt(actor)
+  const terminal = await openATerminalWithAPreparedLine(
+    {
+      who: by,
+      agent: null,
+      project: workspaceOf(req),
+      command: shell.command,
+      args: [],
+      folder,
+      env,
+      cols: body.cols ?? THE_FIRST_SIZE.cols,
+      rows: body.rows ?? THE_FIRST_SIZE.rows,
+      keeping: body.keeping ?? true,
+    },
+    line,
+    by,
+  )
+  writeDownAnActUnderTheRaise(acting, {
+    setting: 'terminals',
+    field: `one terminal opened with a line prepared in it, ${terminal.id}`,
+    before: null,
+    after: 'typed, not entered',
+    workspaceId: workspaceOf(req),
+  })
+  recordAnInput(terminal.id, theSourceOf(req, acting))
+  return terminal
+}
+
+/**
+ * WHETHER A SECRETARY WITH ITS OWN KEY MAY READ THIS TERMINAL: one bound to an agent, or one it prepared for the person
+ * while it runs. A manual shell is neither, and a terminal no longer listed is neither.
+ */
+function aSecretaryMayReadIt(listed: TerminalReading | null, actor: Actor): boolean {
+  if (listed === null) return false
+  if (listed.agent?.kind === 'agent') return true
+  const prepared = listed.prepared
+  return listed.state === 'running' && prepared?.by.kind === 'agent' && prepared.by.id === whoOpensIt(actor).id
+}
+
+/** What the person sends to name a terminal: a name, a group and tags, each none when null or empty. */
+const namingPress = z.object({ name: z.string().nullable(), group: z.string().nullable(), tags: z.array(z.string()) }).strict()
+
+/** One reading of several terminals names them in its query, as terminals=<id>,<id>. */
+const aReading = z.object({ terminals: z.string() })
+
+/**
+ * A NAME OR A GROUP AS IT IS KEPT: the spaces around it taken off, or null for none. A blank one, one longer than the
+ * holder keeps or one that holds a key is refused with its code, and the holder tests the same again.
+ */
+function aKeptLabel(value: string | null, longest: number, code: 'terminalNameRefused' | 'terminalGroupRefused', which: string, id: string): string | null {
+  if (value === null) return null
+  const kept = value.trim()
+  if (kept === '' || Array.from(kept).length > longest || A_CONTROL_CHARACTER.test(kept)) {
+    throw aTerminalRefusal(
+      code,
+      `A terminal's ${which} is a short line of text with no key such as Enter in it, or none. This one is blank, too long or holds a key. Nothing was changed in terminal ${id}.`,
+      400,
+    )
+  }
+  return kept
+}
+
+/** The tags as they are kept: each with the spaces around it taken off, refused when one is blank, too long, keyed or there twice. */
+function theKeptTags(tags: string[], id: string): string[] {
+  const kept = tags.map((tag) => tag.trim())
+  const wrong =
+    kept.length > THE_MOST_TAGS_ON_A_TERMINAL ||
+    new Set(kept).size !== kept.length ||
+    kept.some((tag) => tag === '' || Array.from(tag).length > THE_LONGEST_TERMINAL_TAG || A_CONTROL_CHARACTER.test(tag))
+  if (wrong) {
+    throw aTerminalRefusal(
+      'terminalTagsRefused',
+      "A terminal's tags are a few short words, each with no key such as Enter in it, and no tag twice. One of these is " +
+        `blank, too long, holds a key or is there twice, or there are too many. Nothing was changed in terminal ${id}.`,
+      400,
+    )
+  }
+  return kept
+}
+
 const resizing = z.object({ cols: aSide, rows: aSide }).strict()
 
 const theTerminalNamed = z.object({ id: z.string().min(1) })
@@ -336,6 +528,82 @@ async function theTerminalIfListed(id: string): Promise<TerminalReading | null> 
   return (answer['terminals'] as TerminalReading[]).find((one) => one.id === id) ?? null
 }
 
+/**
+ * OPEN A TERMINAL STREAM ON THIS REPLY, once its watches are made: one terminal's stream and one reading of several
+ * write the same way. `write` sends one event, and `end` ends the stream once, calling `whenItEnds` first so the
+ * caller stops what it watches. The stream ends when the reader leaves.
+ */
+function openATerminalStream(
+  req: FastifyRequest,
+  reply: FastifyReply,
+  warn: (line: string) => void,
+  whenItEnds: () => void,
+): { write: (name: string, data: unknown) => void; end: () => void } {
+  reply.raw.setHeader('content-type', 'text/event-stream')
+  reply.raw.setHeader('cache-control', 'no-cache, no-transform')
+  reply.raw.setHeader('connection', 'keep-alive')
+  // The world, freshness and CORS headers are set here, as GET /api/events sets them, because the
+  // hijack below keeps every onSend hook from running on this reply.
+  for (const [name, value] of Object.entries(whichWorldAnswered())) reply.raw.setHeader(name, value)
+  for (const [name, value] of Object.entries(theCorsHeadersOfAHijackedReply(req))) {
+    reply.raw.setHeader(name, value)
+  }
+  // The moved-home header is copied too, for criterion DF28. The visit hook sets it on `reply` when the
+  // home this request sent is this installation's own former home, and the hook alone decides. Fastify
+  // writes a header set on `reply` only when it sends the reply itself, and after the hijack below it
+  // never does. Copied here, the stream carries it whenever an ordinary reply to the same request would.
+  const movedHome = reply.getHeader(HOME_MOVED_HEADER)
+  if (movedHome !== undefined) reply.raw.setHeader(HOME_MOVED_HEADER, movedHome)
+  reply.hijack()
+  reply.raw.flushHeaders()
+
+  let open = true
+  // A READER THAT FALLS TOO FAR BEHIND IS LET GO, as the holder lets go of a watcher: its output would
+  // otherwise pile up in this server's memory. Reading the terminal again gives it the screen.
+  const write = (name: string, data: unknown): void => {
+    if (!open) return
+    if (reply.raw.writableLength > THE_MOST_A_READER_MAY_FALL_BEHIND) {
+      end()
+      return
+    }
+    reply.raw.write(`event: ${name}\ndata: ${JSON.stringify(data)}\n\n`)
+  }
+  const end = (): void => {
+    if (!open) return
+    open = false
+    clearInterval(keepOpen)
+    whenItEnds()
+    reply.raw.end()
+  }
+  const keepOpen = setInterval(
+    named('a terminal stream\'s beat', warn, () => {
+      if (open) reply.raw.write(': still here\n\n')
+    }),
+    KEEP_OPEN_EVERY_MS,
+  )
+  keepOpen.unref()
+  req.raw.once('close', end)
+  req.raw.once('error', end)
+  return { write, end }
+}
+
+/**
+ * THE TERMINALS ONE READING NAMES, from terminals=<id>,<id>: one or more, each once, and no more than one reading
+ * carries. Anything else is refused with its code, before the holder is asked.
+ */
+function theTerminalsOfAReading(query: unknown): string[] {
+  const asked = aReading.safeParse(query ?? {})
+  const ids = asked.success ? asked.data.terminals.split(',') : []
+  if (ids.length === 0 || ids.length > THE_MOST_TERMINALS_IN_ONE_READING || ids.some((id) => id === '') || new Set(ids).size !== ids.length) {
+    throw aTerminalRefusal(
+      'terminalsReadingRefused',
+      `One reading names one terminal or more, each once and no more than ${String(THE_MOST_TERMINALS_IN_ONE_READING)}, as terminals=<id>,<id>. Nothing was read.`,
+      400,
+    )
+  }
+  return ids
+}
+
 export async function terminalRoutes(app: FastifyInstance): Promise<void> {
   app.get(
     '/terminals',
@@ -369,10 +637,15 @@ export async function terminalRoutes(app: FastifyInstance): Promise<void> {
       'terminals.open',
       'local',
       { because: 'acts-on-this-machine', act: 'Opening a terminal' },
-      'The person opens a terminal: a command, the shell when none is named, in a folder, the person\'s home folder when none is named. The answer shows what was started: the command, its arguments, the folder and the names of the variables it was given.',
+      "The person opens a terminal: a command, the shell when none is named, in a folder, the person's home folder when none is named. The answer shows what was started: the command, its arguments, the folder and the names of the variables it was given. A secretary may open the shell for the person with one line prepared in it: body {line, folder?, warrant?}, with no command, and no Enter or other key in the line. The office types the line and never an Enter, so the person runs it with their own Enter, changes it or clears it. It needs either the person's words for this folder and this exact line, for terminals.open: plus JSON {folder, line}, carried with its own key, or the person's grant where this office's list of what the grant carries lets it open a terminal. The list and the terminal's stream give the whole line and the secretary that prepared it, every page is told at once which secretary prepared a terminal, and that secretary may read the terminal while it runs.",
     ),
     async (req, reply) => {
       const actor = actorFrom(req)
+      if (req.body !== null && typeof req.body === 'object' && Object.hasOwn(req.body, 'line')) {
+        const terminal = await aSecretaryPreparesATerminal(req, actor)
+        reply.code(201)
+        return { terminal }
+      }
       thePersonOrTheGrant(actor, theActKeptHere(req))
       const body = parse(openPress, req.body ?? {}, 'The terminal cannot be opened:')
       const folder = theFolder(body.folder ?? theHomeDirectory())
@@ -423,14 +696,14 @@ export async function terminalRoutes(app: FastifyInstance): Promise<void> {
       const secretary = aSecretaryWithItsOwnKey(actor)
       if (!secretary) thePersonOrTheGrant(actor, theActKeptHere(req))
       const { id } = parse(theTerminalNamed, req.params, 'Which terminal:')
-      // Only a holder binding to an agent admits the ordinary secretary read. A manual shell has none.
-      if (secretary && (await theTerminalIfListed(id))?.agent?.kind !== 'agent') {
+      // A SECRETARY'S OWN KEY READS a terminal bound to an agent, and one it prepared for the person while it runs. A
+      // manual shell is neither.
+      if (secretary && !aSecretaryMayReadIt(await theTerminalIfListed(id), actor)) {
         thePersonOrTheGrant(actor, theActKeptHere(req))
       }
       await theHolder()
       // THE WATCH IS ASKED FOR BEFORE THE STREAM OPENS, so a terminal that is not there, or a holder that
       // is not running, is an ordinary refusal with its status rather than a stream that ends at once.
-      let open = true
       const pendingEvents: TerminalEvent[] = []
       let deliver: ((event: TerminalEvent) => void) | null = null
       let whenGone: (() => void) | null = null
@@ -446,44 +719,12 @@ export async function terminalRoutes(app: FastifyInstance): Promise<void> {
         return
       }
 
-      reply.raw.setHeader('content-type', 'text/event-stream')
-      reply.raw.setHeader('cache-control', 'no-cache, no-transform')
-      reply.raw.setHeader('connection', 'keep-alive')
-      // The world, freshness and CORS headers are set here, as GET /api/events sets them, because the
-      // hijack below keeps every onSend hook from running on this reply.
-      for (const [name, value] of Object.entries(whichWorldAnswered())) reply.raw.setHeader(name, value)
-      for (const [name, value] of Object.entries(whatToTellAPageOnAnotherOrigin(req.headers.origin, originsAPageMayBeOn(settings())))) {
-        reply.raw.setHeader(name, value)
-      }
-      // The moved-home header is copied too, for criterion DF28. The visit hook sets it on `reply` when the
-      // home this request sent is this installation's own former home, and the hook alone decides. Fastify
-      // writes a header set on `reply` only when it sends the reply itself, and after the hijack below it
-      // never does. Copied here, the stream carries it whenever an ordinary reply to the same request would.
-      const movedHome = reply.getHeader(HOME_MOVED_HEADER)
-      if (movedHome !== undefined) reply.raw.setHeader(HOME_MOVED_HEADER, movedHome)
-      reply.hijack()
-      reply.raw.flushHeaders()
-
-      // A READER THAT FALLS TOO FAR BEHIND IS LET GO, as the holder lets go of a watcher: its output would
-      // otherwise pile up in this server's memory. Reading the terminal again gives it the screen.
       // Set once the screen is written; a reader let go before then has nothing to stop.
       let stopTypedFrom = (): void => {}
-      const write = (name: string, data: unknown): void => {
-        if (!open) return
-        if (reply.raw.writableLength > THE_MOST_A_READER_MAY_FALL_BEHIND) {
-          end()
-          return
-        }
-        reply.raw.write(`event: ${name}\ndata: ${JSON.stringify(data)}\n\n`)
-      }
-      const end = (): void => {
-        if (!open) return
-        open = false
-        clearInterval(keepOpen)
+      const { write, end } = openATerminalStream(req, reply, (line) => app.log.warn(line), () => {
         stopTypedFrom()
         watching.stop()
-        reply.raw.end()
-      }
+      })
       // WHERE ITS TYPING CAME FROM goes with the screen, and again each time an input is counted.
       write('screen', { terminal: watching.terminal, screen: watching.screen, typedFrom: typedFromOf(id) })
       stopTypedFrom = watchTypedFrom(id, (now) => write('typed-from', now))
@@ -504,15 +745,98 @@ export async function terminalRoutes(app: FastifyInstance): Promise<void> {
         })
         end()
       }
-      const keepOpen = setInterval(
-        named('a terminal stream\'s beat', (line) => app.log.warn(line), () => {
-          if (open) reply.raw.write(': still here\n\n')
-        }),
-        KEEP_OPEN_EVERY_MS,
-      )
-      keepOpen.unref()
-      req.raw.once('close', end)
-      req.raw.once('error', end)
+    },
+  )
+
+  app.get(
+    '/terminals/stream',
+    // `waits: true` SAYS THIS IS HELD OPEN, as one terminal's stream says it.
+    {
+      config: {
+        ...route(
+          'terminals.read',
+          'local',
+          { because: 'acts-on-this-machine', act: 'Reading several terminals', thePersonMayFromAnotherComputer: true },
+          "One reading of several terminals, named as terminals=<id>,<id>, one or more and each once, as server-sent events. Every event names the terminal it is about as `terminal`: first each one's screen as it is now, with its reading and the lines above it, then each piece of output as it comes. A terminal closed while it is read is said closed and the others go on; the reading ends when the last is closed. Each terminal is under the same authority as its own stream, GET /api/terminals/:id/stream, and a reading that names one the reader may not read is refused whole.",
+        ).config,
+        waits: true,
+      },
+    },
+    async (req, reply) => {
+      const actor = actorFrom(req)
+      await assertATerminalAgentIsHere(req, actor)
+      const secretary = aSecretaryWithItsOwnKey(actor)
+      if (!secretary) thePersonOrTheGrant(actor, theActKeptHere(req))
+      const ids = theTerminalsOfAReading(req.query)
+      // EACH TERMINAL UNDER THE AUTHORITY OF ITS OWN STREAM: one the secretary's own key may not read asks the person or
+      // the grant, as its own stream does, and a refusal refuses the whole reading.
+      if (secretary) {
+        const listed = (await askTheHolderFor({ op: 'list' }, THE_PAGES_HOLDER_READ_MS))['terminals'] as TerminalReading[]
+        if (ids.some((id) => !aSecretaryMayReadIt(listed.find((one) => one.id === id) ?? null, actor))) thePersonOrTheGrant(actor, theActKeptHere(req))
+      }
+      await theHolder()
+      // EVERY WATCH IS ASKED FOR BEFORE THE STREAM OPENS, so a terminal that is not there is an ordinary refusal with its
+      // status, and the watches already made are let go.
+      let deliver: ((id: string, event: TerminalEvent) => void) | null = null
+      let whenGone: ((id: string) => void) | null = null
+      const watches: { id: string; waiting: TerminalEvent[]; terminal: TerminalReading; screen: string; stop: () => void }[] = []
+      try {
+        for (const id of ids) {
+          const waiting: TerminalEvent[] = []
+          const watching = await watchATerminal(
+            id,
+            (event) => (deliver === null ? waiting.push(event) : deliver(id, event)),
+            () => whenGone?.(id),
+          )
+          watches.push({ id, waiting, ...watching })
+        }
+      } catch (err) {
+        for (const one of watches) one.stop()
+        throw err
+      }
+      if (req.raw.destroyed || reply.raw.destroyed) {
+        for (const one of watches) one.stop()
+        reply.hijack()
+        return
+      }
+
+      const stillOpen = new Set(ids)
+      const stopTypedFrom = new Map<string, () => void>()
+      const letGo = (one: { id: string; stop: () => void }): void => {
+        stopTypedFrom.get(one.id)?.()
+        one.stop()
+      }
+      const { write, end } = openATerminalStream(req, reply, (line) => app.log.warn(line), () => {
+        for (const one of watches) letGo(one)
+      })
+      const source = theSourceOf(req, actor)
+      for (const one of watches) {
+        write('screen', { terminal: one.id, reading: one.terminal, screen: one.screen, typedFrom: typedFromOf(one.id) })
+        stopTypedFrom.set(one.id, watchTypedFrom(one.id, (now) => write('typed-from', { terminal: one.id, typedFrom: now })))
+        sayATerminalWasUsedFromAnotherComputer(req, source, one.id, 'read', one.terminal)
+      }
+      deliver = (id, event) => {
+        if (!stillOpen.has(id)) return
+        if (event.event === 'output') write('output', { terminal: id, data: event.data })
+        else if (event.event === 'ended') write('ended', { terminal: id, exit: event.exit })
+        else if (event.event === 'resized') write('resized', { terminal: id, cols: event.cols, rows: event.rows })
+        else {
+          // A TERMINAL CLOSED IN THE READING is let go, and the others go on.
+          write('closed', { terminal: id })
+          stillOpen.delete(id)
+          const closed = watches.find((one) => one.id === id)
+          if (closed !== undefined) letGo(closed)
+          if (stillOpen.size === 0) end()
+        }
+      }
+      for (const one of watches) for (const event of one.waiting.splice(0)) deliver(one.id, event)
+      whenGone = (id) => {
+        write('holder-gone', {
+          terminal: id,
+          says: 'The terminal holder ended this reading: it stopped, or this reader fell too far behind. Read the terminals again to get their screens.',
+        })
+        end()
+      }
     },
   )
 
@@ -786,6 +1110,41 @@ export async function terminalRoutes(app: FastifyInstance): Promise<void> {
       const reading = answer['terminal'] as TerminalReading
       const recordUnchanged = rememberTheKeepingOfTheAgentIn(id, body.on)
       return { ...theKeepingOf(reading), ...(recordUnchanged && answer['changed'] === false ? { nothingWritten: nothingWrittenSentence({ kind: 'already-stored' }) } : {}) }
+    },
+  )
+
+  /*
+   * THE PERSON NAMES A TERMINAL, GROUPS IT AND TAGS IT. The holder keeps them with the terminal, in memory only, so they
+   * end with it and with every terminal when the holder restarts; there is no table for them. The list and the readings
+   * give them back.
+   */
+  app.post(
+    '/terminals/:id/name',
+    route(
+      'terminals.name',
+      'local',
+      { because: 'acts-on-this-machine', act: 'Naming a terminal' },
+      "The person gives one terminal a name, a group and tags: body {name, group, tags}, where a null name or group and no tags are none, and setting none takes them off. The spaces around each are taken off, and the answer shows them as they are kept. A blank, too long or keyed name, group or tag is refused, and a tag twice. They are kept with the terminal in the terminal holder's memory only, so they end with the terminal, and with every terminal when the holder restarts.",
+    ),
+    async (req) => {
+      const actor = actorFrom(req)
+      thePersonOrTheGrant(actor, theActKeptHere(req))
+      const { id } = parse(theTerminalNamed, req.params, 'Which terminal:')
+      const body = parse(namingPress, req.body ?? {}, 'Nothing was changed:')
+      const names = {
+        name: aKeptLabel(body.name, THE_LONGEST_TERMINAL_NAME, 'terminalNameRefused', 'name', id),
+        group: aKeptLabel(body.group, THE_LONGEST_TERMINAL_GROUP, 'terminalGroupRefused', 'group', id),
+        tags: theKeptTags(body.tags, id),
+      }
+      const terminal = await nameATerminal(id, names)
+      writeDownAnActUnderTheRaise(actor, {
+        setting: 'terminals',
+        field: `one terminal named, ${id}`,
+        before: null,
+        after: JSON.stringify(names),
+        workspaceId: workspaceOf(req),
+      })
+      return { terminal }
     },
   )
 }

@@ -376,6 +376,21 @@ export function credentialPagePath(id: string): string {
   return `/${VISITOR_SEGMENT}/${encodeURIComponent(id)}`
 }
 
+/**
+ * THE SEGMENT UNDER THE PERSON'S CARD THAT NAMES ONE OF THEIR BROWSERS: `#/who/person/<id>/browser/<credential>`.
+ * Design C of early idea B9. The router builds the address from it and the address reader reads it
+ * back, so the two cannot spell it differently.
+ */
+export const HIS_BROWSER_SEGMENT = 'browser'
+
+/**
+ * WHERE THE PRESSES ON THE PERSON'S BROWSERS AND MACHINES ARE MADE, AS A REFUSAL SAYS IT. Design C of early idea
+ * B9: the person's own card is the one place for them. The refusals of confirm, end, revoke and undo for
+ * a browser, and of trusting or removing a machine, say this; an agent's credential is not the person's browser,
+ * and its refusals still name the Embassy.
+ */
+export const ON_HIS_OWN_CARD = 'on the owner\'s own person card, in its part for browsers and machines'
+
 // ============================================================================ the refusals
 
 /** Why a request under a credential nothing here holds is refused. */
@@ -422,6 +437,17 @@ export function expiredRefusal(credential: { id: string; handle: string; endsAt:
     'refused and nothing it sent was stored. Ask for another with POST /api/office/visitors and have the owner ' +
     'confirm it at the Embassy.'
   )
+}
+
+/**
+ * Why a working visitor's request for an act no visitor may ask for is refused. The rest of the sentence is the
+ * act's own `refusedToVisitors` mark in src/shared/ops.ts.
+ */
+export function actRefusedToVisitorsRefusal(
+  credential: { id: string; handle: string },
+  refusedToVisitors: string,
+): string {
+  return `The credential "${credential.handle}" (${credential.id}) is a visitor's, and ${refusedToVisitors}`
 }
 
 /**

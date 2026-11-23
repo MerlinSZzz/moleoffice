@@ -14,13 +14,14 @@ import { supplyRuntimeSubmissions } from './synthetic-submission-fixtures.ts'
  * WHAT IS PROVED HERE. An agent says where its notes are with a field on its record, and a relative
  * path is refused rather than resolved against a directory nobody meant. The bundle carries those
  * notes and the records the agent wrote lately, and names every file it left out with the reason.
- * The real worker writes the bundle beside the run and the prompt names the file. The conversation
+ * The real worker writes the bundle inside the run's folder and the prompt names the file. The conversation
  * says which mind is answering. And after a run has answered, the conversation carries a short line
  * saying so.
  */
 
 import type { AddressInfo } from 'node:net'
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath, URL } from 'node:url'
@@ -197,7 +198,12 @@ describe('the run the worker starts', () => {
     }
   }
 
-  it('is handed the bundle in a file beside its output', async () => {
+  it('is handed the bundle inside its folder without dirtying the checkout', async () => {
+    copyFileSync(fileURLToPath(new URL('../.gitignore', import.meta.url)), join(settings.checkout, '.gitignore'))
+    const git = (...args: string[]) => execFileSync('git', ['-C', settings.checkout, ...args], { encoding: 'utf8' })
+    git('init', '-q')
+    git('add', '.')
+    git('-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', '-c', 'commit.gpgsign=false', 'commit', '-q', '-m', 'Initial fixture')
     const listed = (await get('/api/participants')) as { agents?: { id: string; handle: string }[] }
     agentId = one(
       (listed.agents ?? []).filter((a) => a.handle === 'has-notes'),
@@ -217,10 +223,11 @@ describe('the run the worker starts', () => {
 
     const started = one(report.started, 'the run that was started')
     runSession = started.session
-    const bundle = readFileSync(join(outputs, runSession, 'what-this-agent-knows.md'), 'utf8')
+    const bundle = readFileSync(join(settings.checkout, '.logs', 'agent-knows', runSession, 'what-this-agent-knows.md'), 'utf8')
     expect(bundle).toContain('The gripper drifts after twenty minutes.')
     expect(bundle).toContain('What it has written lately')
     expect(bundle).toContain('enormous.md')
+    expect(git('status', '--porcelain')).toBe('')
   })
 
   /**
@@ -229,6 +236,7 @@ describe('the run the worker starts', () => {
    * this argument in one expression out of the path it just wrote, which is the same fact.
    */
   it('and the prompt names the file, and says to read it first', () => {
+    const path = join(settings.checkout, '.logs', 'agent-knows', runSession, 'what-this-agent-knows.md')
     const said = promptFor({
       agent: 'has-notes',
       workspace: 'default',
@@ -238,12 +246,13 @@ describe('the run the worker starts', () => {
       from: `the person ${THE_TEST_OFFICES_OWNER.id}`,
       carryingOn: false,
       howToLead: '## When somebody asks you to take them to a page',
-      knows: { path: '/somewhere/what-this-agent-knows.md', say: '2 of 3 notes are here in full.' },
+      knows: { path, say: '2 of 3 notes are here in full.' },
       brief: null,
     })
 
     expect(said).toContain('WHAT YOU ALREADY KNOW')
-    expect(said).toContain('/somewhere/what-this-agent-knows.md')
+    expect(said).toContain(path)
+    expect(said).toContain('reading it first')
     expect(said).toContain('2 of 3 notes are here in full.')
   })
 
@@ -300,5 +309,36 @@ describe('the run the worker starts', () => {
     // NOT A LIVE SESSION: nobody holds this agent's handle, so a run is what answers.
     expect(read.answering?.how).not.toBe('a live session')
     expect(String(read.answering?.says)).toContain('run')
+  })
+
+  it('hands two runs in one folder their own notes', async () => {
+    const secondNotes = join(notesFolder, 'second')
+    mkdirSync(secondNotes)
+    writeFileSync(join(secondNotes, 'MEMORY.md'), 'A different note for the second run.\n')
+    await post('/api/records', {
+      kind: 'agent', title: 'Different notes',
+      data: { handle: 'different-notes', state: 'active', runtime: 'claude-code', notes: secondNotes },
+    })
+    const listed = (await get('/api/participants')) as { agents?: { id: string; handle: string }[] }
+    const secondId = one(
+      (listed.agents ?? []).filter((a) => a.handle === 'different-notes'),
+      'the registry row for different-notes',
+    ).id
+    const secondMessage = await post('/api/records', {
+      kind: 'message', title: 'Another question',
+      data: { body: 'What do you remember?', to: [{ kind: 'agent', id: secondId }] },
+    })
+    const secondMessageId = (secondMessage['record'] as { id: string } | undefined)?.id
+    expect(secondMessageId, `the message write answered ${JSON.stringify(secondMessage)}`).toBeTruthy()
+    await post(`/api/messages/${String(secondMessageId)}/start-an-agent`, {})
+    const started = one((await onePass(settings, watching)).started, 'the second run')
+    expect(started.session).not.toBe(runSession)
+    const first = readFileSync(join(settings.checkout, '.logs', 'agent-knows', runSession, 'what-this-agent-knows.md'), 'utf8')
+    const second = readFileSync(join(settings.checkout, '.logs', 'agent-knows', started.session, 'what-this-agent-knows.md'), 'utf8')
+    expect(first).toContain('The gripper drifts after twenty minutes.')
+    expect(first).not.toContain('A different note for the second run.')
+    expect(second).toContain('A different note for the second run.')
+    expect(second).not.toContain('The gripper drifts after twenty minutes.')
+    expect(await until(async () => watching.every((run) => run.session !== started.session))).toBe(true)
   })
 })

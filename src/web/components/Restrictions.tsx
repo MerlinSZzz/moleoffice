@@ -60,7 +60,6 @@ import { content, t } from '@shared/i18n.ts'
 import {
   restrictionCounts,
   restrictionDrawing,
-  restrictionNote,
   RESTRICTION_SEVERITY,
 } from '@shared/restriction.ts'
 import { kindWord, linkWord } from '../lib/words.ts'
@@ -68,7 +67,7 @@ import { useMode } from '../lib/mode.ts'
 import { api, errorMessage } from '../api.ts'
 import type { RestrictionReading, RestrictionsOnRecord } from '../api.ts'
 import { recordPath, RouteLink } from './router.tsx'
-import { Btn, Explain, Field, Panel, Tag, TextArea } from './ui.tsx'
+import { Btn, Field, Panel, ServerNote, Tag, TextArea } from './ui.tsx'
 
 /**
  * WORST FIRST, AND THE ORDER IS `RESTRICTION_SEVERITY`'S RATHER THAN THIS FILE'S.
@@ -86,21 +85,18 @@ export function inReadingOrder(found: readonly RestrictionReading[]): Restrictio
 }
 
 /**
- * HOW THIS RESTRICTION GOT HERE, in a sentence.
+ * HOW THIS RESTRICTION GOT HERE, as a short state word, as decided.
  *
- * The three reaches are three different claims and the middle one is the one that gets misread: a
- * module that implements a restricted block reports the block's restriction and says nothing about
- * its own claims. So `carried` says that in as many words rather than leaving a reader to infer it
- * from a word.
+ * The three reaches are three different claims: direct, carried through a link, and a number of links away.
  */
 export function howItReached(reading: RestrictionReading, mode: 'normal' | 'inspect'): string {
-  if (reading.reach.how === 'direct') return t('g2d.restrictions.direct')
+  if (reading.reach.how === 'direct') return t('g2d.restrictions.reach.direct')
   if (reading.reach.how === 'carried') {
     const through = linkWord(reading.reach.through, 'forward', mode).text
-    return t('g2d.restrictions.carried', { through })
+    return t('g2d.restrictions.reach.carried', { through })
   }
   const steps = reading.reach.distance
-  return t('g2d.restrictions.reachedVia', { n: steps, steps })
+  return t('g2d.restrictions.reach.away', { n: steps, steps })
 }
 
 /**
@@ -109,7 +105,7 @@ export function howItReached(reading: RestrictionReading, mode: 'normal' | 'insp
  * `found: []` is a real answer and means nothing restricts this. It is drawn as one quiet line at
  * the foot of the page rather than as a panel, because a panel saying nothing on every record in
  * the corpus is furniture, and furniture stops being read. What could not be checked is in both
- * cases one press away and never dropped: *nothing restricts this* and *nobody could look* must not
+ * cases drawn and never dropped: *nothing restricts this* and *nobody could look* must not
  * read the same.
  */
 export function RestrictionsHere({
@@ -125,15 +121,11 @@ export function RestrictionsHere({
   const mode = useMode()
   const found = inReadingOrder(reading.found)
   const counts = restrictionCounts(found)
-  const note = restrictionNote(found, reading.couldNotCheck)
 
   if (found.length === 0) {
-    // THE SAME SENTENCE WITHOUT ITS SECOND CLAUSE. The clause about what could not be checked is
-    // drawn by the fold beside it, so `0` here is not a claim that nothing was missed — it is the
-    // sentence asked for without the half the fold is already saying.
     return (
       <div className="rst-none">
-        <span>{t('g2d.restrictions.noneHere')}</span>
+        <span>{t('g2d.restrictions.state.none')}</span>
         <WhatWasNotChecked reading={reading} />
       </div>
     )
@@ -149,9 +141,6 @@ export function RestrictionsHere({
       {...(counts.stopsFinal > 0 ? { tone: 'blocked' as const } : {})}
       actions={<Tag tone="quiet">{found.length}</Tag>}
     >
-      {/* THE SERVER'S OWN SENTENCE ABOUT THIS ANSWER, from the shared reader `GET /api/restrictions`
-          prints too. A second wording here could disagree with the reply it describes. */}
-      <p className="rst-said">{note}</p>
       <ul className="rst-list">
         {found.map((one) => (
           <RestrictionRow key={one.restrictionId} recordId={recordId} reading={one} mode={mode} onJudged={onJudged} />
@@ -173,24 +162,19 @@ export function RestrictionsHere({
 function WhatWasNotChecked({ reading }: { reading: RestrictionsOnRecord }) {
   if (reading.couldNotCheck.length === 0 && reading.skippedDeleted === 0) return null
   return (
-    <Explain
-      declares={{ surface: null }}
-      meaning={<span>{t('g2d.restrictions.someNotChecked')}</span>}
-      opens={t('g2d.restrictions.whatCouldNotLookAt')}
-    >
-      <ul className="rst-gaps">
-        {reading.couldNotCheck.map((gap) => (
-          <li key={`${gap.what}:${gap.because}`}>
-            <b>{gap.what}</b> — {gap.because}
-          </li>
-        ))}
-        {reading.skippedDeleted === 0 ? null : (
-          <li>
-            {t('g2d.restrictions.skippedDeleted', { n: reading.skippedDeleted })}
-          </li>
-        )}
-      </ul>
-    </Explain>
+    <ul className="rst-gaps">
+      {reading.couldNotCheck.map((gap) => (
+        <li key={`${gap.what}:${gap.because}`}>
+          {t('g2d.restrictions.state.notChecked', { what: gap.what })}
+          <ServerNote text={gap.because} />
+        </li>
+      ))}
+      {reading.skippedDeleted === 0 ? null : (
+        <li>
+          {t('g2d.restrictions.state.skippedDeleted', { n: reading.skippedDeleted })}
+        </li>
+      )}
+    </ul>
   )
 }
 
@@ -228,7 +212,7 @@ function RestrictionRow({
         title={drawing?.detail ?? t('pageWords.Restrictions.expression01', { severity: String(reading.severity), state: String(reading.standing.state) })}
       >
         {drawing === null
-          ? t('g2d.restrictions.noMark')
+          ? t('g2d.restrictions.state.noMark')
           : drawing.word}
       </p>
       <p className="rst-title">
@@ -236,7 +220,7 @@ function RestrictionRow({
         <span className="rst-kind">{kindWord(reading.kind, mode).text}</span>
       </p>
       {reading.holdsField === null ? null : (
-        <p className="rst-holds">{t('g2d.restrictions.holdsField', { field: content(reading.holdsField) })}</p>
+        <p className="rst-holds">{t('g2d.restrictions.state.field', { field: content(reading.holdsField) })}</p>
       )}
       <p className="rst-reach">{howItReached(reading, mode)}</p>
       {/* THE AUTHOR'S OWN WORDS, UNCHANGED AND UNMERGED. Both halves are drawn, and an empty half is
@@ -332,7 +316,12 @@ function Judge({
           {t('g2d.restrictions.notAffectedButton')}
         </Btn>
       </div>
-      {said === null ? null : <p className="rst-judge-said">{said}</p>}
+      {said === null ? null : (
+        <>
+          <p className="rst-judge-said">{t('g2d.restrictions.state.recorded')}</p>
+          <ServerNote text={said} />
+        </>
+      )}
     </div>
   )
 }

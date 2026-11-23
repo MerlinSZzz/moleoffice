@@ -259,16 +259,18 @@ export const SHORT_FORM_SHAPES: Record<string, ShapeSpec> = {
         type: 'string',
         required: false,
         description:
-          'WHICH agent or person wrote these words, by the actor id on the request that stored them — ' +
-          '"claude-code/short-form-writer", "owner". writtenBy beside it says WHAT KIND of writer it was, and ' +
+          'WHICH agent or person wrote these words, by the registry id of the agent or person whose request ' +
+          'stored them, never a handle. Where no registry row is found, as for the office\'s own writer, it is the ' +
+          'actor id on the request; a form stored before the writer was stored by id holds that too, and may hold ' +
+          'a handle. writtenBy beside it says WHAT KIND of writer it was, and ' +
           'that is what decides the override; this says which one, which is a different fact and is not ' +
-          'derivable from it. YOU DO NOT CHOOSE THIS EITHER: both write doors overwrite it with the actor from ' +
-          'the request headers, for the same reason writtenBy is overwritten. It is absent on every form stored ' +
+          'derivable from it. YOU DO NOT CHOOSE THIS EITHER: both write doors overwrite it with the writer the ' +
+          'request headers name, for the same reason writtenBy is overwritten. It is absent on every form stored ' +
           'before 2 September 2026, and absent when a request stated no actor at all — the identity is then ' +
           'defaulted, and filing a default as the writer would put a name on words nobody said they wrote. ' +
           'Absent means nobody recorded a writer, and nothing is filled in: the composer then says nothing ' +
           'about who wrote the form rather than saying that nobody knows.',
-        example: 'claude-code/short-form-writer',
+        example: 'agent-id',
       },
       {
         key: 'at',
@@ -310,7 +312,8 @@ export const SHORT_FORM_SHAPES: Record<string, ShapeSpec> = {
           'rule — recorded parts are optional provenance, not a requirement. Nothing ' +
           'derives it: a guess presented as a record of what somebody did is the one answer this field forbids. ' +
           'Every path is checked against the parts this record really has when you write through ' +
-          'POST /api/records/<id>/short-forms, so a name nothing holds is refused rather than stored.',
+          'POST /api/records/<id>/short-forms, so a name nothing holds is refused rather than stored. ' +
+          'The same POST that creates a record may carry forms in its top-level `shortForms`.',
         example: ['data.blocks[#b-1]'],
       },
     ],
@@ -324,7 +327,8 @@ export const SHORT_FORM_SHAPES: Record<string, ShapeSpec> = {
       "the record's own `title` and length 3 is its own `summary`, so neither is written here. Lengths 4, 5 and " +
       '6 are written by part and a part names the blocks it covers, so a kind with no blocks has no place for ' +
       'them — `ShortFormsWithParts` is the shape on the kinds that do. The label may be absent and usually is. ' +
-      '`title`, `gist`, `card`, `brief` and `account` are retired, draw nowhere, and refuse a new write.',
+      '`title`, `gist`, `card`, `brief` and `account` are retired, draw nowhere, and refuse a new write. ' +
+      'The same POST that creates a record may carry forms in its top-level `shortForms`.',
     fields: shortFormShapeFields(false),
     rules: SHORT_FORMS_RULES,
   },
@@ -337,7 +341,8 @@ export const SHORT_FORM_SHAPES: Record<string, ShapeSpec> = {
       '`summary`. The next three reading lengths — the outline, the sketch and the digest — are written BY PART ' +
       'and share the one structure under `parts`. Any of them may be absent and usually most of ' +
       'them are. They are different jobs rather than different sizes of one text: see each field for what its ' +
-      'length is for. `card`, `brief` and `account` are retired, draw nowhere, and refuse a new write.',
+      'length is for. `card`, `brief` and `account` are retired, draw nowhere, and refuse a new write. ' +
+      'The same POST that creates a record may carry forms in its top-level `shortForms`.',
     fields: shortFormShapeFields(true),
     rules: SHORT_FORMS_RULES,
   },
@@ -374,9 +379,10 @@ export const SHORT_FORM_SHAPES: Record<string, ShapeSpec> = {
         type: 'string',
         required: false,
         description:
-          'WHICH agent or person wrote them, by the actor id on the request. Overwritten from the actor headers ' +
-          'like writtenBy, and absent when a request stated no actor at all.',
-        example: 'claude-code/short-form-writer',
+          'WHICH agent or person wrote them, stored as by on one short form is: a registry id, or the actor id ' +
+          'where no registry row is found. Overwritten from the actor headers like writtenBy, and absent when a ' +
+          'request stated no actor at all.',
+        example: 'agent-id',
       },
       {
         key: 'at',

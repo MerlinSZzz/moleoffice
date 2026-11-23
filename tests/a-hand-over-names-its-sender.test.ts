@@ -35,7 +35,7 @@ import { spawn, type ChildProcess } from 'node:child_process'
 import { mkdtempSync, readFileSync, existsSync, rmSync, writeFileSync } from 'node:fs'
 import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
 import type { FastifyInstance } from 'fastify'
@@ -93,6 +93,8 @@ async function inject(
 async function started(handle: string, name: string): Promise<string> {
   const reply = await inject('POST', '/api/agents/started', AS_THE_PERSON, { handle, name, runtime: 'claude-code' })
   expect(reply.status, reply.text).toBe(201)
+  const key = (reply.json['whatToGiveIt'] as { key?: string } | undefined)?.key
+  if (key) writeFileSync(join(dirname(t.file), `${handle}.key`), key, { mode: 0o600 })
   return (reply.json['agent'] as { id: string }).id
 }
 
@@ -167,7 +169,7 @@ async function theHookSays(handle: string, session: string): Promise<string> {
 /** Start the waiter for one handle, and answer what it printed once it has stopped. */
 async function theWaiterSays(handle: string, session: string): Promise<string> {
   const child = spawn(process.execPath, [WAITER, '--agent', handle, '--session', session, '--api', api, '--workspace', 'default'], {
-    env: { ...withoutInheritedEffort(), MOLE_OFFICE_HANDLE_BEAT_SECONDS: '1' },
+    env: { ...withoutInheritedEffort(), MOLE_AGENT_KEY: '', MOLE_OFFICE_TOOL_CONFIGURATION: '', MOLE_AGENT_KEY_FILE: join(dirname(t.file), `${handle}.key`), MOLE_OFFICE_HANDLE_BEAT_SECONDS: '1' },
   })
   waiters.push(child)
   let printed = ''

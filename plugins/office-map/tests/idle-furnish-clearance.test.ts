@@ -44,6 +44,30 @@ it('keeps added solid furniture outside door approaches and member clearances at
   }
 }, 30000)
 
+it('keeps solid furniture outside door approaches and secretary clearances at every hall size', () => {
+  for (let count = 1; count <= 14; count++) {
+    const agents = Array.from({ length: count }, (_, i) => agent(`example-secretary-${i}`, { role: 'secretary' }))
+    agents.push(agent('example-worker', { startedBy: { kind: 'agent', id: 'example-secretary-0' } }))
+    const model = mapOffice({ ...people, view: 'roster', agents } as RosterView, null)
+    const layout = finish(new OwnershipGeometryCache().build({ rooms: model.rooms, roster: model.layoutRoster }))
+    const house = layout.houses.find(h => h.type === 'secretariat')!
+    expect(house.occupants).toHaveLength(count)
+    const parts = layout.pieces.filter(p => p.group === house.group && (p as typeof p & { furnishing?: boolean }).furnishing && p.layer !== 'floor' && p.sprite !== 'tea-set')
+    for (const [i, part] of parts.entries()) {
+      expect(overlaps(part, furnishingDoorway(house)), `${count} ${part.sprite}: doorway`).toBe(false)
+      for (const other of parts.slice(i + 1)) expect(overlaps(part, other), `${count} ${part.sprite}/${other.sprite}`).toBe(false)
+      for (const id of house.occupants) {
+        const seat = layout.seats[id]!
+        expect(overlaps(part, seat.desk), `${count} ${part.sprite}/desk`).toBe(false)
+        expect(overlaps(part, seat.stool), `${count} ${part.sprite}/stool`).toBe(false)
+      }
+      for (const id of house.occupants) expect(overlaps(part, bodyBox(layout.seats[id]!.foot)), `${count} ${part.sprite}: ${id}`).toBe(false)
+    }
+    const other = Object.keys(layout.seats).find(id => layout.seats[id]!.room !== house.group)!
+    for (const id of house.occupants) expect(routeBetween(layout, id, other).status, `${count} ${id}`).toBe('found')
+  }
+}, 30000)
+
 // A room of 300,000 square px or more takes a second, floor bookshelf. The secretary hall is left without it: in the
 // hall of 6 to 14 one stood below the front row and shut a secretary in its corner. A team room keeps its own.
 it('leaves the floor bookshelf out of the secretary hall of 6 to 14 and keeps it in a team room of 9 or more', () => {

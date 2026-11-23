@@ -37,7 +37,7 @@
  * The one thing this cannot show is a machine that is not this one reaching this one. The human act
  * under R5 is where that is closed.
  */
-import { apiServerArguments } from './helpers.ts'
+import { apiServerArguments, storeNormalModeWhereNothingIsStored } from './helpers.ts'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { spawn, type ChildProcess } from 'node:child_process'
 import { createServer } from 'node:net'
@@ -234,25 +234,26 @@ describe('a page on one origin can read the world off an API on another', () => 
   })
 
   /**
-   * AND A PAGE SERVED BY SOMETHING ELSE ON THIS MACHINE, since 4 September 2026.
+   * AND NOT A PAGE SERVED BY SOMETHING ELSE ON THIS MACHINE, since SEC-2.
    *
-   * Criterion C7 of design/messages/ACCEPTANCE.md section 8 lets a person enter another world, and
-   * the page then sends its requests to that world's own port. That port is on nobody's list — a
-   * scratch world's web port is not something the world being visited can know — so the Enter button
-   * answered "Failed to fetch" and nothing said why. `aPageOnThisMachine` is what admits it.
+   * From 4 September 2026 until SEC-2, `aPageOnThisMachine` answered a page on 127.0.0.1 or localhost
+   * on any port at all, with leave to send the cookie. It was there so a page that had entered
+   * another world could call that world's own port. A cookie goes to every port of its host, so any
+   * program on this machine that served a page could then act through the person's browser.
    *
-   * WHAT IT DOES NOT WIDEN, which is the half worth testing: an origin that is not loopback, not
-   * `http`, or has no port at all is still refused, and the door another machine comes through still
-   * admits exactly the two addresses it declares.
+   * Now a page on any other port of this machine is another program's page, and it is refused before
+   * any door, with the coded refusal and no leave to read. A visit goes the other way: from this
+   * office's page out to the other world, which takes this office's exact origin and nothing else.
+   * tests/a-visiting-page-carries-no-half.test.ts holds that.
    */
-  it('allows a page served by anything on this machine, whatever port it is on', async () => {
+  it('refuses a page served by anything else on this machine, on a port that is not this office\'s', async () => {
     const head = { 'x-mole-office-workspace': 'default' }
-    for (const origin of ['http://127.0.0.1:29845', 'http://localhost:41999']) {
+    const others = [29845, 41999].map((one) => (one === port ? one + 1 : one))
+    for (const origin of [`http://127.0.0.1:${String(others[0])}`, `http://localhost:${String(others[1])}`]) {
       const answered = await fetch(`${there()}/api/health`, { headers: { ...head, origin } })
-      expect(
-        answered.headers.get('access-control-allow-origin'),
-        `a page on ${origin} could not read this reply, so Enter cannot work from it`,
-      ).toBe(origin)
+      expect(answered.status, `a page on ${origin} was answered`).toBe(403)
+      expect(((await answered.json()) as { code?: unknown }).code).toBe('originIsNotThisOffice')
+      expect(answered.headers.get('access-control-allow-origin'), `a page on ${origin} could read this reply`).toBe(null)
     }
   })
 
@@ -268,6 +269,8 @@ describe('a page on one origin can read the world off an API on another', () => 
     ]) {
       const answered = await fetch(`${there()}/api/health`, { headers: { ...head, origin } })
       expect(answered.headers.get('access-control-allow-origin'), `${origin} was allowed`).toBe(null)
+      expect(answered.status, `${origin} was answered`).toBe(403)
+      expect(((await answered.json()) as { code?: unknown }).code).toBe('originIsNotThisOffice')
     }
   })
 
@@ -280,10 +283,12 @@ describe('a page on one origin can read the world off an API on another', () => 
    * machine and the stream allowed only the declared origins. So a page that had walked into
    * another world could read every record and lost its live channel, and nothing on screen said
    * why. Problem `PjlpSf-hizZA`. They are one function now, and this holds them together.
+   *
+   * Since SEC-2 the origins are this office's own only: the page on either address, and loopback by name.
    */
-  it('gives a page on this machine the same answer on the live channel as on any other reply', async () => {
+  it('gives a page on one of this office\'s own origins the same answer on the live channel as on any other reply', async () => {
     const head = { 'x-mole-office-workspace': 'default' }
-    for (const origin of ['http://127.0.0.1:29845', 'http://localhost:41999', here()]) {
+    for (const origin of [here(), `http://localhost:${String(port)}`, there()]) {
       const ordinary = await fetch(`${there()}/api/health`, { headers: { ...head, origin } })
       // The stream is held open, so it is opened and dropped the moment the headers are in.
       const stop = new AbortController()
@@ -308,8 +313,10 @@ describe('a page on one origin can read the world off an API on another', () => 
       signal: stop.signal,
     })
     const said = stream.headers.get('access-control-allow-origin')
+    const status = stream.status
     stop.abort()
     expect(said).toBeNull()
+    expect(status, 'the live channel was opened for a page on another site').toBe(403)
   })
 
   it('allows a declared origin and refuses one nobody declared', async () => {
@@ -322,13 +329,18 @@ describe('a page on one origin can read the world off an API on another', () => 
       nobody.headers.get('access-control-allow-origin'),
       'an origin nobody declared was allowed, which is the "reflect anything" this replaced',
     ).toBe(null)
-    // The request itself still answers: CORS restrains browsers, not callers, and refusing here
-    // would inconvenience curl and stop nobody.
-    expect(nobody.status).toBe(200)
+    // AND THE REQUEST ITSELF IS REFUSED, since SEC-2. Until then it was answered, because CORS only
+    // keeps a reply from the page. But a page on another site may send a plain POST with no
+    // preflight, and the office then did it before the browser hid the answer. A caller that sends no
+    // Origin, such as curl or an agent, is not a page and goes on as before.
+    expect(nobody.status).toBe(403)
+    expect(((await nobody.json()) as { code?: unknown }).code).toBe('originIsNotThisOffice')
   })
 
   it('lets a real browser on one address read the world off the other', async () => {
-    const tab = await (await browser!.newContext()).newPage()
+    const context = await browser!.newContext()
+    await storeNormalModeWhereNothingIsStored(context)
+    const tab = await context.newPage()
     await tab.goto(`${there()}/`, { waitUntil: 'domcontentloaded', timeout: 60_000 })
     // The page is on the address for other machines; the fetch goes to 127.0.0.1, which the browser
     // treats as another origin. This is the measurement problem a36N9Ivqf46H is about.
@@ -347,7 +359,9 @@ describe('a page on one origin can read the world off an API on another', () => 
   })
 
   it('draws nothing on a page served on the address for other machines, because that world is right', async () => {
-    const tab = await (await browser!.newContext()).newPage()
+    const context = await browser!.newContext()
+    await storeNormalModeWhereNothingIsStored(context)
+    const tab = await context.newPage()
     await tab.goto(`${there()}/`, { waitUntil: 'domcontentloaded', timeout: 60_000 })
     await tab.waitForTimeout(6000)
     expect(await tab.locator('.px-ww').count(), 'a healthy remote page drew the red banner').toBe(0)

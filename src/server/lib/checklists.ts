@@ -73,6 +73,7 @@ import {
   patchRecord,
   recordInWorkspace,
   thePressUnderTheGrantOf,
+  toRecord,
   type Actor,
 } from './records.ts'
 import { theReasonsOfThePresses } from '../db/the-reasons-of-the-presses.ts'
@@ -198,23 +199,39 @@ function ownerOf(record: PanelRecord): ParticipantRef {
 }
 
 /** One checklist as the doors return it to this reader: a message's title is handed only to a reader who may read it. */
-function readAChecklist(record: PanelRecord, reader: Actor): ChecklistReading {
+function readAChecklist(record: PanelRecord, reader: Actor, openItemsOnly = false): ChecklistReading {
   const items = itemsOf(record)
   const owner = ownerOf(record)
+  const head = { id: record.id, workspaceId: record.workspaceId, title: record.title, owner, ownerName: nameOf(owner) }
+  const tail = { version: versionOf(record), updatedAt: record.updatedAt }
+  if (!openItemsOnly) {
+    return {
+      ...head,
+      items,
+      counts: checklistCounts(items),
+      flows: theFlowsOnAChecklist(items),
+      linked: theRecordsTheItemsName(items, reader),
+      named: theParticipantsTheItemsName(items),
+      presses: thePressesTheMarksName(items),
+      ...tail,
+    }
+  }
+  // ONLY THE ITEMS NOT FINISHED, WHEN THE LIST IS ASKED WITH items=open. Finished items are most of a checklist's bytes,
+  // the page and the window draw them only when a fold is pressed, and reading the records only they name is most of
+  // the time a list read takes. The counts are still worked out from every item, and each list below is the whole
+  // reading's list cut to what the kept items name, so nothing a finished item names alone is read.
+  // Measured on a made-up office: everybody's checklists in every project were 575,364 bytes, 375,905 of them finished items.
+  const kept = items.filter((item) => !isClosed(item.state))
   return {
-    id: record.id,
-    workspaceId: record.workspaceId,
-    title: record.title,
-    owner,
-    ownerName: nameOf(owner),
-    items,
+    ...head,
+    items: kept,
+    finishedItems: items.filter((item) => isClosed(item.state)).map((item) => (item.addedBy === undefined ? { id: item.id } : { id: item.id, addedBy: item.addedBy })),
     counts: checklistCounts(items),
-    flows: theFlowsOnAChecklist(items),
-    linked: theRecordsTheItemsName(items, reader),
-    named: theParticipantsTheItemsName(items),
-    presses: thePressesTheMarksName(items),
-    version: versionOf(record),
-    updatedAt: record.updatedAt,
+    flows: theFlowsOnAChecklist(kept),
+    linked: theRecordsTheItemsName(items, reader, kept),
+    named: theParticipantsTheItemsName(items, kept),
+    presses: thePressesTheMarksName(items, kept),
+    ...tail,
   }
 }
 
@@ -229,7 +246,7 @@ function readAChecklist(record: PanelRecord, reader: Actor): ChecklistReading {
  * as a link. Nobody wrote it as a link, so an id no record has, or a message the reader may not read, stays plain words
  * and is not listed. The words are split as the chat splits a message's body.
  */
-function theRecordsTheItemsName(items: readonly ChecklistRequest[], reader: Actor): ChecklistLinked[] {
+function theRecordsTheItemsName(items: readonly ChecklistRequest[], reader: Actor, kept: readonly ChecklistRequest[] = items): ChecklistLinked[] {
   const named = new Map<string, Set<string>>()
   const name = (id: string, block: string | undefined): void => {
     const blocks = named.get(id) ?? new Set<string>()
@@ -248,7 +265,10 @@ function theRecordsTheItemsName(items: readonly ChecklistRequest[], reader: Acto
       name(piece.recordId, undefined)
     }
   }
-  const found = [...named.keys()].map((id) => ({ id, record: getRecord(id) }))
+  // THE ORDER, THE BLOCKS AND WHAT IS ONLY IN THE WORDS ARE DECIDED ACROSS EVERY ITEM, before a record is read, so a
+  // list cut to the kept items holds the same entries as the whole list, in the same order.
+  const asked = kept === items ? null : theRecordIdsTheseItemsName(kept)
+  const found = [...named.keys()].filter((id) => asked === null || asked.has(id)).map((id) => ({ id, record: getRecord(id) }))
   const messages = found.filter(({ record }) => record?.kind === 'message').map(({ id }) => id)
   const readable = messages.length === 0 ? new Set<string>() : theMessagesThisReaderMayRead(theMessageReader(reader), messages)
   return found.map(({ id, record }): ChecklistLinked => {
@@ -270,18 +290,43 @@ function theRecordsTheItemsName(items: readonly ChecklistRequest[], reader: Acto
   }).filter((one) => one.found || !onlyInTheWords.has(one.id))
 }
 
+/** Every record id these items name: as a link, as evidence, or in their words. */
+function theRecordIdsTheseItemsName(items: readonly ChecklistRequest[]): Set<string> {
+  const ids = new Set<string>()
+  for (const item of items) {
+    for (const id of item.links ?? []) ids.add(id)
+    for (const one of item.evidence ?? []) if (one.record !== undefined) ids.add(one.record)
+    for (const piece of piecesOfBody(item.words)) if (piece.what === 'record') ids.add(piece.recordId)
+  }
+  return ids
+}
+
+/** The press each of these items' marks names. */
+function thePressesOf(items: readonly ChecklistRequest[]): string[] {
+  return items.flatMap((item) => (item.doneByThePerson?.press === undefined ? [] : [item.doneByThePerson.press]))
+}
+
 /**
  * EVERY PRESS UNDER THE GRANT A MARK NAMES, once each, with the reason its row holds. The reason is kept only in the press
  * row, so the checklist reads it there and stores no copy of it. A press with no row is left out.
  */
-function thePressesTheMarksName(items: readonly ChecklistRequest[]): ChecklistPress[] {
-  const named = [...new Set(items.flatMap((item) => (item.doneByThePerson?.press === undefined ? [] : [item.doneByThePerson.press])))]
+function thePressesTheMarksName(items: readonly ChecklistRequest[], kept: readonly ChecklistRequest[] = items): ChecklistPress[] {
+  const asked = new Set(thePressesOf(kept))
+  const named = [...new Set(thePressesOf(items))].filter((id) => asked.has(id))
   const reasons = theReasonsOfThePresses(named)
   return named.flatMap((id) => (reasons.has(id) ? [{ id, reason: reasons.get(id) ?? null }] : []))
 }
 
 /** EVERY PARTICIPANT THE ITEMS NAME, once each, with the name the registry holds for it: who added, who to tell, who marked and who was told. */
-function theParticipantsTheItemsName(items: readonly ChecklistRequest[]): ChecklistNamed[] {
+function theParticipantsTheItemsName(items: readonly ChecklistRequest[], kept: readonly ChecklistRequest[] = items): ChecklistNamed[] {
+  const asked = theParticipantsOf(kept)
+  return theParticipantsOf(items)
+    .filter((who) => asked.some((one) => sameParticipant(one, who)))
+    .map((who) => ({ who, name: nameOf(who) }))
+}
+
+/** Every participant these items name, once each, in the order they first appear. */
+function theParticipantsOf(items: readonly ChecklistRequest[]): ParticipantRef[] {
   const named: ParticipantRef[] = []
   const name = (who: ParticipantRef | undefined): void => {
     if (who !== undefined && !named.some((one) => sameParticipant(one, who))) named.push(who)
@@ -292,7 +337,7 @@ function theParticipantsTheItemsName(items: readonly ChecklistRequest[]): Checkl
     name(item.doneByThePerson?.by)
     for (const who of item.doneByThePerson?.told ?? []) name(who)
   }
-  return named.map((who) => ({ who, name: nameOf(who) }))
+  return named
 }
 
 /** The caller as the participant who owns what it makes, or a refusal that says why there is none. */
@@ -553,25 +598,54 @@ export function whoseChecklistsAreAsked(owner: string | undefined): WhoseCheckli
   return { owner: found }
 }
 
+/** The owner a read asks for, or null for every owner. */
+function theOwnerAsked(actor: Actor, whose: WhoseChecklists): ParticipantRef | null {
+  let owner: ParticipantRef | null = null
+  if ('mine' in whose) owner = theCallerOrARefusal(actor, 'Reading your own checklists')
+  if ('owner' in whose) owner = whose.owner
+  return owner
+}
+
+/**
+ * THE LIVE CHECKLISTS OF THESE PROJECTS, OF THIS OWNER OR OF EVERY OWNER WHEN IT IS NULL, IN ONE STATEMENT. The owner's
+ * kind and id are compared in the database, exactly as `sameParticipant` compares them, so no other owner's checklist is
+ * handed to the server (decision OQR0WDVq0FkP). Every asked owner is a registry reference already, as
+ * `participantForActor` gives it. Newest change first. Where two were changed at the same moment, the projects come in
+ * the order given and then the newest row first, which is the order one read of each project in turn gave.
+ */
+function theLiveChecklistsOf(workspaceIds: readonly string[], owner: ParticipantRef | null): PanelRecord[] {
+  const asked = JSON.stringify(workspaceIds)
+  const theOwner = owner === null ? [] : [
+    eq(sql`json_extract(${records.data}, '$.owner.kind')`, owner.kind),
+    eq(sql`json_extract(${records.data}, '$.owner.id')`, owner.id),
+  ]
+  return db
+    .select()
+    .from(records)
+    .where(and(sql`${records.workspaceId} in (select value from json_each(${asked}))`, eq(records.kind, CHECKLIST_KIND), isNull(records.deletedAt), ...theOwner))
+    .orderBy(desc(records.updatedAt), sql`(select key from json_each(${asked}) where value = ${records.workspaceId})`, sql`rowid desc`)
+    .all()
+    .map(toRecord)
+}
+
+/**
+ * THE CHECKLISTS OF SEVERAL PROJECTS, read in one statement, newest change first. The caller sorts them as it shows
+ * them. No project asked reads nothing and refuses nothing, as asking each project in turn did.
+ */
+export function listChecklistsOfProjects(input: { workspaceIds: readonly string[]; actor: Actor; whose: WhoseChecklists; openItemsOnly?: boolean }): ChecklistReading[] {
+  if (input.workspaceIds.length === 0) return []
+  return theLiveChecklistsOf(input.workspaceIds, theOwnerAsked(input.actor, input.whose)).map((record) => readAChecklist(record, input.actor, input.openItemsOnly))
+}
+
 /** The checklists a read returns, and the sentence that says which they are. */
-export function listChecklists(input: { workspaceId: string; actor: Actor; whose: WhoseChecklists }): {
+export function listChecklists(input: { workspaceId: string; actor: Actor; whose: WhoseChecklists; openItemsOnly?: boolean }): {
   checklists: ChecklistReading[]
   says: string
 } {
-  const all = db
-    .select()
-    .from(records)
-    .where(and(eq(records.workspaceId, input.workspaceId), eq(records.kind, CHECKLIST_KIND), isNull(records.deletedAt)))
-    .orderBy(desc(records.updatedAt), sql`rowid desc`)
-    .all()
-    .map((row) => getRecord(row.id))
-    .filter((record): record is PanelRecord => record !== null)
-  let owner: ParticipantRef | null = null
-  if ('mine' in input.whose) owner = theCallerOrARefusal(input.actor, 'Reading your own checklists')
-  if ('owner' in input.whose) owner = input.whose.owner
-  const theirs = owner === null ? all : all.filter((record) => sameParticipant(ownerOf(record), owner))
+  const owner = theOwnerAsked(input.actor, input.whose)
+  const theirs = theLiveChecklistsOf([input.workspaceId], owner)
   // WAITING ON THE OWNER FIRST (point 5), then the newest change first.
-  const checklists = theirs.map((record) => readAChecklist(record, input.actor)).sort((a, b) => Number(b.counts.waitingOnTheOwner > 0) - Number(a.counts.waitingOnTheOwner > 0))
+  const checklists = theirs.map((record) => readAChecklist(record, input.actor, input.openItemsOnly)).sort((a, b) => Number(b.counts.waitingOnTheOwner > 0) - Number(a.counts.waitingOnTheOwner > 0))
   const whose = owner === null ? 'every checklist in this project' : 'mine' in input.whose ? 'your own checklists' : `the checklists of ${nameOf(owner)}`
   const says =
     checklists.length === 0

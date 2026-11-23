@@ -47,6 +47,7 @@
 
 import type { ChildProcess } from 'node:child_process'
 import { spawn } from 'node:child_process'
+import { dirname } from 'node:path'
 import type { AddressInfo } from 'node:net'
 import { fileURLToPath } from 'node:url'
 
@@ -54,12 +55,13 @@ import type { FastifyInstance } from 'fastify'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { THE_PERSON } from '../src/shared/person.ts'
-import { apiApp, freshDb, one, type TestDb } from './helpers.ts'
+import { apiApp, freshDb, one, aTestAgentsKeyEnvironment, type TestDb } from './helpers.ts'
 
 let t: TestDb
 let app: FastifyInstance
 let api = ''
 let agentId = ''
+let keyEnv: NodeJS.ProcessEnv = {}
 /** The session record the first waiter is started with; the wake flow starts the SAME waiter again. */
 let sessionOf = ''
 const started: ChildProcess[] = []
@@ -102,7 +104,7 @@ function startTheWaiter(args: string[]): {
   const child = spawn(
     process.execPath,
     [fileURLToPath(new URL('../tools/hold-the-handle.mjs', import.meta.url)), ...args],
-    { env: { ...process.env, MOLE_OFFICE_HANDLE_BEAT_SECONDS: '1' } },
+    { env: { ...keyEnv, MOLE_OFFICE_HANDLE_BEAT_SECONDS: '1' } },
   )
   started.push(child)
   let out = ''
@@ -144,11 +146,7 @@ beforeAll(async () => {
   await app.ready()
   await app.listen({ host: '127.0.0.1', port: 0 })
   api = `http://127.0.0.1:${String((app.server.address() as AddressInfo).port)}`
-  await post('/api/records', {
-    kind: 'agent',
-    title: 'Exit Line',
-    data: { handle: 'exit-line', runtime: 'claude-code', state: 'active' },
-  })
+  keyEnv = await aTestAgentsKeyEnvironment(app, 'exit-line', dirname(t.file))
   const listed = (await get('/api/participants')) as { agents?: { id: string; handle: string }[] }
   agentId = one((listed.agents ?? []).filter((a) => a.handle === 'exit-line'), 'the registry row').id
 }, 60_000)
@@ -264,11 +262,7 @@ describe('the waiter ends with one line saying why', () => {
   }, 60_000)
 
   it('a signal ends with the stopped line, and the release was really asked of the office', async () => {
-    await post('/api/records', {
-      kind: 'agent',
-      title: 'Exit stopped',
-      data: { handle: 'exit-stopped-hand', runtime: 'claude-code', state: 'active' },
-    })
+    keyEnv = await aTestAgentsKeyEnvironment(app, 'exit-stopped-hand', dirname(t.file))
     const listed = (await get('/api/participants')) as { agents?: { id: string; handle: string }[] }
     const stoppedAgentId = one(
       (listed.agents ?? []).filter((a) => a.handle === 'exit-stopped-hand'),

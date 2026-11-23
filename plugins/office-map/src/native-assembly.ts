@@ -76,15 +76,34 @@ const widenColumns = (fragments: readonly PieceFragment[], cut: number, extra: n
   return [{ ...f, crop: { ...f.crop, width: Math.min(left, f.crop.width) } }, { x: f.x + from + extra, y: f.y, crop: { ...f.crop, x: f.crop.x + from, width: f.crop.width - from } }]
 })
 
+/** Move a rectangle right of a cut, or widen one that crosses it. */
+const widenRect = (r: Rect, cut: number, extra: number): Rect =>
+  r.x >= cut ? { ...r, x: r.x + extra } : r.x + r.width > cut ? { ...r, width: r.width + extra } : r
+
 /** Widen a B01 room at each `[cut, extra]` the same way in every layer, from the rightmost cut, so each cut is in the
  * native room's own columns. A floor rect across a cut grows, and one right of it moves. */
 function widenRoom(room: SecretariatAssembly, cuts: readonly (readonly [cut: number, extra: number])[]): SecretariatAssembly {
   const [width, height] = houseCatalog.B01!.canvasSize as [number, number]
   return cuts.filter(([, extra]) => extra > 0).sort((a, b) => b[0] - a[0]).reduce((r, [cut, extra]) => {
-    const rect = (q: Rect): Rect => q.x >= cut ? { ...q, x: q.x + extra } : q.x + q.width > cut ? { ...q, width: q.width + extra } : q
-    return { ...r, width: r.width + extra, walkable: r.walkable.map(rect), entrance: rect(r.entrance),
+    return { ...r, width: r.width + extra, walkable: r.walkable.map(q => widenRect(q, cut, extra)), entrance: widenRect(r.entrance, cut, extra),
       parts: r.parts.map(p => ({ ...p, fragments: widenColumns(p.fragments ?? [{ x: 0, y: 0, crop: { x: 0, y: 0, width, height } }], cut, extra) })) }
   }, room)
+}
+
+/** Widen a room drawn as crops by repeating the columns immediately left of the cut. Crops crossing it are split
+ * into their left side, the repeated columns, and their right side; uncropped pieces to its right move with it. */
+function widenCroppedRoom(room: SecretariatAssembly, cut: number, extra: number): SecretariatAssembly {
+  const parts = room.parts.flatMap(p => {
+    if (p.x >= cut) return [{ ...p, x: p.x + extra }]
+    if (!p.crop || p.x + p.crop.width <= cut) return [p]
+    const left = cut - p.x
+    if (left < extra) throw Error('A crop starts too close to the cut to repeat its columns')
+    return [{ ...p, crop: { ...p.crop, width: left } },
+      { ...p, x: cut, crop: { ...p.crop, x: p.crop.x + left - extra, width: extra } },
+      { ...p, x: cut + extra, crop: { ...p.crop, x: p.crop.x + left, width: p.crop.width - left } }]
+  })
+  return { ...room, width: room.width + extra, parts,
+    walkable: room.walkable.map(r => widenRect(r, cut, extra)), entrance: widenRect(room.entrance, cut, extra) }
 }
 
 /** Lengthen a B01 room by 96 px using its native floor and wall pixels: the 96 rows above row 220 are drawn again
@@ -168,31 +187,31 @@ export function secretaryRoomFor(count: number): SecretariatAssembly {
   }
   if (count <= 0) return secretariatFor(count)
   if (count > 5) {
-    // The halls of six to eleven keep their height: the back row stands 66 px higher than before, which pays for
-    // three rows 22 px further apart than the hall's own 212. Each row after that makes the hall 22 px taller, and a
-    // hall that grows grows 2 px more, so 130 px of floor stand between the last row's feet and the front wall. With
-    // 128, a walk from the back past a secretary standing at its foot in the middle of the last row had a band only
-    // 14 px tall between that body and the doorway's right post, less than one 16 px step of the walk.
+    // The back row stands at y 94, where a secretary of the largest real size at work clears the back wall. The rows
+    // stand SECRETARY_ROW apart. The hall is 16 px wider and 16 px longer so a secretary of the largest real size,
+    // with the others standing at their feet, finds a walk out from every desk. The ways between desks were 88 px wide,
+    // and the front row left a body 5 px from the doorway's posts.
     const rows = 2 + Math.floor((count - 6) / 3), lower = Math.max(0, rows - 3)
-    const hall = secretariatFor(count + 3, SECRETARY_ROW, rows * 212 + (lower && lower * 22 + 2))
-    // The back row stands at y 94, where a secretary of the largest real size at work is clear of the back wall. A
-    // full row's desks stand at x 60, 292 and 524, so each gap between two desks of a row is an 88 px way. With the
-    // others at their feet, the lane between two rows is narrower than a secretary of the largest real size, so a walk
-    // to the door crosses a row only through those ways. The second row's two desks stand against the side walls. The
-    // shelf that stood on the back wall between two desks stands in the middle of that row, with the A29 that stood at
-    // the back right below it, and the 109 px ways either side of them meet the ways of the rows above and below. The
-    // second B28 lies on the floor below that A29. The plant behind the first desk stands 3 px higher, so its base
-    // meets the desk's top edge instead of standing in the desk. On the bare floor before the front wall, the tea
-    // corner stands left of the doorway in every hall. Right of the doorway, a hall of six to eight keeps its second
-    // A29, and a hall of nine or more keeps its planter with the pot right of it, where the pot closes no way.
+    const hall = widenCroppedRoom(secretariatFor(count + 3, SECRETARY_ROW, rows * 212 + (lower && lower * 22 + 2) + 16), 364, 16)
+    // A full row's 144 px desks stand at x 52, 300 and 548, leaving 104 px between each pair. The second row's two
+    // desks stand against the side walls. The 102 px shelf that stood on the back wall between two desks stands in the
+    // middle of that row, with the A29 that stood at the back right below it. The shelf stands 20 px lower than before,
+    // so its top edge is clear of the stool of the back row's middle desk. The A29 stands 4 px lower, with its top
+    // edge on the shelf's bottom edge. At 20 px lower, the A29 closed the walk to the door of a secretary of the
+    // largest real size in the second row of halls of 10 and 11. The 125 px ways either side of the shelf and 137 px
+    // ways either side of the 78 px A29 meet the ways of the rows above and below. The second B28 lies on the floor
+    // below that A29. The plant behind the first desk stands 3 px higher, so its base meets the desk's top edge instead
+    // of standing in the desk. On the bare floor before the front wall, the tea corner stands left of the doorway in
+    // every hall. Right of the doorway, a hall of six to eight keeps its second A29, and a hall of nine or more keeps
+    // its planter with the pot right of it, where the pot closes no way.
     const front = hall.entrance.y
     return { ...hall, desks: Array.from({ length: count }, (_, index) => {
       const row = index < 3 ? 0 : index < 5 ? 1 : 2 + Math.floor((index - 5) / 3), column = index < 3 ? index : index < 5 ? (index - 3) * 2 : (index - 5) % 3
-      return { x: 60 + column * 232, y: 94 + row * SECRETARY_ROW }
-    }), furnishings: furnish([['message-board', 276, 4, 'back'], ['desk-plant', 68, 81], ['bookshelf', 313, 252], ['A29', 325, 388],
-      ['B28', 196, 244, 'floor'], ['B28', 312, 470, 'floor'],
+      return { x: 52 + column * 248, y: 94 + row * SECRETARY_ROW }
+    }), furnishings: furnish([['message-board', 284, 4, 'back'], ['desk-plant', 60, 81], ['bookshelf', 321, 272], ['A29', 333, 392],
+      ['B28', 196, 244, 'floor'], ['B28', 320, 470, 'floor'],
       ['tea-table', 64, front - 84], ['tea-set', 99, front - 84],
-      ...count < 9 ? [['A29', 567, 780]] as const : [['plant-planter-front', 488, front - 72], ['plant-pot-front', 612, front - 64]] as const]) }
+      ...count < 9 ? [['A29', 583, 780]] as const : [['plant-planter-front', 504, front - 72], ['plant-pot-front', 628, front - 64]] as const]) }
   }
   const hall = secretariatFor(Math.max(6, count + 3), count === 5 ? 272 : undefined)
   // The second back desk stands at x 292, so the first desk has an 88 px way at its right end and the second desk a

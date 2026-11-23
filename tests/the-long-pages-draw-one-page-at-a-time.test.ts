@@ -391,7 +391,8 @@ describe('a press below a list on a phone', () => {
           bar: (document.querySelector('.shell-bar') as HTMLElement).getBoundingClientRect().bottom,
           line: (document.querySelector(first) as HTMLElement).getBoundingClientRect().top,
         }), at.first)
-        expect(where.line, `the line starts at ${String(where.line)} px and the bar ends at ${String(where.bar)} px`).toBeGreaterThanOrEqual(where.bar)
+        // HALF A PIXEL IS ALLOWED, because nobody can see a part of a pixel. The check of the right edge below allows the same.
+        expect(where.line, `the line starts at ${String(where.line)} px and the bar ends at ${String(where.bar)} px`).toBeGreaterThanOrEqual(where.bar - 0.5)
       } finally {
         await phone.close()
       }
@@ -418,7 +419,7 @@ describe('the Messages page', () => {
     const drawn = await app.page.locator('li.px-ms-one .px-ms-words').allTextContents()
     expect(drawn, 'the oldest message is already on page one').not.toContain(OLDEST_WORDS)
     await app.page.click('.px-ms-narrow-open')
-    await app.page.locator('.px-ms-filters input').fill('walnut gauge')
+    await app.page.locator('.px-ms-filters').getByLabel(MESSAGES_PAGE.byWords).fill('walnut gauge')
     await app.page.waitForFunction(
       (words) => {
         const all = [...document.querySelectorAll('li.px-ms-one .px-ms-words')]
@@ -449,7 +450,8 @@ describe('the Messages page', () => {
     const total = queued['total'] as number
     expect(queued['matched'], 'the queued filter hides a message, so this is not the case measured').toBe(total)
     await app.page.click('.px-ms-narrow-open')
-    await app.page.locator('.px-ms-filters select').nth(3).selectOption('queued')
+    // The state is the second select: the sender and the contact are agent pickers, and the group is the first select.
+    await app.page.locator('.px-ms-filters select').nth(1).selectOption('queued')
     const all = total.toLocaleString('en-US')
     const firstPage = t('messages.hiding.none', { total: all, from: '1', to: '50' })
     await app.page.waitForFunction((want) => document.querySelector('.px-ms-hiding')?.textContent?.includes(want) === true, firstPage, {
@@ -466,7 +468,7 @@ describe('the Messages page', () => {
     await openAt('#/messages', 'li.px-ms-one')
     await app.page.click('.px-ms-narrow-open')
     const answered = app.page.waitForResponse((r) => r.url().includes('/api/messages?') && r.url().includes(`group=${groupId}`))
-    await app.page.locator('.px-ms-filters select').nth(2).selectOption(groupId)
+    await app.page.locator('.px-ms-filters select').nth(0).selectOption(groupId)
     await answered
     await app.page.waitForFunction((want) => document.querySelector('.px-pager-line')?.textContent === want, `Showing 1 to ${String(inGroup['matched'])} of ${String(inGroup['matched'])}.`, { timeout: 30_000 })
     const lines = await app.page.locator('li.px-ms-to').allTextContents()

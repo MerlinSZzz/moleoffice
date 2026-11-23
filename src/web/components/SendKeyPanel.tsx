@@ -37,12 +37,6 @@ const SEND_KEY_WORD = {
   enter: 'sendKey.word.enter',
 } as const satisfies Readonly<Record<SendKeySetting, string>>
 
-/** What each answer does to the box, in small words under the name. */
-const SEND_KEY_DOES = {
-  'shift-or-alt-enter': 'sendKey.does.shiftOrAlt',
-  enter: 'sendKey.does.enter',
-} as const satisfies Readonly<Record<SendKeySetting, string>>
-
 export function SendKeyPanel() {
   useLanguage()
   const chosen = useSendKey()
@@ -87,14 +81,10 @@ export function SendKeyPanel() {
             />
             <span className="sendk-words">
               <span className="sendk-word">{t(settingsControlWord('settings.sendkey', SEND_KEY_WORD[which]))}</span>
-              <span className="sendk-does">{t(SEND_KEY_DOES[which])}</span>
             </span>
           </label>
         ))}
       </fieldset>
-      {/* SAID ONCE, UNDER THE CONTROL: that the input method keeps Enter while it is composing. It is
-          true on every path this panel can take. */}
-      <p className="sendk-note">{t('sendKey.composing')}</p>
       {reply.status === 'loading' ? <Loading what={t('pageWords.SendKeyPanel.001')} /> : null}
       {reply.status === 'error' ? <ErrorNote message={reply.message} fault={reply.fault} /> : null}
       {fault === null ? null : <p className="sendk-fault">{fault}</p>}
@@ -127,8 +117,6 @@ const SEND_KEY_CSS = `
 .sendk-pick { margin-top: 2px; }
 .sendk-words { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .sendk-word { font: 600 var(--fs-1)/var(--lh-tight) var(--font-ui); }
-.sendk-does { color: var(--text-3); font: var(--fs-1)/var(--lh-body) var(--font-ui); overflow-wrap: anywhere; }
-.sendk-note { margin: 0; max-width: var(--measure-in-box); color: var(--text-2); font: var(--fs-1)/var(--lh-body) var(--font-ui); }
 .sendk-fault {
   margin: var(--pad) 0 0; max-width: 40ch;
   padding: 2px var(--pad);

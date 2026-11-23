@@ -33,7 +33,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { SYSTEM_LINES } from '../src/shared/groups.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
-import { apiApp, freshDb, type TestDb } from './helpers.ts'
+import { apiApp, freshDb, type TestDb, governsTheWholeProject } from './helpers.ts'
 
 const AS_THE_PERSON = {
   'content-type': 'application/json',
@@ -102,7 +102,7 @@ describe('the door takes words with no full stop', () => {
       method: 'POST',
       url: '/api/records',
       headers: AS_THE_PERSON,
-      payload: { kind: 'decision', title: DECISION_TITLE, data: { replaces: [] } },
+      payload: { kind: 'decision', title: DECISION_TITLE, data: { ...governsTheWholeProject(), replaces: [] } },
     })
     expect(decided.statusCode, decided.body).toBe(201)
     const decision = (decided.json() as { record: { id: string } }).record.id

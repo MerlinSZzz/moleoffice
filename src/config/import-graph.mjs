@@ -15,13 +15,16 @@
  * each was judged against A LIST OF FOLDERS. `src/shared` was on all three lists, because all three
  * import from it.
  *
- * A folder is not what a program is built from. `src/shared` holds sixty files and the API server
- * imports most of them, but seven are outside what the API server loads: `colourroles.ts`,
- * `detail-readers.generated.ts`, `inline.ts`, `mode.ts`, `pictures.ts`, `planwrite.ts` and
- * `reviewmarks.ts`. Six of the seven belong to the browser app. The seventh, `colourroles.ts`, is
- * imported by no file under `src/` at all: it is the colour role register, and one test file and
- * one tool, tools/colour-role-census.mjs, are the only things that import it. Saving one of the seven made the API
- * report itself older than the checkout, and
+ * A folder is not what a program is built from. When this comment was written, on 4 September
+ * 2026, `src/shared` held sixty files and the API server imported most of them. Seven files in it
+ * are outside what the API server loads: `colourroles.ts`, `detail-readers.generated.ts`,
+ * `inline.ts`, `mode.ts`, `pictures.ts`, `planwrite.ts` and `reviewmarks.ts`. Five of the seven
+ * belong to the browser app: `detail-readers.generated.ts`, `inline.ts`, `mode.ts`, `pictures.ts`
+ * and `planwrite.ts`. The other two belong to no program. `colourroles.ts` is imported by no file
+ * under `src/` at all: it is the colour role register, and one test file and one tool,
+ * tools/colour-role-census.mjs, are the only things that import it. `reviewmarks.ts` is imported
+ * under `src/` only by `colourroles.ts`, so no program loads it either. Saving one of the seven
+ * made the API report itself older than the checkout, and
  * `tsx watch` never restarted it — it restarts on the files a process loaded, and the API never
  * loaded any of those seven. So the reading never cleared: `GET /api/health` answered ok false for
  * as long as the stack was left alone, and the red banner blocked the browser app, about a server

@@ -25,6 +25,9 @@
  * A write no report explains is made with the seam's `migrate`: the real `migrateInPlace`, then one row written
  * that no step reports. Every database here is a scratch file in a temporary folder.
  *
+ * A START WITH NOTHING PENDING MAKES NO COPY (tests/a-start-with-nothing-pending-makes-no-copy.test.ts), so where
+ * case 3 asks the server, it asks it of a database one migration behind, which is still measured on a copy.
+ *
  * Mutations, each proved in the commit message: invert the size test; drop `reported.length === 0`; compare only
  * the first chunk; drop the `rmSync` of the folder; drop the second `journal_mode = DELETE`.
  */
@@ -35,6 +38,7 @@ import Database from 'better-sqlite3'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import { migrateInPlace, prepareToServe, previewMigration, removeLeftoverPreviewCopies, THE_PREVIEW_SEAM, whereTheCopyGoes } from '../src/server/db/migrate.ts'
+import { oneMigrationBehind } from './an-office-one-migration-behind.ts'
 import { aTestDatabaseFolder } from './a-test-folder.ts'
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '..')
@@ -51,21 +55,25 @@ afterEach(() => {
   }
 })
 
-/** A fully migrated scratch database holding one authored record, with nothing left to migrate. */
-function aSettledDatabase(name: string): Database.Database {
+/**
+ * A fully migrated scratch database holding one authored record, with nothing left to migrate. With `behind`, it is
+ * migrated with drizzle/ less its newest migration, so that one is pending.
+ */
+function aSettledDatabase(name: string, behind = false): Database.Database {
   const dir = aTestDatabaseFolder(`file-copy-${name}`)
+  const migrations = behind ? oneMigrationBehind(dir) : MIGRATIONS
   const db = new Database(join(dir, 'office.db'))
   // The two pragmas db/client.ts sets, so the fixture is the shape a real start meets.
   db.pragma('journal_mode = WAL')
   db.pragma('foreign_keys = ON')
   scratch.push({ dir, db })
-  migrateInPlace(db, MIGRATIONS)
+  migrateInPlace(db, migrations)
   db.prepare(
     'INSERT INTO records (id, workspace_id, owner_id, created_at, updated_at, kind, title, summary, data, origin) ' +
       "VALUES ('note-1', 'default', 'owner-1', '2026-07-01 09:00:00', '2026-07-01 09:00:00', 'note', 'An invented note', NULL, '{}', 'authored')",
   ).run()
   // MIGRATED AGAIN, so the record gets its baseline revision and the database genuinely has nothing to do.
-  migrateInPlace(db, MIGRATIONS)
+  migrateInPlace(db, migrations)
   return db
 }
 
@@ -120,10 +128,15 @@ describe('the migration preview on a file copy above its limit', () => {
       THE_PREVIEW_SEAM.migrate = migrateAndWriteUnreported
       const preview = previewMigration(db, MIGRATIONS)
       expect(preview.wouldWrite.some((line) => line.includes('none of the')), `${path}: ${preview.wouldWrite.join('\n')}`).toBe(true)
-      const decision = prepareToServe(db, MIGRATIONS)
+      // THE SERVER MEASURES ON A COPY ONLY WHILE A MIGRATION IS PENDING, so it is asked of a database one behind.
+      const behind = aSettledDatabase(`unexplained-${path}-behind`, true)
+      if (path === 'file') takeTheFilePath(behind)
+      const decision = prepareToServe(behind, MIGRATIONS)
       expect(decision.serve, path).toBe(false)
       if (!decision.serve && path === 'file') expect(decision.refusal).toContain('in a folder beside the database')
-      expect(db.prepare("SELECT count(*) AS n FROM sqlite_master WHERE name = 'a_table_no_report_names'").get()).toEqual({ n: 0 })
+      for (const asked of [db, behind]) {
+        expect(asked.prepare("SELECT count(*) AS n FROM sqlite_master WHERE name = 'a_table_no_report_names'").get()).toEqual({ n: 0 })
+      }
     }
   })
 

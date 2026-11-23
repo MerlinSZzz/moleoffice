@@ -33,15 +33,16 @@
  * NOTHING IS COUNTED IN THE BROWSER
  * ---------------------------------------------------------------------------------------
  *
- * The counts, the order and the sentence saying what was counted are the server's. A page that added
- * up its own rows would be a second answer to the same question, drifting from the first the day
- * somebody changed which rows count.
+ * The counts, the order and the sentence saying what was counted are the server's; the sentence is
+ * drawn for a developer only, as decided in November 2026. A page that added up its own rows would
+ * be a second answer to the same question, drifting from the first the day somebody changed which
+ * rows count.
  */
 
 import { api } from '../api.ts'
 import { Avatar } from '../components/Avatar.tsx'
-import { whereRequestsGo } from '../lib/visiting.ts'
-import { Absence, ErrorNote, Loading, Panel } from '../components/ui.tsx'
+import { theCrossOriginOfALoad, whereRequestsGo } from '../lib/visiting.ts'
+import { Absence, ErrorNote, Loading, Panel, ServerNote } from '../components/ui.tsx'
 import { useProjectAsync } from '../lib/project-async.ts'
 import { RouteLink, pathFor, whoPath } from '../components/router.tsx'
 import type { CardHolders, WhoHoldsTheCards } from '@shared/roles.ts'
@@ -59,18 +60,17 @@ export const CENSUS_WORDS = {
   get lists() { return t('pageWords.RoleCensusPage.005') },
   /** The two parts of a bar, said once under the chart. */
   get legendChose() { return t('pageWords.RoleCensusPage.006') },
-  get legendRead() { return t('pageWords.RoleCensusPage.007') },
+  get legendRead() { return t('census.legendNoCard') },
   /** The unit after a count, so a bare number never stands alone. */
   get citizens() { return t('g4.embassy.worldCitizens') },
   get one() { return t('pageWords.RoleCensusPage.008') },
   /** Said on a card nobody holds. It is a real answer and not a list still arriving. */
   get nobody() { return t('pageWords.RoleCensusPage.009') },
-  get nobodySays() { return t('pageWords.RoleCensusPage.010') },
+  get nobodyTitle() { return t('census.nobodyTitle') },
   /** Said beside a citizen whose row names no card. */
   get readAs() { return t('g6b.profile.cardReadAs') },
   /** The heading over cards a row names that no declaration holds. */
   get gone() { return t('pageWords.RoleCensusPage.011') },
-  get goneSays() { return t('pageWords.RoleCensusPage.012') },
   /** Which of the two lists a card is on. They never cross: criterion P45. */
   get forAgents() { return t('pageWords.RoleCensusPage.013') },
   get forPeople() { return t('pageWords.RoleCensusPage.014') },
@@ -112,7 +112,7 @@ export function TheCensus({ said }: { said: WhoHoldsTheCards }) {
   return (
     <>
       <Panel titleIs="label" declares={{ surface: 'rolecensus.chart' }} title={CENSUS_WORDS.chart}>
-        <p className="cen-says">{said.says}</p>
+        <ServerNote text={said.says} />
         <ul className="cen-bars">
           {said.cards.map((one) => (
             <Bar key={`${one.forWhom}:${one.card}`} card={one} most={most} />
@@ -137,7 +137,6 @@ export function TheCensus({ said }: { said: WhoHoldsTheCards }) {
           inside it. */}
       {said.cardsNoLongerDeclared.length === 0 ? null : (
         <Panel titleIs="label" declares={{ surface: 'rolecensus.gone' }} title={CENSUS_WORDS.gone}>
-          <p className="cen-says">{CENSUS_WORDS.goneSays}</p>
           {said.cardsNoLongerDeclared.map((one) => (
             <Holders key={`gone:${one.card}`} card={one} />
           ))}
@@ -171,7 +170,7 @@ function Holders({ card }: { card: CardHolders }) {
   return (
     <section className="cen-card">
       <h3 className="cen-card-name">
-        <img className="cen-card-portrait" src={whereRequestsGo(card.portrait)} alt={t('g6b.cardPicture', { name: cardWord(card.card) })} />
+        <img className="cen-card-portrait" src={whereRequestsGo(card.portrait)} crossOrigin={theCrossOriginOfALoad()} alt={t('g6b.cardPicture', { name: cardWord(card.card) })} />
         <span className="cen-card-word">{cardWord(card.card)}</span>
         <span className="cen-card-for">
           {card.forWhom === 'agent' ? CENSUS_WORDS.forAgents : CENSUS_WORDS.forPeople}
@@ -182,7 +181,7 @@ function Holders({ card }: { card: CardHolders }) {
       </h3>
       {card.holders.length === 0 ? (
         <p className="cen-none">
-          <Absence tier="told-apart" looked word={CENSUS_WORDS.nobody} title={CENSUS_WORDS.nobodySays} />
+          <Absence tier="told-apart" looked word={CENSUS_WORDS.nobody} title={CENSUS_WORDS.nobodyTitle} />
         </p>
       ) : (
         <ul className="cen-holders">
@@ -212,7 +211,6 @@ const CENSUS_CSS = `
 .cen-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--gut); min-width: 0; }
 .cen-title { margin: 0; font: 600 var(--fs-4)/var(--lh-tight) var(--font-ui); color: var(--text); }
 .cen-back { font-size: var(--fs-1); }
-.cen-says { margin: 0 0 var(--gut); color: var(--text-2); font: var(--fs-1)/var(--lh-read) var(--font-ui); }
 
 /* THE CHART. One row per card: the name, the bar, the number. It reads the same at 1440 and at 390
    because nothing about it depends on the row being wide. */

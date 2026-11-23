@@ -37,6 +37,7 @@ export const VISIT_KEY = 'mole-office.visiting'
 
 /** What this page remembers about a trip it is on. */
 import { theApiUrlFor } from './api-address.ts'
+import { theDeviceHalf, withTheDeviceHalf } from './the-device-half.ts'
 
 export interface Visiting {
   /** The office id of the world being visited. */
@@ -172,8 +173,52 @@ export function forgetTheVisitOnThisPage(): void {
  * ever does, prefixing it would produce an address that is two addresses.
  */
 export function whereRequestsGo(path: string): string {
-  if (/^[a-z][a-z0-9+.-]*:/i.test(path)) return path
+  return whereAndWhose(path).to
+}
+
+/** Where one request goes, and whether that is this page's own office. */
+function whereAndWhose(path: string): { to: string; home: boolean } {
+  if (/^[a-z][a-z0-9+.-]*:/i.test(path)) return { to: path, home: false }
   const trip = theVisitThisPageHolds()
-  if (trip === null) return theApiUrlFor(path)
-  return `${trip.address.replace(/\/+$/, '')}${path}`
+  if (trip === null) return { to: theApiUrlFor(path), home: true }
+  return { to: `${trip.address.replace(/\/+$/, '')}${path}`, home: false }
+}
+
+/**
+ * WHAT ONE REQUEST CARRIES: whether the browser sends its cookies, and the headers. `whereRequestsGo` says where it goes.
+ *
+ * A REQUEST TO THIS PAGE'S OWN OFFICE CARRIES BOTH HALVES OF THE DEVICE KEY: the cookie half, because the browser is
+ * told to send its cookies, and the header half beside it (src/web/lib/the-device-half.ts).
+ *
+ * A REQUEST TO A WORLD THE PAGE VISITS CARRIES NEITHER (SEC-2's design, item 2). A cookie goes to every port of its
+ * host, so a world on the same host as the office would be sent the cookie half of the office's key. The browser is
+ * told to send no cookies, and the header half is not added. The visited world answers this page's origin with no
+ * leave to send a cookie (src/server/lib/an-origin-that-is-not-this-office.ts). An address that is already whole is
+ * not known to be this office's, so it carries neither half either.
+ */
+export function whatARequestCarries(path: string, headers: Headers): { credentials: RequestCredentials; headers: Headers } {
+  return whereAndWhose(path).home ? { credentials: 'include', headers: withTheDeviceHalf(headers) } : { credentials: 'omit', headers }
+}
+
+/**
+ * HOW THE BROWSER LOADS A PICTURE OR A VIDEO WHOSE ADDRESS `whereRequestsGo` GAVE: the value of its `crossOrigin`.
+ *
+ * A picture is not a fetch, and the browser decides for itself whether to send cookies with it. On a trip the picture
+ * comes from the visited world, and a cookie goes to every port of its host. So on a trip it loads `anonymous`: the
+ * browser sends no cookie, and draws the picture because the visited world answers this page's origin (SEC-2's design,
+ * item 2). At home it loads as it always has. The browser sends the cookie half with it, and the office reads a
+ * picture load with the cookie half alone as a load with no key (src/server/lib/keyheader.ts).
+ */
+export function theCrossOriginOfALoad(): 'anonymous' | undefined {
+  return theVisitThisPageHolds() === null ? undefined : 'anonymous'
+}
+
+/**
+ * WHETHER A LOAD THE BROWSER MAKES ITSELF OF A FILE GOES BY A FILE TICKET: the page is at home, so the load goes to its
+ * own office, and it keeps a header half, so the browser is paired. Such a load carries the cookie half alone, which
+ * proves nothing, so src/web/lib/file-tickets.tsx asks for a ticket first. A load on a trip carries no cookie and no
+ * half, and a page that keeps no half is not paired; both load by the plain address `whereRequestsGo` gave.
+ */
+export function aLoadGoesHomePaired(): boolean {
+  return theVisitThisPageHolds() === null && theDeviceHalf() !== null
 }

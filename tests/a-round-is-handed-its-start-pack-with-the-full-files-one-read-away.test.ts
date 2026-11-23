@@ -24,7 +24,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
 import { prepareRoundChapters, ROUND_CHAPTERS_POLICY_FILE } from '../src/shared/round-chapters/delivery.ts'
-import { deliveredRoundBrief, readRoundChapters, roundChaptersGivenText, roundChaptersOutline, roundChaptersText, savedChaptersLine, type RoundChapters } from '../src/shared/round-chapters/manifest.ts'
+import { deliveredRoundBrief, readRoundChapters, roundChaptersOutline, roundChaptersText, savedChaptersLine, THE_SAVED_SELECTION_HOLDS_TERRITORIES_IN_FULL, type RoundChapters } from '../src/shared/round-chapters/manifest.ts'
 import {
   declaredLineDiffers, nextIsTheBrief, nextWhole, oneReadAway, THE_FALLBACK_RULE, theFallbackRuleMissing, theMissingLine,
   theNextMissing, theOpenItemsMissing, THE_PACK_REFUSAL, theRoundStartPackHead, twoHeadings, withTheRoundStartPack,
@@ -143,8 +143,12 @@ describe('the rule chapters at outline, NEXT.md, and the one-read-away sentence'
     const f = madeUpPackRound()
     const { manifest } = prepare(f)
     const pack = manifest.pack!
-    expect(pack.text).toContain(roundChaptersGivenText(manifest))
     expect(pack.text).toContain(roundChaptersOutline(manifest))
+    // THE LINE'S OWN PART OF TERRITORIES.md is given beside the chapters. A heading names the sandbox and the policy gives
+    // '*', so the saved selection is already the line's own section, and the sentence that it holds the file in full is not said.
+    expect(pack.text).not.toContain(THE_SAVED_SELECTION_HOLDS_TERRITORIES_IN_FULL)
+    for (const own of ['ONE-FILE', 'ONE-DETAIL', 'RULE words']) expect(pack.text).toContain(own)
+    expect(pack.text).not.toContain('TWO-FILE')
     expect(pack.text).not.toContain(manifest.sources[0]!.text)
     expect(pack.text).toContain('CODE reading levels: 2 at outline')
     expect(pack.text).toContain('5 at outline')

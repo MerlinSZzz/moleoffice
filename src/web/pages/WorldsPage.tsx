@@ -29,7 +29,7 @@ import { content, t, type WordKey } from '@shared/i18n.ts'
 
 import { useState, useSyncExternalStore } from 'react'
 import { api, type WhatTheOfficeSays } from '../api.ts'
-import { Absence, ErrorNote, Loading, Panel, useAsync } from '../components/ui.tsx'
+import { Absence, ErrorNote, Loading, Panel, ServerNote, useAsync } from '../components/ui.tsx'
 import { isEphemeral, theAddressToReachAWorldBy, type Visit, type World } from '@shared/worlds.ts'
 import { worldKindWord, worldStandingWord } from '@shared/words.ts'
 import type { ParticipantRef } from '@shared/participants.ts'
@@ -37,9 +37,10 @@ import { saidOnThePage } from '@shared/dev-sayings.ts'
 import { subscribeToTheVisit, theVisitThisPageHolds } from '../lib/visiting.ts'
 import { theWorldThisPageCallsHome } from '../lib/world.ts'
 import { thisPageIsOn } from '../lib/api-address.ts'
-import { pathFor, RouteLink } from '../components/router.tsx'
-// THE MACHINES THIS OFFICE TRUSTS, criterion P73. The same component Settings draws, with presses.
-import { TrustedMachines } from '../components/TrustedMachines.tsx'
+import { pathFor, RouteLink, whoPath } from '../components/router.tsx'
+import { CodeRows } from '../lib/code-rows.tsx'
+// THE MACHINES THIS OFFICE TRUSTS, criterion P73. Counted here, and set on the person's own card.
+import { THE_PERSON } from '@shared/person.ts'
 import type { WhatTheOfficeTrusts } from '@shared/trustedmachines.ts'
 
 export function WorldsPage() {
@@ -114,6 +115,14 @@ export function TheOffice({
   const shown = showEphemeral ? office.worlds : office.worlds.filter((one) => !isEphemeral(one.kind))
   const alive = shown.filter((one) => one.diedAt === null)
   const gone = shown.filter((one) => one.diedAt !== null)
+  /**
+   * WHETHER A WORLD THAT IS NOT THE OFFICE SERVED THIS PAGE. A page on a trip was served by the office, whichever world
+   * it reads, so it is not one. A world takes as a page's origin only one of the office's own pages (SEC-2's design,
+   * item 6), so a trip started here would be refused by the world it went to. Rename and Stop here would go to the
+   * world that served the page, which renames or stops its own copy of the row, a row this page does not draw, or
+   * answers that it has no such world. So such a page offers none of the three.
+   */
+  const servedByAWorld = !office.isTheOffice && trip === null
 
   return (
     <>
@@ -131,7 +140,7 @@ export function TheOffice({
         between a main world that is down, a copy that was never written, and a world that may read
         no copy at all. The server says which; this draws it rather than making the reader ask.
       */}
-      {office.from === 'this world alone' ? <p className="wd-source-why">{saidOnThePage(office.mirrorNoteSaid, office.mirrorNote)}</p> : null}
+      {office.from === 'this world alone' ? <ServerNote text={saidOnThePage(office.mirrorNoteSaid, office.mirrorNote)} /> : null}
       {/*
         A COPY OF THE MAIN WORLD'S DATABASE IS NOT A SECOND WORLD, and this is where somebody who
         started one finds out. A world is a database, and a database's identity is its path and its
@@ -141,21 +150,29 @@ export function TheOffice({
         database instead with nothing on any screen saying why.
       */}
       {office.theHomeRowBelongsTo === null ? null : (
-        <p className="wd-copy" role="status">
+        <div className="wd-copy" role="status">
           <span className="wd-copy-short">{t('dev.worlds.thisDatabaseIsACopyOfThe')}</span>
-          <span className="wd-copy-said">
-            {t('dev.worlds.copyWarning', { home: office.theHomeRowBelongsTo, current: office.thisWorld ?? t('dev.worlds.unknownDatabase') })}
-          </span>
-        </p>
+          <CodeRows
+            rows={[
+              { label: 'worldsPage.copy.row.homeRow', value: office.theHomeRowBelongsTo },
+              {
+                label: 'worldsPage.copy.row.thisDatabase',
+                value: office.thisWorld ?? '',
+                ...(office.thisWorld === null ? { state: 'worldsPage.copy.row.notIdentified' as const } : {}),
+              },
+            ]}
+          />
+          <span className="wd-copy-said">{t('worldsPage.copy.wayOut')}</span>
+        </div>
       )}
 
       <Panel titleIs="label" declares={{ surface: 'worlds.open' }} title={t('dev.worlds.openNow')}>
         {alive.length === 0 ? (
-          <p className="wd-none">{t('dev.worlds.noWorldIsOpen')}</p>
+          <p className="wd-none">{t('absence.none')}</p>
         ) : (
           <ul className="wd-list">
             {alive.map((one) => (
-              <WorldRow key={one.id} world={one} visiting={trip?.worldId === one.id} away={trip !== null} onDone={onReadAgain} />
+              <WorldRow key={one.id} world={one} visiting={trip?.worldId === one.id} away={trip !== null} servedByAWorld={servedByAWorld} onDone={onReadAgain} />
             ))}
           </ul>
         )}
@@ -175,19 +192,23 @@ export function TheOffice({
         )}
       </Panel>
 
-      {/* THE MACHINES THIS OFFICE TRUSTS, criterion P73. The secretary decided the list belongs here rather
-          than in Settings: the machines this office trusts belong to the installation and not to a
-          person's preferences, and Settings shows the same rows read-only with a link back. */}
+      {/* THE MACHINES THIS OFFICE TRUSTS, criterion P73, now set on the person's own card (design C of early
+          idea B9). This page keeps the count and the way there, so a reader who looks for them here
+          is not told there are none. The presses are on the person's card only. */}
       {trusts === null ? null : (
         <Panel titleIs="label" declares={{ surface: 'worlds.trusted' }} title={t('dev.worlds.machinesThisOfficeTrusts')}>
-          <TrustedMachines said={trusts} presses onChanged={onReadAgain} />
+          <p className="wd-none">
+            <RouteLink to={whoPath('person', THE_PERSON)}>
+              {t('w13s.worlds.machinesOnYourCard', { n: trusts.machines.length })}
+            </RouteLink>
+          </p>
         </Panel>
       )}
 
       <Panel titleIs="label" declares={{ surface: 'worlds.visitors' }} title={t('dev.worlds.awayFromHome')}>
         {/* ORDINARY EMPTINESS IS THE SHORT MARK, WITH THE SENTENCE ON HOVER. */}
         {visits.length === 0 ? (
-          <p className="wd-none"><Absence tier="ordinary" title={t('dev.worlds.nobodyIsWorkingAwayFromHome')} /></p>
+          <p className="wd-none"><Absence tier="ordinary" word={t('absence.none')} /></p>
         ) : (
           <ul className="wd-visits">
             {visits.map((one) => (
@@ -213,11 +234,11 @@ export function TheOffice({
 
       <Panel titleIs="label" declares={{ surface: 'worlds.gone' }} title={t('dev.worlds.ended')}>
         {gone.length === 0 ? (
-          <p className="wd-none"><Absence tier="ordinary" title={t('dev.worlds.noWorldHasEnded')} /></p>
+          <p className="wd-none"><Absence tier="ordinary" word={t('absence.none')} /></p>
         ) : (
           <ul className="wd-list">
             {gone.map((one) => (
-              <WorldRow key={one.id} world={one} visiting={false} away={trip !== null} onDone={onReadAgain} />
+              <WorldRow key={one.id} world={one} visiting={false} away={trip !== null} servedByAWorld={servedByAWorld} onDone={onReadAgain} />
             ))}
           </ul>
         )}
@@ -230,12 +251,15 @@ function WorldRow({
   world,
   visiting,
   away,
+  servedByAWorld,
   onDone,
 }: {
   world: World
   visiting: boolean
   /** Whether this page is on a trip at all, which is what makes coming home a thing to offer. */
   away: boolean
+  /** Whether a world that is not the office served this page, so the row offers no Enter, Rename or Stop. */
+  servedByAWorld: boolean
   onDone: () => void
 }) {
   /**
@@ -310,17 +334,30 @@ function WorldRow({
         ) : (
           <>
             <span className="wd-name">{world.name}</span>
-            <button
-              type="button"
-              className="wd-do"
-              onClick={() => {
-                setNaming(true)
-              }}
-            >{t('dev.worlds.rename')}</button>
+            {servedByAWorld ? null : (
+              <button
+                type="button"
+                className="wd-do"
+                onClick={() => {
+                  setNaming(true)
+                }}
+              >{t('dev.worlds.rename')}</button>
+            )}
           </>
         )}
         {upForThem ? <span className="wd-for-the-person">{t('dev.worlds.upForYou')}</span> : null}
-        {world.diedAt !== null || world.address === null ? null : visiting ? (
+        {servedByAWorld && !isHome ? (
+          /*
+           * ON A PAGE A WORLD SERVED, THE OFFICE'S ROW LEADS TO THE OFFICE, by the address this page reaches it at, and
+           * every other world's row says where a world is entered, renamed and stopped. This world's own row says
+           * "You are here", below.
+           */
+          world.kind === 'home' && world.diedAt === null && reaching.address !== null ? (
+            <a className="wd-to-the-office" href={reaching.address}>{t('w13s.worlds.goToTheOffice')}</a>
+          ) : (
+            <span className="wd-elsewhere">{t('w13s.worlds.fromTheOfficesPage')}</span>
+          )
+        ) : world.diedAt !== null || world.address === null ? null : visiting ? (
           <span className="wd-here">{t('dev.worlds.youAreHere')}</span>
         ) : isHome && !away ? (
           // NOWHERE TO GO. At home, the home world's row is where the reader already is.
@@ -388,7 +425,7 @@ function WorldRow({
         {/* THE PRESS THAT STOPS IT. Criterion C32. A world kept up for the person had an Enter and no way
             to end it from the page; the press stops the processes the office recorded for the world
             through the one release door, which names what it would end, and marks the row ended. */}
-        {upForThem ? (
+        {upForThem && !servedByAWorld ? (
           <TieredPress tier="confirm"
             press={t('dev.worlds.stop')} pending={t('dev.worlds.stopping')}
             question={t('dev.worlds.stopQuestion')} quote={world.name}
@@ -397,7 +434,7 @@ function WorldRow({
               setStopSaid(null)
               setRefused(null)
               const said = await api.stopWorld(world.id, 'you pressed Stop on the Worlds page')
-              setStopSaid(t(said.couldNotStop.length === 0 ? 'dev.worlds.stopped' : 'dev.worlds.partlyStopped', { n: said.couldNotStop.length }))
+              setStopSaid(t(said.couldNotStop.length === 0 ? 'worldsPage.stopped' : 'worldsPage.partlyStopped', { n: said.couldNotStop.length }))
               onDone()
             }}
           />
@@ -406,7 +443,7 @@ function WorldRow({
       {upForThem || purpose !== null ? (
         <p className="wd-purpose">
           <span className="wd-key">{t('dev.worlds.whatToLookAt')}</span>
-          {purpose ?? t('dev.worlds.noPurpose')}
+          {purpose ?? t('dev.worlds.notRecorded')}
         </p>
       ) : null}
       {stopSaid === null ? null : <p className="wd-stopped">{stopSaid}</p>}
@@ -448,7 +485,7 @@ function WorldRow({
             <dd>
               {world.diedAt}
               <span className="wd-sep">·</span>
-              {world.diedBecause ?? t('dev.worlds.noReason')}
+              {world.diedBecause ?? t('dev.worlds.notRecorded')}
             </dd>
           </>
         )}
@@ -498,7 +535,6 @@ const WORLDS_CSS = `
 .wd-copy-short { font-weight: var(--st-failed-weight); }
 .wd-copy-said { font-size: var(--fs-1); line-height: var(--lh-read); overflow-wrap: anywhere; }
 .wd-unreachable { color: var(--st-failed); overflow-wrap: anywhere; }
-.wd-source-why { margin: -6px 0 14px; color: var(--text-2); font-size: 12px; max-width: 78ch; overflow-wrap: anywhere; }
 .wd-key { color: var(--text-3); }
 .wd-again, .wd-do, .wd-enter {
   min-height: var(--row-h);
@@ -523,6 +559,10 @@ const WORLDS_CSS = `
 .wd-head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--pad); margin-bottom: var(--pad); }
 .wd-name { font-size: var(--fs-3); font-weight: 600; }
 .wd-here { margin-left: auto; font-size: var(--fs-1); color: var(--text-3); }
+/* ON A PAGE A WORLD SERVED: the way to the office, which is a place and not an act, so a link; and the sentence that
+   says where a world is entered, renamed and stopped, drawn as quietly as "You are here". */
+.wd-to-the-office { margin-left: auto; font-size: var(--fs-1); }
+.wd-elsewhere { margin-left: auto; font-size: var(--fs-1); color: var(--text-3); }
 /* A WORLD KEPT UP FOR THE PERSON. Criterion C32. Weight in proportion to whether somebody must act: it is
    a state a reader has to notice, so it is a chip rather than a line of small print. */
 .wd-for-the-person {

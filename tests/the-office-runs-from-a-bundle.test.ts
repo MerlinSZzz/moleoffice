@@ -61,9 +61,10 @@
  * THE SPLIT BUILD. scripts/bundle.mjs builds the programs, the threads, register-myself.mjs and the session hook in
  * one build with splitting on, so code two of them import is carried once, in a chunk beside them. Case 5 shows
  * that for thePerUserDataFolder, which the server, the worker and the command each load as they start, and that the
- * holder and the waiter's tool are each one file that imports no chunk. Case 6 runs the command, register-myself.mjs
- * and the session hook from the bundle, each with words that make it say what it is and end, and reads that each
- * started its own program.
+ * holder, the waiter's tool and the guard's two files are each one file that imports no chunk. The guard's two are
+ * built alone because each must be its own program, as scripts/bundle.mjs says. Case 6 runs the command,
+ * register-myself.mjs and the session hook from the bundle, each with words that make it say what it is and end, and
+ * reads that each started its own program.
  *
  * ROUND 15: THE BETA'S BUNDLE (decision sKPFWjOuQVEe; the beta guide, question 7). The
  * stamp carries package.json's version and the server's start line shows it. The bundle carries
@@ -103,6 +104,7 @@ import {
   THE_BUNDLES,
   THE_COMMAND_ENTRY,
   THE_FOR_AGENTS_FOLDER,
+  THE_GUARDS_BUILT_FILES,
   THE_HOLDER_BUNDLE,
   THE_SERVER_ENTRY,
   THE_SESSION_HOOK,
@@ -541,14 +543,21 @@ describe('the office from its bundles', () => {
   it('carries a module the server, the worker and the command share once, in a chunk each of them loads', () => {
     const holder = `/${THE_HOLDER_BUNDLE}`
     const waiter = `/${THE_FOR_AGENTS_FOLDER}/hold-the-handle.mjs`
+    const guards = THE_GUARDS_BUILT_FILES.map((file) => `/${THE_FOR_AGENTS_FOLDER}/${file}`)
     const programs = everyFileIn(bundle).filter((file) => file.endsWith('.mjs') && !file.startsWith('/node_modules/'))
     const holding = programs.filter((file) => readFileSync(join(bundle, file), 'utf8').includes('function thePerUserDataFolder('))
-    // THE HOLDER AND THE WAITER'S TOOL ARE BUILT ALONE, each into one file that imports no chunk (scripts/bundle.mjs).
+    // THE HOLDER, THE WAITER'S TOOL AND THE GUARD'S TWO FILES ARE BUILT ALONE, each into one file that imports no chunk
+    // (scripts/bundle.mjs). The guard's two are built alone because each must be its own program. What they import is
+    // the guard's business and may change, so they are not asked to hold thePerUserDataFolder.
     for (const alone of [holder, waiter]) {
       expect(holding, `${alone} does not hold thePerUserDataFolder, though it is built alone`).toContain(alone)
       expect(theChunksLoadedAtStart(alone), `${alone} imports chunks, though it is built alone to run with nothing beside it`).toEqual([])
     }
-    const inTheSplit = holding.filter((file) => file !== holder && file !== waiter)
+    for (const alone of guards) {
+      expect(theChunksLoadedAtStart(alone), `${alone} imports chunks, though it is built alone to be its own program`).toEqual([])
+    }
+    const builtAlone = [holder, waiter, ...guards]
+    const inTheSplit = holding.filter((file) => !builtAlone.includes(file))
     expect(inTheSplit, `thePerUserDataFolder is in ${String(inTheSplit.length)} files of the split build, not in one chunk`).toHaveLength(1)
     const [chunk] = inTheSplit
     expect(chunk, `thePerUserDataFolder is in ${String(chunk)}, which is not a chunk`).toMatch(/^\/chunk-[A-Z0-9]+\.mjs$/)

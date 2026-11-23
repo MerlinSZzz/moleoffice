@@ -78,10 +78,17 @@ const PHONE: Size = { width: 390, height: 844 }
 /** The width the page changes at, read from the constant so this case moves with the one number. */
 const SPLIT_AT = Number(/\d+/.exec(THE_SPLIT_FROM)?.[0])
 
-/** What the person's browser remembers before the first page, once for each window. */
-type Start = { with?: string; theme?: 'light' | 'dark'; filmed?: boolean; filmTo?: string }
+/**
+ * What the person's browser remembers before the first page, once for each window, and the way the person last had the
+ * chat, which is kept on their row: beside the page unless a case says otherwise.
+ */
+type Start = { with?: string; theme?: 'light' | 'dark'; filmed?: boolean; filmTo?: string; opensAs?: 'split' | 'window' }
 
 async function aWindow(size: Size, start: Start = {}): Promise<{ context: BrowserContext; page: Page }> {
+  // THE CHAT OPENS THE WAY THE PERSON LAST HAD IT, read from their row when the page loads, so it is said before the
+  // page is. A case that sent the chat to its own window has changed it, and the next case starts from it again.
+  const way = await fetch(`${app.api}/api/participants/person/${THE_PERSON}`, { method: 'PATCH', headers: PERSON, body: JSON.stringify({ chatOpensAs: start.opensAs ?? 'split' }) })
+  expect(way.status, await way.clone().text()).toBe(200)
   const videoFolder = start.filmTo ?? (start.filmed === true ? film : undefined)
   const context = await app.browser.newContext({
     viewport: size,
@@ -443,7 +450,9 @@ it('6. the quote press carries selected words and offers a page to pick when non
     await openFromTheSidebar(page)
     const press = '.px-chat-quote-press'
     await page.waitForSelector(press, { timeout: 20_000 })
-    expect(await page.locator(`${press} [aria-hidden="true"]`).textContent()).toBe('"')
+    // THE PRESS DRAWS ITS PAIR OF QUOTATION MARKS as a picture of two shapes, and no character.
+    expect(await page.locator(`${press} svg[aria-hidden="true"] path`).count()).toBe(2)
+    expect(await page.locator(`${press} span[aria-hidden="true"]`).count()).toBe(0)
     expect(await page.locator(press).getAttribute('title')).toBe(t('chat.quote.press'))
 
     await page.click(press)
@@ -644,6 +653,60 @@ it('9. at the split width and one pixel below it, the chat and the frame agree o
   }
 }, 240_000)
 
+type Edges = { left: number; right: number }
+
+/** The drawn width of the left and right border of the chat beside the page and of its seam, as the browser draws them. */
+async function theEdges(page: Page): Promise<{ chat: Edges; seam: Edges }> {
+  return page.evaluate(() => {
+    const read = (selector: string): { left: number; right: number } => {
+      const it = document.querySelector(selector)
+      if (it === null) throw new Error(`${selector} is not drawn`)
+      const style = getComputedStyle(it)
+      return { left: parseFloat(style.borderLeftWidth), right: parseFloat(style.borderRightWidth) }
+    }
+    return { chat: read('aside.px-chat[data-where="split"]'), seam: read('.px-chat-seam') }
+  })
+}
+
+it('10. the chat\'s dark edge faces the page on either side, after a swap either way, and no edge is left at its far side', async () => {
+  const { context, page } = await aWindow(WIDE)
+  try {
+    await theReport(page)
+    await openFromTheSidebar(page)
+    // ON THE RIGHT the page is to the chat's left: that edge is drawn and the window's own edge is not. The seam's line
+    // is between the seam and the conversation, so it is on the seam's right.
+    const onTheRight = await theEdges(page)
+    expect(onTheRight.chat.left, 'the chat on the right draws no edge toward the page').toBeGreaterThan(0)
+    expect(onTheRight.chat.right, 'the chat on the right draws an edge at the window\'s edge').toBe(0)
+    expect(onTheRight.seam.left, 'the seam on the right draws a second edge toward the page').toBe(0)
+    expect(onTheRight.seam.right, 'the seam on the right draws no line toward the conversation').toBeGreaterThan(0)
+
+    // ON THE LEFT the page is to the chat's right, and the sidebar to its left keeps its own line.
+    await page.click('.px-chat-seam-swap')
+    await page.waitForFunction(() => document.documentElement.getAttribute('data-chat-split') === 'left')
+    const onTheLeft = await theEdges(page)
+    expect(onTheLeft.chat.right, 'the chat on the left draws no edge toward the page').toBeGreaterThan(0)
+    expect(onTheLeft.chat.left, 'the chat on the left draws an edge against the sidebar').toBe(0)
+    expect(onTheLeft.seam.right, 'the seam on the left draws a second edge toward the page').toBe(0)
+    expect(onTheLeft.seam.left, 'the seam on the left draws no line toward the conversation').toBeGreaterThan(0)
+
+    // BACK ON THE RIGHT, nothing of the left is left behind.
+    await page.click('.px-chat-seam-swap')
+    await page.waitForFunction(() => document.documentElement.getAttribute('data-chat-split') === 'right')
+    expect(await theEdges(page), 'the swap back drew different edges from the first opening').toEqual(onTheRight)
+
+    // BELOW THE SPLIT WIDTH THE CHAT COVERS THE SCREEN, and the seam is the bar across its top, so neither has a side
+    // edge, whichever side was left stored.
+    await page.click('.px-chat-seam-swap')
+    await page.waitForFunction(() => document.documentElement.getAttribute('data-chat-split') === 'left')
+    await page.setViewportSize(PHONE)
+    await page.locator('.px-chat-seam-back').waitFor({ timeout: 10_000 })
+    expect(await theEdges(page), 'the covering chat left on the left draws a side edge').toEqual({ chat: { left: 0, right: 0 }, seam: { left: 0, right: 0 } })
+  } finally {
+    await context.close()
+  }
+}, 120_000)
+
 const PICKED_GROUP = 'Made-up group for picking'
 const PICKED_OTHER = { name: 'Made-up Second Agent', handle: 'made-up-second-agent' }
 const GROUP_LINE = 'Made-up group line for picking.'
@@ -751,17 +814,26 @@ it('switches between one and two columns and keeps the choice for the person', a
     const toggle = first.page.locator('.px-chat-layout-toggle')
     await columns.locator('.px-chat-them').waitFor({ timeout: 30_000 })
     await expect.poll(() => columns.getAttribute('data-columns')).toBe('two')
-    expect(await toggle.getAttribute('title')).toBe(t('chat.layout.single'))
+    // One press with one word and one icon in both views, drawn as pressed only while two columns show.
+    expect(await toggle.getAttribute('title')).toBe(t('chat.layout.sideBySide'))
+    expect(await toggle.getAttribute('aria-pressed')).toBe('true')
+    const twoColumnsIcon = await toggle.locator('svg').innerHTML()
     await toggle.click()
     await expect.poll(() => columns.getAttribute('data-columns')).toBe('one')
+    await expect.poll(() => toggle.getAttribute('aria-pressed')).toBe('false')
+    expect(await toggle.getAttribute('title')).toBe(t('chat.layout.sideBySide'))
+    expect(await toggle.locator('svg').innerHTML()).toBe(twoColumnsIcon)
     expect(await columns.locator('.px-chat-columns-lists').count()).toBe(0)
     await columns.locator('.px-chat-back').click()
     await columns.locator('.px-chat-columns-lists').waitFor({ timeout: 20_000 })
     await columns.locator(`.px-chat-contact[data-contact="${agentKey}"]`).click()
     await columns.locator('.px-chat-them').waitFor({ timeout: 20_000 })
     expect(await toggle.getAttribute('title')).toBe(t('chat.layout.sideBySide'))
+    expect(await toggle.getAttribute('aria-pressed')).toBe('false')
     await toggle.click()
     await expect.poll(() => columns.getAttribute('data-columns')).toBe('two')
+    await expect.poll(() => toggle.getAttribute('aria-pressed')).toBe('true')
+    expect(await toggle.locator('svg').innerHTML()).toBe(twoColumnsIcon)
     await columns.locator('.px-chat-columns-lists').waitFor({ timeout: 20_000 })
     await toggle.click()
     await expect.poll(async () => {
@@ -831,7 +903,7 @@ it('a saved side-by-side choice leaves the phone chat page in one column', async
 
 it('a saved side-by-side choice leaves a narrow corner window in one column', async () => {
   await withTwoColumnsForThisCase(async () => {
-    const { context, page } = await aWindow(WIDE, { with: agentKey })
+    const { context, page } = await aWindow(WIDE, { with: agentKey, opensAs: 'window' })
     try {
       await theReport(page)
       await page.locator('.px-chat-circle').click({ timeout: 30_000 })

@@ -21,6 +21,11 @@
  * Cases 3 to 5 pass on the hook from before the change too, since it never stamped at a stop. Each is proved by a
  * mutation of its own guard, named in the commit that adds this file.
  *
+ * THE AGENT IN THE PANE HOLDS A KEY OF ITS OWN, from the door that registers it, and every run of the hook is given
+ * it as MOLE_AGENT_KEY, as the office's own pane gives its agent one (src/server/lib/terminal-agents.ts). A session
+ * that names an agent and holds no key of it sends the name alone, and the office lets no name alone change a run,
+ * so the stamps these cases read would not be written without the key.
+ *
  * It runs the real hook, as Claude Code runs it and with Node's type stripping off, against a listening server on a
  * throwaway database. Every name, folder and value is made up.
  */
@@ -55,6 +60,8 @@ let scratch: string
 /** Every request the server was sent, as its method and path, in order. */
 let calls: string[] = []
 const notesWritten: string[] = []
+/** The key the office gave HANDLE when it was registered. Every run of the hook is given it. */
+let agentsKey = ''
 
 beforeEach(async () => {
   t = await freshDb()
@@ -70,6 +77,8 @@ beforeEach(async () => {
   mkdirSync(join(scratch, 'home'))
   const reply = await server.app.inject({ method: 'POST', url: '/api/agents/started', headers: AS_THE_PERSON, payload: { handle: HANDLE, name: HANDLE, role: 'worker' } })
   expect(reply.statusCode, reply.body).toBe(201)
+  agentsKey = String((reply.json() as { whatToGiveIt?: { key?: string } }).whatToGiveIt?.key ?? '')
+  expect(agentsKey, 'the registration gave the agent no key').not.toBe('')
 }, 60_000)
 
 afterEach(async () => {
@@ -112,7 +121,8 @@ function theDataOf(id: string): Record<string, any> {
 
 /**
  * Run the hook as Claude Code runs it, with type stripping off, for the run its environment names, and hand back what
- * it printed. HOME, TMUX_PANE, any key and the office tool's configuration are never inherited.
+ * it printed. The agent's own key goes as MOLE_AGENT_KEY. HOME, TMUX_PANE, any other key, any key file and the office
+ * tool's configuration are never inherited.
  */
 async function theHook(mode: 'start' | 'stop' | 'end', payload: Record<string, unknown>, run: string): Promise<{ out: string; err: string }> {
   const env: NodeJS.ProcessEnv = {
@@ -123,8 +133,9 @@ async function theHook(mode: 'start' | 'stop' | 'end', payload: Record<string, u
     MOLE_OFFICE_DB: t.file,
     MOLE_HOOK_DETAILS_FOLDER: join(scratch, 'hook-details'),
     MOLE_OFFICE_AGENT: HANDLE,
+    MOLE_AGENT_KEY: agentsKey,
   }
-  for (const name of ['TMUX_PANE', 'CLAUDE_PID', 'MOLE_AGENT_KEY', 'SANDBOX_DIR', 'MOLE_OFFICE_TOOL_CONFIGURATION']) delete env[name]
+  for (const name of ['TMUX_PANE', 'CLAUDE_PID', 'MOLE_AGENT_KEY_FILE', 'SANDBOX_DIR', 'MOLE_OFFICE_TOOL_CONFIGURATION']) delete env[name]
   env['MOLE_OFFICE_SESSION'] = run
   const child: ChildProcess = spawn(process.execPath, ['--no-experimental-strip-types', HOOK, mode], { env })
   let out = ''

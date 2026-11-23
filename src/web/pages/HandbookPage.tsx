@@ -66,20 +66,13 @@ export function HandbookPage({ id }: { id: string }) {
         <ErrorNote message={read.message} fault={read.fault} retry={reload} />
       ) : read.value.record.kind !== HANDBOOK_KIND ? (
         <p className="hbk-says">
-          {t('handbookPage.notAHandbook')} <RouteLink to={recordPath(id)}>{t('handbookPage.openItsRecord')}</RouteLink>
+          {t('handbookPage.isNotAHandbook')} <RouteLink to={recordPath(id)}>{t('handbookPage.openItsRecord')}</RouteLink>
         </p>
       ) : (
         <TheHandbook id={id} project={read.value.record.workspaceId} title={read.value.record.title} data={read.value.record.data} updatedAt={read.value.record.updatedAt} reload={reload} />
       )}
     </div>
   )
-}
-
-/** Where a handbook stands, as the sentence its page says. */
-const STATE_WORD: Record<HandbookState, () => string> = {
-  draft: () => t('handbookPage.state.draft'),
-  'in use': () => t('handbookPage.state.inUse'),
-  retired: () => t('handbookPage.state.retired'),
 }
 
 const STATE_NAMED: Record<HandbookState, WordKey> = {
@@ -103,19 +96,18 @@ function TheHandbook({ id, project, title, data, updatedAt, reload }: { id: stri
         ← {t('nav.records')}
       </RouteLink>
       <h1 className="hbk-title" data-title-is="its-label">{content(title)}</h1>
-      <p className="hbk-where">{t('handbookPage.listedOn', { records: t('nav.records'), kind: t('kind.handbook') })}</p>
       <dl className="hbk-facts">
         <div className="hbk-fact">
           <dt>{t('handbookPage.for')}</dt>
-          <dd>{who === null ? t('handbookPage.forNotSaid') : content(who)}</dd>
+          <dd>{who === null ? t('g6a.common.notRecorded') : content(who)}</dd>
         </div>
         <div className="hbk-fact" data-state={state ?? 'unknown'}>
           <dt>{t('handbookPage.stands')}</dt>
-          <dd>{state === null ? t('handbookPage.state.unknown') : STATE_WORD[state]()}</dd>
+          <dd>{t(handbookStateKey(state))}</dd>
         </div>
         <div className="hbk-fact hbk-fact-wide">
           <dt>{t('handbookPage.hangsOn')}</dt>
-          <dd>{places.length === 0 ? t('handbookPage.hangsNowhere') : <ThePlaces places={places} />}</dd>
+          <dd>{places.length === 0 ? t('absence.none') : <ThePlaces places={places} />}</dd>
         </div>
       </dl>
       <TheText key={updatedAt} id={id} project={project} data={data} onSaved={reload} />
@@ -183,7 +175,7 @@ function TheText({ id, project, data, onSaved }: { id: string; project: string; 
         )}
       </div>
       {written.length === 0 ? (
-        <p className="hbk-says">{t('handbookPage.noText')}</p>
+        <p className="hbk-says">{t('handbookPage.textNone')}</p>
       ) : (
         <>
           <span className="hbk-switch" role="group" aria-label={t('handbookPage.language')}>
@@ -219,7 +211,7 @@ function OneLanguage({ text }: { text: HandbookText }) {
       <h3 className="hbk-h3">{t('handbookPage.opening')}</h3>
       <p className="hbk-words">{content(text.opening)}</p>
       <h3 className="hbk-h3">{t('handbookPage.rest')}</h3>
-      {text.rest === undefined || text.rest.trim() === '' ? <p className="hbk-says">{t('handbookPage.noRest')}</p> : <p className="hbk-words">{content(text.rest)}</p>}
+      {text.rest === undefined || text.rest.trim() === '' ? <p className="hbk-says">{t('absence.none')}</p> : <p className="hbk-words">{content(text.rest)}</p>}
     </div>
   )
 }
@@ -242,11 +234,11 @@ function TheChange({ id, project, data, first, onCancel, onSaved }: { id: string
     setRest(text[next]?.rest ?? '')
   }
   const save = async (): Promise<void> => {
-    if (why.trim() === '') return setRefused({ message: t('handbookPage.change.whyNeeded'), fault: null })
+    if (why.trim() === '') return setRefused({ message: t('handbookPage.change.noWhy'), fault: null })
     const next: HandbookText = rest.trim() === '' ? { opening } : { opening, rest }
     const was = text[language]
     if (was !== undefined && was.opening === next.opening && (was.rest ?? '') === (next.rest ?? '')) {
-      return setRefused({ message: t('handbookPage.change.nothingChanged'), fault: null })
+      return setRefused({ message: t('handbookPage.change.sameText'), fault: null })
     }
     const stored = typeof data['text'] === 'object' && data['text'] !== null ? (data['text'] as Record<string, unknown>) : {}
     setSaving(true)
@@ -276,7 +268,7 @@ function TheChange({ id, project, data, first, onCancel, onSaved }: { id: string
           options={(Object.keys(LANGUAGES) as Language[]).map((one) => ({ value: one, label: text[one] === undefined ? t('handbookPage.change.notWrittenYet', { language: LANGUAGES[one] }) : LANGUAGES[one] }))}
         />
       </Field>
-      <Field label={t('handbookPage.opening')} hint={t('handbookPage.change.openingHint', { most: THE_OPENING_MOST_WORDS })}>
+      <Field label={t('handbookPage.opening')} hint={t('handbookPage.change.openingMost', { most: THE_OPENING_MOST_WORDS })}>
         <TextArea value={opening} onChange={setOpening} rows={5} required />
       </Field>
       <Field label={t('handbookPage.rest')} optional>
@@ -333,7 +325,7 @@ function whatItDid(entry: RevisionEntry, content: OneRevision['content'], before
 }
 
 /** Every version listed, newest first, each with what it did to the text. */
-async function theVersionsOf(id: string): Promise<{ versions: AVersion[]; says: string | null }> {
+async function theVersionsOf(id: string): Promise<{ versions: AVersion[]; leftOut: number }> {
   const listing = await api.revisions(id)
   const contents = await Promise.all(listing.revisions.map((entry) => api.revision(id, entry.seq).then((one) => one.content)))
   const versions = listing.revisions.map((entry, n): AVersion => {
@@ -341,15 +333,15 @@ async function theVersionsOf(id: string): Promise<{ versions: AVersion[]; says: 
     const older = listing.revisions[n + 1]
     return { entry, content, did: whatItDid(entry, content, older === undefined ? undefined : { seq: older.seq, content: contents[n + 1]! }) }
   })
-  return { versions, says: listing.says }
+  return { versions, leftOut: listing.subtraction.leftOut }
 }
 
 const DID_WORD: Record<Exclude<WhatItDid, { why: string }>['did'], () => string> = {
-  same: () => t('handbookPage.textDidNotChange'),
-  putBack: () => t('handbookPage.textPutBack'),
-  noReason: () => t('handbookPage.textChangedNoReason'),
-  noText: () => t('handbookPage.noText'),
-  notKnown: () => t('handbookPage.textChangeNotKnown'),
+  same: () => t('handbookPage.textSame'),
+  putBack: () => t('handbookPage.textPutBackShort'),
+  noReason: () => t('handbookPage.textChangedNoWhy'),
+  noText: () => t('handbookPage.textNone'),
+  notKnown: () => t('handbookPage.textChangeUnknown'),
 }
 
 function TheVersions({ id, updatedAt }: { id: string; updatedAt: string }) {
@@ -365,7 +357,7 @@ function TheVersions({ id, updatedAt }: { id: string; updatedAt: string }) {
         <ErrorNote message={read.message} fault={read.fault} retry={reload} />
       ) : (
         <>
-          {read.value.says === null ? null : <p className="hbk-says">{read.value.says}</p>}
+          {read.value.leftOut === 0 ? null : <p className="hbk-says">{t('handbookPage.versionsNotListed', { n: read.value.leftOut })}</p>}
           <ol className="hbk-rows">
             {read.value.versions.map((version) => (
               <li key={version.entry.seq} className="hbk-row">
@@ -445,7 +437,6 @@ export function NewHandbookOnAFlow({ flow, project, onCancel }: { flow: string; 
     >
       <style href="mole-office-handbook-page" precedence="default">{HANDBOOK_PAGE_CSS}</style>
       <h3 className="hbk-h3">{t('handbookPage.new.heading')}</h3>
-      <p className="hbk-says">{t('handbookPage.new.asADraft')}</p>
       <Field label={t('handbookPage.new.title')}>
         <TextInput value={title} onChange={setTitle} />
       </Field>
@@ -455,7 +446,7 @@ export function NewHandbookOnAFlow({ flow, project, onCancel }: { flow: string; 
       <Field label={t('handbookPage.language')}>
         <Select<Language> value={language} onChange={setLanguage} options={(Object.keys(LANGUAGES) as Language[]).map((one) => ({ value: one, label: LANGUAGES[one] }))} />
       </Field>
-      <Field label={t('handbookPage.opening')} hint={t('handbookPage.change.openingHint', { most: THE_OPENING_MOST_WORDS })}>
+      <Field label={t('handbookPage.opening')} hint={t('handbookPage.change.openingMost', { most: THE_OPENING_MOST_WORDS })}>
         <TextArea value={opening} onChange={setOpening} rows={5} required />
       </Field>
       <Field label={t('handbookPage.new.why')}>
@@ -477,7 +468,7 @@ export function NewHandbookOnAFlow({ flow, project, onCancel }: { flow: string; 
 export const HANDBOOK_PAGE_CSS = `
 .hbk-back { display: inline-block; margin: 0 0 var(--pad) 0; }
 .hbk-title { margin: 0 0 4px 0; overflow-wrap: anywhere; }
-.hbk-where, .hbk-says { margin: 0 0 var(--gut) 0; color: var(--text-2); max-width: var(--measure-in-box); }
+.hbk-says { margin: 0 0 var(--gut) 0; color: var(--text-2); max-width: var(--measure-in-box); }
 .hbk-head { display: flex; flex-wrap: wrap; gap: var(--pad) var(--gut); align-items: center; justify-content: space-between; margin: var(--gut) 0 var(--pad) 0; }
 .hbk-head > .hbk-h2 { margin: 0; }
 .hbk-h2 { font-size: var(--fs-3); margin: var(--gut) 0 6px 0; }

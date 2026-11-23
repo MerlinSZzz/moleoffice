@@ -17,10 +17,10 @@
  * and the search starts in the wrong place.
  *
  * This is not hypothetical. Two design threads hand-assigned the number `0120` to two different
- * migrations, and the fix everybody reaches for is to hand-assign different numbers. That fix is
- * the defect: a number typed by a person comes with no journal entry. The right move is to run
- * `npm run db:generate` and take whatever number drizzle-kit assigns, because that writes the file
- * and the journal entry together. This file is what makes the wrong move fail loudly.
+ * migrations. A number typed by hand is safe only with its journal entry beside it, and only when
+ * no other branch holds the same number. So a migration is written by hand with its entry, in one
+ * commit, and the coordinator gives its number; tests/how-a-migration-is-written.ts says so in the
+ * words a failure gives. This file is what makes a file without its entry fail loudly.
  *
  * ---------------------------------------------------------------------------------------
  * THREE CLAIMS, THREE `it` BLOCKS
@@ -29,7 +29,7 @@
  * They are separate blocks on purpose, so that a red says which one fired rather than only that
  * something about the migrations is wrong. Each one is checked against a different thing:
  *
- *   1. Every `.sql` file has a journal entry.   Files -> journal. Catches a hand-written file.
+ *   1. Every `.sql` file has a journal entry.   Files -> journal. Catches a file without its entry.
  *   2. Every journal entry has a `.sql` file.   Journal -> files. Catches a deleted or renamed
  *      file, which stops the migrator with an error that names a missing path.
  *
@@ -57,6 +57,7 @@ import { describe, expect, it } from 'vitest'
 import { readdirSync, readFileSync } from 'node:fs'
 import { fileURLToPath, URL } from 'node:url'
 import { join } from 'node:path'
+import { A_MIGRATION_IS_WRITTEN_BY_HAND } from './how-a-migration-is-written.ts'
 
 const FOLDER = fileURLToPath(new URL('../drizzle', import.meta.url))
 
@@ -116,8 +117,7 @@ describe('every migration in the folder is one the migrator will run', () => {
       missing.length === 0
         ? ''
         : `These .sql files are in drizzle/ with no entry in drizzle/meta/_journal.json, so drizzle's ` +
-          `migrator will never run them: ${missing.join(', ')}. Do not add the entry by hand. Delete the ` +
-          `file and run "npm run db:generate", which writes the file and its journal entry together.`,
+          `migrator will never run them: ${missing.join(', ')}. ${A_MIGRATION_IS_WRITTEN_BY_HAND}`,
     ).toEqual([])
   })
 

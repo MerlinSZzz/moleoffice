@@ -18,12 +18,17 @@ import { afterAll, beforeAll, expect, it } from 'vitest'
 import { apiApp, freshDb, type TestDb } from './helpers.ts'
 import { THE_TEST_OFFICES_SECRETARY } from './a-page-of-a-test-office.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
-import { KEY_COOKIE } from '../src/config/key-header.mjs'
+import { DEVICE_HALF_COOKIE, DEVICE_HALF_HEADER } from '../src/config/key-header.mjs'
 
 const WORKSPACE = 'default'
 const KEY_HEADER = 'x-mole-office-key'
-/** A key that proves nobody rides in the cookie. In the header it is refused before any door, in its own words. */
-const A_COOKIE_THAT_PROVES_NOBODY = `${KEY_COOKIE}=a-made-up-key-this-office-never-made`
+/**
+ * A KEY THAT PROVES NOBODY, as the two halves of a device key the office gave and then took back. A key the office never
+ * gave is refused before any door, in its own words, in the header and as two halves alike; the old cookie is no key.
+ */
+const A_REVOKED_COOKIE_HALF = 'a-made-up-cookie-half-of-a-revoked-key'
+const A_REVOKED_HEADER_HALF = 'a-made-up-header-half-of-a-revoked-key'
+const TWO_HALVES_THAT_PROVE_NOBODY = { cookie: `${DEVICE_HALF_COOKIE}=${A_REVOKED_COOKIE_HALF}`, [DEVICE_HALF_HEADER]: A_REVOKED_HEADER_HALF }
 const GATE = 'an-act-at-a-keyed-door-needs-a-key'
 const AS_THE_PERSON = { 'x-mole-office-actor-type': 'human', 'x-mole-office-actor-id': THE_PERSON, 'x-mole-office-workspace': WORKSPACE }
 const asAgent = (id: string): Record<string, string> => ({ 'x-mole-office-actor-type': 'agent', 'x-mole-office-actor-id': id, 'x-mole-office-workspace': WORKSPACE })
@@ -64,6 +69,10 @@ beforeAll(async () => {
   const filed = await app.inject({ method: 'POST', url: '/api/records', headers: asAgent('holder-one'), payload: { kind: 'session', title: 'A made-up terminal answering as holder-one', data: { state: 'running', runtime: 'claude-code', doing: 'answering as holder-one' } } })
   expect(filed.statusCode, filed.body).toBe(201)
   session = (filed.json() as { record: { id: string } }).record.id
+  const keys = await import('../src/server/lib/keys.ts')
+  const revoked = keys.keyHash(`${A_REVOKED_COOKIE_HALF}.${A_REVOKED_HEADER_HALF}`)
+  keys.holdTheKeyWhoseHashIs('person-device', THE_PERSON, revoked, null)
+  if (keys.revokeTheKeyWhoseHashIs(revoked, 'the test took it back') === null) throw new Error('the made-up halves were not revoked')
 }, 180_000)
 
 afterAll(async () => {
@@ -78,7 +87,7 @@ it('counts each act a listener carried with no key, or with a key that proves no
   expect(noKey.status, noKey.error).toBe(403)
   expect(noKey.error).toContain('came with no key, so it was not taken.')
   expect(counted()).toEqual({ wouldStop: 1, stopped: 1 })
-  const provesNobody = await throughTheListener(HOLD().url, { ...asAgent('holder-one'), cookie: A_COOKIE_THAT_PROVES_NOBODY }, HOLD().payload)
+  const provesNobody = await throughTheListener(HOLD().url, { ...asAgent('holder-one'), ...TWO_HALVES_THAT_PROVE_NOBODY }, HOLD().payload)
   expect(provesNobody.status, provesNobody.error).toBe(403)
   expect(provesNobody.error).toContain('came with a key that proves nobody here, so it was not taken.')
   expect(counted()).toEqual({ wouldStop: 2, stopped: 2 })

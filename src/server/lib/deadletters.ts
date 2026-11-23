@@ -67,7 +67,7 @@ import { readInPieces } from '../db/in-pieces.ts'
 import { onlyTheseFieldsOf } from '../db/only-these-fields-of.ts'
 import { ONE_KIND_WRITTEN_OUT, STORED_FIELDS, agents, deadLetterClaims, messageDelivery, records, theKindOfARowFoundById } from '../db/schema.ts'
 import { localStamp, nowStamp, parseAnyStamp } from '@shared/time.ts'
-import { moleOffice, isMoleOffice, type ParticipantRef } from '@shared/participants.ts'
+import { moleOffice, isMoleOffice, theMoleOfficeTest, type ParticipantRef } from '@shared/participants.ts'
 import { THE_PERSON } from '@shared/person.ts'
 import {
   pastTheThreshold,
@@ -99,7 +99,7 @@ import { syncTheSecretariatGroup } from './secretariat.ts'
 import { type RegisteredAgent } from './participants.ts'
 import { listParticipants } from '../db/list-participants.ts'
 import { readParticipant } from '../db/read-participant.ts'
-import { theOneAgentAStringNames } from './agent-references.ts'
+import { theOneAgentAStringNames, type AgentIdentity } from './agent-references.ts'
 import { deadLetterAfterCount, deadLetterAfterDays } from './env.ts'
 import { theRoleCards } from './roles.ts'
 import { THE_DEAD_LETTER_SWEEP, createRecord, patchRecord, type Actor } from './records.ts'
@@ -141,8 +141,11 @@ export interface DeadLetter {
   because: string
 }
 
-/** Runs may read between turns without holding a handle (problem CcD2zS8LYfER). */
-function agentsWhoseRunsMayRead(now: Date): Set<string> {
+/**
+ * Runs may read between turns without holding a handle (problem CcD2zS8LYfER). `names` is the reader of the one agent a
+ * stored string names; the sweep hands its own, which reads each string once for the whole sweep.
+ */
+function agentsWhoseRunsMayRead(now: Date, names: (stored: string) => AgentIdentity | null = (stored) => theOneAgentAStringNames(sqlite, stored)): Set<string> {
   const protectedAgents = new Set<string>()
   // FIRST THE TWO FIELDS THE TEST READS, FOR EVERY RUN, AND THEN THE FEW RUNS IT KEEPS, WHOLE. SQLite hands back the
   // state and the output stamp, each only when it is text, as the test below reads them; the rest of each record stays
@@ -203,7 +206,7 @@ function agentsWhoseRunsMayRead(now: Date): Set<string> {
     }
     if (serving !== null) protectedAgents.add(serving.id)
     const ranAs = ranAsIn(session, session.workspaceId)
-    const attached = ranAs === null ? null : theOneAgentAStringNames(sqlite, ranAs)
+    const attached = ranAs === null ? null : names(ranAs)
     if (attached !== null) protectedAgents.add(attached.id)
   }
   return protectedAgents
@@ -217,8 +220,15 @@ function agentsWhoseRunsMayRead(now: Date): Set<string> {
  * presence reading says cannot be received, unless its agent has a running or recently speaking
  * session record. A row whose message record is gone (deleted) answers no
  * question about presence and is left out: absence beats a guess.
+ *
+ * `isTheOffice` is the sweep's own test of the office's id, made once for the sweep. A caller that names none gets one
+ * made for this call, so the office's row is read once for every letter, not once for each.
  */
-export function deadLettersNow(now: Date = new Date(), protectedRuns: () => Set<string> = () => agentsWhoseRunsMayRead(now)): DeadLetter[] {
+export function deadLettersNow(
+  now: Date = new Date(),
+  protectedRuns: () => Set<string> = () => agentsWhoseRunsMayRead(now),
+  isTheOffice?: (who: ParticipantRef) => boolean,
+): DeadLetter[] {
   const queued = db
     .select()
     .from(messageDelivery)
@@ -226,6 +236,7 @@ export function deadLettersNow(now: Date = new Date(), protectedRuns: () => Set<
     .all()
   if (queued.length === 0) return []
   const protectedAgents = protectedRuns()
+  const officeTest = isTheOffice ?? theMoleOfficeTest()
   // IN PIECES (src/server/db/in-pieces.ts): every queued letter to an agent names its message here, and a backlog has
   // no cap. The rows go into maps by id, so the order of the pieces does not matter. THE KIND IS ASKED WITHOUT ITS INDEX
   // here, in the read of letters to retired agents and in the read of runs above: asked with `eq`, each piece walked
@@ -269,7 +280,7 @@ export function deadLettersNow(now: Date = new Date(), protectedRuns: () => Set<
     const message = ofMessage.get(row.messageId)
     if (message === undefined) continue
     const sentBy = senderOf(message.data)
-    if (sentBy !== null && isMoleOffice(sentBy)) continue
+    if (sentBy !== null && officeTest(sentBy)) continue
     // A MESSAGE THE OFFICE ALREADY ROUTED IS NOT ALSO A WILD LETTER, by a decision.
     // When an addressee could not be reached, the office also gave the words to the first reachable
     // participant up its chain of starters, so the letter has a home and the secretaries are not
@@ -333,8 +344,13 @@ function everyNamedAddressee(): Set<string> {
  * on the list once; new letters piling up for it are still the same claim's to find.
  */
 export function unbroadcastDeadLetters(now: Date = new Date(), protectedRuns?: () => Set<string>): DeadLetter[] {
+  return unbroadcastAmong(deadLettersNow(now, protectedRuns))
+}
+
+/** The letters among these whose addressee has never been named in a broadcast. The sweep hands its one reading. */
+function unbroadcastAmong(letters: readonly DeadLetter[]): DeadLetter[] {
   const already = everyNamedAddressee()
-  return deadLettersNow(now, protectedRuns).filter((one) => !already.has(one.to.id))
+  return letters.filter((one) => !already.has(one.to.id))
 }
 
 /** How many whole days separate two local wall-clock stamps, floored. */
@@ -453,6 +469,41 @@ export type WhatTheSweepDoes =
   | { rule: 'already'; because: string }
   | { rule: 'none'; because: string }
 
+/**
+ * WHAT ONE SWEEP READS ONCE AND HANDS TO EVERY LETTER IT WALKS. The record door and the Settings panel ask about one
+ * letter at a time, or one list, and read each answer as they ask, as before (`readEachTimeItIsAsked`).
+ */
+export interface WhatOneSweepReadsOnce {
+  /** Whether a reference is the office itself: a test made once for the sweep and dropped with it (`theMoleOfficeTest`). */
+  isTheOffice: (who: ParticipantRef) => boolean
+  /** The one agent a stored string names, or null (`theOneAgentAStringNames`). */
+  theAgentAStringNames: (stored: string) => AgentIdentity | null
+}
+
+/** Each answer read when it is asked: the office's row and the agent rows. */
+function readEachTimeItIsAsked(): WhatOneSweepReadsOnce {
+  return { isTheOffice: isMoleOffice, theAgentAStringNames: (stored) => theOneAgentAStringNames(sqlite, stored) }
+}
+
+/**
+ * THE OFFICE'S ID AND THE AGENT EACH STORED STRING NAMES, READ ONCE FOR ONE SWEEP. A steady sweep read the office's row
+ * for every letter it walked, twice for a letter from an agent, and the agent rows for every letter's sender. The sweep
+ * decides every letter before it writes, and it writes no agent row, so an answer kept is the one it would read again.
+ */
+function readOnceForOneSweep(): WhatOneSweepReadsOnce {
+  const named = new Map<string, AgentIdentity | null>()
+  return {
+    isTheOffice: theMoleOfficeTest(),
+    theAgentAStringNames: (stored) => {
+      const held = named.get(stored)
+      if (held !== undefined) return held
+      const read = theOneAgentAStringNames(sqlite, stored)
+      named.set(stored, read)
+      return read
+    },
+  }
+}
+
 /** Whether an ending is one of the owner endings, which are the only ones that carry the owner's name. */
 function isAnOwnerEnding(ending: { how: string }): ending is TheOwnerEnding {
   return 'owner' in ending
@@ -466,8 +517,8 @@ function isAnOwnerEnding(ending: { how: string }): ending is TheOwnerEnding {
  * `secretary` is who the person named, already checked by `theDeadLetterSecretary`, or null. `sweptAt`
  * is the stamp the routed line says Mole Office looked at, or null because the record door asks as the
  * letter is written (`theSecretarysCopyAsTheLetterIsWritten`); the line then says "when this was sent".
- * `readings` gives what a project's walks read once (`theReadingsForOneSend`). The message id is not
- * read, so the door may ask before the message has one.
+ * `readings` gives what a project's walks read once (`theReadingsForOneSend`), and `once` what the sweep reads once
+ * (`readOnceForOneSweep`). The message id is not read, so the door may ask before the message has one.
  */
 export function whatTheSweepDoesWithALetter(
   letter: Omit<ALetterToARetiredAgent, 'messageId'>,
@@ -475,12 +526,13 @@ export function whatTheSweepDoesWithALetter(
   sweptAt: string | null,
   readings: (workspaceId: string) => TheReadingsForOneSend,
   endedCheckpointWorker = false,
+  once: WhatOneSweepReadsOnce = readEachTimeItIsAsked(),
 ): WhatTheSweepDoes {
   const name = theNameOf(letter.addressee, letter.to.id)
   const swept = sweptAt === null ? {} : { sweptAt }
   // (a) AN OFFICE NOTICE TO A RETIRED ADDRESSEE IS ARCHIVED. Nobody reads it and nobody is woken for it.
   // `deadLettersNow` leaves the office's own lines out, so before this rule they stayed queued for ever.
-  if (letter.sentBy !== null && isMoleOffice(letter.sentBy)) {
+  if (letter.sentBy !== null && once.isTheOffice(letter.sentBy)) {
     return {
       rule: 'a',
       act: 'archive',
@@ -508,7 +560,7 @@ export function whatTheSweepDoesWithALetter(
   const sender = letter.sentBy
   // Both writers use the same ownership walk. An unclear chain leaves the original delivery waiting.
   if (sender !== null && (sender.kind === 'agent' || sender.kind === 'person')) {
-    const registered = sender.kind === 'agent' ? theOneAgentAStringNames(sqlite, sender.id) : null
+    const registered = sender.kind === 'agent' ? once.theAgentAStringNames(sender.id) : null
     const from: ParticipantRef = registered === null ? sender : { kind: 'agent', id: registered.id }
     const walked = theRoutingOfOneAddressee(letter.to, reach, from, readings(letter.workspaceId))
     if (walked.said === undefined) return { rule: 'none', because: walked.line }
@@ -579,9 +631,8 @@ function theQueuedLettersToRetiredAgents(forSweep: boolean): ALetterToARetiredAg
   return out
 }
 
-/** The secretary the person named, as the sweep uses it, or null because nobody qualifies. */
-function theNamedSecretary(): TheNamedSecretary | null {
-  const reading = theDeadLetterSecretary()
+/** The secretary the person named, as the sweep uses it, or null because nobody qualifies. The sweep hands its one reading. */
+function theNamedSecretary(reading: ReturnType<typeof theDeadLetterSecretary> = theDeadLetterSecretary()): TheNamedSecretary | null {
   return reading.named === null ? null : { who: { kind: 'agent', id: reading.named.id }, name: reading.named.handle }
 }
 
@@ -684,8 +735,23 @@ function tellTheReceiverOnce(to: ParticipantRef, letters: readonly ALetterToTell
   return written.id
 }
 
+/**
+ * THE WAITING LIST THE LAST SWEEP LINE NAMED, as this process last wrote or read it, or null because no sweep since the
+ * start has needed it. A steady sweep that found letters waiting read the last line again each time, to learn what it
+ * already held. Now it is read from the database once, the first time a sweep after a start needs it, and set by each
+ * sweep that writes a line. Only the sweep writes that list while the server runs; the re-mint rewrites stored ids
+ * during an upgrade, while the office is closed. Were it changed under a running server, the cost would be one line
+ * naming the same waiting letters again.
+ */
+let theWaitingTheLastLineNamedHeld: Set<string> | null = null
+
 /** The keys of the letters the last sweep line said were waiting, or an empty set because there is no line. */
 function theWaitingTheLastLineNamed(): Set<string> {
+  return (theWaitingTheLastLineNamedHeld ??= theWaitingTheLastLineNamedRead())
+}
+
+/** The waiting list read from the last sweep line in the database. */
+function theWaitingTheLastLineNamedRead(): Set<string> {
   const row = sqlite
     .prepare(
       "SELECT json_extract(data, '$.deadLetterSweep.waiting') AS waiting FROM records WHERE kind = 'message' " +
@@ -717,7 +783,71 @@ function countedBy(names: readonly string[]): ANameAndACount[] {
   return [...out].map(([name, count]) => ({ name, count }))
 }
 
+/** What one sweep, or the sweeps of one backlog, did, by name: what the sweep line counts. */
+interface WhatTheSweepsHaveDone {
+  archived: ANameAndACount[]
+  routed: ANameAndACount[]
+  summarised: ANameAndACount[]
+  keptBySender: number
+  givenFromAgents: number
+  givenFromThePerson: number
+}
+
+/** Two lists of names and counts as one: each name once, with its counts added, in the order each name was first met. */
+function theCountsAddedUp(earlier: readonly ANameAndACount[], later: readonly ANameAndACount[]): ANameAndACount[] {
+  const out = new Map<string, number>()
+  for (const { name, count } of [...earlier, ...later]) out.set(name, (out.get(name) ?? 0) + count)
+  return [...out].map(([name, count]) => ({ name, count }))
+}
+
+/** What the sweeps before did with what this one did added, or this one's alone when nothing came before. */
+function addedUp(before: WhatTheSweepsHaveDone | null, now: WhatTheSweepsHaveDone): WhatTheSweepsHaveDone {
+  if (before === null) return now
+  return {
+    archived: theCountsAddedUp(before.archived, now.archived),
+    routed: theCountsAddedUp(before.routed, now.routed),
+    summarised: theCountsAddedUp(before.summarised, now.summarised),
+    keptBySender: before.keptBySender + now.keptBySender,
+    givenFromAgents: before.givenFromAgents + now.givenFromAgents,
+    givenFromThePerson: before.givenFromThePerson + now.givenFromThePerson,
+  }
+}
+
+/**
+ * WHAT THE SWEEPS OF A BACKLOG HAVE DONE SO FAR, or null because no cap has left a letter since the last line. A sweep
+ * that a cap left letters after writes no line and adds what it did here. The sweep that leaves nothing for later
+ * writes the one line, with these totals and its own, and empties this.
+ *
+ * KEPT IN THE PROCESS AND NOT STORED. A restart in the middle of a backlog loses these totals, and the line that clears
+ * the backlog then counts only the sweeps after the restart. The letters lose nothing: each archived delivery and each
+ * routed entry is stored on its letter, as before, and each receiver's summary is a stored message.
+ */
+let theBacklogSoFar: WhatTheSweepsHaveDone | null = null
+
 // ============================================================================ the sweep
+
+/**
+ * AT MOST THIS MANY OFFICE NOTICES ARE ARCHIVED IN ONE SWEEP, rule (a), oldest first. The rest stay queued for the next
+ * sweeps.
+ *
+ * WHY A CAP. The sweep runs on the server's own timer and holds the server while it runs. On a made-up office at the live
+ * counts, the first sweep after a start archived 13,984 notices and routed 850 letters, and took 8.6 to 10.9 seconds.
+ * WHY LARGER THAN THE ROUTE CAP: archiving a notice marks its one delivery row, in one write for all of them, while
+ * routing a letter walks its owner chain and writes the letter again. A measure that finds this number wrong moves it
+ * here, and the tests read it from here.
+ */
+export const AT_MOST_ARCHIVED_IN_ONE_SWEEP = 1000
+
+/**
+ * AT MOST THIS MANY LETTERS ARE ROUTED IN ONE SWEEP, oldest first: rules (b) and (c) and the route retries. A letter given
+ * to the secretary counts, and so does a letter told about in a summary. A letter left waiting counts toward neither cap.
+ * One receiver's summarised letters go in one sweep, whole, so a part may take a sweep past this number when it is the
+ * only part routed in it (`sweepDeadLetters` says how).
+ *
+ * WHY A CAP: the one written at `AT_MOST_ARCHIVED_IN_ONE_SWEEP`. This and that one replace the single cap of 100 letters
+ * asked for earlier in wave 14c, so the cheap archive and the costly routing are capped apart.
+ */
+export const AT_MOST_ROUTED_IN_ONE_SWEEP = 100
 
 /** What running the sweep did. */
 export interface SweepResult {
@@ -775,6 +905,15 @@ export interface SweepResult {
  * keys in `deadLetterSweep.waiting`, so the next sweep can tell.
  *
  * ---------------------------------------------------------------------------------------
+ * AT MOST TWO CAPS' WORTH IN ONE SWEEP, AND ONE LINE FOR A BACKLOG (wave 14c)
+ * ---------------------------------------------------------------------------------------
+ *
+ * One sweep archives at most `AT_MOST_ARCHIVED_IN_ONE_SWEEP` notices and routes at most
+ * `AT_MOST_ROUTED_IN_ONE_SWEEP` letters, oldest first, and leaves the rest queued. While a cap
+ * leaves letters, the sweep writes no line and makes no broadcast. The sweep that leaves nothing for
+ * later writes one line with the totals of the whole backlog (`theBacklogSoFar`).
+ *
+ * ---------------------------------------------------------------------------------------
  * SAFE TO CALL OFTEN. IT DOES NOTHING WHEN THERE IS NOTHING TO DO.
  * ---------------------------------------------------------------------------------------
  *
@@ -826,25 +965,40 @@ function uncertainOwnerRetryCandidates() {
 export function sweepDeadLetters(by: Actor, now: Date = new Date()): SweepResult {
   lastSweptAt = now
   const sweptAt = nowStamp()
-  const secretary = theNamedSecretary()
+  // ONE READING OF THE SECRETARY SETTING, for the letters and for the line. The sweep writes no setting and no agent row,
+  // so the second reading the line took gave the same answer.
+  const secretaryReading = theDeadLetterSecretary()
+  const secretary = theNamedSecretary(secretaryReading)
   const readings = theReadingsOnce()
+  const once = readOnceForOneSweep()
+  // EACH AGENT'S HANDLE, read once for the sweep, for the line's lists. None of the sweep's writes is to an agent row.
+  const handles = new Map<string, string>()
+  const handleOnce = (who: ParticipantRef): string => {
+    const key = participantKey(who)
+    let held = handles.get(key)
+    if (held === undefined) handles.set(key, (held = handleOf(who)))
+    return held
+  }
   // A sweep changes letters, not runs. Reuse the same lazy run protection for all its reads.
   let protectedAgents: Set<string> | undefined
-  const protectedRuns = () => protectedAgents ??= agentsWhoseRunsMayRead(now)
+  const protectedRuns = () => protectedAgents ??= agentsWhoseRunsMayRead(now, once.theAgentAStringNames)
   const decided = theQueuedLettersToRetiredAgents(true).map((letter) => ({
     letter,
-    does: whatTheSweepDoesWithALetter(letter, secretary, sweptAt, readings),
+    does: whatTheSweepDoesWithALetter(letter, secretary, sweptAt, readings, false, once),
     checkpoint: false,
   }))
   for (const letter of newCheckpointLetters()) {
-    if (letter.sentBy !== null && isMoleOffice(letter.sentBy)) continue
+    if (letter.sentBy !== null && once.isTheOffice(letter.sentBy)) continue
     const reach = readings(letter.workspaceId).reachOf(letter.to.id)
     if (reach?.was !== 'nothing answering') continue
-    decided.push({ letter, does: whatTheSweepDoesWithALetter(letter, secretary, sweptAt, readings, true), checkpoint: true })
+    decided.push({ letter, does: whatTheSweepDoesWithALetter(letter, secretary, sweptAt, readings, true, once), checkpoint: true })
   }
+  // EVERY DEAD LETTER, READ ONCE IN THE SWEEP AND BEFORE IT WRITES: for the owner routes left waiting, just below, and for
+  // the threshold, which says why its answer is the one a reading after the writes gave.
+  const deadNow = deadLettersNow(now, protectedRuns, once.isTheOffice)
   // Retry only a previously unresolved route. The dead-letter reading protects a returning
   // addressee and recent session output before any owner is considered.
-  const unresolved = someWaitingOwnerRoute() ? deadLettersNow(now, protectedRuns) : []
+  const unresolved = someWaitingOwnerRoute() ? deadNow : []
   if (unresolved.length > 0) {
     const messages = new Map(readInPieces(unresolved.map((one) => one.messageId), (piece) =>
       db.select({ id: records.id, data: records.data }).from(records)
@@ -861,7 +1015,7 @@ export function sweepDeadLetters(by: Actor, now: Date = new Date()): SweepResult
       if (addressee === null || addressee.retired) continue
       const workspaceId = pending.workspaceId === MESSAGE_CENTRE ? (writtenInOf(data)?.project ?? MESSAGE_CENTRE) : pending.workspaceId
       const letter = { messageId: pending.messageId, workspaceId, to: pending.to, addressee, sentBy: senderOf(data), data }
-      const does = whatTheSweepDoesWithALetter(letter, secretary, sweptAt, readings, true)
+      const does = whatTheSweepDoesWithALetter(letter, secretary, sweptAt, readings, true, once)
       if (does.rule === 'b' && does.act === 'route' && does.entry.to !== null) decided.push({ letter, does, checkpoint: true })
     }
   }
@@ -879,7 +1033,7 @@ export function sweepDeadLetters(by: Actor, now: Date = new Date()): SweepResult
     for (const message of messages) {
       const data = (message.data ?? {}) as Record<string, unknown>
       const sender = senderOf(data)
-      if (sender === null || isMoleOffice(sender)) continue
+      if (sender === null || once.isTheOffice(sender)) continue
       const routes = routedOf(data)
       const workspaceId = message.workspaceId === MESSAGE_CENTRE ? (writtenInOf(data)?.project ?? MESSAGE_CENTRE) : message.workspaceId
       for (const route of routes) {
@@ -895,18 +1049,61 @@ export function sweepDeadLetters(by: Actor, now: Date = new Date()): SweepResult
         const addressee = readParticipant(owner) as RegisteredAgent | null
         if (addressee === null) continue
         const letter = { messageId: message.id, workspaceId, to: owner, addressee, sentBy: sender, data }
-        const does = whatTheSweepDoesWithALetter(letter, secretary, sweptAt, readings, true)
+        const does = whatTheSweepDoesWithALetter(letter, secretary, sweptAt, readings, true, once)
         if (does.rule === 'b' && does.act === 'route' && does.entry.to !== null) decided.push({ letter, does, checkpoint: true })
       }
     }
   }
   const keyOf = aDeadLetterKey
 
-  // ---- (a) ARCHIVE, in one write so one event goes out per addressee.
-  const toArchive: ADeliveryToArchive[] = []
-  for (const { letter, does } of decided) {
-    if (does.rule === 'a') toArchive.push({ messageId: letter.messageId, who: letter.to, because: does.because })
+  // ---- THE TWO CAPS, OLDEST FIRST. `decided` is in that order: the letters to retired agents by the moment each was
+  // queued, then the new letters to ended checkpoint workers, then the route retries. What a cap leaves stays queued, and
+  // the next sweep decides it again.
+  //
+  // A RECEIVER'S SUMMARISED LETTERS ARE ONE PART, so its one summary names them all, and a part is never split. Every
+  // other letter routed or given is a part of its own. A part stands where its oldest letter stands. Parts are taken in
+  // that order while they fit under the route cap. The first part that would pass it stops the routing there, and no
+  // newer part is taken past it, even one that would fit. A part larger than the cap is taken whole when it comes first,
+  // and alone, so it is never left for ever.
+  type ADecidedLetter = (typeof decided)[number]
+  /** The receiver a letter is told about in a summary, with the line's facts, or null because it goes by itself. */
+  const summarisedFor = ({ letter, does, checkpoint }: ADecidedLetter): ALetterToTellAbout['entry'] | null => {
+    if (checkpoint || letter.sentBy?.kind === 'person' || does.rule !== 'b' || does.act === 'wait') return null
+    const said = does.entry.said
+    return does.entry.to !== null && said !== undefined && anEndingASummaryMayTell(said.ending) ? { ...does.entry, said } : null
   }
+  const parts: ADecidedLetter[][] = []
+  const partOfReceiver = new Map<string, ADecidedLetter[]>()
+  for (const one of decided) {
+    if ((one.does.rule !== 'b' && one.does.rule !== 'c') || one.does.act === 'wait') continue
+    const told = summarisedFor(one)
+    const receiver = told === null || told.to === null ? null : participantKey(told.to)
+    const held = receiver === null ? undefined : partOfReceiver.get(receiver)
+    if (held !== undefined) {
+      held.push(one)
+      continue
+    }
+    const part = [one]
+    if (receiver !== null) partOfReceiver.set(receiver, part)
+    parts.push(part)
+  }
+  const routedNow = new Set<ADecidedLetter>()
+  let routeLeft = false
+  for (const part of parts) {
+    if (routedNow.size > 0 && routedNow.size + part.length > AT_MOST_ROUTED_IN_ONE_SWEEP) {
+      routeLeft = true
+      break
+    }
+    for (const one of part) routedNow.add(one)
+  }
+
+  // ---- (a) ARCHIVE, in one write so one event goes out per addressee.
+  const toArchiveAll: ADeliveryToArchive[] = []
+  for (const { letter, does } of decided) {
+    if (does.rule === 'a') toArchiveAll.push({ messageId: letter.messageId, who: letter.to, because: does.because })
+  }
+  const toArchive = toArchiveAll.slice(0, AT_MOST_ARCHIVED_IN_ONE_SWEEP)
+  const archiveLeft = toArchiveAll.length > toArchive.length
   const archived = archiveDeliveries(toArchive, sweptAt)
   const archivedNames = new Set(archived.map((one) => keyOf(one.messageId, one.who.id)))
 
@@ -922,14 +1119,17 @@ export function sweepDeadLetters(by: Actor, now: Date = new Date()): SweepResult
   let givenFromAgents = 0
   let givenFromThePerson = 0
   const toTell = new Map<string, { to: ParticipantRef; name: string; letters: ALetterToTellAbout[]; given: number }>()
-  for (const { letter, does, checkpoint } of decided) {
+  for (const one of decided) {
+    const { letter, does } = one
     if (does.rule !== 'b' && does.rule !== 'c') continue
     if (does.act === 'wait') continue
-    const said = does.entry.said
-    if (!checkpoint && letter.sentBy?.kind !== 'person' && does.rule === 'b' && does.entry.to !== null && said !== undefined && anEndingASummaryMayTell(said.ending)) {
-      const key = participantKey(does.entry.to)
-      const held = toTell.get(key) ?? { to: does.entry.to, name: handleOf(does.entry.to), letters: [], given: 0 }
-      held.letters.push({ letter, entry: { ...does.entry, said } })
+    // A LETTER THE ROUTE CAP LEFT stays queued as it is, for the next sweep.
+    if (!routedNow.has(one)) continue
+    const told = summarisedFor(one)
+    if (told !== null && told.to !== null) {
+      const key = participantKey(told.to)
+      const held = toTell.get(key) ?? { to: told.to, name: handleOnce(told.to), letters: [], given: 0 }
+      held.letters.push({ letter, entry: told })
       if (does.act === 'give to the secretary') held.given += 1
       toTell.set(key, held)
       continue
@@ -937,7 +1137,7 @@ export function sweepDeadLetters(by: Actor, now: Date = new Date()): SweepResult
     addToTheRouting(letter.messageId, does.entry, by)
     if (does.act === 'route') {
       if (does.entry.to === null) keptBySender += 1
-      else routedTo.push(handleOf(does.entry.to))
+      else routedTo.push(handleOnce(does.entry.to))
     } else if (does.rule === 'b') givenFromAgents += 1
     else givenFromThePerson += 1
   }
@@ -958,9 +1158,22 @@ export function sweepDeadLetters(by: Actor, now: Date = new Date()): SweepResult
     fromAgents: waitingLetters.filter(({ letter }) => letter.sentBy?.kind === 'agent').length,
   }
 
-  // ---- THE THRESHOLD, over every dead letter the three rules did not cover.
+  // ---- THE THRESHOLD, over every dead letter the three rules did not cover, from the one reading taken before the writes.
+  //
+  // IT IS THE ANSWER A READING AFTER THE WRITES GAVE, which is what the threshold read before wave 14c. Of what the sweep
+  // writes before here, only a routed entry that names a receiver changes what `deadLettersNow` answers: from then on it
+  // leaves out every delivery of that message. So the messages the rules route or give to somebody are left out here.
+  // The other writes change nothing it answers. An archived notice, a summary and the line are the office's own, which
+  // it always leaves out. A copy a route makes is a delivery of a message now left out. An entry whose sender keeps the
+  // letter names nobody, and leaves out nothing, then or now. The claims are written after. A letter a cap leaves for the
+  // next sweep is left out the same way, and is covered by its rule, so a cap never makes a letter a dead letter.
+  const goesToSomebody = new Set(
+    decided
+      .filter(({ does }) => (does.rule === 'b' || does.rule === 'c') && does.act !== 'wait' && does.entry.to !== null)
+      .map(({ letter }) => letter.messageId),
+  )
   const coveredByTheRules = new Set(decided.filter(({ does }) => does.rule !== 'none').map(({ letter }) => keyOf(letter.messageId, letter.to.id)))
-  const fresh = unbroadcastDeadLetters(now, protectedRuns).filter((one) => !coveredByTheRules.has(keyOf(one.messageId, one.to.id)))
+  const fresh = unbroadcastAmong(deadNow).filter((one) => !goesToSomebody.has(one.messageId) && !coveredByTheRules.has(keyOf(one.messageId, one.to.id)))
   let thresholdSays: string
   let broadcast: { countSentence: string; letters: number; addressees: DeadLetterAddressee[] } | null = null
   if (fresh.length === 0) {
@@ -994,8 +1207,18 @@ export function sweepDeadLetters(by: Actor, now: Date = new Date()): SweepResult
     summaries,
   }
 
+  // WHAT THIS SWEEP DID, BY NAME, for the line: alone, or added to what the sweeps of a backlog did before it.
+  const thisSweep: WhatTheSweepsHaveDone = {
+    archived: countedBy(toArchive.filter((one) => archivedNames.has(keyOf(one.messageId, one.who.id))).map((one) => handleOnce(one.who))),
+    routed: countedBy(routedTo),
+    summarised: summarised.map((one) => ({ name: one.name, count: one.letters.length })),
+    keptBySender,
+    givenFromAgents,
+    givenFromThePerson,
+  }
+
   // ---- ONE LINE, ONLY WHEN THERE IS SOMETHING NEW TO SAY. The cheap path reads no group at all.
-  const nothingNew = (): SweepResult => {
+  const nothingNew = (alsoSays = ''): SweepResult => {
     const stillWaiting = [
       waiting.fromThePerson === 0 ? '' : waiting.fromThePerson === 1
         ? sayInEnglish('deadLetterSweep.ownerWaiting.fromThePerson.one')
@@ -1005,22 +1228,35 @@ export function sweepDeadLetters(by: Actor, now: Date = new Date()): SweepResult
         : sayInEnglish('deadLetterSweep.ownerWaiting.fromAgents.many', { n: waiting.fromAgents }),
     ].filter(Boolean).join(' ')
     const waitingPrefix = stillWaiting === '' ? '' : `${stillWaiting} `
-    return { groupId: null, lineId: null, addressees: [], deliveredTo: null, ...counts, because: `${waitingPrefix}${thresholdSays}` }
+    return { groupId: null, lineId: null, addressees: [], deliveredTo: null, ...counts, because: `${waitingPrefix}${thresholdSays}${alsoSays}` }
   }
-  if (handled === 0 && broadcast === null && waitingKeys.length === 0) return nothingNew()
+  // ---- NO LINE WHILE A BACKLOG CLEARS. A sweep that a cap left letters after is part of a backlog. It writes no line, a
+  // due broadcast and its claims wait, and what it did is added to the backlog's totals. The sweep that leaves nothing
+  // for later writes the one line, with those totals and its own, even when it handled nothing itself.
+  if (archiveLeft || routeLeft) {
+    theBacklogSoFar = addedUp(theBacklogSoFar, thisSweep)
+    return nothingNew(
+      ' A cap left letters for the next sweep, so this sweep wrote no line. The sweep that leaves nothing for later ' +
+        `writes one line, with what every sweep before it did.${broadcast === null ? '' : ' The broadcast waits for that line.'}`,
+    )
+  }
+  const backlog = theBacklogSoFar
+  if (backlog === null && handled === 0 && broadcast === null && waitingKeys.length === 0) return nothingNew()
   const secretariat = syncTheSecretariatGroup()
   const groupId = secretariat.id
-  const toldBefore = theWaitingTheLastLineNamed()
-  if (handled === 0 && broadcast === null && waitingKeys.every((key) => toldBefore.has(key))) return nothingNew()
+  if (backlog === null && handled === 0 && broadcast === null) {
+    const toldBefore = theWaitingTheLastLineNamed()
+    if (waitingKeys.every((key) => toldBefore.has(key))) return nothingNew()
+  }
 
-  const reading = theDeadLetterSecretary()
+  const done = addedUp(backlog, thisSweep)
   const deliveredTo = secretary?.who ?? null
   const said: TheDeadLetterSweepSaid = {
-    archived: countedBy(toArchive.filter((one) => archivedNames.has(keyOf(one.messageId, one.who.id))).map((one) => handleOf(one.who))),
-    routed: countedBy(routedTo),
-    summarised: summarised.map((one) => ({ name: one.name, count: one.letters.length })),
-    keptBySender,
-    givenToTheSecretary: secretary === null ? null : { name: secretary.name, fromAgents: givenFromAgents, fromThePerson: givenFromThePerson },
+    archived: done.archived,
+    routed: done.routed,
+    summarised: done.summarised,
+    keptBySender: done.keptBySender,
+    givenToTheSecretary: secretary === null ? null : { name: secretary.name, fromAgents: done.givenFromAgents, fromThePerson: done.givenFromThePerson },
     waiting,
     broadcast:
       broadcast === null
@@ -1028,9 +1264,9 @@ export function sweepDeadLetters(by: Actor, now: Date = new Date()): SweepResult
         : {
             countSentence: broadcast.countSentence,
             letters: broadcast.letters,
-            addressees: broadcast.addressees.map((one) => ({ name: handleOf({ kind: 'agent', id: one.agentId }), count: one.count })),
+            addressees: broadcast.addressees.map((one) => ({ name: handleOnce({ kind: 'agent', id: one.agentId }), count: one.count })),
           },
-    deliveredTo: secretary !== null ? { name: secretary.name } : nobodyIsSentIt(reading),
+    deliveredTo: secretary !== null ? { name: secretary.name } : nobodyIsSentIt(secretaryReading),
   }
   const line = SYSTEM_LINES.deadLetterSweep(said)
   // THE FACTS ARE STORED BESIDE THE ENGLISH SENTENCE, so a page says the same sentence in its own language.
@@ -1050,6 +1286,8 @@ export function sweepDeadLetters(by: Actor, now: Date = new Date()): SweepResult
     senderIsMoleOffice: true,
     [THE_DEAD_LETTER_SWEEP]: true,
   })
+  theWaitingTheLastLineNamedHeld = new Set(waitingKeys)
+  theBacklogSoFar = null
 
   // ---- AND THE ADDRESSEES PAST THE THRESHOLD ARE NAMED FOR A CLAIM, once each, ever.
   if (broadcast !== null) {

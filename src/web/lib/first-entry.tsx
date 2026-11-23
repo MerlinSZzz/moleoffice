@@ -14,12 +14,12 @@
  *
  * A press on a link to the report inside the open checklist goes to the report and ends the first entry for good: the
  * office writes down that the person opened it (POST /api/getting-started/opened), and the layer is gone. Where that
- * write fails, the layer goes for this page only and the page says the steps will show again.
+ * write fails, the layer goes for this page only and the page says the write failed.
  *
  * THE KEYBOARD STAYS IN THE GAP AND THE WORDS. Tab moves between what can be pressed there, and focus that lands
  * anywhere else is put back.
  *
- * A BROWSER WHERE THE CHECKLIST IS SWITCHED OFF is not trapped: step two switches it on and says so, since the switch
+ * A BROWSER WHERE THE CHECKLIST IS SWITCHED OFF is not trapped: step two switches it on, since the switch
  * may be left from an older office at the same address.
  *
  * THE GAP IS EACH PLACE OF THE STEP LEFT OPEN ALONE: the press, and the panel it opens. The grey is the rectangles of
@@ -48,9 +48,12 @@ function theChatRow(): string {
   return `[${name}="${value}"]`
 }
 
-/** What each step leaves open, each place alone: the press first, which the mark is on, then the panel it opens. */
+/**
+ * What each step leaves open, each place alone: the press first, which the mark is on, then the panel it opens. The chat
+ * opens the way the person last had it, beside the page or in its corner window, so both are left open.
+ */
 const THE_GAP: Record<Step, readonly string[]> = {
-  chat: [theChatRow(), '.shell-chat-phone', '.px-chat[data-where="split"]'],
+  chat: [theChatRow(), '.shell-chat-phone', '.px-chat[data-where="split"]', '.px-chat[data-where="corner"]'],
   checklist: ['.ckw-press', '.ckw-panel'],
 }
 
@@ -186,7 +189,7 @@ export function FirstEntry() {
       {entry?.shows === true && entry.report !== null && !ended ? <TheLayer report={entry.report} onOpened={end} /> : null}
       {failed === null ? null : (
         <div className="fe-failed" role="alert">
-          <span>{t('firstEntry.failed', { why: failed })}</span>
+          <span>{t('firstEntry.notWritten', { why: failed })}</span>
           <button type="button" className="fe-failed-close" onClick={() => setFailed(null)}>
             {t('firstEntry.close')}
           </button>
@@ -198,7 +201,6 @@ export function FirstEntry() {
 
 function TheLayer({ report, onOpened }: { report: string; onOpened: () => void }) {
   const [step, setStep] = useState<Step>('chat')
-  const [switchedOn, setSwitchedOn] = useState(false)
   const [layout, setLayout] = useState<Layout | null>(null)
   const words = useRef<HTMLDivElement>(null)
   const next = useRef<HTMLButtonElement>(null)
@@ -273,8 +275,8 @@ function TheLayer({ report, onOpened }: { report: string; onOpened: () => void }
   }, [step, layout?.gap === null])
 
   const toTheChecklist = (): void => {
-    // THE CHECKLIST SWITCHED OFF IN THIS BROWSER IS SWITCHED ON, and the words say so.
-    if (!checklistsWindowIsOn() && switchTheChecklistsWindow(true)) setSwitchedOn(true)
+    // THE CHECKLIST SWITCHED OFF IN THIS BROWSER IS SWITCHED ON.
+    if (!checklistsWindowIsOn()) switchTheChecklistsWindow(true)
     setStep('checklist')
   }
 
@@ -306,7 +308,6 @@ function TheLayer({ report, onOpened }: { report: string; onOpened: () => void }
         style={layout === null ? { visibility: 'hidden' } : { left: layout.words.left, top: layout.words.top }}
       >
         <h2 className="fe-words-title">{step === 'chat' ? t('firstEntry.chat.title') : t('firstEntry.checklist.title')}</h2>
-        {step === 'checklist' && switchedOn ? <p className="fe-words-note">{t('firstEntry.checklist.switchedOn')}</p> : null}
         <p className="fe-words-text">{step === 'chat' ? t('firstEntry.chat.text') : t('firstEntry.checklist.text')}</p>
         {step === 'chat' ? (
           <button ref={next} type="button" className="fe-next" onClick={toTheChecklist}>
@@ -344,8 +345,7 @@ const FIRST_ENTRY_CSS = `
   background: var(--panel); color: var(--text); box-shadow: var(--elev-2);
 }
 .fe-words-title { margin: 0 0 4px 0; font-size: var(--fs-3); }
-.fe-words-text, .fe-words-note { margin: 0 0 var(--pad) 0; line-height: var(--lh-body); }
-.fe-words-note { color: var(--text-2); }
+.fe-words-text { margin: 0 0 var(--pad) 0; line-height: var(--lh-body); }
 .fe-words-text:last-child { margin-bottom: 0; }
 .fe-next {
   min-height: 2.25rem; padding: 0 var(--gut); border: var(--border-w) solid var(--accent); border-radius: var(--radius-sm);

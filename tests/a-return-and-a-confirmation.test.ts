@@ -423,7 +423,7 @@ describe('every entry says on its face that it came from outside', () => {
     expect(JSON.stringify(elsewhere)).not.toContain('the outside words')
   })
 
-  it('draws an entry with its outside author and the form it came in', () => {
+  it('draws an entry with its outside author and the form it came in, and its file as code', () => {
     const entry: StatedReturn = {
       at: '2026-09-16 11:02:00',
       broughtBackBy: { actorType: 'human', actorId: THE_PERSON },
@@ -433,7 +433,10 @@ describe('every entry says on its face that it came from outside', () => {
       file: 'data/packages/returns/wrist-camera-module.zip',
       saysItIsFromOutside: true,
     }
-    const html = renderToStaticMarkup(h(panel.ReturnsList, { returns: [entry] }))
+    const markup = renderToStaticMarkup(h(panel.ReturnsList, { returns: [entry] }))
+    // THE FILE IS A PATH, so it is drawn in a code element, the office's code style, and not as words.
+    expect(markup).toMatch(/<code[^>]*>data\/packages\/returns\/wrist-camera-module\.zip<\/code>/)
+    const html = markup
       .replace(/<style[\s\S]*?<\/style>/g, '')
       .replace(/<[^>]+>/g, ' ')
       .replace(/\s+/g, ' ')

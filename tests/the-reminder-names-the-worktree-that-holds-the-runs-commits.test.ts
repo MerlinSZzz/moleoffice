@@ -25,10 +25,14 @@
  *   3. Two worktrees hold commits written since the start and the write names no tip: both are named, and the reminder
  *      says the office cannot tell which holds this run's work.
  *   4. A write that names the new worktree and the tip together is judged on that worktree: no other worktree is named,
- *      and the new worktree's own test file is.
+ *      and a line the new worktree's commit adds under tests/ is.
  *   5. A record that names the worktree holding its commits gets no such item, though a worker's worktree holds
  *      commits written since the start too.
  *   6. When the office could not look at the other worktrees, the reminder says so among what it did not check.
+ *
+ * Since mutation proofs stopped being proof (chapter 5, 18 November 2026), no item names a test file the run added. So
+ * cases 4 and 5 commit a line that reads the whole temporary folder, and the reminder's item for that line is the proof
+ * that the worktree was read.
  *
  * Every repository is made here in the system's temporary folder; every key is made up.
  *
@@ -90,6 +94,9 @@ const asTheRun = (session: string, key: string): Record<string, string> => ({
   'x-mole-office-session': session,
   'x-mole-office-key': key,
 })
+
+/** A line that reads the whole temporary folder, put together so that no line of this file is one. */
+const A_WHOLE_FOLDER_SCAN = `const left = ${['readdir', 'Sync(tmpdir())'].join('')}\n`
 
 const git = (dir: string, ...args: string[]): string => execFileSync('git', ['-C', dir, ...args], { encoding: 'utf8' }).trim()
 
@@ -289,12 +296,13 @@ describe('no other worktree is named when the record names the one with the comm
     const { old, others } = aSandbox(start, [{ name: 'named-in-the-write', commits: 1 }])
     const fresh = others['named-in-the-write']!
     const run = await aRunIn(old.path, start, 'Synthetic run that names its worktree in the sealing write')
-    const first = await write(run, { state: 'finished', tip: fresh.head, workingDirectory: fresh.path })
+    const tip = commitAt(fresh.path, start + 20 * MINUTE, 'tests/made-up-scan.test.ts', A_WHOLE_FOLDER_SCAN, 'Synthetic scan in named-in-the-write')
+    const first = await write(run, { state: 'finished', tip, workingDirectory: fresh.path })
     if (first.reminder === null) throw new Error(`the first sealing write was not reminded: ${first.body.slice(0, 800)}`)
     expect(theItemsNaming(first.reminder, old.path)).toEqual([])
     expect(theItemsNaming(first.reminder, fresh.path)).toEqual([])
-    // THE NEW WORKTREE'S OWN TEST FILE IS JUDGED, which only a reading of that worktree finds.
-    expect(first.reminder.items.map((one) => one.says).join('\n')).toContain('work/named-in-the-write-0.test.ts')
+    // A LINE THE NEW WORKTREE'S COMMIT ADDS UNDER tests/ IS JUDGED, which only a reading of that worktree finds.
+    expect(first.reminder.items.filter((one) => one.key.startsWith('machine-wide:tests/made-up-scan.test.ts:'))).toHaveLength(1)
   })
 
   it('5: a record naming the worktree that holds its commits gets no item, though a worker\'s worktree has commits since the start', async () => {
@@ -302,12 +310,13 @@ describe('no other worktree is named when the record names the one with the comm
     const { others } = aSandbox(start, [{ name: 'its-round', commits: 1 }, { name: 'its-worker', commits: 1 }])
     const round = others['its-round']!
     const run = await aRunIn(round.path, start, 'Synthetic run whose record names its worktree')
-    const first = await write(run, { state: 'finished', tip: round.head })
+    const tip = commitAt(round.path, start + 20 * MINUTE, 'tests/made-up-scan.test.ts', A_WHOLE_FOLDER_SCAN, 'Synthetic scan in its-round')
+    const first = await write(run, { state: 'finished', tip })
     if (first.reminder === null) throw new Error(`the first sealing write was not reminded: ${first.body.slice(0, 800)}`)
     expect(theItemsNaming(first.reminder, others['its-worker']!.path)).toEqual([])
     expect(theItemsNaming(first.reminder, round.path)).toEqual([])
     // THE RUN'S OWN COMMIT IS JUDGED, so the record's worktree was read.
-    expect(first.reminder.items.map((one) => one.says).join('\n')).toContain('work/its-round-0.test.ts')
+    expect(first.reminder.items.filter((one) => one.key.startsWith('machine-wide:tests/made-up-scan.test.ts:'))).toHaveLength(1)
   })
 })
 

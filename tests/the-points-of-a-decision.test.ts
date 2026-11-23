@@ -31,7 +31,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 
 import type { PanelRecord } from '../src/shared/types.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
-import { apiApp, freshDb, type TestDb } from './helpers.ts'
+import { apiApp, freshDb, type TestDb, governsTheWholeProject } from './helpers.ts'
 
 let WORKSPACE = 'panelx'
 let caseNumber = 0
@@ -76,7 +76,7 @@ async function file(
   data: Record<string, unknown> = {},
   headers: Record<string, string> = human(),
 ): Promise<string> {
-  const withReplaces = kind === 'decision' && !Object.hasOwn(data, 'replaces') ? { replaces: [], ...data } : data
+  const withReplaces = kind === 'decision' ? { ...governsTheWholeProject(), replaces: [], ...data } : data
   const res = await app.inject({ method: 'POST', url: '/api/records', headers, payload: { kind, title, data: withReplaces } })
   expect(res.statusCode, res.body).toBe(201)
   return (res.json() as { record: { id: string } }).record.id

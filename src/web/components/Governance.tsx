@@ -66,7 +66,7 @@ import type { ParticipantRef } from '@shared/participants.ts'
 import { RESOLVES_PROPOSAL, type ActorType } from '@shared/types.ts'
 import type { ResolvingDecision } from '../../server/lib/records.ts'
 import { useInspect } from '../lib/mode.ts'
-import { Absence, Btn, ErrorNote, Field, Hint, Panel, Stamp, Tag, TextArea, WordsAroundAStamp, type PanelTone } from './ui.tsx'
+import { Absence, Btn, ErrorNote, Field, Hint, Panel, ServerNote, Stamp, Tag, TextArea, WordsAroundAStamp, type PanelTone } from './ui.tsx'
 import { useProjectAsync } from '../lib/project-async.ts'
 import { useWriteThisRecord } from './AnotherWriter.tsx'
 // WHAT A CARD IS, said on the card. See the header of src/shared/targets.ts.
@@ -338,11 +338,6 @@ function PinTheFork({
         variant={pinned ? 'secondary' : 'ghost'}
         pending={busy}
         onClick={() => void setPin(!pinned)}
-        title={
-          pinned
-            ? t('decisions.unpinReason')
-            : t('decisions.pinReason')
-        }
       >
         {pinned ? t('decisions.unpin') : t('decisions.pin')}
       </Btn>
@@ -794,7 +789,7 @@ function DecideHere({
         if (event.currentTarget.open) setBuilt(true)
       }}
     >
-      <summary className="dq-decide-sum" title={t('decisions.decideHint')}>
+      <summary className="dq-decide-sum">
         <span className="dq-decide-word">{t('decisions.decide')}</span>
       </summary>
       {built ? <DecideBody row={row} here={here} onSettled={onSettled} inspect={inspect} /> : null}
@@ -921,7 +916,7 @@ export function DecideBody({
           the row above, so a reader who disagrees with the order can see what to argue with.
           UNDER THE FORM AND NOT OVER IT: the question is what a person opened this to read, so
           nothing that merely explains the running order may stand above it. */}
-      {inspect ? <p className="dq-why">{row.priority.because}</p> : null}
+      <ServerNote text={row.priority.because} />
 
       {inspect ? (
         <p className="dq-raw">
@@ -1629,7 +1624,6 @@ function Decide({
             {replacesCandidates !== undefined && replacesCandidates.length > 0 ? (
               <fieldset className="px-gov-replaces">
                 <legend>{t('decisions.replaces.heading')}</legend>
-                <p>{t('decisions.replaces.why')}</p>
                 {replacesCandidates.map((candidate) => (
                   <label key={candidate.id}>
                     <input type="checkbox" checked={replaced.includes(candidate.id)} onChange={(event) => {
@@ -2020,9 +2014,9 @@ function SettledPanel({
       {settledBy === undefined ? (
         // A decision not loaded by the caller differs from a settled proposal with no known
         // deciding record. Both are gaps in the reading, beyond ordinary emptiness.
-        <p className="px-gov-settled">{t('decisions.decisionNotLoaded')}</p>
+        <p className="px-gov-settled"><Absence word={t('governance.notRead')} /></p>
       ) : settledBy.length === 0 ? (
-        <p className="px-gov-settled px-gov-none">{t('decisions.settlerUnknown')}</p>
+        <p className="px-gov-settled px-gov-none"><Absence word={t('word.notRecorded')} /></p>
       ) : (
         <ul className="px-gov-settled-list">
           {settledBy.map((d) => (
@@ -2721,7 +2715,6 @@ button.px-gov-opt-inner:disabled { cursor: default; opacity: .55; }
 .px-gov-since-words { font-size: var(--fs-2); line-height: var(--lh-body); color: var(--text); overflow-wrap: anywhere; min-width: 0; flex: 1 1 16rem; }
 .px-gov-m83 { display: flex; flex-wrap: wrap; align-items: center; gap: var(--pad) var(--gut); margin-top: var(--gut); min-width: 0; }
 .px-gov-m83-form { display: flex; flex-direction: column; gap: var(--pad); min-width: 0; flex: 1 1 20rem; }
-.px-gov-m83-says { margin: 0; font-size: var(--fs-2); line-height: var(--lh-body); color: var(--text-2); overflow-wrap: anywhere; }
 .px-gov-m83-none { margin: 0; }
 /* THE TWO HALVES OF A DECISION, criterion P76. Named in plain words, with who may change each and
    which fields belong to it. The values themselves stay where they were; the history below says who
@@ -2729,14 +2722,12 @@ button.px-gov-opt-inner:disabled { cursor: default; opacity: .55; }
 .px-gov-halves { display: flex; flex-direction: column; gap: var(--pad); min-width: 0; }
 .px-gov-half { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .px-gov-half-name { margin: 0; font-size: var(--fs-2); font-weight: 600; color: var(--text); }
-.px-gov-half-who { margin: 0; font-size: var(--fs-1); line-height: var(--lh-body); color: var(--text-3); }
 .px-gov-half-fields { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px var(--gut); min-width: 0; }
 /* FILLED AND GREY NAMES DIFFER AT A GLANCE IN BOTH THEMES (a review of round 34, point 3): a filled name is bold
    in the text colour, and a grey name is plain and a step lighter than --text-3, which the help sentences use. The
    lighter grey is --text-3 mixed with the panel, 85 to 15, and still reads at 4.5:1 or more in both themes. */
 .px-gov-half-field { font-size: var(--fs-1); font-weight: 700; color: var(--text); }
 .px-gov-half-missing { font-weight: 400; color: color-mix(in srgb, var(--text-3) 85%, var(--panel)); }
-.px-gov-halves-key { margin: 6px 0 0; color: var(--text-2); font-size: var(--fs-1); }
 `
 
 // ============================================================================ a decision they can change
@@ -2939,7 +2930,6 @@ export function DecisionGovernance({
             </p>
           ) : choosing ? (
             <div className="px-gov-m83-form">
-              <p className="px-gov-m83-says">{M83_WORDS.chooseSays}</p>
               <Options
                 cards={cards}
                 picked={null}
@@ -2989,7 +2979,6 @@ export const M83_WORDS = {
   get saving() { return t('decisions.saving') },
   get leaveIt() { return t('decisions.leave') },
   get chooseAgain() { return t('decisions.chooseAgain') },
-  get chooseSays() { return t('decisions.chooseSays') },
   get chooseFirst() { return t('decisions.chooseAgainFirst') },
   get ownAnswer() { return t('decisions.ownAnswer') },
   get writeOwn() { return t('decisions.writeOwn') },
@@ -3064,9 +3053,6 @@ export function DecisionHalves({ data, summary }: { data: Record<string, unknown
   // pictures). Any agent may change it (theDecisionItselfWouldChange in src/server/lib/records.ts does not read it), so
   // it is a note. A caller that passes no summary is not drawing the record's page, and this box then lists no summary.
   const summaryHere = summary === undefined ? null : { filled: summary !== null && summary.trim() !== '' }
-  const anyGrey =
-    summaryHere?.filled === false ||
-    halves.some(({ half }) => decisionFieldsIn(half).some((field: FieldSpec) => !filledIn(field.key)))
   return (
     <Panel titleIs="label" declares={{ surface: 'decision.halves' }} title={P76_WORDS.title} rank={0}>
       <style href="mole-office-governance" precedence="default">
@@ -3075,8 +3061,7 @@ export function DecisionHalves({ data, summary }: { data: Record<string, unknown
       <div className="px-gov-halves">
         {halves.map(({ half, heading, who }) => (
           <div key={half} className={`px-gov-half px-gov-half-${half}`}>
-            <p className="px-gov-half-name">{heading}</p>
-            <p className="px-gov-half-who">{who}</p>
+            <div className="px-gov-half-name">{heading} <Hint>{who}</Hint></div>
             <ul className="px-gov-half-fields">
               {half === 'notes' && summaryHere !== null ? (
                 <li className={summaryHere.filled ? 'px-gov-half-field' : 'px-gov-half-field px-gov-half-missing'}>
@@ -3100,9 +3085,6 @@ export function DecisionHalves({ data, summary }: { data: Record<string, unknown
           </div>
         ))}
       </div>
-      {/* WHY SOME NAMES ARE GREY, said where they are (wave 13r's review of round 32): a grey name is a field this
-          decision has not filled in. Drawn only when a name is grey. */}
-      {anyGrey ? <p className="px-gov-halves-key">{t('decisions.halvesGreyKey')}</p> : null}
     </Panel>
   )
 }

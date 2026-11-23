@@ -10,7 +10,7 @@
 import { and, eq, isNull } from 'drizzle-orm'
 import { db } from './client.ts'
 import { records } from './schema.ts'
-import type { TheWordsRecord } from '../lib/card-words.ts'
+import type { TheWordsRecord } from './types/card-words.ts'
 
 /**
  * EVERY LIVE WORDS RECORD, by the card's name, and all of them where one card has two. It never

@@ -171,7 +171,6 @@ afterAll(async () => {
 async function open(address: string): Promise<string> {
   await page.goto(`http://127.0.0.1:${webPort}/#${address}`, { timeout: 60_000 })
   await waitForThePage(page, 60_000)
-  await sleep(900)
   return (await page.evaluate(() => document.body.innerText)).replace(/\s+/g, ' ')
 }
 
@@ -210,7 +209,10 @@ describe("a comment's own page says what the comment is about", () => {
 
   it('takes somebody to the source and lights the exact words there', async () => {
     await page.getByRole('button', { name: 'Go to it' }).click()
-    await sleep(2000)
+    await expect.poll(() => page.evaluate(() => window.location.hash), { timeout: 10_000 }).toContain(reportId)
+    await expect
+      .poll(() => page.evaluate(() => (CSS as unknown as { highlights?: Map<string, unknown> }).highlights?.has('mole-office-showing') ?? false), { timeout: 10_000 })
+      .toBe(true)
 
     const hash = await page.evaluate(() => window.location.hash)
     expect(hash, 'the press did not go to the record the comment is about').toContain(reportId)
@@ -263,7 +265,7 @@ describe('editing a comment from its own page changes what was written, not a sh
 
     await box.fill(REWRITTEN)
     await page.getByRole('button', { name: 'Save these words' }).click()
-    await sleep(1500)
+    await expect.poll(async () => (await stored(queuedId)).data['body'], { timeout: 10_000 }).toBe(REWRITTEN)
 
     const after = await stored(queuedId)
     expect(after.data['body'], 'the words were not written').toBe(REWRITTEN)

@@ -70,6 +70,7 @@ async function refuses(name: string, box: Locator, save: Locator): Promise<void>
 }
 
 const releases = () => app.page.locator('[data-target="uiSurface/profile.releases"]')
+const releaseSwitch = () => releases().getByRole('switch')
 const releaseBox = () => releases().locator('form textarea')
 const releaseSave = () => releases().getByRole('button', { name: 'Save', exact: true })
 const areaBox = () => app.page.getByLabel('Why the area changed')
@@ -97,7 +98,7 @@ afterAll(async () => {
 
 it('1. each reason box carries the mark, refuses an empty reason with the browser\'s words, and sends a written one', async () => {
   await open('/who/agent/kiln-planner', 'light')
-  await app.page.getByRole('button', { name: 'Do not wake it for a release', exact: true }).click()
+  await releaseSwitch().click()
   await refuses('profile-release-why', releaseBox(), releaseSave())
 
   await open('/who/agent/kiln-planner', 'light')
@@ -105,10 +106,10 @@ it('1. each reason box carries the mark, refuses an empty reason with the browse
   await refuses('profile-work-area-why', areaBox(), areaSave())
 
   await open('/who/agent/kiln-planner', 'light')
-  await app.page.getByRole('button', { name: 'Do not wake it for a release', exact: true }).click()
+  await releaseSwitch().click()
   await releaseBox().fill('Test: the kiln planner reads its own releases.')
   await releaseSave().click()
-  await app.page.getByRole('button', { name: 'Wake it for a release', exact: true }).waitFor({ timeout: 30_000 })
+  await releases().locator('[role="switch"][aria-checked="false"]').waitFor({ timeout: 30_000 })
   await app.page.getByRole('button', { name: 'Change work area', exact: true }).click()
   await areaBox().fill('Test: the kiln moved to the back room.')
   await areaSave().click()

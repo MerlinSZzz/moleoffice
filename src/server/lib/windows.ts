@@ -48,8 +48,9 @@ import { ALLOCATABLE_KINDS, resolveAllocated, type AllocatedWork } from './plann
 import { type Actor } from './records.ts'
 import { PanelError } from './panel-error.ts'
 import { toWindow } from '../db/get-window.ts'
+import type { WindowRow } from '../db/types/windows.ts'
 
-export type WindowRow = typeof workWindows.$inferSelect
+export type { WindowRow } from '../db/types/windows.ts'
 
 /** A window with the work it names, or `null` where that record is gone. Assembled, never stored. */
 export interface WindowWithWork {

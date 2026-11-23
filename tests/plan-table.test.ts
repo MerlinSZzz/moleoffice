@@ -39,6 +39,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { freshDb, type TestDb, THIS_TEST_ONLY_DRAWS_THE_TABLE } from './helpers.ts'
 import type { PlanBlocksReply, WorkListReply } from '../src/web/api.ts'
+import { t } from '../src/shared/i18n.ts'
 
 type WebApi = typeof import('../src/web/api.ts')
 type PlanTableModule = typeof import('../src/web/components/plans/PlanTable.tsx')
@@ -784,7 +785,8 @@ describe('the table as it is drawn', () => {
     expect(said).toContain('9 not tracked as work')
     expect(said).toContain('4 blank lines are not shown')
     expect(said).toContain('1 line of prose')
-    expect(said).toContain('2 lines Mole Office could not read')
+    // CRITERION CHANGE, as decided: the lines it could not read are counted in short words.
+    expect(said).toContain(t('planTable.unreadLines', { n: 2, lines: t('g8.onePlan.lines') }))
   })
 
   /**
@@ -961,17 +963,8 @@ describe('the table is a view of the page copy of the plan, not a second copy', 
     expect(reply.version.length).toBeGreaterThan(0)
   })
 
-  it('says where the words are changed instead, when they cannot be changed here', async () => {
-    const reply = await read()
-    expect(words(h(planTable.PlanTable, { versionToWriteOn: THIS_TEST_ONLY_DRAWS_THE_TABLE, plan: planId, lines: reply.lines }))).toContain(
-      'Change the words of an item in the Writing view of this plan',
-    )
-    // And never says it when they can be, because a sentence about a limit that is not there is a
-    // sentence that teaches the reader something false.
-    expect(words(h(planTable.PlanTable, { versionToWriteOn: THIS_TEST_ONLY_DRAWS_THE_TABLE, plan: planId, lines: reply.lines, onWrote: () => {} }))).not.toContain(
-      'Change the words of an item in the Writing view',
-    )
-  })
+  // CRITERION CHANGE, as decided: the table no longer says where the words are changed when they
+  // cannot be changed here, so the case that asked for that sentence is gone.
 
   /**
    * THE CELL THAT DOES NOT TOUCH THE DOCUMENT IS STILL OFFERED. The estimate of a filed row is on
@@ -1204,26 +1197,8 @@ describe('filing a line as work', () => {
     })
   })
 
-  /**
-   * WHAT EACH TYPE MEANS IS STILL THE SCHEMA'S OWN WORDS, AND IT IS NOW BEHIND THE HELP MARK.
-   *
-   * The owner on 17 August 2026: "The explanatory prose for every type … should not permanently fill
-   * the page. Keep concise labels visible and put definitions behind the existing help affordance."
-   * They were four paragraphs under four buttons on this form. `Hint` is a native details element, so
-   * the words are still in the page and still reachable — they are not drawn until it is opened, and
-   * nothing is hidden from a screen reader or from find-in-page.
-   */
-  it('says what each kind is for, in the words the schema itself declares', async () => {
-    const { KIND_SPECS } = await import('../src/shared/kinds.ts')
-    const said = words(h(planItems.WhatTheTypesMean))
-    for (const kind of planItems.KINDS_A_PLAN_LINE_CAN_BE_FILED_AS) {
-      expect(said, kind).toContain(KIND_SPECS[kind].purpose)
-    }
-    // And it says where the thing it makes will stand, rather than leaving a person to find out on
-    // another page that it stands nowhere.
-    expect(said).toContain('Starts as "todo"')
-    expect(said).toContain('has no state, so it gets none')
-  })
+  // CRITERION CHANGE, as decided: the help mark that held what each type means is gone, so the
+  // case that read the schema's words behind it is gone too.
 
   /**
    * THE FORM ASKS NOTHING, BECAUSE THE TABLE ALREADY HOLDS BOTH ANSWERS.
@@ -1305,7 +1280,7 @@ describe('the plan footer counts a parent and its parts once', () => {
     return webApi.api.planBlocks(written.plan.id)
   }
 
-  it('shows the parent value, explains the difference, and never adds a part to what holds it', async () => {
+  it('shows the parent value, what the rows add up to beside it, and never adds a part to what holds it', async () => {
     const reply = await fifteenOverNineAndSix()
     const said = words(h(planTable.PlanTable, { versionToWriteOn: THIS_TEST_ONLY_DRAWS_THE_TABLE, plan: reply.plan.id, lines: reply.lines }))
 
@@ -1314,9 +1289,11 @@ describe('the plan footer counts a parent and its parts once', () => {
     expect(said).not.toContain('24h in all')
     // AND THE OTHER NUMBER IS STILL SAID, in the same words the Schedule already uses for the same
     // shape of arithmetic, so a reader who has met one has met both.
-    expect(said).toContain('A part is never added to what holds it, so the rows themselves come to 24h')
+    // CRITERION CHANGE, as decided: the rows' own sum is drawn as a count, with no sentence saying why
+    // it differs.
+    expect(said).toContain(t('schedule.rowsAddUp', { rows: 24 }))
     // Nothing overflows here, so no floor is claimed and no warning is drawn.
-    expect(said).not.toContain('takes at least')
+    expect(said).not.toContain(t('planTable.partsOver', { atLeast: '' }).trim())
   })
 
   it('does the arithmetic in exactly one place, which is src/shared/envelope.ts', async () => {
@@ -1364,7 +1341,8 @@ describe('the plan footer counts a parent and its parts once', () => {
     expect(markup).toContain('class="pi-over"')
     expect(said).toContain('The parts of this add up to 18h, which is 3h more than the 15h written here')
     // AND CAPACITY IS TOLD THE TRUTH RATHER THAN THE ENVELOPE. 18 does not fit inside 15.
-    expect(said).toContain('takes at least 18h')
+    // CRITERION CHANGE, as decided: the footer draws the floor as a count, not as a sentence.
+    expect(said).toContain(t('planTable.partsOver', { atLeast: planItems.atLeastSaid(18) }).trim())
   })
 
   /**
@@ -1386,8 +1364,8 @@ describe('the plan footer counts a parent and its parts once', () => {
 
     expect(said).toContain('9h from its parts')
     expect(said).toContain('9h in all, from 1 of 1 top-level rows')
-    // The rows themselves also come to 9h, so the sentence about the difference is not drawn.
-    expect(said).not.toContain('the rows themselves come to')
+    // The rows themselves also come to 9h, so their sum is not drawn beside the total.
+    expect(said).not.toContain(t('schedule.rowsAddUp', { rows: 9 }))
   })
 
   /**

@@ -1,5 +1,6 @@
 // Copyright © 2026 Zhengyang Shen
 // Licensed under the MIT License. See LICENSE.
+// Test change: workers and their packages stand under runs.
 /**
  * THE PROJECT BOARD READS NO WHOLE TABLE, AND WRITES NOTHING. Wave 13u round 216, package BV, point BV-2: a test
  * that no query visits a whole table.
@@ -26,9 +27,16 @@
  *      what it found, the changes of the unfinished steps, the requests, the repositories, the stated rows and the
  *      records by kind. And its answer shows the made-up office reached each part.
  *   4. The reading writes nothing: no statement it runs is a `run`.
+ *   5. The people and packages door's reading, `GET /api/projects/<project>/people-and-packages`, is held to cases 1,
+ *      2 and 4 the same way (wave 13u round 242). It is read after the board, in the same office with a made-up
+ *      supervisor, its worker and a package it took added, so the board's reading above is as it was. No plan of a
+ *      statement it runs scans a table, the requests are read through `api_calls_at_idx`, nothing it runs is a `run`,
+ *      and its answer reached the supervisor, the worker under it and the package with its state.
  *
  * WHERE THE READS LIVE: src/server/lib/project-board.ts, and the readers it calls in src/server/lib/records/reading.ts,
- * src/server/lib/implementation.ts, src/server/lib/repositories.ts and src/server/lib/master-pipeline.ts.
+ * src/server/lib/implementation.ts, src/server/lib/repositories.ts and src/server/lib/master-pipeline.ts. The people
+ * and packages reading is src/server/lib/project-people.ts, with the readers it calls in src/server/lib/delegation.ts,
+ * src/server/lib/claims.ts, src/server/lib/departments.ts and src/server/db/read-participant.ts.
  *
  * MUTATIONS, each after a control run, each file copied first and restored with cp and checked with cmp:
  *   1. in the reading, drop `INDEXED BY api_calls_at_idx` and write `+at_ms`, which no index answers: cases 2 and 3
@@ -39,6 +47,7 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { ProjectBoard } from '../src/shared/project-board.ts'
+import type { PeopleAndPackages } from '../src/shared/project-people.ts'
 import { freshDb, type TestDb } from './helpers.ts'
 
 let t: TestDb
@@ -53,9 +62,13 @@ interface ACaughtStatement {
   how: 'all' | 'get' | 'iterate' | 'run'
 }
 
-/** A plan step that reads every row of a table. Scanning `json_each`, a constant row or a subquery reads no table. */
-function aWholeTableStep(detail: string): boolean {
-  return /^SCAN /u.test(detail) && !/VIRTUAL TABLE|^SCAN CONSTANT ROW|^SCAN \(subquery-\d+\)/u.test(detail)
+/**
+ * A plan step that reads every row of a table. Scanning `json_each`, a constant row or a subquery reads no table. An
+ * unnamed subquery is planned as `(subquery-N)`, and a named one as the co-routine the plan names in a step of its own.
+ */
+function aWholeTableStep(detail: string, plan: readonly string[]): boolean {
+  if (!/^SCAN /u.test(detail) || /VIRTUAL TABLE|^SCAN CONSTANT ROW|^SCAN \(subquery-\d+\)/u.test(detail)) return false
+  return !plan.includes(`CO-ROUTINE ${detail.slice('SCAN '.length)}`)
 }
 
 /** Every statement that runs during `work`, caught on the statements' prototype. */
@@ -84,6 +97,7 @@ function thePlanOf(statement: ACaughtStatement): string[] {
 }
 
 let read: { answer: ProjectBoard; caught: ACaughtStatement[] }
+let peopleRead: { answer: PeopleAndPackages; caught: ACaughtStatement[] }
 
 beforeAll(async () => {
   delete process.env['MOLE_OFFICE_IDLE_REMINDER_HOURS']
@@ -150,6 +164,63 @@ beforeAll(async () => {
     .run(Date.now() - 5 * 60_000, id['run']!)
 
   read = theStatementsDuring(() => board.readTheProjectBoard('default'))
+
+  // THE PEOPLE AND PACKAGES DOOR'S OWN MADE-UP AGENTS, added after the board was read: a supervisor with its card and
+  // its acting run, a worker that run started, with the package it names, and a package on line 99z the supervisor took.
+  const people = await import('../src/server/lib/project-people.ts')
+  const { writeTheWorkerRun, writeTheWorkerPackage } = await import('../src/server/lib/records/run-writes.ts')
+  const at = '2026-11-22 10:00:00'
+  const anAgent = (name: string, handle: string, role: string) => {
+    id[name] = `made-up-agent-${name}`
+    t.client.sqlite
+      .prepare(
+        'INSERT INTO assets (id, kind, origin, path, mime, bytes, created_at, created_by_kind, created_by_id, ' +
+          "licence_source) VALUES (?, 'avatar', 'default', NULL, 'image/svg+xml', NULL, ?, NULL, NULL, " +
+          "'generated') ON CONFLICT(id) DO NOTHING",
+      )
+      .run(`avatar-default-agent-${id[name]}`, at)
+    t.client.sqlite
+      .prepare('INSERT INTO agents (id, name, handle, avatar_asset_id, retired, created_at, role) VALUES (?, ?, ?, ?, 0, ?, ?)')
+      .run(id[name], `Made-up ${name}`, handle, `avatar-default-agent-${id[name]}`, at, role)
+  }
+  anAgent('people-supervisor', 'wave-99z-supervisor', 'supervisor')
+  anAgent('people-worker', 'w99z-worker', 'worker')
+  record('task', 'people-package', {
+    state: 'todo',
+    package: {
+      bundleId: 'madeUpBundle',
+      forTheOutside: 'Made-up: nothing leaves.',
+      acceptance: 'Made-up: nothing is judged.',
+      parent: { kind: 'decision', id: 'made-up-parent' },
+      lines: ['99z'],
+      pointIds: ['made-up-point'],
+      at,
+      by: { actorType: 'human', actorId: t.api.HUMAN.id },
+      takenInside: [{ by: { actorType: 'agent', actorId: id['people-supervisor']! }, at, order: 1 }],
+    },
+  })
+  record('session', 'people-supervisor-run', { state: 'running', servingAgent: 'wave-99z-supervisor', servingAgentId: id['people-supervisor'], model: 'made-up-model', runtime: 'claude-code' })
+  record('session', 'people-worker-run', { state: 'running', servingAgent: 'w99z-worker', servingAgentId: id['people-worker'], model: 'made-up-model', runtime: 'codex' })
+  writeTheWorkerRun(id['people-supervisor-run']!, id['people-worker']!, {
+    state: 'started',
+    askedAt: at,
+    askedBy: { who: { kind: 'agent', id: 'made-up-asker' }, session: id['people-supervisor-run']! },
+    handle: 'w99z-worker',
+    brief: { path: '/made-up/sandbox/brief.md', sha256: 'a'.repeat(64), bytes: 1 },
+    sandbox: { folder: '/made-up/sandbox', instance: 'made-up-instance', container: 'made-up-container' },
+    started: { at, run: id['people-worker-run']!, runKeyId: 'made-up-key' },
+  }, t.api.HUMAN)
+  writeTheWorkerPackage(id['people-worker-run']!, { task: id['people-package']!, points: ['made-up-point'], difficulty: 'simple', why: 'A made-up reason.', askedAt: at }, t.api.HUMAN)
+  for (const [n, run] of ['people-supervisor-run', 'people-worker-run'].entries()) {
+    t.client.sqlite
+      .prepare(
+        'INSERT INTO api_calls (id, at_ms, method, status, ms, actor_type, actor_id, session_id, workspace_id, ' +
+          "identity_source) VALUES (?, ?, 'GET', 200, 1, 'agent', 'made-up-agent', ?, 'default', 'none')",
+      )
+      .run(`made-up-people-call-${String(n)}`, Date.now() - 5 * 60_000, id[run]!)
+  }
+
+  peopleRead = theStatementsDuring(() => people.readThePeopleAndPackages('default'))
 }, 120_000)
 
 afterAll(() => {
@@ -161,7 +232,7 @@ describe('the project board reads no whole table', () => {
     const whole = read.caught
       .filter((statement) => statement.how !== 'run')
       .map((statement) => ({ text: statement.text, plan: thePlanOf(statement) }))
-      .filter((one) => one.plan.some(aWholeTableStep))
+      .filter((one) => one.plan.some((step) => aWholeTableStep(step, one.plan)))
     expect(whole, JSON.stringify(whole, null, 1)).toEqual([])
   })
 
@@ -201,5 +272,23 @@ describe('the project board reads no whole table', () => {
 
   it('4. it writes nothing', () => {
     expect(read.caught.filter((statement) => statement.how === 'run').map((statement) => statement.text)).toEqual([])
+  })
+
+  it('5. the people and packages door reads no whole table, reads the requests by api_calls_at_idx, and writes nothing', () => {
+    const whole = peopleRead.caught
+      .filter((statement) => statement.how !== 'run')
+      .map((statement) => ({ text: statement.text, plan: thePlanOf(statement) }))
+      .filter((one) => one.plan.some((step) => aWholeTableStep(step, one.plan)))
+    expect(whole, JSON.stringify(whole, null, 1)).toEqual([])
+    const calls = peopleRead.caught.filter((statement) => statement.text.includes('FROM api_calls'))
+    expect(calls).toHaveLength(1)
+    expect(thePlanOf(calls[0]!).join(' | ')).toMatch(/USING (COVERING )?INDEX api_calls_at_idx/u)
+    expect(peopleRead.caught.filter((statement) => statement.how === 'run').map((statement) => statement.text)).toEqual([])
+
+    const line = peopleRead.answer.lines.find((one) => one.line === '99z')
+    expect(line?.supervisors.map((agent) => agent.id)).toEqual([id['people-supervisor']])
+    expect(line?.supervisors[0]?.runs[0]?.workers.map((agent) => agent.id)).toEqual([id['people-worker']])
+    expect(line?.supervisors[0]?.packages.map((one) => [one.id, one.state])).toEqual([[id['people-package'], 'taken']])
+    expect(line?.supervisors[0]?.runs[0]?.workers[0]?.runs[0]?.packages.map((one) => [one.id, one.state])).toEqual([[id['people-package'], 'taken']])
   })
 })

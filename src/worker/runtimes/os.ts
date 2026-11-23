@@ -33,6 +33,15 @@
  * the Mac it is that `detached: true`. On Windows, which has no process groups, the child is a
  * starter that makes a Job Object named after its own pid and starts the program in it, so the same
  * group id finds it there too.
+ *
+ * ---------------------------------------------------------------------------------------
+ * A PROGRAM IS LOOKED UP IN THE WHOLE ENVIRONMENT IT WILL RUN WITH
+ * ---------------------------------------------------------------------------------------
+ *
+ * `whereItIs`, `theProgramThatRan` and `theGatedProgramThatRan` are handed the environment, not a
+ * search path read out of it. The search path is read by `theSearchPathIn` of the system in
+ * src/config/systems/the-system.mjs. On Windows that is the one name that is PATH in any case, so a
+ * worker whose environment holds it as `Path` finds its tool. On Linux and the Mac it is `PATH` alone.
  */
 
 import { AsyncLocalStorage } from 'node:async_hooks'
@@ -45,8 +54,10 @@ import { dirname, join } from 'node:path'
 import { type ClockStamp, clockStamp, localStamp, parseAnyStamp, parseStoredStamp } from '@shared/time.ts'
 
 import { theVersionItPrinted, theWayToStart, VERSION_MUST_ANSWER_WITHIN_MS, whereIsThisTool } from '../../config/runtimes.mjs'
+import { aCommandsProgram } from '../../config/run-permissions.mjs'
 import { startTimeOf } from '../../config/session-process.mjs'
 import { theSystemFor, thisSystem } from '../../config/systems/the-system.mjs'
+import { theEnvironmentACodexGets } from '../../config/the-environment-a-codex-gets.mjs'
 import { startedByThatStarter } from '../../config/systems/windows-groups.mjs'
 
 /**
@@ -130,14 +141,14 @@ export async function abortStartupGates(witness: StartupWitness): Promise<void> 
 }
 
 /** The registered group contains the timeout and the probe until the probe has ended. */
-export async function theGatedProgramThatRan(command: string, path: string | undefined, witness: StartupWitness, recorded: (group: number) => Promise<void>): Promise<TheProgramThatRan> {
-  const question = `${command}\u0000${path ?? ''}`
+export async function theGatedProgramThatRan(command: string, env: Readonly<Record<string, string | undefined>>, witness: StartupWitness, recorded: (group: number) => Promise<void>): Promise<TheProgramThatRan> {
+  const question = `${command}\u0000${thisSystem().theSearchPathIn(env) ?? ''}`
   const remembered = alreadyRead.get(question)
   if (remembered !== undefined) return remembered
-  const found = whereItIs(command, path)
+  const found = whereItIs(command, env)
   if (found === null) return theVersionItPrinted(null, null)
   const child = spawn('/bin/sh', ['-c', gateCommand, 'gate', '/usr/bin/timeout', '-k', '1s', `${VERSION_MUST_ANSWER_WITHIN_MS / 1000}s`, found, '--version'], {
-    detached: true, stdio: ['ignore', 'pipe', 'pipe', 'pipe', witness.fd],
+    detached: true, stdio: ['ignore', 'pipe', 'pipe', 'pipe', witness.fd], env: theProbesEnvironment(command),
   })
   if (child.pid === undefined) throw new Error(sayInEnglish('startupGate.noProbe'))
   let stdout = '', stderr = ''
@@ -443,7 +454,7 @@ export function listenForAStopRequest(onStop: () => void, say: (sentence: string
 /**
  * Where a program is on this machine, or null because it is not installed.
  *
- * It reads `PATH` and looks, rather than running `which`. A missing program is an ordinary answer
+ * It reads the search path of `env` and looks, rather than running `which`. A missing program is an ordinary answer
  * here — the worker holds the message and says which tool is not installed — so asking the question
  * must not itself cost a process.
  *
@@ -451,8 +462,8 @@ export function listenForAStopRequest(onStop: () => void, say: (sentence: string
  * same question about the same machine and may not load a file out of src/worker. One answer, two
  * readers.
  */
-export function whereItIs(command: string, path: string | undefined): string | null {
-  return whereIsThisTool(command, path)
+export function whereItIs(command: string, env: Readonly<Record<string, string | undefined>>): string | null {
+  return whereIsThisTool(command, env)
 }
 
 /**
@@ -517,13 +528,22 @@ const alreadyRead = new Map<string, TheProgramThatRan>()
  *
  * Read once per command and `PATH` for the life of this process. See the block above.
  */
-export function theProgramThatRan(command: string, path: string | undefined): TheProgramThatRan {
-  const question = `${command}\u0000${path ?? ''}`
+export function theProgramThatRan(command: string, env: Readonly<Record<string, string | undefined>>): TheProgramThatRan {
+  const question = `${command}\u0000${thisSystem().theSearchPathIn(env) ?? ''}`
   const remembered = alreadyRead.get(question)
   if (remembered !== undefined) return remembered
-  const answer = readTheVersion(whereItIs(command, path))
+  const answer = readTheVersion(whereItIs(command, env), theProbesEnvironment(command))
   alreadyRead.set(question, answer)
   return answer
+}
+
+/**
+ * The environment a version probe of `command` starts with: this process's own, as for every program, except that a
+ * Codex gets only the names its list keeps (src/config/the-environment-a-codex-gets.mjs). Undefined is this
+ * process's own.
+ */
+function theProbesEnvironment(command: string): Record<string, string> | undefined {
+  return aCommandsProgram([command]).isCodex ? theEnvironmentACodexGets(process.env) : undefined
 }
 
 /**
@@ -531,13 +551,14 @@ export function theProgramThatRan(command: string, path: string | undefined): Th
  * file under src/worker/ that may start a process; what the answer means is `theVersionItPrinted` in
  * src/config/runtimes.mjs, which the API server's reading uses too.
  */
-function readTheVersion(path: string | null): TheProgramThatRan {
+function readTheVersion(path: string | null, env: Record<string, string> | undefined): TheProgramThatRan {
   if (path === null) return theVersionItPrinted(null, null)
   try {
     const way = theWayToStart(path, ['--version'])
     const ran = spawnSync(way.command, way.args, {
       encoding: 'utf8',
       timeout: VERSION_MUST_ANSWER_WITHIN_MS,
+      env,
       // NO SHELL. A version reader that went through a shell would be a second way to run a command
       // line, which is not what this file is allowed to be. The one exception is a .cmd on Windows, which
       // cannot start any other way and is quoted by theWayToStart.

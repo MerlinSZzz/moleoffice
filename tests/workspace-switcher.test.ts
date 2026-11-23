@@ -55,6 +55,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 // rather than against a second copy of the rule.
 import { DEFAULT_WORKSPACE, UNASSIGNED_WORKSPACE, workspaceIdFault } from '../src/shared/workspaces.ts'
 import { freshDb, apiApp, type TestDb } from './helpers.ts'
+import { createI18n } from '../src/shared/i18n.ts'
 import type { BuiltServer } from '../src/server/index.ts'
 import type { AsyncState } from '../src/web/components/ui.tsx'
 
@@ -440,10 +441,16 @@ describe('the switcher in the sidebar', () => {
     expect(html).toContain(`data-project="${UNASSIGNED_WORKSPACE}"`)
   })
 
-  it('keeps making projects out of the sidebar and reachable through Settings', () => {
-    const html = draw(ws.workspaceSight('robotics', null), { status: 'loading' })
-    expect(html).not.toContain('Make a project')
-    expect(html).toContain('href="#/settings"')
+  // Test change (wave 13y round 175): a project is made at the end of the Switch's list now, as decided. The case asked
+  // that the sidebar draw no make press and lead to Settings; it asks that the list end with the New project press.
+  it('ends the Switch list with the New project press, below every project', async () => {
+    ws.setWorkspace('robotics')
+    const reply = await webApi.api.listWorkspaces()
+    const html = draw(ws.workspaceSight('robotics', reply), { status: 'ready', value: reply })
+    const choices = [...html.matchAll(/class="sbp-choice"/g)].map((match) => match.index)
+    expect(choices).toHaveLength(reply.workspaces.length)
+    const press = html.indexOf(`>${createI18n('en').t('sidebarProject.newProject')}<`, html.indexOf('id="sbp-choices"'))
+    expect(press).toBeGreaterThan(Math.max(...choices))
   })
 
   it('keeps renaming out of the sidebar and reachable through Settings', () => {
@@ -528,7 +535,8 @@ describe('the switcher in the sidebar', () => {
     expect(html.toLowerCase(), 'the switcher can delete a project').not.toContain('delete')
     expect(html.toLowerCase()).not.toContain('remove project')
     // AND THE CASE IS OVER SOMETHING. A switcher drawing nothing would pass the two lines above.
-    expect(html).not.toContain('Make a project')
+    // Test change (wave 13y round 175): the switcher offers New project now, as decided, so the case asks for it.
+    expect(html).toContain(createI18n('en').t('sidebarProject.newProject'))
     expect(html).toContain('data-projects="ready"')
   })
 })

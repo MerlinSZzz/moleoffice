@@ -23,7 +23,15 @@ const fixtureTimeZone = theClockZone()
 const require = createRequire(import.meta.url)
 const databaseModule = require.resolve('better-sqlite3')
 const baselineTag = 'stable-2026-10-01-baseline'
-const candidateTag = `stable-${localStamp(new Date()).slice(0, 10)}-fixture`
+/**
+ * THE CANDIDATE TAG OF A FIXTURE MADE NOW: stable-<the local day>-fixture. The upgrade refuses a tag that does not name
+ * the local day when it runs (validateUpgradeConfig in tools/stable/stable-upgrade-transaction.mjs). So each fixture
+ * makes its own tag when it makes its configuration, and a test reads its own fixture's, f.config.candidateTag. A tag
+ * made once, when this module was loaded, named the day before for a case run after midnight.
+ */
+function theCandidateTagForToday() { return `stable-${localStamp(new Date()).slice(0, 10)}-fixture` }
+/** The candidate tag of each fixture's folder, so the afterEach below finds the logs in that fixture's work folder. */
+const theTagOfEachFolder = new Map<string, string>()
 const out = process.env.STABLE_UPGRADE_TEST_OUTPUT ?? tmpdir()
 const groups = new Set<number>()
 const children: ChildProcess[] = []
@@ -58,6 +66,60 @@ const THE_SLOW_START = '.slow-start'
  */
 const THE_STARTUP = '.supervisor-startup'
 type Startup = 'done' | { heldMs: number } | { endsAfterMs: number }
+/**
+ * WHAT THE MADE-UP ELECTRON'S INSTALL.JS LEAVES OUT (see aMadeUpElectronPackage). A target commit with this file in its
+ * root asks the install.js of its made-up electron package to fail in one way. install.js reads the file in the folder
+ * it runs in, which is the candidate's root. 'no path' writes nothing, and 'no binary' writes path.txt only. Both end
+ * with 0, so only the upgrade's own check can see what is missing.
+ */
+const THE_ELECTRON_FAILURE = '.made-up-electron-fails'
+type ElectronFetch = 'fetched' | 'no path' | 'no binary'
+/**
+ * A START THAT NEVER ANSWERS. A test writes a commit into this file in the stable checkout. The made-up office's
+ * ordinary start on that commit listens and then holds every request without an answer, as the office did on
+ * 23 November 2026 while a start-up sweep held its thread. Once it has started its worker, it writes its pids, as
+ * { server, supervisor, worker }, to the database's path with this name added, so a test knows the start's processes
+ * without a search. A stop ends the requests it holds. Any other start, and any start on another commit, answers as
+ * before. The file is git-ignored, so the checkout stays clean.
+ */
+const THE_START_THAT_NEVER_ANSWERS = '.never-answers'
+/**
+ * A SUPERVISOR THAT GIVES UP. While this file is in the stable checkout, the made-up serve-dev does not end when its
+ * server ends. It starts a stand-in that answers every request with 503 and ends when the stand-in ends. That is what the
+ * real serve-dev does after THE_STOPS_BEFORE_GIVING_UP stops in a row (tools/serve-dev.mjs). The stand-in is started as
+ * the real one is: tools/serve-dev-stand-in.mjs of the checkout, with --supervisor-pid and --reason. It is not detached,
+ * so it is in serve-dev's group, as the real one is. Once it listens, it writes its pid to the database's path with this
+ * name added. Unlike the real one, it does not look for serve-dev: it ends with the fixture's owner, so it stays in
+ * serve-dev's group after serve-dev has gone. The file is git-ignored.
+ */
+const THE_SUPERVISOR_THAT_GIVES_UP = '.gives-up'
+/**
+ * A CHILD THE STAND-IN STARTS LATE. When this file appears in the stable checkout, the stand-in of
+ * THE_SUPERVISOR_THAT_GIVES_UP starts one child. The child runs the same tools/serve-dev-stand-in.mjs with the same
+ * arguments, in the same checkout, and is not detached, so it is in serve-dev's group. Of what the way back reads, only
+ * its start time tells it from the stand-in: the file knows which of the two it is by MADE_UP_LATE_CHILD in its
+ * environment, which the way back does not read. It does not listen. It writes its pid to the database's path with this
+ * name added, and ends with the fixture's owner. The file is git-ignored.
+ */
+const THE_STAND_INS_LATE_CHILD = '.a-late-child'
+/**
+ * The made-up tools/serve-dev-stand-in.mjs, for THE_SUPERVISOR_THAT_GIVES_UP: it answers 503 and ends with `owner`. Started
+ * with MADE_UP_LATE_CHILD=yes, it is the late child of THE_STAND_INS_LATE_CHILD instead.
+ */
+const aStandInThatAnswers503 = (owner: number) => `import{spawn}from'node:child_process';import{existsSync,writeFileSync}from'node:fs';import{createServer}from'node:http';${aLineThatEndsWithItsOwner(owner)}if(process.env.MADE_UP_LATE_CHILD==='yes'){writeFileSync(process.env.MOLE_OFFICE_DB+${JSON.stringify(THE_STAND_INS_LATE_CHILD)},String(process.pid));setInterval(()=>{},1000)}else{createServer((q,r)=>{r.statusCode=503;r.end('{}')}).listen({port:Number(process.env.MOLE_OFFICE_PORT),host:'127.0.0.1',reusePort:true},()=>writeFileSync(process.env.MOLE_OFFICE_DB+${JSON.stringify(THE_SUPERVISOR_THAT_GIVES_UP)},String(process.pid)));const late=setInterval(()=>{if(!existsSync(${JSON.stringify(THE_STAND_INS_LATE_CHILD)}))return;clearInterval(late);spawn(process.execPath,process.argv.slice(1),{stdio:'ignore',env:{...process.env,MADE_UP_LATE_CHILD:'yes'}})},20)}`
+/**
+ * A STRANGER UNDER THE START. While this file is in the stable checkout, the made-up office's ordinary start starts one
+ * more process, detached in a group of its own. It is neither the start's worker nor its terminal holder, and it does not
+ * open the database. It writes its pid to the database's path with this name added. It ends with the fixture's owner,
+ * so a test can leave it running and end it after. The file is git-ignored.
+ */
+const THE_STRANGER_UNDER_THE_START = '.a-stranger'
+/** The made-up office's stranger, for THE_STRANGER_UNDER_THE_START: a CommonJS -e that ends with `owner`. */
+const aStranger = (owner: number) => `${aLineThatEndsWithItsOwner(owner)}setInterval(()=>{},1000);require('node:fs').writeFileSync(process.env.MOLE_OFFICE_DB+${JSON.stringify(THE_STRANGER_UNDER_THE_START)},String(process.pid));`
+/** The name the made-up install.js writes into path.txt, and the name of the file it writes in dist. */
+const THE_MADE_UP_ELECTRON_BINARY = 'made-up-electron'
+/** The bytes the made-up install.js writes as the binary. They are made up and are no program: nothing is downloaded. */
+const THE_MADE_UP_ELECTRON_BYTES = 'Made-up bytes in place of the Electron binary. Nothing was downloaded.\n'
 
 /** The product's settings, which copyBootstrapSettings copies into the made-up repositories at this path. */
 const THE_SETTINGS = 'src/config/settings.mjs'
@@ -90,6 +152,26 @@ function run(cwd: string, program: string, args: string[]) {
 }
 function git(cwd: string, ...args: string[]) { return run(cwd, 'git', args) }
 function write(path: string, contents: string) { mkdirSync(resolve(path, '..'), { recursive: true }); writeFileSync(path, contents) }
+/**
+ * THE PORTS A PROGRAM OF THIS MACHINE LISTENS ON, over TCP on any address, IPv4 or IPv6, read once from `ss -H -ltn`.
+ * A bind on 127.0.0.1 succeeds on a port that another address of the machine listens on, and the upgrade then refuses
+ * that port as "still occupied". This reads the same table as listeners() in tools/stable/stable-upgrade-transaction.mjs,
+ * which asks `ss -H -ltnp 'sport = :<port>'` and is not exported, so the two are a copy of one question. When ss cannot
+ * run, or ends with another status than 0, this throws with ss's own words: a port nobody could look at is never free.
+ */
+function thePortsListenedOn(): Set<number> {
+  const asked = spawnSync('ss', ['-H', '-ltn'], { encoding: 'utf8', timeout: 5_000, env: { PATH: process.env.PATH, LANG: 'C' } })
+  if (asked.error) throw new Error(`The fixture could not run ss -H -ltn to read the ports this machine listens on, so it cannot tell a free port: ${asked.error.message}`)
+  if (asked.status !== 0) throw new Error(`The fixture could not read the ports this machine listens on, so it cannot tell a free port: ss -H -ltn ended with ${String(asked.status ?? asked.signal)}: ${asked.stderr.trim()}`)
+  const rows = asked.stdout.split('\n').filter((row) => row.trim() !== '')
+  const ports = new Set<number>()
+  for (const [n, row] of rows.entries()) {
+    const local = /:(\d+)$/.exec(row.trim().split(/\s+/)[3] ?? '')
+    if (local === null) throw new Error(`The fixture could not read the port of row ${String(n + 1)} of the ${String(rows.length)} that ss -H -ltn printed: its fourth column does not end in a port.`)
+    ports.add(Number(local[1]))
+  }
+  return ports
+}
 function portIsFree(chosen: number): Promise<boolean> {
   return new Promise((done) => {
     const probe = createServer()
@@ -101,13 +183,14 @@ function portIsFree(chosen: number): Promise<boolean> {
 const THE_EPHEMERAL_RANGE_STARTS = Number(readFileSync('/proc/sys/net/ipv4/ip_local_port_range', 'utf8').trim().split(/\s+/)[0])
 /**
  * The fixture's band, the lower half of the ports below the ephemeral range, and up to 200 of its ports in a random
- * order, never a port the live-office guard refuses. Linux hands a port of the ephemeral range to every other listen on
+ * order, never a port the live-office guard refuses and never a port a program listens on, on any address
+ * (thePortsListenedOn, read once for each pick). Linux hands a port of the ephemeral range to every other listen on
  * port 0 and every outgoing connection; a port below it is taken only by a program that names it.
  */
 function theBand(exclude: number[]) {
   if (!Number.isInteger(THE_EPHEMERAL_RANGE_STARTS) || THE_EPHEMERAL_RANGE_STARTS <= 2048) throw new Error('The ephemeral range could not be read, so the fixture cannot pick a port below it.')
   const lowest = Math.floor(THE_EPHEMERAL_RANGE_STARTS / 2), highest = THE_EPHEMERAL_RANGE_STARTS - 1
-  const guarded = new Set([...thePortsATestKeepsOff(), ...exclude])
+  const guarded = new Set([...thePortsATestKeepsOff(), ...exclude, ...thePortsListenedOn()])
   const ports = new Set<number>()
   for (let tries = 0; tries < 200; tries++) {
     const chosen = lowest + Math.floor(Math.random() * (highest + 1 - lowest))
@@ -115,7 +198,10 @@ function theBand(exclude: number[]) {
   }
   return { lowest, highest, ports: [...ports] }
 }
-/** A free port of the fixture's band. It is let go at once, so use it only where nothing must bind it later. */
+/**
+ * A free port of the fixture's band: no program listens on it on any address, and a bind on 127.0.0.1 takes it. It is
+ * let go at once, so use it only where nothing must bind it later.
+ */
 async function port(exclude: number[] = []): Promise<number> {
   const band = theBand(exclude)
   for (const chosen of band.ports) if (await portIsFree(chosen)) return chosen
@@ -145,6 +231,7 @@ sys.exit(1)`
  * A port of the fixture's band, held until the test ends. A port picked, checked and let go could be taken by another
  * program before the upgrade bound it, and the upgrade then refused with "Port <port> is still occupied", or checked
  * that program instead of its own new version. Here only a listen with reusePort, as the made-up office's, can take it.
+ * The holder is offered only ports of theBand, so never a port a program listens on, on any address.
  */
 async function heldPort(exclude: number[] = []): Promise<number> {
   const band = theBand(exclude)
@@ -184,6 +271,8 @@ const theReleaseCheck = join(root, 'src/server/lib/checkpointed-database.ts')
  * A checkout that holds the target's migration is unhealthy until the migration has made the `migrated` table.
  * Each start adds a line to `starts`: its mode, database and checkout, so a test can read what each start was given.
  * A checkout with a .slow-start file waits that many milliseconds before it listens (see THE_SLOW_START).
+ * An ordinary start on the commit a .never-answers file names answers nothing (see THE_START_THAT_NEVER_ANSWERS).
+ * An ordinary start beside an .a-stranger file starts one more process (see THE_STRANGER_UNDER_THE_START).
  */
 const serverSource = (owner: number, starts: string) => `
 import http from 'node:http';import {readFileSync,writeFileSync,appendFileSync,existsSync} from 'node:fs';import {execFileSync,spawn} from 'node:child_process';import {createRequire} from 'node:module';import {dirname,join} from 'node:path';
@@ -207,8 +296,11 @@ const schemaReady=!existsSync(${JSON.stringify(THE_TARGETS_MIGRATION)})||Boolean
 const identity={commit,repository,database,port,mode};
 let worker={started:false,pid:null,pgid:null};
 if(mode==='ordinary'&&existsSync('.detach-child')){const child=spawn(join(process.cwd(),'node_modules/.bin/tsx'),['src/worker/index.ts', '--stop-with-pid='+process.pid],{detached:true,stdio:'ignore',env:{...process.env,PATH:dirname(process.execPath)+':'+process.env.PATH}});worker={started:true,pid:child.pid,pgid:child.pid};}
+if(mode==='ordinary'&&existsSync(${JSON.stringify(THE_STRANGER_UNDER_THE_START)}))spawn(process.execPath,['-e',${JSON.stringify(aStranger(owner))}],{detached:true,stdio:'ignore',env:process.env});
+const neverAnswers=mode==='ordinary'&&existsSync(${JSON.stringify(THE_START_THAT_NEVER_ANSWERS)})&&readFileSync(${JSON.stringify(THE_START_THAT_NEVER_ANSWERS)},'utf8').trim()===commit;
+if(neverAnswers)writeFileSync(database+${JSON.stringify(THE_START_THAT_NEVER_ANSWERS)},JSON.stringify({server:process.pid,supervisor:process.ppid,worker:worker.pid}));
 
-const server=http.createServer((req,res)=>{res.setHeader('content-type','application/json');
+const server=http.createServer((req,res)=>{if(neverAnswers)return;res.setHeader('content-type','application/json');
  if(req.url==='/api/health'&&requireCheckpointed){try{requireCheckpointed(database)}catch(error){res.statusCode=503;return res.end(JSON.stringify({ok:false,code:'RELEASE_CHECK_CHANGED',error:error.message}))}}
  if(req.url==='/api/health'){if(!schemaReady)res.statusCode=503;return res.end(JSON.stringify({ok:schemaReady,diagnostic:schemaReady?'schema ready':'target schema missing',...(checking?{identity}:{world:{repository,database,port,head:commit.slice(0,7)}})}))}
  if(req.url==='/api/runtime')return res.end(JSON.stringify(checking?{identity}:{repository:{path:repository,head:{full:commit}},database:{path:database},addresses:{api:'http://127.0.0.1:'+port},process:{pid:process.pid},supervisor:{pid:process.ppid},worker,fixtureDevelopment:process.env.MOLE_OFFICE_DEVELOPMENT_CHECKOUT,fixtureDatabase:process.env.MOLE_OFFICE_DB,fixturePort:process.env.MOLE_OFFICE_PORT,fixtureHome:process.env.HOME,fixtureWorker:process.env.MOLE_OFFICE_MESSAGE_WORKER,fixtureWorkspace:process.env.MOLE_OFFICE_WORKSPACE,fixturePersistedSecret:process.env.FIXTURE_SERVICE_SECRET==='synthetic-only'}));
@@ -223,7 +315,7 @@ const server=http.createServer((req,res)=>{res.setHeader('content-type','applica
  res.statusCode=404;res.end('{}');});
 if(existsSync(${JSON.stringify(THE_SLOW_START)}))Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,Number(readFileSync(${JSON.stringify(THE_SLOW_START)},'utf8')));
 server.once('error',${aRefusedListenEnds('port')});server.listen({port,host:'127.0.0.1',reusePort:true});
-const stop=()=>{if(worker.started)try{process.kill(-worker.pgid,'SIGTERM')}catch{}server.close(()=>{db.close();process.exit(0)})};
+const stop=()=>{if(worker.started)try{process.kill(-worker.pgid,'SIGTERM')}catch{}server.close(()=>{db.close();process.exit(0)});if(neverAnswers)server.closeAllConnections()};
 process.on('SIGTERM',()=>{if(!existsSync('.ignore-term'))stop()});
 ${aLineThatStopsAServerWithItsStarterOrOwner('stop', owner)}
 `
@@ -256,10 +348,11 @@ async function startOld(stable: string, database: string, chosen: number, home: 
  * `targetsMigration` the target commit brings a migrate.mjs of its own: the function is given the fixture's folder and
  * returns the script. Without it the target's migrate.mjs is the baseline's. With `startup` the target's made-up
  * serve-dev holds the line that says its startup is done, or ends its startup (see THE_STARTUP); the baseline's says
- * its startup is done at once.
+ * its startup is done at once. With `electron` the target's made-up electron package leaves out path.txt or the binary
+ * when the upgrade runs its install.js (see THE_ELECTRON_FAILURE); the baseline's writes both.
  */
-export async function stableUpgradeFixture(withOldWorker = false, externalSecret = false, ignoreTerm = false, gated = false, mismatchedDevelopment = false, walMode = false, releaseCase: 1 | 2 = 2, liveMode: LiveMode = 'taken', slowStartMs = 0, targetsMigration: ((folder: string) => string) | null = null, startup: Startup = 'done') {
-  return aStableUpgradeFixture(withOldWorker, externalSecret, ignoreTerm, gated, mismatchedDevelopment, process.pid, walMode, releaseCase, liveMode, slowStartMs, targetsMigration, startup)
+export async function stableUpgradeFixture(withOldWorker = false, externalSecret = false, ignoreTerm = false, gated = false, mismatchedDevelopment = false, walMode = false, releaseCase: 1 | 2 = 2, liveMode: LiveMode = 'taken', slowStartMs = 0, targetsMigration: ((folder: string) => string) | null = null, startup: Startup = 'done', electron: ElectronFetch = 'fetched') {
+  return aStableUpgradeFixture(withOldWorker, externalSecret, ignoreTerm, gated, mismatchedDevelopment, process.pid, walMode, releaseCase, liveMode, slowStartMs, targetsMigration, startup, electron)
 }
 /**
  * The made-up office for a test that kills its owner: the owner is a stand-in this file starts, returned as `owner`. The
@@ -270,12 +363,35 @@ export async function stableUpgradeFixtureOwnedByAStandIn(withOldWorker = false,
   return { ...(await aStableUpgradeFixture(withOldWorker, externalSecret, ignoreTerm, gated, mismatchedDevelopment, owner, false, releaseCase)), owner }
 }
 /**
- * THE NPM PART OF A MADE-UP WORLD, made once for each test file: the two locked tarballs, package.json, typecheck.mjs,
- * the lock npm writes for them, the node_modules a real `npm ci` installs from that lock, and the dist the typecheck
- * writes. None of it names a world's folder or owner, so every world copies these bytes instead of running npm three
- * times. The upgrade under test still runs its own npm ci and typecheck in the world.
+ * THE MADE-UP ELECTRON PACKAGE, written as electron.tgz in `folder` the way dependency.tgz is made. It returns the
+ * dependency to put in a package.json. The real electron package fetches its binary only when its own install.js runs,
+ * and npm ci does not run it, so the upgrade runs it after npm ci. This package is named electron so that the upgrade
+ * finds it where it finds the real one. Its package.json has no scripts, as the real one has none. Its install.js
+ * downloads nothing: it writes path.txt in its own folder, naming THE_MADE_UP_ELECTRON_BINARY, and writes that file in
+ * dist beside it, holding THE_MADE_UP_ELECTRON_BYTES. A target commit can ask it to leave either out (see
+ * THE_ELECTRON_FAILURE).
  */
-const THE_NPM_PART = ['dependency.tgz', 'fixture-loader.tgz', 'package.json', 'package-lock.json', 'typecheck.mjs']
+function aMadeUpElectronPackage(folder: string) {
+  const source = join(folder, 'made-up-electron')
+  write(join(source, 'package.json'), JSON.stringify({ name: 'electron', version: '0.0.0-made-up' }))
+  write(join(source, 'install.js'), `const{existsSync,mkdirSync,readFileSync,writeFileSync}=require('node:fs');const{join}=require('node:path');
+const asked=existsSync(${JSON.stringify(THE_ELECTRON_FAILURE)})?readFileSync(${JSON.stringify(THE_ELECTRON_FAILURE)},'utf8').trim():'fetched';
+if(!['fetched','no path','no binary'].includes(asked))throw new Error('The made-up electron was asked to leave out '+JSON.stringify(asked)+', which it does not know.');
+if(asked!=='no path')writeFileSync(join(__dirname,'path.txt'),${JSON.stringify(THE_MADE_UP_ELECTRON_BINARY)});
+if(asked==='fetched'){mkdirSync(join(__dirname,'dist'),{recursive:true});writeFileSync(join(__dirname,'dist',${JSON.stringify(THE_MADE_UP_ELECTRON_BINARY)}),${JSON.stringify(THE_MADE_UP_ELECTRON_BYTES)})}
+`)
+  run(folder, 'tar', ['-czf', 'electron.tgz', 'made-up-electron'])
+  rmSync(source, { recursive: true })
+  return { electron: 'file:electron.tgz' }
+}
+/**
+ * THE NPM PART OF A MADE-UP WORLD, made once for each test file: the three locked tarballs, one of them the made-up
+ * electron package, package.json, typecheck.mjs, the lock npm writes for them, the node_modules a real `npm ci` installs
+ * from that lock, and the dist the typecheck writes. None of it names a world's folder or owner, so every world copies
+ * these bytes instead of running npm three times. The upgrade under test still runs its own npm ci and typecheck in the
+ * world.
+ */
+const THE_NPM_PART = ['dependency.tgz', 'fixture-loader.tgz', 'electron.tgz', 'package.json', 'package-lock.json', 'typecheck.mjs']
 const npmParts: string[] = []
 let theNpmPartMade: string | null = null
 function theNpmPart() {
@@ -296,14 +412,15 @@ for(const signal of ['SIGTERM','SIGINT','SIGHUP'])process.on(signal,()=>child.ki
 child.on('error',()=>process.exit(126));child.on('exit',(code,signal)=>{if(signal){process.removeAllListeners(signal);process.kill(process.pid,signal)}else process.exit(code??1)});
 `)
   run(made, 'tar', ['-czf', 'fixture-loader.tgz', 'fixture-loader'])
-  write(join(made, 'package.json'), JSON.stringify({ name: 'synthetic-upgrade-office', version: '1.0.0', type: 'module', scripts: { typecheck: 'node typecheck.mjs', build: 'node build.mjs', start: 'node src/server/index.ts', 'db:migrate': 'node migrate.mjs' }, dependencies: { 'upgrade-fixture-dependency': 'file:dependency.tgz', tsx: 'file:fixture-loader.tgz' } }))
+  const electron = aMadeUpElectronPackage(made)
+  write(join(made, 'package.json'), JSON.stringify({ name: 'synthetic-upgrade-office', version: '1.0.0', type: 'module', scripts: { typecheck: 'node typecheck.mjs', build: 'node build.mjs', start: 'node src/server/index.ts', 'db:migrate': 'node migrate.mjs' }, dependencies: { 'upgrade-fixture-dependency': 'file:dependency.tgz', tsx: 'file:fixture-loader.tgz', ...electron } }))
   write(join(made, 'typecheck.mjs'), `import{mkdirSync,writeFileSync}from'node:fs';mkdirSync('dist',{recursive:true});writeFileSync('dist/fixture-typechecked','checked');`)
   run(made, 'npm', ['install', '--package-lock-only', '--ignore-scripts', '--no-audit', '--no-fund'])
   run(made, 'npm', ['ci', '--no-audit', '--no-fund']); run(made, 'npm', ['run', 'typecheck'])
   theNpmPartMade = made
   return made
 }
-async function aStableUpgradeFixture(withOldWorker: boolean, externalSecret: boolean, ignoreTerm: boolean, gated: boolean, mismatchedDevelopment: boolean, owner = process.pid, walMode = false, releaseCase: 1 | 2 = 2, liveMode: LiveMode = 'taken', slowStartMs = 0, targetsMigration: ((folder: string) => string) | null = null, startup: Startup = 'done') {
+async function aStableUpgradeFixture(withOldWorker: boolean, externalSecret: boolean, ignoreTerm: boolean, gated: boolean, mismatchedDevelopment: boolean, owner = process.pid, walMode = false, releaseCase: 1 | 2 = 2, liveMode: LiveMode = 'taken', slowStartMs = 0, targetsMigration: ((folder: string) => string) | null = null, startup: Startup = 'done', electron: ElectronFetch = 'fetched') {
   const folder = mkdtempSync(join(out, 'stable-transaction-')); folders.push(folder)
   const remote = join(folder, 'remote.git'), dev = join(folder, 'development'), stable = join(folder, 'stable'), recovery = join(folder, 'recovery'), database = join(folder, 'office.sqlite')
   mkdirSync(dev); mkdirSync(recovery, { mode: 0o700 })
@@ -311,11 +428,12 @@ async function aStableUpgradeFixture(withOldWorker: boolean, externalSecret: boo
   const serviceHome = folder // A real service home may be an ancestor of its checkouts.
   git(folder, 'init', '--bare', remote); git(dev, 'init', '-b', 'main')
   git(dev, 'config', 'user.email', 'fixture@example.invalid'); git(dev, 'config', 'user.name', 'Synthetic upgrade fixture')
-  write(join(dev, '.gitignore'), 'node_modules/\ndist/\n.npm-cache/\n.detach-child\n.ignore-term\n.wal-mode\n.env\n')
+  write(join(dev, '.gitignore'), 'node_modules/\ndist/\n.npm-cache/\n.detach-child\n.ignore-term\n.wal-mode\n.never-answers\n.gives-up\n.a-late-child\n.a-stranger\n.env\n')
   write(join(dev, 'src/server/index.ts'), serverSource(owner, join(folder, THE_STARTS)))
   write(join(dev, THE_HOLDER_ENTRY), `import{appendFileSync}from'node:fs';setInterval(()=>{},1000);process.on('SIGTERM',()=>{appendFileSync(process.argv[process.argv.indexOf('--database')+1]+'.holder-signalled','synthetic holder signalled');process.exit(0)});${aLineThatEndsWithItsOwner(owner)}`)
   write(join(dev, 'src/worker/index.ts'), `import{createRequire}from'node:module';const require=createRequire(import.meta.url);const Database=require(${JSON.stringify(databaseModule)});const db=new Database(process.env.MOLE_OFFICE_DB);const owner=process.argv.find(arg=>arg.startsWith('--stop-with-pid='))?.split('=')[1];const stop=()=>{db.close();process.exit(0)};setInterval(()=>{try{process.kill(Number(owner),0)}catch{stop()}},50);process.on('SIGTERM',stop);`)
-  write(join(dev, 'tools/serve-dev.mjs'), `import{spawn}from'node:child_process';import{existsSync,readFileSync}from'node:fs';import{whyAnUpgradeKeepsTheOfficeClosed}from${JSON.stringify(theUpgradeMark)};import{theSupervisorsStartupIsDone}from${JSON.stringify(theStartupLine)};{const closed=whyAnUpgradeKeepsTheOfficeClosed(process.env.MOLE_OFFICE_DB,process.cwd(),undefined);if(closed!==null){console.error(closed);process.exit(1)}}if(!process.argv.includes('--built')||!process.argv.includes('--prepared'))throw Error('Expected built prepared supervisor');const child=spawn(process.execPath,['src/server/index.ts','--stop-with-pid='+process.pid],{detached:true,stdio:'inherit',env:{...process.env,MOLE_OFFICE_RESTART_REASON:'fixture start'}});child.on('exit',code=>process.exit(code??1));process.on('SIGTERM',()=>{if(!existsSync('.ignore-term')){try{process.kill(-child.pid,'SIGTERM')}catch{} }});const done=()=>console.log(theSupervisorsStartupIsDone(process.pid,Number(process.env.MOLE_OFFICE_PORT)));const[startup,ms]=existsSync(${JSON.stringify(THE_STARTUP)})?readFileSync(${JSON.stringify(THE_STARTUP)},'utf8').split(' '):['done','0'];if(startup==='done')done();else{const answered=async()=>{for(;;){try{if((await fetch('http://127.0.0.1:'+process.env.MOLE_OFFICE_PORT+'/api/health')).ok)return}catch{}await new Promise(r=>setTimeout(r,10))}};answered().then(()=>setTimeout(startup==='held'?done:()=>{child.removeAllListeners('exit');child.once('exit',()=>process.exit(1));process.kill(-child.pid,'SIGTERM')},Number(ms)))}`)
+  write(join(dev, 'tools/serve-dev.mjs'), `import{spawn}from'node:child_process';import{existsSync,readFileSync}from'node:fs';import{whyAnUpgradeKeepsTheOfficeClosed}from${JSON.stringify(theUpgradeMark)};import{theSupervisorsStartupIsDone}from${JSON.stringify(theStartupLine)};{const closed=whyAnUpgradeKeepsTheOfficeClosed(process.env.MOLE_OFFICE_DB,process.cwd(),undefined);if(closed!==null){console.error(closed);process.exit(1)}}if(!process.argv.includes('--built')||!process.argv.includes('--prepared'))throw Error('Expected built prepared supervisor');const child=spawn(process.execPath,['src/server/index.ts','--stop-with-pid='+process.pid],{detached:true,stdio:'inherit',env:{...process.env,MOLE_OFFICE_RESTART_REASON:'fixture start'}});child.on('exit',code=>{if(!existsSync(${JSON.stringify(THE_SUPERVISOR_THAT_GIVES_UP)}))process.exit(code??1);spawn(process.execPath,[process.cwd()+'/tools/serve-dev-stand-in.mjs','--supervisor-pid='+process.pid,'--reason=The made-up server ended.'],{stdio:'ignore',env:process.env}).on('exit',end=>process.exit(end??1))});process.on('SIGTERM',()=>{if(!existsSync('.ignore-term')){try{process.kill(-child.pid,'SIGTERM')}catch{} }});const done=()=>console.log(theSupervisorsStartupIsDone(process.pid,Number(process.env.MOLE_OFFICE_PORT)));const[startup,ms]=existsSync(${JSON.stringify(THE_STARTUP)})?readFileSync(${JSON.stringify(THE_STARTUP)},'utf8').split(' '):['done','0'];if(startup==='done')done();else{const answered=async()=>{for(;;){try{if((await fetch('http://127.0.0.1:'+process.env.MOLE_OFFICE_PORT+'/api/health')).ok)return}catch{}await new Promise(r=>setTimeout(r,10))}};answered().then(()=>setTimeout(startup==='held'?done:()=>{child.removeAllListeners('exit');child.once('exit',()=>process.exit(1));process.kill(-child.pid,'SIGTERM')},Number(ms)))}`)
+  write(join(dev, 'tools/serve-dev-stand-in.mjs'), aStandInThatAnswers503(owner))
   write(join(dev, 'fixture-orphan-parent.mjs'), `import{spawn}from'node:child_process';const child=spawn(process.execPath,['fixture-orphan.mjs'],{stdio:'ignore',env:process.env});child.unref();process.exit(0);`)
   write(join(dev, 'fixture-orphan.mjs'), `import{writeFileSync}from'node:fs';writeFileSync(process.env.MOLE_OFFICE_DB+'.orphan-pid',String(process.pid));setInterval(()=>{},1000);process.on('SIGTERM',()=>process.exit(0));${aLineThatEndsWithItsOwner(owner)}`)
   write(join(dev, 'tools/stable/untranslated-words.mjs'), aMadeUpWordCounter(folder))
@@ -351,7 +469,8 @@ const require=createRequire(import.meta.url);const Database=require(${JSON.strin
   if (slowStartMs > 0) write(join(dev, THE_SLOW_START), String(slowStartMs))
   if (targetsMigration !== null) write(join(dev, 'migrate.mjs'), targetsMigration(folder))
   if (startup !== 'done') write(join(dev, THE_STARTUP), 'heldMs' in startup ? `held ${String(startup.heldMs)}` : `ends ${String(startup.endsAfterMs)}`)
-  git(dev, 'add', 'version.txt', ...(releaseCase === 2 ? [THE_TARGETS_MIGRATION] : []), ...(liveMode === 'refused' ? [THE_SETTINGS] : []), ...(slowStartMs > 0 ? [THE_SLOW_START] : []), ...(targetsMigration !== null ? ['migrate.mjs'] : []), ...(startup !== 'done' ? [THE_STARTUP] : [])); git(dev, 'commit', '-m', 'Synthetic candidate'); git(dev, 'push', 'origin', 'main'); const target = git(dev, 'rev-parse', 'HEAD')
+  if (electron !== 'fetched') write(join(dev, THE_ELECTRON_FAILURE), electron)
+  git(dev, 'add', 'version.txt', ...(releaseCase === 2 ? [THE_TARGETS_MIGRATION] : []), ...(liveMode === 'refused' ? [THE_SETTINGS] : []), ...(slowStartMs > 0 ? [THE_SLOW_START] : []), ...(targetsMigration !== null ? ['migrate.mjs'] : []), ...(startup !== 'done' ? [THE_STARTUP] : []), ...(electron !== 'fetched' ? [THE_ELECTRON_FAILURE] : [])); git(dev, 'commit', '-m', 'Synthetic candidate'); git(dev, 'push', 'origin', 'main'); const target = git(dev, 'rev-parse', 'HEAD')
   const db = new Database(database)
   if (walMode) db.pragma('journal_mode = WAL')
   // One transaction: five commits, each synced on its own, took about 100 ms of every world.
@@ -368,6 +487,7 @@ const require=createRequire(import.meta.url);const Database=require(${JSON.strin
   if (ignoreTerm) write(join(stable, '.ignore-term'), 'This owned baseline ignores TERM until cleanup removes this file.')
   if (walMode) write(join(stable, '.wal-mode'), 'This made-up office keeps its database in WAL mode, as the office does.')
   const group = await startOld(stable, database, servicePort, serviceHome, externalSecret, serviceDevelopment, gated, owner)
+  const candidateTag = theCandidateTagForToday(); theTagOfEachFolder.set(folder, candidateTag)
   // The health's attempts may be left out, so a test may delete them and leave the release its own start limit.
   const config = { serviceHome, serviceSettings: { MOLE_OFFICE_MESSAGE_WORKER: 'off', TZ: fixtureTimeZone }, developmentRepository: dev, stableCheckout: stable, database, targetCommit: target, evidence: { recordId: 'synthetic-receipt', seq: 1, contentHash: 'aaaaaaaaaaaaaaaa' }, previousBaselineTag: baselineTag, candidateTag, serviceGroups: [group], notice: 'Synthetic fixture upgrade notice.', noticeApproval: { id: 'synthetic-approval', seq: 1, contentHash: 'bbbbbbbbbbbbbbbb' }, noticeSendIds: { before: 'synthetic-before', after: 'synthetic-after' }, releaseCheckPort, servicePort, health: { ...THE_FIXTURE_HEALTH } as { attempts?: number, intervalMs: number, timeoutMs: number, stopTimeoutMs: number, commandTimeoutMs: number }, recoveryRoot: recovery }
   const oldRuntime = await (await fetch(`http://127.0.0.1:${servicePort}/api/runtime`)).json()
@@ -483,14 +603,16 @@ afterEach(async () => {
   for (const child of children) if (child.exitCode === null && child.signalCode === null) await new Promise<void>((r) => child.once('exit', () => r()))
   groups.clear(); children.length = 0
   for (const folder of folders) {
-    const recovery = join(folder, 'recovery/' + candidateTag)
-    if (existsSync(recovery)) for (const file of readdirSync(recovery).filter((s) => s.endsWith('.log'))) {
+    // A folder a test made for itself has no fixture's tag, and so no fixture's work folder.
+    const tag = theTagOfEachFolder.get(folder)
+    const recovery = tag === undefined ? null : join(folder, 'recovery', tag)
+    if (recovery !== null && existsSync(recovery)) for (const file of readdirSync(recovery).filter((s) => s.endsWith('.log'))) {
       const kept = join(out, 'transaction-command-logs', folder.split('/').at(-1)!)
       mkdirSync(kept, { recursive: true }); cpSync(join(recovery, file), join(kept, file))
     }
     if (process.env.STABLE_UPGRADE_KEEP_FIXTURES !== 'yes') rmSync(folder, { recursive: true, force: true })
   }
-  folders.length = 0
+  folders.length = 0; theTagOfEachFolder.clear()
 })
 afterAll(() => {
   if (process.env.STABLE_UPGRADE_KEEP_FIXTURES !== 'yes') for (const made of npmParts) rmSync(made, { recursive: true, force: true })
@@ -498,4 +620,4 @@ afterAll(() => {
 })
 
 
-export { THE_BASELINES_MIGRATION, THE_TARGETS_MIGRATION, THE_FIXTURE_HEALTH, root, fixtureTimeZone, databaseModule, baselineTag, candidateTag, out, groups, children, folders, standIns, run, git, write, port, heldPort, aRefusedListenEnds, remember, track, snapshot, baselineIsBack, startsOf, nothingChanged, theDatabaseCopies }
+export { THE_BASELINES_MIGRATION, THE_TARGETS_MIGRATION, THE_FIXTURE_HEALTH, THE_START_THAT_NEVER_ANSWERS, THE_SUPERVISOR_THAT_GIVES_UP, THE_STAND_INS_LATE_CHILD, THE_STRANGER_UNDER_THE_START, THE_MADE_UP_ELECTRON_BINARY, THE_MADE_UP_ELECTRON_BYTES, aMadeUpElectronPackage, root, fixtureTimeZone, databaseModule, baselineTag, theCandidateTagForToday, out, groups, children, folders, standIns, run, git, write, port, heldPort, aRefusedListenEnds, remember, track, snapshot, baselineIsBack, startsOf, nothingChanged, theDatabaseCopies }

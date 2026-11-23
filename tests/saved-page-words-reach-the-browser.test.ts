@@ -63,7 +63,7 @@ it('a Settings press updates an open page without a reload, keeps hostile words 
   } finally { letTheReReadGo(); await app.page.unroute(theTable); await other.close() }
 }, 120_000)
 
-it('draws the word table beside Chinese and an edited word at four widths in both themes', async () => {
+it('draws the word table beside Chinese and an edited word at the widest and the narrowest width in the light theme', async () => {
   const current = await row()
   const save = await fetch(app.api + '/api/words/table', { method: 'POST', headers, body: JSON.stringify({ key, version: current.version, en: example, zh: 'Made-up Chinese-field example: the Working heading.', chineseMatchesEnglish: true, because: 'Made-up bilingual word-table picture' }) })
   expect(save.status, await save.clone().text()).toBe(200)

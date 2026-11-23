@@ -20,16 +20,31 @@
  * - When an inner transaction returns, its steps join its caller's frame, because nothing is stored
  *   until the outermost one commits.
  *
- * A transaction a program opens with a bare `BEGIN` would not be seen. None does: every one goes through
- * `transaction` (searched for BEGIN, COMMIT and SAVEPOINT in src/server on 5 October 2026).
+ * A transaction a program opens with a bare `BEGIN` is not seen. Two do (searched for BEGIN, COMMIT and SAVEPOINT in
+ * src/server on 20 November 2026): the export's reading of one moment (src/server/lib/export.ts), which writes
+ * nothing, and the write lock of a start (src/server/db/migrate.ts). A start with nothing pending runs the data steps
+ * inside that lock and always rolls it back, so `whenStored` refuses while `THE_ROLLED_BACK_RUN` is open.
  */
 import type Database from 'better-sqlite3'
 
 /** The steps waiting on each open transaction, outermost first. Empty when none is open. */
 const frames: (() => void)[][] = []
 
+/**
+ * Open while a start runs the data steps on the served file inside a transaction it always rolls back
+ * (src/server/db/migrate.ts). That transaction is a bare `BEGIN IMMEDIATE`, so no frame sees it.
+ */
+export const THE_ROLLED_BACK_RUN = { open: false }
+
 /** Run `step` once what is being written now is stored: at once outside a transaction, else at the outermost commit. */
 export function whenStored(step: () => void): void {
+  if (THE_ROLLED_BACK_RUN.open) {
+    throw new Error(
+      'A data step asked to tell something once its write is stored (whenStored), while the start ran the data steps ' +
+        'on this file inside a transaction it always rolls back. Nothing written there is ever stored, so nothing may ' +
+        'be told about it.',
+    )
+  }
   const open = frames[frames.length - 1]
   if (open === undefined) step()
   else open.push(step)

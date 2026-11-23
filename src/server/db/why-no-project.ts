@@ -3,7 +3,8 @@
 import type { AuthoredTable } from './table-name-lists.ts'
 
 /**
- * WHY EACH TABLE IN `PERSON_LEVEL_TABLES` IN schema.ts BELONGS TO NO PROJECT, in a sentence an archive can print.
+ * WHY EACH TABLE IN `PERSON_LEVEL_TABLES` IN authored-table-of.ts BELONGS TO NO PROJECT, in a sentence an archive
+ * can print.
  *
  * THE SENTENCE HAS TO BE WRITTEN DOWN BECAUSE THERE ARE TWO ANSWERS AND AN ARCHIVE PRINTS ONE OF
  * THEM. A project-scoped archive says, on the page where these rows would have been, that it carries

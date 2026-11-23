@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE.
 /**
  * THE EXPORT READS THE STORE READ-ONLY, AND READS ITS HISTORY ONE ROW AT A TIME. Wave 13s round 187, item 1.
+ * THE EXPORT DOORS COUNT FILE BY FILE AND KEEP NO FILE. Wave 13s round 281.
  *
  * `npx tsx scripts/export.ts` opened the store through the office's own client, which switches the file to write-ahead
  * logging as it opens it, so an export changed a store it only read. And it read every table whole before it wrote a
@@ -15,12 +16,16 @@
  *   4. a revision whose seq is 0 is refused, and nothing is written: every refusal comes before the first file;
  *   5. a change row written by another connection while the command writes its files is in none of them, and is not
  *      counted: one export reads one moment of the store;
- *   6. a day whose stamps do not sort together, and stamps with no day, still give one page each, holding every row.
+ *   6. a day whose stamps do not sort together, and stamps with no day, still give one page each, holding every row;
+ *   7. a test server, given a heap of what it holds once started plus HEAP_MB, answers GET /api/export and
+ *      GET /api/export/workspace on a made-up store larger than that whole heap: each answers 200, the first counts every
+ *      record, revision and change row, and the second counts at least the made-up revisions, which are all in its
+ *      project. Until round 281 both doors built the whole export in memory to count it.
  *
  * Three-run proof, using this whole file each time:
  *   node tools/run-named-tests.mjs tests/the-export-reads-the-store-read-only-and-one-row-at-a-time.test.ts
- * After a green control, copy src/server/lib/export.ts, src/server/lib/the-store-to-export.ts and scripts/export.ts,
- * then make one of these changes:
+ * After a green control, copy src/server/lib/export.ts, src/server/lib/the-store-to-export.ts, scripts/export.ts and
+ * src/server/api/export.ts, then make one of these changes:
  *   1. in export.ts, put `null` in place of `theStoreGivenToTheExport()`: the export loads the office's client, which
  *      switches the store to write-ahead logging, and cases 1 and 2 go red;
  *   2. in export.ts, put `'./records.ts'` in place of `'./panel-error.ts'`: records.ts loads the client, and cases 1 and
@@ -37,10 +42,16 @@
  *      two pages each, and case 6 goes red;
  *   8. in scripts/export.ts, move the line that imports lib/export.ts above `const store = openTheStoreToExport()`: the
  *      export loads the client before the store is given to it, the client makes the missing store, and cases 1 to 3
- *      go red.
+ *      go red;
+ *   9. in api/export.ts, put `buildExport().report` in place of `countExport()` in GET /api/export: the door holds every
+ *      file, the server runs out of memory, and case 7 goes red;
+ *  10. in api/export.ts, put `buildExport({ workspaceId }).report` in place of `countExport({ workspaceId })` in
+ *      GET /api/export/workspace, and case 7 goes red.
  * Restore each file with cp after each change, check it with cmp, and run the command again for green.
  * Every id, note, stamp and block of words here is made up, in a throwaway office. Each command is given only PATH,
- * LANG, a made-up home in the test's own folder and MOLE_OFFICE_DB, so it reads no settings file of anybody's.
+ * LANG, a made-up home in the test's own folder and MOLE_OFFICE_DB, so it reads no settings file of anybody's. The test
+ * server of case 7 is given this test process's environment, which the setup files have already made plain and given
+ * a home of its own, with MOLE_OFFICE_DB, because the server reads the test office's owner from it.
  */
 import Database from 'better-sqlite3'
 import { spawnSync } from 'node:child_process'
@@ -54,8 +65,10 @@ import { freshDb, type TestDb } from './helpers.ts'
 
 const REPO = resolve(fileURLToPath(new URL('..', import.meta.url)))
 const HUMAN = { type: 'human', id: THE_TEST_OFFICES_OWNER.id } as const
-/** The heap the command is given in case 2, in MiB. The made-up store there is larger. */
+/** The heap the command is given in case 2, in MiB, and what the test server of case 7 is given beyond its own. */
 const HEAP_MB = 192
+/** About how many bytes one made-up note of `aStoreLargerThanTheHeap` adds: 21 copies of its data, and the rest. */
+const BYTES_A_NOTE = 2_150_000
 /** A made-up change row: its id, the record it names and its stamp. */
 const A_CHANGE_ROW =
   "INSERT INTO changes (id, record_id, op, actor_type, actor_id, session_id, field, old_value, new_value, at, workspace_id, append_order) VALUES (?, ?, 'update', 'agent', 'made-up-agent', NULL, 'data', NULL, 'a made-up value', ?, 'default', (SELECT coalesce(max(append_order), 0) + 1 FROM changes))"
@@ -88,10 +101,10 @@ afterAll(() => t?.close())
 const folder = () => dirname(t.file)
 
 /**
- * A COPY OF `from` WITH MADE-UP HISTORY OF ABOUT 255 MB: 120 notes, each with 20 revisions and 20 change rows, and
- * every revision's data about 100,000 bytes, as the made-up stores this round was measured on.
+ * A COPY OF `from` WITH MADE-UP HISTORY: `notes` notes, each with 20 revisions and 20 change rows, and every revision's
+ * data about 100,000 bytes, as the made-up stores round 187 was measured on. 120 notes, the default, are about 255 MB.
  */
-function aStoreLargerThanTheHeap(from: string, to: string): void {
+function aStoreLargerThanTheHeap(from: string, to: string, notes = 120): void {
   copyFileSync(from, to)
   const db = new Database(to)
   try {
@@ -106,7 +119,7 @@ function aStoreLargerThanTheHeap(from: string, to: string): void {
       return line.repeat(Math.ceil(100_000 / line.length)).slice(0, 100_000)
     }
     db.transaction(() => {
-      for (let r = 0; r < 120; r++) {
+      for (let r = 0; r < notes; r++) {
         const recordId = id('r', r)
         const title = `A made-up note of history ${String(r)}`
         let last = { data: '', at: '' }
@@ -204,6 +217,60 @@ function aSecondWriter(database: string, to: string, written: string, mark: stri
 /** The store as a person would check it before and after: its bytes, its journal mode and what is beside it. */
 const theStateOf = (file: string) => ({ sha256: sha256(file), journal: theJournalModeOf(file), beside: theFilesBeside(file) })
 
+/** What a test server said once it had started, and then what each door it was asked answered. */
+interface Served {
+  ready: { heap: number; rows: { records: number; revisions: number; changes: number } } | null
+  answers: { url: string; status: number; counts: Record<string, number> | null; said: string | null }[]
+}
+/**
+ * A TEST SERVER ON `database`, IN A CHILD, started as tests/a-gate-choice-ends-at-its-time.test.ts starts one. Once the
+ * app is ready, it reads the heap it holds after a collection and counts the rows of the three tables that grow. Then it
+ * asks each of `urls` with no header, which is the default project for the one door that reads a project. Given
+ * `heapMb`, the child is given that heap; without it, none is set.
+ */
+function aTestServer(database: string, urls: readonly string[], heapMb?: number): { ran: Ran; served: Served } {
+  const code = [
+    "const { buildApp } = await import('./src/server/index.ts')",
+    "const { sqlite } = await import('./src/server/db/client.ts')",
+    "const { app } = await buildApp({ production: false, webDir: 'dist/web', webAppUrl: 'http://127.0.0.1:43210', logLevel: false })",
+    'await app.ready()',
+    'globalThis.gc()',
+    "const count = (table) => sqlite.prepare('SELECT count(*) AS n FROM ' + table).get().n",
+    "console.log(JSON.stringify({ ready: { heap: process.memoryUsage().heapUsed, rows: { records: count('records'), revisions: count('revisions'), changes: count('changes') } } }))",
+    `for (const url of ${JSON.stringify(urls)}) {`,
+    "  const reply = await app.inject({ method: 'GET', url })",
+    '  const ok = reply.statusCode === 200',
+    '  console.log(JSON.stringify({ answer: { url, status: reply.statusCode, counts: ok ? reply.json().counts : null, said: ok ? null : reply.body.slice(0, 2000) } }))',
+    '}',
+    'await app.close()',
+    'sqlite.close()',
+    'process.exit(0)',
+  ].join('\n')
+  const args = [
+    ...(heapMb === undefined ? [] : [`--max-old-space-size=${String(heapMb)}`]),
+    '--expose-gc', '--import', 'tsx', '--input-type=module', '-e', code,
+  ]
+  const it = spawnSync(process.execPath, args, {
+    cwd: REPO,
+    env: { ...process.env, MOLE_OFFICE_DB: database },
+    encoding: 'utf8',
+    maxBuffer: 64 * 1024 * 1024,
+    timeout: 420_000,
+  })
+  if (it.error !== undefined) throw it.error
+  const said = it.stdout
+    .split('\n')
+    .filter((line) => line.startsWith('{"ready"') || line.startsWith('{"answer"'))
+    .map((line) => JSON.parse(line) as { ready?: NonNullable<Served['ready']>; answer?: Served['answers'][number] })
+  return {
+    ran: { status: it.status, stdout: it.stdout, stderr: it.stderr },
+    served: {
+      ready: said.find((one) => one.ready !== undefined)?.ready ?? null,
+      answers: said.flatMap((one) => (one.answer === undefined ? [] : [one.answer])),
+    },
+  }
+}
+
 describe('the export command reads the store read-only', () => {
   it('leaves a store in journal mode delete as it was', () => {
     const before = theStateOf(small)
@@ -297,4 +364,33 @@ describe('the export reads its history one row at a time, from one moment of the
     expect(holding('changes/2026-10-02.md')).toEqual(['cDayTwoMorn', 'cDayTwoSpace'])
     expect(holding('changes/undated.md')).toEqual(['cUndatedZero', 'cUndatedZed'])
   })
+})
+
+describe('the export doors count file by file and keep no file', () => {
+  it(`answer on a test server given ${String(HEAP_MB)} MiB of heap beyond what it holds once started, with a store larger than that whole heap`, () => {
+    // WHAT THE SERVER HOLDS ONCE STARTED, read with no limit on a copy of the small store. Nothing records it, and the
+    // doors are given HEAP_MB beyond it, as the command is given HEAP_MB in case 2. A server writes to the store it
+    // serves, so each server here is given a store of its own.
+    const started = join(folder(), 'a-store-a-server-starts-on.db')
+    copyFileSync(small, started)
+    const first = aTestServer(started, [])
+    expect(first.served.ready, first.ran.stderr.slice(-2000)).not.toBeNull()
+    const heapMb = Math.ceil((first.served.ready?.heap ?? 0) / (1024 * 1024)) + HEAP_MB
+    const notes = Math.ceil((heapMb * 1024 * 1024 * 1.1) / BYTES_A_NOTE)
+    const served = join(folder(), 'a-store-larger-than-a-servers-heap.db')
+    aStoreLargerThanTheHeap(small, served, notes)
+    expect(statSync(served).size).toBeGreaterThan(heapMb * 1024 * 1024)
+    const { ran, served: said } = aTestServer(served, ['/api/export', '/api/export/workspace'], heapMb)
+    const why = `under a heap of ${String(heapMb)} MiB, ${String(ran.status)}: ${ran.stderr.slice(-2000)}`
+    expect(said.ready, `the server did not start ${why}`).not.toBeNull()
+    expect(said.ready?.rows.revisions).toBeGreaterThanOrEqual(20 * notes)
+    expect(said.answers.map((one) => [one.url, one.status, one.said]), why).toEqual([
+      ['/api/export', 200, null],
+      ['/api/export/workspace', 200, null],
+    ])
+    const [whole, project] = said.answers
+    expect({ records: whole?.counts?.['records'], revisions: whole?.counts?.['revisions'], changes: whole?.counts?.['changes'] }).toEqual(said.ready?.rows)
+    expect(project?.counts?.['revisions']).toBeGreaterThanOrEqual(20 * notes)
+    expect(ran.status, why).toBe(0)
+  }, 600_000)
 })

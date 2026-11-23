@@ -53,6 +53,14 @@
  *
  * The change was put back and the control run again: 3 cases, all green. So the test holds the
  * behaviour rather than passing beside it.
+ *
+ * ---------------------------------------------------------------------------------------
+ * WHO RELEASES THE WORK
+ * ---------------------------------------------------------------------------------------
+ *
+ * A release asks the card's retire rule for each agent started for the work, with the releaser as
+ * the one retiring, and a worker may not retire itself or a worker it did not start. So in each
+ * case the claim is filed and released by the agent that started the worker.
  */
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
@@ -69,7 +77,7 @@ let records: RecordsLib
 let people: ParticipantsLib
 /** Each case registers its own workers, so the handles are its own. */
 let caseNumber = 0
-const handleFor = (which: 'a' | 'b'): string => `worker-${which}-${String(caseNumber)}`
+const handleFor = (which: 'a' | 'b' | 's'): string => `worker-${which}-${String(caseNumber)}`
 
 const HUMAN = { type: 'human', id: THE_PERSON } as const
 
@@ -77,7 +85,8 @@ const HUMAN = { type: 'human', id: THE_PERSON } as const
  * An agent as the claim library takes it: by its registry id. The registry gives a new agent an id
  * of its own, which is not its handle, so the id is read from the registry after the agent is made.
  * `a` is the worker agent; `b` is another agent, for the release that ends a claim it did not
- * start. Each case gives its workers handles of its own, so a shared office registers no handle twice.
+ * start; `s` is the agent that started the workers and releases their work. Each case gives its
+ * workers handles of its own, so a shared office registers no handle twice.
  */
 function idOf(handle: string): string {
   const row = t.client.sqlite.prepare('SELECT id FROM agents WHERE handle = ?').get(handle) as
@@ -102,6 +111,9 @@ function theAgentRecord(recordId: string): Record<string, unknown> {
 
 beforeAll(async () => {
   t = await freshDb()
+  // A release asks the card's retire rule, and that rule reads the role cards.
+  const roles = await import('../src/server/lib/roles.ts')
+  roles.readTheRoleCards({ guardActKeys: t.api.GOVERNANCE_GUARDS.flatMap((one) => [one.actKey, one.personAct]) })
   work = await import('../src/server/lib/claims.ts')
   records = await import('../src/server/lib/records.ts')
   people = await import('../src/server/lib/participants.ts')
@@ -115,8 +127,11 @@ afterAll(() => {
   t.close()
 })
 
-/** One agent registered as a durable agent, with `startedFor` only when it was started for the work. */
-function registerAnAgent(handle: string, startedFor: string | null): string {
+/**
+ * One agent registered as a durable agent, with `startedFor` only when it was started for the work,
+ * and `startedBy` only when another agent started it.
+ */
+function registerAnAgent(handle: string, startedFor: string | null, startedBy?: string): string {
   return t.api.createRecord({
     workspaceId: 'default',
     kind: 'agent',
@@ -127,6 +142,7 @@ function registerAnAgent(handle: string, startedFor: string | null): string {
       state: 'active',
       workArea: ['src'],
       ...(startedFor === null ? {} : { startedFor }),
+      ...(startedBy === undefined ? {} : { startedBy: asParticipant(startedBy) }),
     },
     actor: HUMAN,
   }).id
@@ -146,6 +162,7 @@ function aRun(handle: string): string {
 describe('the retire rule, M109', () => {
   it('is retired, with the reason, when the work it was started for is released', () => {
     const a = handleFor('a')
+    const s = handleFor('s')
     const workId = t.api.createRecord({
       workspaceId: 'default',
       kind: 'module',
@@ -153,20 +170,22 @@ describe('the retire rule, M109', () => {
       data: {},
       actor: HUMAN,
     }).id
-    const agentRecord = registerAnAgent(a, workId)
-    const run = aRun(a)
+    registerAnAgent(s, null)
+    const agentRecord = registerAnAgent(a, workId, s)
+    const run = aRun(s)
 
     const WORKER = asParticipant(a)
+    const STARTER = asParticipant(s)
     const filed = work.fileAClaim(
-      { workspaceId: 'default', claimant: WORKER, run, things: [{ what: 'record', id: workId }] },
-      asActor(a),
+      { workspaceId: 'default', claimant: STARTER, run, things: [{ what: 'record', id: workId }] },
+      asActor(s),
     )
     // AND NOT BEFORE. A worker with work left is not retired by anything: the finish that ends the
     // role is somebody releasing the work, never the agent's own word that it is done.
     expect(theAgentRecord(agentRecord)['state']).toBe('active')
     expect(people.agentsStartedFor(workId).map((one) => one.handle)).toEqual([a])
 
-    work.releaseAClaim(filed.claim.id, 'default', WORKER, 'the task is done and checked')
+    work.releaseAClaim(filed.claim.id, 'default', STARTER, 'the task is done and checked')
 
     const said = theAgentRecord(agentRecord)
     expect(said['state']).toBe('retired')
@@ -193,7 +212,8 @@ describe('the retire rule, M109', () => {
     // THIS ONE WAS STARTED FOR NOTHING IN PARTICULAR. Its card has no end written on it, so a
     // release ends nothing of its.
     const freeAgent = registerAnAgent(b, null)
-    const startedOne = registerAnAgent(a, workId)
+    // B STARTED THIS ONE, so b's release may retire it.
+    const startedOne = registerAnAgent(a, workId, b)
     const run = aRun(b)
     const SECOND = asParticipant(b)
     const filed = work.fileAClaim(
@@ -224,15 +244,17 @@ describe('the retire rule, M109', () => {
       data: {},
       actor: HUMAN,
     }).id
-    const onMine = registerAnAgent(a, mine)
-    const onOther = registerAnAgent(b, other)
-    const run = aRun(a)
-    const WORKER = asParticipant(a)
+    const s = handleFor('s')
+    registerAnAgent(s, null)
+    const onMine = registerAnAgent(a, mine, s)
+    const onOther = registerAnAgent(b, other, s)
+    const run = aRun(s)
+    const STARTER = asParticipant(s)
     const filed = work.fileAClaim(
-      { workspaceId: 'default', claimant: WORKER, run, things: [{ what: 'record', id: mine }] },
-      asActor(a),
+      { workspaceId: 'default', claimant: STARTER, run, things: [{ what: 'record', id: mine }] },
+      asActor(s),
     )
-    work.releaseAClaim(filed.claim.id, 'default', WORKER, 'done')
+    work.releaseAClaim(filed.claim.id, 'default', STARTER, 'done')
 
     expect(theAgentRecord(onMine)['state']).toBe('retired')
     // THE RELEASE ONLY NAMED ONE RECORD, so the agent started for the other one stays.

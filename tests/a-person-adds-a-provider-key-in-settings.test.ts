@@ -52,7 +52,8 @@ beforeAll(async () => {
 afterAll(async () => { await app?.stop() })
 async function open(page: Page, language = 'en', provider?: string): Promise<Locator> {
   await page.goto('about:blank')
-  await page.goto(`${app.site}/?lang=${language}#/settings/providerkeys`)
+  // The panel is drawn only in developer mode, so the address names that mode for this load.
+  await page.goto(`${app.site}/?lang=${language}&mode=inspect#/settings/providerkeys`)
   await waitForThePage(page, 30000)
   const panel = page.locator('[data-settings-panel="settings.providerkeys"]')
   await panel.waitFor({ timeout: 10000 })

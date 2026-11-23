@@ -303,10 +303,15 @@ function theNewestRunThatCountsByItsWrites(agentId: string, after: ASessionRecor
  * A run filed in another project is refused as in `theNewestRunOfTheAgent`.
  */
 export function theNewestRunTheResumeLineShows(agentId: string, handle: string, workspaceId: string): ASessionRecord | undefined {
-  const served = theSessionsOfTheAgent(agentId, handle).at(-1)
-  const newest = theNewestRunThatCountsByItsWrites(agentId, served) ?? served
+  const newest = theNewestRunForTheResumeLine(agentId, handle)
   if (newest !== undefined) recordInWorkspace(newest.id, workspaceId)
   return newest
+}
+
+/** The same newest run, without restricting the project in which it was filed. */
+export function theNewestRunForTheResumeLine(agentId: string, handle: string): ASessionRecord | undefined {
+  const served = theSessionsOfTheAgent(agentId, handle).at(-1)
+  return theNewestRunThatCountsByItsWrites(agentId, served) ?? served
 }
 
 /**

@@ -149,6 +149,9 @@ beforeAll(async () => {
   )
   app = (await apiApp()).app
   await app.ready()
+  // A MADE-UP named-tests TOOL, so that case 2 can send a named-tests line by hand.
+  const toolCategory = t.api.createRecord({ workspaceId: 'default', kind: 'tool_category', title: 'Synthetic test tools', data: { says: 'Made-up tools used by the reminder tests.' }, actor: { type: 'agent', id: HANDLE } }).id
+  t.api.createRecord({ workspaceId: 'default', kind: 'tool', title: 'Synthetic named tests', data: { entry: 'tool', slug: 'named-tests', forWhom: 'developers', category: toolCategory, kept: 'in this repository', state: 'not built yet' }, actor: { type: 'agent', id: HANDLE } })
   const registered = await app.inject({ method: 'POST', url: '/api/agents/started', headers: AS_THE_PERSON, payload: { handle: HANDLE, name: HANDLE, role: 'worker', runtime: 'claude-code', workArea: ['work'] } })
   expect(registered.statusCode, registered.body.slice(0, 300)).toBe(201)
 }, 60_000)
@@ -177,7 +180,8 @@ describe('the line the reminder keeps on the run', () => {
     expect(line.at).toMatch(/^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d$/u)
     expect(Array.isArray(line.chapters)).toBe(true)
     expect(line.items?.map((one) => one.key)).toEqual(reply.beforeTheSeal.items.map((one) => one.key))
-    expect(line.items?.map((one) => one.key)).toEqual(expect.arrayContaining(['report:none', 'test:work/made-up.test.ts']))
+    expect(line.items?.map((one) => one.key)).toEqual(expect.arrayContaining(['report:none']))
+    expect(line.items?.map((one) => one.key)).not.toContain('test:work/made-up.test.ts')
     expect(reply.version).toBe(served.version)
     // The run itself is still running and unsealed: the line is the office's, and nothing of the run's write was stored.
     expect(served.record.data['state']).toBe('running')
@@ -186,6 +190,9 @@ describe('the line the reminder keeps on the run', () => {
 
   it('2: at the seal, an item the run dealt with is no longer found and one it did not is still found', async () => {
     const { id, key, b } = await aRunWithACommit()
+    // A NAMED-TESTS LINE SENT BY HAND is an item the run does not deal with (test-lines:not-from-the-tool).
+    const used = await app.inject({ method: 'POST', url: '/api/toolset/uses', headers: asTheRun(id, key), payload: { tool: 'named-tests', said: 'named 1 file (work/made-up.test.ts); 1 ran, exactly those; vitest exited 0' } })
+    expect(used.statusCode, used.body.slice(0, 400)).toBe(201)
     const first = await app.inject({ method: 'PATCH', url: `/api/records/${id}`, headers: asTheRun(id, key), payload: theFinish(b) })
     const version = (first.json() as { version: string }).version
     // A report in form answers the reminder's "no report is linked", and no fault of form refuses the seal.
@@ -201,7 +208,7 @@ describe('the line the reminder keeps on the run', () => {
     if (line === null || !line.reminded || line.atTheSeal === null) throw new Error(`no seal on the line: ${JSON.stringify(line)}`)
     expect(line.atTheSeal.sealedTip).toBe(sealed.data['sealedTip'])
     expect(line.atTheSeal.noLongerFound).toContain('report:none')
-    expect(line.atTheSeal.stillFound).toContain('test:work/made-up.test.ts')
+    expect(line.atTheSeal.stillFound).toContain('test-lines:not-from-the-tool')
     expect(line.atTheSeal.couldNotJudge).toBeNull()
   })
 

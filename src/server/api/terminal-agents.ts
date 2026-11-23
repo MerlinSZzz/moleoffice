@@ -229,7 +229,8 @@ export async function terminalAgentRoutes(app: FastifyInstance): Promise<void> {
         'folder, which the office makes for this user alone and records as its start folder. A handle that cannot ' +
         'name a folder on every system, a folder another agent\'s record names, a data folder inside a git working ' +
         'tree, or "resume" with no start folder is refused, and nothing opens. A recorded folder that is gone is ' +
-        'refused, never replaced. The run is a session record, and the terminal is given ' +
+        'refused, never replaced. A press is refused while a run of the agent still runs. Once its process has stopped, ' +
+        'POST /api/terminals/agents/<agent>/way-back brings its conversation back in the office terminal. The run is a session record, and the terminal is given ' +
         'MOLE_OFFICE_API, MOLE_OFFICE_WORKSPACE, MOLE_OFFICE_AGENT and MOLE_OFFICE_SESSION; on a press proved by the ' +
         'person\'s key, or the secretary\'s own proved starter key, it is also given MOLE_AGENT_KEY, a run key revoked when the run ends. A press under the grant gives no key. The answer ' +
         'says whether a key was given, and never holds it.',

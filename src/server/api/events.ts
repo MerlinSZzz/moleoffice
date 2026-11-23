@@ -58,9 +58,9 @@ import {
   type PresenceReadingOnTheWire,
 } from '@shared/events.ts'
 import { whatAPageHoldsOfTheMachine } from '../lib/runtime.ts'
-import { whatToTellAPageOnAnotherOrigin } from '../../config/what-a-page-may-read.mjs'
 import { HOME_MOVED_HEADER } from '../../config/visit-headers.mjs'
-import { originsAPageMayBeOn, settings, settingValue } from '../../config/settings.mjs'
+import { settingValue } from '../../config/settings.mjs'
+import { theCorsHeadersOfAHijackedReply } from '../lib/an-origin-that-is-not-this-office.ts'
 
 const STREAM_NOTE =
   'WHAT HAPPENED, AS IT HAPPENS. This request is held open and the server writes a line to it whenever there is ' +
@@ -478,11 +478,11 @@ export async function eventRoutes(app: FastifyInstance): Promise<void> {
       // origin — which every page is in development, since Vite serves it on its own port — would
       // have its stream refused by the browser before a line of it arrived, and the page would say
       // it could not reach the server while every other request worked.
-      // `src/config/what-a-page-may-read.mjs` is the one declaration; it reads the same list of
-      // allowed origins the plugin does, and the same rule on whether a page may send its cookie
-      // (`A_PAGE_MAY_SEND_ITS_COOKIE`), so an admitted page gets `access-control-allow-credentials`
-      // here exactly as it does on every other reply.
-      const toThatOrigin = whatToTellAPageOnAnotherOrigin(req.headers.origin, originsAPageMayBeOn(settings()))
+      // They read the one decision the Origin check made for this request, which the plugin reads too
+      // (src/server/lib/an-origin-that-is-not-this-office.ts), and the same rule on whether a page may
+      // send its cookie (`A_PAGE_MAY_SEND_ITS_COOKIE`), so an admitted page gets
+      // `access-control-allow-credentials` here exactly as it does on every other reply.
+      const toThatOrigin = theCorsHeadersOfAHijackedReply(req)
       for (const [name, value] of Object.entries(toThatOrigin)) {
         reply.raw.setHeader(name, value)
       }

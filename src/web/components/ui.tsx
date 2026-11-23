@@ -1934,8 +1934,8 @@ export function Select<T extends string>({ value, onChange, options, force, id, 
  *
  * **THE DISTINCTION STAYS AND THE WEIGHT GOES.** Quietening is not deleting. A blank that reads as
  * "there is none" when the truth is "nobody looked" is the exact defect the fifth invariant exists
- * to prevent, so no tier here draws nothing at all, and the sentence a tier drops is put on the
- * mark's tooltip rather than thrown away.
+ * to prevent, so no tier here draws nothing at all, and a sentence the caller gives is put on the
+ * mark's tooltip.
  *
  * ---------------------------------------------------------------------------------------
  * THE PROPS EACH TIER TAKES, AND THEY ARE DELIBERATELY NOT THE SAME SET
@@ -1979,8 +1979,8 @@ export type AbsenceProps =
       looked: boolean
       /** Overrides the default word where the reader's word is a better one: "not set", "not said". */
       word?: string
-      /** REQUIRED. The sentence has to survive the quietening, and this is where it survives. */
-      title: string
+      /** The sentence, if the caller gives one. It goes on the tooltip and is read out on focus. */
+      title?: string
     }
   | {
       tier: 'must-act-on'
@@ -2032,10 +2032,10 @@ export function Absence(props: AbsenceProps) {
       <Mark
         glyph={props.looked ? NO_FIELD_GLYPH : PROGRESS_GLYPHS.none}
         word={props.word ?? (props.looked ? t('absence.none') : t('absence.notLooked'))}
-        explainOnFocus
+        explainOnFocus={props.title !== undefined}
         tone="todo"
         mark={inlineMark(props.looked ? 'none' : 'hollow', props.looked ? 'none' : 'dashed')}
-        detail={props.title}
+        detail={props.title ?? ''}
       />
     )
   }
@@ -6295,7 +6295,8 @@ export const UI_CSS = `
 .px-panel-head {
   display: flex; align-items: center; gap: var(--gut);
   min-height: var(--row-h);
-  flex-wrap: wrap; row-gap: 4px;
+  --px-head-row-gap: 4px;
+  flex-wrap: wrap; row-gap: var(--px-head-row-gap);
   border-bottom: var(--section-rule);
   padding-bottom: var(--section-pad);
 }
@@ -6791,8 +6792,9 @@ a.px-row-title::after { content: ""; position: absolute; inset: 0; z-index: 1; }
   /* 18px and 13px, not 16 and 11. The mark was the only node under 13px on two pages. It is a
      glyph rather than a sentence, so it broke no measured claim, but the rule in the contract says
      no text below 13px and a mark that has to argue for an exception is not worth the exception. */
-  width: 18px;
-  height: 18px;
+  --px-hint-mark-size: 18px;
+  width: var(--px-hint-mark-size);
+  height: var(--px-hint-mark-size);
   margin-left: 5px;
   border: var(--border-w) solid var(--border-strong);
   border-radius: var(--radius-pill);
@@ -6843,6 +6845,50 @@ a.px-row-title::after { content: ""; position: absolute; inset: 0; z-index: 1; }
   margin-top: 6px;
   box-shadow: none;
 }
+/* A HINT IN A PANEL'S ACTIONS OPENS ITS WORDS UNDER THE PANEL'S HEAD, AS WIDE AS THE HEAD, and the panel's
+   body moves down. Before, the words lay over the body. Before that, they opened leftward from the "?" at
+   the card's right end and ran up to 88 px past the cards beside the chat.
+   Shut, the hint is drawn as before: a closed details
+   still lays its words out, so the box that holds them is placed across the head, out of the page's flow.
+   Open, the actions and the hint draw no box of their own, and the head's own lines lay out the title, the
+   actions, the "?" and the words. The words take a line of their own, after everything else. The head's
+   rule moves from the head's foot to the top of that line, a pad below the line above it. The title takes
+   the room the actions leave, so the actions keep to the right end and the head wraps open where it wraps
+   shut. One thing differs: open, the parts of the actions can go to two lines, where shut they move as one.
+   Open, the head's height no longer sets the height of its first line, so the "?" has a margin above and
+   below that makes that line the row height less the pad. Shut, the first line is the row height less the
+   pad and the rule, so a head on one line moves by half the rule at most. A look may set the pad to a bare
+   0, which calc() refuses, so the pad is read through a property registered as a length. */
+@property --px-head-pad { syntax: '<length>'; inherits: true; initial-value: 0px; }
+.px-panel-head:has(> .px-panel-actions > .px-hint-mark) { position: relative; }
+.px-panel-head > .px-panel-actions > .px-hint-mark { position: static; }
+.px-panel-head > .px-panel-actions > .px-hint-mark::details-content { position: absolute; top: 100%; left: 0; right: 0; }
+.px-panel-head > .px-panel-actions > .px-hint-mark > .px-hint-body { left: 0; right: 0; width: auto; max-width: none; }
+.px-panel-head:has(> .px-panel-actions > .px-hint-mark[open]) {
+  --px-head-pad: var(--section-pad);
+  justify-content: flex-end;
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+.px-panel-head:has(> .px-panel-actions > .px-hint-mark[open]) > .px-panel-ident { flex-grow: 1; }
+.px-panel-head > .px-panel-actions:has(> .px-hint-mark[open]),
+.px-panel-head > .px-panel-actions > .px-hint-mark[open] { display: contents; }
+.px-panel-head > .px-panel-actions > .px-hint-mark[open] > summary {
+  margin-block: calc((var(--row-h) - var(--px-head-pad) - var(--px-hint-mark-size)) / 2);
+}
+.px-panel-head > .px-panel-actions > .px-hint-mark[open]::details-content {
+  position: static;
+  order: 1;
+  flex-basis: 100%;
+  margin-top: calc(var(--px-head-pad) - var(--px-head-row-gap));
+  border-top: var(--section-rule);
+}
+.px-panel-head > .px-panel-actions > .px-hint-mark[open] > .px-hint-body {
+  position: static;
+  display: block;
+  margin-top: var(--gut);
+  box-shadow: none;
+}
 .px-fielderr {
   display: flex; align-items: center; gap: 5px;
   font-size: var(--fs-1); font-weight: 600; color: var(--st-failed); line-height: var(--lh-body);
@@ -6867,7 +6913,7 @@ a.px-row-title::after { content: ""; position: absolute; inset: 0; z-index: 1; }
   resize: vertical;
 }
 .px-input[data-mono="1"] { font-family: var(--font-mono); }
-.px-input::placeholder { color: var(--text-3); }
+.px-input::placeholder { color: var(--placeholder); }
 .px-input:disabled { color: var(--text-2); background: var(--panel-2); cursor: not-allowed; }
 .px-input:hover, .px-select:hover, .px-input[data-force="hover"] { border-color: var(--control-hover-border); }
 .px-input::selection { background: var(--sel); }
@@ -6879,7 +6925,7 @@ a.px-row-title::after { content: ""; position: absolute; inset: 0; z-index: 1; }
    the panel's own ground with nothing around it.
 
    IT IS DIMMED AND IT IS NOT INVISIBLE. --text-2 is the same ink the empty line below uses and it
-   passes contrast in all eight palettes; --text-3 is the placeholder ink and would put an absence
+   passes contrast in all eight palettes; --text-3 is quieter still and would put an absence
    below the words beside it, which is how quietening turns into hiding. */
 .px-absent {
   color: var(--text-2);

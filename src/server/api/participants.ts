@@ -114,7 +114,7 @@ import { openTheGroupsForAWorkArea } from '../lib/claims.ts'
 // THE ONE MESSAGE A NEW AGENT GETS ABOUT THE CARD IT NOW HOLDS.
 import { writeTheCardMessageToOne } from '../lib/cardmessage.ts'
 import { sayItWasDoneFromAnotherComputer } from '../lib/changed-from-another-computer.ts'
-import { checkAgentNotes, createRecordWithReport, getRecord, listRecords, patchRecord, sameAgent, throughTheCardDoor, throughTheRetireDoor, writeDownASettingChange, writeDownAnActUnderTheRaise, type Actor } from '../lib/records.ts'
+import { THE_LISTED_ORDER, checkAgentNotes, createRecordWithReport, getRecord, listRecords, patchRecord, sameAgent, theRecordsListed, throughTheCardDoor, throughTheRetireDoor, writeDownASettingChange, writeDownAnActUnderTheRaise, type Actor } from '../lib/records.ts'
 import { PanelError } from '../lib/panel-error.ts'
 // THE KEY A REGISTRATION ANSWERS, ONCE. Criterion P83, point 5: made here, kept only as its
 // SHA-256, answered in the reply and never read back. The retire door revokes it in the same act.
@@ -123,7 +123,6 @@ import {
   aKeyWasEverHeldBy,
   howThisRequestProvedItself,
   makeAnAgentKey,
-  revokeEveryLiveKeyHeldBy,
 } from '../lib/keys.ts'
 import { theHashOfTheKeyOnThisRequest } from '../db/the-key-on-this-request-was-made-for-a-run.ts'
 import { gateMet } from '../lib/gate-counts.ts'
@@ -208,7 +207,7 @@ import {
   type AvatarOnOffer,
 } from '../lib/avatars.ts'
 import { openToSend, sendTheOpenFile } from './files.ts'
-import { circlePicture, participantFromKey, theReasonAsOneSentence } from '@shared/messages.ts'
+import { circlePicture, participantFromKey } from '@shared/messages.ts'
 import { PROPOSED_NAMES } from '@shared/participants.ts'
 // WHAT A ROW WITH NO ROLE IS READ AS, and what a screen says instead of drawing that word. Both
 // come from shared/roles.ts, which is where the role vocabulary's one statement of each fact is.
@@ -260,6 +259,8 @@ import { theAgentsRuns } from '../lib/agent-runs.ts'
 // so. The reading and the sentence live beside `whereARunStands`, so the door
 // and GET /api/checks answer the same question the same way.
 import { whatRetiringWhileACheckIsOwed, theRetireSentenceWhileACheckIsOwed } from '../lib/inspection.ts'
+import { theRecordedOwner } from '../lib/agent-owner.ts'
+import { theOfficeNameOfAStoredReference } from '../lib/agent-owner-changes.ts'
 // WHETHER THIS AGENT IS ACTING FOR THE PERSON, read in the one place the Role cards page reads it.
 // Criterion P64 put the press on this page, so the two replies must not answer it differently.
 import { asAScreenReadsIt, whatThisAgentIsDoingForYou } from '../lib/actingfor.ts'
@@ -272,7 +273,9 @@ import { whatTheRoutesOfAnOperationSay, type ApiRoute } from './kinds.ts'
 import { whereThisRegistrationCameFrom } from '../lib/registrationgate.ts'
 // THE ROW ONE CREDENTIAL ALREADY HAS. Criterion P81's collision rule; the owner's case of 8 September 2026.
 import { theRowThisCredentialAlreadyHas } from '../lib/participants.ts'
-import { sqlite } from '../db/client.ts'
+import { sql } from 'drizzle-orm'
+import { db, sqlite } from '../db/client.ts'
+import { records as recordsTable } from '../db/schema.ts'
 import { theFiledAliasesReadOnce, type TheFiledAliases } from '../lib/registry-aliases/runs.ts'
 import { theOneAgentAStringNames } from '../lib/agent-references.ts'
 // AN AGENT REGISTERED WITH NO KEY OF ITS OWN, marked in the registration's own transaction.
@@ -522,7 +525,7 @@ const changeBody = z
       })
       .optional(),
     /**
-     * The person's own settings for the two shipped flags and 'No mark', migration 0346. A person's own, read here as
+     * The person's own settings for the four shipped flags and 'No mark', migration 0346. A person's own, read here as
      * the labels are, so a wrong value is refused with nothing written; null puts every default back.
      */
     shippedFlags: z
@@ -692,6 +695,8 @@ interface ParticipantOnTheWire {
   /** Who last set `addressAs`, and when, or null because nobody recorded it. */
   addressAsSetBy: AddressAsSetBy
   runtime?: string | null
+  // The harness the agent's record names, as stored: any harness's word, also one with no adapter.
+  harness?: string | null
   // True on an agent when a listed agent registered earlier bears the same name (problem hqbovBMnTu-z).
   newerOfASharedName?: boolean
   retired?: boolean
@@ -753,13 +758,18 @@ interface ParticipantOnTheWire {
   chatOpensAs?: ChatOpensAs | null
   /** The chosen column layout, or null to follow the available width. */
   chatLayout?: ChatLayout | null
+  /**
+   * The mode they start in while their browser has stored none: `inspect`, Developer mode, or null for a person
+   * made before the column, read as Normal mode. Never on an agent: an agent has no browser mode.
+   */
+  startingMode?: 'inspect' | null
   /** Which key sends a message, or null because they never chose. */
   sendKey?: SendKeySetting | null
   /** Which keyboard shortcuts are on, or null because they never chose. */
   shortcuts?: ShortcutSettings | null
   /** The person's own labels for the messages they write, unreadable with the reader's sentences, or null because they never made one. Migration 0341. */
   chatLabels?: TheStoredMessageLabels
-  /** The person's own settings for the two shipped flags and 'No mark', or null because they changed none. Migration 0346. */
+  /** The person's own settings for the four shipped flags and 'No mark', or null because they changed none. Migration 0346. */
   shippedFlags?: StoredShippedFlags | null
   /** The person's look and own themes, unreadable with the reader's sentences, or null because they never set one; only on their own row as they read it. Migration 0347. */
   themes?: TheStoredLook
@@ -913,6 +923,7 @@ function pageParticipant(kind: 'person' | 'agent', held: Record<string, unknown>
     chatButtonStays: isChatButtonStays(held['chatButtonStays']) ? held['chatButtonStays'] : null,
     chatOpensAs: isChatOpensAs(held['chatOpensAs']) ? held['chatOpensAs'] : null,
     chatLayout: isChatLayout(held['chatLayout']) ? held['chatLayout'] : null,
+    startingMode: held['startingMode'] === 'inspect' ? 'inspect' as const : null,
     sendKey: isSendKeySetting(held['sendKey']) ? held['sendKey'] : null,
     shortcuts: theShortcutsHeld(held['shortcuts']), chatLabels: theLabelsHeld(held['chatLabels']),
     shippedFlags: theShippedFlagsHeld(held['shippedFlags']),
@@ -1029,6 +1040,8 @@ function onTheWire(
       chatButtonStays: isChatButtonStays(held['chatButtonStays']) ? held['chatButtonStays'] : null,
       chatOpensAs: isChatOpensAs(held['chatOpensAs']) ? held['chatOpensAs'] : null,
       chatLayout: isChatLayout(held['chatLayout']) ? held['chatLayout'] : null,
+      // AND THE MODE THEY START IN while their browser has stored none, or null: a person made before the column.
+      startingMode: held['startingMode'] === 'inspect' ? 'inspect' as const : null,
       sendKey: isSendKeySetting(held['sendKey']) ? held['sendKey'] : null,
       shortcuts: theShortcutsHeld(held['shortcuts']),
       chatLabels: theLabelsHeld(held['chatLabels']),
@@ -1052,6 +1065,7 @@ function onTheWire(
   return {
     ...base,
     runtime: held['runtime'] === null ? null : String(held['runtime']),
+    harness: held['harness'] === null || held['harness'] === undefined ? null : String(held['harness']),
     // WHETHER A LISTED AGENT REGISTERED EARLIER BEARS THE SAME NAME, so the chat marks this one as the
     // newer of the two (problem hqbovBMnTu-z). `theAgentsNewerThanASameNamedOne` says what newer is.
     newerOfASharedName: (newerOfASharedName ?? theAgentsNewerThanASameNamedOne()).has(id),
@@ -1161,6 +1175,29 @@ function chainOnTheWire(
 ): { chain: { kind: string; id: string }[]; chainReachesThePerson: boolean; chainSays: string } {
   const read = theChainUpWith(from, theAgentThisNames)
   return { chain: read.chain, chainReachesThePerson: read.reachesThePerson, chainSays: read.says }
+}
+
+/** An agent's owner as one reply says it: nobody recorded, unreadable, or held with its office name. */
+type TheOwnerOnTheWire =
+  | { state: 'absent' }
+  | { state: 'broken' }
+  | { state: 'held'; kind: ParticipantRef['kind']; id: string; name: string | null }
+
+/**
+ * AN AGENT'S OWNER, as a part to spread on the read of one agent and on its profile (wave 13s round 281).
+ *
+ * The state is `theRecordedOwner`'s. A held owner carries its office name, or null because its stored id
+ * names nobody registered. The one place that works the name out is `theOfficeNameOfAStoredReference` in
+ * src/server/lib/agent-owner-changes.ts, which names each hand-over's owners and maker too. A person has
+ * no owner, so a person's reply is unchanged. The list does not carry it: nothing there reads an owner,
+ * and a name for every row would be one more read for every agent.
+ */
+function theOwnerOnTheWire(held: NonNullable<ReturnType<typeof readParticipant>>): { owner?: TheOwnerOnTheWire } {
+  if (!('ownerId' in held)) return {}
+  const recorded = theRecordedOwner(held)
+  if (recorded.state !== 'held') return { owner: recorded }
+  const { kind, id } = recorded.owner
+  return { owner: { state: 'held', kind, id, name: theOfficeNameOfAStoredReference(recorded.owner) } }
 }
 
 /**
@@ -1747,6 +1784,14 @@ const RESTORE_LOOP_ROWS = 8
 const RESTORE_CHANGED_ROWS = 5
 
 /**
+ * A STAMP IN THE FORM THE OFFICE STORES, as a GLOB for SQLite and the same text as a pattern for JavaScript. Between
+ * two stamps in this form, comparing their bytes and `localeCompare` agree: the characters between the digits are the
+ * same, so the first difference is one digit against another.
+ */
+const A_STORED_STAMP_GLOB = '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9] [0-9][0-9]:[0-9][0-9]:[0-9][0-9]'
+const A_STORED_STAMP = new RegExp(`^${A_STORED_STAMP_GLOB}$`)
+
+/**
  * WHAT A KEY NOBODY HOLDS IS ANSWERED, and why it names no agent. A revoked key and a key that was
  * never issued are the same answer: the office keeps only the SHA-256 of a key it issued, so it
  * cannot tell them apart, and it must not fall through to answering by the handle.
@@ -2026,9 +2071,19 @@ async function theRestore(
       'The last session that ran as this agent has no recorded end, so nothing can be counted since it.'
   } else {
     changedSince = lastSession.endedAt
-    const after = listRecords({ workspaceId: projectId }).filter(
-      (one) => one.id !== lastSession.id && one.updatedAt.localeCompare(changedSince as string) > 0,
-    )
+    // THE CHANGED RECORDS ARE ASKED FOR BY THEIR FOUR FIELDS, so that the door does not parse the whole project.
+    // `localeCompare` still decides what changed. SQLite compares bytes, and the two agree only when both stamps are
+    // in the stored form, so the SQL narrows only for an end in that form, and keeps every stamp in another form.
+    const narrowed = A_STORED_STAMP.test(changedSince)
+      ? sql`(${recordsTable.updatedAt} > ${changedSince} OR ${recordsTable.updatedAt} NOT GLOB ${A_STORED_STAMP_GLOB})`
+      : undefined
+    const after = db
+      .select({ id: recordsTable.id, kind: recordsTable.kind, title: recordsTable.title, updatedAt: recordsTable.updatedAt })
+      .from(recordsTable)
+      .where(theRecordsListed(narrowed === undefined ? { workspaceId: projectId } : { workspaceId: projectId, alsoWhere: narrowed }))
+      .orderBy(...THE_LISTED_ORDER)
+      .all()
+      .filter((one) => one.id !== lastSession.id && one.updatedAt.localeCompare(changedSince as string) > 0)
     after.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
     changedCount = after.length
     for (const one of after) {
@@ -3531,7 +3586,7 @@ export async function participantRoutes(
     const held = readParticipant(who)
     if (held === null) throw new PanelError(`No ${participantWord(who.kind)} in this installation answers to "${who.id}".`, 404)
     // AND THE LOOK, only when the one asking is this person, as on their roster row (lib/the-look.ts says why).
-    return { participant: { ...onTheWireWithTheBroadcast(who.kind, held as unknown as Record<string, unknown>, workspaceOf(req), theStarterEachStringNames(), new Date()), ...theLookForTheReader(who, theReaderOfAnOptionalLook(req)) } }
+    return { participant: { ...onTheWireWithTheBroadcast(who.kind, held as unknown as Record<string, unknown>, workspaceOf(req), theStarterEachStringNames(), new Date()), ...theOwnerOnTheWire(held), ...theLookForTheReader(who, theReaderOfAnOptionalLook(req)) } }
   })
 
   // EVERYTHING ONE PROFILE PAGE DRAWS, IN ONE READ. Criterion M51; `theProfile` says why it is one
@@ -3548,6 +3603,7 @@ export async function participantRoutes(
     return {
       participant: {
         ...onTheWireWithTheBroadcast(who.kind, held as unknown as Record<string, unknown>, workspaceId, theStarterEachStringNames(), now),
+        ...theOwnerOnTheWire(held),
         ...(who.kind === 'agent' ? { projects: projectsOfAgent(who.id), personalTags: agentMarksFor(reader).get(who.id) ?? [] } : {}),
       },
       presence: participantPresence(who, workspaceId, now, reader),
@@ -3787,29 +3843,10 @@ export async function participantRoutes(
       const done = sqlite.transaction(() => {
         // WHO RETIRED IT IS STORED BY REGISTRY ID. `participantForActor` reads the caller, so an agent
         // that sent its handle and one that sent its id are stored the same way.
+        // AND THE AGENT'S KEYS DIE WITH IT, IN THE SAME ACT (criterion P83 point 5). `retireThisAgent`
+        // revokes every live key the agent holds and answers how many, so this door revokes nothing
+        // itself and reports that number. `keysRevoked: 0` says the agent held no live key.
         const retired = retireThisAgent(row.id, participantForActor(actor), body.because)
-        /**
-         * AND THE AGENT'S KEY DIES WITH THE AGENT, IN THE SAME ACT. Criterion P83 point 5, and the
-         * lesson of wave 1 driven once already: problem cJHoRBVT6IG8, where ending a credential left
-         * the key it bound alive and a phone the person had just ended still wrote decisions. A retirement that
-         * leaves the agent's key working is the same failure through the other door.
-         *
-         * IT IS REVOKED BY THE OWNER THE RETIRE PRESS NAMES, not by a key the press never saw, and the
-         * reason names the retirement so a person reading the row knows what ended it. Every live key
-         * of this agent goes, not only the newest: this is a statement about the agent, and leaving an
-         * older key alive would be the same defect wearing a different hash.
-         *
-         * REVOKING NOTHING IS NOT A FAILURE. An agent registered before keys existed holds none, and
-         * `keysRevoked: 0` says that rather than the door inventing a key to revoke.
-         */
-        const because = theReasonAsOneSentence(body.because)
-        // BY THE ROW'S ID: a handle can be borne by a retired agent and a live one (criterion I3), and
-        // only this agent's keys end with it.
-        const keysRevoked = revokeEveryLiveKeyHeldBy(
-          'agent',
-          retired.id,
-          `The agent "${retired.handle}" was retired${because === null ? '.' : `: ${because}`}`,
-        )
         /**
          * AND THE RECORD SAYS SO TOO, where there is one. Retirement is stored twice — `state` on the
          * agent record and `retired` on the row — and the record is the source everywhere else. A
@@ -3837,7 +3874,7 @@ export async function participantRoutes(
         const secretariat = bringTheSecretariatGroupInStep()
         // AND A RETIRED SECRETARY'S BROADCAST SCHEDULE ENDS.
         const broadcast = bringTheBroadcastSchedulesInStep()
-        const { nothingWritten, ...agent } = retired
+        const { nothingWritten, keysRevoked, ...agent } = retired
         return { agent, keysRevoked, noWrites: nothingWritten === true && keysRevoked === 0 && !recordWrote && (secretariat === null || (!secretariat.created && !secretariat.membershipChanged)) && broadcast.added.length === 0 && broadcast.ended.length === 0 }
       })()
       const remoteLine = sayItWasDoneFromAnotherComputer(req, `The agent "${done.agent.handle}" was retired`)

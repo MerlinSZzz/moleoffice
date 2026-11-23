@@ -19,25 +19,25 @@
  *      the problem then reads fixed in the state chip under its title, with what was written saved as
  *      its fix. The chip is new with the press: before it, the page drew a problem's state only behind
  *      `/edit`. In English;
- *   2. a page read as an agent draws no press on the same kind of problem, at `#/problem/<id>`;
- *   3. the person sees no press on a problem whose move is an agent's, at `#/problem/<id>`;
- *   4. the person sees the press at `#/r/<id>` too, chooses fixed, and the office then holds the
+ *   2. the person sees no press on a problem whose move is an agent's, at `#/problem/<id>`;
+ *   3. the person sees the press at `#/r/<id>` too, chooses fixed, and the office then holds the
  *      problem as fixed, and the record page reads it fixed beside where the press was;
- *   5. a page read as an agent draws no press at `#/r/<id>` or at `#/problem/<id>`;
- *   6. the person sees no press at `#/r/<id>` on a problem whose move is an agent's, nor on one that
+ *   4. a page read as an agent draws no press at `#/r/<id>` or at `#/problem/<id>`;
+ *   5. the person sees no press at `#/r/<id>` on a problem whose move is an agent's, nor on one that
  *      is already fixed.
- * Cases 1 to 6 are in English. The Chinese repeat of the behaviour and the two photograph cases were
+ * Cases 1 to 5 are in English. The Chinese repeat of the behaviour and the two photograph cases were
  * dropped: the behaviour does not change with the language, and the pictures are held by the wider
  * review rather than by this file.
  *
  * MUTATIONS, NAMED, AFTER A CONTROL RUN:
  *   · the press hidden (`CloseThisProblem` returns null first): case 1 goes red, the press is not
  *     there (round 20's proofs file);
- *   · the press shown to an agent (the `getActor().type !== 'human'` line taken out): case 2 goes red
- *     (round 20's proofs file);
+ *   · the press shown to an agent (the `getActor().type !== 'human'` line taken out): the case that read
+ *     `#/problem/<id>` as an agent went red (round 20's proofs file). That case was cut, because case 4
+ *     reads the same address as an agent;
  *   · the press taken off the record page (the `<CloseThisProblem>` line in RecordPage.tsx removed):
- *     case 4 goes red because the press is not there, and case 1 stays green, because the problem's
- *     own page still draws it. Case 5 goes red in its control half, and the record page's pictures
+ *     case 3 goes red because the press is not there, and case 1 stays green, because the problem's
+ *     own page still draws it. Case 4 goes red in its control half, and the record page's pictures
  *     cannot be taken (round 23's proofs file).
  *
  * Everybody and everything here is made up. The world is the test's own: `liveApp` starts its own API
@@ -171,18 +171,6 @@ for (const lang of ['en'] as const) {
       .poll(async () => (await app.page.locator('.pp-standing .px-chip-stored').innerText()).includes(words('state.fixed')), { timeout: 10_000 })
       .toBe(true)
     await app.page.screenshot({ path: `${shots}/closed-${lang}-1440-light.png`, fullPage: false })
-  }, 180_000)
-
-  it(`a page read as an agent draws no close press (${lang})`, async () => {
-    const id = await aProblem(`The glaze cupboard is unlabelled (${lang})`, 'person')
-    // THE CONTROL HALF: the person sees the press on this very problem.
-    await open(id, lang, 'person')
-    await app.page.locator('.pp-close button').waitFor({ state: 'visible', timeout: 30_000 })
-
-    await open(id, lang, 'agent')
-    // The page has drawn the problem's own body before the press is counted.
-    await app.page.locator('.rd').first().waitFor({ timeout: 30_000 })
-    expect(await app.page.locator('.pp-close').count(), 'a close press drawn for an agent').toBe(0)
   }, 180_000)
 
   it(`the person sees no close press on a problem whose move is an agent's (${lang})`, async () => {

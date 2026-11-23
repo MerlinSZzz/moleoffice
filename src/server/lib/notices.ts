@@ -1,5 +1,6 @@
 // Copyright © 2026 Zhengyang Shen
 // Licensed under the MIT License. See LICENSE.
+import { KNOWLEDGE_WORDS } from '@shared/words/en-wave-13u.ts'
 import { sayInEnglish } from '@shared/i18n.ts'
 /**
  * EVERY KIND OF NOTICE MOLE OFFICE AND THE INSPECTOR WRITE, AND WHETHER IT WAKES ITS READER.
@@ -94,6 +95,7 @@ export type AnotherNoticeKind =
   | 'packageHandedBack'
   | 'packageAccepted'
   | 'packageReturned'
+  | 'packageReminder'
 
 /** Every kind of notice: its name, as stored in a message's `data.notice`. */
 export type NoticeKind = SystemLineKind | AnotherNoticeKind
@@ -109,6 +111,9 @@ const QUIET = (because: () => string): ANotice => ({ wakes: false, get because()
 
 /** THE TABLE. One row for every kind of notice. */
 export const NOTICES: { readonly [K in NoticeKind]: ANotice } = {
+  aKnowledgeChangeWaits: WAKES(() => KNOWLEDGE_WORDS.noticeReason),
+  knowledgeForAFlowStep: WAKES(() => KNOWLEDGE_WORDS.flowStepNotice),
+  aKnowledgeRatingIsLow: WAKES(() => KNOWLEDGE_WORDS.lowNoticeReason),
   storageCapacity: QUIET(() => sayInEnglish('noticeWords.storageCapacity')),
   stableUpgradeNotice: QUIET(() => sayInEnglish('noticeWords.stableUpgradeNotice')),
   // ---------------------------------------------------------------- the lines in SYSTEM_LINES
@@ -198,6 +203,7 @@ export const NOTICES: { readonly [K in NoticeKind]: ANotice } = {
   theStarterOfAnAgentChanged: WAKES(() => sayInEnglish('noticeWords.theStarterOfAnAgentChanged')),
   oldDeadLetterLinesFolded: QUIET(() => sayInEnglish('noticeWords.oldDeadLetterLinesFolded')),
   theGovernsCheckFoundWork: WAKES(() => sayInEnglish('noticeWords.theGovernsCheckFoundWork')),
+  nothingFitsAPage: WAKES(() => sayInEnglish('noticeWords.nothingFitsAPage')),
   aMessageBackAsYouAsked: WAKES(() => sayInEnglish('noticeWords.aMessageBackAsYouAsked')),
   aMessageBackAsTheSecretarySetIt: WAKES(() => sayInEnglish('noticeWords.aMessageBackAsTheSecretarySetIt')),
   theIntentMarkWasBroken: WAKES(() => sayInEnglish('noticeWords.theIntentMarkWasBroken')),
@@ -260,6 +266,7 @@ export const NOTICES: { readonly [K in NoticeKind]: ANotice } = {
   packageHandedBack: WAKES(() => sayInEnglish('noticeWords.packageHandedBack')),
   packageAccepted: WAKES(() => sayInEnglish('noticeWords.packageAccepted')),
   packageReturned: WAKES(() => sayInEnglish('noticeWords.packageReturned')),
+  packageReminder: WAKES(() => sayInEnglish('noticeWords.packageReminder')),
 }
 
 /**

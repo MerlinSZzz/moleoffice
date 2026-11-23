@@ -84,3 +84,56 @@ describe('the attachment list asked for runs that name an agent', () => {
     expect(open).toContain('made-up-second-entry')
   })
 })
+
+// Criterion change (wave 13s round 281, decisions OQR0WDVq0FkP and srwXywF1oYIs): the list asked for the runs that could
+// serve an active agent of the project.
+// The roster drops every run whose agent is not active, so it asks the list for those runs alone. The case below holds
+// that option to the whole list. It keeps each run the whole list gives an active agent, whether the run's first entry or
+// its second names the agent. It leaves out the same two shapes for a retired agent, and every run above, whose agent
+// has no record.
+// Before, no case held a list that leaves out the runs of agents that are not active.
+
+/** The agents the case below writes, by state: each one's id. */
+const AGENT_IN_STATE = { active: 'made-up-active-agent', retired: 'made-up-retired-agent' } as const
+
+/** The runs the case below writes, by id: the data each is stored with. Each is open. */
+const SERVING_RUNS: Record<string, string> = {
+  'made-up-active-first-entry': JSON.stringify({ ranAs: [{ workspaceId: PROJECT, agentId: AGENT_IN_STATE.active }] }),
+  'made-up-retired-first-entry': JSON.stringify({ ranAs: [{ workspaceId: PROJECT, agentId: AGENT_IN_STATE.retired }] }),
+  // THIS PROJECT'S ENTRY IS THE SECOND, so only the second half of the narrowing finds these two.
+  'made-up-active-second-entry': JSON.stringify({ ranAs: [{ workspaceId: 'made-up-other-project' }, { workspaceId: PROJECT, agentId: AGENT_IN_STATE.active }] }),
+  'made-up-retired-second-entry': JSON.stringify({ ranAs: [{ workspaceId: 'made-up-other-project' }, { workspaceId: PROJECT, agentId: AGENT_IN_STATE.retired }] }),
+}
+
+/** The runs of `SERVING_RUNS` whose agent is active. */
+const SERVING_AN_ACTIVE_AGENT = ['made-up-active-first-entry', 'made-up-active-second-entry']
+
+describe('the attachment list asked for runs that could serve an active agent', () => {
+  it("keeps every run the whole list gives an active agent, by its first entry or its second, and leaves out a retired agent's", async () => {
+    const { AGENT_KIND } = await import('../src/server/lib/inbox.ts')
+    const write = t.client.sqlite.prepare(
+      `INSERT INTO records (id, workspace_id, owner_id, created_at, updated_at, kind, title, data, origin) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'authored')`,
+    )
+    const at = '2026-11-21 09:00:00'
+    for (const [state, id] of Object.entries(AGENT_IN_STATE)) {
+      write.run(id, PROJECT, THE_TEST_OFFICES_OWNER.id, at, at, AGENT_KIND, `A made-up agent, ${state}`, JSON.stringify({ handle: id, state }))
+    }
+    for (const [id, data] of Object.entries(SERVING_RUNS)) write.run(id, PROJECT, THE_TEST_OFFICES_OWNER.id, at, at, 'session', `A made-up run, ${id}`, data)
+
+    const written = (one: { id: string }): boolean => Object.hasOwn(SERVING_RUNS, one.id)
+    const whole = attachments.listAttachments({ workspaceId: PROJECT }).filter(written)
+    expect(Object.fromEntries(whole.map((one) => [one.id, one.agentId])), 'the agent the whole list gives each run written here').toEqual({
+      'made-up-active-first-entry': AGENT_IN_STATE.active,
+      'made-up-retired-first-entry': AGENT_IN_STATE.retired,
+      'made-up-active-second-entry': AGENT_IN_STATE.active,
+      'made-up-retired-second-entry': AGENT_IN_STATE.retired,
+    })
+    const served = attachments.listAttachments({ workspaceId: PROJECT, servingAnActiveAgentOnly: true })
+    expect(served.filter(written).map((one) => one.id).sort(), 'the runs written here that are kept').toEqual(SERVING_AN_ACTIVE_AGENT)
+    for (const run of served.filter(written)) expect(run, `the run ${run.id} as the whole list gives it`).toEqual(whole.find((one) => one.id === run.id))
+    expect(served.map((one) => one.id).filter((id) => Object.hasOwn(RUNS, id)), 'the runs above, kept').toEqual([])
+    const withOpenIds = attachments.listAttachmentsAndOpenIds({ workspaceId: PROJECT, servingAnActiveAgentOnly: true })
+    expect(withOpenIds.runs.filter(written).map((one) => one.id).sort(), 'the runs written here that are kept, read with the open rule').toEqual(SERVING_AN_ACTIVE_AGENT)
+    expect(SERVING_AN_ACTIVE_AGENT.filter((id) => withOpenIds.openIds.has(id)), 'the kept runs the SQL open rule calls open').toEqual(SERVING_AN_ACTIVE_AGENT)
+  })
+})

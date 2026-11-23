@@ -38,7 +38,7 @@ import { randomBytes } from 'node:crypto'
 import { writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { THE_TEST_FIXTURE_ROOT } from './a-page-of-a-test-office.ts'
-import { apiApp, freshDb, type TestDb } from './helpers.ts'
+import { apiApp, freshDb, type TestDb, governsTheWholeProject } from './helpers.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { WANTED } from '../src/shared/ops.ts'
 
@@ -121,7 +121,7 @@ beforeAll(async () => {
   const decision = await ask('POST', '/api/records', PERSON, {
     kind: 'decision',
     title: 'Poll at 200 ms',
-    data: { replaces: [], because: 'Latency matters more than a dropped frame.' },
+    data: { ...governsTheWholeProject(), replaces: [], because: 'Latency matters more than a dropped frame.' },
   })
   expect(decision.status, JSON.stringify(decision.json)).toBe(201)
   const settled = await ask('POST', '/api/links', PERSON, {

@@ -355,8 +355,6 @@ const FILES_THAT_NAME_A_FIXED_LOGS_PATH: Readonly<Record<string, string>> = {
     "A server started from a checkout writes the message worker's log in .logs/the-message-worker-<port>.log of that checkout, and the test makes a folder at that path for a free port of its own, so that the worker's start fails, and removes it after.",
   'tests/the-trunk-is-read-from-the-repository.test.ts':
     "'.logs/worker.log' is a file path inside a sealed submission of a clone the test made for itself, not a path on this checkout's disk.",
-  'tests/one-merge-tool-per-entry.test.ts':
-    "'.logs/first-build-finished' is a build-stage marker inside the test's own temporary clone, not this checkout's .logs folder.",
   'tests/cloud-box-commands.mjs':
     "The made-up npm writes the startup journals a whole run leaves in .logs/ of the made-up box's clone, a temporary folder of the test's own, where the real suite leaves them for the cloud runner to keep.",
   'tests/the-cloud-suite-door-runs-the-commit.test.ts':

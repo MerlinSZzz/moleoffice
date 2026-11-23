@@ -14,7 +14,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import * as rules from '../src/server/lib/before-the-seal-rules.ts'
 import type { TheFactsBeforeTheSeal } from '../src/server/lib/before-the-seal-rules.ts'
 import { THE_MESSAGE_WORKER_ID } from '../src/shared/participants.ts'
-import { apiApp, freshDb, theOfficesKeyHeader, type TestDb } from './helpers.ts'
+import { apiApp, freshDb, theOfficesKeyHeader, type TestDb, governsTheWholeProject } from './helpers.ts'
 import { THE_TEST_OFFICES_OWNER } from './a-page-of-a-test-office.ts'
 
 const madeUp = (what: string): string => `${what}-${randomBytes(4).toString('hex')}`
@@ -101,7 +101,8 @@ const anAgent = (id: string): Record<string, string> => ({
 })
 
 async function file(kind: string, title: string, data: Record<string, unknown> = {}, headers = human()): Promise<string> {
-  const r = await app.inject({ method: 'POST', url: '/api/records', headers, payload: { kind, title, data: kind === 'decision' ? { replaces: [], ...data } : data } })
+  const r = await app.inject({ method: 'POST', url: '/api/records', headers, payload: { kind, title, data: kind === 'decision' ? {
+    ...governsTheWholeProject(), replaces: [], ...data } : data } })
   expect(r.statusCode, r.body).toBe(201)
   return r.json().record.id as string
 }

@@ -247,9 +247,9 @@ describe('the recipient picker', () => {
       }),
     )
 
-  it('gives every candidate the sentence saying why it is one', () => {
+  it('gives every candidate its reason, in a short line', () => {
     const html = drawn()
-    expect(html).toContain('It filed this report on 15 August.')
+    expect(html).toContain('Created this')
     expect(html).toContain('Connected to what you pointed at')
   })
 
@@ -259,7 +259,7 @@ describe('the recipient picker', () => {
     // what stops recency being read as relevance, and it is word for word what each row underneath
     // says about itself, so the heading and the rows cannot drift apart.
     expect(html).toContain('Not connected · recently active')
-    expect(html.indexOf('It filed this report on 15 August.')).toBeLessThan(
+    expect(html.indexOf('Created this')).toBeLessThan(
       html.indexOf('Not connected · recently active'),
     )
   })
@@ -270,16 +270,6 @@ describe('the recipient picker', () => {
     expect(html).toContain('Say who you mean')
     // Nothing in the markup claims a choice has been made.
     expect(html).not.toContain('aria-checked="true"')
-  })
-
-  it('puts the ranking rule behind a press rather than in front of the agents', () => {
-    // Measured in the browser on 18 August 2026: drawn open, the rule filled the whole picker and
-    // pushed every candidate below the fold. It is read once and skipped afterwards, which is what
-    // `Explain` is for.
-    const html = drawn()
-    expect(html).toContain('<details')
-    expect(html).toContain('how the ranking works')
-    expect(html).toContain('Five things count, strongest first.')
   })
 
   it('says when nothing Mole Office holds connects an agent to this, rather than showing an empty list', () => {

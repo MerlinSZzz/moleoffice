@@ -1,17 +1,19 @@
 // Copyright © 2026 Zhengyang Shen
 // Licensed under the MIT License. See LICENSE.
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { t } from '@shared/i18n.ts'
 import { EVERY_PROJECT } from '@shared/across-projects.ts'
 import { isClosed, type ChecklistEvidence, type ChecklistReading, type ChecklistRequest } from '@shared/checklists.ts'
-import { api } from '../api.ts'
+import { api, type ChecklistsAcrossReply } from '../api.ts'
 import { usePanelPresence } from '../lib/motion.ts'
 import { useChecklistArrivalRing } from '../lib/checklist-arrival.ts'
+import { readEveryItemWhileTheWindowIsOpen, readMyChecklistsAgain, useMyChecklists } from '../lib/my-checklists.ts'
 import { THE_WIDE_FROM } from '../lib/the-shell-width.ts'
-import { ErrorNote, Loading, useAsync } from './ui.tsx'
-import { checklistsPath, RouteLink } from './router.tsx'
+import { ErrorNote, Loading, useAsync, type AsyncState } from './ui.tsx'
 import { declaredAttributes } from './declares.ts'
 import { Icon } from './Sidebar.tsx'
+import { useProjectTitles } from './ProjectChoice.tsx'
+import { CHECKLIST_SECTIONS_CSS, ChecklistCard, NewChecklistPress, OpenCount, THE_READERS_OWN, useOwners } from './ChecklistSections.tsx'
 import {
   aRefusedPress,
   aSpecialChecklistItem,
@@ -22,11 +24,10 @@ import {
   EvidencePicker,
   FoldPress,
   inOrder,
+  theFoldOf,
+  useTheFoldsReadings,
   ItemMark,
   ItemRow,
-  ownerKey,
-  ownerWords,
-  Progress,
   progressOf,
   refusedPressWords,
   theseMoved,
@@ -37,17 +38,30 @@ import {
   WINDOW_SWITCHED,
   type DrawnLine,
   type RefusedPress,
+  type TheFoldsReading,
 } from './ChecklistParts.tsx'
 /**
  * THE CHECKLISTS WINDOW AT THE TOP RIGHT, on every page while it is switched on (the checklists page has the
- * switch). By point 2 of a decision, the press is a count of the reader's own items still to do; the open
- * window groups the items under each checklist with its progress; every item is shown whole; done items are
- * folded under each checklist with a press that opens them; "Mark done" is a small button beside each item
- * still to do.
+ * switch). The press is a count of the reader's own items still to do.
  *
- * IT OPENS ON THE READER'S OWN CHECKLISTS, with no choice of whose. One press
- * in its top line opens the full view, where the reader chooses whose checklists to read, everyone's at first;
- * those are read and never marked. A press in the full view's top line goes back. Closing goes back as well.
+ * WHAT IT READS, AND WHEN. Closed, it reads only the reader's own checklists, for the count on the press. That read is
+ * the page's one read of them (src/web/lib/my-checklists.ts), which Home's checklist count draws too. Opened, it
+ * reads everybody's checklists as well, for the names and the cards of the name chosen. The part drawn while it
+ * is open, `TheOpenWindow`, also reads the participants through `useOwners`, to put the secretaries first and to name
+ * the reader. While it draws cards, it reads the projects' titles for the mark on each card. The window is on every
+ * page, so the closed window adds no other read to a page's load.
+ *
+ * DESIGN E, as decided: the open window shows one person's checklists as cards, the same cards as on the checklists
+ * page (ChecklistSections.tsx): the items still to do, the finished ones folded under them, and a row that adds an
+ * item. It opens on the reader's own. The names are folded behind Back, at the start of the window's head before its
+ * title and drawn like the ×. Back shows a row of names in the cards' place, the reader's first, then each secretary,
+ * each other agent and each other person, each group by name, each with the number of their items still to do. The
+ * name of the person last shown is marked as the current one. Choosing a name shows that person's checklists, and the
+ * names go. Nothing is added to the window while the names are folded. The row of names goes on to a second line
+ * when the names do not fit, and every name is drawn whole, as decided. Only the reader's own checklists have a box
+ * and "Mark done"; another person's are shown to read, and to add to. At the foot of the reader's own cards is "New
+ * checklist", the press the page draws, which makes a checklist of the reader's own; it is drawn also when the reader
+ * has none. Every item, opened, says who added it.
  *
  * THE PERSON'S PRESS ON AN ITEM'S EMPTY BOX MARKS IT DONE, with no evidence. The door
  * takes it from the person alone, and tells whoever added the item, or the agents the item names, in one message; the
@@ -66,12 +80,16 @@ import {
  *
  * IT STAYS OPEN UNTIL THE READER CLOSES IT, as the chat does:
  * a press inside it, a press on the page outside it and a link in it that leads to a page all leave it open. The ×,
- * Escape and the press that opened it close it.
+ * Escape and the press that opened it close it, from the cards or from the names, and it opens again on the reader's
+ * own cards.
  *
  * ONE MOUNT, FIXED TO THE WINDOW. Below 1024px the shell's top bar is drawn, and the press sits at its right
  * end. Closed, the press is the only thing here that takes a press, and whatever is drawn at the top right keeps
  * room for it (the rules at the end of the sheet below).
  */
+
+/** No checklist read: one list, so a window with nothing read hands the same list to `useOwners` every time. */
+const NONE: readonly ChecklistReading[] = []
 
 export function ChecklistsWindow() {
   const [on, setOn] = useState(checklistsWindowIsOn)
@@ -86,9 +104,10 @@ export function ChecklistsWindow() {
 function TheWindow() {
   const [open, setOpen] = useState(false)
   const panelPresent = usePanelPresence(open)
-  // THE FULL VIEW AND ITS CHOICE OF WHOSE. Neither outlives a closing: the window opens on the reader's own.
-  const [full, setFull] = useState(false)
-  const [owner, setOwner] = useState('everyone')
+  // WHOSE CHECKLISTS ARE SHOWN, by the owner's key. It does not outlive a closing: the window opens on the reader's own.
+  const [whose, setWhose] = useState(THE_READERS_OWN)
+  // WHETHER BACK HAS SHOWN THE NAMES in the cards' place. It does not outlive a closing: the window opens on the cards.
+  const [namesShown, setNamesShown] = useState(false)
   const [reads, setReads] = useState(0)
   // ITEMS MARKED DONE WHILE THE WINDOW IS OPEN, kept in view until it closes, after the items still to do.
   const [doneHere, setDoneHere] = useState<ReadonlySet<string>>(new Set())
@@ -96,22 +115,23 @@ function TheWindow() {
   const [unfolded, setUnfolded] = useState<ReadonlySet<string>>(new Set())
   // THE ITEMS OPENED, by `<checklist>/<item>`. Closed by default, and closed again when the window closes.
   const [opened, setOpened] = useState<ReadonlySet<string>>(new Set())
-  const [own] = useAsync(() => api.listChecklistsAcross(EVERY_PROJECT), [reads], { follows: { kinds: ['checklist'], atMostEveryMs: 5000 } })
+  const own = useMyChecklists()
+  // WHILE THE WINDOW IS OPEN THE READER'S OWN ARE READ WITH EVERY ITEM, said before the opening reads them again below.
+  useEffect(() => (open ? readEveryItemWhileTheWindowIsOpen() : undefined), [open])
+  // AN OPENING OR A PRESS READS THE READER'S OWN AGAIN, for every part of the page that draws them.
+  useEffect(() => {
+    if (reads > 0) readMyChecklistsAgain()
+  }, [reads])
   const checklistPress = useRef<HTMLButtonElement>(null)
   useChecklistArrivalRing(own, checklistPress)
-  const [everyone] = useAsync(() => (full ? api.listChecklistsAcross(EVERY_PROJECT, 'everyone') : Promise.resolve(null)), [full, reads], { follows: { kinds: ['checklist'], atMostEveryMs: 5000 } })
-  const [one] = useAsync(() => (full && owner !== 'everyone' ? api.listChecklistsAcross(EVERY_PROJECT, owner) : Promise.resolve(null)), [full, owner, reads], { follows: { kinds: ['checklist'], atMostEveryMs: 5000 } })
-  // THE READING A MARK'S REPLY HANDED BACK, for each of the reader's own checklists, until the window's own read comes
-  // back. A second box pressed before that read is sent with the version the first press made, and is not refused as
-  // changed since it was read.
-  const [replied, setReplied] = useState<ReadonlyMap<string, ChecklistReading>>(new Map())
-  useEffect(() => setReplied(new Map()), [own])
+  // EVERYBODY'S CHECKLISTS, read while the window is open: the names Back shows, and the checklists of the name chosen.
+  const [everyone] = useAsync(() => (open ? api.listChecklistsAcross(EVERY_PROJECT, 'everyone', 'open') : Promise.resolve(null)), [open, reads], { follows: { kinds: ['checklist'], atMostEveryMs: 5000 } })
   // EACH ROW'S BOX THAT THE DOOR REFUSED, by `<checklist>/<item>`, until the row is pressed again or the window closes.
   const [refusals, setRefusals] = useState<ReadonlyMap<string, RefusedPress>>(new Map())
   const close = useCallback(() => {
     setOpen(false)
-    setFull(false)
-    setOwner('everyone')
+    setWhose(THE_READERS_OWN)
+    setNamesShown(false)
     setDoneHere(new Set())
     setUnfolded(new Set())
     setOpened(new Set())
@@ -129,67 +149,13 @@ function TheWindow() {
   // THE COUNT ON THE PRESS IS THE READER'S OWN ITEMS STILL TO DO, whoever the open window is showing.
   const count = own.status === 'ready' ? own.value.checklists.reduce((sum, list) => sum + list.counts.open, 0) : null
   const waiting = own.status === 'ready' ? own.value.checklists.some((list) => list.counts.waitingOnTheOwner > 0) : false
-  const shown = !full ? own : owner === 'everyone' ? everyone : one
-  const mine = !full
-  const lists =
-    shown.status === 'ready' && shown.value !== null
-      ? shown.value.checklists.map((list) => (mine ? replied.get(list.id) ?? list : list)).filter((list) => list.items.length > 0)
-      : []
-  const owners = everyone.status === 'ready' && everyone.value !== null ? new Map(everyone.value.checklists.map((list) => [ownerKey(list), list])) : new Map<string, ChecklistReading>()
-  const chosen = owners.get(owner)
-  const showAll = t('checklists.window.showAll')
-  const backToMine = t('checklists.window.backToMine')
-  const heading = !full ? t('checklists.window.title') : chosen === undefined ? showAll : t('checklists.window.titleOf', { name: chosen.ownerName })
-  // A STANDING ITEM HAS NO BOX AND NO "MARK DONE": it is never marked done.
-  const canMark = (item: ChecklistRequest): boolean => mine && !isClosed(item.state) && item.standing !== true
-  const groups = lists.map((list) => {
-    const items = inOrder(list.items)
-    const kept = (item: ChecklistRequest): boolean => !isClosed(item.state) || doneHere.has(`${list.id}/${item.id}`)
-    return { list, kept: items.filter(kept), folded: items.filter((item) => !kept(item)), isOpen: unfolded.has(list.id) }
-  })
-  // WHAT THE OPEN WINDOW DRAWS FROM WHAT IT READ, line by line, top to bottom, with each row's refusal in the words it is
-  // drawn in. The rows that moved when the window reads again are worked out from this alone.
-  const drawn: DrawnLine[] = !open
-    ? []
-    : [
-        { key: 'heading', draws: heading },
-        ...groups.flatMap(({ list, kept, folded, isOpen }) => [
-          { key: `${list.id}:heading`, draws: JSON.stringify([list.title, full && owner === 'everyone' ? ownerWords(list) : null, progressOf(list)]) },
-          ...kept.map((item) => {
-            const row = `${list.id}/${item.id}`
-            const refused = refusals.get(row)
-            const said = refused === undefined ? null : refusedPressWords(refused, list, canMark(item))
-            const doneLine = said === null && doneHere.has(row) ? whatTheDoneLineDraws(item, list) : null
-            return { key: row, draws: JSON.stringify([whatTheRowDraws(item, list, opened.has(row)), canMark(item), doneHere.has(row), said, doneLine]) }
-          }),
-          ...(folded.length === 0 ? [] : [{ key: `${list.id}:fold`, draws: JSON.stringify([folded.length, folded.some((item) => item.state === 'superseded'), isOpen]) }]),
-          ...(isOpen ? folded.map((item) => ({ key: `${list.id}/${item.id}`, draws: whatTheRowDraws(item, list, opened.has(`${list.id}/${item.id}`)) })) : []),
-        ]),
-      ]
-  const moved = useMovedRows(drawn, [shown.status === 'ready' ? shown.value : null, replied], `${String(open)}/${String(full)}/${owner}`, (rows) =>
-    setRefusals((now) => theseMoved(now, rows)),
-  )
-
-  const markedDone = (list: ChecklistReading, item: ChecklistRequest, after: ChecklistReading): void => {
-    setDoneHere((now) => new Set([...now, `${list.id}/${item.id}`]))
-    setReplied((now) => new Map([...now, [list.id, after]]))
-    setReads((n) => n + 1)
-  }
-  // A PRESS REFUSED BECAUSE THE CHECKLIST CHANGED AFTER IT WAS READ: the window reads the reader's checklists again.
-  const readAgain = (): void => setReads((n) => n + 1)
-  const toggleFold = (id: string): void =>
-    setUnfolded((now) => {
-      const next = new Set(now)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
 
   const pressName = count === null ? t('checklists.window.press') : t('checklists.window.pressTitle', { n: count })
 
   return (
     <div className="ckw" data-open={open ? 'yes' : 'no'}>
       <style href="mole-office-checklist-parts" precedence="default">{CHECKLIST_PARTS_CSS}</style>
+      <style href="mole-office-checklist-sections" precedence="default">{CHECKLIST_SECTIONS_CSS}</style>
       <style href="mole-office-checklists-window" precedence="default">{CHECKLISTS_WINDOW_CSS}</style>
       <button
         type="button"
@@ -210,50 +176,221 @@ function TheWindow() {
         <span className="ckw-count" data-waiting={waiting ? 'yes' : 'no'}>{count ?? '…'}</span>
       </button>
       {panelPresent ? (
-        <div className="ckw-panel" data-motion-closing={open ? undefined : 'yes'} aria-hidden={open ? undefined : true} inert={!open} role="dialog" aria-label={t('checklists.window.title')} {...declaredAttributes({ surface: 'checklists.window' })}>
-          <div className="ckw-head">
-            {full ? (
-              <button type="button" className="ckw-view" onClick={() => setFull(false)} aria-label={backToMine} title={backToMine}>
-                <span aria-hidden="true">←</span> {backToMine}
-              </button>
-            ) : null}
-            <h2 className="ckw-title">{heading}</h2>
-            {full ? null : (
-              <button type="button" className="ckw-view" onClick={() => setFull(true)} aria-label={showAll} title={showAll}>
-                {showAll}
-              </button>
-            )}
-            <button type="button" className="ckw-close" onClick={close} aria-label={t('checklists.window.close')}>
-              ×
+        <TheOpenWindow
+          open={open}
+          close={close}
+          own={own}
+          everyone={everyone}
+          setReads={setReads}
+          whose={whose}
+          setWhose={setWhose}
+          namesShown={namesShown}
+          setNamesShown={setNamesShown}
+          doneHere={doneHere}
+          setDoneHere={setDoneHere}
+          unfolded={unfolded}
+          setUnfolded={setUnfolded}
+          opened={opened}
+          setOpened={setOpened}
+          refusals={refusals}
+          setRefusals={setRefusals}
+        />
+      ) : null}
+    </div>
+  )
+}
+
+/**
+ * THE OPEN WINDOW: its head, and under it either the cards of the name chosen or the names Back shows in their place.
+ * Over the cards the head is Back, the title and the ×, and the press that makes a new checklist is under the reader's
+ * own cards. Over the names it is the title and the ×. It is drawn while the window is open and while it closes, and
+ * at no other time. It is the one part of the window that calls `useOwners`, so the window reads the participants only
+ * once it has been opened. What the window keeps until it closes is kept by `TheWindow`, where the press that closes
+ * it is drawn.
+ */
+function TheOpenWindow({
+  open,
+  close,
+  own,
+  everyone,
+  setReads,
+  whose,
+  setWhose,
+  namesShown,
+  setNamesShown,
+  doneHere,
+  setDoneHere,
+  unfolded,
+  setUnfolded,
+  opened,
+  setOpened,
+  refusals,
+  setRefusals,
+}: {
+  /** False while the window closes and this part is still drawn. */
+  open: boolean
+  close: () => void
+  /** The reader's own checklists, which the closed window reads too. */
+  own: AsyncState<ChecklistsAcrossReply>
+  /** Everybody's checklists, read while the window is open; null when it was closed as they were asked for. */
+  everyone: AsyncState<ChecklistsAcrossReply | null>
+  setReads: (change: (n: number) => number) => void
+  whose: string
+  setWhose: (whose: string) => void
+  /** True while Back has shown the names in the cards' place. */
+  namesShown: boolean
+  setNamesShown: (shown: boolean) => void
+  doneHere: ReadonlySet<string>
+  setDoneHere: (change: (now: ReadonlySet<string>) => ReadonlySet<string>) => void
+  unfolded: ReadonlySet<string>
+  setUnfolded: (change: (now: ReadonlySet<string>) => ReadonlySet<string>) => void
+  opened: ReadonlySet<string>
+  setOpened: (change: (now: ReadonlySet<string>) => ReadonlySet<string>) => void
+  refusals: ReadonlyMap<string, RefusedPress>
+  setRefusals: (change: (now: ReadonlyMap<string, RefusedPress>) => ReadonlyMap<string, RefusedPress>) => void
+}) {
+  const owners = useOwners(
+    everyone.status === 'ready' && everyone.value !== null ? everyone.value.checklists : NONE,
+    own.status === 'ready' ? own.value.checklists : NONE,
+  )
+  const chosen = owners.find((owner) => owner.key === whose) ?? owners[0]!
+  // THE READER'S OWN ARE READ ON THEIR OWN, and are there before everybody's; another person's come from everybody's.
+  const shown = chosen.isTheReader ? own : everyone
+  const shownReading = shown.status === 'ready' ? shown.value : null
+  // THE READING A REPLY HANDED BACK, a mark's or an add's, for each checklist, until the window's own read of what it
+  // shows comes back. A second box pressed before that read is sent with the version the first press made, and is not
+  // refused as changed since it was read.
+  const [replied, setReplied] = useState<ReadonlyMap<string, ChecklistReading>>(new Map())
+  useEffect(() => setReplied(new Map()), [shownReading])
+  const lists = shownReading === null ? [] : chosen.lists.map((list) => replied.get(list.id) ?? list)
+  // A STANDING ITEM HAS NO BOX AND NO "MARK DONE": it is never marked done.
+  const canMark = (item: ChecklistRequest): boolean => chosen.isTheReader && !isClosed(item.state) && item.standing !== true
+  // EVERYBODY'S ARE READ WITH ONLY THEIR OPEN ITEMS, so a fold of theirs reads its checklist whole when it is pressed.
+  const folds = useTheFoldsReadings(lists, unfolded)
+  const groups = lists.map((list) => {
+    const kept = (item: ChecklistRequest): boolean => !isClosed(item.state) || doneHere.has(`${list.id}/${item.id}`)
+    const keptItems = inOrder(list.items).filter(kept)
+    const reading: TheFoldsReading = folds.get(list.id) ?? { status: 'shut' }
+    const whole = reading.status === 'ready' ? reading.whole : list
+    return {
+      list,
+      kept: keptItems,
+      fold: theFoldOf(list, keptItems.filter((item) => isClosed(item.state))),
+      reading,
+      whole,
+      folded: reading.status === 'ready' ? inOrder(whole.items).filter((item) => !kept(item)) : [],
+      isOpen: reading.status === 'ready' || reading.status === 'error',
+    }
+  })
+  // WHAT THE OPEN WINDOW DRAWS FROM WHAT IT READ, line by line, top to bottom, with each row's refusal in the words it is
+  // drawn in. The rows that moved when the window reads again are worked out from this alone. The names and the cards
+  // are never drawn together. While the names are shown they are the one line, because the row wraps: what takes room
+  // in it is each name, how many digits its count has (the digits are all one width) and whether the count is bold.
+  const drawn: DrawnLine[] = !open
+    ? []
+    : namesShown
+      ? [{ key: 'names', draws: JSON.stringify(owners.map((owner) => [owner.key, owner.name, String(owner.open).length, owner.waiting])) }]
+      : groups.flatMap(({ list, kept, fold, whole, folded, isOpen }) => [
+          { key: `${list.id}:heading`, draws: JSON.stringify([list.title, list.workspaceId, progressOf(list)]) },
+          ...kept.map((item) => {
+            const row = `${list.id}/${item.id}`
+            const refused = refusals.get(row)
+            const said = refused === undefined ? null : refusedPressWords(refused, list, canMark(item))
+            const doneLine = said === null && doneHere.has(row) ? whatTheDoneLineDraws(item, list) : null
+            return { key: row, draws: JSON.stringify([whatTheRowDraws(item, list, opened.has(row)), canMark(item), doneHere.has(row), said, doneLine]) }
+          }),
+          ...(fold.count === 0 ? [] : [{ key: `${list.id}:fold`, draws: JSON.stringify([fold.count, fold.replaced, isOpen]) }]),
+          ...folded.map((item) => ({ key: `${list.id}/${item.id}`, draws: whatTheRowDraws(item, whole, opened.has(`${list.id}/${item.id}`)) })),
+        ])
+  // EVERYBODY'S CHECKLISTS ARE READ TOO, because the counts beside the names come from them. Their first reading,
+  // after the window opens, is the window's first whole drawing and not a read again, so it starts the drawing anew.
+  // A change between the cards and the names starts it anew as well, so a change of screen marks no row as moved.
+  const everyoneReading = everyone.status === 'ready' ? everyone.value : null
+  const moved = useMovedRows(
+    drawn,
+    [shownReading, everyoneReading, replied],
+    `${String(open)}/${namesShown ? 'names' : 'cards'}/${chosen.key}/${everyoneReading === null ? 'own' : 'everyone'}`,
+    (rows) => setRefusals((now) => theseMoved(now, rows)),
+  )
+
+  const answered = (after: ChecklistReading): void => {
+    setReplied((now) => new Map([...now, [after.id, after]]))
+    setReads((n) => n + 1)
+  }
+  const markedDone = (list: ChecklistReading, item: ChecklistRequest, after: ChecklistReading): void => {
+    setDoneHere((now) => new Set([...now, `${list.id}/${item.id}`]))
+    answered(after)
+  }
+  // A PRESS REFUSED BECAUSE THE CHECKLIST CHANGED AFTER IT WAS READ: the window reads the reader's checklists again.
+  const readAgain = (): void => setReads((n) => n + 1)
+  const toggleFold = (id: string): void =>
+    setUnfolded((now) => {
+      const next = new Set(now)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+
+  // THE FOCUS FOLLOWS A CHANGE OF SCREEN: Back moves it to the name of the person last shown, and a name moves it to
+  // Back. It is moved once the new screen is drawn, and only after one of those two presses.
+  const backPress = useRef<HTMLButtonElement>(null)
+  const currentName = useRef<HTMLButtonElement>(null)
+  const focusAfter = useRef<'names' | 'back' | null>(null)
+  useEffect(() => {
+    const after = focusAfter.current
+    focusAfter.current = null
+    if (after === 'names') currentName.current?.focus()
+    else if (after === 'back') backPress.current?.focus()
+  }, [namesShown])
+  const showTheNames = (): void => {
+    focusAfter.current = 'names'
+    setNamesShown(true)
+  }
+  const showTheCardsOf = (key: string): void => {
+    focusAfter.current = 'back'
+    setWhose(key)
+    setNamesShown(false)
+  }
+
+  return (
+    <div className="ckw-panel" data-motion-closing={open ? undefined : 'yes'} aria-hidden={open ? undefined : true} inert={!open} role="dialog" aria-label={t('checklists.window.title')} {...declaredAttributes({ surface: 'checklists.window' })}>
+      <div className="ckw-head">
+        {namesShown ? null : (
+          <button type="button" className="ckw-back" ref={backPress} onClick={showTheNames}>
+            {t('checklists.window.back')}
+          </button>
+        )}
+        <h2 className="ckw-title">{t('checklists.window.title')}</h2>
+        <button type="button" className="ckw-close" onClick={close} aria-label={t('checklists.window.close')}>
+          ×
+        </button>
+      </div>
+      {namesShown ? (
+        <div className="ckw-names" role="group" aria-label={t('checklists.whose')}>
+          {owners.map((owner) => (
+            <button
+              key={owner.key}
+              type="button"
+              className="ckw-name"
+              ref={owner.key === chosen.key ? currentName : undefined}
+              aria-current={owner.key === chosen.key ? 'true' : undefined}
+              onClick={() => showTheCardsOf(owner.key)}
+            >
+              <span className="ckw-name-words">{owner.name}</span>
+              <OpenCount owner={owner} />
             </button>
-          </div>
-          {full ? (
-            <label className="ckw-whose">
-              <span>{t('checklists.whose')}</span>
-              <select className="px-input" value={owner} onChange={(event) => setOwner(event.target.value)}>
-                <option value="everyone">{t('checklists.whose.everyone')}</option>
-                {[...owners].map(([key, list]) => (
-                  <option key={key} value={key}>{ownerWords(list)}</option>
-                ))}
-              </select>
-            </label>
-          ) : null}
-          {mine ? null : <p className="ckw-note">{t('checklists.window.readOnly')}</p>}
-          {shown.status === 'loading' ? <Loading what={t('checklists.loading')} rows={2} /> : null}
+          ))}
+        </div>
+      ) : (
+        <div className="ckw-cards">
+          {shown.status === 'loading' || (shown.status === 'ready' && shown.value === null) ? <Loading what={t('checklists.loading')} rows={2} /> : null}
           {shown.status === 'error' ? <ErrorNote message={shown.message} fault={shown.fault} /> : null}
-          {shown.status === 'ready' && lists.length === 0 ? <p className="ckw-empty">{t('checklists.window.empty')}</p> : null}
-          {groups.length > 0 ? (
-            <div className="ckw-groups">
-              {groups.map(({ list, kept, folded, isOpen }) => {
-                return (
-                  <section key={list.id} className="ckw-group">
-                    <RouteLink className="ckw-group-title" to={checklistsPath(list.id)}>
-                      {list.title}
-                    </RouteLink>
-                    {/* EVERYONE'S CHECKLISTS SAY WHOSE EACH IS; one owner's are named in the heading. */}
-                    {full && owner === 'everyone' ? <p className="ckw-owner">{ownerWords(list)}</p> : null}
-                    <Progress list={list} />
-                    <ul className="ckw-items">
+          {groups.length === 0 ? null : (
+            <WithProjectTitles
+              draw={(titles) =>
+                groups.map(({ list, kept, fold, reading, whole, folded, isOpen }) => (
+                  <ChecklistCard key={list.id} list={list} titles={titles} onAdded={answered}>
+                    <ul className="cks-items">
                       {kept.map((item) => {
                         const row = `${list.id}/${item.id}`
                         return (
@@ -281,18 +418,19 @@ function TheWindow() {
                         )
                       })}
                     </ul>
-                    {folded.length === 0 ? null : (
+                    {fold.count === 0 ? null : (
                       <>
-                        <FoldPress folded={folded} open={isOpen} onPress={() => toggleFold(list.id)} />
-                        {isOpen ? (
-                          <ul className="ckw-items ckp-folded">
+                        <FoldPress fold={fold} open={isOpen} busy={reading.status === 'waiting'} onPress={() => toggleFold(list.id)} />
+                        {reading.status === 'error' ? <ErrorNote message={reading.message} fault={reading.fault} /> : null}
+                        {reading.status === 'ready' ? (
+                          <ul className="cks-items ckp-folded">
                             {folded.map((item) => {
                               const row = `${list.id}/${item.id}`
                               return (
                                 <ItemRow
                                   key={item.id}
                                   item={item}
-                                  list={list}
+                                  list={whole}
                                   moved={moved.has(row)}
                                   opened={opened.has(row)}
                                   onOpened={(now) => setOpened((all) => withOpened(all, row, now))}
@@ -303,21 +441,31 @@ function TheWindow() {
                         ) : null}
                       </>
                     )}
-                  </section>
-                )
-              })}
+                  </ChecklistCard>
+                ))
+              }
+            />
+          )}
+          {chosen.isTheReader && shown.status === 'ready' ? (
+            // THE CARDS ARE A FLEX COLUMN, which stretches what it holds to its width. This box keeps the press as wide
+            // as its words and the title field at its own height, as on the page.
+            <div>
+              <NewChecklistPress project={undefined} onMade={readAgain} />
             </div>
           ) : null}
-          {/* THE PAGE IS REACHED FROM THE FULL VIEW, so the default view has one thing named "All checklists". */}
-          {full ? (
-            <RouteLink className="ckw-all" to={checklistsPath()}>
-              {t('checklists.window.openPage')} →
-            </RouteLink>
-          ) : null}
         </div>
-      ) : null}
+      )}
     </div>
   )
+}
+
+/**
+ * THE PROJECTS' TITLES, read only while the window's cards are drawn, for the small mark on each card that names its
+ * project. The window is on every page, and the closed window asks for nothing it does not draw.
+ */
+function WithProjectTitles({ draw }: { draw: (titles: ReadonlyMap<string, string>) => ReactNode }) {
+  const titles = useProjectTitles()
+  return <>{draw(titles)}</>
 }
 
 function WindowItem({
@@ -455,8 +603,12 @@ function whatTheDoneLineDraws(item: ChecklistRequest, list: ChecklistReading): s
   return JSON.stringify([told, list.named.filter((one) => own.includes(JSON.stringify(one.who.id)))])
 }
 
+
 export const CHECKLISTS_WINDOW_CSS = `
 .ckw { position: fixed; top: var(--pad); right: var(--fab-inset); z-index: var(--z-popover); }
+/* WITH THE CHAT BESIDE THE PAGE ON THE RIGHT, the window stands at the page's own right edge, as the chat circle does.
+   The chat is drawn over the top right of the browser window, so the window stood under it and looked gone. */
+:root[data-chat-split='right'] .ckw { right: calc(var(--chat-split-w, 0px) + var(--fab-inset)); }
 .ckw-press {
   position: relative; z-index: 1; display: inline-flex; align-items: center; gap: 6px; min-height: 2.5rem; min-width: 2.5rem; padding: 0 10px;
   border-radius: var(--radius-pill, 999px); border: var(--border-w) solid var(--border-strong);
@@ -468,7 +620,7 @@ export const CHECKLISTS_WINDOW_CSS = `
 .ckw-count[data-waiting='yes'] { color: var(--ask); }
 /* IT SCROLLS DOWN ONLY. Nothing in it is wider than it: every line wraps, and an item's words are whole at 390. */
 .ckw-panel {
-  position: absolute; z-index: 1; top: calc(100% + 6px); right: 0; width: min(24rem, calc(100vw - 2 * var(--fab-inset)));
+  position: absolute; z-index: 1; top: calc(100% + 6px); right: 0; width: min(26rem, calc(100vw - 2 * var(--fab-inset)));
   max-height: calc(100dvh - 5rem - var(--fab-room)); overflow-x: hidden; overflow-y: auto; padding: var(--pad) var(--gut) var(--gut);
   border: var(--border-w) solid var(--border-strong); border-radius: var(--radius-lg, var(--radius)); background: var(--panel); box-shadow: var(--elev-2);
 }
@@ -476,25 +628,23 @@ export const CHECKLISTS_WINDOW_CSS = `
 .ckw-title { margin: 0; font-size: var(--fs-3); flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
 .ckw-close { flex: none; width: 2rem; height: 2rem; border: none; background: none; color: var(--text-2); font-size: 1.4rem; line-height: 1; cursor: pointer; border-radius: var(--radius-sm); }
 .ckw-close:hover { background: var(--hover); }
-.ckw-view {
-  flex: none; display: inline-flex; align-items: center; gap: 4px; min-height: 2rem; padding: 0 8px; border: var(--border-w) solid var(--border-strong);
-  background: var(--panel); color: var(--text); font: inherit; font-size: var(--fs-1); font-weight: 600; cursor: pointer; border-radius: var(--radius-sm); white-space: nowrap;
+.ckw-back { flex: none; height: 2rem; padding: 0 8px; border: none; background: none; color: var(--text-2); font: inherit; font-size: var(--fs-1); line-height: 1; white-space: nowrap; cursor: pointer; border-radius: var(--radius-sm); }
+.ckw-back:hover { background: var(--hover); }
+/* THE ROW OF NAMES WRAPS, as decided: names that do not fit go on to the next line, in their order. A name longer than
+   the row breaks inside its own press, so every name is drawn whole and nothing is cut. */
+.ckw-names { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; margin: 0 0 var(--pad) 0; padding: 2px 0 6px 0; }
+.ckw-name {
+  flex: none; display: inline-flex; align-items: center; gap: 6px; min-height: 2rem; max-width: 100%; padding: 0 10px; overflow-wrap: anywhere;
+  border: var(--border-w) solid var(--border-strong); border-radius: var(--radius-pill, 999px); background: var(--panel); color: var(--text);
+  font: inherit; font-size: var(--fs-1); cursor: pointer;
 }
-.ckw-view:hover { background: var(--hover); }
-.ckw-whose { display: flex; align-items: center; gap: var(--pad); margin: 0 0 var(--pad) 0; color: var(--text-2); font-size: var(--fs-2); }
-.ckw-whose select { flex: 1 1 auto; min-width: 0; }
-.ckw-whose > span { white-space: nowrap; }
-.ckw-items { list-style: none; margin: 0; padding: 0; }
-.ckw-group { padding: var(--pad) 0 0 0; border-top: var(--border-w) solid var(--border); margin-top: var(--pad); }
-.ckw-group:first-child { border-top: none; margin-top: 0; }
-.ckw-group-title { display: block; font-weight: 600; margin: 0 0 2px 0; overflow-wrap: anywhere; }
-.ckw-group > .ckp-progress { margin: 0 0 2px 0; }
-.ckw-owner { margin: 0 0 2px 0; color: var(--text-2); font-size: var(--fs-1); }
+.ckw-name:hover { background: var(--hover); }
+.ckw-name[aria-current='true'] { background: var(--accent); border-color: var(--accent); color: var(--accent-text); font-weight: 600; }
+.ckw-name[aria-current='true'] .cks-count { color: inherit; }
+.ckw-cards { display: flex; flex-direction: column; gap: var(--pad); min-width: 0; }
 .ckw-done-with { margin: 4px 0 0 calc(1.15rem + 8px); font-size: var(--fs-1); color: var(--st-done); display: flex; flex-wrap: wrap; gap: 0 6px; }
 .ckw-moved-why { display: block; margin: 4px 0 0 0; }
 p.ckw-refusal { margin: 4px 0 0 0; overflow-wrap: anywhere; }
-.ckw-empty { color: var(--text-2); margin: var(--pad) 0; }
-.ckw-all { display: inline-block; margin-top: var(--pad); font-weight: 600; }
 /* WHAT IS DRAWN AT THE TOP RIGHT KEEPS ROOM FOR THE PRESS, so the closed window covers no control. The room is
    taken across and never down: room kept above the page made a drawing that fits the window run past its foot.
    The top bar below 1024px, and the two lines that can stand above the frame, keep room at their right end. */
@@ -510,13 +660,22 @@ body:has(.ckw) .shell-bar, body:has(.ckw) .px-btc, body:has(.ckw) .px-hm { paddi
   }
   body:has(.ckw) .px-where { padding-right: var(--ckw-room); }
 }
-/* NO VEIL ON A PHONE. The window stays open while the reader works on the page behind it, as the chat does, so that
-   page is not drawn as covered: what the panel leaves showing still takes a press. */
+/* ON A PHONE THE OPEN WINDOW IS A SHEET, from under its press to the foot of the screen and from edge to edge, as
+   decided. As a box under the press it left a strip of the page showing at each side and below it, and what showed
+   read as part of the window. The page above the sheet is not drawn as covered, and still takes a press. The corner
+   chat circle, when the person keeps it there, stays over the sheet's foot as it does over the chat's own sheet, so
+   the sheet keeps the circle's room under its last card. */
 @media (max-width: 480px) {
-  .ckw-press { min-height: 44px; min-width: 44px; }
-  .ckw-view { min-height: 44px; }
+  .ckw { --ckw-press-size: 44px; }
+  .ckw-press { min-height: var(--ckw-press-size); min-width: var(--ckw-press-size); }
+  .ckw-panel {
+    position: fixed; top: calc(var(--pad) + var(--ckw-press-size) + 6px); right: 0; bottom: 0; left: 0; width: auto; max-height: none;
+    border-width: var(--border-w) 0 0 0; border-radius: var(--radius-lg, var(--radius)) var(--radius-lg, var(--radius)) 0 0;
+    padding-bottom: calc(var(--gut) + var(--fab-room));
+  }
+  .ckw-name { min-height: 44px; }
   /* A ROW WITHOUT A BOX KEEPS THE ROOM A BOX TAKES HERE, so its words and facts start where those beside a box start. */
-  .ckw-items .ckp-item:not([data-box='yes']) .ckp-summary > .ckp-mark { margin-left: calc((44px - 1.15rem) / 2); margin-right: calc((44px - 1.15rem) / 2); }
-  .ckw-items .ckp-item:not([data-box='yes']) :is(.ckp-details, .ckp-asks, .ckp-flow) { padding-left: calc(44px + 8px); }
+  .ckw-panel .cks-items .ckp-item:not([data-box='yes']) .ckp-summary > .ckp-mark { margin-left: calc((44px - 1.15rem) / 2); margin-right: calc((44px - 1.15rem) / 2); }
+  .ckw-panel .cks-items .ckp-item:not([data-box='yes']) :is(.ckp-details, .ckp-asks, .ckp-flow) { padding-left: calc(44px + 8px); }
 }
 `

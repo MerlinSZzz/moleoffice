@@ -41,7 +41,7 @@ async function openEditor(width: number, theme: string) {
   return { page, editor, history: editor.locator('details').filter({ has: page.getByText(t('wordTable.history'), { exact: true }) }) }
 }
 
-for (const width of [1440, 990, 660, 390]) for (const theme of ['light', 'dark']) {
+for (const width of [1440, 390]) for (const theme of ['light']) {
   it(`keeps Previous choices open after saving and re-reading at ${width} in ${theme}`, async () => {
     const { page, editor, history } = await openEditor(width, theme)
     await history.locator(':scope > summary').click()

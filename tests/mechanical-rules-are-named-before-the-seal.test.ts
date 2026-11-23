@@ -23,7 +23,7 @@
  *      first own commit. It gives each test file's first changed line and its added lines.
  *   7. chaptersRead missing chapters is named, and is certain.
  *   8. No report linked to the run is named, and is certain.
- *   9. A changed page needs the report to name that page's file, as well as image blocks, the four widths and both themes.
+ *   9. A changed page draws no pictures item, whatever the report holds: pictures are not proof (chapter 6).
  *  10. A migration the run adds comes in one commit with its journal row, and no later commit of the run changes it.
  *  11. A test line that names a migration by a bare "NNNN_" prefix is named with its file and line.
  *  12. Every item says whether it is certain (`mechanical`): a test proof and a starter's item are not. The reply's
@@ -43,8 +43,10 @@
  *   - the one-line message rule off: cases 3, 6 and 13;         - only *.test.* files counted as criteria: cases 4, 13;
  *   - only lines taken out counted: cases 4, 5, 6 and 13;       - every commit since the fork base read as the run's: 6;
  *   - the chapters item not marked certain: case 7;            - "no report" not marked certain: cases 8 and 12;
- *   - page files not looked for in the report: case 9;          - the journal rule off: case 10;
+ *   - the journal rule off: case 10;
  *   - the bare-prefix pattern asking five digits: case 11;      - every item counted as certain in the sentence: case 12.
+ *
+ * Since mutation proofs stopped being proof (chapter 5, 18 November 2026), case 12's likely item about test proof is a named-tests line sent by hand.
  *
  * Wave 14a round 1, the seal gate's pure half. A mutation planned, to be run after the released
  * code and recorded here as measured then: `theMigrationItemsRefusingASeal` counting every item rather than the
@@ -203,14 +205,11 @@ describe('the report rules', () => {
     expect(items.map((one) => [one.key, one.mechanical])).toEqual([['report:none', true]])
   })
 
-  it("9: a changed page's file is named in the report, beside image blocks, the four widths and both themes", () => {
+  it('9: a changed page draws no pictures item, whatever the report holds', () => {
     const page = { commits: [commit('p1', [{ path: 'src/web/pages/Thing.tsx', status: 'M', removed: 2 }, { path: 'src/web/components/Other.tsx', status: 'M', removed: 1 }])], existedAtTheForkBase: () => true }
-    const blocks = [{ type: 'image', path: 'a.png', alt: '1440 light' }, { type: 'prose', text: 'Thing at 990, 660 and 390, dark too' }]
-    const items = about({ git: page, reports: [{ id: 'r', title: 'Done', data: { chaptersRead: [1, 6, 9], blocks } }] }, 'pictures')
-    expect(items.map((one) => one.key)).toEqual(['pictures:r'])
-    expect(items[0]!.says).toMatch(/, and report r does not name src\/web\/components\/Other\.tsx\. /u)
-    const named = [...blocks, { type: 'prose', text: 'Other, the same' }]
-    expect(about({ git: page, reports: [{ id: 'r', title: 'Done', data: { chaptersRead: [1, 6, 9], blocks: named } }] }, 'pictures')).toEqual([])
+    for (const blocks of [[], [{ type: 'prose', text: 'Thing changed.' }], [{ type: 'image', path: 'a.png', alt: '1440 light' }]]) {
+      expect(about({ git: page, reports: [{ id: 'r', title: 'Done', data: { chaptersRead: [1, 6, 9], blocks } }] }, 'pictures')).toEqual([])
+    }
   })
 })
 
@@ -270,7 +269,9 @@ describe('the migration rules', () => {
 describe('certain and likely', () => {
   it('12: a test proof and a starter\'s item are likely; the reply counts the certain and the likely apart', () => {
     const changed = { commits: [commit('a1', [{ path: 'tests/new.test.ts', status: 'A', removed: 0 }])], existedAtTheForkBase: () => false }
-    const { items } = judge(facts({ git: changed, checkAlso: ['Does it answer the person?'], reports: [] }))
+    // A NAMED-TESTS LINE SENT BY HAND is the likely item about test proof, since no item asks for a mutation proof now.
+    const sentByHand = [{ seq: 1, said: 'named 1 file (new); 1 ran, exactly those; vitest exited 0', mark: 'Synthetic mark: not shown to have come through the tool.' }]
+    const { items } = judge(facts({ git: changed, testRunsNotFromTheTool: sentByHand, checkAlso: ['Does it answer the person?'], reports: [] }))
     expect(items.map((one) => [one.about, one.mechanical])).toEqual([
       ['report', true],
       ['test proof', false],

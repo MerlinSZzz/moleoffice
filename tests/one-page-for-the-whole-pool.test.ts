@@ -169,10 +169,10 @@ describe('the page can be narrowed, and always says what it is hiding', () => {
     await openThePage()
     const before = (await rows()).length
 
-    // THE SENDER FILTER, chosen by the name the registry holds.
-    const senderBox = (await app.page.$$('.px-ms-filters select'))[0]
-    expect(senderBox, 'the sender filter is not drawn').toBeDefined()
-    await senderBox?.selectOption({ label: 'Builder X' })
+    // THE SENDER FILTER, chosen by the name the registry holds: typed in the sender picker's search box, then pressed.
+    const sender = app.page.locator('.px-ms-filters .px-ms-sender')
+    await sender.getByLabel(MESSAGES_PAGE.bySender).fill('Builder X')
+    await sender.locator('button.agp-row:has(.agp-name:text-is("Builder X"))').click()
 
     await app.page.waitForFunction(
       (words: string) =>
@@ -206,8 +206,9 @@ describe('the page can be narrowed, and always says what it is hiding', () => {
   it('narrows to comments alone', async () => {
     await openThePage()
     const boxes = await app.page.$$('.px-ms-filters select')
-    // The fourth select is how far it got, which is where "is a comment" lives.
-    await boxes[3]?.selectOption({ label: MESSAGES_PAGE.onlyComments })
+    // The second select is how far it got, which is where "is a comment" lives. The sender and the contact are chosen
+    // in agent pickers, which are not selects, and the group is the first select.
+    await boxes[1]?.selectOption({ label: MESSAGES_PAGE.onlyComments })
     await app.page.waitForFunction(
       (words: string) =>
         !Array.from(document.querySelectorAll('.px-ms-one')).some((one) =>
@@ -252,13 +253,13 @@ describe('the page is reachable by name, and a message opens in its conversation
 
   it('does not repeat the Messages link on Agent conversations', async () => {
     // CRITERION CHANGE, 29 September 2026: Messages is in the sidebar, so Agent conversations no
-    // longer links to it from the page body. The page has one short lede instead of the old link
-    // paragraph. Since wave 13q round 44 the pool is reachable from the
-    // chat's foot and from its own route, and no longer from the sidebar.
+    // longer links to it from the page body. The page had one short lede instead of the old link
+    // paragraph, and as decided in November 2026 the heading stands alone. Since wave 13q round 44
+    // the pool is reachable from the chat's foot and from its own route, and no longer from the sidebar.
     await app.page.goto(`${app.site}/#/conversations`)
     await app.page.waitForSelector('.px-ag-title', { timeout: 20_000 })
     const page = app.page.locator('main.page')
-    expect(await page.locator('.px-ag-lead').count(), 'the page does not have one lede').toBe(1)
+    expect(await page.locator('.px-ag-lead').count(), 'the page still draws a lede').toBe(0)
     expect(await page.locator('a[href="#/messages"]').count(), 'the page repeats the Messages link').toBe(0)
   }, 120_000)
 

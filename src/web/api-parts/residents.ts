@@ -75,8 +75,8 @@ export const residentsDoors = {
     }),
 
   /**
-   * Set a secretary's own sleep time: the time of day it begins on the office's clock, as written, and how many minutes
-   * it lasts. The person, or the secretary with its own key: each secretary sets its own.
+   * Set a resident's own sleep time: the time of day it begins on the office's clock, as written, and how many minutes
+   * it lasts. The person, or the resident with its own key: each resident sets its own.
    */
   residentSleepTime: (agentId: string, time: { startsAt: string; minutes: number }) =>
     request<{ said: string; sleep: TheSleepReading }>(`/api/residents/${encodeURIComponent(agentId)}/sleep-time`, {

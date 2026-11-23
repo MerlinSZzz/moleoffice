@@ -54,6 +54,9 @@
  * this checkout's own tools. Into a sandbox it passes only the variables it names, and this is not one of them.
  *
  * A TEST RUNS A SYNTHETIC LAUNCHER INSTEAD, named by `MOLE_OFFICE_FAKE_ROUND_LAUNCHER`, and never a real round.
+ *
+ * ITS PROGRAM IS LOOKED UP IN THE WHOLE ENVIRONMENT IT WAS GIVEN, through `whereItIs` in ./os.ts, so on Windows a
+ * search path held as `Path` is found.
  */
 
 import { existsSync } from 'node:fs'
@@ -129,11 +132,16 @@ export interface RoundRunRequest extends RunStart {
   selection?: CastingSelection
   /** The command given after `--` for OpenCode, with the brief's text as one argument; absent for dsh. */
   command?: string[]
+  /** Outside worker place, supplied only to the host launcher. */
+  place?: unknown
+  agentId?: string
+  commitAddress?: string
 }
 
 export interface RoundLauncherEnding {
   ok: boolean
   says: string
+  beforeRuntime?: boolean
 }
 
 export class RoundAdapter {
@@ -154,7 +162,7 @@ export class RoundAdapter {
 
   /** Why the launcher cannot be started here, or null because it can. */
   whyItCannotStart(checkout: string): string | null {
-    if (whereItIs(this.command, this.from['PATH']) === null) return 'node is not installed on this machine, so the sandbox launcher was not started.'
+    if (whereItIs(this.command, this.from) === null) return 'node is not installed on this machine, so the sandbox launcher was not started.'
     const script = this.script(checkout)
     if (!existsSync(script)) return `The sandbox launcher ${script} is not in this checkout, so no round was started.`
     return null

@@ -13,9 +13,10 @@
  * and proved by the office's key, as the hook writes them. That is for the line only: it gives no holding, so the
  * agent's own key still holds only what it held before.
  *
- *   1. THE HOOK FILES A RUN. The real hook is spawned at a session's start, as Claude Code spawns it, naming the agent
- *      and carrying none of its keys, against this file's own office. It files the run with the office's key under the
- *      agent's name and says it is held by its filer. The profile draws the command that resumes it.
+ *   1. THE HOOK FILES A RUN UNDER THE NAME ALONE. The real hook is spawned at a session's start, as Claude Code spawns
+ *      it, naming the agent and carrying none of its keys, against this file's own office. It files the run under the
+ *      agent's name with no key, and does not say it is held by its filer. Nothing shows the agent filed it itself, so
+ *      the run is not on the agent's line.
  *   2. A RUN SHAPED LIKE THE OWNER'S. It was filed with the office's key under the name "claude-code", which names no
  *      agent here, and its later writes are under the agent's name with the office's key, as the hook writes them
  *      after a resume. Its stamp carries a resume command and no process. The profile draws the command.
@@ -32,10 +33,11 @@
  *      them holds is refused. The run counts for the agent whose write came before, and the subagent's line stays its
  *      own run.
  *   8. AN AGENT'S OWN KEY MOVES NO RUN TO ITS LINE. A second agent's own key, sent with no session header, may not
- *      write to the run the hook filed for the first agent. The run still counts for the first agent, and not for the
- *      second.
+ *      write to the run the hook filed with the first agent's own key. The run still counts for the first agent, and
+ *      not for the second.
  *   9. THE HOOK FILES A RUN WITH THE AGENT'S OWN KEY. When the agent holds its key, the hook files the run with that
- *      key and does not say it is held by its filer. The agent filed it itself, so the way back gives its command.
+ *      key and does not say it is held by its filer. The agent filed it itself, so the way back gives its command, and
+ *      the profile draws the command that resumes it.
  *  10. A FILING NO KEY PROVES IS PASSED OVER. A run filed under the agent's name with no key does not count for it,
  *      since nothing shows the agent filed it itself.
  *
@@ -45,6 +47,10 @@
  *
  * Red before the code: cases 1, 2, 4, 6, 7, 8 and 9 found no run for the agent, and case 5 found the press refused
  * with wayBackNoRun. Cases 3 and 10 are guards and passed at the old code too.
+ *
+ * The hook no longer files a run with the office's key under an agent's name that it holds no key of. So case 1 now
+ * shows that filing passed over, case 8's run is filed by the hook with the first agent's own key, and the profile's
+ * drawing of a run the hook filed is read in case 9.
  *
  * The door now refuses the writes of cases 6, 7 and 8, as a run's record is changed only by those who hold the run.
  * The reader still passes over such writes, which a store written before that rule may hold, and no case here plants
@@ -275,18 +281,19 @@ async function theProfilesWayBack(handle: string): Promise<Locator> {
   const panel = app.page
     .locator('section.px-panel')
     .filter({ has: app.page.locator('.px-panel-head', { hasText: t('agentLive.back.title') }) })
-  await panel.locator('.al-back-says').waitFor({ state: 'visible', timeout: 30_000 })
+  await panel.locator('.al-back-state, .al-command').first().waitFor({ state: 'visible', timeout: 30_000 })
   return panel
 }
 
-/** What the profile's way back says, its command, and whether it offers the press. */
-async function whatTheProfileDraws(handle: string): Promise<{ says: string; command: string | null; press: number }> {
+/** The profile's way back: its state line if it draws one, its command, and whether it offers the press. */
+async function whatTheProfileDraws(handle: string): Promise<{ state: string | null; command: string | null; press: number }> {
   const panel = await theProfilesWayBack(handle)
-  const says = ((await panel.locator('.al-back-says').textContent()) ?? '').trim()
+  const line = panel.locator('.al-back-state')
+  const state = (await line.count()) === 0 ? null : ((await line.textContent()) ?? '').trim()
   const code = panel.locator('.al-command code')
   const command = (await code.count()) === 0 ? null : ((await code.textContent()) ?? '').trim()
   const press = await panel.getByRole('button', { name: t('agentLive.back.press') }).count()
-  return { says, command, press }
+  return { state, command, press }
 }
 
 /** The fixture's own check: no write names a serving agent, so the old reading finds none of these runs. */
@@ -317,20 +324,16 @@ describe("an agent's profile draws the resume line of its own run, which names n
   let hookRun = ''
   let ownersShape = ''
 
-  it('of a run the hook filed under its name', async () => {
+  it('passes over a run the hook filed under its name alone', async () => {
     hookRun = await theHookFilesARun(A, randomUUID())
     namesNoServingAgent(hookRun)
-    expect(theDataOf(hookRun)['heldByItsFiler']).toBe(true)
-    expect(theWritesOf(hookRun), 'the filing is not the only write, so the case would not be about the filing').toEqual([
-      { seq: 1, actorType: 'agent', actorId: A, provedBy: 'the-office-key' },
+    expect(theDataOf(hookRun)['heldByItsFiler'], 'the hook said the run is held by its filer').toBeUndefined()
+    expect(theWritesOf(hookRun), 'the hook did not file it by the agent’s name alone').toEqual([
+      { seq: 1, actorType: 'agent', actorId: A, provedBy: null },
     ])
 
-    const command = theCommandOf(hookRun)
-    const way = await theWayBackFor(A)
-    expect(way.run?.id ?? null).toBe(hookRun)
-    expect(way.way.command).toBe(command)
-    expect(await whatTheProfileDraws(A)).toEqual({ says: t('agentLive.back.host'), command, press: 1 })
-  }, 180_000)
+    expect((await theWayBackFor(A)).run?.id ?? null, 'the run the hook filed by the name alone').not.toBe(hookRun)
+  }, 60_000)
 
   it("of a run filed under another name whose later writes are under its name, shaped like the owner's", async () => {
     ownersShape = await aRunFiledBeforeItsAgentWasKnown(randomUUID(), [A, A])
@@ -346,7 +349,7 @@ describe("an agent's profile draws the resume line of its own run, which names n
     const way = await theWayBackFor(A)
     expect(way.run?.id ?? null).toBe(ownersShape)
     expect(way.way.command).toBe(command)
-    expect(await whatTheProfileDraws(A)).toEqual({ says: t('agentLive.back.host'), command, press: 1 })
+    expect(await whatTheProfileDraws(A)).toEqual({ state: null, command, press: 1 })
   }, 180_000)
 
   it("gives the agent's own key no holding of that run", async () => {
@@ -425,12 +428,12 @@ describe("an agent's profile draws the resume line of its own run, which names n
   }, 60_000)
 
   it("leaves a run on its agent's line when a second agent's own key tries to write to it", async () => {
-    const hooks = await theHookFilesARun(A, randomUUID())
+    const hooks = await theHookFilesARun(A, randomUUID(), keyOfA)
     const wrote = await ask('PATCH', `/api/records/${hooks}`, asAgent(B, keyOfB), { dataPatch: { doing: 'Test run, written later with the second agent’s own key.' } })
     expect(wrote.status, said(wrote.body)).toBe(403)
     expect(said(wrote.body)).toContain(NOT_ITS_RUN)
     namesNoServingAgent(hooks)
-    expect(theWritesOf(hooks)).toEqual([{ seq: 1, actorType: 'agent', actorId: A, provedBy: 'the-office-key' }])
+    expect(theWritesOf(hooks)).toEqual([{ seq: 1, actorType: 'agent', actorId: A, provedBy: 'an-agent-key' }])
 
     expect((await theWayBackFor(A)).run?.id ?? null).toBe(hooks)
     expect((await theWayBackFor(B)).run?.id ?? null, 'the run the second agent’s own key was refused a write to').not.toBe(hooks)
@@ -445,10 +448,12 @@ describe("an agent's profile draws the resume line of its own run, which names n
     ])
     expect(theKeyHolderOf(filed, 1)).toBeNull()
 
+    const command = theCommandOf(filed)
     const back = await theWayBackFor(A)
     expect(back.run?.id ?? null).toBe(filed)
-    expect(back.way.command).toBe(theCommandOf(filed))
-  }, 60_000)
+    expect(back.way.command).toBe(command)
+    expect(await whatTheProfileDraws(A)).toEqual({ state: null, command, press: 1 })
+  }, 180_000)
 
   it("passes over a filing under an agent's name that no key proves", async () => {
     const filed = await ask('POST', '/api/records', asAgent(A, null), {

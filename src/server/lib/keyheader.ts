@@ -74,16 +74,17 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify'
 import { whyThisRunKeyDidNotActFor } from './acting-for.ts'
 import { gateMet } from './gate-counts.ts'
-import { actorFrom, theKeyProvedTheNameTheHeadersGave } from './http.ts'
+import { actorFrom, aDoorNobodyNeedsAKeyFor, theKeyProvedTheNameTheHeadersGave } from './http.ts'
 import { ACTOR_HEADERS } from '@shared/request-headers.ts'
 import { arrivalOf } from '@shared/arrival-of.ts'
+import { sayInEnglish } from '@shared/i18n.ts'
 import { THE_MAIL_TOOL_HANDLE } from '../../config/the-mail-tool.mjs'
 import {
   howThisRequestProvedItself,
   theHashOfAHeaderKeyNoKeyFileOrRowHolds,
 } from './keys.ts'
 import { theAgentAKeysHolderNames } from './the-handle-of-the-agent-a-key-proves.ts'
-import { theHashOfTheKeyOnThisRequest } from '../db/the-key-on-this-request-was-made-for-a-run.ts'
+import { oneHeader, theHalvesOn, theHashOfTheKeyOnThisRequest } from '../db/the-key-on-this-request-was-made-for-a-run.ts'
 import { theAgentAnArrivingReferenceNames } from './the-agent-an-arriving-reference-names.ts'
 import { readParticipant } from '../db/read-participant.ts'
 import { PanelError } from './panel-error.ts'
@@ -214,9 +215,9 @@ export function refuseAnAgentsKeyUnderAnotherName(req: FastifyRequest): void {
  */
 export const A_KEY_THIS_OFFICE_NEVER_GAVE =
   `This request was refused, and nothing was done. This office has no record of giving the key in its ${KEY_HEADER} ` +
-  'header. Check the key your headers file or your settings hold. An agent sends the key its registration answered, ' +
-  'and an agent that no longer holds that key asks its starter or the person for a new one. ' +
-  "The office's own programs send the office's key, from its key file."
+  'header, or the key its two halves make. Check the key your headers file or your settings hold. An agent sends the ' +
+  'key its registration answered, and an agent that no longer holds that key asks its starter or the person for a new ' +
+  "one. The office's own programs send the office's key, from its key file. A browser pairs again on the Pairing page."
 
 /**
  * THE REFUSAL OF A KEY THIS OFFICE NEVER GAVE, OR NOTHING. Asked on every request, before the rule above.
@@ -226,10 +227,15 @@ export const A_KEY_THIS_OFFICE_NEVER_GAVE =
  * Now it is refused with 401, whether the window is open or closed. A request with no key is not refused
  * here: the window still decides it.
  *
+ * THE KEY IS THE ONE IN THE KEY HEADER, OR THE ONE A BROWSER'S TWO HALVES JOIN TO. Two halves of two different keys
+ * join to a key the office never gave, and are refused here, not as one half alone.
+ *
  * WHAT IS NOT REFUSED, and is read as before:
  *
  *   - a key the office gave and then revoked, or a waiting credential's token. The office gave both.
- *   - a key in the cookie. A browser cannot clear a cookie the office set as HttpOnly.
+ *   - the old cookie. It is no key.
+ *   - two halves at the pairing page's read and at the doors to a key. A browser cannot clear its cookie half, which is
+ *     HttpOnly, so this is where it is given two new halves.
  *   - a request no listener carried. It is the office itself.
  *   - any key in a test world. A world is a copy of the office with its key rows emptied, so every key the
  *     office gave before the copy would be refused there, and lib/keys.ts already says which keys a world trusts.
@@ -240,16 +246,61 @@ export function refuseAKeyThisOfficeNeverGave(req: FastifyRequest): void {
   const hash = theHashOfAHeaderKeyNoKeyFileOrRowHolds(req)
   if (hash === null) return
   if (credentialByTokenHash(hash) !== null) return
+  if (oneHeader(req.headers[KEY_HEADER]) === undefined && aDoorNobodyNeedsAKeyFor(req)) return
   throw new PanelError(A_KEY_THIS_OFFICE_NEVER_GAVE, 401)
 }
 
 /**
- * INSTALL BOTH ABOVE EVERY ROUTE GROUP. A hook registered after a route group does not run for that
+ * ONE HALF OF A BROWSER'S DEVICE KEY, WITHOUT THE OTHER, IS REFUSED, OR NOTHING. Asked on every request, first.
+ *
+ * Neither half alone proves anything, and a request that carries one half is not read as a request with no key. The
+ * cookie half alone is what a request another site makes this browser send would carry, and the header half alone is
+ * what a script that read the page's storage would hold. Each is refused with 401, whether the key window is open or
+ * closed, so the window never lets one half in under the name its headers give.
+ *
+ * WHAT IS NOT REFUSED:
+ *
+ *   - a request with a key in the key header. That key decides, and the halves are not read.
+ *   - a request outside /api/. A page load carries the cookie half and no header, and asks nothing.
+ *   - a load the browser makes itself: a GET or a HEAD with the cookie half alone that names nobody. A picture on a
+ *     page of this office is such a load, from /api/portraits, /api/avatars or /api/file, and a page cannot add a
+ *     header to it. It is read as a request with no key, exactly as if it carried no cookie, so the cookie half adds
+ *     nothing to it: a door that asks who is calling refuses it as unproved, and a door that answers anyone answers it.
+ *   - the pairing page's read and the doors to a key. A browser that kept its cookie half and lost the other pairs
+ *     again there.
+ *   - a request no listener carried, and any request in a test world, as for the refusal above.
+ */
+export function refuseOneHalfOfADeviceKey(req: FastifyRequest): void {
+  if (arrivalOf(req) === undefined) return
+  if (theWorldsOwnAuthority().inATestWorld) return
+  if (oneHeader(req.headers[KEY_HEADER]) !== undefined) return
+  const halves = theHalvesOn(req)
+  if ((halves.cookie === undefined) === (halves.header === undefined)) return
+  if (!req.url.startsWith('/api/')) return
+  if (aDoorNobodyNeedsAKeyFor(req)) return
+  if (aLoadTheBrowserMadeItself(req, halves.header)) return
+  throw new PanelError(sayInEnglish('server.oneHalfOfADeviceKey'), 401, undefined, undefined, undefined, {
+    code: 'oneHalfOfADeviceKey',
+    values: {},
+  })
+}
+
+/** A GET or a HEAD with no header half that names nobody: a load the browser made itself, as the rule above says. */
+function aLoadTheBrowserMadeItself(req: FastifyRequest, headerHalf: string | undefined): boolean {
+  return (req.method === 'GET' || req.method === 'HEAD')
+    && headerHalf === undefined
+    && oneHeader(req.headers[ACTOR_HEADERS.type]) === undefined
+    && oneHeader(req.headers[ACTOR_HEADERS.id]) === undefined
+}
+
+/**
+ * INSTALL ALL THREE ABOVE EVERY ROUTE GROUP. A hook registered after a route group does not run for that
  * group's routes, and the failure is silent: those doors would go on accepting one agent's key under
- * another's name, and a key this office never gave.
+ * another's name, a key this office never gave, and one half of a device key.
  */
 export function refuseAgentsKeysUnderAnotherName(app: FastifyInstance): void {
   app.addHook('onRequest', async (req) => {
+    refuseOneHalfOfADeviceKey(req)
     refuseAKeyThisOfficeNeverGave(req)
     refuseAnAgentsKeyUnderAnotherName(req)
   })

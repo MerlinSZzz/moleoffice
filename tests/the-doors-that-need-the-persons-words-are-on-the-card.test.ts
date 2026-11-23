@@ -45,7 +45,7 @@ import { deadLetterThresholdWarrantFor } from '../src/shared/dead-letter-thresho
 import { THE_PERSON } from '../src/shared/person.ts'
 import type { RoleCard } from '../src/shared/roles.ts'
 import { THE_DOORS_THAT_ALSO_NEED_THE_PERSONS_WORDS, type AnAnswerAboutADoor, type WhatTheGrantCarriesReading } from '../src/shared/what-the-grant-carries.ts'
-import { A_TESTS_REASON_FOR_THE_PERSON, apiApp, freshDb, FOR_THE_PERSON, thePersonsKeyHeader, type TestDb } from './helpers.ts'
+import { A_TESTS_REASON_FOR_THE_PERSON, apiApp, freshDb, FOR_THE_PERSON, thePersonsKeyHeader, type TestDb, governsTheWholeProject } from './helpers.ts'
 
 const RAISED = 'words-grant-secretary'
 const UNRAISED = 'words-plain-secretary'
@@ -275,7 +275,8 @@ beforeAll(async () => {
     const applied = await call('POST', '/api/roles/added', PERSON, { version: now?.version ?? null, card: card(powers), because: 'A made-up card the person adds.' })
     expect(applied.status, applied.raw).toBe(200)
   }
-  const decided = await call('POST', '/api/records', PERSON, { kind: 'decision', title: 'A made-up decision a restart grant rests on', data: { replaces: [] } })
+  const decided = await call('POST', '/api/records', PERSON, { kind: 'decision', title: 'A made-up decision a restart grant rests on', data: {
+    ...governsTheWholeProject(), replaces: [] } })
   expect(decided.status, decided.raw).toBe(201)
   decisionId = String(decided.body.record.id)
 }, 60_000)

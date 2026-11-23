@@ -38,6 +38,13 @@
  *      with a sentence. This case adds records and links of its own.
  *  14. every record an area is headed by is among the drawn records, made like any other, and is not listed as not
  *      placed.
+ *  15. on the master's Boxes level with nothing stored, the modules joined to its boxes by `feeds` links are drawn as
+ *      module cards. A module a box feeds is in a column with no heading, beside the right of the row of the first box
+ *      that feeds it, in the boxes' order. Every other one is in one row with no heading, before the first step's row,
+ *      in the order of the `feeds` links among them. Each of those links is a line with what it carries, and no
+ *      sentence names it. The rows of boxes are as they are with no modules. The master's Steps level, the master
+ *      with stored lanes and an ordinary pipeline draw what they draw with no modules joined. This case adds records
+ *      and links of its own.
  *
  * WHAT ROUND 230'S REPAIR CHANGED HERE, AND WHY. On a filed pipeline's page the drawing threw and drew nothing: the
  * engine draws an area's head from the input's records, and two kinds of area were headed by a record that was not among
@@ -84,6 +91,12 @@
  * own step, so both ends are drawn and the link is a line, by case 1's rule. Pick's title leads to Pick's own page, so
  * no title draws that link. Case 3 now asks for the line, and for no sentence about it. Ridge is not drawn on that
  * page, and its link still gives a sentence for developers.
+ *
+ * WHAT ROUND 242 CHANGED HERE, AND WHY (PV-2a). A decision of 22 November 2026 says that with nothing stored for the
+ * master's drawing, its Boxes level also draws the modules joined to its boxes by `feeds` links, as the architecture
+ * drawing of 13 November draws the people in a row at its top and the outside parts beside their boxes. Case 15 is new
+ * and holds it. No other case changed: the shared project joins no module to a box by a `feeds` link, so the master's
+ * Boxes level draws what it drew.
  *
  * The function does not exist at the Criterion commit, so every case imports it on its own: each case is red there
  * because the module is missing, and never because this file could not load.
@@ -227,6 +240,35 @@ const COUNTED = {
   ],
   linkCarries: CARRIES,
 }
+
+// CASE 15'S PROJECT: the one above, with four modules joined to the master's boxes by `feeds` links. `gardener` feeds
+// `apprentice`, and `apprentice` feeds the box `lamp`. The box `lamp` feeds `windmill`, and the box `kettle`, in the
+// same row, feeds `barrow`. Each pair's titles sort the other way round from its links and boxes, so an order by title
+// alone is wrong.
+const JOINED = {
+  records: [
+    ...RECORDS,
+    record('gardener', 'module', 'Gardener'),
+    record('apprentice', 'module', 'Apprentice'),
+    record('windmill', 'module', 'Windmill'),
+    record('barrow', 'module', 'Barrow'),
+  ],
+  links: [
+    ...LINKS,
+    link('gardener-apprentice', 'feeds', 'gardener', 'apprentice'),
+    link('apprentice-lamp', 'feeds', 'apprentice', 'lamp'),
+    link('lamp-windmill', 'feeds', 'lamp', 'windmill'),
+    link('kettle-barrow', 'feeds', 'kettle', 'barrow'),
+  ],
+  linkCarries: new Map<string, string | null | undefined>([
+    ...CARRIES,
+    ['gardener-apprentice', '[{"out":"tells"}]'],
+    ['apprentice-lamp', '[{"out":"lights"}]'],
+    ['lamp-windmill', '[{"out":"turns"}]'],
+    ['kettle-barrow', '[{"out":"fills"}]'],
+  ]),
+}
+const JOINED_MODULES = ['gardener', 'apprentice', 'windmill', 'barrow']
 
 const byId = (id: string): PanelRecord => {
   const found = RECORDS.find((one) => one.id === id)
@@ -626,5 +668,82 @@ describe('the lanes input is read from the records and links the page loaded', (
     expect(drawn(drawings["the master's Boxes level"], 'north')).toMatchObject({
       kind: 'block', title: 'North', role: 'step', state: 'todo', number: null, href: hrefOf(pipelinePath('ridge')),
     })
+  })
+
+  it("15. the master's Boxes level with nothing stored draws the modules joined to its boxes: a row on top, and a column beside a box's row", async () => {
+    const { lanesInputFor } = await fromRecords()
+    const { hrefOf, recordPath } = await router()
+    const reading = lanesInputFor(JOINED, 'plan', byId('plan'), 'boxes', stored({}, 'pipeline:plan'))
+    const { input } = reading
+    const plain = await master('boxes')
+    const before = plain.input
+
+    // A master whose boxes no module is joined to by a feeds link draws its rows and the other pipelines' areas, and no
+    // other area.
+    expect(before.tree.areas.map((area) => area.heading?.record ?? null)).toEqual(['north', 'south', 'garden'])
+
+    // Each module is drawn as a module card, by the rules any card is drawn by, and nothing else is added.
+    expect(ids(input)).toEqual([...ids(before), ...JOINED_MODULES].sort())
+    for (const [id, title] of [['gardener', 'Gardener'], ['apprentice', 'Apprentice'], ['windmill', 'Windmill'], ['barrow', 'Barrow']] as const) {
+      expect(drawn(input, id)).toMatchObject({
+        kind: 'module',
+        title,
+        role: 'module',
+        state: null,
+        number: null,
+        badges: [],
+        counts: { carries: { thisPipeline: 0, otherPipelines: 0 }, carriedBy: null, holds: null },
+        href: hrefOf(recordPath(id, 'module')),
+      })
+    }
+
+    // The modules no box feeds: one row, first among the areas, with no heading, along the feeds link between them.
+    const [top, ...rest] = input.tree.areas
+    expect(top).toMatchObject({ heading: null, arrange: 'row', columns: null, beside: null, tint: null })
+    expect(items(top!)).toEqual(['gardener', 'apprentice'])
+
+    // The modules a box feeds: one column beside the right of that box's row, with no heading, in the boxes' order.
+    const north = rest.find((area) => area.heading?.record === 'north')
+    expect(north, "North's row").toBeDefined()
+    const columns = rest.filter((area) => area.beside !== null)
+    expect(columns).toHaveLength(1)
+    expect(columns[0]).toMatchObject({ heading: null, arrange: 'stack', columns: null, beside: { side: 'right', of: north!.key }, tint: null })
+    expect(items(columns[0]!)).toEqual(['windmill', 'barrow'])
+
+    // The rows of boxes and the other pipelines' areas are as they are with no modules, in the same order, after the top row.
+    expect(rest.filter((area) => area !== columns[0])).toEqual(before.tree.areas)
+    expect(input.tree.notPlaced).toEqual(before.tree.notPlaced)
+
+    // Each feeds link with a module at an end is a line with what it carries, and no sentence names it.
+    const byLink = new Map(input.links.map((one) => [one.id, one]))
+    const lines = [
+      ['gardener-apprentice', 'gardener', 'apprentice', 'tells'],
+      ['apprentice-lamp', 'apprentice', 'lamp', 'lights'],
+      ['lamp-windmill', 'lamp', 'windmill', 'turns'],
+      ['kettle-barrow', 'kettle', 'barrow', 'fills'],
+    ] as const
+    expect([...byLink.keys()].sort()).toEqual([...before.links.map((one) => one.id), ...lines.map(([id]) => id)].sort())
+    for (const [id, from, to, carries] of lines) {
+      expect(byLink.get(id)).toEqual({ id, type: 'feeds', from, to, carries, gate: null, upTo: null, inferred: false })
+    }
+    for (const title of ['Gardener', 'Apprentice', 'Windmill', 'Barrow']) {
+      expect(saying(told(reading), title), `no sentence for developers names ${title}`).toEqual([])
+      expect(saying(reading.said, title), `no sentence for every reader names ${title}`).toEqual([])
+    }
+    expect(told(reading)).toEqual(told(plain))
+    expect(reading.said).toEqual(plain.said)
+
+    // Nothing changes anywhere else: the master's Steps level, the same master with stored lanes, and an ordinary pipeline
+    // in the same project draw what they draw with no modules joined, and draw none of the modules.
+    const lanes: ScopeIntent = { lanes: [{ name: 'Front', arrange: 'row' }], nodes: { lamp: { lane: 'Front' } } }
+    const elsewhere = [
+      ["the master's Steps level", lanesInputFor(JOINED, 'plan', byId('plan'), 'steps', stored({}, 'pipeline:plan')), await master('steps')],
+      ['the master with stored lanes', lanesInputFor(JOINED, 'plan', byId('plan'), 'boxes', stored(lanes, 'pipeline:plan')), await master('boxes', lanes)],
+      ['an ordinary pipeline', lanesInputFor(JOINED, 'plan', byId('garden'), 'steps', stored({}, 'pipeline:garden')), await garden()],
+    ] as const
+    for (const [which, joined, without] of elsewhere) {
+      expect(joined.input.tree, which).toEqual(without.input.tree)
+      for (const id of JOINED_MODULES) expect(ids(joined.input), which).not.toContain(id)
+    }
   })
 })

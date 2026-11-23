@@ -11,10 +11,10 @@
  * request and says plainly that it has no source map yet; the old page made the second request on
  * every project and called the expected 404 "the source map could not be read".
  *
- * THE SENTENCES ARE READ FROM THE CODE through `t()`, never copied. Three sentences for the states:
- * no map yet (`projectGraph.coverage.none`), counts (`projectGraph.coverage` and
- * `projectGraph.coverage.unclaimed`), and a real failed read (`projectGraph.coverage.failed`).
- * The file also asserts that the first and the third are different sentences. A graph that cannot
+ * THE WORDS ARE READ FROM THE CODE through `t()`, never copied. Three answers for the states:
+ * no map yet (`projectGraph.coverage.noMap`), counts (`projectGraph.coverage` and
+ * `projectGraph.coverage.unclaimed`), and a real failed read (`projectGraph.coverage.notRead`).
+ * CRITERION CHANGE, as decided: the no-map and failed answers are short state words now, not sentences. A graph that cannot
  * tell whether there is an index, because the stored index data is damaged, asks the coverage door
  * and uses the failed sentence; it is not the no-map state.
  *
@@ -71,7 +71,7 @@ describe('the project graph page’s source-map read', () => {
     expect(read.sourceIndexBuilt).toBe(false)
     expect(read.coverage, 'no source map is read').toBeNull()
     expect(read.graph, 'the graph is still read').toEqual(aGraph(false))
-    expect(theSourceMapSentence(read), 'the no-map sentence, read from the word file').toBe(t('projectGraph.coverage.none'))
+    expect(theSourceMapSentence(read), 'the no-map word, read from the word file').toBe(t('projectGraph.coverage.noMap'))
   })
 
   it('asks the source-map door when the project has one, and says the counts it answered', async () => {
@@ -98,8 +98,8 @@ describe('the project graph page’s source-map read', () => {
     expect(read.sourceIndexBuilt).toBe(true)
     expect(read.coverage, 'a failed read is null, never a zero').toBeNull()
     expect(read.graph).toEqual(aGraph(true))
-    expect(theSourceMapSentence(read), 'the could-not-be-read sentence, read from the word file').toBe(
-      t('projectGraph.coverage.failed'),
+    expect(theSourceMapSentence(read), 'the not-read word, read from the word file').toBe(
+      t('projectGraph.coverage.notRead'),
     )
   })
 
@@ -110,14 +110,8 @@ describe('the project graph page’s source-map read', () => {
     expect(read.sourceIndexBuilt, 'cannot tell is not no index').toBeNull()
     expect(read.coverage, 'the failed coverage read is null').toBeNull()
     expect(read.graph).toEqual(aGraph(null))
-    expect(theSourceMapSentence(read), 'the could-not-be-read sentence, not the no-map sentence').toBe(
-      t('projectGraph.coverage.failed'),
+    expect(theSourceMapSentence(read), 'the not-read word, not the no-map word').toBe(
+      t('projectGraph.coverage.notRead'),
     )
-  })
-
-  it('keeps “no source map yet” and “could not be read” as two different sentences', () => {
-    expect(t('projectGraph.coverage.none').trim(), 'the no-map sentence has words').not.toBe('')
-    expect(t('projectGraph.coverage.failed').trim(), 'the failed sentence has words').not.toBe('')
-    expect(t('projectGraph.coverage.none'), 'a missing map is not a failed read').not.toBe(t('projectGraph.coverage.failed'))
   })
 })

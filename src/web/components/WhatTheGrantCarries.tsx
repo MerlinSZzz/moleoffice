@@ -17,10 +17,10 @@
  * Where this office has its own answer, the same line says who set it and when.
  *
  * A DOOR THAT DOES NOT ASK YET SAYS SO. Its menu is drawn, because the answer is kept and holds once the door asks, but
- * the line under it says the door still refuses the secretary, so "may press" there is never read as true today.
+ * the short words under it say it does not ask yet, so "may press" there is never read as true today.
  *
  * A DOOR THAT ALSO NEEDS THE PERSON'S WORDS SAYS FOR WHICH CHANGES. The two role card doors need them only for a change
- * to a card's words, so their line says the grant alone may press a change that leaves the words as they are.
+ * to a card's words, so their short words say so.
  */
 import { useState } from 'react'
 
@@ -113,15 +113,14 @@ function TheList({ reading, onChanged }: { reading: WhatTheGrantCarriesReading; 
   return (
     <section className="wgc" data-what-the-grant-carries>
       <p className="wgc-head tc-label">{t('grantList.heading')}</p>
-      <p className="wgc-intro">{t('grantList.intro')}</p>
-      {mayChange ? null : <p className="wgc-read-only">{t('grantList.readOnly')}</p>}
+      {mayChange ? null : <p className="wgc-read-only">{t('settingsState.readOnly')}</p>}
       {THE_GROUPS.map((answer) => {
         const doors = reading.doors.filter((door) => door.answer === answer)
         return (
           <details className="wgc-group" key={answer} data-group={answer}>
             <summary className="wgc-group-head">{t(GROUP_WORD[answer], { n: reading.counts[answer] })}</summary>
             {doors.length === 0 ? (
-              <p className="wgc-none">{t('grantList.group.none')}</p>
+              <p className="wgc-none">{t('absence.none')}</p>
             ) : (
               <ul className="wgc-rows">
                 {doors.map((door) => (
@@ -132,13 +131,13 @@ function TheList({ reading, onChanged }: { reading: WhatTheGrantCarriesReading; 
                         {t('grantList.byTheCard', { answer: t(SHORT_WORD[door.card]) })}
                         {door.office === null ? null : <WhoSetThisOfficesAnswer office={door.office} />}
                       </span>
-                      {door.asksTheCheck ? null : <span className="wgc-not-yet">{t('grantList.doesNotAskYet')}</span>}
+                      {door.asksTheCheck ? null : <span className="wgc-not-yet">{t('grantList.state.doesNotAskYet')}</span>}
                       {door.alsoNeedsThePersonsWords ? (
                         <span className="wgc-needs-words">
                           {t(
                             doesThisDoorNeedThePersonsWordsOnlyForACardsWords(door.door, door.card, door.answer)
-                              ? 'grantList.alsoNeedsYourWordsForACardsWords'
-                              : 'grantList.alsoNeedsYourWords',
+                              ? 'grantList.state.alsoNeedsYourWordsForACardsWords'
+                              : 'grantList.state.alsoNeedsYourWords',
                           )}
                         </span>
                       ) : null}
@@ -170,7 +169,6 @@ function TheList({ reading, onChanged }: { reading: WhatTheGrantCarriesReading; 
       {reading.stale.length === 0 ? null : (
         <div className="wgc-stale">
           <p className="wgc-group-head">{t('grantList.stale.head')}</p>
-          <p className="wgc-intro">{t('grantList.stale.says')}</p>
           <ul className="wgc-rows">
             {reading.stale.map((row) => (
               <li className="wgc-row" key={row.door} data-stale-door={row.door}>
@@ -258,7 +256,6 @@ function WhoSetThisOfficesAnswer({ office }: { office: WhoSetIt }) {
 const WHAT_THE_GRANT_CARRIES_CSS = `
 .wgc { margin-top: var(--pad); border-top: 1px solid var(--border); padding-top: var(--pad); min-width: 0; }
 .wgc-head { margin: 0; width: auto; }
-.wgc-intro { margin: 4px 0 var(--pad); max-width: var(--measure); color: var(--text-2); font-size: var(--fs-1); line-height: var(--lh-read); }
 .wgc-read-only { margin: 0 0 var(--pad); color: var(--text-2); font-size: var(--fs-1); }
 .wgc-loading { margin: var(--pad) 0 0; color: var(--text-3); font-size: var(--fs-1); }
 .wgc-group { margin: 0 0 var(--pad); min-width: 0; }

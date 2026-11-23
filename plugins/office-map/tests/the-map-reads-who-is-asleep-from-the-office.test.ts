@@ -69,4 +69,9 @@ describe('the map reads who is asleep from the office', () => {
       expect(words[language].asleepUnread).not.toBe(words[language].asleepMadeUp)
     }
   })
+
+  it('shows a sleeper\'s bubble word in Chinese on the Chinese map', () => {
+    expect(words.zh.asleepPlate).not.toBe(words.en.asleepPlate)
+    expect(words.zh.asleepPlate).toMatch(/\p{Script=Han}/u)
+  })
 })

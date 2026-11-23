@@ -11,21 +11,37 @@
  * THE NEWEST USE IS THE ONE WITH THE HIGHEST PLACE ON ITS RUN, read through `tool_uses_run_seq_idx`: one indexed lookup
  * per run, never a scan of the table. The use door gives each use the next place with the office's clock inside one
  * transaction, so the highest place is the latest use. Its `at` is a local stamp, as every other clock of a run is, so
- * across a clock change it carries the same hour of doubt they do.
+ * across a clock change it carries the same hour of doubt they do. A use written since migration 0358 keeps the moment
+ * of that stamp beside it (`at_instant`), from the same reading of the clock, and a reader that measures time from the
+ * use reads the stamp with that moment by the rule of `momentOfAStampAndItsInstant` in src/shared/time.ts: the moment
+ * only when it names the stamp beside it.
  */
 
 import { sqlite } from '../db/client.ts'
 
-const THE_NEWEST_USE = 'SELECT at FROM tool_uses WHERE run_id = ? ORDER BY seq DESC LIMIT 1'
+const THE_NEWEST_USE = 'SELECT at, at_instant AS atInstant FROM tool_uses WHERE run_id = ? ORDER BY seq DESC LIMIT 1'
+
+/** The newest use of a tool on a run: its stamp, and the moment of that stamp, empty on a use written before it was kept. */
+export interface TheNewestUse {
+  at: string
+  atInstant: string | null
+}
+
+/** The newest use of a tool on each run that has one, with the moment of its stamp. A run with no use is not in the map. */
+export function theNewestUsesWithTheirMomentsOf(runs: Iterable<string>): Map<string, TheNewestUse> {
+  const newest = sqlite.prepare(THE_NEWEST_USE)
+  const out = new Map<string, TheNewestUse>()
+  for (const run of runs) {
+    if (out.has(run)) continue
+    const row = newest.get(run) as TheNewestUse | undefined
+    if (row !== undefined) out.set(run, { at: row.at, atInstant: row.atInstant })
+  }
+  return out
+}
 
 /** The stamp of the newest use of a tool on each run that has one. A run with no use is not in the map. */
 export function theNewestUsesOf(runs: Iterable<string>): Map<string, string> {
-  const newest = sqlite.prepare(THE_NEWEST_USE)
   const out = new Map<string, string>()
-  for (const run of runs) {
-    if (out.has(run)) continue
-    const row = newest.get(run) as { at: string } | undefined
-    if (row !== undefined) out.set(run, row.at)
-  }
+  for (const [run, use] of theNewestUsesWithTheirMomentsOf(runs)) out.set(run, use.at)
   return out
 }

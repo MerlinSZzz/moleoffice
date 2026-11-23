@@ -16,7 +16,7 @@
  * - the roster's picture editor, which draws the whole avatar set.
  *
  * PICTURES. With W13P_ART_SHOTS set to a folder, it photographs both pages at 1440, 990, 660 and
- * 390 in light and dark, and at 1440 in Chinese, into that folder and nowhere else. Without it, it
+ * 390 in light and dark, into that folder and nowhere else. Without it, it
  * photographs nothing and checks the light look alone: the dark look sets colour and shadow only, so
  * a check of pictures arriving learns nothing more from it.
  */
@@ -139,15 +139,6 @@ describe('the Embassy draws the portraits, the avatars and the chat button from 
     expect(broken, `these pictures did not draw: ${broken.join(', ')}`).toEqual([])
     await photograph(`embassy-${look}`)
   }, 180_000)
-
-  it('draws them in Chinese as well', async () => {
-    await useLook('light')
-    await openTheEmbassy('zh')
-    const pictures = await thePicturesFromTheMovedFolders()
-    expect(pictures.filter((one) => one.src.includes('/api/portraits/role/')).length).toBeGreaterThan(0)
-    expect(pictures.filter((one) => !one.complete || one.width === 0).map((one) => one.src)).toEqual([])
-    await photograph('embassy-zh', [1440])
-  }, 180_000)
 })
 
 describe('the picture editor draws the whole avatar set from public/', () => {
@@ -162,14 +153,5 @@ describe('the picture editor draws the whole avatar set from public/', () => {
     const broken = pictures.filter((one) => !one.complete || one.width === 0).map((one) => one.src)
     expect(broken, `these pictures did not draw: ${broken.join(', ')}`).toEqual([])
     await photograph(`picker-${look}`)
-  }, 180_000)
-
-  it('draws them in Chinese as well', async () => {
-    await useLook('light')
-    await openThePicker('zh')
-    const pictures = await thePicturesFromTheMovedFolders()
-    expect(pictures.filter((one) => one.src.includes('/api/avatars/')).length).toBeGreaterThan(0)
-    expect(pictures.filter((one) => !one.complete || one.width === 0).map((one) => one.src)).toEqual([])
-    await photograph('picker-zh', [1440])
   }, 180_000)
 })

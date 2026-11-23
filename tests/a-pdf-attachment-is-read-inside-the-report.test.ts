@@ -4,41 +4,38 @@
  * A PDF ATTACHED TO A REPORT IS READ INSIDE THE REPORT ON ONE PRESS, EVERY PAGE, WITHOUT DOWNLOADING.
  *
  * ---------------------------------------------------------------------------------------
- * WHY THIS TEST LAUNCHES ITS OWN BROWSER
- * ---------------------------------------------------------------------------------------
- *
- * The Chromium Playwright starts by default is its headless shell, and it does not draw a PDF in a
- * frame at all: the frame never navigates to the PDF and no PDF frame appears. The full Chromium
- * that Playwright installs as channel "chromium" does draw it, with the PDF reader's own frame and
- * page controls, so this test launches that browser by name. If that browser is missing or does
- * not start, this test fails and says so; it does not skip, because a skip would report a PDF that
- * nobody had looked at. The real built page is still the page driven, and the real office and file
- * door are still the ones serving the file.
- *
- * ---------------------------------------------------------------------------------------
  * WHAT IS PROVED
  * ---------------------------------------------------------------------------------------
  *
  *   1. The made-up PDF has three pages and says so in its own bytes.
- *   2. Before the press the report draws the file's facts and one press, and no frame. The file's
+ *   2. Before the press the report draws the file's facts and one press, and no box. The file's
  *      body is not fetched for drawing before the press.
- *   3. One press draws a frame with no sandbox attribute, asking for the file with open=1&shown=1. The
- *      reply carries default-src 'none'; sandbox and still says nosniff.
- *   4. The frame draws page 1 (red). A wheel scroll over the frame reaches the last page, page 3
- *      (blue): the count from the file and the last page drawn together say every page is there.
- *   5. Nothing was downloaded, and the office's page still shows the report and the frame.
+ *   3. One press draws the box, and the box holds no frame: the office's page draws the PDF itself.
+ *      The page asks for the file with open=1&shown=1, and the reply carries default-src 'none';
+ *      sandbox, so the same address opened on its own still runs nothing.
+ *   4. The box holds three pages, one under another, each a canvas: page 1 red, page 2 green and
+ *      page 3 blue. The colours are read out of each canvas, so they are what the page drew.
+ *   5. A wheel over the box scrolls it to the last page: the count from the file and the last page
+ *      in view together say every page is there.
+ *   6. Nothing was downloaded, and the office's page still shows the report and the box.
+ *   7. In a second case, the file door's answer is held back. While it is held, the box holds the
+ *      office's own reading state, with the file's name, and no page. Once the answer goes on and
+ *      page 1 is drawn, the reading state is gone.
  *
- * Only Chromium is measured here. Firefox and Safari use their own PDF readers, and nobody in this
- * office has looked at this frame in either of them.
+ * On the code before the office drew a PDF itself, the box was a frame of the browser's own PDF
+ * reader, which holds no canvas this page can read, so this test fails at step 4. On the code
+ * before the box drew a reading state, the box was empty while the answer was held, so the second
+ * case fails at step 7.
+ *
+ * Only Chromium is driven here.
  */
 
 import { chromium, type Browser, type BrowserContext, type Locator, type Page } from 'playwright'
-import sharp from 'sharp'
 import type { FastifyInstance } from 'fastify'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { recordPath } from '../src/web/components/router.tsx'
-import { freshDb, openRecordPagesAt, theBuiltPage, type TestDb } from './helpers.ts'
+import { freshDb, openRecordPagesAt, storeNormalModeWhereNothingIsStored, theBuiltPage, type TestDb } from './helpers.ts'
 
 const HERE = 'default'
 const OWNER = {
@@ -54,8 +51,8 @@ const THE_PDF_POLICY = "default-src 'none'; sandbox"
 const PAGES = 3
 
 /**
- * A three-page PDF whose pages are solid red, green and blue with the page number in white, so a
- * screenshot can say which page is drawn without reading anything out of a plugin's shadow DOM.
+ * A three-page PDF whose pages are solid red, green and blue with the page number in white, so the
+ * colours read out of a page's canvas say which page it drew.
  */
 function theThreePagePdf(): Buffer {
   const objects: string[] = []
@@ -110,7 +107,7 @@ let pdfPath = ''
 let browser: Browser
 let context: BrowserContext
 let page: Page
-const answers: { method: string; path: string; status: number; policy: string | null }[] = []
+const answers: { method: string; path: string; open: string | null; shown: string | null; status: number; policy: string | null }[] = []
 
 async function post(path: string, body: unknown): Promise<any> {
   const response = await fetch(`${origin}${path}`, { method: 'POST', headers: OWNER, body: JSON.stringify(body) })
@@ -125,15 +122,7 @@ beforeAll(async () => {
 
   database = await freshDb()
   const webDir = await theBuiltPage()
-  try {
-    browser = await chromium.launch({ headless: true, channel: 'chromium' })
-  } catch (error) {
-    throw new Error(
-      'This PDF test needs the full Chromium that Playwright installs as channel "chromium"; the ' +
-        'default headless shell draws no PDF in a frame. It was missing or would not start, so the ' +
-        `PDF was not looked at. The browser said: ${error instanceof Error ? error.message : String(error)}`,
-    )
-  }
+  browser = await chromium.launch({ headless: true })
   const { buildApp } = await import('../src/server/index.ts')
   office = (await buildApp({ production: true, webDir, webAppUrl: 'http://localhost:5173', logLevel: false })).app
   office.addHook('onResponse', async (request, reply) => {
@@ -142,6 +131,8 @@ beforeAll(async () => {
     answers.push({
       method: request.method,
       path: url.searchParams.get('path') ?? '',
+      open: url.searchParams.get('open'),
+      shown: url.searchParams.get('shown'),
       status: reply.statusCode,
       policy: reply.getHeader('content-security-policy') === undefined ? null : String(reply.getHeader('content-security-policy')),
     })
@@ -173,6 +164,7 @@ beforeAll(async () => {
   })).record.id
 
   context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, acceptDownloads: true })
+  await storeNormalModeWhereNothingIsStored(context)
   await openRecordPagesAt(context, 'full')
   page = await context.newPage()
 }, 240_000)
@@ -185,45 +177,41 @@ afterAll(async () => {
 }, 60_000)
 
 /**
- * THE COLOURS THE VIEWPORT SHOWS WHERE THE FRAME IS.
+ * THE COLOURS EACH PAGE OF THE BOX DREW, read out of its canvas.
  *
- * An element screenshot of the PDF iframe does not capture the PDF's plugin layer: it comes back
- * blank or the colour behind it. The browser's own viewport screenshot is composited, so the frame
- * is cut out of that at its place on the screen and every eighth pixel of the cut is counted. A
- * solid page of a colour reaches the count even when the page is only part of what is visible;
- * reading one point would depend on where its page happened to be scrolled.
+ * Every sixty-fourth pixel of a page's canvas is counted. A page that has not been drawn yet counts
+ * nothing, so a caller polls until the counts are there; reading one point would depend on where the
+ * page's words happened to fall.
  */
-async function frameColours(frame: Locator): Promise<{ red: number; green: number; blue: number }> {
-  const box = await frame.boundingBox()
-  if (box === null) throw new Error('The PDF frame has no place on the page to read')
-  const whole = await page.screenshot({ animations: 'disabled' })
-  const viewport = page.viewportSize() ?? { width: 1440, height: 1000 }
-  const left = Math.max(0, Math.round(box.x))
-  const top = Math.max(0, Math.round(box.y))
-  const cut = await sharp(whole).extract({
-    left,
-    top,
-    width: Math.max(1, Math.min(Math.round(box.width), viewport.width - left)),
-    height: Math.max(1, Math.min(Math.round(box.height), viewport.height - top)),
-  }).raw().toBuffer({ resolveWithObject: true })
-  let red = 0
-  let green = 0
-  let blue = 0
-  for (let y = 0; y < cut.info.height; y += 8) {
-    for (let x = 0; x < cut.info.width; x += 8) {
-      const at = (y * cut.info.width + x) * cut.info.channels
-      const r = cut.data[at] ?? 0
-      const g = cut.data[at + 1] ?? 0
-      const b = cut.data[at + 2] ?? 0
-      if (r > 150 && g < 120 && b < 120) red++
-      else if (r < 120 && g > 150 && b < 120) green++
-      else if (r < 120 && g < 120 && b > 150) blue++
-    }
-  }
-  return { red, green, blue }
+async function pageColours(box: Locator): Promise<{ page: string | null; red: number; green: number; blue: number }[]> {
+  return box.locator('[data-shown-page]').evaluateAll((pages) =>
+    pages.map((element) => {
+      const counts = { page: element.getAttribute('data-shown-page'), red: 0, green: 0, blue: 0 }
+      const canvas = element.querySelector('canvas')
+      const drawing = canvas?.getContext('2d') ?? null
+      if (canvas === null || drawing === null || canvas.width === 0 || canvas.height === 0) return counts
+      const pixels = drawing.getImageData(0, 0, canvas.width, canvas.height).data
+      for (let at = 0; at + 2 < pixels.length; at += 4 * 64) {
+        const r = pixels[at] ?? 0
+        const g = pixels[at + 1] ?? 0
+        const b = pixels[at + 2] ?? 0
+        if (r > 150 && g < 120 && b < 120) counts.red++
+        else if (r < 120 && g > 150 && b < 120) counts.green++
+        else if (r < 120 && g < 120 && b > 150) counts.blue++
+      }
+      return counts
+    }),
+  )
 }
 
-it('draws the three pages inside the report on one press, with no sandbox attribute and the PDF policy', async () => {
+/** The colour a page's counts are mostly, or null when no colour has a thousand samples. */
+function theColourOf(counts: { red: number; green: number; blue: number }): string | null {
+  const each: [string, number][] = [['red', counts.red], ['green', counts.green], ['blue', counts.blue]]
+  const [colour, count] = each.sort((one, other) => other[1] - one[1])[0] ?? ['', 0]
+  return count > 1000 ? colour : null
+}
+
+it('draws the three pages inside the report on one press, in the office page itself, with the PDF policy on the reply', async () => {
   await page.goto(`${origin}/#${recordPath(report)}`, { timeout: 60_000 })
   await page.locator('.sb-file-name').waitFor({ timeout: 60_000 })
   expect(await page.locator('.sb-file-name').innerText()).toBe('made-up-three-pages.pdf')
@@ -236,45 +224,45 @@ it('draws the three pages inside the report on one press, with no sandbox attrib
   expect(answers.filter((answer) => answer.path === pdfPath && answer.method !== 'HEAD')).toEqual([])
 
   await page.locator('.sb-file-show').click()
-  const frame = page.locator('.sb-file-frame')
-  await frame.waitFor({ timeout: 20_000 })
-  expect(await frame.getAttribute('sandbox')).toBeNull()
-  expect(await frame.getAttribute('src')).toContain('open=1&shown=1')
-  await frame.scrollIntoViewIfNeeded()
+  const box = page.locator('.sb-file-frame')
+  await box.waitFor({ timeout: 20_000 })
+  expect(await page.locator('.sb-file iframe').count(), 'the PDF is drawn by the office page, not in a frame').toBe(0)
+  await box.scrollIntoViewIfNeeded()
 
-  // THE PDF READER'S OWN FRAME, drawn by full Chromium. Nothing but a real reader produces it.
-  await expect.poll(() => page.frames().some((candidate) => candidate.url().includes(`${origin}/api/file?`)), {
-    timeout: 30_000,
-  }).toBe(true)
+  // EVERY PAGE IS DRAWN, EACH IN ITS OWN COLOUR. The file itself states the count.
+  await expect
+    .poll(async () => (await pageColours(box)).map((counts) => [counts.page, theColourOf(counts)]), { timeout: 30_000 })
+    .toEqual([
+      ['1', 'red'],
+      ['2', 'green'],
+      [String(PAGES), 'blue'],
+    ])
 
-  // EVERY PAGE IS DRAWN: page one at the top, then a wheel through the reader until page two's
-  // green and page three's blue have both been seen. The file itself states the count.
-  const box = await frame.boundingBox()
-  if (box === null) throw new Error('The PDF frame has no place on the page to scroll over')
-  await page.mouse.move(box.x + box.width / 2, box.y + Math.min(box.height / 2, 400))
-  const seen = new Set<string>()
-  let counts = { red: 0, green: 0, blue: 0 }
-  // PAGE ONE FIRST, WITHOUT SCROLLING: a wheel sent before it is drawn would carry the test past
-  // the page it is waiting for.
-  for (let turn = 0; turn < 60 && counts.red <= 100; turn++) {
-    counts = await frameColours(frame)
-    if (counts.red <= 100) await page.waitForTimeout(500)
+  // THE PAGES ARE ONE UNDER ANOTHER, and a wheel over the box scrolls it to the last one.
+  const places = await box.locator('[data-shown-page]').evaluateAll((pages) => pages.map((element) => element.getBoundingClientRect().top))
+  expect(places.length).toBe(PAGES)
+  expect(places.every((top, index) => index === 0 || top > (places[index - 1] ?? Infinity)), `the pages' tops were ${JSON.stringify(places)}`).toBe(true)
+  const room = await box.evaluate((element) => ({ height: element.scrollHeight, shown: element.clientHeight }))
+  expect(room.height, 'three pages do not fit in the box, so the box scrolls').toBeGreaterThan(room.shown)
+  const where = await box.boundingBox()
+  if (where === null) throw new Error('The PDF box has no place on the page to scroll over')
+  await page.mouse.move(where.x + where.width / 2, where.y + Math.min(where.height / 2, 400))
+  for (let turn = 0; turn < 40; turn++) {
+    const scrolled = await box.evaluate((element) => element.scrollTop + element.clientHeight >= element.scrollHeight - 1)
+    if (scrolled) break
+    await page.mouse.wheel(0, 600)
+    await page.waitForTimeout(100)
   }
-  expect(counts.red, `page one was not drawn; the colours counted were ${JSON.stringify(counts)}`).toBeGreaterThan(100)
-  seen.add('red')
-  // THEN A WHEEL THROUGH THE READER until page two's green and page three's blue have both been seen.
-  for (let turn = 0; turn < 24 && seen.size < 3; turn++) {
-    await page.mouse.wheel(0, 500)
-    await page.waitForTimeout(500)
-    counts = await frameColours(frame)
-    if (counts.green > 100) seen.add('green')
-    if (counts.blue > 100) seen.add('blue')
-  }
-  expect([...seen].sort(), `the pages drawn were ${String(seen.size)}; the colours counted were ${JSON.stringify(counts)}`).toEqual(['blue', 'green', 'red'])
+  const last = await box.locator(`[data-shown-page="${String(PAGES)}"]`).boundingBox()
+  const after = await box.boundingBox()
+  if (last === null || after === null) throw new Error('The last page or the box has no place on the page')
+  expect(last.y + last.height, 'the last page ends inside the box once it is scrolled').toBeLessThanOrEqual(after.y + after.height + 1)
+  expect(last.y + last.height).toBeGreaterThan(after.y)
 
-  // THE REPLY CARRIES THE POLICY, ON THE GET THE READER READ.
+  // THE PAGE ASKED FOR THE FILE WITH open=1&shown=1, AND THE REPLY CARRIES THE POLICY.
   const read = answers.filter((answer) => answer.path === pdfPath && answer.method === 'GET')
   expect(read.length).toBeGreaterThan(0)
+  expect(read.every((answer) => answer.open === '1' && answer.shown === '1')).toBe(true)
   expect(read[read.length - 1]?.policy).toBe(THE_PDF_POLICY)
   expect(read.every((answer) => answer.status === 200 || answer.status === 206)).toBe(true)
 
@@ -283,3 +271,46 @@ it('draws the three pages inside the report on one press, with no sandbox attrib
   expect(await page.locator('.sb-file-name').innerText()).toBe('made-up-three-pages.pdf')
   expect(await page.locator('.sb-file-frame').count()).toBe(1)
 }, 180_000)
+
+it('draws the office reading state in the box while the PDF is on its way, and takes it away once a page is drawn', async () => {
+  const waiting = await context.newPage()
+  // THE FILE DOOR'S ANSWER FOR THE PDF'S BYTES IS HELD until the box has been read, so the box is read
+  // at a moment when nothing of the PDF can have been drawn.
+  let letItGo = (): void => {}
+  const goesOn = new Promise<void>((resolve) => {
+    letItGo = resolve
+  })
+  let held = 0
+  await waiting.route(
+    (url) => url.pathname === '/api/file' && url.searchParams.get('path') === pdfPath && url.searchParams.get('shown') === '1',
+    async (route) => {
+      if (route.request().method() === 'GET') {
+        held++
+        await goesOn
+      }
+      await route.continue()
+    },
+  )
+  try {
+    await waiting.goto(`${origin}/#${recordPath(report)}`, { timeout: 60_000 })
+    await waiting.locator('.sb-file-show').waitFor({ timeout: 20_000 })
+    await waiting.locator('.sb-file-show').click()
+    const box = waiting.locator('.sb-file-frame')
+    await box.waitFor({ timeout: 20_000 })
+    await expect.poll(() => held, { timeout: 20_000 }).toBeGreaterThan(0)
+
+    // WHILE THE ANSWER IS HELD, the box holds the office's own reading state, named by the file, and no page.
+    const reading = box.locator('.px-loading[role="status"]')
+    expect(await reading.count(), 'the box draws the office reading state while the PDF is on its way').toBe(1)
+    expect(await reading.textContent()).toContain('made-up-three-pages.pdf')
+    expect(await box.locator('[data-shown-page]').count()).toBe(0)
+
+    // ONCE THE ANSWER GOES ON AND PAGE 1 IS DRAWN, the reading state is gone.
+    letItGo()
+    await box.locator('[data-shown-page="1"] canvas').waitFor({ timeout: 30_000 })
+    await expect.poll(() => reading.count(), { timeout: 10_000 }).toBe(0)
+  } finally {
+    letItGo()
+    await waiting.close()
+  }
+}, 120_000)

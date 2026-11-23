@@ -37,7 +37,7 @@
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { FastifyInstance } from 'fastify'
-import { apiApp, freshDb, settleLinkBypassingTheGate, type TestDb } from './helpers.ts'
+import { apiApp, freshDb, settleLinkBypassingTheGate, type TestDb, governsTheWholeProject } from './helpers.ts'
 import { THE_OWNER, type ForkSettler } from '../src/shared/kinds.ts'
 import type { NeedsYouReply } from '../src/server/api/needs-you.ts'
 import type { ForksReply } from '../src/server/api/forks.ts'
@@ -113,7 +113,7 @@ async function agentDecision(): Promise<string> {
     payload: {
       kind: 'decision',
       title: 'Poll the gripper at 500ms',
-      data: { replaces: [],
+      data: { ...governsTheWholeProject(), replaces: [],
         because: 'The bus drops a frame at 200ms on four runs out of five, measured on 27 August 2026.',
         authority: 'a measurement',
         decided_by: 'claude-code',
@@ -135,7 +135,7 @@ async function personDecision(): Promise<string> {
     payload: {
       kind: 'decision',
       title: 'Poll the gripper at 200ms',
-      data: { replaces: [], because: 'Latency matters more than the dropped frame.' },
+      data: { ...governsTheWholeProject(), replaces: [], because: 'Latency matters more than the dropped frame.' },
     },
   })
   expect(res.statusCode, res.body).toBe(201)

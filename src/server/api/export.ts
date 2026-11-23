@@ -54,7 +54,7 @@ import type { FastifyInstance, FastifyRequest } from 'fastify'
 import {
   EXPORTED_REGIONS,
   FORMAT_VERSION,
-  buildExport,
+  countExport,
   exportRoot,
   workspaceExportRoot,
   writeExport,
@@ -99,9 +99,10 @@ export async function exportRoutes(app: FastifyInstance): Promise<void> {
   /**
    * What an export would contain, without producing one.
    *
-   * It BUILDS the whole export in memory to answer, rather than counting rows, because "how many
+   * It MAKES every file of the export to answer, rather than counting rows, because "how many
    * files and how many bytes" answered from a different code path to the one that writes them is
-   * a number about nothing. Nothing touches the disk.
+   * a number about nothing. It counts each file as it is made and keeps none, so a store larger
+   * than the server's heap is counted too. Nothing touches the disk.
    */
   app.get(
     '/export',
@@ -127,18 +128,18 @@ export async function exportRoutes(app: FastifyInstance): Promise<void> {
       committing: string
     }> => {
       refuseWorkspaceHeader(req, 'GET /api/export')
-      const built = buildExport()
+      const counted = countExport()
       return {
         format: FORMAT_VERSION,
-        workspace: built.report.workspace,
+        workspace: counted.workspace,
         root: exportRoot(),
-        wouldWrite: { files: built.report.files, bytes: built.report.bytes },
-        counts: built.report.counts,
+        wouldWrite: { files: counted.files, bytes: counted.bytes },
+        counts: counted.counts,
         // Named on every reply, because a table that is absent by decision and a table somebody
         // forgot look identical from the outside, and only one of them is safe.
         notExported: DERIVED_TABLES,
         mirror: mirrorStatus(exportRoot()),
-        notes: built.report.notes,
+        notes: counted.notes,
         committing: COMMITTING_IS_THE_CLI,
       }
     },
@@ -214,7 +215,7 @@ export async function exportRoutes(app: FastifyInstance): Promise<void> {
   /**
    * What ONE project's archive would contain.
    *
-   * The same build, read through one workspace. A project that does not exist is a refusal and
+   * The same count, read through one workspace. A project that does not exist is a refusal and
    * never an empty archive: "this project holds nothing" and "there is no such project" are
    * different answers, and only one of them is a reason to go and look for your work.
    */
@@ -240,15 +241,15 @@ export async function exportRoutes(app: FastifyInstance): Promise<void> {
       committing: string
     }> => {
       const workspaceId = exportWorkspace(req)
-      const built = buildExport({ workspaceId })
+      const counted = countExport({ workspaceId })
       return {
         format: FORMAT_VERSION,
         workspace: workspaceId,
         root: workspaceExportRoot(workspaceId),
-        wouldWrite: { files: built.report.files, bytes: built.report.bytes },
-        counts: built.report.counts,
+        wouldWrite: { files: counted.files, bytes: counted.bytes },
+        counts: counted.counts,
         notExported: DERIVED_TABLES,
-        notes: built.report.notes,
+        notes: counted.notes,
         committing: COMMITTING_IS_THE_CLI,
       }
     },

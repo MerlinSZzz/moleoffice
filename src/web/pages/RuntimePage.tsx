@@ -1,6 +1,6 @@
 // Copyright © 2026 Zhengyang Shen
 // Licensed under the MIT License. See LICENSE.
-import { t } from '@shared/i18n.ts'
+import { content, t } from '@shared/i18n.ts'
 /**
  * `#/runtime` — WHAT IS RUNNING, ON A PAGE SOMEBODY OPENS ON PURPOSE.
  *
@@ -54,13 +54,14 @@ import { whyTheOfficeCannotStartThisRuntime } from '@shared/participants.ts'
 import { useRef } from 'react'
 import type { RuntimeRecord, RuntimePlace } from '@shared/runtime.ts'
 import type { StartCostCeiling, StartCostMeasured, StartStepReading } from '@shared/start-cost.ts'
-import { startStepNameSaid, startStepDescriptionSaid, startTokensExplanation, startCostCeilingSaid, startCostNumbers, startStepSpentSaid, startTokensSaid, TOKENS_ARE_WHOLE_START } from '@shared/start-cost.ts'
-import { Absence, ErrorNote, Loading, Panel, useAsync } from '../components/ui.tsx'
+import { startStepNameSaid, startCostCeilingSaid, startCostNumbers, startStepSpentSaid, startTokensSaid } from '@shared/start-cost.ts'
+import { Absence, ErrorNote, Loading, Panel, ServerNote, useAsync } from '../components/ui.tsx'
 import { api } from '../api.ts'
 import { OFFICE_LOAD_NUMBERS, type OfficeLoadNumber, type OfficeLoadReading } from '@shared/office-load.ts'
 import { theWorldThisPageStartedIn } from '../lib/world.ts'
 import { readTheMachineAgain, readTheMachineOnce } from '../lib/onemachine.ts'
 import { RouteLink, pathFor } from '../components/router.tsx'
+import { CodeRows } from '../lib/code-rows.tsx'
 
 export function RuntimePage() {
   /**
@@ -177,18 +178,11 @@ function TheRuntime({ record, onReadAgain }: { record: RuntimeRecord; onReadAgai
           <Fact name={t('dev.runtime.canonicalOrScratch')} value={standing} />
           <Fact name={t('dev.runtime.whoStartedIt')} value={saidOnThePage(record.startedBy.said, record.startedBy.says)} />
         </dl>
-        {/* THE TWO ADDRESSES DISAGREEING, in the server's own sentence, and nothing at all when
-            they are the same address. */}
-        {record.addresses.says === null ? null : <p className="rt-wrong">{saidOnThePage(record.addresses.saysSaid, record.addresses.says)}</p>}
         {/* WHY IT IS SCRATCH, in the server's own words. A canonical runtime has an empty list, so
             this draws nothing at all when there is nothing to say. */}
-        {record.standing.because.length > 0 ? (
-          <ul className="rt-because">
-            {record.standing.because.map((one, at) => (
-              <li key={one}>{saidOnThePage(record.standing.becauseSaid[at], one)}</li>
-            ))}
-          </ul>
-        ) : null}
+        {record.standing.because.map((one, at) => (
+          <ServerNote key={one} text={saidOnThePage(record.standing.becauseSaid[at], one)} />
+        ))}
       </Panel>
 
       {/* WHO HAS COME IN FROM SOMEWHERE ELSE. Its own panel because it is about callers rather than
@@ -221,14 +215,11 @@ function TheRuntime({ record, onReadAgain }: { record: RuntimeRecord; onReadAgai
           <Fact name={t('dev.runtime.identity')} value={identityOf()} />
           <Fact
             name={t('dev.runtime.theCanonicalOne')}
-            value={
-              record.database.canonical
-                ? t('dev.runtime.canonicalYes')
-                : t('dev.runtime.canonicalNo', { path: record.database.canonicalPath })
-            }
+            value={record.database.canonical ? t('dev.runtime.canonicalYes') : t('dev.runtime.no')}
             wrong={!record.database.canonical}
           />
         </dl>
+        {record.database.canonical ? null : <CodeRows rows={[{ label: 'runtime.row.canonicalFile', value: record.database.canonicalPath }]} />}
         {record.database.problem === null ? null : <p className="rt-wrong">{saidOnThePage(record.database.problemSaid, record.database.problem)}</p>}
       </Panel>
 
@@ -268,6 +259,9 @@ function TheRuntime({ record, onReadAgain }: { record: RuntimeRecord; onReadAgai
             value={served === undefined ? null : served.fromABuild ? t('dev.runtime.yes') : t('dev.runtime.no')}
           />
         </dl>
+        {record.freshness.newestOnDiskFile === null ? null : (
+          <CodeRows rows={[{ label: 'runtime.row.newestServerFile', value: record.freshness.newestOnDiskFile }]} />
+        )}
       </Panel>
 
       {/* THE WORKER THAT DELIVERS A MESSAGE TO AN AGENT, or the reason there is not one. It is the
@@ -305,10 +299,9 @@ function TheRuntime({ record, onReadAgain }: { record: RuntimeRecord; onReadAgai
               agent's profile names a model. Which model each place's runs go to is in the panel
               below, from the one reader the worker asks. */}
           <Fact name={t('dev.runtime.modelARunFallsBackTo')} value={oneAnswer({ name: record.worker.model.name, from: record.worker.model.from, fromSaid: [record.worker.model.fromSaid] })} />
-          {record.worker.runsAreFaked === null ? null : (
-            <Fact name={t('dev.runtime.runsAreNotReal')} value={fakedSays(record.worker.runsAreFaked)} wrong />
-          )}
+          {record.worker.runsAreFaked === null ? null : <Fact name={t('dev.runtime.runsAreNotReal')} value={t('dev.runtime.yes')} wrong />}
         </dl>
+        {record.worker.runsAreFaked === null ? null : <CodeRows rows={[{ label: 'runtime.row.answeredBy', value: record.worker.runsAreFaked }]} />}
       </Panel>
 
       {/* WHICH RUNS GO WHERE, AND WHERE EACH ANSWER CAME FROM. Criterion T7. One entry per place
@@ -323,14 +316,15 @@ function TheRuntime({ record, onReadAgain }: { record: RuntimeRecord; onReadAgai
               <Fact name={t('dev.runtime.model')} value={oneAnswer(one.model)} />
               <Fact name={t('dev.runtime.reasoningEffort')} value={oneAnswer(one.variant)} />
             </dl>
-            {one.says === null ? null : <p className="rt-note">{saidOnThePage(one.saysSaid, one.says)}</p>}
+            {one.says === null ? null : <ServerNote text={saidOnThePage(one.saysSaid, one.says)} />}
           </div>
         ))}
       </Panel>
 
       {/* WHICH AGENT TOOLS ARE ON THIS MACHINE. The sentence for a word the office does not dispatch
           is the one whatIsInstalled already answers, so the page never calls a tool missing when
-          there is nothing here that needs it. */}
+          there is nothing here that needs it. An agent of a harness with no adapter follows, by its
+          handle, and its model is chosen in that harness. */}
       <Panel titleIs="label" declares={{ surface: 'runtime.tools' }} title={t('dev.runtime.theAgentToolsOnThisMachine')}>
         <dl className="rt-facts">
           {record.installed.map((one) => (
@@ -339,6 +333,9 @@ function TheRuntime({ record, onReadAgain }: { record: RuntimeRecord; onReadAgai
               name={one.runtime}
               value={one.where === null ? (notDispatched(one.runtime, one.says) ?? t('dev.runtime.notInstalled')) : one.where}
             />
+          ))}
+          {record.harnesses.map((one) => (
+            <Fact key={`agent:${one.handle}`} name={content(one.handle)} value={t('g6b.model.chosenInTheHarness', { runtime: content(one.harness) })} />
           ))}
         </dl>
       </Panel>
@@ -364,9 +361,7 @@ function TheRuntime({ record, onReadAgain }: { record: RuntimeRecord; onReadAgai
           />
           <Fact name={t('dev.runtime.notMeasured')} value={String(record.starts.unmeasuredCount)} />
         </dl>
-        {record.starts.recent.length === 0 ? (
-          <p className="rt-note">{t('dev.runtime.noSessionsHaveBeenRecordedHereYet')}</p>
-        ) : (
+        {record.starts.recent.length === 0 ? null : (
           <ul className="rt-starts">
             {record.starts.recent.map((row) => (
               <li className="rt-start-row" key={row.sessionId}>
@@ -375,12 +370,11 @@ function TheRuntime({ record, onReadAgain }: { record: RuntimeRecord; onReadAgai
                   {row.cost.measured ? (
                     <span className={row.cost.over.length > 0 ? 'rt-wrong' : undefined}>{startCostLine(row.cost)}</span>
                   ) : (
-                    <Absence tier="told-apart" looked={false} word={t('dev.runtime.notMeasured')} title={row.cost.why} />
+                    <Absence tier="told-apart" looked={false} word={t('dev.runtime.notMeasured')} title={t('dev.runtime.whatStartsCost')} />
                   )}
                 </span>
                 {row.cost.measured ? (
                   <span className="rt-start-steps">
-                    {row.cost.tokensSays === null ? null : <span className="rt-note">{startTokensExplanation(row.cost.tokensSays)}</span>}
                     <ul className="rt-steps">
                       {row.cost.steps.map((step) => (
                         <StepLine key={step.name} step={step} />
@@ -427,9 +421,8 @@ function TheOfficesLoad({ readAt }: { readAt: string }) {
   const latest = load.latest
   return (
     <Panel titleIs="label" declares={{ surface: 'runtime.load' }} title={t('dev.runtime.load.title')}>
-      <p className="rt-note">{t('dev.runtime.load.note', { since: load.serverStartedAt, n: load.readingsInARow })}</p>
       {latest === null ? (
-        <p className="rt-note">{t('dev.runtime.load.noReading')}</p>
+        <p className="rt-note">{t('dev.runtime.load.notYet')}</p>
       ) : (
         <dl className="rt-facts">
           {OFFICE_LOAD_NUMBERS.map((number) => {
@@ -457,7 +450,6 @@ function TheOfficesLoad({ readAt }: { readAt: string }) {
           })}
         </dl>
       )}
-      <p className="rt-note">{t('dev.runtime.load.change')}</p>
     </Panel>
   )
 }
@@ -486,11 +478,6 @@ function stillThere(record: RuntimeRecord): string | null {
   if (record.worker.alive === 'unknown') return null
   if (!record.worker.started) return t('dev.runtime.noWorker')
   return record.worker.alive ? t('dev.runtime.yes') : t('dev.runtime.workerStopped')
-}
-
-/** What it means that runs are being answered by a script rather than by a model. */
-function fakedSays(script: string): string {
-  return t('dev.runtime.fakeRuns', { script })
 }
 
 /**
@@ -544,19 +531,14 @@ function StepLine({ step }: { step: StartStepReading }) {
     <li className="rt-step">
       <span className="rt-step-name">{startStepNameSaid(step)}</span>
       {when === null ? (
-        <Absence tier="told-apart" looked={false} word={t('dev.runtime.noRequestOfThisKind')} title={startStepDescriptionSaid(step)} />
+        <Absence tier="told-apart" looked={false} word={t('dev.runtime.noRequestOfThisKind')} title={startStepNameSaid(step)} />
       ) : (
         <span className="rt-step-when">
           {when} — {startStepSpentSaid(step)}
         </span>
       )}
       {step.tokens == null ? (
-        <Absence
-          tier="told-apart"
-          looked={false}
-          word={t('dev.runtime.tokensNotMeasured')}
-          title={startTokensExplanation(step.tokensSays ?? TOKENS_ARE_WHOLE_START)}
-        />
+        <Absence tier="told-apart" looked={false} word={t('dev.runtime.tokensNotMeasured')} title={startStepNameSaid(step)} />
       ) : (
         <span className="rt-step-tokens">{startTokensSaid(step.tokens)}</span>
       )}
@@ -595,17 +577,15 @@ function identityOf(): string | null {
 }
 
 /**
- * The newest file the SERVER is built from, with its time, in one value, or nothing when the walk
- * failed.
+ * When the newest file the SERVER is built from was changed, or nothing when the walk failed. The
+ * file itself is drawn on a row of its own below the panel's facts.
  *
  * The label beside it says "the server is built from" and not "in the checkout", because those are
  * different files and the difference is what problem `aI9V57-ZTyv0` was: this reading covers
  * src/server, src/shared and src/config, and a page file is not one of them.
  */
 function onDiskOf(record: RuntimeRecord): string | null {
-  if (record.freshness.newestOnDisk === null) return null
-  const file = record.freshness.newestOnDiskFile
-  return file === null ? record.freshness.newestOnDisk : t('dev.runtime.fileChanged', { file, at: record.freshness.newestOnDisk })
+  return record.freshness.newestOnDisk
 }
 
 /**
@@ -646,7 +626,6 @@ const RUNTIME_CSS = `
 .rt-value { margin: 0; overflow-wrap: anywhere; }
 .rt-none { color: var(--text-2); font-style: italic; }
 .rt-wrong { color: var(--st-broken); font-weight: 600; }
-.rt-because { margin: var(--gut) 0 0; padding-left: var(--pad-lg); font-size: var(--fs-1); color: var(--text-2); overflow-wrap: anywhere; }
 .rt-place { margin: 0 0 var(--gut-lg) 0; }
 .rt-place:last-child { margin-bottom: 0; }
 .rt-place-title { font-size: var(--fs-2); margin: 0 0 var(--gut) 0; }

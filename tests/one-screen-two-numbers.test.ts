@@ -27,6 +27,10 @@
  *      The false one is the third.
  *   4  `null` REACHED A READER. "Schedule — null hours in 2026-08-17" on a plan's Writing view.
  *
+ * CRITERION CHANGE, as decided: the panel of hours no longer says that a block on the board gives
+ * no hours, so the cases that counted the blocks for that sentence are gone. Defect 3 is still held
+ * by the sentence about hours, in part 3.
+ *
  * ---------------------------------------------------------------------------------------
  * HOW THEY ARE MEASURED
  * ---------------------------------------------------------------------------------------
@@ -42,7 +46,7 @@
  * test is whether the screen says which of its two true numbers is which.
  */
 
-import { en } from '../src/shared/words/en.ts'
+import { sayInEnglish } from '../src/shared/i18n.ts'
 import Fastify, { type FastifyInstance } from 'fastify'
 import { createElement as h } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
@@ -198,18 +202,20 @@ describe('1 — a plan with a size in it is never told nobody has sized anything
     expect(said).not.toContain('Nobody has sized anything')
     // CRITERION CHANGE (problem ZPNVOJkn1oVp, wave 13k round 14): no total is said in words, not with a
     // lone dash that read as a stray mark before "· 3 not sized as work".
-    expect(said).toContain(`${en['r14.plan.noTotal']} · `)
+    expect(said).toContain(`${sayInEnglish('planTable.total.none')} · `)
   })
 
-  it('still counts the size the person wrote, and still says it is in no total', async () => {
+  it('still counts the size the person wrote', async () => {
     // The clause the lead sentence used to contradict. Both halves of the paragraph now say the
     // same thing about the same plan.
-    expect(tableWords(await sizedInThePlanOnly())).toContain('1 sized in the plan only, which is in no total')
+    // CRITERION CHANGE, as decided: the count no longer goes on to say it is in no total; the
+    // absent total beside it says so.
+    expect(tableWords(await sizedInThePlanOnly())).toContain(sayInEnglish('planTable.sizedInPlanOnly', { n: 1 }).trim())
   })
 
   it('uses the same short mark when nothing has a size, which is the control', async () => {
     const said = tableWords(await planOf('nothing sized', ['# Handover', '- rewrite the controller', '- write the report']))
-    expect(said).toContain(`${en['r14.plan.nothingSized']} · `)
+    expect(said).toContain(`${sayInEnglish('planTable.total.nothingSized')} · `)
     expect(said).not.toMatch(/— · \d+ not sized as work/)
   })
 
@@ -267,11 +273,12 @@ describe('2 — the envelope and the floor, drawn where each of them comes from'
     expect(said).toContain('at least 11h')
   })
 
-  it('says which of the two numbers under the table is which', async () => {
+  it('draws both numbers under the table', async () => {
+    // CRITERION CHANGE, as decided: the footer draws the two numbers with a short label each, and
+    // no longer explains which is which or where the marked rows are.
     const said = tableWords(await eightOverElevenM())
-    expect(said).toContain('8h in all, from 1 of 1 top-level rows. That is what the plan says.')
-    expect(said).toContain('Parts of this plan add up to more than what holds them, so it takes at least 11h.')
-    expect(said).toContain('The rows this happens on are marked.')
+    expect(said).toContain('8h in all, from 1 of 1 top-level rows.')
+    expect(said).toContain(sayInEnglish('planTable.partsOver', { atLeast: planItems.atLeastSaid(11) }).trim())
   })
 
   it('keeps the red mark on the row whose own parts overflow it, and its two numbers', async () => {
@@ -313,7 +320,7 @@ describe('2 — the envelope and the floor, drawn where each of them comes from'
 
     const said = tableWords(reply)
     expect(said).toContain('at least 11h')
-    expect(said).toContain('9h in all, from 1 of 1 top-level rows. That is what the plan says.')
+    expect(said).toContain('9h in all, from 1 of 1 top-level rows.')
   })
 
   it('says nothing about a floor on a plan whose parts fit, which is the control', async () => {
@@ -325,7 +332,6 @@ describe('2 — the envelope and the floor, drawn where each of them comes from'
     const said = tableWords(await webApi.api.planBlocks(reply.plan.id))
 
     expect(said).toContain('15h in all, from 1 of 1 top-level rows.')
-    expect(said).not.toContain('That is what the plan says')
     expect(said).not.toContain('at least')
   })
 })
@@ -411,48 +417,6 @@ describe('3 — a week carrying a block is never told nothing is on it', () => {
     )
     expect(said).toContain('No hours are on tue 25 august yet.')
     expect(said).not.toContain('Nothing is on')
-  })
-
-  /**
-   * HOW MANY BLOCKS ARE ON THE BOARD, AND THE DIFFERENCE BETWEEN NONE AND NOT KNOWING.
-   *
-   * The panel of hours draws its sentence from this. A page that answered "no blocks" while the
-   * request was still in flight would be stating a fact nobody had, which is the fifth invariant.
-   *
-   * IT IS HANDED THE WEEK THE BOARD IS DRAWING, and `null` is how "nobody has read it" arrives —
-   * from the request being in flight, from a failed read, or from a period that is not a week. It
-   * used to take the state of the request itself and decide that here, while the board drew the
-   * answer it was holding; the two came apart for one frame after a block moved off the week, and
-   * the sentence counted a block the board no longer drew. One answer, counted once.
-   */
-  it('counts the blocks on the board, and answers null until it knows', () => {
-    const days = planning.daysOf(WEEK)
-    const window = {
-      window: { id: 'w1', recordId: 'rec-one', startsOn: '2026-08-24', endsOn: '2026-08-27', state: 'planned', note: null },
-      work: null,
-    }
-    const ready = { from: days[0]!, to: days[days.length - 1]!, windows: [window], note: '' }
-
-    expect(planning.placedOnTheBoard(null, days), 'a page in flight claims a count').toBeNull()
-    expect(planning.placedOnTheBoard({ from: days[0]!, to: days[days.length - 1]!, windows: [], note: '' }, days)).toBe(0)
-    expect(planning.placedOnTheBoard(ready as never, days)).toBe(1)
-  })
-
-  it('says in the panel of hours that a block gives none, in one sentence, where the total is', () => {
-    expect(words(h(planning.BlocksGiveNoHours, { placed: 1 }))).toBe(
-      // CRITERION CHANGE (wave 13j round 12): "above" became "below", because the hours now come
-      // first and the board under them (report n9Mjk3c_sJRu, block b-13).
-      'The block on the board below gives no hours, so it is not counted here.',
-    )
-    expect(words(h(planning.BlocksGiveNoHours, { placed: 2 }))).toBe(
-      'The 2 blocks on the board below give no hours, so none of them are counted here.',
-    )
-  })
-
-  it('says nothing at all where there is nothing to explain', () => {
-    // No blocks, or none read yet: there is no pair of numbers to join, so there is no sentence.
-    expect(words(h(planning.BlocksGiveNoHours, { placed: 0 }))).toBe('')
-    expect(words(h(planning.BlocksGiveNoHours, { placed: null }))).toBe('')
   })
 
   it('names the panel about days for what it counts, which is hours', () => {

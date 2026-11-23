@@ -5,8 +5,8 @@
  *
  * The merge queue's owner-content gate (tools/merge-tool/owner-content.mjs) reads no list of its own. Its caller gives
  * it these patterns. integrate.mjs gets them through theOwnerContentPatterns in tools/merge-tool/arguments.mjs, because
- * the merge tool may read the office settings only there and in office-keeper.mjs
- * (tests/the-merge-tool-reaches-the-office-only-through-two-modules.test.ts), and the setting that names the file is an
+ * the merge tool may read the office settings only there and in office-keeper.mjs,
+ * and the setting that names the file is an
  * office setting. The bundle scan (scripts/no-owner-content.mjs) and the tests that screen as the queue does import them
  * from here. The merge queue reads this module, so it is on the queue's own-code list and a change to it is tested
  * alone.

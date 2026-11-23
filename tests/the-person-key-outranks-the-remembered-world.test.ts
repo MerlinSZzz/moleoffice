@@ -455,13 +455,14 @@ describe('the one line, photographed', () => {
 })
 
 /**
- * THE FOREIGN HOME REFUSAL, WHEN A RUN ASKS FOR PICTURES. The worlds page's AddOne press makes a
- * real write and draws its caught fault through ErrorNote. liveApp's browser context has no default
+ * THE FOREIGN HOME REFUSAL, WHEN A RUN ASKS FOR PICTURES. The AddOne press on his person card makes a
+ * real write and draws its caught fault through ErrorNote. It was on the worlds page until design C of
+ * early idea B9 moved the machines this office trusts to his card. liveApp's browser context has no default
  * headers or person-key init script, and moleOfficeHeaders sends no person key, so its remembered
  * foreign home is refused.
  */
 describe('the foreign home refusal, photographed', () => {
-  it.skipIf(!process.env['FOREIGN_HOME_SHOTS'])('draws the worlds-page refusal at four widths in both themes', async () => {
+  it.skipIf(!process.env['FOREIGN_HOME_SHOTS'])('draws the refusal on his card at four widths in both themes', async () => {
     const { mkdirSync } = await import('node:fs')
     const shots = process.env['FOREIGN_HOME_SHOTS'] as string
     mkdirSync(shots, { recursive: true })
@@ -476,16 +477,17 @@ describe('the foreign home refusal, photographed', () => {
       await live.page.addInitScript((home) => {
         window.localStorage.setItem('mole-office.world.home', JSON.stringify({ database: home, head: null }))
       }, HOME_OF_ANOTHER_INSTALLATION)
-      const { pathFor } = await import('../src/web/components/router.tsx')
+      const { whoPath } = await import('../src/web/components/router.tsx')
+      const { TRUSTED_WORDS } = await import('../src/web/components/TrustedMachines.tsx')
       const address = new URL(live.site)
       address.searchParams.set('lang', 'en')
-      address.hash = pathFor('worlds')
+      address.hash = whoPath('person', THE_PERSON)
       await live.page.goto(address.toString(), { timeout: 60_000 })
       await waitForThePage(live.page, 60_000)
 
-      // AddOne on Worlds is a real page write. It catches this server fault and passes it to ErrorNote.
-      const trustedMachines = live.page.locator('.px-panel').filter({ has: live.page.locator('.tm-says') })
-      await trustedMachines.locator('button').first().click()
+      // AddOne on his card is a real page write. It catches this server fault and passes it to ErrorNote.
+      const trustedMachines = live.page.locator('.px-panel[data-target="uiSurface/profile.browsers"]')
+      await trustedMachines.getByRole('button', { name: TRUSTED_WORDS.add, exact: true }).click()
       await live.page.locator('.tm-add input').fill('127.0.0.2')
       await live.page.locator('.tm-acts button').first().click()
       const note = live.page.locator('.tm-add .px-error')

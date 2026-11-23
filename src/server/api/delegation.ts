@@ -33,6 +33,7 @@
  */
 
 import type { FastifyInstance } from 'fastify'
+import { sayInEnglish } from '@shared/i18n.ts'
 import { z } from 'zod'
 import { gatePosition } from '../../config/settings.mjs'
 import { actorFrom, takesNoBody, takesNoInput } from '../lib/http.ts'
@@ -50,6 +51,7 @@ import { theZipExportOf } from '../lib/zip-export/related-files.ts'
 import { actorTypeWord, packageReturnFormWord } from '@shared/words.ts'
 import {
   takeThePackageInside, restateThePackage, answerThePackageAlignment, handBackThePackage, checkThePackage, acceptThePackage, packageOf,
+  selfCompleteThePackage, auditThePackage, readPackageProgress,
   confirmThePackage,
   delegationColumn,
   makeThePackage,
@@ -305,6 +307,33 @@ export async function delegationRoutes(app: FastifyInstance): Promise<void> {
     const result = acceptThePackage({ taskId: recordId, workspaceId, actor: actorFrom(req), ...body })
     reply.code(201)
     return { ...result, note: 'The inside brief records this step.' }
+  })
+
+  app.post('/delegation/:recordId/self-complete', route('delegation.selfComplete', 'remote', sayInEnglish('packageProgress.selfDoor')), async (req, reply) => {
+    const workspaceId = workspaceOf(req)
+    const { recordId } = parse(packageParams, req.params, 'The address is not usable:')
+    recordInWorkspace(recordId, workspaceId, theMessageReader(actorFrom(req)))
+    const body = parse(z.object({ points: z.unknown().optional() }).strict(), req.body ?? {}, 'The inside brief cannot accept this body:')
+    const result = selfCompleteThePackage({ taskId: recordId, workspaceId, actor: actorFrom(req, { proveOwnRun: true }), ...body })
+    reply.code(201)
+    return result
+  })
+
+  app.post('/delegation/:recordId/audit', route('delegation.audit', 'remote', sayInEnglish('packageProgress.auditDoor')), async (req, reply) => {
+    const workspaceId = workspaceOf(req)
+    const { recordId } = parse(packageParams, req.params, 'The address is not usable:')
+    recordInWorkspace(recordId, workspaceId, theMessageReader(actorFrom(req)))
+    const body = parse(z.object({ audit: z.unknown().optional(), verdict: z.unknown().optional(), evidence: z.unknown().optional(), words: z.unknown().optional() }).strict(), req.body ?? {}, 'The inside brief cannot accept this body:')
+    const result = auditThePackage({ taskId: recordId, workspaceId, actor: actorFrom(req, { proveOwnRun: true }), ...body })
+    reply.code(201)
+    return result
+  })
+
+  app.get('/delegation/:recordId/progress', route('delegation.progress', 'remote', sayInEnglish('packageProgress.readDoor')), async (req) => {
+    const workspaceId = workspaceOf(req)
+    const { recordId } = parse(packageParams, req.params, 'The address is not usable:')
+    recordInWorkspace(recordId, workspaceId, theMessageReader(actorFrom(req)))
+    return readPackageProgress({ taskId: recordId, workspaceId, actor: actorFrom(req) })
   })
 
   app.post('/delegation/:recordId/package', route('delegation.package', 'remote', PACKAGE_NOTE), async (req, reply) => {

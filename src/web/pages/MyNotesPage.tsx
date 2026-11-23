@@ -14,8 +14,11 @@
  *
  * A CARD OPENS ITS NOTE IN THE NOTE'S OWN PROJECT. A note's page reads it in the project chosen in the switcher, so the
  * link chooses the note's project first, as Home's links into another project do.
+ *
+ * THE SAME LIST IS SHOWN INSIDE A NOTE'S WINDOW after Back, and there a card opens its note in that window instead
+ * (components/QuickNoteBeside.tsx).
  */
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type MouseEvent } from 'react'
 import { t } from '@shared/i18n.ts'
 import {
   MY_NOTES_CHOICES,
@@ -28,12 +31,15 @@ import {
   type MyNotesReply,
 } from '@shared/my-notes.ts'
 import { api, errorMessage, faultOf } from '../api.ts'
-import { NoteSmallPicture, theFirstWordsOf, whatTheSmallPictureLeavesOut } from '../components/NoteSmallPicture.tsx'
+import { NoteSmallPicture, theCardWordsOf, whatTheSmallPictureLeavesOut } from '../components/NoteSmallPicture.tsx'
 import { recordPath, RouteLink } from '../components/router.tsx'
 import { Btn, drawnDay, Empty, ErrorNote, Loading, Stamp, useAsync } from '../components/ui.tsx'
 import { useLanguage } from '../lib/language.ts'
 import { nameOfProject, useProjects } from '../lib/projectlist.ts'
 import { openTheLinkedNote } from '../lib/open-a-quick-note.ts'
+import { quickNoteTagsOf } from '@shared/kinds/quick-note.ts'
+import { theColourOfATag } from '../lib/note-tags.ts'
+import { LabelColourStyle } from '../components/chat/LabelColours.tsx'
 
 /** How long the page waits after the last key before it searches, so a search is not sent for every letter. */
 const SEARCH_AFTER_MS = 300
@@ -53,7 +59,13 @@ function theReadersZone(): string {
 
 type Failed = { message: string; fault: ReturnType<typeof faultOf> }
 
-export function MyNotesPage() {
+/** What a click on a card's link does with its note. */
+type OpensANote = (event: MouseEvent, note: MyNotesNote) => void
+
+/** How the notes are sorted: newest first, under the week each was started in, or by their first tag from A to Z. */
+type TheSort = 'newest' | 'tag'
+
+export function MyNotesPage({ opens = openTheLinkedNote }: { opens?: OpensANote } = {}) {
   useLanguage()
   const [typed, setTyped] = useState('')
   const [q, setQ] = useState('')
@@ -78,9 +90,11 @@ export function MyNotesPage() {
     return () => clearTimeout(wait)
   }, [typed, q])
 
+  // A NOTE ADDED OR CHANGED IN THE NOTE BESIDE THE PAGE is read again here, so it shows without a reload.
   const [state, reload] = useAsync(
     () => api.myNotes({ q, only: choice, zone: theReadersZone(), limit: MY_NOTES_PAGE_SIZE, offset }),
     [q, choice, offset],
+    { follows: { kinds: ['quick_note'], atMostEveryMs: 5000 } },
   )
   const reply = state.status === 'ready' ? state.value : null
   // WHILE THE NEXT PAGE IS READ, the reading on screen is the page before, whose notes are already in `earlier`.
@@ -90,6 +104,10 @@ export function MyNotesPage() {
     if (offset === 0) reload()
     else startAgain()
   }
+
+  // THE SORT THE PERSON CHOSE, newest first as the page starts. It lasts while the page is open, and is not kept.
+  const [sort, setSort] = useState<TheSort>('newest')
+  const anyTag = notes.some((note) => quickNoteTagsOf(note.data).length > 0)
 
   return (
     <div className="page mn">
@@ -130,12 +148,16 @@ export function MyNotesPage() {
           </div>
         </div>
       </header>
+      <LabelColourStyle />
+      <TheSortPress anyTag={anyTag} left={reply?.left ?? 0} sort={sort} choose={setSort} />
       {state.status === 'error' ? <ErrorNote message={state.message} fault={state.fault ?? null} retry={reload} /> : null}
       {reply === null && earlier.length === 0 && state.status === 'loading' ? <Loading label={t('myNotes.loading')} rows={2} /> : null}
       {reply === null ? null : (
         <TheNotes
           notes={notes}
           reply={reply}
+          byTag={sort === 'tag' && anyTag}
+          opens={opens}
           moved={moved}
           onMoved={(id, said) => {
             setMoved((before) => new Map(before).set(id, said))
@@ -160,22 +182,70 @@ export function MyNotesPage() {
   )
 }
 
-/** What the reading found, under the week each note was started in. */
+/**
+ * THE PRESS THAT SORTS THE NOTES, newest first or by tag from A to Z, saying by its words and its pressed state which
+ * sort is on. A sort by tag works on the notes read so far, because the door reads no tags, and the press says so while
+ * more are left to read. Nothing is drawn while no note shown has a tag.
+ */
+function TheSortPress({ anyTag, left, sort, choose }: { anyTag: boolean; left: number; sort: TheSort; choose: (sort: TheSort) => void }) {
+  if (!anyTag) return null
+  return (
+    <div className="mn-tag-bar">
+      <div className="mn-choices" role="group" aria-label={t('myNotes.sortBy')}>
+        <span className="mn-tag-bar-word">{t('myNotes.sortBy')}</span>
+        {(['newest', 'tag'] as const).map((way) => (
+          <button key={way} type="button" className="mn-choice" data-sort={way} aria-pressed={sort === way} onClick={() => choose(way)}>
+            {t(way === 'newest' ? 'myNotes.newestFirst' : 'myNotes.tagAToZ')}
+          </button>
+        ))}
+      </div>
+      {left > 0 ? <p className="mn-tag-bar-said">{t('myNotes.ofTheShown')}</p> : null}
+    </div>
+  )
+}
+
+/** What the reading found, under the week each note was started in, or sorted by tag. */
 function TheNotes({
   notes,
   reply,
+  byTag,
+  opens,
   moved,
   onMoved,
 }: {
   notes: readonly MyNotesNote[]
   reply: MyNotesReply
+  byTag: boolean
+  opens: OpensANote
   moved: ReadonlyMap<string, string>
   onMoved: (id: string, said: string) => void
 }) {
   if (reply.counts.all === 0) {
-    return <Empty message={reply.q === null ? t('myNotes.none') : t('myNotes.noneHoldIt')} />
+    return <Empty message={reply.q === null ? t('absence.none') : t('myNotes.noneHoldIt')} />
   }
   if (reply.matched === 0) return <Empty message={t('myNotes.noneOfThisChoice')} />
+  if (byTag) {
+    // BY THE FIRST TAG, A TO Z, and newest first among notes with the same first tag, as the door gave them. A note with
+    // no tag is last. There are no week heads, because a sort by tag mixes the weeks.
+    const first = (note: MyNotesNote): string | null => quickNoteTagsOf(note.data)[0] ?? null
+    const sorted = notes
+      .map((note, at) => ({ note, at, tag: first(note) }))
+      .sort((a, b) => (a.tag === null ? 1 : 0) - (b.tag === null ? 1 : 0) || (a.tag ?? '').localeCompare(b.tag ?? '') || a.at - b.at)
+      .map((one) => one.note)
+    return (
+      <div className="mn-weeks">
+        <section className="mn-week" data-sort="tag">
+          <ol className="mn-cards">
+            {sorted.map((note) => (
+              <li key={note.id}>
+                <NoteCard note={note} opens={opens} said={moved.get(note.id) ?? null} onMoved={onMoved} />
+              </li>
+            ))}
+          </ol>
+        </section>
+      </div>
+    )
+  }
   const weeks: { starts: string; notes: MyNotesNote[] }[] = []
   for (const note of notes) {
     const last = weeks[weeks.length - 1]
@@ -195,7 +265,7 @@ function TheNotes({
           <ol className="mn-cards">
             {week.notes.map((note) => (
               <li key={note.id}>
-                <NoteCard note={note} said={moved.get(note.id) ?? null} onMoved={onMoved} />
+                <NoteCard note={note} opens={opens} said={moved.get(note.id) ?? null} onMoved={onMoved} />
               </li>
             ))}
           </ol>
@@ -213,9 +283,27 @@ function theWeekWord(starts: string, thisWeek: string): string {
   return t('myNotes.weekOf', { day: drawnDay(new Date(year, month - 1, day)) })
 }
 
-function NoteCard({ note, said, onMoved }: { note: MyNotesNote; said: string | null; onMoved: (id: string, said: string) => void }) {
+/**
+ * A NOTE'S TAGS ON ITS CARD, above its title, each a filled label in the colour it has in the note. Nothing while the
+ * note has none.
+ */
+function CardTags({ tags }: { tags: readonly string[] }) {
+  if (tags.length === 0) return null
+  return (
+    <ul className="mn-card-tags" data-part="tags" aria-label={t('quickNote.tags')}>
+      {tags.map((tag) => (
+        <li key={tag} className="mn-tag px-label-ink" data-colour={theColourOfATag(tag)}>
+          {tag}
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+function NoteCard({ note, opens, said, onMoved }: { note: MyNotesNote; opens: OpensANote; said: string | null; onMoved: (id: string, said: string) => void }) {
   const parts = theParts(note)
-  const words = theFirstWordsOf(parts)
+  const tags = quickNoteTagsOf(note.data)
+  const words = theCardWordsOf(note.title, parts)
   const besides = whatTheSmallPictureLeavesOut(parts)
   const startedOn = thePageItWasStartedOn(note)
   const projects = useProjects()
@@ -228,11 +316,12 @@ function NoteCard({ note, said, onMoved }: { note: MyNotesNote; said: string | n
     <article className="mn-card" data-note={note.id}>
       <NoteSmallPicture parts={parts} />
       <div className="mn-card-words">
+        <CardTags tags={tags} />
         <h3 className="mn-card-title" data-part="title">
           <a
             data-part="open"
             href={`#${recordPath(note.id, 'quick_note')}`}
-            onClick={(event) => openTheLinkedNote(event, note)}
+            onClick={(event) => opens(event, note)}
           >
             {words.title ?? t('quickNote.untitled')}
           </a>
@@ -373,4 +462,14 @@ export const MY_NOTES_CSS = `
 .mn-move-pick { max-width: 100%; min-width: 0; }
 .mn-move-said { margin: 0; color: var(--text-2); font: var(--fs-1)/var(--lh-read) var(--font-ui); overflow-wrap: anywhere; }
 .mn-more { display: flex; justify-content: center; margin: var(--gut) 0 0; }
+/* THE SORT PRESS over the notes, and each card's tags, filled labels in their colours, drawn as the chat's flags are. */
+.mn-tag-bar { display: grid; gap: 4px; min-width: 0; margin: 0 0 var(--gut); }
+.mn-tag-bar-word { align-self: center; color: var(--text-2); font: var(--fs-1)/var(--lh-tight) var(--font-ui); }
+.mn-tag-bar-said { margin: 0; color: var(--text-3); font: var(--fs-1)/var(--lh-read) var(--font-ui); }
+.mn-card-tags { display: flex; flex-wrap: wrap; gap: 4px; min-width: 0; margin: 0; padding: 0; list-style: none; }
+.mn-tag {
+  min-width: 0; padding: 1px 8px; font: 600 var(--fs-1)/var(--lh-tight) var(--font-ui); overflow-wrap: anywhere;
+  border: var(--border-w) solid var(--label-ink); border-radius: var(--radius-sm); background: var(--label-soft);
+  color: var(--label-words);
+}
 `

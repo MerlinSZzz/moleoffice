@@ -18,7 +18,7 @@
 
 import { content, t, type WordKey } from '@shared/i18n.ts'
 import type { QuickInputOutcome } from '@shared/quick-inputs.ts'
-import { Btn, ErrorNote, Loading, Panel } from './ui.tsx'
+import { Btn, ErrorNote, Loading, Panel, ServerNote } from './ui.tsx'
 import { useProjectAsync } from '../lib/project-async.ts'
 import { AGENT_LIVE_CSS } from './AgentLiveParts.tsx'
 import { useLanguage } from '../lib/language.ts'
@@ -58,16 +58,15 @@ export function AgentQuickInputs({ agentId }: { agentId: string }): React.ReactE
         <div className="aqi">
           <div className="al-row">
             <p className="al-line" data-testid="agent-quick-inputs-next">
-              {reply.value.nextAllowedAt === null
-                ? t('agentLive.quickInputs.nextNow')
-                : t('agentLive.quickInputs.nextFrom', { at: stampToTheMinute(reply.value.nextAllowedAt) })}
+              <span className="aqi-key">{t('agentLive.quickInputs.nextLabel')}</span>{' '}
+              {reply.value.nextAllowedAt === null ? t('agentLive.quickInputs.nextNowWord') : stampToTheMinute(reply.value.nextAllowedAt)}
             </p>
             <Btn size="sm" onClick={readAgain}>
               {t('agentLive.quickInputs.readAgain')}
             </Btn>
           </div>
           {reply.value.asks.length === 0 ? (
-            <p className="al-line al-none">{t('agentLive.quickInputs.none')}</p>
+            <p className="al-line al-none">{t('agentLive.quickInputs.noneRecorded')}</p>
           ) : (
             <ol className="aqi-asks" aria-label={t('agentLive.quickInputs.listLabel')}>
               {reply.value.asks.map((ask) => (
@@ -77,9 +76,7 @@ export function AgentQuickInputs({ agentId }: { agentId: string }): React.ReactE
                   </span>
                   <span className="aqi-input">{content(ask.input)}</span>
                   <span className="aqi-outcome">{t(OUTCOME_WORD[ask.outcome])}</span>
-                  <span className="aqi-says">
-                    <span className="aqi-says-key">{t('agentLive.quickInputs.answered')}</span> {content(ask.says)}
-                  </span>
+                  <ServerNote text={content(ask.says)} />
                 </li>
               ))}
             </ol>
@@ -115,10 +112,10 @@ const AGENT_QUICK_INPUTS_CSS = `
 .aqi-row[data-outcome='typed'] .aqi-outcome { color: var(--st-done); }
 .aqi-row[data-outcome='typed-without-enter'] .aqi-outcome, .aqi-row[data-outcome='unknown'] .aqi-outcome { color: var(--st-overdue); }
 .aqi-row[data-outcome='not-typed'] .aqi-outcome { color: var(--st-failed); }
-.aqi-says { grid-column: 2 / -1; min-width: 0; color: var(--text-2); }
-.aqi-says-key { color: var(--text-3); }
+.aqi-row .px-server-note { grid-column: 2 / -1; min-width: 0; margin: 0; }
+.aqi-key { color: var(--text-3); }
 @media (max-width: 40rem) {
   .aqi-row { grid-template-columns: minmax(0, 1fr); }
-  .aqi-at, .aqi-input, .aqi-outcome, .aqi-says { grid-column: 1; }
+  .aqi-at, .aqi-input, .aqi-outcome, .aqi-row .px-server-note { grid-column: 1; }
 }
 `

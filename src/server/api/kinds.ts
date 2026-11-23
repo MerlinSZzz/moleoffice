@@ -371,6 +371,7 @@ export const FAMILY_LINES: Readonly<Record<string, string>> = {
   sidebar: 'Read, preview, save and restore the office-wide sidebar arrangement, and read its history.',
   'home-layout': 'Read and keep the Home layout of the person asking: one row for each person, written only by that person.',
   'sidebar-pins': 'Read and keep the pages in front of the sidebar for the person asking: one row for each person, written only by that person.',
+  'report-count': 'Read and keep whether the person asking sees how many reports are unread: one row for each person, written only by that person.',
   words: 'Page words: saved office-wide choices, English beside Chinese, translation freshness, shipped sources, history and restore.',
   agent: 'Reaching one durable agent: what is waiting for it, and which pages have a comment for it.',
   'agent-tags': 'Read and keep the asking person’s own coloured tags for agents.',
@@ -394,19 +395,24 @@ export const FAMILY_LINES: Readonly<Record<string, string>> = {
   'host-jobs': "Host jobs: a running run asking for a registered host tool, reading what came of it, and the host runner taking the oldest job and saying how it ended.",
   'host-tools': "The registered host tools: what each runs and who may ask it, and a secretary registering, changing or taking one off on a decision the owner made.",
   'dead-letters': "Messages that reached nobody, and the secretaries' claims on them.",
-  decisions: 'Which decisions govern a file, module, flow or pipeline, and the check of what the decisions say they govern.',
+  decisions: 'Which decisions govern a file or a page, and the check of what the decisions say they govern.',
   drafts: 'Writing kept in the office until it is sent: your drafts with when each reminder is due, and the door that sends one.',
   delegation: 'The packaged tasks, and the marks on one: take it, return it, confirm it, export it.',
+  departments: 'The departments as a tree: one page of the top departments with every department under each, one department with those directly under it and its history, and filing or changing one, by the person or a secretary on the person\'s words.',
   events: 'What happened as it happens, over a channel the server holds open, and what it holds now.',
   export: 'What a durable export would contain, and the write that puts it on disk.',
+  figures: "The four figures the home page lacks: packages per line by state, packages done per day, each package's time from taken to live, and the whole suite's minutes per run.",
+  file: 'One file that a live record in this project points at: reading it to preview, download or open, and an address with a ticket that opens it in a paired browser.',
   flows: 'The office\'s flows: the register with which flows have problems, a page of flows with their runs, one flow, a page of its runs, a new flow, a stage added, changed, moved or removed, and an agent entering one, which puts an item on the agent\'s checklist until the flow ends.',
   forks: 'The forks waiting on a person, and the ones that might be one question.',
   groups: 'Conversations with several subscribers, and opening one.',
   handles: 'Which session is answering as which durable agent right now.',
+  knowledge: 'Read and write shared knowledge categories and entries, review changes, and bookmark entries in projects.',
   harnesses: 'The agent tools on this machine: which are installed, their versions and the newest, and the press that installs the ticked ones.',
   'honour-board': 'What the office reads about one run from the records it already holds, and the reading kept on the run itself.',
   implementation: "Where this project's meaning lives in the code: repositories, relationships and revisions.",
   import: 'What reading the durable archive back would do, and the write that does it.',
+  'key-items': "A project's key items with their progress and an estimate of the time left: listing them for one project or every project, adding one, changing, moving, closing and opening one again, written only by the person or a secretary.",
   kinds: 'Every record kind, one kind in full, and one kind\'s fields cheaply.',
   links: 'Every typed relationship between records, and the write that makes or removes one.',
   'merge-queue': "The merge queue, lane by lane: submitting a sealed run's changeset, one entry and what it waits on, withdrawing it, and the merge tool's steps.",
@@ -559,7 +565,9 @@ export const ROUTE_NOTES: Readonly<Record<string, string>> = {
     '`sessionBinding`, only when it happened: filing a `session` while writing under ' +
     'x-mole-office-session claims that run name for the new record and repoints every change row already stored ' +
     'under the raw name, and says how many rows moved. ' +
-    THE_PROSE_CAP_SENTENCE,
+    THE_PROSE_CAP_SENTENCE +
+    ' A create may carry forms in its top-level `shortForms`; the office names the revision they were made from. ' +
+    'A message with this key is filed at once rather than held in a turn draft.',
   'GET /api/records/:id':
     'One record with everything a page needs: its links, both directions, and its history. Every link carries ' +
     'its gate — `gate` as stored, `gateLabel` as words, `gateProblem` when the stored pair cannot be read — on ' +
@@ -1134,11 +1142,14 @@ export const DERIVED_ROUTE_NOTES: Readonly<Record<string, string>> = {
     '{"why":…} — stop a run that will not stop. Only the agent that started the run, its supervisor or a ' +
     'secretary may, each proved by its own key. In one call it revokes the run\'s key, so the run\'s writes stop at ' +
     'once; stops the process group the ledger recorded for the run, never one found by name or port; and, when it ' +
-    'signalled that group, writes on the run who stopped it and why. The run is written crashed only when its group ' +
-    'has gone after the signal. When nothing was signalled it is refused, saying what was found: with 409 when no ' +
-    'group is recorded, its row is closed or its group had ended already, and with the release\'s own status when ' +
-    'the release refused. The key is revoked all the same. The run then says only that its key was revoked, with ' +
-    'what it said before kept after it. A call that revoked no key either writes nothing on the run.',
+    'signalled that group, writes on the run who stopped it and why. Of a group it signalled, the run is written ' +
+    'crashed only when the group has gone after the signal. When nothing was signalled it is refused, saying what ' +
+    'was found: with 409 when no group is recorded, its row is closed or its group had ended already, with 503 ' +
+    'when nothing was ended and its program may still run, and with the release\'s own status when the release ' +
+    'refused. On Windows the group is ' +
+    'the Job Object the run\'s starter made, and it is ended at once. The key is revoked all the same. The run then ' +
+    'says only that its key was revoked, with what it said before kept after it. When its group had ended already, ' +
+    'the run is written crashed as well. A call that revoked no key either writes nothing on the run.',
   'GET /api/resources':
     'The ledger: what sessions have registered. Live rows only by default; ?includeReleased=true adds the ones ' +
     'already let go, ?sessionRecordId=<id> narrows it to one session and ?pgid=<n> to one process group. A live ' +

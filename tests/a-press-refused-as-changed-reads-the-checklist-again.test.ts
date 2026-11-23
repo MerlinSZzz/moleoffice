@@ -2,7 +2,7 @@
 // Licensed under the MIT License. See LICENSE.
 /**
  * A PRESS ON A CHECKLIST ITEM, REFUSED BECAUSE THE CHECKLIST CHANGED AFTER THE PAGE READ IT, SAYS SO IN THE PAGE'S
- * WORDS, AND THE PAGE READS THE CHECKLIST AGAIN. Wave 13j round loop-8, backlog item 1, from the secretary's answer 923JEq0L34bg:
+ * WORDS, AND THE PAGE READS THE CHECKLIST AGAIN. Wave 13j round loop-8, backlog item 1, from the secretary's answer:
  * the press is a person's, so its refusal is in a person's words, by a code, and "better still, read the item again
  * yourself, so the second press works".
  *
@@ -13,8 +13,8 @@
  * reading, and "Press once more" only while the press it draws does what the refused press asked and its row has not
  * moved. The page never presses again for the person.
  *
- * A ROW THAT MOVED IN THE RE-READ GETS NO "PRESS ONCE MORE", then or later (wave 13j round loop-9, the secretary's answers
- * L8_V7OK149wo and u1xHS9oaCIOn): a second press at the same place may land on another row. A row has moved when its
+ * A ROW THAT MOVED IN THE RE-READ GETS NO "PRESS ONCE MORE", then or later (wave 13j round loop-9, the secretary's
+ * answers): a second press at the same place may land on another row. A row has moved when its
  * place among the rows the view draws changed, or when anything drawn above it in the view changed. The guard that
  * keeps such a row from taking a press for one second is proved in
  * tests/a-checklist-row-that-moved-takes-no-press.test.ts.
@@ -38,6 +38,11 @@
  *      once more", and pressed once more the item is done.
  *   6. THE PAGE'S "Make it standing", after an agent changed the words of the item below it: "Press once more", and
  *      pressed once more the item is standing.
+ *
+ * Test change (wave 13y round 175): the page and the window draw design E, as decided. Each checklist is a card, in
+ * the window and on the page; the page cases read the card the address `#/checklists/<id>` marks, and the window's
+ * cases find a checklist by its card's title. Before, the window drew each checklist as a group under a title and the
+ * page drew the one opened checklist with its counts line.
  */
 
 import type { Locator, Page, Response } from 'playwright'
@@ -100,7 +105,7 @@ async function openTheWindow(page: Page): Promise<void> {
   await waitForThePage(page, 60_000)
   await page.waitForSelector('.ckw-press', { timeout: 30_000 })
   await page.click('.ckw-press')
-  await page.waitForSelector('.ckw-panel .ckw-group', { timeout: 30_000 })
+  await page.waitForSelector('.ckw-panel .cks-card', { timeout: 30_000 })
 }
 
 const row = (page: Page, words: string) => page.locator('.ckw-panel .ckp-item', { hasText: words })
@@ -121,21 +126,22 @@ function wordsOf(rows: Locator): Promise<string[]> {
 
 /** The rows of one checklist in the window still to do, or done in this opening of it, in the order drawn. */
 function rowsOf(page: Page, title: string): Promise<string[]> {
-  const group = page.locator('.ckw-panel .ckw-group', { has: page.locator('.ckw-group-title', { hasText: title }) })
-  return wordsOf(group.locator('.ckw-items:not(.ckp-folded) > .ckp-item .ckp-words'))
+  const card = page.locator('.ckw-panel .cks-card', { has: page.locator('.cks-title', { hasText: title }) })
+  return wordsOf(card.locator('.cks-items:not(.ckp-folded) > .ckp-item .ckp-words'))
 }
 
-/** The rows of the checklist opened on the page still to do, in the order drawn. */
+/** The rows of the checklist's card on the page still to do, in the order drawn. */
 function itemsOn(one: Locator): Promise<string[]> {
-  return wordsOf(one.locator('.ck1-items:not(.ckp-folded) > .ckp-item .ckp-words'))
+  return wordsOf(one.locator('.cks-items:not(.ckp-folded) > .ckp-item .ckp-words'))
 }
 
 async function openThePage(page: Page, id: string): Promise<Locator> {
   await page.goto('about:blank')
   await page.goto(`${app.site}/?lang=en#/checklists/${id}`, { timeout: 60_000 })
   await waitForThePage(page, 60_000)
-  const one = page.locator('.ck1')
-  await one.locator('.ck1-counts').waitFor({ timeout: 30_000 })
+  // THE CARD THE ADDRESS MARKS on the page.
+  const one = page.locator('.cks-card[data-marked="yes"]')
+  await one.locator('.ckp-item').first().waitFor({ timeout: 30_000 })
   return one
 }
 
@@ -219,15 +225,15 @@ describe('a press refused because the checklist changed says so in the page\'s w
     await runners.getByRole('button', MAKE).click()
     await itWasRefusedAsChanged(answer)
     await held.release()
-    await expect.poll(() => runners.locator('.ck1-refusal').innerText(), { timeout: 10_000 }).toBe(READ_AGAIN)
+    await expect.poll(() => runners.locator('.ckl-refusal').innerText(), { timeout: 10_000 }).toBe(READ_AGAIN)
     expect(await itemsOn(one), 'the item in progress sorts first, so the pressed row moved').toEqual(['Count the handles', 'Wax the runners'])
     expect((await theList(list))['version'], 'nothing was written').toBe(before)
     expect(Object.hasOwn(await theItem(list, 'Wax the runners'), 'standing')).toBe(false)
     await expect.poll(() => runners.getAttribute('data-moved'), { timeout: 10_000 }).toBeNull()
-    expect(await runners.locator('.ck1-refusal').innerText(), 'and not once the row takes presses again').toBe(READ_AGAIN)
+    expect(await runners.locator('.ckl-refusal').innerText(), 'and not once the row takes presses again').toBe(READ_AGAIN)
     await runners.getByRole('button', MAKE).click()
     await expect.poll(async () => (await theItem(list, 'Wax the runners'))['standing'], { timeout: 10_000 }).toBe(true)
-    await expect.poll(() => runners.locator('.ck1-refusal').count(), { timeout: 10_000 }).toBe(0)
+    await expect.poll(() => runners.locator('.ckl-refusal').count(), { timeout: 10_000 }).toBe(0)
   }, 120_000)
 
   it('4. the page\'s "Make it standing", after that item was made standing: the press reads "Make it ordinary", and no "Press once more"', async () => {
@@ -242,7 +248,7 @@ describe('a press refused because the checklist changed says so in the page\'s w
     await notes.getByRole('button', MAKE).click()
     await itWasRefusedAsChanged(answer)
     await held.release()
-    await expect.poll(() => notes.locator('.ck1-refusal').innerText(), { timeout: 10_000 }).toBe(READ_AGAIN)
+    await expect.poll(() => notes.locator('.ckl-refusal').innerText(), { timeout: 10_000 }).toBe(READ_AGAIN)
     expect(await notes.getByRole('button', UNMAKE).count()).toBe(1)
     expect(await notes.getByRole('button', MAKE).count()).toBe(0)
     expect((await theItem(list, 'Keep the lamp notes'))['standing']).toBe(true)
@@ -280,7 +286,7 @@ describe('a press refused because the checklist changed says so in the page\'s w
     await wick.getByRole('button', MAKE).click()
     await itWasRefusedAsChanged(answer)
     await held.release()
-    await expect.poll(() => wick.locator('.ck1-refusal').innerText(), { timeout: 10_000 }).toBe(PRESS_ONCE_MORE)
+    await expect.poll(() => wick.locator('.ckl-refusal').innerText(), { timeout: 10_000 }).toBe(PRESS_ONCE_MORE)
     expect(await itemsOn(one)).toEqual(['Trim the wick', 'Polish the brass base'])
     expect(await wick.getAttribute('data-moved'), 'nothing above the row changed').toBeNull()
     expect((await theList(list))['version'], 'nothing was written').toBe(before)

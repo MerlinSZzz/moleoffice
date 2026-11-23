@@ -1,5 +1,15 @@
 // Copyright © 2026 Zhengyang Shen
 // Licensed under the MIT License. See LICENSE.
+// Criterion change (wave 13s round 281, decision 0evm2ORnvdXu): the Home case reads the ask among the rows Home
+// draws.
+// Since HD-2d, Home's Needs you draws only its first `NEEDS_SHOWN` rows. In this office the ask and the two messages
+// the asks sent are written in the same second. The waiting reading orders rows of one second by id, and the ids are
+// random, so the ask was left out about one run in three. The case now has the person read both messages first, so the
+// ask is the only waiting row. It checks by `GET /api/waiting` that the ask is among the first `NEEDS_SHOWN` rows
+// before it reads Home. The Decisions page then draws no message, so opening it waits for the ask's row, and case 2
+// waits for the message itself. Mutation 1 now turns case 3 red as well: under it the ask's row does not name the
+// agent, and opening the Decisions page waits for that name. Before, the Home case was held to find the ask's row on
+// Home whatever rows waited beside it.
 /**
  * A CARD ASK'S ROW NAMES THE AGENT THE WAY THE MESSAGE BESIDE IT DOES, IN THE PAGE'S WORDS.
  *
@@ -20,10 +30,11 @@
  *      does, with no id; in the test language the row's words are marked as the page's;
  *   3. the list of withdrawn asks draws the withdrawn ask the same way, and says who withdrew it by the same name,
  *      with no handle;
- *   4. Home's Needs you draws the waiting ask's row the same way.
+ *   4. Home's Needs you draws the waiting ask's row the same way, once the person has read the two messages the asks
+ *      sent; the case first checks that the ask is among the rows Home draws.
  *
  * THE MUTATIONS THAT TURN THIS RED, WITH A CONTROL RUN FIRST:
- *   1. src/server/lib/waiting.ts: leave `askerAndCard` off the waiting row → cases 1, 2 and 4;
+ *   1. src/server/lib/waiting.ts: leave `askerAndCard` off the waiting row → cases 1, 2, 3 and 4;
  *   2. src/web/lib/waiting.ts: the row's words are the stored title again → cases 2, 3 and 4;
  *   3. GovernancePage.tsx: the withdrawn list draws the stored title again → case 3;
  *   4. HomeSections.tsx: Home reads a card ask's record for its words again → case 4;
@@ -39,6 +50,7 @@ import { liveApp, thePersonsKeyHeader, waitForThePage, type LiveApp } from './he
 import { THE_PERSON } from '../src/shared/person.ts'
 import { sayInEnglish } from '../src/shared/i18n.ts'
 import { cardWord } from '../src/shared/card-words.ts'
+import { NEEDS_SHOWN } from '../src/web/components/home/HomeSections.tsx'
 
 let app: LiveApp
 let asPerson: Record<string, string> = {}
@@ -47,10 +59,10 @@ const ASKS = { handle: 'reed-example', name: 'Reed Example' }
 const WITHDRAWS = { handle: 'wren-sample', name: 'Wren Sample' }
 const CARD = 'supervisor'
 
-/** Each ask as the test office stored it. */
-const stored: Record<'asks' | 'withdraws', { id: string; title: string; askerId: string }> = {
-  asks: { id: '', title: '', askerId: '' },
-  withdraws: { id: '', title: '', askerId: '' },
+/** Each ask as the test office stored it, with the message it sent. */
+const stored: Record<'asks' | 'withdraws', { id: string; title: string; askerId: string; messageId: string }> = {
+  asks: { id: '', title: '', askerId: '', messageId: '' },
+  withdraws: { id: '', title: '', askerId: '', messageId: '' },
 }
 
 /** Every key in a reply replaced, so no failure message carries one. */
@@ -85,7 +97,8 @@ async function openDecisions(lang: string): Promise<void> {
   // A goto that changes only the hash keeps the page, so it is loaded again to read the language and the look.
   await app.page.reload({ timeout: 60_000 })
   await waitForThePage(app.page, 60_000)
-  await app.page.locator(`${MESSAGES} .da-from`).first().waitFor({ state: 'visible', timeout: 30_000 })
+  // THE ASK'S ROW, which the page draws in every case. Once the Home case has read the messages, it draws none.
+  await app.page.locator(ROW_TITLES, { hasText: ASKS.name }).first().waitFor({ state: 'visible', timeout: 30_000 })
 }
 
 async function openTheWithdrawnList(lang: string): Promise<void> {
@@ -123,11 +136,12 @@ beforeAll(async () => {
     delete asAgent['x-mole-office-key']
     const asked = await post('/api/roles/requests', asAgent, { asking: CARD, because: 'Made-up: to lead a wave' })
     const id = String(asked['request'])
+    const messageId = String(asked['message'])
     if (which === 'withdraws') {
       await post(`/api/roles/requests/${id}/withdraw`, { ...asAgent, 'x-mole-office-key': String(started['whatToGiveIt']?.key) }, {})
     }
     const record = (await get(`/api/records/${id}`))['record'] as { title: string; data: { asker: { id: string } } }
-    stored[which] = { id, title: record.title, askerId: record.data.asker.id }
+    stored[which] = { id, title: record.title, askerId: record.data.asker.id, messageId }
   }
   // THE PRECONDITION: each ask stores its asker by a registry id that is not its handle, and its title names that id.
   for (const [which, agent] of [['asks', ASKS], ['withdraws', WITHDRAWS]] as const) {
@@ -166,6 +180,7 @@ describe("a card ask's row", () => {
     expect(titles).toContain(theRowSays(ASKS.name))
     for (const title of titles) expect(title, 'a row draws a registry id').not.toContain(stored.asks.askerId)
     // THE MESSAGE THE ASK SENT, beside it, names the same agent by the same name.
+    await app.page.locator(`${MESSAGES} .da-from`).first().waitFor({ state: 'visible', timeout: 30_000 })
     expect(await app.page.locator(`${MESSAGES} .da-from`).allInnerTexts()).toContain(sayInEnglish('decisionsAsks.from', { name: ASKS.name }))
 
     // THE TEST LANGUAGE MARKS EVERY WORD THE PAGE WROTE, and the agent's name is content and is not marked.
@@ -190,6 +205,19 @@ describe("a card ask's row", () => {
   }, 120_000)
 
   it("is written the same way in Home's Needs you", async () => {
+    // THE PERSON READS THE TWO MESSAGES THE ASKS SENT, so the ask is the only row waiting, and Home draws it.
+    for (const which of ['asks', 'withdraws'] as const) {
+      await post(`/api/messages/${stored[which].messageId}/mark`, asPerson, { mark: 'seen' })
+    }
+    // THE ASK IS AMONG THE ROWS HOME DRAWS, or the case says what crowded it out.
+    const items = (await get('/api/waiting'))['items'] as { id: string; title: string }[]
+    const place = items.findIndex((one) => one.id === stored.asks.id)
+    const ahead = (place < 0 ? items : items.slice(0, place)).map((one) => one.title)
+    const why =
+      `the ask's place in the waiting reading is ${String(place)} (-1 means it is not a row); Home draws the first ` +
+      `${String(NEEDS_SHOWN)}; the rows ahead of it, or every row when it is not one, are ${JSON.stringify(ahead)}`
+    expect(place, why).toBeGreaterThanOrEqual(0)
+    expect(place, why).toBeLessThan(NEEDS_SHOWN)
     await openHome('en')
     const one = homeRow(stored.asks.id)
     expect(await one.locator('.hm-row-title').innerText()).toBe(theRowSays(ASKS.name))

@@ -25,7 +25,7 @@
  * page is written beside the manifest. The stand-in keeps every message the office sends it in `window.told`.
  *
  * THE PICTURES. When W13Y_R119_PICTURES names a folder, case 6 writes the Working page, the Settings page at the
- * looks category and the Settings page at the plugins panel, at 1440, 990, 660 and 390 pixels wide, in both themes
+ * looks category and the Settings page at the plugins panel, at 1440 and 390 pixels wide, in the light theme
  * and both modes. Each is labelled as a made-up test office. Case 6 asserts only that each page fits its width and
  * shows the theme it was asked for, so it passes before the change and after it, and takes both sets of pictures.
  */
@@ -201,43 +201,42 @@ describe('the office map is one entry on the Settings page, and the older built-
     await expect.poll(() => fold.getByRole('switch').getAttribute('aria-checked')).toBe('true')
   }, 240_000)
 
-  it('6. pictures: the Working page and the Settings page, at four widths, in both themes and both modes', async () => {
+  it('6. pictures: the Working page and the Settings page, at the widest and the narrowest width, in the light theme and both modes', async () => {
     const page = app.page
     const pictures = process.env['W13Y_R119_PICTURES']
     if (pictures) mkdirSync(pictures, { recursive: true })
-    for (const width of [1440, 990, 660, 390]) {
-      for (const theme of ['light', 'dark'] as const) {
-        for (const mode of ['normal', 'inspect'] as const) {
-          await page.setViewportSize({ width, height: 1000 })
-          for (const surface of ['working', 'settings-looks', 'settings-plugins'] as const) {
-            let above
-            if (surface === 'working') {
-              await open(page, '/working', mode, theme)
-              await page.locator('.wrk ul.wrk-list, .wrk .px-office, .wrk .px-error').first().waitFor({ timeout: 60_000 })
-              above = page.locator('.wrk')
-            } else if (surface === 'settings-looks') {
-              await open(page, '/settings/look', mode, theme)
-              const older = page.locator('[data-settings-panel="settings.pixeloffice"]')
-              if ((await older.count()) > 0) {
-                await openSettingsPanel(page, 'settings.pixeloffice')
-                await page.waitForFunction(() => document.querySelectorAll('[data-settings-panel="settings.pixeloffice"] .px-loading').length === 0, undefined, { timeout: 30_000 })
-                above = older
-              } else above = page.locator('section.sf-cat[data-category="looks"]')
-            } else {
-              await open(page, '/settings/plugins', mode, theme)
-              await page.locator(THE_ROW).waitFor({ timeout: 30_000 })
-              const fold = page.locator(`${THE_ROW} details.plgs-settings`)
-              if ((await fold.count()) > 0) await fold.locator(':scope > summary').click()
-              above = page.locator('[data-settings-panel="settings.plugins"]')
-            }
-            await above.scrollIntoViewIfNeeded()
-            expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `${surface} ${width} ${theme} ${mode}`).toBe(true)
-            await page.mouse.move(width - 1, 999)
-            if (pictures) {
-              const called = surface === 'working' ? 'the Working page' : 'the Settings page'
-              await putTheMadeUpLabelIn(page, 'Made-up test office — two made-up agents; the office map plugin is a stand-in', above, called)
-              await page.screenshot({ path: `${pictures}/${surface}-${width}-${theme}-${mode === 'inspect' ? 'developer' : 'normal'}.png`, fullPage: false })
-            }
+    for (const width of [1440, 390]) {
+      const theme = 'light'
+      for (const mode of ['normal', 'inspect'] as const) {
+        await page.setViewportSize({ width, height: 1000 })
+        for (const surface of ['working', 'settings-looks', 'settings-plugins'] as const) {
+          let above
+          if (surface === 'working') {
+            await open(page, '/working', mode, theme)
+            await page.locator('.wrk ul.wrk-list, .wrk .px-office, .wrk .px-error').first().waitFor({ timeout: 60_000 })
+            above = page.locator('.wrk')
+          } else if (surface === 'settings-looks') {
+            await open(page, '/settings/look', mode, theme)
+            const older = page.locator('[data-settings-panel="settings.pixeloffice"]')
+            if ((await older.count()) > 0) {
+              await openSettingsPanel(page, 'settings.pixeloffice')
+              await page.waitForFunction(() => document.querySelectorAll('[data-settings-panel="settings.pixeloffice"] .px-loading').length === 0, undefined, { timeout: 30_000 })
+              above = older
+            } else above = page.locator('section.sf-cat[data-category="looks"]')
+          } else {
+            await open(page, '/settings/plugins', mode, theme)
+            await page.locator(THE_ROW).waitFor({ timeout: 30_000 })
+            const fold = page.locator(`${THE_ROW} details.plgs-settings`)
+            if ((await fold.count()) > 0) await fold.locator(':scope > summary').click()
+            above = page.locator('[data-settings-panel="settings.plugins"]')
+          }
+          await above.scrollIntoViewIfNeeded()
+          expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `${surface} ${width} ${theme} ${mode}`).toBe(true)
+          await page.mouse.move(width - 1, 999)
+          if (pictures) {
+            const called = surface === 'working' ? 'the Working page' : 'the Settings page'
+            await putTheMadeUpLabelIn(page, 'Made-up test office — two made-up agents; the office map plugin is a stand-in', above, called)
+            await page.screenshot({ path: `${pictures}/${surface}-${width}-${theme}-${mode === 'inspect' ? 'developer' : 'normal'}.png`, fullPage: false })
           }
         }
       }

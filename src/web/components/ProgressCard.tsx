@@ -5,6 +5,7 @@ import { useMemo } from 'react'
 import { t } from '@shared/i18n.ts'
 import { api } from '../api.ts'
 import { Counted } from './home/Counted.tsx'
+import { HomeLines } from './home/HomeLinesTable.tsx'
 import { ErrorNote } from './ui.tsx'
 import { useProjectAsync } from '../lib/project-async.ts'
 import { PROGRESS_ASK_FLOOR_MS, READ_COST_FACTOR, oneAsk } from '../lib/oneask.ts'
@@ -23,8 +24,13 @@ import type { ProjectProgress } from '../../shared/progress.ts'
  * something to do.
  *
  * THE WHOLE ANSWER IS DRAWN, zeros included, because a zero is a fact here. A reading that answered with no backlog
- * point, no brief and no brief it could not read draws no card at all. While the card is read, and when the reading
+ * point, no brief and no brief it could not read draws no counts. While the card is read, and when the reading
  * failed, the card is drawn and says so, so a reading that did not answer is never shown as an empty project.
+ *
+ * THE LINES COME FIRST (wave 13y round 175): a table of the project's lines, read from
+ * `GET /api/projects/<project>/people-and-packages` and drawn by src/web/components/home/HomeLinesTable.tsx. Each of
+ * the two reads says its own reading and its own failure. When both reads answered and neither holds anything, with
+ * no line, no backlog point and no brief, the card is not drawn.
  */
 export function ProgressCard({ tick }: { tick: number }) {
   // ONE ASK AT A TIME, PACED BY ITS LAST ANSWER (src/web/lib/oneask.ts). The card is asked on the
@@ -36,16 +42,24 @@ export function ProgressCard({ tick }: { tick: number }) {
     [],
   )
   const [reading, readAgain] = useProjectAsync(() => askProgress(), [tick])
-  if (reading.status === 'ready' && holdsNothing(reading.value)) return null
+  // THE PROJECT'S LINES, from the door the board's people and packages tab reads, asked the same way and as often.
+  const askPeople = useMemo(
+    () => oneAsk((project) => api.peopleAndPackages(project), { key: currentWorkspace, floorMs: PROGRESS_ASK_FLOOR_MS, factor: READ_COST_FACTOR }),
+    [],
+  )
+  const [people, readPeopleAgain] = useProjectAsync(() => askPeople(), [tick])
+  const noProgress = reading.status === 'ready' && holdsNothing(reading.value)
+  if (noProgress && people.status === 'ready' && people.value.lines.length === 0) return null
   return (
     <section className="hm-section pg-card" data-progress-card="project">
       <style href="mole-office-progress-card" precedence="default">{PG_CARD_CSS}</style>
       <h2 className="hm-section-title">{t('progressCard.title')}</h2>
+      <HomeLines people={people} retry={readPeopleAgain} />
       {reading.status === 'loading' ? <p className="pg-reading">{t('progressCard.reading')}</p> : null}
       {reading.status === 'error' ? (
         <ErrorNote message={t('progressCard.failed')} fault={reading.fault ?? null} retry={readAgain} />
       ) : null}
-      {reading.status === 'ready' ? <TheProgress reading={reading.value} /> : null}
+      {reading.status === 'ready' && !noProgress ? <TheProgress reading={reading.value} /> : null}
     </section>
   )
 }

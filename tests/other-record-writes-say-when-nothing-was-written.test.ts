@@ -23,7 +23,7 @@ import { THE_SECRETARY, THE_WORKER } from '../src/shared/roles.ts'
 import { THE_OWNER } from '../src/shared/kinds.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { SECRETARIAT_GROUP_KEY } from '../src/shared/groups.ts'
-import { apiApp, freshDb, type TestDb } from './helpers.ts'
+import { apiApp, freshDb, type TestDb, governsTheWholeProject } from './helpers.ts'
 
 const person = { 'content-type': 'application/json', 'x-mole-office-workspace': 'default', 'x-mole-office-actor-type': 'human', 'x-mole-office-actor-id': THE_PERSON }
 let t: TestDb
@@ -125,7 +125,7 @@ it('a secretary repeating its notebook entry explains the unchanged text', async
 
 it('repeating secretary duties explains the unchanged record', async () => {
   const id = await register('test-duties-secretary', THE_SECRETARY)
-  const decision = await send('POST', '/api/records', { kind: 'decision', title: 'Duties decision', data: { option_taken: 'A test choice.', because: 'A test reason.', decided_by: THE_OWNER, replaces: [] } })
+  const decision = await send('POST', '/api/records', { kind: 'decision', title: 'Duties decision', data: { option_taken: 'A test choice.', because: 'A test reason.', decided_by: THE_OWNER, ...governsTheWholeProject(), replaces: [] } })
   expect(decision.statusCode, decision.body).toBe(201)
   const decisionId = (decision.json() as { record: { id: string } }).record.id
   const first = await send('PUT', `/api/secretaries/${id}/duties`, { area: 'A test area.', restsOn: [decisionId] })

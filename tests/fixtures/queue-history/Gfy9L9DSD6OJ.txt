@@ -1,5 +1,0 @@
-2026-10-08 02:15:23 sandbox merge-be6wb4anqngn-c4868e of final merge entry be6wb4AnQNGn was cleared at 2026-10-08 02:15:23; freed 398688073 bytes
-2026-10-08 02:15:23 merge entry 26z3ZMJAfjEz (git) is judged; lane /srv/mole-office; workdir /srv/mole-office-cache/merge-queue/26z3ZMJAfjEz
-2026-10-08 02:15:55 main moved from 13c7308e4a72bd175e656ceb3d8cccd3c71e9b85 to 056e65c7946d58b6e151e5865ae0747ee537a582 by fast-forward
-2026-10-08 02:15:56 step landed: {"mainAfter":"056e65c7946d58b6e151e5865ae0747ee537a582","says":"Main moved from 13c7308e4a72 to 056e65c7946d by fast-forward; backup skipped; relying on /srv/mole-office/data/backups/mole-office-20261008-021029.db, 5.44 minutes old; no migration came along; the office is healthy and serves 056e65c7946d58b6e151e5865ae0747ee537a582."}
-2026-10-08 02:15:56 the office answered: the entry is now merged

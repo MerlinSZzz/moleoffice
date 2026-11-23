@@ -6,6 +6,8 @@ line in the run's `data.toolUses` until migration 0231 moved it here, and it nam
 never said who wrote each line.
 `proof` is what the use door found when it checked that tools/use-line.mjs sent the line: `matches`, `none` or
 `does not match`. It is empty on a row written before migration 0300, when the door did not check.
+`atInstant` is the same moment as `at`, as an instant with its offset. It is empty on a row written before
+migration 0358 and on a row moved out of a run's list.
 
 ### run-a — use 1
 
@@ -21,6 +23,7 @@ actorType: null
 actorId: null
 movedAt: null
 proof: null
+atInstant: null
 ```
 
 ### run-z — use 1
@@ -37,4 +40,5 @@ actorType: null
 actorId: null
 movedAt: null
 proof: null
+atInstant: null
 ```

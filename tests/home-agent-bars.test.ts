@@ -1,5 +1,11 @@
 // Copyright © 2026 Zhengyang Shen
 // Licensed under the MIT License. See LICENSE.
+// Criterion change (wave 13s round 281, decisions OQR0WDVq0FkP and M1ngfatGQcwn, F2): a roster row carries
+// doingFrom, the run serving its agent, and a bar takes no doing reading.
+// Home reads the serving run from the roster's rows, so an agent is stuck when its row names a run that an alarm
+// names. A project with no alarm on a run is counted with nothing more, and the readings that can fail are the
+// roster, the waiting list and the attention.
+// Before, a bar took a fourth reading, the runs serving the agents, which could be loading or fail on its own.
 /**
  * AGENTS AT WORK, AS BARS. One bar per project, split into working, waiting on you and stuck, with the number
  * at the bar's end, and a key below the bars. Each count comes from a reading Home already makes:
@@ -44,8 +50,8 @@ beforeAll(async () => {
 })
 
 type Presence = 'online' | 'stale' | 'offline' | 'inactive'
-function agent(id: string, presence: Presence) {
-  return { agentId: `made-up-agent-record-${id}`, participant: { id: `made-up-participant-${id}`, name: `Made-up agent ${id}`, startedBy: null }, presence: { presence } }
+function agent(id: string, presence: Presence, doingFrom: string | null = null) {
+  return { agentId: `made-up-agent-record-${id}`, participant: { id: `made-up-participant-${id}`, name: `Made-up agent ${id}`, startedBy: null }, presence: { presence }, doingFrom }
 }
 const ready = <T,>(value: T) => ({ status: 'ready' as const, value })
 const failed = { status: 'error' as const, message: 'made-up failure' }
@@ -67,16 +73,12 @@ function runAlarm(runId: string) {
 function attention(...rows: ReturnType<typeof runAlarm>[]) {
   return ready({ alarms: { sessionIds: rows.map((row) => row.recordId) } })
 }
-function doing(rows: { id: string; run: string | null }[]) {
-  return ready({ workspaceId: 'made-up-project', computedAt: '2026-11-13 09:00:00', rows: rows.map(one => ({ agentId: `made-up-agent-record-${one.id}`, doing: null, doingFrom: one.run })), notActiveHere: [], note: '' })
-}
 
 /** One working, one waiting on you, one stuck, and one offline that is in none of the three. */
 const THREE = {
-  roster: roster([agent('a', 'online'), agent('b', 'online'), agent('c', 'stale'), agent('d', 'offline')]),
+  roster: roster([agent('a', 'online', 'made-up-run-a'), agent('b', 'online'), agent('c', 'stale', 'made-up-run-c'), agent('d', 'offline')]),
   waiting: waitingFrom('b'),
   attention: attention(runAlarm('made-up-run-c')),
-  doing: doing([{ id: 'a', run: 'made-up-run-a' }, { id: 'b', run: null }, { id: 'c', run: 'made-up-run-c' }, { id: 'd', run: null }]),
 }
 
 /** The agents THREE counts, each by its participant: the offline one is in none of the three parts. */
@@ -98,8 +100,8 @@ describe('the counts', () => {
     expect(bars.theBarOf(THREE)).toEqual({ read: true, working: 1, waiting: 1, stuck: 1, total: 3, atWork: AT_WORK_IN_THREE })
   })
 
-  it('counts nobody stuck without asking which runs serve the agents when no alarm is a run', () => {
-    const quiet = { ...THREE, attention: attention(), doing: loading }
+  it('counts nobody stuck when no alarm is a run', () => {
+    const quiet = { ...THREE, attention: attention() }
     expect(bars.theBarOf(quiet)).toEqual({ read: true, working: 2, waiting: 1, stuck: 0, total: 3, atWork: AT_WORK_IN_THREE })
   })
 
@@ -107,7 +109,6 @@ describe('the counts', () => {
     expect(bars.theBarOf({ ...THREE, roster: failed })).toMatchObject({ read: false, failed: ['roster'] })
     expect(bars.theBarOf({ ...THREE, waiting: failed })).toMatchObject({ read: false, failed: ['waiting'] })
     expect(bars.theBarOf({ ...THREE, attention: failed })).toMatchObject({ read: false, failed: ['attention'] })
-    expect(bars.theBarOf({ ...THREE, doing: failed })).toMatchObject({ read: false, failed: ['doing'] })
     expect(bars.theBarOf({ ...THREE, roster: loading })).toMatchObject({ read: false, failed: [] })
   })
 })
@@ -133,7 +134,7 @@ describe('the drawing', () => {
   })
 
   it('draws only the name of a project whose roster holds none, and counts the projects in the heading', () => {
-    const empty = { ...THREE, roster: roster([]), doing: loading }
+    const empty = { ...THREE, roster: roster([]) }
     const html = draw([
       { id: 'made-up-busy', name: 'Made-up busy project', bar: bars.theBarOf(THREE) },
       { id: 'made-up-empty', name: 'Made-up empty project', bar: bars.theBarOf(empty) },
@@ -148,7 +149,7 @@ describe('the drawing', () => {
   })
 
   it('counts one agent on the rosters of two projects once in the heading, and in each of the two bars', () => {
-    const inFirst = { ...THREE, roster: roster([agent('a', 'online')]), waiting: waitingFrom(), attention: attention(), doing: loading }
+    const inFirst = { ...THREE, roster: roster([agent('a', 'online')]), waiting: waitingFrom(), attention: attention() }
     // THE SECOND PROJECT HOLDS AN AGENT RECORD OF ITS OWN, and it is the same agent: the same participant.
     const inSecond = { ...inFirst, roster: roster([{ ...agent('a', 'online'), agentId: 'made-up-agent-record-a-in-the-second-project' }]) }
     const html = draw([

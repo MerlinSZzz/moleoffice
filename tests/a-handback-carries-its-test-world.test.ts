@@ -237,18 +237,23 @@ describe('C31 — a world that is gone says so, rather than offering a dead addr
 })
 
 describe('C31 — a world nobody wrote down says that, which is not the same as up', () => {
-  it('says nobody registered it, and says there is no press that stops it', async () => {
+  it('says nobody registered it, and draws no paragraph about the ledger', async () => {
     await open(`/r/${unregistered}`, 'light', 1440)
     const seen = await readTheWorld()
     expect(seen.state).toBe('cannot-tell')
-    expect(seen.text).toContain('Nobody registered this world')
-    expect(seen.text).toContain('no press that stops it')
+    expect(seen.text).toContain(en['sb.world.notRegistered'])
+    // This world has no address for other machines, so the block still draws the paragraph that says it is
+    // reachable from this machine only. That paragraph is not about the ledger, and it is the only one allowed.
+    const paragraphs = await page.evaluate(() =>
+      [...document.querySelectorAll('.sb-world .sb-world-why')].map((paragraph) => paragraph.textContent ?? ''),
+    )
+    expect(paragraphs.filter((words) => words !== en['sb.world.reachableHereOnly'])).toEqual([])
   })
 })
 
-describe('C31 — the block is readable at both widths and in both themes', () => {
-  it('overflows nothing at 1440 or 390, light or dark', async () => {
-    for (const theme of ['light', 'dark'] as const) {
+describe('C31 — the block is readable at both widths, in the light theme', () => {
+  it('overflows nothing at 1440 or 390, in light', async () => {
+    for (const theme of ['light'] as const) {
       for (const width of [1440, 390]) {
         await open(`/r/${up}`, theme, width)
         const seen = await readTheWorld()

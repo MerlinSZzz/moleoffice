@@ -1,6 +1,11 @@
 // Copyright © 2026 Zhengyang Shen
 // Licensed under the MIT License. See LICENSE.
-/** The office's check tool, using the worker's ordinary process group and output lifecycle. */
+/**
+ * The office's check tool, using the worker's ordinary process group and output lifecycle.
+ *
+ * Its program is looked up in the whole environment it was given, through `whereItIs` in ./os.ts, so on Windows a
+ * search path held as `Path` is found.
+ */
 import { closeSync, fstatSync, openSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { INSPECTION_RUNTIME, theModelForTheCommand, type RunHandle, type RunRequest, type RunResult, type RuntimeAdapter, type ServedReading } from './adapter.ts'
@@ -106,7 +111,7 @@ export class InspectionAdapter implements RuntimeAdapter {
     },
     private readonly from: NodeJS.ProcessEnv,
   ) {}
-  whereItIs(): string | null { return whereItIs(this.command, this.from['PATH']) }
+  whereItIs(): string | null { return whereItIs(this.command, this.from) }
   // THE MODEL THE QUEUE ROW CARRIES FIRST: the checking agent's own, or the Settings page's choice for
   // the check (criterion U2). Without one, MOLE_OFFICE_INSPECTION_MODEL in this worker's environment,
   // and null when that names none too: `startOne` then refuses the check.

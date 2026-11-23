@@ -62,7 +62,18 @@ import { localStamp } from '@shared/time.ts'
 import type { PanelRecord } from '@shared/types.ts'
 import type { ClosedHow } from '@shared/lifecycle.ts'
 import { listRecords, patchRecord, theProcessesAWriteReads, type Actor } from './records.ts'
-import { ledgerRowById, osProbe, type AProcessToRead, type OsContainers, type OsContainerState } from './resources.ts'
+import {
+  ledgerRowById,
+  osProbe,
+  readRows,
+  theProcessGroupsLiveness,
+  toEntry,
+  type AProcessToRead,
+  type LedgerEntry,
+  type Liveness,
+  type OsContainers,
+  type OsContainerState,
+} from './resources.ts'
 import { theSessionIdsWhere } from './session-fields.ts'
 import { theRowNamesAnotherMachine } from './machines.ts'
 import { saysStillGoing, STILL_GOING_STATES } from '../../config/still-going.mjs'
@@ -251,7 +262,11 @@ export function theProcessesTheOwnRowsCloseReads(input: { workspaceId: string; n
  * closer above's question, not this one's: the directory being gone does not say the process is.
  * A row that records no working directory at all is left alone: nothing can be asked of it. A row
  * whose directory is still on the disk is left alone: something may still be behind it. A row that
- * names another machine is left alone: the path is a path on that machine, not here.
+ * names another machine is left alone: the path is a path on that machine, not here. A row whose
+ * launcher's process row is still open is left alone: its launcher has not said that the command
+ * ended, so the removed worktree does not say the run did. Once that row is released, the row is
+ * closed here as any other. The launcher's rows are read by `theProcessRowsItsLauncherRegistered`,
+ * as the launcher closer below reads them.
  *
  * It never writes `crashed`. The directory's absence is what was observed; how the run itself ended
  * was not. The rule for the words written is `theDirectoryGoneRowPatch` in `src/config/own-rows.mjs`,
@@ -278,10 +293,21 @@ export function closeTheRunningRowsWhoseDirectoryIsGone(input: {
     if (theRecordedProcessOf(row).pid !== null) continue
     const directory = theRecordedCheckoutOf(row)
     if (directory === null || existsSync(directory)) continue
+    if (theProcessRowsItsLauncherRegistered(input.workspaceId, row.id).some(entry => entry.releasedAt === null)) continue
     patchRecord(row.id, { dataPatch: theDirectoryGoneRowPatch(directory, stamp) }, input.actor)
     closed.push(row.id)
   }
   return closed
+}
+
+/**
+ * The process rows a run's launcher registered for its command, released or not: the rows of the run marked as started
+ * by the product. The launcher closer reads each one's process group, and the directory closer reads whether one is still
+ * open, so both read the same rows.
+ */
+function theProcessRowsItsLauncherRegistered(workspaceId: string, runId: string): LedgerEntry[] {
+  return readRows({ workspaceId, sessionRecordId: runId, type: 'process', includeReleased: true })
+    .map(toEntry).filter(entry => entry.startedByTheProduct === true)
 }
 
 /** One lazy docker listing and one inspection per missing name, shared by every project in this pass. */
@@ -303,6 +329,22 @@ export function theSandboxContainerReadingsForAPass(): (name: string) => OsConta
   }
 }
 
+/**
+ * THE STILL-GOING RUNS A SANDBOX CLOSER MAY READ: each names a sandbox container, and none is another computer's run.
+ *
+ * Both closers below read this one list, so a run either of them acts on is a run the other would have looked at too.
+ * The database condition stays narrow, and the two skips live here rather than at each caller for the same reason.
+ */
+function theStillGoingRunsOnASandbox(input: { workspaceId: string; sessionIds?: string[] }): PanelRecord[] {
+  const ids = input.sessionIds ?? theSessionIdsWhere(input.workspaceId, one => saysStillGoing(one.state))
+  const candidates = and(
+    inArray(sql`json_extract(${records.data}, '$.state')`, [...STILL_GOING_STATES]),
+    sql`json_type(${records.data}, '$.sandbox.container') = 'text' AND json_extract(${records.data}, '$.sandbox.container') <> ''`,
+  )
+  return listRecords({ workspaceId: input.workspaceId, kind: 'session', ids, alsoWhere: candidates })
+    .filter(row => stillGoing(row) && !theRowNamesAnotherMachine(row))
+}
+
 /** Close runs whose sandbox stopped. An unreadable container leaves the run unchanged and names the reason. */
 export function closeTheRunsWhoseSandboxContainerStopped(input: {
   workspaceId: string
@@ -313,15 +355,7 @@ export function closeTheRunsWhoseSandboxContainerStopped(input: {
   sessionIds?: string[]
 }): { closed: string[]; problems: string[] } {
   const result: { closed: string[]; problems: string[] } = { closed: [], problems: [] }
-  const ids = input.sessionIds ?? theSessionIdsWhere(input.workspaceId, one => saysStillGoing(one.state))
-  const candidates = and(
-    inArray(sql`json_extract(${records.data}, '$.state')`, [...STILL_GOING_STATES]),
-    sql`json_type(${records.data}, '$.sandbox.container') = 'text' AND json_extract(${records.data}, '$.sandbox.container') <> ''`,
-  )
-  for (const row of listRecords({ workspaceId: input.workspaceId, kind: 'session', ids, alsoWhere: candidates })) {
-    if (!stillGoing(row)) continue
-    // A RUN ON ANOTHER COMPUTER names a container this computer's docker does not have, as the two closers above skip it.
-    if (theRowNamesAnotherMachine(row)) continue
+  for (const row of theStillGoingRunsOnASandbox(input)) {
     const sandbox = row.data['sandbox'] as { container: string }
     const container = ledgerRowById(sandbox.container, input.workspaceId)
     if (container === null || container.type !== 'container') {
@@ -339,6 +373,108 @@ export function closeTheRunsWhoseSandboxContainerStopped(input: {
       : `docker no longer has its sandbox container ${container.key}, so how it ended is not known`
     patchRecord(row.id, { dataPatch: {
       state: 'crashed', closedAt: localStamp(input.now), closedBecause,
+      closedHow: 'went-stale' satisfies ClosedHow,
+    } }, input.actor)
+    result.closed.push(row.id)
+  }
+  return result
+}
+
+/**
+ * THE SENTENCE A RUN CLOSED FOR AN ENDED LAUNCHER CARRIES: which process group or groups ended, and how the command
+ * ended when the run recorded it. `commandEnded` is the launcher's own writing, `{ at, code }` or `{ at, signal }`.
+ */
+export function theSandboxLauncherEndedBecause(pgids: readonly number[], commandEnded: unknown): string {
+  const groups = pgids.length === 1
+    ? `the process group ${String(pgids[0])} of its sandbox launcher has ended`
+    : `the process groups ${pgids.join(', ')} of its sandbox launcher have ended`
+  const ended = commandEnded !== null && typeof commandEnded === 'object' ? commandEnded as Record<string, unknown> : null
+  if (ended !== null) {
+    const at = String(ended['at'])
+    if (ended['code'] !== undefined && ended['code'] !== null) return `${groups}, and its command ended at ${at} with exit ${String(ended['code'])}`
+    if (ended['signal'] !== undefined && ended['signal'] !== null) return `${groups}, and its command ended at ${at} with signal ${String(ended['signal'])}`
+    return `${groups}, and its command ended at ${at} with neither an exit code nor a signal recorded`
+  }
+  return `${groups}, and nobody recorded how its command ended`
+}
+
+/**
+ * CLOSE A SANDBOX RUN WHOSE LAUNCHER'S PROCESS GROUPS HAVE ALL ENDED.
+ *
+ * ---------------------------------------------------------------------------------------
+ * WHAT WAS WRONG, MEASURED
+ * ---------------------------------------------------------------------------------------
+ *
+ * A sandbox container outlives the run working in it by days. The closer above reads the container, so a run whose
+ * launcher ended without its last write stayed running while its container lived on. The launcher writes the run's own
+ * command as a process row marked as started by the product, with its group and the group leader's start time, so the
+ * group can be read directly.
+ *
+ * ---------------------------------------------------------------------------------------
+ * WHAT IT READS, AND WHEN IT LEAVES THE RUN ALONE
+ * ---------------------------------------------------------------------------------------
+ *
+ * Every marked process row of the run is read, released or not: a given-back row is read again rather than taken as
+ * gone. With no such row, with a row that records no group or no start time or whose pid is not its group's leader, or
+ * with a reading that cannot be made, the run is left as it is and the report names it and the reason. A row whose
+ * group still holds its leader, or any process of it, leaves the run with no problem. Only when every marked row reads
+ * gone is the run written crashed, with `went-stale` and the sentence `theSandboxLauncherEndedBecause` makes.
+ */
+export function closeTheSandboxRunsWhoseLauncherEnded(input: {
+  workspaceId: string
+  actor: Actor
+  now: Date
+  /** A superset shared by the minute pass. Each candidate still has to match the database filter. */
+  sessionIds?: string[]
+}): { closed: string[]; problems: string[] } {
+  const result: { closed: string[]; problems: string[] } = { closed: [], problems: [] }
+  const probe = osProbe()
+  for (const row of theStillGoingRunsOnASandbox(input)) {
+    const launchers = theProcessRowsItsLauncherRegistered(input.workspaceId, row.id)
+    if (launchers.length === 0) {
+      result.problems.push(
+        `run ${row.id} has no process row its launcher registered, so whether its launcher still runs cannot be read`,
+      )
+      continue
+    }
+    let leavesTheRun = false
+    const pgids: number[] = []
+    for (const launcher of launchers) {
+      const pid = Number(launcher.key)
+      if (launcher.pgid === null || launcher.osStartedAt === null || pid !== launcher.pgid) {
+        const which = launcher.pgid === null
+          ? 'no process group'
+          : launcher.osStartedAt === null
+            ? 'no start time for its process group'
+            : `pid ${launcher.key} rather than the leader of its process group ${String(launcher.pgid)}`
+        result.problems.push(
+          `run ${row.id}: launcher row ${launcher.id} names ${which}, so whether its launcher still runs cannot be read`,
+        )
+        leavesTheRun = true
+        continue
+      }
+      pgids.push(launcher.pgid)
+      let live: Liveness
+      try {
+        live = theProcessGroupsLiveness(
+          { pgid: launcher.pgid, leaderStartedAt: launcher.osStartedAt },
+          'this run',
+          probe,
+        )
+      } catch (err) {
+        live = { state: 'unknown', reason: err instanceof Error ? err.message : String(err) }
+      }
+      if (live.state === 'alive') leavesTheRun = true
+      else if (live.state === 'unknown') {
+        result.problems.push(`run ${row.id}: ${live.reason}`)
+        leavesTheRun = true
+      }
+    }
+    if (leavesTheRun) continue
+    patchRecord(row.id, { dataPatch: {
+      state: 'crashed',
+      closedAt: localStamp(input.now),
+      closedBecause: theSandboxLauncherEndedBecause(pgids, row.data['commandEnded']),
       closedHow: 'went-stale' satisfies ClosedHow,
     } }, input.actor)
     result.closed.push(row.id)

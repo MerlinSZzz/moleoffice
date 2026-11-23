@@ -1,0 +1,13 @@
+{
+  "why": "A request whose Host is not this office's (wave 13s, line 13s, SEC-1). It is refused before any other hook, and only when a listener carried the request: this test reaches every door by inject, which no listener carries, so no door here can meet it. tests/a-request-that-names-another-host-is-refused.test.ts meets it through each of the three listeners, in cases 1, 2 and 4 to 11.",
+  "refusals": [
+    {
+      "code": "hostIsNotThisOffice",
+      "status": 421,
+      "english": "Test: this office does not answer to the name this request used.",
+      "values": {
+        "port": 39017
+      }
+    }
+  ]
+}

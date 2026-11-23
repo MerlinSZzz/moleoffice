@@ -89,15 +89,15 @@ export const makeLinks = (base: BaseColumns, records: RecordsTable) => sqliteTab
      */
     gateUpToSort: text('gate_up_to_sort').$type<GateStageSort>(),
     /**
-     * WHAT MOVES ALONG THIS EDGE, as JSON: `{out: string, in?: string}[]`, naming ports the two
-     * blocks declare. NULL means NOBODY SAID WHAT MOVES, which is a real answer and is what every
+     * WHAT MOVES ALONG THIS EDGE, as JSON: `{out: string, in?: string}[]`, in the writer's own
+     * words. NULL means NOBODY SAID WHAT MOVES, which is a real answer and is what every
      * link written before this column holds.
      *
-     * LEGAL ONLY ON A `feeds` LINK WITH A BLOCK RECORD AT BOTH ENDS. That rule is not written here:
-     * it is on the write path, where a refusal can be a sentence naming the port that is missing and
-     * listing the ones that are declared. A CHECK constraint would be a second statement of one rule
-     * that could drift from the first, and all it could ever say is "CHECK constraint failed" — the
-     * same argument `gate` above makes.
+     * LEGAL ONLY ON A `feeds` LINK, WITH A BLOCK OR A MODULE RECORD AT EACH END. That rule is not
+     * written here: it is on the write path, in `createLink` and `checkLinkKinds`, where a refusal can
+     * be a sentence naming the link type and both ends. A CHECK constraint would be a second statement
+     * of one rule that could drift from the first, and all it could ever say is "CHECK constraint
+     * failed" — the same argument `gate` above makes.
      *
      * NO INDEX. `links_type_idx` already narrows a scan to the rows that can have one.
      */

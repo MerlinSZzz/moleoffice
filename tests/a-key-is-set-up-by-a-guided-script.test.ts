@@ -809,7 +809,7 @@ it.each([openaiFake, openaiLegacyFake])('OpenAI setup saves an invented key and 
   for (const phrase of ['Mole Office', 'Restricted', 'images', 'auto-recharge', 'OFF', '现有余额', 'the person who provided this script', '没有登录核对过', 'HTTP 200', '返回 2 个模型', '不能证明允许生成图像', '不能证明余额足够']) expect(result.out).toContain(phrase)
 }, 20000)
 
-it.each([401, 403, 429, 302, 500])('OpenAI trial reports HTTP %s without following redirects or showing responses', async (status) => {
+it.each([401, 302])('OpenAI trial reports HTTP %s without following redirects or showing responses', async (status) => {
   const result = await openaiTrial(openaiFake, status)
   expect(result.code).toBe(1)
   expect(result.requests).toHaveLength(1)

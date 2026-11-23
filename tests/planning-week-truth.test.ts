@@ -57,6 +57,7 @@ import {
   type Period,
 } from '../src/shared/planning.ts'
 import { ALLOCATABLE_KINDS } from '../src/shared/work.ts'
+import { sayInEnglish } from '../src/shared/i18n.ts'
 import { type AllocationWithWork } from '../src/server/lib/planning.ts'
 import type { PlanReply } from '../src/server/api/planning.ts'
 
@@ -229,14 +230,12 @@ describe('the headline and the project lines, on one screen', () => {
     expect(reply.fit.load.rowHours).toBe(21)
   })
 
-  it('says beside the project lines what they add up to and what the headline counts instead', () => {
-    const read = text(drawWeek(twoLevels()))
+  it('says beside the project lines what they add up to', () => {
+    const markup = drawWeek(twoLevels())
+    const read = text(markup)
     expect(read).toContain('12h')
     expect(read).toContain('21h over 3 pieces of work')
-    expect(read).toContain(
-      'These lines count every row on its own, so they come to 21h. The 12h above counts a piece ' +
-        'of work and the parts planned inside it once.',
-    )
+    expect(markup).toContain(`px-pl-splitsum">${sayInEnglish('schedule.rowsAddUp', { rows: 21 })}<`)
   })
 
   it('names the row sum from the reading of the period, never a second sum of its own', () => {
@@ -247,7 +246,7 @@ describe('the headline and the project lines, on one screen', () => {
       entries: [withWork(allocation('parent', 6)), withWork(allocation('childA', 2))],
       counted: containment([['parent', 'childA']]),
     })
-    expect(text(drawWeek(reply))).toContain('so they come to 8h. The 6h above counts')
+    expect(drawWeek(reply)).toContain(`px-pl-splitsum">${sayInEnglish('schedule.rowsAddUp', { rows: 8 })}<`)
   })
 
   it('says nothing at all on an ordinary week, where the two totals are the same number', () => {
@@ -255,7 +254,7 @@ describe('the headline and the project lines, on one screen', () => {
     expect(reply.fit.load.plannedHours).toBe(reply.fit.load.rowHours)
     const read = text(drawWeek(reply))
     expect(read).toContain('7h over 2 pieces of work')
-    expect(read).not.toContain('count every row on its own')
+    expect(read).not.toContain(sayInEnglish('schedule.rowsAddUp', { rows: 7 }))
   })
 
   it('draws no such line when nobody read what is inside what, because there is nothing to say', () => {
@@ -265,7 +264,7 @@ describe('the headline and the project lines, on one screen', () => {
     const load = loadOf('week', WEEK, entries.map((e) => e.allocation))
     expect(load.envelopes).toBeNull()
     const markup = renderToStaticMarkup(h(planning.ProjectSplit, { entries, load }))
-    expect(text(markup)).not.toContain('count every row on its own')
+    expect(text(markup)).not.toContain(sayInEnglish('schedule.rowsAddUp', { rows: 17 }))
   })
 })
 

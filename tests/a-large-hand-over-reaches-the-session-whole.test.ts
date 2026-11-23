@@ -38,8 +38,10 @@ async function runTheTool(mode: 'delivery' | 'refusal' | 'error') {
   const server = createServer((req, res) => {
     const path = new URL(req.url ?? '/', 'http://fake').pathname
     if (path === `/api/records/${SESSION}`) {
-      // THE SHAPE THE SERVER GIVES TO WHAT WAS ASKED: `?shape=where` is the record's id, kind and project alone
-      // (wave 13y round 15), and the waiter asks for that.
+      // THE SHAPE THE SERVER GIVES TO WHAT WAS ASKED: `?shape=where` is the record's id, kind and project, and a
+      // session's runtime word when its record names one (wave 13y round 15), and the waiter asks for that. This fake
+      // leaves the runtime word out, so the waiter takes no word from the record and holds as the `--runtime codex`
+      // it was started with.
       const workspaceId = mode === 'error' ? sentence : 'default'
       const where = new URL(req.url ?? '/', 'http://fake').searchParams.get('shape') === 'where'
       answer(res, 200, where ? { id: SESSION, kind: 'session', workspaceId } : { record: { id: SESSION, workspaceId } })

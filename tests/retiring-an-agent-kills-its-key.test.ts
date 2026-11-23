@@ -19,9 +19,14 @@
  * MUTATION PROOF (after a green control)
  * ---------------------------------------------------------------------------------------
  *
- * Delete the `revokeEveryLiveKeyHeldBy(...)` call from the retire route in
- * src/server/api/participants.ts. The key survives retirement, and the note written after it is
+ * Delete the `revokeEveryLiveKeyHeldBy(...)` call from `retireThisAgent` in
+ * src/server/lib/participants.ts. The key survives retirement, and the note written after it is
  * attributed to the agent again — the case goes red. Restoring the call turns it green.
+ *
+ * THE CASES. 1: the retire door ends the registration key. 2: it ends a run key too. 3: a PATCH to
+ * retired, a delete of the last record and the release of a claim end the key as the door does,
+ * because each one retires through `retireThisAgent`. 4: the retire door answers how many keys it
+ * revoked, once, and revokes none a second time.
  */
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
@@ -149,7 +154,7 @@ afterAll(async () => {
 })
 
 describe('a retired agent’s key is dead', () => {
-  it('names the agent before retirement and stops naming it after, and the decision is refused', async () => {
+  it('1: names the agent before retirement and stops naming it after, and the decision is refused', async () => {
     const registered = await app.inject({
       method: 'POST',
       url: '/api/agents/started',
@@ -208,7 +213,7 @@ describe('a retired agent’s key is dead', () => {
     expect(String(row?.revoked_because), 'the reason does not name the retirement').toContain('retired')
   })
 
-  it('kills the run key too, because an agent may hold its registration key and a run key at once', async () => {
+  it('2: kills the run key too, because an agent may hold its registration key and a run key at once', async () => {
     const registered = await app.inject({
       method: 'POST',
       url: '/api/agents/started',
@@ -265,5 +270,115 @@ describe('a retired agent’s key is dead', () => {
       })
       expect(refused.status, `a retired agent’s key wrote a decision: ${refused.recordId}`).toBe(403)
     }
+  })
+
+  it('3: ends the key on a PATCH to retired, a delete of the last record and a release, as the door does', async () => {
+    for (const way of ['patch', 'delete', 'release'] as const) {
+      const handle = `retire-by-${way}`
+      const task = t.api.createRecord({
+        workspaceId: 'default',
+        kind: 'task',
+        title: `The work ${handle} was started for`,
+        data: { state: 'doing' },
+        actor: { type: 'human', id: THE_PERSON },
+      }).id
+      const registered = await app.inject({
+        method: 'POST',
+        url: '/api/agents/started',
+        headers: AS_THE_PERSON,
+        payload: { handle, name: `Retire By ${way}`, role: 'worker', ...(way === 'release' ? { startedFor: task } : {}) },
+      })
+      expect(registered.statusCode, registered.body).toBe(201)
+      const key = String((registered.json() as { whatToGiveIt?: { key?: string } }).whatToGiveIt?.key)
+      expect(key, 'the registration answered no key').toMatch(/^[0-9a-f]{64}$/)
+      const recordId = String((registered.json() as { record?: string }).record)
+      const id = registryIdOf(handle)
+
+      // CONTROL: while the key lives, a note written with the key alone is the agent's.
+      const before = await writeWithTheKey(key, {
+        kind: 'note',
+        title: `Before the ${way}`,
+        data: { body: 'The key names me.' },
+      })
+      expect(before.status, before.error).toBe(201)
+      expect(actorOnTheChange(before.recordId)).toEqual({ type: 'agent', id })
+
+      // THE RETIREMENT, as the person, by a way that is not the retire door.
+      let acted
+      if (way === 'patch') {
+        acted = await app.inject({
+          method: 'PATCH',
+          url: `/api/records/${recordId}`,
+          headers: AS_THE_PERSON,
+          payload: { dataPatch: { state: 'retired' } },
+        })
+      } else if (way === 'delete') {
+        acted = await app.inject({ method: 'DELETE', url: `/api/records/${recordId}`, headers: AS_THE_PERSON })
+      } else {
+        const run = t.api.createRecord({
+          workspaceId: 'default',
+          kind: 'session',
+          title: `The run working for ${handle}`,
+          data: { state: 'running' },
+          actor: { type: 'human', id: THE_PERSON },
+        }).id
+        const filed = await app.inject({
+          method: 'POST',
+          url: '/api/claims',
+          headers: AS_THE_PERSON,
+          payload: { run, things: [{ what: 'record', id: task }] },
+        })
+        expect(filed.statusCode, filed.body).toBe(201)
+        const claim = String((filed.json() as { claim: { id: string } }).claim.id)
+        acted = await app.inject({
+          method: 'POST',
+          url: `/api/claims/${claim}/release`,
+          headers: AS_THE_PERSON,
+          payload: { because: 'The work is done and checked.' },
+        })
+      }
+      expect(acted.statusCode, `${way}: ${acted.body}`).toBe(200)
+
+      // DRIVEN, NOT READ OFF A ROW: the same note with the same key no longer reads as the agent.
+      const after = await writeWithTheKey(key, {
+        kind: 'note',
+        title: `After the ${way}`,
+        data: { body: 'The key names nobody now.' },
+      })
+      expect.soft(after.status, after.error).toBe(201)
+      expect.soft(actorOnTheChange(after.recordId), `${way}: the retired agent’s key still named that agent`).not.toEqual({
+        type: 'agent',
+        id,
+      })
+      expect.soft(keyCounts(handle), `${way}: a live key outlived the retirement`).toEqual({ live: 0, all: 1 })
+    }
+  })
+
+  it('4: answers on the retire door how many keys it revoked, once, and revokes none a second time', async () => {
+    const registered = await app.inject({
+      method: 'POST',
+      url: '/api/agents/started',
+      headers: AS_THE_PERSON,
+      payload: { handle: 'retire-and-count', name: 'Retire And Count', role: 'worker' },
+    })
+    expect(registered.statusCode, registered.body).toBe(201)
+    const runKey = await aRunKeyFor('retire-and-count')
+    expect(runKey, 'the office minted a run no key').toMatch(/^[0-9a-f]{64}$/)
+    expect(keyCounts('retire-and-count')).toEqual({ live: 2, all: 2 })
+
+    const retired = await app.inject({
+      method: 'POST',
+      url: '/api/participants/agent/retire-and-count/retire',
+      headers: AS_THE_PERSON,
+      payload: { because: 'the test retires it and counts its keys' },
+    })
+    expect(retired.statusCode, retired.body).toBe(200)
+    const said = retired.json() as { agent?: Record<string, unknown>; keysRevoked?: unknown }
+    // BOTH KEYS, COUNTED ONCE: a second revoke after the first would find none and answer 0.
+    expect(said.keysRevoked, 'the door did not answer the two keys it revoked').toBe(2)
+    expect(said.agent, 'the door answered no agent').toBeDefined()
+    expect(said.agent, 'the agent in the answer carries the count as well').not.toHaveProperty('keysRevoked')
+    expect(retired.body.split('"keysRevoked"').length - 1, 'the answer gives the count more than once').toBe(1)
+    expect(keyCounts('retire-and-count'), 'a live key outlived the retirement').toEqual({ live: 0, all: 2 })
   })
 })

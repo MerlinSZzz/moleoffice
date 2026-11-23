@@ -8,9 +8,11 @@
  * ---------------------------------------------------------------------------------------
  *
  * The person's key exists (point 1) and the pairing page offers one press. This is the door behind
- * that press: a request from the office's own computer sets the person's key as a cookie, and the
- * next request from that browser is the person. The cookie is HttpOnly, so page JavaScript cannot
- * read the key, and SameSite strict, so another site cannot make this browser act as the person.
+ * that press: a request from the office's own computer gives this browser a device key of its own, in
+ * two halves, and the next request from that browser carrying both is the person. The cookie half is
+ * HttpOnly, so page JavaScript cannot read it, and SameSite strict, so another site cannot make this
+ * browser act as the person. The header half is answered once, for the page to keep and send. The
+ * person's own key is no longer put in a browser.
  * Pairing is offered on this machine only: the same press through the listener for other machines
  * is refused and sets no cookie.
  *
@@ -33,8 +35,8 @@
  * THE KEY IS NEVER PRINTED
  * ---------------------------------------------------------------------------------------
  *
- * The pairing press answers with a real cookie, and this file carries it back without ever writing
- * its value: `cookieOnly` returns the name-and-value pair and no assertion quotes it.
+ * The pairing press answers with a real cookie half and a header half, and this file carries both back
+ * without ever writing a value: `cookieOnly` returns the name-and-value pair and no assertion quotes it.
  */
 
 import { THE_TEST_OFFICES_OWNER } from './a-page-of-a-test-office.ts'
@@ -42,6 +44,7 @@ import type { Server } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import type { FastifyInstance } from 'fastify'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { DEVICE_HALF_COOKIE, DEVICE_HALF_HEADER } from '../src/config/key-header.mjs'
 import { apiApp, freshDb, type TestDb } from './helpers.ts'
 
 /** The person's headers and no key: exactly the claim the one-version window is about. */
@@ -90,9 +93,12 @@ afterAll(async () => {
 
 interface Answer {
   status: number
-  body: { paired?: boolean; offered?: boolean; error?: string; detail?: string }
+  body: { paired?: boolean; offered?: boolean; error?: string; detail?: string; deviceHalf?: string }
   setCookie: string | null
 }
+
+/** The name this file's browser gives itself at the press. A made-up label, never a secret. */
+const A_BROWSER_NAME = 'Test browser on this machine'
 
 /** Ask whether this browser is paired, and whether pairing is offered here. */
 async function readPairing(door: string, headers: Record<string, string> = THE_PERSON): Promise<Answer> {
@@ -101,9 +107,9 @@ async function readPairing(door: string, headers: Record<string, string> = THE_P
   return { status: res.status, body, setCookie: res.headers.get('set-cookie') }
 }
 
-/** The one press. */
+/** The one press, with the name the browser gives itself. */
 async function pressPairing(door: string, headers: Record<string, string> = THE_PERSON): Promise<Answer> {
-  const res = await fetch(`${door}/api/office/pairing`, { method: 'POST', headers })
+  const res = await fetch(`${door}/api/office/pairing`, { method: 'POST', headers, body: JSON.stringify({ device: A_BROWSER_NAME }) })
   const body = (await res.json()) as Answer['body']
   return { status: res.status, body, setCookie: res.headers.get('set-cookie') }
 }
@@ -118,10 +124,17 @@ async function pressPairing(door: string, headers: Record<string, string> = THE_
 function cookieOnly(setCookie: string | null): string {
   if (setCookie === null) throw new Error('the pairing reply set no cookie')
   const pair = setCookie.split(';')[0]
-  if (pair === undefined || !pair.startsWith('mole-office-key=')) {
-    throw new Error('the pairing reply set no mole-office-key cookie')
+  if (pair === undefined || !pair.startsWith(`${DEVICE_HALF_COOKIE}=`)) {
+    throw new Error('the pairing reply set no cookie half')
   }
   return pair
+}
+
+/** Both halves, as the paired browser sends them. Never printed. */
+function bothHalves(pressed: Answer): Record<string, string> {
+  const half = pressed.body.deviceHalf
+  if (typeof half !== 'string' || half === '') throw new Error('the pairing reply answered no header half')
+  return { cookie: cookieOnly(pressed.setCookie), [DEVICE_HALF_HEADER]: half }
 }
 
 /** A person-only act: change whether the office map moves. Its guard asks for the person unconditionally. */
@@ -135,7 +148,7 @@ async function changeTheScene(door: string, headers: Record<string, string>): Pr
 }
 
 describe('one press on this machine pairs this browser', () => {
-  it('sets the cookie, and the next request from that browser is the person', async () => {
+  it('sets the cookie half and answers the header half, and the next request from that browser with both is the person', async () => {
     // BEFORE THE PRESS: nothing has proved this browser, and pairing is offered here.
     const before = await readPairing(thisMachine)
     expect(before.status, before.body.error).toBe(200)
@@ -146,24 +159,27 @@ describe('one press on this machine pairs this browser', () => {
     expect(pressed.status, `the pairing press was refused: ${pressed.body.error ?? ''}`).toBe(200)
     expect(pressed.body.paired).toBe(true)
     expect(pressed.body.offered, 'a paired browser was still offered pairing').toBe(false)
-    const cookie = cookieOnly(pressed.setCookie)
+    const halves = bothHalves(pressed)
 
-    // THE NEXT REQUEST CARRIES THE COOKIE AND IS THE PERSON. `paired` is true only when the key was
+    // THE NEXT REQUEST CARRIES BOTH HALVES AND IS THE PERSON. `paired` is true only when the key was
     // read, and a person-only door is driven as well so this is an act and not only a header read.
-    const after = await readPairing(thisMachine, { ...THE_PERSON, cookie })
+    const after = await readPairing(thisMachine, { ...THE_PERSON, ...halves })
     expect(after.body.paired, 'the browser that just paired is not the person').toBe(true)
     expect(after.body.offered, 'a paired browser was offered pairing again').toBe(false)
     expect(
-      await changeTheScene(thisMachine, { ...THE_PERSON, cookie }),
+      await changeTheScene(thisMachine, { ...THE_PERSON, ...halves }),
       'a person-only door refused the browser that had just paired',
     ).toBe(200)
+    // THE COOKIE ALONE IS NOT THE PAIRING: the read says paired only with both halves.
+    const cookieAlone = await readPairing(thisMachine, { ...THE_PERSON, cookie: halves['cookie'] ?? '' })
+    expect(cookieAlone.body.paired, 'the cookie half alone read as paired').not.toBe(true)
   })
 
-  it('sets a cookie that is HttpOnly and SameSite strict, on the whole site', async () => {
+  it('sets a cookie half that is HttpOnly and SameSite strict, on the whole site', async () => {
     const pressed = await pressPairing(thisMachine)
     const header = pressed.setCookie ?? ''
-    expect(header, 'the pairing reply set no cookie').toContain('mole-office-key=')
-    // THE TWO ATTRIBUTES THE CRITERION NAMES. HttpOnly keeps page JavaScript from reading the key;
+    expect(header, 'the pairing reply set no cookie').toContain(`${DEVICE_HALF_COOKIE}=`)
+    // THE TWO ATTRIBUTES THE CRITERION NAMES. HttpOnly keeps page JavaScript from reading the half;
     // SameSite strict keeps another site from making this browser act as the person.
     expect(header, 'the cookie is not HttpOnly').toContain('HttpOnly')
     expect(header, 'the cookie is not SameSite strict').toMatch(/SameSite=Strict/i)

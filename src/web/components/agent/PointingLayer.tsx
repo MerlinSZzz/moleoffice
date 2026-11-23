@@ -365,6 +365,8 @@ export function PointingLayer() {
           about={opened.pointed.about}
           at={{ ...opened.at, underAnElement: opened.underAnElement }}
           selectedWords={whatBecameOfTheWords(opened.pointed)}
+          {...(opened.pointed.inFile === undefined ? {} : { inFile: opened.pointed.inFile })}
+          {...(opened.pointed.inPage === undefined ? {} : { inPage: opened.pointed.inPage })}
           alsoInside={pointingControl}
           changing={changing}
           onDoneChanging={stopChanging}

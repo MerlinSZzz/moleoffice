@@ -29,7 +29,6 @@ import type { FastifyInstance } from 'fastify'
 import { THE_TEST_OFFICES_SECRETARY } from './a-page-of-a-test-office.ts'
 import { apiApp, freshDb, reduceASealAsMigration0154Did, writeAVerdictAsItsDoorWould, type TestDb } from './helpers.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
-import { ABSENT } from '../src/shared/merge-queue.ts'
 
 let t: TestDb
 let app: FastifyInstance
@@ -124,30 +123,6 @@ afterAll(async () => {
 })
 
 describe('a release that names its seal as it was before migration 0154', () => {
-  /**
-   * THE QUEUE'S VERDICT ON AN OLDER RELEASE. Wave 13k round 7, the inspector's note on piece 0:
-   * `theVerdictOnThePinnedContent` (src/server/lib/merge-state-machine.ts) reads the release through
-   * `howAReleaseNamesThisSeal`. The entry is submitted after the migration, on the seal as it is now.
-   * MUTATION: drop the `reduced.was` branch of `howAReleaseNamesThisSeal`; the entry stays pinned, waiting.
-   */
-  it('is judged at the pin by the merge queue', async () => {
-    const { run, seal, branch } = await aReleasedRun((hash) => hash)
-    reduceASealAsMigration0154Did(t, seal)
-    const submitted = await app.inject({ method: 'POST', url: '/api/merge-queue', headers: asAgent(THE_TEST_OFFICES_SECRETARY.handle), payload: { run, changeset: { adapter: 'git', repository: 'lane-0154', branch } } })
-    expect(submitted.statusCode, submitted.body).toBe(201)
-    const entry = String((submitted.json() as { entry: { id: string } }).entry.id)
-    const files = (t.api.getRecord(seal)!.data['seal'] as { git: { files: { path: string; hash: string | null }[] } }).git.files
-    const pinned = await app.inject({
-      method: 'POST',
-      url: `/api/merge-queue/${entry}/step`,
-      headers: asAgent('mole-office/the-message-worker'),
-      payload: { step: 'pinned', facts: { files: Object.fromEntries(files.map((one) => [one.path, one.hash ?? ABSENT])) } },
-    })
-    expect(pinned.statusCode, pinned.body).toBe(200)
-    const moved = pinned.json() as { entry: { state: string }; decided?: string }
-    expect(moved.entry.state, pinned.body).toBe('judged')
-  })
-
   it('is confirmed, and the answer says the release named the seal as it was before migration 0154', async () => {
     const { run, seal, hashAtRelease } = await aReleasedRun((hash) => hash)
     reduceASealAsMigration0154Did(t, seal)

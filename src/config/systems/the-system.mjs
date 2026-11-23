@@ -31,7 +31,8 @@
  *   - `whatATerminalStarts(command, args, folder, env)`: what node-pty is handed to open a terminal for a command;
  *   - `aFileIsMadePrivate`: how a file is made one that only this user may read and write;
  *   - `aFolderIsLinkedBy`: what a link to a folder is made as;
- *   - `anInstallerMade(folder, aFileInIt)`: which installer made a folder, asked of the installer by a promise (./the-installer-of-a-folder.mjs).
+ *   - `anInstallerMade(folder, aFileInIt)`: which installer made a folder, asked of the installer by a promise (./the-installer-of-a-folder.mjs);
+ *   - `theSearchPathIn(env)`: the search path of an environment, which every program lookup in src/ reads through it.
  *
  * ---------------------------------------------------------------------------------------------
  * WHAT EACH SYSTEM DOES
@@ -73,6 +74,14 @@
  * An ask to stop on Linux and the Mac is SIGTERM to the group, and the program hears it as SIGTERM. On Windows the
  * program listens on a named pipe named after its group, and the ask writes a line to that pipe and waits for the
  * answer (./windows-groups.mjs).
+ *
+ * THE SEARCH PATH OF AN ENVIRONMENT. Linux and the Mac read it from `PATH` alone, because a name there is read in its
+ * own case, and `Path` is another variable. Windows reads a name in any case, and its window hands the office the
+ * search path as `Path`. A plain copy of an environment keeps the spelling it was given, so `PATH` alone finds nothing
+ * in it. So on Windows the search path is the value of the one name that is PATH in any case. Two such names with the
+ * same value are one search path. Two with different values are refused in a sentence that names both, and nothing is
+ * looked up: the office never picks one. Every place in src/ that looks a program up, or reads the search path of an
+ * environment, reads it through this piece (tests/the-search-path-is-read-whatever-its-spelling.test.ts).
  *
  * SOME OF THE WINDOWS PIECES HAVE RUN ON A WINDOWS 11 MACHINE, in wave 13t. Each of ./windows-commands.mjs,
  * ./windows-processes.mjs, ./windows-starts.mjs and ./windows-groups.mjs says what of it ran there. They are all read
@@ -177,6 +186,7 @@ import { linuxInstallerMade, noInstallerQuestion, windowsInstallerQuestion } fro
  *   aFileIsMadePrivate: AFileIsMadePrivate,
  *   aFolderIsLinkedBy: 'a-symbolic-link' | 'a-junction',
  *   anInstallerMade: import('./the-installer-of-a-folder.mjs').AnInstallerMade,
+ *   theSearchPathIn: (env: Readonly<Record<string, string | undefined>>) => string | undefined,
  * }} ASystem
  */
 
@@ -207,10 +217,10 @@ const A_TERMINAL_ON_LINUX_OR_A_MAC = {
 }
 
 /**
- * THE NAMES A SHELL NEEDS ON WINDOWS, spelled as Windows spells them, except PATH, which is spelled as every reader of a
- * terminal's environment here reads it. Windows reads a variable's name in any case, so a name is matched in any case
- * there, and the terminal is given it as this list spells it. HOME is in it because Git for Windows reads it first when
- * it is set. No name in it carries a key.
+ * THE NAMES A SHELL NEEDS ON WINDOWS, spelled as Windows spells them, except PATH. Windows reads a variable's name in
+ * any case, so a name is matched in any case there, and the terminal is given it as this list spells it. So a
+ * terminal's environment holds one search path entry, `PATH`, and every reader reads it through `theSearchPathIn`.
+ * HOME is in it because Git for Windows reads it first when it is set. No name in it carries a key.
  */
 const A_TERMINAL_ON_WINDOWS = {
   names: [
@@ -220,6 +230,44 @@ const A_TERMINAL_ON_WINDOWS = {
     'TMP', 'TZ', 'USERNAME', 'USERPROFILE', 'windir',
   ],
   startingWith: [],
+}
+
+/**
+ * THE SEARCH PATH ON LINUX AND THE MAC: the value of `PATH`, because a name there is read in its own case.
+ * @param {Readonly<Record<string, string | undefined>>} env
+ * @returns {string | undefined}
+ */
+function theSearchPathOnLinuxOrAMac(env) {
+  return env['PATH']
+}
+
+/**
+ * THE SEARCH PATH ON WINDOWS: the value of the one name that is PATH in any case. Two such names with one value are one
+ * search path. Two with different values are refused, naming both, because the office does not pick one of them.
+ * @param {Readonly<Record<string, string | undefined>>} env
+ * @returns {string | undefined}
+ */
+function theSearchPathOnWindows(env) {
+  const names = Object.keys(env).filter((name) => name.toLowerCase() === 'path' && env[name] !== undefined)
+  const values = new Set(names.map((name) => env[name]))
+  if (values.size > 1) {
+    throw new Error(
+      `This environment holds the search path under ${theNamesInWords(names)}, and their values differ. ` +
+      'Nothing was looked up, because the office does not pick one of them.',
+    )
+  }
+  const [first] = names
+  return first === undefined ? undefined : env[first]
+}
+
+/**
+ * Names in a sentence: "Path" and "PATH", or "Path", "PATH" and "path".
+ * @param {readonly string[]} names two or more
+ * @returns {string}
+ */
+function theNamesInWords(names) {
+  const quoted = names.map((name) => `"${name}"`)
+  return `${quoted.slice(0, -1).join(', ')} and ${quoted[quoted.length - 1]}`
 }
 
 /** @type {Map<string, ASystem>} */
@@ -253,6 +301,7 @@ export function theSystemFor(platform) {
     aFileIsMadePrivate: onWindows ? windowsPrivateFiles() : { by: 'its-mode' },
     aFolderIsLinkedBy: onWindows ? 'a-junction' : 'a-symbolic-link',
     anInstallerMade: onWindows ? windowsInstallerQuestion() : platform === 'linux' ? linuxInstallerMade : noInstallerQuestion(platform === 'darwin' ? 'the Mac' : platform),
+    theSearchPathIn: onWindows ? theSearchPathOnWindows : theSearchPathOnLinuxOrAMac,
   }
   made.set(platform, system)
   return system

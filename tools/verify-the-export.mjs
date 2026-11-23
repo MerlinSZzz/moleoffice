@@ -85,7 +85,8 @@ try {
   staged = readTheStagedRemint(mapPath)
 } catch (error) { refuse(`The staged map could not be read: ${said(error)}`) }
 
-// THE ROOT, read whole before any check runs, so a link anywhere in it is refused before anything is compared.
+// THE ROOT, listed whole before any check runs, so a link anywhere in it is refused before anything is compared. The
+// checks read its files from disk, one of each tree at a time.
 let root
 try { root = checks.theRootsFolders(rootPath) } catch (error) { refuse(`The root cannot be compared: ${said(error)}`) }
 

@@ -310,4 +310,22 @@ describe('a chapters line is loose to write and strict to store', () => {
     expect(read.named).toEqual([{ chapter: 5, level: 'digest' }])
     expect(read.problems).toHaveLength(2)
   })
+
+  // A CHAPTER SENT AS A JSON NUMBER IS THE CHAPTER OF THAT NUMBER (invariant 8: loose input). Until 22 November 2026
+  // a bare 5 was refused as no chapter number at all, while "5" was read as chapter 5.
+  const chapters = [{ n: 1, label: 'The live server and database' }, { n: 5, label: 'Tests and gates' }]
+
+  it('3: reads a whole number as the chapter of that number, at the level its text would get', () => {
+    const asNumbers = readAChaptersLine([1, 5], chapters)
+    expect(asNumbers.named).toEqual(readAChaptersLine(['1', '5'], chapters).named)
+    expect(asNumbers.problems).toEqual([])
+  })
+
+  it('4: refuses a number with no chapter as its text is refused, and a number that is not whole as not whole', () => {
+    expect(readAChaptersLine([99], chapters).problems).toEqual(readAChaptersLine(['99'], chapters).problems)
+    const notWhole = readAChaptersLine([1.5], chapters)
+    expect(notWhole.named).toEqual([])
+    expect(notWhole.problems.map((one) => one.because)).toEqual(readAChaptersLine([{ chapter: 1.5 }], chapters).problems.map((one) => one.because))
+    expect(notWhole.problems.map((one) => one.because)).not.toEqual(readAChaptersLine([true], chapters).problems.map((one) => one.because))
+  })
 })

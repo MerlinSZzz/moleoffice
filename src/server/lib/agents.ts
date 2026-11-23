@@ -1,6 +1,6 @@
 // Copyright © 2026 Zhengyang Shen
 // Licensed under the MIT License. See LICENSE.
-import { moleOffice } from '@shared/participants.ts'
+import { aHarnessWithNoAdapter, moleOffice } from '@shared/participants.ts'
 /**
  * TALKING TO AN AGENT ABOUT REAL WORK: threads, what was said, and the runs a dispatch writes.
  *
@@ -145,7 +145,7 @@ import { anOfficeId } from './ids.ts'
 import { db, sqlite } from '../db/client.ts'
 import { readInPieces } from '../db/in-pieces.ts'
 import { agentMessages, agentRuns, agentThreads } from '../db/schema.ts'
-import { aRaiseCarriesIt, createRecord, durableIdentityOfRun, everyAgentAStoredStampCouldName, getRecord, identityForAddressedRun, sameAgent, theTwoHalvesOfAStamp, theWriterAStampNames, throughTheCardDoor, type Actor } from './records.ts'
+import { aRaiseCarriesIt, createRecord, durableIdentityOfRun, everyAgentAStoredStampCouldName, getRecord, identityForAddressedRun, refuseAMessageToARunThatAnswersAsNobody, sameAgent, theTwoHalvesOfAStamp, theWriterAStampNames, throughTheCardDoor, type Actor } from './records.ts'
 import { now } from '@shared/now.ts'
 import { thePersonIsProved } from '@shared/the-person-proved.ts'
 import { PanelError } from './panel-error.ts'
@@ -242,6 +242,7 @@ import { MESSAGE_INTENTS, type MessageIntent } from '@shared/intent.ts'
 // drawn on a screen, so a stored state word may not reach one of them as itself.
 import { kindWord, stateWord } from '@shared/words.ts'
 import { sayANewAgent, sayTheDispatch, sayTheLine, type DispatchFacts, type PickUpReason, type SendPlanSentence } from '@shared/send-plan-words.ts'
+import { RUN_STATES, type RunState } from '../db/types/agents.ts'
 
 export { MESSAGE_INTENTS }
 export type { MessageIntent }
@@ -259,13 +260,7 @@ export type { MessageIntent }
  */
 export { MESSAGE_STATES, type MessageState } from './dispatch.ts'
 
-/**
- * `withdrawn` IS A RUN THE OFFICE TOOK BACK BEFORE ANY WORKER TOOK IT, so nothing was tried. Only the data half of
- * migration 0253 writes it (src/server/db/withdraw-review-runs-migration.ts): the runs a sent review wrote before a sent
- * review stopped starting runs (wave 13u round 19). It is not `failed`, which would say something was tried.
- */
-export const RUN_STATES = ['queued', 'claimed', 'running', 'finished', 'failed', 'crashed', 'declined', 'withdrawn'] as const
-export type RunState = (typeof RUN_STATES)[number]
+export { RUN_STATES, type RunState } from '../db/types/agents.ts'
 
 /**
  * Who a comment is for, in four words.
@@ -2006,6 +2001,18 @@ function recipientColumnsForAWrite(recipient: MessageInput['recipient'], actor: 
   return { ...columns, recipientAgentId: answer.agentId }
 }
 
+/**
+ * A RECIPIENT NAMING A RUN THAT ANSWERS AS NOBODY IS REFUSED, before the transaction `recipientColumnsForAWrite` runs
+ * in, so nothing is minted and nothing is written. `refuseAMessageToARunThatAnswersAsNobody` in
+ * lib/records/addressed-run.ts says which runs and in what words. Every other recipient is stored as before.
+ */
+function refuseARecipientThatWouldReachNobody(recipient: MessageInput['recipient']): void {
+  if (recipient === null || recipient === undefined || recipient.kind !== 'session') return
+  const sessionId = recipient.sessionId ?? null
+  if (sessionId === null || sessionId === '') return
+  refuseAMessageToARunThatAnswersAsNobody(sessionId)
+}
+
 function recipientColumns(recipient: MessageInput['recipient']): Partial<MessageRow> {
   if (recipient === null || recipient === undefined) {
     return { recipientKind: null, recipientSessionId: null, recipientSaid: null, recipientWhy: null }
@@ -2192,6 +2199,10 @@ export function addMessage(
   // thing, or names a run whose transcript is not on this machine is a property of this comment that
   // can be corrected. Refusing the write over it threw away the sentence somebody had just typed —
   // see `deliveryOf` and the header. The reply carries the reading, so the answer is not lost either.
+  // ONE EXCEPTION: a run that answers as nobody is refused with 422, as a message record addressed to
+  // it is, because storing the choice would mint an agent from the run's title. See
+  // `refuseARecipientThatWouldReachNobody`.
+  refuseARecipientThatWouldReachNobody(input.recipient)
 
   // WHICH COMMENT THESE WORDS CAME FROM IS CHECKED: see `checkTheCommentTheWordsCameFrom`. A message
   // carrying several comments of a sent review has each of them checked the same way, and each of
@@ -2465,13 +2476,16 @@ export function patchMessage(
   // A NEW RECIPIENT IS STORED WITHOUT BEING CHECKED, for the reason `addMessage` stores one without
   // checking: this is how a person corrects an address, and refusing the correction because the new
   // address is also unreachable would leave them nowhere to go. The reply says what Mole Office makes of
-  // it, and dispatch is where it counts.
+  // it, and dispatch is where it counts. THE SAME ONE EXCEPTION AS `addMessage`: a run that answers as
+  // nobody is refused with 422 before the transaction, so nothing is minted and the comment keeps the
+  // recipient it had.
   // NOTHING TO CHANGE IS ASKED BEFORE THE RECIPIENT IS RESOLVED, because resolving one WRITES — it
   // mints the durable identity of a run somebody chose — and a patch that is about to be refused
   // for being empty must not mint anything first.
   if (patch.recipient === undefined && Object.keys(write).length === 0) {
     throw new PanelError('Nothing to change. Send intent, body, context or recipient.')
   }
+  refuseARecipientThatWouldReachNobody(patch.recipient)
 
   // ONE TRANSACTION, for the reason `addMessage` opens one: `recipientColumnsForAWrite` mints an
   // identity and binds a run, and a failure after that must take those two writes back with it.
@@ -3056,6 +3070,8 @@ export function dispatchThread(
       if (agentId === null || registered === null) throw new PanelError(`${A_DISPATCH_WITH_NO_REGISTERED_AGENT} to hold its key. Nothing was sent.`, 409)
       recipients.push({ agentId, messageIds: group.messages.map((row) => row.id) })
       if (runs === 'none') continue
+      // A HARNESS THE OFFICE HAS NO ADAPTER FOR GETS NO RUN, because no worker would claim it. Its messages wait for its own waiter.
+      if (aHarnessWithNoAdapter(group.runtime) !== null) continue
       const agentKeyId = keepADispatchedAgentsKey(id, registered.id, proof)
       rows.push({
         id, threadId, runtime: group.runtime, state: 'queued', recipientSessionId: group.sessionId,

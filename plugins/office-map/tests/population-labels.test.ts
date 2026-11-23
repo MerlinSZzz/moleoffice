@@ -34,7 +34,7 @@ class Context {
   beginPath() { this.path = null }
   rect(x: number, y: number, width: number, height: number) { this.path = { x, y, width, height } }
   clip() { this.clipArea = this.path }
-  setTransform() {}; translate() {}; scale() {}; moveTo() {}; lineTo() {}; closePath() {}; fill() {}; strokeRect() {}
+  roundRect() {}; stroke() {}; setTransform() {}; translate() {}; scale() {}; moveTo() {}; lineTo() {}; closePath() {}; fill() {}; strokeRect() {}
   getImageData() { return { data: new Uint8ClampedArray(4) } }
   createPattern() { return null }
 }

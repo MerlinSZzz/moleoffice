@@ -15,7 +15,8 @@ export function useChecklistArrivalRing(reading:AsyncState<ChecklistsAcrossReply
     const before=known.current
     const next=new Set<string>()
     let arrived=false
-    for(const list of reading.value.checklists)for(const item of list.items){
+    // A READ OF ONLY THE OPEN ITEMS names each finished one in finishedItems, so the two together are every item.
+    for(const list of reading.value.checklists)for(const item of [...list.items,...(list.finishedItems??[])]){
       const key=`${list.workspaceId}:${list.id}:${item.id}`
       next.add(key)
       const author=item.addedBy

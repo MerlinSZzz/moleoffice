@@ -16,6 +16,7 @@ import { PanelError } from '../panel-error.ts'
 // WHAT A DECISION REPLACES: the one reading, and the refusal of a decision that does not say what it replaces.
 import { candidatesOnTheSameSubjects, REPLACES_FIELD, theSubjectsAForkIsLinkedTo, whatSupersedes, whatThisDecisionReplaces } from '../replaced-decisions.ts'
 import { toRecord } from '../to-record.ts'
+import { whatTheOfficeSendsItGoverns } from '../what-a-record-names.ts'
 import { type Actor } from './actor.ts'
 import { createRecordWithReport } from './creating.ts'
 import { type ChooseAgainInput, type PromoteInput, type PromoteResult, promotionNote, PROPOSAL_KIND, proposalResolution, TASK_KIND, THE_WORK_A_DECISION_CREATES, theForkIsAlreadySettled, theProposalThisDecisionResolves, type TheWorkFiled, whatThisDecisionStandsOn } from './fork-settled.ts'
@@ -31,6 +32,16 @@ import { type PanelRecord, RESOLVES_PROPOSAL } from '@shared/types.ts'
 // is what stops this file writing "a obligation" again.
 import { displayWord, withArticle } from '@shared/work.ts'
 import { and, eq, or } from 'drizzle-orm'
+
+/**
+ * WHY A DECISION THESE PRESSES FILE NAMES NO PAGE, in the one nothingFits entry the office writes when the press said
+ * nothing and nothing else names a page (`whatTheOfficeSendsItGoverns` in ../what-a-record-names.ts). Exported so a
+ * test reads the words from here.
+ */
+export const WHY_A_CHOSEN_AGAIN_DECISION_NAMES_NO_PAGE =
+  'The decision it replaces named no page it governs, and the press that chose again did not say.'
+export const WHY_A_PROMOTED_DECISION_NAMES_NO_PAGE =
+  'The fork it settles is linked to no page, and the press that settled it did not say what the decision governs.'
 
 /**
  * FILE WHAT RAN INSTEAD, THROUGH THE STEP IT IS ABOUT. One transaction, three refusals.
@@ -180,7 +191,16 @@ export function chooseAgain(decisionId: string, input: ChooseAgainInput, actor: 
   // Any other earlier decision the new one also replaces may be named beside it.
   const saidReplaces = input.data?.[REPLACES_FIELD]
   const replacesHere = [...new Set([old.id, ...(Array.isArray(saidReplaces) ? saidReplaces.filter((one): one is string => typeof one === 'string') : [])])]
-  const withReplaces = { ...(input.data ?? {}), [REPLACES_FIELD]: replacesHere }
+  // AND WHAT IT GOVERNS: what the press said, else what the old decision named, else the pages its fork is linked to,
+  // else a nothingFits entry that says so (lib/what-a-record-names.ts).
+  const governsHere = whatTheOfficeSendsItGoverns({
+    said: input.data,
+    workspaceId: old.workspaceId,
+    replaced: [old.data],
+    pages: fork === null ? [] : theSubjectsAForkIsLinkedTo(fork.id),
+    whyNoPage: WHY_A_CHOSEN_AGAIN_DECISION_NAMES_NO_PAGE,
+  })
+  const withReplaces = { ...(input.data ?? {}), ...governsHere, [REPLACES_FIELD]: replacesHere }
   return sqlite.transaction((): PromoteResult => {
     const created = createRecordWithReport({
       kind: DECISION_KIND,
@@ -190,6 +210,7 @@ export function chooseAgain(decisionId: string, input: ChooseAgainInput, actor: 
       workspaceId: old.workspaceId,
       actor,
       mustSayWhatItReplaces: true,
+      mustSayWhatItGoverns: true,
       door: `POST /api/records/${decisionId}/choose-again`,
       links: [
         { type: 'supersedes', toId: old.id },
@@ -253,7 +274,15 @@ export function promoteProposal(proposalId: string, input: PromoteInput, actor: 
                 'Nobody named one, and no earlier decision in this project is linked to the same records as the fork it settles.',
             }
           : {}
-  const promotedData = { ...(input.data ?? {}), ...answered }
+  // AND WHAT IT GOVERNS: what the press said, else the live pages the fork is linked to, else a nothingFits entry that
+  // says so (lib/what-a-record-names.ts).
+  const governsHere = whatTheOfficeSendsItGoverns({
+    said: input.data,
+    workspaceId: proposal.workspaceId,
+    pages: subjects,
+    whyNoPage: WHY_A_PROMOTED_DECISION_NAMES_NO_PAGE,
+  })
+  const promotedData = { ...(input.data ?? {}), ...answered, ...governsHere }
   // A REFUSAL HERE NAMES THE CANDIDATES ON THE FORK'S OWN SUBJECTS, not only on the one link the create writes.
   whatThisDecisionReplaces({
     data: promotedData,
@@ -275,6 +304,7 @@ export function promoteProposal(proposalId: string, input: PromoteInput, actor: 
       actor,
       links: [{ type: RESOLVES_PROPOSAL, toId: proposal.id }],
       mustSayWhatItReplaces: true,
+      mustSayWhatItGoverns: true,
       door: `POST /api/records/${proposalId}/promote`,
     })
     const link = created.links?.[0]

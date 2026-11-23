@@ -32,6 +32,7 @@ import { isMoleOffice } from '@shared/participants.ts'
 import { api, errorMessage, getActor } from '../api.ts'
 import type { SecretariesDutiesReply } from '../api-parts/messages.ts'
 import { useLanguage } from '../lib/language.ts'
+import { useInspect } from '../lib/mode.ts'
 import { oneRead } from '../lib/oneread.ts'
 import { currentWorkspace, subscribeWorkspace } from '../lib/workspace.ts'
 
@@ -123,9 +124,12 @@ export function useTheSecretariesDuties(): TheDutiesReading {
  */
 export function TheDutyLine({ who, folds = false }: { who: { kind: string; id: string }; folds?: boolean }): React.ReactElement | null {
   useLanguage()
+  const inspect = useInspect()
   const line = theDutyLineOf(useTheSecretariesDuties(), who)
   if (line === null) return null
-  const words = line.says === 'area' ? line.area : t('chat.duty.unread', { why: line.why })
+  const words = line.says === 'area' ? line.area : t('chat.duty.notRead')
+  // WHY THE READ FAILED IS DEVELOPER DATA, so only developer mode puts it on the hover.
+  const hover = line.says === 'area' || !inspect ? words : line.why
   return (
     <>
       <style href="mole-office-duty-line" precedence="default">
@@ -133,10 +137,10 @@ export function TheDutyLine({ who, folds = false }: { who: { kind: string; id: s
       </style>
       {folds ? (
         // KEYED BY THE AGENT, so another conversation starts folded again. Only an agent has a line, so its id is enough.
-        <TheFoldedDuty key={who.id} words={words} says={line.says} />
+        <TheFoldedDuty key={who.id} words={words} hover={hover} says={line.says} />
       ) : (
         /* THE WHOLE LINE IS THE HOVER TEXT, because a narrow chat cuts it at the edge. */
-        <span className="duty-line" data-says={line.says} title={words}>
+        <span className="duty-line" data-says={line.says} title={hover}>
           {words}
         </span>
       )}
@@ -149,7 +153,7 @@ export function TheDutyLine({ who, folds = false }: { who: { kind: string; id: s
  * chat, and a long duty took four or five lines above the messages. The press is drawn only when the two lines cut the
  * duty, and it closes the duty again once it is open. A new duty, or a new width, is measured again.
  */
-function TheFoldedDuty({ words, says }: { words: string; says: 'area' | 'unread' }): React.ReactElement {
+function TheFoldedDuty({ words, hover, says }: { words: string; hover: string; says: 'area' | 'unread' }): React.ReactElement {
   const [open, setOpen] = useState(false)
   const [cut, setCut] = useState(false)
   const shown = useRef<HTMLSpanElement>(null)
@@ -175,7 +179,7 @@ function TheFoldedDuty({ words, says }: { words: string; says: 'area' | 'unread'
   // THE LINE HOLDS THE DUTY'S WORDS ALONE, as it does everywhere else, and the press stands beside it.
   return (
     <span className="duty-fold" data-open={open ? 'yes' : 'no'}>
-      <span ref={shown} className="duty-line" data-says={says} title={open ? undefined : words}>
+      <span ref={shown} className="duty-line" data-says={says} title={open ? undefined : hover}>
         {words}
       </span>
       {cut || open ? (

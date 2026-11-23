@@ -3,7 +3,7 @@
 import { describe, expect, it } from 'vitest'
 import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core'
 
-import * as schema from '../src/server/db/schema.ts'
+import { NAMES_A_PART_MAY_NOT_TAKE } from '../src/server/db/every-part-table.ts'
 import { aPartTable, thePartTables, type WhatAnArchiveAndARestoreDo } from '../src/server/db/part-tables.ts'
 
 const COMPARED: WhatAnArchiveAndARestoreDo = { exported: true, restore: 'compared', fillForTheProof: async () => 'a made-up row' }
@@ -46,10 +46,10 @@ describe('a schema part table says what happens to it, and only it has its name'
   })
 
   it('refuses a part table with the name of a table schema.ts already has', () => {
-    const taken = schema.NAMES_A_PART_MAY_NOT_TAKE[0]
+    const taken = NAMES_A_PART_MAY_NOT_TAKE[0]
     expect(taken, 'schema.ts names no table a part may not take').toBeDefined()
     if (taken === undefined) return
-    const refusal = refusalOf({ 'a-part.ts': { again: aComparedTable(taken) } }, schema.NAMES_A_PART_MAY_NOT_TAKE)
+    const refusal = refusalOf({ 'a-part.ts': { again: aComparedTable(taken) } }, NAMES_A_PART_MAY_NOT_TAKE)
     expect(refusal).not.toBeNull()
     expect(refusal).toContain(taken)
     expect(refusal).toContain('again')

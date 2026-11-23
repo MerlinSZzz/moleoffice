@@ -14,6 +14,8 @@
  * through Date.now and setTimeout, so it runs on a fake clock that also moves on by itself. The stand-in moves that clock
  * on by the transport timeout at each try, and by the wrapper's pause as soon as the wrapper has set it, so the minute
  * passes on the release's clock without being waited for. The repositories, the database and the office are made up.
+ * The second case prints the release's journal when its refusal is not the one it expects, so a failure names the call
+ * that failed.
  *
  * Mutations, one at a time after a control run, then restored:
  * - no wrapper before downtime: the first case is red;
@@ -71,6 +73,12 @@ const theNotice = (stage: 'before' | 'after') => (request: Request) => request.m
 /** The lines that say a call was tried again. */
 const triedAgain = (journal: any[]) => journal.filter((e) => e.step === 'live-office' && e.phase === 'tried-again')
 
+/** The release's journal, one JSON line an entry, or that it does not exist, for a failed assertion's message. */
+function theJournal(path: string): string {
+  if (!existsSync(path)) return `The release's journal ${path} does not exist.`
+  return rows(path).map((entry) => JSON.stringify(entry)).join('\n')
+}
+
 // Each case builds one made-up office and runs one release, a few seconds each here. The limits leave room for a slower
 // machine.
 it('goes on when the BEFORE notice gets no answer for a while, and sends the same call each time', async () => {
@@ -90,7 +98,7 @@ it('stops before downtime when the BEFORE notice gets no answer for longer than 
   const office = aStallingOffice(f, theNotice('before'), THE_RETRY_WINDOW_MS * 1.5)
   const result = await release(f, office)
   expect(result.state, JSON.stringify(result)).toBe('unchanged')
-  expect(result.failure).toContain(`POST ${NOTICE}`)
+  expect(result.failure, theJournal(result.paths.journal)).toContain(`POST ${NOTICE}`)
   const waited = Number(/after ([\d.]+) seconds/.exec(result.failure)?.[1])
   expect(waited, 'the refusal says how long it waited').toBeGreaterThanOrEqual(THE_RETRY_WINDOW_MS / 1000)
   expect(result.notices?.state).toBe('unconfirmed')

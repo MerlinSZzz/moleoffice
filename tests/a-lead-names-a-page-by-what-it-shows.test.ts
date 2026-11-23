@@ -8,7 +8,7 @@
  * address with an id in it, which is not a name a person reads. Now `whereALeadGoes` in
  * src/web/components/Leading.tsx names a page this way:
  *   - an address that names a record: the record's kind word in the page language and its title, read
- *     in the project the lead names. For a pipeline's drawing, the brief's example: 流程 Handover v2 的图;
+ *     in the project the lead names. For a pipeline's drawing, the brief's example: 流水线 Handover v2 的图;
  *   - any other address: the page's own name, the one the sidebar draws (全部记录 for /records);
  *   - in developer mode, the address as well.
  *
@@ -18,7 +18,7 @@
  *   2. A lead to /records reads the page's own name, and not the address.
  *   3. In developer mode, the address is there too.
  *   4. On a Chinese page a space stands where a Chinese character meets a Latin name, as the secretary's review
- *      of round 29 asks: 'Guide P 想带你去 Robotics，流程 Handover v2 的图。'.
+ *      of round 29 asks: 'Guide P 想带你去 Robotics，流水线 Handover v2 的图。'.
  *   6. At 1440 in Chinese the last word stays with what comes before it: 的 and 图 lie on one line
  *      (the secretary's review of wave 13n's round 29, which found 图 alone on the second line).
  *   5. At 390 the offer takes at most two lines, project first, and nothing of it is hidden or cut off.
@@ -187,7 +187,7 @@ describe('on a Chinese page a Latin name stands apart from the Chinese around it
   it(`says the sentence ${THE_TEST_OFFICES_SECRETARY.handle}\u2019s review wrote`, async () => {
     await leadTo({ kind: 'page', route: `/pipeline/${pipelineThere}`, workspaceId: OTHER })
     await openAt('lang=zh&mode=normal')
-    await expect.poll(wordsOfTheOffer, { timeout: 20_000 }).toBe('Guide P 想带你去 Robotics，流程 Handover v2 的图。')
+    await expect.poll(wordsOfTheOffer, { timeout: 20_000 }).toBe('Guide P 想带你去 Robotics，流水线 Handover v2 的图。')
   }, 120_000)
 })
 

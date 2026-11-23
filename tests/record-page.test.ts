@@ -29,6 +29,7 @@ import { beforeAll, describe, expect, it } from 'vitest'
 import type { Change, GatedLink, PanelRecord, ResolvedLink } from '../src/shared/types.ts'
 /** The declaration `POST /api/records` validates against, so a field here is a field that exists. */
 import { KIND_SPECS } from '../src/shared/kinds.ts'
+import { createI18n } from '../src/shared/i18n.ts'
 import { sectionRegionId } from '../src/shared/regions.ts'
 import { unclassifiedNote } from '../src/shared/work.ts'
 
@@ -40,6 +41,9 @@ import { unclassifiedNote } from '../src/shared/work.ts'
  * that leaves the markup they read exactly as it was.
  */
 const SEE_THROUGH = { surface: null } as const
+
+/** The English words, read from the word list by their keys. */
+const en = createI18n('en').t
 
 
 type RecordPage = typeof import('../src/web/pages/RecordPage.tsx')
@@ -521,54 +525,41 @@ describe('LinkPanel draws the gate and keeps inferred visibly apart from confirm
     // The dash means "Mole Office worked this out" here and in the inferred mark, and nowhere else.
     expect(html).toContain('data-inferred="1"')
     expect(html).toContain('inferred')
-    expect(html).toContain('worked out by')
+    expect(html).toContain(en('record.links.notConfirmed', { n: 1, total: 1 }))
   })
 
   /**
-   * THE COUNT IS A FACT ABOUT THIS RECORD; WHAT A DASHED EDGE MEANS IS A FACT ABOUT THE APP.
+   * THE COUNT IS A FACT ABOUT THIS RECORD, AND IT IS ALL THE PANEL SAYS ABOUT INFERRED LINKS.
    *
-   * The panel used to say both in one permanent paragraph, which left it as the last surface in the
-   * product that explained itself by default — Queries and the rail both fold the same kind of
-   * sentence now. So the count stays on screen and the convention goes behind the same `Explain`.
+   * The panel used to fold a sentence about what a dashed edge means under the count. The dashed
+   * edge and the inferred mark on each row say which links they are, so the count stands alone,
+   * on screen, with nothing folded beside it.
    */
-  describe('the inferred count stays on screen and the convention behind it folds', () => {
+  describe('the inferred count stays on screen, with nothing folded beside it', () => {
     const shownAtRest = (html: string): string =>
       [...html.matchAll(/<summary[^>]*>([\s\S]*?)<\/summary>/g)]
         .map((match) => match[1] ?? '')
         .join(' ')
         .replace(/<[^>]+>/g, '')
+    const inferredLine = (html: string): string | null =>
+      /<p class="lp-inferred">([\s\S]*?)<\/p>/.exec(html)?.[1]?.replace(/<[^>]+>/g, '') ?? null
 
-    it('says how many of these links nobody has confirmed, without opening anything', () => {
+    it('counts how many of these links nobody has confirmed, with no fold', () => {
       const html = render([link({ inferred: true }), link({ linkId: 'l2', inferred: true }), link({ linkId: 'l3' })])
-      const shown = shownAtRest(html)
-      expect(shown).toContain('2 of these 3 links')
-      expect(shown).toContain('worked out by Mole Office and nobody has confirmed')
+      expect(inferredLine(html)).toBe(en('record.links.notConfirmed', { n: 2, total: 3 }))
+      expect(html).not.toContain('px-explain')
     })
 
-    it('writes the small counts as sentences, not as arithmetic nobody would say out loud', () => {
-      // "1 of these 1 links was worked out" is what a count-everything rule writes when it is not
-      // looking, and one link with one inference is the ordinary case on a young record.
-      expect(lp.inferredNote(1, 1)).toBe('The one link here was worked out by Mole Office and nobody has confirmed it.')
-      expect(lp.inferredNote(3, 3)).toContain('All 3 links here were')
-      expect(lp.inferredNote(1, 4)).toContain('1 of these 4 links was')
-      expect(lp.inferredNote(2, 4)).toContain('2 of these 4 links were')
-      // Nothing inferred is not a sentence at all, so the caller draws no disclosure.
+    it('counts the small cases the same way, and gives nothing when nothing is inferred', () => {
+      expect(lp.inferredNote(1, 1)).toBe(en('record.links.notConfirmed', { n: 1, total: 1 }))
+      expect(lp.inferredNote(3, 3)).toBe(en('record.links.notConfirmed', { n: 3, total: 3 }))
+      expect(lp.inferredNote(1, 4)).toBe(en('record.links.notConfirmed', { n: 1, total: 4 }))
+      expect(lp.inferredNote(2, 4)).toBe(en('record.links.notConfirmed', { n: 2, total: 4 }))
+      // Nothing inferred gives no count, so the caller draws no line.
       expect(lp.inferredNote(0, 4)).toBe(null)
-      expect(shownAtRest(render([link({ inferred: true })]))).toContain('The one link here was')
     })
 
-    it('keeps every word about the dashed edge, one press away and not on the first read', () => {
-      const html = render([link({ inferred: true })])
-      expect(html).toContain('Those rows carry a dashed edge, which means that')
-      expect(shownAtRest(html)).not.toContain('dashed edge, which means that')
-    })
-
-    it('names what the fold opens rather than saying the bare word "more"', () => {
-      const shown = shownAtRest(render([link({ inferred: true })]))
-      expect(shown).toContain('what the dashed edge on those rows means')
-    })
-
-    it('draws no fold at all when nobody inferred anything, so there is no dead disclosure', () => {
+    it('draws no count at all when nobody inferred anything', () => {
       const html = render([link({})])
       expect(html).not.toContain('px-explain')
       expect(html).not.toContain('lp-inferred')

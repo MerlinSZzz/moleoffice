@@ -6,11 +6,11 @@
  * Point 2 of the owner's review asks for one press that installs the ticked harnesses and a check for
  * upgrades. Each agent tool the office runs is a row: its program, where it is
  * and the version it says it is, the newest version its vendor publishes, and whether a newer one
- * exists, said only when both were read. A tool with no install command says why.
+ * exists, said only when both were read. A tool with no install command says which of the two codes it has.
  *
  * THE TICK BOXES ARE BEHIND A PRESS, so the page at rest shows no boxes (tests/read-before-edit.test.ts). Pressing
  * Install opens the installer's terminal below, in the page's own terminal view (TerminalView). The person signs in
- * to each program themselves; the panel says so, and the office never sees the login.
+ * to each program themselves; the panel asks them to, and the office never sees the login.
  *
  * THE ROWS ARE DRAWN BEFORE THE VERSIONS ARRIVE. Wave 13x round 12: the first whole read after a start took 658 ms,
  * because each program is asked its version and each registry its newest. The panel asks for the declared list as
@@ -19,19 +19,27 @@
  *
  * A PRESS THAT WAITS IS NOT A REFUSAL. Installing reaches every agent, so the press raises a readiness checklist and
  * signs it as the person (src/server/lib/readiness.ts). The door then answers 409 with the code `readinessWaits` and the
- * checklist's id. The panel says the signature is recorded, reads the checklist to name who has not signed, links to
- * it, and says the install starts by itself when the last one signs (wave 13u round 13b).
+ * checklist's id. The panel says it waits for signatures, reads the checklist to name who has not signed, and links to
+ * it (wave 13u round 13b).
+ *
+ * WHILE THE USER'S PATH IS NOT READ, A TOOL NOT FOUND IS NOT ON THE OFFICE'S PATH, and that may not be the user's
+ * (wave 13u round 242). Its row says so, with the line saying why the user's PATH was not read. Neither its tick nor
+ * its install command line is drawn, so this page offers no install of it, neither by the press nor by a command the
+ * person types: the tool may already be installed for the user's shell, and either would install it again. A
+ * secretary asked by the person still installs it. When the user's PATH was read, a tool not found is not found, and
+ * the page is as it was.
  *
  * Every door is asked through src/web/lib/harnesses.ts; the shapes are src/shared/harnesses.ts.
  */
 
 import { useState } from 'react'
-import { t } from '@shared/i18n.ts'
-import type { HarnessListing, HarnessReading } from '@shared/harnesses.ts'
+import { t, type WordKey } from '@shared/i18n.ts'
+import type { HarnessListing, HarnessReading, NoInstallCode } from '@shared/harnesses.ts'
 import { readRefusal } from '@shared/refusal-codes.ts'
 import type { TerminalReading } from '@shared/terminals.ts'
 import type { AReadinessChecklist } from '../../server/lib/readiness.ts'
-import { Btn, ErrorNote, Loading, relativeTime, useAsync } from './ui.tsx'
+import type { TheUsersPathAsTheDoorSaysIt } from '../../config/the-users-own-path.mjs'
+import { Btn, ErrorNote, Loading, ServerNote, relativeTime, useAsync } from './ui.tsx'
 import { TerminalView } from './TerminalView.tsx'
 import { useLanguage } from '../lib/language.ts'
 import { installTheHarnesses, theHarnessList, theHarnesses } from '../lib/harnesses.ts'
@@ -46,6 +54,9 @@ export function InstallHarnesses({ onOpened }: { onOpened?: () => void }): React
   // The whole read when it is here, and the declared list until then.
   const rows: readonly (HarnessListing | HarnessReading)[] | null =
     reply.status === 'ready' ? reply.value.harnesses : listing.status === 'ready' ? listing.value.harnesses : null
+  const usersPath = reply.status === 'ready' ? reply.value.usersPath : listing.status === 'ready' ? listing.value.usersPath : null
+  // A tool not on the office's PATH while the user's PATH is not read is never offered, whatever was ticked before the read came.
+  const offered = (one: HarnessListing | HarnessReading): boolean => anInstallIsOffered(one, usersPath)
   const [choosing, setChoosing] = useState(false)
   const [ticked, setTicked] = useState<ReadonlySet<string>>(new Set())
   const [pending, setPending] = useState(false)
@@ -60,7 +71,7 @@ export function InstallHarnesses({ onOpened }: { onOpened?: () => void }): React
     setWaiting(null)
     setOutcome(null)
     try {
-      const opened = await installTheHarnesses([...ticked])
+      const opened = await installTheHarnesses([...ticked].filter((id) => rows?.some((one) => one.id === id && offered(one)) === true))
       setInstaller(opened.terminal)
       setChoosing(false)
       setTicked(new Set())
@@ -93,7 +104,6 @@ export function InstallHarnesses({ onOpened }: { onOpened?: () => void }): React
         {INSTALL_HARNESSES_CSS}
       </style>
       <h2 id="ih-heading" className="ih-heading">{t('harnesses.heading')}</h2>
-      <p className="ih-intro">{t('harnesses.intro')}</p>
       {rows === null && reply.status === 'loading' ? <Loading label={t('harnesses.reading')} rows={2} /> : null}
       {reply.status === 'error' ? <ErrorNote message={reply.message} fault={reply.fault} label={t('harnesses.refused')} retry={readAgain} /> : null}
       {rows !== null ? (
@@ -104,6 +114,8 @@ export function InstallHarnesses({ onOpened }: { onOpened?: () => void }): React
                 key={one.id}
                 one={one}
                 choosing={choosing}
+                offered={offered(one)}
+                usersPath={usersPath}
                 failed={reply.status === 'error'}
                 ticked={ticked.has(one.id)}
                 onTick={(on) =>
@@ -135,7 +147,7 @@ export function InstallHarnesses({ onOpened }: { onOpened?: () => void }): React
               </>
             ) : (
               <>
-                {rows.some((one) => one.install !== null) ? <Btn onClick={() => setChoosing(true)}>{t('harnesses.choose')}</Btn> : null}
+                {rows.some(offered) ? <Btn onClick={() => setChoosing(true)}>{t('harnesses.choose')}</Btn> : null}
                 <Btn variant="ghost" onClick={readAgain}>{t('harnesses.readAgain')}</Btn>
               </>
             )}
@@ -146,7 +158,6 @@ export function InstallHarnesses({ onOpened }: { onOpened?: () => void }): React
       ) : null}
       {installer !== null ? (
         <div className="ih-installer">
-          <p className="ih-installing">{t('harnesses.installing')}</p>
           <p className="ih-sign-in">{t('harnesses.signIn')}</p>
           <TerminalView key={installer.id} terminal={installer} onPutAway={putAway} onClosed={putAway} />
         </div>
@@ -166,11 +177,10 @@ export function TheInstallWaits({ id }: { id: string }): React.ReactElement {
   const [read] = useAsync(() => api.readinessChecklist(id), [id])
   return (
     <div className="ih-waits" role="status" data-readiness-waits={id}>
-      <p className="ih-waits-head">{t('harnesses.waiting.signed')}</p>
+      <p className="ih-waits-head">{t('harnesses.state.waitingForSignatures')}</p>
       {read.status === 'loading' ? <Loading label={t('harnesses.waiting.reading')} rows={1} /> : null}
-      {read.status === 'error' ? <ErrorNote message={read.message} fault={read.fault} label={t('harnesses.waiting.unread')} /> : null}
+      {read.status === 'error' ? <ErrorNote message={read.message} fault={read.fault} label={t('harnesses.state.checklistNotRead')} /> : null}
       {read.status === 'ready' ? <TheSignersStillToSign checklist={read.value.checklist} /> : null}
-      <p>{t('harnesses.waiting.byItself')}</p>
       <p>
         <a href={`#${readinessPath(id)}`}>{t('harnesses.waiting.open')}</a>
       </p>
@@ -180,7 +190,7 @@ export function TheInstallWaits({ id }: { id: string }): React.ReactElement {
 
 /** Who has not signed yet, as the checklist says it. */
 export function TheSignersStillToSign({ checklist }: { checklist: AReadinessChecklist }): React.ReactElement {
-  if (checklist.state !== 'waiting') return <p>{t('harnesses.waiting.notWaiting')}</p>
+  if (checklist.state !== 'waiting') return <p>{t('harnesses.state.notWaiting')}</p>
   return (
     <>
       <p>{t('harnesses.waiting.for')}</p>
@@ -193,7 +203,25 @@ export function TheSignersStillToSign({ checklist }: { checklist: AReadinessChec
   )
 }
 
-function TheHarness({ one, choosing, failed, ticked, onTick }: { one: HarnessListing | HarnessReading; choosing: boolean; failed: boolean; ticked: boolean; onTick: (on: boolean) => void }): React.ReactElement {
+/** Whether this tool was not found while the user's PATH is not read, so it is only not on the office's PATH. */
+function notOnTheOfficesPath(one: HarnessListing | HarnessReading, usersPath: TheUsersPathAsTheDoorSaysIt | null): boolean {
+  return usersPath?.read === false && 'installed' in one && one.installed.path === null
+}
+
+/**
+ * Whether this page offers an install of this tool: it has an install command, and it is not only off the office's
+ * PATH. Where it is false for a tool with an install command, the row draws neither the tick nor the command line.
+ */
+export function anInstallIsOffered(one: HarnessListing | HarnessReading, usersPath: TheUsersPathAsTheDoorSaysIt | null): boolean {
+  return one.install !== null && !notOnTheOfficesPath(one, usersPath)
+}
+
+/**
+ * One tool's row. `offered` is `anInstallIsOffered` for it, so a row with no install offered draws no tick, and a tool
+ * that has an install command but is not offered draws no install command line either. A tool with no install command
+ * still says why it has none.
+ */
+export function TheHarness({ one, choosing, offered, usersPath, failed, ticked, onTick }: { one: HarnessListing | HarnessReading; choosing: boolean; offered: boolean; usersPath: TheUsersPathAsTheDoorSaysIt | null; failed: boolean; ticked: boolean; onTick: (on: boolean) => void }): React.ReactElement {
   // Null while only the declared list is here: the versions are still being read, or the read of them failed.
   const read = 'installed' in one ? one : null
   const notRead = failed ? (
@@ -204,7 +232,7 @@ function TheHarness({ one, choosing, failed, ticked, onTick }: { one: HarnessLis
   return (
     <li className="ih-row" data-harness={one.id}>
       <div className="ih-row-head">
-        {choosing && one.install !== null ? (
+        {choosing && offered ? (
           <label className="ih-tick">
             <input type="checkbox" checked={ticked} onChange={(e) => onTick(e.target.checked)} aria-label={t('harnesses.tick', { name: one.name })} />
             <span className="ih-name">{one.name}</span>
@@ -224,14 +252,19 @@ function TheHarness({ one, choosing, failed, ticked, onTick }: { one: HarnessLis
           <dd data-fact="installed">
             {read === null ? (
               notRead
+            ) : read.installed.path === null && usersPath?.read === false ? (
+              <>
+                {t('harnesses.state.notOnTheOfficesPath')}
+                <div className="ih-path-unread">{t('harnesses.usersPath.notRead', { why: t(PATH_UNREAD_WORDS[usersPath.code]) })}</div>
+              </>
             ) : read.installed.path === null ? (
-              t('harnesses.notFound')
+              t('harnesses.state.notFound')
             ) : read.installed.versionWasRead ? (
               <span className="ih-mono">{read.installed.version}</span>
             ) : (
               <>
-                {t('harnesses.versionUnread', { path: read.installed.path })}
-                <Why says={read.installed.version} />
+                <span className="ih-mono">{read.installed.path}</span> · {t('harnesses.versionNotRead')}
+                <ServerNote text={read.installed.version} />
               </>
             )}
             {read?.beingReadAgain.installed ? <ReadAgain at={read.beingReadAgain.installed} /> : null}
@@ -246,8 +279,8 @@ function TheHarness({ one, choosing, failed, ticked, onTick }: { one: HarnessLis
               <span className="ih-mono">{read.newest.version}</span>
             ) : (
               <>
-                {t('harnesses.newestUnread')}
-                <Why says={read.newest.why} />
+                {t('harnesses.versionNotRead')}
+                <ServerNote text={read.newest.why} />
               </>
             )}
             {read?.beingReadAgain.newest ? <ReadAgain at={read.beingReadAgain.newest} /> : null}
@@ -256,19 +289,21 @@ function TheHarness({ one, choosing, failed, ticked, onTick }: { one: HarnessLis
       </dl>
       {read?.newer.answer === 'no' ? <p className="ih-state" data-newer="no">{t('harnesses.newer.no')}</p> : null}
       {read?.newer.answer === 'unknown' && read.newer.why !== 'notInstalled' ? (
-        <p className="ih-state" data-newer="unknown">{t(`harnesses.newer.${read.newer.why}`)}</p>
+        <p className="ih-state" data-newer="unknown">{t('harnesses.state.newerNotKnown')}</p>
       ) : null}
       {one.install !== null ? (
-        <p className="ih-install">
-          <span className="ih-install-label">{t('harnesses.installsWith')}</span> <code className="ih-mono">{one.install.command}</code>{' '}
-          <a href={one.install.source} target="_blank" rel="noreferrer">
-            {t('harnesses.vendorsPage')}
-          </a>
-        </p>
+        offered ? (
+          <p className="ih-install">
+            <span className="ih-install-label">{t('harnesses.installsWith')}</span> <code className="ih-mono">{one.install.command}</code>{' '}
+            <a href={one.install.source} target="_blank" rel="noreferrer">
+              {t('harnesses.vendorsPage')}
+            </a>
+          </p>
+        ) : null
       ) : one.noInstall !== null ? (
         <div className="ih-install" data-no-install={one.noInstall.code}>
-          {t(`harnesses.noInstall.${one.noInstall.code}`)}
-          <Why says={one.noInstall.says} />
+          {t(NO_INSTALL_WORDS[one.noInstall.code])}
+          <ServerNote text={one.noInstall.says} />
         </div>
       ) : null}
     </li>
@@ -280,20 +315,27 @@ function ReadAgain({ at }: { at: string }): React.ReactElement {
   return <div className="ih-read-again">{t('harnesses.beingReadAgain', { ago: relativeTime(at) })}</div>
 }
 
-/** The office's own sentence, one press away, as the holder's sentence is on Terminal management. */
-function Why({ says }: { says: string }): React.ReactElement {
-  return (
-    <details className="ih-why">
-      <summary>{t('harnesses.why')}</summary>
-      <p>{says}</p>
-    </details>
-  )
+/** Why the user's PATH was not read, in short words. */
+const PATH_UNREAD_WORDS: Record<Extract<TheUsersPathAsTheDoorSaysIt, { read: false }>['code'], WordKey> = {
+  noLoginShell: 'harnesses.usersPath.noLoginShell',
+  noAnswerInTime: 'harnesses.usersPath.noAnswerInTime',
+  noMarkers: 'harnesses.usersPath.noMarkers',
+  couldNotStart: 'harnesses.usersPath.couldNotStart',
+  registryUnreadable: 'harnesses.usersPath.registryUnreadable',
+  inASandbox: 'harnesses.usersPath.inASandbox',
+  aTestStartedThisServer: 'harnesses.usersPath.aTestStartedThisServer',
+  notReadAtThisStart: 'harnesses.usersPath.notReadAtThisStart',
+}
+
+/** Why a tool has no install command, in short words. */
+const NO_INSTALL_WORDS: Record<NoInstallCode, WordKey> = {
+  vendorArchivedIt: 'harnesses.state.archived',
+  installedSeparately: 'harnesses.state.installedSeparately',
 }
 
 const INSTALL_HARNESSES_CSS = `
 .ih { margin: 0 0 calc(var(--pad) * 2) 0; }
 .ih-heading { margin: 0 0 0.25em 0; font-size: 1.15em; }
-.ih-intro { margin: 0 0 var(--pad) 0; color: var(--text-2); }
 .ih-rows { list-style: none; margin: 0 0 var(--pad) 0; padding: 0; display: grid; gap: 0.5rem; }
 .ih-row { border: var(--border-w, 1px) solid var(--border); border-radius: var(--radius-sm); background: var(--panel); padding: 0.6rem var(--pad); min-width: 0; }
 .ih-row-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 0.5rem; }
@@ -306,16 +348,12 @@ const INSTALL_HARNESSES_CSS = `
 .ih-mono { font-family: var(--font-mono); }
 .ih-reading { color: var(--text-3); }
 .ih-read-again { margin-top: 0.25rem; color: var(--text-3); font-size: 0.85em; }
+.ih-path-unread { margin-top: 0.25rem; color: var(--text-2); font-size: 0.85em; }
 .ih-state { margin: 0.4rem 0 0 0; color: var(--text-2); }
 .ih-install { margin: 0.4rem 0 0 0; color: var(--text-2); overflow-wrap: anywhere; }
 .ih-install-label { color: var(--text-3); }
-.ih-why { display: inline; margin-inline-start: 0.5rem; }
-.ih-why summary { display: inline; cursor: pointer; color: var(--text-2); }
-.ih-why summary:focus-visible { outline: var(--focus-w) solid var(--focus); outline-offset: 2px; border-radius: var(--radius-sm); }
-.ih-why p { margin: 0.25rem 0 0 0; color: var(--text-2); overflow-wrap: anywhere; }
 .ih-press { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0 0 var(--pad) 0; }
-.ih-installing, .ih-sign-in { margin: 0 0 0.4rem 0; }
-.ih-sign-in { font-weight: 600; }
+.ih-sign-in { margin: 0 0 0.4rem 0; font-weight: 600; }
 .ih-waits { border: var(--border-w, 1px) solid var(--border); border-radius: var(--radius-sm); background: var(--panel); padding: 0.6rem var(--pad); margin: 0 0 var(--pad) 0; overflow-wrap: anywhere; }
 .ih-waits p { margin: 0 0 0.4rem 0; }
 .ih-waits p:last-child { margin-bottom: 0; }

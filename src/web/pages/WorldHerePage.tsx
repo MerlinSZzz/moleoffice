@@ -28,6 +28,7 @@ import { useState } from 'react'
 import { api, type WhatTheOfficeSays } from '../api.ts'
 import { ErrorNote, Loading, Panel, useAsync } from '../components/ui.tsx'
 import { pathFor, RouteLink } from '../components/router.tsx'
+import { CodeRows } from '../lib/code-rows.tsx'
 import {
   theFacesSentence,
   recordsAfterTheCopyLiveOnTheirOfficeSentence,
@@ -58,6 +59,19 @@ export function WorldHerePage() {
 /** The page, from the office's answer, as a pure function of it so a test can hold it still. */
 export function TheWorldItself({ office, onChanged }: { office: WhatTheOfficeSays; onChanged: () => void }) {
   const world = office.worlds.find((one) => one.databaseIdentity === office.thisWorld) ?? null
+  if (world === null) {
+    return (
+      <CodeRows
+        rows={[
+          {
+            label: 'worldHere.row.database',
+            value: office.thisWorld ?? '',
+            state: office.thisWorld === null ? 'worldHere.row.notIdentified' : 'worldHere.row.noWorldRow',
+          },
+        ]}
+      />
+    )
+  }
   /**
    * THE OFFICE IS NOT A COPY OF ANYTHING. A person reading this page at the office has nothing
    * missing and nothing to be told about a copy; saying a copy sentence here would be false.
@@ -67,15 +81,8 @@ export function TheWorldItself({ office, onChanged }: { office: WhatTheOfficeSay
    * apart, and it is non-null exactly when the home row here is about another database — which is a
    * copy. A copy that tool makes carries no home row, so `isTheOffice` is false there.
    */
-  if (world === null || (office.isTheOffice && office.theHomeRowBelongsTo === null)) {
-    return (
-      <>
-        <p className="wh-lead">
-          {world === null
-            ? t('dev.worldhere.noRow', { database: office.thisWorld ?? t('dev.worlds.unknownDatabase') })
-            : t('dev.worldhere.office')}{t('dev.worldhere.everyWorldButTheOfficeIsA')}</p>
-      </>
-    )
+  if (office.isTheOffice && office.theHomeRowBelongsTo === null) {
+    return <p className="wh-lead">{t('dev.worldhere.office')}</p>
   }
   return (
     <AWorldThatIsACopy
@@ -102,7 +109,7 @@ function AWorldThatIsACopy({
   return (
     <>
       <Panel titleIs="label" declares={{ surface: 'world.here' }} title={t('dev.worldhere.whatToLookAt')}>
-        <p className="wh-purpose">{purpose ?? t('dev.worldhere.noPurpose')}</p>
+        <p className="wh-purpose">{purpose ?? t('dev.worlds.notRecorded')}</p>
         <ul className="wh-screens">
           {SCREENS.map((name) => (
             <li key={name} className="wh-screen">
@@ -127,19 +134,16 @@ function AWorldThatIsACopy({
             {world.diedBecause === null || world.diedBecause === undefined ? '.' : `: ${world.diedBecause}`}
           </p>
         ) : (
-          <>
-            <TieredPress tier="confirm"
-              press={t('dev.worldhere.stop')} pending={t('dev.worlds.stopping')}
-              question={t('dev.worlds.stopQuestion')} quote={world.name}
-              warning={t('dev.worlds.stopWarning')} cancel={t('dev.worlds.cancel')}
-              onPress={async () => {
-                const said = await api.stopWorld(world.id, 'you pressed Stop on this world’s own page')
-                setStopped(t(said.couldNotStop.length === 0 ? 'dev.worlds.stopped' : 'dev.worlds.partlyStopped', { n: said.couldNotStop.length }))
-                onChanged()
-              }}
-            />
-            <p className="wh-stop-why">{t('dev.worldhere.stoppingEndsTheProcessesTheOfficeRecorded')}</p>
-          </>
+          <TieredPress tier="confirm"
+            press={t('dev.worldhere.stop')} pending={t('dev.worlds.stopping')}
+            question={t('dev.worlds.stopQuestion')} quote={world.name}
+            warning={t('dev.worlds.stopWarning')} cancel={t('dev.worlds.cancel')}
+            onPress={async () => {
+              const said = await api.stopWorld(world.id, 'you pressed Stop on this world’s own page')
+              setStopped(t(said.couldNotStop.length === 0 ? 'worldsPage.stopped' : 'worldsPage.partlyStopped', { n: said.couldNotStop.length }))
+              onChanged()
+            }}
+          />
         )}
         {stopped === null ? null : <p className="wh-stopped">{stopped}</p>}
       </Panel>
@@ -179,7 +183,6 @@ const WORLD_HERE_CSS = `
   cursor: pointer;
 }
 .wh-stop:hover { background: var(--hover); }
-.wh-stop-why { margin: 6px 0 0; color: var(--text-2); font-size: var(--fs-1); max-width: 78ch; }
 .wh-ended { margin: 0; color: var(--text-2); }
 .wh-stopped { margin: 6px 0 0; color: var(--text); }
 .wh-refused { margin: 6px 0 0; color: var(--st-failed); font-size: var(--fs-1); }

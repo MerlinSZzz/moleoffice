@@ -44,6 +44,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { freshDb, type TestDb, THIS_TEST_ONLY_DRAWS_THE_TABLE } from './helpers.ts'
 import type { PlanBlocksReply } from '../src/web/api.ts'
+import { t } from '../src/shared/i18n.ts'
 import { THE_TEST_OFFICES_OWNER } from './a-page-of-a-test-office.ts'
 
 type WebApi = typeof import('../src/web/api.ts')
@@ -425,9 +426,11 @@ describe('a filed row edits the record, and a value that could not move stays vi
    * line is not on any record, so it is in no total anywhere — and a total that said nothing about
    * it would read as though nobody had sized those rows at all.
    */
-  it('says how many rows are sized in the plan only, and leaves them out of the hours', async () => {
+  it('counts the rows sized in the plan only, and leaves them out of the hours', async () => {
     const said = words(await table())
-    expect(said).toContain('sized in the plan only, which is in no total')
+    // CRITERION CHANGE, as decided: the count no longer goes on to say it is in no total. The two
+    // rows are the gripper's 3h and the report's 2h; the line that sizes itself twice has no size.
+    expect(said).toContain(t('planTable.sizedInPlanOnly', { n: 2 }).trim())
     // The hours are over the rows whose estimate is on a RECORD, and there is one: tracking the task
     // moved its 4h. The 2h and the 3h still written in lines are in no total anywhere. The 4h is
     // reported at the top level, because the tracked row sits inside two untracked headings and a

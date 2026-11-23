@@ -12,8 +12,8 @@
  * ON ANOTHER DEVICE IT READS THE SAME ANSWER THROUGH THE OFFICE, because the tool answers on its own computer alone: the
  * office there asks it and passes the answer on, keeping nothing (GET /api/office/mail-tool/state). Each press is passed
  * on the same way (POST /api/office/mail-tool/addresses, /account and /test), and the office writes the press down as
- * their act. When the office has no answer of the tool's, it says why in words; after a press, that the change was not
- * confirmed, since the tool may or may not have made it.
+ * their act. When the office has no answer of the tool's, it says why in a short state word; after a press, that the
+ * change was not confirmed, since the tool may or may not have made it.
  *
  * EVERY WORD IS FROM THE WORD LISTS, IN THEIR LANGUAGE: the tool answers codes and data, never a sentence. Their addresses,
  * the accounts and a summons's title are the person's content and are drawn as they are. What the office, the account reader
@@ -73,10 +73,10 @@ const WAITS_FOR: Readonly<Record<'save' | 'pick' | 'test', WordKey>> = {
 
 /** Why the office had no answer of the tool's to pass on, in the words of the lists. */
 const NOT_READ: Readonly<Record<WhyTheToolWasNotRead, WordKey>> = {
-  'no address': 'settingsPanel.mailtool.throughTheOffice.noAddress',
-  'no answer': 'settingsPanel.mailtool.throughTheOffice.noAnswer',
-  refused: 'settingsPanel.mailtool.throughTheOffice.refused',
-  'not the tool': 'settingsPanel.mailtool.throughTheOffice.notTheTool',
+  'no address': 'settingsPanel.mailtool.throughTheOffice.state.noAddress',
+  'no answer': 'settingsPanel.mailtool.throughTheOffice.state.noAnswer',
+  refused: 'settingsPanel.mailtool.throughTheOffice.state.refused',
+  'not the tool': 'settingsPanel.mailtool.throughTheOffice.state.notTheTool',
 }
 
 /** How the settings are read: from the tool itself on its computer, or through the office on another device. */
@@ -104,8 +104,8 @@ function saidBy(err: unknown): string {
 /** What saving the list came to, in the words of the lists. */
 function whatSavingDid(done: AddressesDone): string {
   if (done.saved) return t('settingsPanel.mailtool.addresses.saved')
-  if (done.reason === 'not an address') return t('settingsPanel.mailtool.addresses.notAnAddress', { which: content(done.which) })
-  return t('settingsPanel.mailtool.addresses.tooMany', { most: done.most, count: done.count })
+  if (done.reason === 'not an address') return t('settingsPanel.mailtool.addresses.notSaved.notAnAddress', { which: content(done.which) })
+  return t('settingsPanel.mailtool.addresses.notSaved.tooMany', { most: done.most, count: done.count })
 }
 
 export function MailToolSettings(asked: HowTheToolIsAsked) {
@@ -213,7 +213,7 @@ export function MailToolSettings(asked: HowTheToolIsAsked) {
         <ServerNote text={read.says} />
         {/* WHICH PAGE ASKED, in developer mode (problem cmlTxSP_m1rR): the tool answers only the pages the office serves,
             and its log names them when it starts, so a page it refused can tell whether it is one of them. */}
-        {developer ? <p className="mts-said">{t('settingsPanel.mailtool.tool.thisPage', { origin: window.location.origin })}</p> : null}
+        {developer ? <p className="mts-said">{t('settingsPanel.mailtool.tool.pageOrigin', { origin: window.location.origin })}</p> : null}
       </div>
     )
   }
@@ -237,22 +237,22 @@ export function MailToolSettings(asked: HowTheToolIsAsked) {
       </style>
 
       {/* WHAT IT READS, AND WHAT IT LAST MAILED. */}
-      {s.reading === 'none' ? <p className="mts-said">{t('settingsPanel.mailtool.reading.none')}</p> : null}
-      {s.reading === 'refused' ? <p className="mts-said">{t('settingsPanel.mailtool.reading.refused')}</p> : null}
+      {s.reading === 'none' ? <p className="mts-said">{t('settingsPanel.mailtool.reading.state.noKey')}</p> : null}
+      {s.reading === 'refused' ? <p className="mts-said">{t('settingsPanel.mailtool.reading.state.keyRefused')}</p> : null}
       <ServerNote text={s.details.key} />
-      {s.officeAnswers ? null : <p className="mts-said">{t('settingsPanel.mailtool.reading.officeSilent')}</p>}
+      {s.officeAnswers ? null : <p className="mts-said">{t('settingsPanel.mailtool.reading.state.officeSilent')}</p>}
       <ServerNote text={s.details.office} />
       <p className="mts-said">
         {s.lastMailed === null
-          ? t('settingsPanel.mailtool.noneMailed')
+          ? t('settingsPanel.mailtool.lastMailedNone')
           : t('settingsPanel.mailtool.lastMailed', { title: content(s.lastMailed.title), at: s.lastMailed.at })}
       </p>
-      {s.lastSend !== null && s.lastSend.reason !== null ? <p className="mts-said">{t('settingsPanel.mailtool.lastSend.notYet')}</p> : null}
+      {s.lastSend !== null && s.lastSend.reason !== null ? <p className="mts-said">{t('settingsPanel.mailtool.lastSend.notSentYet')}</p> : null}
       <ServerNote text={s.details.lastSend} />
 
       {/* WHICH ACCOUNT IT SENDS FROM. */}
       <h4 className="mts-head">{t('settingsPanel.mailtool.from.head')}</h4>
-      {s.accounts === null ? <p className="mts-said">{t('settingsPanel.mailtool.from.unreadable')}</p> : null}
+      {s.accounts === null ? <p className="mts-said">{t('settingsState.notRead')}</p> : null}
       <ServerNote text={s.details.accounts} />
       {sender !== null && sender.account !== null ? (
         <p className="mts-said">
@@ -299,7 +299,7 @@ export function MailToolSettings(asked: HowTheToolIsAsked) {
       ) : null}
 
       {/* THE LIST OF ADDRESSES, which stays with the tool. */}
-      <Field label={t(settingsControlWord('settings.mailtool', 'settingsPanel.mailtool.addresses.label'))} hint={t('settingsPanel.mailtool.addresses.hint')}>
+      <Field label={t(settingsControlWord('settings.mailtool', 'settingsPanel.mailtool.addresses.label'))}>
         <TextArea
           value={typed ?? ''}
           onChange={(next) => {
@@ -325,7 +325,7 @@ export function MailToolSettings(asked: HowTheToolIsAsked) {
       </Btn>
       {s.lastTest === null ? null : s.lastTest.outcome === 'empty list' ? (
         <p className="mts-said" role="status">
-          {t('settingsPanel.mailtool.test.emptyList')}
+          {t('settingsPanel.mailtool.test.notSentEmpty')}
         </p>
       ) : s.lastTest.outcome === 'not sent' ? (
         <p className="mts-said" role="status">

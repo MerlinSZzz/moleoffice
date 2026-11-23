@@ -7,8 +7,8 @@
  *
  * The office acts on the agent a session names: its message limit, its finished-child line and its stop are read
  * from it. A session write that names an agent (`ranAs`, `servingAgent` or `servingAgentId`) is accepted only from
- * that agent, an agent above it in its chain of starters, the person with their key (or from inside the office's own
- * program), and the office itself. A session for the inspector may also be filed by a secretary, or by whoever
+ * that agent, an agent above it in its chain of starters, the agent recorded as its leader, the person with their key
+ * (or from inside the office's own program), and the office itself. A session for the inspector may also be filed by a secretary, or by whoever
  * submitted the merge entry the check is for. The patch path is the same door. Anything else is refused with 403, a
  * sentence naming who may, and nothing written.
  *
@@ -17,7 +17,9 @@
  * which is checked before it writes anything and reads the owner as the owner's other acts do.
  *
  * THE AGENTS. The person registers the secretary, the inspector and a stranger. The secretary registers supervisor S;
- * S registers worker V.
+ * S registers worker V. For the leader cases the person registers L, and the secretary registers B and C. L is recorded
+ * as B's leader, and B as C's, with the fixture that sets an agent's owner. L started neither, and neither is above C in
+ * its chain of starters.
  *
  *   (a) the stranger files a session for S: refused, the sentence names who may, nothing is written.
  *   (b) S files a session for itself: accepted.
@@ -41,6 +43,12 @@
  *   (m) the owner's press admitting a waiting registration, keyless from the owner's own program while the key window is open:
  *       accepted, and the agent, its session and its ranAs are all written.
  *   (n) a press nothing proves to be the owner's is refused before it writes anything.
+ *   (o) L, B's recorded leader and not its starter, files a session for B: accepted.
+ *   (p) L patches a session it filed for nobody so that it names B: accepted, and the session names B.
+ *   (q) the stranger, neither above B in its chain nor its leader, files one for B: refused, and the sentence names
+ *       the recorded leader among those who may.
+ *   (r) the leader of the leader gains nothing: L files one for C and is refused; B, C's leader, files one for C and
+ *       is accepted.
  *
  * ---------------------------------------------------------------------------------------
  * MUTATION PROOF (after a green control), each alone
@@ -71,6 +79,7 @@ import type { FastifyInstance } from 'fastify'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { THE_PERSON } from '../src/shared/person.ts'
+import { setFixtureOwner } from './agent-owner-fixture.ts'
 import { apiApp, freshDb, type TestDb } from './helpers.ts'
 import { THE_TEST_FIXTURE_ROOT, THE_TEST_OFFICES_SECRETARY } from './a-page-of-a-test-office.ts'
 
@@ -153,7 +162,7 @@ function expectTheRefusal(reply: { status: number; body: Record<string, unknown>
   expect(reply.status, said(reply.body)).toBe(403)
   expect(said(reply.body)).toContain(`This session names the agent "${handle}"`)
   expect(said(reply.body)).toContain(
-    'A session for an agent is filed only by that agent, an agent above it in its chain of starters, the person with their key, or the office itself.',
+    'A session for an agent is filed only by that agent, an agent above it in its chain of starters, its recorded leader, the person with their key, or the office itself.',
   )
   expect(said(reply.body)).toContain('Nothing was written.')
 }
@@ -169,6 +178,12 @@ beforeAll(async () => {
   await register('a-stranger', AS_THE_PERSON, 'supervisor')
   await register('sup-s', asAgent(THE_TEST_OFFICES_SECRETARY.handle), 'supervisor')
   await register('worker-v', asAgent('sup-s'), 'worker')
+  // THE LEADERS. Each agent starts with its starter as its owner, so the owner is set apart from the starter here.
+  await register('leader-l', AS_THE_PERSON, 'supervisor')
+  await register('led-b', asAgent(THE_TEST_OFFICES_SECRETARY.handle), 'supervisor')
+  await register('led-c', asAgent(THE_TEST_OFFICES_SECRETARY.handle), 'supervisor')
+  setFixtureOwner(t.client.sqlite, idOf('leader-l'), idOf('led-b'), 'id')
+  setFixtureOwner(t.client.sqlite, idOf('led-b'), idOf('led-c'), 'id')
 }, 60_000)
 
 afterAll(async () => {
@@ -185,7 +200,7 @@ describe('the four who may file a session for an agent', () => {
     // WHAT TO DO INSTEAD, for an agent that wanted to start a run for a worker it did not register (
     // message HtiZpb6fcwb5: the old road of a supervisor filing such runs is dead, and the refusal says so).
     expect(said(refused.body)).toContain(
-      'To start a run for an agent you did not register, ask a secretary to file it, or register the agent yourself, as its starter.',
+      'To start a run for an agent you did not register and are not the recorded leader of, ask a secretary to file it, or register the agent yourself, as its starter.',
     )
     expect(howManyCalled(title)).toBe(0)
   })
@@ -351,5 +366,38 @@ describe(`the office's binding and the owner's press are their own acts (${THE_T
       }),
     ).toThrow("Admitting a registration files a session for the agent it admits, so it is the person's own press")
     expect(wrote).toBe(false)
+  })
+})
+
+describe("an agent's recorded leader files its sessions through the same door", () => {
+  it('(o) L, recorded as B\'s leader and not its starter, files a session for B: accepted', async () => {
+    const led = await file(asAgent('leader-l'), 'a session L files for B', forThe('led-b'))
+    expect(led.status, said(led.body)).toBe(201)
+  })
+
+  it('(p) L patches a session it filed for nobody so that it names B: accepted, and the session names B', async () => {
+    const plain = await file(asAgent('leader-l'), 'a session L files for nobody', {})
+    expect(plain.status, said(plain.body)).toBe(201)
+    const id = idIn(plain.body)
+    const named = await ask('PATCH', `/api/records/${id}`, asAgent('leader-l'), { dataPatch: forThe('led-b') })
+    expect(named.status, said(named.body)).toBe(200)
+    expect(dataOf(id)['servingAgent']).toBe('led-b')
+  })
+
+  it('(q) the stranger files one for B: refused, the sentence names the recorded leader, and nothing is written', async () => {
+    const title = 'a session the stranger files for B'
+    const refused = await file(asAgent('a-stranger'), title, forThe('led-b'))
+    expectTheRefusal(refused, 'led-b')
+    expect(said(refused.body)).toContain('its recorded leader')
+    expect(howManyCalled(title)).toBe(0)
+  })
+
+  it("(r) the leader of the leader gains nothing: L is refused for C, and B, C's leader, is accepted", async () => {
+    const title = 'a session L files for C'
+    const refused = await file(asAgent('leader-l'), title, forThe('led-c'))
+    expectTheRefusal(refused, 'led-c')
+    expect(howManyCalled(title)).toBe(0)
+    const byItsLeader = await file(asAgent('led-b'), 'a session B files for C', forThe('led-c'))
+    expect(byItsLeader.status, said(byItsLeader.body)).toBe(201)
   })
 })

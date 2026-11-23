@@ -54,8 +54,20 @@ export function isAnAbsolutePath(written, platform = THIS_PLATFORM) {
  * @returns {string}
  */
 export function howAFullPathIsWritten(name, platform = THIS_PLATFORM) {
-  if (platform === 'win32') return `such as C:\\Users\\<you>\\${name}`
-  return `starting with /, such as ${platform === 'darwin' ? '/Users' : '/home'}/<you>/${name}`
+  if (platform === 'win32') return `such as ${anExampleOfAFullPath(name, platform)}`
+  return `starting with /, such as ${anExampleOfAFullPath(name, platform)}`
+}
+
+/**
+ * The example alone: C:\Users\<you>\<name> on Windows, /home/<you>/<name> on Linux and /Users/<you>/<name> on the
+ * Mac. A refusal sent as a code carries it as a value, and its words say the rest.
+ * @param {string} name the last part of the example: the file or folder that is asked for
+ * @param {string} [platform] a value of `process.platform`
+ * @returns {string}
+ */
+export function anExampleOfAFullPath(name, platform = THIS_PLATFORM) {
+  if (platform === 'win32') return `C:\\Users\\<you>\\${name}`
+  return `${platform === 'darwin' ? '/Users' : '/home'}/<you>/${name}`
 }
 
 /**

@@ -26,8 +26,8 @@
  *   R1.  A row with no native data: the ask keeps it with no revision and says so. Another row marked after the ask is
  *        not taken: the start starts the kept row's model, with its effort, and no selection.
  *   R2.  No row in force: the ask keeps the run's model and says so. A row added after the ask is not taken.
- *   R3.  A row that casts another runtime: refused at the ask, with nothing written and nobody told. At the start, after
- *        the run's runtime was changed in the database, it fails in the same words.
+ *   R3.  A row that casts another runtime: the ask keeps the run. At the start, after
+ *        the run's runtime changed, it fails in the kept row's words: its program, model and the run's other runtime.
  *   R4.  A model of the wrong shape or provider: a row's model under another provider, and a run's model a command line
  *        cannot carry, are refused at the ask. At the start, after the kept entry was changed in the database to match,
  *        each fails in the same words.
@@ -47,7 +47,7 @@
  *
  * THE MUTATIONS, AFTER A CONTROL RUN, each alone, restored and checked with cmp:
  *   - theHoldOn answers null: R5 goes red at the ask and at the start;
- *   - the rule's check of another runtime is removed: R3 goes red at the ask and at the start;
+ *   - the rule's check of another runtime is removed: R3 goes red at the start;
  *   - the rule's provider part is removed: R4's row cases go red at the ask and at the start;
  *   - the rule's effort catch throws again: R6 goes red at the ask and at the start;
  *   - the start reads the row in force instead of the kept row: R1's start and R9 go red;
@@ -480,13 +480,20 @@ describe('R3. a row in force that casts another runtime', () => {
   let row = 0
   const cast = aModel('3')
 
-  it('at the ask: is refused in the row’s words, with nothing written and nobody told', async () => {
+  it('at the ask: keeps the run when no row casts its runtime', async () => {
     row = await aRow({ program: 'claude-code', model: cast })
-    const line = await aLine('rk-codex', { runtime: 'codex', run: { runtime: 'codex', model: underCodex('3-run') } })
-    await theAskIsRefused('rk-codex', line, anotherRuntime(row, cast, line.run, 'codex', false))
+    const model = underCodex('3-run')
+    const line = await aLine('rk-codex', { runtime: 'codex', run: { runtime: 'codex', model } })
+    const reply = await theAskIsTaken('rk-codex', line)
+    const says = `Casting row ${String(row)}, in force for ${THE_SUPERVISOR}, casts claude-code, and no row in force casts codex, the run's program, so the round keeps runtime codex and model ${model} from run ${line.run}.`
+    expect(reply['says']).toContain(says)
+    expect(theEntryOf(line.run)).toMatchObject({ row: null, model, unmatchedRow: { id: row, card: THE_SUPERVISOR, program: 'claude-code' } })
+    const started = await atTheStartingDoor(line.run)
+    expect(started.status, JSON.stringify(started.body)).toBe(200)
+    expect(started.body['round']).toMatchObject({ runtime: 'codex', model })
   })
 
-  it('at the start: a run whose runtime changed after the ask fails in the same words', async () => {
+  it('at the start: a run whose runtime changed after the ask fails in the kept row’s words', async () => {
     const line = await aLine('rk-turned')
     await theAskIsTaken('rk-turned', line)
     inTheDatabase(line.run, "json_set(data, '$.runtime', 'codex')")
@@ -732,7 +739,7 @@ describe('R10. the round launcher takes the kept row’s selection', () => {
       aRunWithNoTitleARoundCanTakeWords, theAgentsOwnWorktree, whyARunMayNotWorkIn,
       theClaudeCodeEnvironment: () => ({ env: {}, from: {} }), theSecretsFor: () => ({ lines: [] }), theCallerNamed: () => asTheWorker,
       theNameClaudeTakes: (name: string) => name, theNameCodexTakes: (name: string) => name,
-      readTheRoundsBacklog: async () => null, readTheRoundsDelegations: async () => null, theStandingStagesFor: async () => null,
+      readTheRoundsBacklog: async () => null, readTheRoundsDelegations: async () => null, readTheRoundsRules: async () => null, theStandingStagesFor: async () => null,
       prepareRoundChapters: ({ brief }: { brief: string }) => ({ manifest: {}, brief, workArea: null }), roundChaptersList: () => 'No chapters are delivered to this made-up round.',
       theCodexThreadOf: () => null, theOpenCodeSessionOf: () => null, refreshMainBeforeRun: () => {}, theHelperTakesStdin: () => false,
       theBriefWithTheStartingWords: (_sb: unknown, _runtime: string, brief: string) => brief,

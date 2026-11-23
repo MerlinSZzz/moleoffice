@@ -8,82 +8,73 @@
  * `delegationProgressColumn`, whose state is itself worked out from the package's append-only lists. Every call reads
  * again.
  *
- * A POINT WITH NO STATE IS A GAP AND NOT `todo`, and so is a point whose stored state names a word none of the four
- * does. It is counted in `noState` and in no state bucket, because counting it as `todo` would put work into the queue
- * that nobody placed there. A point whose `briefId` is missing or is not a non-empty string is in `inNoBrief`.
- * `carriedThreeBriefs` counts a point carried through three or more briefs while neither done nor dropped: a point
- * with no state has not moved, so it can be carried.
+ * A POINT WITH NO STATE IS A GAP AND NOT `todo`, because counting it as `todo` would put work into the queue that
+ * nobody placed there. One statement counts the points, and the rule for each count is written on it below.
  *
  * THE BRIEF IS THE INSIDE DELEGATION ONLY. A package for outside work has no parent and is not a brief; other projects
  * are not read at all. The reply's `says` sentence says which of those were counted and which were not.
  */
 
-import { BACKLOG_ITEM_KIND } from '@shared/backlog.ts'
-import { sql } from 'drizzle-orm'
+import { BACKLOG_ITEM_KIND, BACKLOG_ITEM_STATES, type BacklogItemState } from '@shared/backlog.ts'
+import { type SQL, notInArray, sql } from 'drizzle-orm'
+import { db } from '../db/client.ts'
 import { records } from '../db/schema.ts'
 import type {
   ProjectProgress,
   ProjectProgressBriefCounts,
   ProjectProgressPointCounts,
 } from '@shared/progress.ts'
-import type { PanelRecord } from '@shared/types.ts'
 import { delegationProgressColumn, type DelegationProgressReading } from './delegation.ts'
-import { listRecordsWithDataAs, onlyTheseFieldsOf } from './records.ts'
-
-/** A record's stored `data` as a plain bag, or an empty one when it is not an object. */
-function theDataOf(record: PanelRecord): Record<string, unknown> {
-  const data = record.data
-  return typeof data === 'object' && data !== null && !Array.isArray(data) ? (data as Record<string, unknown>) : {}
-}
-
-/** "A non-empty string", as the point's `briefId` must be to count as naming a brief. */
-function aNonEmptyString(value: unknown): value is string {
-  return typeof value === 'string' && value.length > 0
-}
+import { theRecordsListed } from './records.ts'
 
 /**
- * THE POINTS IN THEIR BUCKETS. A point's state is its stored `data.state`; exactly one of the four words counts in
- * that bucket, and everything else counts in `noState` and nowhere else. The two other counts read their fields from
- * the same stored bag, so a point is read once.
+ * THE POINTS IN THEIR BUCKETS, COUNTED BY ONE STATEMENT, so the server is handed the counts and not the points
+ * (decision OQR0WDVq0FkP). The points are the project's live points, narrowed by line when one is named, chosen by
+ * `theRecordsListed` as `listRecords` chooses them.
+ *
+ * - A point's state is its stored `data.state`. Each of the four buckets counts a point whose state is that word.
+ * - `noState` counts every other point: one with no state, a word none of the four, or a value that is not a string,
+ *   such as 1 or true. A bound word never equals a number in SQLite, so no such value lands in a bucket.
+ * - `inNoBrief` counts a point whose `briefId` is missing or is not a non-empty string. `json_type` tells a string
+ *   from an object or a list, which `json_extract` hands back as text.
+ * - `carriedThreeBriefs` counts a point whose `briefsCarried` is a number of 3 or more while it is neither done nor
+ *   dropped. A point with no state has not moved, so it can be carried: `IS NOT` keeps it, where `<>` would not.
+ * - A `data` that is not an object holds none of these fields.
+ *
+ * The kind and every state word are values, never words in the statement. A key written twice in one stored object is
+ * read at its first value here; the office writes `data` by JSON.stringify, which never writes a key twice.
  */
-function thePointCounts(points: readonly PanelRecord[]): ProjectProgressPointCounts {
-  const counts: ProjectProgressPointCounts = {
-    total: 0,
-    todo: 0,
-    doing: 0,
-    done: 0,
-    dropped: 0,
-    noState: 0,
-    inNoBrief: 0,
-    carriedThreeBriefs: 0,
+function thePointCounts(workspaceId: string, line: string | null): ProjectProgressPointCounts {
+  const theState = sql`json_extract(${records.data}, '$.state')`
+  const counted = (where: SQL): SQL<number> => sql<number>`count(*) FILTER (WHERE ${where})`
+  const isNot = (word: BacklogItemState): SQL => sql`${theState} IS NOT ${word}`
+  const byWord = Object.fromEntries(
+    BACKLOG_ITEM_STATES.map((word) => [word, counted(sql`${theState} = ${word}`)]),
+  ) as Record<BacklogItemState, SQL<number>>
+  const row = db
+    .select({
+      total: sql<number>`count(*)`,
+      ...byWord,
+      noState: counted(sql`${theState} IS NULL OR ${notInArray(theState, [...BACKLOG_ITEM_STATES])}`),
+      inNoBrief: counted(
+        sql`json_type(${records.data}, '$.briefId') IS NOT 'text' OR json_extract(${records.data}, '$.briefId') = ''`,
+      ),
+      carriedThreeBriefs: counted(
+        sql`json_type(${records.data}, '$.briefsCarried') IN ('integer', 'real')
+          AND json_extract(${records.data}, '$.briefsCarried') >= 3 AND ${isNot('done')} AND ${isNot('dropped')}`,
+      ),
+    })
+    .from(records)
+    .where(theRecordsListed({
+      workspaceId,
+      kind: BACKLOG_ITEM_KIND,
+      ...(line === null ? {} : { alsoWhere: sql`json_extract(${records.data}, '$.line') = ${line}` }),
+    }))
+    .get()
+  if (row === undefined) {
+    throw new Error('SQLite answered no row for the point counts, where a count with no GROUP BY answers one.')
   }
-  for (const point of points) {
-    counts.total += 1
-    const data = theDataOf(point)
-    const state = data['state']
-    switch (state) {
-      case 'todo':
-        counts.todo += 1
-        break
-      case 'doing':
-        counts.doing += 1
-        break
-      case 'done':
-        counts.done += 1
-        break
-      case 'dropped':
-        counts.dropped += 1
-        break
-      default:
-        counts.noState += 1
-    }
-    if (!aNonEmptyString(data['briefId'])) counts.inNoBrief += 1
-    const carried = data['briefsCarried']
-    if (typeof carried === 'number' && carried >= 3 && state !== 'done' && state !== 'dropped') {
-      counts.carriedThreeBriefs += 1
-    }
-  }
-  return counts
+  return row
 }
 
 /**
@@ -157,15 +148,10 @@ function theSays(counts: {
  * says. `couldNotRead` is the delegation column's own list, unchanged.
  */
 export function theProjectProgress(workspaceId: string, line: string | null): ProjectProgress {
-  const points = listRecordsWithDataAs({
-    workspaceId,
-    kind: BACKLOG_ITEM_KIND,
-    ...(line === null ? {} : { alsoWhere: sql`json_extract(${records.data}, '$.line') = ${line}` }),
-  }, onlyTheseFieldsOf(['state', 'briefId', 'briefsCarried']))
   const briefs = delegationProgressColumn(workspaceId)
   const progress: ProjectProgress = {
     line,
-    points: thePointCounts(points),
+    points: thePointCounts(workspaceId, line),
     briefs: theBriefCounts(briefs.rows),
     couldNotRead: briefs.couldNotRead,
     says: '',

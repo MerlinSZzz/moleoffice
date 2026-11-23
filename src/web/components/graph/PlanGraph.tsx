@@ -141,11 +141,11 @@ import {
   Absence,
   DepthLadder,
   ErrorNote,
-  Explain,
   gateWordsForReader,
   Hint,
   Loading,
   Panel,
+  ServerNote,
   StoredState,
   Tag,
   useNarrow,
@@ -197,6 +197,7 @@ import {
 import { cardsHere, setCardHere, subscribeToCards } from './cardhere.ts'
 import { useDetail } from '../../lib/detailchoice.ts'
 import type { Rung } from '@shared/detail.ts'
+import { declaredAttributes } from '../declares.ts'
 import { DrawingControl, DrawingControls, sameZoom } from './controls.tsx'
 import { buildStructureGraph, placeOf, scopeKey, type GraphNode, type StructureGraph } from './model.ts'
 import type { PlanGraphEdge, PlanGraphNode, PlanGraphReply } from '../../../server/api/plan-graph.ts'
@@ -308,8 +309,6 @@ export interface PlanBand {
   anchor: PlanGraphNode | null
   /** What the band is called, built from its own records. Never a template with a number in it. */
   heading: string
-  /** Why it is called that, so the heading is not the only thing carrying the claim. */
-  headingWhy: string
   allocated: number
   /** Set when every card is one straight run of one link type — drawn as a row of chips. */
   run: StraightRun | null
@@ -355,26 +354,23 @@ function topAnchorOf(nodes: readonly PlanGraphNode[]): string | null {
 }
 
 /** What one band is called, and the sentence saying where the name came from. */
-function nameBand(nodes: readonly PlanGraphNode[]): { heading: string; headingWhy: string } {
+function nameBand(nodes: readonly PlanGraphNode[]): { heading: string } {
   const goal = nodes.find((node) => node.role === 'goal')
   if (goal !== undefined) {
     return {
       heading: t('g8.graph.goal', { value1: goal.name }),
-      headingWhy: t('g8.graph.namedAfterTheGoalInItTheWorkIn'),
     }
   }
   const deadline = nodes.find((node) => node.role === 'deadline')
   if (deadline !== undefined) {
     return {
       heading: t('g8.graph.toward', { value1: deadline.name }),
-      headingWhy: t('g8.graph.namedAfterTheDeadlineInItThatIsThe'),
     }
   }
   const direction = nodes.find((node) => node.role === 'direction')
   if (direction !== undefined) {
     return {
       heading: t('g8.graph.exploring', { value1: direction.name }),
-      headingWhy: t('g8.graph.namedAfterTheFutureDirectionInItDrawingA'),
     }
   }
   // THE REPEATED LINE, HOISTED. Five wave cards each printed "in Mole Office development campaign — waves
@@ -384,14 +380,11 @@ function nameBand(nodes: readonly PlanGraphNode[]): { heading: string; headingWh
   if (within !== null && nodes.every((node) => node.within === within)) {
     return {
       heading: within,
-      headingWhy: t('g8.graph.everyRecordInThisGroupBelongsToThatPipeline'),
     }
   }
   const first = nodes[0]
   return {
     heading: first === undefined ? t('g8.graph.unnamedGroup') : first.name,
-    headingWhy:
-      t('g8.graph.nothingInThisGroupIsADeadlineOrA'),
   }
 }
 
@@ -708,7 +701,7 @@ export function PlanGraphView({
           so the row and the picture cannot say different numbers; the paragraph that says the same
           thing at length is behind inspect, and it is the whole answer when there is nothing to
           draw, which is why an empty drawing still prints it. */}
-      {inspect ? <p className="pg-note">{reply.note}</p> : reply.nodes.length === 0 ? <Absence title={t('g8.graph.nothingDrawn')} /> : null}
+      {inspect ? <ServerNote text={reply.note} /> : reply.nodes.length === 0 ? <Absence title={t('g8.graph.nothingDrawn')} /> : null}
 
       {/* THE SUMMARY, MARKED AS ONE. Owner, on this row: *"we could place them in a grey block like
           the '>' render in markdown"*. `px-sum` is that block — grey ground, a left rule, the word
@@ -870,16 +863,10 @@ export function PlanGraphView({
       {reply.omitted.length === 0 ? (
         <p className="pg-omitted-none"><Absence title={t('g8.graph.nothingIsLeftOutOfThisDrawing')} /></p>
       ) : (
-        <Explain declares={{ surface: 'plan.omitted' }}
-          meaning={
-            <span>
-              <b className="num">{omittedTotal}</b> {t('g8.graph.omittedRecords', { n: omittedTotal })}
-            </span>
-          }
-          opens={t('g8.graph.whatIsLeftOutAndWhy')}
-          holds={{ count: reply.omitted.length, what: t('g8.graph.reasons', { n: reply.omitted.length }) }}
-          open={inspect}
-        >
+        <div className="pg-omitted-all" {...declaredAttributes({ surface: 'plan.omitted' })}>
+          <p className="pg-omitted-count">
+            <b className="num">{omittedTotal}</b> {t('g8.graph.omittedRecords', { n: omittedTotal })}
+          </p>
           {/* A NUMBERED LIST, BECAUSE IT IS A LIST. Owner: *"no numerical render like the '1. 2.' or
               '-' or '*' in markdown to make those lists look organized"*. Five reasons ran together
               as five unmarked paragraphs, each ending in a long clause; the count and the thing are
@@ -890,45 +877,30 @@ export function PlanGraphView({
                 <span className="pg-omitted-what">
                   <b className="num">{entry.count}</b> {inspect ? entry.what : entry.what.replace(reply.workspaceId, projectName(reply.workspaceId, reply.workspaceTitle))}
                 </span>
-                <span className="pg-omitted-why">{entry.why}</span>
+                <ServerNote text={entry.why} />
               </li>
             ))}
           </ol>
-        </Explain>
+        </div>
       )}
-
-      {inspect ? (
-        <Explain declares={{ surface: 'plan.drawing' }}
-          meaning={<span>{t('g8.graph.layoutDerivedExceptWhereSomebodyMovedACard')}</span>}
-          opens={t('g8.graph.whatIsStoredAndWhatIsWorkedOutAgain')}
-          holds={{ count: 3, what: t('g8.graph.statementsAboutThisDrawing') }}
-        >
-          <p className="pg-prose">
-            <b>{t('g8.graph.stored')}</b> {t('g8.graph.theRecordsDrawnAsBoxesTheLinksBetweenThem')}</p>
-          <p className="pg-prose">
-            <b>{t('g8.graph.workedOutAgainOnEveryDrawAndNeverStored')}</b> {t('g8.graph.everyPositionEveryLineEveryBoxSizeWhichGroup')}</p>
-          <p className="pg-prose">
-            <b>{t('g8.graph.notComputedHereAtAll')}</b> {t('g8.graph.whetherADeadlineHasPassed')}<code>{t('g8.graph.due')}</code> {t('g8.graph.isPrintedExactlyAsItIsStoredIncludingWhen')}</p>
-        </Explain>
-      ) : null}
     </Panel>
   )
 }
 
 /**
- * WHAT A ROLE IS CALLED, AND WHAT THAT NAME MEANS — one table, two readers.
+ * WHAT A ROLE IS CALLED — one table, two readers.
  *
  * The key said *"future direction — planned, not adopted"* and `roleWords` said the same clause on
  * every card, as two separate string literals with nothing making them agree. That is the defect
  * CLAUDE.md names, and the owner found the other half of it first: *"'future direction — planned,
  * not adopted' is bad, it is too much for a block or type description"*. A key entry is a NAME. So
- * `word` is what a reader sees — one word — and `means` is the sentence, which lives in the `title`
- * of the thing it is about rather than beside it in first-glance space.
+ * each row holds one `word` and nothing else. The legend draws that word. The card's role line
+ * draws the same word. Neither carries a sentence about the role, not even in a `title`.
  */
 export const ROLE_KEY = {
-  goal: { get word() { return t('g8.graph.goalAt708') }, get means() { return t('g8.graph.whatTheWorkDrawnUnderItIsFor') } },
-  deadline: { get word() { return t('g8.graph.deadline') }, get means() { return t('g8.graph.somebodyOutsideIsWaitingOnIt') } },
-  direction: { get word() { return t('g8.graph.direction') }, get means() { return t('g8.graph.plannedAndNeverAdoptedByBeingDrawn') } },
+  goal: { get word() { return t('g8.graph.goalAt708') } },
+  deadline: { get word() { return t('g8.graph.deadline') } },
+  direction: { get word() { return t('g8.graph.direction') } },
 } as const
 
 /**
@@ -940,9 +912,9 @@ export const ROLE_KEY = {
  * it is eight entries of one or two words in two columns, and on the canvas it is drawn INSIDE the
  * pane, boxed, in the corner, exactly as a plot's legend sits inside its axes (`PlanPane`).
  *
- * NOTHING WAS DELETED. Every clause that was printed here is now the `title` of the entry it
- * belongs to, and the role sentences come from `ROLE_KEY` — the same table `roleWords` reads, so
- * the key and the cards cannot say two different things about what a direction is.
+ * EACH ENTRY DRAWS ONE OR TWO WORDS AND CARRIES NO SENTENCE, not even in a `title`. The role words
+ * come from `ROLE_KEY`, the table the cards read through `roleWords`, so the key and the cards
+ * cannot say two different things about what a direction is.
  *
  * Every sample is the real thing at its real size: the line samples are drawn by the same
  * `LINE_FAMILY_STYLE` table the canvas strokes from, so a family whose weight changes changes here
@@ -954,28 +926,28 @@ export function Legend({ placed }: { placed?: boolean }) {
       className={placed === true ? 'pg-legend pg-legend-placed' : 'pg-legend'}
       aria-label={t('g8.graph.whatTheMarksAndTheLinesOnThisDrawing')}
     >
-      <li title={t('g8.graph.aGoal', { value1: ROLE_KEY.goal.means })}>
+      <li>
         <span className="pg-key" data-role="goal" />
         {ROLE_KEY.goal.word}
       </li>
-      <li title={t('g8.graph.aDeadline', { value1: ROLE_KEY.deadline.means })}>
+      <li>
         <span className="pg-key" data-role="deadline" />
         {ROLE_KEY.deadline.word}
       </li>
-      <li title={t('g8.graph.aFutureDirection', { value1: ROLE_KEY.direction.means })}>
+      <li>
         <span className="pg-key" data-role="direction" />
         {ROLE_KEY.direction.word}
       </li>
-      <li title={t('g8.graph.thisWeekOrMonthOrDayGivesItTime')}>
+      <li>
         <span className="pg-key" data-plan="allocated" />
         <span className="pg-mark">■</span> {t('g8.graph.hasTime')}</li>
-      <li title={t('g8.graph.nothingInThisPeriodGivesItTime')}>
+      <li>
         <span className="pg-key" data-plan="unallocated" />
         <span className="pg-mark">□</span> {t('g8.graph.noTime')}</li>
       {LINK_FAMILIES.map((family) => {
         const style = LINE_FAMILY_STYLE[family]
         return (
-          <li key={family} title={style.note}>
+          <li key={family}>
             <svg className="pg-key-line" width="28" height="12" aria-hidden="true">
               <defs>
                 <marker
@@ -1005,7 +977,7 @@ export function Legend({ placed }: { placed?: boolean }) {
           `related` never has one. `relates to` is the one type shared/types.ts marks symmetric and
           it is drawn without a head; `about` reads `about` one way and `subject of` the other, so
           it keeps its head and stays dotted. */}
-      <li title={t('g8.graph.anArrowHeadMeansTheLinkReadsOneWay')}>
+      <li>
         <svg className="pg-key-line" width="28" height="12" aria-hidden="true">
           <defs>
             <marker
@@ -1057,21 +1029,13 @@ function dueWords(due: unknown): string {
 
 /**
  * The role, in the words the legend uses — and now literally out of the legend's own table, so the
- * key and the cards cannot drift. What the word MEANS is the row's `title`, never a clause beside it.
+ * key and the cards cannot drift. The card's role line draws the word alone, with no `title`.
  */
 function roleWords(node: PlanGraphNode): string {
   if (node.role === 'goal') return ROLE_KEY.goal.word
   if (node.role === 'deadline') return ROLE_KEY.deadline.word
   if (node.role === 'direction') return ROLE_KEY.direction.word
   return kindWord(node.kind).text
-}
-
-/** The sentence behind that word, for the `title` of the line that carries it. Null for work. */
-function roleMeans(node: PlanGraphNode): string | undefined {
-  if (node.role === 'goal') return t('g8.graph.aGoal', { value1: ROLE_KEY.goal.means })
-  if (node.role === 'deadline') return t('g8.graph.aDeadline', { value1: ROLE_KEY.deadline.means })
-  if (node.role === 'direction') return t('g8.graph.aFutureDirection', { value1: ROLE_KEY.direction.means })
-  return undefined
 }
 
 /**
@@ -1246,7 +1210,7 @@ function PlanCard({ node }: { node: PlanGraphNode }) {
         </button>
       </div>
 
-      <p className="pg-card-role" title={roleMeans(node)}>
+      <p className="pg-card-role">
         {roleWords(node)}
       </p>
 
@@ -1931,12 +1895,10 @@ function BandHead({
   band,
   folded,
   onToggle,
-  inspect,
 }: {
   band: PlanBand
   folded: boolean
   onToggle: () => void
-  inspect: boolean
 }) {
   return (
     <div className="pg-band-head">
@@ -1972,16 +1934,11 @@ function BandHead({
               a true answer nothing on the screen was giving: they share no link at all. 78px of grey
               was carrying the whole claim, and a gap that size reads as a tier, not a separation. */}
           <b className="num">{band.crossings}</b> {band.crossings === 1 ? t('g8.onePlan.line') : t('g8.onePlan.lines')} {t('g8.graph.toAnotherGroup')}</p>
-        {inspect ? <p className="pg-band-why">{band.headingWhy}</p> : null}
         {folded ? (
           <p className="pg-band-why">
             {/* A group of one record said "Folded because it is on this period's plan" here, which is
                 the opposite of why it was folded: nothing in it has time in this period. */}
-            {band.allocated === 0
-              ? band.nodes.length === 1
-                ? t('planNotes.graph.foldedOneNotOnThePlan')
-                : t('g8.graph.foldedBecauseOnThisPeriodSPlan', { value1: t('g8.graph.nothingInItIs') })
-              : t('g8.graph.folded')}
+            {t('g8.graph.folded')}
           </p>
         ) : null}
       </div>
@@ -2083,7 +2040,6 @@ function PlanLayers(props: PlanCanvasProps) {
               band={band}
               folded={folded.has(band.key)}
               onToggle={() => onToggleBand(band.key)}
-              inspect={inspect}
             />
             {folded.has(band.key) ? null : <BandBody band={band} drawn={drawn.get(band.key)} props={props} />}
           </section>
@@ -2246,16 +2202,6 @@ const PLAN_GRAPH_CSS = `
 /* Position relative because the hidden boxes that get measured are positioned, and they are placed
    off to the left of THIS box rather than of whatever happens to be positioned further up. */
 .pg { position: relative; display: flex; flex-direction: column; gap: var(--gut); min-width: 0; }
-.pg-prose { font-size: var(--fs-1); line-height: var(--lh-read); color: var(--text-2); max-width: var(--measure-in-box); }
-.pg-prose + .pg-prose { margin-top: var(--pad); }
-.pg-prose code { font-family: var(--font-mono); font-size: 0.94em; }
-.pg-note {
-  font-size: var(--fs-2);
-  line-height: var(--lh-read);
-  color: var(--text);
-  max-width: var(--measure-in-box);
-  margin-bottom: var(--pad);
-}
 /* The days and the project, inside the summary block rather than as a third line of their own. */
 .pg-where {
   display: flex;
@@ -2742,7 +2688,7 @@ ${FAMILY_CSS}
 .pg-gone { color: var(--st-failed); }
 
 /* ---- what is left out ---- */
-.pg-omitted, .pg-omitted-none {
+.pg-omitted, .pg-omitted-none, .pg-omitted-count {
   margin-top: var(--pad);
   font-size: var(--fs-1);
   line-height: var(--lh-read);
@@ -2753,7 +2699,6 @@ ${FAMILY_CSS}
 .pg-omitted { list-style: decimal; padding-left: 1.6rem; display: flex; flex-direction: column; gap: 5px; }
 .pg-omitted li::marker { color: var(--text-3); font-variant-numeric: tabular-nums; }
 .pg-omitted-what { display: block; color: var(--text); }
-.pg-omitted-why { display: block; color: var(--text-3); }
 .pg-omitted .num { color: var(--text); font-weight: 700; }
 
 @media (max-width: 480px) {

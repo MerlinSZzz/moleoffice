@@ -237,9 +237,10 @@ function theOpenCodeSessionInfo(row: Record<string, unknown>): Record<string, un
  * ONE OPENCODE SESSION AS THE RUNTIME'S OWN EXPORT READS IT: the session row, then its messages and each message's
  * parts, in the order the runtime writes them. The database is opened read-only and never written; a store that is not
  * there, a session that is not in it, a row that is not JSON, or a session over the bound is said in its own state.
- * The returned text is the raw export, before this file's scrub.
+ * The returned text is the raw export, before this file's scrub. The bound is the sync's copy unless the caller
+ * names its own: the conversation export reads a session whole, up to the bytes one export carries.
  */
-export function theOpenCodeExport(database: string, session: string): AnOpenCodeExport {
+export function theOpenCodeExport(database: string, session: string, limit: number = CONVERSATION_SYNC_MAX_BYTES): AnOpenCodeExport {
   let store: Database.Database
   try {
     store = new Database(database, { readonly: true, fileMustExist: true })
@@ -258,10 +259,10 @@ export function theOpenCodeExport(database: string, session: string): AnOpenCode
       )
       .get(session, session) as { messages: number; parts: number }
     const rough = Number(sizes.messages) + Number(sizes.parts)
-    if (rough > CONVERSATION_SYNC_MAX_BYTES) {
+    if (rough > limit) {
       return {
         state: 'too-large',
-        says: `OpenCode session ${session} holds at least ${String(rough)} bytes of messages and parts, over the ${String(CONVERSATION_SYNC_MAX_BYTES)}-byte limit, so it was left out.`,
+        says: `OpenCode session ${session} holds at least ${String(rough)} bytes of messages and parts, over the ${String(limit)}-byte limit, so it was left out.`,
       }
     }
     const messages = store.prepare('select id, data from message where session_id = ? order by time_created, id').all(session) as {
@@ -278,10 +279,10 @@ export function theOpenCodeExport(database: string, session: string): AnOpenCode
     }
     const text = `${JSON.stringify(exported, null, 2)}\n`
     const bytes = Buffer.byteLength(text, 'utf8')
-    return bytes > CONVERSATION_SYNC_MAX_BYTES
+    return bytes > limit
       ? {
           state: 'too-large',
-          says: `The OpenCode export of ${session} is ${String(bytes)} bytes, over the ${String(CONVERSATION_SYNC_MAX_BYTES)}-byte limit, so it was left out.`,
+          says: `The OpenCode export of ${session} is ${String(bytes)} bytes, over the ${String(limit)}-byte limit, so it was left out.`,
         }
       : { state: 'synced', text, bytes }
   } catch (why) {
@@ -387,6 +388,97 @@ function theConversationFile(
   return { kind: 'none', says: `A ${runtime} conversation is not one this release reads.` }
 }
 
+/** Which of a run's three fields is missing or unfit, in the order the sync and the export ask. */
+export type ConversationNotNamedWhy = 'no-runtime' | 'runtime-not-read' | 'no-conversation-id' | 'conversation-id-unfit' | 'no-working-directory'
+
+/** What a run's record names of its conversation, or the first field that is missing or unfit and the sync's sentence for it. */
+export type TheConversationARunNames =
+  | { named: true; runtime: string; providerSession: string; workingDirectory: string }
+  | { named: false; why: ConversationNotNamedWhy; says: string; runtime: string | null; providerSession: string | null }
+
+/**
+ * WHAT A RUN'S RECORD NAMES OF ITS CONVERSATION: the runtime, the conversation id and the working directory. The sync
+ * and the conversation export both ask here, so a run one of them reads is a run the other reads, and they refuse the
+ * rest for the same reason in the same order. The sentences are the ones the sync writes on the run's copy.
+ */
+export function theConversationARunNames(
+  runtime: string | null,
+  providerSession: string | null,
+  workingDirectory: string | null,
+): TheConversationARunNames {
+  const notNamed = (why: ConversationNotNamedWhy, says: string): TheConversationARunNames => ({ named: false, why, says, runtime, providerSession })
+  if (runtime === null) return notNamed('no-runtime', 'No runtime was recorded for this run, so its conversation cannot be found and nothing was guessed.')
+  if (!theRuntimeHasAConversationFile(runtime)) return notNamed('runtime-not-read', `A ${runtime} conversation is not one this release reads.`)
+  if (providerSession === null) return notNamed('no-conversation-id', 'No conversation id was recorded for this run, so there is no file to read.')
+  if (!aProviderIdForAFileStem(providerSession)) {
+    return notNamed(
+      'conversation-id-unfit',
+      `The conversation id "${providerSession}" cannot be used as a file name: only letters, digits, underscore and hyphen are used, so no file was read.`,
+    )
+  }
+  if (workingDirectory === null) return notNamed('no-working-directory', 'No working directory was recorded for this run, so its conversation cannot be found.')
+  return { named: true, runtime, providerSession, workingDirectory }
+}
+
+/** What one run's conversation read whole gave: its scrubbed words and the scrub's counts, or why it was not read. */
+export type AWholeConversation =
+  | { read: true; text: string; shape: 'lines' | 'whole'; pathsMapped: number; secretsRemoved: number; secretShapes: string[] }
+  | { read: false; why: 'not-there' | 'unreadable' | 'over-the-line'; says: string }
+
+/**
+ * ONE RUN'S CONVERSATION READ WHOLE, for the conversation export. It is found where the sync finds it and scrubbed as
+ * the sync scrubs it: a Claude Code or Codex transcript as lines of text, an OpenCode session through its own export
+ * walked as JSON. The only difference is the bound: the sync copies at most its own bytes, and this reads up to the
+ * bytes the caller names. Nothing is written. The sentence of a conversation not read has its paths scrubbed.
+ */
+export function theWholeConversationOf(
+  named: { runtime: string; providerSession: string; workingDirectory: string },
+  servingAgent: string | null,
+  paths: readonly ConversationPath[],
+  limit: number,
+  env: Record<string, string | undefined> = process.env,
+): AWholeConversation {
+  const located = theConversationFile(named.runtime, named.providerSession, named.workingDirectory, env, servingAgent)
+  if (located.kind === 'none') return { read: false, why: 'not-there', says: scrubConversationPath(located.says, paths) }
+  if (located.kind === 'opencode') {
+    const read = theOpenCodeExport(located.database, located.session, limit)
+    if (read.state !== 'synced') {
+      const why = read.state === 'missing' ? 'not-there' : read.state === 'too-large' ? 'over-the-line' : 'unreadable'
+      return { read: false, why, says: scrubConversationPath(read.says, paths) }
+    }
+    return { read: true, shape: 'whole', ...theScrubbedOpenCodeExport(read.text, paths) }
+  }
+  let size: number
+  try {
+    size = statSync(located.file).size
+  } catch {
+    return { read: false, why: 'not-there', says: `The conversation file is not there: ${scrubConversationPath(located.file, paths)}.` }
+  }
+  if (size > limit) {
+    return { read: false, why: 'over-the-line', says: `The conversation file is ${String(size)} bytes, over the ${String(limit)}-byte limit.` }
+  }
+  let text: string
+  try {
+    text = readFileSync(located.file, 'utf8')
+  } catch {
+    return { read: false, why: 'unreadable', says: `The conversation file could not be read: ${scrubConversationPath(located.file, paths)}.` }
+  }
+  const scrubbed = scrubConversation(text, paths)
+  return { read: true, shape: 'lines', ...scrubbed }
+}
+
+/**
+ * THE PATH MAP ONE RUN'S EXPORT IS SCRUBBED WITH: the map the sync keeps for this workspace, with this run's checkout
+ * and the latest runs' checkouts added where the map does not hold them yet, as the sync adds them. Nothing is written.
+ */
+export function thePathMapForOneRun(
+  workspaceId: string,
+  run: { id: string; title: string; data: Record<string, unknown> },
+  env: Record<string, string | undefined> = process.env,
+): ConversationPath[] {
+  return pathsForTheRuns(env, [run, ...theLatestRuns(workspaceId)], readTheSyncSetting(workspaceId)?.paths ?? [])
+}
+
 /** A copy that did not sync, with the sentence that says why. */
 function aCopyThatDidNotSync(
   runtime: string | null,
@@ -438,47 +530,16 @@ export function runTheConversationSync(
   for (const run of runs) {
     const stored = bagOf(run.data[CONVERSATION_SYNC_FIELD])
     const previous = stored as unknown as ConversationCopy | null
-    const runtime = textOf(run.data['runtime'])
-    const providerSession = textOf(run.data['providerSession'])
-    const workingDirectory = textOf(run.data['workingDirectory'])
     const servingAgent = textOf(run.data['servingAgent'])
+    const named = theConversationARunNames(textOf(run.data['runtime']), textOf(run.data['providerSession']), textOf(run.data['workingDirectory']))
+    if (!named.named) {
+      const copy = aCopyThatDidNotSync(named.runtime, named.providerSession, 'not-synced', named.says, previous)
+      counts['not-synced'] += 1
+      writeTheCopy(run.id, copy, previous, actor)
+      continue
+    }
+    const { runtime, providerSession, workingDirectory } = named
     const mark = theRuntimeMark(runtime)
-    if (runtime === null) {
-      const copy = aCopyThatDidNotSync(null, providerSession, 'not-synced', 'No runtime was recorded for this run, so its conversation cannot be found and nothing was guessed.', previous)
-      counts['not-synced'] += 1
-      writeTheCopy(run.id, copy, previous, actor)
-      continue
-    }
-    if (!theRuntimeHasAConversationFile(runtime)) {
-      const copy = aCopyThatDidNotSync(runtime, providerSession, 'not-synced', `A ${runtime} conversation is not one this release reads.`, previous)
-      counts['not-synced'] += 1
-      writeTheCopy(run.id, copy, previous, actor)
-      continue
-    }
-    if (providerSession === null) {
-      const copy = aCopyThatDidNotSync(runtime, null, 'not-synced', 'No conversation id was recorded for this run, so there is no file to read.', previous)
-      counts['not-synced'] += 1
-      writeTheCopy(run.id, copy, previous, actor)
-      continue
-    }
-    if (!aProviderIdForAFileStem(providerSession)) {
-      const copy = aCopyThatDidNotSync(
-        runtime,
-        providerSession,
-        'not-synced',
-        `The conversation id "${providerSession}" cannot be used as a file name: only letters, digits, underscore and hyphen are used, so no file was read.`,
-        previous,
-      )
-      counts['not-synced'] += 1
-      writeTheCopy(run.id, copy, previous, actor)
-      continue
-    }
-    if (workingDirectory === null) {
-      const copy = aCopyThatDidNotSync(runtime, providerSession, 'not-synced', 'No working directory was recorded for this run, so its conversation cannot be found.', previous)
-      counts['not-synced'] += 1
-      writeTheCopy(run.id, copy, previous, actor)
-      continue
-    }
     if (filesRead >= CONVERSATION_SYNC_MAX_FILES) {
       overCount += 1
       counts['not-synced'] += 1

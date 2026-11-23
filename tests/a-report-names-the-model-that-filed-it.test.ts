@@ -12,7 +12,8 @@
  * WHAT THIS FILE PROVES, in a real browser, in English and in Chinese:
  *   1. a report an agent filed from a run on a named model says the agent's name and never the model's;
  *   2. a report an agent filed from a run that recorded no model says the same, with no sentence about the gap;
- *   3. a report the person filed has no filer line at all in normal mode.
+ *   3. a report the person filed has no filer line at all in normal mode. This one runs in English only: it reads no
+ *      words, and whether the line is drawn does not depend on the page's language.
  *
  * MUTATION, after a control run: in `filedHere` (src/web/pages/RecordPage.tsx), answer the old model sentence for an
  * agent in normal mode again. Cases 1 and 2 go red in both languages.
@@ -102,7 +103,7 @@ for (const lang of ['en', 'zh'] as const) {
     expect(said, 'a sentence about a missing model is back').not.toContain('model')
   }, 120_000)
 
-  it(`a report the person filed has no filer line in normal mode (${lang})`, async () => {
+  if (lang === 'en') it(`a report the person filed has no filer line in normal mode (${lang})`, async () => {
     expect(await theFilerLine(filed.byThePerson, lang)).toBeNull()
   }, 120_000)
 }

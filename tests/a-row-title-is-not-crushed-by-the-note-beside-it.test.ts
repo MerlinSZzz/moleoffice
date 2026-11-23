@@ -25,8 +25,8 @@
  * Home's Late or stuck rows draw a long title with a state line above it and the project under it.
  * They stand in Needs you, and the person chooses where on Home Needs you goes. Its narrowest place
  * is the second column, about a third of the board at 1440. So this test keeps that layout for the
- * person before it opens Home: Needs you alone in the second column, Agents at work and Schedule in
- * the first. With nothing kept, Needs you is in one column as wide as the board, and there these
+ * person before it opens Home: Needs you alone in the second column, and every other part where
+ * Home's first layout puts it. With nothing kept, Needs you is in one column as wide as the board, and there these
  * titles fit on one line and cannot fill their row. The two claims are measured in the narrow place:
  *
  *   1. THE SHAPE. Nothing in a Late or stuck row is drawn beside the title: the state line ends
@@ -46,7 +46,7 @@
 
 import type { Page } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import type { HomeLayout } from '../src/shared/home-layout.ts'
+import { HOME_LAYOUT_A, movePart, type HomeLayout } from '../src/shared/home-layout.ts'
 import { THE_TEST_OFFICES_OWNER } from './a-page-of-a-test-office.ts'
 import { liveApp, type LiveApp } from './helpers.ts'
 
@@ -96,7 +96,7 @@ beforeAll(async () => {
   }
 
   // NEEDS YOU ALONE IN THE SECOND COLUMN, kept for the person, so Late or stuck stands in Home's narrowest place.
-  const narrow: HomeLayout = { band: [], first: ['agents', 'schedule'], second: ['needs'] }
+  const narrow: HomeLayout = movePart(HOME_LAYOUT_A, 'needs', 'second', 0)
   const kept = await fetch(`${app.api}/api/home-layout`, {
     method: 'PUT',
     headers: {
@@ -110,6 +110,8 @@ beforeAll(async () => {
 
   await page.goto(`http://127.0.0.1:${String(app.webPort)}/#/`, { waitUntil: 'domcontentloaded' })
   await page.reload({ waitUntil: 'domcontentloaded' })
+  // LATE OR STUCK IS ONE NUMBER, and pressing it opens its list.
+  await page.locator('[data-home-section="late"] summary').click({ timeout: 60_000 })
   await page.waitForSelector('[data-home-section="late"] .hm-alarm-row', { timeout: 60_000 })
 }, 300_000)
 

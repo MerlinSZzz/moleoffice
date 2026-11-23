@@ -41,17 +41,19 @@ import { openTheChatAt } from '../../lib/open-chat.ts'
  * THE ORDER THE RIGHT-CLICK IS READ IN, AND WHY THAT ORDER
  * ---------------------------------------------------------------------------------------
  *
- *   1  a box you type in   -> leave it alone. The browser's own menu, so paste, spell-check and
+ *   1  a view in its own   -> leave it alone. The person chose it with the view's switch, as on
+ *      state                 a terminal, for its own copy and paste.
+ *   2  a box you type in   -> leave it alone. The browser's own menu, so paste, spell-check and
  *                            look-up are reachable in every box in the product. Contract 5.5.
- *   2  `button === -1`      -> a menu raised from the keyboard. Never blocked by Shift.
- *   3  touch or pen        -> a touch hold is handled below; a pen keeps its platform behaviour.
- *   4  `shiftKey`          -> leave it alone. The browser's own menu.
- *   5  otherwise           -> a pointer, and Mole Office takes it wherever it lands.
+ *   3  `button === -1`      -> a menu raised from the keyboard. Never blocked by Shift.
+ *   4  touch or pen        -> a touch hold is handled below; a pen keeps its platform behaviour.
+ *   5  `shiftKey`          -> leave it alone. The browser's own menu.
+ *   6  otherwise           -> a pointer, and Mole Office takes it wherever it lands.
  *
  * The keyboard test comes ahead of the rest, and that order is measured rather than chosen. Claim
  * `wKR0jkvl_7sz`, three engines, headless and headed, 20 August 2026: Chromium raises `Shift+F10`
  * with `shiftKey === false` and `button === -1`. An engine that reported `shiftKey === true` for the
- * same keys would otherwise fall into rule 4 and the keyboard route would never run at all.
+ * same keys would otherwise fall into rule 5 and the keyboard route would never run at all.
  *
  * The same measurement killed the test this file replaces. `PointingLayer.tsx` detected the keyboard
  * with `clientX === 0 && clientY === 0`. The measured event arrived at `(56, 98)` — the centre of the
@@ -69,7 +71,7 @@ import { isTheComposersOwn } from '@shared/surfaces.ts'
 import { draftAbout } from '../../lib/drafts.ts'
 import { makeBroadcast } from '../../lib/store.ts'
 import { clearSubject, setSubject } from './MarkLayer.tsx'
-import { addressableAt, isInThePage, pointableInThePage, pointedAt, thePage, type Pointed } from './pointing.ts'
+import { addressableAt, heldWords, isInThePage, pointableInThePage, pointedAt, thePage, type Pointed } from './pointing.ts'
 import type { ChangeAsked } from './TalkBox.tsx'
 
 // ============================================================================ where a box hangs
@@ -141,6 +143,31 @@ export interface Opened {
    * comment about a whole page is named after. There is no second way of spelling the address here.
    */
   route: string
+  /**
+   * WHAT THE BOX'S COPY PRESS PUTS ON THE CLIPBOARD, read when the box opens. `whatCopyTakes` works it out.
+   *
+   * It is read then and not when Copy is pressed, because opening the box can move the selection: `markTheSource`
+   * may remove it.
+   */
+  copies: string
+}
+
+/**
+ * WHAT COPY TAKES: the selected words when a selection covers the thing, and the thing's drawn text when none does.
+ *
+ * The words a view gave come first, whole and as the view gave them: the words selected in it, or with none selected,
+ * the words under the pointer. A terminal keeps its selection where the page's selection does not see it, so there is
+ * no kept range to read, and the quote holds only their opening.
+ *
+ * The selected words are the live selection's own text, exactly as selected and as the browser lays it out. A range's
+ * text is only the characters of the text nodes it covers, with no break between two paragraphs. So the range kept
+ * when the thing was pointed at is read only when there is no live selection to read. The thing's drawn text is
+ * trimmed, because the space at the edges of an element is its layout and not its words.
+ */
+function whatCopyTakes(pointed: Pointed, selection: Selection | null): string {
+  if (pointed.held !== undefined) return pointed.held
+  if (pointed.kept === null) return pointed.element.innerText.trim()
+  return selection !== null && selection.rangeCount > 0 ? selection.toString() : pointed.kept.toString()
 }
 
 /**
@@ -328,7 +355,8 @@ export function askedChange(pointed: Pointed, at: { x: number; y: number }): Cha
 export function openAbout(node: Node | null, at: At, keepSelection = false): void {
   if (!keepSelection) stopFollowingTouchSelection()
   stopShowing()
-  const pointed = pointedAt(node, window.getSelection())
+  const selection = window.getSelection()
+  const pointed = pointedAt(node, selection, theViewsWords(node, at))
   const where = whereItHangs(at)
   // AN UNSENT INSTRUCTION IS ANSWERED BY THE COMPOSER HOLDING IT, not by a second composer.
   const change = askedChange(pointed, where)
@@ -343,7 +371,13 @@ export function openAbout(node: Node | null, at: At, keepSelection = false): voi
     return
   }
   setComposer({
-    opened: { pointed, at: where, underAnElement: at.at === 'element', route: thePage().route },
+    opened: {
+      pointed,
+      at: where,
+      underAnElement: at.at === 'element',
+      route: thePage().route,
+      copies: whatCopyTakes(pointed, selection),
+    },
     changing: null,
     offered: null,
     cameFrom: null,
@@ -404,8 +438,15 @@ export function talkAboutThatInstead(): void {
   if (offered === null || opened === null) return
   // THE ADDRESS IS THIS ONE AND NOT THE ONE THE FRAME OPENED AT. The part being taken as the new
   // subject is a part of the composer, and the composer is on the page the reader is on now.
+  // THE SELECTION NOW IS NOT THE ONE THE OFFER WAS MADE WITH, so Copy takes the range kept then, if there was one.
   setComposer({
-    opened: { pointed: offered, at: opened.at, underAnElement: opened.underAnElement, route: thePage().route },
+    opened: {
+      pointed: offered,
+      at: opened.at,
+      underAnElement: opened.underAnElement,
+      route: thePage().route,
+      copies: whatCopyTakes(offered, null),
+    },
     changing: null,
     offered: null,
     cameFrom: opened,
@@ -489,6 +530,73 @@ export function moleOfficeKeepsTheMenu(): Record<string, string> {
 }
 
 /**
+ * A VIEW THAT CHOOSES WHAT A RIGHT-CLICK INSIDE IT DOES, through src/web/components/RightClickSwitch.tsx.
+ * A terminal is one. It has its own copy and paste, and it keeps its selected words where the page's
+ * selection does not see them.
+ *
+ * `its-own` gives a right-click inside the view to the view, as a box you type in gives it to the browser.
+ * `mole-office` gives it to Mole Office, the view's own boxes included. `selected` hands `openAbout` the
+ * words selected in the view, and `wordsAt` the words it draws under a point, which the page cannot read there.
+ */
+export type RightClickIn = 'its-own' | 'mole-office'
+
+/** What a view that chooses says: whose its right-click is, the words selected in it now, and the words under a point. */
+export interface ViewThatChooses {
+  whose: RightClickIn
+  selected: () => string
+  wordsAt: (x: number, y: number) => string
+}
+
+/**
+ * WHERE A VIEW THAT CHOOSES IS DRAWN, as the view holds it. The element is read at each right-click and not when the
+ * view says what it chooses. A view may say that before its element is drawn: React runs an earlier sibling's layout
+ * effect before it attaches a later sibling's ref.
+ */
+export interface ViewsRegion {
+  readonly current: Element | null
+}
+
+const viewsThatChoose = new Map<ViewsRegion, ViewThatChooses>()
+
+/** Say what the view drawn in `region` chooses. The answer is the call that takes it back. */
+export function chooseTheRightClickIn(region: ViewsRegion, view: ViewThatChooses): () => void {
+  viewsThatChoose.set(region, view)
+  return () => {
+    if (viewsThatChoose.get(region) === view) viewsThatChoose.delete(region)
+  }
+}
+
+/** The view that chooses, around this node, or null. With no such view open it reads no document. */
+function theViewAround(node: unknown): ViewThatChooses | null {
+  if (viewsThatChoose.size === 0 || node === null || typeof node !== 'object') return null
+  for (const [region, view] of viewsThatChoose) if (region.current?.contains(node as Node) === true) return view
+  return null
+}
+
+/**
+ * THE WORDS A VIEW GIVES FOR A PRESS INSIDE IT: the words selected in it, or with none selected, the words it draws
+ * under the pointer, as a press on Mole Office's own words quotes the words under the pointer. A gesture with no
+ * pointer has no words under it. Undefined outside a view that chooses.
+ */
+function theViewsWords(node: Node | null, at: At): string | undefined {
+  const view = theViewAround(node)
+  if (view === null) return undefined
+  const selected = view.selected()
+  if (heldWords(selected) !== null || at.at !== 'pointer') return selected
+  return view.wordsAt(at.x, at.y)
+}
+
+/**
+ * WHETHER A GESTURE AT THIS NODE IS KEPT FROM MOLE OFFICE: by a view in its own state, or by a box the
+ * browser keeps. Inside a view in Mole Office's state, nothing is kept.
+ */
+function keptFromMoleOffice(node: unknown): 'its-own' | 'editable' | null {
+  const view = theViewAround(node)
+  if (view !== null) return view.whose === 'its-own' ? 'its-own' : null
+  return theBrowsersOwnBox(node) ? 'editable' : null
+}
+
+/**
  * THE INPUT TYPES A PERSON CANNOT TYPE INTO, and therefore the ones that are not boxes.
  *
  * The rule is about what a person came for: paste, spell-check and look-up all need typed text. A
@@ -533,26 +641,33 @@ function theBrowsersOwnBox(node: unknown): boolean {
 }
 
 /**
- * WHAT A RIGHT-CLICK MEANS, as five answers over four fields.
+ * WHAT A RIGHT-CLICK MEANS, as six answers over four fields.
  *
  * Exported, because the order of these tests is the whole of the keyboard route and a test that had
  * to raise a real menu could only ask it in one of the three engines.
  *
- *   1  a box you type in             leave it alone. The browser's own menu, with paste,
+ *   1  a view in its own state       leave it alone. The view's own right-click, such as a
+ *                                    terminal's copy and paste. In Mole Office's state the rules
+ *                                    below answer, and a box inside the view is not the browser's.
+ *   2  a box you type in             leave it alone. The browser's own menu, with paste,
  *                                    spell-check and look-up in it. Contract 5.5.
- *   2  `button === -1`               a menu raised from the keyboard. Never blocked by Shift.
- *   3  `pointerType` touch or pen    handled separately: touch holds open the office menu, while a
+ *   3  `button === -1`               a menu raised from the keyboard. Never blocked by Shift.
+ *   4  `pointerType` touch or pen    handled separately: touch holds open the office menu, while a
  *                                    pen keeps its platform behaviour.
- *   4  `shiftKey`                    leave it alone. The browser's own menu.
- *   5  otherwise                     a pointer.
+ *   5  `shiftKey`                    leave it alone. The browser's own menu.
+ *   6  otherwise                     a pointer.
  *
- * THE BOX TEST IS FIRST, and that is the contract's own order rather than a convenience: a person
+ * THE VIEW TEST IS FIRST because the view's switch is the person's own choice for that view. A
+ * terminal draws its rows over a hidden box of its own, so the box test alone would answer for it
+ * by where that hidden box was left, which the person cannot see.
+ *
+ * THE BOX TEST IS NEXT, and that is the contract's own order rather than a convenience: a person
  * standing in a search box wants Paste however they asked for the menu, including with `Shift+F10`.
  * It is the one place in the product where the keyboard reaches the browser's menu.
  *
  * THE KEYBOARD TEST IS AHEAD OF THE REST and that is measured rather than chosen: Chromium raises
  * `Shift+F10` with `shiftKey === false` and `button === -1` (claim `wKR0jkvl_7sz`), so an engine
- * that reported the shift key as held would otherwise fall into rule 4 and the keyboard route would
+ * that reported the shift key as held would otherwise fall into rule 5 and the keyboard route would
  * never run. It is also ahead of the touch test because a gesture with no pointer has no pointer
  * type either, and a missing field must not be read as a mouse.
  *
@@ -566,8 +681,9 @@ export function whatTheMenuDoes(e: {
   shiftKey: boolean
   pointerType?: string
   target?: unknown
-}): 'editable' | 'keyboard' | 'touch' | 'native' | 'pointer' {
-  if (theBrowsersOwnBox(e.target)) return 'editable'
+}): 'its-own' | 'editable' | 'keyboard' | 'touch' | 'native' | 'pointer' {
+  const kept = keptFromMoleOffice(e.target)
+  if (kept !== null) return kept
   if (e.button === -1) return 'keyboard'
   if (e.pointerType === 'touch' || e.pointerType === 'pen') return 'touch'
   if (e.shiftKey) return 'native'
@@ -661,7 +777,7 @@ function touchBegan(e: TouchEvent): void {
   forgetTouchHold()
   const finger = e.touches[0]
   const element = e.target instanceof Element ? e.target : null
-  if (!finger || element === null || theBrowsersOwnBox(element)) return
+  if (!finger || element === null || keptFromMoleOffice(element) !== null) return
   const node = textAt(finger.clientX, finger.clientY)
   if (touchBelongsElsewhere(element)) return
   const at = { at: 'pointer', x: finger.clientX, y: finger.clientY } as const
@@ -746,15 +862,15 @@ function touchSelectionChanged(): void {
  * row", and measured at 1440 on 18 August 2026 a 1146px module row answered a right-click only in
  * the 5% strip at each end.
  *
- * WHAT IS STILL LEFT ALONE: a box a person types in that is not the composer's own instruction box,
- * `Shift`, and a pen pointer. A touch hold is handled by the touch listeners below.
+ * WHAT IS STILL LEFT ALONE: a view in its own state, a box a person types in that is not the composer's
+ * own instruction box, `Shift`, and a pen pointer. A touch hold is handled by the touch listeners below.
  */
 function onMenu(e: MouseEvent): void {
   const does = whatTheMenuDoes(e as MouseEvent & { pointerType?: string })
   // A BOX A PERSON TYPES IN IS THE BROWSER'S, AND SO IS ANYTHING WITH SHIFT HELD. Two reasons, one
   // answer: return before `preventDefault`, so the browser draws its own menu and Mole Office does
-  // nothing at all. Contract 5.5 and 6.4.
-  if (does === 'editable' || does === 'native') return
+  // nothing at all. Contract 5.5 and 6.4. A view in its own state is left alone the same way.
+  if (does === 'its-own' || does === 'editable' || does === 'native') return
   // Some browsers omit pointerType from a touch-generated contextmenu.
   if (touchHold !== null && does === 'pointer') {
     e.preventDefault()

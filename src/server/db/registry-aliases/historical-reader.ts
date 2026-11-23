@@ -298,7 +298,8 @@ function readDataOfAKind(w: Walk, site: string, data: DataOfAKind, value: unknow
 
 /**
  * A stamp: the handle a request named or the registry id its key proved. It is read only where exactly one agent answers
- * to it, and the office's own writers are not read at all. Nor is the value the register says names the person there.
+ * to it, and the office's own writers are not read at all. Nor is the value the register says names the person there,
+ * nor an old system name the register lists for the position.
  */
 function readAStamp(w: Walk, path: string, as: IdentityFound['as'], stored: string, site: string): void {
   const entry = thePositionAt(site)
@@ -306,6 +307,7 @@ function readAStamp(w: Walk, path: string, as: IdentityFound['as'], stored: stri
   if (entry.whenThePerson !== undefined && stored === entry.whenThePerson) return
   w.tell?.({ path, site, stored })
   if (isOneOfTheOfficesOwnWriters({ actorType: 'agent', actorId: stored })) return
+  if (entry.oldSystemNames?.includes(stored) === true) return
   const reading = theStampRead(w.db, path, stored, site, entry.parse)
   w.found.push(...reading.found.map((one) => ({ ...one, as })))
   w.blocks.push(...reading.blocks)

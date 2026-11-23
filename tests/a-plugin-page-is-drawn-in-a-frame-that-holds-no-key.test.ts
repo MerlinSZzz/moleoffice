@@ -434,19 +434,21 @@ describe('a plugin page is drawn in a frame that holds no key', () => {
     expect(await app.page.$$('#shell-side a.shell-link:not(.shell-all-pages)[aria-current]')).toHaveLength(0)
   }, 120_000)
 
-  it('4. says in words why an address has no page, and draws no frame', async () => {
-    const cases: { path: string; why: string; reason?: string; toSettings: boolean; pages?: string[] }[] = [
-      { path: '/plugin/made-up-calendar/month', why: said('pluginPage.why.nobodyChose', { name: 'Made-up calendar' }), toSettings: true },
-      { path: '/plugin/made-up-broken/main', why: said('pluginPage.why.refused', { name: 'made-up-broken' }), reason: 'version', toSettings: true },
-      { path: '/plugin/made-up-linked/main', why: said('pluginPage.why.refused', { name: 'made-up-linked' }), reason: 'is a link to another place', toSettings: true },
-      { path: '/plugin/made-up-nothing/main', why: said('pluginPage.why.unknown', { id: 'made-up-nothing' }), toSettings: false },
-      { path: '/plugin/made-up-clock/year', why: said('pluginPage.why.noSuchPage', { name: 'Made-up clock', slug: 'year' }), toSettings: false, pages: ['Main', 'Week'] },
+  // Test change (as decided, the page draws no explanation): the state is the plugin's name and a short state word,
+  // where it was a sentence saying why.
+  it('4. draws the plugin and a short state word for an address with no page, and draws no frame', async () => {
+    const cases: { path: string; state: string; reason?: string; toSettings: boolean; pages?: string[] }[] = [
+      { path: '/plugin/made-up-calendar/month', state: `Made-up calendar · ${said('pluginState.neverSwitchedOn')}`, toSettings: true },
+      { path: '/plugin/made-up-broken/main', state: `made-up-broken · ${said('pluginState.refused')}`, reason: 'version', toSettings: true },
+      { path: '/plugin/made-up-linked/main', state: `made-up-linked · ${said('pluginState.refused')}`, reason: 'is a link to another place', toSettings: true },
+      { path: '/plugin/made-up-nothing/main', state: `made-up-nothing · ${said('pluginState.notFound')}`, toSettings: false },
+      { path: '/plugin/made-up-clock/year', state: `Made-up clock · ${said('pluginPage.state.noSuchPage', { slug: 'year' })}`, toSettings: false, pages: ['Main', 'Week'] },
     ]
     for (const one of cases) {
       await componentOpen(one.path)
       await componentPage.waitForSelector('.plgp-none', { timeout: 20_000 })
       expect(await componentPage.$eval('.plgp-none h1', (el) => el.textContent ?? ''), one.path).toBe(en['pluginPage.noPage'])
-      expect(await componentPage.$eval('.plgp-why', (el) => el.textContent ?? ''), one.path).toBe(one.why)
+      expect(await componentPage.$eval('.plgp-state', (el) => el.textContent ?? ''), one.path).toBe(one.state)
       if (one.reason !== undefined) expect(await componentPage.$eval('.plgp-reason', (el) => el.textContent ?? ''), one.path).toContain(one.reason)
       expect((await componentPage.$$('.plgp-way a')).length, one.path).toBe(one.toSettings ? 1 : 0)
       if (one.pages !== undefined) expect(await componentPage.$$eval('.plgp-pages a', (links) => links.map((a) => a.textContent ?? '')), one.path).toEqual(one.pages)
@@ -509,12 +511,12 @@ describe('a plugin page is drawn in a frame that holds no key', () => {
     expect(await componentPage.$eval('.plgp-raw', (one) => one.textContent ?? '')).toBe(brokenRefusal)
   }, 240_000)
 
-  it('5. says what the office said of a page it could not load, and that a page which never says it is ready is not answering', async () => {
+  // Test change (as decided, the page draws no explanation): a page that could not load is "not loaded", and the
+  // office's own sentence about it is Developer mode's; it was a sentence with the office's words inside it.
+  it('5. draws not loaded for a page the office could not load, and not ready for a page which never says it is ready', async () => {
     await open('/plugin/made-up-unbuilt/main')
     await app.page.waitForSelector(`${THE_PANEL} .plgp-said[role="alert"]`, { timeout: 20_000 })
-    const failed = await app.page.$eval(`${THE_PANEL} .plgp-said`, (el) => el.textContent ?? '')
-    expect(failed.startsWith(said('pluginPage.failedToLoad', { name: 'Made-up unbuilt plugin', said: '' }))).toBe(true)
-    expect(failed).toContain('may not have been built')
+    expect(await app.page.$eval(`${THE_PANEL} .plgp-said`, (el) => el.textContent ?? '')).toBe(said('pluginPage.state.notLoaded'))
     expect(await app.page.$$('iframe')).toHaveLength(0)
 
     expect(PLUGIN_READY_WITHIN_MS).toBe(10_000)
@@ -525,7 +527,7 @@ describe('a plugin page is drawn in a frame that holds no key', () => {
     expect(await app.page.$$(`${THE_PANEL} .plgp-said`)).toHaveLength(0)
     await app.page.clock.fastForward(PLUGIN_READY_WITHIN_MS)
     await app.page.waitForSelector(`${THE_PANEL} .plgp-said[role="status"]`, { timeout: 25_000 })
-    expect(await app.page.$eval(`${THE_PANEL} .plgp-said`, (el) => el.textContent ?? '')).toBe(said('pluginPage.notAnswering', { name: 'Made-up silent page', seconds: '10' }))
+    expect(await app.page.$eval(`${THE_PANEL} .plgp-said`, (el) => el.textContent ?? '')).toBe(said('pluginPage.state.notAnswering', { seconds: '10' }))
     // THE FRAME STAYS, because a slow page may still answer.
     expect(await app.page.$$(THE_FRAME)).toHaveLength(1)
     await photograph('plugin-page-not-answering')
@@ -540,7 +542,7 @@ describe('a plugin page is drawn in a frame that holds no key', () => {
       }, 0)
     })
     await app.page.waitForSelector(`${THE_PANEL} .plgp-moved`, { timeout: 20_000 })
-    expect(await app.page.$eval(`${THE_PANEL} .plgp-moved .plgp-said`, (el) => el.textContent ?? '')).toBe(said('pluginPage.moved', { name: 'Made-up clock' }))
+    expect(await app.page.$eval(`${THE_PANEL} .plgp-moved .plgp-said`, (el) => el.textContent ?? '')).toBe(said('pluginPage.state.frameClosed'))
     expect(await app.page.$$('iframe')).toHaveLength(0)
     await photograph('plugin-page-moved')
 
@@ -573,7 +575,7 @@ describe('a plugin page is drawn in a frame that holds no key', () => {
     await switchIt('made-up-calendar', false)
     await open('/plugin/made-up-calendar/month')
     await app.page.waitForSelector('.plgp-none', { timeout: 20_000 })
-    expect(await app.page.$eval('.plgp-why', (el) => el.textContent ?? '')).toBe(said('pluginPage.why.off', { name: 'Made-up calendar' }))
+    expect(await app.page.$eval('.plgp-state', (el) => el.textContent ?? '')).toBe(`Made-up calendar · ${said('shortcuts.off')}`)
     expect(await app.page.$$('iframe')).toHaveLength(0)
   }, 120_000)
 

@@ -181,19 +181,19 @@ describe('the following controls on a narrow screen', () => {
     await app.page.waitForSelector('.px-lead-following', { timeout: 30_000 })
     const wide = await app.page.evaluate(() => {
       const stop = document.querySelector('.px-lead-stop')
-      const why = document.querySelector('.px-lead-following .px-lead-folds')
+      const words = document.querySelector('.px-lead-following .px-lead-said')
       const seen = (one: Element | null): boolean =>
         one !== null &&
         one.checkVisibility({ contentVisibilityAuto: true, opacityProperty: true, visibilityProperty: true })
       return {
         stopSays: stop === null ? '' : (stop as HTMLElement).innerText.trim(),
-        explanationOnScreen: seen(why),
+        wordsOnScreen: seen(words),
         pressOnScreen: seen(document.querySelector('.px-lead-fold')),
       }
     })
-    // The short word is drawn only where there is no room for the sentence.
+    // The short word is drawn only where there is no room for the sentence, and the agent's words are not folded away.
     expect(wide.stopSays).toBe(LEADING.stopFollowing('Lead Bot'))
-    expect(wide.explanationOnScreen).toBe(true)
+    expect(wide.wordsOnScreen).toBe(true)
     expect(wide.pressOnScreen).toBe(false)
   }, 120_000)
 

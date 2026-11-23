@@ -10,19 +10,19 @@
  *
  * WHAT IS MEASURED, in a browser on a test office of this file's own (liveApp):
  *   3. the Decisions badge in the rail counts the admission;
- *   4. at 1440, 990, 660 and 390 wide, in the light and the dark look, Home and the ask's page are drawn with nothing
+ *   4. at 1440 and 390 wide, in the light look, Home and the ask's page are drawn with nothing
  *      wider than the window. A picture of each is kept in the folder TEST_SHOTS names.
  *
  * THE TWO OTHER ASKS AT THE DOOR said two words for one press as well. An agent's ask for a card was "Give card" on its
  * row and "Give the card" on its press, and an agent's ask for a new key was "Give key" on its row and "Give a new key"
  * on its press. Each row now says its press's word. They are made after case 3, so the badge there counts the
  * admission alone.
- *   9. at the four widths, in both looks, Home, the Decisions page and the Office page in English and Chinese, and
+ *   9. at 1440 and 390 wide, in the light look, Home, the Decisions page and the Office page in English and Chinese, and
  *      the two asks' pages in English, are drawn with nothing wider than the window. Home, the Decisions page and the
  *      Office page draw the row's word; the asks' pages draw the press's.
  *
  * EACH PAGE IS OPENED ONCE FOR EACH LANGUAGE AND LOOK, in cases 4 and 9. It is opened at 1440 and the window is then
- * resized to 990, 660 and 390, rather than the page being opened again at each width. An open that changes only the
+ * resized to 390, rather than the page being opened again at each width. An open that changes only the
  * address's hash is not a new load, and the second of two pages under the same address is opened that way, as before.
  * Before this was changed, every reading was taken both ways, after an open at the width and after a resize to it; the
  * two were the same in each.
@@ -34,6 +34,7 @@
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { THE_PERSON } from '../src/shared/person.ts'
+import type { HomePart } from '../src/shared/home-layout.ts'
 import { categoryPath, governancePath } from '../src/web/components/router.tsx'
 import { THE_TEST_FIXTURE_ROOT } from './a-page-of-a-test-office.ts'
 import { liveApp, thePersonsKeyHeader, theResizeIsDrawn, waitForThePage, type LiveApp } from './helpers.ts'
@@ -53,6 +54,10 @@ async function open(path: string, query: string): Promise<void> {
 
 /** Home's link for one waiting item. */
 const homeLink = (id: string) => app.page.locator(`[data-home-section="needs"] a.hm-needs-link[data-home-waiting-id="${id}"]`)
+
+/** Home's Needs you, which Home draws whichever rows it holds, by its part's name in the layout. */
+const NEEDS: HomePart = 'needs'
+const homeNeeds = () => app.page.locator(`[data-home-section="${NEEDS}"]`).first()
 
 /** The first press on the ask's page: the one that answers the ask. */
 const thePress = () => app.page.locator('.tc-ask .tc-acts button').first()
@@ -94,9 +99,10 @@ describe('a session that registered itself and waits for the press that admits i
     await expect.poll(theDecisionsBadge, { timeout: 20_000, message: 'the Decisions badge does not count the admission' }).toBe(badgeBefore + 1)
   }, 120_000)
 
-  it('4. Home and the ask’s page are drawn at four widths in both looks with nothing wider than the window', async () => {
+  it('4. Home and the ask’s page are drawn at 1440 and 390 in the light look with nothing wider than the window', async () => {
     const tooWide: string[] = []
-    for (const look of ['light', 'dark'] as const) {
+    {
+      const look = 'light' as const
       await app.page.emulateMedia({ colorScheme: look })
       for (const [name, path, shown] of [
         ['home', '/', homeLink(request)],
@@ -105,7 +111,7 @@ describe('a session that registered itself and waits for the press that admits i
         // EACH PAGE IS OPENED ONCE FOR EACH LOOK, at 1440; the window is then resized to each of the other widths.
         await app.page.setViewportSize({ width: 1440, height: 1000 })
         await open(path, `?lang=en&look=${look}`)
-        for (const width of [1440, 990, 660, 390]) {
+        for (const width of [1440, 390]) {
           await app.page.setViewportSize({ width, height: 1000 })
           await theResizeIsDrawn(app.page)
           await shown.waitFor({ state: 'visible', timeout: 30_000 })
@@ -144,7 +150,7 @@ describe('an ask for a card and an ask for a new key', () => {
   let newKeyAsk = ''
 
   beforeAll(async () => {
-    // CASE 4 LEFT THE WINDOW NARROW AND DARK. The page is put back at 1440 and in the light look.
+    // CASE 4 LEFT THE WINDOW NARROW. The page is put back at 1440 and in the light look.
     await app.page.setViewportSize({ width: 1440, height: 1000 })
     await app.page.emulateMedia({ colorScheme: 'light' })
     const key = thePersonsKeyHeader(join(app.dir, 'keys.json'))
@@ -169,23 +175,26 @@ describe('an ask for a card and an ask for a new key', () => {
 
   }
 
-  it('9. Home, the Decisions page, the Office page and both asks’ pages are drawn at four widths in both looks with nothing wider than the window', async () => {
+  it('9. Home, the Decisions page, the Office page and both asks’ pages are drawn at 1440 and 390 in the light look with nothing wider than the window', async () => {
     const tooWide: string[] = []
     const pages = [
-      ['home', '/', () => homeLink(cardAsk), ['en', 'zh']],
+      // HOME DRAWS ONLY THE FIRST TWO ROWS OF NEEDS YOU, and the card ask may be past them, so Home is drawn when
+      // Needs you is.
+      ['home', '/', homeNeeds, ['en', 'zh']],
       ['decisions', governancePath(), () => app.page.locator('.gq-act').first(), ['en', 'zh']],
       ['office', categoryPath('office'), () => app.page.locator(`.px-category-needs-row[href="#/r/${cardAsk}"]`), ['en', 'zh']],
       ['card-ask', `/r/${cardAsk}`, thePress, ['en']],
       ['new-key-ask', `/r/${newKeyAsk}`, thePress, ['en']],
     ] as const
-    for (const look of ['light', 'dark'] as const) {
+    {
+      const look = 'light' as const
       await app.page.emulateMedia({ colorScheme: look })
       for (const [name, path, shown, languages] of pages) {
         for (const lang of languages) {
           // EACH PAGE IS OPENED ONCE FOR EACH LANGUAGE AND LOOK, at 1440; the window is then resized to each of the others.
           await app.page.setViewportSize({ width: 1440, height: 1000 })
           await open(path, `?lang=${lang}&look=${look}`)
-          for (const width of [1440, 990, 660, 390]) {
+          for (const width of [1440, 390]) {
             await app.page.setViewportSize({ width, height: 1000 })
             await theResizeIsDrawn(app.page)
             await shown().waitFor({ state: 'visible', timeout: 30_000 })

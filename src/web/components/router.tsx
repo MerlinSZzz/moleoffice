@@ -18,7 +18,8 @@ import { isParticipantKind, type ParticipantKind } from '@shared/participants.ts
 import type { RecordKind } from '@shared/types.ts'
 import { PROFILE_SEGMENT } from '@shared/profile.ts'
 // WHERE ONE VISITING AGENT'S CREDENTIAL LIVES. One spelling, shared with the server's refusals.
-import { VISITOR_SEGMENT, credentialPagePath } from '@shared/visitors.ts'
+import { HIS_BROWSER_SEGMENT, VISITOR_SEGMENT, credentialPagePath } from '@shared/visitors.ts'
+import { THE_PERSON } from '@shared/person.ts'
 // THE ADDRESS OF THE STATISTICS PAGE, criterion P72. One spelling, beside the shape it draws.
 import { ROLE_CENSUS_SEGMENT } from '@shared/roles.ts'
 import { INCIDENT_SEGMENT } from '@shared/incident.ts'
@@ -43,6 +44,7 @@ import type { TARGET_ATTRIBUTE } from '@shared/targets.ts'
  * the same names from the same place it always did.
  */
 import { NOTEBOOK_SEGMENT } from '@shared/notebook.ts'
+import { SHOWN_FILE_SEGMENT } from '@shared/shown-file.ts'
 import {
   CATEGORY_PAGES,
   categoryOfPage,
@@ -154,6 +156,12 @@ export function readinessPath(id?: string): string {
 
 export function signingPackagePath(id?: string): string {
   const base = pathFor('signingPackages')
+  return id === undefined ? base : `${base}/${encodeURIComponent(id)}`
+}
+
+/** THE DEPARTMENTS. `#/departments`. With an id, one department with its sub-departments and its history. */
+export function departmentPath(id?: string): string {
+  const base = pathFor('departments')
   return id === undefined ? base : `${base}/${encodeURIComponent(id)}`
 }
 
@@ -283,6 +291,11 @@ export const visitorPath = (id: string) => credentialPagePath(id)
 export const pluginPagePath = (id: string, slug: string) =>
   `/${PLUGIN_SEGMENT}/${encodeURIComponent(id)}/${encodeURIComponent(slug)}`
 
+/** THE OFFICE'S PAGE FOR ONE FILE A RECORD NAMES. The one place this address is built; a report's file block leads here,
+ * and parseRoute reads it back. */
+export const shownFilePath = (record: string, path: string) =>
+  `/${SHOWN_FILE_SEGMENT}/${encodeURIComponent(record)}/${encodeURIComponent(path)}`
+
 /** WHO HOLDS EACH CARD, criterion P72. The one place this address is built. */
 export const roleCensusPath = () => `${pathFor('roles')}/${ROLE_CENSUS_SEGMENT}`
 /** THE CASTING TABLE. */
@@ -303,6 +316,14 @@ export const whoPath = (kind: ParticipantKind, id: string) =>
   // PARTICIPANT_KINDS, and encoding it would let a word that needed encoding into that list. The
   // record address treats its section word the same way.
   `/${PROFILE_SEGMENT}/${kind}/${encodeURIComponent(id)}`
+
+/**
+ * ONE OF THE PERSON'S BROWSERS, ON THEIR CARD: `#/who/person/<id>/browser/<credential>`. Design C of early idea
+ * B9. The one place this address is built, from `whoPath`, so their card and its rows cannot diverge.
+ * A browser's old credential address and the Embassy's count both lead here.
+ */
+export const hisBrowserPath = (credential: string) =>
+  `${whoPath('person', THE_PERSON)}/${HIS_BROWSER_SEGMENT}/${encodeURIComponent(credential)}`
 
 export const pipelinePath = (id?: string) =>
   id === undefined ? pathFor('pipeline') : `${pathFor('pipeline')}/${encodeURIComponent(id)}`

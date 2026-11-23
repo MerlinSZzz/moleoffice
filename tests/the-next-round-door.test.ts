@@ -14,7 +14,7 @@
  * The worker's agent runtime is a script that refuses, so a run it started would show.
  *
  * WHAT IS PROVED
- *   1. The ask is refused, in words, with nothing written: a retired agent, an asker who is none of the four, an agent
+ *   1. The ask is refused, in words, with nothing written: a retired agent, an asker who is none of the five, an agent
  *      with no sandbox run, a sandbox the ledger does not vouch for, a sandbox that is not the agent's, a missing brief,
  *      a brief outside the sandbox folder, a run already serving the agent, and a message worker that is off.
  *   2. Each of the four askers is taken: the run's agent with its own key, its starter, a secretary and the person.
@@ -61,6 +61,9 @@
  *      names now, with its effort. With no row in force the round keeps the previous run's model and says so in one
  *      sentence. A row in force that casts another runtime, or one that is held, fails the ask in words, tells the
  *      asker and starts nothing.
+ *  14. The agent's recorded leader, which is not its starter, asks its next round with its own key, and the ask is
+ *      kept with the leader as the asker, as its leader. The leader's header claim with no key, and a stranger with
+ *      its own key, are refused, and the refusal names the recorded leader among those who may.
  *
  * MUTATION PROOF (after a green control, each alone, restored with cp and checked with cmp, then green again)
  * ---------------------------------------------------------------------------------------
@@ -130,6 +133,7 @@ import { A_ROW_WITH_NO_ROLE_READS_AS } from '../src/shared/roles.ts'
 import { ONLY_THE_OFFICE_WRITES_THE_NEXT_ROUND, type TheNextRound } from '../src/shared/next-round.ts'
 import { onePass, type WatchingARound, type WorkerSettings } from '../src/worker/index.ts'
 import { RoundAdapter, THE_LAUNCHER_ASKS_AS } from '../src/worker/runtimes/round.ts'
+import { setFixtureOwner } from './agent-owner-fixture.ts'
 import { apiApp, freshDb, type TestDb } from './helpers.ts'
 
 const CHECKOUT = fileURLToPath(new URL('..', import.meta.url)).replace(/\/$/, '')
@@ -492,11 +496,11 @@ describe('1. the ask is refused, in words, and nothing is written', () => {
     expect(r.body['error']).toContain('is retired, so no next round of it is started. Nothing was written.')
   })
 
-  it('refuses an asker who is none of the four: a header claim with no key, and another agent with its own key', async () => {
+  it('refuses an asker who is none of the five: a header claim with no key, and another agent with its own key', async () => {
     for (const headers of [asAgent('nr-starter'), asOne('nr-stranger')]) {
       const r = await ask('nr-worker', headers, { brief: main.brief })
       expect(r.status, JSON.stringify(r.body)).toBe(403)
-      expect(r.body['error']).toContain('is asked for by the agent with its own key, its registered starter, a secretary proved by its own key, or the person')
+      expect(r.body['error']).toContain('is asked for by the agent with its own key, its registered starter, its recorded leader, a secretary proved by its own key, or the person')
     }
     expect(theNextRoundOf(last)).toBeUndefined()
   })
@@ -1023,19 +1027,21 @@ describe('13. the round takes its model from the role’s Casting row in force',
     expect(theNextRoundOf(run)).toMatchObject({ state: 'starting', starting: { wrapper, model: A_PREVIOUS_MODEL, modelSays: says } })
   })
 
-  it('refuses at the ask, in words, a round whose row in force casts another runtime, writes no ask, tells nobody and starts nothing', async () => {
+  it('keeps the run when the row in force casts another runtime', async () => {
     const handle = 'nr-cast-codex'
+    const model = 'openai/gpt-made-up-round-0'
     await started(handle, 'supervisor', asOne('nr-secretary'), 'codex')
     const sandbox = aSandbox('nr-cast-codex-sandbox')
-    const run = aSandboxRun(handle, sandbox, 'nr-secretary', { runtime: 'codex', model: 'openai/gpt-made-up-round-0' })
-    const before = sessions()
+    const run = aSandboxRun(handle, sandbox, 'nr-secretary', { runtime: 'codex', model })
     const r = await ask(handle, AS_THE_PERSON, { brief: sandbox.brief })
-    const says = `Casting row ${String(row)}, in force for supervisor, casts claude-code with ${A_CAST_MODEL}, and the round continues run ${run} on codex, so it cannot take its model from that row.`
-    expect(r.status, JSON.stringify(r.body)).toBe(409)
-    expect(r.body['error']).toBe(`${says} Nothing was written.`)
-    expect(theNextRoundOf(run)).toBeUndefined()
-    expect(linesToThePersonAbout(run)).toEqual([])
-    expect(sessions()).toEqual(before)
+    const says = `Casting row ${String(row)}, in force for supervisor, casts claude-code, and no row in force casts codex, the run's program, so the round keeps runtime codex and model ${model} from run ${run}.`
+    expect(r.status, JSON.stringify(r.body)).toBe(202)
+    expect(r.body['says']).toContain(says)
+    expect(theNextRoundOf(run)).toMatchObject({ row: null, model, unmatchedRow: { id: row, card: 'supervisor', program: 'claude-code' } })
+    const wrapper = await aLauncherRun(run)
+    const startedRound = await call('POST', `/api/worker/rounds/${run}/starting`, AS_THE_WORKER(), { wrapper })
+    expect(startedRound.status, JSON.stringify(startedRound.body)).toBe(200)
+    expect(startedRound.body['round']).toMatchObject({ runtime: 'codex', model })
   })
 
   it('refuses at the ask, in words, a round whose row in force is held, writes no ask and tells nobody', async () => {
@@ -1293,5 +1299,37 @@ describe('a next round after a sealed run', () => {
     expect((await file(worktree, f.base, 'Another head')).status).toBe(409)
     git(worktree, 'checkout', '--detach', f.tip)
     expect((await file(worktree, f.base, 'Prepared round')).status).toBe(201)
+  })
+})
+
+describe('14. the agent’s recorded leader, proved by its own key, asks its next round', () => {
+  let led = ''
+  let sandbox: { folder: string; brief: string; container: string }
+
+  beforeAll(async () => {
+    await started('nr-leader', null)
+    await started('nr-led', null, asOne('nr-starter'))
+    // THE LEADER IS NOT THE STARTER. A registration records the starter as the owner, so the owner is set apart here.
+    setFixtureOwner(t.client.sqlite, agents.get('nr-leader')!.id, agents.get('nr-led')!.id, 'id')
+    sandbox = aSandbox('nr-led-sandbox')
+    led = aSandboxRun('nr-led', sandbox)
+  })
+
+  it('refuses the leader’s header claim with no key and a stranger with its own key, naming the recorded leader', async () => {
+    for (const headers of [asAgent('nr-leader'), asOne('nr-stranger')]) {
+      const r = await ask('nr-led', headers, { brief: sandbox.brief })
+      expect(r.status, JSON.stringify(r.body)).toBe(403)
+      expect(r.body['error']).toContain('is asked for by the agent with its own key, its registered starter, its recorded leader, a secretary proved by its own key, or the person')
+    }
+    expect(theNextRoundOf(led)).toBeUndefined()
+  })
+
+  it('takes the leader with its own key, and keeps it as the asker, as its leader', async () => {
+    const r = await ask('nr-led', asOne('nr-leader'), { brief: sandbox.brief })
+    expect(r.status, JSON.stringify(r.body)).toBe(202)
+    expect(r.body['run']).toBe(led)
+    const kept = theNextRoundOf(led)!
+    expect(kept.state).toBe('wanted')
+    expect(kept.askedBy).toMatchObject({ as: 'its leader', who: { kind: 'agent', id: agents.get('nr-leader')!.id } })
   })
 })

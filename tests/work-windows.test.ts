@@ -34,6 +34,8 @@ import { THE_TEST_OFFICES_OWNER } from './a-page-of-a-test-office.ts'
 import Fastify, { type FastifyInstance } from 'fastify'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { WINDOW_STATES, windowDays } from '../src/shared/planning.ts'
+import { isKnowledgeKind } from '../src/shared/knowledge/constants.ts'
+import { PACK_KIND } from '../src/shared/kinds/pack.ts'
 import { AGENT, freshDb, type TestDb } from './helpers.ts'
 
 let t: TestDb
@@ -318,7 +320,12 @@ describe('what a window refuses, naming what is wrong', () => {
       // REVIEW only through its own at /api/designs/<id>/reviews (wave 13s round 226).
       // A DESIGN REMINDER is written by the office before a seal and judged only at /api/design-reminders/<id>/judgement
       // (wave 13s round 228).
-      if (kind === 'sealed_tip' || kind === 'merge_entry' || kind === 'counter' || kind === 'flow_run' || kind === 'checklist' || kind === 'booking' || kind === 'notice_rules' || kind === 'secretary_duties' || kind === 'emergency_push' || kind === 'host_job' || kind === 'project_chapter' || kind === 'design_review' || kind === 'design_reminder') { expect(ALLOCATABLE_KINDS).not.toContain(kind); continue }
+      // A DEPARTMENT rests on the person's decisions and names a supervisor, which this board has neither of, and a plan
+      // gives it no hours (wave 13s round 281).
+      // A KEY ITEM only through its own doors at /api/key-items, and a plan gives it no hours: its time left is an
+      // estimate of its own (wave 13s round 281).
+      // KNOWLEDGE KINDS are written only through /api/knowledge into the shared knowledge workspace; a plan gives them no hours.
+      if (isKnowledgeKind(kind) || kind === 'sealed_tip' || kind === 'merge_entry' || kind === 'counter' || kind === 'flow_run' || kind === 'checklist' || kind === 'booking' || kind === 'notice_rules' || kind === 'secretary_duties' || kind === 'emergency_push' || kind === 'host_job' || kind === PACK_KIND || kind === 'project_chapter' || kind === 'design_review' || kind === 'design_reminder' || kind === 'department' || kind === 'key_item') { expect(ALLOCATABLE_KINDS).not.toContain(kind); continue }
       // TWO KINDS CANNOT BE FILED ON THEIR OWN and both are the product refusing rather than an
       // exception this test makes. A block's title and position live on its pipeline; a
       // `ran_instead` record's canonical method and its restriction's target both live on its

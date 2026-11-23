@@ -12,6 +12,24 @@ import { isOneOf, theFiledAliasesReadOnce } from './registry-aliases/runs.ts'
 import { theRegistryIdsOf } from './registry-aliases/stamps.ts'
 
 /**
+ * THE HAND-OVERS SQLITE MAY LEAVE OUT: a stamp in the exact form `nowStamp` writes, of a real date and time, earlier in
+ * text than the bound. A year written with a leading zero is not vouched for, because `new Date` does not read a
+ * two-digit year as written. The whole test is asked `IS NOT 1`, so a row for which any part is false or unknown is
+ * kept, and no index can serve it. Both branches of the read add it, with the bound as the last value.
+ */
+const ONLY_THOSE_THAT_COULD_BE_LATER =
+  " AND (d.at < ? AND d.at GLOB '[1-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9] [0-9][0-9]:[0-9][0-9]:[0-9][0-9]' AND strftime('%Y-%m-%d %H:%M:%S', d.at) = d.at) IS NOT 1"
+
+/**
+ * The bound: the UTC wall clock of `after` less 25 hours, in the stored form. When `after` names no instant, it is the
+ * empty text, which no stamp sorts before, so nothing is left out.
+ */
+function theBoundFor(after: Date): string {
+  const bound = new Date(after.getTime() - 25 * 60 * 60 * 1000)
+  return Number.isNaN(bound.getTime()) ? '' : bound.toISOString().slice(0, 19).replace('T', ' ')
+}
+
+/**
  * THE FIRST MESSAGE HANDED TO THIS SESSION LATER THAN `after`, for the handle it holds now, or null when none was.
  *
  * Problem `-MLrleDe93wM`. A hand-over is the delivery row the took door writes when the session's
@@ -37,21 +55,36 @@ import { theRegistryIdsOf } from './registry-aliases/stamps.ts'
  * day the clocks go back, a local hour comes twice, and its stamps do not sort by when they were
  * written.
  *
+ * SQLITE HANDS BACK ONLY THE HAND-OVERS THAT COULD BE LATER, AND EVERY ONE WHOSE STAMP IT CANNOT
+ * VOUCH FOR. It leaves a hand-over out only when its stamp is in the exact form `nowStamp` writes,
+ * names a real date and time, and sorts as text before the bound: the UTC wall clock of `after`,
+ * less 25 hours. Such a stamp reads, in any zone, as its own wall clock less one of that zone's
+ * offsets from UTC. On the hour that is skipped it is the offset from before the change, and on the
+ * hour that comes twice it is the first pass. No zone has ever been 25 hours behind UTC, so that
+ * instant is earlier than `after`, and the rule below would pass the hand-over over. The margin is
+ * the same in every zone, so the bound does not depend on the zone the server runs in. Every other
+ * stamp is handed back and read as before. The test is written so that no index can serve it, so
+ * the plan stays on the recipient index.
+ *
  * Every stamp here is written by `nowStamp`, so one that will not read is a broken row. When its
  * message is a message that is not deleted, it stops the reading with the row's words rather than
- * being left out, because whether it came later cannot be told.
+ * being left out, because whether it came later cannot be told. The bound never leaves such a row
+ * out, because a stamp it vouches for always reads. It only takes rows out of the walk, so the first
+ * such row is the one it was before.
  */
 export function theFirstMessageHandedToThisSessionAfter(sessionRecordId: string, after: Date): Date | null {
   const aliases = theFiledAliasesReadOnce(sqlite)
+  const bound = theBoundFor(after)
   let rows: { at: string; messageId: string }[]
   if (!aliases.anyFiled()) {
     rows = sqlite
       .prepare(
         'SELECT d.at AS at, d.message_id AS messageId FROM handle_holds h ' +
           "CROSS JOIN message_delivery d ON d.recipient_kind = 'agent' AND d.recipient_id = h.agent_id " +
-          "WHERE h.session_record_id = ? AND h.released_at IS NULL AND d.mark <> 'queued' AND d.because = ?",
+          "WHERE h.session_record_id = ? AND h.released_at IS NULL AND d.mark <> 'queued' AND d.because = ?" +
+          ONLY_THOSE_THAT_COULD_BE_LATER,
       )
-      .all(sessionRecordId, theLiveSessionTookIt(sessionRecordId)) as { at: string; messageId: string }[]
+      .all(sessionRecordId, theLiveSessionTookIt(sessionRecordId), bound) as { at: string; messageId: string }[]
   } else {
     // WITH AN ALIAS FILED, the hold's agent is read first, and then its hand-overs under every id it alone answers to,
     // through the recipient index, because a row written before the alias was filed keeps the old id.
@@ -61,8 +94,8 @@ export function theFirstMessageHandedToThisSessionAfter(sessionRecordId: string,
       ids.length === 0
         ? []
         : (sqlite
-            .prepare(`SELECT d.at AS at, d.message_id AS messageId FROM message_delivery d WHERE d.recipient_kind = 'agent' AND d.recipient_id ${isOneOf(ids)} AND d.mark <> 'queued' AND d.because = ?`)
-            .all(...ids, theLiveSessionTookIt(sessionRecordId)) as { at: string; messageId: string }[])
+            .prepare(`SELECT d.at AS at, d.message_id AS messageId FROM message_delivery d WHERE d.recipient_kind = 'agent' AND d.recipient_id ${isOneOf(ids)} AND d.mark <> 'queued' AND d.because = ?${ONLY_THOSE_THAT_COULD_BE_LATER}`)
+            .all(...ids, theLiveSessionTookIt(sessionRecordId), bound) as { at: string; messageId: string }[])
   }
   const aLiveMessage = sqlite.prepare("SELECT 1 AS found FROM records WHERE id = ? AND kind = 'message' AND deleted_at IS NULL")
   const isALiveMessage = (messageId: string): boolean => aLiveMessage.get(messageId) !== undefined

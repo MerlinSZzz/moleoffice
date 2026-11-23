@@ -323,7 +323,9 @@ describe('once the window is closed', () => {
   })
 
   it('still lets a browser on this computer pair, which is how it gets the owner’s key', async () => {
-    const paired = await ask(thisMachine, 'POST', '/api/office/pairing', {})
+    // THE PRESS CARRIES THE OFFICE'S MARK, as every request the page sends does, and the workspace header names nobody.
+    // A bare POST is one a website could send, and the office refuses it before any door.
+    const paired = await ask(thisMachine, 'POST', '/api/office/pairing', WORKSPACE, { device: 'A test browser after the close' })
     expect(paired.status, paired.error).toBe(200)
   })
 })

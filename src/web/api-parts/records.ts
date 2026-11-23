@@ -13,6 +13,7 @@ import type { AnAnswer, ReportAnswers, ThePress } from '@shared/answers.ts'
 import type { ObligationState } from '@shared/kinds.ts'
 import type { Gate, KindFamily } from '@shared/work.ts'
 import type { ReportsAndNotesReply } from '../../server/api/records.ts'
+import type { RelatedAnswer, RelatedKind } from '../../server/lib/related.ts'
 import type { DetailSupply } from '@shared/detailsupply.ts'
 import type { WorkToTalkAbout } from '@shared/talksources.ts'
 import type { ReportsPageShow } from '@shared/reports-page.ts'
@@ -33,6 +34,7 @@ import { WORKSPACE_HEADER } from '../lib/workspace.ts'
 import { EVERY_PROJECT, PROJECTS_QUERY, type ProjectChoice, projectsQuery } from '@shared/across-projects.ts'
 import { annotationTitle } from '../components/agent/context.ts'
 import type { ItemState, LinkType, PanelRecord, RecordKind } from '@shared/types.ts'
+import type { PipelinesStandingStill } from '@shared/pipelines-standing-still.ts'
 
 /**
  * WHAT A BUNDLE EXPORT ANSWERS: the text answer the press has always given, or one zip.
@@ -372,10 +374,25 @@ export const recordsDoors = {
    * ONE PAGE OF THE REPORTS PAGE: reports and notes of every project, grouped, with every count
    * worked out over every row before the page is cut. It sends no project, because it reads them all.
    */
-  reportsAndNotes: (ask: { show: ReportsPageShow; limit: number; offset: number }) =>
+  reportStars: () => request<{ stars: string[] }>('/api/records/report-stars'),
+  setReportStar: (id: string, starred: boolean) => request<{ stars: string[] }>(`/api/records/report-stars/${encodeURIComponent(id)}`, { method: 'PUT', body: json({ starred }) }),
+  reportsAndNotes: (ask: { show: ReportsPageShow; limit: number; offset: number; scope?: string; filter?: 'unread' | 'starred' }) =>
     request<ReportsAndNotesReply>(
-      `/api/records/reports-and-notes?${new URLSearchParams({ show: ask.show, limit: String(ask.limit), offset: String(ask.offset) }).toString()}`,
+      `/api/records/reports-and-notes?${new URLSearchParams({ show: ask.show, limit: String(ask.limit), offset: String(ask.offset), ...(ask.scope === undefined ? {} : { scope: ask.scope }), ...(ask.filter === undefined ? {} : { filter: ask.filter }) }).toString()}`,
     ),
+
+  /**
+   * WHAT IS RELATED TO A MODULE OR A PIPELINE, AT EVERY DEPTH: its decisions, its reports or its checklists, one page
+   * of at most 25, newest first. The walk and each reading are worked out by the door (src/server/lib/related.ts), and
+   * a page draws what it answers. `secondLevel: 'show'` asks each decision's basis, which a page folds one press down.
+   */
+  related: (id: string, ask: { kind: RelatedKind; limit?: number; offset?: number; secondLevel?: 'show' }) => {
+    const params = new URLSearchParams({ kind: ask.kind })
+    if (ask.limit !== undefined) params.set('limit', String(ask.limit))
+    if (ask.offset !== undefined) params.set('offset', String(ask.offset))
+    if (ask.secondLevel !== undefined) params.set('secondLevel', ask.secondLevel)
+    return request<RelatedAnswer>(`/api/records/${encodeURIComponent(id)}/related?${params.toString()}`)
+  },
 
   /**
    * ONE PAGE OF MY NOTES: the quick notes of every project, searched, chosen and counted by the door, with the weeks
@@ -1325,4 +1342,11 @@ export const recordsDoors = {
       `/api/records/${encodeURIComponent(recordId)}/revisions/${String(seq)}/revoke`,
       { method: 'POST' },
     ),
+
+  /**
+   * THE PIPELINES OF THE PROJECT ON SCREEN THAT STAND STILL, for Home's Late or stuck: at most as many as it draws,
+   * and how many there are in all. The server works out which stand still, in one statement
+   * (src/server/lib/pipelines-standing-still.ts), so the browser holds no copy of the rule.
+   */
+  pipelinesStandingStill: () => request<PipelinesStandingStill>('/api/pipelines/standing-still'),
 }

@@ -38,7 +38,7 @@ import { useState } from 'react'
 import type { PanelRecord } from '@shared/types.ts'
 import { isRung, type Rung } from '@shared/detail.ts'
 import { cardWord } from '@shared/card-words.ts'
-import { content, t, type WordKey } from '@shared/i18n.ts'
+import { content, t, type Say, type WordKey } from '@shared/i18n.ts'
 import { THE_INSPECTOR, THE_SECRETARY } from '@shared/roles.ts'
 import {
   andHowItLanded,
@@ -48,8 +48,6 @@ import {
   howARunStands,
   nameIn,
   needsNoCheckSays,
-  reportConfirmerNames,
-  reportConfirmers,
   STANDING_WITHOUT_A_CHECK_WORD_KEYS,
   STANDING_WORD_KEYS,
   theBasisNamed,
@@ -68,9 +66,10 @@ import {
 } from '@shared/releasing.ts'
 import { beforeTheSealSays, readRemindedBeforeTheSeal, REMINDED_BEFORE_THE_SEAL } from '@shared/before-the-seal.ts'
 import { api, errorMessage, type ParticipantsReply } from '../api.ts'
+import { CodeRows } from '../lib/code-rows.tsx'
 import { stampToTheMinute } from '../lib/minute.ts'
 import { useInspect } from '../lib/mode.ts'
-import { Absence, Btn, Panel, type PanelProps } from './ui.tsx'
+import { Absence, Btn, Panel, ServerNote, type PanelProps } from './ui.tsx'
 import { recordPath } from './router.tsx'
 
 const CHAPTER_LEVEL_WORDS: Readonly<Record<Rung, WordKey>> = {
@@ -97,13 +96,13 @@ function reviewLevelWord(level: 'none' | 'light'): string {
 }
 
 /**
- * THE WORD AND THE SENTENCE FOR A STATIC STANDING, IN THE PAGE'S LANGUAGE.
+ * THE WORD FOR A STATIC STANDING, IN THE PAGE'S LANGUAGE. Since November 2026, as decided, the fixed
+ * sentence that went with it is not drawn: it stays in the API.
  *
  * `RUN_STANDING` and `STANDING_WITHOUT_A_CHECK` in `@shared/releasing.ts` are outside this piece's
- * files, and every word and sentence they hold is fixed English text with nothing dynamic in it —
- * no id, no date, no name. So this table only borrows the STANDING as a key and substitutes this
- * piece's own translated word and sentence for it; it never reads `.word` or `.sentence` off the
- * shared constant. The sentences a refusal, a supersession or a merge-queue close compose (`theBasisNamed`, `confirmedNotChecked`,
+ * files, and every word they hold is fixed English text with nothing dynamic in it — no id, no
+ * date, no name. So this table only borrows the STANDING as a key and substitutes this piece's own
+ * translated word for it; it never reads `.word` off the shared constant. The sentences a refusal, a supersession or a merge-queue close compose (`theBasisNamed`, `confirmedNotChecked`,
  * `endedWithItsMergeEntrySays`, `needsNoCheckSays`, `supersededSays`) stitch in a run's own facts,
  * and reproducing their wording here would be a second account of what those facts mean — the
  * file's own rule, stated at the top of it. Those stay in the shared module's English. A confirmation's
@@ -121,13 +120,11 @@ function reviewLevelWord(level: 'none' | 'light'): string {
  * again exactly, and otherwise hand back the stored English, which is then drawn as the server wrote it.
  * `theBasisNamed` and `supersededSays` are not in the standing paragraph and are unchanged.
  */
-function standingWords(standing: RunStanding): { word: string; sentence: string } {
-  const keys = STANDING_WORD_KEYS[standing]
-  return { word: t(keys.word), sentence: t(keys.sentence) }
+function standingWordOf(standing: RunStanding): string {
+  return t(STANDING_WORD_KEYS[standing].word)
 }
-function standingWithoutCheckWords(standing: 'inspecting' | 'closed'): { word: string; sentence: string } {
-  const keys = STANDING_WITHOUT_A_CHECK_WORD_KEYS[standing]
-  return { word: t(keys.word), sentence: t(keys.sentence) }
+function standingWithoutCheckWordOf(standing: 'inspecting' | 'closed'): string {
+  return t(STANDING_WITHOUT_A_CHECK_WORD_KEYS[standing].word)
 }
 
 // ============================================================================ what is on the run
@@ -235,27 +232,27 @@ export function TheCheckOnARun({
   // office asks for, and their sentences would say one is still to come, so they are not drawn. A
   // later confirmation is read the ordinary way.
   const askedOfNobody = stands.needsNoCheck !== null && stands.standing === 'closed' && stands.confirmed === null && stands.endedWithItsMergeEntry === null
-  // THE WORD IS ALWAYS THIS PIECE'S OWN TRANSLATION (`standingWords`/`standingWithoutCheckWords`).
-  // THE SENTENCE IS TRANSLATED TOO WHEREVER IT IS ONE OF THE FIXED ONES `@shared/releasing.ts`
-  // DECLARES. WHEREVER IT IS A SENTENCE COMPOSED FROM THIS RUN'S OWN FACTS it is that module's composer,
+  // THE WORD IS ALWAYS THIS PIECE'S OWN TRANSLATION (`standingWordOf`/`standingWithoutCheckWordOf`).
+  // WHERE THE SENTENCE WOULD BE ONE OF THE FIXED ONES `@shared/releasing.ts` DECLARES, NONE IS DRAWN.
+  // WHEREVER IT IS A SENTENCE COMPOSED FROM THIS RUN'S OWN FACTS it is that module's composer,
   // asked with this page's reader (`closedUncheckedSays` with `andHowItLanded`, which is what `stands.says`
   // is for such a run, `endedWithItsMergeEntrySays`, `needsNoCheckSays`, `confirmedNotChecked`) — see the
   // comment on `STANDING_WORD_KEYS` above.
-  const standingWord = roundStanding !== null
-    ? { ...roundStanding, serverWritten: false }
+  const standingWord: { word: string; sentence: string | null; serverWritten: boolean } = roundStanding !== null
+    ? { word: roundStanding.word, sentence: null, serverWritten: false }
     : stands.closedUnchecked !== null
-    ? { word: standingWords('closed unchecked').word, sentence: andHowItLanded(closedUncheckedSays(stands.closedUnchecked, t, nameOf), stands.landedByHand, t, nameOf), serverWritten: false }
+    ? { word: standingWordOf('closed unchecked'), sentence: andHowItLanded(closedUncheckedSays(stands.closedUnchecked, t, nameOf), stands.landedByHand, t, nameOf), serverWritten: false }
     : stands.endedWithItsMergeEntry !== null
-    ? { word: standingWords('closed').word, sentence: endedWithItsMergeEntrySays(stands.endedWithItsMergeEntry, t), serverWritten: false }
+    ? { word: standingWordOf('closed'), sentence: endedWithItsMergeEntrySays(stands.endedWithItsMergeEntry, t), serverWritten: false }
     : askedOfNobody && stands.needsNoCheck !== null
-    ? { word: standingWords('closed').word, sentence: needsNoCheckSays(stands.needsNoCheck, t), serverWritten: false }
+    ? { word: standingWordOf('closed'), sentence: needsNoCheckSays(stands.needsNoCheck, t), serverWritten: false }
     : withoutACheck && (stands.standing === 'inspecting' || stands.standing === 'closed')
       // The confirmation's standing also embeds its path and commit. The same decisions
       // apply here; normal mode explains the accepted work in WhatTreeItRead below.
       ? inspect && stands.standing === 'closed' && stands.confirmed !== null
-        ? { word: standingWithoutCheckWords('closed').word, sentence: confirmedNotChecked(stands.confirmed, t), serverWritten: false }
-        : { ...standingWithoutCheckWords(stands.standing), serverWritten: false }
-      : { ...standingWords(stands.standing), serverWritten: false }
+        ? { word: standingWithoutCheckWordOf('closed'), sentence: confirmedNotChecked(stands.confirmed, t), serverWritten: false }
+        : { word: standingWithoutCheckWordOf(stands.standing), sentence: null, serverWritten: false }
+      : { word: standingWordOf(stands.standing), sentence: null, serverWritten: false }
   const word = roundStanding !== null ? standingWord : failedSaid !== null && failedSaid.says !== '' && stands.standing === 'inspecting'
     ? { word: t('chk.checkFailed'), sentence: failedSaid.says, serverWritten: !failedSaid.composed }
     : noCheckSaid === null || stands.standing !== 'inspecting'
@@ -263,7 +260,11 @@ export function TheCheckOnARun({
       : { word: t('chk.checkNotStarted'), sentence: noCheckSaid.says, serverWritten: !noCheckSaid.composed }
   // WHAT THE RUN WAITS FOR is drawn only where it is a wait, not a stored refusal, and that wait is asked of
   // the shared composer with this page's reader. `stands.waitingFor` says whether there is one.
-  const waiting = noCheck === null && failed === null && stands.waitingFor !== null ? whatTheRunWaitsFor(data, stands, t, nameOf, reportConfirmation) : null
+  //
+  // A WAIT FOR A CHECK WITH NO INSPECTOR NAMED is said here as a short state, not the composer's sentence.
+  // The reader swaps that one key for this page's word, so every other waiting line stays the composer's.
+  const sayOnThisPage: Say = (key, values) => key === 'chk.says.waits.aCheck' ? t('chk.waitsNoInspectorWord') : t(key, values)
+  const waiting = noCheck === null && failed === null && stands.waitingFor !== null ? whatTheRunWaitsFor(data, stands, sayOnThisPage, nameOf, reportConfirmation) : null
   // THE PRESS THAT CLOSES THE RUN, at the moment this project's level says it may be pressed. At
   // `full` that is after a release, which is `reporting`. At `none` and `light` no release is coming,
   // so the press belongs on the finish itself — and `confirmTheReport` is the door that agrees.
@@ -292,7 +293,7 @@ export function TheCheckOnARun({
             {withoutACheck ? null : noCheck === null || wouldRead !== null ? <WhatItWouldRead read={wouldRead} /> : null}
             {withoutACheck ? null : noCheck === null || stands.refused !== null ? <TheVerdict released={stands.released} refused={stands.refused} nameOf={nameOf} /> : null}
             {noCheck === null || wouldRead?.read || stands.confirmed?.read ? <WhatTreeItRead released={stands.released} refused={stands.refused} confirmed={stands.confirmed} read={wouldRead?.read ?? null} /> : null}
-            {mayConfirm ? <ConfirmIt run={record.id} released={stands.released} reportConfirmation={reportConfirmation} withoutACheck={withoutACheck} nameOf={nameOf} onChanged={onChanged} /> : null}
+            {mayConfirm ? <ConfirmIt run={record.id} onChanged={onChanged} /> : null}
           </>
         )}
       </div>
@@ -305,7 +306,8 @@ export function TheCheckOnARun({
  *
  * THE SENTENCE AND `waiting` ARE COMPOSED FROM THIS RUN'S OWN FACTS, in `@shared/releasing.ts`
  * (`whatARunWaitsFor` and the sentence-builders named on `STANDING_WORD_KEYS` above), and the panel asks
- * those composers with the page's reader, so both read in the page's language. `sentenceIsServerWritten`
+ * those composers with the page's reader, so both read in the page's language. A fixed standing draws its
+ * word and no sentence. `sentenceIsServerWritten`
  * is true only where the sentence is a stored one the page could not say again (see `whyTheCheckFailedIn`):
  * that sentence is the server's English and carries `chk-server`, so a browser test can tell it from a
  * word this panel forgot to move.
@@ -319,7 +321,7 @@ function WhereItStands({
 }: {
   standing: RunStanding
   word: string
-  sentence: string
+  sentence: string | null
   sentenceIsServerWritten?: boolean
   waiting: string | null
 }) {
@@ -329,7 +331,7 @@ function WhereItStands({
       <p className="chk-word" data-standing={standing}>
         {word}
       </p>
-      <p className={sentenceIsServerWritten === true ? 'chk-said chk-server' : 'chk-said'}>{sentence}</p>
+      {sentence === null ? null : <p className={sentenceIsServerWritten === true ? 'chk-said chk-server' : 'chk-said'}>{sentence}</p>}
       {waiting === null ? null : <p className="chk-waiting">{waiting}</p>}
     </section>
   )
@@ -349,7 +351,7 @@ function WhoWasAsked({ asked }: { asked: AskedFor | null }) {
     return (
       <section className="chk-part">
         <h3 className="chk-h">{t('chk.whoAsked')}</h3>
-        <p className="chk-said">{t('chk.notAskedYet')}</p>
+        <p className="chk-said">{t('chk.notAskedYetWord')}</p>
       </section>
     )
   }
@@ -377,7 +379,7 @@ function WhoWasAsked({ asked }: { asked: AskedFor | null }) {
           saying so on every run would be furniture. */}
       {withoutACheck ? (
         <p className="chk-said">
-          {t('chk.reviewLevelSet', { level: reviewLevelWord(asked.reviewLevel as 'none' | 'light') })}
+          {t('chk.reviewLevelWord', { level: reviewLevelWord(asked.reviewLevel as 'none' | 'light') })}
         </p>
       ) : null}
       {/* THE OFFICE'S RUN IS REACHED FROM HERE IN BOTH MODES. A person has to be able to open the run
@@ -393,30 +395,38 @@ function WhoWasAsked({ asked }: { asked: AskedFor | null }) {
             <a className="chk-link" href={`#${recordPath(asked.execution.session)}`}>{t('chk.openTheOfficeRun')}</a>
           </p>
           {inspect ? (
-            <p className="chk-said">
-              {t('chk.officeRunIs', { session: asked.execution.session })} {t('chk.officeRunLog', { log: asked.execution.log })}
-            </p>
+            <CodeRows
+              rows={[
+                { label: 'chk.row.officeRun', value: asked.execution.session },
+                { label: 'chk.row.log', value: asked.execution.log },
+              ]}
+            />
           ) : null}
         </>
-      ) : asked.says !== undefined ? (
-        <p className="chk-said chk-server">{asked.says}</p>
-      ) : null}
+      ) : (
+        <ServerNote text={asked.says} />
+      )}
       {/* THE WORKING FOLDER, ITS BRANCH AND THE FORK POINT ARE DEVELOPER DETAIL, by item 3 of one
           of the owner's decisions and item 2 of another.
-          Normal mode draws none of these sentences, the one that says no working directory was
+          Normal mode draws none of these, the sentence that says no working directory was
           recorded included, because it too is about the branch the fork point is read from. */}
       {asked.checkout === undefined || !inspect ? null : asked.checkout.directory === undefined ? (
         // NO WORKING DIRECTORY WAS RECORDED, so there is no repository to read a trunk from. The
         // old sentence claimed the base was the fork point against main in this case as well, and
         // main was a guess: the trunk may be master, or unreadable. A change on 15 September 2026
         // made the server resolve the trunk itself, and this says the honest thing where it could.
-        <p className="chk-said">{t('chk.noWorkingDirectory')}</p>
+        <p className="chk-said">{t('chk.noWorkingDirectoryWord')}</p>
       ) : (
-        <p className="chk-said">
-          {asked.checkout.cutFrom === undefined
-            ? t('chk.workInNoBranch', { directory: asked.checkout.directory })
-            : t('chk.workInCutFrom', { directory: asked.checkout.directory, cutFrom: asked.checkout.cutFrom })}
-        </p>
+        <CodeRows
+          rows={[
+            {
+              label: 'chk.row.workFolder',
+              value: asked.checkout.directory,
+              ...(asked.checkout.cutFrom === undefined ? { state: 'chk.row.noBranchRead' as const } : {}),
+            },
+            ...(asked.checkout.cutFrom === undefined ? [] : [{ label: 'chk.row.cutFrom' as const, value: asked.checkout.cutFrom }]),
+          ]}
+        />
       )}
     </section>
   )
@@ -429,7 +439,7 @@ function WhatItWouldRead({ read }: { read: WouldRead | null }) {
     return (
       <section className="chk-part">
         <h3 className="chk-h">{t('chk.whatItWouldRead')}</h3>
-        <p className="chk-said">{t('chk.notAssembled')}</p>
+        <p className="chk-said">{t('chk.notAssembledWord')}</p>
       </section>
     )
   }
@@ -458,8 +468,12 @@ function WhatItWouldRead({ read }: { read: WouldRead | null }) {
       )}
       {/* THE ASSEMBLY'S OWN SENTENCE ABOUT THE BASE, drawn as it wrote it: a server sentence, not
           translated on this page (this round's report says so). Developer mode only, as above. */}
-      {read.base?.says === undefined || !inspect ? null : <p className="chk-said chk-server">{read.base.says}</p>}
-      {read.read === undefined || !inspect ? null : <p className="chk-said chk-read-tree">{t('chk.worktree', { worktree: read.read.worktree })}</p>}
+      <ServerNote text={read.base?.says} />
+      {read.read === undefined || !inspect ? null : (
+        <div className="chk-read-tree">
+          <CodeRows rows={[{ label: 'chk.row.worktree', value: read.read.worktree }]} />
+        </div>
+      )}
       <p className="chk-said">
         {/* A PLUGIN-ONLY CHANGE THAT LEAVES ITS MANIFEST ALONE IS NOT READ, and the line says so. */}
         {read.pluginRule?.read === false
@@ -523,7 +537,7 @@ function TheVerdict({ released, refused, nameOf }: { released: Release | null; r
     return (
       <section className="chk-part">
         <h3 className="chk-h">{t('chk.theVerdict')}</h3>
-        <p className="chk-said">{t('chk.noVerdictYet')}</p>
+        <p className="chk-said">{t('chk.noVerdictYetWord')}</p>
       </section>
     )
   }
@@ -553,19 +567,16 @@ function TheVerdict({ released, refused, nameOf }: { released: Release | null; r
             // `NO_GROUP_FOR_A_CHECK_AGAIN` HOLDS NO DYNAMIC FACT — its own comment in
             // `@shared/releasing.ts` says so — so this piece's own translated word for it is used
             // instead of the shared module's English, the same way `STANDING_WORD_KEYS` above does.
-            <p className="chk-said">{t('chk.noGroupForCheckAgain')}</p>
+            <p className="chk-said">{t('chk.noGroupWord')}</p>
           ) : (
             <p className="chk-said">
-              {t('chk.groupOpen')}{' '}
               <a className="chk-link" href={`#${recordPath(refused.group)}`}>
                 {t('chk.openTheGroup')}
               </a>
             </p>
           )}
-          {refused.reworked == null ? (
-            refused.group === undefined ? null : <p className="chk-said">{t('chk.refusalStands')}</p>
-          ) : (
-            <p className="chk-said">{t('chk.reworkedAgain', { at: aMoment(refused.reworked.at, inspect) })}</p>
+          {refused.reworked == null ? null : (
+            <p className="chk-said">{t('chk.finishedAgainAt', { at: aMoment(refused.reworked.at, inspect) })}</p>
           )}
         </>
       )}
@@ -573,7 +584,7 @@ function TheVerdict({ released, refused, nameOf }: { released: Release | null; r
         <p className="chk-said">
           {t('chk.releasedOn', { who: nameIn(released.by, nameOf), at: aMoment(released.at, inspect), how: released.how === 'its starter' ? t('chk.who.itsStarter') : released.how === 'the standard-change rule' ? t('chk.who.theStandardChangeRule') : t('chk.who.anInspector') })}
           {' '}
-          {reportedTo === null ? t('chk.reportedNobody') : t('chk.reportedToName', { who: reportedTo })}
+          {reportedTo === null ? t('chk.reportedToNobody') : t('chk.reportedToName', { who: reportedTo })}
         </p>
       )}
     </section>
@@ -645,19 +656,26 @@ function WhatTreeItRead({
     <section className="chk-part">
       <h3 className="chk-h">{t(fromAConfirmation ? 'chk.whichWorkWasAccepted' : 'chk.whichTreeItRead')}</h3>
       {said == null ? (
-        <p className="chk-said">{t('chk.noWorktreeNamed')}</p>
+        <p className="chk-said">{t('chk.noWorktreeNamedWord')}</p>
       ) : (
         <>
           {/* By item 2 of one decision and item 6 of another, as read in hX_qDiISkTCp, developer
               mode keeps the evidence and the full stored sentence; normal mode keeps an account of
               the reading without paths or commits. */}
-          {!inspect ? null : <p className="chk-said chk-read-evidence">
-            {said.tip == null ? t('chk.worktreeNoTip', { worktree: said.worktree }) : t('chk.worktreeAtTip', { worktree: said.worktree, tip: said.tip })}
-          </p>}
+          {!inspect ? null : (
+            <div className="chk-read-evidence">
+              <CodeRows
+                rows={[
+                  { label: 'chk.row.worktree', value: said.worktree, ...(said.tip == null ? { state: 'chk.row.tipNotRecorded' as const } : {}) },
+                  ...(said.tip == null ? [] : [{ label: 'chk.row.tip' as const, value: said.tip }]),
+                ]}
+              />
+            </div>
+          )}
           <p className={inspect ? 'chk-said chk-server' : 'chk-said'}>
             {inspect ? said.says : readingInWords(said, fromAConfirmation)}
           </p>
-          {said.ofItsOwn || fromAConfirmation ? null : <p className="chk-warn">{t('chk.notItsOwnTree')}</p>}
+          {said.ofItsOwn || fromAConfirmation ? null : <p className="chk-warn">{t('chk.notItsOwnTreeWarning')}</p>}
         </>
       )}
     </section>
@@ -673,24 +691,7 @@ function WhatTreeItRead({
  * A LINE IS REQUIRED AND THE BUTTON SAYS SO, rather than sending an empty one. A close with nothing
  * behind it is indistinguishable from a mis-press a year later, which is why the route refuses one.
  */
-function ConfirmIt({
-  run,
-  released,
-  reportConfirmation,
-  withoutACheck,
-  nameOf,
-  onChanged,
-}: {
-  run: string
-  released: Release | null
-  reportConfirmation?: ReportConfirmation | undefined
-  /** True where this project asked for no inspector, so nothing released the run and nothing will. */
-  withoutACheck: boolean
-  nameOf: NameOf
-  onChanged?: () => void
-}) {
-  const allowed = reportConfirmers(released, reportConfirmation)
-  const confirming = reportConfirmerNames(allowed, t, nameOf)
+function ConfirmIt({ run, onChanged }: { run: string; onChanged?: () => void }) {
   const [typed, setTyped] = useState('')
   const [busy, setBusy] = useState(false)
   const [failed, setFailed] = useState<string | null>(null)
@@ -712,14 +713,6 @@ function ConfirmIt({
   return (
     <section className="chk-part chk-confirm">
       <h3 className="chk-h">{t('chk.closeThisRun')}</h3>
-      <p className="chk-said">
-        {withoutACheck && reportConfirmation?.asker == null
-          ? t('chk.noInspectorConfirm')
-          : reportConfirmation?.rule === 'any-registered-at-off' ? t('chk.anybodyConfirmsAtOff')
-          : confirming === null
-            ? t('chk.reportedNobodyAnybody')
-            : t('chk.waitingForReport', { who: confirming })}
-      </p>
       <label className="chk-label" htmlFor={`chk-because-${run}`}>
         {t('chk.whatYouAreSaying')}
       </label>
@@ -736,7 +729,7 @@ function ConfirmIt({
           variant="primary"
           pending={busy}
           disabled={typed.trim() === ''}
-          reason={typed.trim() === '' ? t('chk.sayFirst') : undefined}
+          reason={typed.trim() === '' ? t('chk.sayWhatFirst') : undefined}
           onClick={() => void confirm()}
         >
           {t('chk.confirmAndClose')}

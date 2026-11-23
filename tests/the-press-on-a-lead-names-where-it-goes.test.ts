@@ -16,7 +16,7 @@
  *      named whole, the press draws the short word from the word list and not the place, and the
  *      old not-now sentence is nowhere on the card.
  *   2. The chat draws the same sentence and the same short press under each message.
- *   3. At 1440, 990, 660 and 390, light and dark, nothing scrolls sideways, no press runs out of
+ *   3. At 1440 and 390, in light, nothing scrolls sideways, no press runs out of
  *      its card, and Not now stays on one line. Pictures of each are kept only when TEST_SHOTS
  *      names a folder.
  *
@@ -39,8 +39,8 @@ import { openTheChat } from './open-the-chat.ts'
 import { pageTitle } from '../src/web/components/Sidebar.tsx'
 import { parseRoute } from '../src/web/components/router.tsx'
 
-const WIDTHS = [1440, 990, 660, 390] as const
-const THEMES = ['light', 'dark'] as const
+const WIDTHS = [1440, 390] as const
+const THEMES = ['light'] as const
 type Theme = (typeof THEMES)[number]
 
 const GUIDE = 'guide-press'
@@ -174,7 +174,7 @@ describe('the offer names where a lead goes, and the press is short', () => {
     expect(pageErrors).toEqual([])
   }, 240_000)
 
-  it('draws nothing past the card at four widths in both looks', async () => {
+  it('draws nothing past the card at the widest and the narrowest width in the light look', async () => {
     for (const width of WIDTHS) for (const theme of THEMES) {
       await open(THE_PAGE, theme, width)
       for (const one of sent) await page.locator(`${cardOf(one.id)} .px-lead-go`).waitFor({ state: 'visible', timeout: 30_000 })

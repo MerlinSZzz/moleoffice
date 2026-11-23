@@ -6,7 +6,7 @@
  * words below it showed. A send pressed on this page now brings the line "This review has gone" into view once,
  * clear of the top bar.
  *
- * At 390 Send is the bar's; at 660 and 1440 it is the column's. At each width the line is drawn whole: its top and
+ * At 390 Send is the bar's; at 1440 it is the column's. At each width the line is drawn whole: its top and
  * its foot are inside the window, and the line itself is what is drawn at its middle (nothing lies over it).
  *
  * Three-run proof (control, mutation, restore) is in round 16's report. The mutation: the call that brings the
@@ -92,7 +92,7 @@ afterAll(async () => {
 }, 120_000)
 
 describe('after Send, the first line of what happened', () => {
-  for (const width of [390, 660, 1440]) {
+  for (const width of [390, 1440]) {
     it(`is drawn whole at ${String(width)}`, async () => {
       await app.page.setViewportSize({ width, height: width === 390 ? 844 : 1000 })
       await startAReviewOn(await aReport(`Made-up kiln report at ${String(width)}`))

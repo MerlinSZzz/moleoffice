@@ -3,20 +3,40 @@
 /**
  * THE KEYBOARD SHORTCUTS: WHICH KEYS THERE ARE, WHEN ONE MAY FIRE, AND WHAT THE PERSON TURNED OFF.
  *
- * By item 5 of a decision, the eight questions of the shortcut proposal (report hbu756wTdJnz) are
- * each answered as its recommendation says. This file is the one place
- * those answers are worked out. The key handler, the "?" list, the Settings rows and the hints on
- * the page all read the table below, so they cannot disagree (USER.md's ninth invariant).
+ * This file is the one place the keys are worked out. The key handler, the list of keys, the
+ * Settings rows and the hints on the page all read the table below, so they cannot disagree
+ * (USER.md's ninth invariant).
  *
  * ---------------------------------------------------------------------------------------
- * TWO KINDS OF KEY (question 1)
+ * TWO KINDS OF KEY, AND NO BARE KEY
  * ---------------------------------------------------------------------------------------
  *
  * ANYWHERE KEYS hold Ctrl, or ⌘ on a Mac. They work even when a text box has the focus. There are
  * two: Ctrl+Shift+K for the chat and Ctrl+/ for the list of keys.
  *
- * SINGLE KEYS are one character, or "g" followed by a letter. They work only when no text box has
- * the focus. The one switch in Settings turns every one of them off (question 3).
+ * ALT KEYS are Alt and one letter, and on a Mac Alt is Option. They work only when no text box has
+ * the focus. There are nine: O for Home, C for Decisions, G for Settings, P for the list of
+ * projects, J and K for the next waiting message and the one before, R for the page's search box,
+ * X for the quick search, and L for light or dark.
+ *
+ * NO DEFAULT IS A BARE KEY, and none is "g" then a letter.
+ *
+ * WHY THESE NINE LETTERS. Each one is free in three ways. No browser or system that was read uses
+ * it with Alt. It is not a dead key with Option on a Mac's US layout. Its place carries the same
+ * letter on US, German and French keyboards. The decision that chose them says where each was read,
+ * and what was not read. On another layout, the key at a place may print another letter than the
+ * one the list draws.
+ *
+ * ---------------------------------------------------------------------------------------
+ * AN ALT KEY IS MATCHED BY ITS PLACE
+ * ---------------------------------------------------------------------------------------
+ *
+ * An Alt key is matched by `code`, the key's place on the keyboard, such as "KeyO". It is never
+ * matched by `key`, the character. On a Mac, Option and O give "ø", and Option and some letters
+ * give "Dead". The place is still KeyO, so the key still fires.
+ *
+ * ALTGR on Windows comes as Ctrl and Alt together, and it types a character. So an Alt key never
+ * fires while Ctrl is held. On Linux, AltGr does not come as Alt at all.
  *
  * ---------------------------------------------------------------------------------------
  * THE ONE RULE FOR WHETHER A PRESS MAY FIRE A SHORTCUT
@@ -24,12 +44,15 @@
  *
  * `mayThisPressFire` is asked by every key, in this order:
  *
- *   an input method is composing                          -> no, for both kinds
- *   something on the page already took the key            -> no, for both kinds
- *   an anywhere key: Ctrl (⌘ on a Mac) is held, Alt is not -> yes
- *   a single key: the focus is in an input, a textarea, a select or an editable element -> no
- *   a single key: Ctrl, Alt or Meta is held               -> no
- *   a single key otherwise                                -> yes
+ *   an input method is composing                           -> no, for both kinds
+ *   something on the page already took the key             -> no, for both kinds
+ *   an anywhere key: Ctrl (⌘ on a Mac) is held, Alt is not  -> yes
+ *   an Alt key: the focus is in an input, a textarea, a select or an editable element -> no
+ *   an Alt key: Alt is held, and Ctrl, Meta and Shift are not -> yes
+ *   an Alt key otherwise                                   -> no
+ *
+ * NO ALT KEY FIRES IN A TEXT BOX. There, Option on a Mac and AltGr type letters, and a key that
+ * fired would take a letter the person meant to type.
  *
  * THE INPUT METHOD IS ASKED FIRST, for the reason `src/web/lib/send-key.ts` gives for Enter: while
  * an input method is composing, every key belongs to it. `isComposing` is the browser's word for
@@ -38,6 +61,19 @@
  * "ALREADY TOOK THE KEY" is `defaultPrevented`. The handler listens on the window, so the page's own
  * handlers have run first; a key one of them took (Escape in the talk box, Ctrl+S in a plan) is
  * never taken a second time here.
+ *
+ * ---------------------------------------------------------------------------------------
+ * WHAT A PERSON CHOSE IS KEPT
+ * ---------------------------------------------------------------------------------------
+ *
+ * The choice is stored as `ShortcutSettings` in `@shared/participants.ts`, and nothing stored names
+ * a key. Nothing stored was rewritten when the keys moved to Alt, and there is no migration.
+ *
+ *   `off`         The shortcuts the person turned off. It keeps its meaning: each stays off.
+ *   `singleKeys`  The one switch. Its name and its stored value are kept. It turned off every key
+ *                 that works only outside a text box, which were the single keys and the "g" keys.
+ *                 Those keys are now the Alt keys, so false now turns off every Alt key. The two
+ *                 anywhere keys stay on. Its words in Settings say so.
  */
 
 import { useSyncExternalStore } from 'react'
@@ -70,18 +106,18 @@ export type ShortcutAction =
   | 'quick-search'
   | 'theme'
 
+/** The place of a letter key, as `KeyboardEvent.code` names it: "KeyO" is the place of O. */
+export type ALetterPlace = `Key${string}`
+
 /**
  * ONE PRESS THAT FIRES A SHORTCUT.
  *
  * `anywhere`: Ctrl (⌘ on a Mac) with this key, and Shift when `shift` is true.
- * `single`: this one key alone. `shift` true or false asks for Shift held or not; left out, Shift is
- * not asked about, because "?" and "/" need Shift on some keyboards and not on others.
- * `g`: "g", then this letter.
+ * `alt`: Alt (Option on a Mac) with the key at this place, and nothing else held.
  */
 export type Chord =
   | { kind: 'anywhere'; key: string; shift?: boolean }
-  | { kind: 'single'; key: string; shift?: boolean }
-  | { kind: 'g'; key: string }
+  | { kind: 'alt'; code: ALetterPlace }
 
 /** One row of the table: which setting turns it off, what it does, its words, and its keys. */
 export interface ShortcutRow {
@@ -92,26 +128,26 @@ export interface ShortcutRow {
 }
 
 /**
- * EVERY SHORTCUT, IN THE ORDER THE "?" LIST AND THE SETTINGS GROUP DRAW THEM.
+ * EVERY SHORTCUT, IN THE ORDER THE LIST OF KEYS AND THE SETTINGS GROUP DRAW THEM.
  *
  * The waiting messages are two rows under one setting, because "next" and "the one before" are two
  * things to say and one thing to turn off.
  *
- * NOT HERE, ON PURPOSE: `r` for the review pane and `a` for pointing at a part. The proposal's first
- * batch (its question 8) does not include them.
+ * NOT HERE, ON PURPOSE: a key for the review pane and a key for pointing at a part. The first batch
+ * of shortcuts did not include them.
  */
 export const SHORTCUTS: readonly ShortcutRow[] = [
-  { id: 'chat', action: 'chat', what: 'shortcuts.what.chat', chords: [{ kind: 'anywhere', key: 'k', shift: true }, { kind: 'single', key: 'c', shift: false }] },
-  { id: 'keys', action: 'keys', what: 'shortcuts.what.keys', chords: [{ kind: 'anywhere', key: '/' }, { kind: 'single', key: '?' }] },
-  { id: 'home', action: 'home', what: 'shortcuts.what.home', chords: [{ kind: 'g', key: 'h' }] },
-  { id: 'decisions', action: 'decisions', what: 'shortcuts.what.decisions', chords: [{ kind: 'g', key: 'd' }] },
-  { id: 'settings', action: 'settings', what: 'shortcuts.what.settings', chords: [{ kind: 'g', key: 's' }] },
-  { id: 'project', action: 'project', what: 'shortcuts.what.project', chords: [{ kind: 'g', key: 'p' }] },
-  { id: 'waiting', action: 'waiting-next', what: 'shortcuts.what.waitingNext', chords: [{ kind: 'single', key: 'n', shift: false }] },
-  { id: 'waiting', action: 'waiting-previous', what: 'shortcuts.what.waitingPrevious', chords: [{ kind: 'single', key: 'n', shift: true }] },
-  { id: 'search', action: 'search', what: 'shortcuts.what.search', chords: [{ kind: 'single', key: '/' }] },
-  { id: 'quickSearch', action: 'quick-search', what: 'shortcuts.what.quickSearch', chords: [{ kind: 'single', key: 'f', shift: false }] },
-  { id: 'theme', action: 'theme', what: 'shortcuts.what.theme', chords: [{ kind: 'single', key: 't', shift: false }] },
+  { id: 'chat', action: 'chat', what: 'shortcuts.what.chat', chords: [{ kind: 'anywhere', key: 'k', shift: true }] },
+  { id: 'keys', action: 'keys', what: 'shortcuts.what.keys', chords: [{ kind: 'anywhere', key: '/' }] },
+  { id: 'home', action: 'home', what: 'shortcuts.what.home', chords: [{ kind: 'alt', code: 'KeyO' }] },
+  { id: 'decisions', action: 'decisions', what: 'shortcuts.what.decisions', chords: [{ kind: 'alt', code: 'KeyC' }] },
+  { id: 'settings', action: 'settings', what: 'shortcuts.what.settings', chords: [{ kind: 'alt', code: 'KeyG' }] },
+  { id: 'project', action: 'project', what: 'shortcuts.what.project', chords: [{ kind: 'alt', code: 'KeyP' }] },
+  { id: 'waiting', action: 'waiting-next', what: 'shortcuts.what.waitingNext', chords: [{ kind: 'alt', code: 'KeyJ' }] },
+  { id: 'waiting', action: 'waiting-previous', what: 'shortcuts.what.waitingPrevious', chords: [{ kind: 'alt', code: 'KeyK' }] },
+  { id: 'search', action: 'search', what: 'shortcuts.what.search', chords: [{ kind: 'alt', code: 'KeyR' }] },
+  { id: 'quickSearch', action: 'quick-search', what: 'shortcuts.what.quickSearch', chords: [{ kind: 'alt', code: 'KeyX' }] },
+  { id: 'theme', action: 'theme', what: 'shortcuts.what.theme', chords: [{ kind: 'alt', code: 'KeyL' }] },
 ]
 
 // The settings row words are declared in shared/shortcut-setting-words.ts.
@@ -122,26 +158,30 @@ export function chordsOf(id: ShortcutId): Chord[] {
   return SHORTCUTS.filter((row) => row.id === id).flatMap((row) => [...row.chords])
 }
 
-/** How long the page waits for the letter after "g", in milliseconds. The proposal says about 1.5 seconds. */
-export const G_WAITS_MS = 1500
+/** The letter printed at a place on a US keyboard, which the list draws: "O" for KeyO. */
+export function theLetterAt(code: ALetterPlace): string {
+  return code.slice('Key'.length)
+}
 
 /** The event the Settings group sends to open the list of keys. The component that draws the list listens for it. */
 export const OPEN_THE_LIST = 'mole-office.shortcuts.open-the-list'
 
-/** The event the sidebar's press and the key f send to open the quick search. The quick search listens for it. */
+/** The event the sidebar's press and Alt and X send to open the quick search. The quick search listens for it. */
 export const OPEN_THE_QUICK_SEARCH = 'mole-office.quick-search.open'
 
 // ------------------------------------------------------------------------------ the rule
 
-/** A keydown, as plain values, and the two facts about where it landed. */
+/** A keydown, as plain values, the key's place, and the two facts about where it landed. */
 export interface AShortcutPress extends AKeyPress {
+  /** The key's place on the keyboard, as `KeyboardEvent.code` names it, such as "KeyO". */
+  code: string
   /** The focus is in an input, a textarea, a select or an editable element. */
   inATextBox: boolean
   /** Something on the page already called preventDefault on this key. */
   alreadyTaken: boolean
 }
 
-/** Whether this machine is a Mac, where the anywhere keys hold ⌘ rather than Ctrl. */
+/** Whether this machine is a Mac, where the anywhere keys hold ⌘ rather than Ctrl, and Alt is Option. */
 export function isAMac(): boolean {
   if (typeof navigator === 'undefined') return false
   return /Mac|iPhone|iPad|iPod/.test(navigator.platform)
@@ -156,73 +196,41 @@ export function mayThisPressFire(press: AShortcutPress, kind: Chord['kind'], mac
     return held && !press.altKey
   }
   if (press.inATextBox) return false
-  if (press.ctrlKey || press.altKey || press.metaKey) return false
-  return true
+  return press.altKey && !press.ctrlKey && !press.metaKey && !press.shiftKey
 }
 
 /** Whether a press is this chord's key, once the rule has said it may fire. */
 function pressIs(press: AShortcutPress, chord: Chord, mac: boolean): boolean {
-  if (chord.kind === 'anywhere') {
-    // THE OTHER COMMAND KEY IS NOT THIS ONE: Ctrl on a Mac and ⌘ elsewhere make a different press.
-    if (mac ? press.ctrlKey : press.metaKey) return false
-    if (chord.shift !== undefined && press.shiftKey !== chord.shift) return false
-    return press.key.toLowerCase() === chord.key
-  }
-  if (chord.kind === 'single') {
-    if (chord.shift !== undefined && press.shiftKey !== chord.shift) return false
-    return chord.shift === undefined ? press.key === chord.key : press.key.toLowerCase() === chord.key
-  }
-  return press.key.toLowerCase() === chord.key && !press.shiftKey
+  // AN ALT KEY IS ITS PLACE, whatever character the layout and Option make of it.
+  if (chord.kind === 'alt') return press.code === chord.code
+  // THE OTHER COMMAND KEY IS NOT THIS ONE: Ctrl on a Mac and ⌘ elsewhere make a different press.
+  if (mac ? press.ctrlKey : press.metaKey) return false
+  if (chord.shift !== undefined && press.shiftKey !== chord.shift) return false
+  return press.key.toLowerCase() === chord.key
 }
 
-/** Whether a setting leaves this chord on. The one switch stops every chord that is not an anywhere key. */
+/**
+ * Whether a setting leaves this chord on. The one switch stops every Alt key, which are the keys
+ * that work only outside a text box.
+ */
 export function isOn(id: ShortcutId, chord: Chord, settings: ShortcutSettings): boolean {
   if (settings.off.includes(id)) return false
   return chord.kind === 'anywhere' || settings.singleKeys
 }
 
 /** What one press means, once the rule has been asked. */
-export type ShortcutAnswer =
-  | { what: 'fire'; action: ShortcutAction; id: ShortcutId }
-  | { what: 'wait-for-g' }
-  | { what: 'cancel-g' }
-  | { what: 'nothing' }
+export type ShortcutAnswer = { what: 'fire'; action: ShortcutAction; id: ShortcutId } | { what: 'nothing' }
 
-/**
- * WHAT A KEYDOWN MEANS. `afterG` is true while the page waits for the letter after "g".
- *
- * After "g", a letter that is a "g" key and is on fires it; any other press that may fire a single
- * key ends the wait and does nothing else, so a mistyped letter never fires a second shortcut.
- * A press the rule refuses (a composing key, a key in a text box) leaves the wait as it is.
- */
-export function theShortcutFor(
-  press: AShortcutPress,
-  state: { mac: boolean; settings: ShortcutSettings; afterG: boolean },
-): ShortcutAnswer {
-  const { mac, settings, afterG } = state
-  if (afterG) {
-    if (!mayThisPressFire(press, 'g', mac)) return { what: 'nothing' }
-    // Shift alone, and the other modifier keys pressed on their own, are not the letter.
-    if (press.key === 'Shift' || press.key === 'CapsLock') return { what: 'nothing' }
-    for (const row of SHORTCUTS) {
-      for (const chord of row.chords) {
-        if (chord.kind === 'g' && isOn(row.id, chord, settings) && pressIs(press, chord, mac)) {
-          return { what: 'fire', action: row.action, id: row.id }
-        }
-      }
-    }
-    return { what: 'cancel-g' }
-  }
+/** WHAT A KEYDOWN MEANS: the first key of the table that is on, may fire, and is this press. */
+export function theShortcutFor(press: AShortcutPress, state: { mac: boolean; settings: ShortcutSettings }): ShortcutAnswer {
+  const { mac, settings } = state
   for (const row of SHORTCUTS) {
     for (const chord of row.chords) {
-      if (chord.kind === 'g') continue
       if (!isOn(row.id, chord, settings)) continue
       if (!mayThisPressFire(press, chord.kind, mac)) continue
       if (pressIs(press, chord, mac)) return { what: 'fire', action: row.action, id: row.id }
     }
   }
-  const aGKeyIsOn = SHORTCUTS.some((row) => row.chords.some((chord) => chord.kind === 'g' && isOn(row.id, chord, settings)))
-  if (aGKeyIsOn && mayThisPressFire(press, 'g', mac) && press.key === 'g') return { what: 'wait-for-g' }
   return { what: 'nothing' }
 }
 
@@ -236,11 +244,12 @@ export function isATextBox(element: Element | null): boolean {
   return element.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"])') !== null
 }
 
-/** The press and its two facts, read off a real keydown. */
+/** The press, its place and its two facts, read off a real keydown. */
 export function aShortcutPress(event: KeyboardEvent): AShortcutPress {
   const target = event.composedPath()[0]
   return {
     key: event.key,
+    code: event.code,
     shiftKey: event.shiftKey,
     altKey: event.altKey,
     ctrlKey: event.ctrlKey,
@@ -254,12 +263,13 @@ export function aShortcutPress(event: KeyboardEvent): AShortcutPress {
 // ------------------------------------------------------------------------------ the words of a key
 
 /** The keys that have a name rather than a character printed on them. */
-export type NamedKey = 'Ctrl' | 'Shift' | 'Alt' | 'Enter' | 'Esc'
+export type NamedKey = 'Ctrl' | 'Shift' | 'Alt' | 'Option' | 'Enter' | 'Esc'
 
 const NAMED_KEY_WORDS: Readonly<Record<NamedKey, WordKey>> = {
   Ctrl: 'shortcuts.key.ctrl',
   Shift: 'shortcuts.key.shift',
   Alt: 'shortcuts.key.alt',
+  Option: 'shortcuts.key.option',
   Enter: 'shortcuts.key.enter',
   Esc: 'shortcuts.key.esc',
 }
@@ -277,33 +287,24 @@ export function keyCap(key: NamedKey | string): string {
 
 /** The keys of one chord, one by one, as the page draws them: each is a <kbd>. */
 export function keysOf(chord: Chord, mac: boolean): string[] {
-  const upper = (key: string): string => (key.length === 1 ? key.toUpperCase() : key)
-  const mod = mac ? '⌘' : 'Ctrl'
-  const keys =
-    chord.kind === 'anywhere'
-      ? [mod, ...(chord.shift === true ? ['Shift'] : []), upper(chord.key)]
-      : chord.kind === 'g'
-        ? ['g', chord.key]
-        : chord.shift === true
-          ? ['Shift', upper(chord.key)]
-          : [chord.key]
-  return keys.map(keyCap)
+  if (chord.kind === 'alt') return [mac ? 'Option' : 'Alt', theLetterAt(chord.code)].map(keyCap)
+  const key = chord.key.length === 1 ? chord.key.toUpperCase() : chord.key
+  return [mac ? '⌘' : 'Ctrl', ...(chord.shift === true ? ['Shift'] : []), key].map(keyCap)
 }
 
-/** One chord as one short line of text, for a tooltip: "Ctrl+Shift+K", "g s", "c". */
+/** One chord as one short line of text, for a tooltip: "Ctrl+Shift+K", "Alt+G", "Option+G". */
 export function chordText(chord: Chord, mac: boolean): string {
-  return chord.kind === 'g' ? keysOf(chord, mac).join(' ') : keysOf(chord, mac).join('+')
+  return keysOf(chord, mac).join('+')
 }
 
 /**
- * One chord in the words of `aria-keyshortcuts`, or null when that attribute cannot say it. It names
- * keys pressed together, and a space means "or", so "g then s" cannot be written there.
+ * One chord in the words of `aria-keyshortcuts`. That attribute names the modifiers Control, Meta,
+ * Alt and Shift, so Option on a Mac is Alt there.
  */
-export function chordForScreenReaders(chord: Chord, mac: boolean): string | null {
-  if (chord.kind === 'g') return null
+export function chordForScreenReaders(chord: Chord, mac: boolean): string {
+  if (chord.kind === 'alt') return `Alt+${theLetterAt(chord.code)}`
   const key = chord.key.length === 1 ? chord.key.toUpperCase() : chord.key
-  if (chord.kind === 'anywhere') return [mac ? 'Meta' : 'Control', ...(chord.shift === true ? ['Shift'] : []), key].join('+')
-  return chord.shift === true ? `Shift+${key}` : key
+  return [mac ? 'Meta' : 'Control', ...(chord.shift === true ? ['Shift'] : []), key].join('+')
 }
 
 // ------------------------------------------------------------------------------ the reading

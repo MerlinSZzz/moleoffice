@@ -70,6 +70,7 @@ import { readTheFinishApart } from './the-seal-read-apart.ts'
 import { theRefusalAgain } from './the-refusal-again.ts'
 import { thePartsOf, type ThePartsOfADoor } from './the-parts-of-a-check-door.ts'
 import type { ACarriedGitFacts, ACommitsPastTheCutAsk, AFinishReading, AGitFactsAsk, ASealGitAsk, TheCommitsPastTheCut } from './the-seal-read-apart-thread.ts'
+import type { AnOwnCommitsAsk, TheRunsOwnCommits } from './a-runs-own-commits.ts'
 
 /**
  * The most times a finishing write reads its git on the thread, and the most reads of the facts the reminder asks for,
@@ -92,6 +93,8 @@ interface TheReadings {
   parts: ThePartsOfADoor
   /** The commits past a run's cut a records seal asked for. */
   commits: ACommitsPastTheCutAsk[]
+  /** The run's own commits a seal asked for (./a-runs-own-commits.ts). */
+  own: AnOwnCommitsAsk[]
   /** Why the pass that runs now, or the last one, did not check the commits past the run's cut, for the answer alone. */
   notChecked: string | null
   /**
@@ -137,7 +140,7 @@ export class AReadingIsNeeded extends Error {
 function theReadingsOf(req: FastifyRequest): TheReadings {
   let readings = THE_READINGS.get(req)
   if (readings === undefined) {
-    readings = { facts: [], seals: [], reading: null, usable: false, again: [], parts: UNTIMED, commits: [], notChecked: null, revisions: new Map() }
+    readings = { facts: [], seals: [], reading: null, usable: false, again: [], parts: UNTIMED, commits: [], own: [], notChecked: null, revisions: new Map() }
     THE_READINGS.set(req, readings)
   }
   return readings
@@ -172,9 +175,9 @@ export async function aFinishReadsItsGitApart<T>(req: FastifyRequest, write: (in
       // THE SEAL'S QUESTION ALONE, when the pass that stopped at the seal could use its reading and that reading holds every
       // question of the facts noted, none failed and none git could not read: the facts are not read a second time.
       const before = readings.reading
-      if (before !== null && readings.usable && (readings.seals.length > 0 || readings.commits.length > 0) && theFactsAreAllIn(before, readings.facts)) {
+      if (before !== null && readings.usable && (readings.seals.length > 0 || readings.commits.length > 0 || readings.own.length > 0) && theFactsAreAllIn(before, readings.facts)) {
         const alone = await readings.parts.waited(`the git read apart after pass ${pass}, for 0 of the facts and ${String(readings.seals.length)} of the seal${andTheCommits(readings)}`, () =>
-          readTheFinishApart({ facts: [], seals: readings.seals, commits: readings.commits }),
+          readTheFinishApart({ facts: [], seals: readings.seals, commits: readings.commits, own: readings.own }),
           (read) => ({ asksAhead: read.asksAhead, threadWaitMs: read.threadWaitMs, gitReadMs: read.gitReadMs }),
         )
         readings.reading = theTwoReadingsJoined(before, alone)
@@ -184,7 +187,7 @@ export async function aFinishReadsItsGitApart<T>(req: FastifyRequest, write: (in
       // that reached the seal.
       const asked = `${String(readings.facts.length)} of the facts and ${String(readings.seals.length)} of the seal${andTheCommits(readings)}`
       readings.reading = await readings.parts.waited(`the git read apart after pass ${pass}, for ${asked}`, () =>
-        readTheFinishApart({ facts: readings.facts, seals: readings.seals, commits: readings.commits }),
+        readTheFinishApart({ facts: readings.facts, seals: readings.seals, commits: readings.commits, own: readings.own }),
         (read) => ({ asksAhead: read.asksAhead, threadWaitMs: read.threadWaitMs, gitReadMs: read.gitReadMs }),
       )
     }
@@ -220,7 +223,8 @@ function during<U>(readings: TheReadings, act: () => U): U {
 
 /** The part's words for the commits past the cut a read asked for, said only when it asked for some. */
 function andTheCommits(readings: TheReadings): string {
-  return readings.commits.length === 0 ? '' : `, and ${String(readings.commits.length)} of the commits past the cut`
+  return (readings.commits.length === 0 ? '' : `, and ${String(readings.commits.length)} of the commits past the cut`) +
+    (readings.own.length === 0 ? '' : `, and ${String(readings.own.length)} of the run's own commits`)
 }
 
 /** Whether `reading` holds a reading of every question in `asks`, none failed and none git could not read. */
@@ -290,6 +294,32 @@ export function theCommitsPastTheCutAtTheWrite(ask: ACommitsPastTheCutAsk): TheC
 
 function needTheCommits(readings: TheReadings, ask: ACommitsPastTheCutAsk): never {
   if (!readings.commits.some((one) => JSON.stringify(one) === JSON.stringify(ask))) readings.commits.push(ask)
+  throw new AReadingIsNeeded(readings)
+}
+
+/**
+ * A RUN'S OWN COMMITS INSIDE A PASS, as `theRunsOwnCommitsRead` read them on the thread, or null outside a finishing
+ * write. A directory git could not read is used with no stamp, as the commits past the cut are. An `unread` that holds a
+ * head needs the stamp, as every answer that holds a head does. Throws `AReadingIsNeeded` when the pass's reading does
+ * not hold it.
+ *
+ * `seal` IS THE SEAL'S GIT THE SAME WRITE ASKS NEXT, or null for a seal that reads none. A read the own commits need asks
+ * for it too, so a finish reads its own commits and its seal's git in one read apart, under one stamp, and not in two.
+ */
+export function theRunsOwnCommitsAtTheWrite(ask: AnOwnCommitsAsk, seal: ASealGitAsk | null): TheRunsOwnCommits | null {
+  const readings = current
+  if (readings === null) return null
+  const reading = readings.usable ? readings.reading : null
+  const found = reading?.own.find((one) => JSON.stringify(one.ask) === JSON.stringify(ask))
+  if (reading === null || reading === undefined || found === undefined) return needTheOwnCommits(readings, ask, seal)
+  if ('failed' in found.read) throw new Error(found.read.failed)
+  if (!('unread' in found.read && found.read.head === undefined) && !stamped(reading, ask.directory)) return needTheOwnCommits(readings, ask, seal)
+  return found.read
+}
+
+function needTheOwnCommits(readings: TheReadings, ask: AnOwnCommitsAsk, seal: ASealGitAsk | null): never {
+  if (!readings.own.some((one) => JSON.stringify(one) === JSON.stringify(ask))) readings.own.push(ask)
+  if (seal !== null) note(readings, { seal })
   throw new AReadingIsNeeded(readings)
 }
 

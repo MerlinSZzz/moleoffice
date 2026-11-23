@@ -39,6 +39,11 @@ import { setFixtureOwner } from './agent-owner-fixture.ts'
  *
  * A LIVE PROCESS IS A REAL CHILD OF THIS TEST, in its own group, registered as a process resource of
  * the session. The children are killed by their group in afterAll.
+ *
+ * EVERY HOLD HERE IS KEPT: past its lapse and inside its grace. While a hold beats, the hold is the answer for every
+ * tool, so a beating hold with nothing readable behind it reads answering and nothing is routed on it at all. The
+ * office's "could not tell" is read only for a hold that no longer beats. So each hold is aged past the lapse once it
+ * is taken, and the grace is set to a day for this file and put back after it.
  */
 
 import { spawn, type ChildProcess } from 'node:child_process'
@@ -47,6 +52,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { apiApp, freshDb, type TestDb } from './helpers.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 import type { HoldOnTheWire } from '../src/shared/handles.ts'
+import { localStamp as aStampOf } from '../src/shared/time.ts'
 
 let t: TestDb
 let app: FastifyInstance
@@ -71,6 +77,10 @@ const processForSession = new Map<string, ChildProcess>()
 
 /** The session record behind each held handle, by handle. */
 const sessionOf = new Map<string, string>()
+
+/** The grace setting this file turns up, and what it was before, put back in afterAll. */
+const GRACE = 'MOLE_OFFICE_HANDLE_GRACE_SECONDS'
+const GRACE_BEFORE = process.env[GRACE]
 
 /** One routed entry, as the reply carries it. */
 interface TheRouting {
@@ -156,7 +166,8 @@ async function makeReachable(handle: string): Promise<void> {
  *
  * It names no serving agent, so it is not read as a run: the only thing that answers for it is the
  * reading behind the hold in answering.ts. `alive` gives it a live process; without one, the office
- * knows nothing of it is there.
+ * knows nothing of it is there. The hold is aged a hundred seconds once it is taken, past the lapse
+ * and inside the grace this file sets, so it is kept and no longer beats.
  */
 async function aHeldSessionWithNoTranscript(handle: string, alive: boolean): Promise<void> {
   const session = t.api.createRecord({
@@ -174,6 +185,9 @@ async function aHeldSessionWithNoTranscript(handle: string, alive: boolean): Pro
     payload: { session, machine: 'a-machine', runtime: 'claude-code' },
   })
   expect(reply.statusCode, reply.body).toBe(201)
+  t.client.sqlite
+    .prepare('UPDATE handle_holds SET last_heard_at = ? WHERE session_record_id = ? AND released_at IS NULL')
+    .run(aStampOf(new Date(Date.now() - 100_000)), session)
   sessionOf.set(handle, session)
 }
 
@@ -215,6 +229,7 @@ const couldNotTell = (name: string): string =>
   `Mole Office could not tell whether ${name} is answering, so it did not also give this message to anybody else.`
 
 beforeAll(async () => {
+  process.env[GRACE] = '86400'
   t = await freshDb()
   const built = await apiApp()
   app = built.app
@@ -262,6 +277,8 @@ afterAll(() => {
   }
   app.close()
   t.close()
+  if (GRACE_BEFORE === undefined) delete process.env[GRACE]
+  else process.env[GRACE] = GRACE_BEFORE
 })
 
 describe('a live process with no transcript is "could not tell", and nothing is routed on it', () => {

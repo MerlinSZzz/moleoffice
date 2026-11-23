@@ -71,7 +71,7 @@
 
 import { Component, createContext, useContext, useEffect, useRef, useState, type ErrorInfo, type ReactNode } from 'react'
 
-import { content, t } from '@shared/i18n.ts'
+import { t } from '@shared/i18n.ts'
 import { api } from '../api.ts'
 import { recordPath } from './router.tsx'
 import { useLanguage } from '../lib/language.ts'
@@ -102,30 +102,23 @@ export const FAULT_WORDS = {
   get page() { return t('frameFiles.fault.page') },
   get press() { return t('frameFiles.fault.press') },
   /** Said where nothing on this page had been pressed, which is a real answer and not a gap. */
-  get nothingPressed() { return t('frameFiles.fault.nothingPressed') },
+  get nothingPressed() { return t('frameFiles.fault.noPress') },
   /** The press that gets the reader out. */
   get again() { return t('frameFiles.fault.again') },
   /** What a press is called when it carries a picture or several elements rather than a word. */
   get unnamedPress() { return t('frameFiles.fault.unnamedPress') },
   /**
-   * Said before the link to the problem the office filed for this fault. Criterion E4. The link's
-   * words are `openIt`; the problem's id is drawn after them in developer mode only.
+   * The label of the problem the office files for this fault, and its three states. Criterion E4.
+   * The link after `filed` has the words `openIt`; the problem's id is drawn after them in developer
+   * mode only. Where the filing itself failed, `notFiled` says the office has NOT got a copy, so
+   * nobody goes looking for a problem record that was never written, and the office's own message
+   * is drawn in developer mode only.
    */
-  get filed() { return t('frameFiles.fault.filed') },
+  get problem() { return t('frameFiles.fault.problem') },
+  get filed() { return t('frameFiles.fault.problemWritten') },
   get openIt() { return t('frameFiles.fault.openIt') },
-  /** Said while the filing is still in flight, so the space is never an empty promise. */
-  get filing() { return t('frameFiles.fault.filing') },
-}
-
-/**
- * SAID WHEN THE FILING ITSELF FAILED, with the office's own message inside it.
- *
- * A fault panel that could not file is still a fault panel: the words a person needs are already
- * on the screen, and this line says the office has NOT got a copy, so nobody goes looking for a
- * problem record that was never written.
- */
-function notFiled(because: string): string {
-  return t('frameFiles.fault.notFiled', { because: content(because) })
+  get filing() { return t('frameFiles.fault.problemWriting') },
+  get notFiled() { return t('frameFiles.fault.problemNotWritten') },
 }
 
 /** What a caught fault is, in the one fact a reader always has and the two they may. */
@@ -359,12 +352,13 @@ export function TheFault({
    * THE STORED WORD NEVER REACHES THE DRAWING. `filed.state` is `filing`, `filed` or `refused`, and
    * those are words for a program. Comparing them inside the JSX puts a machine word in the place a
    * person reads, which is what tests/the-machine-word-gate.test.ts exists to notice — it noticed
-   * this one on 8 September 2026. The drawing below reads two values a person can read: the problem
-   * this fault has, or the sentence saying why it has none.
+   * this one on 8 September 2026. The drawing below reads values a person can read: the problem
+   * this fault has, the state word of its filing, and the office's refusal.
    */
   const theProblem = filed.state === 'filed' ? filed.problem : null
-  const whatTheOfficeSaid =
-    filed.state === 'refused' ? notFiled(filed.because) : FAULT_WORDS.filing
+  const whereTheFilingIs =
+    filed.state === 'filed' ? FAULT_WORDS.filed : filed.state === 'refused' ? FAULT_WORDS.notFiled : FAULT_WORDS.filing
+  const refusal = filed.state === 'refused' ? filed.because : null
 
   return (
     <div className="fault" role="alert">
@@ -395,16 +389,17 @@ export function TheFault({
           is the press that opens it, so the reader can add what they were doing to the record while
           they still remember it. All three states say something; none of them is a blank space. */}
       <p className="fault-filed">
-        {theProblem === null ? whatTheOfficeSaid : null}
+        <span className="fault-key">{FAULT_WORDS.problem}</span>
+        <span className="fault-value">{whereTheFilingIs}</span>
         {theProblem === null ? null : (
           <>
-            {FAULT_WORDS.filed}{' '}
             <a className="fault-problem" href={'#' + recordPath(theProblem)}>
               {FAULT_WORDS.openIt}
             </a>
             {inspect ? <span className="fault-problem-id">{theProblem}</span> : null}
           </>
         )}
+        {inspect && refusal !== null ? <span className="fault-refusal">{refusal}</span> : null}
       </p>
       <button
         type="button"
@@ -536,7 +531,7 @@ const FAULT_CSS = `
   line-height: var(--lh-body);
   overflow-wrap: anywhere;
 }
-.fault-where { margin: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; min-width: 0; }
+.fault-where, .fault-filed { margin: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; min-width: 0; }
 .fault-key {
   font-size: var(--fs-1);
   font-weight: 600;
@@ -545,11 +540,11 @@ const FAULT_CSS = `
   text-transform: uppercase;
 }
 .fault-value { font-size: var(--fs-2); color: var(--text-2); overflow-wrap: anywhere; }
-.fault-none, .fault-says, .fault-filed { margin: 0; font-size: var(--fs-1); color: var(--text-3); }
+.fault-none, .fault-says { margin: 0; font-size: var(--fs-1); color: var(--text-3); }
 /* THE PROBLEM THE OFFICE FILED, as a press. It is the reader's way into the record, so it is drawn
    as a link rather than as an id to copy. The id itself follows it in developer mode only. */
 .fault-problem { color: var(--text-2); }
-.fault-problem-id { margin-left: 6px; color: var(--text-3); font-family: var(--font-mono); overflow-wrap: anywhere; }
+.fault-problem-id, .fault-refusal { color: var(--text-3); font-family: var(--font-mono); font-size: var(--fs-1); overflow-wrap: anywhere; }
 .fault-again {
   justify-self: start;
   min-height: 30px;

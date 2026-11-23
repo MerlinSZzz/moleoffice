@@ -33,7 +33,7 @@ import {
   type Place,
   type ScratchServer,
 } from './terminal-holder-stand.ts'
-import { THE_HOLDER_PROTOCOL, theTerminalHolderLog, theTerminalHolderSocket } from '../src/config/the-terminal-holder.mjs'
+import { THE_HOLDER_PROTOCOL, theLongestSocketPathBytes, theTerminalHolderLog, theTerminalHolderSocket } from '../src/config/the-terminal-holder.mjs'
 import { apiApp, freshDb, type TestDb } from './helpers.ts'
 
 let place: Place
@@ -350,6 +350,34 @@ describe('a holder that cannot be read', () => {
       for (const socket of held) socket.destroy()
       await closed
     }
+  }, 180_000)
+
+  it.skipIf(process.platform !== 'linux')("8: calls the holder not running when its socket path is too long, names the path's length, and refuses opening with 503", async () => {
+    // A CONFIG FOLDER DEEP ENOUGH that the holder's socket in it is longer than a Unix socket's path may be. It is made,
+    // so nothing but the length can stop the ask. The holder's own start refuses such a path, so none can listen on it,
+    // and nothing may be said to answer there. On a Mac a path too long moves to a shorter place or is refused before
+    // any ask, and on Windows the address is a named pipe, so the case runs on Linux only.
+    const long = aPlace('too-long')
+    const deep = join(long.dir, 'd'.repeat(theLongestSocketPathBytes()))
+    mkdirSync(join(deep, 'mole-office', 'terminals'), { recursive: true })
+    const socket = theTerminalHolderSocket(long.database, { ...long.env, XDG_CONFIG_HOME: deep })
+    const length = Buffer.byteLength(socket)
+    expect(length, socket).toBeGreaterThan(theLongestSocketPathBytes())
+    const one = await inlineServer(long, undefined, { MOLE_OFFICE_TERMINAL_HOLDER: 'on', XDG_CONFIG_HOME: deep })
+    const listed = await ask(one.api, '/api/terminals')
+    expect(listed.status, JSON.stringify(listed.body)).toBe(200)
+    const holder = listed.body['holder'] as { state: string; says: string }
+    expect(holder.state, JSON.stringify(holder)).toBe('not running')
+    // The numbers are looked for outside the path, whose name is made of hexadecimal digits.
+    const besideThePath = holder.says.split(socket)
+    expect(besideThePath.length, holder.says).toBeGreaterThan(1)
+    expect(besideThePath.join(' '), holder.says).toContain(String(length))
+    expect(besideThePath.join(' '), holder.says).toContain(String(theLongestSocketPathBytes()))
+    const health = await ask(one.api, '/api/health')
+    expect((health.body['terminalHolder'] as { state: string }).state, JSON.stringify(health.body)).toBe('not running')
+    const opened = await ask(one.api, '/api/terminals', { method: 'POST', body: { folder: long.dir, command: '/bin/bash' } })
+    expect(opened.status, JSON.stringify(opened.body)).toBe(503)
+    expect(opened.body['code'], JSON.stringify(opened.body)).toBe('terminalHolderNotRunning')
   }, 180_000)
 })
 

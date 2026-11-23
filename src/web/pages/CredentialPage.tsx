@@ -7,12 +7,14 @@ import { useLanguage } from '../lib/language.ts'
 import { TieredPress } from '../components/TieredPress.tsx'
 import { RevokeTheirKey } from '../components/RevokeTheirKey.tsx'
 import type React from 'react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { errorMessage, faultOf, api } from '../api.ts'
 import { Absence, ErrorNote, Loading, Panel } from '../components/ui.tsx'
 import { useProjectAsync } from '../lib/project-async.ts'
 import { BackLink } from '../components/BackLink.tsx'
+import { hisBrowserPath, hrefOf } from '../components/router.tsx'
 import {
+  isAPersonsDeviceCredential,
   noKeyWorksUnder,
   whatACredentialCannotProve,
   whatAMismatchDoesToday,
@@ -61,10 +63,24 @@ export const CREDENTIAL_WORDS = {
   get noWorld() { return t('g4.credential.noWorld') },
   get noWorldWhy() { return t('g4.credential.noWorldWhy') },
 } as const
+/**
+ * WHERE A CREDENTIAL'S OLD ADDRESS OPENS NOW, or null where it is still this page. Design C of early
+ * idea B9: one of the person's browsers is a row on their own card, so its credential address opens that card at
+ * that row. An agent's credential keeps this page.
+ */
+export function whereACredentialOpens(credential: VisitorCredential): string | null {
+  return isAPersonsDeviceCredential(credential) ? hisBrowserPath(credential.id) : null
+}
 export function CredentialPage({ id }: { id: string }) {
   useLanguage()
   const [again, setAgain] = useState(0)
   const [state] = useProjectAsync(() => api.visitor(id), [id, again])
+  const elsewhere = state.status === 'ready' ? whereACredentialOpens(state.value.credential) : null
+  // THE ADDRESS IS REPLACED, not added to, so Back does not return here only to be sent on again.
+  useEffect(() => {
+    if (elsewhere !== null) window.location.replace(hrefOf(elsewhere))
+  }, [elsewhere])
+  if (elsewhere !== null) return null
   return (
     <div className="page cred">
       <style href="mole-office-credential" precedence="default">

@@ -16,7 +16,7 @@ import { setTimeout as delay } from 'node:timers/promises'
 import { expect } from 'vitest'
 import { resumeStableUpgrade, upgradeStable } from '../tools/stable/stable-upgrade-transaction.mjs'
 import { theResumeCommand, theUpgradeMarkPath } from '../src/config/the-upgrade-mark.mjs'
-import { baselineIsBack, candidateTag, children, databaseModule, groups, remember, root, snapshot, write, type stableUpgradeFixture } from './stable-upgrade-fixture.ts'
+import { baselineIsBack, children, databaseModule, groups, remember, root, snapshot, write, type stableUpgradeFixture } from './stable-upgrade-fixture.ts'
 import { commandUnderTheOwnerWatchingGate } from './the-owner-watching-gate.ts'
 
 export type Fixture = Awaited<ReturnType<typeof stableUpgradeFixture>>
@@ -311,7 +311,7 @@ export async function theCrashIsResumed(f: Fixture, b: Boundary, crash: Awaited<
     else await onlyTheOldVersionAnswers(f)
     const restart = await aStartOfTheMadeUpOffice(f)
     expect(restart.code, restart.stderr).toBe(1)
-    expect(restart.stderr).toContain(`the stable upgrade from ${f.baseline} to ${f.target} (tag ${candidateTag})`)
+    expect(restart.stderr).toContain(`the stable upgrade from ${f.baseline} to ${f.target} (tag ${f.config.candidateTag})`)
     expect(restart.stderr).toContain(`; ${theResumeCommand(f.stable, lock)} resumes it`)
   }
   const before = readFileSync(lock, 'utf8')

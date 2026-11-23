@@ -1,0 +1,7 @@
+{
+  "why": "A handle hold and a tool use keep their moment: one nullable column beside last_heard_at on handle_holds, and one beside at on tool_uses, each holding the same moment as an instant with its offset, written in the same write and from the same reading of the clock. On the night the clocks go back, the stamp alone cannot say which of the two passes of the hour from 01:00 it means. NULL is a row written before this migration, which is read from its stamp as before. Two ALTER TABLE; they rewrite no row.",
+  "columnsAddedAfterTheRebuild": {
+    "handle_holds": ["last_heard_instant"],
+    "tool_uses": ["at_instant"]
+  }
+}

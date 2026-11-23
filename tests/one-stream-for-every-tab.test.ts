@@ -18,7 +18,8 @@
  *
  *   1. Eight tabs of the office in one browser all load, the server holds one stream for the browser,
  *      and an event reaches every tab within a few seconds. The key window is closed first, and the
- *      one stream proves itself with the paired browser's key, as the page's other requests do.
+ *      one stream proves itself with the paired browser's two halves, the cookie half and the header
+ *      half, as the page's other requests do.
  *   2. When the tab holding the stream closes, another takes it over, and an event written in between
  *      still reaches every tab that is left (the new holder picks up with the last event id).
  *   3. A hidden tab keeps what it is handed and hands it to its panels when it is shown again.
@@ -35,6 +36,8 @@ import { join } from 'node:path'
 import type { Page } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { liveApp, waitForThePage, type LiveApp } from './helpers.ts'
+import { pairTheContext } from './a-paired-context.ts'
+import { DEVICE_HALF_HEADER } from '../src/config/key-header.mjs'
 import { THE_PERSON } from '../src/shared/person.ts'
 
 /** Only subscription messages are held; locks, stream reads and event broadcasts stay native. */
@@ -61,13 +64,15 @@ const OWNER = {
 
 let app: LiveApp
 let agentId = ''
+/** The header half the press gave this browser. Never printed. */
+let headerHalf = ''
 const tabs: Page[] = []
 
-/** A request made with this browser's cookies, which is how the paired browser's key is sent. */
+/** A request made as this browser: its cookies carry the cookie half, and it sends the header half as its pages do. */
 async function asThisBrowser(method: 'GET' | 'POST', path: string, body?: unknown): Promise<{ status: number; json: Record<string, unknown> }> {
   const res = await app.context.request.fetch(`${app.api}${path}`, {
     method,
-    headers: OWNER,
+    headers: { ...OWNER, [DEVICE_HALF_HEADER]: headerHalf },
     ...(body === undefined ? {} : { data: JSON.stringify(body) }),
   })
   return { status: res.status(), json: (await res.json().catch(() => ({}))) as Record<string, unknown> }
@@ -136,9 +141,8 @@ beforeAll(async () => {
       }
     }
   })
-  // PAIR THIS BROWSER: the reply sets the person's key as a cookie in this browser's own jar.
-  const paired = await asThisBrowser('POST', '/api/office/pairing')
-  expect(paired.status, JSON.stringify(paired.json)).toBe(200)
+  // PAIR THIS BROWSER: the reply sets the cookie half in this browser's own jar, and its pages keep the header half.
+  headerHalf = (await pairTheContext(app.context, app.api)).headerHalf
   const agent = await asThisBrowser('POST', '/api/records', { kind: 'agent', title: 'Tab reader', data: { handle: 'tab-reader', runtime: 'claude-code', state: 'active' } })
   expect(agent.status, JSON.stringify(agent.json)).toBe(201)
   const registry = (await asThisBrowser('GET', '/api/participants')).json as { agents: { id: string; handle: string }[] }

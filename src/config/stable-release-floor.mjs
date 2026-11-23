@@ -21,6 +21,8 @@ export const STABLE_RELEASE_FLOOR_SETTINGS = [
     absentMeans: null,
     inTemplate: true,
     notInTemplateBecause: null,
+    served: true,
+    notServedBecause: null,
     emptyMeans: null,
   },
 ]

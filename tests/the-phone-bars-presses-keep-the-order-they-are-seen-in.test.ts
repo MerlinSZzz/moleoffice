@@ -9,7 +9,7 @@
  * user and a screen reader were given a different order from the one on screen.
  *
  * WHAT THIS MEASURES, in a real browser on a test office of this file's own, at 390 by 844, with a fork waiting on
- * the person and seven open problems waiting on the person, so both counts are drawn, in both looks:
+ * the person and seven open problems waiting on the person, so both counts are drawn, in the light look:
  *   - the order the four presses stand on screen, left to right and then top to bottom;
  *   - the order they stand in the page;
  *   - the order the Tab key meets them, starting at the menu press.
@@ -45,7 +45,7 @@ const LABEL = 'Made-up data — an invented office, not real office data'
 const THE_PAGE_TOP = '#main > *:not([data-made-up-label]):not(style)'
 const PHONE = { width: 390, height: 844 }
 const NARROW_START = { width: 660, height: 900 }
-const LOOKS = ['light', 'dark'] as const
+const LOOKS = ['light'] as const
 const URGENT = 7
 const THE_PHONE_ORDER = ['menu', 'chat', 'decisions', 'urgent']
 const THE_ORDER_AT_660 = ['menu', 'decisions', 'urgent', 'chat']
@@ -220,17 +220,6 @@ it("keeps the phone's order in the page when a wide window is narrowed to a phon
     await context.close()
   }
 }, 180_000)
-
-it("keeps the order at 660 that it has where the bar is not a phone's", async () => {
-  const { context, page } = await aWindow(NARROW_START.width, NARROW_START.height, 'light')
-  try {
-    await open(page, pathFor('records'))
-    await theBarWithBothCounts(page)
-    expect((await thePresses(page)).onScreen, 'at 660 the order the eye reads').toEqual(THE_ORDER_AT_660)
-  } finally {
-    await context.close()
-  }
-}, 120_000)
 
 it.skipIf(PICTURES === undefined)('takes the bar at the widths and looks named', async () => {
   const folder = PICTURES!

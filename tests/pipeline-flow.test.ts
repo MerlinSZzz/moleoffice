@@ -39,6 +39,7 @@ import type { PanelRecord } from '../src/shared/types.ts'
 // stand-in below is installed.
 import type { FlowStep, StepAttention } from '../src/web/components/PipelineFlow.tsx'
 import { englishWords } from '../src/shared/words/joined.ts'
+import { t } from '../src/shared/i18n.ts'
 
 type Flow = typeof import('../src/web/components/PipelineFlow.tsx')
 type Page = typeof import('../src/web/pages/PipelinePage.tsx')
@@ -457,7 +458,8 @@ describe('the counted sentence about dependencies', () => {
     expect(facts.partial).toBe(2)
     expect(facts.sentence).toContain('9 dependencies between these 9 steps: 7 hard and 2 partial')
     expect(facts.sentence).toContain('may go only as far as a named stage')
-    expect(facts.sentence).toContain('not the same as waiting on nothing')
+    // CRITERION CHANGE, as decided: the count of blocks with no dependency is said as a state, with no reason after it.
+    expect(facts.sentence).toContain(t('pipelineFlow.fact.noDependency', { v1: '' }).trim())
   })
 
   it('does not claim a pipeline waits on nothing when nothing has been written down', () => {
@@ -593,9 +595,9 @@ describe('the drawing says what it cannot know', () => {
     // THE HALF OF THE OLD DISTINCTION THAT SURVIVED. `needs: []` and a missing `needs` used to be
     // two answers; a link exists or it does not, so there is one — and it is the weaker one, which
     // is the only one the data still supports.
+    // CRITERION CHANGE, as decided: the two sentences became one short state word.
     const html = draw(HANDOVER)
-    expect(html).toContain('Dependencies have not been recorded.')
-    expect(html).toContain('This does not establish that the step can run independently.')
+    expect(html).toContain(t('pipelineFlow.noDependencies'))
   })
 
   it('explains a step stored as blocked that nothing it waits on is holding', () => {
@@ -644,20 +646,15 @@ describe('the drawing says what it cannot know', () => {
     expect(html).toContain('nothing here can start')
   })
 
-  it('says out loud that the row order is not a dependency', () => {
-    expect(draw(HANDOVER)).toContain('the order the work is read in, and nothing else')
-  })
-
-  it('words the lane footer so it cannot be read as a module’s own condition', () => {
-    expect(draw(HANDOVER)).toContain('They say nothing about a module’s own condition')
-  })
+  // CRITERION CHANGE, as decided: the column head's note on the row order and the lane footer's
+  // note are gone from the page, so the two cases that read them are removed.
 
   it('prints the legend rather than hiding it behind a hover a phone does not have', () => {
     const html = draw(HANDOVER)
+    // CRITERION CHANGE, as decided: the legend keeps its names and marks, and its sentences are gone.
     expect(html).toContain('How to read the lines on the left')
-    expect(html).toContain('A solid bar across a line is a hard gate')
-    expect(html).toContain('A bar with a gap in it is a partial gate')
-    expect(html).toContain('not a measurement')
+    expect(html).toContain(t('g7b.PipelineFlow.hard_gate'))
+    expect(html).toContain(t('g7b.PipelineFlow.partial_gate'))
   })
 
   it('names every module in the roster, so a truncated lane header loses nothing', () => {
@@ -991,9 +988,11 @@ describe('the detail panel says what it could not do, without being pressed', ()
     // sentence saying what WAS drawn instead, which reads as a contradiction. Finding 5 of the
     // language audit, 19 August 2026. The substitution is still said out loud, because a different
     // pipeline really is being drawn and that is invariant 2.
-    expect(text(html)).toContain('There is no pipeline at that address')
-    expect(unpressed(html)).toContain('There is no pipeline at that address')
-    expect(unpressed(html)).toContain('is drawn below because it is first in the order')
+    expect(text(html)).toContain(t('g7b.PipelinePage.there_is_no_pipeline_at_that_address'))
+    expect(unpressed(html)).toContain(t('g7b.PipelinePage.there_is_no_pipeline_at_that_address'))
+    // CRITERION CHANGE, as decided: the notice no longer names the pipeline drawn instead. Its name
+    // is on the summary of the drawn pipeline's fold, which is on screen without a press.
+    expect(defaultVisible(html)).toContain('First on file')
     // The id is in the address bar, where the reader typed it, and no longer in the sentence.
     expect(unpressed(html)).not.toContain('no-such-pipeline')
   })

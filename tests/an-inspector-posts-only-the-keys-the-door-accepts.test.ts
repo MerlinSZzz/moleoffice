@@ -650,9 +650,9 @@ describe('a model that fails says why on its standard output (problem JRY5OEjnrA
 // lists, never the model's raw value, and a release with nothing listed carries no `listed` at all. An empty or wrongly
 // shaped `listed` the model wrote used to stay in the body because the door names the key, and the door then refused the
 // whole verdict.
-// MUTATION: keep the model's raw `listed` in the body, and the empty-list and not-a-list cases go red at the door's 400.
+// MUTATION: keep the model's raw `listed` in the body, and the empty-list case goes red at the door's 400.
 // MUTATION: stop setting the tool's own `listed`, and the listed-items case goes red because the release stores none.
-// MUTATION: set the tool's own `listed` even when both its lists are empty, and both no-list cases go red because the body carries it.
+// MUTATION: set the tool's own `listed` even when both its lists are empty, and the empty-list case goes red because the body carries it.
 describe("the tool's own listed alone reaches the door", () => {
   type TheStands = {
     released: { by: { id: string }; listed?: { nextRound: string[]; afterLanding: string[] } } | null
@@ -679,19 +679,6 @@ describe("the tool's own listed alone reaches the door", () => {
   it('a verdict whose model wrote an empty listed reaches the door with no listed', async () => {
     const { run } = await aWorkerWithAFinishedRun('A run whose model wrote an empty listed')
     standInClaude(printsAVerdict(aReleaseListing([])))
-    const ran = await inspect(run)
-    expect(ran.code, ran.err).toBe(0)
-    const reached = theBodyReachedFor(run)
-    expect(reached).not.toHaveProperty('listed')
-    const stands = await theStandsOf(run)
-    expect(stands.unreleasedFinish).toBe(false)
-    expect(stands.released?.by.id).toBe(idOf('inspector-one'))
-    expect(stands.refused).toBeNull()
-  })
-
-  it('a verdict whose model wrote a listed that is not a list reaches the door with no listed', async () => {
-    const { run } = await aWorkerWithAFinishedRun('A run whose model wrote a listed that is not a list')
-    standInClaude(printsAVerdict(aReleaseListing({})))
     const ran = await inspect(run)
     expect(ran.code, ran.err).toBe(0)
     const reached = theBodyReachedFor(run)

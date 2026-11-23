@@ -188,14 +188,20 @@ export const people = aPartTable(sqliteTable(
      */
     chatLayout: text('chat_layout'),
     /**
+     * THE MODE A PERSON STARTS IN: `inspect` (Developer mode), which the office writes for a person it
+     * makes, or NULL, a person made before the column, read as Normal mode. The page takes it only
+     * while its browser has stored no mode. Migration 0354.
+     */
+    startingMode: text('starting_mode'),
+    /**
      * A PERSON'S OWN LABELS FOR THE MESSAGES THEY WRITE: JSON, a list of a short word and a colour, or
      * NULL because nobody has made one. Migration 0341. The one reading is `readMessageLabels` in
      * `src/shared/message-label.ts`.
      */
     chatLabels: text('chat_labels'),
     /**
-     * A PERSON'S OWN SETTINGS FOR THE TWO FLAGS THE OFFICE SHIPS AND FOR 'NO MARK': JSON, keyed by
-     * `just-ask`, `proposal-first` and `none`, each holding the things the person changed. NULL means
+     * A PERSON'S OWN SETTINGS FOR THE FOUR FLAGS THE OFFICE SHIPS AND FOR 'NO MARK': JSON, keyed by
+     * `just-ask`, `proposal-first`, `align`, `give-options` and `none`, each holding the things the person changed. NULL means
      * nobody changed any, and the defaults hold. Migration 0346. The one reading is
      * `readShippedFlags` in `src/shared/intent-mark.ts`.
      */

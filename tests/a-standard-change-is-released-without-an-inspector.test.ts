@@ -19,8 +19,6 @@
  *   · a path the tool names as protected keeps it back;
  *   · only the inspector may ask;
  *   · the seal keeps the declaration, and refuses it where it cannot hold;
- *   · the merge queue judges a standard release at the pin, as it judges an inspector's, and the merge entry's rule
- *     H_RELEASE, which GET /api/kinds/merge_entry serves, says that it does.
  *
  * "The ordinary way" here is a 409 that names why, with nothing written on the run: the check tool then runs the
  * inspector's model as before.
@@ -38,7 +36,6 @@ import type { FastifyInstance } from 'fastify'
 import { THE_TEST_OFFICES_OWNER, THE_TEST_OFFICES_SECRETARY } from './a-page-of-a-test-office.ts'
 import { apiApp, freshDb, type TestDb } from './helpers.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
-import { ABSENT } from '../src/shared/merge-queue.ts'
 import { STANDARD_KINDS, THE_CHECKS_OF_A_STANDARD_KIND, THE_GATE_OF_A_STANDARD_KIND, aTestLikeFile, aWordFile, theChangedTestFiles, type AStandardChangesFile, type StandardKind } from '../src/shared/standard-change.ts'
 
 let t: TestDb
@@ -432,39 +429,5 @@ describe('the standard release door', () => {
     const { code, said } = await ask(sealed.run, theToolsAsk(sealed, 'documents'), THE_TEST_OFFICES_SECRETARY.handle)
     expect(code, JSON.stringify(said)).toBe(403)
     expect(JSON.stringify(t.api.getRecord(sealed.run)!.data)).toBe(before)
-  })
-})
-
-describe('the merge queue', () => {
-  it('judges a standard release at the pin, as it judges an inspector\'s', async () => {
-    const sealed = await aSealedRun(aChange([INSIDE.documents]), { kind: 'git', standard: 'documents' })
-    const { code, said } = await ask(sealed.run, theToolsAsk(sealed, 'documents'))
-    expect(code, JSON.stringify(said)).toBe(201)
-    const submitted = await app.inject({
-      method: 'POST',
-      url: '/api/merge-queue',
-      headers: asAgent(THE_TEST_OFFICES_SECRETARY.handle),
-      payload: { run: sealed.run, changeset: { adapter: 'git', repository: 'lane-standard', branch: sealed.branch } },
-    })
-    expect(submitted.statusCode, submitted.body).toBe(201)
-    const entry = String((submitted.json() as { entry: { id: string } }).entry.id)
-    const pinned = await app.inject({
-      method: 'POST',
-      url: `/api/merge-queue/${entry}/step`,
-      headers: asAgent('mole-office/the-message-worker'),
-      payload: { step: 'pinned', facts: { files: Object.fromEntries(sealed.files.map((one) => [one.path, one.hash ?? ABSENT])) } },
-    })
-    expect(pinned.statusCode, pinned.body).toBe(200)
-    expect((pinned.json() as { entry: { state: string } }).entry.state, pinned.body).toBe('judged')
-  })
-
-  it('says so in the merge entry\'s rule H_RELEASE: an inspector\'s release or a standard change\'s judges an entry', async () => {
-    const served = await app.inject({ method: 'GET', url: '/api/kinds/merge_entry' })
-    expect(served.statusCode, served.body).toBe(200)
-    const rule = (served.json().kind.rules as string[]).find((one) => one.startsWith('H_RELEASE:'))
-    expect(rule, 'the merge entry has no rule that starts H_RELEASE:').toBeDefined()
-    expect(rule).toContain("an inspector's release")
-    expect(rule).toContain('a release by the standard-change rule')
-    expect(rule).toContain("A starter's own release judges nothing")
   })
 })

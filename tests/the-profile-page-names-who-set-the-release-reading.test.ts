@@ -9,7 +9,8 @@
  * it names that agent and says it did so as a secretary raised by the owner.
  *
  * Each value is written through the real door and read back through the real GET, and the sentence is the one the
- * page draws (`whoSaidTheReleaseReading`). Every agent here is made up for the test, in a fresh test database.
+ * page draws behind the "?" on the panel's heading (`whoSaidTheReleaseReading`). Every agent here is made up for the
+ * test, in a fresh test database.
  *
  * PICTURES, only when R10B_SHOTS names a folder: both pages, with the Releases panel scrolled into view, at 1440, 990, 660
  * and 390 pixels wide in light and dark, and at 1440 in Chinese.
@@ -124,9 +125,9 @@ describe('the Releases panel names who said it', () => {
           await page.addInitScript((theme) => localStorage.setItem('mole-office.preset.theme', theme), look)
           await page.goto(`${live.site}/${lang === 'en' ? '' : `?lang=${lang}`}#/who/agent/${handle}`, { timeout: 60_000 })
           await waitForThePage(page, 60_000)
-          const said = page.getByText(lang === 'en' ? 'Its reason:' : '理由：').or(page.getByText('The reason:')).first()
-          await said.waitFor({ timeout: 30_000 })
-          await said.scrollIntoViewIfNeeded()
+          const theSwitch = page.locator('[data-target="uiSurface/profile.releases"] [role="switch"]')
+          await theSwitch.waitFor({ timeout: 30_000 })
+          await theSwitch.scrollIntoViewIfNeeded()
           await page.screenshot({ path: `${dir}/releases-${handle}-${String(width)}-${look}-${lang}.png` })
           await page.close()
         }

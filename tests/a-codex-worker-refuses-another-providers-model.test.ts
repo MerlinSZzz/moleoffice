@@ -288,18 +288,14 @@ describe('a start given --selection', () => {
   }
 
   // MUTATION: aCommandsStartFromTheOffice in src/config/sandbox-start-values.mjs uses a given selection without the
-  // office's recheck. These cases and the next go red on both paths, because the sandbox is asked to exec.
+  // office's recheck. These cases and the next go red on both paths, because the sandbox is asked to exec. A changed
+  // native model takes the same recheck, which tests/the-launcher-names-an-effort-in-place-of-the-rows.test.ts refuses.
   it.each([
     { verb: 'worker', what: 'another revision' },
     { verb: 'exec', what: 'another revision' },
-    { verb: 'worker', what: 'another native model' },
-    { verb: 'exec', what: 'another native model' },
-  ] as const)('$verb: a selection the office answers differently for ($what) is refused', async ({ verb, what }) => {
-    const given = what === 'another revision'
-      ? { ...selection, casting: { id: row, revision: `another-${randomUUID()}` } }
-      : { ...selection, native: { ...selection.native, model: `another-${randomUUID()}` } }
-    const words = what === 'another revision' ? 'The selected Casting row could not be rechecked (' : 'The selected Casting row changed. Nothing was started.'
-    await refusedBeforeAnything(theStart(verb, given, selection.model), words)
+  ] as const)('$verb: a selection the office answers differently for ($what) is refused', async ({ verb }) => {
+    const given = { ...selection, casting: { id: row, revision: `another-${randomUUID()}` } }
+    await refusedBeforeAnything(theStart(verb, given, selection.model), 'The selected Casting row could not be rechecked (')
   }, 60_000)
 
   it.each(['worker', 'exec'] as const)('%s: a selection whose recheck the office does not answer is refused', async (verb) => {

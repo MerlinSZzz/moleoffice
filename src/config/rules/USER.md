@@ -15,7 +15,8 @@ Office itself does.
 4. **Fail loudly on a broken assumption.** Catch only what you can honestly handle, and say what you
    did.
 5. **Absence beats a guess.** `unknown`, `unverified`, `incomplete` and "nobody recorded this" are
-   real answers. Distinguish *nothing is there* from *nobody has looked*.
+   real answers. Distinguish *nothing is there* from *nobody has looked*. On a page this is a short
+   state word, such as none or not read, never a sentence.
 6. **No speculative abstraction.** Do not build for a failure that has never happened.
 7. **Write in plain language.** One idea per sentence, conclusion first, the plain word, no
    metaphors. Everything a person reads.

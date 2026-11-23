@@ -17,11 +17,13 @@
  * ---------------------------------------------------------------------------------------
  *
  *   1. From the second listener (another machine), the press creates a person's-device credential
- *      and sets a cookie holding that credential's own token — which proves nothing yet. It never
- *      answers the token. Both halves are asserted: a credential row exists, and a request carrying
- *      only that cookie is still refused a person's act.
+ *      and gives the browser that credential's own token in two halves: a cookie half, and a header
+ *      half in the answer. Both prove nothing yet. It never answers the whole token. Both facts are
+ *      asserted: a credential row exists, and a request carrying both halves is still refused a
+ *      person's act.
  *   2. A confirm from a paired loopback browser makes the asking browser's next request THE PERSON,
- *      by the cookie alone. The ACT is driven, not the cookie's presence.
+ *      by its two halves, and the cookie half alone is refused. The ACT is driven, not the cookie's
+ *      presence.
  *   3. A confirm asked from the second listener is refused, and the refusal names where it may be done.
  *   4. Ending the credential from the Embassy makes that cookie prove nothing.
  *   5. The loopback press still pairs at once, with no confirmation.
@@ -44,9 +46,10 @@
  * THE TOKEN IS NEVER PRINTED
  * ---------------------------------------------------------------------------------------
  *
- * The ask door answers a token and this file carries it into the Cookie or x-mole-office-key header
- * without ever quoting its value. That is the same rule tests/pairing-is-one-press-on-this-machine
- * follows, and it is why `cookieOnly` returns the name-and-value pair and no assertion prints it.
+ * The ask door answers one half of a token and sets the other as a cookie, and this file carries both into
+ * the Cookie header and the header half's header without ever quoting a value. That is the same rule
+ * tests/pairing-is-one-press-on-this-machine follows, and it is why `cookieOnly` returns the name-and-value
+ * pair and no assertion prints it.
  */
 
 import { THE_TEST_OFFICES_OWNER } from './a-page-of-a-test-office.ts'
@@ -54,6 +57,7 @@ import { type Server } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import type { FastifyInstance } from 'fastify'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { DEVICE_HALF_COOKIE, DEVICE_HALF_HEADER } from '../src/config/key-header.mjs'
 import { ASKS_TO_PAIR_ALLOWED } from '../src/shared/pairing.ts'
 import { apiApp, freshDb, type TestDb } from './helpers.ts'
 
@@ -151,6 +155,7 @@ interface Ask {
   device: string
   waitingForConfirmation: boolean
   token: unknown
+  deviceHalf: unknown
   setCookie: string | null
   error: string
 }
@@ -169,16 +174,21 @@ async function askToPair(door: string, headers: Record<string, string>): Promise
     device: String(body['device'] ?? ''),
     waitingForConfirmation: body['waitingForConfirmation'] === true,
     token: body['token'],
+    deviceHalf: body['deviceHalf'],
     setCookie: res.headers.get('set-cookie'),
     error: String(body['error'] ?? ''),
   }
 }
 
-/** The loopback press: the person's key as a cookie, in one press, with no confirmation. */
-async function pairOnThisMachine(): Promise<{ status: number; setCookie: string | null; error: string }> {
-  const res = await fetch(`${thisMachine}/api/office/pairing`, { method: 'POST', headers: THE_PERSON })
+/** The loopback press: a confirmed device key in two halves, in one press, with no confirmation. */
+async function pairOnThisMachine(): Promise<{ status: number; setCookie: string | null; deviceHalf: unknown; error: string }> {
+  const res = await fetch(`${thisMachine}/api/office/pairing`, {
+    method: 'POST',
+    headers: THE_PERSON,
+    body: JSON.stringify({ device: A_BROWSER_NAME }),
+  })
   const body = (await res.json()) as Record<string, unknown>
-  return { status: res.status, setCookie: res.headers.get('set-cookie'), error: String(body['error'] ?? '') }
+  return { status: res.status, setCookie: res.headers.get('set-cookie'), deviceHalf: body['deviceHalf'], error: String(body['error'] ?? '') }
 }
 
 /**
@@ -191,10 +201,16 @@ async function pairOnThisMachine(): Promise<{ status: number; setCookie: string 
 function cookieOnly(setCookie: string | null): string {
   if (setCookie === null) throw new Error('the ask reply set no cookie')
   const pair = setCookie.split(';')[0]
-  if (pair === undefined || !pair.startsWith('mole-office-key=')) {
-    throw new Error('the ask reply set no mole-office-key cookie')
+  if (pair === undefined || !pair.startsWith(`${DEVICE_HALF_COOKIE}=`)) {
+    throw new Error('the ask reply set no cookie half')
   }
   return pair
+}
+
+/** Both halves, as the asking browser sends them: the cookie half and the header half. Never printed. */
+function bothHalves(answer: { setCookie: string | null; deviceHalf: unknown }): Record<string, string> {
+  if (typeof answer.deviceHalf !== 'string' || answer.deviceHalf === '') throw new Error('the reply answered no header half')
+  return { cookie: cookieOnly(answer.setCookie), [DEVICE_HALF_HEADER]: answer.deviceHalf }
 }
 
 /** A person-only act: change whether the office map moves. Its guard asks for the person unconditionally. */
@@ -237,19 +253,20 @@ describe('the offer reads the listener and the trusted list, and nothing a calle
 })
 
 describe('the ask press from another machine', () => {
-  it('issues a credential, sets only its token, and proves nothing yet', async () => {
+  it('issues a credential, sets one half of its token and answers the other, and proves nothing yet', async () => {
     const asked = await askToPair(anotherMachine, atATrustedMachine())
     expect(asked.status, asked.error).toBe(201)
     expect(asked.credentialId, 'the ask door named no credential').not.toBe('')
     expect(asked.device).toBe(A_BROWSER_NAME)
     expect(asked.waitingForConfirmation, 'the ask door did not say the owner\'s confirmation is needed').toBe(true)
-    // IT NEVER ANSWERS THE TOKEN, in a field or anywhere else.
+    // IT NEVER ANSWERS THE WHOLE TOKEN, in a field or anywhere else. It answers the header half.
     expect(asked.token, 'the ask door answered a token').toBeUndefined()
     expect(JSON.stringify(asked)).not.toContain('"token"')
+    expect(typeof asked.deviceHalf, 'the ask door answered no header half').toBe('string')
 
-    // THE COOKIE IS THE SAME ONE THE LOOPBACK PRESS SETS.
+    // THE COOKIE IS THE SAME COOKIE HALF THE LOOPBACK PRESS SETS.
     const header = asked.setCookie ?? ''
-    expect(header, 'the ask reply set no cookie').toContain('mole-office-key=')
+    expect(header, 'the ask reply set no cookie').toContain(`${DEVICE_HALF_COOKIE}=`)
     expect(header, 'the cookie is not HttpOnly').toContain('HttpOnly')
     expect(header, 'the cookie is not SameSite strict').toMatch(/SameSite=Strict/i)
     expect(header, 'the cookie is not scoped to the whole site').toContain('Path=/')
@@ -263,18 +280,18 @@ describe('the ask press from another machine', () => {
     expect(row?.standing).toBe('pending')
     expect(row?.handle).toBe(A_BROWSER_NAME)
 
-    // AND THE COOKIE PROVES NOTHING YET. A person-only act carrying only that cookie is refused, and
-    // the refusal is not the window's: this request carried no forwarded address, so the window does
-    // not cover it and the cookie is the only thing that could have proved anything.
-    const refused = await changeTheScene(anotherMachine, { ...THE_PERSON, cookie: cookieOnly(asked.setCookie) })
-    expect(refused, 'an unconfirmed credential’s cookie was the person').toBe(403)
+    // AND THE TWO HALVES PROVE NOTHING YET. A person-only act carrying both is refused, and the refusal
+    // is not the window's: this request carried no forwarded address, so the window does not cover it
+    // and the halves are the only thing that could have proved anything.
+    const refused = await changeTheScene(anotherMachine, { ...THE_PERSON, ...bothHalves(asked) })
+    expect(refused, 'an unconfirmed credential’s halves were the person').toBe(403)
   })
 
-  it('tells the asking browser it is waiting, read from the cookie', async () => {
+  it('tells the asking browser it is waiting, read from its two halves', async () => {
     const asked = await askToPair(anotherMachine, atATrustedMachine())
     const read = await readPairing(anotherMachine, {
       ...atATrustedMachine(),
-      cookie: cookieOnly(asked.setCookie),
+      ...bothHalves(asked),
     })
     expect(read.paired, 'an unconfirmed credential read as paired').toBe(false)
     expect(read.waiting, 'the read lost the credential the cookie belongs to').not.toBeNull()
@@ -282,7 +299,7 @@ describe('the ask press from another machine', () => {
     expect(read.waiting?.standing).toBe('pending')
   })
 
-  it('files a stranger’s ask and shows it at the Embassy, and never answers the token', async () => {
+  it('files a stranger’s ask and shows it at the Embassy, and never answers the whole token', async () => {
     const asked = await askToPair(anotherMachine, atAStranger())
     expect(asked.status, `a stranger's knock was refused: ${asked.error}`).toBe(201)
     expect(asked.credentialId, 'the ask door named no credential').not.toBe('')
@@ -312,7 +329,7 @@ describe('the ask press from another machine', () => {
 
   it('makes a stranger’s confirmed browser the person, and refuses its confirm anywhere but this computer', async () => {
     const asked = await askToPair(anotherMachine, atAStranger())
-    const cookie = cookieOnly(asked.setCookie)
+    const halves = bothHalves(asked)
     const elsewhere = await fetch(`${anotherMachine}/api/office/visitors/${asked.credentialId}/confirm`, {
       method: 'POST',
       headers: atAStranger(),
@@ -320,25 +337,28 @@ describe('the ask press from another machine', () => {
     })
     expect(elsewhere.status, 'a stranger’s credential was confirmed from another machine').toBe(403)
     expect(await pressOnThisMachine(`/api/office/visitors/${asked.credentialId}/confirm`), 'the confirm on this computer failed').toBe(200)
-    expect(await changeTheScene(anotherMachine, { ...AN_AGENT, cookie }), 'the confirmed stranger was not the person').toBe(200)
+    expect(await changeTheScene(anotherMachine, { ...AN_AGENT, ...halves }), 'the confirmed stranger was not the person').toBe(200)
   })
 })
 
 describe('the owner\u2019s confirmation makes the asking browser the person', () => {
-  it('does the person’s act by the cookie alone after a loopback confirm', async () => {
+  it('does the person’s act by its two halves after a loopback confirm, and refuses the cookie half alone', async () => {
     const asked = await askToPair(anotherMachine, atATrustedMachine())
-    const cookie = cookieOnly(asked.setCookie)
+    const halves = bothHalves(asked)
     expect(await pressOnThisMachine(`/api/office/visitors/${asked.credentialId}/confirm`), 'the confirm failed').toBe(
       200,
     )
 
     // THE ACT IS DRIVEN, NOT THE COOKIE'S PRESENCE. The actor header says `agent` and names somebody
-    // who is not the person, so only the key the cookie carries can make this theirs.
-    const allowed = await changeTheScene(anotherMachine, { ...AN_AGENT, cookie })
+    // who is not the person, so only the key the two halves make can make this theirs.
+    const allowed = await changeTheScene(anotherMachine, { ...AN_AGENT, ...halves })
     expect(allowed, 'the confirmed device key was refused the person’s act').toBe(200)
+    // ONE HALF IS NOT THE PERSON, after the confirm as before it.
+    const cookieAlone = await changeTheScene(anotherMachine, { ...AN_AGENT, cookie: cookieOnly(asked.setCookie) })
+    expect(cookieAlone, 'the cookie half alone was the person').toBe(401)
 
     // AND THE READ NOW SAYS PAIRED, with nothing waiting.
-    const read = await readPairing(anotherMachine, { ...atATrustedMachine(), cookie })
+    const read = await readPairing(anotherMachine, { ...atATrustedMachine(), ...halves })
     expect(read.paired).toBe(true)
     expect(read.waiting).toBeNull()
   })
@@ -358,20 +378,20 @@ describe('the owner\u2019s confirmation makes the asking browser the person', ()
     expect(body.error, 'the refusal does not say the request came from elsewhere').toContain('another computer')
   })
 
-  it('ends the key with the credential, so the cookie proves nothing', async () => {
+  it('ends the key with the credential, so the two halves prove nothing', async () => {
     const asked = await askToPair(anotherMachine, atATrustedMachine())
-    const cookie = cookieOnly(asked.setCookie)
+    const halves = bothHalves(asked)
     expect(await pressOnThisMachine(`/api/office/visitors/${asked.credentialId}/confirm`)).toBe(200)
-    // CONTROL: while the credential stands, the cookie is the person.
-    expect(await changeTheScene(anotherMachine, { ...AN_AGENT, cookie })).toBe(200)
+    // CONTROL: while the credential stands, the two halves are the person.
+    expect(await changeTheScene(anotherMachine, { ...AN_AGENT, ...halves })).toBe(200)
 
     expect(await pressOnThisMachine(`/api/office/visitors/${asked.credentialId}/end`)).toBe(200)
-    expect(await changeTheScene(anotherMachine, { ...AN_AGENT, cookie }), 'an ended credential’s cookie proved the person').toBe(
+    expect(await changeTheScene(anotherMachine, { ...AN_AGENT, ...halves }), 'an ended credential’s halves proved the person').toBe(
       403,
     )
 
     // AND THE READ SAYS THE PAIRING WAS ENDED, so the page can offer the press again.
-    const read = await readPairing(anotherMachine, { ...atATrustedMachine(), cookie })
+    const read = await readPairing(anotherMachine, { ...atATrustedMachine(), ...halves })
     expect(read.paired).toBe(false)
     expect(read.waiting?.standing).toBe('ended')
   })
@@ -381,8 +401,7 @@ describe('the loopback press is unchanged', () => {
   it('pairs this browser in one press, with no confirmation anywhere', async () => {
     const pressed = await pairOnThisMachine()
     expect(pressed.status, `the loopback press was refused: ${pressed.error}`).toBe(200)
-    const cookie = cookieOnly(pressed.setCookie)
-    // No confirm was ever asked for. The key was set by the press itself.
-    expect(await changeTheScene(thisMachine, { ...AN_AGENT, cookie })).toBe(200)
+    // No confirm was ever asked for. The key was given by the press itself.
+    expect(await changeTheScene(thisMachine, { ...AN_AGENT, ...bothHalves(pressed) })).toBe(200)
   })
 })

@@ -27,7 +27,7 @@
  *      order: a join that arrives after a message stands after it.
  *   3. Every join's text has one line box at 1440 and at 390.
  *   4. The order rule, as a pure case of `theTimelineOfAGroup`.
- *   5. The disabled Edit in the Secretaries heading, with the tooltip words from shared/contacts.ts.
+ *   5. The disabled Edit in the Secretaries heading.
  *
  * ---------------------------------------------------------------------------------------
  * THE MUTATIONS THAT TURN EACH CASE RED, WITH THE CONTROL RUN FIRST
@@ -401,19 +401,15 @@ describe('the order rule of a group timeline', () => {
 })
 
 describe('the Secretaries heading carries a disabled Edit', () => {
-  it('draws it disabled, with the tooltip words from shared/contacts.ts', async () => {
+  it('draws it disabled', async () => {
     await openTheGroups()
     const edit = await app.page.$eval('.px-chat-top-group[data-category="pinned"] .px-chat-edit', (one) => ({
       disabled: (one as HTMLButtonElement).disabled,
-      title: one.getAttribute('title') ?? '',
       text: one.textContent?.trim() ?? '',
     })).catch(() => null)
     // THE CONTROL: the press is drawn at all.
     expect(edit, 'the Secretaries heading draws no Edit press').not.toBeNull()
     expect(edit?.disabled, 'the Edit press on the office-kept group is not disabled').toBe(true)
-    expect(edit?.title, 'the Edit press says nothing about why it is disabled').toBe(
-      CONTACT_GROUP_WORDS.secretaryGroupEditTitle,
-    )
     expect(edit?.text, 'the disabled press is not labelled Edit').toBe(CONTACT_GROUP_WORDS.edit)
   }, 120_000)
 })

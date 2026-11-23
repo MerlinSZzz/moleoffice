@@ -67,6 +67,11 @@ class Thing {
   rect = { left: 0, top: 0, right: 0, bottom: 0, width: 0, height: 0 }
   /** Every event this element was asked to dispatch, so a test can assert none was faked. */
   dispatched: string[] = []
+  /**
+   * The text this element draws. The stand-in draws nothing, so this is the empty string, which is what a browser
+   * gives for an element with no text in it. `openAbout` reads it on every open, for what the box's Copy press takes.
+   */
+  innerText = ''
 
   constructor(tag: string, attributes: Record<string, string> = {}, classes: string[] = []) {
     this.tag = tag

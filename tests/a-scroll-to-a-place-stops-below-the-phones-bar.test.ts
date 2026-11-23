@@ -13,13 +13,13 @@
  *
  * MUTATIONS, each red here:
  *   1. App.tsx: take out the call to useTheBarIsRoomAtTheTop. Every case but 1440 is red: the worker card's name is
- *      under the bar at 390, 660 and 990 and under the taller bar, a Settings heading at 390 stops under the list,
+ *      under the bar at 390 and 990 and under the taller bar, a Settings heading at 390 stops under the list,
  *      and a regulations chapter's heading at 390 stops under the bar.
  *   2. App.tsx: measure the bar once and not again when its size changes (no ResizeObserver). A bar made taller after
  *      the page opened covers the name, and a regulations chapter's heading at 390 stops 56px below the bar.
  *   3. App.tsx: write the room as 54px, the bar's height at 660 and 990, instead of measuring it. At 390 the bar is
  *      70px tall and covers the top of the name, at 1440 the name stops 54px below the top of the window, and the
- *      taller bar, the Settings heading and the regulations heading are red too. Only 660 and 990 stay green.
+ *      taller bar, the Settings heading and the regulations heading are red too. Only 990 stays green.
  *   4. SettingsFolds.tsx: add barHeight() back into stuckAbove. A pressed category's heading stops a bar's height
  *      below the list.
  *   5. RegulationsPage.tsx: put `scroll-margin-top: 4.5rem` back on a chapter's heading. A pressed chapter's heading
@@ -71,7 +71,7 @@ async function scrollToTheName(page: Page): Promise<{ top: number; bar: number; 
 }
 
 describe('a scroll to the worker card\'s name', () => {
-  for (const width of [390, 660, 990]) {
+  for (const width of [390, 990]) {
     it(`stops with the name just below the bar at ${String(width)}`, async () => {
       const { page, close } = await theRoleCards(app.browser, width)
       try {

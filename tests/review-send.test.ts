@@ -294,6 +294,45 @@ async function readThread(threadId: string): Promise<{
 
 const toSession = (sessionId: string) => ({ kind: 'session', sessionId, said: null, why: null })
 
+/** A durable agent with a handle, and its registry id. */
+async function aDurableAgent(handle: string): Promise<string> {
+  await file('agent', handle, { handle, state: 'active', runtime: 'claude-code' })
+  const res = await app.inject({ method: 'GET', url: '/api/participants', headers: HUMAN })
+  expect(res.statusCode, res.body).toBe(200)
+  const agents = (res.json() as { agents: { id: string; handle: string }[] }).agents
+  const found = agents.find((one) => one.handle === handle)
+  expect(found, `no registry row for the agent "${handle}"`).toBeDefined()
+  return (found as { id: string }).id
+}
+
+/** Say which durable agent a run worked as, which is what makes a comment to it reach that agent. */
+async function bindTheRunToTheAgent(sessionId: string, agentId: string): Promise<void> {
+  const res = await app.inject({
+    method: 'PATCH',
+    url: `/api/records/${sessionId}`,
+    headers: HUMAN,
+    payload: { dataPatch: { ranAs: [{ workspaceId: WORKSPACE, agentId }] } },
+  })
+  expect(res.statusCode, res.body).toBe(200)
+}
+
+/**
+ * Give a run an agent of its own: an agent record in this project, named in the run's `ranAs`. A comment sent to a run
+ * that names no agent is refused before anything is written, so a case that sends to a run gives it one first.
+ */
+async function giveTheRunAnAgent(sessionId: string, handle: string): Promise<void> {
+  await bindTheRunToTheAgent(sessionId, await file('agent', handle, { handle, state: 'active', runtime: 'claude-code' }))
+}
+
+/** A comment written the way the chat composer writes one: a message that says what it is about. */
+async function commentTo(on: string, body: string, sessionId: string): Promise<string> {
+  return file('message', body.slice(0, 40), {
+    body,
+    target: { target: { kind: 'record', recordId: on, workspaceId: WORKSPACE } },
+    chosenRecipient: { kind: 'session', sessionId },
+  })
+}
+
 // ============================================================================ nothing ran before
 
 describe('nothing is handed to an agent until somebody sends', () => {
@@ -323,6 +362,7 @@ describe('nothing is handed to an agent until somebody sends', () => {
   it('sending is what hands one over, and it is the only thing that did', async () => {
     const gripper = await file('module', 'The gripper', { context: 'x' })
     const agent = await resumableSession('Calibration work', 'ext-send-1')
+    await giveTheRunAnAgent(agent, 'ext-send-1')
     const review = await startReview(gripper)
     const one = await remark(gripper, 'This number does not match the run log.')
     await finishCollecting(review)
@@ -346,6 +386,8 @@ describe('one review is one conversation, and the work partitions', () => {
     const gripper = await file('module', 'The gripper', { context: 'x' })
     const first = await resumableSession('Calibration work', 'ext-two-1')
     const second = await resumableSession('Wrist camera work', 'ext-two-2')
+    await giveTheRunAnAgent(first, 'ext-two-1')
+    await giveTheRunAnAgent(second, 'ext-two-2')
     const review = await startReview(gripper)
     const a = await remark(gripper, 'The calibration number is wrong here.')
     const b = await remark(gripper, 'The camera mount drawing is out of date.')
@@ -371,6 +413,7 @@ describe('one review is one conversation, and the work partitions', () => {
   it('routes a comment from the words the person wrote on it, without being told again', async () => {
     const gripper = await file('module', 'The gripper', { context: 'x' })
     const agent = await resumableSession('Zetacal calibration work', 'ext-hint-1')
+    await giveTheRunAnAgent(agent, 'ext-hint-1')
     await resumableSession('Something else entirely', 'ext-hint-2')
     const review = await startReview(gripper)
     await remark(gripper, 'Check this against what you measured.', 'zetacal')
@@ -398,6 +441,8 @@ describe('what a person wrote outlives the agent it was addressed to', () => {
     const gripper = await file('module', 'The gripper', { context: 'x' })
     const alive = await resumableSession('Calibration work', 'ext-live-1')
     const gone = await stampedButGone('A run whose transcript is not here', 'ext-dead-1')
+    await giveTheRunAnAgent(alive, 'ext-live-1')
+    await giveTheRunAnAgent(gone, 'ext-dead-1')
     const review = await startReview(gripper)
     const good = await remark(gripper, 'The calibration number is wrong here.')
     const stranded = await remark(gripper, 'These are the words that must not be lost.')
@@ -470,6 +515,7 @@ describe('a comment only a person may answer is not handed to an agent', () => {
   it('holds it back, names it, files nothing, and sends the rest', async () => {
     const gripper = await file('module', 'The gripper', { context: 'x' })
     const agent = await resumableSession('Calibration work', 'ext-gov-1')
+    await giveTheRunAnAgent(agent, 'ext-gov-1')
     const review = await startReview(gripper)
     const work = await remark(gripper, 'Please check this number against the run log.')
     const choice = await remark(gripper, 'Decide for me whether we drop the printed mount.')
@@ -558,6 +604,7 @@ describe('the refusals name what is missing and what to do about it', () => {
   it('refuses a second send of a review that has gone, and names when it went', async () => {
     const gripper = await file('module', 'The gripper', { context: 'x' })
     const agent = await resumableSession('Calibration work', 'ext-twice-1')
+    await giveTheRunAnAgent(agent, 'ext-twice-1')
     const review = await startReview(gripper)
     const one = await remark(gripper, 'The calibration number is wrong here.')
     await finishCollecting(review)
@@ -610,6 +657,7 @@ describe('sending hides nothing and deletes nothing', () => {
   it('still lists every comment, its words, and what was read into it', async () => {
     const gripper = await file('module', 'The gripper', { context: 'x' })
     const agent = await resumableSession('Calibration work', 'ext-keep-1')
+    await giveTheRunAnAgent(agent, 'ext-keep-1')
     const review = await startReview(gripper)
     const one = await remark(gripper, 'The calibration number is wrong here.')
     await finishCollecting(review)
@@ -822,37 +870,6 @@ describe('sending one comment stays inside one review and one conversation', () 
  * the line claims, not what the press does.
  */
 describe('a comment a live session has already taken says so before the press, not after it', () => {
-  /** A durable agent with a handle, and its registry id. */
-  async function aDurableAgent(handle: string): Promise<string> {
-    await file('agent', handle, { handle, state: 'active', runtime: 'claude-code' })
-    const res = await app.inject({ method: 'GET', url: '/api/participants', headers: HUMAN })
-    expect(res.statusCode, res.body).toBe(200)
-    const agents = (res.json() as { agents: { id: string; handle: string }[] }).agents
-    const found = agents.find((one) => one.handle === handle)
-    expect(found, `no registry row for the agent "${handle}"`).toBeDefined()
-    return (found as { id: string }).id
-  }
-
-  /** Say which durable agent a run worked as, which is what makes a comment to it reach that agent. */
-  async function bindTheRunToTheAgent(sessionId: string, agentId: string): Promise<void> {
-    const res = await app.inject({
-      method: 'PATCH',
-      url: `/api/records/${sessionId}`,
-      headers: HUMAN,
-      payload: { dataPatch: { ranAs: [{ workspaceId: WORKSPACE, agentId }] } },
-    })
-    expect(res.statusCode, res.body).toBe(200)
-  }
-
-  /** A comment written the way the chat composer writes one: a message that says what it is about. */
-  async function commentTo(on: string, body: string, sessionId: string): Promise<string> {
-    return file('message', body.slice(0, 40), {
-      body,
-      target: { target: { kind: 'record', recordId: on, workspaceId: WORKSPACE } },
-      chosenRecipient: { kind: 'session', sessionId },
-    })
-  }
-
   it('says so on the screen, and the reply after the press says the same about the same comment', async () => {
     const gripper = await file('module', 'The gripper', { context: 'x' })
     const agentId = await aDurableAgent('open-in-a-terminal')
@@ -905,5 +922,251 @@ describe('a comment a live session has already taken says so before the press, n
     expect(sent.status, sent.body).toBe(200)
     expect(sent.reply.sent).toBe(2)
     expect(sent.reply.alreadyGone, 'the reply and the screen disagreed about the same comment').toBe(1)
+  })
+})
+
+// ============================================================================ a choice taken back
+
+/**
+ * A COMMENT WHOSE CHOICE IS TAKEN BACK HAS NOT BEEN SENT.
+ *
+ * WHAT WENT WRONG. Choosing who a comment is for writes the agent the choice names into `to`, beside the choice. Taking
+ * the choice back took `chosenRecipient` away and left `to`. A message with a `to` and no choice is one its writer sent
+ * as it was written, so the comment read as sent: the review stopped listing it, the message pool said it had gone, and
+ * nobody had been handed it.
+ *
+ * WHAT EACH CASE HOLDS:
+ *
+ *   1. A comment written to nobody, chosen by a later press and then unchosen, has no `to` and no choice. The pool says
+ *      it is not sent yet, its review still lists it as waiting with nobody chosen, and no delivery row of it is past
+ *      queued.
+ *   2. A comment chosen when it was written and then unchosen says the same four things.
+ *   3. A comment that went out keeps what it went to. Before this change the door accepted taking its choice back and
+ *      left its `to` as it was, so this case holds that: the change is accepted, `to` stays, and it is still not "not
+ *      sent yet". It is the control, and it passes before the change and after it.
+ *   4. A person its writer added to `to` before the choice was taken back stays. Only the agent the choice named goes.
+ *   5. A comment chosen for one agent and then for another is addressed to the second alone, as a comment chosen only
+ *      for the second is, and it still waits to be sent.
+ *   6. A comment to an agent nothing answers as has a copy routed to the agent's owner. The copy is kept in `routed` and
+ *      never written into `to`. Unchosen, and then with its words changed, the comment still waits for a choice.
+ */
+describe('a comment whose choice is taken back has not been sent', () => {
+  /** A module, a durable agent, a run that worked as it, and a review of the module that is still collecting. */
+  async function aReviewAndARunToChoose(handle: string, externalId: string): Promise<{ on: string; review: string; run: string }> {
+    const on = await file('module', 'The gripper', { context: 'x' })
+    const agentId = await aDurableAgent(handle)
+    const run = await resumableSession(`The run answering as ${handle}`, externalId)
+    await bindTheRunToTheAgent(run, agentId)
+    const review = await startReview(on)
+    return { on, review, run }
+  }
+
+  /** A comment written the way the chat composer writes one, to nobody yet: no choice and no `to`. */
+  async function commentToNobody(on: string, body: string): Promise<string> {
+    return file('message', body.slice(0, 40), {
+      body,
+      target: { target: { kind: 'record', recordId: on, workspaceId: WORKSPACE } },
+    })
+  }
+
+  /** The comment's data, read back from the record. */
+  async function storedData(id: string): Promise<Record<string, unknown>> {
+    const res = await app.inject({ method: 'GET', url: `/api/records/${id}`, headers: HUMAN })
+    expect(res.statusCode, res.body).toBe(200)
+    return (res.json() as { record: { data: Record<string, unknown> } }).record.data
+  }
+
+  /** What the message pool says of the comment: whether it has not been sent yet. */
+  async function notSentYet(id: string): Promise<boolean> {
+    const res = await app.inject({ method: 'GET', url: `/api/messages/${id}`, headers: HUMAN })
+    expect(res.statusCode, res.body).toBe(200)
+    return (res.json() as { message: { notSentYet: boolean } }).message.notSentYet
+  }
+
+  /** The `to` a comment holds, which must name somebody before the choice is taken back, or the case proves nothing. */
+  async function itIsAddressed(id: string): Promise<unknown[]> {
+    const to = (await storedData(id))['to']
+    expect(Array.isArray(to) && to.length > 0, `the comment names nobody in to: ${JSON.stringify(to)}`).toBe(true)
+    return to as unknown[]
+  }
+
+  /** The four things a comment that waits for somebody to be chosen says. */
+  async function itWaitsForAChoice(comment: string, review: string): Promise<void> {
+    const data = await storedData(comment)
+    expect(data['to'], 'the agent the choice named is still in to').toBeUndefined()
+    expect(data['chosenRecipient'] ?? null).toBeNull()
+
+    expect(await notSentYet(comment), 'the message pool says the comment has gone').toBe(true)
+
+    const member = (await readReview(review)).members.find((one) => one.id === comment)
+    expect(member, 'the review no longer lists the comment').toBeDefined()
+    expect(member?.state).toBe('queued')
+    expect(member?.chosen ?? null).toBeNull()
+    expect((await whereTheyWouldGo(review)).comments.find((one) => one.id === comment)?.says).toContain('No recipient chosen')
+
+    const marks = t.client.sqlite.prepare('SELECT mark FROM message_delivery WHERE message_id = ?').all(comment) as { mark: string }[]
+    expect(marks.filter((row) => row.mark !== 'queued'), 'somebody was handed the comment').toEqual([])
+  }
+
+  it('chosen by a later press and then unchosen, it waits in its review for a choice', async () => {
+    const { on, review, run } = await aReviewAndARunToChoose('unchosen-after-a-press', 'ext-unchosen-after-a-press')
+    const comment = await commentToNobody(on, 'Chosen by a later press, then unchosen.')
+    await finishCollecting(review)
+
+    await chooseWhoItIsFor(comment, { kind: 'session', sessionId: run })
+    await itIsAddressed(comment)
+    await chooseWhoItIsFor(comment, null)
+    await itWaitsForAChoice(comment, review)
+  })
+
+  it('chosen when it was written and then unchosen, it waits in its review for a choice', async () => {
+    const { on, review, run } = await aReviewAndARunToChoose('unchosen-when-written', 'ext-unchosen-when-written')
+    const comment = await commentTo(on, 'Chosen when it was written, then unchosen.', run)
+    await finishCollecting(review)
+
+    await itIsAddressed(comment)
+    await chooseWhoItIsFor(comment, null)
+    await itWaitsForAChoice(comment, review)
+  })
+
+  it('a comment that went out keeps what it went to when its choice is taken back afterwards', async () => {
+    const { on, review, run } = await aReviewAndARunToChoose('unchosen-after-it-went', 'ext-unchosen-after-it-went')
+    const comment = await commentTo(on, 'Sent with the review, then unchosen.', run)
+    await finishCollecting(review)
+    // THE SEND NEEDS A LIVE SESSION HOLDING THE AGENT'S HANDLE, as in the describe above, or it hands the comment to nobody.
+    const held = await app.inject({
+      method: 'POST',
+      url: '/api/handles/unchosen-after-it-went/hold',
+      headers: HUMAN,
+      payload: { session: run, machine: 'a-machine', runtime: 'claude-code' },
+    })
+    expect(held.statusCode, held.body).toBe(201)
+    const sent = await send(review)
+    expect(sent.status, sent.body).toBe(200)
+    expect(sent.reply.sent).toBe(1)
+    const went = await itIsAddressed(comment)
+    expect(await notSentYet(comment), 'the send did not carry the comment').toBe(false)
+
+    // THE DOOR ITSELF, with no helper. Before the change it accepted this, because the choice is a field its writer
+    // may change at any time, and it left `to` as it was. That is what this case holds.
+    const unchosen = await app.inject({
+      method: 'PATCH',
+      url: `/api/records/${comment}`,
+      headers: HUMAN,
+      payload: { dataPatch: { chosenRecipient: null } },
+    })
+    expect(unchosen.statusCode, unchosen.body).toBe(200)
+    expect((await storedData(comment))['to']).toEqual(went)
+    expect(await notSentYet(comment)).toBe(false)
+  })
+
+  it('keeps a person its writer added before the choice was taken back, and only the agent goes', async () => {
+    const { on, review, run } = await aReviewAndARunToChoose('unchosen-beside-the-person', 'ext-unchosen-beside-the-person')
+    const comment = await commentToNobody(on, 'Chosen, given to the person too, then unchosen.')
+    await finishCollecting(review)
+
+    await chooseWhoItIsFor(comment, { kind: 'session', sessionId: run })
+    const theAgent = await itIsAddressed(comment)
+    const thePerson = { kind: 'person', id: THE_TEST_OFFICES_OWNER.id }
+    const added = await app.inject({
+      method: 'PATCH',
+      url: `/api/records/${comment}`,
+      headers: HUMAN,
+      payload: { dataPatch: { to: [...theAgent, thePerson] } },
+    })
+    expect(added.statusCode, added.body).toBe(200)
+
+    await chooseWhoItIsFor(comment, null)
+    const data = await storedData(comment)
+    expect(data['to']).toEqual([thePerson])
+    expect(data['chosenRecipient'] ?? null).toBeNull()
+  })
+
+  it('chosen for one agent and then for another, it is addressed to the second alone and still waits to be sent', async () => {
+    const { on, review, run } = await aReviewAndARunToChoose('chosen-first', 'ext-chosen-first')
+    const second = await resumableSession('The run answering as chosen-second', 'ext-chosen-second')
+    await bindTheRunToTheAgent(second, await aDurableAgent('chosen-second'))
+    const comment = await commentToNobody(on, 'Chosen for one agent, then for another.')
+    // WHAT CHOOSING THE SECOND AGENT GIVES A COMMENT THAT WAS NEVER CHOSEN, which is the `to` the first must end with.
+    const onlyTheSecond = await commentToNobody(on, 'Chosen for the second agent only.')
+    await finishCollecting(review)
+
+    await chooseWhoItIsFor(comment, { kind: 'session', sessionId: run })
+    const theFirst = await itIsAddressed(comment)
+    await chooseWhoItIsFor(onlyTheSecond, { kind: 'session', sessionId: second })
+    const theSecond = await itIsAddressed(onlyTheSecond)
+    expect(theSecond, 'the two runs answer as one agent, so the case proves nothing').not.toEqual(theFirst)
+
+    await chooseWhoItIsFor(comment, { kind: 'session', sessionId: second })
+    expect((await storedData(comment))['to'], 'the first agent is still in to').toEqual(theSecond)
+    expect(await notSentYet(comment), 'the message pool says the comment has gone').toBe(true)
+    expect((await readReview(review)).members.find((one) => one.id === comment), 'the review no longer lists the comment').toBeDefined()
+  })
+
+  it('unchosen, it keeps the copy routed to an owner out of `to` when its words change afterwards', async () => {
+    const { on, review } = await aReviewAndARunToChoose('routed-first-owner', 'ext-routed-first-owner')
+    // AN AGENT NOTHING ANSWERS AS, AND AN OWNER A RUN IS WAITING FOR. The owner holds the secretary card and owns nobody,
+    // so the create door routes a copy of the comment to it, as tests/a-message-follows-the-owners-of-an-unheld-agent.test.ts
+    // routes a message.
+    const target = await aDurableAgent('routed-unheld')
+    const owner = await aDurableAgent('routed-owner')
+    const { theRoleCards } = await import('../src/server/lib/roles.ts')
+    const { localStamp } = await import('../src/shared/time.ts')
+    const { setFixtureOwner } = await import('./agent-owner-fixture.ts')
+    t.client.sqlite.prepare('UPDATE agents SET role = ? WHERE id = ?').run(theRoleCards().elevation.onlyThisCardCanHoldIt, owner)
+    setFixtureOwner(t.client.sqlite, owner, target, 'id')
+    setFixtureOwner(t.client.sqlite, null, owner, 'id')
+    t.api.createRecord({
+      workspaceId: WORKSPACE,
+      kind: 'session',
+      title: 'A run waiting as the owner',
+      data: {
+        state: 'finished',
+        runtime: 'claude-code',
+        servingAgentId: owner,
+        deliveringMessage: 'test-message',
+        providerSession: `test-conversation-${owner}`,
+        waitsUntil: localStamp(new Date(Date.now() + 30 * 60_000)),
+      },
+      actor: t.api.HUMAN,
+    })
+
+    // CHOSEN WHEN IT WAS WRITTEN. The door answers a person's send to an agent nothing answers as with its own status,
+    // which this case does not hold, and stores the comment either way.
+    const made = await app.inject({
+      method: 'POST',
+      url: '/api/records',
+      headers: HUMAN,
+      payload: {
+        kind: 'message',
+        title: 'Chosen for an agent nobody holds.',
+        data: {
+          body: 'Chosen for an agent nobody holds, then unchosen.',
+          target: { target: { kind: 'record', recordId: on, workspaceId: WORKSPACE } },
+          chosenRecipient: { kind: 'agent', agentId: target },
+        },
+      },
+    })
+    const written = (made.json() as { record?: { id: string } }).record
+    expect(written, made.body).toBeDefined()
+    const comment = (written as { id: string }).id
+    await finishCollecting(review)
+
+    const routed = (await storedData(comment))['routed'] as { to: unknown }[] | undefined
+    expect(routed?.map((one) => one.to), 'no copy was routed, so the case proves nothing').toEqual([{ kind: 'agent', id: owner }])
+    expect(await itIsAddressed(comment)).toEqual([{ kind: 'agent', id: target }])
+
+    await chooseWhoItIsFor(comment, null)
+    await itWaitsForAChoice(comment, review)
+
+    const reworded = await app.inject({
+      method: 'PATCH',
+      url: `/api/records/${comment}`,
+      headers: HUMAN,
+      payload: { dataPatch: { body: 'Chosen for an agent nobody holds, unchosen, and then reworded.' } },
+    })
+    expect(reworded.statusCode, reworded.body).toBe(200)
+    expect((await storedData(comment))['to'], 'the copy routed to the owner was written into to').toBeUndefined()
+    await itWaitsForAChoice(comment, review)
   })
 })

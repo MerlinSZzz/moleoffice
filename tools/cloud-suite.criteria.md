@@ -136,8 +136,10 @@ The optional runs alone add one more step to manifest mode, for the scheduled
 whole suite on main only:
 
 16. `--alone <absolute folder>` is off unless given. The merge queue's call
-    path never passes it, and a test spies on the queue's own arguments to
-    prove that. It needs `--manifest`. The folder must be absolute, normalized,
+    path never passes it, and no test holds this since 20 Nov 2026: the merge
+    queue is not in use (the coordinator pushes to main directly), and its
+    case was cut in P9 (c5fde6c52). If the queue is used again, that case comes
+    back. `--alone` needs `--manifest`. The folder must be absolute, normalized,
     not `/`, and neither inside nor around the clone, the report, the reads,
     the log or the manifest. An unknown or repeated option, an option without
     a value, or a folder whose path holds an address is refused before any
@@ -190,8 +192,8 @@ whole suite on main only:
     never pass it, so a real run is read every 15 s.
 
 Stand-in tests prove a red-beside-others file run alone and green, a file red
-alone, the 50-file limit, the time limit, a green run and a failed build, the
-option's refusals, and the queue never passing the option. The mutation named
+alone, the 50-file limit, the time limit, a green run and a failed build, and
+the option's refusals. The mutation named
 for this step is the run alone skipped while the index still says it ran with
 exit 0: the test of the red-beside-others file goes red.
 
@@ -396,3 +398,25 @@ past the spell, and one whose test prints a line every second and uses no CPU,
 prove that neither is ended. The mutations named for this step are the CPU
 reading taken out, the output reading taken out, and a worker's wait or file
 left out of the records.
+
+28. The whole run also writes vitest's blob report, at the report's path with
+    `.blob` added, beside the JSON report. The JSON report's file times start
+    at a file's first case, so they leave out each file's start, which the
+    blob keeps. The runs alone write none. The blob travels through the mounts,
+    the mask, the transfer, the text checks and the cleanup with the other
+    outputs, and the box keeps no copy. A blob over 256 MiB is removed on the
+    box and is not handed back, and the suite log says how many bytes it was;
+    under the test mark `MOLE_OFFICE_CLOUD_BLOB_BYTES` may set a smaller bound.
+    A run that writes no blob is answered as before. The answer does not read
+    the blob, and nothing in it changes. A blob path that is, or lies in,
+    another output is refused before any transport, after the journals' own
+    check, so a report that check refuses is refused in its words.
+
+A made-up run proves that npm test is asked for the blob at that path, that the
+blob comes back with a made-up address masked, and that the answer is the same.
+A made-up blob over a smaller bound proves that it is not kept, that the log
+says so, and that the run is answered green. A log named at the blob's path is
+refused before any transport. The real vitest on the stand-in box
+proves that it writes a blob the door hands back. The mutations named for this
+step are the blob reporter taken out, the blob left out of the transfer, and the
+bound not checked.

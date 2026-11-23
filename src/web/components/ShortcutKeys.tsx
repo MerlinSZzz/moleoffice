@@ -1,9 +1,8 @@
 // Copyright © 2026 Zhengyang Shen
 // Licensed under the MIT License. See LICENSE.
 /**
- * THE KEYBOARD SHORTCUTS ON EVERY PAGE: THE KEY HANDLER, THE "?" LIST, THE LINE AFTER "g", AND THE
- * HINTS ON THE PRESSES. It follows item 5 of a decision, on the proposal in report
- * hbu756wTdJnz.
+ * THE KEYBOARD SHORTCUTS ON EVERY PAGE: THE KEY HANDLER, THE LIST OF KEYS, AND THE HINTS ON THE
+ * PRESSES.
  *
  * Which keys there are, when one may fire and what the person turned off are worked out in
  * `src/web/lib/shortcuts.ts`. This file only acts on its answers and draws them.
@@ -12,41 +11,41 @@
  * WHAT EACH KEY DOES
  * ---------------------------------------------------------------------------------------
  *
- * chat      opens the chat as the sidebar's Chat row does (the top bar's chat press below 1024
- *           pixels), and closes it with the close drawn in its own frame: beside the page, over it,
- *           or in its own window. On the chat page a line says the chat is open.
- * keys      opens or closes the list of keys.
- * g h/d/s   go to Home, Decisions or Settings.
- * g p       opens the list of projects in the sidebar, opening the drawer first on a narrow screen,
- *           and puts the focus on the project being read.
- * n         opens the next message waiting for your answer in the chat, with the same function
- *           a press on its row on the Decisions page uses. It is the first waiting message these
- *           keys have not opened yet.
- * Shift+N   opens again the message `n` opened before the one on screen.
- * /         puts the focus in this page's own search box. The corner chat's box and the sidebar
- *           are not this page's. With no search box, a line says so.
- * f         opens the quick search, as the sidebar's press does (components/QuickSearch.tsx).
- * t         switches between light and dark. From "follow the browser" it goes to the look that is
- *           not showing.
+ * Ctrl+Shift+K  opens the chat as the sidebar's Chat row does (the top bar's chat press below 1024
+ *               pixels), and closes it with the close drawn in its own frame: beside the page, over
+ *               it, or in its own window. On the chat page a line says the chat is open.
+ * Ctrl+/        opens or closes the list of keys.
+ * Alt+O/C/G     go to Home, Decisions or Settings.
+ * Alt+P         opens the list of projects in the sidebar, opening the drawer first on a narrow
+ *               screen, and puts the focus on the project being read.
+ * Alt+J         opens the next message waiting for your answer in the chat, with the same function
+ *               a press on its row on the Decisions page uses. It is the first waiting message these
+ *               keys have not opened yet.
+ * Alt+K         opens again the message Alt+J opened before the one on screen.
+ * Alt+R         puts the focus in this page's own search box. The corner chat's box and the sidebar
+ *               are not this page's. With no search box, a line says so.
+ * Alt+X         opens the quick search, as the sidebar's press does (components/QuickSearch.tsx).
+ * Alt+L         switches between light and dark. From "follow the browser" it goes to the look that
+ *               is not showing.
+ *
+ * On a Mac, Ctrl is ⌘ and Alt is Option.
  *
  * NO KEY ACTS ON A RECORD. A key only opens, closes, moves or changes the look, so a wrong press
- * costs one Escape (the proposal's rule).
+ * costs one Escape.
  *
  * ---------------------------------------------------------------------------------------
  * THE HINTS ON THE PRESSES
  * ---------------------------------------------------------------------------------------
  *
- * The proposal asks each press that has a key to name it in its tooltip. Those presses are drawn by
- * the sidebar, the top bar and the chat, which this file does not change. So the hints are written
- * onto them here: the key is added to the press's own tooltip, and `aria-keyshortcuts` where that
- * attribute can say the key. A "g" key is two presses one after the other, which `aria-keyshortcuts`
- * cannot say, so a "g" key has the tooltip only. A key that is turned off has no hint. When the press
- * redraws its own tooltip, the hint is written again.
+ * Each press that has a key names it in its tooltip. Those presses are drawn by the sidebar, the top
+ * bar and the chat, which this file does not change. So the hints are written onto them here: the
+ * key is added to the press's own tooltip, and to `aria-keyshortcuts`. A key that is turned off has
+ * no hint. When the press redraws its own tooltip, the hint is written again.
  */
 
 import { useEffect, useRef, useState } from 'react'
 
-import { t, type WordKey } from '@shared/i18n.ts'
+import { t } from '@shared/i18n.ts'
 import { settingsPath } from '@shared/addresses.ts'
 import type { ShortcutId, ShortcutSettings } from '@shared/participants.ts'
 import { targetAttributes } from '@shared/targets.ts'
@@ -55,7 +54,6 @@ import { openTheChatAsChosen, theSplit } from '../lib/chat-split.ts'
 import { useLanguage } from '../lib/language.ts'
 import { useSendKey } from '../lib/send-key.ts'
 import {
-  G_WAITS_MS,
   OPEN_THE_LIST,
   OPEN_THE_QUICK_SEARCH,
   SHORTCUTS,
@@ -81,14 +79,14 @@ import { navigate, pathFor } from './router.tsx'
 
 // ------------------------------------------------------------------------------ how a key is drawn
 
-/** One chord as keys: <kbd>Ctrl</kbd>+<kbd>/</kbd>, or <kbd>g</kbd> then <kbd>h</kbd>. */
+/** One chord as keys: <kbd>Ctrl</kbd>+<kbd>/</kbd>, or <kbd>Alt</kbd>+<kbd>O</kbd>. */
 export function ChordKeys({ chord, mac }: { chord: Chord; mac: boolean }) {
   const keys = keysOf(chord, mac)
   return (
     <span className="sck-chord">
       {keys.map((key, index) => (
         <span key={index}>
-          {index === 0 ? null : chord.kind === 'g' ? <span className="sck-then">{t('shortcuts.key.then')}</span> : '+'}
+          {index === 0 ? null : '+'}
           <kbd className="sck-kbd">{key}</kbd>
         </span>
       ))}
@@ -138,7 +136,7 @@ function isShown(element: Element): boolean {
 }
 
 /**
- * The messages the `n` keys opened, in order, and where Shift+N stands among them. Kept for the
+ * The messages Alt+J and Alt+K opened, in order, and where Alt+K stands among them. Kept for the
  * life of the page, so the keys can walk back to a message that has since been read.
  */
 const opened: WaitingItem[] = []
@@ -148,7 +146,7 @@ async function openAWaitingMessageByKey(
   direction: 'next' | 'previous',
   say: (words: string) => void,
 ): Promise<void> {
-  // WALKING FORWARD AGAIN after Shift+N goes back through the ones already opened.
+  // WALKING FORWARD AGAIN after Alt+K goes back through the ones already opened.
   if (direction === 'next' && standingAt < opened.length - 1) {
     standingAt += 1
     await openOne(opened[standingAt]!, say)
@@ -172,7 +170,7 @@ async function openAWaitingMessageByKey(
   }
   const seen = new Set(opened.map((row) => row.id))
   const fresh = rows.filter((row) => !seen.has(row.id))
-  // NOTHING OPENED YET AND SHIFT+N: the one before the first is the last one waiting.
+  // NOTHING OPENED YET AND ALT+K: the one before the first is the last one waiting.
   const row = direction === 'next' ? fresh[0] : fresh[fresh.length - 1]
   if (row === undefined) {
     say(t(direction === 'next' ? 'shortcuts.note.noNext' : 'shortcuts.note.noPrevious'))
@@ -302,9 +300,7 @@ function writeTheHints(settings: ShortcutSettings, mac: boolean): void {
       if (current !== title) element.setAttribute('title', title)
       element.dataset['sckBase'] = base
       element.dataset['sckTitle'] = title
-      const spoken = chords.map((chord) => chordForScreenReaders(chord, mac)).filter((one): one is string => one !== null)
-      if (spoken.length === 0) element.removeAttribute('aria-keyshortcuts')
-      else element.setAttribute('aria-keyshortcuts', spoken.join(' '))
+      element.setAttribute('aria-keyshortcuts', chords.map((chord) => chordForScreenReaders(chord, mac)).join(' '))
     }
   }
 }
@@ -317,15 +313,12 @@ export function ShortcutKeys() {
   const sendKey = useSendKey()
   const mac = isAMac()
   const [listOpen, setListOpen] = useState(false)
-  const [afterG, setAfterG] = useState(false)
   const [note, setNote] = useState<Note | null>(null)
   const listOpenRef = useRef(false)
-  const afterGRef = useRef(false)
   const returnTo = useRef<HTMLElement | null>(null)
   const closeRef = useRef<HTMLButtonElement | null>(null)
 
   listOpenRef.current = listOpen
-  afterGRef.current = afterG
 
   const say = (words: string): void => setNote({ words, key: Date.now() })
 
@@ -386,7 +379,7 @@ export function ShortcutKeys() {
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
       const press = aShortcutPress(event)
-      const answer = theShortcutFor(press, { mac, settings: shortcutsNow(), afterG: afterGRef.current })
+      const answer = theShortcutFor(press, { mac, settings: shortcutsNow() })
       // WHILE THE LIST IS OPEN, only its own keys act, and they close it. Escape is taken earlier.
       if (listOpenRef.current) {
         if (answer.what === 'fire' && answer.action === 'keys') {
@@ -395,19 +388,8 @@ export function ShortcutKeys() {
         }
         return
       }
-      if (answer.what === 'wait-for-g') {
-        event.preventDefault()
-        setAfterG(true)
-        return
-      }
-      if (answer.what === 'cancel-g') {
-        // NOT preventDefault: Escape, or a mistyped letter, keeps doing whatever else it does.
-        setAfterG(false)
-        return
-      }
       if (answer.what === 'fire') {
         event.preventDefault()
-        setAfterG(false)
         actRef.current(answer.action)
       }
     }
@@ -447,13 +429,6 @@ export function ShortcutKeys() {
     return () => window.removeEventListener('hashchange', onPage)
   }, [])
 
-  // THE WAIT AFTER "g" ENDS BY ITSELF.
-  useEffect(() => {
-    if (!afterG) return
-    const timer = window.setTimeout(() => setAfterG(false), G_WAITS_MS)
-    return () => window.clearTimeout(timer)
-  }, [afterG])
-
   // A LINE AT THE FOOT GOES AFTER A FEW SECONDS.
   useEffect(() => {
     if (note === null) return
@@ -479,27 +454,12 @@ export function ShortcutKeys() {
     }
   }, [settings, mac])
 
-  const gRows = SHORTCUTS.filter((row) => row.chords.some((chord) => chord.kind === 'g' && isOn(row.id, chord, settings)))
-
   return (
     <>
       <style href="mole-office-shortcut-keys" precedence="default">
         {SHORTCUT_KEYS_CSS}
       </style>
-      {afterG ? (
-        <p className="sck-line" role="status" data-shortcut-line="after-g">
-          <span>{t('shortcuts.g.pressed')}</span>
-          {gRows.map((row) => {
-            const chord = row.chords.find((one) => one.kind === 'g')!
-            return (
-              <span key={row.id} className="sck-line-one">
-                <kbd className="sck-kbd">{keyCap(chord.key)}</kbd> {t(G_WORDS[row.id] ?? row.what)}
-              </span>
-            )
-          })}
-          <span className="sck-line-cancel">{t('shortcuts.g.cancel')}</span>
-        </p>
-      ) : note !== null ? (
+      {note !== null ? (
         <p className="sck-line" role="status" data-shortcut-line="note" key={note.key}>
           {note.words}
         </p>
@@ -509,17 +469,10 @@ export function ShortcutKeys() {
   )
 }
 
-/** The short name after each "g" letter on the line: the page's own name where there is one. */
-const G_WORDS: Partial<Record<ShortcutId, WordKey>> = {
-  home: 'nav.home',
-  decisions: 'nav.decisions',
-  settings: 'nav.settings',
-  project: 'shortcuts.what.project',
-}
-
 // ------------------------------------------------------------------------------ the list
 
-function TheList({
+/** The list of keys. It is drawn over the page while it is open. */
+export function TheList({
   settings,
   sendKey,
   mac,
@@ -557,7 +510,6 @@ function TheList({
           <h2 className="sck-title" id="sck-list-title">
             {t('settingsCats.cat.keys')}
           </h2>
-          <span className="sck-how">{t('shortcuts.list.escCloses')}</span>
           <button type="button" className="sck-close" ref={closeRef} onClick={onClose} aria-label={t('shortcuts.list.close')} title={t('shortcuts.list.close')}>
             {'×'}
           </button>
@@ -566,7 +518,6 @@ function TheList({
           <div className="sck-col">
             <section className="sck-group" data-group="anywhere">
               <h3 className="sck-group-title">{t('shortcuts.group.anywhere')}</h3>
-              <p className="sck-group-note">{t('shortcuts.group.anywhereNote')}</p>
               {anywhere.map(({ row, chord }) => (
                 <Row key={`${row.action}-${chordText(chord, mac)}`} what={t(row.what)} off={!isOn(row.id, chord, settings)} action={row.action}>
                   <ChordKeys chord={chord} mac={mac} />
@@ -578,7 +529,6 @@ function TheList({
             </section>
             <section className="sck-group" data-group="outside">
               <h3 className="sck-group-title">{t('shortcuts.group.outside')}</h3>
-              <p className="sck-group-note">{t('shortcuts.group.outsideNote')}</p>
               {outside.map(({ row, chord }) => (
                 <Row key={`${row.action}-${chordText(chord, mac)}`} what={t(row.what)} off={!isOn(row.id, chord, settings)} action={row.action}>
                   <ChordKeys chord={chord} mac={mac} />
@@ -611,7 +561,6 @@ function TheList({
           </div>
         </div>
         <footer className="sck-foot">
-          <span className="sck-foot-note">{t('shortcuts.list.offNote')}</span>
           <a className="sck-foot-link" href={`#${settingsPath('settings.shortcuts')}`} onClick={onClose}>
             {t('shortcuts.list.toSettings')}
           </a>
@@ -670,7 +619,6 @@ export const SHORTCUT_KEYS_CSS = `
   background: var(--panel); color: var(--text); box-shadow: var(--elev-2);
   font: var(--fs-1)/var(--lh-body) var(--font-ui);
 }
-.sck-line-cancel { color: var(--text-3); }
 .sck-veil {
   position: fixed; inset: 0; z-index: var(--z-overlay);
   background: color-mix(in srgb, var(--text) 35%, transparent);
@@ -685,7 +633,6 @@ export const SHORTCUT_KEYS_CSS = `
 }
 .sck-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; }
 .sck-title { margin: 0; font: var(--heading-weight) var(--fs-4)/var(--lh-tight) var(--font-ui); }
-.sck-how { color: var(--text-3); font: var(--fs-1)/var(--lh-tight) var(--font-ui); }
 .sck-close {
   margin-inline-start: auto; min-width: 32px; min-height: 32px;
   border: var(--border-w) solid var(--border-strong); border-radius: var(--radius-sm);
@@ -696,7 +643,6 @@ export const SHORTCUT_KEYS_CSS = `
 .sck-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 0 28px; }
 .sck-group { margin-top: 14px; }
 .sck-group-title { margin: 0 0 4px; color: var(--text-3); font: 600 var(--fs-1)/var(--lh-tight) var(--font-ui); letter-spacing: .04em; }
-.sck-group-note { margin: 0 0 6px; color: var(--text-3); font: var(--fs-1)/var(--lh-body) var(--font-ui); }
 .sck-row {
   display: flex; justify-content: space-between; align-items: baseline; gap: 12px;
   padding: 6px 0; border-bottom: var(--border-w) solid var(--border);
@@ -708,7 +654,6 @@ export const SHORTCUT_KEYS_CSS = `
 .sck-off { margin-inline-start: 6px; font: var(--fs-1)/var(--lh-tight) var(--font-ui); }
 .sck-keys { flex: none; max-width: 60%; text-align: end; }
 .sck-foot { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; margin-top: 14px; font: var(--fs-1)/var(--lh-body) var(--font-ui); }
-.sck-foot-note { color: var(--text-3); }
 .sck-foot-link { color: var(--accent); }
 @media (max-width: 60rem) {
   .sck-list {

@@ -23,7 +23,7 @@
  * second with an ellipsis, and still shows whole on hover. The row still holds its four parts side by side, with
  * their middles level.
  *
- * So, at 1440, 990 and 390 in the light theme, this file holds the page to four things:
+ * So, at 1440 and 390 in the light theme, this file holds the page to four things:
  *
  *   - a name that fits beside the presses is drawn whole on one line, and is not cut;
  *   - a name of two words that does not fit one line, the made-up office's own, is drawn whole on two lines;
@@ -72,7 +72,7 @@ const THE_TWO_WORD_NAME = 'Made-up caretaker'
 const THE_LONG_NAME = 'Made-up caretaker of everything'
 /** A made-up one-word name longer than any foot row. */
 const THE_LONG_WORD = 'madeupcaretakerverylongnameindeed'
-const WIDTHS = [1440, 990, 390] as const
+const WIDTHS = [1440, 390] as const
 const THEMES = ['light'] as const
 /** The four parts of the foot's row, in the order the row draws them. */
 const THE_LINE = ['.sbp-disc', '.sbp-person-name', '.sbp-look', '.sbp-shut-down'] as const
@@ -261,7 +261,7 @@ describe('the sidebar foot is one row, draws a name whole on two lines, and cuts
     expect(at.words, 'a word of the foot is missing').not.toContain('⟦')
   }, 120_000)
 
-  it('draws a short name whole on one line, at 1440, 990 and 390 in light', async () => {
+  it('draws a short name whole on one line, at 1440 and 390 in light', async () => {
     for (const width of WIDTHS) {
       for (const theme of THEMES) {
         const where = `${String(width)} ${theme}`
@@ -274,18 +274,18 @@ describe('the sidebar foot is one row, draws a name whole on two lines, and cuts
     }
   }, 240_000)
 
-  it('draws a name of two words that does not fit one line whole on two lines, at 1440, 990 and 390 in light', async () => {
+  it('draws a name of two words that does not fit one line whole on two lines, at 1440 and 390 in light', async () => {
     await atEveryWidth(THE_TWO_WORD_NAME, async (at, where) => {
       expectOneRow(at, where, 2)
       expect(at.cut, `${where}: the name of two words was cut, its box ${at.nameBox}`).toBe(false)
     })
   }, 300_000)
 
-  it('cuts a long name of four words with an ellipsis at the end of its second line, whole on hover, at 1440, 990 and 390 in light', async () => {
+  it('cuts a long name of four words with an ellipsis at the end of its second line, whole on hover, at 1440 and 390 in light', async () => {
     await expectCutWithItsWholeNameOnHover(THE_LONG_NAME, 2)
   }, 300_000)
 
-  it('cuts a long one-word name with an ellipsis on its one line, whole on hover, at 1440, 990 and 390 in light', async () => {
+  it('cuts a long one-word name with an ellipsis on its one line, whole on hover, at 1440 and 390 in light', async () => {
     await expectCutWithItsWholeNameOnHover(THE_LONG_WORD, 1)
   }, 300_000)
 })

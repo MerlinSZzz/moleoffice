@@ -33,6 +33,9 @@ import type { AnAnswerAboutADoor } from '../src/shared/what-the-grant-carries.ts
 
 const ROOT = resolve(fileURLToPath(new URL('..', import.meta.url)))
 
+/** A refusal of the mover's check, as a code and its values. */
+type ARefusal = ReturnType<typeof import('../src/config/the-data-folder-move.mjs')['thePlaceIsNotAFullPathRefusal']>
+
 /** One way the door may start the mover, as this file hands it in. */
 type TheWaysToMove = {
   session: string
@@ -40,7 +43,7 @@ type TheWaysToMove = {
   fromABundle: () => boolean
   markPath: () => string
   runsAtWork: () => any[]
-  whyRefused: (to: string) => string | null
+  whyRefused: (to: string) => ARefusal | null
   startTheMover: (input: { to: string; cwd: string; logPath: string; env: NodeJS.ProcessEnv }) => ChildProcess
   waitMs: number
 }
@@ -149,12 +152,12 @@ function startTheMover(input: { to: string; cwd: string; logPath: string; env: N
 }
 
 /** A start-at-login reading of a computer with no login unit, as the facts carry it. */
-function noLoginUnit(): { unit: 'none'; unitPath: string; startsAtLogin: false; activeWord: null } {
-  return { unit: 'none', unitPath: join(scratch, 'no-unit', 'mole-office.service'), startsAtLogin: false, activeWord: null }
+function noLoginUnit(): { unit: 'none'; unitPath: string; startsAtLogin: false; activeWord: null; fromAnAppImage: false } {
+  return { unit: 'none', unitPath: join(scratch, 'no-unit', 'mole-office.service'), startsAtLogin: false, activeWord: null, fromAnAppImage: false }
 }
 
 /** The mover's own check, with the facts of a data folder this file made, for the cases that ask it. */
-function theRealCheck(to: string): string | null {
+function theRealCheck(to: string): ARefusal | null {
   return move.whyAMoveThereIsRefused(to, move.theFactsOfAMove(to, noLoginUnit(), envFile))
 }
 
@@ -406,17 +409,30 @@ describe('the reading', () => {
     expect(secretary.body.mayMove).toBe(true)
   })
 
-  it("DF19: ?to= answers the real check's sentence for a relative place and writes no mark and no log", async () => {
+  it("DF19: ?to= answers the real check's code, values and English for a relative place and writes no mark and no log", async () => {
     theDoorGiven(theWays({ whyRefused: theRealCheck }))
     const place = 'a/relative/place'
     const seen = await call('GET', `/api/office/data-folder?to=${encodeURIComponent(place)}`, PERSON)
     expect(seen.status, seen.text.slice(0, 300)).toBe(200)
+    const refused = move.thePlaceIsNotAFullPathRefusal(place, process.platform === 'win32' ? 'win32' : 'linux')
     expect(seen.body.wouldRefuse).toEqual({
       to: place,
-      why: move.thePlaceIsNotAFullPathWords(place, process.platform === 'win32' ? 'win32' : 'linux'),
+      why: move.theRefusalInEnglish(refused),
+      code: refused.code,
+      values: refused.values,
     })
+    expect(seen.body.wouldRefuse.why).toContain(JSON.stringify(place))
     expect(existsSync(markPath)).toBe(false)
     expect(existsSync(logPath())).toBe(false)
+    expect(startCalls).toEqual([])
+  })
+
+  it('DF19: ?to= of a place the check lets through answers null for the English, the code and the values', async () => {
+    const place = aPlace()
+    const seen = await call('GET', `/api/office/data-folder?to=${encodeURIComponent(place)}`, PERSON)
+    expect(seen.status, seen.text.slice(0, 300)).toBe(200)
+    expect(seen.body.wouldRefuse).toEqual({ to: place, why: null, code: null, values: null })
+    expect(existsSync(markPath)).toBe(false)
     expect(startCalls).toEqual([])
   })
 
@@ -467,15 +483,15 @@ describe('starting the mover', () => {
     expect(existsSync(markPath)).toBe(false)
   })
 
-  it('DF20: a refused place is refused with dataFolderMoveRefused and the check’s sentence, and nothing is started', async () => {
+  it('DF20: a refused place is refused with the check’s own code and values and its English, and nothing is started', async () => {
     theDoorGiven(theWays({ whyRefused: theRealCheck }))
     const place = 'a/relative/place'
     const moved = await call('POST', '/api/office/data-folder/move', PERSON, { to: place })
     expect(moved.status, moved.text.slice(0, 500)).toBe(409)
-    expect(moved.body.code).toBe('dataFolderMoveRefused')
-    const why = move.thePlaceIsNotAFullPathWords(place, process.platform === 'win32' ? 'win32' : 'linux')
-    expect(moved.body.values).toEqual({ why })
-    expect(moved.body.error).toBe(why)
+    const refused = move.thePlaceIsNotAFullPathRefusal(place, process.platform === 'win32' ? 'win32' : 'linux')
+    expect(moved.body.code).toBe(refused.code)
+    expect(moved.body.values).toEqual(refused.values)
+    expect(moved.body.error).toBe(move.theRefusalInEnglish(refused))
     expect(startCalls).toEqual([])
     expect(existsSync(markPath)).toBe(false)
   })
@@ -547,7 +563,7 @@ describe('starting the mover', () => {
     const [code] = (await once(child, 'exit')) as [number | null, string | null]
     expect(code).toBe(1)
     expect(readFileSync(log, 'utf8')).toContain(
-      move.thePlaceIsNotAFullPathWords('a/relative/place', process.platform === 'win32' ? 'win32' : 'linux'),
+      move.theRefusalInEnglish(move.thePlaceIsNotAFullPathRefusal('a/relative/place', process.platform === 'win32' ? 'win32' : 'linux')),
     )
     expect(existsSync(database), 'the refused move wrote a database').toBe(false)
     rmSync(folder, { recursive: true, force: true })
@@ -567,7 +583,7 @@ describe('starting the mover', () => {
     const [code] = (await once(child, 'exit')) as [number | null, string | null]
     expect(code).toBe(1)
     expect(readFileSync(log, 'utf8')).toContain(
-      move.thePlaceIsNotAFullPathWords('a/relative/place', process.platform === 'win32' ? 'win32' : 'linux'),
+      move.theRefusalInEnglish(move.thePlaceIsNotAFullPathRefusal('a/relative/place', process.platform === 'win32' ? 'win32' : 'linux')),
     )
     expect(existsSync(database), 'the refused move wrote a database').toBe(false)
     rmSync(folder, { recursive: true, force: true })
@@ -591,14 +607,56 @@ describe('starting the mover', () => {
       expect(reading.unit, 'the file this case wrote is the unit the reading finds').not.toBe('none')
       expect(move.theLoginUnitWouldStartTheOldFolder(reading)).toBe(true)
 
-      const why = door.theRealWaysToMove('a-session', 'default').whyRefused(place)
+      const refused = door.theRealWaysToMove('a-session', 'default').whyRefused(place)
 
-      expect(why).toBe(move.theLoginUnitKeepsTheOldFolderWords(reading))
+      expect(refused).toEqual(move.theLoginUnitKeepsTheOldFolderRefusal(reading))
     } finally {
       if (beforeHome === undefined) delete process.env['HOME']
       else process.env['HOME'] = beforeHome
       if (beforePath === undefined) delete process.env['PATH']
       else process.env['PATH'] = beforePath
+    }
+  })
+
+  // THE READING IS ONE OF AN APPIMAGE when APPIMAGE and APPDIR are set and APPDIR holds the office's command
+  // (theAppImageFolderHolding, src/config/systems/the-installer-of-a-folder.mjs). The AppImage file need not be there.
+  it("DF4: in an AppImage the door hands the check the reading's AppImage", async () => {
+    const startAtLogin = await import('../src/config/start-at-login.mjs')
+    const home = aFolder('data-folder-door-home-')
+    const emptyPath = aFolder('data-folder-door-path-')
+    const unitPath = startAtLogin.theStartAtLoginUnitPath(home)
+    mkdirSync(dirname(unitPath), { recursive: true })
+    writeFileSync(unitPath, `${startAtLogin.START_AT_LOGIN_UNIT_MARK}\n`)
+    const place = join(aFolder('data-folder-door-unit-place-'), 'new-data')
+    const image = join(aFolder('data-folder-door-appimage-'), 'Mole-Office.AppImage')
+    const beforeHome = process.env['HOME']
+    const beforePath = process.env['PATH']
+    const beforeAppDir = process.env['APPDIR']
+    const beforeAppImage = process.env['APPIMAGE']
+    try {
+      process.env['HOME'] = home
+      process.env['PATH'] = emptyPath
+      process.env['APPDIR'] = dirname(startAtLogin.theOfficeThisServerIs().command)
+      process.env['APPIMAGE'] = image
+      const reading = startAtLogin.readStartAtLogin({ home, office: startAtLogin.theOfficeThisServerIs() })
+      expect(reading.fromAnAppImage, 'APPDIR holds the office command').toBe(true)
+      expect(reading.systemd, 'in an AppImage systemd is not asked').toBe('not asked')
+      expect(reading.unit, 'the file this case wrote is the unit the reading finds').not.toBe('none')
+
+      const refused = await door.theRealWaysToMove('a-session', 'default').whyRefused(place)
+
+      expect(refused).toEqual(move.theLoginUnitKeepsTheOldFolderRefusal(reading))
+      expect(refused?.code).toBe('dataFolderLoginUnitInAnAppImage')
+      expect(move.theRefusalInEnglish(refused!)).not.toContain('on again')
+    } finally {
+      if (beforeHome === undefined) delete process.env['HOME']
+      else process.env['HOME'] = beforeHome
+      if (beforePath === undefined) delete process.env['PATH']
+      else process.env['PATH'] = beforePath
+      if (beforeAppDir === undefined) delete process.env['APPDIR']
+      else process.env['APPDIR'] = beforeAppDir
+      if (beforeAppImage === undefined) delete process.env['APPIMAGE']
+      else process.env['APPIMAGE'] = beforeAppImage
     }
   })
 })
@@ -646,10 +704,9 @@ describe('the confirm press', () => {
     rmSync(oldFolder, { recursive: true, force: true })
   })
 
-  it('DF21: a mark that says the move was switched back answers dataFolderNothingToConfirm', async () => {
+  it("DF21: a mark that says the move was switched back answers the confirm's own code and values", async () => {
     const oldFolder = aFolder('data-folder-door-switched-back-')
     mkdirSync(oldFolder, { recursive: true })
-    const why = move.theConfirmNeedsAStartedMoveWords(markPath, 'switched-back')
     move.writeTheMoveMark(markPath, {
       version: 1,
       from: oldFolder,
@@ -664,9 +721,9 @@ describe('the confirm press', () => {
     })
     const confirmed = await call('POST', '/api/office/data-folder/confirm', PERSON)
     expect(confirmed.status, confirmed.text.slice(0, 500)).toBe(409)
-    expect(confirmed.body.code).toBe('dataFolderNothingToConfirm')
-    expect(confirmed.body.values).toEqual({ why })
-    expect(confirmed.body.error).toBe(why)
+    expect(confirmed.body.code).toBe('dataFolderConfirmNeedsAStartedMove')
+    expect(confirmed.body.values).toEqual({ mark: markPath, state: 'switched-back' })
+    expect(confirmed.body.error).toBe(move.theRefusalInEnglish(move.theConfirmNeedsAStartedMoveRefusal(markPath, 'switched-back')))
     rmSync(oldFolder, { recursive: true, force: true })
   })
 
@@ -810,6 +867,7 @@ describe("the words the page draws", () => {
         since: '2026-01-01 00:00:00',
         conversation: null,
         pausable: true,
+        state: 'running' as const,
         says: 'A shutdown would pause it.',
       },
     ]
@@ -819,14 +877,17 @@ describe("the words the page draws", () => {
       { code: 'dataFolderNotABundle', values: {}, says: door.theNotABundleWords() },
       { code: 'dataFolderRunsAtWork', values: door.theRunsAtWorkValues(runs), says: door.theRunsAtWorkWords(runs) },
       { code: 'dataFolderMoveStarting', values: {}, says: door.theMoveStartingWords() },
-      { code: 'dataFolderMoveRefused', values: { why: 'a made-up sentence' }, says: door.theMoveRefusedWords('a made-up sentence') },
+      {
+        code: 'dataFolderMoveRefused',
+        values: { why: 'a made-up sentence' },
+        says: move.theRefusalInEnglish({ code: 'dataFolderMoveRefused', values: { why: 'a made-up sentence' } }),
+      },
       { code: 'dataFolderMoverEnded', values: { log: 'the end of a log' }, says: door.theMoverEndedWords('the end of a log') },
       {
         code: 'dataFolderMoverNotSeen',
         values: { group: '4321', log: '/a/log' },
         says: door.theMoverNotSeenWords('4321', '/a/log'),
       },
-      { code: 'dataFolderNothingToConfirm', values: { why: 'a made-up sentence' }, says: door.theNothingToConfirmWords('a made-up sentence') },
     ]
     for (const one of cases) {
       expect(sayInEnglish(`server.${one.code}` as never, one.values), one.code).toBe(one.says)

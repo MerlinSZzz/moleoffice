@@ -19,6 +19,9 @@
  * first, and looks in all of it for the owner of this repository: their id or name in any case, their
  * home folder, and the name of their own project.
  *
+ * THE FIRST PAGE IS READ IN DEVELOPER MODE. The browser is this test's own and stores nothing, so the
+ * page opens in the person's starting mode. A new office's owner starts in Developer mode.
+ *
  * WHAT IT CANNOT HOLD YET, NAMED RATHER THAN WEAKENED. `THE_LATER_PIECES` below lists each answer
  * that still carries one of those words from a piece of work that is not this round's, with the
  * reason and the round's name for it. The list is exact: a word found anywhere else is red, and an
@@ -34,15 +37,19 @@
  * person's key counts as the person only when the office finds the program that sent it, running as the same
  * user and in no container. On Linux it finds this test's own process. A Mac checkout outside the installed app
  * finds no program, on purpose, so there the same reads were refused and the test stopped before its first case.
- * So every read after the health check carries the person's key, as a header, and the browser carries it in the
- * cookie the pairing press sets. The key is read from the key file the clone's own server made beside its
- * database, in this test's folder. The test makes no key, reads none from anywhere else and never prints one, so
- * it reads the same answers on every system. The case before last finds that the office refused none of the
- * page's own reads.
+ * So every read after the health check carries the person's key, as a header. The key is read from the key file
+ * the clone's own server made beside its database, in this test's folder. The test makes no key, reads none from
+ * anywhere else and never prints one. The case before last finds that the office refused none of the page's own
+ * reads.
+ * THE BROWSER IS THE PERSON IN ONE OF TWO WAYS, and the case before last names which. Where the office offers pairing
+ * on this computer, as on Linux, the browser is paired by the press, with the two halves it gives, because a browser
+ * holds no whole key: the old cookie is no key. Where the office offers none, as on a Mac checkout outside the
+ * installed app, its press refuses every browser, because it finds no program that sent it. There the browser
+ * carries the person's key in a header, once the press has answered 403. The context that carries it opens only the
+ * clone's own address. tests/a-test-browser-carries-the-key-where-no-pairing-is-offered.test.ts shows both ways on
+ * Linux.
  * MUTATION: the server reads carry no key: red under a probe that finds no program, at the first read that needs it.
  * MUTATION: the server reads carry a wrong key: red, at the first read.
- * MUTATION: the browser carries no key: red under a probe that finds no program, the case before last.
- * MUTATION: the browser carries a wrong key: red under a probe that finds no program, the case before last.
  * MUTATION: the key file is worked out without the clone's database: red, the key is not read.
  * MUTATION: a made-up owner name planted in the clone, with a made-up list of the owner's content read: red, the case of the owner's names.
  */
@@ -55,9 +62,9 @@ import { dirname, join, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
-import { KEY_COOKIE, KEY_HEADER } from '../src/config/key-header.mjs'
 import { keysPathFrom } from '../src/config/settings.mjs'
 import { theBuiltPage, apiServerArguments, thePersonsKeyHeader } from './helpers.ts'
+import { makeTheContextThePerson, type HowTheContextIsThePerson } from './a-paired-context.ts'
 import { THE_AGENTS_VARIABLES } from './the-agents-variables.ts'
 import { THE_REAL_NAME } from './the-owners-copyright-line.ts'
 import { takenOutWithoutTheOwnersContent } from './the-owners-content-list.ts'
@@ -125,6 +132,8 @@ const answers = new Map<string, string>()
 let theKey: Record<string, string> = {}
 /** Each of the page's own reads the office refused, with its status. */
 const refusedReads: string[] = []
+/** How the browser was made the person, once it was. */
+let theWay: HowTheContextIsThePerson | undefined
 
 /** A port nothing is listening on, from the operating system. */
 function aFreePort(): Promise<number> {
@@ -174,6 +183,13 @@ async function read(path: string): Promise<string> {
   const text = await reply.text()
   expect(reply.status, `${path} answered ${String(reply.status)}: ${text.slice(0, 400)}`).toBe(200)
   return text
+}
+
+/** How the browser was made the person, in the words the case of the page's own reads says it. */
+function theWayItWasMade(): string {
+  if (theWay === undefined) return 'The browser was not made the person.'
+  if (theWay.way === 'paired by the press') return 'The browser was paired by the press.'
+  return `The browser carries the person's key. ${theWay.because}`
 }
 
 beforeAll(async () => {
@@ -227,13 +243,13 @@ beforeAll(async () => {
   const { chromium } = await import('playwright')
   const browser = await chromium.launch()
   try {
-    // PAIRED AS THE PAIRING PRESS PAIRS A BROWSER: the person's key in the cookie it sets, so the page's own
-    // reads carry it.
-    const person = theKey[KEY_HEADER]
-    if (person === undefined) throw new Error(`The person's key was read with no ${KEY_HEADER} header.`)
-    const paired = await browser.newContext()
-    await paired.addCookies([{ name: KEY_COOKIE, value: encodeURIComponent(person), domain: '127.0.0.1', path: '/', httpOnly: true, sameSite: 'Strict' }])
-    const page = await paired.newPage()
+    // MADE THE PERSON. Where the office offers pairing, it is paired as the press pairs a browser: the cookie half in
+    // its cookies and the header half in its pages' storage, so the page's own reads carry both. Where it offers none,
+    // the press answered 403 and the context carries the person's key on every request. It opens only the clone's own
+    // address.
+    const asThePerson = await browser.newContext()
+    theWay = await makeTheContextThePerson(asThePerson, api, theKey)
+    const page = await asThePerson.newPage()
     const fetched = new Map<string, string>()
     page.on('response', (response) => {
       if (!response.url().startsWith(`${api}/api/`)) return
@@ -307,7 +323,7 @@ describe('a fresh clone on an empty database, with no .env', () => {
   it('refuses none of the page’s own reads, which carry the person’s key', () => {
     const asked = [...answers.keys()].filter((one) => one.startsWith('the page asked '))
     expect(asked.length, 'the page asked the office for nothing').toBeGreaterThan(0)
-    expect(refusedReads, refusedReads.join('\n')).toEqual([])
+    expect(refusedReads, `${theWayItWasMade()}\n${refusedReads.join('\n')}`).toEqual([])
   })
 })
 

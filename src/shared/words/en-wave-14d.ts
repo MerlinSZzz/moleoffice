@@ -46,10 +46,7 @@ export const enWave14d = {
   'settingsPanel.ownThemes.change': 'Change',
   'settingsPanel.ownThemes.copyName': 'Copy of {name}',
   'settingsPanel.ownThemes.copied': 'Made {name}, a copy of {from}. Change it below. The page keeps the theme in use until you choose this one.',
-  'settingsPanel.ownThemes.noneYet': 'You have not made a theme of your own yet. Press New from a copy beside a theme to make one.',
   'settingsPanel.ownThemes.howMany': { one: 'You keep {n} theme of your own, and you may keep {most}.', other: 'You keep {n} themes of your own, and you may keep {most}.' },
-  'settingsPanel.ownThemes.looksAreNotCopied': 'Auto, Light and Dark are drawn by the page itself and not from a theme, so they cannot be copied. Copy one of the themes below them instead.',
-  'settingsPanel.ownThemes.shippedIsCopyOnly': 'A theme Mole Office ships cannot be changed. Make a copy of it and change the copy.',
   'settingsPanel.ownThemes.changing': 'Changing {name}',
   'settingsPanel.ownThemes.name': 'Name',
   'settingsPanel.ownThemes.rename': 'Rename',
@@ -66,7 +63,6 @@ export const enWave14d = {
   'settingsPanel.ownThemes.notSaved': { one: '{n} change is not saved yet.', other: '{n} changes are not saved yet.' },
   'settingsPanel.ownThemes.refused': 'The office did not keep it: {reason}',
   'settingsPanel.ownThemes.preview': 'Preview',
-  'settingsPanel.ownThemes.previewSays': 'Drawn with the changes, before they are saved.',
   'settingsPanel.ownThemes.previewHeading': 'A panel heading',
   'settingsPanel.ownThemes.previewBody': 'Body text on a panel. Most of a page is written in this.',
   'settingsPanel.ownThemes.previewQuiet': 'Quieter text, for what matters less.',
@@ -77,7 +73,6 @@ export const enWave14d = {
   'settingsPanel.ownThemes.sample': 'Aa',
   'settingsPanel.ownThemes.check': 'Readability check',
   'settingsPanel.ownThemes.checkPasses': 'Every pair can be read: {all} of {all}.',
-  'settingsPanel.ownThemes.checkFails': '{failing} of {all} pairs are too faint to read. The theme cannot be saved until each of them can be read.',
   'settingsPanel.ownThemes.pair': '{what} on {on}',
   'settingsPanel.ownThemes.ratio': '{ratio} to 1. The floor is {floor} to 1.',
   // HOW TO FIX A FAINT PAIR: the way its colour {fg} alone can move, then the way its ground {bg} alone can move, or none
@@ -98,22 +93,14 @@ export const enWave14d = {
   'settingsPanel.ownThemes.group.shape': 'Shape',
   'settingsPanel.ownThemes.group.modules': 'Modules',
   'settingsPanel.ownThemes.group.controls': 'Controls',
-  'settingsPanel.ownThemes.groupSays.colour': 'Grounds, text, the accent, borders and the status colours.',
-  'settingsPanel.ownThemes.groupSays.type': 'Faces, weights and sizes.',
-  'settingsPanel.ownThemes.groupSays.shape': 'Corners, borders, dividers, shadows and density.',
-  'settingsPanel.ownThemes.groupSays.modules': "A module's frame, its heading and how a count is drawn.",
-  'settingsPanel.ownThemes.groupSays.controls': 'Buttons, the round button and a chosen item.',
   'settingsPanel.ownThemes.valueOf': 'The value of {name}',
   'settingsPanel.ownThemes.colourOf': 'The colour of {name}',
   'settingsPanel.ownThemes.startAgain': 'Start again from the look showing now',
-  'settingsPanel.ownThemes.startAgainSays': 'The office keeps a look this version cannot read. Starting again writes the look showing now over it, and the themes in it are gone.',
-  'settingsPanel.ownThemes.elsewhere': 'Your own themes are kept in the office, and this page cannot reach them: {because}',
   'settingsPanel.ownThemes.loading': 'Reading your themes from the office.',
 
-  // THE FLAGS PANEL (src/web/components/ChatLabelsPanel.tsx) AND THE FLAG'S MENU. One list holds the two flags the office
-  // ships, the person's own and the menu's 'No mark' entry. A thing left empty is put back to its default.
+  // THE FLAGS PANEL (src/web/components/ChatLabelsPanel.tsx) AND THE FLAG'S MENU. One list holds the four flags the
+  // office ships, the person's own and the menu's 'No mark' entry. A thing left empty is put back to its default.
   'settingsPanel.title.chatflags': 'Your flags',
-  'settingsPanel.chatFlags.what': 'A flag tells an agent what the message carrying it asks. Each has a name, a description you see in the menu, an instruction the agent is given with the message, a short word beside the flag left of Send, and two colours: the flag\'s own and the words it marks. The two flags Mole Office ships keep their defaults unless you change them, and so does the menu\'s "No mark" entry.',
   'settingsPanel.chatFlags.shipped': 'The flags Mole Office ships',
   'settingsPanel.chatFlags.own': 'Your own flags',
   'settingsPanel.chatFlags.shippedFlag': 'Shipped flag',
@@ -138,10 +125,9 @@ export const enWave14d = {
   'chat.wordsWithNoFlag': 'THE WORDS NOT IN A MARKED PART: {quotes} carry no flag ({noMark}).',
 
   // MARKED WORDS IN THE WRITING BOX AND THE BUBBLE (DB-2). The bubble's foot says how many parts the message has; the
-  // box says why a part went when typing touches its words, or when a whole-message flag takes the parts' place.
+  // box says when a whole-message flag takes the parts' place. A part typing took out is not said: its words lose
+  // their colour.
   'chat.markedPartsCount': { one: '1 marked part', other: '{n} marked parts' },
-  'chat.partDroppedMoved': 'The mark "{name}" on "{quote}" was dropped: those words are still in the message, in another place.',
-  'chat.partDroppedGone': 'The mark "{name}" on "{quote}" was dropped: those words are no longer in the message.',
   'chat.marksTakenOff': 'The whole message now carries "{name}", so the marks on its words were taken off.',
   'chat.marksNotKeptWithTheDraft': 'This browser could not keep the marks on your words with the draft: {reason} The words are kept.',
 } as const

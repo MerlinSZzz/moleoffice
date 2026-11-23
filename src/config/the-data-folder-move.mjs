@@ -75,7 +75,9 @@ import {
 } from './settings.mjs'
 import { localStampOf } from './stopped-run-cause.mjs'
 import { theRealWindowsCommands } from './systems/windows-commands.mjs'
-import { THIS_PLATFORM, howAFullPathIsWritten, isAnAbsolutePath, thePathsOf, theSameSpelling } from './the-paths-of-a-system.mjs'
+import { THE_DATA_FOLDER_MOVE_WORDS, filledIn } from './the-data-folder-move-words.mjs'
+import { THIS_PLATFORM, anExampleOfAFullPath, howAFullPathIsWritten, isAnAbsolutePath, thePathsOf, theSameSpelling } from './the-paths-of-a-system.mjs'
+import { withTheOfficesOwnSearchPath } from './the-users-own-path.mjs'
 
 /** The mark's name, in the per-user folder, beside the `.env`. */
 export const THE_MOVE_MARK = 'data-folder-move.json'
@@ -113,9 +115,9 @@ export const THE_STATES_THAT_KEEP_THE_OFFICE_CLOSED = ['stopping', 'copying', 'c
  */
 
 /**
- * What the move's refusal reads about the login unit: its file, the word systemd says for enabled, and the word for
- * active.
- * @typedef {Pick<StartAtLoginReading, 'unit' | 'unitPath' | 'startsAtLogin' | 'activeWord'>} LoginUnit
+ * What the move's refusal reads about the login unit: its file, the word systemd says for enabled, the word for
+ * active, and whether the office runs from an AppImage.
+ * @typedef {Pick<StartAtLoginReading, 'unit' | 'unitPath' | 'startsAtLogin' | 'activeWord' | 'fromAnAppImage'>} LoginUnit
  */
 
 /**
@@ -202,7 +204,7 @@ function theHashOfAFile(path) {
  * @param {string} platform
  * @returns {boolean}
  */
-function isAtOrInside(child, parent, platform) {
+export function isAtOrInside(child, parent, platform) {
   const paths = thePathsOf(platform)
   const from = paths.resolve(parent)
   const at = paths.resolve(child)
@@ -383,7 +385,9 @@ export function theChosenByWords(chosenBy) {
  * the process environment decides the database, and every start the mover made would be handed the old database
  * whatever the line said.
  *
- * A name the shell set, which no `.env` load supplied, is kept as it is.
+ * A name the shell set, which no `.env` load supplied, is kept as it is. The PATH handed on is the office's own, without
+ * the user's entries this start joined after it (./the-users-own-path.mjs), because the office the mover starts reads
+ * the user's PATH again at its own start.
  * @param {Record<string, string | undefined>} [processEnv]
  * @param {string} [file]
  * @returns {Record<string, string | undefined>}
@@ -391,7 +395,7 @@ export function theChosenByWords(chosenBy) {
 export function theEnvironmentTheMoverIsHanded(processEnv = process.env, file = ENV_FILE) {
   /** @type {Record<string, string | undefined>} */
   const handed = {}
-  for (const [name, value] of Object.entries(processEnv)) {
+  for (const [name, value] of Object.entries(withTheOfficesOwnSearchPath(processEnv))) {
     if (!theEnvFileSuppliedThis(name, file)) handed[name] = value
   }
   return handed
@@ -436,57 +440,87 @@ export async function readWhetherTheMoverIsAlive(mover) {
   return theRowIsAboutThisProcess(mover.startedAt, { startedAt: localStampOf(new Date(at.startedAt)) }).same === true
 }
 
-// ============================================================ sentences a person reads
+// ============================================================ refusals and sentences a person reads
 
-/** @param {unknown} to @param {string} platform */
-export function thePlaceIsNotAFullPathWords(to, platform) {
-  return `The place ${JSON.stringify(to)} is not a full path written the way this system writes one (${howAFullPathIsWritten('data-folder', platform)}), so the move was refused and nothing was changed.`
+/**
+ * A REFUSAL OF THE MOVE'S CHECK, ITS WALK OR ITS CONFIRM: a code, and the values its words are filled in with. The
+ * English of each code is written once, in the-data-folder-move-words.mjs, and the page says the code in its own
+ * language. A value is a path, a number, a process id, a mark's state, or words made elsewhere and kept as they came.
+ * @typedef {keyof typeof THE_DATA_FOLDER_MOVE_WORDS} AMoveRefusalCode
+ * @typedef {{ code: AMoveRefusalCode, values: Record<string, string | number> }} AMoveRefusal
+ */
+
+/**
+ * A refusal's English: its code's words with its values filled in. The service command and the log say this.
+ * @param {AMoveRefusal} refusal
+ * @returns {string}
+ */
+export function theRefusalInEnglish(refusal) {
+  return filledIn(THE_DATA_FOLDER_MOVE_WORDS[refusal.code], refusal.values)
 }
 
-/** @param {string} to */
-export function thePlaceIsNotEmptyWords(to) {
-  return `The place ${to} is there and is not an empty folder, so the move was refused and nothing was changed.`
+/**
+ * A place that is not a full path, with one code for each way a system writes one: from `/` on Linux and the Mac, and
+ * from a drive letter on Windows. The place goes in as it was written, and the example as the system writes one.
+ * @param {unknown} to @param {string} platform
+ * @returns {AMoveRefusal}
+ */
+export function thePlaceIsNotAFullPathRefusal(to, platform) {
+  const values = { place: JSON.stringify(to), example: anExampleOfAFullPath('data-folder', platform) }
+  if (platform === 'win32') return { code: 'dataFolderPlaceNotAFullPathOnWindows', values }
+  return { code: 'dataFolderPlaceNotAFullPathFromSlash', values }
 }
 
-/** @param {string} to @param {string} from @param {'same' | 'inside' | 'holds'} relation */
-export function thePlaceIsAroundTheDataFolderWords(to, from, relation) {
-  if (relation === 'same') return `The place ${to} is the data folder, so the move was refused and nothing was changed.`
-  if (relation === 'inside') return `The place ${to} is inside the data folder ${from}, so the move was refused and nothing was changed.`
-  return `The place ${to} holds the data folder ${from}, so the move was refused and nothing was changed.`
+/** @param {string} to @returns {AMoveRefusal} */
+export function thePlaceIsNotEmptyRefusal(to) {
+  return { code: 'dataFolderPlaceNotEmpty', values: { to } }
 }
 
-/** @param {string} to @param {string} installFolder */
-export function thePlaceIsInTheInstallFolderWords(to, installFolder) {
-  return `The place ${to} is inside the install folder ${installFolder}, which an update deletes, so the move was refused and nothing was changed.`
+/** @param {string} to @param {string} from @param {'same' | 'inside' | 'holds'} relation @returns {AMoveRefusal} */
+export function thePlaceIsAroundTheDataFolderRefusal(to, from, relation) {
+  if (relation === 'same') return { code: 'dataFolderPlaceIsTheDataFolder', values: { to } }
+  if (relation === 'inside') return { code: 'dataFolderPlaceInsideTheDataFolder', values: { to, from } }
+  return { code: 'dataFolderPlaceHoldsTheDataFolder', values: { to, from } }
 }
 
-/** @param {string} to */
-export function thePlaceHasNoFolderWords(to) {
-  return `The folder that would hold ${to} does not exist, so the move was refused and nothing was changed.`
+/** @param {string} to @param {string} installFolder @returns {AMoveRefusal} */
+export function thePlaceIsInTheInstallFolderRefusal(to, installFolder) {
+  return { code: 'dataFolderPlaceInTheInstallFolder', values: { to, installFolder } }
 }
 
-/** @param {string} to @param {number} freeBytes @param {number} folderBytes */
-export function thePlaceHasTooLittleRoomWords(to, freeBytes, folderBytes) {
-  return `The drive of ${to} has ${String(freeBytes)} free bytes and the data folder holds ${String(folderBytes)} bytes, so the move was refused and nothing was changed.`
+/** @param {string} to @returns {AMoveRefusal} */
+export function thePlaceHasNoFolderRefusal(to) {
+  return { code: 'dataFolderPlaceHasNoFolder', values: { to } }
 }
 
-export function theProcessEnvironmentDecidesWords() {
-  return 'MOLE_OFFICE_DB is set by the process environment, so a .env line would not decide where the data folder is; the move was refused and nothing was changed.'
+/** @param {string} to @param {number} freeBytes @param {number} folderBytes @returns {AMoveRefusal} */
+export function thePlaceHasTooLittleRoomRefusal(to, freeBytes, folderBytes) {
+  return { code: 'dataFolderPlaceHasTooLittleRoom', values: { to, freeBytes, folderBytes } }
 }
 
-/** @param {string} markPath @param {TheMoveMark} mark */
-export function theMoveIsStillRunningWords(markPath, mark) {
-  return `A data folder move is still running: the mark ${markPath} says ${mark.state} and the process ${String(mark.mover.pid)} that is moving the data folder from ${mark.from} to ${mark.to} is still alive, so the move was refused and nothing was changed.`
+/** @returns {AMoveRefusal} */
+export function theProcessEnvironmentDecidesRefusal() {
+  return { code: 'dataFolderProcessEnvironmentDecides', values: {} }
 }
 
-/** @param {string} markPath @param {TheMoveMark} mark */
-export function theMoveIsNotConfirmedWords(markPath, mark) {
-  return `A data folder move switched the office to ${mark.to} and has not been confirmed: the mark ${markPath} says ${mark.state}, so the move was refused and nothing was changed.`
+/** @param {string} markPath @param {TheMoveMark} mark @returns {AMoveRefusal} */
+export function theMoveIsStillRunningRefusal(markPath, mark) {
+  return { code: 'dataFolderMoveStillRunning', values: { mark: markPath, state: mark.state, pid: mark.mover.pid, from: mark.from, to: mark.to } }
 }
 
-/** @param {string} markPath @param {string} why */
-export function theUnreadableMarkWords(markPath, why) {
-  return `The data folder move mark ${markPath} cannot be read (${why}), so whether a move is running is not known; remove it when no move is running.`
+/** @param {string} markPath @param {TheMoveMark} mark @returns {AMoveRefusal} */
+export function theMoveIsNotConfirmedRefusal(markPath, mark) {
+  return { code: 'dataFolderMoveNotConfirmed', values: { to: mark.to, mark: markPath, state: mark.state } }
+}
+
+/**
+ * A mark that cannot be read, for the check and the confirm alike. `why` is the reason the mark's reader gave, as it
+ * came: the file system's error, or the reader's own words for a mark that is not JSON or not a mark it writes.
+ * @param {string} markPath @param {string} why
+ * @returns {AMoveRefusal}
+ */
+export function theUnreadableMarkRefusal(markPath, why) {
+  return { code: 'dataFolderMoveRunningUnknown', values: { mark: markPath, why } }
 }
 
 /** @param {string} markPath @param {string} why */
@@ -494,67 +528,82 @@ export function theOfficeStaysClosedForAnUnreadableMarkWords(markPath, why) {
   return `The office stays closed because the data folder move mark ${markPath} cannot be read (${why}); remove it when no move is running.`
 }
 
-/** @param {string} to @param {string} folder @param {string} variable */
-export function theWindowsPlaceIsInTheTemporaryFolderWords(to, folder, variable) {
-  return `The place ${to} is in this user's temporary folder ${folder}, which ${variable} names; Disk Cleanup and Storage Sense delete files there, so the move was refused and nothing was changed.`
+/** @param {string} to @param {string} folder @param {string} variable @returns {AMoveRefusal} */
+export function theWindowsPlaceIsInTheTemporaryFolderRefusal(to, folder, variable) {
+  return { code: 'dataFolderPlaceInTheTemporaryFolder', values: { to, folder, variable } }
 }
 
 /**
- * The sentence a network place is refused with (DF4).
+ * The refusal of a network place (DF4): a network path, or a drive Windows reports as a network drive.
  * @param {string} to
  * @param {string | null} drive the drive Windows reports as a network drive, or null for a UNC path
+ * @returns {AMoveRefusal}
  */
-export function theWindowsPlaceIsOnANetworkWords(to, drive) {
-  const where = drive === null ? `The place ${to} is a network path.` : `The place ${to} is on ${drive}, which Windows reports as a network drive.`
-  return `${where} The office's database keeps a write-ahead log, which does not work on a network share, so the move was refused and nothing was changed.`
+export function theWindowsPlaceIsOnANetworkRefusal(to, drive) {
+  if (drive === null) return { code: 'dataFolderPlaceIsANetworkPath', values: { to } }
+  return { code: 'dataFolderPlaceOnANetworkDrive', values: { to, drive } }
 }
 
 /**
- * The sentence a place is refused with when Windows cannot tell what kind of drive it is on (DF4).
+ * The refusal of a place when Windows cannot tell what kind of drive it is on (DF4), with one code for each reason:
+ * Windows could not be read, it answered a type that is not a local drive, or nobody asked it. The reason Windows could
+ * not be read goes in as the drive's reading gave it.
  * @param {string} to
  * @param {string} drive
- * @param {string} why what Windows answered, or why it could not be asked
+ * @param {{ unread: string } | { type: string } | null} reading what the drive's reading said, or null when nobody asked
+ * @returns {AMoveRefusal}
  */
-export function theWindowsDriveCannotBeToldWords(to, drive, why) {
-  return `The place ${to} is on ${drive}, and Windows could not tell what kind of drive that is (${why}). It may be a network drive, where the office's database cannot keep its write-ahead log, so the move was refused and nothing was changed.`
+export function theWindowsDriveCannotBeToldRefusal(to, drive, reading) {
+  if (reading === null) return { code: 'dataFolderDriveNotAsked', values: { to, drive } }
+  if ('unread' in reading) return { code: 'dataFolderDriveNotRead', values: { to, drive, why: reading.unread } }
+  return { code: 'dataFolderDriveTypeUnknown', values: { to, drive, type: reading.type } }
 }
 
 /**
- * THE SENTENCE A MOVE IS REFUSED WITH WHILE THE LOGIN UNIT WOULD START THE OLD FOLDER (DF4). It says what systemd says
- * of the unit, that the unit names the database it opens so an office it starts would open the old folder's database,
- * that the move was refused and nothing was changed, and what to do. A unit that runs says so, because the office runs
- * from it now and the person has to start the computer again to have the window start the office without it.
+ * THE REFUSAL OF A MOVE WHILE THE LOGIN UNIT WOULD START THE OLD FOLDER (DF4). Each whole sentence below is its own
+ * code, nine in all, and the unit's path is the one value, so no words the mover picks are sent as a value.
+ *
+ * A UNIT MOLE OFFICE DID NOT WRITE GETS ONE SENTENCE ON EVERY LINUX INSTALL, an AppImage or not. It says the file was
+ * not written by Mole Office, that the move was refused and nothing was changed, and asks the person to remove the
+ * file, and then move, because Settings draws no Off that removes it. It says nothing of what systemd says, because the
+ * reading does not ask systemd whether that unit starts at login. When systemd says that unit runs, which it can only
+ * off an AppImage, the last sentence instead asks the person to remove the file and start the computer again, because
+ * the office runs from that unit now and the window then starts the office without it.
+ *
+ * FOR A UNIT A PRESS WROTE, IN AN APPIMAGE it never asks to turn start at login on again, because On is refused there,
+ * and it says nothing of what systemd says, because systemd was not asked. It asks for Off in Settings, which removes
+ * the unit, and then the move.
+ *
+ * FOR A UNIT A PRESS WROTE, OFF AN APPIMAGE it says what systemd says of the unit, that the unit names the database it
+ * opens so an office it starts would open the old folder's database, that the move was refused and nothing was
+ * changed, and what to do. A unit that runs says so, because the office runs from it now and the person has to start
+ * the computer again to have the window start the office without it.
  * @param {LoginUnit} loginUnit
- * @returns {string}
+ * @returns {AMoveRefusal}
  */
-export function theLoginUnitKeepsTheOldFolderWords(loginUnit) {
+export function theLoginUnitKeepsTheOldFolderRefusal(loginUnit) {
   const running = theLoginUnitIsRunning(loginUnit.activeWord)
-  const systemdSays =
-    loginUnit.startsAtLogin === true
-      ? 'Start at login is on.'
-      : loginUnit.startsAtLogin === null
-        ? 'systemd does not say that start at login is off.'
-        : null
-  const theUnitNamesTheDatabase = `The login unit ${loginUnit.unitPath} names the database it opens, so an office it starts after the move would open the database in the old folder.`
-  const whatToDo = running
-    ? 'The office runs from that unit now, so turn start at login off in Settings, then start the computer again and open Mole Office, because the window then starts the office without the unit; then move the data folder, and turn start at login on again, which writes the unit for the new folder.'
-    : 'Turn start at login off in Settings, move the data folder, and then turn start at login on again, which writes the unit for the new folder.'
-  return `${systemdSays === null ? '' : `${systemdSays} `}${theUnitNamesTheDatabase} The move was refused and nothing was changed. ${whatToDo}`
+  const values = { unit: loginUnit.unitPath }
+  if (loginUnit.unit === 'not ours') return { code: running ? 'dataFolderLoginUnitNotOursRuns' : 'dataFolderLoginUnitNotOurs', values }
+  if (loginUnit.fromAnAppImage) return { code: 'dataFolderLoginUnitInAnAppImage', values }
+  if (loginUnit.startsAtLogin === true) return { code: running ? 'dataFolderLoginUnitStartsAtLoginRuns' : 'dataFolderLoginUnitStartsAtLogin', values }
+  if (loginUnit.startsAtLogin === null) return { code: running ? 'dataFolderLoginUnitMayStartAtLoginRuns' : 'dataFolderLoginUnitMayStartAtLogin', values }
+  return { code: running ? 'dataFolderLoginUnitRuns' : 'dataFolderLoginUnitOff', values }
 }
 
-/** @param {string} folder @param {string} name @param {string} path */
-export function theFolderHoldsASymbolicLinkWords(folder, name, path) {
-  return `The data folder ${folder} holds the symbolic link ${name} (${path}), so it cannot be moved whole and nothing was changed.`
+/** @param {string} folder @param {string} name @param {string} path @returns {AMoveRefusal} */
+export function theFolderHoldsASymbolicLinkRefusal(folder, name, path) {
+  return { code: 'dataFolderWalkMetASymbolicLink', values: { folder, name, path } }
 }
 
-/** @param {string} folder @param {string} name */
-export function theFolderHoldsASpecialFileWords(folder, name) {
-  return `The data folder ${folder} holds ${name}, which is not an ordinary file or a folder, so it cannot be moved whole and nothing was changed.`
+/** @param {string} folder @param {string} name @returns {AMoveRefusal} */
+export function theFolderHoldsASpecialFileRefusal(folder, name) {
+  return { code: 'dataFolderWalkMetASpecialFile', values: { folder, name } }
 }
 
-/** @param {string} path @param {number} links @param {number} found */
-export function theFileHasMoreNamesWords(path, links, found) {
-  return `The file ${path} has ${String(links)} names and the walk met ${String(found)} of them inside the folder, so the folder cannot be moved whole and nothing was changed.`
+/** @param {string} path @param {number} links @param {number} found @returns {AMoveRefusal} */
+export function theFileHasMoreNamesRefusal(path, links, found) {
+  return { code: 'dataFolderWalkMetMoreNames', values: { path, links, found } }
 }
 
 /** @param {string} from @param {string} to @param {string} name @param {string} code */
@@ -622,19 +671,23 @@ export function theOfficeStaysClosedWords(markPath, mark) {
   return `The office stays closed because the data folder move recorded in ${markPath} is ${mark.state}: it is moving the data folder from ${mark.from} to ${mark.to}, and the process that is moving it is still running.`
 }
 
-/** @param {string} markPath @param {string} state */
-export function theConfirmNeedsAStartedMoveWords(markPath, state) {
-  return `The old data folder can be removed only after the move is confirmed, and the mark ${markPath} says ${state} rather than started, so nothing was removed.`
+/** @param {string} markPath @param {string} state @returns {AMoveRefusal} */
+export function theConfirmNeedsAStartedMoveRefusal(markPath, state) {
+  return { code: 'dataFolderConfirmNeedsAStartedMove', values: { mark: markPath, state } }
 }
 
-/** @param {string} markPath @param {string} from @param {string} why */
-export function theOldFolderCannotBeReadWords(markPath, from, why) {
-  return `The old data folder ${from} cannot be read, so nothing was removed and the move recorded in ${markPath} is not confirmed: ${why}`
+/**
+ * The old folder cannot be read, so the confirm removes nothing. `why` is the file system's error, as it came.
+ * @param {string} markPath @param {string} from @param {string} why
+ * @returns {AMoveRefusal}
+ */
+export function theOldFolderCannotBeReadRefusal(markPath, from, why) {
+  return { code: 'dataFolderConfirmCannotReadTheOldFolder', values: { mark: markPath, from, why } }
 }
 
-/** @param {string} markPath @param {string} wanted @param {string} inUse */
-export function theConfirmNeedsTheNewDatabaseWords(markPath, wanted, inUse) {
-  return `The mark ${markPath} moved the data folder to ${wanted}, and the office in use names ${inUse}, so nothing was removed.`
+/** @param {string} markPath @param {string} wanted @param {string} inUse @returns {AMoveRefusal} */
+export function theConfirmNeedsTheNewDatabaseRefusal(markPath, wanted, inUse) {
+  return { code: 'dataFolderConfirmNeedsTheNewDatabase', values: { mark: markPath, wanted, inUse } }
 }
 
 /**
@@ -643,10 +696,10 @@ export function theConfirmNeedsTheNewDatabaseWords(markPath, wanted, inUse) {
  * the mover has ended.
  * @param {string} markPath
  * @param {number} pid
- * @returns {string}
+ * @returns {AMoveRefusal}
  */
-export function theConfirmWaitsForTheMoverWords(markPath, pid) {
-  return `The data folder move recorded in ${markPath} says switched and the process ${String(pid)} that is moving the data folder is still running, so it may still switch the office back; nothing was removed, and the confirm can be pressed again once that process has ended.`
+export function theConfirmWaitsForTheMoverRefusal(markPath, pid) {
+  return { code: 'dataFolderConfirmWaitsForTheMover', values: { mark: markPath, pid } }
 }
 
 /**
@@ -752,8 +805,11 @@ export function theServiceStartFailedWords(code) {
 
 /**
  * EVERY NAME UNDER A FOLDER, each with its file's identity, and each file once. A symbolic link or a special file is
- * refused in a sentence, and so is a file whose link count is more than the names the walk met, because the move
- * cannot carry it whole. `leaveOut` names relative paths the walk does not enter.
+ * refused, and so is a file whose link count is more than the names the walk met, because the move cannot carry it
+ * whole. `leaveOut` names relative paths the walk does not enter.
+ *
+ * A REFUSAL IS THROWN AS AN ERROR WHOSE MESSAGE IS ITS ENGLISH, because the move and the copy's check read the message.
+ * The error carries the refusal's code and values beside it, as `refusal`, so the move's check can answer the code.
  * @param {string} folder
  * @param {string[]} [leaveOut]
  * @returns {AWalk}
@@ -772,12 +828,12 @@ export function theFilesOf(folder, leaveOut = []) {
       if (leftOut(relativeName)) continue
       const path = join(folderAt, name)
       const stats = lstatSync(path)
-      if (stats.isSymbolicLink()) throw new Error(theFolderHoldsASymbolicLinkWords(folder, relativeName, path))
+      if (stats.isSymbolicLink()) throw theWalksRefusal(theFolderHoldsASymbolicLinkRefusal(folder, relativeName, path))
       if (stats.isDirectory()) {
         visit(path, `${relativeName}/`)
         continue
       }
-      if (!stats.isFile()) throw new Error(theFolderHoldsASpecialFileWords(folder, relativeName))
+      if (!stats.isFile()) throw theWalksRefusal(theFolderHoldsASpecialFileRefusal(folder, relativeName))
       const identity = `${String(stats.dev)}:${String(stats.ino)}`
       const file = files.get(identity) ?? { path, links: stats.nlink, size: stats.size, found: 0 }
       file.found += 1
@@ -788,9 +844,14 @@ export function theFilesOf(folder, leaveOut = []) {
 
   visit(folder, '')
   for (const file of files.values()) {
-    if (file.found !== file.links) throw new Error(theFileHasMoreNamesWords(file.path, file.links, file.found))
+    if (file.found !== file.links) throw theWalksRefusal(theFileHasMoreNamesRefusal(file.path, file.links, file.found))
   }
   return { names, files, bytes: [...files.values()].reduce((sum, file) => sum + file.size, 0) }
+}
+
+/** The error the walk throws for a refusal: its English as the message, and the refusal beside it. @param {AMoveRefusal} refusal */
+function theWalksRefusal(refusal) {
+  return Object.assign(new Error(theRefusalInEnglish(refusal)), { refusal })
 }
 
 /**
@@ -1059,7 +1120,7 @@ function theLongNameOf(folder) {
 
 /**
  * THE FACTS A MOVE'S CHECK USES on this machine: the folders, the environment, the mark, the free bytes, the current
- * folder's size, and the walk of it or the sentence that walk refused with. The start-at-login reading is handed in
+ * folder's size, and the walk of it or the refusal that walk gave. The start-at-login reading is handed in
  * because this file cannot import the reading without a cycle: the reading's file imports the service command, which
  * imports this file.
  * The drive's reading is handed in too, because Windows answers it only after a wait, and this function does not wait.
@@ -1070,7 +1131,7 @@ function theLongNameOf(folder) {
  * @returns {{
  *   from: string, database: string, installFolder: string, perUserFolder: string,
  *   processEnv: Record<string, string | undefined>, envFile: string, mark: AMarkRead, platform: string,
- *   freeBytes: number, folderBytes: number, walk: AWalk | string, loginUnit: LoginUnit,
+ *   freeBytes: number, folderBytes: number, walk: AWalk | AMoveRefusal, loginUnit: LoginUnit,
  *   placeExists: boolean, placeIsAFolder: boolean, placeEmpty: boolean, holderExists: boolean, leaveOut: string[],
  *   refusedFolders: ARefusedFolder[], drive?: ADriveReading
  * }}
@@ -1078,12 +1139,13 @@ function theLongNameOf(folder) {
 export function theFactsOfAMove(to, loginUnit, envFile = ENV_FILE, drive = null) {
   const where = whereTheDataIs(process.env, envFile)
   const leaveOut = theLeaveOutOf(where.folder, where.database)
-  /** @type {AWalk | string} */
+  /** @type {AWalk | AMoveRefusal} */
   let walk
   try {
     walk = theFilesOf(where.folder, leaveOut)
   } catch (error) {
-    walk = saysOf(error)
+    // ANY OTHER ERROR OF THE WALK, such as a folder it may not read, goes in with its own words as they came.
+    walk = theRefusalTheWalkCarries(error) ?? { code: 'dataFolderMoveRefused', values: { why: saysOf(error) } }
   }
   const place = typeof to === 'string' ? to : ''
   const placeExists = place !== '' && existsSync(place)
@@ -1101,7 +1163,7 @@ export function theFactsOfAMove(to, loginUnit, envFile = ENV_FILE, drive = null)
     mark: readTheMoveMark(theMoveMarkPath(envFile)),
     platform: THIS_PLATFORM,
     freeBytes: theFreeBytesAbove(place),
-    folderBytes: typeof walk === 'string' ? 0 : walk.bytes,
+    folderBytes: 'code' in walk ? 0 : walk.bytes,
     walk,
     placeExists,
     placeIsAFolder,
@@ -1117,6 +1179,16 @@ export function theFactsOfAMove(to, loginUnit, envFile = ENV_FILE, drive = null)
 // ============================================================ what a move refuses
 
 /**
+ * The refusal an error of the walk carries, or null when it carries none.
+ * @param {unknown} error
+ * @returns {AMoveRefusal | null}
+ */
+function theRefusalTheWalkCarries(error) {
+  if (!(error instanceof Error) || !('refusal' in error)) return null
+  return /** @type {AMoveRefusal} */ (error.refusal)
+}
+
+/**
  * WHETHER THE LOGIN UNIT WOULD START THE OFFICE FROM THE OLD FOLDER AFTER A MOVE (DF4). A unit that is there and that
  * systemd does not say is disabled may start the office at the next login. A unit that systemd says is disabled but
  * that is running holds the office now, and the move's start after the switch would start it again from the old
@@ -1130,53 +1202,55 @@ export function theLoginUnitWouldStartTheOldFolder(loginUnit) {
 }
 
 /**
- * WHY A MOVE THERE IS REFUSED, in one sentence, or null when it may go on. The checks are asked in the order DF4
- * lists them. It reads nothing from the disk: every fact it uses is handed to it, so a test can describe any machine.
+ * WHY A MOVE THERE IS REFUSED, as a code and its values, or null when it may go on. The checks are asked in the order
+ * DF4 lists them. It reads nothing from the disk: every fact it uses is handed to it, so a test can describe any
+ * machine.
  * @param {string} to
  * @param {ReturnType<typeof theFactsOfAMove>} facts
- * @returns {string | null}
+ * @returns {AMoveRefusal | null}
  */
 export function whyAMoveThereIsRefused(to, facts) {
   const platform = facts.platform
   const paths = thePathsOf(platform)
   if (typeof to !== 'string' || to === '' || /[\r\n\0]/.test(to) || !isAnAbsolutePath(to, platform) || paths.resolve(to) !== to) {
     // A UNC PATH IS REFUSED AS A NETWORK PLACE, though it is not a full path that begins with a drive letter either.
-    if (platform === 'win32' && typeof to === 'string' && isAWindowsNetworkPath(to)) return theWindowsPlaceIsOnANetworkWords(to, null)
-    return thePlaceIsNotAFullPathWords(to, platform)
+    if (platform === 'win32' && typeof to === 'string' && isAWindowsNetworkPath(to)) return theWindowsPlaceIsOnANetworkRefusal(to, null)
+    return thePlaceIsNotAFullPathRefusal(to, platform)
   }
-  if (facts.placeExists && !(facts.placeIsAFolder && facts.placeEmpty)) return thePlaceIsNotEmptyWords(to)
+  if (facts.placeExists && !(facts.placeIsAFolder && facts.placeEmpty)) return thePlaceIsNotEmptyRefusal(to)
   if (theSameSpelling(paths.resolve(to), paths.resolve(facts.from), platform)) {
-    return thePlaceIsAroundTheDataFolderWords(to, facts.from, 'same')
+    return thePlaceIsAroundTheDataFolderRefusal(to, facts.from, 'same')
   }
-  if (isAtOrInside(to, facts.from, platform)) return thePlaceIsAroundTheDataFolderWords(to, facts.from, 'inside')
-  if (isAtOrInside(facts.from, to, platform)) return thePlaceIsAroundTheDataFolderWords(to, facts.from, 'holds')
-  if (isAtOrInside(to, facts.installFolder, platform)) return thePlaceIsInTheInstallFolderWords(to, facts.installFolder)
-  if (!facts.holderExists) return thePlaceHasNoFolderWords(to)
-  if (facts.freeBytes < facts.folderBytes) return thePlaceHasTooLittleRoomWords(to, facts.freeBytes, facts.folderBytes)
+  if (isAtOrInside(to, facts.from, platform)) return thePlaceIsAroundTheDataFolderRefusal(to, facts.from, 'inside')
+  if (isAtOrInside(facts.from, to, platform)) return thePlaceIsAroundTheDataFolderRefusal(to, facts.from, 'holds')
+  if (isAtOrInside(to, facts.installFolder, platform)) return thePlaceIsInTheInstallFolderRefusal(to, facts.installFolder)
+  if (!facts.holderExists) return thePlaceHasNoFolderRefusal(to)
+  if (facts.freeBytes < facts.folderBytes) return thePlaceHasTooLittleRoomRefusal(to, facts.freeBytes, facts.folderBytes)
   if (platform === 'linux' && theLoginUnitWouldStartTheOldFolder(facts.loginUnit)) {
-    return theLoginUnitKeepsTheOldFolderWords(facts.loginUnit)
+    return theLoginUnitKeepsTheOldFolderRefusal(facts.loginUnit)
   }
   if (whereTheDataIs(facts.processEnv, facts.envFile).chosenBy === 'the process environment') {
-    return theProcessEnvironmentDecidesWords()
+    return theProcessEnvironmentDecidesRefusal()
   }
   const markPath = theMoveMarkPath(facts.envFile)
-  if (facts.mark.state === 'unreadable') return theUnreadableMarkWords(markPath, facts.mark.why)
+  if (facts.mark.state === 'unreadable') return theUnreadableMarkRefusal(markPath, facts.mark.why)
   if (facts.mark.state === 'read') {
     const mark = facts.mark.mark
     if (THE_STATES_THAT_KEEP_THE_OFFICE_CLOSED.includes(mark.state) && theMoverIsAlive(mark.mover)) {
-      return theMoveIsStillRunningWords(markPath, mark)
+      return theMoveIsStillRunningRefusal(markPath, mark)
     }
-    if (mark.state === 'switched' || mark.state === 'started') return theMoveIsNotConfirmedWords(markPath, mark)
+    if (mark.state === 'switched' || mark.state === 'started') return theMoveIsNotConfirmedRefusal(markPath, mark)
   }
-  if (typeof facts.walk === 'string') return facts.walk
+  if ('code' in facts.walk) return facts.walk
   if (platform === 'win32') {
     // A DRIVE NOBODY ASKED WINDOWS ABOUT IS NOT TAKEN AS LOCAL.
-    const drive = facts.drive ?? { root: to.slice(0, 3), unread: 'nobody asked Windows' }
-    if ('unread' in drive) return theWindowsDriveCannotBeToldWords(to, drive.root, drive.unread)
-    if (drive.type === 'Network') return theWindowsPlaceIsOnANetworkWords(to, drive.root)
-    if (!THE_LOCAL_DRIVE_TYPES.includes(drive.type)) return theWindowsDriveCannotBeToldWords(to, drive.root, `Windows answered ${drive.type}`)
+    const drive = facts.drive ?? null
+    if (drive === null) return theWindowsDriveCannotBeToldRefusal(to, to.slice(0, 3), null)
+    if ('unread' in drive) return theWindowsDriveCannotBeToldRefusal(to, drive.root, drive)
+    if (drive.type === 'Network') return theWindowsPlaceIsOnANetworkRefusal(to, drive.root)
+    if (!THE_LOCAL_DRIVE_TYPES.includes(drive.type)) return theWindowsDriveCannotBeToldRefusal(to, drive.root, drive)
     const refused = facts.refusedFolders.find((one) => one.names.some((name) => isAtOrInside(to, name, platform)))
-    if (refused !== undefined) return theWindowsPlaceIsInTheTemporaryFolderWords(to, refused.folder, refused.variable)
+    if (refused !== undefined) return theWindowsPlaceIsInTheTemporaryFolderRefusal(to, refused.folder, refused.variable)
   }
   return null
 }
@@ -1256,8 +1330,8 @@ export function theStopAndStartOfAMove(how) {
 }
 
 /**
- * MOVE THE DATA FOLDER to `to`, by DF5 to DF12, and answer the last mark. A refusal writes no mark and answers the
- * sentence as `{ refused }`. The old folder is not changed; a copy is left in place when a step after it stops.
+ * MOVE THE DATA FOLDER to `to`, by DF5 to DF12, and answer the last mark. A refusal writes no mark and answers its
+ * English as `{ refused }`. The old folder is not changed; a copy is left in place when a step after it stops.
  * @param {string} to
  * @param {MoveWays} ways
  * @returns {Promise<TheMoveMark | { refused: string }>}
@@ -1270,7 +1344,7 @@ export async function moveTheDataFolder(to, ways) {
   const drive = await (ways.theDrive ?? theDriveOfAPlace)(to)
   const facts = theFactsOfAMove(to, loginUnit, envFile, drive)
   const refusal = whyAMoveThereIsRefused(to, facts)
-  if (refusal !== null) return { refused: refusal }
+  if (refusal !== null) return { refused: theRefusalInEnglish(refusal) }
 
   const from = facts.from
   const database = facts.database
@@ -1382,7 +1456,7 @@ export async function moveTheDataFolder(to, ways) {
  * `setTheLine` then writes by rename. Its folder is made when it is not there.
  * @param {string} envFile
  */
-function makeTheEnvFile(envFile) {
+export function makeTheEnvFile(envFile) {
   makeTheFolder(dirname(envFile))
   const fd = openSync(envFile, 'wx', 0o600)
   try {
@@ -1413,25 +1487,25 @@ function makeTheEnvFile(envFile) {
  * @param {string} markPath
  * @param {string} theDatabaseInUse
  * @param {(mover: { pid: number, startedAt: string }) => boolean} [isAlive]
- * @returns {{ removed: string[], kept: string[] } | { refused: string }}
+ * @returns {{ removed: string[], kept: string[] } | { refused: AMoveRefusal }}
  */
 export function confirmTheMove(markPath, theDatabaseInUse, isAlive = theMoverIsAlive) {
   const read = readTheMoveMark(markPath)
-  if (read.state === 'absent') return { refused: theNoMoveToConfirmWords(markPath) }
-  if (read.state === 'unreadable') return { refused: theUnreadableMarkWords(markPath, read.why) }
+  if (read.state === 'absent') return { refused: theNoMoveToConfirmRefusal(markPath) }
+  if (read.state === 'unreadable') return { refused: theUnreadableMarkRefusal(markPath, read.why) }
   const mark = read.mark
   const mayConfirm = mark.state === 'started' || (mark.state === 'switched' && !isAlive(mark.mover))
   if (!mayConfirm) {
     return {
       refused:
         mark.state === 'switched'
-          ? theConfirmWaitsForTheMoverWords(markPath, mark.mover.pid)
-          : theConfirmNeedsAStartedMoveWords(markPath, mark.state),
+          ? theConfirmWaitsForTheMoverRefusal(markPath, mark.mover.pid)
+          : theConfirmNeedsAStartedMoveRefusal(markPath, mark.state),
     }
   }
   const wanted = join(mark.to, mark.database)
   if (!theSameSpelling(thePathsOf(THIS_PLATFORM).resolve(theDatabaseInUse), thePathsOf(THIS_PLATFORM).resolve(wanted), THIS_PLATFORM)) {
-    return { refused: theConfirmNeedsTheNewDatabaseWords(markPath, wanted, theDatabaseInUse) }
+    return { refused: theConfirmNeedsTheNewDatabaseRefusal(markPath, wanted, theDatabaseInUse) }
   }
 
   // THE OLD FOLDER ITSELF IS READ FIRST. When it cannot be read, every name in it looks absent: nothing would be removed,
@@ -1440,7 +1514,7 @@ export function confirmTheMove(markPath, theDatabaseInUse, isAlive = theMoverIsA
   try {
     readdirSync(mark.from)
   } catch (error) {
-    if (codeOf(error) !== 'ENOENT') return { refused: theOldFolderCannotBeReadWords(markPath, mark.from, saysOf(error)) }
+    if (codeOf(error) !== 'ENOENT') return { refused: theOldFolderCannotBeReadRefusal(markPath, mark.from, saysOf(error)) }
   }
 
   const manifest = mark.manifest ?? {}
@@ -1466,9 +1540,9 @@ export function confirmTheMove(markPath, theDatabaseInUse, isAlive = theMoverIsA
   return { removed: removed.sort(), kept: [...new Set(kept)].sort() }
 }
 
-/** The sentence a confirm gives when no mark is there at all. @param {string} markPath */
-export function theNoMoveToConfirmWords(markPath) {
-  return `There is no data folder move mark at ${markPath}, so there is no old data folder to remove and nothing was removed.`
+/** The refusal a confirm gives when no mark is there at all. @param {string} markPath @returns {AMoveRefusal} */
+export function theNoMoveToConfirmRefusal(markPath) {
+  return { code: 'dataFolderNoMoveToConfirm', values: { mark: markPath } }
 }
 
 /**

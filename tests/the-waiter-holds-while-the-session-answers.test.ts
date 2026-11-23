@@ -33,11 +33,12 @@
  *
  * Criterion M106: a secretary stopped for a long time by a usage limit still showed as online, though
  * it was offline all along. A hold is a claim written by a waiter process, and the waiter is not the
- * session: it can outlive the session it speaks for. So a held handle is no longer read as answering
- * by itself. The handle door and the presence dot both read `theSessionBehindTheHold` in
- * src/server/lib/answering.ts: the session's own recorded process alive, or a live process resource
- * row, or its transcript grown inside the lapse window. When none can be read, the agent reads grey
- * and the sentence names what could not be read.
+ * session: it can outlive the session it speaks for. The handle door and the presence dot both read
+ * `theSessionBehindTheHold` in src/server/lib/answering.ts. Since 23 November 2026 a hold that still
+ * beats is the base answer for every tool: the agent reads as answering unless something read of its
+ * session says it is not. A hold past its lapse is read as before: the session's own recorded process
+ * alive, or a live process resource row, or its transcript grown inside the lapse window. When none
+ * can be read, the agent reads grey and the sentence names what could not be read.
  *
  * M81 IS UNCHANGED AND STILL PROVED HERE: past the lapse the handle is still its session's inside
  * the grace window, so a message waits for that session and no run starts. The two rules fit
@@ -48,7 +49,8 @@
  * WHAT IS BEING PROVED
  * ---------------------------------------------------------------------------------------
  *
- *   1. With nothing running at all, the hold is kept but the agent does NOT read as answering. It
+ *   1. While the waiter beats, the agent reads as answering on its hold. Once the waiter stops and
+ *      the hold is kept, with nothing running at all, the agent does NOT read as answering. It
  *      reads offline, and the sentence names the process and the transcript that could not be read.
  *   2. A MESSAGE WRITTEN WHILE THE SESSION ANSWERS IS STILL THERE FOR THAT SESSION, and the next
  *      hold hands it over. Nothing else answered in its place.
@@ -64,7 +66,8 @@
  * M106 replaced — by returning `{ answering: true, from: 'a live process', says: null }` before any
  * process or transcript was read. Case 1 went red: it read answering again. Cases 2 and 3 stayed
  * green, because the waiter handing a message over does not depend on the answering reading. The
- * change was put back and the control run again: 3 cases, all green.
+ * change was put back and the control run again: 3 cases, all green. This run was before
+ * 23 November 2026, when case 1 still read a beating hold as grey; it was not run again since.
  *
  * ---------------------------------------------------------------------------------------
  * WHAT WOULD MAKE EACH CASE GO RED
@@ -78,16 +81,18 @@ import type { ChildProcess } from 'node:child_process'
 import { spawn } from 'node:child_process'
 import type { AddressInfo } from 'node:net'
 import { fileURLToPath } from 'node:url'
+import { dirname } from 'node:path'
 
 import type { FastifyInstance } from 'fastify'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { THE_PERSON } from '../src/shared/person.ts'
-import { apiApp, freshDb, one, type TestDb } from './helpers.ts'
+import { apiApp, freshDb, one, aTestAgentsKeyEnvironment, type TestDb } from './helpers.ts'
 
 let t: TestDb
 let app: FastifyInstance
 let api = ''
+let keyEnv: NodeJS.ProcessEnv = {}
 let agentId = ''
 let session = ''
 const started: ChildProcess[] = []
@@ -132,7 +137,7 @@ function startTheWaiter(): { child: ChildProcess; said: () => string; ended: Pro
       '--workspace',
       'default',
     ],
-    { env: { ...process.env, MOLE_OFFICE_HANDLE_BEAT_SECONDS: '1', MOLE_OFFICE_HANDLE_LAPSES_AFTER_SECONDS: '120' } },
+    { env: { ...keyEnv, MOLE_OFFICE_HANDLE_BEAT_SECONDS: '1', MOLE_OFFICE_HANDLE_LAPSES_AFTER_SECONDS: '120' } },
   )
   started.push(child)
   let printed = ''
@@ -179,11 +184,7 @@ beforeAll(async () => {
   await app.ready()
   await app.listen({ host: '127.0.0.1', port: 0 })
   api = `http://127.0.0.1:${String((app.server.address() as AddressInfo).port)}`
-  await post('/api/records', {
-    kind: 'agent',
-    title: 'Answering',
-    data: { handle: 'answering', runtime: 'claude-code', state: 'active' },
-  })
+  keyEnv = await aTestAgentsKeyEnvironment(app, 'answering', dirname(t.file))
   const listed = (await get('/api/participants')) as { agents?: { id: string; handle: string }[] }
   agentId = one((listed.agents ?? []).filter((a) => a.handle === 'answering'), 'the registry row').id
   const filed = await post('/api/records', {
@@ -224,15 +225,15 @@ describe('the waiter holds the handle while the session answers', () => {
       expect(before.from).toBe(null)
 
       const waiter = startTheWaiter()
-      // WHILE THE WAITER RUNS, ITS HOLD IS THERE AND THE AGENT IS STILL NOT GREEN. M106: a hold alone is
-      // not enough, and nothing shows the session behind it is answering (no process recorded, no
-      // transcript), so the reading is grey and names that session. Until 27 September 2026 the
-      // waiter's own open connection turned the dot green here; since problem h1S1MLK-SQ1I an open
-      // connection is not something answering, so it no longer does.
+      // WHILE THE WAITER RUNS, ITS HOLD BEATS AND THE AGENT READS AS ANSWERING. Nothing read of the
+      // session says otherwise (no process recorded, no transcript), so the hold is the answer and
+      // the sentence names that session. Until 23 November 2026 this was grey, because a hold alone
+      // was not enough. The waiter's open connection is still not what answers (problem
+      // h1S1MLK-SQ1I): the hold is.
       expect(
         await until(async () => {
           const now = await presence()
-          return now.colour === 'grey' && now.says.includes(session)
+          return now.colour === 'green' && now.says.includes(session)
         }),
         waiter.said(),
       ).toBe(true)

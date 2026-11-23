@@ -63,7 +63,7 @@ export function AddSandboxLogin() {
   return <section className="private-login" aria-label={t(settingsControlWord('settings.keys', 'privateLogin.add'))}>
     <style href="private-sandbox-login" precedence="default">{CSS}</style>
     <button type="button" className="keys-press" disabled={busy || capability?.available !== true || state !== null || fault === 'PoolUnknown'} onClick={() => void act(() => api.privateLoginStart(binding, capability!.generation!, random()))}>{t(settingsControlWord('settings.keys', 'privateLogin.add'))}</button>
-    {capability?.available === false ? <p className="private-login-note">{refusal('Unavailable')}</p> : null}
+    {capability?.available === false ? <p className="private-login-note">{t('settingsState.unavailable')}</p> : null}
     {state ? <div className="private-login-panel" role="region" aria-label={t('privateLogin.signIn')}>
       <h4>{t('privateLogin.signIn')}</h4>
       <p aria-live="polite">{state.state === 'added' ? t('privateLogin.added') : state.state === 'saving' ? t('privateLogin.saving') : state.state === 'cancelled' ? refusal('Cancelled') : state.reason ? refusal(state.reason) : t('privateLogin.waiting')}</p>

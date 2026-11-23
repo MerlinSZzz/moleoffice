@@ -35,7 +35,6 @@ import type { FastifyInstance } from 'fastify'
 import { freshDb, apiApp, thePersonsKeyHeader, type TestDb } from './helpers.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 import type { GpuView } from '../src/server/lib/bookings.ts'
-import { GRACE_MINUTES } from '../src/shared/bookings.ts'
 import { createI18n } from '../src/shared/i18n.ts'
 
 type ResourcesLib = typeof import('../src/server/lib/resources.ts')
@@ -199,7 +198,6 @@ describe('the card', () => {
     expect(next).toContain('Test sort the photographs')
     expect(week).toContain('wa1')
     expect(week).toMatch(/Without a booking<\/span><span>2 min/)
-    expect(week).toContain('Hours with a job on the card, as the GPU watcher saw them.')
     expect(waiting).not.toBe('')
   })
 })
@@ -212,7 +210,6 @@ describe('the owner’s window', () => {
     const html = drawn(gpu, true)
     expect(html).toContain('Book the GPU for you')
     expect(html).toContain('Go first now')
-    expect(html).toContain(en.t('resources.book.goFirstSays', { n: GRACE_MINUTES }))
     expect(html).toContain('Let wa1 finish first')
     expect(html).toContain('data-choices="owner"')
   })
@@ -230,7 +227,6 @@ describe('the owner’s window', () => {
       expect(html).not.toContain('Book the GPU for me')
       expect(html).not.toContain('Go first now')
       expect(html).not.toContain('data-choices')
-      expect(html).toContain(en.t('resources.book.onlyTheOwner'))
     }
   })
 })

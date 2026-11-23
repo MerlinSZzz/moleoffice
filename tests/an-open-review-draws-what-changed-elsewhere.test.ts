@@ -13,7 +13,7 @@
  * - Between presses, the column reads the review again when the list of collecting reviews, read at each look, shows it
  *   differently from what is drawn: another count of comments not sent, or not collecting at all. No new read per look.
  * - At the press of Send, the review is read fresh. If its comments or its state differ from what is drawn, the new
- *   state is drawn, nothing is sent, and a sentence says why.
+ *   state is drawn, nothing is sent, and a line says so.
  *
  * Every write here is a call to the server, never a press on the page, so the page has written nothing that would make
  * it read again. Everything is made up: the notes, the agent Kiln Keeper, and the comments, in a Mole Office of the
@@ -38,8 +38,8 @@ import { en } from '../src/shared/words/en.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { liveApp, waitForThePage, type LiveApp } from './helpers.ts'
 
-/** The sentence drawn when a press of Send found the review changed, in English. */
-const CHANGED_AT_SEND = 'Nothing was sent. This review changed somewhere else after it was shown here. It is shown again below as it is now.'
+/** The line drawn when a press of Send found the review changed, in English. */
+const CHANGED_AT_SEND = createI18n('en').t('review.b.changedNothingSent')
 
 const SHOTS = process.env['OPEN_REVIEW_SHOTS']
 
@@ -296,7 +296,7 @@ describe('between presses, the review open in the column is read again when the 
 })
 
 describe('at the press of Send, the review is read fresh, and a review that changed since it was drawn is not sent', () => {
-  it('a comment added elsewhere and not yet drawn: nothing is sent, the second comment is drawn, and a sentence says why', async () => {
+  it('a comment added elsewhere and not yet drawn: nothing is sent, the second comment is drawn, and a line says nothing was sent', async () => {
     const here = await aNote('Made-up glaze log, stood on')
     const elsewhere = await aNote('Made-up shelf log, commented on elsewhere')
     const review = await aReviewStartedElsewhere(elsewhere)
@@ -323,7 +323,7 @@ describe('at the press of Send, the review is read fresh, and a review that chan
     }
   }, 180_000)
 
-  it('the review ended elsewhere and not yet drawn: nothing is sent, the review is drawn as ended, and a sentence says why', async () => {
+  it('the review ended elsewhere and not yet drawn: nothing is sent, the review is drawn as ended, and a line says nothing was sent', async () => {
     const here = await aNote('Made-up clay log, stood on')
     const elsewhere = await aNote('Made-up firing log, ended elsewhere')
     const review = await aReviewStartedElsewhere(elsewhere)

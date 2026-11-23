@@ -152,6 +152,8 @@
  * rather than the walk's.
  */
 
+import { KNOWLEDGE_WORKSPACE, isKnowledgeKind } from '@shared/knowledge/constants.ts'
+import { KNOWLEDGE_WORDS } from '@shared/words/en-wave-13u.ts'
 import { and, eq, inArray, or, sql, type SQL } from 'drizzle-orm'
 import { db, sqlite } from '../db/client.ts'
 import { piecesOf, readInPieces } from '../db/in-pieces.ts'
@@ -170,8 +172,9 @@ import {
 } from './records.ts'
 import { theProjectARecordsRowsAreFiledIn } from './log-change.ts'
 import { PanelError } from './panel-error.ts'
-import { checkNoDutiesRestOn, checkTheDutiesTakenAway, checkTheSecretaryDuties } from './grant/secretary-duties.ts'
+import { checkNoDutiesOrDepartmentsRestOn, checkTheDutiesTakenAway, checkTheSecretaryDuties } from './grant/secretary-duties.ts'
 import { SECRETARY_DUTIES_KIND } from '@shared/secretary-duties-record.ts'
+import { checkTheDepartment, checkTheDepartmentTakenAway, DEPARTMENT_KIND } from './grant/departments.ts'
 import { getWorkspace } from '../db/get-workspace.ts'
 
 // ---------------------------------------------------------------------------- what comes back
@@ -654,6 +657,7 @@ export function moveRecordToWorkspace(
   const dryRun = input.dryRun ?? false
   const named = recordInWorkspace(id, workspaceId)
   const namedWithIt = [...new Set(input.withIt ?? [])].filter((each) => each !== id).map((each) => recordInWorkspace(each, workspaceId))
+  if (to === KNOWLEDGE_WORKSPACE || [named, ...namedWithIt].some((each) => isKnowledgeKind(each.kind))) throw new PanelError(KNOWLEDGE_WORDS.onlyDoor, 400)
   // A MESSAGE IS KEPT IN THE MESSAGE CENTRE AND BELONGS TO NO PROJECT, and the message centre holds
   // nothing else, so neither is moved. A project a message is about is its writer's `aboutProject`, not a move.
   for (const each of [named, ...namedWithIt]) {
@@ -745,9 +749,17 @@ export function moveRecordToWorkspace(
     .filter((row) => row.kind === SECRETARY_DUTIES_KIND)
     .map((row) => ({ id: row.id, from: row.workspaceId, data: theStoredDataOf(row.id) }))
   for (const duties of dutiesMoving) checkTheDutiesTakenAway({ workspaceId: duties.from, data: duties.data, actor, act: 'move' })
-  // AND A DECISION THAT DUTIES LEFT BEHIND REST ON DOES NOT LEAVE THEM, on a dry run too. Duties moving with it are
-  // asked at the write, where they land.
-  for (const row of movingRows) if (row.kind === 'decision') checkNoDutiesRestOn(row, 'move', movingIds)
+  // A DEPARTMENT LEAVES ITS PROJECT AS A DELETE TAKES IT AWAY (lib/grant/departments.ts), and is asked the whole write
+  // guard where it lands, inside the write.
+  const departmentsMoving = movingRows
+    .filter((row) => row.kind === DEPARTMENT_KIND)
+    .map((row) => ({ id: row.id, from: row.workspaceId, data: theStoredDataOf(row.id) }))
+  for (const one of departmentsMoving) {
+    checkTheDepartmentTakenAway({ workspaceId: one.from, id: one.id, data: one.data, actor, act: 'move', goingWithIt: movingIds })
+  }
+  // AND A DECISION THAT DUTIES OR A DEPARTMENT LEFT BEHIND REST ON DOES NOT LEAVE THEM, on a dry run too. Duties moving
+  // with it are asked at the write, where they land.
+  for (const row of movingRows) if (row.kind === 'decision') checkNoDutiesOrDepartmentsRestOn(row, 'move', movingIds)
 
   const sessionNote = sessionAttributionNote(movingIds, to)
   const plan = (note: string, rows: MovedRows, crossing: CrossingLink[]): MoveReport => ({
@@ -924,6 +936,7 @@ export function moveRecordToWorkspace(
   const carried = sqlite.transaction((): MovedRows => {
     const rows = carryInto(movingIds, movingRows, to, actor)
     for (const duties of dutiesMoving) checkTheSecretaryDuties({ workspaceId: to, data: duties.data, before: null, mine: duties.id, actor })
+    for (const one of departmentsMoving) checkTheDepartment({ workspaceId: to, data: one.data, before: null, mine: one.id, actor })
     return rows
   })()
 

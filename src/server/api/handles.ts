@@ -62,6 +62,7 @@ import { addressForOtherMachines } from '../lib/runtime.ts'
 import { thisMachine } from '../lib/machines.ts'
 import { readEveryProcessFirst } from '../../config/session-process.mjs'
 import { HOLD_STATES, whatTheWaiterSaysAboutTheAddress, type HoldState } from '@shared/handles.ts'
+import { whyThatIsNoRuntimeWord } from '@shared/participants.ts'
 import { REPO_ROOT, THE_FOR_AGENTS_FOLDER, THE_INSTALL, gatePosition, settings } from '../../config/settings.mjs'
 import { readFile } from 'node:fs/promises'
 import { build } from 'esbuild'
@@ -444,7 +445,11 @@ const holdBody = z.object({
    * honest answer to a question it can answer itself.
    */
   machine: z.string().min(1).max(200).optional(),
-  runtime: z.string().min(1).max(40),
+  // ONE RULE FOR A RUNTIME WORD, the agent kind's: any harness's name, not blank, within one length.
+  runtime: z.string().superRefine((word, said) => {
+    const why = whyThatIsNoRuntimeWord(word)
+    if (why !== null) said.addIssue({ code: 'custom', message: why })
+  }),
 })
 
 const beatBody = z.object({ session: z.string().min(1) })

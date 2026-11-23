@@ -1,4 +1,4 @@
-# Mole Office 0.1.0-beta.9: release notes
+# Mole Office 0.1.0-beta.10: release notes
 
 This is a beta release. Some parts do not work yet. The section "What does not work yet", near the end
 of these notes, lists them.

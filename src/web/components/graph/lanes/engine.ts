@@ -1,6 +1,6 @@
 // Copyright © 2026 Zhengyang Shen
 // Licensed under the MIT License. See LICENSE.
-import { placePill } from "./routing-words.ts";
+import { placeGateMarks, placePill } from "./routing-words.ts";
 import { clearFrameRuns } from "./clear-frame-runs.ts";
 import { stateWord, linkWord, packageStateWord } from "@shared/words.ts";
 import { t } from "@shared/i18n.ts";
@@ -42,6 +42,7 @@ type Routes = Map<string, Point[]>;
 type RouteResult = { routes: Routes; used: [Uint8Array, Uint8Array]; loose: { link: string; letGo: string[] }[] };
 export type { AreaNode, EndPin, Layout, Point, Rect, Rectangles, Side };
 const CANVAS_PAD = 12;
+const GATE_SIZE = { w: 28, h: 28 };
 const MAX_ZOOM = 1.6;
 const MIN_ZOOM = 0.1;
 const READING_ZOOM = 1;
@@ -272,21 +273,31 @@ class Measurer {
   }
 }
 function cardHeadSize(measurer: Measurer, record: DrawnRecord, rung: number, facts: Facts = {}): { width: number; markRoom: number } {
-  const key = `${record.id}|${rung}`;
-  const cached = measurer.cardHeads.get(key);
-  if (cached) return cached;
-  const card = cardElement(record, rung, facts);
-  card.style.width = "min-content";
-  card.querySelector<HTMLElement>(".e-title")!.style.minWidth = "min-content";
-  card.querySelector(".e-chip-row")?.remove();
-  measurer.room.append(card);
-  const marks = card.querySelector<HTMLElement>(".e-marks");
-  const markRoom = marks ? Math.max(0, marks.scrollWidth - marks.clientWidth) : 0;
-  if (marks && markRoom) marks.style.paddingRight = `${markRoom}px`;
-  const result = { width: Math.ceil(card.getBoundingClientRect().width), markRoom };
-  card.remove();
-  measurer.cardHeads.set(key, result);
-  return result;
+  return cardHeadSizes(measurer, [{ record, facts }], rung)[0]!;
+}
+// The same for several cards. Every card not measured yet goes into the room before the first is read, so the page is
+// laid out twice for them all rather than twice for each (round 238). Each is placed on its own in the room, as in
+// sizeAll, so it has the size it has when measured alone.
+function cardHeadSizes(measurer: Measurer, cards: readonly { record: DrawnRecord; facts?: Facts | undefined }[], rung: number): { width: number; markRoom: number }[] {
+  const made = new Map<string, { card: HTMLElement; marks: HTMLElement | null }>();
+  for (const { record, facts = {} } of cards) {
+    const key = `${record.id}|${rung}`;
+    if (measurer.cardHeads.has(key) || made.has(key)) continue;
+    const card = cardElement(record, rung, facts);
+    card.style.width = "min-content";
+    card.querySelector<HTMLElement>(".e-title")!.style.minWidth = "min-content";
+    card.querySelector(".e-chip-row")?.remove();
+    measurer.room.append(card);
+    made.set(key, { card, marks: card.querySelector<HTMLElement>(".e-marks") });
+  }
+  const markRooms = new Map([...made].map(([key, { marks }]) => [key, marks ? Math.max(0, marks.scrollWidth - marks.clientWidth) : 0]));
+  for (const [key, { marks }] of made) {
+    const markRoom = markRooms.get(key)!;
+    if (marks && markRoom) marks.style.paddingRight = `${markRoom}px`;
+  }
+  for (const [key, { card }] of made) measurer.cardHeads.set(key, { width: Math.ceil(card.getBoundingClientRect().width), markRoom: markRooms.get(key)! });
+  for (const { card } of made.values()) card.remove();
+  return cards.map(({ record }) => measurer.cardHeads.get(`${record.id}|${rung}`)!);
 }
 function reserveMarkRoom(card: HTMLElement, markRoom: number) {
   const marks = card.querySelector<HTMLElement>(".e-marks");
@@ -304,7 +315,7 @@ function nodeOf(area: DrawingArea, nested: boolean, records: Map<string, DrawnRe
     kind: "area",
     area,
     nested,
-    framed: Boolean(record) || nested && area.heading !== null,
+    framed: Boolean(area.frame) || Boolean(record) || nested && area.heading !== null,
     record: record ?? null,
     tint: area.tint ?? null,
     items: area.items.map((item): LayoutNode => 'record' in item ? { kind: "card", id: item.record, x: 0, y: 0, w: 0, h: 0, natW: 0 } : nodeOf(item.area, true, records)),
@@ -312,7 +323,9 @@ function nodeOf(area: DrawingArea, nested: boolean, records: Map<string, DrawnRe
   };
 }
 const NOT_PLACED_KEY = "\0not-placed";
-function layoutAt(tree: DrawingTree, notPlaced: string[], records: Map<string, DrawnRecord>, links: DrawnLink[], measurer: Measurer, rung: number, { card, facts, besideLast, rowWidth }: { card: number; facts: Map<string, Facts>; besideLast: boolean; rowWidth: number }): Layout {
+// With `widest`, a layout whose natural width is over it stops once that width is known, before any card is measured
+// at the width, and is null (round 238).
+function layoutAt(tree: DrawingTree, notPlaced: string[], records: Map<string, DrawnRecord>, links: DrawnLink[], measurer: Measurer, rung: number, { card, facts, besideLast, rowWidth, widest = Infinity }: { card: number; facts: Map<string, Facts>; besideLast: boolean; rowWidth: number; widest?: number }): Layout | null {
   const wrap = (area: DrawingArea): DrawingArea => {
     const items = area.items.map((item) => 'area' in item ? { area: wrap(item.area) } : item);
     const gap = area.tierRow ? 56 : UNITS.gap;
@@ -331,13 +344,26 @@ function layoutAt(tree: DrawingTree, notPlaced: string[], records: Map<string, D
     return measurer.size(key, make, width);
   };
   const asksIn = (node: LayoutNode): MeasureAsk[] => node.kind === "card" ? [cardAsk(node.id, node.w)] : [...(node.area.heading === null ? [] : [headAskIn(node)]), ...node.items.flatMap(asksIn)];
-  const headLeast = (node: AreaNode) => node.area.heading === null ? 0 : measurer.size(`head|${node.area.key}|least`, () => areaHeadElement(node.area.heading!, node.record)).w;
+  const leastAsks = (node: AreaNode): MeasureAsk[] => node.area.heading === null ? [] : [{ key: `head|${node.area.key}|least`, make: () => areaHeadElement(node.area.heading!, node.record) }];
+  const leastAsksIn = (node: LayoutNode): MeasureAsk[] => node.kind === "card" ? [] : [...leastAsks(node), ...node.items.flatMap(leastAsksIn)];
+  const headLeast = (node: AreaNode) => {
+    const [ask] = leastAsks(node);
+    return ask ? measurer.size(ask.key, ask.make).w : 0;
+  };
   const pad = (node: AreaNode) => node.framed ? UNITS.framePad : 0;
   const headRoom = (node: AreaNode) => node.area.heading === null ? 0 : headSizeIn(node, measurer).h + UNITS.headGap;
-  const pillSize = (link: DrawnLink) => {
+  const pillAsks = (link: DrawnLink): MeasureAsk[] => {
     const look = lineLook(link);
-    return look.word ? measurer.size(`pill|${link.id}`, () => pillElement(look)) : null;
+    return look.word ? [{ key: `pill|${link.id}`, make: () => pillElement(look) }] : [];
   };
+  const pillSize = (link: DrawnLink) => {
+    const [ask] = pillAsks(link);
+    return ask ? measurer.size(ask.key, ask.make) : null;
+  };
+  // The gaps and the natural widths ask for the words on the lines and the least width of each heading one at a time,
+  // and a size read after an element goes into the room lays the page out again, so all of them are measured in one
+  // layout first (round 238). The plan measures every word on a line at rest in any case.
+  measurer.sizeAll([...links.flatMap(pillAsks), ...tops.flatMap(leastAsksIn)]);
   const roomFor = (a: LayoutNode | undefined, b: LayoutNode | undefined, along: 'w' | 'h') => {
     let room = UNITS.gap;
     if (!a || !b || a.kind !== "card" || b.kind !== "card") return room;
@@ -453,7 +479,8 @@ function layoutAt(tree: DrawingTree, notPlaced: string[], records: Map<string, D
     else tiers.push(tierOf([np], np));
   }
   const W = Math.max(0, ...tiers.map((t2) => t2.natW));
-  const setW = (node: LayoutNode, width: number): void => {
+  if (!(W <= widest)) return null;
+  const setW =(node: LayoutNode, width: number): void => {
     node.w = width;
     if (node.kind === "card") return;
     const inner = width - 2 * pad(node);
@@ -812,14 +839,21 @@ async function drawTree(slot: HTMLElement, snapshot: LanesInput, tree: LanesTree
   // A compact viewport can scroll a wider readable drawing instead of forcing
   // connected rows into narrow, obstructed grids.
   const rowWidthAt = (card2: number) => frameW < 800 ? Math.max(frameW - 2 * CANVAS_PAD, 4 * card2 + 3 * UNITS.gap + 2 * ROUTE_ROOM) : frameW - 2 * CANVAS_PAD;
+  let screenedLayout: { card: number; layout: Layout } | null = null;
+  const routingWorker = () => new Worker(new URL("./routing-worker.ts", import.meta.url), { type: "module" });
+  // The worker started for the first plan before the headings are measured, until that plan takes it (round 238).
+  let started: RoutesAway | null = null;
   const planAt = async (rung2: number, card2: number, unavailable2 = new Map<string, string>(), held: RoutesAway | null = null) => {
     // Every route search of this plan runs in a worker of its own, so the page answers presses while it runs. A retry
     // with one more link left out is the same plan and is given its worker, since a worker's start cost about 26 ms
     // where a search with no route took under 0.01 ms (round 231).
-    const away = held ?? new RoutesAway(new Worker(new URL("./routing-worker.ts", import.meta.url), { type: "module" }), signal);
+    const away = held ?? started ?? new RoutesAway(routingWorker(), signal);
+    started = null;
     try {
       const atRest2 = shown.filter((l) => !ON_SELECTION.has(l.type) && !unavailable2.has(l.id)).map((l) => ({ ...l, kindWord: ["consumes", "measures"].includes(l.type) || tree.level === "boxes" && l.type === "blocks" }));
-      const layout2 = layoutAt(drawing.tree, drawing.notPlaced, records, atRest2, measurer, rung2, { card: card2, facts, besideLast: opts.besideLast, rowWidth: rowWidthAt(card2) });
+      const screened = rung2 === 3 && !unavailable2.size && screenedLayout?.card === card2 ? screenedLayout.layout : null;
+      screenedLayout = null;
+      const layout2 = screened ?? layoutAt(drawing.tree, drawing.notPlaced, records, atRest2, measurer, rung2, { card: card2, facts, besideLast: opts.besideLast, rowWidth: rowWidthAt(card2) })!;
       const spare = frameW / (12 / SMALLEST_UNITS) - layout2.W;
       const fitRoom = spare > 0 && spare < 2 * ROUTE_ROOM ? Math.max(5, Math.floor(spare / 2 / 5) * 5) : undefined;
       const rects = { ...rectsOf(layout2, measurer), routeCost: COST };
@@ -1160,9 +1194,16 @@ async function drawTree(slot: HTMLElement, snapshot: LanesInput, tree: LanesTree
           box2 = proposed;
         }
       }
+      // The gate marks are placed once the words at rest are final, so a mark is drawn only on a clear place. The layout,
+      // the routes and the words at rest are planned without the marks, so a mark moves no other line's words; and a mark
+      // keeps inside box2's width, so it does not change the card the fit chooses (round 238).
+      const gates = placeGateMarks(atRest2.filter((link) => link.gate !== null && link.gate !== undefined), rest.routes, GATE_SIZE, hard, restWords.pills, box2.x0, box2.x1);
+      const movedWords = [...gates.words].filter(([id, rect]) => restWords.pills.get(id) !== rect).map(([id]) => id);
+      restWords = { pills: gates.words, crowded: restWords.crowded.filter((id: string) => !movedWords.includes(id)) };
+      for (const r of [...gates.marks.values(), ...gates.words.values()]) Object.assign(box2, { x0: Math.min(box2.x0, r.x), y0: Math.min(box2.y0, r.y), x1: Math.max(box2.x1, r.x + r.w), y1: Math.max(box2.y1, r.y + r.h) });
       const crowded2 = [...restWords.crowded, ...[...selections2.values()].flatMap((s) => s.crowded)];
       const loose2 = [...rest.loose, ...[...selections2].flatMap(([id, s]) => s.loose.map((l: any) => ({ ...l, selected: id })))];
-      return { layout: layout2, rects, bands: bands2, routes: rest.routes, pills: restWords.pills, selections: selections2, crowded: crowded2, loose: loose2, unavailable: unavailable2, rung: rung2, card: card2, box: { x: box2.x0, y: box2.y0, w: box2.x1 - box2.x0, h: box2.y1 - box2.y0 } };
+      return { layout: layout2, rects, bands: bands2, routes: rest.routes, pills: restWords.pills, gates: gates.marks, gateMarksWithNoPlace: gates.noPlace, selections: selections2, crowded: crowded2, loose: loose2, unavailable: unavailable2, rung: rung2, card: card2, box: { x: box2.x0, y: box2.y0, w: box2.x1 - box2.x0, h: box2.y1 - box2.y0 } };
     } catch (error: any) {
       if (typeof error?.linkId !== "string" || unavailable2.has(error.linkId)) throw error;
       unavailable2.set(error.linkId, NO_ROUTE);
@@ -1173,45 +1214,62 @@ async function drawTree(slot: HTMLElement, snapshot: LanesInput, tree: LanesTree
   };
   const ladder = [3];
   if (!ladder.length) throw new Error(`the trial names no rung on the ladder: ${JSON.stringify(opts.rungs)}`);
-  const cardIds = new Set(drawing.notPlaced);
-  const collectCards = (area: DrawingArea) => {
-    for (const item of area.items) {
-      if ('record' in item) cardIds.add(item.record);
-      else collectCards(item.area);
+  // Measures the headings and screens the card widths, and gives the widths the plans are tried at.
+  const screenWidths = async () => {
+    const cardIds = new Set(drawing.notPlaced);
+    const collectCards = (area: DrawingArea) => {
+      for (const item of area.items) {
+        if ('record' in item) cardIds.add(item.record);
+        else collectCards(item.area);
+      }
+    };
+    for (const area of drawing.tree.areas) collectCards(area);
+    // Measuring the headings forces layout. They are measured 8 at a time, and the page is given a turn between batches
+    // and before width screening.
+    let minimumCard = 1;
+    const heads = [...cardIds].map((id) => ({ record: records.get(id)!, facts: facts.get(id) }));
+    for (let from = 0; from < heads.length; from += 8) {
+      const batch = heads.slice(from, from + 8);
+      for (const head of cardHeadSizes(measurer, batch, 3)) minimumCard = Math.max(minimumCard, head.width);
+      if (batch.length === 8) {
+        await new Promise<void>((resolve) => setTimeout(resolve, 0));
+        signal?.throwIfAborted();
+      }
     }
-  };
-  for (const area of drawing.tree.areas) collectCards(area);
-  // Measuring each heading forces layout. Give the page a turn between small batches and before width screening.
-  let minimumCard = 1;
-  let measuredHeads = 0;
-  for (const id of cardIds) {
-    minimumCard = Math.max(minimumCard, cardHeadSize(measurer, records.get(id)!, 3, facts.get(id)).width);
-    if (++measuredHeads % 8 === 0) {
+    const widths = [...opts.card].filter((value) => value >= minimumCard);
+    if (!widths.includes(minimumCard)) widths.push(minimumCard);
+    const maxNaturalWidth = (frameW - 2 * CANVAS_PAD) / (12 / SMALLEST_UNITS) - 2 * ROUTE_ROOM;
+    const tierLengths = (area: DrawingArea): number[] => [area.tierRow ? area.items.length : 0, ...area.items.flatMap(item => 'area' in item ? tierLengths(item.area) : [])];
+    const largestTier = Math.max(0, ...drawing.tree.areas.flatMap(tierLengths));
+    if (largestTier > 1) {
+      const fitting = widths.filter(card2 => largestTier * card2 + (largestTier - 1) * 56 <= frameW - 2 * CANVAS_PAD - 2 * ROUTE_ROOM);
+      if (fitting.length) widths.splice(0, widths.length, ...fitting);
+    }
+    let firstWidth = -1;
+    for (let index = 0; index < widths.length; index++) {
       await new Promise<void>((resolve) => setTimeout(resolve, 0));
       signal?.throwIfAborted();
+      const card2 = widths[index]!;
+      // A width is screened by the drawing's natural width alone, so a width that does not fit is not laid out further.
+      const layout = layoutAt(drawing.tree, drawing.notPlaced, records, atRest, measurer, 3, { card: card2, facts, besideLast: opts.besideLast, rowWidth: rowWidthAt(card2), widest: maxNaturalWidth });
+      if (layout !== null) {
+        screenedLayout = { card: card2, layout };
+        firstWidth = index;
+        break;
+      }
     }
-  }
-  const widths = [...opts.card].filter((value) => value >= minimumCard);
-  if (!widths.includes(minimumCard)) widths.push(minimumCard);
-  const maxNaturalWidth = (frameW - 2 * CANVAS_PAD) / (12 / SMALLEST_UNITS) - 2 * ROUTE_ROOM;
-  const tierLengths = (area: DrawingArea): number[] => [area.tierRow ? area.items.length : 0, ...area.items.flatMap(item => 'area' in item ? tierLengths(item.area) : [])];
-  const largestTier = Math.max(0, ...drawing.tree.areas.flatMap(tierLengths));
-  if (largestTier > 1) {
-    const fitting = widths.filter(card2 => largestTier * card2 + (largestTier - 1) * 56 <= frameW - 2 * CANVAS_PAD - 2 * ROUTE_ROOM);
-    if (fitting.length) widths.splice(0, widths.length, ...fitting);
-  }
-  let firstWidth = -1;
-  for (let index = 0; index < widths.length; index++) {
-    await new Promise<void>((resolve) => setTimeout(resolve, 0));
-    signal?.throwIfAborted();
-    const card2 = widths[index]!;
-    if (layoutAt(drawing.tree, drawing.notPlaced, records, atRest, measurer, 3, { card: card2, facts, besideLast: opts.besideLast, rowWidth: rowWidthAt(card2) }).W <= maxNaturalWidth) {
-      firstWidth = index;
-      break;
-    }
-  }
-  widths.splice(0, firstWidth < 0 ? widths.length - 1 : firstWidth);
-  if (!widths.length || widths.some((w) => !(w > 0))) throw new Error(`the card widths are ${JSON.stringify(opts.card)}, not a list of widths`);
+    widths.splice(0, firstWidth < 0 ? widths.length - 1 : firstWidth);
+    if (!widths.length || widths.some((w) => !(w > 0))) throw new Error(`the card widths are ${JSON.stringify(opts.card)}, not a list of widths`);
+    return widths;
+  };
+  // The first plan's routing worker is started before the headings are measured, so it loads its code while they and
+  // the widths are worked out (round 238). The first plan takes it in place of starting its own, and ends it as its own.
+  // A drawing that fails before that plan ends it here.
+  started = new RoutesAway(routingWorker(), signal);
+  const widths = await screenWidths().catch((error: unknown) => {
+    started?.end();
+    throw error;
+  });
   const tries = [];
   let chosen = null;
   if (view === "reading") chosen = { ...await planAt(ladder[0]!, widths[0]!), zoom: READING_ZOOM };
@@ -1229,7 +1287,7 @@ async function drawTree(slot: HTMLElement, snapshot: LanesInput, tree: LanesTree
   // the page keeps the drawing before on screen and makes this one beside it, and this one is not the drawing yet.
   slot.dataset.drawing = "lanes";
   slot.dataset.level = tree.level;
-  const { layout, routes, pills, selections, crowded, loose, rung, card, box, zoom, unavailable } = chosen;
+  const { layout, routes, pills, gates, gateMarksWithNoPlace, selections, crowded, loose, rung, card, box, zoom, unavailable } = chosen;
   shown = shown.filter((link) => !unavailable.has(link.id));
   atRest = atRest.filter((link: any) => !unavailable.has(link.id));
   slot.dataset.drawnLinks = JSON.stringify(atRest.map((link: any) => link.id));
@@ -1249,6 +1307,7 @@ async function drawTree(slot: HTMLElement, snapshot: LanesInput, tree: LanesTree
     const box2 = el("div", "e-area");
     box2.dataset.key = node.area.key;
     box2.dataset.framed = node.framed ? "1" : "0";
+    if (node.area.frame) box2.dataset.frame = node.area.frame;
     box2.dataset.nested = node.nested ? "1" : "0";
     if (node.record) box2.dataset.head = node.record.id;
     Object.assign(box2.style, { left: `${node.x}px`, top: `${node.y}px`, width: `${node.w}px`, height: `${node.h}px` });
@@ -1370,17 +1429,128 @@ async function drawTree(slot: HTMLElement, snapshot: LanesInput, tree: LanesTree
     pill.dataset.link = link.id;
     return pill;
   };
+  let openGate: HTMLElement | null = null;
+  const closeGate = (mark: HTMLElement) => {
+    mark.removeAttribute("data-open");
+    mark.querySelector(".e-gate-words")?.remove();
+    mark.removeAttribute("aria-describedby");
+    mark.setAttribute("aria-expanded", "false");
+    mark.setAttribute("aria-label", t("g7b.Canvas.why_this_is_closed"));
+    mark.title = t("g7b.Canvas.say_why_this_block_is_closed");
+    if (openGate === mark) openGate = null;
+  };
+  // The open words are one line beside their mark, at its right, left, foot or head: the first place where the whole of
+  // them is inside the frame and the window and the page draws nothing over them, read at their middle and corners
+  // with elementFromPoint, so the legend counts. While open they may lie over the drawing's other parts. Each corner
+  // point steps in by 0.3 of the corner's radius on screen and a pixel more, so it lies inside the rounded corner: a
+  // point a pixel in from both edges lies outside a corner of 4 px and reads what is behind the words (round 238).
+  const placeGateWords = (mark: HTMLElement, said: HTMLElement) => {
+    const at = mark.getBoundingClientRect();
+    const scale = at.width / mark.offsetWidth || 1;
+    const size = said.getBoundingClientRect();
+    const style = getComputedStyle(said);
+    const step = (radius: string) => 0.3 * scale * Math.max(0, ...radius.split(" ").map(parseFloat).filter(Number.isFinite)) + 1;
+    const [topLeft, topRight, bottomLeft, bottomRight] = [style.borderTopLeftRadius, style.borderTopRightRadius, style.borderBottomLeftRadius, style.borderBottomRightRadius].map(step) as [number, number, number, number];
+    const seen = frame.getBoundingClientRect();
+    const bounds = { left: Math.max(seen.left, 0) + 2, top: Math.max(seen.top, 0) + 2, right: Math.min(seen.right, document.documentElement.clientWidth) - 2, bottom: Math.min(seen.bottom, document.documentElement.clientHeight) - 2 };
+    const within = (value: number, low: number, high: number) => Math.max(low, Math.min(value, high));
+    const beside = (left: number) => ({ left, top: within((at.top + at.bottom - size.height) / 2, bounds.top, bounds.bottom - size.height) });
+    const level = (top: number) => ({ left: within((at.left + at.right - size.width) / 2, bounds.left, bounds.right - size.width), top });
+    const places = [beside(at.right + 4), beside(at.left - 4 - size.width), level(at.bottom + 4), level(at.top - 4 - size.height)];
+    const inside = places.filter((p) => p.left >= bounds.left && p.top >= bounds.top && p.left + size.width <= bounds.right && p.top + size.height <= bounds.bottom);
+    const put = (p: { left: number; top: number }) => Object.assign(said.style, { left: `${(p.left - at.left) / scale - mark.clientLeft}px`, top: `${(p.top - at.top) / scale - mark.clientTop}px` });
+    for (const p of inside) {
+      put(p);
+      const box = said.getBoundingClientRect();
+      const points = [[(box.left + box.right) / 2, (box.top + box.bottom) / 2], [box.left + topLeft, box.top + topLeft], [box.right - topRight, box.top + topRight], [box.left + bottomLeft, box.bottom - bottomLeft], [box.right - bottomRight, box.bottom - bottomRight]];
+      if (points.every(([x, y]) => said.contains(document.elementFromPoint(x!, y!)))) return;
+    }
+    put(inside[0] ?? places[0]!);
+  };
+  // The gate's own mark: the old board's shape for a hard or partial gate, a control that opens the gate's words on the
+  // drawing and puts them away again. It is one function's words with the line's list (gateWordsFor), and a real button.
+  const gateMarkFor = (link: DrawnLink) => {
+    const mark = el("button", "e-gate-mark") as HTMLButtonElement;
+    mark.type = "button";
+    mark.dataset.link = link.id;
+    mark.dataset.gate = link.gate ?? "";
+    mark.setAttribute("aria-expanded", "false");
+    mark.setAttribute("aria-label", t("g7b.Canvas.why_this_is_closed"));
+    mark.title = t("g7b.Canvas.say_why_this_block_is_closed");
+    const glyph = document.createElementNS(SVG, "svg");
+    glyph.setAttribute("class", "e-gate-glyph");
+    glyph.setAttribute("viewBox", "0 0 16 16");
+    glyph.setAttribute("aria-hidden", "true");
+    for (const d of link.gate === "hard" ? ["M1.6 8h5.2", "M9.4 2v12"] : ["M1.6 8h12.8", "M9.4 2v3.4", "M9.4 10.6V14"]) {
+      const path = document.createElementNS(SVG, "path");
+      path.setAttribute("d", d);
+      path.setAttribute("fill", "none");
+      path.setAttribute("stroke", "currentColor");
+      path.setAttribute("stroke-width", d === "M1.6 8h5.2" || d === "M1.6 8h12.8" ? "1.8" : "2.4");
+      path.setAttribute("stroke-linecap", "round");
+      glyph.append(path);
+    }
+    mark.append(glyph);
+    mark.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      if (mark.dataset.open === "1") { closeGate(mark); return; }
+      const words = gateWordsFor(link);
+      if (words === null) return;
+      if (openGate !== null) closeGate(openGate);
+      mark.dataset.open = "1";
+      mark.setAttribute("aria-expanded", "true");
+      mark.setAttribute("aria-label", t("g7b.Canvas.put_away_why_this_is_closed"));
+      mark.title = t("g7b.Canvas.put_away_why_this_block_is_closed");
+      const said = el("span", "e-gate-words", words);
+      said.id = `e-gate-words-${link.id}`;
+      mark.append(said);
+      placeGateWords(mark, said);
+      mark.setAttribute("aria-describedby", said.id);
+      openGate = mark;
+    });
+    return mark;
+  };
+  const drawRestGateMarks = () => {
+    for (const link of atRest) {
+      const rect = gates.get(link.id);
+      if (rect === undefined) continue;
+      const mark = gateMarkFor(link);
+      Object.assign(mark.style, { left: `${rect.x}px`, top: `${rect.y}px` });
+      world.append(mark);
+    }
+  };
   const restPillNodes = /* @__PURE__ */ new Map();
   for (const [id, rect] of pills) {
     const node = pillFor(shown.find((link) => link.id === id), rect);
     restPillNodes.set(id, node);
     world.append(node);
   }
+  drawRestGateMarks();
   const selectedWords = el("div", "e-selected-words");
   world.append(selectedWords);
   const key = el("div", "e-key");
   const compactKey = tree.level === "boxes" || shown.some((link) => link.gate === "hard" || link.gate === "partial");
   if (compactKey) key.classList.add("e-key-compact");
+  if (snapshot.byStep) key.append(el("span", "", t("lanes.byStep")));
+  if (snapshot.blockLegend) {
+    key.append(el("span", "e-block-legend-head", t("lanes.blocks")));
+    for (const block of snapshot.blockLegend) {
+      const entry = el("span", "e-block-legend-entry");
+      entry.dataset.block = block.id;
+      const badge = el("span", "e-badge", t("bigMap.place", { n: block.place }));
+      badge.dataset.module = String(block.place);
+      entry.append(badge);
+      if (block.pipelines.length === 0) entry.append(document.createTextNode(block.title));
+      block.pipelines.forEach((pipeline, n) => {
+        if (n) entry.append(document.createTextNode(", "));
+        const link = el("a", "", pipeline.title);
+        link.href = pipeline.href;
+        entry.append(link);
+      });
+      key.append(entry);
+    }
+  }
   const keyTypes = new Set(shown.map((link) => link.type));
   const addKey = (tone: string, label: string, dashed = false) => {
     const group = el("span");
@@ -1495,7 +1665,14 @@ async function drawTree(slot: HTMLElement, snapshot: LanesInput, tree: LanesTree
     });
   }
   slot.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && selected !== null) select(selected);
+    if (event.key !== "Escape") return;
+    if (openGate !== null) {
+      closeGate(openGate);
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
+    if (selected !== null) select(selected);
   });
   const drawnSelected = heldCard?.() ?? null;
   if (drawnSelected !== null && cards.has(drawnSelected)) select(drawnSelected);
@@ -1505,11 +1682,17 @@ async function drawTree(slot: HTMLElement, snapshot: LanesInput, tree: LanesTree
   slot.dataset.selectionRoutes = JSON.stringify(
     Object.fromEntries([...selections].map(([id, s]) => [id, { routes: Object.fromEntries([...s.routes].map(([l, ps]) => [l, ps.map((p: Point) => [round(p.x, 2), round(p.y, 2)])])), pills: Object.fromEntries(s.pills), restPills: Object.fromEntries(s.restPills) }]))
   );
-  slot.dataset.fit = JSON.stringify({ ...view ? { view } : {}, trial: opts, zoom: round(zoom, 4), rung, card, smallestPx: round(SMALLEST_UNITS * zoom, 2), frame: { w: frameW, h: fittedH }, natural: { w: round(box.w, 1), h: round(box.h, 1), x: box.x, y: box.y }, tries, crowdedWords: crowded, looseEnds: loose });
+  slot.dataset.fit = JSON.stringify({ ...view ? { view } : {}, trial: opts, zoom: round(zoom, 4), rung, card, smallestPx: round(SMALLEST_UNITS * zoom, 2), frame: { w: frameW, h: fittedH }, natural: { w: round(box.w, 1), h: round(box.h, 1), x: box.x, y: box.y }, tries, crowdedWords: crowded, looseEnds: loose, gateMarksWithNoPlace });
 }
 function round(n: number, places: number) {
   const f = 10 ** places;
   return Math.round(n * f) / f;
+}
+/** The words a waits-on line's gate says, the same words in the line's list and on the gate's own mark. */
+function gateWordsFor(link: DrawnLink): string | null {
+  return link.type === "blocks" && link.gate !== null
+    ? gateWordsForReader(link.gate === "partial" && link.upTo !== null ? { kind: "partial", upTo: link.upTo } : { kind: link.gate }, link.stage)
+    : null;
 }
 function linesInWords(id: string, links: DrawnLink[], records: Map<string, DrawnRecord>) {
   const list = el("ul", "e-said");
@@ -1520,7 +1703,7 @@ function linesInWords(id: string, links: DrawnLink[], records: Map<string, Drawn
     const title = records.get(other)?.title ?? other;
     const words = link.type === "blocks" ? out ? t("lanes.waitedOnBy", { title }) : t("lanes.waitsOn", { title }) : t("lanes.relationship", { word: linkWord(link.type, out ? "forward" : "reverse").text, title });
     // A wait says how much it blocks, in the words a step card gives its gate, after the same dash (round 230).
-    const gate = link.type === "blocks" && link.gate !== null ? gateWordsForReader(link.gate === "partial" && link.upTo !== null ? { kind: "partial", upTo: link.upTo } : { kind: link.gate }, link.stage) : null;
+    const gate = gateWordsFor(link);
     const li = el("li", "", gate === null ? words : `${words} — ${gate}`);
     if (link.carries) li.append(document.createTextNode(": " + link.carries));
     list.append(li);

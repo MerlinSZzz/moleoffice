@@ -56,21 +56,22 @@ import type {
   SourceCoverageResponse,
   SourceIndexResponse,
 } from '../../server/api/source.ts'
-import { content, t } from '@shared/i18n.ts'
+import { t } from '@shared/i18n.ts'
 import { claimProblemCode } from '@shared/paths.ts'
 import { gapBetween } from '@shared/spacing.ts'
 import { moleOfficeRequest } from '../api.ts'
-import { useInspect } from '../lib/mode.ts'
 import {
-  Empty,
+  Absence,
   ErrorNote,
   Loading,
   Panel,
+  ServerNote,
   StampAfter,
   Tag,
   parseStamp,
 } from './ui.tsx'
 import { useProjectAsync } from '../lib/project-async.ts'
+import { CodeRows } from '../lib/code-rows.tsx'
 
 // ============================================================================ the requests
 
@@ -238,13 +239,6 @@ export function SourceStyles() {
  */
 export function IndexAge({ stamp, files = [] }: { stamp: SourceIndexStamp; files?: readonly SourceFile[] }) {
   const freshness = freshnessOf(stamp, files)
-  const detail = t('moduleSource.scannedDetail', {
-    root: content(stamp.root),
-    at: stamp.builtAt,
-    by: content(stamp.builtBy),
-    files: fileCount(stamp.fileCount),
-    ms: stamp.scanMs,
-  })
   const built = t('moduleSource.built')
   const age = indexAgeSaid(stamp.ageSeconds)
 
@@ -252,7 +246,7 @@ export function IndexAge({ stamp, files = [] }: { stamp: SourceIndexStamp; files
     <span className="sx-age">
       <span className="sx-age-word">{built}</span>
       {gapBetween(built, age)}
-      <span className="sx-age-value num" title={detail}>
+      <span className="sx-age-value num">
         {age}
       </span>
       {freshness.kind === 'behind' ? (
@@ -280,33 +274,6 @@ export function DerivedNote({ stamp, children }: { stamp: SourceIndexStamp; chil
   return (
     <p className="sx-note sx-derived">
       <strong>{stamp.derived}</strong> {children}
-    </p>
-  )
-}
-
-/**
- * THE SAME RULE ON THE MODULE PAGE, IN THE PAGE'S LANGUAGE (wave 13k round 43, problem oQdFG3cyRWI_).
- *
- * The server's `derived` sentence is English for agents and ends on an address no person presses,
- * so Developer mode draws it with `DerivedNote` and Normal mode draws this. It says where the scan
- * is run again. A project with repositories in Settings is scanned there, one repository at a
- * time, by the press `Repositories.tsx` draws. A project with none is answered from the one
- * workspace scan, which only POST /api/source/reindex rebuilds; the source page that had a press
- * for it is not routed, so the sentence says no press exists.
- */
-export function ModuleDerivedNote({ scansByRepository }: { scansByRepository: boolean }) {
-  return (
-    <p className="sx-note sx-derived">
-      <strong>{t('moduleSource.derived')}</strong>
-      {t('saveAnswer.sentenceGap')}
-      {scansByRepository
-        ? t('moduleSource.scanAgainAt', {
-            settings: t('nav.settings'),
-            category: t('settingsCats.cat.devMachines'),
-            panel: t('settingsPanel.title.repositories'),
-            press: t('settingsPanel.repos.scanNow'),
-          })
-        : t('moduleSource.scanAgainNoPress')}
     </p>
   )
 }
@@ -353,7 +320,10 @@ export function FileLine({ file, note }: { file: SourceFile; note?: React.ReactN
 }
 
 /**
- * What the scan could not see, in the scan's own words.
+ * What the scan looked at and could not see, in the scan's own words.
+ *
+ * The folder it scanned, when, by whom, how many files and how long it took are each a row of their
+ * own, so that no sentence holds the folder.
  *
  * Every coverage number on these pages is computed over the files the scan looked at, and a
  * percentage over an unstated set is a number nobody can argue with. So the skipped directories
@@ -362,6 +332,19 @@ export function FileLine({ file, note }: { file: SourceFile; note?: React.ReactN
 export function ScanLimits({ stamp }: { stamp: SourceIndexStamp }) {
   return (
     <div className="sx-limits">
+      <CodeRows
+        rows={[
+          {
+            label: 'moduleSource.row.scannedFolder',
+            value: stamp.root,
+            ...(stamp.skipped.length === 0 ? { state: 'moduleSource.row.skippedNothing' as const } : {}),
+          },
+          { label: 'moduleSource.row.scannedAt', value: stamp.builtAt },
+          { label: 'moduleSource.row.scannedBy', value: stamp.builtBy },
+          { label: 'moduleSource.row.files', value: String(stamp.fileCount) },
+          { label: 'moduleSource.row.scanTook', value: `${String(stamp.scanMs)} ms` },
+        ]}
+      />
       <p className="sx-note">
         <strong>{t('moduleSource.howImportsRead')}</strong> {stamp.howRead}
       </p>
@@ -376,9 +359,7 @@ export function ScanLimits({ stamp }: { stamp: SourceIndexStamp }) {
             ))}
           </ul>
         </>
-      ) : (
-        <p className="sx-note">{t('moduleSource.scanSkippedNothing', { root: content(stamp.root) })}</p>
-      )}
+      ) : null}
     </div>
   )
 }
@@ -401,7 +382,6 @@ export function ModuleSource({ moduleId }: { moduleId: string }) {
       <SourceStyles />
       <Panel id="module-source-panel" declares={{ surface: null }}
         title={t('moduleSource.panel.title')}
-        kind={t('moduleSource.panel.kind')}
         actions={
           state.status === 'ready' ? (
             <span className="sx-actions">
@@ -428,7 +408,6 @@ export function ModuleSourceBody({ answer }: { answer: ModuleSourceResponse }) {
   // Keyed by repository and path, because one path can be claimed in two repositories and is two files.
   const byPath = new Map(answer.files.map((file) => [fileKey(file.repository?.id, file.path), file]))
   const stale = answer.staleClaims.length
-  const inspect = useInspect()
   const lede = t('moduleSource.lede', {
     files: fileCount(answer.files.length),
     claims: t('moduleSource.claimCount', { n: answer.claims.length }),
@@ -439,15 +418,16 @@ export function ModuleSourceBody({ answer }: { answer: ModuleSourceResponse }) {
       {/* First thing in the block, before any data: what this is, and why nothing here can be
           typed. Placed after the list it would be an excuse; placed here it frames everything
           below it. */}
-      {inspect ? <DerivedNote stamp={answer.index} /> : <ModuleDerivedNote scansByRepository={answer.repositories !== undefined} />}
+      <ServerNote text={answer.index.derived} />
 
       {/* The stated rows could not be counted: the project holds more than one repository and the
           index names none. Not the same as a stale claim, and not drawn like one: the lists below
           are not merely empty, they are unanswerable. */}
       {answer.problem !== null ? (
-        <p className="sx-note sx-note-bad">
-          {t('moduleSource.couldNotCount', { problem: content(answer.problem) })}
-        </p>
+        <>
+          <p className="sx-note sx-note-bad">{t('moduleSource.claimsNotCounted')}</p>
+          <ServerNote text={answer.problem} />
+        </>
       ) : null}
 
       {answer.repositories === undefined ? null : <CountedInEachRepository entries={answer.repositories} />}
@@ -456,13 +436,9 @@ export function ModuleSourceBody({ answer }: { answer: ModuleSourceResponse }) {
           and drawing the "claims no paths" empty state for them would state as fact ("this module
           claims nothing") what is actually unknown ("what it claims could not be counted"). */}
       {answer.problem !== null ? null : answer.claims.length === 0 ? (
-        <Empty
-          message={
-            <>
-              <b>{t('moduleSource.claimsNoFiles')}</b> {t('moduleSource.claimsNoFilesBody')}
-            </>
-          }
-        />
+        <p className="sx-lede">
+          <Absence word={t('moduleSource.noClaims')} />
+        </p>
       ) : (
         <>
           <p className="sx-lede num">
@@ -477,9 +453,7 @@ export function ModuleSourceBody({ answer }: { answer: ModuleSourceResponse }) {
         </>
       )}
 
-      <p className="sx-note">
-        <strong>{t('moduleSource.howListBuilt')}</strong> {inspect ? answer.index.howRead : t('moduleSource.howRead')}
-      </p>
+      <ServerNote text={answer.index.howRead} />
     </>
   )
 }
@@ -550,14 +524,7 @@ export function CountedInEachRepository({ entries }: { entries: readonly ClaimsI
  * that have a reason but no code.
  */
 export function ClaimUnmatched({ pattern, problem, problemCode }: { pattern?: string; problem: string | null; problemCode?: ResolvedClaim['problemCode'] }) {
-  if (problem === null) {
-    return (
-      <>
-        <p className="sx-note sx-note-bad">{t('moduleSource.claimNothingMatches')}</p>
-        <p className="sx-note">{t('moduleSource.claimRenameHint')}</p>
-      </>
-    )
-  }
+  if (problem === null) return null
   const code = problemCode ?? (pattern === undefined ? null : claimProblemCode(pattern))
   if (code === null) {
     const message = `This claim ${problem}${/[.!?]$/.test(problem) ? '' : '.'}`
@@ -605,7 +572,7 @@ function ClaimSection({ claim, byPath }: { claim: ResolvedClaim; byPath: Map<str
               return (
                 <li className="sx-file sx-file-missing" key={path}>
                   <code className="sx-file-path wrap-anywhere">{path}</code>
-                  <p className="sx-note sx-note-bad">{t('moduleSource.matchedButNoFile')}</p>
+                  <Absence word={t('state.unknown')} title={t('moduleSource.matchedButNoFile')} />
                 </li>
               )
             }

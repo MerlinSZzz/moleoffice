@@ -11,7 +11,7 @@
 import { Fragment } from 'react'
 
 import { t } from '@shared/i18n.ts'
-import { theFlagFor, theFlagForLabel, type AMarkedPart, type AnIntentThatAsks, type TheFlagsOfAPerson } from '@shared/intent-mark.ts'
+import { THE_SHIPPED_COLOURS, theFlagFor, theFlagForLabel, type AMarkedPart, type AnIntentThatAsks, type TheFlagsOfAPerson } from '@shared/intent-mark.ts'
 import { type MessageLabel } from '@shared/message-label.ts'
 
 import { runsOfMarkedWords } from '../../lib/marking-the-words.ts'
@@ -40,7 +40,7 @@ export function theDrawingOfAPart(part: AMarkedPartToDraw, flags: TheFlagsOfAPer
   wordsColour: string
 } {
   const flag = theFlagOfAPart(part, flags)
-  const stored = part.label?.colour ?? 'blue'
+  const stored = part.label?.colour ?? (part.intent === undefined ? 'blue' : THE_SHIPPED_COLOURS[part.intent])
   return {
     name: part.name ?? flag?.name ?? part.label?.text ?? '',
     flagColour: flag?.colour ?? stored,
@@ -123,6 +123,7 @@ export function MarkedWordsPaint({ body, parts, flags }: {
           <span
             key={at}
             className="px-chat-marked px-label-ink"
+            data-colour={drawing.flagColour}
             data-words-colour={drawing.wordsColour}
             data-flag-colour={drawing.flagColour}
             data-flag-name={drawing.name}
@@ -133,6 +134,50 @@ export function MarkedWordsPaint({ body, parts, flags }: {
           </span>
         )
       })}
+    </div>
+  )
+}
+
+/** Words of the box held for a flag while the flag's menu is open: where the selection was when the press was pressed. */
+export interface WordsHeldForAFlag {
+  from: number
+  to: number
+}
+
+/**
+ * THE GROUND UNDER THE BOX'S WORDS: each marked run on its flag's soft ground, and the words held for a flag on a grey
+ * ground while the flag's menu is open. The press takes the focus from the box and the browser then stops drawing the
+ * selection, so without this the person could not see which words the flag would mark. The layer lies under the box,
+ * which is clear while the layer is there, so the box's own caret, selection and words are drawn over it. Its words are
+ * transparent and take no pointer, with the box's font, padding and wrapping, so each ground sits under its words.
+ */
+export function MarkedWordsGround({ body, parts, held, flags }: {
+  body: string
+  parts: readonly AMarkedPartToDraw[]
+  held: WordsHeldForAFlag | null
+  flags: TheFlagsOfAPerson
+}): React.JSX.Element | null {
+  if (parts.length === 0 && held === null) return null
+  const pieces: React.JSX.Element[] = []
+  for (const run of runsOfMarkedWords(body, parts as readonly AMarkedPart[])) {
+    const inside = held === null ? [] : [held.from, held.to].filter((at) => at > run.from && at < run.to)
+    const cuts = [run.from, ...inside, run.to]
+    for (let at = 0; at + 1 < cuts.length; at += 1) {
+      const from = cuts[at]!
+      const to = cuts[at + 1]!
+      const words = body.slice(from, to)
+      if (held !== null && from >= held.from && to <= held.to) {
+        pieces.push(<span key={from} className="px-chat-held">{words}</span>)
+      } else if (run.part !== null) {
+        pieces.push(<span key={from} className="px-chat-marked-ground px-label-ink" data-colour={theDrawingOfAPart(run.part, flags).flagColour}>{words}</span>)
+      } else {
+        pieces.push(<span key={from}>{words}</span>)
+      }
+    }
+  }
+  return (
+    <div className="px-chat-box px-chat-mark-ground" aria-hidden="true">
+      {pieces}
     </div>
   )
 }

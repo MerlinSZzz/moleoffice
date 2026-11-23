@@ -46,7 +46,6 @@ import { createServer as aTcpProbe } from 'node:net'
 import { join, resolve } from 'node:path'
 import { fileURLToPath, URL } from 'node:url'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { THE_BUILT_PAGE, missingWebBuild } from '../src/config/the-built-page.mjs'
 import { readTheServiceLock } from '../src/config/the-service-lock.mjs'
 import { theTerminalHolderLog } from '../src/config/the-terminal-holder.mjs'
 import { databaseIdentity } from '../src/config/database-identity.mjs'
@@ -189,8 +188,6 @@ function aStandInAt(port: number, supervisor: number): Server {
 }
 
 beforeAll(async () => {
-  const missing = missingWebBuild(THE_BUILT_PAGE)
-  if (missing !== null) throw new Error(`This test starts the server in production, which serves the built page. ${missing}`)
   await theCheckoutsPageBuiltAtThisCommit()
 }, 300_000)
 

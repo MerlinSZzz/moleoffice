@@ -13,6 +13,13 @@
  *
  * The direct case with an untaken offer also pauses the page's dev server for six seconds just
  * after it answered, as a loaded box does. The page must still get every file it asks for.
+ *
+ * Test change (wave 13y round 175): the checklists page and window draw design E, as decided, so
+ * each checklist is a card, and every checklist of the person's lies open on the page. Both cases
+ * make a checklist with the same item, so the page's press is aimed in the card the address
+ * `#/checklists/<id>` marks, and the window's in the card of that checklist. Before, the page drew
+ * one opened checklist, and the window's checklist was found by the link in its group's title,
+ * which went.
  */
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import { appendFileSync } from 'node:fs'
@@ -133,7 +140,7 @@ for (const { cross, mode, pending } of cases) it(`${cross ? 'cross-project' : 's
   await app.page.locator('.px-lead-stop').waitFor({ timeout: 30_000 })
   expect(await app.page.evaluate(key => localStorage.getItem(key), FOLLOWING_KEY)).toBe(`agent:${guideId}`)
   if (pending) await expect.poll(() => heldReads).toBeGreaterThan(0)
-  const row = app.page.locator('main.page .ckp-item', { hasText: 'Read the lab manual' })
+  const row = app.page.locator('main.page .cks-card[data-marked="yes"] .ckp-item', { hasText: 'Read the lab manual' })
   await row.locator('summary').click()
   await row.locator(`.ckp-link a[href="#/report/${manual}"]`).click()
   await expect.poll(() => app.page.locator('main.page').textContent(), { timeout: 30_000 }).toContain('Sample robotics lab manual')
@@ -141,7 +148,7 @@ for (const { cross, mode, pending } of cases) it(`${cross ? 'cross-project' : 's
     const stillWaiting = await fetch(`${app.api}/api/messages?only=waiting-for-me&leads=1`, { headers: owner })
     expect((await stillWaiting.json()).messages.map((one: { id: string }) => one.id), 'the earlier offer was read before the report press').toContain(manualOffer)
     if (!await app.page.locator('.ckw-panel').isVisible()) await app.page.locator('.ckw-press').click()
-    const pendingGroup = app.page.locator('.ckw-panel .ckw-group').filter({ has: app.page.locator(`a[href="#/checklists/${checklist}"]`) })
+    const pendingGroup = app.page.locator(`.ckw-panel .cks-card[data-list="${checklist}"]`)
     const pendingRow = pendingGroup.locator('.ckp-item', { hasText: 'Read the lab manual' })
     if (!await pendingRow.locator('.ckp-link').first().isVisible()) await pendingRow.locator('summary').click()
     await pendingRow.locator(`a[href="#/report/${daily}"]`).click()

@@ -21,7 +21,9 @@
  *   4. `list` names who holds each seat, and a `run` stopped with SIGTERM passes the signal to its
  *      command's group and gives the seat back;
  *   5. a queued `run` whose tool dies never starts its command: the command waits at a gate for the
- *      word "go", and a gate whose writer has gone reads end-of-file.
+ *      word "go", and a gate whose writer has gone reads end-of-file;
+ *   6. a waiter with no --every asks again every 10 s, unless a test sets SLOT_ASK_EVERY_S_FOR_A_TEST
+ *      in the tool's environment, and an interval it sets is never under 1 s.
  *
  * The office here is the product's own slot and resource routes on a throwaway database, listening
  * on a port of its own on loopback. Nothing here talks to the owner's server.
@@ -32,7 +34,7 @@ import { existsSync, mkdtempSync, readFileSync, readlinkSync, rmSync } from 'nod
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import type { AddressInfo } from 'node:net'
+import { createServer, type AddressInfo } from 'node:net'
 import type { FastifyInstance } from 'fastify'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { freshDb, type TestDb } from './helpers.ts'
@@ -297,5 +299,47 @@ describe('node tools/slot.mjs against real processes', () => {
 
     process.kill(-(holder.child.pid as number), 'SIGTERM')
     await holder.done
+  })
+})
+
+describe('how often a waiter asks again', () => {
+  /**
+   * The interval `acquire --wait` names when the office does not answer: "asking again in <n> s". The office here is a
+   * port nothing listens on, and the tool is stopped at that first line, before it waits.
+   */
+  async function theIntervalItSays(variable: string | undefined, more: string[] = []): Promise<string> {
+    const port = await new Promise<number>((done) => {
+      const probe = createServer()
+      probe.listen(0, '127.0.0.1', () => {
+        const { port: free } = probe.address() as AddressInfo
+        probe.close(() => done(free))
+      })
+    })
+    const env = { ...process.env }
+    delete env['SLOT_ASK_EVERY_S_FOR_A_TEST']
+    if (variable !== undefined) env['SLOT_ASK_EVERY_S_FOR_A_TEST'] = variable
+    const flags = ['--api', `http://127.0.0.1:${String(port)}`, '--workspace', 'default', '--as', 'claude-code', '--session', 'a-waiter-session']
+    const child = spawn(process.execPath, [TOOL, 'acquire', 'full-suite', '--wait', '--pid', String(process.pid), ...flags, ...more], {
+      cwd: REPO,
+      detached: true,
+      stdio: ['ignore', 'ignore', 'pipe'],
+      env,
+    })
+    if (child.pid !== undefined) groups.add(child.pid)
+    let said = ''
+    child.stderr?.on('data', (b: Buffer) => (said += b.toString()))
+    const ended = new Promise((done) => child.on('close', done))
+    await until('the first "asking again" line', () => / asking again in \S+ s\./.test(said))
+    process.kill(-(child.pid as number), 'SIGKILL')
+    await ended
+    return (/ asking again in (\S+) s\./.exec(said) as RegExpExecArray)[1] as string
+  }
+
+  it('asks every 10 s unset, and as a test\'s SLOT_ASK_EVERY_S_FOR_A_TEST says but never under 1 s; --every still wins', async () => {
+    expect(await theIntervalItSays(undefined)).toBe('10')
+    expect(await theIntervalItSays('3')).toBe('3')
+    expect(await theIntervalItSays('0.2')).toBe('1')
+    expect(await theIntervalItSays('none')).toBe('10')
+    expect(await theIntervalItSays('3', ['--every', '0.2'])).toBe('0.2')
   })
 })

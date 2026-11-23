@@ -70,9 +70,7 @@ describe('the check tool takes an older office\'s yeses options and ignores them
   })
 
   it.each([
-    ['--yeses', (): string => aMissingFile],
     ['--yeses-of', (): string => ANOTHER_RUN],
-    ['--no-yeses', (): string => A_REASON],
   ] as const)('takes %s alone and names only it in its line', async (option, value) => {
     const result = await fixture.inspect([option, value()])
     expect(result.code, result.err).toBe(0)

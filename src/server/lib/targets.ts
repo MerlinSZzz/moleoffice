@@ -51,6 +51,7 @@ import {
   WHY_AN_ACTION_INSIDE_A_READING_HAS_NO_IDENTITY,
   WHY_A_DRAFT_IS_NOT_ON_THE_SERVER,
   type Context,
+  type Place,
   type Span,
   type Target,
   type TargetKind,
@@ -66,6 +67,7 @@ import { theProjectsAReaderMayRead } from '../db/the-projects-a-reader-may-read.
 import type { AMessageReader } from './messages.ts'
 import { getRecord, recordInWorkspace, resolveLinks } from './records.ts'
 import { PanelError } from './panel-error.ts'
+import { MAX_REPORT_FILE_NAME } from './reportfiles.ts'
 // WHICH PROJECTS THIS INSTALLATION HOLDS. Read by the one refusal below that is about a project
 // rather than about a thing: a lead may name another project, so the name has to be one.
 import { getWorkspace } from '../db/get-workspace.ts'
@@ -1291,6 +1293,7 @@ export function checkView(context: Context, writtenBy: ActorType): void {
  *   · AN EMPTY QUOTE. An empty string is found wherever it is looked for, so it would report that
  *     the words are still there for a surface that has since been rewritten. `quoteWhatItHolds`
  *     below refuses an empty cell for exactly the same reason.
+ *   · A QUOTE'S FILE OR PAGE THAT CANNOT BE TRUE. See `refuseAFileOrPageThatCannotBeTrue` below.
  */
 export function checkPlace(context: Context): void {
   const place = context.place
@@ -1347,6 +1350,7 @@ export function checkPlace(context: Context): void {
     )
   }
   if (place.at === 'quote') refuseAPlaceQuoteOverTheBound(place.words)
+  if (place.at === 'quote') refuseAFileOrPageThatCannotBeTrue(place)
   if (place.at === 'run') {
     if (place.field === '') {
       throw new PanelError('A run of text is named by which stored string it is part of, and this leaves that blank.')
@@ -1387,6 +1391,34 @@ function refuseAPlaceQuoteOverTheBound(quote: string): void {
     `A place quote may use at most ${String(SHOWN_CHARACTERS)} characters. Send the opening text shown on screen and ` +
       'set `cut: true` when the rest was left out. Keep any `from` and `to` at the full selection.',
   )
+}
+
+/**
+ * THE FILE AND THE PAGE A QUOTE NAMES, REFUSED WHEN THEY CANNOT BE TRUE. A page is a page of the named file, so a page
+ * with no file names nothing. The longest name is the bound a stored file's name already has, so no second bound is
+ * declared here.
+ */
+function refuseAFileOrPageThatCannotBeTrue(place: Extract<Place, { at: 'quote' }>): void {
+  if (place.file === '') {
+    throw new PanelError(
+      'A quote\'s `file` is the name the file was shown under, and this leaves it blank. Leave `file` out when the ' +
+        'words were in no file.',
+    )
+  }
+  if (place.file !== undefined && place.file.length > MAX_REPORT_FILE_NAME) {
+    throw new PanelError(
+      `A quote's \`file\` is a file's name, and a file's name is at most ${String(MAX_REPORT_FILE_NAME)} characters. ` +
+        `This one is ${String(place.file.length)}.`,
+    )
+  }
+  if (place.page !== undefined && !(Number.isInteger(place.page) && place.page >= 1)) {
+    throw new PanelError(`A quote's \`page\` is a page of a PDF, counted from 1, and this says ${String(place.page)}.`)
+  }
+  if (place.page !== undefined && place.file === undefined) {
+    throw new PanelError(
+      'A quote\'s `page` is a page of its `file`, and this names no file. Send `file` with the page, or neither.',
+    )
+  }
 }
 
 /** A pair that can be true. Shared by `checkSpan` and by the two-ended place, which holds two of them. */

@@ -260,6 +260,7 @@ export function planStaleLedgers(sqlite: Database.Database): {
 } {
   if (!hasRevisionsTable(sqlite)) return { tableMissing: true, records: [] }
 
+  // The rows are read one at a time, so that this step never holds every record at once.
   const rows = sqlite
     .prepare(
       'SELECT r.id, r.workspace_id, r.kind, r.title, r.summary, r.data, r.deleted_at, ' +
@@ -269,9 +270,10 @@ export function planStaleLedgers(sqlite: Database.Database): {
         ' WHERE v.seq = (SELECT max(w.seq) FROM revisions w WHERE w.record_id = r.id) ' +
         ' ORDER BY r.created_at, r.id',
     )
-    .all() as (RecordRow & { newest_seq: number; newest_hash: string })[]
+    .iterate() as Iterable<RecordRow & { newest_seq: number; newest_hash: string }>
 
-  const stale = rows.filter((row) => {
+  const stale: (RecordRow & { newest_seq: number })[] = []
+  for (const row of rows) {
     const content = contentOf({
       kind: row.kind,
       title: row.title,
@@ -279,10 +281,12 @@ export function planStaleLedgers(sqlite: Database.Database): {
       data: decodeData(row.data),
       deletedAt: row.deleted_at,
     })
-    return versionOf(content) !== row.newest_hash
-  })
+    if (versionOf(content) === row.newest_hash) continue
+    const { newest_hash: _ignored, ...kept } = row
+    stale.push(kept)
+  }
 
-  return { tableMissing: false, records: stale.map(({ newest_hash: _ignored, ...row }) => row) }
+  return { tableMissing: false, records: stale }
 }
 
 /**

@@ -20,6 +20,7 @@ export const SHIPPED_SIDEBAR = {
       'counters',
       'checklists',
       'flows',
+      'knowledge',
       'bundles',
       'records',
     ] },

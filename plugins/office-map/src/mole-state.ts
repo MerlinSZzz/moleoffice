@@ -3,7 +3,7 @@
 import type { PixelState } from '../../../src/shared/plugin-read.ts'
 import { coherentFacts, workGroup, type Occupant, type WorkRow } from './model.ts'
 import type { Standing, StandingLook } from './appearance.ts'
-import { gaitFrame, type MovingContact } from './walks.ts'
+import { gaitFrame, SITTING_TIMING, type MovingContact } from './walks.ts'
 
 const priority: PixelState[] = ['attention', 'working', 'handoff', 'paused', 'waiting', 'unknown', 'completed']
 export const confirmed = (row: WorkRow): boolean => row.detail === 'completed' && row.runStanding === 'closed'
@@ -26,10 +26,16 @@ export const badges = {
 export function moleSprite(look: StandingLook, rows: WorkRow[], still: boolean, walk?: MovingContact, wave = false, available = true, place: 'desk' | 'play' | 'sleep' = 'desk', sleepAvailable = false): string {
   if (place === 'sleep') return sleepAvailable || look === 'tuft' ? 'sleep-' + look : 'stand-' + look
   if (still) return 'stand-' + look
+  if (walk?.phase === 'sit') return sittingSprite(look, walk.elapsed)
   if (walk) return `walk-${look}-${gaitFrame(walk.elapsed)}`
   if (wave) return 'wave-' + look
   const group = moleGroup(rows, available)
   return (group === 'handoff' ? 'carry-' : group === 'completed' ? 'cheer-' : 'stand-') + look
+}
+
+export function sittingSprite(look: string, elapsed: number): string {
+  const time = Math.max(0, elapsed)
+  return `sit-${look}${time < SITTING_TIMING.down ? '-down' : time < SITTING_TIMING.down + SITTING_TIMING.sitting ? '' : '-up'}`
 }
 
 /** Missing or incoherent reads cannot establish that an online agent is idle. */

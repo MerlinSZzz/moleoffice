@@ -19,9 +19,10 @@
  * Each agent in a terminal is a session record: its runtime, its folder, the agent it serves, the
  * provider's conversation id where the office chose one, and in `data.extra.inATerminal` which terminal
  * and which holder (pid and start time) hold it. The office files it and writes on it, because the office
- * starts the process: a session for an agent is filed only by that agent, its starters, the person with
- * their key or the office itself (lib/records.ts), and a press made while the key window is open carries no
- * key. Who pressed is kept on the record as `openedBy`, and the request is in the office's call log.
+ * starts the process: a session for an agent is filed only by that agent, an agent above it in its chain of
+ * starters, its recorded leader, the person with their key, or the office itself
+ * (lib/records/may-write.ts), and a press made while the key window is open carries no key. Who pressed is
+ * kept on the record as `openedBy`, and the request is in the office's call log.
  *
  * ---------------------------------------------------------------------------------------
  * THE KEY THIS RUN IS GIVEN, AND WHY THIS WAY
@@ -84,6 +85,10 @@
  * When a watched terminal's connection drops, the holder may be restarting, so the server asks for the
  * holder every two seconds for a minute. A holder that comes back later is noticed by the next terminal
  * door anybody uses, or by the server's next start.
+ *
+ * An agent's program is looked up in the whole environment a terminal gets. Its search path is read by
+ * `theSearchPathIn` of the system (src/config/systems/the-system.mjs): on Windows the one name that is
+ * PATH in any case, and on Linux and the Mac `PATH` alone.
  */
 
 import { randomBytes, randomUUID } from 'node:crypto'
@@ -96,12 +101,15 @@ import type { AWayBack, TerminalParty, TerminalReading } from '@shared/terminals
 import { nowStamp } from '@shared/time.ts'
 import { MESSAGE_CENTRE } from '@shared/workspaces.ts'
 import { anOpenCodeConfigWithTheFeaturesOff, CLAUDE_CODE_FEATURES_OFF, CODEX_FEATURES_OFF } from '../../config/harness-features-off.mjs'
+import { aRuntimeIsCodex, CODEX_SHELL_SNAPSHOT_OFF } from '../../config/run-permissions.mjs'
+import { theEnvironmentACodexGets } from '../../config/the-environment-a-codex-gets.mjs'
 import { THE_PROGRAM_FOR_RUNTIME, whereIsThisTool } from '../../config/runtimes.mjs'
+import { aCommandsStartValues } from '../../config/sandbox-start-values.mjs'
 import { THE_FIRST_SIZE } from '../../config/the-terminal-holder.mjs'
 import { claudeConversationIn, codexThreadIn, namesTheCodexProgram, theRecordedProcess } from '../../config/session-process.mjs'
 import { theRecordedProcessOf } from '../../config/own-rows.mjs'
 import { theProcessReader } from '../../config/process-reader.mjs'
-import { theWayBackOf } from '../../config/the-way-back.mjs'
+import { theConversationOfTheRun, theSandboxOfTheRun, theWayBackOf } from '../../config/the-way-back.mjs'
 import { sqlite } from '../db/client.ts'
 import { addressText, theAddressThisProcessAnswersOn } from './bound-address.ts'
 import { writeASystemLineToOne } from './groups.ts'
@@ -117,10 +125,11 @@ import { theAgentAnArrivingReferenceNames } from './the-agent-an-arriving-refere
 import { theChainUpWith } from '@shared/the-chain-up-with.ts'
 import { theRowAnArrivingReferenceNames } from './the-row-an-arriving-reference-names.ts'
 import { theStarterEachStringNames } from './the-starter-each-string-names.ts'
-import { runtimeOfTheAgentRecord } from '../db/read-participant.ts'
+import { harnessOfTheAgentRecord } from '../db/read-participant.ts'
 import { createRecord, getRecord, patchRecord, recordInWorkspace, recordTheOriginalRunKeyMint, replaceTheRunKeyOfAReopenedRun, type Actor } from './records.ts'
 import { PanelError } from './panel-error.ts'
-import { theNewestRunTheResumeLineShows, theRunTheResumeLineCounts } from './session-origins.ts'
+import { theNewestRunForTheResumeLine, theNewestRunTheResumeLineShows, theRunTheResumeLineCounts, theSessionsOfTheAgent } from './session-origins.ts'
+import { getWorkspace } from '../db/get-workspace.ts'
 import { isOneOf, theFiledAliasesReadOnce } from './registry-aliases/runs.ts'
 import { theReceiptAtATerminalsEnd } from './terminal-run-receipt.ts'
 import { aTerminalRefusal, askTheHolderFor, theEnvironmentATerminalGets, theHolder, watchATerminal, type HolderHello } from './terminals.ts'
@@ -128,13 +137,14 @@ import { named } from './named-timers.ts'
 import { trustTheRecordedClaudeFolder } from './terminals/claude-folder-trust.ts'
 import { makeTheAgentsOwnFolder } from './terminals/an-agents-own-folder.ts'
 import { theAgentRecordsNamingTheStartFolder } from './terminals/agent-records-naming-a-start-folder.ts'
+import type { AStartOutside } from './a-terminal-outside.ts'
 
 /** Mole Office itself, as the office's own writes on a run's record and its line to the person are signed. */
 function theOffice(): Actor { return { type: 'system', id: moleOffice().id } }
 /** The four runtimes the office opens in a terminal: the ones with a program in THE_PROGRAM_FOR_RUNTIME. */
-type OpenedRuntime = keyof typeof THE_PROGRAM_FOR_RUNTIME
+export type OpenedRuntime = keyof typeof THE_PROGRAM_FOR_RUNTIME
 
-function isOpenedRuntime(runtime: string): runtime is OpenedRuntime {
+export function isOpenedRuntime(runtime: string): runtime is OpenedRuntime {
   return Object.hasOwn(THE_PROGRAM_FOR_RUNTIME, runtime)
 }
 
@@ -211,10 +221,13 @@ function theResumeCommand(runtime: OpenedRuntime, providerSession: string | null
  * EVERY LAUNCH WITH THE HARNESS'S OWN SUBAGENTS OFF: a new conversation, a resume, the way back and a reopening after
  * the holder restarts. An agent in the office's terminal splits its work by registered office workers, which the
  * office can see, and never by the harness's own subagents, which it cannot. The switches are the one list in
- * src/config/harness-features-off.mjs, where each was read from its version.
+ * src/config/harness-features-off.mjs, where each was read from its version. A Codex launch also writes no shell
+ * snapshot, by the same constant the sandbox launcher reads; before a subcommand that switch is read from the code, not
+ * measured.
  *
  * claude-code  `--disallowedTools=<the list>`, before the conversation's own arguments.
- * codex        `--disable <feature>` for each, before the subcommand, so before `resume` as well.
+ * codex        `--disable <feature>` for each, then CODEX_SHELL_SNAPSHOT_OFF, before the subcommand, so before `resume`
+ *              as well.
  * opencode     its task tool denied in OPENCODE_CONFIG_CONTENT, merged into what the environment already holds. The
  *              terminal's environment carries no such variable from this server's, so it is the office's alone; one
  *              that is not a JSON object throws, and nothing is opened.
@@ -222,11 +235,42 @@ function theResumeCommand(runtime: OpenedRuntime, providerSession: string | null
  */
 function withTheHarnessFeaturesOff(runtime: OpenedRuntime, args: readonly string[], env: Record<string, string>): { args: string[]; env: Record<string, string> } {
   if (runtime === 'claude-code') return { args: [...CLAUDE_CODE_FEATURES_OFF, ...args], env }
-  if (runtime === 'codex') return { args: [...CODEX_FEATURES_OFF, ...args], env }
+  if (runtime === 'codex') return { args: [...CODEX_FEATURES_OFF, ...CODEX_SHELL_SNAPSHOT_OFF, ...args], env }
   if (runtime === 'opencode') {
     return { args: [...args], env: { ...env, OPENCODE_CONFIG_CONTENT: anOpenCodeConfigWithTheFeaturesOff(env['OPENCODE_CONFIG_CONTENT']) } }
   }
   return { args: [...args], env }
+}
+
+/** The model and effort a new agent is started with, as the Casting row chosen for it names them; null where it names none. */
+export interface TheChosenModel {
+  model: string | null
+  effort: string | null
+}
+
+/**
+ * THE CHOSEN MODEL AND EFFORT ON A COMMAND, with the flags and the variable the launcher and the message worker pass
+ * (`aCommandsStartValues` in src/config/sandbox-start-values.mjs). The command starts with the runtime's program name,
+ * which is how the start values tell the runtime. The model and effort answered are the start's own, the ones its flags
+ * carry, so a run's record says what its command was given and nothing else. With nothing chosen, nothing changes.
+ * A runtime the start values do not know takes no model or effort, and a chosen one throws.
+ */
+export function withTheChosenModel(
+  command: readonly string[],
+  runtime: OpenedRuntime,
+  chosen: TheChosenModel | undefined,
+): { command: string[]; env: Record<string, string>; model: string | null; effort: string | null } {
+  if (chosen === undefined || (chosen.model === null && chosen.effort === null)) return { command: [...command], env: {}, model: null, effort: null }
+  // THE START VALUES ARE JAVASCRIPT WHOSE TYPES ARE NOT CHECKED, so the part of the answer read here is typed here.
+  const given = aCommandsStartValues([...command], {
+    runtime,
+    model: chosen.model,
+    effortAnswer: { effort: chosen.effort, effortFrom: chosen.effort === null ? 'none' : 'Casting', model: chosen.model },
+  }) as unknown as { command: string[]; env: Record<string, string>; start: { model: string | null; effort: string | null } | null }
+  if (given.start === null) {
+    throw new Error(`The office passes no model or effort to ${runtime}, so it cannot be started with model ${chosen.model ?? 'none'} and effort ${chosen.effort ?? 'none'}.`)
+  }
+  return { command: given.command, env: given.env, model: given.start.model, effort: given.start.effort }
 }
 
 /** What a resume command promises, in words. */
@@ -366,9 +410,13 @@ export interface AnAgentOpened {
   says: string
 }
 
-/** The terminal's environment: what any terminal gets, and who this agent is and where its office is. */
-function theAgentsEnvironment(base: Record<string, string>, facts: { workspaceId: string; handle: string; session: string; key: string | null }): Record<string, string> {
-  return {
+/**
+ * The terminal's environment: what any terminal gets, and who this agent is and where its office is. A Codex gets only
+ * the names its list keeps (src/config/the-environment-a-codex-gets.mjs), as the last step. openTheRun, and so
+ * bringTheRunBack, and reopenOne each give their terminal this.
+ */
+function theAgentsEnvironment(runtime: OpenedRuntime, base: Record<string, string>, facts: { workspaceId: string; handle: string; session: string; key: string | null }): Record<string, string> {
+  const env = {
     ...base,
     MOLE_OFFICE_API: theOfficesAddress(),
     MOLE_OFFICE_WORKSPACE: facts.workspaceId,
@@ -376,11 +424,13 @@ function theAgentsEnvironment(base: Record<string, string>, facts: { workspaceId
     MOLE_OFFICE_SESSION: facts.session,
     ...(facts.key === null ? {} : { MOLE_AGENT_KEY: facts.key }),
   }
+  return aRuntimeIsCodex(runtime) ? theEnvironmentACodexGets(env) : env
 }
 
 /**
  * OPEN A REGISTERED AGENT IN A TERMINAL, as the person's press asks. The caller has already checked that the person
  * pressed (src/server/api/terminal-agents.ts). Every refusal below happens before anything is written or opened.
+ * A new agent's press (src/server/api/new-agent.ts) gives the model and effort chosen for it.
  */
 export async function openTheAgentInATerminal(input: {
   reference: string
@@ -389,7 +439,70 @@ export async function openTheAgentInATerminal(input: {
   actor: Actor
   cols: number
   rows: number
+  chosen?: TheChosenModel
 }): Promise<AnAgentOpened> {
+  const { agent, runtime, folder, where, program, command, base } = theAgentsStart(input)
+  return await openTheRun({
+    agent,
+    runtime,
+    folder,
+    where,
+    program,
+    args: command.args,
+    providerSession: command.providerSession,
+    base,
+    workspaceId: input.workspaceId,
+    actor: input.actor,
+    cols: input.cols,
+    rows: input.rows,
+    title: `${agent.handle} in a terminal`,
+    doing: `Works in a terminal the office holds, opened by ${atWhosePress(input.actor)}.`,
+    extra: {},
+    ...(input.chosen === undefined ? {} : { chosen: input.chosen }),
+  })
+}
+
+/**
+ * A NEW AGENT'S START IN A TERMINAL OUTSIDE THE OFFICE: what the system's own terminal is asked to run
+ * (lib/a-terminal-outside.ts). The checks, the folder, the command, the chosen model and effort and the harness
+ * switches are the ones an agent gets in the office's own terminal. The office files no run for it, because it does not
+ * hold that terminal. The variables name the agent, its project and its office, and `keyFile`, when the person's own
+ * press gave the agent a key file (lib/an-agents-key-file.ts), goes as MOLE_AGENT_KEY_FILE: the path only, never the
+ * key. The caller has checked that the person pressed (src/server/api/new-agent.ts).
+ */
+export function theAgentsStartOutside(input: { reference: string; workspaceId: string; actor: Actor; chosen?: TheChosenModel; keyFile?: string }): AStartOutside {
+  const { agent, runtime, folder, where, program, command, base } = theAgentsStart({ ...input, resume: false })
+  const chosen = withTheChosenModel([program, ...command.args], runtime, input.chosen)
+  const off = withTheHarnessFeaturesOff(runtime, chosen.command.slice(1), chosen.env)
+  return {
+    program: where,
+    args: off.args,
+    folder: trustBeforeOpening(runtime, folder, agent.id, input.workspaceId, { ...base, ...off.env }),
+    env: {
+      MOLE_OFFICE_API: theOfficesAddress(),
+      MOLE_OFFICE_WORKSPACE: input.workspaceId,
+      MOLE_OFFICE_AGENT: agent.handle,
+      ...(input.keyFile === undefined ? {} : { MOLE_AGENT_KEY_FILE: input.keyFile }),
+      ...off.env,
+    },
+    // A CODEX'S OPENER IS STARTED WITH ONLY THE NAMES ITS LIST KEEPS (runTheOpener in src/server/lib/a-terminal-outside.ts).
+    isCodex: aRuntimeIsCodex(runtime),
+  }
+}
+
+/**
+ * EVERY CHECK AN AGENT'S OPEN PRESS MAKES, THEN ITS FOLDER AND ITS COMMAND. Every refusal happens before the folder is
+ * made and recorded.
+ */
+function theAgentsStart(input: { reference: string; resume: boolean; workspaceId: string; actor: Actor }): {
+  agent: { id: string; handle: string }
+  runtime: OpenedRuntime
+  folder: string
+  where: string
+  program: string
+  command: ACommand
+  base: Record<string, string>
+} {
   const named = theAgentAnArrivingReferenceNames(input.reference, 'writing')
   if (named === null) {
     throw aTerminalRefusal('terminalAgentNotFound', `No agent answers to "${input.reference}". Nothing was opened.`, 404)
@@ -398,7 +511,9 @@ export async function openTheAgentInATerminal(input: {
   if (agent.retired) {
     throw aTerminalRefusal('terminalAgentRetired', `${agent.handle} is retired, so it was not opened in a terminal.`, 409)
   }
-  const runtime = runtimeOfTheAgentRecord(agent.id)
+  refuseWhileAnAgentRuns(agent, input.workspaceId)
+  // THE STORED WORD, any harness's: a harness the office cannot start is refused below as one it does not open.
+  const runtime = harnessOfTheAgentRecord(agent.id)
   if (runtime === null) {
     throw aTerminalRefusal(
       'terminalAgentNoRuntime',
@@ -420,7 +535,7 @@ export async function openTheAgentInATerminal(input: {
   }
   const base = theEnvironmentATerminalGets()
   const program = THE_PROGRAM_FOR_RUNTIME[runtime]
-  const where = whereIsThisTool(program, base['PATH'])
+  const where = whereIsThisTool(program, base)
   if (where === null) {
     throw aTerminalRefusal(
       'terminalAgentProgramMissing',
@@ -452,23 +567,7 @@ export async function openTheAgentInATerminal(input: {
   } else {
     command = theOpeningCommand(runtime)
   }
-  return await openTheRun({
-    agent,
-    runtime,
-    folder,
-    where,
-    program,
-    args: command.args,
-    providerSession: command.providerSession,
-    base,
-    workspaceId: input.workspaceId,
-    actor: input.actor,
-    cols: input.cols,
-    rows: input.rows,
-    title: `${agent.handle} in a terminal`,
-    doing: `Works in a terminal the office holds, opened by ${atWhosePress(input.actor)}.`,
-    extra: {},
-  })
+  return { agent: { id: agent.id, handle: agent.handle }, runtime, folder, where, program, command, base }
 }
 
 /**
@@ -578,6 +677,8 @@ export function fileATerminalsRunAndItsKey(o: {
   title: string
   doing: string
   extra: Record<string, unknown>
+  /** The model and effort the run's command was given, from `withTheChosenModel`; absent or null where it was given none. */
+  chosen?: TheChosenModel
 }): { session: string; key: string | null } {
   const proof = howThisPressProvesTheKeyItMakes(o.actor)
   const grant = o.actor.press?.underTheGrant
@@ -596,6 +697,8 @@ export function fileATerminalsRunAndItsKey(o: {
         servingAgent: o.agent.handle,
         servingAgentId: o.agent.id,
         ...(o.providerSession === null ? {} : { providerSession: o.providerSession }),
+        ...(o.chosen === undefined || o.chosen.model === null ? {} : { model: o.chosen.model }),
+        ...(o.chosen === undefined || o.chosen.effort === null ? {} : { effort: o.chosen.effort }),
         startedByMoleOffice: true,
         extra: { ...o.extra, openedBy: { type: o.actor.type, id: o.actor.id, ...(grant === undefined ? {} : { underTheGrant: grant }) } },
       },
@@ -628,10 +731,13 @@ async function openTheRun(o: {
   title: string
   doing: string
   extra: Record<string, unknown>
+  chosen?: TheChosenModel
 }): Promise<AnAgentOpened> {
   const { agent, runtime, folder, where, program } = o
   const input = o
-  const off = withTheHarnessFeaturesOff(runtime, o.args, o.base)
+  // THE ONE ANSWER THE COMMAND AND THE RUN'S RECORD ARE BOTH WRITTEN FROM, so the record says what the command was given.
+  const chosen = withTheChosenModel([program, ...o.args], runtime, o.chosen)
+  const off = withTheHarnessFeaturesOff(runtime, chosen.command.slice(1), { ...o.base, ...chosen.env })
   const base = off.env
   const command = { args: off.args, providerSession: o.providerSession }
   const folderToOpen = trustBeforeOpening(runtime, folder, agent.id, o.workspaceId, base)
@@ -641,7 +747,7 @@ async function openTheRun(o: {
   // AND SO IS A PRESS WHOSE PRESSER CANNOT BE NAMED.
   const who = whoOpensIt(o.actor)
 
-  const { session, key } = fileATerminalsRunAndItsKey({ ...o, providerSession: command.providerSession })
+  const { session, key } = fileATerminalsRunAndItsKey({ ...o, providerSession: command.providerSession, chosen: { model: chosen.model, effort: chosen.effort } })
   const giveAKey = key !== null
 
   let terminal: TerminalReading
@@ -654,7 +760,7 @@ async function openTheRun(o: {
       command: where,
       args: command.args,
       folder: folderToOpen,
-      env: theAgentsEnvironment(base, { workspaceId: input.workspaceId, handle: agent.handle, session, key }),
+      env: theAgentsEnvironment(runtime, base, { workspaceId: input.workspaceId, handle: agent.handle, session, key }),
       cols: input.cols,
       rows: input.rows,
       // ON WHEN IT OPENS, as in every terminal the person opens (decision YLv8grhgilBV, point 1).
@@ -761,14 +867,49 @@ export function theProcessOfTheRun(data: Record<string, unknown>, conversation: 
  * Whether a run's program runs now, and the sentence saying what was read: its process (theProcessOfTheRun), or the
  * office's own terminal while its record has not ended.
  */
-function whetherTheRunStillRuns(data: Record<string, unknown>, conversation: string): { running: boolean; says: string } {
+function whetherTheRunStillRuns(data: Record<string, unknown>, conversation: string | null): { running: boolean; says: string; pid: number | null } {
   const process = theProcessOfTheRun(data, conversation)
-  if (process.pid !== null) return { running: true, says: `It still runs: ${process.says}.` }
+  if (process.pid !== null) return { running: true, says: `It still runs: ${process.says}.`, pid: process.pid }
   const held = inATerminalOf(data)
   if (held !== null && !theRunHasEnded(data['state'])) {
-    return { running: true, says: `It still runs: it is in the office's terminal ${held.terminal}, and its record has not ended.` }
+    return { running: true, says: `It still runs: it is in the office's terminal ${held.terminal}, and its record has not ended.`, pid: null }
   }
-  return { running: false, says: `It does not run now: ${process.says}.` }
+  return { running: false, says: `It does not run now: ${process.says}.`, pid: null }
+}
+
+/** Refuse before making a folder or opening anything, including for a run filed in another project. */
+function refuseWhileAnAgentRuns(agent: { id: string; handle: string }, workspaceId: string): void {
+  const newest = theNewestRunForTheResumeLine(agent.id, agent.handle)
+  const others = theSessionsOfTheAgent(agent.id, agent.handle)
+    .filter((run) => run.id !== newest?.id && !theRunHasEnded(run.data['state']))
+  for (const run of [...(newest === undefined ? [] : [newest]), ...others]) {
+    const ended = theRunHasEnded(run.data['state'])
+    const sandbox = theSandboxOfTheRun(run.data)
+    const conversation = theConversationOfTheRun(run.data)
+    const still = sandbox !== null && !ended ? null : whetherTheRunStillRuns(run.data, conversation)
+    if (still !== null && !still.running) continue
+    const record = getRecord(run.id)
+    if (record === null) continue
+    if (record.workspaceId !== workspaceId) {
+      const project = getWorkspace(record.workspaceId)?.title ?? record.workspaceId
+      throw new PanelError(`A run of this agent in project ${project} still runs. Nothing was opened.`, 409, undefined, undefined, undefined,
+        { code: 'terminalAgentRunsInAnotherProject', values: { project } })
+    }
+    const wayBack = `Once that process has stopped, POST /api/terminals/agents/${agent.handle}/way-back with ${JSON.stringify({ session: run.id })} brings it back in Mole Office's terminal.`
+    if (still === null) {
+      throw new PanelError(`Run ${run.id} "${record.title}" ran in a sandbox whose record has not ended. The office cannot see whether it still runs. Nothing was opened.`, 409, undefined, undefined, undefined,
+        { code: 'terminalAgentRunsInASandbox', values: { run: record.title } })
+    }
+    const held = !ended ? inATerminalOf(run.data) : null
+    if (held !== null) {
+      throw new PanelError(`Run ${run.id} "${record.title}" is already in the office's terminal ${held.terminal}. ${still.says} Nothing was opened. ${wayBack}`, 409, undefined, undefined, undefined,
+        { code: 'terminalAgentInTheOfficesTerminal', values: { run: record.title, terminal: held.terminal } })
+    }
+    if (still.pid !== null) {
+      throw new PanelError(`Run ${run.id} "${record.title}" still runs. ${still.says} Nothing was opened. ${wayBack}`, 409, undefined, undefined, undefined,
+        { code: 'terminalAgentRunsHere', values: { run: record.title, pid: still.pid } })
+    }
+  }
 }
 
 /** A process whose arguments resume or start this claude conversation, or a codex process resuming this thread; null when none does. Any program counts for claude, so a doubt refuses the press. */
@@ -852,7 +993,7 @@ export async function bringTheRunBack(input: {
   const runtime = way.runtime
   if (!isOpenedRuntime(runtime)) throw aTerminalRefusal('wayBackNone', `${run.id} ran on ${runtime}, which the office does not open in a terminal. Nothing was opened.`, 409)
   const base = theEnvironmentATerminalGets()
-  const where = whereIsThisTool(way.program, base['PATH'])
+  const where = whereIsThisTool(way.program, base)
   if (where === null) {
     throw aTerminalRefusal(
       'terminalAgentProgramMissing',
@@ -1172,7 +1313,7 @@ async function reopenOne(session: string, hello: HolderHello): Promise<AReopenin
     if (named === null) return notBack('its session record names no agent the registry holds')
     if (named.agent.retired) return notBack(`${named.agent.handle} is retired`)
     const base = theEnvironmentATerminalGets()
-    const where = whereIsThisTool(THE_PROGRAM_FOR_RUNTIME[runtime], base['PATH'])
+    const where = whereIsThisTool(THE_PROGRAM_FOR_RUNTIME[runtime], base)
     if (where === null) return notBack(`no "${THE_PROGRAM_FOR_RUNTIME[runtime]}" is on the PATH this server gives its terminals`)
     const resumed = theResumeCommand(runtime, said(data['providerSession']))
     if ('cannot' in resumed) return notBack(resumed.cannot)
@@ -1194,7 +1335,7 @@ async function reopenOne(session: string, hello: HolderHello): Promise<AReopenin
         command: where,
         args: command.args,
         folder: folderToOpen,
-        env: theAgentsEnvironment(off.env, { workspaceId, handle: named.agent.handle, session, key }),
+        env: theAgentsEnvironment(runtime, off.env, { workspaceId, handle: named.agent.handle, session, key }),
         // THE HOLDER'S FIRST SIZE, until a page fits it.
         cols: THE_FIRST_SIZE.cols,
         rows: THE_FIRST_SIZE.rows,

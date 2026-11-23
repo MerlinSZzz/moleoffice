@@ -38,7 +38,7 @@
  *   - `protected` not recorded as decided: case 7 red.
  * And after the check of run 5OEGnN3JXrRs:
  *   - the null sentence naming only the benign case again: case 3 red, and the merge tool's origin case
- *     in tests/the-merger.test.ts with it.
+ *     with it.
  */
 
 import { spawn } from 'node:child_process'

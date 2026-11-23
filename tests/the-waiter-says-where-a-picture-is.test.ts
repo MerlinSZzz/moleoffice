@@ -41,7 +41,7 @@ import type { FastifyInstance } from 'fastify'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { THE_PERSON } from '../src/shared/person.ts'
-import { apiApp, freshDb, type TestDb } from './helpers.ts'
+import { apiApp, freshDb, aTestAgentsKeyEnvironment, type TestDb } from './helpers.ts'
 
 /** A one pixel png, so what the message points at is a real picture rather than bytes called one. */
 const A_REAL_PNG = Buffer.from(
@@ -60,6 +60,7 @@ const AS_THE_OWNER = {
 let t: TestDb
 let app: FastifyInstance
 let api: string
+let keyEnv: NodeJS.ProcessEnv = {}
 let agentId = ''
 let session = ''
 let ours = ''
@@ -84,13 +85,7 @@ beforeAll(async () => {
   await app.listen({ host: '127.0.0.1', port: 0 })
   api = `http://127.0.0.1:${String((app.server.address() as AddressInfo).port)}`
 
-  t.api.createRecord({
-    workspaceId: 'default',
-    kind: 'agent',
-    title: 'Woken',
-    data: { handle: 'woken', runtime: 'claude-code', state: 'active' },
-    actor: { type: 'human', id: THE_PERSON },
-  })
+  keyEnv = await aTestAgentsKeyEnvironment(app, 'woken', dirname(t.file))
   session = t.api.createRecord({
     workspaceId: 'default',
     kind: 'session',
@@ -139,7 +134,7 @@ function startTheWaiter(): { child: ChildProcess; said: () => string; ended: Pro
       '--runtime',
       'claude-code',
     ],
-    { env: { ...process.env, MOLE_OFFICE_HANDLE_BEAT_SECONDS: '1', MOLE_OFFICE_HANDLE_LAPSES_AFTER_SECONDS: '30' } },
+    { env: { ...keyEnv, MOLE_OFFICE_HANDLE_BEAT_SECONDS: '1', MOLE_OFFICE_HANDLE_LAPSES_AFTER_SECONDS: '30' } },
   )
   started.push(child)
   let printed = ''

@@ -38,7 +38,9 @@
  * did for drizzle. Why both, and which is which, is written once, in src/config/migration-look.mjs,
  * whose `theMigrationsNotYetApplied` this command, the dev supervisor and the backup all ask. (So
  * EDITING A MIGRATION FROM 0212 ON AFTER IT HAS LANDED RUNS IT AGAIN, because its hash changes. Worth
- * knowing before trying to fix a migration by editing it: write a new one.) That is the whole
+ * knowing before trying to fix a migration by editing it: write a new one.) A migration file the
+ * public version changed also counts as applied under the hash it had before the change, which a
+ * list beside the journal gives; that rule is in the same file. That is the whole
  * mechanism, and it is why `ALTER TABLE ... ADD COLUMN` is safe to have in a migration even though
  * SQLite has no `ADD COLUMN IF NOT EXISTS`. The whole run is one transaction, so a migration that
  * fails half way leaves the database as it was.
@@ -95,6 +97,10 @@
  * anything: `previewMigration` calls `migrateInPlace`, so a migration added to one is seen by the
  * other, and there is no list anywhere of which migrations are dangerous.
  *
+ * WITH NO MIGRATION PENDING, A START MAKES NO COPY. It runs the same data steps (`everyDataStepIn`) on the served file
+ * itself, inside one transaction that is always rolled back, and judges from what the steps report and from two counts
+ * SQLite keeps; see `measureOnThisFile`.
+ *
  * ---------------------------------------------------------------------------------------
  * WHY THE WORK IS IN AN EXPORTED FUNCTION AND THE SCRIPT IS FOUR LINES AT THE BOTTOM
  * ---------------------------------------------------------------------------------------
@@ -138,6 +144,10 @@ import {
 // The one place that knows how to write a moment down. Local wall clock, never UTC, because a day
 // here has to mean the operator's day — see src/shared/time.ts.
 import { nowStamp } from '@shared/time.ts'
+// HOW THE START MEASURED, in the type the update page reads it in.
+import type { TheUpdateOffer } from '@shared/the-update.ts'
+// Open while the data steps run on the served file in a transaction this rolls back; `whenStored` reads it.
+import { THE_ROLLED_BACK_RUN } from './told-when-stored.ts'
 // The recorder and its guarded monotonic clock are shared with the migrations check's timing line.
 import { readMonotonicClock, type MigrationsCheckTiming } from '../lib/start-steps.ts'
 import { enWave14c } from '../../shared/words/en-wave-14c.ts'
@@ -145,12 +155,11 @@ import { enWave14c } from '../../shared/words/en-wave-14c.ts'
 // what it cost when this file kept its own copy of that list.
 import {
   DERIVED_TABLES,
-  everyPartTable,
-  irreplaceableTablesWithParts,
   MEASURED_TABLES,
   MIGRATION_DECLARED_TABLES,
   RECORD_TEXT_INDEX_TABLES,
 } from './schema.ts'
+import { everyPartTable, irreplaceableTablesWithParts } from './every-part-table.ts'
 import { migrateBlocks, type BlockMigrationReport } from './blocks-migration.ts'
 import { migrateOrigins, type OriginMigrationReport } from './origin-migration.ts'
 import { migrateSealCopiesToPointers, type SealRewriteReport } from './seal-copies-to-pointers.ts'
@@ -903,10 +912,15 @@ function applyTheSchemaMigrations(sqlite: Database.Database, migrations: FolderM
  * `reviewsBroughtForward` is the local name the step has always had; `reviews` is what the outcome
  * calls it. Renamed here rather than at the return, so the mapping is written once.
  */
-type DataSteps = Omit<
+type DataSteps = Omit<MigrationOutcome, keyof AroundTheSteps | 'reviews'> & {
+  reviewsBroughtForward: MigrationOutcome['reviews']
+}
+
+/** The seven fields of an outcome worked out around the transaction rather than by a step in it. */
+type AroundTheSteps = Pick<
   MigrationOutcome,
-  'file' | 'at' | 'before' | 'after' | 'alreadyApplied' | 'newlyApplied' | 'heldTheWriteLockMs' | 'reviews'
-> & { reviewsBroughtForward: MigrationOutcome['reviews'] }
+  'file' | 'at' | 'before' | 'after' | 'alreadyApplied' | 'newlyApplied' | 'heldTheWriteLockMs'
+>
 
 /**
  * EVERY PART OF THE MIGRATIONS CHECK THE SECOND START LINE MAY NAME, in words that hold no path.
@@ -920,7 +934,9 @@ export const THE_MIGRATIONS_CHECK_PARTS = {
   theFileIsIntact: 'checking the file is intact',
   theFileMigratedInPlace: 'migrating the file in place',
   theIntegrityStarted: 'starting the integrity check beside the preview',
+  thePendingRead: 'reading which migrations are pending',
   theLeftoversRemoved: 'removing copies an earlier preview left',
+  theStepsRolledBack: 'running the data steps on the file and rolling them back',
   theFileCopied: 'copying the file',
   theCopyHeldInMemory: 'copying into memory',
   theJournalModeSet: "setting the copy's journal mode",
@@ -1097,301 +1113,9 @@ export function migrateInPlace(
   // The nested `sqlite.transaction(...)` each step already opens becomes a SAVEPOINT inside this
   // one, which is better-sqlite3's own behaviour and is why no step had to change.
   //
-  /**
-   * BEGIN AND END ONE DATA STEP UNDER ITS OWN NAME FROM `THE_STEPS`. They are called before and after the step, never
-   * around it, so a step that throws leaves the stack it left before timing existed. A field the table does not name
-   * is run untimed rather than given words typed here.
-   */
-  const beginStep = (field: keyof MigrationOutcome): void => beginPart(timing, theStepName(field))
-  const endStep = (field: keyof MigrationOutcome): void => endPart(timing, theStepName(field))
-
-  // THE SCHEMA MIGRATIONS ARE IN HERE TOO, since 10 October 2026. Before, drizzle's migrator applied and journaled them
-  // in a transaction of its own, so a data step that refused left the schema half of a landing in the file without the
-  // code that goes with it. Now a refusal leaves neither.
-  const everyDataStep = sqlite.transaction((): DataSteps => {
-    // THE TAGS THIS RUN APPLIED, for the one step below that must run only in the run that applies its migration.
-    beginPart(timing, THE_MIGRATIONS_CHECK_PARTS.theSchemaMigrationsApplied)
-    const applied = applyTheSchemaMigrations(sqlite, migrations)
-    endPart(timing, THE_MIGRATIONS_CHECK_PARTS.theSchemaMigrationsApplied)
-
-    // FIRST, because the steps below may insert change rows, and migration 0194's trigger numbers each
-    // new row after the highest number in the table. The rows already here take their numbers first.
-    beginStep('appendOrder')
-    const appendOrder = migrateAppendOrder(sqlite)
-    endStep('appendOrder')
-
-    // The DATA migration runs after the SCHEMA migrations, because it writes rows into tables that
-    // 0003 may just have created. It is its own transaction and it refuses rather than half-applying;
-    // a refusal throws here, before the counts are compared, and nothing it would have written exists.
-    beginStep('blocks')
-    const blocks = migrateBlocks(drizzle(sqlite), sqlite)
-    endStep('blocks')
-
-    // THE ORDER OF THE THREE DATA MIGRATIONS IS A FACT ABOUT WHAT THEY READ, not a preference.
-    //
-    // The block migration runs first because it CREATES records, and the origin stamp has to see the
-    // corpus it is stamping. The origin stamp runs before the blocked_by move because the move
-    // rewrites `records.data` and the stamp reads `id`, `kind` and `title` — so if that ever changed,
-    // it would be this comment that was wrong rather than the behaviour that was surprising.
-    // WINDOW B, STEP A — THE DURABLE IDENTITIES, and it is here rather than lower for the same reason
-    // the block migration is first: it CREATES records, and the origin stamp below has to see the
-    // corpus it is stamping. Without this position a minted agent would carry `origin` NULL and be
-    // drawn as "Nobody said where this record came from" beside a summary saying exactly where it
-    // came from. It writes `origin = 'authored'` itself as well, so the two are belt and braces.
-    beginStep('agentIdentities')
-    const agentIdentities = migrateAgentIdentities(sqlite, countIdentities(sqlite))
-    endStep('agentIdentities')
-
-    beginStep('origin')
-    const origin = migrateOrigins(sqlite)
-    endStep('origin')
-    beginStep('blockedBy')
-    const blockedBy = migrateBlockedBy(sqlite)
-    endStep('blockedBy')
-
-    // ------------------------------------------------------ THE THREE STEPS THAT MUST BE ABOVE THE
-    // REVISION LEDGER, and being above it is the whole of how they keep it.
-    //
-    // `migrateRevisions` has TWO acts (./revision-backfill.ts): it writes baselines, and it CATCHES UP
-    // every record whose newest revision no longer hashes to what the row holds. A step that rewrites
-    // `records.data` therefore has two options and no third — run above that pass, or restamp itself.
-    // Measured on a copy of the owner's corpus: with `data.state` removed from the owner's comments BELOW this
-    // pass, the report said `caughtUp` and `prepareToServe` REFUSED TO SERVE. Above it, the catch-up
-    // happens inside the same run and the boot afterwards serves.
-
-    // WINDOW B, STEP B — `session.data.agent` becomes `session.data.runtime`. 92 records on the owner's
-    // corpus, no value changed, and the catch-up revision each one needs is written below.
-    beginStep('sessionRuntime')
-    const sessionRuntime = migrateSessionRuntime(sqlite, countSessionRuntime(sqlite))
-    endStep('sessionRuntime')
-
-    // WINDOW B — THE ANNOTATION STATE KEY, act one of two.
-    //
-    // THE WORDS ARE READ HERE, BEFORE THE KEY IS TAKEN OFF, AND HANDED TO ACT TWO FURTHER DOWN. Act
-    // two decides from the stored word; act one deletes it and restamps the one revision that held it.
-    // On a corpus where any comment's word says its words went out and nothing else holds that fact,
-    // act one REFUSES rather than running first — so this read is what lets the plan's ordering stand
-    // at all. See the header of ./annotation-state.ts.
-    const theStoredWords = readTheStoredWords(sqlite)
-    beginStep('annotationStateKey')
-    const annotationStateKey = migrateAnnotationStateActOne(sqlite, countAnnotationState(sqlite))
-    endStep('annotationStateKey')
-
-    // WINDOW B — THE BLOCK RETITLE, before `migrateWorkspaces` reads the workspace of every record.
-    // It restamps its own revisions, so it holds the ledger rule by the other end.
-    beginStep('blockIdentity')
-    const blockIdentity = migrateBlockIdentity(sqlite, planBlockIdentity(sqlite).counts)
-    endStep('blockIdentity')
-
-    // LAST, because it reads the workspace of every record and copies it onto everything that names
-    // one. Anything that CREATES a record has to have run already or the new rows would be behind no
-    // boundary — the block migration above creates block records, and a block belongs to the project
-    // its pipeline is in.
-    beginStep('workspaces')
-    const workspaces = migrateWorkspaces(sqlite)
-    endStep('workspaces')
-
-    // ABOVE THE LEDGER PASS, because it rewrites `records.data` of every seal that still holds
-    // copies and the pass must take its baseline AFTER that rewrite, so the newest revision of a
-    // rewritten seal is what the record now holds. Nothing above it writes a `sealed_tip`: seals
-    // are written by the server when a run finishes, never by a migration. It is the data half of
-    // migration 0154: the SQL half converted the baselines table and dropped `submission_events`
-    // while that table was still there to read, and this half rewrites the seals, which needs
-    // sha256 and therefore cannot be SQL.
-    beginStep('sealPointers')
-    const sealPointers = migrateSealCopiesToPointers(sqlite)
-    endStep('sealPointers')
-
-    // READ ONLY IN A --remint RUN, AND JUST BEFORE THE LEDGER PASS FILLS THEM: every record with no
-    // revision, and every record whose newest revision does not hold what it holds. The re-mint at
-    // the end refuses with them, so a --remint run that re-mints writes no catch-up or baseline
-    // revision; one that finds the map already applied re-mints nothing and is a plain migrate. See
-    // ./remint-migration.ts.
-    const ledgerGaps = staged === null ? [] : theGapsInTheLedger(sqlite)
-
-    // LAST OF ALL, because every migration above it changes what a record holds and one of them
-    // creates records. A baseline revision claims to hold what the record contains, so it has to be
-    // taken when nothing else is going to move afterwards.
-    beginStep('revisions')
-    const revisions = migrateRevisions(sqlite)
-    endStep('revisions')
-
-    // AFTER ALL OF THEM, and it reads none of what they wrote: it moves what a COMMENT points at into
-    // the shape round eight stores, in `agent_messages` alone. See ./context-migration.ts.
-    beginStep('contexts')
-    const contexts = migrateContexts(sqlite)
-    endStep('contexts')
-
-    // LAST, AND AFTER THE CONTEXTS, because it reads what a comment points at to find where a review
-    // was started from — and it can only read the round-eight shape the line above writes. See
-    // ./review-migration.ts.
-    beginStep('reviews')
-    const reviewsBroughtForward = migrateReviews(sqlite)
-    endStep('reviews')
-
-    // ------------------------------------------------------------- THE REST OF WINDOW B, BELOW THE
-    // LEDGER PASS, where each step that rewrites `records.data` RESTAMPS instead.
-
-    // Act two of the annotation-state step. It reads `agent_messages` — which is why it is above the
-    // dispatch backfill, whose whole job is writing that table — and it writes no `records.data`, so
-    // the ledger rule does not reach it. The words it is given are the ones read above, before act one
-    // took them off the records.
-    beginStep('annotationMarkers')
-    const annotationMarkers = migrateAnnotationStateActTwo(sqlite, theStoredWords, countDispatch(sqlite))
-    endStep('annotationMarkers')
-
-    // WINDOW B, STEP C — the moments and the recipients on `agent_messages`, and `agent_runs.agent_id`.
-    beginStep('agentDispatch')
-    const agentDispatch = migrateAgentDispatch(sqlite, countDispatchBackfill(sqlite))
-    endStep('agentDispatch')
-
-    // `module.data.claims` into `implementation_map`. It restamps its own 15 revisions.
-    beginStep('moduleClaims')
-    const moduleClaims = migrateModuleClaims(sqlite, countModuleClaims(sqlite))
-    endStep('moduleClaims')
-
-    // The reading-measure words, renamed once. It restamps the newest revision of each record it
-    // rewrites, so it may sit anywhere below the ledger pass; it reads nothing another step writes.
-    beginStep('measureWords')
-    const measureWords = migrateMeasureWords(sqlite)
-    endStep('measureWords')
-
-    // Every review's `reach`, and THEN the partial unique index, so a corpus already holding two
-    // project-wide reviews collecting fails loudly rather than being silently narrowed.
-    beginStep('reviewsReach')
-    const reviewsReach = migrateReviewsReach(sqlite, countReachShapes(sqlite))
-    endStep('reviewsReach')
-
-    // LAST OF ALL, because it reads what `migrateContexts` and `migrateReviews` wrote and can only
-    // read the shape they leave. It cannot move above the ledger pass, so it restamps.
-    beginStep('regions')
-    const regions = migrateContextsToRegions(sqlite, countOldShapes(sqlite))
-    endStep('regions')
-
-    // AFTER EVERYTHING, because it reads the records of kind `agent` and `migrateAgentIdentities`
-    // above CREATES some. Running it earlier would leave an agent minted by this same command with no
-    // registry row, and nothing would say so. It writes no `records.data`, so the revision ledger's
-    // rule does not reach it and it needs no restamp.
-    beginStep('participants')
-    const participants = migrateParticipants(sqlite)
-    endStep('participants')
-    beginStep('pixelScale')
-    const pixelScale = migratePixelScale(sqlite)
-    endStep('pixelScale')
-
-    // AFTER `migrateParticipants`, because it looks each message's writer up in the two registries
-    // that step fills. Running it earlier would find no registry rows and leave every message
-    // without a sender, which is exactly what this step is here to avoid saying wrongly.
-    beginStep('messageDelivery')
-    const messageDelivery = migrateMessageDelivery(sqlite)
-    endStep('messageDelivery')
-
-    // AFTER `migrateParticipants` TOO, and for the same reason turned around: it gives a home world
-    // to every row of the two registries, so a row that step is about to write would be left without
-    // one if this ran first. Criterion C1 of design/messages/ACCEPTANCE.md section 8.
-    beginStep('citizenship')
-    const citizenship = migrateCitizenship(sqlite)
-    endStep('citizenship')
-
-    // BELOW THE REVISION PASS, because it writes its own revision for each run it changes, as the
-    // office. It reads each run's first revision, which the pass never changes, and it creates no
-    // record, so nothing above needs to see what it writes. See ./secretary-runs-need-no-check.ts.
-    beginStep('secretaryRuns')
-    const secretaryRuns = markSecretaryRunsAsNeedingNoCheck(sqlite)
-    endStep('secretaryRuns')
-
-    // BELOW THE REVISION PASS AND AFTER `migrateMessageDelivery`, because it writes its own revision for each message it
-    // moves, as the office, and moves messages that step may have just given a sender. See ./message-centre-migration.ts.
-    beginStep('messageCentre')
-    const messageCentre = moveMessagesIntoTheMessageCentre(sqlite)
-    endStep('messageCentre')
-
-    // LAST, AND IT READS NOTHING ANOTHER STEP WRITES. It moves each rough draft into `plans` and `plan_lines`, which
-    // no other step touches, writes no record, no change row and no revision, so the ledger pass has nothing to say
-    // about it. See ./drafts-into-plans-migration.ts.
-    beginStep('roughDrafts')
-    const roughDrafts = moveDraftsIntoPlans(sqlite)
-    endStep('roughDrafts')
-
-    // BELOW THE REVISION PASS, because it writes its own revision for each run it changes, as the office. It reads
-    // only `data.toolUses`, which no step above writes. See ./tool-uses-migration.ts.
-    beginStep('toolUses')
-    const toolUses = moveToolUsesIntoTheirTable(sqlite)
-    endStep('toolUses')
-
-    // ONLY IN THE RUN THAT APPLIES 0253, and it reads and writes only `agent_runs` and `held_keys`, which no step above
-    // writes. It writes no record, so the ledger pass has nothing to say about it. See ./withdraw-review-runs-migration.ts.
-    beginStep('reviewRunsWithdrawn')
-    const reviewRunsWithdrawn = withdrawTheRunsASentReviewLeftWaiting(sqlite, applied)
-    endStep('reviewRunsWithdrawn')
-
-    // ONLY IN THE RUN THAT APPLIES 0311. It writes only the four kind columns 0311 added, which no step above reads or
-    // writes, and reads the registries, which no step above changes in that run. It writes no record, so the ledger
-    // pass has nothing to say about it. See ./kinds-beside-ids-migration.ts.
-    beginStep('kindsBesideIds')
-    const kindsBesideIds = tellTheKindsBesideTheIds(sqlite, applied)
-    endStep('kindsBesideIds')
-    beginStep('agentOwners')
-    const agentOwners = setTheOldAgentsOwners(sqlite, applied)
-    endStep('agentOwners')
-
-    // ONLY IN THE RUN THAT APPLIES 0318, and it reads and writes only `casting_rows` and `casting_row_changes`, which no
-    // step above writes. It writes no record, so the ledger pass has nothing to say about it. See
-    // ./casting-work-groups-migration.ts.
-    beginStep('castingWorkGroups')
-    const castingWorkGroups = setTheCastingWorkGroups(sqlite, applied)
-    endStep('castingWorkGroups')
-
-    // ONLY IN THE RUN THAT APPLIES 0349, after the work groups, which it reads. It reads and writes only the Casting
-    // tables, which no other step writes. It writes no record, so the ledger pass has nothing to say about it. See
-    // ./casting-labels-migration.ts.
-    beginStep('castingLabels')
-    const castingLabels = makeTheFirstCastingLabels(sqlite, applied)
-    endStep('castingLabels')
-
-    // LAST, AND ALONE: it refuses a run that applied a migration, and it runs after every step above, which have
-    // nothing to do on a store that is up to date. Given no staged map it reads and writes nothing. It writes no record,
-    // so the ledger pass has nothing to say about it. See ./remint-migration.ts.
-    beginStep('remint')
-    const remint = applyTheStagedRemint(sqlite, staged, applied, ledgerGaps)
-    endStep('remint')
-
-    return {
-      appendOrder,
-      blocks,
-      agentIdentities,
-      origin,
-      blockedBy,
-      sessionRuntime,
-      annotationStateKey,
-      blockIdentity,
-      workspaces,
-      revisions,
-      contexts,
-      reviewsBroughtForward,
-      annotationMarkers,
-      agentDispatch,
-      moduleClaims,
-      measureWords,
-      reviewsReach,
-      regions,
-      pixelScale,
-      participants,
-      messageDelivery,
-      citizenship,
-      sealPointers,
-      secretaryRuns,
-      messageCentre,
-      roughDrafts,
-      toolUses,
-      reviewRunsWithdrawn,
-      kindsBesideIds,
-      agentOwners,
-      castingWorkGroups,
-      castingLabels,
-      remint,
-    }
-  })
+  // THE STEPS THEMSELVES ARE IN `everyDataStepIn`, the one list of them, which a start with no migration pending also
+  // runs on the served file and rolls back (`runTheStepsAndRollThemBack`).
+  const everyDataStep = sqlite.transaction((): DataSteps => everyDataStepIn(sqlite, migrations, staged, timing))
 
   // THE REFUSAL IS RE-STATED WITH WHAT REALLY HAPPENED, and this is the other half of the repair.
   // Rolling back is not enough on its own: the step's own sentence says "Nothing was written",
@@ -1433,41 +1157,6 @@ export function migrateInPlace(
         'nothing was lost. Fix what the refusal above asks for and run this again.',
     )
   }
-  const {
-    appendOrder,
-    blocks,
-    agentIdentities,
-    origin,
-    blockedBy,
-    sessionRuntime,
-    annotationStateKey,
-    blockIdentity,
-    workspaces,
-    revisions,
-    contexts,
-    reviewsBroughtForward,
-    annotationMarkers,
-    agentDispatch,
-    moduleClaims,
-    measureWords,
-    reviewsReach,
-    regions,
-    pixelScale,
-    participants,
-    messageDelivery,
-    citizenship,
-    sealPointers,
-    secretaryRuns,
-    messageCentre,
-    roughDrafts,
-    toolUses,
-    reviewRunsWithdrawn,
-    kindsBesideIds,
-    agentOwners,
-    castingWorkGroups,
-    castingLabels,
-    remint,
-  } = steps
 
   // Counted under the lock, so `after - before` is this command's work and nobody else's. Then it commits.
   let after: RowCounts
@@ -1532,7 +1221,7 @@ export function migrateInPlace(
   }
   // THE ROUGH DRAFTS, the second declared removal: a draft leaves `planning_drafts` only by becoming a plan in this
   // same transaction, and the table goes only when the move found it empty. See `whatTheDraftsLost`.
-  const draftsLost = whatTheDraftsLost({ before, after, roughDrafts })
+  const draftsLost = whatTheDraftsLost({ before, after, roughDrafts: steps.roughDrafts })
   if (draftsLost !== null) lost.push(draftsLost)
   if (lost.length > 0) {
     throw new Error(
@@ -1545,9 +1234,361 @@ export function migrateInPlace(
     )
   }
 
+  return theOutcomeOf({ file, at: nowStamp(), before, after, alreadyApplied, newlyApplied, heldTheWriteLockMs }, steps)
+}
+
+/**
+ * EVERY DATA STEP, AND THE SCHEMA MIGRATIONS FIRST, IN ORDER, inside whatever transaction the caller holds open. This
+ * is the one list of the steps: `migrateInPlace` runs it and commits, and a start with no migration pending runs it on
+ * the served file and rolls it back (`runTheStepsAndRollThemBack`).
+ */
+function everyDataStepIn(
+  sqlite: Database.Database,
+  migrations: FolderMigration[],
+  staged: StagedRemint | null,
+  timing: MigrationsCheckTiming | null,
+): DataSteps {
+  /**
+   * BEGIN AND END ONE DATA STEP UNDER ITS OWN NAME FROM `THE_STEPS`. They are called before and after the step, never
+   * around it, so a step that throws leaves the stack it left before timing existed. A field the table does not name
+   * is run untimed rather than given words typed here.
+   */
+  const beginStep = (field: keyof MigrationOutcome): void => beginPart(timing, theStepName(field))
+  const endStep = (field: keyof MigrationOutcome): void => endPart(timing, theStepName(field))
+
+  // THE SCHEMA MIGRATIONS ARE IN HERE TOO, since 10 October 2026. Before, drizzle's migrator applied and journaled them
+  // in a transaction of its own, so a data step that refused left the schema half of a landing in the file without the
+  // code that goes with it. Now a refusal leaves neither.
+
+  // THE TAGS THIS RUN APPLIED, for the one step below that must run only in the run that applies its migration.
+  beginPart(timing, THE_MIGRATIONS_CHECK_PARTS.theSchemaMigrationsApplied)
+  const applied = applyTheSchemaMigrations(sqlite, migrations)
+  endPart(timing, THE_MIGRATIONS_CHECK_PARTS.theSchemaMigrationsApplied)
+
+  // FIRST, because the steps below may insert change rows, and migration 0194's trigger numbers each
+  // new row after the highest number in the table. The rows already here take their numbers first.
+  beginStep('appendOrder')
+  const appendOrder = migrateAppendOrder(sqlite)
+  endStep('appendOrder')
+
+  // The DATA migration runs after the SCHEMA migrations, because it writes rows into tables that
+  // 0003 may just have created. It is its own transaction and it refuses rather than half-applying;
+  // a refusal throws here, before the counts are compared, and nothing it would have written exists.
+  beginStep('blocks')
+  const blocks = migrateBlocks(drizzle(sqlite), sqlite)
+  endStep('blocks')
+
+  // THE ORDER OF THE THREE DATA MIGRATIONS IS A FACT ABOUT WHAT THEY READ, not a preference.
+  //
+  // The block migration runs first because it CREATES records, and the origin stamp has to see the
+  // corpus it is stamping. The origin stamp runs before the blocked_by move because the move
+  // rewrites `records.data` and the stamp reads `id`, `kind` and `title` — so if that ever changed,
+  // it would be this comment that was wrong rather than the behaviour that was surprising.
+  // WINDOW B, STEP A — THE DURABLE IDENTITIES, and it is here rather than lower for the same reason
+  // the block migration is first: it CREATES records, and the origin stamp below has to see the
+  // corpus it is stamping. Without this position a minted agent would carry `origin` NULL and be
+  // drawn as "Nobody said where this record came from" beside a summary saying exactly where it
+  // came from. It writes `origin = 'authored'` itself as well, so the two are belt and braces.
+  beginStep('agentIdentities')
+  const agentIdentities = migrateAgentIdentities(sqlite, countIdentities(sqlite))
+  endStep('agentIdentities')
+
+  beginStep('origin')
+  const origin = migrateOrigins(sqlite)
+  endStep('origin')
+  beginStep('blockedBy')
+  const blockedBy = migrateBlockedBy(sqlite)
+  endStep('blockedBy')
+
+  // ------------------------------------------------------ THE THREE STEPS THAT MUST BE ABOVE THE
+  // REVISION LEDGER, and being above it is the whole of how they keep it.
+  //
+  // `migrateRevisions` has TWO acts (./revision-backfill.ts): it writes baselines, and it CATCHES UP
+  // every record whose newest revision no longer hashes to what the row holds. A step that rewrites
+  // `records.data` therefore has two options and no third — run above that pass, or restamp itself.
+  // Measured on a copy of the owner's corpus: with `data.state` removed from the owner's comments BELOW this
+  // pass, the report said `caughtUp` and `prepareToServe` REFUSED TO SERVE. Above it, the catch-up
+  // happens inside the same run and the boot afterwards serves.
+
+  // WINDOW B, STEP B — `session.data.agent` becomes `session.data.runtime`. 92 records on the owner's
+  // corpus, no value changed, and the catch-up revision each one needs is written below.
+  beginStep('sessionRuntime')
+  const sessionRuntime = migrateSessionRuntime(sqlite, countSessionRuntime(sqlite))
+  endStep('sessionRuntime')
+
+  // WINDOW B — THE ANNOTATION STATE KEY, act one of two.
+  //
+  // THE WORDS ARE READ HERE, BEFORE THE KEY IS TAKEN OFF, AND HANDED TO ACT TWO FURTHER DOWN. Act
+  // two decides from the stored word; act one deletes it and restamps the one revision that held it.
+  // On a corpus where any comment's word says its words went out and nothing else holds that fact,
+  // act one REFUSES rather than running first — so this read is what lets the plan's ordering stand
+  // at all. See the header of ./annotation-state.ts.
+  const theStoredWords = readTheStoredWords(sqlite)
+  beginStep('annotationStateKey')
+  const annotationStateKey = migrateAnnotationStateActOne(sqlite, countAnnotationState(sqlite))
+  endStep('annotationStateKey')
+
+  // WINDOW B — THE BLOCK RETITLE, before `migrateWorkspaces` reads the workspace of every record.
+  // It restamps its own revisions, so it holds the ledger rule by the other end.
+  beginStep('blockIdentity')
+  const blockIdentity = migrateBlockIdentity(sqlite, planBlockIdentity(sqlite).counts)
+  endStep('blockIdentity')
+
+  // LAST, because it reads the workspace of every record and copies it onto everything that names
+  // one. Anything that CREATES a record has to have run already or the new rows would be behind no
+  // boundary — the block migration above creates block records, and a block belongs to the project
+  // its pipeline is in.
+  beginStep('workspaces')
+  const workspaces = migrateWorkspaces(sqlite)
+  endStep('workspaces')
+
+  // ABOVE THE LEDGER PASS, because it rewrites `records.data` of every seal that still holds
+  // copies and the pass must take its baseline AFTER that rewrite, so the newest revision of a
+  // rewritten seal is what the record now holds. Nothing above it writes a `sealed_tip`: seals
+  // are written by the server when a run finishes, never by a migration. It is the data half of
+  // migration 0154: the SQL half converted the baselines table and dropped `submission_events`
+  // while that table was still there to read, and this half rewrites the seals, which needs
+  // sha256 and therefore cannot be SQL.
+  beginStep('sealPointers')
+  const sealPointers = migrateSealCopiesToPointers(sqlite)
+  endStep('sealPointers')
+
+  // READ ONLY IN A --remint RUN, AND JUST BEFORE THE LEDGER PASS FILLS THEM: every record with no
+  // revision, and every record whose newest revision does not hold what it holds. The re-mint at
+  // the end refuses with them, so a --remint run that re-mints writes no catch-up or baseline
+  // revision; one that finds the map already applied re-mints nothing and is a plain migrate. See
+  // ./remint-migration.ts.
+  const ledgerGaps = staged === null ? [] : theGapsInTheLedger(sqlite)
+
+  // LAST OF ALL, because every migration above it changes what a record holds and one of them
+  // creates records. A baseline revision claims to hold what the record contains, so it has to be
+  // taken when nothing else is going to move afterwards.
+  beginStep('revisions')
+  const revisions = migrateRevisions(sqlite)
+  endStep('revisions')
+
+  // AFTER ALL OF THEM, and it reads none of what they wrote: it moves what a COMMENT points at into
+  // the shape round eight stores, in `agent_messages` alone. See ./context-migration.ts.
+  beginStep('contexts')
+  const contexts = migrateContexts(sqlite)
+  endStep('contexts')
+
+  // LAST, AND AFTER THE CONTEXTS, because it reads what a comment points at to find where a review
+  // was started from — and it can only read the round-eight shape the line above writes. See
+  // ./review-migration.ts.
+  beginStep('reviews')
+  const reviewsBroughtForward = migrateReviews(sqlite)
+  endStep('reviews')
+
+  // ------------------------------------------------------------- THE REST OF WINDOW B, BELOW THE
+  // LEDGER PASS, where each step that rewrites `records.data` RESTAMPS instead.
+
+  // Act two of the annotation-state step. It reads `agent_messages` — which is why it is above the
+  // dispatch backfill, whose whole job is writing that table — and it writes no `records.data`, so
+  // the ledger rule does not reach it. The words it is given are the ones read above, before act one
+  // took them off the records.
+  beginStep('annotationMarkers')
+  const annotationMarkers = migrateAnnotationStateActTwo(sqlite, theStoredWords, countDispatch(sqlite))
+  endStep('annotationMarkers')
+
+  // WINDOW B, STEP C — the moments and the recipients on `agent_messages`, and `agent_runs.agent_id`.
+  beginStep('agentDispatch')
+  const agentDispatch = migrateAgentDispatch(sqlite, countDispatchBackfill(sqlite))
+  endStep('agentDispatch')
+
+  // `module.data.claims` into `implementation_map`. It restamps its own 15 revisions.
+  beginStep('moduleClaims')
+  const moduleClaims = migrateModuleClaims(sqlite, countModuleClaims(sqlite))
+  endStep('moduleClaims')
+
+  // The reading-measure words, renamed once. It restamps the newest revision of each record it
+  // rewrites, so it may sit anywhere below the ledger pass; it reads nothing another step writes.
+  beginStep('measureWords')
+  const measureWords = migrateMeasureWords(sqlite)
+  endStep('measureWords')
+
+  // Every review's `reach`, and THEN the partial unique index, so a corpus already holding two
+  // project-wide reviews collecting fails loudly rather than being silently narrowed.
+  beginStep('reviewsReach')
+  const reviewsReach = migrateReviewsReach(sqlite, countReachShapes(sqlite))
+  endStep('reviewsReach')
+
+  // LAST OF ALL, because it reads what `migrateContexts` and `migrateReviews` wrote and can only
+  // read the shape they leave. It cannot move above the ledger pass, so it restamps.
+  beginStep('regions')
+  const regions = migrateContextsToRegions(sqlite, countOldShapes(sqlite))
+  endStep('regions')
+
+  // AFTER EVERYTHING, because it reads the records of kind `agent` and `migrateAgentIdentities`
+  // above CREATES some. Running it earlier would leave an agent minted by this same command with no
+  // registry row, and nothing would say so. It writes no `records.data`, so the revision ledger's
+  // rule does not reach it and it needs no restamp.
+  beginStep('participants')
+  const participants = migrateParticipants(sqlite)
+  endStep('participants')
+  beginStep('pixelScale')
+  const pixelScale = migratePixelScale(sqlite)
+  endStep('pixelScale')
+
+  // AFTER `migrateParticipants`, because it looks each message's writer up in the two registries
+  // that step fills. Running it earlier would find no registry rows and leave every message
+  // without a sender, which is exactly what this step is here to avoid saying wrongly.
+  beginStep('messageDelivery')
+  const messageDelivery = migrateMessageDelivery(sqlite)
+  endStep('messageDelivery')
+
+  // AFTER `migrateParticipants` TOO, and for the same reason turned around: it gives a home world
+  // to every row of the two registries, so a row that step is about to write would be left without
+  // one if this ran first. Criterion C1 of design/messages/ACCEPTANCE.md section 8.
+  beginStep('citizenship')
+  const citizenship = migrateCitizenship(sqlite)
+  endStep('citizenship')
+
+  // BELOW THE REVISION PASS, because it writes its own revision for each run it changes, as the
+  // office. It reads each run's first revision, which the pass never changes, and it creates no
+  // record, so nothing above needs to see what it writes. See ./secretary-runs-need-no-check.ts.
+  beginStep('secretaryRuns')
+  const secretaryRuns = markSecretaryRunsAsNeedingNoCheck(sqlite)
+  endStep('secretaryRuns')
+
+  // BELOW THE REVISION PASS AND AFTER `migrateMessageDelivery`, because it writes its own revision for each message it
+  // moves, as the office, and moves messages that step may have just given a sender. See ./message-centre-migration.ts.
+  beginStep('messageCentre')
+  const messageCentre = moveMessagesIntoTheMessageCentre(sqlite)
+  endStep('messageCentre')
+
+  // LAST, AND IT READS NOTHING ANOTHER STEP WRITES. It moves each rough draft into `plans` and `plan_lines`, which
+  // no other step touches, writes no record, no change row and no revision, so the ledger pass has nothing to say
+  // about it. See ./drafts-into-plans-migration.ts.
+  beginStep('roughDrafts')
+  const roughDrafts = moveDraftsIntoPlans(sqlite)
+  endStep('roughDrafts')
+
+  // BELOW THE REVISION PASS, because it writes its own revision for each run it changes, as the office. It reads
+  // only `data.toolUses`, which no step above writes. See ./tool-uses-migration.ts.
+  beginStep('toolUses')
+  const toolUses = moveToolUsesIntoTheirTable(sqlite)
+  endStep('toolUses')
+
+  // ONLY IN THE RUN THAT APPLIES 0253, and it reads and writes only `agent_runs` and `held_keys`, which no step above
+  // writes. It writes no record, so the ledger pass has nothing to say about it. See ./withdraw-review-runs-migration.ts.
+  beginStep('reviewRunsWithdrawn')
+  const reviewRunsWithdrawn = withdrawTheRunsASentReviewLeftWaiting(sqlite, applied)
+  endStep('reviewRunsWithdrawn')
+
+  // ONLY IN THE RUN THAT APPLIES 0311. It writes only the four kind columns 0311 added, which no step above reads or
+  // writes, and reads the registries, which no step above changes in that run. It writes no record, so the ledger
+  // pass has nothing to say about it. See ./kinds-beside-ids-migration.ts.
+  beginStep('kindsBesideIds')
+  const kindsBesideIds = tellTheKindsBesideTheIds(sqlite, applied)
+  endStep('kindsBesideIds')
+  beginStep('agentOwners')
+  const agentOwners = setTheOldAgentsOwners(sqlite, applied)
+  endStep('agentOwners')
+
+  // ONLY IN THE RUN THAT APPLIES 0318, and it reads and writes only `casting_rows` and `casting_row_changes`, which no
+  // step above writes. It writes no record, so the ledger pass has nothing to say about it. See
+  // ./casting-work-groups-migration.ts.
+  beginStep('castingWorkGroups')
+  const castingWorkGroups = setTheCastingWorkGroups(sqlite, applied)
+  endStep('castingWorkGroups')
+
+  // ONLY IN THE RUN THAT APPLIES 0349, after the work groups, which it reads. It reads and writes only the Casting
+  // tables, which no other step writes. It writes no record, so the ledger pass has nothing to say about it. See
+  // ./casting-labels-migration.ts.
+  beginStep('castingLabels')
+  const castingLabels = makeTheFirstCastingLabels(sqlite, applied)
+  endStep('castingLabels')
+
+  // LAST, AND ALONE: it refuses a run that applied a migration, and it runs after every step above, which have
+  // nothing to do on a store that is up to date. Given no staged map it reads and writes nothing. It writes no record,
+  // so the ledger pass has nothing to say about it. See ./remint-migration.ts.
+  beginStep('remint')
+  const remint = applyTheStagedRemint(sqlite, staged, applied, ledgerGaps)
+  endStep('remint')
+
+  return {
+    appendOrder,
+    blocks,
+    agentIdentities,
+    origin,
+    blockedBy,
+    sessionRuntime,
+    annotationStateKey,
+    blockIdentity,
+    workspaces,
+    revisions,
+    contexts,
+    reviewsBroughtForward,
+    annotationMarkers,
+    agentDispatch,
+    moduleClaims,
+    measureWords,
+    reviewsReach,
+    regions,
+    pixelScale,
+    participants,
+    messageDelivery,
+    citizenship,
+    sealPointers,
+    secretaryRuns,
+    messageCentre,
+    roughDrafts,
+    toolUses,
+    reviewRunsWithdrawn,
+    kindsBesideIds,
+    agentOwners,
+    castingWorkGroups,
+    castingLabels,
+    remint,
+  }
+}
+
+/**
+ * THE OUTCOME OF ONE RUN OF THE DATA STEPS: what the caller worked out around them, then what each step returned, in
+ * the order the outcome has always had. One place, so `migrateInPlace` and the rolled-back run on a served file name
+ * every step the same way.
+ */
+function theOutcomeOf(around: AroundTheSteps, steps: DataSteps): MigrationOutcome {
+  const {
+    appendOrder,
+    blocks,
+    agentIdentities,
+    origin,
+    blockedBy,
+    sessionRuntime,
+    annotationStateKey,
+    blockIdentity,
+    workspaces,
+    revisions,
+    contexts,
+    reviewsBroughtForward,
+    annotationMarkers,
+    agentDispatch,
+    moduleClaims,
+    measureWords,
+    reviewsReach,
+    regions,
+    pixelScale,
+    participants,
+    messageDelivery,
+    citizenship,
+    sealPointers,
+    secretaryRuns,
+    messageCentre,
+    roughDrafts,
+    toolUses,
+    reviewRunsWithdrawn,
+    kindsBesideIds,
+    agentOwners,
+    castingWorkGroups,
+    castingLabels,
+    remint,
+  } = steps
+  const { file, at, before, after, alreadyApplied, newlyApplied, heldTheWriteLockMs } = around
   return {
     file,
-    at: nowStamp(),
+    at,
     before,
     after,
     alreadyApplied,
@@ -2612,13 +2653,20 @@ const COMPARE_CHUNK_BYTES = 64 * 1024 * 1024
  * THE ONE SEAM INTO THE MEASUREMENT, for tests. Production never changes it. A test lowers the limit
  * to take the file path on a small database, lowers the chunk to compare across many chunks, or puts
  * a migration of its own in place of `migrateInPlace` to make a write no report explains — and puts
- * each value back afterwards.
+ * each value back afterwards. `stepsOnThisFile` is the same for a start with nothing pending, whose steps run on the
+ * file itself and are rolled back.
  */
 export const THE_PREVIEW_SEAM: {
   inMemoryLimit: number
   compareChunkBytes: number
   migrate: typeof migrateInPlace
-} = { inMemoryLimit: IN_MEMORY_COPY_LIMIT, compareChunkBytes: COMPARE_CHUNK_BYTES, migrate: migrateInPlace }
+  stepsOnThisFile: typeof everyDataStepIn
+} = {
+  inMemoryLimit: IN_MEMORY_COPY_LIMIT,
+  compareChunkBytes: COMPARE_CHUNK_BYTES,
+  migrate: migrateInPlace,
+  stepsOnThisFile: everyDataStepIn,
+}
 
 /** Where the throwaway copy of this database is made: in memory, or in a file in a folder beside the database. */
 export function whereTheCopyGoes(sqlite: Database.Database): 'memory' | 'file' {
@@ -2874,6 +2922,148 @@ function whatTheOutcomeReports(
 }
 
 /**
+ * A START WITH NO MIGRATION PENDING MAKES NO COPY. It runs every data step on the served file itself, inside one
+ * transaction that is always rolled back, and reads three things inside that transaction: what each step reports,
+ * SQLite's count of rows changed on this connection (`total_changes()`), and the schema version
+ * (`PRAGMA schema_version`). Any of them showing a write is a refusal, as on a copy; see
+ * `whatTheRolledBackRunWouldWrite`.
+ *
+ * WHY THE TWO COUNTS ARE ENOUGH HERE AND NOT WITH A MIGRATION PENDING. With nothing pending no schema migration runs,
+ * only the data steps. SQLite counts every row an INSERT, UPDATE or DELETE writes, a trigger's rows included, in
+ * `total_changes()`, and every table, index or trigger made, changed or dropped moves the schema version. A pending
+ * schema migration may be any SQL at all, so that case still runs on a copy and compares its bytes.
+ */
+function measureOnThisFile(
+  sqlite: Database.Database,
+  migrationsFolder: string,
+  timing: MigrationsCheckTiming | null,
+): { outcome: MigrationOutcome; wouldWrite: string[]; leftoverCopiesRemoved: string[] } {
+  // COPIES AN EARLIER PREVIEW LEFT ARE STILL REMOVED on this path, which makes none of its own.
+  beginPart(timing, THE_MIGRATIONS_CHECK_PARTS.theLeftoversRemoved)
+  const leftoverCopiesRemoved =
+    sqlite.memory || sqlite.name === '' || sqlite.name === ':memory:' ? [] : removeLeftoverPreviewCopies(dirname(resolve(sqlite.name)))
+  endPart(timing, THE_MIGRATIONS_CHECK_PARTS.theLeftoversRemoved)
+  beginPart(timing, THE_MIGRATIONS_CHECK_PARTS.theStepsRolledBack)
+  const ran = runTheStepsAndRollThemBack(sqlite, migrationsFolder, timing)
+  endPart(timing, THE_MIGRATIONS_CHECK_PARTS.theStepsRolledBack)
+  beginPart(timing, THE_MIGRATIONS_CHECK_PARTS.theOutcomeReports)
+  const reported = whatTheOutcomeReports(ran.outcome, sqlite, migrationsFolder)
+  endPart(timing, THE_MIGRATIONS_CHECK_PARTS.theOutcomeReports)
+  return {
+    outcome: ran.outcome,
+    wouldWrite: whatTheRolledBackRunWouldWrite(reported, ran.changedRows, ran.schemaVersion),
+    leftoverCopiesRemoved,
+  }
+}
+
+/** What a start says when the transaction the data steps ran in on the served file had ended before it could roll it back. */
+export const THE_ROLLED_BACK_RUN_ENDED =
+  'The transaction the data steps ran in on this file had ended before this check could roll it back. Something in ' +
+  'the steps ended it, so what they wrote before then may have been stored in this file.'
+
+/** The data steps ended the transaction they ran in on the served file. `stepsSaid` is what they threw, or null when they returned. */
+class TheRolledBackRunEnded extends Error {
+  constructor(readonly stepsSaid: unknown) {
+    super(THE_ROLLED_BACK_RUN_ENDED)
+  }
+}
+
+/**
+ * THE DATA STEPS ON THE SERVED FILE, UNDER ITS WRITE LOCK, AND EVERY ONE OF THEM ROLLED BACK. The counts are read
+ * inside the transaction, before the rollback, because the rollback puts the rows and the schema version back. Every
+ * way out after the lock is taken, a step that throws included, rolls back, so the file is left as it was found.
+ *
+ * THE TRANSACTION IS STILL OPEN WHEN THE STEPS END, or this refuses with `THE_ROLLED_BACK_RUN_ENDED`: a step that ended
+ * it may have stored what it wrote, and the rollback would then put back nothing. It is asked whether the steps
+ * returned or threw, because a step that commits inside a transaction of its own throws as that transaction closes.
+ *
+ * `whenStored` (./told-when-stored.ts) REFUSES WHILE THIS RUNS. Its frames do not see the bare `BEGIN IMMEDIATE` this
+ * opens, so a step that asked it would be told about a write this then rolls back. No data step asks it today.
+ */
+function runTheStepsAndRollThemBack(
+  sqlite: Database.Database,
+  migrationsFolder: string,
+  timing: MigrationsCheckTiming | null,
+): { outcome: MigrationOutcome; changedRows: { before: number; after: number }; schemaVersion: { before: number; after: number } } {
+  const file = sqlite.name
+  const migrations = theMigrationsInTheFolder(migrationsFolder)
+  const changedRows = (): number => (sqlite.prepare('SELECT total_changes() AS n').get() as { n: number }).n
+  const schemaVersion = (): number => sqlite.pragma('schema_version', { simple: true }) as number
+  const lockedAt = Date.now()
+  beginPart(timing, THE_MIGRATIONS_CHECK_PARTS.theWriteLockTaken)
+  takeTheWriteLock(sqlite, file)
+  endPart(timing, THE_MIGRATIONS_CHECK_PARTS.theWriteLockTaken)
+  try {
+    THE_ROLLED_BACK_RUN.open = true
+    beginPart(timing, THE_MIGRATIONS_CHECK_PARTS.theStartRead)
+    const before = countAll(sqlite)
+    const alreadyApplied = theJournalRows(sqlite).length
+    refuseAnOfficeWithNoOwnerToWrite(sqlite)
+    endPart(timing, THE_MIGRATIONS_CHECK_PARTS.theStartRead)
+    const rowsBefore = changedRows()
+    const schemaBefore = schemaVersion()
+    let steps: DataSteps
+    try {
+      steps = THE_PREVIEW_SEAM.stepsOnThisFile(sqlite, migrations, null, timing)
+    } catch (stepsSaid) {
+      if (!sqlite.inTransaction) throw new TheRolledBackRunEnded(stepsSaid)
+      throw stepsSaid
+    }
+    if (!sqlite.inTransaction) throw new TheRolledBackRunEnded(null)
+    const rowsAfter = changedRows()
+    const schemaAfter = schemaVersion()
+    const after = countAll(sqlite)
+    const newlyApplied = theJournalRows(sqlite).length - alreadyApplied
+    return {
+      outcome: theOutcomeOf(
+        { file, at: nowStamp(), before, after, alreadyApplied, newlyApplied, heldTheWriteLockMs: Date.now() - lockedAt },
+        steps,
+      ),
+      changedRows: { before: rowsBefore, after: rowsAfter },
+      schemaVersion: { before: schemaBefore, after: schemaAfter },
+    }
+  } finally {
+    THE_ROLLED_BACK_RUN.open = false
+    if (sqlite.inTransaction) sqlite.exec('ROLLBACK')
+  }
+}
+
+/**
+ * WHAT A RUN ON THE SERVED FILE WOULD WRITE, judged from what it read before it was rolled back. The steps' own lines
+ * when any step reports a write. Otherwise, one line for a write no report names when SQLite's count of changed rows
+ * or the schema version moved. Otherwise nothing, and the start serves.
+ */
+export function whatTheRolledBackRunWouldWrite(
+  reported: readonly string[],
+  changedRows: { before: number; after: number },
+  schemaVersion: { before: number; after: number },
+): string[] {
+  if (reported.length > 0) return [...reported]
+  const moved: string[] = []
+  const rows = changedRows.after - changedRows.before
+  if (rows !== 0) moved.push(`SQLite counted ${String(rows)} changed row${rows === 1 ? '' : 's'}`)
+  if (schemaVersion.after !== schemaVersion.before) {
+    moved.push(`the schema version went from ${String(schemaVersion.before)} to ${String(schemaVersion.after)}`)
+  }
+  if (moved.length === 0) return []
+  return [
+    aWriteNoReportNames(
+      `${moved.join(' and ')} while the data steps ran on this file`,
+      ' They ran inside one transaction that was rolled back, so none of it was written.',
+    ),
+  ]
+}
+
+/** The line for a write no migration report names: `whatMoved` is what showed it, `more` what follows the steps. */
+function aWriteNoReportNames(whatMoved: string, more: string): string {
+  return (
+    `write something none of the ${THE_STEPS.length} migration reports names: ${whatMoved}, and every report said it ` +
+    'had nothing to do. Nothing here can say what the difference is, which is why this is a refusal rather than a ' +
+    `shrug. The steps that were asked: ${namesOfTheSteps()}.${more}`
+  )
+}
+
+/**
  * THE LINE FOR A WRITE NOTHING CAN NAME, and what folding the log in did about it.
  *
  * The two sensors disagreeing is itself a finding, and the loud one wins. A write nothing can name
@@ -2890,12 +3080,7 @@ function theUnexplainedDifference(settled: LogSettled): string {
           'can make the two images differ. Run PRAGMA wal_checkpoint(TRUNCATE) on this file with nothing else ' +
           'reading it, then start again.'
         : 'The write-ahead log was not asked about.'
-  return (
-    `write something none of the ${THE_STEPS.length} migration reports names: the copy came out byte-different ` +
-    'from the image it was made from, and every report said it had nothing to do. Nothing here can say what the ' +
-    'difference is, which is why this is a refusal rather than a shrug. The steps that were asked: ' +
-    `${namesOfTheSteps()}. ${aboutTheLog}`
-  )
+  return aWriteNoReportNames('the copy came out byte-different from the image it was made from', ` ${aboutTheLog}`)
 }
 
 /**
@@ -3019,7 +3204,9 @@ export function databaseObjection(sqlite: Database.Database): string | null {
  * WHAT DOES NOT CHANGE: the check is the same `integrity_check`, and its answer still decides first. A damaged file
  * is refused whatever the preview found; nothing is written to the real file before the answer is in, because the one
  * write the preview can make (folding the log in, `settleTheLog`) waits for it; and the empty or seed-only branch,
- * which migrates in place, asks the check on this connection before it writes, as before.
+ * which migrates in place, asks the check on this connection before it writes, as before. A start with no migration
+ * pending runs the data steps on the real file inside a transaction it rolls back (`measureOnThisFile`), and waits for
+ * the answer after the rollback: nothing is committed before the answer is in.
  *
  * WHEN IT CANNOT RUN BESIDE: a database with no file (`:memory:`), or a worker that does not answer. The same check
  * then runs on this connection when the answer is needed, and the start report says which happened and why.
@@ -3136,7 +3323,7 @@ export function startTheIntegrityCheckBeside(
         where = `the worker could not open the file read-only (${got.error}), so it ran on this connection afterwards`
         answer = { objection: runHere() }
       } else {
-        where = 'on a read-only connection of its own while the copy was measured'
+        where = 'on a read-only connection of its own while the migrations were measured'
         try {
           if (typeof got.duration === 'number' && Number.isFinite(got.duration) && waitBegan !== null && waitEnded !== null) {
             const wasWaited = Math.max(0, Math.round(waitEnded - waitBegan))
@@ -3171,10 +3358,11 @@ export type ServeDecision =
       refusal: string
       /**
        * Set only on the refusal for a database that is not up to date and holds work, where bringing it up to date
-       * would write: what it holds and what the migrations would write, in their own words. An installed office
-       * offers its owner one press from these (src/server/lib/the-update.ts); a checkout prints the refusal.
+       * would write: what it holds, what the migrations would write, in their own words, and how that was measured. An
+       * installed office offers its owner one press from these (src/server/lib/the-update.ts); a checkout prints the
+       * refusal.
        */
-      update?: { holds: string; wouldWrite: string[] }
+      update?: { holds: string; wouldWrite: string[]; measuredOn: TheUpdateOffer['measuredOn'] }
     }
 
 /**
@@ -3233,22 +3421,59 @@ export function prepareToServe(
   beginPart(timing, THE_MIGRATIONS_CHECK_PARTS.theIntegrityStarted)
   const integrity = startTheIntegrityCheckBeside(sqlite, timing)
   endPart(timing, THE_MIGRATIONS_CHECK_PARTS.theIntegrityStarted)
-  let preview: MigrationPreview
+  // WHERE THE MIGRATIONS ARE MEASURED, chosen from the journal: on a copy when a migration is pending, and on this file
+  // itself, in a transaction that is rolled back, when none is (`measureOnThisFile`). Null until the journal is read.
+  let measuredOn: TheUpdateOffer['measuredOn'] | null = null
+  let measured: { outcome: MigrationOutcome; wouldWrite: string[]; leftoverCopiesRemoved: string[] }
   try {
-    preview = previewMigration(
-      sqlite,
-      migrationsFolder,
-      () => {
-        const damaged = integrity.wait()
-        if (damaged !== null) throw new Error('the integrity check refused this file, so the log is not folded in')
-      },
-      timing,
-    )
+    beginPart(timing, THE_MIGRATIONS_CHECK_PARTS.thePendingRead)
+    const pending = tagsARunApplies(sqlite, migrationsFolder)
+    endPart(timing, THE_MIGRATIONS_CHECK_PARTS.thePendingRead)
+    if (pending.length === 0) {
+      measuredOn = 'this file'
+      measured = measureOnThisFile(sqlite, migrationsFolder, timing)
+    } else {
+      measuredOn = 'a copy'
+      const preview = previewMigration(
+        sqlite,
+        migrationsFolder,
+        () => {
+          const damaged = integrity.wait()
+          if (damaged !== null) throw new Error('the integrity check refused this file, so the log is not folded in')
+        },
+        timing,
+      )
+      if (preview.logSettled.settled === 'folded in') {
+        sayPart(timing, 'a second measure ran after the write-ahead log was folded in')
+      } else if (preview.logSettled.settled === 'not needed') {
+        sayPart(timing, 'no second measure ran: the write-ahead log was not folded in')
+      } else {
+        sayPart(timing, 'no second measure ran: the write-ahead log could not be folded in')
+      }
+      measured = preview
+    }
   } catch (err) {
     // A DAMAGED FILE IS NAMED AS DAMAGED, whatever the preview did on it: a copy of a damaged file can fail in any way.
     beginPart(timing, THE_MIGRATIONS_CHECK_PARTS.theIntegrityWaited)
     const damaged = integrity.wait()
     endPart(timing, THE_MIGRATIONS_CHECK_PARTS.theIntegrityWaited)
+    // A RUN THE STEPS ENDED IS SAID BEFORE A DAMAGED FILE, and with no update to offer. The damaged file's refusal and
+    // the one below both say that nothing has been written, and here that may be false.
+    if (err instanceof TheRolledBackRunEnded) {
+      const said = err.stepsSaid === null ? null : err.stepsSaid instanceof Error ? err.stepsSaid.message : String(err.stepsSaid)
+      const trace = err.stepsSaid instanceof Error && typeof err.stepsSaid.stack === 'string' ? err.stepsSaid.stack : null
+      return {
+        serve: false,
+        refusal:
+          `${REFUSING_TO_SERVE} ${file}. It holds ${describeHoldings(sqlite)}. No migration is pending, so this check ` +
+          `ran the data steps on this file itself, inside one transaction it always rolls back, and made no copy of ` +
+          `it. ${THE_ROLLED_BACK_RUN_ENDED} This check cannot tell what was stored.` +
+          (damaged === null ? '' : " SQLite's integrity check also found this file damaged.") +
+          (said === null ? '' : `\n\nWhat the steps said:\n\n${said}`) +
+          `\n\nUntil that is settled this database is not served.\n` +
+          (trace === null ? '' : `\nWhere it happened, for whoever fixes Mole Office:\n${trace}\n`),
+      }
+    }
     if (damaged !== null) return { serve: false, refusal: damaged }
     /**
      * A MIGRATION THAT REFUSED OR FELL OVER IS A REASON NOT TO SERVE, NOT A REASON TO CRASH.
@@ -3274,13 +3499,20 @@ export function prepareToServe(
      */
     const why = err instanceof Error ? err.message : String(err)
     const trace = err instanceof Error && typeof err.stack === 'string' ? err.stack : null
+    const how =
+      measuredOn === 'a copy'
+        ? `the migrations ran against ${theCopyAsSaid(whereTheCopyGoes(sqlite))}, ` +
+          `and no row of this file was changed. Its write-ahead log was folded into it first, ` +
+          `which moves committed pages and no rows.`
+        : measuredOn === 'this file'
+          ? 'no migration is pending, so this check runs the data steps on this file itself, inside one transaction it ' +
+            'always rolls back, and makes no copy of it. Whatever ran before the refusal below was rolled back.'
+          : 'no migration ran, because which migrations are pending could not be read.'
     return {
       serve: false,
       refusal:
         `${REFUSING_TO_SERVE} ${file}. It holds ${describeHoldings(sqlite)}, and working out whether it needs ` +
-        `migrating did not finish. NO ROW HAS BEEN CHANGED: the migrations ran against ${theCopyAsSaid(whereTheCopyGoes(sqlite))}, ` +
-        `and no row of this file was changed. Its write-ahead log was folded into it first, ` +
-        `which moves committed pages and no rows.\n\n` +
+        `migrating did not finish. NO ROW HAS BEEN CHANGED: ${how}\n\n` +
         `What the migrations said:\n\n${why}\n\n` +
         `Until that is settled this database is not served. Take a copy and run the migrations deliberately — ` +
         `that prints the whole report, about the file it is actually changing:\n\n` +
@@ -3292,21 +3524,14 @@ export function prepareToServe(
     }
   }
 
-  if (preview.logSettled.settled === 'folded in') {
-    sayPart(timing, 'a second measure ran after the write-ahead log was folded in')
-  } else if (preview.logSettled.settled === 'not needed') {
-    sayPart(timing, 'no second measure ran: the write-ahead log was not folded in')
-  } else {
-    sayPart(timing, 'no second measure ran: the write-ahead log could not be folded in')
-  }
-
   beginPart(timing, THE_MIGRATIONS_CHECK_PARTS.theIntegrityWaited)
   const damaged = integrity.wait()
   endPart(timing, THE_MIGRATIONS_CHECK_PARTS.theIntegrityWaited)
   if (damaged !== null) return { serve: false, refusal: damaged }
 
-  if (preview.wouldWrite.length === 0) {
-    const applied = preview.outcome.alreadyApplied
+  const onThisFile = measuredOn === 'this file'
+  if (measured.wouldWrite.length === 0) {
+    const applied = measured.outcome.alreadyApplied
     return {
       serve: true,
       report:
@@ -3314,35 +3539,47 @@ export function prepareToServe(
         // COMPUTED FROM THE STEP LIST RATHER THAN TYPED. This sentence named six of the seven steps
         // there were before window B and the missing one was `reviews`; a seventh name typed here
         // would have been the same defect one step later, and window B adds nine more.
-        `${namesOfTheSteps()} each report nothing to write). Measured by running them ` +
-        `against ${theCopyAsSaid(whereTheCopyGoes(sqlite))}, which came out identical. No row of the file was changed; its ` +
-        `write-ahead log was folded into it before the copy was taken, which moves committed pages and no rows. ` +
-        `${integrity.said()}${theLeftoversAsSaid(preview.leftoverCopiesRemoved)} \`npm run db:migrate\` prints the whole report.`,
+        `${namesOfTheSteps()} each report nothing to write). ` +
+        (onThisFile
+          ? 'Measured by running them on this file itself, inside one transaction that was rolled back: no step ' +
+            "reported a write, and neither SQLite's count of changed rows nor its schema version moved. No row of the " +
+            'file was changed, and no copy of it was made. '
+          : `Measured by running them against ${theCopyAsSaid(whereTheCopyGoes(sqlite))}, which came out identical. ` +
+            'No row of the file was changed; its write-ahead log was folded into it before the copy was taken, which ' +
+            'moves committed pages and no rows. ') +
+        `${integrity.said()}${theLeftoversAsSaid(measured.leftoverCopiesRemoved)} \`npm run db:migrate\` prints the whole report.`,
     }
   }
 
   const holds = describeHoldings(sqlite)
   return {
     serve: false,
-    update: { holds, wouldWrite: preview.wouldWrite },
+    update: { holds, wouldWrite: measured.wouldWrite, measuredOn },
     refusal:
       `${REFUSING_TO_SERVE} ${file}. It holds ${holds}, it is NOT up to date, and ` +
       `bringing it up to date would write to it. Starting a server must never do that: \`npm run dev\` runs ` +
       `under \`tsx watch\`, so every save of a server file restarts it, and a migration that moves data would ` +
       `then run unattended at a moment nobody chose. NO ROW HAS BEEN CHANGED — what a migration would write was ` +
-      `measured by running the real migrations against ${theCopyAsSaid(whereTheCopyGoes(sqlite))}, and no row of this file was ` +
-      `changed.\n\n` +
+      (onThisFile
+        ? 'measured by running the real data steps on this file itself, inside one transaction that was rolled back, ' +
+          'so no row of this file was changed and no copy of it was made.\n\n'
+        : `measured by running the real migrations against ${theCopyAsSaid(whereTheCopyGoes(sqlite))}, and no row of ` +
+          'this file was changed.\n\n') +
       // IT USED TO SAY "NOTHING HAS BEEN CHANGED … the file itself was only read", and that is false
       // for a database not already in WAL mode. Opening it runs `journal_mode = WAL` in
       // db/client.ts, 39 lines before this check, which rewrites the header and creates -wal and
       // -shm. No row content moves. But an operator verifying this sentence the obvious way — hash
       // the file before and after — was measured getting a different hash and a message telling
-      // them nothing had happened, which is worse than the mode change itself.
-      `The file's own bytes may differ from before this start, for two reasons and neither is a row moving. ` +
-      `Opening a database puts it into WAL journal mode, which rewrites the header and creates ${file}-wal. And ` +
-      `this check folds the write-ahead log back into the file before it takes its image, which moves pages that ` +
-      `were already committed. Not one row of any authored table moved.\n\n` +
-      `What a migration would do to it:\n${preview.wouldWrite.map((line) => `  - ${line}`).join('\n')}\n\n` +
+      // them nothing had happened, which is worse than the mode change itself. With nothing pending
+      // no log is folded in, so that path names only the mode change.
+      (onThisFile
+        ? `The file's own bytes may differ from before this start, and not because a row moved: opening a database ` +
+          `puts it into WAL journal mode, which rewrites the header and creates ${file}-wal.\n\n`
+        : `The file's own bytes may differ from before this start, for two reasons and neither is a row moving. ` +
+          `Opening a database puts it into WAL journal mode, which rewrites the header and creates ${file}-wal. And ` +
+          `this check folds the write-ahead log back into the file before it takes its image, which moves pages that ` +
+          `were already committed. Not one row of any authored table moved.\n\n`) +
+      `What a migration would do to it:\n${measured.wouldWrite.map((line) => `  - ${line}`).join('\n')}\n\n` +
       // THE COMMAND IS THE LAST LINE, and the copy's full report is deliberately not printed above
       // it. That report — every note, every refusal, every crossing link — is what
       // `npm run db:migrate` prints, about the database it is actually changing. Printing it here

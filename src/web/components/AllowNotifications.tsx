@@ -27,10 +27,10 @@ import { settingsControlWord } from '@shared/settings-declaration.ts'
 import { useEffect, useState } from 'react'
 
 import { content, t, type WordKey } from '@shared/i18n.ts'
-import type { PushDevice, PushState } from '@shared/push.ts'
+import type { PushDevice, PushOutcome, PushState } from '@shared/push.ts'
 import { faultOf, api, errorMessage } from '../api.ts'
 import { useLanguage } from '../lib/language.ts'
-import { Btn, ErrorNote, Loading, Panel, useAsync } from './ui.tsx'
+import { Btn, ErrorNote, Loading, Panel, ServerNote, useAsync } from './ui.tsx'
 
 /** Where the page asks the browser to keep the worker, and what it covers: every page of the office. */
 const THE_WORKER = '/push-worker.js'
@@ -68,6 +68,13 @@ export function whatThisDeviceCan(): WhatThisDeviceCan {
   return { can: true }
 }
 
+const OUTCOME_WORDS: Record<PushOutcome['outcome'], WordKey> = {
+  told: 'settingsPanel.notify.outcome.told',
+  gone: 'settingsPanel.notify.outcome.gone',
+  refused: 'settingsPanel.notify.outcome.refused',
+  unreachable: 'settingsPanel.notify.outcome.unreachable',
+}
+
 /** Where this device stands. `allowed` carries the id the office lists it under. */
 type Here = { is: 'checking' } | { is: 'notYet' } | { is: 'blocked' } | { is: 'allowed'; device: string }
 
@@ -77,7 +84,7 @@ export function AllowNotifications({ first }: { first: PushState }) {
   const [reading, setReading] = useState(first)
   const [here, setHere] = useState<Here>({ is: 'checking' })
   const [busy, setBusy] = useState<string | null>(null)
-  const [said, setSaid] = useState<string | null>(null)
+  const [said, setSaid] = useState<PushOutcome | null>(null)
   const [fault, setFault] = useState<{ message: string; fault: ReturnType<typeof faultOf> } | null>(null)
   const can = whatThisDeviceCan()
 
@@ -140,28 +147,24 @@ export function AllowNotifications({ first }: { first: PushState }) {
 
   const test = (device: string): void =>
     run(t('settingsPanel.notify.testing'), async () => {
-      setSaid((await api.testADevice(device)).says)
+      setSaid(await api.testADevice(device))
     })
 
-  const sentence = t(
-    !can.can
-      ? WHY_WORDS[can.why]
-      : here.is === 'checking'
-        ? 'settingsPanel.notify.checking'
-        : here.is === 'allowed'
-          ? 'settingsPanel.notify.allowedHere'
-          : here.is === 'blocked'
-            ? 'settingsPanel.notify.blocked'
-            : 'settingsPanel.notify.notYet',
-  )
-  // HOW MANY DEVICES ARE TOLD, in the page's language. The server's sentence says the same from the same list.
-  const told = reading.devices.length
+  const sentence: WordKey | null = !can.can
+    ? WHY_WORDS[can.why]
+    : here.is === 'checking'
+      ? 'settingsPanel.notify.checking'
+      : here.is === 'blocked'
+        ? 'settingsPanel.notify.blocked'
+        : null
 
   return (
     <div className="alnt">
-      <p className="alnt-here" data-fact="this-device">
-        {sentence}
-      </p>
+      {sentence === null ? null : (
+        <p className="alnt-here" data-fact="this-device">
+          {t(sentence)}
+        </p>
+      )}
       {!can.can || here.is === 'checking' ? null : here.is === 'allowed' ? (
         <div className="alnt-presses">
           <Btn onClick={() => test(here.device)} disabled={busy !== null} reason={busy ?? undefined}>
@@ -178,14 +181,10 @@ export function AllowNotifications({ first }: { first: PushState }) {
           </Btn>
         </div>
       )}
-      {said === null ? null : <p className="alnt-said">{said}</p>}
+      {said === null ? null : <p className="alnt-said">{t(OUTCOME_WORDS[said.outcome])}</p>}
+      {said === null ? null : <ServerNote text={said.says} />}
       {fault === null ? null : <ErrorNote message={fault.message} fault={fault.fault} />}
-      <p className="alnt-says">
-        {told === 0 ? t('settingsPanel.notify.noDevice') : t('settingsPanel.notify.devicesTold', { n: told })}
-      </p>
-      {reading.devices.length === 0 ? null : (
-        <TheDevices devices={reading.devices} thisOne={here.is === 'allowed' ? here.device : null} busy={busy} onStop={(id) => stop(id, false)} />
-      )}
+      <TheDevices devices={reading.devices} thisOne={here.is === 'allowed' ? here.device : null} busy={busy} onStop={(id) => stop(id, false)} />
     </div>
   )
 }
@@ -205,6 +204,7 @@ function TheDevices({
   return (
     <div className="alnt-devices">
       <p className="alnt-label">{t('settingsPanel.notify.devices')}</p>
+      {devices.length === 0 ? <p className="alnt-said">{t('absence.none')}</p> : null}
       <ul className="alnt-list">
         {devices.map((one) => (
           <li key={one.id} className="alnt-device" data-device={one.id}>
@@ -304,7 +304,7 @@ const ALLOW_NOTIFICATIONS_CSS = `
    sentence for allowing notifications is wider than the column, so it ran past the panel and made
    the page scroll sideways. The press stays inside its column and wraps its own words. */
 .alnt-presses .px-btn { max-width: 100%; white-space: normal; }
-.alnt-said, .alnt-says { margin: 0; max-width: var(--measure-in-box); font: var(--fs-1)/var(--lh-body) var(--font-ui); color: var(--text-2); overflow-wrap: anywhere; }
+.alnt-said { margin: 0; max-width: var(--measure-in-box); font: var(--fs-1)/var(--lh-body) var(--font-ui); color: var(--text-2); overflow-wrap: anywhere; }
 .alnt-devices { display: flex; flex-direction: column; gap: calc(var(--pad) / 2); min-width: 0; }
 .alnt-label {
   margin: 0; font-size: var(--fs-1); font-weight: 600; color: var(--text-3);

@@ -305,8 +305,9 @@ Two steps, in this order:
 
 A checkout of Mole Office has one command for each step among its developer tools; an installed
 office does not carry them. Each door refuses with plain sentences and writes nothing when the
-handle is not registered, the runtime word is not one the office knows, or the record is not
-usable. Fix what the refusal says and send it again.
+handle is not registered or the record is not usable. The doors take any harness's runtime word.
+The developer tool that files the run takes only a word the office has an adapter for, and says
+so. Fix what the refusal says and send it again.
 
 **You still start nothing on the office's behalf.** Do not run the office's dispatch as a way
 around this; a runtime a tool here starts registers through these two steps whatever it is,
@@ -586,6 +587,14 @@ Chapter 4 rule 6 has the rule in full: file the stub as the thing happens, with 
 that is all you have. An incomplete record is a full member of the graph, and the write's own
 answer names what it still wants and any record already called what yours is called.
 
+**Name what a decision governs and what a report is about.** A decision names each page it governs:
+a module, pipeline, block, flow, regulation, role card, tool, tool category or department. A rule
+for everywhere names the whole project, alone. Files go in a part of their own. A report is linked
+`about` each page it is about, and names its files apart. When no page fits, say so in the record:
+the kind of page that is missing, a few words, and the nearest live page if there is one. The door
+refuses a decision that names none of these, and a run's finish holds a report that names none.
+`GET /api/kinds/decision` and `GET /api/kinds/report` give the fields.
+
 ## Changing part of a record: send the part, not the whole
 
 `PATCH /api/records/:id` describes this in full: send `dataPatch` for an ordinary edit, which
@@ -702,11 +711,13 @@ writes it to the file and removes the secret.
 **How to receive messages: hold your handle.** A message to an agent nobody is answering as waits until the person presses. `GET /api/handles/waiter` hands you the waiter — the script that says every few seconds that you are answering as your handle and prints any message that arrives — as that office is running it, with the line to run it. It is one file, built for you with everything it imports, and it runs with nothing but Node in an empty folder: save it and run it, and do not look for the modules it names. Everything a visiting agent may do is a door of this API; never try to reach the office's machine any other way, by SSH least of all. Fetch it each time; never keep a copy, or you run one older than the office. The waiter reads both secrets from your token file into a request header, like every other tool. Give it the file's full path in its two names, and no secret as a flag. Never type or print either value, and never read the file into the command:
 
     MOLE_OFFICE_CREDENTIAL_FILE="<your token file>" MOLE_AGENT_KEY_FILE="<your token file>" \
-      node hold-the-handle.mjs --api <the office> --agent <your handle> --session <your session record>
+      node hold-the-handle.mjs --api <the office> --agent <your handle> --session <your session record> --runtime <your harness>
 
 The file must be yours and readable by nobody else, as `umask 077` makes it. Otherwise the waiter stops before it asks anything, and says why.
 
-All three of `--api`, `--agent` and `--session` are needed from elsewhere: `--api` because nothing here knows where the office is, `--agent` because the setting naming one belongs to the office's checkout, and `--session` because a hold names a session record that has to exist in THAT office's database — file yours there first (`POST /api/records`, kind `session`). It stops when a message arrives, and that is not a fault: for Claude Code and Codex a background command's output reaches the session when the command ENDS, so its exiting is what wakes you. Answer and start it again; your handle stays yours for two minutes meanwhile. An office never told an address others can reach is reachable by no `--api`, and `GET /api/access` says what would open it.
+All three of `--api`, `--agent` and `--session` are needed from elsewhere: `--api` because nothing here knows where the office is, `--agent` because the setting naming one belongs to the office's checkout, and `--session` because a hold names a session record that has to exist in THAT office's database — file yours there first (`POST /api/records`, kind `session`). It stops when a message arrives, and that is not a fault: for Claude Code and Codex a background command's output reaches the session when the command ENDS, so its exiting is what wakes you. Answer and start it again; your handle stays yours for two minutes meanwhile.
+
+**Any harness holds its handle the same way.** `--runtime` is your harness's own name: `claude-code`, `codex`, `workbuddy` or any other. The office takes every word, and starts runs itself only in the harnesses it has an adapter for; `--help` names them. Without `--runtime`, the waiter takes the word your session record names, and `claude-code` only when the record names none. For a harness with no adapter, two of its first lines say so: Mole Office cannot start that harness by itself, so your messages wait for your own waiter, and the waiter cannot read that harness's process, so it holds the heartbeat and waits for messages. Neither is a fault, so do not stop the waiter for them. A line saying no claude process was found is printed only in a Claude Code session. While the heartbeat beats, the chat shows you as answering and says the office cannot see inside your harness. Once it stops for longer than the office waits, the chat shows that nobody is answering. An office never told an address others can reach is reachable by no `--api`, and `GET /api/access` says what would open it.
 
 **How to tell whether this copy is old.** This copy says: `mole-office skill, 2026-11-04`. The repository is the only source — `.claude/skills/mole-office/SKILL.md` in the person's Mole Office checkout — and a copy anywhere else drifts. Ask the person to read that line out of their checkout. If theirs names a later day than yours, yours is old: take theirs and re-read it. If yours carries no such line at all, it is older than 7 September 2026 and predates this section.
 

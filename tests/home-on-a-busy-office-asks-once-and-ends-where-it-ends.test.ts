@@ -1,5 +1,18 @@
 // Copyright © 2026 Zhengyang Shen
 // Licensed under the MIT License. See LICENSE.
+// Criterion change (wave 13s round 281, point HD-2e): Home asks one door for the pipelines that stand still.
+// Late or stuck asks GET /api/pipelines/standing-still, and the server works out there which pipelines stand still.
+// So case 1 holds that Home asks no records-list read at all, and asks that door once, for the project the page is
+// in. The door is one of HOME_DOORS, so a read of it again while nothing changes is a late read.
+// Before, case 1 held that Home asked the records list twice, for kind pipeline and kind block. The code change that
+// took both reads away left that check behind, so the case stopped there and its later checks did not run.
+// Criterion change (wave 13s round 281, decisions OQR0WDVq0FkP and M1ngfatGQcwn, F2): Home asks no doing read,
+// and each roster row in Home's shape carries doingFrom.
+// Home reads the run serving each agent from the roster's rows, which already hand the server each active agent's
+// open runs. So case 1 holds that no read with the `doing` word is asked, and that a row's fields are the column's
+// and doingFrom.
+// Before, case 1 held that a doing read asked only active agents of its project, each once, and no more than the
+// door takes at once.
 /**
  * HOME ON AN OFFICE OF THE LIVE SHAPE ASKS FOR WHAT IT DRAWS, ONCE, AND ITS PAGE ENDS WHERE ITS CONTENT ENDS.
  *
@@ -13,14 +26,19 @@
  * WHAT THIS FILE HOLDS, on that office:
  *   1. Home asks each door it reads at most the number of times it needs, and nothing again while the
  *      page stands open with nothing changing: each project's roster in Home's shape once, never the
- *      whole roster, the pipelines and their steps once and never every record. Each roster row
- *      carries only the fields the column draws, and the rows are the active agents and no more.
+ *      whole roster, the pipelines that stand still once, at their own door and for the project the
+ *      page is in, and never the records list. Each roster row carries only the fields the column
+ *      draws, and the rows are the active agents and no more.
  *      MUTATIONS: (a) the readers in src/web/components/home/HomeSections.tsx ask `api.whoIsWorking`
  *      again, the whole roster: red on the whole roster asked and on the row fields. (a2) the second
  *      shape of the query in src/server/api/working.ts takes `only` as well: red on the refusal of
  *      both at once. (b) HomePage
- *      asks `api.listRecords(undefined, 'home')` again: red on the whole record list. (c) the roster's
- *      read is put on a two-second timer: red on the quiet window.
+ *      asks `api.listRecords(undefined, 'home')` again: red on the whole record list. (b2) HomePage
+ *      asks `api.pipelinesStandingStill()` a second time on its first load, after the first has
+ *      answered (a second read asked while the first is out joins it in src/web/api.ts): red on the
+ *      pipelines that stand still, once. (b3) Late or stuck asks `api.listRecords('pipeline', 'home')`
+ *      again: red on the records list asked at all. (c) the roster's read is put on a two-second
+ *      timer: red on the quiet window.
  *   2. A project's roster is read again when the event stream says its agents changed, and no other
  *      project's is. A new agent registered in one project is drawn without a reload.
  *      MUTATION: the `useChannel` ear in `useRosterRereads` is removed: red, the new agent never appears.
@@ -33,9 +51,9 @@
  *      the column is the other half of the round. This case holds that nothing else adds height.
  *
  * ROUND 31b OF WAVE 13k ADDS, on the same office:
- *   4. Home asks which runs serve a project's agents only to count the agents that are stuck, so only in a
- *      project whose late or stuck alarms include a run, each agent once, and never more agents in one read
- *      than the door takes (case 1).
+ *   4. Home asks no doing read. Each roster row names the run serving its agent, and the count of the
+ *      agents that are stuck reads it there (case 1). Wave 13s round 281 made it so; before, Home asked the
+ *      doing read in a project whose late or stuck alarms include a run.
  *   5, 6. The cases that opened a group of agents and marked one "Needs you" left with the groups, when
  *      Agents at work became one bar per project. tests/home-agent-bars.test.ts holds the bars' counts.
  *   7. A project card whose open count cannot be given says why in words on the card (Default and Tide
@@ -48,7 +66,6 @@ import { liveApp, waitForThePage, type LiveApp } from './helpers.ts'
 import { anOfficeOfTheLiveShape, LIVE_SHAPE } from './an-office-of-the-live-shape.ts'
 import { photographWithNothingOver, TEST_SHOTS, testShots } from './where-shots-go.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
-import { DOING_ASKED_AT_ONCE } from '../src/shared/working.ts'
 
 let app: LiveApp
 let remove: () => void = () => {}
@@ -62,8 +79,8 @@ const QUIET_MS = 2_000
 /** Where the page's pictures go, only when TEST_SHOTS names a folder. */
 const busyShots = process.env[TEST_SHOTS] ? testShots('home-busy-office') : undefined
 
-/** The fields a row of the roster in Home's shape carries, which are the fields the column draws. */
-const DRAWN_FIELDS = ['agentId', 'participant', 'presence']
+/** The fields a row of the roster in Home's shape carries: the fields the column draws, and the run serving the agent. */
+const DRAWN_FIELDS = ['agentId', 'doingFrom', 'participant', 'presence']
 
 beforeAll(async () => {
   const office = await anOfficeOfTheLiveShape()
@@ -107,8 +124,11 @@ async function openHome(page: Page, width: number, language = 'en'): Promise<{ a
   return { asked, readyAt: Date.now() - started, stop: () => page.removeListener('request', watch) }
 }
 
+/** The door Late or stuck asks for the pipelines that stand still (src/web/api-parts/records.ts). */
+const STANDING_STILL = '/api/pipelines/standing-still'
+
 /** The doors Home itself reads. A request to one of them while nothing changes is a loop. */
-const HOME_DOORS = ['/api/working', '/api/records', '/api/attention', '/api/waiting', '/api/planning', '/api/claims', '/api/groups', '/api/workspaces']
+const HOME_DOORS = ['/api/working', '/api/records', '/api/attention', '/api/waiting', '/api/planning', '/api/claims', '/api/groups', '/api/workspaces', STANDING_STILL]
 
 describe('Home on an office of the live shape', () => {
   it('asks each door it reads once, for the rows it draws, and nothing again while nothing changes', async () => {
@@ -123,7 +143,12 @@ describe('Home on an office of the live shape', () => {
 
     const records = asked.filter((one) => one.path === '/api/records')
     expect(records.filter((one) => one.query.get('kind') === null).map((one) => one.request.url()), 'Home asked for every record of the project').toEqual([])
-    expect(records.map((one) => one.query.get('kind')).sort(), 'the pipelines and their steps, once each').toEqual(['block', 'pipeline'])
+    expect(records.map((one) => one.request.url()), 'Home asked the records list').toEqual([])
+    // LATE OR STUCK ASKS ONE DOOR FOR THE PIPELINES THAT STAND STILL, once, for the project the page is in. This
+    // browser has chosen no project, so it reads the stated default, and the made-up office's default holds the most
+    // records, so the page does not move to another project.
+    const standingStill = asked.filter((one) => one.path === STANDING_STILL)
+    expect(standingStill.map((one) => one.project ?? '(no project)'), 'the pipelines that stand still, once, for the project the page is in').toEqual(['default'])
 
     // NOTHING AGAIN WHILE NOTHING CHANGES. Everything Home asks for is asked by the time the page has
     // drawn its agents; the minute's re-read is the only timer and it is a minute away.
@@ -140,18 +165,9 @@ describe('Home on an office of the live shape', () => {
     }
     expect(rows, 'every active agent of the office, and no retired one').toBe(ACTIVE)
 
-    // WHICH RUNS SERVE THE AGENTS IS ASKED ONLY TO COUNT THE STUCK ONES: each asked agent is an active agent of the
-    // project asked, none is asked twice, and no read asks more than the door takes at once.
-    const active = new Map<string, Set<string>>()
-    for (const one of roster) {
-      const reply = (await (await one.request.response())?.json()) as { rows: { agentId: string }[] }
-      active.set(one.project ?? '', new Set(reply.rows.map((row) => row.agentId)))
-    }
+    // HOME ASKS NO DOING READ: each roster row names the run serving its agent.
     const doing = asked.filter((one) => one.path === '/api/working' && one.query.has('doing'))
-    const doingIds = doing.flatMap((one) => (one.query.get('doing') ?? '').split(',').map((agentId) => ({ project: one.project ?? '', agentId })))
-    for (const one of doing) expect((one.query.get('doing') ?? '').split(',').length, 'a doing read asks more than the door takes').toBeLessThanOrEqual(DOING_ASKED_AT_ONCE)
-    expect(doingIds.filter((one) => active.get(one.project)?.has(one.agentId) !== true), 'a doing read asks an agent its project does not hold').toEqual([])
-    expect(new Set(doingIds.map((one) => `${one.project}:${one.agentId}`)).size, 'a doing read asks an agent twice').toBe(doingIds.length)
+    expect(doing.map((one) => one.request.url()), 'Home asked a read with the doing word').toEqual([])
 
     // THE TWO NARROW READINGS ARE TWO QUESTIONS: asking for both at once is refused, not half answered.
     const both = await fetch(`${app.api}/api/working?only=unregistered&shape=home`, {

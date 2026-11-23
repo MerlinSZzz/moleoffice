@@ -23,7 +23,7 @@ import type { WaitingReply } from '../lib/waiting.ts'
 import { TieredPress } from '../components/TieredPress.tsx'
 import { Dot } from '../components/ContactChooser.tsx'
 import { RouteLink, visitorPath, whoPath } from '../components/router.tsx'
-import { whereRequestsGo } from '../lib/visiting.ts'
+import { theCrossOriginOfALoad, whereRequestsGo } from '../lib/visiting.ts'
 import { OpensLarge } from '../components/PictureLarge.tsx'
 import { smallPortrait } from '@shared/portraits.ts'
 import { type ParticipantKind } from '@shared/participants.ts'
@@ -31,8 +31,8 @@ import { worldKindWord } from '@shared/words.ts'
 import { NO_ROLE_SET, whoChoseTheCardInAWord } from '@shared/roles.ts'
 import { cardWord } from '@shared/card-words.ts'
 import type { EmbassyOffice, EmbassyRow, EmbassyView, EmbassyWorldRow, WhatTheEmbassySays } from '@shared/worlds.ts'
-import { isEphemeral } from '@shared/worlds.ts'
-import { credentialNeedsOwnerAction, isAPersonsDeviceCredential, noKeyWorksUnder, type VisitorCredential } from '@shared/visitors.ts'
+import { anAskTheEmbassyDraws, isEphemeral } from '@shared/worlds.ts'
+import { isAPersonsDeviceCredential, noKeyWorksUnder, type VisitorCredential } from '@shared/visitors.ts'
 import { drawnStamp } from '@shared/time.ts'
 export const EMBASSY_WORDS = {
   get everybody() { return t('g4.embassy.everybody') },
@@ -58,11 +58,8 @@ export const EMBASSY_WORDS = {
   keyRevoked: (name: string): string => t('g4.embassy.keyRevoked', { name }),
   undoKey: (seconds: number): string => t('g4.embassy.undoKey', { seconds }),
   get undoingKey() { return t('g4.embassy.undoingKey') },
-  get device() { return t('g4.embassy.device') },
-  get agent() { return t('g4.embassy.agent') },
   get waitForTheOther() { return t('g4.embassy.waitForTheOther') },
   get firstCalled() { return t('g4.embassy.firstCalled') },
-  waitingSays: (held: string): string => t('g4.embassy.waitingSays', { held }),
   get onlyContacts() { return t('g4.embassy.onlyContacts') },
   get unregistered() { return t('g4.embassy.unregistered') },
   get world() { return t('g4.embassy.world') },
@@ -103,6 +100,9 @@ export const EMBASSY_WORDS = {
   get noCard() { return t('g4.embassy.noCard') },
   get chosenBy() { return t('g4.embassy.chosenBy') },
   get registeredOn() { return t('g4.embassy.registeredOn') },
+  /** On the person's own row: how many browsers they have and how many wait for them. Their rows are on that card. */
+  hisBrowsers: (n: number): string => t('w13s.embassy.hisBrowsers', { n }),
+  hisBrowsersWaiting: (n: number): string => t('w13s.embassy.hisBrowsersWaiting', { n }),
 } as const
 
 // THE CARD WORDS, read in the page language by the one function every page that names a card uses
@@ -117,7 +117,7 @@ function groupWord(row: Pick<EmbassyRow, 'group' | 'groupKey' | 'groupMade'>): s
 }
 
 /** What a press on an asking card answers: the credential it acted on, and the one row that changed. */
-type AnAnsweredCredential = { credential: VisitorCredential; row: EmbassyRow | null }
+export type AnAnsweredCredential = { credential: VisitorCredential; row: EmbassyRow | null }
 
 export function EmbassyPage({
   waiting,
@@ -135,9 +135,11 @@ export function EmbassyPage({
    * loading and blank the list; this ref is how the follows reading knows what to ask for.
    */
   const view = useRef<EmbassyView>({ everyone: false, retired: false, tests: false })
-  // WHO THE OFFICE KNOWS, read again when an agent is registered or its registry row changes, and when a visit is
-  // registered or ended, at most once in 5 seconds (src/web/lib/record-changes.ts).
-  const [state, readAgain] = useProjectAsync(() => api.embassy(view.current), [], { follows: { lists: ['participants', 'visits'], atMostEveryMs: 5_000 } })
+  // WHO THE OFFICE KNOWS, read again when an agent is registered or its registry row changes, when a visit is
+  // registered or ended, and when what waits on the person changes, at most once in 5 seconds
+  // (src/web/lib/record-changes.ts). A pairing request asked, confirmed or ended elsewhere is announced on that last
+  // list, so a visitor's ask for a card is drawn here, and leaves the asking list, with no reload.
+  const [state, readAgain] = useProjectAsync(() => api.embassy(view.current), [], { follows: { lists: ['participants', 'visits', 'needsYou'], atMostEveryMs: 5_000 } })
   // WHO IS A PERMANENT RESIDENT, AND WHAT IS PROPOSED, for the marks and the proposals' rows. Read again when a proposal
   // or a decision is stored, because confirming a proposal stores a decision linked to it.
   const [residents, readResidentsAgain] = useAsync(() => api.residents(), [], { follows: { kinds: ['proposal', 'decision'], atMostEveryMs: 5_000 } })
@@ -225,17 +227,20 @@ export function TheEmbassy({
   const [tests, setTests] = useState(false)
   const [retired, setRetired] = useState(false)
   const stillRunning = (one: EmbassyWorldRow): boolean => one.world.diedAt === null && !isEphemeral(one.world.kind)
-  const waiting = shown.visitors.filter(credentialNeedsOwnerAction)
+  // THE PERSON'S BROWSERS ARE ON THEIR OWN CARD, design C of early idea B9: their asks and their rows are not drawn
+  // here, and the person's one row says how many there are. The same split as the office's page (shared/worlds.ts).
+  const waiting = shown.visitors.filter(anAskTheEmbassyDraws)
   // A PAGE REPLY SAYS WHAT IT HOLDS AND WHAT IS LEFT; a hand-made or older reply is filtered here as
   // it always was. `rowsTotal` is the mark that the office made a page.
   const aPage = shown.rowsTotal !== undefined
-  const live = shown.rows.filter((one) => one.standing !== 'asks to come in' && one.retired === null)
-  const closed = shown.rows.filter((one) => one.retired !== null)
-  const onlyContacts = (list: EmbassyRow[]): EmbassyRow[] =>
-    everyone ? list : list.filter((one) => one.contact || one.credential !== null)
-  const rows = aPage ? [...shown.rows, ...moreRows] : onlyContacts(retired ? [...live, ...closed] : live)
+  const citizens = shown.rows.filter((one) => !one.device)
+  const live = citizens.filter((one) => one.standing !== 'asks to come in' && one.retired === null)
+  const closed = citizens.filter((one) => one.retired !== null)
+  const aRowToPress = (one: EmbassyRow): boolean => one.contact || one.credential !== null || one.hisBrowsers !== undefined
+  const onlyContacts = (list: EmbassyRow[]): EmbassyRow[] => (everyone ? list : list.filter(aRowToPress))
+  const rows = aPage ? [...citizens, ...moreRows.filter((one) => !one.device)] : onlyContacts(retired ? [...live, ...closed] : live)
   const worlds = aPage ? shown.worlds : tests ? shown.worlds : shown.worlds.filter(stillRunning)
-  const hidden = shown.hidden ?? live.filter((one) => !one.contact && one.credential === null).length
+  const hidden = shown.hidden ?? live.filter((one) => !aRowToPress(one)).length
   const retiredCount = shown.retiredCount ?? closed.length
   const otherWorlds = shown.otherWorlds ?? shown.worlds.filter((one) => !stillRunning(one)).length
   const left = aPage ? Math.max(0, (shown.rowsTotal ?? 0) - rows.length) : 0
@@ -305,7 +310,6 @@ export function TheEmbassy({
   }
   return (
     <>
-      {inspect ? <p className="emb-says">{shown.says}</p> : null}
       {/* WHAT NEEDS THE PERSON COMES FIRST (shared rule R6): the asks, or one quiet line when there are none. */}
       {/* "NOTHING NEEDS YOU" ONLY WHEN THE PAGE KNOWS: if the proposals could not be read, it says that instead. */}
       {waiting.length === 0 && !sawAsks && !sawProposals ? (
@@ -381,7 +385,7 @@ export function TheEmbassy({
               </button>
             )}
             {worlds.length === 0 ? (
-              <p className="emb-none"><Absence /></p>
+              <p className="emb-none"><Absence tier="told-apart" looked word={t('absence.none')} /></p>
             ) : (
               <ul className="emb-list">
                 {worlds.map((one) => (
@@ -421,7 +425,7 @@ function WorldRow({ row }: { row: EmbassyWorldRow }) {
             {row.mismatches}
           </span>
         </span>
-        <span className="emb-claim">{inspect ? row.ownerIsAClaim : t('g4.embassy.ownerClaim')}</span>
+        {inspect ? <span className="emb-claim">{row.ownerIsAClaim}</span> : null}
       </div>
     </li>
   )
@@ -481,7 +485,6 @@ function TheOfficeItself({ office }: { office: EmbassyOffice }) {
               <span className="emb-top">
                 <RouteLink to={whoPath('agent', office.who.id)} className="emb-name">{name}</RouteLink>
               </span>
-              <span className="emb-claim">{t('embassyPage.theOffice.sends')}</span>
             </div>
           </li>
         </ul>
@@ -546,10 +549,11 @@ function Row({
         <span className="emb-picture"><Avatar kind={kind} id={row.who.id} name={name} url={row.avatarUrl} size={40} /></span>
       ) : (
         // A SMALL COPY IS DRAWN, AND A PRESS OPENS THE WHOLE PICTURE. See src/server/lib/portraits.ts.
-        <OpensLarge src={whereRequestsGo(row.portrait)} alt={EMBASSY_WORDS.portraitOf(cardWord(row.role ?? ''), row.chosePortrait)}>
+        <OpensLarge src={whereRequestsGo(row.portrait)} crossOrigin={theCrossOriginOfALoad()} alt={EMBASSY_WORDS.portraitOf(cardWord(row.role ?? ''), row.chosePortrait)}>
           <img
             className="emb-portrait"
             src={whereRequestsGo(smallPortrait(row.portrait))}
+            crossOrigin={theCrossOriginOfALoad()}
             alt={EMBASSY_WORDS.portraitOf(cardWord(row.role ?? ''), row.chosePortrait)}
             data-chosen={row.chosePortrait ? 'yes' : 'no'}
             width={40}
@@ -601,6 +605,12 @@ function Row({
           )}
           {row.registered || row.standing === 'asks to come in' ? null : (
             <span className="emb-unregistered">{EMBASSY_WORDS.unregistered}</span>
+          )}
+          {row.hisBrowsers === undefined ? null : (
+            <RouteLink to={whoPath('person', row.who.id)} className="emb-value">
+              {EMBASSY_WORDS.hisBrowsers(row.hisBrowsers.paired)}
+              {row.hisBrowsers.waiting === 0 ? null : <> · {EMBASSY_WORDS.hisBrowsersWaiting(row.hisBrowsers.waiting)}</>}
+            </RouteLink>
           )}
           {!inspect || row.who.kind !== 'agent' || row.device ? null : (
             <>
@@ -690,12 +700,19 @@ function AskingToComeIn({
     </Panel>
   )
 }
-function AskingCard({
+/**
+ * ONE ASK, WITH CONFIRM AND REFUSE. The person's own card draws their browsers' asks with this same card, so A1 (no
+ * Confirm where no key works) is drawn in one place. There `onHisCard` names the browser's row on that card.
+ */
+export function AskingCard({
   credential,
   onAnswered,
+  onHisCard,
 }: {
   credential: VisitorCredential
   onAnswered: (answer: AnAnsweredCredential) => void
+  /** Drawn on the person's card: where the name leads, and whether an address picked this row. */
+  onHisCard?: { opens: string; picked: boolean }
 }) {
   const inspect = useInspect()
   const [busy, setBusy] = useState<'confirm' | 'refuse' | null>(null)
@@ -723,10 +740,14 @@ function AskingCard({
       })
   }
   return (
-    <li className="emb-row emb-asking-card" data-standing="asks to come in">
+    <li
+      className="emb-row emb-asking-card"
+      data-standing="asks to come in"
+      {...(onHisCard === undefined ? {} : { 'data-browser': credential.id, 'data-picked': onHisCard.picked ? 'yes' : 'no' })}
+    >
       <div className="emb-words">
         <span className="emb-top">
-          <RouteLink to={visitorPath(credential.id)} className="emb-name">
+          <RouteLink to={onHisCard?.opens ?? visitorPath(credential.id)} className="emb-name">
             {credential.name}
           </RouteLink>
           {inspect ? <span className="emb-kind">{credential.handle}</span> : null}
@@ -747,9 +768,7 @@ function AskingCard({
         </span>
         {fault === null ? null : <ErrorNote message={fault.message} fault={fault.fault} />}
         {!inspect || keySays === null ? null : <span className="emb-claim">{keySays}</span>}
-        <p className="emb-asking-says">
-          {noKey ? t('g4.credential.tokenRemoved') : EMBASSY_WORDS.waitingSays(itIsAPersonsDevice ? EMBASSY_WORDS.device : EMBASSY_WORDS.agent)}
-        </p>
+        {noKey ? <p className="emb-asking-says">{t('g4.credential.tokenRemovedStanding')}</p> : null}
         <div className="emb-asking-acts">
           {noKey ? null : <Btn
             variant="primary"
@@ -774,8 +793,8 @@ function AskingCard({
   )
 }
 // The stylesheet's comments give their reasons in words. The two-column citizen row is a
-// decision's.
-const EMBASSY_CSS = `
+// decision's. The person's card draws the asking cards with it too.
+export const EMBASSY_CSS = `
 .emb-row[data-retired='yes'] { opacity: .7; }
 .emb-retired {
   color: var(--text-3); font-size: var(--fs-1); font-weight: 600;
@@ -796,14 +815,6 @@ const EMBASSY_CSS = `
 .emb-presence-word { color: var(--text-3); font-size: var(--fs-1); }
 .emb { display: flex; flex-direction: column; gap: var(--gut); min-width: 0; }
 .emb-title { margin: 0; color: var(--text); font: 600 var(--fs-6)/var(--lh-tight) var(--font-ui); }
-.emb-says {
-  margin: 0;
-  max-width: var(--measure-in-box);
-  font-size: var(--fs-2);
-  line-height: var(--lh-read);
-  color: var(--text-2);
-}
-.emb-says { font-size: var(--fs-1); color: var(--text-3); }
 .emb-show {
   min-height: 30px;
   align-self: flex-start;

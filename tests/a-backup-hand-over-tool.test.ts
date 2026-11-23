@@ -133,7 +133,7 @@ import { THE_PERSON } from '../src/shared/person.ts'
 import { momentOfAnInstant } from '../src/shared/time.ts'
 import { filesFolderOf, leftOutListOf } from '../src/shared/what-is-kept.ts'
 import { aTestDatabaseFolder } from './a-test-folder.ts'
-import { apiApp, freshDb, thePersonsKeyHeader, type TestDb } from './helpers.ts'
+import { apiApp, freshDb, thePersonsKeyHeader, type TestDb, governsTheWholeProject } from './helpers.ts'
 import { runOnce } from '../tools/run-the-host-jobs.mjs'
 import {
   everyProcessArgv,
@@ -1059,7 +1059,9 @@ describe('the door and the register', () => {
     const decided = await send(person, '/api/records', {
       kind: 'decision',
       title: 'The hand-over tool is registered for this test',
-      data: { replaces: [], option_taken: 'register the stand-in', because: 'this test office needs it', decided_by: THE_OWNER, authority: 'the owner said so', authority_reference: words.body['record'].id },
+      data: {
+        ...governsTheWholeProject(),
+        replaces: [], option_taken: 'register the stand-in', because: 'this test office needs it', decided_by: THE_OWNER, authority: 'the owner said so', authority_reference: words.body['record'].id },
     })
     expect(decided.status, decided.said.slice(0, 300)).toBe(201)
     decisionId = String(decided.body['record'].id)
@@ -1212,7 +1214,9 @@ describe('the runner calls a lost job\'s own recovery step, and only after its s
     const decided = await send('POST', '/api/records', person, {
       kind: 'decision',
       title: 'A registered tool may name its own recovery step for this test',
-      data: { replaces: [], option_taken: 'register the recovery stand-in', because: 'this test needs a lost job', decided_by: THE_OWNER, authority: 'the owner said so', authority_reference: words.body['record'].id },
+      data: {
+        ...governsTheWholeProject(),
+        replaces: [], option_taken: 'register the recovery stand-in', because: 'this test needs a lost job', decided_by: THE_OWNER, authority: 'the owner said so', authority_reference: words.body['record'].id },
     })
     expect(decided.status, decided.said.slice(0, 300)).toBe(201)
     decision = String(decided.body['record'].id)
@@ -1385,13 +1389,14 @@ describe('the runner calls a lost job\'s own recovery step, and only after its s
     // THE RUNNER TAKES THIS JOB ITSELF, so it writes the group down as it starts it and the test can stop it after.
     // THE GROUP IS SAID TO STILL HAVE A MEMBER, so the answer must say the step did not run. KILL is sent for real;
     // only the question "is the group gone" is answered no, so this branch is reached without a process ignoring KILL.
+    // THE RUNNER WAITS 300 MS for the group to go, not the live 5 s, since here it never goes.
     const realKill = process.kill.bind(process)
     const kill = vi.spyOn(process, 'kill').mockImplementation(((pid: number, signal?: string | number) => {
       if (pid < 0 && signal === 0) return true
       return realKill(pid, signal)
     }) as typeof process.kill)
     const stopping = new AbortController()
-    const running = runOnce({ api, key: officeKey, folder: runnerFolder, toolsFile, graceMs: 100, stop: stopping.signal })
+    const running = runOnce({ api, key: officeKey, folder: runnerFolder, toolsFile, graceMs: 100, groupWaitMs: 300, stop: stopping.signal })
     try {
       const until = Date.now() + 10_000
       for (;;) {

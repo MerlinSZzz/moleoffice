@@ -125,6 +125,8 @@ export const SURFACES = {
   'rail.quicksearch': 'Quick search',
   // THE SIDEBAR'S PRESS THAT OPENS A NEW QUICK NOTE, wave 13y round 167.
   'rail.quicknote': 'New note',
+  // THE SIDEBAR'S PRESS THAT OPENS A WEB PAGE in the window, wave 13t package OT-B (src/web/components/WebPage.tsx).
+  'rail.webpage': 'Web page',
   'rail.sheet': 'Mole Office component sheet',
   // THE OFFICE CONTROLS PAGE, wave 13y round 125: a panel on Settings before, now the Developer group's last page.
   'rail.officecontrols': 'Office controls',
@@ -188,7 +190,8 @@ export const SURFACES = {
   // EVERYBODY'S CHECKLISTS, part 2 of the checklists work: a person's and every agent's, in every project.
   'rail.checklists': 'Checklists',
   // THE FLOWS PAGE, every project's flows, each with its runs.
-  'rail.flows': 'Flows',
+  'rail.flows': 'Office flows',
+  'rail.knowledge': 'Knowledge',
   // THE READINESS CHECKLISTS, wave 13u round 13: an operation that reaches others waits for their signatures.
   'rail.readiness': 'Readiness checklists',
   'rail.signingpackages': 'Signing packages',
@@ -249,13 +252,13 @@ export const SURFACES = {
   'checklists.window': 'The checklists window',
   // THE FLOWS PAGE'S LIST, AND ONE FLOW: its facts, its stages in order, its latest runs over them, and the fold of
   // each stage's why and sources.
-  'flows.list': 'The list of flows',
-  'flows.facts': "A flow's facts",
-  'flows.stages': "A flow's stages",
-  'flows.runs': "A flow's latest runs",
-  'flows.reasons': "A flow's reasons and changes",
+  'flows.list': 'The list of office flows',
+  'flows.facts': "An office flow's facts",
+  'flows.stages': "An office flow's stages",
+  'flows.runs': "An office flow's latest runs",
+  'flows.reasons': "An office flow's reasons and changes",
   // THE FLOW EDITOR (round 36): one flow's stages being changed, or a new flow being filed.
-  'flows.editor': 'The flow editor',
+  'flows.editor': 'The office flow editor',
   // THE PACKAGE ON THE TASK'S OWN PAGE, criterion F16 point 3. A task that has a package shows it
   // where a person reads that task; a task with none draws nothing at all rather than an empty
   // panel. Named so a comment left on the panel is about the package and not the whole record.
@@ -368,6 +371,9 @@ export const SURFACES = {
   // ONE ROW PER LIVE KEY OF THE CITIZEN, each with its own Revoke press (problem yZ71bheXm-Ji). On the profile and
   // on the credential page.
   'profile.keys': 'Keys',
+  // THE PERSON'S BROWSERS AND THE MACHINES THIS OFFICE TRUSTS, ON THEIR OWN CARD. Design C of early idea B9: the one
+  // place for them and their presses, so its name says whose they are.
+  'profile.browsers': 'Your browsers and machines',
   'worlds.trusted': 'Machines this office trusts',
   // NOT THE SAME WORDS AS THE PANEL ABOVE, deliberately. It is one list drawn twice, and two chips
   // reading alike would leave a person unable to say which of the two they had commented on. The
@@ -650,6 +656,9 @@ export const SURFACES = {
   // changes rather than after either setting.
   'settings.messagelinks': 'A link in a message',
   'settings.detail': 'How much each thing says',
+  // WHETHER THE NUMBER OF REPORTS NOBODY HAS READ IS DRAWN. It is beside how much a page says because it is one
+  // more choice about what is drawn, and it is kept on the server so every browser the person reads in draws it.
+  'settings.reportcount': 'Unread reports',
   // THE ONE PANEL ON THIS PAGE THAT IS NOT ABOUT THIS BROWSER. It is registered on the Mole Office
   // computer and it belongs to one project, and the panel says both. `implementation-map.md` §9.4
   // puts it here — "registering a repository is configuration and not project work" — and
@@ -708,8 +717,8 @@ export const SURFACES = {
   // THE ENTRY IN LOOKS THAT LEADS TO THAT PAGE, which has no sidebar row of its own.
   'settings.arrangesidebar': 'Arrange the sidebar',
   'settings.chattextsize': "The chat's text size",
-  // THE PERSON'S FLAGS FOR THE MESSAGES THEY WRITE (wave 14d): one list of the two flags the office ships and the
-  // person's own, with the menu's 'No mark' entry. They follow the person.
+  // THE PERSON'S FLAGS FOR THE MESSAGES THEY WRITE (wave 14d): one list of the four flags the office ships and
+  // the person's own, with the menu's 'No mark' entry. They follow the person.
   'settings.chatlabels': 'Your flags',
   // WHICH KEY SENDS A MESSAGE. By default Enter starts a new line, and Shift+Enter
   // or Alt+Enter sends. It is the first panel in the `keys` category,
@@ -772,12 +781,15 @@ export const SURFACES = {
   // WHETHER THE OFFICE STARTS WHEN THE PERSON LOGS IN (wave 13t round W18c): the start-at-login card of Terminal
   // management, drawn again where Normal mode finds it. The name is the card's own heading.
   'settings.startatlogin': 'Start at login',
-  // THE KEYS THIS OFFICE HAS: ITS OWN TWO, AND EACH RUNTIME'S OWN ASKED READ-ONLY. Criterion U2.
-  // The reader's question is "which keys does this office have?", which is one question in two
-  // halves: the office's own, kept in one file beside its database, and each runtime's own, which
-  // the office never copies and only asks about. The name is short because a chip draws it.
+  // THE KEYS THIS OFFICE HAS: ITS OWN TWO, AND THE SANDBOXES' LOGINS. Criterion U2.
+  // The reader's question is "which keys does this office have?". Each runtime's own key was a
+  // third half here until wave 13u round 242 gave each coding tool a line in 'settings.codingtools'.
+  // The name is short because a chip draws it.
   'settings.keys': 'Keys and runtimes',
-  'settings.providerkeys': 'Add a provider key',
+  // ONE LINE FOR EACH CODING TOOL, WITH ITS SET UP PRESS (wave 13u round 242). The reader's question is "where do I
+  // set up a coding tool and its key?", and the answer is one line for each tool and one press that asks a secretary.
+  'settings.codingtools': 'Coding tools',
+  'settings.providerkeys': 'Keys for the id service and its mail',
   // NOTIFICATIONS ON THIS DEVICE. The reader's question is "will I be
   // told here when a secretary calls me?", and the answer is one press on each device.
   'settings.notifications': 'Notifications on this device',
@@ -1005,6 +1017,7 @@ export const RAIL_WORD_KEYS = {
   'rail.allpages': 'nav.allPages',
   'rail.quicksearch': 'nav.quickSearch',
   'rail.quicknote': 'nav.newNote',
+  'rail.webpage': 'nav.webPage',
   'rail.sheet': 'nav.sheet',
   'rail.officecontrols': 'runtimeSettings.title',
   'rail.bundles': 'nav.bundles',
@@ -1014,6 +1027,7 @@ export const RAIL_WORD_KEYS = {
   'rail.resources': 'nav.resources',
   'rail.checklists': 'nav.checklists',
   'rail.flows': 'nav.flows',
+  'rail.knowledge': 'knowledge.title',
   'rail.readiness': 'nav.readiness',
   'rail.signingpackages': 'nav.signingPackages',
   'rail.honour': 'nav.honourBoard',

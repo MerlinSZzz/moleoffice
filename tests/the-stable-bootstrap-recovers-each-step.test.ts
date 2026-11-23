@@ -5,7 +5,7 @@ import { expect, it } from 'vitest'
 import { createHash } from 'node:crypto'
 import { writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { fixture } from './stable-bootstrap-step-fixture.ts'
+import { fixture, theOriginalServesOn } from './stable-bootstrap-step-fixture.ts'
 
 it('refuses a live handoff after preparation and before the first stop', async () => {
   const f = await fixture()
@@ -38,10 +38,7 @@ it('recovers isolated failures before and after every preparation and handoff st
     for (const step of points) for (const when of ['before', 'after']) {
       const f = await fixture([{ step, phase: when }]), failed = await f[phase]()
       expect(f.remainingFaults, `${phase}:${step}/${when} did not execute`).toHaveLength(0)
-      expect(['unchanged', 'restored'], `${phase}:${step}/${when}: ${JSON.stringify(failed)}`).toContain(failed.state)
-      expect(f.serving()).toContain('development')
-      expect(f.envHash()).toBe(createHash('sha256').update(f.originalEnv).digest('hex'))
-      expect(f.groups.every(group => group.exit !== null || group.name === 'recover-development')).toBe(true)
+      theOriginalServesOn(f, failed, `${phase}:${step}/${when}`)
       writeFileSync(join(f.folder, 'isolated-result.json'), JSON.stringify({ phase, step, when, failed, events: f.events }, null, 2), { mode: 0o600 })
     }
   }

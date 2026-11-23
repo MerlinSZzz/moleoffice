@@ -103,6 +103,13 @@ describe('the row a shared sandbox is stopped by', () => {
     expect(theRowToStop(started, { workspace: 'robotics', check: 'the-last-check' })).toEqual({ workspace: 'panelx', session: 'the-first-check' })
   })
 
+  it('uses the holder project before the original project and retains the original project for old facts', () => {
+    const original = { workspace: 'first-project', startedBy: { session: 'first-check' }, containerRowHeldBy: { session: 'second-check', workspace: 'second-project' } }
+    expect(theRowToStop(original, { workspace: 'third-project', check: 'last-check' })).toEqual({ workspace: 'second-project', session: 'second-check' })
+    const old = { ...original, containerRowHeldBy: { session: 'second-check' } }
+    expect(theRowToStop(old, { workspace: 'third-project', check: 'last-check' })).toEqual({ workspace: 'first-project', session: 'second-check' })
+  })
+
   it("is the leaving check's own only when the instance records none", () => {
     expect(theRowToStop(null, { workspace: 'robotics', check: 'the-last-check' })).toEqual({ workspace: 'robotics', session: 'the-last-check' })
   })

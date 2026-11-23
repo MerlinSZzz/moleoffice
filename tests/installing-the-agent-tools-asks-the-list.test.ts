@@ -96,7 +96,8 @@ async function refused(who: string, words: string) {
 }
 
 beforeAll(async () => {
-  for (const name of ['MOLE_OFFICE_WORLD_STARTED_BY', 'MOLE_OFFICE_WORLD_SECRETARIES']) {
+  // SANDBOX_DIR TOO, because the office refuses every install press inside a sandbox, before the list is asked.
+  for (const name of ['MOLE_OFFICE_WORLD_STARTED_BY', 'MOLE_OFFICE_WORLD_SECRETARIES', 'SANDBOX_DIR']) {
     saved.set(name, process.env[name])
     delete process.env[name]
   }

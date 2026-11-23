@@ -50,6 +50,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { FastifyInstance } from 'fastify'
 import { apiApp, freshDb, type TestDb } from './helpers.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
+import { THE_TOOLSET_SENTENCE } from '../src/shared/toolset.ts'
+import { KNOWLEDGE_WORDS } from '../src/shared/words/en-wave-13u.ts'
 
 let t: TestDb
 let app: FastifyInstance
@@ -216,6 +218,7 @@ describe('the summonses, read by the person’s own tool', () => {
     expect(decl.cards.filter((one) => one.rung === null).map((one) => one.name)).toEqual(['inspector'])
     expect(theCardOffTheTree(decl)?.name).toBe('inspector')
     expect(theCardMessageSaidFor(decl, 'inspector', null)).toContain('the work you are to check')
+    expect(theCardMessageSaidFor(decl, 'inspector', null)).toContain(`${THE_TOOLSET_SENTENCE} ${KNOWLEDGE_WORDS.introduction}`)
   })
 
   it('7: are read in the order they were made, even when several are made in one second', async () => {

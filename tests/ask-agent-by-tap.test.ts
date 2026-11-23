@@ -1,5 +1,11 @@
 // Copyright © 2026 Zhengyang Shen
 // Licensed under the MIT License. See LICENSE.
+// Criterion change (wave 13s round 281, problem dWyVAhGRCn-v): the test opens Home's Late or stuck fold
+// before it taps a row.
+// Since HD-2d, Home draws Late or stuck inside a closed fold. The record row the late obligation
+// makes is inside it. So the test opens the fold with a tap before Mole Office is armed, and takes
+// the row from inside the fold. Before, the test took the first record row anywhere on Home, and the
+// row it meant was drawn closed.
 /**
  * `Ask agent` IS REACHABLE BY TAP, WHICH IS THE ONLY WAY IN ON A TOUCH SCREEN.
  *
@@ -70,10 +76,24 @@ beforeAll(async () => {
   await post('/api/records', { kind: 'problem', title: 'A tap has no button to press with', summary: 'Measured at 1440.' })
   // A PROMISE PAST ITS DATE, so Home's Late or stuck draws a record row. Since the approved Home
   // a record that is neither late nor waiting on the person is on no Home
-  // section, and the second tap below is on a record row.
+  // section, and the second tap below is on a record row. The row is inside Late or stuck's fold,
+  // which `beforeAll` opens below.
   await post('/api/records', { kind: 'obligation', title: 'A tap is owed an answer', data: { due: '2020-03-01', owedTo: 'the touch review', state: 'open' } })
   await page.goto(`http://127.0.0.1:${String(app.webPort)}/#/`, { timeout: 60_000 })
   await waitForThePage(page, 60_000)
+  // LATE OR STUCK IS A CLOSED FOLD ON HOME, and the row the second tap means is inside it. A finger
+  // opens it here, before the first tap arms Mole Office, as a person would. The fold is drawn once
+  // the projects' readings arrive.
+  const fold = '#main [data-home-late-open]'
+  await page.waitForSelector(fold, { timeout: 60_000 })
+  await page.tap(`${fold} > summary`)
+  // The click a tap makes may land after `page.tap` returns, so the fold's open property is read
+  // until it is true, for at most five seconds. A fold still closed fails here, by its own name.
+  await page
+    .waitForFunction((at) => document.querySelector<HTMLDetailsElement>(at)?.open === true, fold, { timeout: 5_000 })
+    .catch((err: unknown) => {
+      throw new Error(`a tap on Late or stuck's summary did not open its fold, so no row in it can be tapped: ${String(err)}`)
+    })
   await sleep(900)
   await page.keyboard.press('Escape')
   await sleep(150)
@@ -113,9 +133,10 @@ describe('the arm state, which is the whole touch path', () => {
   it('opens the composer on the thing the second tap lands on', async () => {
     // A RECORD ROW ON HOME, which says what it is and is not the control itself. Home's rows name
     // their records so they can be talked about (Row's target prop in ui.tsx says why: on 18 August
-    // 2026 Home had none).
+    // 2026 Home had none). It is the row inside Late or stuck's fold, which `beforeAll` opened.
+    // Test change (wave 13s round 281): before, this took the first record row anywhere on Home.
     const at = await page.evaluate(() => {
-      const one = document.querySelector('#main [data-target^="record/"]:not(:has([data-target]))')
+      const one = document.querySelector('#main [data-home-late-open] [data-target^="record/"]:not(:has([data-target]))')
       if (one === null) return null
       one.scrollIntoView({ block: 'center' })
       const box = one.getBoundingClientRect()

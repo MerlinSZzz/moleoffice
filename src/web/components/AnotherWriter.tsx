@@ -324,7 +324,7 @@ function TheirVersion({ recordId, kind, from, theirs }: { recordId: string; kind
         {open ? t('record.anotherWriter.hide') : t('record.anotherWriter.see')}
       </Btn>
       {!open ? null : from.seq === null ? (
-        <p className="aw-note">{t('record.anotherWriter.noComparison')}</p>
+        <p className="aw-note">{t('record.anotherWriter.cannotCompare')}</p>
       ) : (
         <TheComparison recordId={recordId} kind={kind} from={from.seq} to={theirs.seq} />
       )}
@@ -462,8 +462,6 @@ function TheChoice({
         </section>
         <YourChange record={theirs.record} patch={mine} />
       </div>
-      <p className="aw-note">{t('record.anotherWriter.saveMineMeans')}</p>
-      <p className="aw-note">{t('record.anotherWriter.keepTheirsMeans')}</p>
       <div className="aw-acts">
         <Btn onClick={() => answer('not now')}>{t('record.anotherWriter.notNow')}</Btn>
         <Btn onClick={() => answer('theirs')}>{t('record.anotherWriter.keepTheirs')}</Btn>

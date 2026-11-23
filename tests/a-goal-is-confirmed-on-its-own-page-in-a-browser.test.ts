@@ -39,7 +39,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { theRoleCardsFile } from '../src/server/lib/roles.ts'
 import { recordPath } from '../src/web/components/router.tsx'
-import { liveApp, waitForThePage, type LiveApp } from './helpers.ts'
+import { liveApp, waitForThePage, type LiveApp, governsTheWholeProject } from './helpers.ts'
 import { TEST_SHOTS, testShots } from './where-shots-go.ts'
 
 const HERE = 'default'
@@ -118,7 +118,7 @@ beforeAll(async () => {
   })
   const words = (await call<{ note: { id: string } }>('POST', `/api/records/${prepared}/file-as-my-words`, AS_THE_PERSON)).note.id
   decision = await file(asAgent('quill'), 'decision', 'The glaze bucket goal is the owner’s', {
-    replaces: [],
+    ...governsTheWholeProject(), replaces: [],
     decided_by: 'the owner',
     authority: 'the owner said so',
     authority_reference: words,

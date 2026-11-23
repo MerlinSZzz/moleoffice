@@ -44,8 +44,9 @@
  * LuJPs2otqWJN and Rp9Zn_WIAHPA). Only parentAttachment changes; attribution stays with
  * the filer. The office decides which parent a caller may name (problem NlOyicZP_Jjt): a session the caller has a
  * part in. It also files the run only for an agent the caller may file for: the agent itself, an agent above it in
- * its chain of starters, the person with their key, or the office; a run for the inspector may also be filed by a
- * secretary or by the submitter of the merge entry it checks. A refusal comes back as the office's own sentence.
+ * its chain of starters, its recorded leader, the person with their key, or the office; a run for the inspector
+ * may also be filed by a secretary or by the submitter of the merge entry it checks. A refusal comes back as the
+ * office's own sentence.
  *
  * A RUN ON ANOTHER COMPUTER IS FILED WITH --machine <name> INSTEAD OF --worktree (wave 13t round 22, agreed in
  * message Mtt-iDulvWDc). Its checkout is on that computer, so no git is run here and the run claims no worktree and no

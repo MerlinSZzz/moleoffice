@@ -24,7 +24,7 @@
  *      it is not judged;
  *   3. given `judge`, an unjudged reminder offers the three verdicts as presses, and a judged reminder and a miss offer
  *      none; with no `judge`, nothing offers a press;
- *   4. days with no reminder and no miss say so in words, and draw no lone dash;
+ *   4. days with no reminder and no miss draw the state word "none", and draw no lone dash;
  *   5. on a Chinese page each label is the word a Chinese page draws for it, and no word is missing;
  *   6. at 1440, 990, 660 and 390, light and dark, the part with long words never scrolls sideways;
  *   7. a judge's words are drawn as a line of their own, after the verdict and who judged, and never run on after
@@ -144,7 +144,6 @@ const NONE: TheDesignReminderCount['counts'] = { right: 0, wrongNotMethodWork: 0
 /** The labels the part draws with no value in them. */
 const LABELS = [
   'regulationsPage.reminders.title',
-  'regulationsPage.reminders.says',
   'regulationsPage.reminders.right',
   'regulationsPage.reminders.wrongNotMethodWork',
   'regulationsPage.reminders.wrongItWasThere',
@@ -290,9 +289,9 @@ describe('the design reminders in the This project part', () => {
     expect(pressesIn(theReminders(drawn(aCount()))), 'a press is drawn with no judge').toEqual([])
   })
 
-  it('4. days with no reminder and no miss say so in words, with no lone dash', () => {
+  it('4. days with no reminder and no miss draw the state word "none", with no lone dash', () => {
     const html = theReminders(drawn({ ...aCount(), counts: NONE, reminders: [] }))
-    expect(html).toContain(asDrawn(word('regulationsPage.reminders.none')))
+    expect(html).toContain(`>${asDrawn(word('absence.none'))}</span>`)
     expect(html).not.toContain('data-design-reminder="')
     const lone = [...html.matchAll(/class="px-absent"/g)]
     expect(lone, 'a lone dash is drawn').toEqual([])
@@ -316,9 +315,9 @@ describe('the design reminders in the This project part', () => {
       expect(drawnWord, `the Chinese page has no word for ${key}`).toBeDefined()
       expect(html, key).toContain(asDrawn(drawnWord!))
     }
-    const none = theWordAPageDraws('zh', 'regulationsPage.reminders.none')
-    expect(none, 'the Chinese page has no word for regulationsPage.reminders.none').toBeDefined()
-    expect(empty).toContain(asDrawn(none!))
+    const none = theWordAPageDraws('zh', 'absence.none')
+    expect(none, 'the Chinese page has no word for absence.none').toBeDefined()
+    expect(theReminders(empty)).toContain(`>${asDrawn(none!)}</span>`)
   })
 
   it("7. a judge's words are drawn as a line of their own, not run on after who judged", () => {

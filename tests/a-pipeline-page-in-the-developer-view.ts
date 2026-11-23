@@ -53,16 +53,16 @@ export interface ADeveloperLine {
   words: string
 }
 
-/** Every line of the developer section, in order; none when the page draws no such section. */
-export function theDeveloperLines(page: Page): Promise<ADeveloperLine[]> {
-  return page.locator(`${DEVELOPER} li`).evaluateAll((lines) =>
-    lines.map((line) => {
-      const key = line.querySelector('code')?.textContent?.trim() ?? ''
-      const all = line.textContent ?? ''
-      const at = key === '' ? -1 : all.indexOf(key)
-      return { key, words: (at === -1 ? all : all.slice(at + key.length)).replace(/\s+/g, ' ').trim() }
-    }),
-  )
+/** Lines kept on the drawing or its empty-state element, in their page order. */
+export async function theDeveloperLines(page: Page): Promise<ADeveloperLine[]> {
+  const raw = await page.locator('[data-to-developers]').first().getAttribute('data-to-developers')
+  return raw === null ? [] : JSON.parse(raw) as ADeveloperLine[]
+}
+
+/** The engine's unchanged map of link ids to its no-route reasons. */
+export async function theUnroutedLinks(page: Page): Promise<Record<string, string>> {
+  const raw = await page.locator('[data-drawing="lanes"]').first().getAttribute('data-not-drawn')
+  return raw === null ? {} : JSON.parse(raw) as Record<string, string>
 }
 
 /**
@@ -89,7 +89,6 @@ export const FOR_DEVELOPERS = [
   'lanesInput.linkOfAnotherPipeline',
   'lanesInput.linkOfAnotherPipelinesStep',
   'lanes.missingEnd',
-  'lanes.noRoute',
   'drawingWithNoMarks.workDomain',
   'g7b.Canvas.could_not_run',
   'g7b.Canvas.reading_who_is_working_on_these_records',

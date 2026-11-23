@@ -9,7 +9,7 @@ import type { AttentionPart, AttentionPartPage } from '@shared/attention-first-p
 import type { ParticipantKind } from '@shared/participants.ts'
 import { participantKey } from '@shared/messages.ts'
 import type { RuntimeRecord } from '@shared/runtime.ts'
-import type { HomeDoing, HomeRoster, WhoIsWorking } from '../../server/lib/working.ts'
+import type { HomeRoster, WhoIsWorking } from '../../server/lib/working.ts'
 import type { SearchReply } from '../../server/api/search.ts'
 import type { AttentionFlowReply, AttentionFullReply } from '../../server/lib/attention-shapes.ts'
 import type { MachineSweepReport } from '../../server/api/queries.ts'
@@ -18,6 +18,9 @@ import type { SessionTimeline } from '../../server/lib/sessions.ts'
 import { WORKSPACE_HEADER } from '../lib/workspace.ts'
 import { PROJECTS_QUERY, type ProjectChoice } from '@shared/across-projects.ts'
 import type { PanelRecord, RecordKind } from '@shared/types.ts'
+
+/** A search's reply asked at level 2, where every result carries its title. */
+export type SearchReplyWithTitles = Omit<SearchReply, 'results'> & { results: (SearchReply['results'][number] & { record: { title: string } })[] }
 
 type AttentionOptions = { machine?: 'include' | 'omit'; workspaceId?: string }
 function readAttention(opts: AttentionOptions & { shape: 'flow' }): Promise<AttentionFlowReply>
@@ -52,11 +55,13 @@ export const presenceDoors = {
    * right one for finding anything else — a note, a finding, a record that is not work.
    */
   search: (q: string, kind?: RecordKind, limit?: number, projects?: ProjectChoice) => {
-    const params = new URLSearchParams({ q })
+    // AT LEVEL 2, THE TITLE (src/shared/results-at-a-level.ts): every page that searches draws a result by its id, title,
+    // kind and project, and reads nothing else of it. At level 2 every result carries its title, past the cap as well.
+    const params = new URLSearchParams({ q, level: '2' })
     if (kind !== undefined) params.set('kind', kind)
     if (limit !== undefined) params.set('limit', String(limit))
     if (projects !== undefined) params.set(PROJECTS_QUERY, projects)
-    return request<SearchReply>(`/api/search?${params.toString()}`)
+    return request<SearchReplyWithTitles>(`/api/search?${params.toString()}`)
   },
 
   /**
@@ -125,23 +130,12 @@ export const presenceDoors = {
   /**
    * WHO IS ACTIVE IN ONE PROJECT, AS HOME'S AGENTS AT WORK DRAWS IT: the name, who started it and the
    * dot, and nothing else. The same roster as `whoIsWorking` above, read from the same rows;
-   * `theRosterHomeDraws` on the server has the measurement that made it. It does NOT carry what the
-   * run says it is doing: that line is read by `homeDoing` below, only for the agents of a group the
-   * person opens (round 31b of wave 13k).
+   * `theRosterHomeDraws` on the server has the measurement that made it. Each row names the run serving
+   * the agent (`doingFrom`), so Home asks no other read for it. It does NOT carry what that run says it is
+   * doing, which Home does not draw.
    */
   homeRoster: (opts: { workspaceId: string }) =>
     request<HomeRoster>('/api/working?shape=home', { headers: { [WORKSPACE_HEADER]: opts.workspaceId } }),
-
-  /**
-   * WHAT THE RUNS SERVING THESE AGENTS SAY THEY ARE DOING, in one project: the doing line each tile of an
-   * opened group draws under the agent's name. Asked for one opened group's agents and nobody else's, at
-   * most `DOING_ASKED_AT_ONCE` ids a read (src/shared/working.ts); `theDoingLinesHomeDraws` on the server
-   * says how it is read.
-   */
-  homeDoing: (opts: { workspaceId: string; agentIds: readonly string[] }) =>
-    request<HomeDoing>(`/api/working?shape=home&doing=${encodeURIComponent(opts.agentIds.join(','))}`, {
-      headers: { [WORKSPACE_HEADER]: opts.workspaceId },
-    }),
 
   /** One run's flow run, by the run's record id: the record, or null and the sentence saying why there is none. */
   flowRunOf: (runId: string) =>

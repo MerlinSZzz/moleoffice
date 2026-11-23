@@ -67,6 +67,7 @@ import { theWorldsOwnAuthority } from '../lib/worldauthority.ts'
 // an act for the person. In a test world it also names who may act there (criterion P84).
 import { theRefusalForSomebodyNotProvedThePerson, whatThisRequestShowed } from '../lib/not-proved-the-person.ts'
 import { anAgentItsOwnKeyProves, refusedWhileTheGateIsOff } from '../lib/who-may-act.ts'
+import { giveTheEntrysAgentItsKey, theStateOfTheEntrysKey } from '../lib/an-agents-key-file.ts'
 import { REPO_ROOT, gatePosition } from '../../config/settings.mjs'
 import {
   installTheEntry,
@@ -188,8 +189,13 @@ export async function entryRoutes(app: FastifyInstance): Promise<void> {
         'POST /api/office/install-the-entry',
         'It takes nothing: the two paths it writes are this server\'s own home directory and this checkout.',
       )
-      const result = await installTheEntry({ home: theOwnersHome(), checkout: REPO_ROOT })
-      if (!result.ok) throw new PanelError(result.says, 409)
+      const written = await installTheEntry({ home: theOwnersHome(), checkout: REPO_ROOT })
+      if (!written.ok) throw new PanelError(written.says, 409)
+      // THE KEY STEP, after the lines were written: on the person's own press the entry agent is found or made and keeps
+      // or is given a key of its own, in the file the session hook reads (lib/an-agents-key-file.ts). Any other press
+      // makes no key, and the answer says why.
+      const key = giveTheEntrysAgentItsKey(actor, workspaceOf(req))
+      const result = { ...written, thisComputersKey: key.thisComputersKey, says: `${written.says} ${key.says}` }
       // BEFORE IS NOT READ HERE, and the row says so rather than holding nothing, which would read as nothing having been
       // there (the inspector's note on run 9PpzkI9AiBPR, invariant 5).
       // An agent the gate let through at off is written down by name, as the change log names any change.
@@ -201,6 +207,27 @@ export async function entryRoutes(app: FastifyInstance): Promise<void> {
         workspaceId: workspaceOf(req),
       })
       return result
+    },
+  )
+
+  /**
+   * THE STATE OF THIS COMPUTER'S ENTRY KEY: none yet, held, or refused. The Settings entry reads it when it is drawn. It
+   * reads two files beside the office's key file and the key table, says nothing of what the files hold, and writes
+   * nothing.
+   */
+  app.get(
+    '/office/install-the-entry/this-computers-key',
+    route(
+      'office.install-entry.this-computers-key',
+      'local',
+      { because: 'acts-on-this-machine', act: "Reading the state of this computer's entry key" },
+      "The state of this computer's entry key: none-yet when no key file is there, and the entry press gives one; held " +
+        'when the file holds a live key of the live agent its neighbour file names; refused otherwise. It answers ' +
+        '{thisComputersKey}, never what a file holds, and writes nothing.',
+    ),
+    async (req) => {
+      takesNoInput(req, 'GET /api/office/install-the-entry/this-computers-key', 'It takes nothing: the files it reads are this office\'s own.')
+      return { thisComputersKey: theStateOfTheEntrysKey() }
     },
   )
 

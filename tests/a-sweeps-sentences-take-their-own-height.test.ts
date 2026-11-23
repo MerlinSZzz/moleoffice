@@ -1,12 +1,13 @@
 // Copyright © 2026 Zhengyang Shen
 // Licensed under the MIT License. See LICENSE.
 /**
- * A SWEEP'S SENTENCES TAKE THEIR OWN HEIGHT, NOT THE WIDTH OF THE PRIVACY SENTENCE BESIDE THE PRESS.
+ * A SWEEP'S SENTENCES TAKE THEIR OWN HEIGHT, NOT A WIDTH.
  *
- * The Agent runs page has one row: a privacy sentence and the press "Look for runs on this computer". The
- * sentence is a flex item with an 18em basis, which is a width there. What the press found is drawn under
- * that row in `.sx-look-did`, a flex COLUMN. Its sentences carried the same class, so the 18em basis became
- * each sentence's height: two sentences stood at the top of two empty blocks about 230 pixels tall.
+ * The Agent runs page has one row with the press "Look for runs on this computer". Until November 2026 a
+ * privacy sentence stood beside the press, a flex item with an 18em basis, which is a width there. What the
+ * press found is drawn under that row in `.sx-look-did`, a flex COLUMN. Its sentences carried the same class,
+ * so the 18em basis became each sentence's height: two sentences stood at the top of two empty blocks about
+ * 230 pixels tall. The privacy sentence was taken off the page in November 2026, as decided; the class stays.
  *
  * THIS FILE PRESSES THE REAL PAGE, with the server's answer to POST /api/sessions/discover made up by
  * page.route. The made-up reply carries the world header and the CORS headers the page needs to read a
@@ -14,15 +15,14 @@
  *
  * 1. AT 1440 AND AT 390, after a press that answers a whole sweep, every sentence in `.sx-look-did` is no
  *    taller than a Range over its own text, within 2 pixels.
- * 2. AT 1440, the privacy sentence still sits beside the press: the two share a top within a few pixels,
- *    and the sentence ends before the press begins sideways.
  *
  * MUTATIONS: put `flex: 1 1 18em` back on the sentences inside `.sx-look-did`, and 1 goes red on the
- * height. Give the privacy sentence no width in the row, and 2 goes red on the top or the side.
+ * height.
  */
 
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import type { Page } from 'playwright'
+import { HEADERS_A_PAGE_MAY_READ } from '../src/config/what-a-page-may-read.mjs'
 import { WORLD_HEADER } from '../src/config/world-header.mjs'
 import { t } from '../src/shared/i18n.ts'
 import { liveApp, waitForThePage, type LiveApp } from './helpers.ts'
@@ -30,14 +30,17 @@ import { liveApp, waitForThePage, type LiveApp } from './helpers.ts'
 let app: LiveApp
 /** Which world the test office says answered, copied onto every reply this file makes up. */
 let worldAnswered = ''
-/** The reply headers a page is allowed to read, copied from the real office's own health answer. */
-let exposedHeaders = ''
+/**
+ * The reply headers a page is allowed to read: the office's own list, joined as the office joins it for a page it
+ * takes. A reply to a request with no Origin carries no CORS headers, so the test process's own health read has none
+ * to copy.
+ */
+const exposedHeaders = HEADERS_A_PAGE_MAY_READ.join(', ')
 
 beforeAll(async () => {
   app = await liveApp({ name: 'a-sweeps-sentences-take-their-own-height', viewport: { width: 1440, height: 900 } })
   const health = await fetch(`${app.api}/api/health`)
   worldAnswered = health.headers.get(WORLD_HEADER) ?? ''
-  exposedHeaders = health.headers.get('access-control-expose-headers') ?? ''
   if (worldAnswered === '') throw new Error('the test office did not say which world answered GET /api/health')
 }, 240_000)
 
@@ -175,26 +178,3 @@ it('1. at 1440 and 390, each sentence of the sweep takes no more height than its
     }
   }
 }, 180_000)
-
-it('2. at 1440, the privacy sentence still sits beside the press', async () => {
-  const { page, close } = await aWindow(1440, 'light')
-  try {
-    await pressLookForRuns(page)
-    const privacy = page.locator('.sx-look > .sx-look-say').first()
-    await expect.poll(() => privacy.count(), { timeout: 10_000, message: 'the row drew its privacy sentence' }).toBe(1)
-    expect(await privacy.innerText()).toBe(t('g6a.sessions.lookPrivacy'))
-    const press = page.locator('.sx-look > .sx-look-act .px-btn').first()
-    const [sentenceBox, pressBox] = await Promise.all([privacy.boundingBox(), press.boundingBox()])
-    if (sentenceBox === null || pressBox === null) throw new Error('the privacy sentence or the press has no box')
-    expect(
-      Math.abs(sentenceBox.y - pressBox.y),
-      `the privacy sentence's top is ${String(Math.round(sentenceBox.y))} and the press's top is ${String(Math.round(pressBox.y))}`,
-    ).toBeLessThanOrEqual(6)
-    expect(
-      sentenceBox.x + sentenceBox.width,
-      'the privacy sentence has run into the press rather than sitting beside it',
-    ).toBeLessThanOrEqual(pressBox.x + 1)
-  } finally {
-    await close()
-  }
-}, 120_000)

@@ -1,6 +1,6 @@
 {
   "sort": "carried",
   "checks": 2,
-  "why": "Reading and installing the agent tools ask the person, then the grant check. The card keeps both doors unless this office allows them. An install under the grant raises and signs as the secretary; the person still signs through the person's own door.",
+  "why": "Reading the agent tools, installing them and reading whether one is signed in ask the person, then the grant check. The card keeps the list and the install unless this office allows them. An install under the grant raises and signs as the secretary; the person still signs through the person's own door. The key and the sign-in doors are asked by the provider key doors' own check, which no grant carries.",
   "background": "THE INSTALL PRESS, wave 13u round 3. Installing programs on this machine runs each vendor's installer in a terminal in the owner's home, and the list names where programs are on this machine; the round's brief makes both the owner's only."
 }

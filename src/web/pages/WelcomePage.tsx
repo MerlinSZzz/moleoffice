@@ -103,7 +103,6 @@ export function WelcomePage({ onNamed }: { onNamed: (owner: TheOfficeOwner) => v
               </label>
             ))}
           </div>
-          <p className="wlc-say">{t('welcomeGuide.languageSays')}</p>
         </fieldset>
 
         <header className="wlc-head">
@@ -122,10 +121,9 @@ export function WelcomePage({ onNamed }: { onNamed: (owner: TheOfficeOwner) => v
               autoComplete="name"
               value={name}
               data-placeholder-kept={keepsThePlaceholder ? '1' : undefined}
-              aria-describedby={`${ids}-says${keepsThePlaceholder ? ` ${ids}-kept` : ''}`}
+              aria-describedby={keepsThePlaceholder ? `${ids}-kept` : undefined}
               onChange={(event) => setTyped(event.target.value)}
             />
-            <p className="wlc-say" id={`${ids}-says`}>{t('welcomeGuide.nameSays')}</p>
             {/* THE WARNING KEEPS ITS PLACE WHILE IT IS NOT SHOWN (wave 13y round 129, item 68), so typing over the
                 placeholder moves nothing under it. Hidden, it is not read out, and the field no longer names it. */}
             <p className="wlc-say wlc-kept" id={`${ids}-kept`} data-shown={keepsThePlaceholder ? '1' : undefined}>

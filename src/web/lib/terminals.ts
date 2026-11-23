@@ -8,7 +8,8 @@
  * management page and an agent's profile page read the same way.
  *
  * READING A TERMINAL is a GET that stays open, carrying server-sent events: first `screen`, the terminal's
- * screen as it is now with the lines above it, then `output` and `resized` as they come, then `ended` or `closed`. It is
+ * screen as it is now with the lines above it, then `output` and `resized` as they come, then `ended` or `closed`. One
+ * reading of several terminals is one such GET, and every event on it names its terminal. It is
  * read with fetch rather than EventSource, as the page's own channel is (src/web/lib/channel.ts), because
  * only fetch carries the office's headers and the page's cookie. It is not counted as a request in
  * flight, because it never settles: the page would never be marked ready.
@@ -35,7 +36,8 @@ import type {
 import { HOME_MOVED_HEADER } from '../../config/visit-headers.mjs'
 import { ApiError, moleOfficeHeaders, moleOfficeRequest, readFault } from '../api.ts'
 import { theRefusalInWords } from '../components/ui.tsx'
-import { whereRequestsGo } from './visiting.ts'
+import { whatARequestCarries, whereRequestsGo } from './visiting.ts'
+import { theHoldOnThisRequest } from './the-device-half.ts'
 import { theWorldThatAnswered, WORLD_HEADER } from './world.ts'
 
 /**
@@ -201,17 +203,48 @@ function theEventsIn(block: string): { name: string; data: string } | null {
 }
 
 /**
- * READ ONE TERMINAL until `stop` is aborted or the stream ends. It does not open the stream again by
- * itself: a reader that wants to go on reads again, and is given the screen afresh.
+ * TELL ONE READER ONE EVENT OF ITS TERMINAL, in the shapes one terminal's stream sends. Answers true for an event after
+ * which that terminal's reading ends: it was closed, or the holder ended the stream.
  */
-export async function readTheTerminal(id: string, reader: TerminalReader, stop: AbortSignal): Promise<void> {
+function tellTheReader(reader: TerminalReader, name: string, said: Record<string, unknown>): boolean {
+  if (name === 'screen') {
+    reader.onScreen(said['terminal'] as TerminalReading, String(said['screen']))
+    if (said['typedFrom'] !== undefined) reader.onTypedFrom?.(said['typedFrom'] as TypedFrom)
+  } else if (name === 'typed-from') reader.onTypedFrom?.(said as unknown as TypedFrom)
+  else if (name === 'output') reader.onOutput(String(said['data']))
+  else if (name === 'resized') reader.onResized(Number(said['cols']), Number(said['rows']))
+  else if (name === 'ended') reader.onEnded(said['exit'] as { code: number; signal: number | null })
+  else if (name === 'closed') {
+    reader.onClosed()
+    return true
+  } else if (name === 'holder-gone') {
+    reader.onGone(String(said['says']))
+    return true
+  }
+  return false
+}
+
+/**
+ * READ ONE STREAM OF TERMINAL EVENTS at `path` until `stop` is aborted or the stream ends, handing each event to
+ * `onEvent`. `failed` is told a refusal's sentence or what went wrong. A stream that ends while it is still wanted was cut
+ * off, and `cutOff` is told; the caller knows whether a closing event came first.
+ */
+async function readAStream(
+  path: string,
+  stop: AbortSignal,
+  failed: (sentence: string) => void,
+  cutOff: (says: string) => void,
+  onEvent: (name: string, said: Record<string, unknown>) => void,
+): Promise<void> {
   const headers = moleOfficeHeaders()
   headers.set('accept', 'text/event-stream')
   let res: Response
   try {
-    res = await fetch(whereRequestsGo(`/api/terminals/${encodeURIComponent(id)}/stream`), { headers, credentials: 'include', signal: stop })
+    const heldByAPress = theHoldOnThisRequest()
+    if (heldByAPress !== undefined) await heldByAPress
+    res = await fetch(whereRequestsGo(path), { ...whatARequestCarries(path, headers), signal: stop })
   } catch (err) {
-    if (!stop.aborted) reader.onFailed(err instanceof Error ? err.message : String(err))
+    if (!stop.aborted) failed(err instanceof Error ? err.message : String(err))
     return
   }
   // A STREAM FROM ANOTHER WORLD IS NOT DRAWN. theWorldThatAnswered puts the page's own banner up. IT IS
@@ -219,7 +252,7 @@ export async function readTheTerminal(id: string, reader: TerminalReader, stop: 
   // own move, a reply from the moved office is read as this page's new home, and the terminal is drawn.
   if (theWorldThatAnswered(res.headers.get(WORLD_HEADER), res.headers.get(HOME_MOVED_HEADER)) !== null) {
     void res.body?.cancel()
-    reader.onFailed(t('terminals.view.otherWorld'))
+    failed(t('terminals.view.otherWorld'))
     return
   }
   if (!res.ok || res.body === null) {
@@ -229,21 +262,20 @@ export async function readTheTerminal(id: string, reader: TerminalReader, stop: 
     } catch {
       // The refusal had no body this could read; readFault then says what can be said from the status.
     }
-    const fault = readFault(res.status, `/api/terminals/${id}/stream`, body)
-    reader.onFailed(theRefusalInWords(fault.message, fault))
+    const fault = readFault(res.status, path, body)
+    failed(theRefusalInWords(fault.message, fault))
     return
   }
   const body = res.body.getReader()
   const decoder = new TextDecoder()
   let held = ''
-  // A STREAM THAT ENDS WITH NO CLOSING EVENT was cut off: the office restarted, or let a reader that fell too
-  // far behind go. The reader is told, so a view never goes on saying it is live when nothing comes.
-  let told = false
   try {
     for (;;) {
       const next = await body.read()
       if (next.done) {
-        if (!told && !stop.aborted) reader.onGone(t('terminals.view.cutOff'))
+        // A STREAM THAT ENDS WITH NO CLOSING EVENT was cut off: the office restarted, or let a reader that fell too
+        // far behind go. The reader is told, so a view never goes on saying it is live when nothing comes.
+        if (!stop.aborted) cutOff(t('terminals.view.cutOff'))
         return
       }
       held += decoder.decode(next.value, { stream: true })
@@ -253,26 +285,67 @@ export async function readTheTerminal(id: string, reader: TerminalReader, stop: 
         held = held.slice(at + 2)
         at = held.indexOf('\n\n')
         if (event === null) continue
-        const said = JSON.parse(event.data) as Record<string, unknown>
-        if (event.name === 'screen') {
-          reader.onScreen(said['terminal'] as TerminalReading, String(said['screen']))
-          if (said['typedFrom'] !== undefined) reader.onTypedFrom?.(said['typedFrom'] as TypedFrom)
-        } else if (event.name === 'typed-from') reader.onTypedFrom?.(said as unknown as TypedFrom)
-        else if (event.name === 'output') reader.onOutput(String(said['data']))
-        else if (event.name === 'resized') reader.onResized(Number(said['cols']), Number(said['rows']))
-        else if (event.name === 'ended') reader.onEnded(said['exit'] as { code: number; signal: number | null })
-        else if (event.name === 'closed') {
-          told = true
-          reader.onClosed()
-        } else if (event.name === 'holder-gone') {
-          told = true
-          reader.onGone(String(said['says']))
-        }
+        onEvent(event.name, JSON.parse(event.data) as Record<string, unknown>)
       }
     }
   } catch (err) {
-    if (!stop.aborted) reader.onFailed(err instanceof Error ? err.message : String(err))
+    if (!stop.aborted) failed(err instanceof Error ? err.message : String(err))
   }
+}
+
+/**
+ * READ ONE TERMINAL until `stop` is aborted or the stream ends. It does not open the stream again by
+ * itself: a reader that wants to go on reads again, and is given the screen afresh.
+ */
+export async function readTheTerminal(id: string, reader: TerminalReader, stop: AbortSignal): Promise<void> {
+  let told = false
+  await readAStream(
+    `/api/terminals/${encodeURIComponent(id)}/stream`,
+    stop,
+    reader.onFailed,
+    (says) => {
+      if (!told) reader.onGone(says)
+    },
+    (name, said) => {
+      if (tellTheReader(reader, name, said)) told = true
+    },
+  )
+}
+
+/**
+ * READ SEVERAL TERMINALS ON ONE STREAM, GET /api/terminals/stream, until `stop` is aborted or the reading ends. Each
+ * terminal has its reader, told what one terminal's stream would tell it: every event names its terminal, and it is
+ * handed to that terminal's reader. A terminal closed in the reading is told so, and the others go on. A refusal is told
+ * to every reader, because a reading that names one terminal its reader may not read is refused whole. It does not open
+ * the reading again by itself.
+ */
+export async function readTheTerminals(readers: ReadonlyMap<string, TerminalReader>, stop: AbortSignal): Promise<void> {
+  const told = new Set<string>()
+  const theUntold = (): TerminalReader[] => [...readers].filter(([id]) => !told.has(id)).map(([, reader]) => reader)
+  await readAStream(
+    `/api/terminals/stream?terminals=${[...readers.keys()].map(encodeURIComponent).join(',')}`,
+    stop,
+    (sentence) => {
+      for (const reader of readers.values()) reader.onFailed(sentence)
+    },
+    (says) => {
+      for (const reader of theUntold()) reader.onGone(says)
+    },
+    (name, said) => {
+      const id = String(said['terminal'])
+      const reader = readers.get(id)
+      if (reader === undefined || told.has(id)) return
+      // THE HOLDER ENDED THE WHOLE READING, so every terminal still read is told.
+      if (name === 'holder-gone') {
+        for (const one of theUntold()) one.onGone(String(said['says']))
+        for (const one of readers.keys()) told.add(one)
+        return
+      }
+      // EACH EVENT IN THE SHAPE ONE TERMINAL'S STREAM GIVES IT: the screen's terminal is its reading.
+      const asItsOwn = name === 'screen' ? { ...said, terminal: said['reading'] } : name === 'typed-from' ? (said['typedFrom'] as Record<string, unknown>) : said
+      if (tellTheReader(reader, name, asItsOwn)) told.add(id)
+    },
+  )
 }
 
 /** The last line the person typed into a terminal, when the screen showed it, and whether it looks like a key. */

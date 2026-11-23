@@ -8,9 +8,10 @@
  *
  *   1. The phone's top bar names the Reports page by the key its sidebar row reads, at 990 and 390,
  *      and names no project, because the sidebar lists that page under All projects.
- *   2. The chat's notice says the office could not tell for an agent whose session has a live
- *      process and no transcript, and "Cannot reach" for an agent nothing is answering as, in English
- *      and in the test language (problem TOoUy7fMbg1P, a note on wave 13j's round).
+ *   2. The chat's notice says the office could not tell for an agent whose hold has stopped beating
+ *      but is still kept, and whose session has a live process and no transcript, and "Cannot reach"
+ *      for an agent nothing is answering as, in English and in the test language (problem
+ *      TOoUy7fMbg1P, a note on wave 13j's round).
  *   3. The phone's top bar draws no "0 urgent" when nothing is urgent, and draws the pill with 2 when
  *      two things are (problem cslafTCFymQb).
  *   4. The Decisions page draws no "Project name unavailable" in normal mode: a project nobody could
@@ -26,13 +27,15 @@
 import { spawn, type ChildProcess } from 'node:child_process'
 import { mkdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import Database from 'better-sqlite3'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { BrowserContext, Page } from 'playwright'
-import { liveApp, waitForThePage, type LiveApp } from './helpers.ts'
+import { liveApp, waitForThePage, type LiveApp, governsTheWholeProject } from './helpers.ts'
 import { openTheContact } from './a-contact-navigation-keeps-what-failed.ts'
 import { createI18n } from '../src/shared/i18n.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { en } from '../src/shared/words/en.ts'
+import { localStamp } from '../src/shared/time.ts'
 
 let app: LiveApp
 const shots = process.env.W13Q_NOTES_FIXES_SHOTS
@@ -71,9 +74,15 @@ async function urgentNow(): Promise<number> {
   return ((await request('/api/attention')) as { visible: unknown[] }).visible.length
 }
 
+/** The setting for how long a hold that has stopped beating is still kept. */
+const GRACE = 'MOLE_OFFICE_HANDLE_GRACE_SECONDS'
+
 /**
- * An agent whose handle is held by a session with a live process and NO transcript on record: the
- * reading behind the hold says the office could not tell (src/server/lib/answering.ts).
+ * An agent whose handle is held by a session with a live process and NO transcript on record, and whose hold has
+ * stopped beating but is still kept: the reading behind the hold says the office could not tell
+ * (src/server/lib/answering.ts). A hold that still beats answers for its session unless something read of the
+ * session says it has gone, and a live process with no transcript says nothing either way, so the agent would read
+ * as answering. A kept hold is read from the session's process and transcript, and those cannot tell.
  */
 async function anAgentTheOfficeCannotTellAbout(): Promise<void> {
   await file('agent', UNSURE.name, { handle: UNSURE.handle, runtime: 'claude-code', state: 'active' })
@@ -93,6 +102,17 @@ async function anAgentTheOfficeCannotTellAbout(): Promise<void> {
     'x-mole-office-actor-id': UNSURE.handle,
     'x-mole-office-key': theOfficesKey,
   })
+  // THE HOLD LAST BEAT A HUNDRED SECONDS AGO, past the ninety-second lapse, so it is kept and no longer beating. The
+  // stamp is written into this test office's own database; nothing beats the hold again, because no waiter runs.
+  const db = new Database(join(app.dir, 'panelx.db'))
+  try {
+    const aged = db
+      .prepare('UPDATE handle_holds SET last_heard_at = ? WHERE session_record_id = ? AND released_at IS NULL')
+      .run(localStamp(new Date(Date.now() - 100_000)), session)
+    expect(aged.changes, 'the hold was not found, so nothing below reads a kept hold').toBe(1)
+  } finally {
+    db.close()
+  }
 }
 
 async function aWindow(width: number, theme: 'light' | 'dark' = 'light'): Promise<Page> {
@@ -109,10 +129,15 @@ async function open(page: Page, address: string): Promise<void> {
 }
 
 beforeAll(async () => {
-  app = await liveApp({ name: 'notes-fixes', workspace: 'default', viewport: { width: 1440, height: 900 } })
+  // THE GRACE IS A DAY for this file's office alone, so the hold stays kept for the whole file. The office is started
+  // with this process's environment, and the setting is put back as soon as it has started.
+  const graceBefore = process.env[GRACE]
+  process.env[GRACE] = '86400'
+  try { app = await liveApp({ name: 'notes-fixes', workspace: 'default', viewport: { width: 1440, height: 900 } }) }
+  finally { if (graceBefore === undefined) delete process.env[GRACE]; else process.env[GRACE] = graceBefore }
   await anAgentTheOfficeCannotTellAbout()
   await file('agent', GONE.name, { handle: GONE.handle, runtime: 'claude-code', state: 'active' })
-  // TEST KESTREL'S HANDLE IS HELD, so a send to it answers 201; nothing holds Test Heron's.
+  // TEST KESTREL'S HANDLE IS HELD, and kept, so a send to it answers 201; nothing holds Test Heron's.
   await file('message', 'A made-up question', { body: 'Can you read the lighthouse log for me?', to: [{ kind: 'agent', id: UNSURE.handle }] })
   // A PERSON'S SEND TO AN AGENT NOTHING HOLDS ANSWERS 409, with the letter stored and routed (decision 60sbc5I-bwKx).
   await file('message', 'A made-up question', { body: 'Can you read the lighthouse log for me?', to: [{ kind: 'agent', id: GONE.handle }] }, 409)
@@ -239,7 +264,7 @@ describe('the Decisions page', () => {
       because: 'Test reason.',
       who_settles_it: 'the owner',
     })
-    await file('decision', 'Test decision: the bell rings at dusk', { option_taken: 'The bell rings at dusk.', replaces: [] })
+    await file('decision', 'Test decision: the bell rings at dusk', { option_taken: 'The bell rings at dusk.', ...governsTheWholeProject(), replaces: [] })
     const page = await aWindow(1440)
     // THE NULL THE SERVER SENDS FOR AN ID NO PROJECT ROW HOLDS, put on every row of the reply.
     await page.route('**/api/forks', async (route) => {

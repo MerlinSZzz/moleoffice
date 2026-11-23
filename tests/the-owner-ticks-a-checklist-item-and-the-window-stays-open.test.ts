@@ -4,7 +4,7 @@
  * THE OWNER TICKS AN ITEM'S EMPTY BOX, AND THE CHECKLISTS WINDOW STAYS OPEN UNTIL THE OWNER CLOSES IT. Wave 13j round
  * loop-5, from a decision sent in a message: mark done can be a press on the empty box on the left, and the owner's
  * press needs no evidence.
- * Part e comes from a message in the brief vTlootllRM0Z: the checklist stays open when the owner presses inside
+ * Part e comes from a message in a brief: the checklist stays open when the owner presses inside
  * it, and closes only when the owner closes it, as the chat does.
  *
  * In a real browser, on this test's own office. The browser is the person: `liveApp`'s key window covers a caller on
@@ -20,11 +20,26 @@
  *    "Told: the tool maintainer" and, for an item the owner added, the line that no agent was told. Those three are read from their keys.
  *    MUTATION: `ItemFacts` in src/web/components/ChecklistParts.tsx drew none of the four. Case 2 goes red.
  * 3. THE WINDOW STAYS OPEN on a press inside it, on a press on the page outside it, at 1440 and at 390, and after a
- *    link in it takes the reader to a page. It closes on × and on Escape.
+ *    link in an opened item takes the reader to a page. It closes on × and on Escape. At 390 the window reaches the
+ *    foot of the screen, so the press outside it is on the page's name in the bar above it.
  *    MUTATION: `useCloseOnOutsidePress(box, close)` put back in ChecklistsWindow.tsx. Case 3 goes red.
  *    MUTATION: the hashchange listener that closed it put back. Case 3 goes red.
- * 4. SOMEBODY ELSE'S CHECKLIST, IN THE FULL VIEW, HAS NO BOX: it is shown to be read.
+ * 4. SOMEBODY ELSE'S CHECKLIST, UNDER THEIR NAME AMONG THE WINDOW'S NAMES, HAS NO BOX: it is shown to be read.
  *    MUTATION: the box drawn whatever `mayMark` says. Case 4 goes red.
+ *
+ * Test change (wave 13y round 175): the window draws design E, as decided. Each checklist is a card whose title opens
+ * nothing, so case 3 follows the link in an opened item to a report. Case 4 reaches another owner's checklist by
+ * choosing that owner's name in the window's row of names. Before, case 3 followed the link in a checklist's title to
+ * its page, and case 4 opened the window's full view; that link and the full view went.
+ *
+ * Test change (wave 13y round 175, after the pictures): at 390 the window is a sheet down to the foot of the screen,
+ * as decided, so case 3 presses outside it on the page's name in the bar above it. Before, it pressed near the foot
+ * of the screen at both widths, which at 390 is now inside the window.
+ *
+ * Test change (wave 13y round 175, the names behind Back): the window's names are folded behind a Back press at the
+ * start of its head, as decided, and they are plain presses, not tabs. Case 4 presses Back, found by its words, before
+ * it chooses the other owner's name among the window's name presses. Before, it chose the name in a row of tabs above
+ * the cards. What the case checks is unchanged.
  */
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
@@ -52,6 +67,7 @@ async function send(method: string, url: string, body: object | undefined, heade
 }
 
 let kiln = ''
+let notes = ''
 
 async function theItem(words: string): Promise<Record<string, any>> {
   const read = await send('GET', `/api/checklists/${kiln}`, undefined)
@@ -67,6 +83,15 @@ beforeAll(async () => {
   await send('POST', `/api/checklists/${kiln}/items`, { words: 'Sweep the kiln shelf', tell: ['quill'] }, AS('lark'))
   await send('POST', `/api/checklists/${kiln}/items`, { words: 'Weigh the glaze' }, AS('lark'))
   await send('POST', '/api/checklists', { title: "Lark's shelf list", items: [{ words: 'Clear the top shelf' }] }, AS('lark'))
+  // A LINK IN AN ITEM, for case 3: an opened item draws the records it links to.
+  notes = (
+    await send('POST', '/api/records', {
+      kind: 'report',
+      title: 'Made-up kiln notes',
+      data: { for: 'The owner', date: '2026-11-20', blocks: [{ id: 'b-1', type: 'text', text: 'Made up.' }] },
+    })
+  )['record'].id as string
+  await send('POST', `/api/checklists/${kiln}/items`, { words: 'Read the kiln notes', links: [notes] })
 }, 300_000)
 
 afterAll(async () => {
@@ -80,7 +105,7 @@ async function openTheWindow(page: Page, width = 1440): Promise<void> {
   await waitForThePage(page, 60_000)
   await page.waitForSelector('.ckw-press', { timeout: 30_000 })
   await page.click('.ckw-press')
-  await page.waitForSelector('.ckw-panel .ckw-group', { timeout: 30_000 })
+  await page.waitForSelector('.ckw-panel .cks-card', { timeout: 30_000 })
 }
 
 const row = (page: Page, words: string) => page.locator('.ckw-panel .ckp-item', { hasText: words })
@@ -134,11 +159,14 @@ describe("the owner's box marks an item done, and the window stays open until th
       const panel = page.locator('.ckw-panel')
       await panel.locator('.ckw-title').click()
       expect(await panel.isVisible(), `${String(width)}: a press inside it`).toBe(true)
-      await page.mouse.click(8, 890)
+      if (width === 390) await page.locator('.shell-bar-page').click()
+      else await page.mouse.click(8, 890)
       await page.waitForTimeout(300)
       expect(await panel.isVisible(), `${String(width)}: a press outside it`).toBe(true)
-      await panel.locator('.ckw-group-title', { hasText: 'Kiln checklist' }).click()
-      await page.waitForFunction(() => window.location.hash.startsWith('#/checklists'), undefined, { timeout: 15_000 })
+      const linked = row(page, 'Read the kiln notes')
+      if ((await linked.locator('details').getAttribute('open')) === null) await linked.locator('summary').click()
+      await linked.locator(`.ckp-link a[href="#/report/${notes}"]`).click()
+      await page.waitForFunction((id) => window.location.hash === `#/report/${id}`, notes, { timeout: 15_000 })
       await page.waitForTimeout(300)
       expect(await panel.isVisible(), `${String(width)}: after a link in it`).toBe(true)
       await page.keyboard.press('Escape')
@@ -150,12 +178,13 @@ describe("the owner's box marks an item done, and the window stays open until th
     }
   }, 180_000)
 
-  it("4. somebody else's checklist in the full view has no box", async () => {
+  it("4. somebody else's checklist, under their name, has no box", async () => {
     const page = app.page
     await openTheWindow(page)
     const panel = page.locator('.ckw-panel')
-    await panel.locator('.ckw-head').getByRole('button', { name: 'All checklists', exact: true }).click()
-    const theirs = panel.locator('.ckw-group', { hasText: "Lark's shelf list" })
+    await panel.getByRole('button', { name: en.t('checklists.window.back'), exact: true }).click()
+    await panel.locator('.ckw-names button', { hasText: 'Lark' }).click()
+    const theirs = panel.locator('.cks-card', { hasText: "Lark's shelf list" })
     await theirs.waitFor({ timeout: 20_000 })
     expect(await theirs.getByRole('button', { name: /^Mark as done/ }).count()).toBe(0)
     await page.keyboard.press('Escape')

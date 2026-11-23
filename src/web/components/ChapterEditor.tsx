@@ -107,6 +107,8 @@ export function ChapterEditor({ selected, editing = true, onChanged, children }:
   const recovery = current.inUse !== 'stored'
   const contentToEdit = current.stored ?? current.chapter
   const shippedContent = current.shipped
+  // ONE PRESS AT A TIME: the preview until a preview passes, then the reason and Apply. An edit clears the preview, so it comes back.
+  const theReviewIsGood = preview !== null && preview.problems.length === 0
   const actions = <div className="ce-actions">
     {person && editing && contentToEdit !== null ? <Btn size="sm" disabled={busy} reason={t('chapterEdit.busy')} onClick={() => begin(contentToEdit)}>{t('chapterEdit.edit')}</Btn> : null}
     {person && editing && recovery && shippedContent !== null ? <Btn size="sm" disabled={busy} reason={t('chapterEdit.busy')} onClick={() => begin(shippedContent, 'shipped')}>{t(current.inUse === 'none' ? 'chapterEdit.fileShipped' : 'chapterEdit.restoreShipped')}</Btn> : null}
@@ -127,7 +129,6 @@ export function ChapterEditor({ selected, editing = true, onChanged, children }:
     {person && draft !== null && !editing ? <p role="status">{t('regulationsMode.draftKept')}</p> : null}
     {person && draft !== null ? <section hidden={!editing} className="ce-form" data-chapter-form="" aria-label={t('chapterEdit.editing', { n: current.n })}>
       <h4>{t(from === 'shipped' ? 'chapterEdit.restoringShipped' : from === undefined ? 'chapterEdit.editing' : 'chapterEdit.restoringVersion', { n: from === undefined || from === 'shipped' ? current.n : from })}</h4>
-      {from === undefined ? <p>{t('chapterEdit.languages')}</p> : null}
       {from === undefined ? <fieldset disabled={busy}>
         {(['label', 'title', 'conclusion'] as const).map(key => <div className="ce-languages" key={key}>
           <label>{t(`chapterEdit.english.${key}`)}<textarea aria-label={t(`chapterEdit.english.${key}`)} lang="en" rows={key === 'conclusion' ? 3 : 2} value={draft[key]} onChange={event => edit({ ...draft, [key]: event.target.value })} /></label>
@@ -141,13 +142,12 @@ export function ChapterEditor({ selected, editing = true, onChanged, children }:
             <label>{t(`chapterEdit.chinese.${key}`, { id: rule.id })}<textarea aria-label={t(`chapterEdit.chinese.${key}`, { id: rule.id })} lang="zh" rows={key === 'text' ? 4 : 2} value={rule.zh?.[key] ?? ''} onChange={event => edit({ ...draft, rules: draft.rules.map((one, i) => i === index ? { ...one, zh: { heading: '', text: '', ...one.zh, [key]: event.target.value } } : one) })} />
             </label>
           </div>)}
-          <p className="ce-hint">{t('chapterEdit.chineseNeeded')}</p>
           <Btn size="sm" disabled={busy} reason={t('chapterEdit.busy')} onClick={() => edit({ ...draft, rules: draft.rules.filter((_, i) => i !== index) })}>{t('chapterEdit.removeRule', { id: rule.id })}</Btn>
         </fieldset>)}
         <Btn size="sm" disabled={busy} reason={t('chapterEdit.busy')} onClick={() => edit({ ...draft, rules: [...draft.rules, { id: nextRuleId(draft), heading: '', text: '', zh: null }] })}>{t('chapterEdit.addRule')}</Btn>
       </fieldset> : null}
       {needsKeep ? <label>{t('chapterEdit.keepRecord')}<select aria-label={t('chapterEdit.keepRecord')} disabled={busy} value={keep} onChange={event => { setKeep(event.target.value); setPreview(null) }}><option value="">{t('chapterEdit.chooseRecord')}</option>{base.notUsed!.records.map(id => <option value={id} key={id}>{id}</option>)}</select></label> : null}
-      <div className="ce-actions"><Btn pending={busy} disabled={needsKeep && !keep} reason={t('chapterEdit.chooseRecord')} onClick={() => void check()}>{t('chapterEdit.preview')}</Btn><Btn variant="ghost" disabled={busy} reason={t('chapterEdit.busy')} onClick={() => { setDraft(null); setPreview(null); setFailure(null); setNotice('') }}>{t('chapterEdit.cancel')}</Btn></div>
+      <div className="ce-actions">{theReviewIsGood ? null : <Btn pending={busy} disabled={needsKeep && !keep} reason={t('chapterEdit.chooseRecord')} onClick={() => void check()}>{t('chapterEdit.preview')}</Btn>}<Btn variant="ghost" disabled={busy} reason={t('chapterEdit.busy')} onClick={() => { setDraft(null); setPreview(null); setFailure(null); setNotice('') }}>{t('chapterEdit.cancel')}</Btn></div>
       {preview === null ? null : <section className="ce-preview" data-chapter-preview="" aria-live="polite">
         <h4>{t('chapterEdit.previewTitle')}</h4>
         {preview.problems.length > 0 ? <div role="alert"><p>{t('chapterEdit.fixProblems')}</p><ul>{preview.problems.map((problem, i) => <li key={i}>{problem}</li>)}</ul></div> : <p>{t('chapterEdit.valid')}</p>}
@@ -155,8 +155,10 @@ export function ChapterEditor({ selected, editing = true, onChanged, children }:
         <>{preview.ownWords === null ? null : <ChapterChanges before={preview.ownWords.was} after={preview.ownWords.becomes} />}<RuleChanges changes={preview.changes} /></>
       </section>}
 
-      <label>{t('chapterEdit.reason')}<textarea aria-label={t('chapterEdit.reason')} rows={2} maxLength={500} required disabled={busy} value={because} onChange={event => setBecause(event.target.value)} /></label>
-      <Btn pending={busy} disabled={preview === null || preview.problems.length > 0 || !reasonOK || (needsKeep && !keep) || conflict} reason={t('chapterEdit.applyNeeds')} onClick={() => void apply()}>{t(from === undefined ? 'chapterEdit.apply' : 'chapterEdit.restore')}</Btn>
+      {theReviewIsGood ? <>
+        <label>{t('chapterEdit.reason')}<textarea aria-label={t('chapterEdit.reason')} rows={2} maxLength={500} required disabled={busy} value={because} onChange={event => setBecause(event.target.value)} /></label>
+        <Btn pending={busy} disabled={!reasonOK || (needsKeep && !keep) || conflict} reason={t('chapterEdit.applyNeeds')} onClick={() => void apply()}>{t(from === undefined ? 'chapterEdit.apply' : 'chapterEdit.restore')}</Btn>
+      </> : null}
     </section> : null}
     {failure === null ? null : <><ErrorNote message={errorMessage(failure)} fault={faultOf(failure)} />{conflict ? <div role="alert"><p>{t('chapterEdit.changed')}</p><Btn pending={busy} onClick={() => void reread()}>{t('chapterEdit.readAgain')}</Btn></div> : null}</>}
     {notice ? <p role="status">{notice}</p> : null}

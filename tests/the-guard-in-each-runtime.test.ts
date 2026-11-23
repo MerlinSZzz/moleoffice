@@ -168,7 +168,7 @@ describe.skipIf(ON)('the guard in each real runtime (switched off)', () => {
 })
 
 describe.skipIf(!ON)('the guard in each real runtime', () => {
-  it.skipIf(whereItIs('claude', process.env['PATH']) === null)('Claude Code, under bypassPermissions, does not run the call the guard stops', async () => {
+  it.skipIf(whereItIs('claude', process.env) === null)('Claude Code, under bypassPermissions, does not run the call the guard stops', async () => {
     const { root, work } = world('claude')
     const api = await standIn(anthropic([
       { name: 'Bash', input: { command: EMPTY_DELETE, description: 'a delete of an unset variable' } },
@@ -198,7 +198,7 @@ describe.skipIf(!ON)('the guard in each real runtime', () => {
     }
   }, 90_000)
 
-  it.skipIf(whereItIs('codex', process.env['PATH']) === null)('Codex, with full access, does not run the shell call or the patch the guard stops', async () => {
+  it.skipIf(whereItIs('codex', process.env) === null)('Codex, with full access, does not run the shell call or the patch the guard stops', async () => {
     const { root, work } = world('codex')
     mkdirSync(join(root, 'codex-home'), { recursive: true })
     const api = await standIn(responses([
@@ -233,7 +233,7 @@ describe.skipIf(!ON)('the guard in each real runtime', () => {
     }
   }, 90_000)
 
-  it.skipIf(whereItIs('opencode', process.env['PATH']) === null)('OpenCode does not run the call the guard plugin stops', async () => {
+  it.skipIf(whereItIs('opencode', process.env) === null)('OpenCode does not run the call the guard plugin stops', async () => {
     const { root, work } = world('opencode')
     const api = await standIn(anthropic([
       { name: 'bash', input: { command: EMPTY_DELETE } },

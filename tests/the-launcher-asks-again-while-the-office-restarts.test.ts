@@ -90,13 +90,14 @@ import { aTestAddress } from './the-test-commit-address.mjs'
 import { spawn, execFileSync } from 'node:child_process'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, readlinkSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { createServer as createHttpServer, type Server as HttpServer } from 'node:http'
-import { connect, createServer, type Server, type Socket } from 'node:net'
+import { createServer, type Server } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import type { AddressInfo } from 'node:net'
 import type { FastifyInstance } from 'fastify'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { aRelayThatNamesTheOffice } from './a-relay-that-names-the-office.ts'
 import { apiApp, freshDb, type TestDb } from './helpers.ts'
 import { FAKE_DF, FAKE_FREE, FAKE_DU, FAKE_DEVCONTAINER, FAKE_DOCKER, startsOf, theFakeMachine, withAPrivateTmpToSweep } from './sandbox-stand-ins.ts'
 import { askTheOfficeWhileItRestarts, readHostInstance, THE_FACTS_VARIABLE, theFactsAStartIsGiven } from '../tools/sandbox-common.mjs'
@@ -182,13 +183,7 @@ const THE_STAND_IN_ANSWERED = 'the dev supervisor answered for the office that n
 async function aRelayThatStartsLate(ms: number): Promise<ARestart> {
   const port = await aFreePort()
   const target = (app.server.address() as AddressInfo).port
-  const relay: Server = createServer((inbound: Socket) => {
-    const outbound = connect(target, '127.0.0.1')
-    inbound.pipe(outbound)
-    outbound.pipe(inbound)
-    inbound.on('error', () => outbound.destroy())
-    outbound.on('error', () => inbound.destroy())
-  })
+  const relay = aRelayThatNamesTheOffice(target)
   let listen: NodeJS.Timeout | undefined
   closers.push(() => {
     clearTimeout(listen)
@@ -214,13 +209,7 @@ async function aRestartWithTheStandIn(ms: number): Promise<ARestart> {
     stdio: ['ignore', 'pipe', 'inherit', held as any],
   })
   const gone = new Promise<void>((ok) => standIn.once('exit', () => ok()))
-  const relay: Server = createServer((inbound: Socket) => {
-    const outbound = connect(target, '127.0.0.1')
-    inbound.pipe(outbound)
-    outbound.pipe(inbound)
-    inbound.on('error', () => outbound.destroy())
-    outbound.on('error', () => inbound.destroy())
-  })
+  const relay = aRelayThatNamesTheOffice(target)
   let giveWay: NodeJS.Timeout | undefined
   const heard = (said: string): void => {
     if (giveWay !== undefined || !said.includes(THE_STAND_IN_ANSWERED)) return

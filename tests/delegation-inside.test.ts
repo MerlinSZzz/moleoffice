@@ -4,7 +4,7 @@ import { aMadeUpModuleForPackage, injectedPackageFixture } from './module-packag
 import type { FastifyInstance } from 'fastify'
 import { afterAll, beforeAll, beforeEach, expect, it } from 'vitest'
 import { THE_MESSAGE_WORKER_ID } from '../src/shared/participants.ts'
-import { apiApp, freshDb, theOfficesKeyHeader, type TestDb } from './helpers.ts'
+import { apiApp, freshDb, theOfficesKeyHeader, type TestDb, governsTheWholeProject } from './helpers.ts'
 import { THE_TEST_OFFICES_OWNER } from './a-page-of-a-test-office.ts'
 
 let db: TestDb
@@ -17,7 +17,7 @@ beforeAll(async () => { db = await freshDb(); app = (await apiApp()).app; await 
 afterAll(async () => { await app.close(); db.close() })
 beforeEach(async () => { workspace = `inside-${++n}`; const r = await app.inject({ method: 'POST', url: '/api/workspaces', payload: { id: workspace, title: 'Inside test' } }); expect(r.statusCode, r.body).toBe(201) })
 async function file(kind: string, title: string, data: Record<string, unknown> = {}, headers = human()) {
-  const r = await app.inject({ method: 'POST', url: '/api/records', headers, payload: { kind, title, data: kind === 'decision' ? { replaces: [], ...data } : data } })
+  const r = await app.inject({ method: 'POST', url: '/api/records', headers, payload: { kind, title, data: kind === 'decision' ? { ...governsTheWholeProject(), replaces: [], ...data } : data } })
   expect(r.statusCode, r.body).toBe(201)
   return r.json().record.id as string
 }

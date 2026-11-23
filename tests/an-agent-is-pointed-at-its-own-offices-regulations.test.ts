@@ -50,6 +50,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { FastifyInstance } from 'fastify'
 
 import { THE_PERSON } from '../src/shared/person.ts'
+import { THE_TOOLSET_SENTENCE } from '../src/shared/toolset.ts'
+import { KNOWLEDGE_WORDS } from '../src/shared/words/en-wave-13u.ts'
 import { apiApp, freshDb, thePersonsKeyHeader, type TestDb } from './helpers.ts'
 
 const BARE = 'no-chapters-here'
@@ -178,6 +180,7 @@ describe("an agent is pointed at the regulations of the office it is in", () => 
       const registered = await register(project, { handle, name: handle, role: 'worker' })
       expect(registered.statusCode, registered.body).toBe(201)
       const said = await theCardMessageTo(handle)
+      expect(said).toContain(`${THE_TOOLSET_SENTENCE} ${KNOWLEDGE_WORDS.introduction}`)
       for (const n of [1, 2, 3, 5, 9]) expect(said, `the worker card reads chapter ${String(n)}, registered in ${project}`).toContain(label(n))
       expect(said, 'the worker card reads chapter 4, which the office does not hold, and the message must say so').toMatch(
         /chapter 4[^.]*does not hold|holds no chapter 4/u,

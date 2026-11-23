@@ -7,7 +7,8 @@ import { type WhatTheOfficeSays, request } from '../api.ts'
 import { PAGE_SHAPE } from '@shared/short-lists.ts'
 import type { EmbassyView, WhatTheEmbassyPageSays, World as WorldOnTheWire } from '@shared/worlds.ts'
 import type { WhatTheHeaderOnlyCallersSay } from '@shared/headeronlycalls.ts'
-import type { WhatAskingToPairSays, WhatThePairingSays } from '@shared/pairing.ts'
+import type { WhatAskingToPairSays, WhatTheMoveSays, WhatThePairingSays, WhatThePressSays } from '@shared/pairing.ts'
+import { aPressThatSetsTheCookieHalf } from '../lib/the-device-half.ts'
 
 /** The page of the Embassy a view asks for, as a path. The view's flags are the only query it sets. */
 function theEmbassyPageUrl(onThePage: Partial<EmbassyView>): string {
@@ -88,21 +89,35 @@ export const worldsDoors = {
   pairing: () => request<WhatThePairingSays>('/api/office/pairing'),
 
   /**
-   * PAIR THIS BROWSER, IN ONE PRESS. The reply sets the person's key as an HttpOnly cookie and the
-   * browser attaches it to every request from then on, because the transport sends credentials.
+   * PAIR THIS BROWSER, IN ONE PRESS, UNDER A NAME THIS BROWSER GIVES ITSELF. The reply sets the cookie half of a device
+   * key as an HttpOnly cookie and answers the header half once. The header half is kept before the press is said to be
+   * done, and the page's other requests wait until it is (`aPressThatSetsTheCookieHalf`). The transport sends both
+   * halves on every request from then on.
    */
-  pairThisBrowser: () => request<WhatThePairingSays>('/api/office/pairing', { method: 'POST' }),
+  pairThisBrowser: (device: string): Promise<WhatThePressSays> =>
+    aPressThatSetsTheCookieHalf({ method: 'POST', body: JSON.stringify({ device }) }, (press) =>
+      request<WhatThePressSays>('/api/office/pairing', press),
+    ),
 
   /**
-   * ASK TO PAIR FROM A MACHINE THE OFFICE TRUSTS, UNDER A NAME THIS BROWSER GIVES ITSELF. It receives
-   * a person's-device credential's token as the same HttpOnly cookie and NEVER the token in the
-   * reply; nothing works until the person confirms the credential at the Embassy.
+   * ASK TO PAIR FROM ANOTHER MACHINE, UNDER A NAME THIS BROWSER GIVES ITSELF. It receives the cookie half of a
+   * person's-device credential's key as the same HttpOnly cookie, and the header half in the reply, which is kept as the
+   * press's is. It NEVER receives the whole key. Nothing works until the person confirms the credential at the Embassy.
    */
-  askToPairThisBrowser: (device: string) =>
-    request<WhatAskingToPairSays>('/api/office/pairing/ask', {
-      method: 'POST',
-      body: JSON.stringify({ device }),
-    }),
+  askToPairThisBrowser: (device: string): Promise<WhatAskingToPairSays> =>
+    aPressThatSetsTheCookieHalf({ method: 'POST', body: JSON.stringify({ device }) }, (press) =>
+      request<WhatAskingToPairSays>('/api/office/pairing/ask', press),
+    ),
+
+  /**
+   * MOVE THIS BROWSER FROM THE OLD COOKIE TO TWO HALVES, ONCE, UNDER A NAME THIS BROWSER GIVES ITSELF. Item 7 of SEC-2's
+   * design. The reply sets the cookie half, ends the old cookie and answers the header half once, which is kept as the
+   * press's is, before the move is said to be done. src/web/lib/the-old-cookie.ts asks it at most once a load.
+   */
+  moveThisBrowser: (device: string): Promise<WhatTheMoveSays> =>
+    aPressThatSetsTheCookieHalf({ method: 'POST', body: JSON.stringify({ device }) }, (press) =>
+      request<WhatTheMoveSays>('/api/office/pairing/move', press),
+    ),
 
   /** The name a person reads for a world. The identity of a world is its database and does not move. */
   renameWorld: (id: string, name: string) =>

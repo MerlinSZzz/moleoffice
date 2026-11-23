@@ -285,7 +285,7 @@ describe('the notice after a filed line is taken out of the plan', () => {
     expect(normal).toContain('This plan can no longer see:')
     expect(normal).toContain(`3 hours in ${named()}`)
     expect(normal).not.toContain(thisWeek())
-    expect(normal).toContain('Nothing was deleted. All of it is still on the work, unchanged.')
+    // CRITERION CHANGE, as decided: the notice no longer adds that nothing was deleted.
     expect(screen(drawn, 'inspect')).toContain(`3 hours in ${thisWeek()}`)
   })
 })

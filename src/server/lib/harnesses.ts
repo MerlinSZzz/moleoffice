@@ -9,23 +9,30 @@
  *
  * WHAT THE OFFICE DOES AND DOES NOT DO (design report 6NVaDzG7tyUB, block b-5). The office ships none of these
  * programs. It runs each vendor's own installer, unchanged, in a terminal the person can see, in the person's
- * home. It never collects, stores or passes on a login: each person signs in to the unmodified program with
- * their own account, themselves. Nothing here reads a key, passes a key or runs a login command.
+ * home. It never collects or stores a login: each person signs in to the unmodified program with their own
+ * account. Nothing here reads a key, passes a key or runs a login command. Since wave 13u round 242 the person may
+ * also type a key that the office gives to the tool's own login on standard input and drops, or press a sign-in that
+ * starts the tool's own: both are in ./setting-up-an-agent-tool.ts, with the reading of whether a tool is signed in.
  *
  * THIS FILE IS THE ONE DECLARATION. Each entry names its program, its official install command with the
  * vendor's page that states it, and where its newest version is read. Every install command was read on the
  * vendor's own page on 4 October 2026, and the line it was read from is quoted beside it. A harness whose
  * vendor names no installer the office can run has `install: null` and the reason, and the page says so.
  * No install command here was written from memory.
+ *
+ * A PROGRAM IS FOUND IN THE WHOLE ENVIRONMENT IT RUNS WITH. Its search path is read by `theSearchPathIn` of this
+ * system (src/config/systems/the-system.mjs): on Windows the one name that is PATH in any case, and elsewhere `PATH`
+ * alone. The key a kept version is held under is made from the same reading.
  */
 
 import { realpathSync, statSync } from 'node:fs'
 import type { HarnessListing, HarnessReading, NewestVersion, Newer, NoInstallCode, ProgramVersion } from '@shared/harnesses.ts'
 import { THE_PROGRAM_FOR_RUNTIME, whereIsThisTool } from '../../config/runtimes.mjs'
+import { thisSystem } from '../../config/systems/the-system.mjs'
 import { FULL_PERMISSIONS } from '../../config/run-permissions.mjs'
 import { settingValue } from '../../config/settings.mjs'
 import { osProbe } from './resources.ts'
-import type { HarnessRefusalCode } from '@shared/refusal-codes.ts'
+import type { AgentToolSetupRefusalCode, HarnessRefusalCode } from '@shared/refusal-codes.ts'
 import { theHomeNamedIn, theHomeVariable } from '../../config/the-paths-of-a-system.mjs'
 import { THE_FIRST_SIZE } from '../../config/the-terminal-holder.mjs'
 import { PanelError } from './panel-error.ts'
@@ -53,6 +60,12 @@ export interface Harness {
   install: { command: string; source: string; read: string } | null
   noInstall: { code: NoInstallCode; says: string } | null
   newest: NewestFrom
+  /**
+   * WHERE ITS ACCOUNT SIGN-IN SENDS THE PERSON, and the page that states it with the day it was read there: a device
+   * page the office answers itself, or the one host an address the tool prints must have
+   * (./setting-up-an-agent-tool.ts). Null for a tool the office starts no account sign-in for.
+   */
+  signIn: { devicePage: string; source: string; read: string } | { host: string; source: string; read: string } | null
 }
 
 /**
@@ -73,6 +86,9 @@ export const THE_HARNESSES: readonly Harness[] = [
     // The same page: "The npm package installs the same native binary as the standalone installer."
     //   npm install -g @anthropic-ai/claude-code
     newest: { registry: 'npm', package: '@anthropic-ai/claude-code' },
+    // https://code.claude.com/docs/en/network-config, read 2026-11-22, table "Network access requirements":
+    //   "`claude.com` | claude.ai account sign-in opens a `claude.com` page in the browser, which redirects to `claude.ai`"
+    signIn: { host: 'claude.com', source: 'https://code.claude.com/docs/en/network-config', read: '2026-11-22' },
   },
   {
     id: 'codex',
@@ -84,6 +100,11 @@ export const THE_HARNESSES: readonly Harness[] = [
     noInstall: null,
     // The same README: "Codex CLI can also be installed via the following package managers: ... npm install -g @openai/codex"
     newest: { registry: 'npm', package: '@openai/codex' },
+    // Its device sign-in, `codex login --device-auth`. Its page https://learn.chatgpt.com/docs/auth, read 2026-11-22, says
+    // "Open the link in your browser, sign in, then enter the one-time code" and gives no address. Its own source gives it,
+    // read the same day: codex-rs/login/src/device_code_auth.rs, `verification_url: format!("{base_url}/codex/device")`,
+    // where base_url is the issuer, and codex-rs/login/src/server.rs, `DEFAULT_ISSUER: &str = "https://auth.openai.com"`.
+    signIn: { devicePage: 'https://auth.openai.com/codex/device', source: 'https://github.com/openai/codex/blob/main/codex-rs/login/src/device_code_auth.rs', read: '2026-11-22' },
   },
   {
     id: 'opencode',
@@ -95,6 +116,7 @@ export const THE_HARNESSES: readonly Harness[] = [
     noInstall: null,
     // The same page: "Alternatively, you can install it using npm" (npm install -g opencode-ai).
     newest: { registry: 'npm', package: 'opencode-ai' },
+    signIn: null,
   },
   {
     id: 'kimi',
@@ -116,6 +138,7 @@ export const THE_HARNESSES: readonly Harness[] = [
         'Kimi Code CLI, is a different program the office has not been checked against, so it is not installed here.',
     },
     newest: { registry: 'pypi', package: 'kimi-cli' },
+    signIn: null,
   },
   {
     id: 'dsh',
@@ -133,6 +156,7 @@ export const THE_HARNESSES: readonly Harness[] = [
         'profile of its own (tools/dsh-hooks/install-profile.mjs).',
     },
     newest: { registry: 'npm', package: '@deepseek-ai/dsh' },
+    signIn: null,
   },
 ]
 
@@ -279,9 +303,9 @@ const AN_INSTALLED_VERSION_IS_KEPT_MS = 10 * 60 * 1000
 const keptVersions = new Map<string, { until: number; file: string; answer: ProgramVersion; readAt: string }>()
 const readingInstalled = new Map<string, Promise<void>>()
 
-/** Which file a program is, as far as a change of version can tell, or null when the PATH finds none. */
+/** Which file a program is, as far as a change of version can tell, or null when the search path finds none. */
 function theFileOf(program: string, env: Readonly<Record<string, string>>): string | null {
-  const where = whereIsThisTool(program, env['PATH'])
+  const where = whereIsThisTool(program, env)
   if (where === null) return null
   try {
     const real = realpathSync(where)
@@ -309,7 +333,7 @@ async function theInstalledVersion(
       beingReadAgain: null,
     }
   }
-  const key = `${program}\n${env['PATH'] ?? ''}`
+  const key = `${program}\n${thisSystem().theSearchPathIn(env) ?? ''}`
   const file = theFileOf(program, env)
   const held = keptVersions.get(key)
   if (held !== undefined && file !== null && held.file === file) {
@@ -424,8 +448,16 @@ export function theInstallScript(harnesses: readonly Harness[]): string {
   return lines.join('\n')
 }
 
-/** A refusal of the install press, with its code, so the panel draws it in its own language. */
-export function aHarnessRefusal(code: HarnessRefusalCode, sentence: string, status = 400, reason?: string): PanelError {
+/**
+ * A refusal of the install press or of setting up a tool (./setting-up-an-agent-tool.ts), with its code, so the panel
+ * draws it in its own language. A refusal whose words take values is built where it is thrown.
+ */
+export function aHarnessRefusal(
+  code: HarnessRefusalCode | Exclude<AgentToolSetupRefusalCode, 'harnessKeyLoginNotThisVersion'>,
+  sentence: string,
+  status = 400,
+  reason?: string,
+): PanelError {
   return new PanelError(sentence, status, undefined, undefined, reason, { code, values: {} })
 }
 

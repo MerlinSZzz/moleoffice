@@ -41,7 +41,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { GATES } from '../src/config/gates.mjs'
 import { MOLE_OFFICE_IS_NOT_YOURS_TO_CHANGE } from '../src/shared/participants.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
-import { apiApp, freshDb, thePersonsKeyHeader, type TestDb } from './helpers.ts'
+import { A_SLEEP_TIME, apiApp, freshDb, thePersonsKeyHeader, type TestDb } from './helpers.ts'
 
 const SUPERVISOR = 'round-x-supervisor'
 const SECRETARY = 'round-x-secretary'
@@ -197,7 +197,7 @@ describe('Mole Office\'s own row cannot be a permanent resident', () => {
 
   it('a secretary\'s proposal of the row is refused in words that name it, and nothing is filed', async () => {
     const before = proposals()
-    const refused = await call('POST', '/api/residents/proposals', as(SECRETARY), { agentId: moleOffice, because: BECAUSE })
+    const refused = await call('POST', '/api/residents/proposals', as(SECRETARY), { agentId: moleOffice, because: BECAUSE, sleepTime: A_SLEEP_TIME })
     expect(refused.status, refused.raw).toBe(409)
     expect(refused.error, 'the refusal does not name Mole Office\'s own row').toContain(String(moleOfficesRow()['name']))
     expect(proposals(), 'a refused proposal filed a record').toBe(before)
@@ -205,7 +205,7 @@ describe('Mole Office\'s own row cannot be a permanent resident', () => {
   })
 
   it('the person\'s confirm of a proposal that names the row is refused, the row is no resident, and no space is made', async () => {
-    const proposed = await call('POST', '/api/residents/proposals', as(SECRETARY), { agentId: PROPOSED, because: BECAUSE })
+    const proposed = await call('POST', '/api/residents/proposals', as(SECRETARY), { agentId: PROPOSED, because: BECAUSE, sleepTime: A_SLEEP_TIME })
     expect(proposed.status, proposed.raw).toBe(201)
     const id = String(proposed.body.proposal?.id ?? '')
     // A proposal filed before round X, standing for one: the agent it names is rewritten straight in the scratch database.

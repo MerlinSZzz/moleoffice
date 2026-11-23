@@ -1,23 +1,25 @@
 // Copyright © 2026 Zhengyang Shen
 // Licensed under the MIT License. See LICENSE.
 /**
- * A SECRETARY'S SLEEP TIME IS DRAWN ON ITS PROFILE, BESIDE ITS LAST SLEEP, AND ON ITS CHAT SIDE. On 6 November 2026
+ * A SECRETARY'S SLEEP TIME IS DRAWN ON ITS PROFILE, BESIDE ITS LAST SLEEP. ITS CHAT SIDE SAYS UNTIL WHEN IT SLEEPS
+ * WHILE THE OFFICE'S SLEEP GOES ON, AND NOTHING WHILE IT IS AWAKE. On 6 November 2026
  * each secretary sets its own sleep time, and the person may change it too. The door is
  * PUT /api/residents/:agentId/sleep-time; tests/a-secretary-sleeps-at-its-own-time.test.ts proves the door and the clock.
  *
  * WHAT IS MEASURED, each drawn with renderToStaticMarkup from a reading written here, with no server:
  *   1. the profile's Sleep place says the sleep time, the zone, when the next sleep begins and who set it; with none
- *      set it says so; on a resident without the secretary card it says only a secretary has one;
- *   2. the sleep-time editor is drawn for the person and for the secretary itself, holding the time that is set, and
- *      for nobody else, nor on a retired resident or one without the secretary card;
+ *      set it says so; a resident without the secretary card is drawn the same way;
+ *   2. the sleep-time editor is drawn for the person and for the resident itself, holding the time that is set, for a
+ *      resident without the secretary card too, and for nobody else, nor on a retired resident;
  *   3. while the office's sleep goes on, the Sleep place says until when, and the secretary itself may postpone it;
  *      a sleep begun by a press still has no Postpone;
- *   4. the chat's line says until when it sleeps, or at what time it sleeps, and the line after a press carries both;
+ *   4. the chat's line says until when it sleeps while the office's sleep goes on, and nothing for an awake resident,
+ *      with a last sleep and a sleep time or with a sleep time alone;
  *   5. the editor's press asks the sleep-time door, by path, method and body.
  *
  * MUTATIONS, EACH AFTER A CONTROL RUN AND RESTORED (the round's report names each run):
  *   - the Sleep time fact says "none" whatever is set: case 1 goes red;
- *   - the editor is drawn without asking for the secretary card: case 2 goes red;
+ *   - the editor is drawn only for a resident holding the secretary card: case 2 goes red;
  *   - `SleepPresses` draws Postpone only while awake, as before: case 3 goes red;
  *   - `sleepLineWords` forgets `wakesAt`: case 4 goes red;
  *   - `residentSleepTime` asks with POST: case 5 goes red.
@@ -50,7 +52,6 @@ const storage = {
 let sleep: typeof import('../src/web/components/ResidentSleep.tsx')
 let presses: typeof import('../src/web/components/SleepPresses.tsx')
 let line: typeof import('../src/web/components/SleepLine.tsx')
-let ui: typeof import('../src/web/components/ui.tsx')
 let api: typeof import('../src/web/api.ts')['api']
 const realFetch = globalThis.fetch
 
@@ -58,7 +59,6 @@ beforeAll(async () => {
   sleep = await import('../src/web/components/ResidentSleep.tsx')
   presses = await import('../src/web/components/SleepPresses.tsx')
   line = await import('../src/web/components/SleepLine.tsx')
-  ui = await import('../src/web/components/ui.tsx')
   api = (await import('../src/web/api.ts')).api
 })
 
@@ -106,6 +106,7 @@ function aReading(over: Partial<OneResidentReading['resident']>): OneResidentRea
       decisionId: 'test-decision',
       confirmedBy: owner,
       factsAtProposal: null,
+      homeWorldIsThisOffice: null,
       retired: false,
       retiredAt: null,
       successor: null,
@@ -138,7 +139,7 @@ function drawn(reading: OneResidentReading, looking: { type: string; id: string 
 const SET_THE_TIME = (): string => t('resident.sleep.time.press')
 
 describe('the sleep time on the profile', () => {
-  it('1: says the time, the zone, the next sleep and who set it; with none set, says so; without the card, says only a secretary has one', () => {
+  it('1: says the time, the zone, the next sleep and who set it; with none set, says none is set; the card changes nothing', () => {
     const set = strip(drawn(aReading({}), ANOTHER, false))
     expect(set).toContain(t('resident.sleep.time.label'))
     expect(set).toContain(t('resident.sleep.time.set', { startsAt: '03:00', minutes: 120, zone: 'Test/Zone', next: drawnStamp('2026-10-15 03:00:00') }))
@@ -148,13 +149,13 @@ describe('the sleep time on the profile', () => {
     expect(strip(drawn(byThePerson, THE_PERSON, true))).toContain(t('resident.sleep.time.setByYou', { when: drawnStamp(stamp) }))
     expect(strip(drawn(byThePerson, ITSELF, false))).toContain(t('resident.sleep.time.setByThePerson', { when: drawnStamp(stamp) }))
 
-    expect(strip(drawn(aReading({ sleep: { ...awake, sleepTime: null } }), ANOTHER, false))).toContain(t('resident.sleep.time.none'))
-    const noCard = strip(drawn(aReading({ sleep: { ...awake, sleepTime: null }, holdsTheSecretaryCard: false }), THE_PERSON, true))
-    expect(noCard).toContain(t('resident.sleep.time.notASecretary'))
-    expect(noCard).not.toContain(t('resident.sleep.time.none'))
+    expect(strip(drawn(aReading({ sleep: { ...awake, sleepTime: null } }), ANOTHER, false))).toContain(t('resident.sleep.time.noneSet'))
+    const noCard = strip(drawn(aReading({ holdsTheSecretaryCard: false }), ANOTHER, false))
+    expect(noCard).toContain(t('resident.sleep.time.set', { startsAt: '03:00', minutes: 120, zone: 'Test/Zone', next: drawnStamp('2026-10-15 03:00:00') }))
+    expect(noCard).not.toContain(t('resident.sleep.time.notASecretaryWord'))
   })
 
-  it('2: the editor is drawn for the person and for the secretary itself, holding the time that is set, and for nobody else', () => {
+  it('2: the editor is drawn for the person and for the resident itself, holding the time that is set, and for nobody else', () => {
     for (const [looking, thePerson] of [
       [THE_PERSON, true],
       [ITSELF, false],
@@ -168,7 +169,9 @@ describe('the sleep time on the profile', () => {
     expect(inputValues(drawn(aReading({ sleep: { ...awake, sleepTime: null } }), THE_PERSON, true))).toEqual(['', ''])
     expect(buttons(drawn(aReading({}), ANOTHER, false))).not.toContain(SET_THE_TIME())
     expect(buttons(drawn(aReading({ retired: true, retiredAt: stamp }), THE_PERSON, true))).not.toContain(SET_THE_TIME())
-    expect(buttons(drawn(aReading({ holdsTheSecretaryCard: false }), THE_PERSON, true))).not.toContain(SET_THE_TIME())
+    const noCard = drawn(aReading({ holdsTheSecretaryCard: false }), THE_PERSON, true)
+    expect(buttons(noCard)).toContain(SET_THE_TIME())
+    expect(inputValues(noCard)).toEqual(['03:00', '120'])
   })
 
   it('3: while the office’s sleep goes on it says until when, and the secretary itself may postpone it; a sleep by a press may not be', () => {
@@ -184,21 +187,14 @@ describe('the sleep time on the profile', () => {
 })
 
 describe("the chat's line", () => {
-  it('4: says until when it sleeps, or at what time it sleeps; the line after a press carries both', () => {
+  it('4: says until when it sleeps while the office’s sleep goes on, and nothing while it is awake', () => {
     const now = '2026-10-14 11:00:00'
     expect(line.sleepLineWords({ asleepSince: stamp, lastSleptAt: null, wakesAt: wakes, sleepTime: { startsAt: '10:00', minutes: 120 } }, now)).toBe(
       t('resident.sleep.line.asleepUntil', { until: '12:00' }),
     )
-    expect(line.sleepLineWords({ asleepSince: null, lastSleptAt: stamp, wakesAt: null, sleepTime: { startsAt: '03:00', minutes: 120 } }, now)).toBe(
-      t('resident.sleep.line.lastSleptSleepsAt', { ago: ui.relativeTime(stamp), at: '03:00' }),
-    )
-    expect(line.sleepLineWords({ asleepSince: null, lastSleptAt: null, wakesAt: null, sleepTime: { startsAt: '03:00', minutes: 120 } }, now)).toBe(
-      t('resident.sleep.line.sleepsAt', { at: '03:00' }),
-    )
+    expect(line.sleepLineWords({ asleepSince: null, lastSleptAt: stamp, wakesAt: null, sleepTime: { startsAt: '03:00', minutes: 120 } }, now)).toBeNull()
+    expect(line.sleepLineWords({ asleepSince: null, lastSleptAt: null, wakesAt: null, sleepTime: { startsAt: '03:00', minutes: 120 } }, now)).toBeNull()
     expect(line.sleepLineWords({ asleepSince: null, lastSleptAt: null, wakesAt: null, sleepTime: null }, now)).toBeNull()
-
-    expect(line.theLineAfterAPress(asleepByTheOffice)).toEqual({ asleepSince: stamp, lastSleptAt: null, wakesAt: wakes, sleepTime: { startsAt: '03:00', minutes: 120 } })
-    expect(line.theLineAfterAPress({ ...awake, lastSleepEndedAt: stamp, sleepTime: null })).toEqual({ asleepSince: null, lastSleptAt: stamp, wakesAt: null, sleepTime: null })
   })
 })
 

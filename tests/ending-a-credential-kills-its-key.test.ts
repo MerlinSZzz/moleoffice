@@ -43,7 +43,7 @@ import type { AddressInfo } from 'node:net'
 import type { FastifyInstance } from 'fastify'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { THE_TEST_OFFICES_OWNER } from './a-page-of-a-test-office.ts'
-import { apiApp, freshDb, type TestDb } from './helpers.ts'
+import { apiApp, freshDb, type TestDb, governsTheWholeProject } from './helpers.ts'
 
 /** The person's headers and the key: a device that was confirmed sends both. */
 const THE_PERSON = {
@@ -123,7 +123,8 @@ async function writeADecisionWithTheToken(token: string, title: string): Promise
     body: JSON.stringify({
       kind: 'decision',
       title,
-      data: { replaces: [], because: 'the token the device was shown when it asked' },
+      data: {
+        ...governsTheWholeProject(), replaces: [], because: 'the token the device was shown when it asked' },
     }),
   })
   const body = (await res.json()) as { error?: string; record?: { id?: string } }

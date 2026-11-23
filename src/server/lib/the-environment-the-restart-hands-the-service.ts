@@ -1,6 +1,7 @@
 // Copyright © 2026 Zhengyang Shen
 // Licensed under the MIT License. See LICENSE.
 import { ENV_FILE, mergedEnvironment, theEnvFileSuppliedThis } from '../../config/settings.mjs'
+import { withTheOfficesOwnSearchPath } from '../../config/the-users-own-path.mjs'
 
 /**
  * THE ENVIRONMENT THE INSTALLED SERVICE'S RESTART HANDS THE NEW SERVER.
@@ -16,6 +17,9 @@ import { ENV_FILE, mergedEnvironment, theEnvFileSuppliedThis } from '../../confi
  * is. Stored runtime choices are not flattened into the environment here: the replacement reads its
  * own database, as the restart manager's own note says.
  *
+ * THE PATH HANDED ON IS THE OFFICE'S OWN, without the user's entries this start joined after it
+ * (src/config/the-users-own-path.mjs). The new server reads the user's PATH again at its own start.
+ *
  * `file` and `processEnv` are taken so a test can hand in a made-up `.env` and a made-up
  * environment; production calls it with neither.
  */
@@ -24,7 +28,7 @@ export function theEnvironmentTheRestartHandsTheService(
   file: string = ENV_FILE,
 ): Record<string, string | undefined> {
   const inherited: Record<string, string | undefined> = {}
-  for (const [name, value] of Object.entries(processEnv)) {
+  for (const [name, value] of Object.entries(withTheOfficesOwnSearchPath(processEnv))) {
     if (!theEnvFileSuppliedThis(name, file)) inherited[name] = value
   }
   return mergedEnvironment(inherited, file)

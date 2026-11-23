@@ -55,6 +55,7 @@ import { existsSync, readdirSync, statSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { DEVICE_HALF_COOKIE, KEY_COOKIE } from '../src/config/key-header.mjs'
 import type { Page } from 'playwright'
 
 import { THE_PERSON } from '../src/shared/person.ts'
@@ -147,7 +148,7 @@ beforeAll(async () => {
   await live.page.addInitScript((who) => localStorage.setItem('mole-office.actor', JSON.stringify(who)), { type: 'agent', id: AGENT.handle })
   await live.page.addInitScript((theme) => localStorage.setItem('mole-office.preset.theme', theme), 'light')
   const held = await live.context.cookies()
-  expect(held.some((one) => one.name === 'mole-office-key'), 'the browser was given the person key').toBe(false)
+  expect(held.some((one) => one.name === KEY_COOKIE || one.name === DEVICE_HALF_COOKIE), 'the browser was given the person key or a half of a device key').toBe(false)
 }, 240_000)
 
 afterAll(async () => {

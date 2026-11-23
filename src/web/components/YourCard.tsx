@@ -41,7 +41,7 @@ import { useState } from 'react'
 import { api, errorMessage, faultOf, type Fault, type ProfileReply } from '../api.ts'
 import { Absence, Btn, ErrorNote, Panel, useAsync } from './ui.tsx'
 import { useProjectAsync } from '../lib/project-async.ts'
-import { whereRequestsGo } from '../lib/visiting.ts'
+import { theCrossOriginOfALoad, whereRequestsGo } from '../lib/visiting.ts'
 import { OpensLarge } from './PictureLarge.tsx'
 import { smallPortrait, type PortraitOnOffer } from '@shared/portraits.ts'
 
@@ -169,8 +169,8 @@ export function YourCard({ said, onChanged }: { said: ProfileReply; onChanged: (
                 <Absence say title={YOUR_CARD_WORDS.noPictureSays} />
               ) : (
                 // A SMALL COPY IS DRAWN, AND A PRESS OPENS THE WHOLE PICTURE.
-                <OpensLarge src={whereRequestsGo(heldPortrait)} alt={YOUR_CARD_WORDS.portrait}>
-                  <img className="yc-shown" src={whereRequestsGo(smallPortrait(heldPortrait))} alt={YOUR_CARD_WORDS.portrait} />
+                <OpensLarge src={whereRequestsGo(heldPortrait)} crossOrigin={theCrossOriginOfALoad()} alt={YOUR_CARD_WORDS.portrait}>
+                  <img className="yc-shown" src={whereRequestsGo(smallPortrait(heldPortrait))} crossOrigin={theCrossOriginOfALoad()} alt={YOUR_CARD_WORDS.portrait} />
                 </OpensLarge>
               )}
             </dd>
@@ -246,7 +246,7 @@ export function YourCard({ said, onChanged }: { said: ProfileReply; onChanged: (
                   title={`${one.of} ${one.name} — ${where}`}
                 >
                   {/* A small copy. The press here chooses the picture, so it does not open it. */}
-                  <img className="yc-pic-img" src={whereRequestsGo(smallPortrait(one.address))} alt={`${one.of} ${one.name}`} />
+                  <img className="yc-pic-img" src={whereRequestsGo(smallPortrait(one.address))} crossOrigin={theCrossOriginOfALoad()} alt={`${one.of} ${one.name}`} />
                 </button>
               </li>
             ))}

@@ -19,6 +19,8 @@
  *   5. an unreadable reading names its round and time, and draws no percentage;
  *   6. a null window draws "not given in this reading", and never 0%;
  *   7. a newer reading round with no event is named with its time;
+ *   9. a round, and the time it was read or last written, are labelled rows in the office's code style, a state the
+ *      sentence said is a state word after the round, and no sentence holds a round.
  *   8. a rejected reading draws that the login refused requests, and an allowed reading draws no status line.
  *
  * Every figure, stamp, sandbox and round here is made up. No token, key file, account or real reading is used.
@@ -30,10 +32,14 @@ import { createElement as h } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { beforeAll, describe, expect, it } from 'vitest'
 import type { LoginsWeek, OwnEventReading } from '../src/shared/logins-week.ts'
+import { createI18n, type WordKey } from '../src/shared/i18n.ts'
 
 type ThePanel = typeof import('../src/web/components/TheLoginsWeek.tsx')
 
 let panel: ThePanel
+const en = createI18n('en')
+/** A row's label or state word, by its key: the keys are new with the rows. */
+const word = (key: string): string => en.t(key as WordKey)
 
 /** A made-up zone, and the made-up stamps every reading here is written in. */
 const ZONE = 'Europe/London'
@@ -90,17 +96,34 @@ function theRow(markup: string): string {
   return textOf(row[1]!)
 }
 
+/** Each row in the sandboxes' login row: its label, the tag and text of its value, and the state word after it. */
+function theRows(markup: string): { label: string; tag: string; value: string; state: string | null }[] {
+  const row = /<li[^>]*data-login="sandboxes-claude"[^>]*>([\s\S]*?)<\/li>/.exec(markup)
+  if (row === null) throw new Error('the sandboxes’ login row was not drawn')
+  return [...row[1]!.matchAll(/<dt>([^<]*)<\/dt><dd><(\w+)[^>]*>([^<]*)<\/\2>(?:<span[^>]*>([^<]*)<\/span>)?<\/dd>/g)].map((m) => ({ label: m[1]!, tag: m[2]!, value: m[3]!, state: m[4] ?? null }))
+}
+
+/** The text of each sentence in the sandboxes' login row. */
+function theSentences(markup: string): string[] {
+  const row = /<li[^>]*data-login="sandboxes-claude"[^>]*>([\s\S]*?)<\/li>/.exec(markup)
+  return [...(row?.[1] ?? '').matchAll(/<p[^>]*>([\s\S]*?)<\/p>/g)].map((m) => textOf(m[1]!))
+}
+
 beforeAll(async () => {
   panel = await import('../src/web/components/TheLoginsWeek.tsx')
 })
 
 describe('the sandboxes’ Claude login, as its own reading said', () => {
-  it('draws both windows of a current reading, and the time and round it was read from', () => {
-    const text = textOf(drawn(ownEvent()))
+  it('draws both windows of a current reading, and the time and round it was read from as rows', () => {
+    const markup = drawn(ownEvent())
+    const text = textOf(markup)
     expect(text).toContain('Seven days: 63% used, resets at 2026-10-18 09:00')
     expect(text).toContain('Five hours: 12% used, resets at 2026-10-14 12:00')
-    expect(text).toContain('Read at 2026-10-14 09:00')
-    expect(text).toContain('sandbox-a/round-1')
+    expect(theRows(markup)).toEqual([
+      { label: word('loginsWeek.row.readAt'), tag: 'code', value: `2026-10-14 09:00 ${ZONE}`, state: null },
+      { label: word('loginsWeek.row.round'), tag: 'code', value: 'sandbox-a/round-1', state: null },
+    ])
+    for (const said of theSentences(markup)) expect(said, 'a sentence holds the round').not.toContain('sandbox-a/round-1')
     expect(text, 'the panel drew the server’s whole sentence').not.toContain(SERVER_SENTENCE)
   })
 
@@ -124,12 +147,14 @@ describe('the sandboxes’ Claude login, as its own reading said', () => {
     expect(row).not.toContain('%')
   })
 
-  it('names the round and time of an unreadable reading, and draws no figure', () => {
-    const row = theRow(drawn(ownEvent({ state: 'unreadable', status: null, windowType: null, resetsAt: null, sevenDays: null, fiveHours: null })))
-    expect(row).toContain('2026-10-14 09:00')
-    expect(row).toContain('sandbox-a/round-1')
-    expect(row).toContain('a shape the office does not know')
-    expect(row).not.toContain('%')
+  it('names the round and time of an unreadable reading as rows, with a state word, and draws no figure', () => {
+    const markup = drawn(ownEvent({ state: 'unreadable', status: null, windowType: null, resetsAt: null, sevenDays: null, fiveHours: null }))
+    expect(theRows(markup)).toEqual([
+      { label: word('loginsWeek.row.readAt'), tag: 'code', value: `2026-10-14 09:00 ${ZONE}`, state: null },
+      { label: word('loginsWeek.row.round'), tag: 'code', value: 'sandbox-a/round-1', state: word('loginsWeek.row.shapeNotKnown') },
+    ])
+    for (const said of theSentences(markup)) expect(said, 'a sentence holds the round').not.toContain('sandbox-a/round-1')
+    expect(theRow(markup)).not.toContain('%')
   })
 
   it('says a window the reading did not give was not given, and never draws it as 0%', () => {
@@ -139,11 +164,13 @@ describe('the sandboxes’ Claude login, as its own reading said', () => {
     expect(row).toContain('Five hours: 12% used, resets at 2026-10-14 12:00')
   })
 
-  it('names a newer reading round that gave no rate-limit event, with its time', () => {
-    const row = theRow(drawn(ownEvent({ newerRoundWithNoEvent: { sandbox: 'sandbox-b', folder: 'round-2', at: '2026-10-14 10:00:00' } })))
-    expect(row).toContain('sandbox-b/round-2')
-    expect(row).toContain('2026-10-14 10:00')
-    expect(row).toContain('gave no rate-limit event')
+  it('names a newer reading round that gave no rate-limit event, with its time, as rows', () => {
+    const markup = drawn(ownEvent({ newerRoundWithNoEvent: { sandbox: 'sandbox-b', folder: 'round-2', at: '2026-10-14 10:00:00' } }))
+    expect(theRows(markup).slice(2)).toEqual([
+      { label: word('loginsWeek.row.newerRound'), tag: 'code', value: 'sandbox-b/round-2', state: word('loginsWeek.row.noEvent') },
+      { label: word('loginsWeek.row.lastWritten'), tag: 'code', value: `2026-10-14 10:00 ${ZONE}`, state: null },
+    ])
+    for (const said of theSentences(markup)) expect(said, 'a sentence holds the newer round').not.toContain('sandbox-b/round-2')
   })
 
   it('draws that a rejected reading refused requests, and draws no status line for an allowed one', () => {

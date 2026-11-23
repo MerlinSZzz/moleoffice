@@ -28,7 +28,8 @@
  *
  * WHICH RECORDS, as the decisions on how lanes are stored and how the page carries the drawing say:
  *   - the master's Boxes level: every box of the big map, every record a node lane places in a listed lane, and every
- *     lane's head; with no lanes listed, each master step, at the head of the row of its boxes;
+ *     lane's head; with no lanes listed, each master step, at the head of the row of its boxes, and the modules joined
+ *     to the boxes by `feeds` links, as the next paragraph says;
  *   - the master's Steps level: the master's own steps, in tiers; stored lanes are not used there;
  *   - every other pipeline, at its Steps level only: its steps, the modules recorded as carrying them, every record a
  *     node lane places in a listed lane, and every lane's head;
@@ -36,6 +37,15 @@
  *     and the pipeline itself, as the area's head.
  * Every record an area is headed by is among the drawn records, made like any other, because the drawing draws an area's
  * head from its records and cannot draw a head that is not there.
+ *
+ * THE MODULES JOINED TO THE MASTER'S BOXES, by the decision on the master's Boxes level with no lanes stored: each module
+ * joined by a `feeds` link, in either direction, to a drawn box, and then each module joined by a `feeds` link to a
+ * module drawn so, until no more are found. Each is drawn as any module is. A module that a box's `feeds` link leads to
+ * is in a column beside the right of the row of the first such box, in the big map's order. A row has one column at
+ * most, its modules in the order of their first boxes, then by title. Every other such module is in one row above the
+ * first step's row, in the order of the `feeds` links among them, then by title; where those links go round in a ring,
+ * the first of the modules left, by title, comes next. Neither area has a heading, and nothing is stored. A master with
+ * no module joined to its boxes so draws the areas it drew before.
  */
 import { readTheBigMap, type TheBigMap } from '@shared/big-map-reading.ts'
 import { BLOCK_KIND, blockIdsOf, carriesBlock, carriesOf as carriedDataOf, type BlockLinkRow } from '@shared/blocks.ts'
@@ -285,8 +295,60 @@ export function lanesInputFor(
     })
   }
 
+  // The modules joined to the master's boxes, as the file's head says: the row above the first step's row, and the column
+  // beside the right of a row, by the row's key. Filled on the master's Boxes level with no lanes listed, and only there.
+  const joinedOnTop: string[] = []
+  const joinedBeside = new Map<string, string[]>()
+  /** Draws the modules joined to the map's drawn boxes by `feeds` links, and says where each goes. */
+  const drawTheJoinedModules = (map: TheBigMap): void => {
+    const feeds = loaded.links.filter((link) => link.type === 'feeds' && !link.broken && link.fromId !== link.toId)
+    const isAModule = (id: string): boolean => byId.get(id)?.kind === 'module'
+    const boxAt = new Map(map.boxes.flatMap((box, n) => (drawn.has(box.id) ? [[box.id, n] as const] : [])))
+    const joined = new Set<string>()
+    for (const link of feeds) {
+      if (boxAt.has(link.fromId) && isAModule(link.toId)) joined.add(link.toId)
+      if (boxAt.has(link.toId) && isAModule(link.fromId)) joined.add(link.fromId)
+    }
+    // Then each module joined to one of those, until no more are found.
+    for (let size = -1; size !== joined.size; ) {
+      size = joined.size
+      for (const link of feeds) {
+        if (joined.has(link.fromId) && isAModule(link.toId)) joined.add(link.toId)
+        if (joined.has(link.toId) && isAModule(link.fromId)) joined.add(link.fromId)
+      }
+    }
+    const byTitle = (a: string, b: string): number => byId.get(a)!.title.localeCompare(byId.get(b)!.title) || a.localeCompare(b)
+
+    // A module a box's feeds link leads to goes beside the row of the first such box, in the big map's order.
+    const firstBox = new Map<string, number>()
+    for (const link of feeds) {
+      const n = boxAt.get(link.fromId)
+      if (n === undefined || !joined.has(link.toId)) continue
+      if (n < (firstBox.get(link.toId) ?? Infinity)) firstBox.set(link.toId, n)
+    }
+    for (const [id, n] of [...firstBox].sort(([a, atA], [b, atB]) => atA - atB || byTitle(a, b))) {
+      const box = map.boxes[n]!
+      const row = map.blocks.find((block) => block.place === box.block)
+      if (row === undefined) throw new Error(`The box ${box.id} is in no row of the master's map, so the module ${id} it feeds has no row to go beside.`)
+      joinedBeside.set(row.id, [...(joinedBeside.get(row.id) ?? []), id])
+    }
+
+    // Every other one goes in the row on top, along the feeds links among them, then by title. When each module left is
+    // fed by another one left, the links go round in a ring, and the first left by title comes next.
+    const onTop = [...joined].filter((id) => !firstBox.has(id)).sort(byTitle)
+    const among = feeds.filter((link) => onTop.includes(link.fromId) && onTop.includes(link.toId))
+    while (joinedOnTop.length < onTop.length) {
+      const left = onTop.filter((id) => !joinedOnTop.includes(id))
+      const free = left.find((id) => !among.some((link) => link.toId === id && left.includes(link.fromId)))
+      joinedOnTop.push(free ?? left[0]!)
+    }
+
+    for (const id of joined) draw(byId.get(id)!)
+  }
+
   // ---------------------------------------------------------------- the drawing's own records
   const map = atBoxes ? readTheMastersMap(pipeline, loaded) : null
+  const layered = map !== null && listed === null && map.boxes.some((box) => box.tier !== null)
   if (map !== null) {
     map.boxes.forEach((box, n) => {
       const record = byId.get(box.id)
@@ -310,8 +372,12 @@ export function lanesInputFor(
         place: { order: undefined, group: 2, n, title: box.name, id: box.id },
       })
     })
-    // With no lanes listed, each master step heads the row of its boxes, so each is drawn, as that row's head.
-    if (listed === null) for (const block of map.blocks) draw(byId.get(block.id)!)
+    // With no lanes listed, each master step heads the row of its boxes, so each is drawn, as that row's head; and the
+    // modules joined to the boxes by feeds links are drawn, as the file's head says.
+    if (listed === null) {
+      if (!layered) for (const block of map.blocks) draw(byId.get(block.id)!)
+      drawTheJoinedModules(map)
+    }
   } else {
     for (const step of own.steps) draw(step.record)
     if (!isMaster) {
@@ -360,7 +426,7 @@ export function lanesInputFor(
     if (ownIds.has(link.fromId) === ownIds.has(link.toId) || link.broken) continue
     const far = ownIds.has(link.fromId) ? link.toId : link.fromId
     const step = firstReading.get(far)
-    if (step === undefined || !ofAnotherPipeline(far) || drawn.has(far)) continue
+    if (step === undefined || !ofAnotherPipeline(far) || drawn.has(far) || layered && map!.blocks.some((block) => block.id === far)) continue
     const listers = listedBy.get(far)!
     draw(step.record)
     elsewhere.set(listers[0]!.id, [...(elsewhere.get(listers[0]!.id) ?? []), far])
@@ -478,8 +544,41 @@ export function lanesInputFor(
     }
     for (const entry of byName.values()) entry.area.items = entry.held.sort((a, b) => byPlace(a.place, b.place)).map((one) => one.item)
     areas = top.sort((a, b) => byPlace(a.place, b.place)).map((one) => one.area)
+  } else if (map !== null && layered) {
+    const tier = (name: 'ways-in' | 'gate' | 'services' | 'data' | 'hosting' | 'runtime' | 'stores', arrange: LaneArea['arrange']): LaneArea | null => {
+      const boxes = map.boxes.filter((box) => box.tier === name && drawn.has(box.id)).map((box) => box.id)
+      if (!boxes.length) return null
+      const area = areaOf(name, { text: t(`bigMap.tier.${name}`), record: null }, arrange, boxes)
+      if (name === 'services') area.columns = 4
+      return area
+    }
+    const people = joinedOnTop.length ? areaOf('people', { text: t('lanes.people'), record: null }, 'row', joinedOnTop) : null
+    const ways = tier('ways-in', 'row')
+    const inside = [tier('gate', 'row'), tier('services', 'grid'), tier('data', 'row')].filter((area): area is LaneArea => area !== null)
+    const api: LaneArea | null = inside.length ? { ...areaOf('api-server', { text: t('lanes.apiServer'), record: null }, 'stack', []), frame: 'solid', items: inside.map((area) => ({ area })) } : null
+    const hosting = tier('hosting', 'stack')
+    const runtime = tier('runtime', 'stack')
+    const outsideIds = [...joinedBeside.values()].flat()
+    const outside: LaneArea | null = outsideIds.length ? { ...areaOf('outside', { text: t('lanes.outside'), record: null }, 'stack', outsideIds), frame: 'dashed' as const } : null
+    if (api && hosting) hosting.beside = { side: 'left', of: api.key }
+    if (api && runtime) runtime.beside = { side: 'right', of: api.key }
+    if (api && outside) outside.beside = { side: 'right', of: runtime?.key ?? api.key }
+    if (!api) for (const area of [hosting, runtime, outside]) if (area) area.arrange = 'row'
+    areas = [people, ways, api, hosting, runtime, outside, tier('stores', 'row')].filter((area): area is LaneArea => area !== null)
   } else if (map !== null) {
-    areas = map.blocks.map((block) => areaOf(block.id, { text: block.title, record: block.id }, 'row', map.boxes.filter((box) => box.block === block.place && drawn.has(box.id)).map((box) => box.id)))
+    // Each master step's row of its boxes, headed by the step, in the map's order. Above them, the row of the joined
+    // modules no box feeds; beside the right of a row, the column of the joined modules its boxes feed first. Neither
+    // has a heading, and neither is there with no module in it.
+    const onTop = joinedOnTop.length > 0 ? [areaOf('joined modules', null, 'row', joinedOnTop)] : []
+    areas = [
+      ...onTop,
+      ...map.blocks.flatMap((block): LaneArea[] => {
+        const row = areaOf(block.id, { text: block.title, record: block.id }, 'row', map.boxes.filter((box) => box.block === block.place && drawn.has(box.id)).map((box) => box.id))
+        const column = joinedBeside.get(block.id)
+        if (column === undefined) return [row]
+        return [row, { ...areaOf(`joined modules beside ${block.id}`, null, 'stack', column), beside: { side: 'right', of: row.key } }]
+      }),
+    ]
   } else {
     const steps = areaOf('steps', null, 'tiers', own.steps.map((step) => step.id))
     areas = [steps]
@@ -510,6 +609,8 @@ export function lanesInputFor(
   return {
     input: {
       pipeline: { id: pipeline.id, title: pipeline.title },
+      ...(layered && map !== null ? { blockLegend: map.blocks.map((block) => ({ id: block.id, title: block.title, place: block.place, pipelines: block.pipelines.map((one) => ({ title: one.title, href: hrefOf(pipelinePath(one.id)) })) })) } : {}),
+      ...(map !== null && listed === null && !layered ? { byStep: true } : {}),
       records: [...new Set([...sorted([...ownIds]), ...[...elsewhere].flatMap(([head, ids]) => [head, ...ids])])].map((id) => drawn.get(id)!.record),
       links,
       tree: {

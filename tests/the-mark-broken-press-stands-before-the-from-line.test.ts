@@ -10,9 +10,9 @@
  * WHAT THIS FILE PROVES, in a real browser, against a real office:
  *   1. IN THE PERSON'S CONVERSATION WITH AN AGENT, the press on the agent's reply stands directly before the "from"
  *      line: the next thing after it is that line. They share a line when the source fits inside the bubble; otherwise
- *      the source begins below the press at its left edge and wraps inside the bubble. The tag stays first. The press
- *      stays under the label at 1440, 990 and 660 beside the page and in the window, with Edit open and shut.
- *      The original 390 window case stays as well.
+ *      the source begins below the press at its left edge and wraps inside the bubble. The tag stays first. This holds
+ *      at 1440 beside the page and in the window, and at 390 in the window. The press under the label at 1440, 990 and
+ *      660, with Edit open and shut, is checked in tests/the-reply-press-aligns-with-the-mark.test.ts.
  *   2. IN A GROUP, the press on the agent's reply stands in the same place, before the "from" line.
  *   3. THE EDGE THE "FROM" LINE IS JUDGED BY. The page moves the line below the press when, written on one line beside
  *      the press, it would end past the bubble's content edge: the bubble's right less its right border and right
@@ -241,73 +241,6 @@ const IN_ITS_PLACE = {
   sourcePlaced: true,
 }
 
-/** The test moves the label to each reply edge; this is not the product's own label layout. */
-async function putTheLabelAt(page: Page, asked: string, replied: string, side: 'left' | 'right' | 'restore'): Promise<void> {
-  await page.evaluate(([asked, replied, side]) => {
-    const row = (words: string) => [...document.querySelectorAll<HTMLElement>('.px-chat-one')].find((one) => one.querySelector('.px-chat-words')?.textContent?.includes(words))
-    const label = row(asked)?.querySelector<HTMLElement>('.px-chat-intent-mark')
-    const reply = row(replied)
-    const press = reply?.querySelector<HTMLElement>('.px-chat-mark-broken')
-    const bubble = reply?.querySelector<HTMLElement>('.px-chat-bubble')
-    if (!label || !press || !bubble) throw new Error('The made-up messages are not drawn.')
-    label.style.removeProperty('left')
-    label.style.removeProperty('position')
-    if (side === 'restore') return
-    const original = label.getBoundingClientRect().left
-    const b = bubble.getBoundingClientRect(), style = getComputedStyle(bubble)
-    const left = b.left + parseFloat(style.borderLeftWidth) + parseFloat(style.paddingLeft)
-    const right = b.right - parseFloat(style.borderRightWidth) - parseFloat(style.paddingRight)
-    const target = side === 'left' ? left : right - press.getBoundingClientRect().width
-    label.style.position = 'relative'
-    label.style.left = `${target - original}px`
-  }, [asked, replied, side] as const)
-}
-
-async function theReplyBubble(page: Page, replied: string): Promise<{ left: number; width: number }> {
-  return page.evaluate((words) => {
-    const row = [...document.querySelectorAll<HTMLElement>('.px-chat-one')].find((one) => one.querySelector('.px-chat-words')?.textContent?.includes(words))
-    const bubble = row?.querySelector<HTMLElement>('.px-chat-bubble')
-    if (!bubble) throw new Error('The made-up reply is not drawn.')
-    const rect = bubble.getBoundingClientRect()
-    return { left: rect.left, width: rect.width }
-  }, replied)
-}
-
-/** In the page: whether the reply's bubble keeps its box when the page's own wrapping of the "from" line is taken off. */
-function theBubbleKeepsItsBox(replied: string): boolean | null {
-  const reply = [...document.querySelectorAll<HTMLElement>('.px-chat-one')].find((one) => one.querySelector('.px-chat-words')?.textContent?.includes(replied))
-  const press = reply?.querySelector<HTMLElement>('.px-chat-foot .px-chat-mark-broken')
-  const from = reply?.querySelector<HTMLElement>('.px-chat-foot .px-chat-from')
-  const bubble = reply?.querySelector<HTMLElement>('.px-chat-bubble')
-  const line = press?.parentElement
-  if (!from || !bubble || !line) return null
-  const b = bubble.getBoundingClientRect()
-  const lineStyle = line.getAttribute('style'), fromStyle = from.getAttribute('style')
-  line.style.flex = ''; line.style.width = ''; line.style.flexDirection = ''; line.style.alignItems = ''
-  from.style.width = ''; from.style.maxWidth = ''; from.style.overflowWrap = ''
-  const unwrappedBubble = bubble.getBoundingClientRect()
-  if (lineStyle === null) line.removeAttribute('style'); else line.setAttribute('style', lineStyle)
-  if (fromStyle === null) from.removeAttribute('style'); else from.setAttribute('style', fromStyle)
-  return Math.abs(b.left - unwrappedBubble.left) <= 1 && Math.abs(b.width - unwrappedBubble.width) <= 1
-}
-
-/** Measure the hypothetical one-line source as well as the drawn foot, so each fixture proves which rule applies. */
-async function sourceStaysInItsPlace(page: Page, source: 'short' | 'long', expected?: 'beside' | 'below'): Promise<void> {
-  let last: unknown = null
-  try {
-    await expect.poll(async () => {
-      const foot = await page.evaluate(theReplyFoot, [ASKED, REPLIED] as const)
-      const bubbleUnchanged = await page.evaluate(theBubbleKeepsItsBox, REPLIED)
-      last = foot === null ? null : { ...foot, bubbleUnchanged }
-      if (foot === null) return false
-      const aligned = Math.abs(Math.max(foot.labelLeft, foot.contentLeft) - foot.pressLeft) <= 1
-      return bubbleUnchanged === true && aligned && foot.next === 'px-chat-from' && (source !== 'long' || foot.wouldCross) && (expected === undefined || (expected === 'below') === foot.wouldCross) && (foot.wouldCross ? foot.below : foot.sameLine)
-    }, { timeout: 10_000 }).toBe(true)
-  } catch (error) {
-    throw new Error(`The reply foot did not fit the ${source} source; what the foot measured: ${JSON.stringify(last)}\n${String(error)}`)
-  }
-}
-
 /** How far inside the band, on each side, the chosen line must end, so that rounding cannot carry it over either edge. */
 const INSIDE_THE_BAND = 1.5
 
@@ -367,32 +300,6 @@ async function theLineGoesBelowThePress(page: Page): Promise<void> {
     throw new Error(`The page left the "from" line beside the press, though on one line it would end past the bubble's content edge and inside its outer edge: ${JSON.stringify(last)}\n${String(error)}`)
   }
 }
-
-describe('the source fits beside or below the aligned press', () => {
-  const cases = ([1440, 990, 660] as const).flatMap((width) => (['right', 'window'] as const).flatMap((where) => (['short', 'long'] as const).map((source) => [width, where, source] as const)))
-  it.each(cases)('keeps the source inside at %i with chat %s and a %s source', async (width, where, source) => {
-    const { context, page } = await aWindow(width, where, participantKey({ kind: 'agent', id: agentId }), source)
-    try {
-      await sourceStaysInItsPlace(page, source)
-      if (source === 'short') {
-        const bubble = await theReplyBubble(page, REPLIED)
-        for (const [side, expected] of [['left', 'beside'], ['right', 'below']] as const) {
-          await putTheLabelAt(page, ASKED, REPLIED, side)
-          await sourceStaysInItsPlace(page, source, expected)
-          const after = await theReplyBubble(page, REPLIED)
-          expect(Math.abs(after.left - bubble.left)).toBeLessThanOrEqual(1)
-          expect(Math.abs(after.width - bubble.width)).toBeLessThanOrEqual(1)
-        }
-        await putTheLabelAt(page, ASKED, REPLIED, 'restore')
-        await sourceStaysInItsPlace(page, source)
-      }
-      const asked = theMessage(page, ASKED)
-      await asked.locator('.px-chat-edit').click()
-      await asked.locator('.px-chat-editor-words').waitFor()
-      await sourceStaysInItsPlace(page, source)
-    } finally { await context.close() }
-  }, 120_000)
-})
 
 describe('the "mark broken" press in the person\'s conversation', () => {
   const cases: [number, Where][] = [

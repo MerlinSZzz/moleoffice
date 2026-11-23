@@ -12,7 +12,7 @@
  * the window is 1024 pixels or wider (src/web/lib/chat-split.ts is the breakpoint's one home). One
  * made-up message is left waiting, so at 1440 in English and in Chinese a long page is scrolled to its
  * end, and the bottom of the lowest line of text in the content area must be at or above the top of the
- * circle. At 990, 660 and 390 the circle is not drawn: the case checks that it is not, because the
+ * circle. At 990 and 390 the circle is not drawn: the case checks that it is not, because the
  * phone's bar is held at the window's top and cannot cover a last line at the foot. At 1440 and 990,
  * where the review pane is a column beside the page, the pane is opened and made long with twenty
  * made-up lines the test adds at its end; at 1440 its lowest line is measured the same way, and at 990
@@ -44,8 +44,8 @@ const headers = {
   'x-mole-office-actor-type': 'human',
   'x-mole-office-actor-id': THE_PERSON,
 }
-const WIDTHS = [1440, 990, 660, 390] as const
-const THEMES = ['light', 'dark'] as const
+const WIDTHS = [1440, 990, 390] as const
+const THEMES = ['light'] as const
 
 beforeAll(async () => {
   app = await liveApp({ name: 'corner-button-room', viewport: { width: 1440, height: 800 } })

@@ -13,7 +13,7 @@
  *      a knob in it, and a different fill on and off.
  *   3. Pressing it changes the stored value, read back through the door, and pressing it again
  *      puts it back.
- *   4. An agent's profile says where the switch is and draws no press and no switch of its own.
+ *   4. An agent's profile links to the switch and draws no press and no switch of its own.
  *
  * The server half is tests/the-inject-switch-is-one-setting.test.ts.
  *
@@ -26,6 +26,7 @@
 import { mkdirSync } from 'node:fs'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
+import { createI18n } from '../src/shared/i18n.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { INJECT_WORDS, type MayInject } from '../src/shared/profile.ts'
 import { liveApp, waitForThePage, type LiveApp } from './helpers.ts'
@@ -116,8 +117,9 @@ describe('the switch on the Settings page', () => {
       }
     })
     expect(drawn).toMatchObject({ tag: 'BUTTON', checked: 'true', name: INJECT_WORDS.agentsMayInject, wide: true, knob: true })
-    const says = await app.page.$eval(`${THE_PANEL} .injs-state`, (el) => el.textContent ?? '')
-    expect(says).toBe(INJECT_WORDS.nobodyChose)
+    // NOBODY HAS CHOSEN YET, so the word "default" stands beside the switch.
+    const label = await app.page.$eval(`${THE_PANEL} .injs-default`, (el) => el.textContent ?? '')
+    expect(label).toBe(createI18n('en').t('switch.byDefault'))
     expect(await app.page.$eval(`${THE_PANEL} .injs-word`, (el) => el.textContent ?? '')).toBe(INJECT_WORDS.on)
     await photograph('settings')
   }, 180_000)
@@ -159,12 +161,10 @@ describe('the switch on the Settings page', () => {
 })
 
 describe('the profile of an agent', () => {
-  it('says where the switch is, and draws no press and no switch', async () => {
+  it('links to the switch, and draws no press and no switch', async () => {
     await app.page.goto(`${app.site}/#/who/agent/${agentId}`, { timeout: 60_000 })
     await waitForThePage(app.page, 60_000)
     await app.page.waitForSelector('[data-target*="profile.inject"] .inject-state', { timeout: 30_000 })
-    const panel = await app.page.$eval('[data-target*="profile.inject"]', (el) => el.textContent ?? '')
-    expect(panel).toContain(INJECT_WORDS.whereItIsSet)
     expect(await app.page.$$('[data-target*="profile.inject"] button')).toHaveLength(0)
     expect(await app.page.$$('[data-target*="profile.inject"] [role="switch"]')).toHaveLength(0)
     const goes = await app.page.$eval('[data-target*="profile.inject"] a', (el) => el.getAttribute('href') ?? '')
@@ -185,7 +185,8 @@ describe('the off state', () => {
     await openTheSettings()
     expect(await app.page.$eval(`${THE_PANEL} [role="switch"]`, (el) => el.getAttribute('aria-checked'))).toBe('false')
     expect(await app.page.$eval(`${THE_PANEL} .injs-word`, (el) => el.textContent ?? '')).toBe(INJECT_WORDS.off)
-    expect(await app.page.$eval(`${THE_PANEL} .injs-state`, (el) => el.textContent ?? '')).toBe(INJECT_WORDS.switchedOff)
+    // SOMEBODY HAS CHOSEN, so the word "default" is gone.
+    expect(await app.page.$$(`${THE_PANEL} .injs-default`)).toHaveLength(0)
     await photograph('settings-off')
 
     await app.page.goto(`${app.site}/#/who/agent/${agentId}`, { timeout: 60_000 })

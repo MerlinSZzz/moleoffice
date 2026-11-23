@@ -235,7 +235,7 @@ beforeAll(async () => {
      * MUTATION PROOF: take `watch: { ignored: () => true }` out of this line, and the two cases after
      * A FILE VITE.CONFIG.TS IMPORTS CHANGES go red. Put it back for green.
      */
-    server: { port: 0, strictPort: false, watch: { ignored: () => true } },
+    server: { host: '127.0.0.1', port: 0, strictPort: false, watch: { ignored: () => true } },
   })
   await vite.listen()
 

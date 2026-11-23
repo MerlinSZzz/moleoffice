@@ -15,14 +15,14 @@
  *
  *   1. Settings, Tools, Terminal holder says the holder runs and offers the restart press, and lists nothing yet.
  *   2. The first press lists every terminal by whose it is, says which the restart ends and which have already ended,
- *      says what happens to an agent in one, and asks again. Nothing is stopped, and the list has the keyboard.
+ *      and asks again. Nothing is stopped, and the list has the keyboard.
  *   3. Keep it running puts the list away, and nothing is stopped.
  *   4. A terminal opened after the list was shown: the confirming press is refused in the page's words, the panel says
  *      where the holder is now, and nothing is stopped.
  *   5. The confirming press restarts it: the panel says how many running terminals were asked to end and shows the old
  *      holder's last line; the old holder is gone, and a new one runs.
  *   7. With no holder running, the panel says so with the start press, and offers no restart.
- *   Each scene is measured at 1440, 990, 660 and 390, in light and dark, and never scrolls sideways. Each is photographed
+ *   Each scene is measured at 1440 and 390, in light, and never scrolls sideways. Each is photographed
  *   in English into the folder TERMINAL_HOLDER_SHOTS names, when it names one: the panel, and the page around it.
  *
  * MUTATIONS (each after a control run; the commit message that added this file has the runs):
@@ -112,13 +112,13 @@ function sideways(): Promise<number> {
 }
 
 /**
- * MEASURE A SCENE at 1440, 990, 660 and 390, in light and dark: it never scrolls sideways, and when TERMINAL_HOLDER_SHOTS
+ * MEASURE A SCENE at 1440 and 390, in light: it never scrolls sideways, and when TERMINAL_HOLDER_SHOTS
  * names a folder it is photographed twice, the panel alone and the window with the panel's top just under the row.
  */
 async function sweep(scene: string): Promise<void> {
-  for (const theme of ['light', 'dark'] as const) {
+  for (const theme of ['light'] as const) {
     await page.emulateMedia({ colorScheme: theme })
-    for (const width of [1440, 990, 660, 390]) {
+    for (const width of [1440, 390]) {
       await page.setViewportSize({ width, height: 900 })
       await theResizeIsDrawn(page)
       expect(await sideways(), `${scene} ${String(width)} ${theme}`).toBeLessThanOrEqual(1)
@@ -144,7 +144,11 @@ beforeAll(async () => {
   place = aPlace('thb')
   // ITS OUTPUT GOES TO ITS LOG, as the service command sends it, so the panel can show its last line after it stops.
   theFirstHolder = await startAHolder(place, { toTheLog: true })
-  server = await startAServer(place, undefined, { MOLE_OFFICE_TERMINAL_HOLDER: 'on' })
+  // THE PAGE FIRST, SO THE SCRATCH SERVER CAN BE TOLD ITS PORT. The page is on the liveApp's web port and its calls
+  // go to the scratch server, which refuses a page on a loopback port that is not its own unless it is told that
+  // port is its dev page's.
+  app = await liveApp({ name: 'terminal-holder-restart', viewport: { width: 1440, height: 900 } })
+  server = await startAServer(place, undefined, { MOLE_OFFICE_TERMINAL_HOLDER: 'on', MOLE_OFFICE_WEB_PORT: String(app.webPort) })
 
   made.push(await openThroughTheDoor('/bin/bash', ['--noprofile', '--norc']))
   const ended = await openThroughTheDoor('/bin/bash', ['--noprofile', '--norc'])
@@ -181,7 +185,6 @@ beforeAll(async () => {
     (read) => ((read.body['terminals'] ?? []) as HeldTerminal[]).some((one) => one.id === ended.id && one.state === 'ended'),
   )
 
-  app = await liveApp({ name: 'terminal-holder-restart', viewport: { width: 1440, height: 900 } })
   context = await app.browser.newContext({ viewport: { width: 1440, height: 900 } })
   const theScratchApi = new URL(server.api)
   const thePagesApiPort = String(app.apiPort)
@@ -226,10 +229,9 @@ describe('the terminal holder in Settings', () => {
       [t('terminals.title.agents', { name: 'Terminal worker' }), t('terminals.title.yours'), t('terminals.title.yours'), t('terminals.title.yours')].sort(),
     )
     const states = await theAsk.locator('.th-row-state').allInnerTexts()
-    expect(states.filter((one) => one === t('terminalHolder.row.running')).length).toBe(3)
-    expect(states.filter((one) => one === t('terminalHolder.row.ended')).length).toBe(1)
+    expect(states.filter((one) => one === t('terminalHolder.rowState.running')).length).toBe(3)
+    expect(states.filter((one) => one === t('terminalHolder.rowState.ended')).length).toBe(1)
     expect(await theAsk.innerText()).toContain('/bin/sleep 300')
-    expect(await theAsk.innerText()).toContain(t('terminalHolder.agents'))
     await theAsk.getByRole('button', { name: t('terminalHolder.confirm', { n: 3 }) }).waitFor()
     // THE LIST HAS THE KEYBOARD, because it is what the confirming press is about.
     expect(await page.evaluate(() => document.activeElement?.className ?? '')).toContain('th-key')
@@ -276,7 +278,7 @@ describe('the terminal holder in Settings', () => {
     expect(now.state).toBe('running')
     expect(now.pid).not.toBe(theFirstHolder.pid)
     expect(isAlive(theFirstHolder.pid), 'the old holder still runs').toBe(false)
-    expect(await done.innerText()).toContain(t('terminalHolder.done', { n: 4 }))
+    expect(await done.innerText()).toContain(t('terminalHolder.restartedEnded', { n: 4 }))
     expect(await done.innerText()).toContain(t('terminalHolder.oldLastWord'))
     expect(await done.innerText()).toContain('stopped;')
     // THE PROCESS NUMBERS ARE BEHIND THE DEVELOPERS' FOLD.
@@ -299,8 +301,8 @@ describe('the terminal holder in Settings', () => {
     const read = await ask(server.api, '/api/terminals')
     const copy = (read.body['holder'] as { anotherCopy: { copy: string } }).anotherCopy.copy
     await visit()
-    const sentence = thePanel().locator('[data-testid="terminal-holder-another-copy"]')
-    expect(await sentence.innerText()).toBe(t('terminalHolder.anotherCopy', { copy }))
+    const heldBy = thePanel().locator('[data-testid="terminal-holder-another-copy"]')
+    expect(await heldBy.innerText()).toBe(t('terminalHolder.heldByCopy', { copy }))
     await thePanel().getByRole('button', { name: t('terminalHolder.restart') }).click()
     const confirmation = thePanel().locator('[data-testid="terminal-holder-confirm"]')
     await confirmation.waitFor({ state: 'visible', timeout: 30_000 })

@@ -1,11 +1,11 @@
 // Copyright © 2026 Zhengyang Shen
 // Licensed under the MIT License. See LICENSE.
 /**
- * A SECRETARY SLEEPS AT ITS OWN TIME, AND THE OFFICE REMINDS IT TO PUT ITS MEMORY, NOTES AND HANDOVER IN ORDER FIRST.
+ * A PERMANENT RESIDENT SLEEPS AT ITS OWN TIME, AND THE OFFICE REMINDS IT TO PUT ITS MEMORY, NOTES AND HANDOVER IN ORDER FIRST.
  *
  * The person's decisions of 3 October 2026: a resident sleeps, a postponed sleep is shown on the agent and sent to
  * nobody, and non-urgent messages wait until it wakes.
- * On 6 November each secretary sets its own sleep time, at the hour its department is least
+ * On 6 November each resident sets its own sleep time, at the hour its department is least
  * affected.
  * At points 3 and 4 of another decision, the message at the start of the sleep asks it to tidy as well,
  * and a checklist with many open items is a thing to look at, never a gate. The door is
@@ -17,8 +17,9 @@
  *                the started timer is the same read each minute and nothing else;
  *   door      2. the secretary itself and the person each set and change its sleep time; "3:00" is stored as 03:00 and
  *                the reply shows what was stored, the zone and when the next sleep begins;
- *   refused   3. another agent, a request with no key, an agent that is not a resident, a resident without the
- *                secretary card, a time that is no time and a length out of bounds are refused, and nothing is written;
+ *   refused   3. another agent, a request with no key, an agent that is not a resident, a time that is no time and a
+ *                length out of bounds are refused, and nothing is written; a resident without the secretary card sets
+ *                its own time;
  *   clock     4. the clock begins the sleep when its time opens, by Mole Office, with one reminder, once, and ends it
  *                when the time is over; the next day it begins again; a wake press is not undone; a time set inside
  *                its own window waits for the next one;
@@ -35,7 +36,7 @@
  * MUTATIONS (each after a green control run, then restored; logs in the round's out/ folder):
  *   quiet     the clock reads the residents before it asks whether any time is set           → 1 goes red;
  *   door      the door stores the time as sent, not as HH:MM                                  → 2 goes red;
- *   refused   the secretary-card check in `setASleepTime` taken out                           → 3 goes red;
+ *   refused   the secretary-card check put back into `setASleepTime`                            → 3 goes red;
  *   clock     the "no row since the start" check taken out of the clock                       → 4 goes red;
  *   clock     the "set before the start" check taken out of the clock                         → 4 goes red;
  *   postpone  `postponeASleep` refuses during the office's sleep as before                    → 5 goes red;
@@ -127,7 +128,7 @@ function count(sql: string, ...args: unknown[]): number {
 
 /** Propose and confirm, by a secretary and the person. */
 async function makeAResident(handle: string): Promise<void> {
-  const proposed = await inject('POST', '/api/residents/proposals', as('sec-made-up'), { agentId: handle, because: 'It has done steady work here for weeks.' })
+  const proposed = await inject('POST', '/api/residents/proposals', as('sec-made-up'), { agentId: handle, because: 'It has done steady work here for weeks.', sleepTime: { startsAt: '12:00', minutes: 60 } })
   expect(proposed.status, proposed.text).toBe(201)
   const confirmed = await inject('POST', `/api/residents/proposals/${String(proposed.json['proposal'].id)}/confirm`, AS_THE_PERSON)
   expect(confirmed.status, confirmed.text).toBe(200)
@@ -265,10 +266,10 @@ describe('the sleep-time door', () => {
     expect(rowsOf('sec-door')).toEqual([])
   })
 
-  it('3: another agent, no key, not a resident, no secretary card, no time and a length out of bounds are refused; nothing is written', async () => {
+  it('3: another agent, no key, not a resident, no time and a length out of bounds are refused; a resident without the card sets its time', async () => {
     await makeAResident('res-worker')
     const { SLEEP_TIME_SHORTEST_MINUTES, SLEEP_TIME_LONGEST_MINUTES } = await import('../src/shared/residents.ts')
-    const { HAVING_A_SLEEP_TIME, residencyOf, setASleepTime, theResidentToActOn } = await import('../src/server/lib/residents.ts')
+    const { HAVING_A_SLEEP_TIME, theResidentToActOn } = await import('../src/server/lib/residents.ts')
     const stored = (handle: string): unknown =>
       t.client.sqlite.prepare('SELECT sleep_time_starts AS s, sleep_time_minutes AS m, sleep_time_set_at AS at, sleep_time_set_by AS b FROM agents WHERE id = ?').get(idOf(handle))
     const before = stored('sec-door')
@@ -282,10 +283,8 @@ describe('the sleep-time door', () => {
     expect(notAResident.status, notAResident.text).toBe(409)
     expect(notAResident.json['error']).toBe(refusalOf(() => theResidentToActOn(idOf('sec-not-resident'), HAVING_A_SLEEP_TIME)))
     const noCard = await setTheTime(at, 'res-worker', AS_THE_PERSON, { startsAt: '04:00', minutes: 60 })
-    expect(noCard.status, noCard.text).toBe(409)
-    expect(noCard.json['error']).toBe(
-      refusalOf(() => setASleepTime(residencyOf(idOf('res-worker'))!, { startsAt: '04:00', minutes: 60 }, { type: 'human', id: THE_PERSON })),
-    )
+    expect(noCard.status, noCard.text).toBe(200)
+    expect(stored('res-worker')).toMatchObject({ s: '04:00', m: 60, b: 'person' })
 
     for (const body of [
       { startsAt: '25:00', minutes: 60 },
@@ -301,7 +300,7 @@ describe('the sleep-time door', () => {
       expect(refused.status, `${JSON.stringify(body)}: ${refused.text}`).toBe(400)
     }
     expect(stored('sec-door')).toEqual(before)
-    expect(stored('res-worker')).toEqual({ s: null, m: null, at: null, b: null })
+    expect(stored('res-worker')).toMatchObject({ s: '04:00', m: 60, b: 'person' })
     expect(stored('sec-not-resident')).toEqual({ s: null, m: null, at: null, b: null })
   })
 })
@@ -478,7 +477,7 @@ describe('where the sleep time is seen', () => {
     const presence = async (): Promise<Record<string, any>> =>
       (await inject('GET', `/api/presence/agent/${id}`, AS_THE_PERSON)).json['presence'] as Record<string, any>
 
-    expect((await presence())['residentSleep']).toEqual({ asleepSince: null, lastSleptAt: null, wakesAt: null, sleepTime: null })
+    expect((await presence())['residentSleep']).toEqual({ asleepSince: null, lastSleptAt: null, wakesAt: null, sleepTime: { startsAt: '12:00', minutes: 60 } })
     expect((await setTheTime('2030-01-17T10:30:00Z', 'sec-seen', AS_THE_PERSON, { startsAt: '11.00', minutes: 60 })).status).toBe(200)
     expect((await presence())['residentSleep']).toEqual({ asleepSince: null, lastSleptAt: null, wakesAt: null, sleepTime: { startsAt: '11:00', minutes: 60 } })
 

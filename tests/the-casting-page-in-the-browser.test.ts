@@ -188,7 +188,7 @@ beforeAll(async () => {
   argusKey = String((await post('/api/agents/started', { handle: THE_TEST_OFFICES_SECRETARY.handle, name: 'Fixture secretary', runtime: 'claude-code', role: 'secretary' }))['whatToGiveIt']?.key ?? '')
   expect(argusKey, 'the registration answered a key').not.toBe('')
   await post('/api/workspaces', { id: 'sample-project', title: 'A sample project' })
-  const filed = await post('/api/records', { kind: 'decision', title: 'A sample decision the test files', data: { replaces: [] } })
+  const filed = await post('/api/records', { kind: 'decision', title: 'A sample decision the test files', data: { governs: [{ wholeProject: true }], replaces: [] } })
   decision = filed['record'].id as string
   first = (await post('/api/casting/worker', {
     program: { value: 'dsh', decision },
@@ -256,7 +256,7 @@ describe('the Casting page, in the browser', () => {
     expect(await role('worker').locator('tbody').evaluateAll((all) => all.map((one) => `${one.getAttribute('data-casting') ?? ''}/${one.getAttribute('data-marked') ?? ''}`))).toEqual([`${String(own)}/yes`])
     expect(await row(own).locator('.cast-cell-program').textContent()).toBe('Nothing is written here yet.')
     await pickRole('supervisor')
-    expect(await role('supervisor').textContent()).toContain(createI18n('en').t('casting.nobodyCast'))
+    expect(await role('supervisor').textContent()).toContain(createI18n('en').t('casting.glance.nobody'))
   }, 240_000)
 
   it('shows a set probability as a percentage in English and Chinese, and keeps the empty cells in words', async () => {
@@ -327,7 +327,7 @@ describe('the Casting page, in the browser', () => {
       expect((await read('/api/casting/for/supervisor'))['casting']).toBeNull()
       // THE SUPERVISOR HAS NO CASTING, so its list draws no table and says so in words. Mutation N1: the page draws
       // nothing for a role nobody has cast. Red: the words are missing.
-      expect(await role('supervisor').textContent()).toContain(createI18n('en').t('casting.nobodyCast'))
+      expect(await role('supervisor').textContent()).toContain(createI18n('en').t('casting.glance.nobody'))
       await lookAtEveryWidth('refused', undefined, false)
       // THE CARD IN THE PAGE LANGUAGE: the value the server sent is the card's stored name, and the page draws its word.
       // The check reads that word as the page does, through cardWord from the word table, and never writes it out.

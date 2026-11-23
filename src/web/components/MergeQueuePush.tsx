@@ -14,7 +14,7 @@
  * WHAT THE MERGE TOOL SAID CAN NAME PATHS, and so can the reason a follow-up cannot be read, so the record page draws
  * them in developer mode only. The queue page names ids and paths in both modes, and draws them always.
  */
-import type { ReactNode } from 'react'
+import { Fragment, type ReactNode } from 'react'
 import type { EmergencyPushReading } from '@shared/emergency-push.ts'
 import { content, t, type WordKey } from '@shared/i18n.ts'
 import type { PanelRecord } from '@shared/types.ts'
@@ -25,7 +25,7 @@ import { useInspect } from '../lib/mode.ts'
 import { declaredAttributes, type Declares } from './declares.ts'
 import { RouteLink, recordPath } from './router.tsx'
 import { titleHere } from './sections.ts'
-import { ErrorNote, Loading, Panel } from './ui.tsx'
+import { ErrorNote, Loading, Panel, ServerNote } from './ui.tsx'
 import { useProjectAsync } from '../lib/project-async.ts'
 
 /** A stored moment, short: "01:24" when it is on the day of `now`, and with its day when it is not. */
@@ -63,32 +63,29 @@ export function WhoPushed({ who, form }: { who: string | null; form: 'by' | 'alo
   )
 }
 
-/** One line said of a push: its words, whether it is a red follow-up, and the receipt it leads to, if any. */
+/** One line said of a push: its words, whether it is a red follow-up, the receipt it leads to, if any, and the server's own words under it, if any. */
 export interface PushLine {
   says: string
   red: boolean
   receipt: string | null
+  note: string | null
 }
-const plain = (says: string): PushLine => ({ says, red: false, receipt: null })
+const plain = (says: string, note: string | null = null): PushLine => ({ says, red: false, receipt: null, note })
 
 /**
- * HOW THE PUSH ENDED, in short sentences: while it moves main, that a landing waits for it; once it ended, when, and
- * whether it went on to the private copy and the mirror. `machineWords` adds what the merge tool said.
+ * HOW THE PUSH ENDED, in short sentences: nothing while it moves main; once it ended, when, and whether it went on to
+ * the private copy and the mirror. What the merge tool said goes under its line, for developer mode.
  */
-export function howThePushEnded(push: EmergencyPushReading, now: Date, machineWords: boolean): PushLine[] {
-  if (push.ended === null) return [plain(t('mergeQueuePage.push.moving'))]
+export function howThePushEnded(push: EmergencyPushReading, now: Date): PushLine[] {
+  if (push.ended === null) return []
   const onward = push.ended.onward
   const lines = [
     plain(t('mergeQueuePage.push.ended', { at: shortTime(push.ended.at, now) })),
-    plain(
-      onward === null
-        ? t('mergeQueuePage.push.onward.none')
-        : onward.ok
-          ? t('mergeQueuePage.push.onward.ok')
-          : machineWords
-            ? t('mergeQueuePage.push.onward.failed', { says: content(onward.says) })
-            : t('pushPage.onward.failed'),
-    ),
+    onward === null
+      ? plain(t('pushPage.onward.none'))
+      : onward.ok
+        ? plain(t('mergeQueuePage.push.onward.ok'))
+        : plain(t('pushPage.onward.notCopied'), content(onward.says)),
   ]
   return lines
 }
@@ -98,13 +95,13 @@ export function howThePushEnded(push: EmergencyPushReading, now: Date, machineWo
  * marked `red`, so a page marks it apart from the lines around it (wave 13u round 83), and a filed run leads to its
  * receipt rather than writing its id.
  */
-export function theFollowUpOf(push: EmergencyPushReading, machineWords: boolean): PushLine | null {
+export function theFollowUpOf(push: EmergencyPushReading): PushLine | null {
   const follow = push.followUp
   if (follow === null) return null
   if (follow.state === 'not-owed') throw new Error(`The office says emergency push ${push.id} owes no follow-up run, which it says only of a release that did not go in.`)
-  if (follow.state === 'missing') return plain(t('mergeQueuePage.push.followUp.missing'))
-  if (follow.state === 'unknown') return plain(machineWords ? t('mergeQueuePage.push.followUp.unknown', { because: content(follow.because) }) : t('pushPage.followUp.unknown'))
-  return { says: t(follow.green ? 'mergeQueuePage.push.followUp.green' : 'mergeQueuePage.push.followUp.red'), red: !follow.green, receipt: follow.receipt.id }
+  if (follow.state === 'missing') return plain(t('mergeQueuePage.push.followUp.notTested'))
+  if (follow.state === 'unknown') return plain(t('pushPage.followUp.unknown'), content(follow.because))
+  return { says: t(follow.green ? 'mergeQueuePage.push.followUp.green' : 'mergeQueuePage.push.followUp.red'), red: !follow.green, receipt: follow.receipt.id, note: null }
 }
 
 /** The lines said of a push, each a paragraph of `className`, a red one marked, and a receipt as a link. */
@@ -112,15 +109,18 @@ export function PushLines({ lines, className }: { lines: PushLine[]; className: 
   return (
     <>
       {lines.map((line) => (
-        <p key={line.says} className={line.red ? `${className} mq-follow-red` : className} {...(line.red ? { 'data-follow-up': 'red' } : {})}>
-          {line.says}
-          {line.receipt === null ? null : (
-            <>
-              {' '}
-              <RouteLink to={recordPath(line.receipt)}>{t('mergeQueuePage.push.followUp.receipt')}</RouteLink>
-            </>
-          )}
-        </p>
+        <Fragment key={line.says}>
+          <p className={line.red ? `${className} mq-follow-red` : className} {...(line.red ? { 'data-follow-up': 'red' } : {})}>
+            {line.says}
+            {line.receipt === null ? null : (
+              <>
+                {' '}
+                <RouteLink to={recordPath(line.receipt)}>{t('mergeQueuePage.push.followUp.receipt')}</RouteLink>
+              </>
+            )}
+          </p>
+          <ServerNote text={line.note} />
+        </Fragment>
       ))}
     </>
   )
@@ -171,8 +171,8 @@ function theSwitchLines(push: EmergencyPushReading, now: Date): { word: string; 
  * a section the push declares declares that section; the follow-up is worked out on read, so it is no section.
  */
 export function ThePushFacts({ push, now, inspect, sections }: { push: EmergencyPushReading; now: Date; inspect: boolean; sections: (key: string) => Declares }) {
-  const ended = howThePushEnded(push, now, inspect)
-  const follow = theFollowUpOf(push, inspect)
+  const ended = howThePushEnded(push, now)
+  const follow = theFollowUpOf(push)
   return (
     <dl className="mp-facts" data-push-facts="">
       <Fact fact="by" title={titleHere('emergency_push', 'by')} declares={sections('by')}>

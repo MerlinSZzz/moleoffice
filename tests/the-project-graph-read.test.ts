@@ -56,7 +56,7 @@ import {
   type GraphLane,
   type ProjectGraphModel,
 } from '../src/web/components/graph/project-graph-model.ts'
-import { apiApp, freshDb, type TestDb } from './helpers.ts'
+import { apiApp, freshDb, type TestDb, governsTheWholeProject } from './helpers.ts'
 import { THE_TEST_OFFICES_OWNER } from './a-page-of-a-test-office.ts'
 
 let t: TestDb
@@ -90,7 +90,7 @@ beforeEach(async () => {
 
 /** File one record through the route and hand back its id. A decision says it replaces none, as the door requires. */
 async function file(kind: string, title: string, data: Record<string, unknown>): Promise<string> {
-  const withReplaces = kind === 'decision' && !Object.hasOwn(data, 'replaces') ? { replaces: [], ...data } : data
+  const withReplaces = kind === 'decision' ? { ...governsTheWholeProject(), replaces: [], ...data } : data
   const res = await app.inject({ method: 'POST', url: '/api/records', headers: human(), payload: { kind, title, data: withReplaces } })
   expect(res.statusCode, res.body).toBe(201)
   return (res.json() as { record: { id: string } }).record.id

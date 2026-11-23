@@ -47,7 +47,7 @@
 import type { AddressInfo } from 'node:net'
 import type { FastifyInstance } from 'fastify'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { apiApp, freshDb, one, type TestDb } from './helpers.ts'
+import { apiApp, freshDb, one, type TestDb, governsTheWholeProject } from './helpers.ts'
 import { THE_TEST_OFFICES_OWNER } from './a-page-of-a-test-office.ts'
 
 /** The whole credential the verification used: the word `human`, and a name it made up. */
@@ -179,7 +179,7 @@ describe('the three acts the product reserves to the person, asked in a made-up 
       {
         kind: 'decision',
         title: 'The gripper stays on position control',
-        data: { replaces: [], because: 'a header is not a person' },
+        data: { ...governsTheWholeProject(), replaces: [], because: 'a header is not a person' },
       },
       A_MADE_UP_NAME,
     )
@@ -244,7 +244,8 @@ describe('the three acts the product reserves to the person, asked in a made-up 
     const answer = await ask(
       'POST',
       '/api/records',
-      { kind: 'decision', title: 'The refusal is read by a person', data: { replaces: [], because: 'a refusal nobody can act on failed' } },
+      { kind: 'decision', title: 'The refusal is read by a person', data: {
+        ...governsTheWholeProject(), replaces: [], because: 'a refusal nobody can act on failed' } },
       A_MADE_UP_NAME,
     )
     expect(answer.error).toContain('Writing a decision')
@@ -261,7 +262,8 @@ describe('the three acts the product reserves to the person, asked in a made-up 
     const answer = await ask(
       'POST',
       '/api/records',
-      { kind: 'decision', title: 'A person by header', data: { replaces: [], because: 'there is no such header' } },
+      { kind: 'decision', title: 'A person by header', data: {
+        ...governsTheWholeProject(), replaces: [], because: 'there is no such header' } },
       { ...A_MADE_UP_NAME, 'x-mole-office-actor-established': 'yes' },
     )
     expect(answer.status, answer.error).toBe(400)
@@ -278,7 +280,7 @@ describe('and the person at this machine is refused none of it', () => {
       {
         kind: 'decision',
         title: 'The owner writes their own decisions',
-        data: { replaces: [], because: 'this is the path the browser takes, through the same listener' },
+        data: { ...governsTheWholeProject(), replaces: [], because: 'this is the path the browser takes, through the same listener' },
       },
       THE_PERSON,
     )
@@ -311,7 +313,8 @@ describe('nothing else changed about who is refused, or why', () => {
     const answer = await ask(
       'POST',
       '/api/records',
-      { kind: 'decision', title: 'A decision from an agent', data: { replaces: [], because: 'agents file forks' } },
+      { kind: 'decision', title: 'A decision from an agent', data: {
+        ...governsTheWholeProject(), replaces: [], because: 'agents file forks' } },
       AN_AGENT,
     )
     expect(answer.status, answer.error).toBe(403)
@@ -331,7 +334,8 @@ describe('nothing else changed about who is refused, or why', () => {
     const answer = await ask(
       'POST',
       '/api/records',
-      { kind: 'decision', title: 'A decision from a request with no headers', data: { replaces: [], because: 'silence' } },
+      { kind: 'decision', title: 'A decision from a request with no headers', data: {
+        ...governsTheWholeProject(), replaces: [], because: 'silence' } },
       { 'content-type': 'application/json' },
     )
     expect(answer.status, answer.error).toBe(403)
@@ -367,7 +371,7 @@ describe('nothing else changed about who is refused, or why', () => {
       payload: {
         kind: 'decision',
         title: 'A decision from a caller on no socket at all',
-        data: { replaces: [], because: 'no listener saw this, so there is nothing to place' },
+        data: { ...governsTheWholeProject(), replaces: [], because: 'no listener saw this, so there is nothing to place' },
       },
     })
     expect(res.statusCode, res.body).toBe(201)

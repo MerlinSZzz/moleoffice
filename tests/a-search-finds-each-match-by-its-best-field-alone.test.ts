@@ -15,7 +15,9 @@
  *      written in the same second are among them, and stay in the order they were given in.
  *   3. GET /api/search answers the person with the results, the count and the ids left out that the door gave before
  *      this round. They are worked out here as the door worked them out then: every record of the project, each with its
- *      count of what is incomplete, through `searchRecords`, the first `limit` sent and the rest named by id.
+ *      count of what is incomplete, through `searchRecords`, the first `limit` sent and the rest named by id. Since
+ *      20 November 2026 a search gives each result at a level, by the person's decision of that day, so each record
+ *      carries `atLevel` and past the answer's cap is titles only; what the door gave before is compared without it.
  *
  * Parts 1 and 2 need no database. Part 3 is a fresh test database with made-up notes written through the records' own
  * write, so the index of the records' text holds them. Every row is made up.
@@ -158,13 +160,35 @@ describe('3. GET /api/search', () => {
     expect(listed).toHaveLength(60)
     const records = listed.map((record) => ({ ...record, incompleteCount: incompletenessOf(record).length }))
     let leftOut = 0
+    let givenWhole = 0
     for (const q of [...WORDS, 'made-up', 'A made-up note', 'zzqqxxnothing']) {
       for (const limit of [5, 500]) {
         const every = searchRecords(records, q)
         const reply = await app.inject({ method: 'GET', url: `/api/search?q=${encodeURIComponent(q)}&limit=${String(limit)}`, headers: THE_PERSONS_HEADERS })
         expect(reply.statusCode, reply.body.slice(0, 300)).toBe(200)
-        const body = reply.json() as { results: unknown[]; counts: { matched: number; returned: number }; leftOutGroups: { ids: string[] }[] }
-        expect(body.results, `the results for "${q}", limit ${String(limit)}`).toEqual(every.slice(0, limit))
+        const body = reply.json() as {
+          results: { record: Record<string, unknown> & { id: string; atLevel: { given: string | null; because: string } } }[]
+          counts: { matched: number; returned: number }
+          leftOutGroups: { ids: string[] }[]
+        }
+        // SINCE 20 NOVEMBER 2026 A SEARCH GIVES EACH RESULT AT A LEVEL, by the person's decision of that day, so each
+        // record carries `atLevel` and past the answer's cap is titles only. What the door gave before is compared
+        // without it.
+        expect(body.results, `the results for "${q}", limit ${String(limit)}`).toHaveLength(every.slice(0, limit).length)
+        for (const [i, result] of body.results.entries()) {
+          const before = every[i]!
+          const { record, ...theRest } = result
+          const { atLevel, ...recordWithoutItsLevel } = record
+          const { record: oldRecord, ...oldRest } = before
+          expect(theRest, `the results for "${q}", limit ${String(limit)}`).toEqual(oldRest)
+          expect(record.id, `the results for "${q}", limit ${String(limit)}`).toEqual(oldRecord.id)
+          if (atLevel.given === 'full') {
+            expect(recordWithoutItsLevel, `the results for "${q}", limit ${String(limit)}`).toEqual(oldRecord)
+            givenWhole += 1
+          } else {
+            expect(atLevel.because, `the results for "${q}", limit ${String(limit)}`).toBe('pastTheCap')
+          }
+        }
         expect(body.counts, `the counts for "${q}", limit ${String(limit)}`).toMatchObject({ matched: every.length, returned: Math.min(limit, every.length) })
         expect(body.leftOutGroups.map((group) => group.ids), `the ids left out for "${q}", limit ${String(limit)}`).toEqual([every.slice(limit).map((hit) => hit.record.id)])
         leftOut += every.slice(limit).length
@@ -172,5 +196,7 @@ describe('3. GET /api/search', () => {
     }
     // Some searches left records out, so the ids left out were compared, and not only empty lists.
     expect(leftOut, 'the matches left out over every search').toBeGreaterThan(50)
+    // The records given whole were compared, and not only their ids.
+    expect(givenWhole, 'the records given whole over every search').toBeGreaterThan(0)
   })
 })

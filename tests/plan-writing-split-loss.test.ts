@@ -259,7 +259,7 @@ describe('a cell edit and a keystroke with no pause between them', () => {
     }
     const panel = words(h(writing.PlanSaveBar, { state: shown }))
     expect(panel).toContain('The table beside your writing changed a line while you were typing, so nothing was saved.')
-    expect(panel).toContain('Every character you typed is still on this page')
+    // CRITERION CHANGE, as decided: the banner no longer explains that the typing is still on the page.
     expect(panel).toContain('Read what is stored now')
     expect(panel).not.toContain('Somebody wrote in this plan first')
   })

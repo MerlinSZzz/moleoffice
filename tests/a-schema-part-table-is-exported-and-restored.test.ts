@@ -39,6 +39,7 @@ import {
   readThePartTables,
   type Snapshot,
 } from '../scripts/restore-check.ts'
+import { everyPartTable } from '../src/server/db/every-part-table.ts'
 
 vi.mock('../src/server/db/schema-parts/index.ts', () => import('./fixtures/an-invented-schema-part.ts'))
 
@@ -49,7 +50,7 @@ type ImportLib = typeof import('../src/server/lib/import.ts')
 /** What drizzle-kit's own diff writes for schema.ts with its parts, over schema.ts without them. */
 async function whatTheGeneratorWritesForTheParts(schema: Schema): Promise<string[]> {
   const kit = await import('drizzle-kit/api')
-  const partNames = new Set(schema.everyPartTable().map((t) => t.name))
+  const partNames = new Set(everyPartTable().map((t) => t.name))
   const withoutParts = Object.fromEntries(
     Object.entries(schema).filter(([, value]) => !(is(value, SQLiteTable) && partNames.has(getTableName(value)))),
   )

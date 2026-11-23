@@ -26,12 +26,16 @@
  *      (./held-by-its-filer.ts). That is the session hook's filing when it knows the agent and not the agent's key. A
  *      session discovery filed in the agent's name, from a transcript it found on this computer, is not the agent's:
  *      the agent asked for a sweep and did not name that conversation. Its first revision's stamp says so.
+ *   4. A DISPATCHED RUN'S KEY (the one `agent_runs.request.agentKeyId` names) HOLDS THE SESSION ITS WORKER FILED FOR IT:
+ *      the newest session whose first revision the office's key proved and whose `extra.agentRun` names that run, as
+ *      tools/agent-worker.mjs files it after its claim, while the run is claimed or running. A newer filing for the
+ *      same run takes the key from the older one. Nothing is stored for this: the first revisions say it, read through
+ *      the index of migration 0277. A deleted session is refused, as it is for a run key.
  *
  * The office's key, the person's key file and the person's own device and tool keys are taken as given
- * (`theKeyOnThisRequestIsTakenAsGiven` in lib/keys.ts). A visitor's credential is an agent's key here. A dispatched run's
- * key is refused with its own words, which name problem J60KF9L_OR-X: tools/agent-worker.mjs cannot tie its writes to
- * its run until that is fixed. Any other key is refused. A request with no key is not this file's question; `actorFrom`
- * in lib/http.ts refuses its session header only at a door to a key.
+ * (`theKeyOnThisRequestIsTakenAsGiven` in lib/keys.ts). A visitor's credential is an agent's key here. Any other key is
+ * refused. A request with no key is not this file's question; `actorFrom` in lib/http.ts refuses its session header
+ * only at a door to a key.
  */
 
 import type { FastifyRequest } from 'fastify'
@@ -44,7 +48,9 @@ import {
   theRunThisRunKeyIsBoundTo,
 } from './keys.ts'
 import { theHashOfTheKeyOnThisRequest, theHeldKeyRowWhoseHashIs, whatTheKeyWithThisIdIsFor } from '../db/the-key-on-this-request-was-made-for-a-run.ts'
+import { STORED_FIELDS, theWordsOfAStoredField } from '../db/schema.ts'
 import { theRunHasEnded } from '@shared/run-has-ended.ts'
+import type { EmbassyKey } from '@shared/worlds.ts'
 import { HELD_BY_ITS_FILER } from './held-by-its-filer.ts'
 import { everyAgentASessionsDataNames } from './messages.ts'
 import { resolveSessionRef } from './resolve-session-ref.ts'
@@ -56,7 +62,6 @@ export type WhatTheKeyMakesOfTheRunNamed =
   | { is: 'no-key' }
   | { is: 'held' }
   | { is: 'not-held'; because: string }
-  | { is: 'a-dispatched-runs-key' }
 
 const HOLDS: WhatTheKeyMakesOfTheRunNamed = { is: 'held' }
 const NO_KEY: WhatTheKeyMakesOfTheRunNamed = { is: 'no-key' }
@@ -179,6 +184,44 @@ function whyTheRunIsNotRunning(run: Omit<ARunNamed, 'id'>): string | null {
 }
 
 /**
+ * `json_extract(data, '$.extra.agentRun')`, in the words of the index of migration 0277, which holds first revisions
+ * only. A read uses that index only when it asks in these words and says `seq = 1` with the literal value.
+ */
+const THE_DISPATCHED_RUN_NAMED = theWordsOfAStoredField(STORED_FIELDS.agentRun, 'data')
+
+/**
+ * THE FOURTH PART OF THE RULE AT THE TOP OF THIS FILE: why a dispatched run's key does not hold this session, or null
+ * when it does. The session is not deleted, the run is claimed or running, the session's first revision was proved by
+ * the office's key and names the run in `extra.agentRun`, and no later first revision does the same for that run.
+ */
+function whyADispatchedRunsKeyDoesNotHold(run: EmbassyKey['of'], named: ARunNamed): string | null {
+  if (run === null) return 'nobody can say which dispatched run this key was made for'
+  if (named.deleted) return "that run's session record is deleted"
+  if (run.state !== 'not-ended') return `this key is the key of dispatched run ${run.id}, which is not claimed or running`
+  const filedFor = (id: string): boolean =>
+    sqlite
+      .prepare(
+        'SELECT 1 AS one FROM revisions WHERE record_id = ? AND seq = 1 ' +
+          `AND ${THE_DISPATCHED_RUN_NAMED} = ? AND op = 'create' AND proved_by = 'the-office-key'`,
+      )
+      .get(id, run.id) !== undefined
+  if (!filedFor(named.id)) {
+    return `this key is the key of dispatched run ${run.id}, and the office's key did not file that session for that run`
+  }
+  // THE NEWEST FILING FOR THE RUN, by the order the revisions were written.
+  const newest = sqlite
+    .prepare(
+      `SELECT record_id AS id FROM revisions WHERE seq = 1 AND ${THE_DISPATCHED_RUN_NAMED} = ? ` +
+        "AND kind = 'session' AND op = 'create' AND proved_by = 'the-office-key' ORDER BY rowid DESC LIMIT 1",
+    )
+    .get(run.id) as { id: string } | undefined
+  if (newest !== undefined && newest.id !== named.id) {
+    return `this key is the key of dispatched run ${run.id}, and a newer session the office's key filed for that run, ${newest.id}, holds it now`
+  }
+  return null
+}
+
+/**
  * WHAT THE KEY THIS WRITE CARRIES MAKES OF THE RUN ITS SESSION HEADER NAMES, by the rule at the top of this file.
  * `no-key` where the request carries no key, carries one this office does not hold, or carries a live one a test world
  * does not trust: each of those proves nobody, and the request is judged as one with no key.
@@ -206,9 +249,12 @@ export function whatTheKeyMakesOfTheRunNamed(req: FastifyRequest, session: strin
   }
 
   if (row.revokedAt !== null) return refused('this key has been revoked')
-  const madeFor = whatTheKeyWithThisIdIsFor(row.id).is
-  if (madeFor === 'a-dispatched-run') return { is: 'a-dispatched-runs-key' }
-  if (madeFor === 'a-run' || madeFor === 'a-deleted-run') {
+  const madeFor = whatTheKeyWithThisIdIsFor(row.id)
+  if (madeFor.is === 'a-dispatched-run') {
+    const why = whyADispatchedRunsKeyDoesNotHold(madeFor.of, named)
+    return why === null ? HOLDS : refused(why)
+  }
+  if (madeFor.is === 'a-run' || madeFor.is === 'a-deleted-run') {
     return refused("this key was made for a run, and no binding the office wrote ties it to that run or to any other")
   }
   // AN AGENT'S OWN KEY, AND A WORLD'S REPORTING KEY, WHICH IS ITS HOLDER'S.

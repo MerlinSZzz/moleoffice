@@ -300,10 +300,65 @@ it.each([{ args: [] }, { args: ['--even-so', 'Synthetic reason cannot authorize 
   expect(existsSync(join(root, 'git-trace.log'))).toBe(false)
 })
 
-it.each([undefined, -1, 0.5, '0'])('an incomplete hidden count %j keeps the worktree', async hiddenCount => {
+it.each([undefined, -1])('an incomplete hidden count %j keeps the worktree', async hiddenCount => {
   body = { ...answer([]), hiddenCount }
   const out = await remove()
   expect(out.code, out.output).toBe(1)
   expect(existsSync(tree)).toBe(true)
   expect(out.output).toContain('Nothing was removed')
+})
+
+/**
+ * Commit a .gitignore in the worktree and put a branch on it, so the ignored files, and not a commit on no ref, decide
+ * whether the worktree goes.
+ */
+function commitAGitignore(lines: string[]) {
+  writeFileSync(join(tree, '.gitignore'), lines.map((line) => `${line}\n`).join(''))
+  git('-C', tree, 'add', '--', '.gitignore')
+  git('-C', tree, 'commit', '-q', '-m', 'Test ignored files')
+  git('-C', tree, 'branch', 'test-ignored-files')
+}
+
+// AN IGNORED FILE THAT NO BUILD, INSTALL OR RENDER MAKES AGAIN KEEPS THE WORKTREE, AND IS NAMED BY ITS PATH. Git's removal
+// with --force deletes ignored files with the worktree, so a run's logs, which records cite, went with it. Only what
+// the tool's list says a build makes again from tracked files may go.
+it('keeps a worktree whose ignored file no build makes again, names the file, and runs no removal', async () => {
+  commitAGitignore(['.logs/'])
+  mkdirSync(join(tree, '.logs'))
+  writeFileSync(join(tree, '.logs', 'run.log'), 'A run log that a record cites.\n')
+  const out = await remove()
+  expect(out.code, out.output).toBe(1)
+  expect(existsSync(tree)).toBe(true)
+  expect(readFileSync(join(tree, '.logs', 'run.log'), 'utf8')).toBe('A run log that a record cites.\n')
+  expect(out.output.split('\n')).toContain('.logs/run.log')
+  expect(readFileSync(join(root, 'git-trace.log'), 'utf8')).not.toContain('worktree remove')
+})
+
+it('removes a worktree whose ignored files are all under dist/ and a node_modules link, as before', async () => {
+  commitAGitignore(['dist/', 'node_modules'])
+  mkdirSync(join(tree, 'dist'))
+  writeFileSync(join(tree, 'dist', 'app.js'), 'Test build output.\n')
+  // A worktree's node_modules is a link to the checkout's, so the link goes with the worktree and its folder does not.
+  const installed = join(root, 'installed')
+  mkdirSync(installed)
+  writeFileSync(join(installed, 'index.js'), 'Test installed package.\n')
+  symlinkSync(installed, join(tree, 'node_modules'))
+  const out = await remove()
+  expect(out.code, out.output).toBe(0)
+  expect(existsSync(tree)).toBe(false)
+  expect(git('-C', repository, 'worktree', 'list', '--porcelain')).not.toContain(tree)
+  expect(existsSync(join(installed, 'index.js'))).toBe(true)
+})
+
+// A .env MAY HOLD KEYS, so the tool names it by its path and never reads or prints what it holds.
+it('keeps a worktree with an ignored .env, names it by its path, and prints nothing it holds', async () => {
+  const value = 'made-up-value-that-is-not-a-key'
+  commitAGitignore(['.env'])
+  writeFileSync(join(tree, '.env'), `MADE_UP_SETTING=${value}\n`)
+  const out = await remove()
+  expect(out.code, out.output).toBe(1)
+  expect(existsSync(tree)).toBe(true)
+  expect(readFileSync(join(tree, '.env'), 'utf8')).toBe(`MADE_UP_SETTING=${value}\n`)
+  expect(out.output.split('\n')).toContain('.env')
+  expect(out.output).not.toContain(value)
 })

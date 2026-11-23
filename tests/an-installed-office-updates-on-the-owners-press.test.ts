@@ -15,11 +15,18 @@
  * Since wave 13s round 257 the press also gives each agent whose id is still a handle a new id, after the
  * migrations, when the office has filed no re-mint yet. The last block of cases holds that.
  *
+ * Since wave 13s round 281 the reduced mode runs the office's Host check and refuses a write without the office's
+ * mark, as the server does once it serves. The cases over a real socket in the second block hold that: a keyless press
+ * without the mark is refused and nothing is backed up or updated, a read or a press for another Host is refused, and
+ * the keyless press with the mark, as the page sends it, still presses.
+ *
  * PICTURES. With TEST_SHOTS naming a folder, the last case photographs the page after a press whose re-mint
  * refused, at 1440, 990, 660 and 390 in both looks, into the-update-remint-refused under it.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync, readdirSync } from 'node:fs'
+import { request as aRequestOnTheSocket } from 'node:http'
 import { basename, dirname, join } from 'node:path'
 import type Database from 'better-sqlite3'
 import type { FastifyInstance } from 'fastify'
@@ -28,8 +35,10 @@ import type { BrowserContext } from 'playwright'
 import { freshDb, theBrowserThisWorkerShares, theOfficesOwnIdIn, type TestDb } from './helpers.ts'
 import { MIGRATIONS } from './an-office-one-migration-behind.ts'
 import { THE_TEST_OFFICES_OWNER } from './a-page-of-a-test-office.ts'
+import { A_TEST_BROWSERS_NAME } from './a-paired-context.ts'
 import { testShots } from './where-shots-go.ts'
 import type { TheUpdateOffer, TheUpdateReading } from '../src/shared/the-update.ts'
+import type { ADeviceKeyInTwoHalves } from '../src/server/lib/visitors.ts'
 
 // The first test imports the server's modules cold, which was measured at 2.7 to 5 s.
 vi.setConfig({ testTimeout: 30_000 })
@@ -65,7 +74,7 @@ async function anOfficeWaitingForThePress(first?: (sqlite: Database.Database) =>
   if (decision.serve || decision.update === undefined) throw new Error(`the start check did not offer an update: ${decision.serve ? decision.report : decision.refusal}`)
   const backups = join(dirname(db.file), 'backups')
   mkdirSync(backups, { recursive: true })
-  return { db, sqlite, offer: { file: db.file, holds: decision.update.holds, wouldWrite: decision.update.wouldWrite, backups } }
+  return { db, sqlite, offer: { file: db.file, holds: decision.update.holds, wouldWrite: decision.update.wouldWrite, measuredOn: decision.update.measuredOn, backups } }
 }
 
 /** How many revisions the note written past the door has. The update writes its first one. */
@@ -91,17 +100,127 @@ function safetyCopiesBeside(file: string): string[] {
   return readdirSync(dirname(file)).filter((name) => name.startsWith(`.${basename(file)}.before-the-update-`))
 }
 
+/**
+ * The database file as it is on disk, by the digest of its bytes, and of its write-ahead log when there is one. A
+ * write goes into the log first, so a press that wrote changes one of the two.
+ */
+function theFileAsItIs(file: string): { file: string; log: string | null } {
+  const digest = (path: string): string => createHash('sha256').update(readFileSync(path)).digest('hex')
+  return { file: digest(file), log: existsSync(`${file}-wal`) ? digest(`${file}-wal`) : null }
+}
+
+/** The port the reduced mode listens on, once `app.listen` has bound it. */
+function thePortOf(app: FastifyInstance): number {
+  const address = app.server.address()
+  if (address === null || typeof address === 'string') throw new Error('the reduced mode is listening on no port')
+  return address.port
+}
+
+/** The one code an export of src/shared/refusal-codes.ts holds, read from the export and never typed here. */
+function theOneCodeOf(codes: Readonly<Record<string, unknown>>): string {
+  const [code, ...more] = Object.keys(codes)
+  if (code === undefined || more.length > 0) throw new Error(`the export holds ${String(Object.keys(codes).length)} codes, not one`)
+  return code
+}
+
+/** The mark the waiting page's press sends: a JSON body, which a website cannot make a browser send without asking. */
+const THE_MARK = { type: 'application/json', body: '{}' }
+
+/**
+ * One request to the reduced mode over a real socket on 127.0.0.1, naming the Host given, and its status and body. A
+ * POST carries the mark, as the page's press does. `fetch` cannot name a Host of its own, so this uses node:http.
+ */
+function askOnTheSocket(port: number, method: 'GET' | 'POST', host: string): Promise<{ status: number; body: string }> {
+  return new Promise((done, failed) => {
+    const headers: Record<string, string> = { host }
+    if (method === 'POST') {
+      headers['content-type'] = THE_MARK.type
+      headers['content-length'] = String(Buffer.byteLength(THE_MARK.body))
+    }
+    const asked = aRequestOnTheSocket({ host: '127.0.0.1', port, method, path: '/api/office/the-update', headers, agent: false }, (answer) => {
+      let body = ''
+      answer.setEncoding('utf8')
+      answer.on('data', (piece: string) => (body += piece))
+      answer.on('end', () => done({ status: answer.statusCode ?? 0, body }))
+    })
+    asked.on('error', failed)
+    if (method === 'POST') asked.write(THE_MARK.body)
+    asked.end()
+  })
+}
+
+/** A name a website could put in the Host header: a made-up name in a domain kept for documentation. */
+const A_WEBSITES_NAME = 'a-website.example'
+
 /** The address the browser cases open. Nothing listens there: the reduced mode answers each request. */
 const AT = 'http://the-waiting-office.test'
 
-/** Answer every request the browser makes to AT by the reduced mode itself, through `inject`, with the browser's own headers. */
-async function answeredByTheReducedMode(context: BrowserContext, app: FastifyInstance): Promise<void> {
+/**
+ * A BROWSER PAIRED BEFORE THE UPDATE WAITS, written into the file the way the pairing press writes it: a device
+ * credential the owner confirmed, whose key the cookie half and the header half join to. The waiting office serves no
+ * pairing door, so the live office paired the browser before the update came, and the test writes that pairing before
+ * the start check. The press on this computer carries no key, so the key it binds is recorded as made with none.
+ */
+async function aBrowserPairedBeforeTheUpdate(): Promise<ADeviceKeyInTwoHalves> {
+  const { pairABrowserAsThePerson } = await import('../src/server/lib/visitors.ts')
+  const paired = pairABrowserAsThePerson(
+    { name: A_TEST_BROWSERS_NAME, machine: null, machineHow: 'nobody could tell', runtime: null },
+    { kind: 'person', id: THE_TEST_OFFICES_OWNER.id },
+    'no-key',
+  )
+  return paired.halves
+}
+
+/**
+ * Give the context both halves as a paired browser holds them: the cookie half in its cookies for AT, and the header
+ * half in the page's storage under the name the page reads it from, before any page of the context runs a script.
+ */
+async function holdTheHalves(context: BrowserContext, halves: ADeviceKeyInTwoHalves): Promise<void> {
+  const { DEVICE_HALF_COOKIE } = await import('../src/config/key-header.mjs')
+  const { DEVICE_HALF_KEY } = await import('../src/web/lib/the-device-half.ts')
+  await context.addCookies([{ name: DEVICE_HALF_COOKIE, value: halves.cookie, url: AT }])
+  await context.addInitScript(
+    ({ key, half }) => {
+      window.localStorage.setItem(key, half)
+    },
+    { key: DEVICE_HALF_KEY, half: halves.header },
+  )
+}
+
+/**
+ * Answer every request the browser makes to AT by the reduced mode itself, through `inject`, with the browser's own
+ * headers and body. The page's press sends a JSON body as the office's mark, and a JSON request with no body is refused.
+ *
+ * EACH POST THE BROWSER SENDS MUST CARRY THE OFFICE'S MARK, as `carriesTheOfficesMark` reads it from the browser's own
+ * headers. A request made by `inject` has no arrival, so neither request hook of the reduced mode reads it, and this is
+ * the one place a browser case checks that the page's own press carries the mark. A POST without it is refused here,
+ * and `unmarked`, which the helper gives back, fails at once with a sentence that names the request's method and path.
+ * Each case races its waits on the page against `unmarked`, so such a POST fails the case with that sentence, and not
+ * by a time limit or a missing panel.
+ */
+async function answeredByTheReducedMode(context: BrowserContext, app: FastifyInstance): Promise<{ unmarked: Promise<never> }> {
+  const { carriesTheOfficesMark } = await import('../src/server/lib/a-write-a-website-could-send.ts')
+  let refused: (why: Error) => void = () => {}
+  const unmarked = new Promise<never>((_never, failed) => (refused = failed))
+  // A case that sends no POST never reads `unmarked`, and one that ends early may not have read it yet.
+  void unmarked.catch(() => undefined)
   await context.route(`${AT}/**`, async (route) => {
     const request = route.request()
-    const answer = await app.inject({ method: request.method() as 'GET' | 'POST', url: new URL(request.url()).pathname, headers: await request.allHeaders() })
+    if (request.method() === 'POST' && !carriesTheOfficesMark(await request.allHeaders())) {
+      refused(new Error(`The browser sent ${request.method()} ${new URL(request.url()).pathname} without the office's mark: no header of the office's own and no JSON body.`))
+      await route.abort()
+      return
+    }
+    const answer = await app.inject({
+      method: request.method() as 'GET' | 'POST',
+      url: new URL(request.url()).pathname,
+      headers: await request.allHeaders(),
+      payload: request.postDataBuffer() ?? undefined,
+    })
     const headers = Object.fromEntries(Object.entries(answer.headers).map(([name, value]) => [name, String(value)]))
     await route.fulfill({ status: answer.statusCode, headers, body: answer.rawPayload })
   })
+  return { unmarked }
 }
 
 describe('a checkout keeps its refusal and its command', () => {
@@ -186,7 +305,8 @@ describe('the reduced mode of an installed office', () => {
 
   // A WINDOW THAT WAS NEVER PAIRED holds no key, and the reduced mode serves no pairing door. Its keyless press, over
   // a real socket from this computer's own program, is the one the pairing press would already hand the owner's key
-  // to, so it is the owner's here too. The same request naming an agent is refused, and nothing is written.
+  // to, so it is the owner's here too. The same request naming an agent is refused, and nothing is written. The press
+  // carries the office's mark, a JSON body, as the page's press sends it: without it the press is refused (the next case).
   // CONTROL: passes. MUTATIONS, each red: the own-program answer made `&& false` (the window's press is refused); the
   // line that refuses a request naming an agent made a no-op (the agent's press is taken). RESTORE: passes.
   it('takes a keyless press from this computer\'s own program, as the installed window sends it, and refuses one naming an agent', async () => {
@@ -208,11 +328,75 @@ describe('the reduced mode of an installed office', () => {
       expect(everyCount(sqlite), 'the refused press wrote nothing').toEqual(before)
 
       expect(((await (await fetch(at)).json()) as TheUpdateReading).mayPress).toBe(true)
-      const pressed = await fetch(at, { method: 'POST' })
+      const pressed = await fetch(at, { method: 'POST', headers: { 'content-type': THE_MARK.type }, body: THE_MARK.body })
       expect(pressed.status).toBe(200)
       expect(((await pressed.json()) as TheUpdateReading).update.state).toBe('done')
       await done
       expect(revisionsOfTheNote(sqlite)).toBe(1)
+    } finally {
+      await app.close()
+    }
+  })
+
+  // A KEYLESS PRESS WITHOUT THE OFFICE'S MARK is one a page on any website could make the browser send to this
+  // computer's own address. It is refused 403 in the office's words and code, before the press is read, and nothing is
+  // backed up or updated. Red at the cut, where this press, sent by this test's own program, presses.
+  it("refuses a keyless press without the office's mark over a real socket, and backs up and updates nothing", async () => {
+    const { db, sqlite, offer } = await anOfficeWaitingForThePress()
+    const { theReducedMode } = await import('../src/server/lib/the-update.ts')
+    const { OFFICES_MARK_REFUSAL_CODES } = await import('../src/shared/refusal-codes.ts')
+    const { createI18n } = await import('../src/shared/i18n.ts')
+    const { app } = theReducedMode({ sqlite, offer, migrationsFolder: MIGRATIONS, headers: () => ({}) })
+    await app.listen({ port: 0, host: '127.0.0.1' })
+    try {
+      const at = `http://127.0.0.1:${String(thePortOf(app))}/api/office/the-update`
+      const before = { file: theFileAsItIs(db.file), counts: everyCount(sqlite) }
+
+      const refused = await fetch(at, { method: 'POST' })
+      expect(refused.status).toBe(403)
+      expect(await refused.json()).toEqual({ error: createI18n('en').t('server.writeWithoutTheOfficesMark'), code: theOneCodeOf(OFFICES_MARK_REFUSAL_CODES) })
+
+      expect(theFileAsItIs(db.file), 'the refused press changed the database file').toEqual(before.file)
+      expect(readdirSync(offer.backups), 'the refused press made a backup').toEqual([])
+      expect(safetyCopiesBeside(db.file)).toEqual([])
+      expect(everyCount(sqlite)).toEqual(before.counts)
+      expect(revisionsOfTheNote(sqlite), 'the refused press updated the file').toBe(0)
+      expect(((await (await fetch(at)).json()) as TheUpdateReading).update.state).toBe('offered')
+    } finally {
+      await app.close()
+    }
+  })
+
+  // A REQUEST WHOSE HOST IS NOT THE OFFICE'S is one a website could have a browser send under a name it controls. The
+  // read of the offer and the press are each refused 421 in the office's words and code, with the port the socket came
+  // in on. The press carries the mark, so the Host alone refuses it. Nothing is backed up or updated. Red at the cut,
+  // where the read answers and the press presses.
+  it("refuses the read and the press for a Host that is not the office's over a real socket, and writes nothing", async () => {
+    const { db, sqlite, offer } = await anOfficeWaitingForThePress()
+    const { theReducedMode } = await import('../src/server/lib/the-update.ts')
+    const { HOST_REFUSAL_CODES } = await import('../src/shared/refusal-codes.ts')
+    const { createI18n } = await import('../src/shared/i18n.ts')
+    const { app } = theReducedMode({ sqlite, offer, migrationsFolder: MIGRATIONS, headers: () => ({}) })
+    await app.listen({ port: 0, host: '127.0.0.1' })
+    try {
+      const port = thePortOf(app)
+      const host = `${A_WEBSITES_NAME}:${String(port)}`
+      const theRefusal = { error: createI18n('en').t('server.hostIsNotThisOffice', { port }), code: theOneCodeOf(HOST_REFUSAL_CODES) }
+      const before = { file: theFileAsItIs(db.file), counts: everyCount(sqlite) }
+
+      const read = await askOnTheSocket(port, 'GET', host)
+      expect(read.status, read.body).toBe(421)
+      expect(JSON.parse(read.body)).toEqual(theRefusal)
+
+      const pressed = await askOnTheSocket(port, 'POST', host)
+      expect(pressed.status, pressed.body).toBe(421)
+      expect(JSON.parse(pressed.body)).toEqual(theRefusal)
+
+      expect(theFileAsItIs(db.file), 'the refused press changed the database file').toEqual(before.file)
+      expect(readdirSync(offer.backups), 'the refused press made a backup').toEqual([])
+      expect(safetyCopiesBeside(db.file)).toEqual([])
+      expect(everyCount(sqlite)).toEqual(before.counts)
+      expect(revisionsOfTheNote(sqlite), 'the refused press updated the file').toBe(0)
     } finally {
       await app.close()
     }
@@ -313,8 +497,12 @@ describe('the window reads the waiting office as its own', () => {
 // press, as `mayPressTheUpdate` says, and the page then says where the press is, so a person is never left at an offer
 // with nothing to do. A paired browser is shown the press and not that sentence. The page is the reduced mode's own,
 // drawn in a browser; each of its requests is answered by the reduced mode itself through `inject`, with the browser's
-// own headers. So a browser that holds no key comes from no program of this computer, and one whose cookie holds the
-// owner's key is a paired browser. The sentence is read from the words the page's own words come from.
+// own headers. So a browser that holds no key comes from no program of this computer, and one that holds both halves of
+// a device key the owner confirmed is a paired browser: the cookie half in its cookies, and the header half in the
+// page's storage, which the page's own script sends on its read and its press. Since a browser's key was made in two
+// halves, the old whole-key cookie is no key, and the waiting office serves no pairing door and no move of the old
+// cookie, so the pairing is written into the file before the update waits, as the live office would have written it.
+// The sentence is read from the words the page's own words come from.
 // Since round DW that sentence is the only place on the page that says where the press is. The older sentence above it
 // said "a browser on that computer" while this one says "a browser that has paired", and two places that say one thing
 // drift apart.
@@ -332,18 +520,24 @@ describe('the offer says where the press is', () => {
 
   /** What the offer page says once it is drawn, and how many presses it shows, to a browser paired or not. */
   async function theOfferPage(paired: boolean): Promise<{ says: string; presses: number }> {
-    const { db, sqlite, offer } = await anOfficeWaitingForThePress()
+    const pairing: { halves?: ADeviceKeyInTwoHalves } = {}
+    const { sqlite, offer } = await anOfficeWaitingForThePress(
+      paired
+        ? async () => {
+            pairing.halves = await aBrowserPairedBeforeTheUpdate()
+          }
+        : undefined,
+    )
     const { theReducedMode } = await import('../src/server/lib/the-update.ts')
-    const { KEY_COOKIE } = await import('../src/config/key-header.mjs')
     const { app } = theReducedMode({ sqlite, offer, migrationsFolder: MIGRATIONS, headers: () => ({}) })
     const context = await (await theBrowserThisWorkerShares()).newContext()
     try {
-      if (paired) await context.addCookies([{ name: KEY_COOKIE, value: await thePersonsKey(db.file), url: AT }])
-      await answeredByTheReducedMode(context, app)
+      if (pairing.halves !== undefined) await holdTheHalves(context, pairing.halves)
+      const { unmarked } = await answeredByTheReducedMode(context, app)
       const page = await context.newPage()
       await page.goto(`${AT}/`)
       // The offer is drawn: what the check found, and the panel that holds the press or says who may press.
-      await page.locator('#the-update .panel').nth(1).waitFor()
+      await Promise.race([page.locator('#the-update .panel').nth(1).waitFor(), unmarked])
       return { says: await page.locator('#the-update').innerText(), presses: await page.locator('#back-up-and-update').count() }
     } finally {
       await context.close()
@@ -572,34 +766,37 @@ describe('the press gives each agent whose id is still a handle a new id', () =>
    * is drawn. Given a folder, the page is then photographed into it at four widths in both looks.
    */
   async function theDonePageAfterARefusal(into: string | null): Promise<string> {
-    const { db, sqlite, offer } = await anOfficeWaitingForThePress(async (s) => {
+    const pairing: { halves?: ADeviceKeyInTwoHalves } = {}
+    const { sqlite, offer } = await anOfficeWaitingForThePress(async (s) => {
       await theOwnRowAsAnOlderOfficeHoldsIt(s)
       aLegacyAgent(s, RESIDENT, '2026-10-02 09:00:00')
+      pairing.halves = await aBrowserPairedBeforeTheUpdate()
     })
+    const halves = pairing.halves
+    if (halves === undefined) throw new Error('the browser was not paired before the update waited')
     const { theReducedMode } = await import('../src/server/lib/the-update.ts')
-    const { KEY_COOKIE } = await import('../src/config/key-header.mjs')
     const { app } = theReducedMode({ sqlite, offer, migrationsFolder: MIGRATIONS, headers: () => ({}) })
     const browser = await theBrowserThisWorkerShares()
     const contexts: BrowserContext[] = []
     try {
       const context = await browser.newContext()
       contexts.push(context)
-      await context.addCookies([{ name: KEY_COOKIE, value: await thePersonsKey(db.file), url: AT }])
-      await answeredByTheReducedMode(context, app)
+      await holdTheHalves(context, halves)
+      const { unmarked } = await answeredByTheReducedMode(context, app)
       const page = await context.newPage()
       await page.goto(`${AT}/`)
       await page.locator('#back-up-and-update').click()
-      await page.locator('#the-update .panel.done').waitFor()
+      await Promise.race([page.locator('#the-update .panel.done').waitFor(), unmarked])
       const says = await page.locator('#the-update').innerText()
       for (const theme of into === null ? [] : (['light', 'dark'] as const)) {
         const looked = await browser.newContext({ colorScheme: theme })
         contexts.push(looked)
-        await answeredByTheReducedMode(looked, app)
+        const answered = await answeredByTheReducedMode(looked, app)
         const at = await looked.newPage()
         for (const width of [1440, 990, 660, 390]) {
           await at.setViewportSize({ width, height: 900 })
           await at.goto(`${AT}/`)
-          await at.locator('#the-update .panel.done').waitFor()
+          await Promise.race([at.locator('#the-update .panel.done').waitFor(), answered.unmarked])
           await at.screenshot({ path: join(into as string, `the-update-remint-refused-${String(width)}-${theme}.png`), fullPage: true })
         }
       }

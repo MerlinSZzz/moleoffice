@@ -44,7 +44,7 @@
  * releasing the hold says only that Mole Office will no longer send it messages.
  */
 
-import type { ParticipantRef } from './participants.ts'
+import { aHarnessTheOfficeCannotReadInside, type ParticipantRef } from './participants.ts'
 import { parseLocalStamp } from './time.ts'
 import type { DevSaying } from './dev-sayings.ts'
 
@@ -99,7 +99,7 @@ export interface HoldOnTheWire {
   session: string
   /** The computer that session is running on, in its own words. */
   machine: string
-  /** `claude-code`, `codex` or `opencode`. */
+  /** The harness's own word as the hold stored it: one of the known runtimes, or any other harness's name. */
   runtime: string
   /** When the hold was claimed. Local wall clock. */
   claimedAt: string
@@ -211,7 +211,20 @@ export function whoIsAnsweringSays(
       'the agent still uses the same tool.'
     )
   }
+  /**
+   * A SESSION OF A HARNESS THE OFFICE CANNOT READ INSIDE is answering on its hold's heartbeat alone, and
+   * the sentence says so: the office cannot see inside that harness, and a message waits for its own
+   * waiter. That is a harness with no adapter, and opencode and kimi too.
+   */
   if (how === 'a live session') {
+    const harness = where === null ? null : aHarnessTheOfficeCannotReadInside(where.runtime)
+    if (where !== null && harness !== null) {
+      return (
+        `Answering from a ${harness} session on ${where.machine}. Mole Office cannot see inside ${harness}, so the ` +
+        "hold's heartbeat is the sign it is there. A message waits for that session's own waiter, and Mole Office " +
+        'starts no run.'
+      )
+    }
     const at = where === null ? 'a terminal' : `a ${where.runtime} session on ${where.machine}`
     return `Answering from ${at}. A message goes to that session, and Mole Office starts no run.`
   }
@@ -263,6 +276,8 @@ function whoIsAnsweringSaid(
   }
   if (how === 'its own conversation') return { code: 'answeringOwnConversation', values: {} }
   if (how === 'a live session') {
+    const harness = where === null ? null : aHarnessTheOfficeCannotReadInside(where.runtime)
+    if (where !== null && harness !== null) return { code: 'answeringLiveSessionUnread', values: { runtime: harness, machine: where.machine } }
     return where === null
       ? { code: 'answeringLiveSessionTerminal', values: {} }
       : { code: 'answeringLiveSession', values: { runtime: where.runtime, machine: where.machine } }

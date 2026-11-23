@@ -78,6 +78,7 @@ import { nothingWrittenSentence } from './records/patching.ts'
 import { PanelError } from './panel-error.ts'
 import { participantForActor } from './participant-for-actor.ts'
 import { theAgentOfARun } from './inspection.ts'
+import { isAnActiveAgent } from './inbox.ts'
 import { ranAsIn } from '@shared/ran-as.ts'
 
 // ============================================================================ reading one
@@ -230,6 +231,13 @@ export interface AttachmentQuery {
    * every run with no agent. Default false. A run it leaves out is one `ranAsIn` finds no agent for.
    */
   namingAnAgentOnly?: boolean
+  /**
+   * True for only the runs whose `ranAs` could name an active agent of the project (`theRunsThatCouldNameAnAgent`, asked
+   * for an active agent), for a reader that drops every run whose agent is not active. Default false. It narrows what
+   * `namingAnAgentOnly` keeps, and needs no `namingAnAgentOnly` beside it. A run it leaves out is one `ranAsIn` finds no
+   * active agent of the project for.
+   */
+  servingAnActiveAgentOnly?: boolean
 }
 
 /**
@@ -246,16 +254,49 @@ export interface AttachmentQuery {
  * each index, since SQLite chose the index of every record's kind for the first half when it was not named: 130 ms
  * for under 1, each the median of six reads, on the made-up office of 4 November shaped like the live project (wave
  * 13y round 143).
+ *
+ * ASKED FOR AN ACTIVE AGENT, EACH HALF KEEPS ONLY THE RUNS THAT COULD SERVE ONE (decision srwXywF1oYIs). Who is active
+ * is `isAnActiveAgent`'s, in src/server/lib/inbox.ts, which the roster's read of its agents asks too. The first half
+ * keeps a run whose first entry's agent is an active agent of the project. The second keeps a run some entry of whose
+ * `ranAs` is for this project and names an active agent of it. It also keeps a run whose data is not JSON, so a list
+ * read still fails on that run as before, and does not leave it out in silence. Each entry is read from the run's own
+ * data by its path, so an entry that is not an object reads as null and raises nothing. The second half does not
+ * choose the entry `ranAsIn` takes. So it keeps a run whose entry `ranAsIn` takes names an agent that is not active,
+ * when another entry for this project names one that is, and `ranAsIn` still reads each run. Neither half leaves out
+ * a run `ranAsIn` finds an active agent for.
  */
-function theRunsThatCouldNameAnAgent(workspaceId: string): SQL {
+function theRunsThatCouldNameAnAgent(workspaceId: string, anActiveAgentOnly = false): SQL {
   const data = sql.raw('candidate.data')
+  const first = STORED_FIELDS.sessionFirstBindingAgent(data)
+  const active = theActiveAgentsOf(workspaceId)
+  const anEntryHereNamesOne = sql`EXISTS (SELECT 1 FROM json_each(${data}, '$.ranAs') AS entry WHERE entry.type = 'object'
+    AND json_extract(${data}, entry.fullkey || '.workspaceId') = ${workspaceId} AND json_extract(${data}, entry.fullkey || '.agentId') IN ${active})`
   const halves = [
-    [sql`${STORED_FIELDS.sessionFirstBindingAgent(data)} > ''`, 'records_session_first_binding_agent_idx'],
-    [sql`${STORED_FIELDS.sessionReferenceNeedsFallback(data)} = 1`, 'records_session_reference_fallback_idx'],
+    [sql`${first} > ''`, sql`${first} IN ${active}`, 'records_session_first_binding_agent_idx'],
+    [
+      sql`${STORED_FIELDS.sessionReferenceNeedsFallback(data)} = 1`,
+      sql`CASE WHEN json_valid(${data}) THEN ${anEntryHereNamesOne} ELSE 1 END`,
+      'records_session_reference_fallback_idx',
+    ],
   ] as const
-  const reads = halves.map(([condition, index]) => sql`SELECT candidate.rowid FROM records AS candidate INDEXED BY ${sql.raw(index)}
-    WHERE candidate.kind = 'session' AND ${condition} AND candidate.workspace_id = ${workspaceId} AND candidate.deleted_at IS NULL`)
+  const reads = halves.map(([condition, servingAnActiveAgent, index]) => {
+    const narrowed = anActiveAgentOnly ? sql`${condition} AND ${servingAnActiveAgent}` : condition
+    return sql`SELECT candidate.rowid FROM records AS candidate INDEXED BY ${sql.raw(index)}
+    WHERE candidate.kind = 'session' AND ${narrowed} AND candidate.workspace_id = ${workspaceId} AND candidate.deleted_at IS NULL`
+  })
   return sql`${records}.rowid IN (${sql.join(reads, sql` UNION ALL `)})`
+}
+
+/** The ids of the project's active agents, as a subquery under its own alias, for the narrowing above. */
+function theActiveAgentsOf(workspaceId: string): SQL {
+  const agent = { kind: sql.raw('agent.kind'), data: sql.raw('agent.data'), deletedAt: sql.raw('agent.deleted_at') }
+  return sql`(SELECT agent.id FROM records AS agent WHERE agent.workspace_id = ${workspaceId} AND ${isAnActiveAgent(agent)})`
+}
+
+/** The narrowing a list was asked for, or none. */
+function theNarrowingAskedIn(query: Omit<AttachmentQuery, 'openOnly'>): SQL | undefined {
+  if (query.servingAnActiveAgentOnly === true) return theRunsThatCouldNameAnAgent(query.workspaceId, true)
+  return query.namingAnAgentOnly === true ? theRunsThatCouldNameAnAgent(query.workspaceId) : undefined
 }
 
 /**
@@ -279,7 +320,7 @@ export function listAttachments(query: AttachmentQuery): AttachmentView[] {
         eq(records.workspaceId, query.workspaceId),
         isNull(records.deletedAt),
         query.openOnly === true ? sql`json_extract(${records.data}, '$.closedAt') IS NULL` : undefined,
-        query.namingAnAgentOnly === true ? theRunsThatCouldNameAnAgent(query.workspaceId) : undefined,
+        theNarrowingAskedIn(query),
       ),
     )
     .all()
@@ -319,7 +360,7 @@ export function listAttachmentsAndOpenIds(query: Omit<AttachmentQuery, 'openOnly
         eq(records.kind, 'session'),
         eq(records.workspaceId, query.workspaceId),
         isNull(records.deletedAt),
-        query.namingAnAgentOnly === true ? theRunsThatCouldNameAnAgent(query.workspaceId) : undefined,
+        theNarrowingAskedIn(query),
       ),
     )
     .all()

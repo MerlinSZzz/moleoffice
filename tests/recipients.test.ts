@@ -733,8 +733,8 @@ describe('a stamp holding only the conversation is read honestly', () => {
  * were all of them. Choosing one wrote nothing and explained itself with the name of a database
  * field. Problem `TXUeeKcpTVI4`.
  *
- * The fact they are dropped by is the stored one: a runtime word that is not one of the three an
- * agent may be served by, or `startedByMoleOffice`. Not the title.
+ * The fact they are dropped by is the stored one: a runtime word the office files for its own
+ * processes, or `startedByMoleOffice`. Not the title.
  */
 describe("Mole Office's own processes are never offered as runs to write to", () => {
   /** A session record of the shape one of Mole Office's own processes files for itself. */

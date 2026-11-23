@@ -25,7 +25,7 @@
 import { readFileSync } from 'node:fs'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
-import { apiApp, freshDb, type TestDb } from './helpers.ts'
+import { apiApp, freshDb, type TestDb, governsTheWholeProject } from './helpers.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { theRoleCardsFile } from '../src/server/lib/roles.ts'
 import type { BuiltServer } from '../src/server/index.ts'
@@ -98,7 +98,7 @@ async function theOwnersDecision(names: string | null): Promise<string> {
   expect(filed.status, filed.said).toBe(200)
   const words = String((filed.body['note'] as { id: string }).id)
   return file(asAgent('quill'), 'decision', 'The spring batch takes the celadon', {
-    replaces: [],
+    ...governsTheWholeProject(), replaces: [],
     decided_by: 'the owner',
     authority: 'the owner said so',
     authority_reference: words,
@@ -191,7 +191,7 @@ describe('a secretary closes a proposal by a decision the owner already made', (
   it('is refused with its own decision, even one that names the fork', async () => {
     const fork = await aForkForThePerson('Which shelf for the winter batch?')
     const own = await file(asAgent('quill'), 'decision', 'The winter batch goes on the top shelf', {
-      replaces: [],
+      ...governsTheWholeProject(), replaces: [],
       decided_by: 'quill',
       authority: 'a measurement',
       authority_reference: 'The top shelf held 40 degrees over two firings.',

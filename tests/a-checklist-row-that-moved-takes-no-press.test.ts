@@ -2,16 +2,16 @@
 // Licensed under the MIT License. See LICENSE.
 /**
  * A CHECKLIST ROW THAT MOVED WHEN THE VIEW READ THE CHECKLIST AGAIN TAKES NO PRESS FOR ONE SECOND, AND IS MARKED AS MOVED
- * FOR THAT SECOND. Wave 13j round loop-9, backlog item 1, from the secretary's answer L8_V7OK149wo: "after any re-read, a row
+ * FOR THAT SECOND. Wave 13j round loop-9, backlog item 1, from the secretary's answer: "after any re-read, a row
  * whose position changed takes no press for one second, and it is marked as moved for that second. A press must never
  * act for the person on a row they did not aim at." The decision that sorts the items by state stands.
  *
- * WHAT "MOVED" MEANS, from the secretary's answer u1xHS9oaCIOn, worked out from the readings alone: a row has moved when its place
+ * WHAT "MOVED" MEANS, from the secretary's answer, worked out from the readings alone: a row has moved when its place
  * among the rows the view draws changed, when it was not drawn before, or when anything drawn above it in the same view
  * changed in the re-read, such as a refusal line, a "told" line or an item whose words changed. What the person does,
  * such as scrolling or opening or closing an item, never counts as a move.
  *
- * ONLY WHAT IS DRAWN COUNTS, from the secretary's answer WUHKbopia72M, answer 2: "A change hidden inside a closed item moves
+ * ONLY WHAT IS DRAWN COUNTS, from the secretary's answer, point 2: "A change hidden inside a closed item moves
  * nothing on screen, so it must not mark that row or the rows below." A closed item draws its mark, its words and the
  * flow it stands for; its facts are drawn only when it is opened. So a change to its facts marks no row while it is
  * closed, and marks the rows below it once it is opened.
@@ -40,6 +40,11 @@
  *      the refused row too, and its refusal has no "Press once more".
  *   6. ON THE PAGE, THE SAME: a change inside a closed item above an opened row marks no row and its refusal says
  *      "Press once more"; once the item above is opened, the same kind of change marks the row below it.
+ *
+ * Test change (wave 13y round 175): the page and the window draw design E, as decided. Each checklist is a card, in
+ * the window and on the page; the page cases read the card the address `#/checklists/<id>` marks, and the window's
+ * cases find a checklist by its card's title. Before, the window drew each checklist as a group under a title and the
+ * page drew the one opened checklist with its counts line.
  */
 
 import type { Locator, Page, Request, Response } from 'playwright'
@@ -112,13 +117,15 @@ async function openTheWindow(page: Page): Promise<void> {
   await waitForThePage(page, 60_000)
   await page.waitForSelector('.ckw-press', { timeout: 30_000 })
   await page.click('.ckw-press')
-  await page.waitForSelector('.ckw-panel .ckw-group', { timeout: 30_000 })
+  await page.waitForSelector('.ckw-panel .cks-card', { timeout: 30_000 })
   await page.locator('.ckw-panel').evaluate((panel) => Promise.all(panel.getAnimations().map((one) => one.finished.catch(() => undefined))))
 }
 
 const row = (page: Page, words: string) => page.locator('.ckw-panel .ckp-item', { hasText: words })
 const box = (page: Page, words: string) => row(page, words).getByRole('button', { name: `Mark as done: ${words}`, exact: true })
 const MARKED = '[data-moved="yes"]'
+/** The card the address `#/checklists/<id>` marks on the page. */
+const ADDRESSED = '.cks-card[data-marked="yes"]'
 
 /** The words of these rows, top to bottom, without the state a screen reader is told before them. */
 function wordsOf(rows: Locator): Promise<string[]> {
@@ -135,8 +142,8 @@ function wordsOf(rows: Locator): Promise<string[]> {
 
 /** The rows of one checklist in the window still to do, or done in this opening of it, in the order drawn. */
 function rowsOf(page: Page, title: string): Promise<string[]> {
-  const group = page.locator('.ckw-panel .ckw-group', { has: page.locator('.ckw-group-title', { hasText: title }) })
-  return wordsOf(group.locator('.ckw-items:not(.ckp-folded) > .ckp-item .ckp-words'))
+  const card = page.locator('.ckw-panel .cks-card', { has: page.locator('.cks-title', { hasText: title }) })
+  return wordsOf(card.locator('.cks-items:not(.ckp-folded) > .ckp-item .ckp-words'))
 }
 
 /** When the row was marked as moved, when the mark went and when each click came, on the page's own clock. */
@@ -189,8 +196,8 @@ async function openThePage(page: Page, id: string): Promise<Locator> {
   await page.goto('about:blank')
   await page.goto(`${app.site}/?lang=en#/checklists/${id}`, { timeout: 60_000 })
   await waitForThePage(page, 60_000)
-  const one = page.locator('.ck1')
-  await one.locator('.ck1-counts').waitFor({ timeout: 30_000 })
+  const one = page.locator(ADDRESSED)
+  await one.locator('.ckp-item').first().waitFor({ timeout: 30_000 })
   return one
 }
 
@@ -293,9 +300,9 @@ describe('a checklist row that moved when the view read again takes no press for
     const kitchen = await aChecklist('Kitchen checklist', ['Wipe the bench', 'Empty the bin'])
     await openTheWindow(page)
     await nothingMarked(page)
-    const groups = page.locator('.ckw-panel .ckw-group-title')
-    expect((await groups.allInnerTexts()).slice(0, 2)).toEqual(['Garden checklist', 'Kitchen checklist'])
-    await page.locator('.ckw-panel .ckw-group', { has: page.locator('.ckw-group-title', { hasText: 'Garden checklist' }) }).locator('.ckp-fold').click()
+    const titles = page.locator('.ckw-panel .cks-card .cks-title')
+    expect((await titles.allInnerTexts()).slice(0, 2)).toEqual(['Garden checklist', 'Kitchen checklist'])
+    await page.locator('.ckw-panel .cks-card', { has: page.locator('.cks-title', { hasText: 'Garden checklist' }) }).locator('.ckp-fold').click()
     await row(page, 'Rake the leaves').waitFor({ timeout: 5_000 })
     await row(page, 'Ask about the hedge').locator('summary').click()
     await row(page, 'Ask about the hedge').locator('.ckp-facts').first().waitFor({ timeout: 5_000 })
@@ -394,7 +401,7 @@ describe('a checklist row that moved when the view read again takes no press for
     await below.getByRole('button', MAKE).click()
     await itWasRefusedAsChanged(first)
     await held.release()
-    await expect.poll(() => below.locator('.ck1-refusal').innerText(), { timeout: 10_000 }).toBe(PRESS_ONCE_MORE)
+    await expect.poll(() => below.locator('.ckl-refusal').innerText(), { timeout: 10_000 }).toBe(PRESS_ONCE_MORE)
     expect(await one.locator(`.ckp-item${MARKED}`).count(), 'no row is marked').toBe(0)
     const above = await openedItem(one, 'Oil the latch')
     await above.locator('.ckp-manual').waitFor({ timeout: 5_000 })
@@ -407,7 +414,7 @@ describe('a checklist row that moved when the view read again takes no press for
     await below.and(page.locator(MARKED)).waitFor({ timeout: 5_000 })
     expect(await above.getAttribute('data-moved'), 'the opened item itself did not move').toBeNull()
     await expect.poll(() => below.getAttribute('data-moved'), { timeout: 10_000 }).toBeNull()
-    expect(await below.locator('.ck1-refusal').innerText(), 'no "Press once more"').toBe(READ_AGAIN)
+    expect(await below.locator('.ckl-refusal').innerText(), 'no "Press once more"').toBe(READ_AGAIN)
     expect(Object.hasOwn(await theItem(list, 'Paint the gate'), 'standing')).toBe(false)
   }, 120_000)
 })

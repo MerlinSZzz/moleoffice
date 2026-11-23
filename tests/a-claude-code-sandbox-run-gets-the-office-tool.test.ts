@@ -14,10 +14,10 @@ import { tmpdir } from 'node:os'
 import { basename, dirname, isAbsolute, join, relative } from 'node:path'
 import { createInterface } from 'node:readline'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { aClaudeCommandsOfficeTool, aCommandsOfficeTool, aCommandsPermissions, OFFICE_MCP_ENV_VARS, OFFICE_MCP_SERVER, OFFICE_TOOL_CONFIGURATION } from '../src/config/run-permissions.mjs'
+import { aClaudeCommandsOfficeTool, aCommandsOfficeTool, aCommandsPermissions, CODEX_SHELL_SNAPSHOT_OFF, OFFICE_MCP_ENV_VARS, OFFICE_MCP_SERVER, OFFICE_TOOL_CONFIGURATION } from '../src/config/run-permissions.mjs'
 import { officeMcpTool } from '../tools/office-mcp.mjs'
 import { pictureJudgementTools } from '../tools/picture-judgements/index.mjs'
-import { expectRoundRulesSaved, LEGACY_ROUND_CHAPTERS, writeRoundStartRules } from './round-chapters-fixture.ts'
+import { expectRoundRulesSaved, LEGACY_ROUND_CHAPTERS, theMadeUpOfficesAnswer, writeRoundStartRules } from './round-chapters-fixture.ts'
 import { deliveredRoundBrief, savedRoundChapters } from '../src/shared/round-chapters/manifest.ts'
 import { THE_MODELS_START_VALUES, THE_RUNTIMES_FAST_MODE } from '../src/config/model-efforts.mjs'
 import { FAKE_DOCKER, withAPrivateTmpToSweep } from './sandbox-stand-ins.ts'
@@ -92,14 +92,17 @@ beforeAll(async () => {
   writeInstance(dir, facts())
   writeFileSync(join(dir, 'bin', 'docker'), FAKE_DOCKER, { mode: 0o755 })
   // A stand-in records the configuration while it is alive, before the launcher removes it.
-  // No real Claude Code or authentication is involved.
+  // No real Claude Code or authentication is involved. IT READS WHERE TO WRITE FROM THE FILE BESIDE IT, which each start
+  // writes (theStandInIsTold), and not from its environment: a Codex is given only the names its list keeps
+  // (src/config/the-environment-a-codex-gets.mjs), and none of this test's own names is on it.
   const fake = `#!${process.execPath}
 const fs = require('fs')
 const path = require('path')
+const told = JSON.parse(fs.readFileSync(path.join(__dirname, 'the-stand-in.json'), 'utf8'))
 const argv = process.argv.slice(2)
 const flag = argv.find(word => word.startsWith('--mcp-config='))
 const configPath = flag ? flag.slice('--mcp-config='.length) : null
-fs.writeFileSync(process.env.CLAUDE_CAPTURE, JSON.stringify({
+fs.writeFileSync(told.capture, JSON.stringify({
   argv, cwd: process.cwd(), stdin: fs.readFileSync(0, 'utf8'), allEnv: process.env,
   env: Object.fromEntries(${JSON.stringify(OFFICE_MCP_ENV_VARS)}.filter(name => process.env[name] !== undefined).map(name => [name, process.env[name]])),
   path: configPath,
@@ -107,12 +110,12 @@ fs.writeFileSync(process.env.CLAUDE_CAPTURE, JSON.stringify({
   mode: configPath ? fs.statSync(configPath).mode & 0o777 : null,
   files: configPath ? fs.readdirSync(path.dirname(configPath)).filter(name => name.endsWith('.json')) : [],
   folderMode: configPath ? fs.statSync(path.dirname(configPath)).mode & 0o777 : null,
-  mcpFiles: fs.readdirSync(process.env.CLAUDE_LOGS, { recursive: true }).filter(name => name.endsWith('office-mcp.json')),
-  mcpFolders: fs.readdirSync(process.env.CLAUDE_TMP).filter(name => name.startsWith('office-mcp-')),
+  mcpFiles: fs.readdirSync(told.logs, { recursive: true }).filter(name => name.endsWith('office-mcp.json')),
+  mcpFolders: fs.readdirSync(told.tmp).filter(name => name.startsWith('office-mcp-')),
 }))
 process.stdout.write(JSON.stringify(argv))
-if (process.env.CLAUDE_END === 'signal') process.kill(process.pid, 'SIGTERM')
-else process.exit(Number(process.env.CLAUDE_END || 0))
+if (told.end === 'signal') process.kill(process.pid, 'SIGTERM')
+else process.exit(Number(told.end || 0))
 `
   for (const program of ['claude', 'codex']) {
     writeFileSync(join(dir, 'bin', program), fake)
@@ -131,6 +134,9 @@ else process.exit(Number(process.env.CLAUDE_END || 0))
         agent: String(req.headers['x-mole-office-actor-id'] ?? ''),
         oversize: [],
       } }))
+    } else if (req.method === 'GET' && theMadeUpOfficesAnswer(req.url ?? '') !== null) {
+      // THE TWO DOORS A ROUND'S START READS ITS RULES FROM, answered as an office that holds no chapter and no regulation.
+      res.end(JSON.stringify(theMadeUpOfficesAnswer(req.url ?? '')))
     } else if (req.url === '/api/participants') {
       res.end(JSON.stringify({ agents: [{ id: agent, handle: agent, name: agent, record: 'synthetic-agent-record' }] }))
     } else if (req.method === 'GET' && req.url?.startsWith('/api/office/run-models/for/')) {
@@ -195,6 +201,11 @@ afterAll(async () => {
   rmSync(root, { recursive: true, force: true })
 })
 
+/** Tells the stand-in where this start's capture goes and how it ends, in the file beside it. Each start is awaited before the next. */
+function theStandInIsTold(capture: string, end = '0') {
+  writeFileSync(join(dir, 'bin', 'the-stand-in.json'), JSON.stringify({ capture, logs: join(dir, 'logs'), tmp: join(dir, 'tmp'), end }))
+}
+
 async function launched(command: string[], options: { flags?: string[]; own?: boolean; runtime?: string; end?: string; existing?: boolean; waits?: boolean } = {}) {
   const label = `synthetic-${++sequence}`
   const capturePath = join(dir, `${label}.json`)
@@ -215,6 +226,7 @@ async function launched(command: string[], options: { flags?: string[]; own?: bo
       '--worktree', worktree, '--cut-from', 'main', '--filed', label,
     ]
   }
+  theStandInIsTold(capturePath, options.end)
   const child = spawn(process.execPath, [
     'tools/sandbox-start.mjs', '--in-background', '--instance', dir, '--cwd', worktree,
     '--as', 'synthetic-starter', '--session', 'synthetic-starter-session', '--workspace', 'default', '--api', api,
@@ -226,8 +238,7 @@ async function launched(command: string[], options: { flags?: string[]; own?: bo
     CLAUDE_CODE_OAUTH_TOKEN: 'synthetic-login-for-the-stand-in-only',
     MOLE_OFFICE_COMMIT_EMAIL: 'synthetic@example.invalid',
     PATH: join(dir, 'bin') + ':' + process.env['PATH'],
-    CLAUDE_CAPTURE: capturePath, CLAUDE_LOGS: join(dir, 'logs'), CLAUDE_END: options.end ?? '0',
-    TMPDIR: join(dir, 'tmp'), CLAUDE_TMP: join(dir, 'tmp'),
+    TMPDIR: join(dir, 'tmp'),
   }, join(dir, 'a-private-tmp')) })
   let out = ''
   let err = ''
@@ -248,10 +259,10 @@ async function launched(command: string[], options: { flags?: string[]; own?: bo
 // Run the host launcher through the shared Docker stand-in and the real sandbox helper.
 async function launchedVerb(verb: 'worker' | 'round', brief: string) {
   const capturePath = join(dir, `verb-capture-${++sequence}.json`)
+  theStandInIsTold(capturePath)
   writeFileSync(join(dir, 'state.json'), JSON.stringify({ containers: {
     'synthetic-container': { Id: 'synthetic-container', State: { Running: true }, Mounts: [], Config: { Env: [
-      `HOME=${join(dir, 'home')}`, `CLAUDE_CAPTURE=${capturePath}`, `CLAUDE_LOGS=${join(dir, 'logs')}`,
-      `TMPDIR=${join(dir, 'tmp')}`, `CLAUDE_TMP=${join(dir, 'tmp')}`,
+      `HOME=${join(dir, 'home')}`, `TMPDIR=${join(dir, 'tmp')}`,
       'CLAUDE_CODE_OAUTH_TOKEN=synthetic-login-for-the-stand-in-only',
     ] } },
   }, calls: [], bugs: {} }))
@@ -529,7 +540,7 @@ describe('Claude Code gets the sandbox office tool', () => {
     const { capture, record, err } = await launched(command, { runtime: 'codex', flags: ['--verbose'] })
     const permitted = aCommandsPermissions(command, { ...identity(), SANDBOX_DIR: dir })
     // This named synthetic Codex model has no effort, and gets fast mode as the data file gives it for the runtime.
-    const off = [permitted.command[0]!, ...CODEX_FEATURES_OFF, ...permitted.command.slice(1)]
+    const off = [permitted.command[0]!, ...CODEX_FEATURES_OFF, ...CODEX_SHELL_SNAPSHOT_OFF, ...permitted.command.slice(1)]
     expect(record.command).toEqual([...aCommandsOfficeTool(off, identity()).command, '-m', 'synthetic-model', ...theFastFlag])
     expect(capture.path).toBeNull()
     expect(capture.configuration).toBeNull()

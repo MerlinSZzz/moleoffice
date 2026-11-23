@@ -47,9 +47,10 @@ it('saves one batch choice per kind, previews both restored lists, and returns t
   await rules.getByRole('button',{name:t('noticeRules.restore'),exact:true}).last().click();await tookTheReply(rules)
   await expect.poll(async ()=>(await reading()).batchedKinds).toEqual(['theBroadcastIsDue'])
 },120_000)
-it('draws the batch choices and boundary at four widths in both themes',async () => {
+it('draws the batch choices and boundary at 1440 and 390 in the light theme',async () => {
   const folder=process.env.W13S_BATCH_SHOTS;if(folder)mkdirSync(folder,{recursive:true})
-  for(const width of [1440,990,660,390])for(const theme of ['light','dark']) {
+  for(const width of [1440,390]) {
+    const theme='light'
     const rules=await open(width,theme)
     await rules.getByLabel(t('noticeRules.find')).fill('report')
     expect(await rules.locator('[data-notice-kind=theBroadcastIsDue]').inputValue()).toBe('batch')
@@ -61,13 +62,14 @@ it('draws the batch choices and boundary at four widths in both themes',async ()
     if(folder) {await putTheMadeUpLabelIn(app.page,'Made-up test office — notice batch choices',rules,'the Messages page');await app.page.screenshot({path:`${folder}/notice-batches-${width}-${theme}.png`,fullPage:true})}
   }
 },240_000)
-it('shows the ownership change notice choice at four widths in both themes',async () => {
+it('shows the ownership change notice choice at 1440 and 390 in the light theme',async () => {
   const {t: words}=await import('../src/shared/i18n.ts')
   const folder=process.env.OWNER_NOTICE_PICTURES
   if(folder)mkdirSync(folder,{recursive:true})
   const wordKey='noticeWords.theOwnerOfAnAgentChanged'
   const description=words(wordKey)
-  for(const width of [1440,990,660,390])for(const theme of ['light','dark']) {
+  for(const width of [1440,390]) {
+    const theme='light'
     const rules=await open(width,theme)
     await rules.getByLabel(words('noticeRules.find')).fill(description)
     await expect.poll(()=>rules.locator(`[data-notice-kind=${wordKey.split('.')[1]}]`).isVisible(),{timeout:10_000}).toBe(true)

@@ -344,10 +344,6 @@ export interface FilterInput {
  * THE ONE PLACE. It is printed beside the controls and again above the results, from this one
  * function, because a filter you have forgotten you set is a lie about the data — and two hand
  * -written versions of the same sentence would eventually say two different things.
- *
- * The deleted clause is always there. `GET /api/records` never returns soft-deleted records, so
- * this list is not the whole database however the controls are set, and a page whose lede said
- * "everything" was quietly wrong about that on every render.
  */
 export function filterState({
   loaded,
@@ -386,11 +382,8 @@ export function filterState({
   // not match in the title or the summary and are not drawn", which described a narrowing this page
   // no longer does: the server answers the search and returns only what matched, so there is no
   // local remainder to count. What replaced it belongs in the head sentence — see `countLine`.
-  if (mode === 'inspect') clauses.push(t('g7a.records.deletedFilter'))
-  // No "Excluded right now:" in front. Every clause already ends in what it excludes — "were never
-  // fetched", "are not drawn", "are never in this list" — so the label was a heading for a list of
-  // headings, and "right now" was flatly wrong about the clause it introduced: the deleted one is
-  // in force whatever the controls say, which is why it is always the last one.
+  // No "Excluded right now:" in front. Every clause already ends in what it excludes, so the label
+  // was a heading for a list of headings.
   // EACH CLAUSE IS A WHOLE SENTENCE, joined by the office's spacing rule. They were phrases joined
   // with "and", made for the middle of a sentence, and the count line stood one between two whole
   // sentences: "1 record. showing only “report” Counted in Default." at 390 in round 166's pictures.
@@ -444,36 +437,34 @@ export function countLine(input: FilterInput & { locked?: boolean; facet?: Famil
  */
 function LongTextField({
   label,
-  hint,
+  optional = false,
   value,
   onChange,
   rows,
 }: {
   label: string
-  hint: string
+  /** Draws the word Field draws for a box that may be left out. */
+  optional?: boolean
   value: string
   onChange: (next: string) => void
   rows: number
 }) {
-  const base = useId()
-  const id = `${base}-c`
-  const hintId = `${base}-h`
+  const id = `${useId()}-c`
   return (
     <div className="rec-longfield">
-      <label className="rec-longlabel" htmlFor={id}>
-        {label}
-      </label>
+      <div className="rec-longlabelrow">
+        <label className="rec-longlabel" htmlFor={id}>
+          {label}
+        </label>
+        {optional ? <span className="px-field-optional">{t('sheet.fieldOptional')}</span> : null}
+      </div>
       <textarea
         className="rec-longinput"
         id={id}
         rows={rows}
         value={value}
-        aria-describedby={hintId}
         onChange={(e) => onChange(e.target.value)}
       />
-      <span className="rec-longhint" id={hintId}>
-        {hint}
-      </span>
     </div>
   )
 }
@@ -577,7 +568,7 @@ function NewRecordForm({
       <form className="rec-form" onSubmit={(e) => void submit(e)}>
         <div className="rec-form-line">
           {into === undefined ? null : (
-            <Field label={t('g7a.records.filesInto')} hint={t('g7a.records.filesIntoHint')}>
+            <Field label={t('g7a.records.filesInto')}>
               <Select<string>
                 value={project}
                 onChange={setProject}
@@ -594,22 +585,18 @@ function NewRecordForm({
               options={RECORD_KINDS.map((k) => ({ value: k, label: kindWord(k, mode).text }))}
             />
           </Field>
-          <Field
-            label={t('g7a.records.titleLabel')}
-            hint={t('g7a.records.titleHint')}
-          >
+          <Field label={t('g7a.records.titleLabel')}>
             <TextInput value={title} onChange={setTitle} autoFocus />
           </Field>
         </div>
 
-        <Field label={t('g7a.records.summary')} hint={t('g7a.records.summaryHint')}>
+        <Field label={t('g7a.records.summary')} optional>
           <TextInput value={summary} onChange={setSummary} />
         </Field>
 
         {kind === 'module' ? (
           <LongTextField
             label={t('g7a.records.context')}
-            hint={t('g7a.records.contextHint')}
             value={context}
             onChange={setContext}
             rows={3}
@@ -623,7 +610,7 @@ function NewRecordForm({
         {kind === 'proposal' ? (
           <LongTextField
             label={t('g7a.records.result')}
-            hint={t('g7a.records.resultHint')}
+            optional
             value={usedTo}
             onChange={setUsedTo}
             rows={2}
@@ -711,27 +698,17 @@ export const OPENING_SORT: { column: CatalogueColumn; direction: SortDirection }
   direction: 'desc',
 }
 
-/**
- * What each head says, and the sentence behind it. The heading is short; the title says why.
- *
- * PLAIN WORDS, NOT OUR WORDS. "How it entered the corpus" and "its own declared fields" are two
- * sentences a reader would have to be taught before they could use them. What a person wants to
- * know in the origin column is whether a person wrote this record or a generator made it up, and
- * that is what it now says.
- */
-export const COLUMN_WORDS: Readonly<Record<DrawnColumn, { head: string; what: string }>> = {
-  project: { get head(): string { return t('g7a.records.projectHead') }, get what(): string { return t('g7a.records.projectHint') } },
-  // COUNTED, NEVER TYPED. `RECORD_KINDS.length` is the only place that number may come from — a
-  // sentence saying "sixteen" is a second copy of it that nothing keeps in step, and this file has
-  // already had one that said FOURTEEN while the array held sixteen.
-  kind: { get head(): string { return t('g7a.records.kindHead') }, get what(): string { return t('g7a.records.kindHint') } },
-  state: { get head(): string { return t('g7a.records.stateHead') }, get what(): string { return t('g7a.records.stateHint') } },
-  title: { get head(): string { return t('g7a.records.titleHead') }, get what(): string { return t('g7a.records.titleColumnHint') } },
-  updated: { get head(): string { return t('g7a.records.updated') }, get what(): string { return t('g7a.records.updatedHint') } },
-  created: { get head(): string { return t('g7a.records.created') }, get what(): string { return t('g7a.records.createdHint') } },
-  incomplete: { get head(): string { return t('g7a.records.missing') }, get what(): string { return t('g7a.records.missingHint') } },
-  origin: { get head(): string { return t('g7a.records.origin') }, get what(): string { return t('g7a.records.originHint') } },
-  id: { get head(): string { return t('g7a.records.id') }, get what(): string { return t('g7a.records.idHint') } },
+/** What each head says. */
+export const COLUMN_WORDS: Readonly<Record<DrawnColumn, { head: string }>> = {
+  project: { get head(): string { return t('g7a.records.projectHead') } },
+  kind: { get head(): string { return t('g7a.records.kindHead') } },
+  state: { get head(): string { return t('g7a.records.stateHead') } },
+  title: { get head(): string { return t('g7a.records.titleHead') } },
+  updated: { get head(): string { return t('g7a.records.updated') } },
+  created: { get head(): string { return t('g7a.records.created') } },
+  incomplete: { get head(): string { return t('g7a.records.missing') } },
+  origin: { get head(): string { return t('g7a.records.origin') } },
+  id: { get head(): string { return t('g7a.records.id') } },
 }
 
 /**
@@ -945,11 +922,11 @@ function CatalogueTable({
                 aria-sort={column === 'project' ? undefined : sort.column === column ? (sort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}
               >
                 {column === 'project' ? (
-                  <span className="rec-th rec-th-plain" title={COLUMN_WORDS[column].what}>
+                  <span className="rec-th rec-th-plain">
                     {COLUMN_WORDS[column].head}
                   </span>
                 ) : (
-                  <button type="button" className="rec-th" onClick={() => onSort(column)} title={COLUMN_WORDS[column].what}>
+                  <button type="button" className="rec-th" onClick={() => onSort(column)}>
                     {COLUMN_WORDS[column].head}
                     <span className="rec-th-mark" aria-hidden="true">
                       {sort.column === column ? (sort.direction === 'asc' ? '▲' : '▼') : '·'}
@@ -1823,10 +1800,7 @@ function Catalogue({ only }: { only?: RecordKind }) {
       <Loading label={t('g7a.records.loading')} rows={5} status={state.status} />
 
       {state.status === 'error' ? (
-        <ErrorNote message={state.message} fault={state.fault} retry={reload}>
-          <span className="rec-note">
-            {t('g7a.family.failedRead')}</span>
-        </ErrorNote>
+        <ErrorNote message={state.message} fault={state.fault} retry={reload} />
       ) : null}
 
       {/* THE RECORD THIS QUERY *IS*, when the query is an id — first, and told apart from the
@@ -2086,14 +2060,6 @@ ${cardRules('.rec-table[data-many="1"]')}
 
 .rec-lead { display: inline-flex; align-items: center; gap: var(--pad); flex-wrap: wrap; }
 
-.rec-note {
-  margin: var(--gut) 0 0;
-  padding: 0 var(--pad);
-  font-size: var(--fs-1);
-  line-height: var(--lh-body);
-  color: var(--text-3);
-}
-
 /* ---------------------------------------------------------------- the new-record form */
 /* Capped: the panel is as wide as the page, and a 1400px-wide box for a record title is a
    target nobody needs and a line nobody can scan back along. */
@@ -2112,6 +2078,7 @@ ${cardRules('.rec-table[data-many="1"]')}
 /* The textarea is dressed exactly like .px-input, in the same tokens, so the one multi-line
    field on the page cannot drift away from every other control as themes change. */
 .rec-longfield { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.rec-longlabelrow { display: flex; align-items: center; gap: var(--gut); min-width: 0; }
 .rec-longlabel {
   font-size: var(--fs-1); font-weight: 600; letter-spacing: .06em;
   text-transform: uppercase; color: var(--text-3); line-height: var(--lh-tight);
@@ -2134,7 +2101,6 @@ ${cardRules('.rec-table[data-many="1"]')}
   outline-offset: 1px;
   border-color: var(--focus);
 }
-.rec-longhint { font-size: var(--fs-1); color: var(--text-3); line-height: var(--lh-body); }
 
 /* Phone: the header stops trying to keep the button on the title's line, and the one text
    field goes to 16px because anything smaller makes iOS zoom the page on focus. */

@@ -15,7 +15,7 @@ import { THE_PERSON } from '../src/shared/person.ts'
 import { localStamp } from '../src/shared/time.ts'
 import { apiApp, freshDb, type TestDb } from './helpers.ts'
 
-const HOLD_READ = 'select "id", "agent_id", "session_record_id", "machine", "runtime", "claimed_at", "last_heard_at", "released_at", "released_because" from "handle_holds" where ("handle_holds"."agent_id" = ? and "handle_holds"."released_at" is null)'
+const HOLD_READ = 'select "id", "agent_id", "session_record_id", "machine", "runtime", "claimed_at", "last_heard_at", "last_heard_instant", "released_at", "released_because" from "handle_holds" where ("handle_holds"."agent_id" = ? and "handle_holds"."released_at" is null)'
 const HEADERS = { 'x-mole-office-workspace': 'default', 'x-mole-office-actor-type': 'human', 'x-mole-office-actor-id': THE_PERSON }
 let t: TestDb
 let app: FastifyInstance
@@ -102,7 +102,7 @@ afterAll(async () => { await app?.close(); t?.close(); vi.unstubAllEnvs() })
 it('keeps the whole mapped row, its field order and nulls, and undefined for released or absent holds', () => {
   mapped.length = 0
   for (const i of [0, 2, 4]) handles.theLiveHoldOn(agents[i]!, true, at)
-  const expected = { id: 'fresh-hold', agentId: agents[0], sessionRecordId: sessions[0], machine: 'fixture-machine', runtime: 'claude-code', claimedAt: stamp(1000), lastHeardAt: stamp(), releasedAt: null, releasedBecause: null }
+  const expected = { id: 'fresh-hold', agentId: agents[0], sessionRecordId: sessions[0], machine: 'fixture-machine', runtime: 'claude-code', claimedAt: stamp(1000), lastHeardAt: stamp(), lastHeardInstant: null, releasedAt: null, releasedBecause: null }
   expect(mapped).toEqual([expected, undefined, undefined])
   expect(Object.keys(mapped[0] as object)).toEqual(Object.keys(expected))
 })

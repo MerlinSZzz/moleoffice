@@ -270,7 +270,7 @@ describe('every fault in a marked part is refused and nothing is written', () =>
   })
 
   it('(n) the part carries a label that is not a word and a colour', async () => {
-    const badLabel = { text: OWN.text, colour: 'orange' }
+    const badLabel = { text: OWN.text, colour: 'teal' }
     const part = { from: ASKED_FROM, to: ASKED_TO, quote: ASKED, label: badLabel }
     await refusedByTheKind([part])
     const label = readMessageLabel(badLabel)

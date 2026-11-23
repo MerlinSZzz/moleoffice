@@ -88,12 +88,18 @@ async function file(kind: string, title: string, data: Record<string, unknown> =
   return (res.json() as { record: { id: string } }).record.id
 }
 
-/** A run Mole Office could really pick up again: a session record carrying what discovery stamps on one. */
+/**
+ * A run Mole Office could really pick up again: a session record carrying what discovery stamps on one. It says which
+ * agent it worked as, an agent record in this project named in its `ranAs`, because a comment addressed to a run that
+ * names no agent is refused before anything is written, and every case here sends to this run.
+ */
 async function resumableSession(title: string, externalId: string): Promise<string> {
   const logPath = fakeTranscript(externalId)
+  const agentId = await file('agent', externalId, { handle: externalId, state: 'active', runtime: 'claude-code' })
   return file('session', title, {
     state: 'idle',
     runtime: 'claude-code',
+    ranAs: [{ workspaceId: WORKSPACE, agentId }],
     extra: {
       discovered: {
         tool: 'claude-code',

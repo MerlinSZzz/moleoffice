@@ -35,7 +35,7 @@ import { copyFileSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
-import { AGENT, apiApp, freshDb, one, type TestDb } from './helpers.ts'
+import { AGENT, apiApp, freshDb, one, type TestDb, governsTheWholeProject } from './helpers.ts'
 import { aTestDatabaseFolder, removeThisTestFolder } from './a-test-folder.ts'
 import { DEFAULT_WORKSPACE } from '@shared/workspaces.ts'
 import { THE_TEST_OFFICES_OWNER } from './a-page-of-a-test-office.ts'
@@ -456,7 +456,7 @@ describe('what it refuses', () => {
       DEFAULT_WORKSPACE,
       'decision',
       'Stay on position control',
-      { replaces: [], because: 'it works', decided_on: '2026-08-11' },
+      { ...governsTheWholeProject(), replaces: [], because: 'it works', decided_on: '2026-08-11' },
       asHuman(DEFAULT_WORKSPACE),
     )
     const note = await file(DEFAULT_WORKSPACE, 'note', 'Wave 1 closeout', { body: 'what happened' })

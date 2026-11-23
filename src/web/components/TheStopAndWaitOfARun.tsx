@@ -31,7 +31,7 @@ import { Panel } from './ui.tsx'
 const STOP_AND_WAIT_SHEET = 'mole-office-stop-and-wait-of-a-run'
 
 const STOP_AND_WAIT_CSS = `
-.sw-lead { margin: 0 0 var(--pad) 0; font-weight: 600; overflow-wrap: anywhere; }
+.sw-state { margin: 0 0 var(--pad) 0; font-weight: 600; overflow-wrap: anywhere; }
 .sw-facts { margin: 0; display: flex; flex-direction: column; gap: 0.3rem; }
 .sw-fact { display: grid; grid-template-columns: 7rem minmax(0, 1fr); column-gap: 0.5rem; align-items: baseline; }
 .sw-fact dt { color: var(--text-3); font-size: var(--fs-1); overflow-wrap: anywhere; }
@@ -58,7 +58,7 @@ export function TheStopOfARun({ data }: { data: Data }) {
     <>
       <Sheet />
       <Panel declares={{ surface: null }} title={titleHere('session', 'stopCause')} rank={0} tone="blocked">
-        <p className="sw-lead">{theStopInWords(cause['kind'])}</p>
+        <p className="sw-state">{theStopInWords(cause['kind'])}</p>
         <dl className="sw-facts">
           <Fact label={t('w13s.limit.said')}>{theWords(cause['said'])}</Fact>
           <Fact label={t('w13s.limit.at')}>{theMoment(cause['at']) ?? <span className="sw-none">{t('w13s.limit.noWhen')}</span>}</Fact>
@@ -81,7 +81,7 @@ export function TheWaitOfARun({ data }: { data: Data }) {
     <>
       <Sheet />
       <Panel declares={{ surface: null }} title={titleHere('session', 'waitingOnALimit')}>
-        <p className="sw-lead">{going ? t('w13s.wait.waiting') : t('w13s.wait.notGoing')}</p>
+        <p className="sw-state">{going ? t('w13s.wait.waitingWord') : t('w13s.wait.notGoingWord')}</p>
         <dl className="sw-facts">
           <Fact label={t('w13s.limit.said')}>{theWords(mark['said'])}</Fact>
           <Fact label={t('w13s.limit.seen')}>{theMoment(mark['seenAt']) ?? <span className="sw-none">{t('w13s.limit.noWhen')}</span>}</Fact>
@@ -103,12 +103,12 @@ function Fact({ label, children }: { label: string; children: ReactNode }) {
   )
 }
 
-/** The sentence for one stop cause. A kind the office has no words for is named as stored rather than guessed at. */
+/** The state word for one stop cause. A kind the office has no words for is named as stored rather than guessed at. */
 function theStopInWords(kind: unknown): string {
-  if (kind === 'session-limit') return t('w13s.stop.sessionLimit')
-  if (kind === 'quota') return t('w13s.stop.quota')
-  if (kind === 'login') return t('w13s.stop.login')
-  return t('w13s.stop.other', { kind: String(kind) })
+  if (kind === 'session-limit') return t('w13s.stop.sessionLimitWord')
+  if (kind === 'quota') return t('w13s.stop.quotaWord')
+  if (kind === 'login') return t('w13s.stop.loginWord')
+  return t('w13s.stop.otherWord', { kind: String(kind) })
 }
 
 /** What the limit said, quoted, or the words saying nobody recorded it. */

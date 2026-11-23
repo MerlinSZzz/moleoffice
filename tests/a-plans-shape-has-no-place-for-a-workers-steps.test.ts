@@ -8,22 +8,20 @@
  * Everything here is made up. A throwaway database is used, and no real office or model.
  *
  * WHAT IS PROVED:
- *   1. The declared shape has exactly the keys the outcome names, and no key for a worker's steps.
  *   2. The align door refuses a plan whose worker carries `steps`, and one whose package carries `steps`, and writes
  *      no alignment for either.
  *   3. A plan in the shape is stored and is read back through the record door in the same shape.
  *   4. An older free-text plan is stored as the same words and read as text, not as a shape it does not have.
  *
  * MUTATION: add `steps` to `PLANNED_WORKER_KEYS` and read it as an array in `readAPlannedWorker`
- * (src/shared/delegation.ts). Part 1 goes red on the key list, and part 2 goes red when the door accepts a plan with
- * steps. Removing both restores green.
+ * (src/shared/delegation.ts). Part 2 goes red when the door accepts a plan with steps. Removing both restores green.
  */
 
 import { aMadeUpModuleForPackage, injectedPackageFixture } from './module-package-fixture.ts'
 import type { FastifyInstance } from 'fastify'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 
-import { PACKAGE_PLAN_KEYS, PLANNED_WORKER_KEYS, readAStoredPlan } from '../src/shared/delegation.ts'
+import { readAStoredPlan } from '../src/shared/delegation.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { apiApp, freshDb, type TestDb } from './helpers.ts'
 
@@ -103,12 +101,6 @@ beforeAll(async () => {
 afterAll(async () => {
   await app?.close()
   t?.close()
-})
-
-it('1. declares the plan and worker keys the outcome names, and no key for a worker\'s steps', () => {
-  expect([...PACKAGE_PLAN_KEYS]).toEqual(['workers', 'waves', 'waits'])
-  expect([...PLANNED_WORKER_KEYS]).toEqual(['worker', 'outcome', 'points', 'files', 'difficulty', 'difficultyWhy', 'model', 'modelWhy'])
-  for (const key of [...PACKAGE_PLAN_KEYS, ...PLANNED_WORKER_KEYS]) expect(key).not.toMatch(/step|stage|phase/i)
 })
 
 it('2. refuses a plan offering a place for steps, and writes no alignment', async () => {

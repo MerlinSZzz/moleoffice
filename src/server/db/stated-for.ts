@@ -8,7 +8,7 @@
  */
 
 import { sqlite } from './client.ts'
-import type { StatedRelationship, MapRow } from '../lib/implementation.ts'
+import type { StatedRelationship, MapRow } from './types/implementation.ts'
 import { authorityOf, type Provenance, type Relation } from '@shared/implementation.ts'
 
 /** Every live relationship somebody stated about one record. */

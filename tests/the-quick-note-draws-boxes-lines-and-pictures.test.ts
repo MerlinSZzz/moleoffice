@@ -287,7 +287,7 @@ type TheStand = {
 async function aNotePage(
   address: string,
   before?: (page: Page) => Promise<void>,
-  viewport: { width: number; height: number } = { width: 420, height: 520 },
+  viewport: { width: number; height: number } = { width: 420, height: 700 },
 ): Promise<Page> {
   const page = await browser.newPage({ viewport })
   await page.goto(`${site}/${address}`)
@@ -338,6 +338,22 @@ async function theSheet(page: Page): Promise<{ x: number; y: number }> {
   return sheet
 }
 
+/**
+ * A BROKEN ASSUMPTION FAILS LOUDLY: the point of the sheet a case presses is inside the sheet in view and off the zoom
+ * buttons. A change to the note's head or foot then fails here with the reason, not as a part that was never made.
+ */
+async function expectInTheSheetInView(page: Page, at: [number, number]): Promise<void> {
+  const box = (one: string) => page.locator(one).boundingBox()
+  const [paper, sheet, buttons] = await Promise.all([box('.qn-paper'), box('.qn-sheet'), box('.qn-view-controls')])
+  if (paper === null || sheet === null || buttons === null) throw new Error('The sheet or its zoom buttons are not drawn.')
+  const [x, y] = [paper.x + at[0], paper.y + at[1]]
+  const holds = (box: { x: number; y: number; width: number; height: number }) =>
+    box.x <= x && x < box.x + box.width && box.y <= y && y < box.y + box.height
+  const where = `the sheet's (${String(at[0])}, ${String(at[1])}), at page (${String(x)}, ${String(y)})`
+  expect(holds(sheet), `${where} is outside the sheet in view, ${JSON.stringify(sheet)}`).toBe(true)
+  expect(holds(buttons), `${where} is on the zoom buttons, ${JSON.stringify(buttons)}`).toBe(false)
+}
+
 /** Choose a tool by its word. */
 const choose = (page: Page, word: string) => page.locator(`.qn-tools button[title="${word}"]`).click({ timeout: 5_000 })
 
@@ -371,7 +387,9 @@ describe('a person draws boxes, writes in them and joins them with lines', () =>
     await expect.poll(() => keptParts(page).then(ofType('box')).then((boxes) => boxes[0]?.['text'])).toBe('Made-up box words')
     expectPlaced(ofType('box')(await keptParts(page))[0], { x: 40, y: 120, width: 200, height: 80 })
     // A PRESS WITH BOX CHOSEN makes a box where it lands, ready to be written in. The press is inside the sheet in
-    // view: below the tools, which take two rows in a note this narrow, and above the foot.
+    // view: below the tools, which take two rows in a note this narrow, and above the zoom buttons and the foot. The
+    // window is 700 high for that, because the head above the tools also holds the note's tags.
+    await expectInTheSheetInView(page, [300, 250])
     const sheet = await theSheet(page)
     await page.mouse.click(sheet.x + 300, sheet.y + 250)
     await expect.poll(() => keptParts(page).then(ofType('box'))).toHaveLength(2)
@@ -400,6 +418,7 @@ describe('a person draws boxes, writes in them and joins them with lines', () =>
     // WITH BOX CHOSEN, a drag on a box moves it, and its line is drawn to it as it goes.
     await choose(page, t('quickNote.box'))
     let during: { box: { y: number } | null; line: { height: number } | null } = { box: null, line: null }
+    await expectInTheSheetInView(page, [300, 170])
     await drag(page, [300, 170], [300, 330], async () => {
       during = { box: await two.boundingBox(), line: await line.boundingBox() }
     })
@@ -431,6 +450,7 @@ describe('a person draws boxes, writes in them and joins them with lines', () =>
     await page.waitForSelector('.qn-box')
     const shaping = () => page.locator('[data-shaping]').count()
     await choose(page, t('quickNote.box'))
+    await expectInTheSheetInView(page, [60, 260])
     await drag(page, [60, 260], [200, 340], async () => {
       expect(await shaping(), 'the box is drawn as the drag goes').toBe(1)
       await page.keyboard.press('Escape')
@@ -445,6 +465,7 @@ describe('a person draws boxes, writes in them and joins them with lines', () =>
     await choose(page, t('quickNote.box'))
     const two = page.locator('.qn-box[data-part="b-two"]')
     const at = (await two.boundingBox())?.y ?? 0
+    await expectInTheSheetInView(page, [300, 170])
     await drag(page, [300, 170], [300, 290], async () => {
       expect((await two.boundingBox())?.y ?? 0, 'the box moves as the drag goes').toBeGreaterThan(at + 100)
       await page.keyboard.press('Escape')

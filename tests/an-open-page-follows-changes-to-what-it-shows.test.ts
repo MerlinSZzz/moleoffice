@@ -36,8 +36,13 @@
  * 990, 660 and 390 in both looks, and W13Y_FOLLOW_FILM to film a report's page and Home following changes, at 1440.
  * The ordinary run takes neither. Every record here is made up, and every picture and the film say so above the page.
  * The film shows no page before its label: each page is drawn unseen until the label above it is in, so no frame
- * shows made-up records without the label. At 1440 the checklist's picture has an empty band above the label, which the page does not draw: the label's
- * helper takes the opened checklist, sticky at that width, for a bar stuck at the top of the window.
+ * shows made-up records without the label.
+ *
+ * Test change (wave 13y round 175): the checklists page draws design E, as decided, so each checklist is a card, and
+ * case 7 and the checklist's picture read the open items of the card the address `#/checklists/<id>` marks. Before,
+ * they read the items of the one opened checklist, and this header said the label's helper took that checklist, sticky
+ * at 1440, for a bar stuck at the top of the window. The page no longer draws that sticky checklist, so the sentence
+ * went.
  */
 
 import { mkdirSync } from 'node:fs'
@@ -63,6 +68,8 @@ const shots = process.env['W13Y_FOLLOW_SHOTS']
 const film = process.env['W13Y_FOLLOW_FILM']
 const LABEL = 'Made-up data — an invented office, not real office data'
 const THE_PAGE_TOP = '#main > *:not([data-made-up-label]):not(style)'
+/** The open items of the checklist card the address `#/checklists/<id>` marks. */
+const MARKED_ITEMS = '.cks-card[data-marked="yes"] .cks-items'
 /** How long a change may take to be drawn. */
 const DRAWN_WITHIN_MS = 8_000
 /** How long a case waits to see that nothing was read. Over four times the half second a page waits. */
@@ -194,9 +201,9 @@ it('6. the records list draws a report filed while it is open: without the follo
 }, 120_000)
 
 it("7. a checklist's page draws an item another writer added: without the follow on the opened checklist's read the item is drawn only after a reload", async () => {
-  await open(app.page, `/checklists/${checklist}`, '.ck1-items .ckp-words')
+  await open(app.page, `/checklists/${checklist}`, `${MARKED_ITEMS} .ckp-words`)
   await send('POST', `/api/checklists/${checklist}/items`, { words: ITEM_ADDED }, PERSON)
-  await drawn(app.page, '.ck1-items', ITEM_ADDED)
+  await drawn(app.page, MARKED_ITEMS, ITEM_ADDED)
   expect(await notReloaded(app.page)).toBe(true)
 }, 120_000)
 
@@ -320,7 +327,7 @@ it.runIf(shots)('8. photographs the four pages after their changes, at four widt
     { name: 'report', hash: `/r/${report}`, waitFor: '.rd-rail' },
     { name: 'home', hash: '/', waitFor: '[data-home-section="needs"] .hm-needs-item' },
     { name: 'records', hash: '/records', waitFor: '#main table tbody tr' },
-    { name: 'checklist', hash: `/checklists/${checklist}`, waitFor: '.ck1-items .ckp-words' },
+    { name: 'checklist', hash: `/checklists/${checklist}`, waitFor: `${MARKED_ITEMS} .ckp-words` },
   ]
   for (const look of ['light', 'dark'] as const) {
     await app.page.goto(`${app.site}/`)

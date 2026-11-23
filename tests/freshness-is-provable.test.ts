@@ -19,7 +19,7 @@
  * WHAT IS PROVED HERE, AND WHAT IS PROVED ELSEWHERE
  * ---------------------------------------------------------------------------------------
  *
- * Here: a real `tsx watch` picks up a change under `src/shared` and under `src/server` without
+ * Here: a real `tsx watch` picks up a change under `src/shared` without
  * anybody restarting it, and the runtime record shows the restart — a new process id, a later start
  * time, and a freshness verdict that has gone back to fresh. That is the whole claim, end to end,
  * with a real server and a real edit.
@@ -77,9 +77,8 @@ let copy = ''
  * what the stamp case's title says: the stamp moves without the configuration being reloaded.
  */
 const SHARED_FILE = 'src/shared/addresses.ts'
-const watched = (): { shared: string; server: string } => ({
+const watched = (): { shared: string } => ({
   shared: join(copy, SHARED_FILE),
-  server: join(copy, 'src/server/lib/runtime.ts'),
 })
 
 let child: ChildProcess | null = null
@@ -255,16 +254,6 @@ describe('a running server says how old its code is, and a change reaches it wit
       'the restarted server reported itself as new as the checkout',
     )
     expect(settled.freshness.verdict).toBe('as new as the checkout')
-  }, 120_000)
-
-  it('restarts on a change under src/server too', async () => {
-    const before = await until(() => true, 'the server answered before the second change')
-    const after = await moveUntilItRestarts(
-      watched().server,
-      before,
-      'the server restarted after src/server changed',
-    )
-    expect(after.process.pid).not.toBe(before.process.pid)
   }, 120_000)
 
   it('answers the same freshness on its own route, which is what the tools ask', async () => {

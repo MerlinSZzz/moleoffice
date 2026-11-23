@@ -43,7 +43,7 @@ import {
   whatOnMeans,
 } from '@shared/checks-in-merges-only.ts'
 import { runtimeShownName } from '@shared/participants.ts'
-import { whetherAnOfficeWouldStartACheck, type AMessageWorkerMode, type TheChecksSwitch, type WhetherACheckWouldStart } from '@shared/whether-a-check-would-start.ts'
+import { whetherAnOfficeWouldStartACheck, whetherAnOfficesChecksAreSwitchedOff, type AMessageWorkerMode, type TheChecksSwitch, type WhetherACheckWouldStart } from '@shared/whether-a-check-would-start.ts'
 import { momentOfAnInstant, stampInZone, theClockZone } from '@shared/time.ts'
 import { theStopCauseOf } from '../../config/a-runs-stop-and-wait.mjs'
 import { settingValue } from '../../config/settings.mjs'
@@ -56,6 +56,7 @@ import { theStaleForkBases } from './the-stale-fork-bases.ts'
 import { theStored } from './the-stale-fork-bases.ts'
 import { A_FULL_COMMIT } from './the-stale-fork-bases.ts'
 import { theHoldOnNewChecks } from './the-hold-on-new-checks.ts'
+import { inspectorAnswersRun } from './inspector-answers-lines.ts'
 
 /** The reading, as the door answers it and the worker reads it. */
 export interface ChecksInMergesOnly {
@@ -112,6 +113,19 @@ function theSwitchAsStored(): TheChecksSwitch & { projects: string[] | null } {
  */
 export function whetherThisOfficeWouldStartACheck(project: string): WhetherACheckWouldStart {
   return whetherAnOfficeWouldStartACheck(settingValue('MOLE_OFFICE_MESSAGE_WORKER') as AMessageWorkerMode, theSwitchAsStored, project)
+}
+
+/** Whether the deliberate checks-off choice applies to this project now. */
+export function whetherThisOfficesChecksAreSwitchedOff(project: string): boolean {
+  return whetherAnOfficesChecksAreSwitchedOff(settingValue('MOLE_OFFICE_MESSAGE_WORKER') as AMessageWorkerMode, theSwitchAsStored, project)
+}
+
+/** A deliberately disabled check is still started for an included hand-back. */
+export function whetherThisOfficeWouldStartThisRunCheck(project: string, run: string): WhetherACheckWouldStart {
+  const reading = whetherThisOfficeWouldStartACheck(project)
+  return !reading.starts && whetherThisOfficesChecksAreSwitchedOff(project) && inspectorAnswersRun(run, project)
+    ? { starts: true }
+    : reading
 }
 
 /** Switch it on or off, or take the choice away with null, and answer with the reading as it now stands. */

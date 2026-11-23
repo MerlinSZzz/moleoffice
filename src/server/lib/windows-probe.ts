@@ -44,9 +44,10 @@
  *
  * WHO SENT A CONNECTION, INSIDE THE INSTALLED APP ONLY, by the Mac's rule (lib/darwin-probe.ts). The office is installed
  * when it runs from a bundle in resources\office beside the app's own mole-office.exe. There `readSenderOfAConnection`
- * recognises only the app's own window. One script reads, through Get-NetTCPConnection, the rows from the far end's port
- * to this server's port, and through Get-CimInstance Win32_Process each row's owner and the owner's parent, with their
- * programs, their starts and the SIDs of the users they run as. The window sent it only when all of these hold:
+ * recognises only the app's own window. One script reads, through Windows' own calls, the rows from the far end's port
+ * to this server's port, each row's owner and the owner's parent, with their programs, their starts and the SIDs of the
+ * users they run as (`readWhoHoldsAConnection` in src/config/systems/windows-processes.mjs). Readings that wait are read
+ * together in one script, and each is judged here alone. The window sent it only when all of these hold:
  *   - both ends are loopback, and exactly one row is that exact connection;
  *   - its owner runs as the user this server runs as. A SID Windows will not give means the owner was not found;
  *   - its owner's program is the app's own mole-office.exe, and so is its parent's;
@@ -66,7 +67,8 @@
  *
  * ONE LINE IN THE LOG FOR EACH READING (`theReadingLine`). It says how long the reading took and where the time went:
  * waiting behind other readings, waiting for PowerShell to start, and the script, with each of the script's four steps
- * as PowerShell timed them. A reading that failed is a line that says why, and the failure still throws.
+ * as PowerShell timed them. Readings read together have the same four steps, those of their one script, and each its
+ * own wait. A reading that failed is a line that says why, and the failure still throws.
  * tests/installed/time-the-sender-reading.mjs reads these lines from the log of an installed office.
  *
  * This was read on Linux with stand-ins for PowerShell (tests/the-windows-window-is-the-person.test.ts). Whether a real

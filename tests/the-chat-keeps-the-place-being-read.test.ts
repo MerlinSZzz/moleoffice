@@ -119,7 +119,7 @@ import { NEAR_THE_TOP } from '../src/web/lib/conversationpages.ts'
 import { OPEN_AT, groupOpenKey } from '../src/web/lib/open-chat.ts'
 import { isARecordId, participantKey } from '../src/shared/messages.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
-import { liveApp, waitForThePage, type LiveApp, theAnswerToAWriteInATestOffice } from './helpers.ts'
+import { liveApp, storeNormalModeWhereNothingIsStored, waitForThePage, type LiveApp, theAnswerToAWriteInATestOffice } from './helpers.ts'
 import { putTheMadeUpLabelIn } from './the-made-up-label-above-the-page.ts'
 
 const PERSON = {
@@ -315,6 +315,8 @@ async function aWindow(slow: Slow, filmed = false, where: Where = { width: 1440,
     ...(where.touch === true ? { hasTouch: true } : {}),
     ...(!filmed || film === undefined ? {} : { recordVideo: { dir: join(film, 'films'), size } }),
   })
+  // A Chromium of the file's own stores Normal mode as the shared one does: see the helper.
+  if (where.browser !== null) await storeNormalModeWhereNothingIsStored(context)
   await context.addInitScript((key) => {
     if (sessionStorage.getItem('chat-test-set') === 'yes') return
     sessionStorage.setItem('chat-test-set', 'yes')
@@ -363,13 +365,19 @@ async function aWindow(slow: Slow, filmed = false, where: Where = { width: 1440,
 }
 
 /**
- * Press the circle, and wait for the conversation's first page to be drawn. The circle opens the chat beside the page.
- * Only the chat's own window has grips that drag its size, so a case that drags them puts the chat there with the seam's
- * press, the way the person does.
+ * Press the circle, and wait for the conversation's first page to be drawn. The circle opens the chat the way the person
+ * last had it, which an earlier case may have changed, so the chat is put where the case wants it by the press the
+ * person has: the window's beside press, or the seam's window press. Only the chat's own window has grips that drag its
+ * size, so a case that drags them puts the chat there.
  */
 async function openTheConversation(page: Page, where: 'beside the page' | 'in its own window' = 'beside the page'): Promise<void> {
   await page.click('.px-chat-circle')
-  if (where === 'in its own window') await page.click('.px-chat-seam-window')
+  await page.waitForSelector('aside.px-chat', { timeout: 30_000 })
+  const there = where === 'beside the page' ? 'split' : 'corner'
+  if ((await page.locator(`aside.px-chat[data-where="${there}"]`).count()) === 0) {
+    await page.click(where === 'beside the page' ? '.px-chat-beside' : '.px-chat-seam-window')
+    await page.waitForSelector(`aside.px-chat[data-where="${there}"]`, { timeout: 30_000 })
+  }
   await page.waitForFunction((n) => document.querySelectorAll('.px-chat-said .px-chat-words').length >= n, 50, { timeout: 30_000 })
 }
 

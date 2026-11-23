@@ -71,6 +71,7 @@ import { recordNamedByTarget, type Context } from '@shared/targets.ts'
 import { NoticeWakeRules } from '../components/NoticeWakeRules.tsx'
 import { api, errorMessage, faultOf, type Fault, type PoolEntry, type ParticipantOnTheWire } from '../api.ts'
 import { Absence, Btn, ErrorNote, Field, Loading, Select, TextInput, drawnDay } from '../components/ui.tsx'
+import { AgentPicker, type AnAgentToPick } from '../components/agent/AgentPicker.tsx'
 import { useProjectAsync } from '../lib/project-async.ts'
 import { declaredAttributes } from '../components/declares.ts'
 import { useInspect } from '../lib/mode.ts'
@@ -86,7 +87,7 @@ import { Avatar } from '../components/Avatar.tsx'
 import { MessagePictures } from '../components/MessagePictures.tsx'
 import { openTheChatAt, openTheChatAtUnregistered } from '../components/Chat.tsx'
 import { openTheChatAtGroup } from '../lib/open-chat.ts'
-import { RouteLink, pathFor, recordPath } from '../components/router.tsx'
+import { recordPath } from '../components/router.tsx'
 import { titleOrSentence, useRecordTitles } from '../lib/titles.ts'
 // WHERE A COMMENT OPENS, and what has to be put where the drawing will find it before going there.
 // One map, in one file, for the review column, a comment's own page and this list alike.
@@ -346,6 +347,15 @@ export function MessagesPage() {
     handle: one.handle,
     record: one.record,
   }))
+  /** Who the sender and the contact pickers offer: everybody either registry holds, each by its participant key. */
+  const pickable: AnAgentToPick[] = useMemo(
+    () => [...everybody.values()].map((one) => ({
+      kind: one.kind as 'person' | 'agent',
+      id: one.id,
+      value: participantKey({ kind: one.kind as ParticipantKind, id: one.id }),
+    })),
+    [everybody],
+  )
   const groupNames = useMemo(
     () => new Map((groups.status === 'ready' ? groups.value.groups : []).map((one) => [one.id, one.name])),
     [groups],
@@ -370,10 +380,6 @@ export function MessagesPage() {
       <header className="px-ms-page-head">
         <div className="px-ms-ident">
           <h1 className="px-ms-title">{t('nav.messages')}</h1>
-          <p className="px-ms-lead">
-            {MESSAGES_PAGE.andTheOtherPage}{' '}
-            <RouteLink to={pathFor('agents')}>{MESSAGES_PAGE.theOtherPage}</RouteLink>
-          </p>
         </div>
         {ready && me !== null ? (
           <div className="px-ms-act">
@@ -432,32 +438,24 @@ export function MessagesPage() {
         <details className="px-ms-narrow" {...declaredAttributes({ surface: 'messages.narrow' })}>
           <summary className="px-ms-narrow-open">{MESSAGES_PAGE.chooseWhatToShow}</summary>
           <div className="px-ms-filters">
-            <Field label={MESSAGES_PAGE.bySender}>
-              <Select
-                value={sender}
-                onChange={narrowTo(setSender)}
-                options={[
-                  { value: '', label: MESSAGES_PAGE.anybody },
-                  ...people.map((one) => ({
-                    value: participantKey({ kind: one.kind as ParticipantKind, id: one.id }),
-                    label: one.name,
-                  })),
-                ]}
-              />
-            </Field>
-            <Field label={MESSAGES_PAGE.byContact}>
-              <Select
-                value={contact}
-                onChange={narrowTo(setContact)}
-                options={[
-                  { value: '', label: MESSAGES_PAGE.anybody },
-                  ...people.map((one) => ({
-                    value: participantKey({ kind: one.kind as ParticipantKind, id: one.id }),
-                    label: one.name,
-                  })),
-                ]}
-              />
-            </Field>
+            {/* THE SENDER AND THE CONTACT ARE CHOSEN IN AGENT PICKERS, which find a person or an agent by typing. Each
+                offers everybody either registry holds, retired agents behind its press, and "anybody" first. */}
+            <AgentPicker
+              className="px-ms-sender"
+              label={MESSAGES_PAGE.bySender}
+              candidates={pickable}
+              chosen={sender}
+              onChoose={narrowTo(setSender)}
+              fixed={[{ value: '', name: MESSAGES_PAGE.anybody }]}
+            />
+            <AgentPicker
+              className="px-ms-contact"
+              label={MESSAGES_PAGE.byContact}
+              candidates={pickable}
+              chosen={contact}
+              onChoose={narrowTo(setContact)}
+              fixed={[{ value: '', name: MESSAGES_PAGE.anybody }]}
+            />
             <Field label={MESSAGES_PAGE.byGroup}>
               <Select
                 value={group}
@@ -780,7 +778,6 @@ const MESSAGES_CSS = `
 .px-ms-page-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--gut) var(--pad-lg); flex-wrap: wrap; min-width: 0; margin: 0 0 calc(var(--gut) * 2); }
 .px-ms-ident { min-width: 0; flex: 1 1 22rem; display: flex; flex-direction: column; gap: 4px; }
 .px-ms-title { margin: 0; font-size: var(--fs-6); font-weight: 600; line-height: var(--lh-tight); color: var(--text); }
-.px-ms-lead { margin: 0; font-size: var(--fs-2); line-height: var(--lh-body); color: var(--text-2); }
 .px-ms-act { flex: none; display: flex; align-items: center; gap: var(--pad); flex-wrap: wrap; }
 .px-ms-nothing-unread, .px-ms-unread-count { color: var(--text-2); font-size: var(--fs-1); font-variant-numeric: tabular-nums; }
 
@@ -800,6 +797,7 @@ const MESSAGES_CSS = `
 .px-ms-narrow-open:focus-visible { outline: var(--focus-w) solid var(--focus); outline-offset: 2px; border-radius: var(--radius-sm); }
 .px-ms-narrow[open] .px-ms-narrow-open { margin-bottom: var(--pad); }
 .px-ms-filters { display: grid; gap: var(--pad); grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); }
+.px-ms-filters .agp { grid-column: 1 / -1; }
 .px-ms-hiding { margin: 0 0 var(--pad); color: var(--text-2); line-height: var(--lh-body); }
 .px-ms-clear { border: 1px solid var(--border-strong); border-radius: 0.25rem; background: none; color: var(--text); padding: 0.1rem 0.4rem; cursor: pointer; }
 

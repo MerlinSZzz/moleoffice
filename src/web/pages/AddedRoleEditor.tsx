@@ -79,6 +79,8 @@ export function AddedRoleForm({ roles, saved, historicalName, action }: { roles:
     finally { setBusy(false) }
   }
   const text = (field: 'duties' | 'reportsTo' | 'whatEndsIt' | 'flow', label: string) => <label>{label}<TextArea rows={3} aria-label={label} value={typeof card[field] === 'string' ? card[field]! : ''} onChange={value => { if (field === 'flow' && value === '') { const next = { ...card }; delete next.flow; setCard(next); setPreview(null); setFrom(null) } else change({ [field]: value }) }} /></label>
+  // ONE PRESS AT A TIME: Preview until a preview passes, then the reason and Apply. A change to the card clears the preview, so Preview comes back.
+  const theReviewIsGood = preview !== null && preview.problems.length === 0
   return <div className="added-role" data-added-role="">
     <style href="mole-office-added-role" precedence="default">{CSS}</style>
     <div className="rnc-pic-none added-silhouette" aria-hidden="true"><MoleSilhouette /></div>
@@ -106,7 +108,7 @@ export function AddedRoleForm({ roles, saved, historicalName, action }: { roles:
       </fieldset>
       <details><summary>{t('addedRoles.handbook')}</summary>{text('flow', t('g6b.roles.flow'))}{(['howItWorks', 'inPractice'] as const).map(field => <fieldset key={field}><legend>{t(field === 'howItWorks' ? 'addedRoles.howItWorks' : 'addedRoles.inPractice')}</legend>{(['en', 'zh'] as const).map(language => <label key={language}>{language}<TextArea rows={3} value={card[field]?.[language] ?? ''} onChange={value => { const both = { en: card[field]?.en ?? '', zh: card[field]?.zh ?? '', [language]: value }; if (both.en === '' && both.zh === '') { const next = { ...card }; delete next[field]; setCard(next); setPreview(null); setFrom(null) } else change({ [field]: both }) }} /></label>)}</fieldset>)}</details>
     </fieldset>
-    <div className="added-actions"><Btn disabled={busy} reason={t('addedRoles.wait')} onClick={() => { void look() }}>{t('addedRoles.preview')}</Btn>{saved ? <><Btn disabled={busy} reason={t('addedRoles.wait')} onClick={() => setShowHistory(!showHistory)}>{t('addedRoles.history')}</Btn><Btn disabled={busy} reason={t('addedRoles.wait')} onClick={() => { void look('shipped') }}>{t('addedRoles.remove')}</Btn></> : null}</div>
+    <div className="added-actions">{theReviewIsGood ? null : <Btn disabled={busy} reason={t('addedRoles.wait')} onClick={() => { void look() }}>{t('addedRoles.preview')}</Btn>}{saved ? <><Btn disabled={busy} reason={t('addedRoles.wait')} onClick={() => setShowHistory(!showHistory)}>{t('addedRoles.history')}</Btn><Btn disabled={busy} reason={t('addedRoles.wait')} onClick={() => { void look('shipped') }}>{t('addedRoles.remove')}</Btn></> : null}</div>
     {fault ? <ErrorNote message={fault.message} fault={fault.fault} /> : null}
     {preview ? <section data-role-preview="" className="added-preview">
       <h2>{t('addedRoles.preview')}</h2>
@@ -117,8 +119,10 @@ export function AddedRoleForm({ roles, saved, historicalName, action }: { roles:
       <h3>{t('addedRoles.gained')}</h3>{preview.gained.length === 0 ? <p>{t('addedRoles.none')}</p> : <ul>{preview.gained.map(act => <li key={act.act}>{act.inWords}</li>)}</ul>}
       <h3>{t('addedRoles.lost')}</h3>{preview.lost.length === 0 ? <p>{t('addedRoles.none')}</p> : <ul>{preview.lost.map(act => <li key={act.act}>{act.inWords}</li>)}</ul>}
       <h3>{t('addedRoles.difference')}</h3><RoleCardDifference before={preview.before} after={preview.card} changes={preview.difference} roles={roles} />
-      <label>{t('addedRoles.reason')}<TextArea rows={3} aria-label={t('addedRoles.reason')} value={because} onChange={setBecause} /></label>
-      <Btn disabled={busy || !because.trim() || preview.problems.length > 0} reason={busy ? t('addedRoles.wait') : !because.trim() ? t('addedRoles.needReason') : preview.problems.length > 0 ? t('addedRoles.fixProblems') : undefined} onClick={() => { void apply() }}>{t('addedRoles.apply')}</Btn>
+      {theReviewIsGood ? <>
+        <label>{t('addedRoles.reason')}<TextArea rows={3} aria-label={t('addedRoles.reason')} value={because} onChange={setBecause} /></label>
+        <Btn disabled={busy || !because.trim()} reason={busy ? t('addedRoles.wait') : !because.trim() ? t('addedRoles.needReason') : undefined} onClick={() => { void apply() }}>{t('addedRoles.apply')}</Btn>
+      </> : null}
     </section> : null}
     {showHistory ? <section data-role-history=""><h2>{t('addedRoles.history')}</h2>{history.status === 'loading' ? <Loading what={t('addedRoles.reading')} /> : history.status === 'error' ? <ErrorNote message={history.message} fault={history.fault} /> : <>
       {history.value.versions.length === 0 ? <p>{t('addedRoles.none')}</p> : null}

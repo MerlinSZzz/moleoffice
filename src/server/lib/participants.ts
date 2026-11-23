@@ -1,7 +1,7 @@
 // Copyright © 2026 Zhengyang Shen
 // Licensed under the MIT License. See LICENSE.
-import { generatePixelScale, pixelScaleSchema, type PixelScale } from '@shared/pixel-scale.ts'
-import { generateCWholeAppearance, pixelAppearanceSchema, type PixelAppearance } from '@shared/pixel-office.ts'
+import { generatePixelScale, pixelScaleSchema } from '@shared/pixel-scale.ts'
+import { generateCWholeAppearance, pixelAppearanceSchema } from '@shared/pixel-office.ts'
 /**
  * THE TWO REGISTRIES: the people of this installation and its durable agents.
  *
@@ -70,7 +70,7 @@ export {
 }
 import { localStamp, nowStamp } from '@shared/time.ts'
 import { readElevation, readElevations } from '@shared/read-elevations.ts'
-import type { Elevation, RoleCard } from '@shared/roles.ts'
+import type { RoleCard } from '@shared/roles.ts'
 import {
   AVATAR_ASSET_KIND,
   CIRCLE_SHOWS,
@@ -79,7 +79,6 @@ import {
   CHAT_TEXT_SIZES,
   LANGUAGES,
   isLanguage,
-  type Language,
   GENERATED_AVATAR_LICENCE,
   GENERATED_AVATAR_MIME,
   MESSAGE_LINK_LAYOUTS,
@@ -101,7 +100,6 @@ import {
   isMessageProjectMark,
   isSendKeySetting,
   readShortcutSettings,
-  type MessageProjectMark,
   isMessageLinkLevel,
   isMoleOffice,
   isParticipantKind,
@@ -111,31 +109,25 @@ import {
   participantWord,
   whyNameIsRefused,
   whyStateIsRefused,
-  type ChatButtonStays,
-  type ChatOpensAs,
+  THE_OFFICE_WRITER_ID,
   type ChatLayout,
-  type ChatTextSize,
-  type CircleShows,
-  type MessageLinkLayout,
-  type MessageLinkLevel,
   type ParticipantKind,
   type ParticipantRef,
-  type PresenceChoice,
-  type SendKeySetting,
-  type ShortcutSettings,
 } from '@shared/participants.ts'
-import { CIRCLE_PICTURES, circlePicture } from '@shared/messages.ts'
+import { CIRCLE_PICTURES, circlePicture, theReasonAsOneSentence } from '@shared/messages.ts'
+// AND A RETIRED AGENT'S KEYS END WITH IT, wherever it is retired (`retireThisAgent`).
+import { revokeEveryLiveKeyHeldBy } from './keys.ts'
 // HOW A PERSON OR AN AGENT WISHES TO BE ADDRESSED, declared once.
-import { ADDRESS_AS_PARTS, theAddressAsStored, type AddressAs, type AddressAsPart, type AddressAsSetBy } from '@shared/address-as.ts'
+import { ADDRESS_AS_PARTS, theAddressAsStored, type AddressAs, type AddressAsPart } from '@shared/address-as.ts'
 // HOW A PICTURE IN A MESSAGE IS DRAWN, declared once for the door, the reply and the control.
-import { MESSAGE_PICTURE_CHOICES, isMessagePictureChoice, type MessagePictureChoice } from '@shared/messagepictures.ts'
+import { MESSAGE_PICTURE_CHOICES, isMessagePictureChoice } from '@shared/messagepictures.ts'
 // WHETHER MEDIA A RECORD POINTS AT ARE LOADED, declared once for the door, the reply and the control.
 // IT IS NOT `messagepictures.ts` ABOVE: that is a picture inside a chat message, and its three words
 // are `shown`, `pressed` and `path`; this answers about media a report points at.
-import { MEDIA_LOAD_CHOICES, isMediaLoadChoice, type MediaLoadChoice } from '@shared/mediaload.ts'
+import { MEDIA_LOAD_CHOICES, isMediaLoadChoice } from '@shared/mediaload.ts'
 // A PERSON'S OWN LABELS FOR THE MESSAGES THEY WRITE, read by the one strict reading.
-import { readMessageLabels, type TheStoredMessageLabels } from '@shared/message-label.ts'
-import { readShippedFlags, type StoredShippedFlags } from '@shared/intent-mark.ts'
+import { readMessageLabels } from '@shared/message-label.ts'
+import { readShippedFlags } from '@shared/intent-mark.ts'
 import {
   A_PERSON_WITH_NO_ROLE_READS_AS,
   A_ROW_WITH_NO_ROLE_READS_AS,
@@ -145,7 +137,6 @@ import {
   isAPersonRole,
   theMarkSaying,
   whyTheAreaBreaksTheCardsRule,
-  type WhoChoseTheCard,
 } from '@shared/roles.ts'
 // THE CARDS THIS INSTALLATION DECLARES, read once when the server started. `theRoleCardsAreRead`
 // is asked first because a migration and a test may reach this before any server has read them,
@@ -156,7 +147,9 @@ import { theCardInTheOfficesWords } from './the-card-in-the-offices-words.ts'
 import type { MachineSeenFrom } from '@shared/profile.ts'
 import { giveTheOfferedPicture } from './avatars.ts'
 import { writeTheBroadcastSkip, writeTheBroadcastTimes, type BroadcastSchedule, type TheBroadcastSkip, type TheBroadcastTimesChange } from './broadcast.ts'
-import { aRaiseCarriesIt, getRecord, patchRecord, sameAgent, throughTheRetireDoor, throughTheStartFolderDoor, type Actor } from './records.ts'
+import {
+  aRaiseCarriesIt, getRecord, patchRecord, sameAgent, throughTheRetireDoor, throughTheStartFolderDoor, throughTheWorkAreaDoor, type Actor,
+} from './records.ts'
 // THE ONE READING OF WHICH AGENT A RUN IS, the seal's, so a work area set for a run names the run the seal will empty it at.
 import { theSealsReadingOfARunsAgent } from './inspection.ts'
 // AND THE ENTRIES AN ASKED START IS KEPT IN, so the seal reads which run the ask a declared area was set for started.
@@ -206,114 +199,9 @@ import { theAgentAStoredReferenceNamesIn } from './the-agent-a-stored-reference-
 import { theKeyProvesASecretary } from './the-key-proves-a-secretary.ts'
 import { repositoryRelativePaths } from './repository-relative-paths.ts'
 import { whyTheRegistryCannotFollow } from '../db/why-the-registry-cannot-follow.ts'
+import type { RegisteredAgent, RegisteredPerson, ReadAll, WhoAnAgentIs } from '../db/types/participants.ts'
 
-/** One durable agent as the registry holds it. */
-export interface RegisteredAgent {
-  pixelScale?: PixelScale | null
-  pixelAppearance?: PixelAppearance | null
-
-  id: string
-  name: string
-  handle: string
-  avatarAssetId: string
-  state: string | null
-  stateAt: string | null
-  /**
-   * Who set the state line, or null because nobody recorded it.
-   *
-   * Null is not "the agent set it": it is what every row written before criterion M21 holds, and
-   * naming a setter nobody wrote down would be inventing a record of an act nobody witnessed.
-   */
-  stateBy: ParticipantRef | null
-  runtime: string | null
-  /**
-   * Who started this agent, or null because nobody recorded one.
-   *
-   * NULL IS NOT "THE PERSON STARTED IT". It is what every row registered before 6 September 2026
-   * holds and what an agent a person registered by hand holds. Reading the absence as the owner
-   * would make 199 unregistered writers the person's own children on the strength of a missing value.
-   */
-  startedBy: ParticipantRef | null
-  /** The agent responsible for this agent, kept separately from its starter. */
-  ownerId: string | null
-  ownerKind: string | null
-  /**
-   * The word on the role card this agent holds, or null because nobody set one.
-   *
-   * A row with null here is READ AS a worker — `A_ROW_WITH_NO_ROLE_READS_AS` in shared/roles.ts is
-   * the one place that says so — and a screen says "no role set" rather than drawing that word,
-   * because nobody chose it.
-   */
-  role: string | null
-  /**
-   * WHO CHOSE THAT CARD, as it is stored, or null because nobody recorded it. Criterion P75.
-   *
-   * NULL IS NOT "THE RULE CHOSE IT". It is what every row registered before 8 September 2026 holds,
-   * and the word on such a row may have been a starter's choice or may be the word the row was read
-   * as. A screen says nobody recorded it; nothing infers which.
-   */
-  cardChosenBy: WhoChoseTheCard | null
-  /**
-   * The person's say that this agent may act for them, as it is stored, or null because they never
-   * said. Criterion P59.
-   *
-   * A GRANT THAT HAS ENDED IS STILL HERE, with `endedAt` set. Whether it still HOLDS is a different
-   * question — it asks the clock and asks whether this card can hold one at all — and
-   * `theElevationHeldBy` in lib/elevation.ts is what answers it. Nothing decides a refusal from this
-   * field directly.
-   */
-  elevation: Elevation | null
-  /** Every grant they ever made to this agent, oldest first. Empty because they never made one. */
-  everyElevation: Elevation[]
-  /**
-   * The folders and files this agent was started to change, or null because nobody recorded any.
-   *
-   * Null and an empty list are different answers. Null is nobody recorded one; an empty list is
-   * somebody saying there is no area. Criterion P43.
-   */
-  workArea: string[] | null
-  /**
-   * The record whose end ends this role, or null because nobody said. Criterion P15.
-   *
-   * Null is never read as "there is no end": it is read as nobody having named one, and an agent
-   * with none is never retired by the rule that reads it.
-   */
-  startedFor: string | null
-  /** The session record of the run that registered this agent, or null because nobody recorded one. */
-  startedByRun: string | null
-  retired: boolean
-  retiredBecause: string | null
-  /**
-   * WHEN IT WAS RETIRED AND BY WHOM. Problem zyCcJYCLsAe7, and null on a row that is not retired.
-   *
-   * Null on a RETIRED row is a real answer as well: every row retired before the retire door existed
-   * was retired by the release of a claim, and nobody recorded the moment or the hand.
-   */
-  retiredAt: string | null
-  retiredBy: ParticipantRef | null
-  createdAt: string
-  /** The world it is a citizen of, or null because nobody could say. */
-  homeWorld: string | null
-  /** The installation that world belongs to, or null because nobody could say. */
-  homeInstallation: string | null
-  /** When it became a citizen, which is when it was registered. Null exactly when `homeWorld` is. */
-  citizenSince: string | null
-  /**
-   * THE VISITOR CREDENTIAL THIS AGENT WAS REGISTERED ON, or null because it needed none. P69.
-   *
-   * Null is the ordinary answer and means this machine: a registration made here needs no
-   * credential, and one made from elsewhere cannot be written without one. So null says "none was
-   * needed" and never "nobody looked".
-   */
-  credential: string | null
-  /**
-   * HOW THIS AGENT WISHES TO BE ADDRESSED. A part left out is a
-   * part nobody has set; an empty object is an agent that has set none.
-   */
-  addressAs: AddressAs
-  /** Who last set `addressAs`, and when, or null because nobody recorded it. */
-  addressAsSetBy: AddressAsSetBy
-}
+export type { RegisteredAgent, RegisteredPerson, ReadAll, WhoAnAgentIs } from '../db/types/participants.ts'
 
 /**
  * THE OFFICE'S CURRENT ID, FOUND BY ITS RESERVED HANDLE.
@@ -334,123 +222,6 @@ export function moleOfficeIdFromItsRow(): string {
   return rows[0]!.id
 }
 readMoleOfficeIdWith(moleOfficeIdFromItsRow)
-
-/** One person as the registry holds it. */
-export interface RegisteredPerson {
-  id: string
-  name: string
-  handle: string
-  avatarAssetId: string
-  state: string | null
-  stateAt: string | null
-  /** What they said about whether they are here, or null because they have never said. */
-  presenceChoice: PresenceChoice | null
-  /** When they said it. Null exactly when `presenceChoice` is null. */
-  presenceChoiceAt: string | null
-  /**
-   * How they want the number on the chat circle drawn, or null because they have never chosen.
-   *
-   * Null is read as `CIRCLE_BEFORE_ANYBODY_CHOOSES` by whatever draws it, and it is not the same
-   * fact as having chosen that word. Criterion M32.
-   */
-  circleShows: CircleShows | null
-  /**
-   * Which picture they put on the round chat button, or null because they never chose. Criterion
-   * M38; with null, the page draws mole-at-the-sill in both looks.
-   */
-  circlePicture: string | null
-  /**
-   * Which name a record named in a message is drawn under: `label`, `title`, or null because they
-   * have never chosen. Criterion M47; null is read as `MESSAGE_LINK_LEVEL_BEFORE_ANYBODY_CHOOSES`.
-   */
-  messageLinkLevel: MessageLinkLevel | null
-  /**
-   * How a link in a message is laid out in the bubble: `own-line`, `inline`, or null because they
-   * have never chosen. Criterion M48; null is read as `MESSAGE_LINK_LAYOUT_BEFORE_ANYBODY_CHOOSES`.
-   */
-  messageLinkLayout: MessageLinkLayout | null
-  /**
-   * Whether a message says which project it is in: `always`, `never`, or null because they have
-   * never chosen. Criterion M73; null is read as `MESSAGE_PROJECT_MARK_BEFORE_ANYBODY_CHOOSES`.
-   */
-  messageProjectMark: MessageProjectMark | null
-  /**
-   * How a picture in a message is drawn: `shown`, `pressed`, `path`, or null because they have
-   * never chosen. Criterion M64, moved off the browser by decision rJphPkCG3l7X; null is read as
-   * `MESSAGE_PICTURE_BY_DEFAULT`.
-   */
-  messagePictures: MessagePictureChoice | null
-  /**
-   * Whether media a record points at are loaded: `with-page`, `never`, `on-press`, or null because
-   * they have never chosen. Criterion U5; null is read as `MEDIA_LOAD_BY_DEFAULT`.
-   *
-   * IT IS NOT `messagePictures` ABOVE. That one is about a picture inside a chat message and answers
-   * `shown`, `pressed` or `path`; this one is about media a report points at.
-   */
-  mediaLoad: MediaLoadChoice | null
-  /**
-   * How big the chat's own text is: `small`, `normal`, `large`, or null because they have never
-   * chosen. Criterion M112; null is read as `CHAT_TEXT_SIZE_BEFORE_ANYBODY_CHOOSES`.
-   */
-  chatTextSize: ChatTextSize | null
-  /**
-   * Which key sends a message: `shift-or-alt-enter` or `enter`, or null because they have never
-   * chosen. Null is read as `SEND_KEY_BEFORE_ANYBODY_CHOOSES`.
-   */
-  sendKey: SendKeySetting | null
-  /**
-   * Which keyboard shortcuts are on, or null because they have never chosen,
-   * at item 5. Null is read as `SHORTCUTS_BEFORE_ANYBODY_CHOOSES`, every shortcut on.
-   */
-  shortcuts: ShortcutSettings | null
-  /**
-   * When the chat circle shows: `when-unread`, `always`, or null because they have never chosen. Null
-   * is read by `chatButtonStaysBeforeAnybodyChooses` according to the reader kind.
-   */
-  chatButtonStays: ChatButtonStays | null
-  /**
-   * How the chat opens: `split` (beside the page), `window`, or null because they have never chosen.
-   * Null is read as `CHAT_OPENS_AS_BEFORE_ANYBODY_CHOOSES`.
-   */
-  chatOpensAs: ChatOpensAs | null
-  /** The chosen column layout, or null to follow the available width. */
-  chatLayout: ChatLayout | null
-  /** The person's own labels for the messages they write, unreadable with the reader's sentences, or null because they have never made one. Migration 0341. */
-  chatLabels: TheStoredMessageLabels
-  /** The person's own settings for the two shipped flags and 'No mark', or null because they changed none. Migration 0346. */
-  shippedFlags: StoredShippedFlags | null
-  language: Language | null
-  createdAt: string
-  /** The world they are a citizen of, or null because nobody could say. */
-  homeWorld: string | null
-  /** The installation that world belongs to, or null because nobody could say. */
-  homeInstallation: string | null
-  /** When they became a citizen, which is when they were registered. Null exactly when `homeWorld` is. */
-  citizenSince: string | null
-  /**
-   * WHICH ROLE CARD THEY HOLD, one word from `personCards` in design/permissions/roles.json, or null
-   * because nobody wrote one. Criterion P45. Null is read as `A_PERSON_WITH_NO_ROLE_READS_AS`, and a
-   * screen says no role set rather than drawing a word nobody chose.
-   */
-  role: string | null
-  /**
-   * WHAT THEY DO, in their own words, or null because nobody has written one. Criterion P45. It is
-   * theirs to write and nothing checks it; the role above is where they stand in the Office.
-   */
-  occupation: string | null
-  /**
-   * WHICH PORTRAIT IS ON THEIR CARD, by the address it is served at, or null because they have not
-   * chosen. Criterion P47. Null is not "no picture": the card's own portrait is drawn instead.
-   */
-  portrait: string | null
-  /**
-   * HOW THIS PERSON WISHES TO BE ADDRESSED. A part left out is a
-   * part nobody has set; an empty object is a person who has set none.
-   */
-  addressAs: AddressAs
-  /** Who last set `addressAs`, and when, or null because nobody recorded it. */
-  addressAsSetBy: AddressAsSetBy
-}
 
 export { ADDRESS_AS_COLUMN } from '../db/read-participant.ts'
 
@@ -601,8 +372,6 @@ export { theOwnRecordsOfTheAgentsHolding } from '../db/the-own-records-of-the-ag
 
 export { theNewestOfEach } from '../db/records-for-agents-in.ts'
 
-export type ReadAll = { all: (...args: unknown[]) => unknown[] }
-
 export { RECORDS_FOR_AGENTS } from '../db/records-for-agents-in.ts'
 
 export { theRecordsForAgentsStatements } from '../db/records-for-agents-in.ts'
@@ -702,9 +471,6 @@ export { pathsOrNull } from '../db/read-participant.ts'
 export { safelyParsed } from '../db/read-participant.ts'
 
 export { theRoleOnTheRow } from '../db/the-role-on-the-agent-row.ts'
-
-/** The fields of a participant stored on its registry row as they are, which the plugins' roster carries. */
-export type WhoAnAgentIs = Pick<RegisteredAgent, 'id' | 'handle' | 'name' | 'role' | 'retired' | 'credential' | 'startedBy' | 'createdAt'>
 
 export { whoTheRowSays } from '../db/read-participant.ts'
 
@@ -1336,17 +1102,33 @@ function capitaliseTheCard(said: string): string {
   return said.slice(0, 1).toUpperCase() + said.slice(1)
 }
 
+/** The line a refusal to retire ends with. A caller that writes something else, as a release does, leaves it off. */
+const NOTHING_WAS_WRITTEN = 'Nothing was written.'
+
+/**
+ * WHY THIS ACTOR MAY NOT RETIRE THIS ROW, or null because it may. The rule is `whoMayRetire`, asked as a press.
+ *
+ * The words leave off the line saying nothing was written, which some of the rule's refusals end with: the release of
+ * a claim asks this for each agent started for the work, leaves a refused one live and still releases the claim.
+ */
+export function whyThisActorMayNotRetire(row: RegisteredAgent, actor: Actor): string | null {
+  const said = whoMayRetire(row, actor, true)
+  if (said.may) return null
+  const why = said.whyNot ?? 'This row is not yours to retire.'
+  return why.endsWith(NOTHING_WAS_WRITTEN) ? why.slice(0, -NOTHING_WAS_WRITTEN.length).trimEnd() : why
+}
+
 /**
  * Refuse the retire unless this actor may. The door's half of `whoMayRetire`.
  *
- * The card's refusal already ends with the line about nothing being written. Other refusals get
- * that line here. The profile reply carries the same rule's reason.
+ * Every refusal ends with the line about nothing being written. The profile reply carries the same rule's reason.
+ * `saidFirst` is a sentence put before the reason, for a caller asking the same rule about another act, such as making
+ * a retired agent active again.
  */
-export function whyThisIsNotYoursToRetire(row: RegisteredAgent, actor: Actor): void {
-  const said = whoMayRetire(row, actor, true)
-  if (said.may) return
-  const why = said.whyNot ?? 'This row is not yours to retire.'
-  const refusal = new PanelError(why.endsWith('Nothing was written.') ? why : `${why} Nothing was written.`, 403)
+export function whyThisIsNotYoursToRetire(row: RegisteredAgent, actor: Actor, saidFirst?: string): void {
+  const whyNot = whyThisActorMayNotRetire(row, actor)
+  if (whyNot === null) return
+  const refusal = new PanelError(`${saidFirst === undefined ? '' : `${saidFirst} `}${whyNot} ${NOTHING_WAS_WRITTEN}`, 403)
   // AN AGENT ITS OWN KEY PROVES, REFUSED HERE, WAS COUNTED AS STOPPED. A revision put back asks this inside its write,
   // which the refusal takes back with the count, so the count is made again once the write is taken back.
   if (anAgentItsOwnKeyProves(actor) === null || isMoleOffice({ kind: 'agent', id: row.id })) throw refusal
@@ -1379,18 +1161,38 @@ export function whyThisIsNotYoursToRetire(row: RegisteredAgent, actor: Actor): v
  *
  * THE RECORD IS FOLLOWED WHERE THERE IS ONE. Retirement is stored twice — `state` on the agent
  * record and `retired` on the row — and `keepTheAgentRegistryInStep` derives the second from the
- * first. This retires the row and every live record mapped to it in one transaction, so a later
- * record edit cannot make the row active again. A row with no record is retired too.
+ * first. This retires the row and every live agent record mapped to it in one transaction, so no record
+ * mapped to it still says active. A row with no record is retired too. A record write that retires the
+ * agent comes here as well, and names its own record as `besides`, because it writes that one itself.
+ * A record write that makes the agent active again is asked the same rule as retiring it.
+ *
+ * ONLY THE MAPPED RECORDS THAT ARE STILL AGENTS ARE WRITTEN. A record whose kind was changed away from agent keeps its
+ * mapping, but it holds none of the agent's fields any more, and a note refuses `state: 'retired'`. Writing it threw
+ * inside this transaction, so the person's delete of the agent's last record answered that the row could not be
+ * retired, and the row stayed live.
+ *
+ * AND EVERY LIVE KEY OF THE AGENT DIES WITH IT, IN THE SAME ACT. Criterion P83 point 5. Only the retire door revoked
+ * keys, so an agent retired by a record write, a delete of its last record or the release of its work went on
+ * writing with its key. Every way of retiring an agent comes through here, so the keys are
+ * revoked here once, and the answer says how many. An already-retired row is asked too: a row retired before this
+ * change by one of those ways may still hold a live key. Revoking nothing is not a failure, and 0 says so.
  */
 export function retireThisAgent(
   id: string,
   by: ParticipantRef | null,
   because: string,
-): RegisteredAgent & { nothingWritten?: boolean } {
+  /** An agent record the caller is writing itself, as a record write that retires the agent is. It is left out. */
+  besides?: string,
+): RegisteredAgent & { nothingWritten?: boolean; keysRevoked: number } {
   const row = sqlite.prepare('SELECT * FROM agents WHERE id = ?').get(id) as Record<string, unknown> | undefined
   if (row === undefined) return theAgentThisIsNot(id)
   const held = asAgent(row)
-  if (held.retired) return { ...held, nothingWritten: true }
+  // BY THE ROW'S ID: a handle can be borne by a retired agent and a live one (criterion I3), and only this agent's keys
+  // end with it. The reason names the retirement, so a person reading the key's row knows what ended it.
+  const said = theReasonAsOneSentence(because)
+  const revokeItsKeys = (): number =>
+    revokeEveryLiveKeyHeldBy('agent', held.id, `The agent "${held.handle}" was retired${said === null ? '.' : `: ${said}`}`)
+  if (held.retired) return { ...held, nothingWritten: true, keysRevoked: revokeItsKeys() }
   return sqlite.transaction(() => {
     sqlite
       .prepare(
@@ -1398,14 +1200,16 @@ export function retireThisAgent(
           'retired_by_id = ? WHERE id = ?',
       )
       .run(because.trim(), nowStamp(), by?.kind ?? null, by?.id ?? null, id)
+    const keysRevoked = revokeItsKeys()
     const records = sqlite.prepare(
-      'SELECT r.id FROM agent_records m JOIN records r ON r.id = m.record_id WHERE m.agent_id = ? AND r.deleted_at IS NULL',
+      "SELECT r.id FROM agent_records m JOIN records r ON r.id = m.record_id WHERE m.agent_id = ? AND r.deleted_at IS NULL AND r.kind = 'agent'",
     ).all(id) as { id: string }[]
     for (const record of records) {
+      if (record.id === besides) continue
       throughTheRetireDoor(() => patchRecord(record.id, { dataPatch: { state: 'retired', retiredBecause: because.trim() } },
-        { type: 'agent', id: 'mole-office/the-api-server', stated: true }))
+        { type: 'agent', id: THE_OFFICE_WRITER_ID, stated: true }))
     }
-    return asAgent(sqlite.prepare('SELECT * FROM agents WHERE id = ?').get(id) as Record<string, unknown>)
+    return { ...asAgent(sqlite.prepare('SELECT * FROM agents WHERE id = ?').get(id) as Record<string, unknown>), keysRevoked }
   })()
 }
 
@@ -2326,7 +2130,7 @@ export function setParticipantChatLabels(who: ParticipantRef, choice: unknown, b
 }
 
 /**
- * KEEP A PERSON'S OWN SETTINGS FOR THE TWO SHIPPED FLAGS AND 'NO MARK'. Migration 0346.
+ * KEEP A PERSON'S OWN SETTINGS FOR THE FOUR SHIPPED FLAGS AND 'NO MARK'. Migration 0346.
  *
  * A PERSON'S OWN, in the same `messageLink` permission group as the labels above. `null` clears the column, which
  * puts every default back. Anything `readShippedFlags` does not accept is refused with a 400 before the row is touched.
@@ -2496,6 +2300,44 @@ export function unregisteredAgentsSeen(): UnregisteredAgent[] {
 }
 
 /**
+ * THE STATEMENT BEHIND `machinesSeenFrom`, written once so its test reads this and holds no copy.
+ *
+ * ONE SEARCH PER NAME, THEN THE TWO ADDED TOGETHER. Each branch asks for one actor type and one actor
+ * id with an address, which is one range of `api_calls_actor_address_idx`. Inside that range the
+ * calls already lie in address order, so each branch groups them as it reads them, without sorting
+ * every call first. Asking for both names in one `IN` would read two ranges, and then SQLite sorts
+ * every call of the participant by address before it can group them.
+ *
+ * The outer query adds each address's counts and keeps its newest call. It sorts only the rows the
+ * branches hand it, at most two for each address, and not the calls.
+ *
+ * THE HANDLE BRANCH READS NOTHING WHEN THE HANDLE IS THE REGISTRY ID. Otherwise both branches would
+ * find the same calls and each would be counted twice.
+ *
+ * `client_addr IS NOT NULL` is in both branches because the index holds only calls with an address,
+ * and SQLite uses it only for a query whose WHERE implies that term. Saying the term itself is the
+ * plain way to imply it, and it is the list's own rule that a call with no address is left out.
+ */
+export const MACHINES_SEEN_FROM = `SELECT address, max(newestMs) AS lastMs, sum(n) AS calls
+  FROM (SELECT client_addr AS address, max(at_ms) AS newestMs, count(*) AS n
+          FROM api_calls
+         WHERE actor_type = @actorType
+           AND actor_id = @id
+           AND client_addr IS NOT NULL
+         GROUP BY client_addr
+        UNION ALL
+        SELECT client_addr, max(at_ms), count(*)
+          FROM api_calls
+         WHERE actor_type = @actorType
+           AND actor_id = @handle
+           AND @handle <> @id
+           AND client_addr IS NOT NULL
+         GROUP BY client_addr)
+ GROUP BY address
+ ORDER BY lastMs DESC
+ LIMIT @most`
+
+/**
  * THE MACHINES ONE PARTICIPANT WAS SEEN FROM, newest first. Criterion M51.
  *
  * ---------------------------------------------------------------------------------------
@@ -2533,17 +2375,8 @@ export function machinesSeenFrom(who: ParticipantRef, mostMachines = 12): Machin
   const actorType = who.kind === 'person' ? 'human' : 'agent'
   const handle = held === null ? who.id : String((held as unknown as Record<string, unknown>)['handle'])
   const rows = sqlite
-    .prepare(
-      `SELECT client_addr AS address, max(at_ms) AS lastMs, count(*) AS calls
-         FROM api_calls
-        WHERE actor_type = ?
-          AND client_addr IS NOT NULL
-          AND (actor_id = ? OR actor_id = ?)
-        GROUP BY client_addr
-        ORDER BY lastMs DESC
-        LIMIT ?`,
-    )
-    .all(actorType, who.id, handle, mostMachines) as { address: string; lastMs: number; calls: number }[]
+    .prepare(MACHINES_SEEN_FROM)
+    .all({ actorType, id: who.id, handle, most: mostMachines }) as { address: string; lastMs: number; calls: number }[]
   return rows.map((row) => ({
     address: row.address,
     lastSeen: localStamp(new Date(row.lastMs)),
@@ -2641,9 +2474,11 @@ export function changeWorkArea(id: string, workspace: string, area: string[], be
   // THE STAMP NAMES THE CALLER'S REGISTRY ID, which is what `participantForActor` answers, so an
   // agent that wrote under its handle and returned under its id still owns the change it made.
   const caller = participantForActor(actor)
-  const written = patchRecord(recordId, { dataPatch: { workArea: area, extra: { ...extra, workAreaChange: {
+  // THROUGH THE WORK-AREA DOOR, because an ordinary record write of `workArea` is the person's alone and this door has
+  // asked its own rule above.
+  const written = throughTheWorkAreaDoor(() => patchRecord(recordId, { dataPatch: { workArea: area, extra: { ...extra, workAreaChange: {
     ...NOTHING_IT_WAS_SET_FOR, by: { type: actor.type, id: caller?.id ?? actor.id }, how, at: nowStamp(), because, before: row.workArea, after: area, ...setFor,
-  } } } }, actor)
+  } } } }, actor))
   return { ...(readParticipant({ kind: 'agent', id: named.agent.id }) as RegisteredAgent), ...(written.nothingWritten === undefined ? {} : { nothingWritten: true }) }
 }
 
@@ -2726,9 +2561,9 @@ function moleOfficeEmptiesTheArea(
   last: { record: PanelRecord; extra: Record<string, unknown> }, before: string[] | null,
   how: 'the-seal' | 'a-failed-start' | 'a-crashed-run', because: string, about: Record<string, unknown>, office: Actor,
 ): void {
-  patchRecord(last.record.id, { dataPatch: { workArea: [], extra: { ...last.extra, workAreaChange: {
+  throughTheWorkAreaDoor(() => patchRecord(last.record.id, { dataPatch: { workArea: [], extra: { ...last.extra, workAreaChange: {
     ...NOTHING_IT_WAS_SET_FOR, by: { type: 'agent', id: moleOfficeIdFromItsRow() }, how, at: nowStamp(), because, before, after: [], ...about,
-  } } } }, office)
+  } } } }, office))
 }
 
 /**

@@ -6,7 +6,7 @@
  * change of behaviour. That file imports it back and re-exports it, so every caller keeps its import.
  */
 import type { Workspace } from '@shared/workspaces.ts'
-import type { AMessageReader } from '../lib/messages.ts'
+import type { AMessageReader } from './types/messages.ts'
 import { listWorkspaces } from './list-workspaces.ts'
 
 /** Every project this reader may read. Today every registered project; see the header in across-projects.ts. */

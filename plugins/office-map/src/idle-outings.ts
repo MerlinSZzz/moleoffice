@@ -24,3 +24,7 @@ export function seededChances(seed: number): () => number {
 export function outingChances(seed: number | undefined): () => number {
   return Number.isSafeInteger(seed) ? seededChances(seed!) : Math.random
 }
+/** A separate seeded stream avoids coupling sitting to the group-size draw. */
+export function sittingChances(seed: number | undefined): () => number {
+  return Number.isSafeInteger(seed) ? seededChances(seed! ^ 0x27d4eb2f) : Math.random
+}

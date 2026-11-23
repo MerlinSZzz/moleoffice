@@ -163,7 +163,7 @@ describe('a record page', () => {
           }, theme)
           await page.reload({ timeout: 60_000 })
           await waitForThePage(page, 60_000)
-          await page.locator('.att-rep').first().waitFor({ timeout: 30_000 })
+          await page.locator('[data-home-section="needs"]').first().waitFor({ timeout: 30_000 })
           await page.screenshot({ path: join(SHOTS, `home-${language}-${width}-${theme}.png`), fullPage: true })
         }
       }

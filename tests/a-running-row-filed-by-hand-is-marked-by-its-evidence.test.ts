@@ -39,6 +39,7 @@ import { THE_TEST_OFFICES_OWNER } from './a-page-of-a-test-office.ts'
 import { freshDb, type TestDb } from './helpers.ts'
 import { theProcessBehindTheHook } from '../src/config/session-process.mjs'
 import { wholeRows } from '@shared/sessions-said-once.ts'
+import { t } from '@shared/i18n.ts'
 import type { AdapterEnv } from '../src/server/lib/adapters/types.ts'
 
 const NOW = new Date('2026-10-14T09:00:00Z')
@@ -340,7 +341,7 @@ describe('the page reads the reading and draws it beside the state word', () => 
     expect(read.problems.join('\n')).toContain('itsProcess')
   })
 
-  it('each row draws its mark beside the running chip, and the third mark carries the reader’s sentence', async () => {
+  it('each row draws its mark beside the running chip, and the third mark carries the reader’s sentence as its title', async () => {
     const none = aRun('running', null)
     const other = aRun('running', { pid: process.pid, pidStartedAt: await thisProcessStartedAt() })
     const own = anOwnRow({ pid: process.pid, pidStartedAt: await thisProcessStartedAt() })
@@ -356,9 +357,11 @@ describe('the page reads the reading and draws it beside the state word', () => 
 
     const otherHtml = drawn(other)
     expect(otherHtml).toContain(NOT_ITS_OWN_WORD)
-    // THE READER'S SENTENCE IS WRITTEN AFTER THE THIRD MARK, as text a reader sees. Its place in the mark's title
-    // alone would not do: a title is read only by somebody who points at the mark.
-    expect(otherHtml).toContain(`>its recorded process ${String(process.pid)} is not the claude program<`)
+    // THE READER'S SENTENCE IS THE THIRD MARK'S TITLE, as on the other two marks. It was written after the mark as
+    // text until November 2026, when the explanations were taken off the pages, as decided.
+    const says = `its recorded process ${String(process.pid)} is not the claude program`
+    expect(otherHtml).toContain(`title="${t('sessions.itsProcess.saw', { says })}"`)
+    expect(otherHtml, 'and it is no longer written after the mark').not.toContain(`>${says}<`)
 
     const ownHtml = drawn(own)
     expect(ownHtml).toContain(RUNNING_WORD)

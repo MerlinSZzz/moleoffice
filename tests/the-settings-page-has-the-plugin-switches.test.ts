@@ -8,9 +8,9 @@
  * WHAT IS BEING PROVED, IN A REAL BROWSER
  * ---------------------------------------------------------------------------------------
  *
- *   1. The panel is in the Tools category under its title. A good plugin is drawn with a switch that is off, and says
- *      nobody has switched it on. A refused plugin draws no switch, and says why it cannot be switched on: one for its
- *      manifest, and one whose folder is a link to another place (wave 13x round 19). One whose folder is a link that
+ *   1. The panel is in the Tools category under its title. A good plugin is drawn with a switch that is off, and the
+ *      word Off beside it. A refused plugin draws no switch, the word "refused" and the reason: one for its manifest,
+ *      and one whose folder is a link to another place (wave 13x round 19). One whose folder is a link that
  *      leads to nothing, and one whose plugin.json is a link, are drawn the same way, and the others are still drawn
  *      beside them (wave 13x round 20). One whose plugin.json is a folder, and one whose plugin.json this office has
  *      no permission to read, are drawn the same way too (wave 13x round 21). So are one whose folder this office has
@@ -276,7 +276,6 @@ describe('the plugin switches on the Settings page', () => {
     })
     expect(drawn).toEqual({ tag: 'BUTTON', checked: 'false', name: 'Made-up weather board', wide: true })
     expect(await app.page.$eval(`${GOOD} .plgs-word`, (el) => el.textContent ?? '')).toBe(en['settingsPanel.plugins.off'])
-    expect(await app.page.$eval(`${GOOD} .plgs-state`, (el) => el.textContent ?? '')).toBe(en['settingsPanel.plugins.nobodyChose'])
     // WHAT IT READS IS BUILT FROM THE WORD LIST as the page builds it: each view's word, joined by the list gap.
     const views = [en['settingsPanel.plugins.view.projects'], en['settingsPanel.plugins.view.people'], en['settingsPanel.plugins.view.talk']]
     const reads = createI18n('en').t('settingsPanel.plugins.reads', { views: views.join(en['sentence.listGap']) })
@@ -285,7 +284,7 @@ describe('the plugin switches on the Settings page', () => {
     expect(await app.page.$$(`${GOOD} .plgs-id`), 'Normal mode draws no folder name for a good plugin').toHaveLength(0)
 
     expect(await app.page.$$(`${REFUSED} [role="switch"]`)).toHaveLength(0)
-    expect(await app.page.$eval(`${REFUSED} .plgs-refused`, (el) => el.textContent ?? '')).toBe(en['settingsPanel.plugins.refused'])
+    expect(await app.page.$eval(`${REFUSED} .plgs-refused`, (el) => el.textContent ?? '')).toBe(en['pluginState.refused'])
     // NORMAL MODE SAYS THE REASON IN PLAIN WORDS, never the reader's own text.
     expect(await app.page.$eval(`${REFUSED} .plgs-reason`, (el) => el.textContent ?? '')).toBe('Its plugin.json has no version.')
     const refusedSaid = await app.page.$eval(REFUSED, (el) => el.textContent ?? '')
@@ -314,7 +313,7 @@ describe('the plugin switches on the Settings page', () => {
     expect(await app.page.$$(`${LINKED} [role="switch"]`)).toHaveLength(0)
     expect(await app.page.$eval(`${LINKED} .plgs-id`, (el) => el.textContent ?? '')).toBe('made-up-linked')
     expect(await app.page.$$(`${LINKED} .plgs-name`)).toHaveLength(0)
-    expect(await app.page.$eval(`${LINKED} .plgs-refused`, (el) => el.textContent ?? '')).toBe(en['settingsPanel.plugins.refused'])
+    expect(await app.page.$eval(`${LINKED} .plgs-refused`, (el) => el.textContent ?? '')).toBe(en['pluginState.refused'])
     expect(await app.page.$eval(`${LINKED} .plgs-reason`, (el) => el.textContent ?? '')).toBe(
       'The plugin\'s folder "made-up-linked" is a link to another place. A plugin is read only from a real folder of its ' +
         'own inside the plugins folder, so its plugin.json was not read.',
@@ -361,7 +360,7 @@ describe('the plugin switches on the Settings page', () => {
       expect(await app.page.$$(`${row} [role="switch"]`), id).toHaveLength(0)
       expect(await app.page.$eval(`${row} .plgs-id`, (el) => el.textContent ?? '')).toBe(id)
       expect(await app.page.$$(`${row} .plgs-name`), id).toHaveLength(0)
-      expect(await app.page.$eval(`${row} .plgs-refused`, (el) => el.textContent ?? '')).toBe(en['settingsPanel.plugins.refused'])
+      expect(await app.page.$eval(`${row} .plgs-refused`, (el) => el.textContent ?? '')).toBe(en['pluginState.refused'])
       // THE FOLDER AND FILE CAUSES KEEP TODAY'S EXACT ENGLISH, and their raw text is the same English, so no `.plgs-raw`.
       expect(await app.page.$eval(`${row} .plgs-reason`, (el) => el.textContent ?? '')).toBe(reason)
       expect(await app.page.$$(`${row} .plgs-raw`), id).toHaveLength(0)
@@ -379,7 +378,7 @@ describe('the plugin switches on the Settings page', () => {
     await app.page.click(`${GOOD} [role="switch"]`)
     await app.page.waitForSelector(`${GOOD} [role="switch"][aria-checked="true"]`, { timeout: 20_000 })
     expect(await theStoredState()).toBe('on')
-    expect(await app.page.$eval(`${GOOD} .plgs-state`, (el) => el.textContent ?? '')).toBe(en['settingsPanel.plugins.switchedOn'])
+    expect(await app.page.$eval(`${GOOD} .plgs-word`, (el) => el.textContent ?? '')).toBe(en['settingsPanel.plugins.on'])
 
     // A RELOAD DRAWS WHAT IS STORED, not what this page remembered.
     await openTheSettings()
@@ -390,7 +389,7 @@ describe('the plugin switches on the Settings page', () => {
     await app.page.click(`${GOOD} [role="switch"]`)
     await app.page.waitForSelector(`${GOOD} [role="switch"][aria-checked="false"]`, { timeout: 20_000 })
     expect(await theStoredState()).toBe('off')
-    expect(await app.page.$eval(`${GOOD} .plgs-state`, (el) => el.textContent ?? '')).toBe(en['settingsPanel.plugins.switchedOff'])
+    expect(await app.page.$eval(`${GOOD} .plgs-word`, (el) => el.textContent ?? '')).toBe(en['settingsPanel.plugins.off'])
   }, 180_000)
 
   it('adds the folder name of a good plugin in Developer mode, and draws the folder name of a refused one in both modes', async () => {

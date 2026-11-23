@@ -50,6 +50,7 @@ import { whyNotPlainPaths } from '../src/config/a-workers-left-out-paths.mjs'
 import { LAUNCHER_MODEL_COMPATIBILITY } from '../src/config/model-efforts.mjs'
 import { THE_PROVIDER_A_RUNTIME_RUNS } from '../src/config/runtime-native-providers.mjs'
 import { FAKE_DOCKER } from './sandbox-stand-ins.ts'
+import { theMadeUpOfficesAnswer } from './round-chapters-fixture.ts'
 import { withoutInheritedEffort } from './without-inherited-effort.ts'
 import { writeInstance } from '../tools/sandbox-common.mjs'
 
@@ -175,7 +176,10 @@ describe('2. the launcher', () => {
       for await (const chunk of req) body += chunk
       const agentAsked = /^\/api\/participants\/agent\/([^/?]+)$/.exec(url)?.[1]
       const handRun = /^\/api\/agents\/([^/]+)\/hand-run$/.exec(url)?.[1]
-      if (url === '/api/participants') {
+      if (req.method === 'GET' && theMadeUpOfficesAnswer(url) !== null) {
+        // THE TWO DOORS A ROUND'S START READS ITS RULES FROM, answered as an office that holds no chapter and no regulation.
+        res.end(JSON.stringify(theMadeUpOfficesAnswer(url)))
+      } else if (url === '/api/participants') {
         res.end(JSON.stringify({ agents: Object.values(AGENTS).map(agent => ({ id: agent, handle: agent, name: agent, record: `${agent}-record` })) }))
       } else if (req.method === 'GET' && url.startsWith('/api/office/run-models/for/')) {
         res.end(JSON.stringify({ model: CODEX_MODEL, effort: null, effortFrom: 'none' }))

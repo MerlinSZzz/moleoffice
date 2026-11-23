@@ -223,7 +223,7 @@ export const ENTRIES = [
     data: {
       entry: 'tool',
       slug: 'page-screenshots',
-      does: 'Photographs every page of the office at 1440, 990, 660 and 390 wide, in light and dark, on a throwaway office, and compares with the last run that passed.',
+      does: 'Photographs every page of the office at 1440, 1200, 990, 660 and 390 wide, in light and dark, on a throwaway office, and compares with the last run that passed.',
       forWhom: 'both',
       whenToUse: 'Before you call a change to a page done.',
       whenNotToUse: 'Not to photograph the live office: it starts its own on a seeded database.',

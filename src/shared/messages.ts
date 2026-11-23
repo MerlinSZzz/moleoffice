@@ -2006,7 +2006,7 @@ export function theAgentAStoredSenderNames(sentBy: ParticipantRef, everyone: rea
  * that no registry row holds. Criterion M25.
  */
 export function unregisteredWriterOf(
-  one: MessageOnTheWire,
+  one: Pick<MessageOnTheWire, 'sentBy' | 'from'>,
   everyone: readonly KnownParticipant[],
 ): UnregisteredWriter | null {
   if (one.sentBy !== null) {
@@ -2566,9 +2566,17 @@ export function theMessageAnAgentReads(body: string, quotes: readonly Context[],
     const words = wordsNamedBy(part.quote)
     if (words === null) return sayInEnglish('agent.quote.empty', { source })
     const field = spanNamedBy(part.quote)?.field
-    const start = field === undefined
-      ? sayInEnglish('agent.quote.from', { source })
-      : sayInEnglish('agent.quote.fromField', { source, field })
+    // WORDS SELECTED IN A FILE THE OFFICE DRAWS name the file and its page, which the block holding the file does not.
+    const place = part.quote.place
+    const file = place?.at === 'quote' ? place.file : undefined
+    const page = place?.at === 'quote' ? place.page : undefined
+    const start = file !== undefined
+      ? page !== undefined
+        ? sayInEnglish('agent.quote.fromFilePage', { file, page, source })
+        : sayInEnglish('agent.quote.fromFile', { file, source })
+      : field === undefined
+        ? sayInEnglish('agent.quote.from', { source })
+        : sayInEnglish('agent.quote.fromField', { source, field })
     return [start, ...words.split('\n').map((line) => `> ${line}`), sayInEnglish('agent.quote.end')].join('\n')
   }).join('\n')
 }

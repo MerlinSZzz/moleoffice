@@ -105,6 +105,26 @@ async function file(kind: string, title: string, data: Record<string, unknown> =
   return (res.json() as { record: { id: string } }).record.id
 }
 
+/** The agent "the run that wrote the note" worked as, filed once, because the office is made once for the file. */
+let theNoteWritersAgent: string | null = null
+
+/**
+ * THE RUN THAT WROTE THE NOTE, naming the agent it worked as in `ranAs`. A comment addressed to a run that answers as no
+ * agent is refused before it is stored, and nothing is made up for it. Only the person with their key may file a
+ * session for an agent.
+ */
+async function theRunThatWroteTheNote(data: Record<string, unknown>): Promise<string> {
+  theNoteWritersAgent ??= await file('agent', 'The agent that wrote the note', { handle: 'the-note-writer', state: 'active', runtime: 'claude-code' })
+  const res = await app.inject({
+    method: 'POST',
+    url: '/api/records',
+    headers: { ...HUMAN, ...thePersonsKeyHeader() },
+    payload: { kind: 'session', title: 'the run that wrote the note', data: { ...data, ranAs: [{ workspaceId: WORKSPACE, agentId: theNoteWritersAgent }] } },
+  })
+  expect(res.statusCode, res.body).toBe(201)
+  return (res.json() as { record: { id: string } }).record.id
+}
+
 async function becomes(id: string, kind: string): Promise<KindChange> {
   const res = await app.inject({
     method: 'PATCH',
@@ -421,8 +441,9 @@ describe('a record that is in another project', () => {
 describe('the refusal when a review cannot be sent', () => {
   it('does not claim a comment fails to say who it is for when it says exactly that', async () => {
     // A session record nothing has ever stamped: Mole Office knows who the comment is for and cannot
-    // pick that agent up again. That is a different fault from "nobody has been chosen".
-    const session = await file('session', 'the run that wrote the note', { state: 'idle', runtime: 'claude-code' })
+    // pick that agent up again. That is a different fault from "nobody has been chosen". It names the
+    // agent it worked as, so the comment is stored and the refusal is dispatch's.
+    const session = await theRunThatWroteTheNote({ state: 'idle', runtime: 'claude-code' })
     const thread = (
       await app.inject({
         method: 'POST',
@@ -521,7 +542,7 @@ describe('a finished run writes down the conversation that answered', () => {
 
   /** A session record that can be picked up, a thread addressed to it, and its dispatched run. */
   async function runAddressedTo(externalId: string, logPath: string): Promise<{ runId: string; sessionId: string }> {
-    const sessionId = await file('session', 'the run that wrote the note', {
+    const sessionId = await theRunThatWroteTheNote({
       state: 'idle',
       runtime: 'claude-code',
       extra: {

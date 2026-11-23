@@ -11,6 +11,9 @@
  * When `MOLE_OFFICE_FAKE_RUNTIME` names a script, every word is served by the fake adapter instead.
  * That is how the test suite runs the worker end to end without a model call, and it is said out
  * loud wherever it is on: see `RUNS_ARE_FAKED` in `runtimes/fake.ts`.
+ *
+ * `whatIsInstalled` asks of the whole environment, so on Windows a search path held as `Path` is
+ * found.
  */
 
 import { AGENT_RUNTIMES, THE_RUNTIMES_THE_OFFICE_DISPATCHES, whyTheOfficeCannotStartThisRuntime, type AgentRuntime } from '@shared/participants.ts'
@@ -127,5 +130,5 @@ export function whatIsInstalled(
   // answer without loading this file: of src/worker/runtimes the server loads only
   // what-a-runtime-passes-on.ts. The registry list and the reason a word is not dispatched from here
   // are handed in, because those live in src/shared.
-  return installedTools(from['PATH'], AGENT_RUNTIMES, whyTheOfficeCannotStartThisRuntime)
+  return installedTools(from, AGENT_RUNTIMES, whyTheOfficeCannotStartThisRuntime)
 }

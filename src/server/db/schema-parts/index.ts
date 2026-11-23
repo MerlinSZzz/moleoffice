@@ -15,11 +15,11 @@
  * created by a migration of its own.
  *
  * A TABLE schema.ts READS WHILE IT LOADS IS NOT DECLARED IN A FILE THAT IMPORTS schema.ts, directly or
- * through another file. schema.ts reads such tables to build AUTHORED_TABLE_OF and the maps made from
- * it. A file that imports schema.ts back is in a cycle with it, and when that file loads first, as it
- * can in the bundle, schema.ts reads the file's table before the table is made.
- * tests/a-schema-part-file-can-load-first.test.ts loads each part file first and names the one that
- * breaks schema.ts.
+ * through another file. A file that imports schema.ts back is in a cycle with it, and when that file loads first, as it
+ * can in the bundle, schema.ts reads the file's table before the table is made. schema.ts read every part table this
+ * way to build AUTHORED_TABLE_OF and the maps made from it, until they moved to authored-table-of.ts, which loads after
+ * schema.ts. tests/a-schema-part-file-can-load-first.test.ts loads each part file first and names the one that
+ * breaks schema.ts or the maps.
  */
 
 // This line keeps the file a module, whatever it names.
@@ -68,3 +68,15 @@ export * from './groups.ts'
 export * from './reader-anchors.ts'
 export * from './run-models.ts'
 export * from './casting-legacy.ts'
+export * from './agents.ts'
+export * from './resident-read-grants.ts'
+export * from './resident-void-marks.ts'
+export * from './resident-space-writes.ts'
+export * from './resident-sleeps.ts'
+export * from './agent-records.ts'
+export * from './handle-holds.ts'
+export * from './casting-rows.ts'
+export * from './casting-row-changes.ts'
+export * from './casting-labels.ts'
+export * from './casting-label-changes.ts'
+export * from './agent-owner-changes.ts'

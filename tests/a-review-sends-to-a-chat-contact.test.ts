@@ -29,9 +29,11 @@ import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { ReviewDetail, SendOutcome } from '../src/server/lib/reviews.ts'
+import { createI18n } from '../src/shared/i18n.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { liveApp, waitForThePage, type LiveApp } from './helpers.ts'
 
+const { t } = createI18n('en')
 const PERSON = {
   'content-type': 'application/json',
   'x-mole-office-workspace': 'default',
@@ -173,10 +175,10 @@ describe('a contact a review cannot go to', () => {
    * AN AGENT WITH NO RECORD IN THIS PROJECT. The chat's contacts are gathered from every project, so an agent whose only
    * record is in another project, and who has written to the person there, is a contact here too. A review cannot go
    * to it: a comment's choice names an agent by its record in this project. The press chooses nobody, stores nothing,
-   * leaves the list open, and says why. (A person contact takes the same path with its own sentence; a fresh office
+   * leaves the list open, and says it has no record here. (A person contact takes the same path with its own sentence; a fresh office
    * holds no second person whose conversation would put one in the list, so no case presses one.)
    */
-  it('says why an agent with no record here cannot be chosen, and stores nothing', { timeout: 120_000 }, async () => {
+  it('says an agent has no record here, and stores nothing', { timeout: 120_000 }, async () => {
     const made = await fetch(`${app.api}/api/workspaces`, { method: 'POST', headers: PERSON, body: JSON.stringify({ id: 'far-harbour', title: 'Far harbour' }) })
     expect(made.status, await made.text()).toBe(201)
     const there = { ...PERSON, 'x-mole-office-workspace': 'far-harbour' }
@@ -210,7 +212,7 @@ describe('a contact a review cannot go to', () => {
     const stored: string[] = []
     app.page.on('request', (request) => { if (request.method() === 'PATCH' && request.url().includes('/api/records/')) stored.push(request.url()) })
     await list.locator('.px-talk-contact', { hasText: FAR_CONTACT }).click()
-    await list.getByText('This agent has no record in this project, so a review cannot go to it. Choose another agent.', { exact: true })
+    await list.getByText(t('savedComment.agentHasNoRecord'), { exact: true })
       .waitFor({ timeout: 20_000 })
     expect(await list.locator('.px-talk-filter').isVisible()).toBe(true)
     expect(stored).toEqual([])

@@ -32,12 +32,12 @@
 import { closeSync, fstatSync, openSync, readSync } from 'node:fs'
 import { createConnection, type Socket } from 'node:net'
 import { REPO_ROOT, settingValue, settings } from '../../config/settings.mjs'
-import { askTheHolder, ONE_REQUEST_MS, THE_HOLDER_PROTOCOL, theTerminalHolderLog, theTerminalHolderSocket, howTheHolderIsNotThisCopys } from '../../config/the-terminal-holder.mjs'
+import { askTheHolder, NO_HOLDER_LISTENS_ON_A_PATH_THIS_LONG, ONE_REQUEST_MS, THE_HOLDER_PROTOCOL, THE_LONGEST_WAIT_TO_TYPE_A_PREPARED_LINE_MS, theTerminalHolderLog, theTerminalHolderSocket, howTheHolderIsNotThisCopys } from '../../config/the-terminal-holder.mjs'
 import { thisSystem, type ASystem } from '../../config/systems/the-system.mjs'
 import { theSameSpelling } from '../../config/the-paths-of-a-system.mjs'
 import { theBoundPort } from './bound-address.ts'
 import { announce } from './events.ts'
-import type { AgentPaneRefusalCode, AgentStepsRefusalCode, CodedRefusal, TerminalAgentRefusalCode, TerminalGrantRefusalCode, TerminalHolderRestartRefusalCode, TerminalRefusalCode, TerminalTypedForAnotherRefusalCode, WayBackRefusalCode } from '@shared/refusal-codes.ts'
+import type { AgentPaneRefusalCode, AgentStepsRefusalCode, CodedRefusal, TerminalAgentRefusalCode, TerminalGrantRefusalCode, TerminalHolderRestartRefusalCode, TerminalPreparedRefusalCode, TerminalRefusalCode, TerminalTypedForAnotherRefusalCode, WayBackRefusalCode } from '@shared/refusal-codes.ts'
 import { createRecord, listRecords, type Actor } from './records.ts'
 import { PanelError } from './panel-error.ts'
 import { THE_TERMINAL_HOLDER, theOwnPartBlock, theOwnPartUsageReceipt, closeTheEarlierOwnRows, theProcessesTheEarlierOwnRowsCloseReads, type OwnPart } from './own-rows.ts'
@@ -84,7 +84,8 @@ export function aTerminalRefusal(
     | AgentPaneRefusalCode
     | AgentStepsRefusalCode
     | TerminalHolderRestartRefusalCode
-    | TerminalTypedForAnotherRefusalCode,
+    | TerminalTypedForAnotherRefusalCode
+    | TerminalPreparedRefusalCode,
   sentence: string,
   status: number,
   reason?: string,
@@ -110,8 +111,9 @@ export function theHolderSocket(): string {
 
 /**
  * ASK THE HOLDER ONE THING. An answer with `ok: false` is the holder refusing, and becomes a 400 with
- * its own sentence. No holder at all is a 503 that says so; a holder that does not answer in time is a
- * 504. Nothing is retried and nothing is guessed. Each terminal the answer holds is read as asTheOfficeReadsIt says.
+ * its own sentence. No holder at all is a 503 that says so, and so is a socket path too long for any holder to
+ * listen on; a holder that does not answer in time is a 504. Nothing is retried and nothing is guessed. Each terminal
+ * the answer holds is read as asTheOfficeReadsIt says.
  */
 export async function askTheHolderFor(request: Record<string, unknown>, waitMs: number = ONE_REQUEST_MS): Promise<Record<string, unknown>> {
   let answer: Record<string, unknown> & { ok: boolean }
@@ -120,8 +122,9 @@ export async function askTheHolderFor(request: Record<string, unknown>, waitMs: 
   } catch (err) {
     const code = (err as { code?: string }).code
     const sentence = err instanceof Error ? err.message : String(err)
-    if (code === 'absent' || code === 'refused') {
-      throw aTerminalRefusal('terminalHolderNotRunning', `${sentence} So no terminal can be opened, read or typed into.`, 503, 'No terminal holder is running.')
+    if (code === 'absent' || code === 'refused' || code === 'too-long') {
+      const why = code === 'too-long' ? `${sentence} ${NO_HOLDER_LISTENS_ON_A_PATH_THIS_LONG}` : sentence
+      throw aTerminalRefusal('terminalHolderNotRunning', `${why} So no terminal can be opened, read or typed into.`, 503, 'No terminal holder is running.')
     }
     if (code === 'silent') throw aTerminalRefusal('terminalHolderNoAnswer', sentence, 504)
     throw aTerminalRefusal('terminalHolderUnusable', sentence, 502)
@@ -143,11 +146,18 @@ const isAReading = (value: unknown): value is TerminalReading => typeof value ==
  * its stored id names, through the filed aliases and never by a handle. An id that no alias owns is kept as the holder
  * holds it: the agent's current id, or an id that names nobody. A person is not read here, and the holder's own memory
  * is not changed. Every terminal the server reads from the holder is read here first: the answers of askTheHolderFor
- * and the first answer of watchATerminal.
+ * and the first answer of watchATerminal. The secretary that prepared a terminal's line is read the same way.
  */
 function asTheOfficeReadsIt(reading: TerminalReading): TerminalReading {
-  const read = (party: TerminalParty | null): TerminalParty | null => (party?.kind === 'agent' ? { ...party, id: theCanonicalAgentId(sqlite, party.id) } : party)
-  return { ...reading, who: read(reading.who), agent: read(reading.agent) }
+  const readOne = (party: TerminalParty): TerminalParty => (party.kind === 'agent' ? { ...party, id: theCanonicalAgentId(sqlite, party.id) } : party)
+  const read = (party: TerminalParty | null): TerminalParty | null => (party?.kind === 'agent' ? readOne(party) : party)
+  const prepared = reading.prepared
+  return {
+    ...reading,
+    who: read(reading.who),
+    agent: read(reading.agent),
+    ...(prepared === undefined ? {} : { prepared: prepared === null ? null : { ...prepared, by: readOne(prepared.by) } }),
+  }
 }
 
 /**
@@ -360,6 +370,66 @@ export async function typeALineForSomebodyElse(terminal: string, text: string): 
       `${terminal}. The line may have been typed, and whether its Enter was sent is not known.`,
     502,
   )
+}
+
+/**
+ * OPEN A TERMINAL FOR THE PERSON WITH ONE LINE A SECRETARY PREPARED IN IT. The holder types the line once the shell is
+ * quiet and never types an Enter (open with `prepared` in src/holder/index.mjs), so the line waits until the person runs
+ * it with their own Enter, changes it or clears it. Who may ask for it, and whether the line holds a key, are decided by
+ * the door. The holder tests the line again and refuses it in its own words.
+ *
+ * The holder's hello is read first, and a holder that does not name prepareALine is refused before anything is sent: it
+ * would open the shell and leave the line out. The open answers once the line is typed, so it is given the holder's
+ * longest wait for that on top of one request's. Every page is told at once that the list changed, with the terminal
+ * and the secretary, so a page can bring the terminal up in front of the person. The line is not on that event, which
+ * reaches every page; a page reads it from the list.
+ */
+export async function openATerminalWithAPreparedLine(open: Record<string, unknown>, line: string, by: TerminalParty): Promise<TerminalReading> {
+  const hello = await theHolder()
+  if (!(hello.understands ?? []).includes('prepareALine')) {
+    throw aTerminalRefusal(
+      'terminalHolderTooOldToPrepare',
+      `The terminal holder that runs now, process ${String(hello.pid)}, is older than this office and cannot open a ` +
+        'terminal with a line prepared in it. Nothing was opened. Restarting the holder ends every terminal the person ' +
+        'has open.',
+      409,
+    )
+  }
+  const answer = await askTheHolderFor({ ...open, op: 'open', prepared: { line, by } }, ONE_REQUEST_MS + THE_LONGEST_WAIT_TO_TYPE_A_PREPARED_LINE_MS)
+  const terminal = answer['terminal'] as TerminalReading
+  announce({
+    name: 'list.changed',
+    workspaceId: null,
+    lists: ['terminals'],
+    about: null,
+    groupId: null,
+    prepared: { terminal: terminal.id, by },
+    because: 'A secretary opened a terminal for the person with a line prepared in it, for the person to run.',
+  })
+  return terminal
+}
+
+/**
+ * GIVE A TERMINAL THE NAME, THE GROUP AND THE TAGS THE PERSON WROTE, or none (nameATerminal in src/holder/index.mjs). The
+ * door trims and checks them first, and the holder keeps only a value already in that form. The holder keeps them with
+ * the terminal in memory and nowhere else, so they end with the terminal, and with every terminal when the holder
+ * restarts. A holder that does not name nameATerminal is refused before anything is sent. Every page is told the list
+ * changed.
+ */
+export async function nameATerminal(terminal: string, names: { name: string | null; group: string | null; tags: string[] }): Promise<TerminalReading> {
+  const hello = await theHolder()
+  if (!(hello.understands ?? []).includes('nameATerminal')) {
+    throw aTerminalRefusal(
+      'terminalHolderTooOldToName',
+      `The terminal holder that runs now, process ${String(hello.pid)}, is older than this office and cannot keep a ` +
+        `name, a group or tags for a terminal. Nothing was changed in terminal ${terminal}. Restarting the holder ends ` +
+        'every terminal the person has open.',
+      409,
+    )
+  }
+  const answer = await askTheHolderFor({ op: 'nameATerminal', terminal, ...names })
+  announce({ name: 'list.changed', workspaceId: null, lists: ['terminals'], about: null, groupId: null, because: `Terminal ${terminal} was given a name, a group or tags, or had them taken off.` })
+  return answer['terminal'] as TerminalReading
 }
 
 /** The standing holder session for this pid and the start time read by the ledger's process probe. */

@@ -89,8 +89,15 @@ async function aComment(body: string, context: Record<string, unknown>, runId: s
   })
   expect(chose.statusCode, chose.body).toBe(200)
   // A SECOND APART, because a stamp is to the second and the order written is the order numbered.
-  await new Promise((done) => setTimeout(done, 1050))
+  await aSecondLater()
   return id
+}
+
+/** Resolves once the office's clock reads a later second than it did when called; a condition, not a time. */
+async function aSecondLater(): Promise<void> {
+  const { nowStamp } = await import('../src/shared/time.ts')
+  const stamp = nowStamp()
+  while (nowStamp() <= stamp) await new Promise((next) => setTimeout(next, 20))
 }
 
 async function aReview(entry: Record<string, unknown>): Promise<string> {
@@ -216,7 +223,7 @@ describe('the numbered quote line of a sent review', () => {
  * MUTATION (after a green control, then restored): whatItWasLeftOn in src/server/lib/reviews.ts goes
  * back to the old removal, every id the target names taken out of the reading's sentence:
  * `idsOfTarget(target).reduce((said, id) => said.split(id).join(''), comment.reading.about)`.
- * Both projects go red.
+ * The case goes red.
  */
 describe('a quoted title that holds the project id', () => {
   const as = (workspace: string): Record<string, string> => ({ ...HUMAN, 'x-mole-office-workspace': workspace })
@@ -227,7 +234,7 @@ describe('a quoted title that holds the project id', () => {
     return (res.json() as { record: { id: string } }).record.id
   }
 
-  for (const [workspace, title] of [['robotics', 'robotics bench plan'], ['default', 'Change the default port']] as const) {
+  for (const [workspace, title] of [['default', 'Change the default port']] as const) {
     it(`keeps "${title}" whole in project ${workspace}, in the preview and in the stored message`, async () => {
       if (workspace !== 'default') {
         const made = await app.inject({ method: 'POST', url: '/api/workspaces', payload: { id: workspace, title: 'A made-up robot project' } })
@@ -257,7 +264,7 @@ describe('a quoted title that holds the project id', () => {
           payload: { dataPatch: { chosenRecipient: { kind: 'session', sessionId: run } } },
         })
         expect(chose.statusCode, chose.body).toBe(200)
-        await new Promise((done) => setTimeout(done, 1050))
+        await aSecondLater()
       }
       const finished = await app.inject({ method: 'POST', url: `/api/reviews/${review}/finish-collecting`, headers: as(workspace) })
       expect(finished.statusCode, finished.body).toBe(200)

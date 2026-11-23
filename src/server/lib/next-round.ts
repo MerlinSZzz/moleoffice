@@ -6,8 +6,9 @@
  * replaces the old start-after.sh. The rules: one run per round, and the next round starts on
  * the supervisor's word. src/shared/next-round.ts holds the shape.
  *
- * THE ASK, `askForTheNextRound`. Five may ask: the run's agent with its own key, its registered starter, a secretary
- * proved by its own key, the person, and the office itself. The office asks only in this process, for a fix round of a
+ * THE ASK, `askForTheNextRound`. Six may ask: the run's agent with its own key, its registered starter, its recorded
+ * leader proved by its own key (the agent's owner, `isItsRecordedLeader` in ./agent-owner.ts), a secretary proved by its
+ * own key, the person, and the office itself. The office asks only in this process, for a fix round of a
  * red merge entry or for a hand-back's resolve brief, while ./the-office-asks-for-a-round.ts marks that one agent and
  * brief (wave 13u round 90), and for the next round of a run it saw sealed (./next-round-at-the-seal.ts, round 94). It is refused, in words, for a retired agent, a run already serving the
  * agent, a missing brief and a sandbox that is not the agent's. A count limit is only reminded of. The ask is kept on
@@ -79,6 +80,7 @@ import { theModelTheLauncherIsGiven, theRowAsTheAskReadIt, theStartOfTheRow, typ
 import { sqlite } from '../db/client.ts'
 import { STORED_FIELDS, theWordsOfAStoredField } from '../db/schema.ts'
 import { theKeyHolderIsTheRegisteredStarterOf } from './claims.ts'
+import { isItsRecordedLeader } from './agent-owner.ts'
 import { claudeSupervisorsAtOnce } from './env.ts'
 import { theRoundTheOfficeIsAsking } from './the-office-asks-for-a-round.ts'
 import { nameOf, writeASystemLineToOne } from './groups.ts'
@@ -150,7 +152,7 @@ function theAgentAskedFor(reference: string, actor: Actor): RegisteredAgent {
 }
 
 /**
- * Which of the five who may ask this is, each proved by its own key or as the person is proved, or null. The office is
+ * Which of the six who may ask this is, each proved by its own key or as the person is proved, or null. The office is
  * its own writer with no key, and only while it marks this agent: a request over HTTP that names the office's writer
  * meets the same rules as any other caller.
  */
@@ -160,6 +162,7 @@ function whoAsks(agent: RegisteredAgent, actor: Actor): TheNextRound['askedBy'] 
   const proved = theAgentTheKeyProves(actor)
   if (actor.type === 'agent' && proved === agent.id && actor.provedHolder === undefined) return asAgent(proved, 'the run’s agent')
   if (proved !== null && actor.keyHolder !== undefined && theKeyHolderIsTheRegisteredStarterOf(agent, actor.keyHolder)) return asAgent(proved, 'its starter')
+  if (proved !== null && isItsRecordedLeader(agent, { kind: 'agent', id: proved })) return asAgent(proved, 'its leader')
   if (proved !== null && theKeyProvesASecretary(actor)) return asAgent(proved, 'a secretary')
   if (thePersonIsProved(actor)) return { who: { kind: 'person', id: actor.id }, as: 'the person', ...(session === undefined ? {} : { session }) }
   const office = theRoundTheOfficeIsAsking()
@@ -252,7 +255,7 @@ export function theBriefAt(path: string, folder: string): TheNextRound['brief'] 
 }
 
 /** theBriefAt with the words it read, for the worker-run door, which reads the difficulty a brief marks. */
-export function theBriefAndItsWordsAt(path: string, folder: string): { brief: TheNextRound['brief']; words: string } {
+export function theBriefAndItsWordsAt(path: string, folder: string, outside = false): { brief: TheNextRound['brief']; words: string } {
   if (!isAbsolute(path)) refused(`The brief "${path}" is not an absolute path. Give the path of a file inside ${folder}. Nothing was written.`, 400)
   let real: string
   let inside: string
@@ -263,6 +266,7 @@ export function theBriefAndItsWordsAt(path: string, folder: string): { brief: Th
     refused(`There is no brief at ${path}. Nothing was written.`, 409)
   }
   if (!real.startsWith(inside + sep)) {
+    if (outside) refused(`The brief ${path} is not inside the asking run's workingDirectory ${folder}. Put the brief in that folder and ask again. Nothing was written.`, 409)
     refused(
       `The brief ${path} is not inside the sandbox folder ${folder}. The office reads a brief only from the sandbox ` +
         'the run it starts will run in. Put the brief in that folder and ask again. Nothing was written.',
@@ -280,7 +284,7 @@ export function theBriefAndItsWordsAt(path: string, folder: string): { brief: Th
  * the folder, or anything that is not a file, is refused before it is read. A refusal quotes nothing from the file. A
  * brief with no declaration, or one that names no work area, answers a work area of null, and the ask goes on as before.
  */
-export function theWorkAreaDeclaredBeside(brief: string, folder: string): { file: string; workArea: string[] | null } {
+export function theWorkAreaDeclaredBeside(brief: string, folder: string, outside = false): { file: string; workArea: string[] | null } {
   const file = theDeclarationOf(brief)
   if (lstatSync(file, { throwIfNoEntry: false }) === undefined) return { file, workArea: null }
   let real: string
@@ -290,6 +294,7 @@ export function theWorkAreaDeclaredBeside(brief: string, folder: string): { file
     refused(`The declaration ${file} is a link to nothing that can be read. Nothing was written.`, 409)
   }
   if (!real.startsWith(realpathSync(folder) + sep)) {
+    if (outside) refused(`The declaration ${file} is not inside the asking run's workingDirectory ${folder}. Nothing was written.`, 409)
     refused(
       `The declaration ${file} is not inside the sandbox folder ${folder}. The office reads a declaration only from the ` +
         'sandbox the run it starts will run in, as it reads the brief. Nothing was written.',
@@ -541,8 +546,8 @@ export function askForTheNextRound(input: TheNextRoundAskNames & { agent: string
   const askedBy = whoAsks(agent, actor)
   if (askedBy === null) {
     refused(
-      `The next round of ${agent.handle} is asked for by the agent with its own key, its registered starter, a secretary ` +
-        `proved by its own key, or the person, and this request was made by "${actor.id}". Nothing was written.`,
+      `The next round of ${agent.handle} is asked for by the agent with its own key, its registered starter, its recorded ` +
+        `leader, a secretary proved by its own key, or the person, and this request was made by "${actor.id}". Nothing was written.`,
       403,
     )
   }
@@ -636,7 +641,7 @@ export function askForTheNextRound(input: TheNextRoundAskNames & { agent: string
     ...(askedBy.as !== 'the office' || theRoundTheOfficeIsAsking()?.repair === undefined ? {} : { repair: theRoundTheOfficeIsAsking()!.repair! }),
     ...(serving === null ? {} : { after: serving }),
     ...(replaces ? { replaced: { askedAt: before.askedAt, askedBy: before.askedBy.who.id } } : {}),
-    ...(chosen.row === null ? { row: null, model: chosen.model } : { row: chosen.row }),
+    ...(chosen.row === null ? { row: null, model: chosen.model, ...(chosen.unmatchedRow === undefined ? {} : { unmatchedRow: chosen.unmatchedRow }) } : { row: chosen.row }),
     ...(chosen.switched === undefined ? {} : { switched: chosen.switched }),
     ...(asked === null ? {} : { delegations: asked.delegations, line: asked.line }),
   }
@@ -1130,7 +1135,7 @@ type TheSwitchedProgram = { from: string; says: string }
  */
 type TheRowARoundReads =
   | { row: Pick<CastingRow, 'id' | 'cells' | 'native' | 'hold' | 'selectionRevision'>; card: string; when: 'now' | 'at the ask'; switched?: TheSwitchedProgram }
-  | { row: null; card: string | null; model: string | null; when: 'now' | 'at the ask' }
+  | { row: null; card: string | null; model: string | null; when: 'now' | 'at the ask'; unmatchedRow?: { id: number; card: string; program: string } }
 
 /**
  * WHAT THE OFFICE KNOWS LIMITS A RUNTIME AND A MODEL NOW, in the limit's own words, or null because it knows none.
@@ -1231,7 +1236,8 @@ function theDrawnRowOfAnotherProgram(limits: CastingLimits, card: string, worksp
  * THE ROW THE ASK READS: the marked row in force for the agent's card when it casts the run's program, else the one row
  * in force for the card that casts it, marked or not. Of two or more rows in force for the card that cast it, it reads the
  * one that casts the run's model; none, or more than one, fails the ask, because the round cannot choose between them.
- * With no row at all it reads none, with the model of the run it continues.
+ * With no row in force casting the run's program and no covering limit, it reads no row and keeps the run's model.
+ * With no row at all it also reads none, with the model of the run it continues.
  * When the run's own program is spent, the ask draws the line's row of another program, and the round starts a new
  * conversation there (the case first: a Codex line whose Terra row is out gets a Claude row).
  */
@@ -1264,7 +1270,7 @@ function theRowTheAskReads(run: PanelRecord, agentId: string, workspaceId: strin
   // No row in force casts the run's program: the provider can still report its limit, and then the round moves.
   const limited = theLimitThatCovers(limits, runtime, text(run.data['model']))
   if (limited !== null) return theDrawnRowOfAnotherProgram(limits, card, workspaceId, runtime, limited)
-  return { row, card, when: 'now' }
+  return { row: null, card, model: text(run.data['model']), when: 'now', unmatchedRow: { id: row.id, card, program: row.cells.program.value ?? 'no program' } }
 }
 
 /**
@@ -1280,7 +1286,7 @@ function theModelARoundStartsOn(
   workspaceId: string,
   read: TheRowARoundReads | { fails: string },
 ):
-  | { runtime: string; model: string; modelSays: string; effort: TheEffortTheLauncherIsAnswered; row: TheRowAWorkerIsGiven | null; selection: CastingSelection | null; switched?: TheSwitchedProgram }
+  | { runtime: string; model: string; modelSays: string; effort: TheEffortTheLauncherIsAnswered; row: TheRowAWorkerIsGiven | null; selection: CastingSelection | null; switched?: TheSwitchedProgram; unmatchedRow?: { id: number; card: string; program: string } }
   | { fails: string } {
   if ('fails' in read) return read
   // THE PROGRAM IS THE RUN'S OWN, unless the ask drew another because the run's own program is spent. Then the launcher
@@ -1293,9 +1299,8 @@ function theModelARoundStartsOn(
   // program, else the one row in force for the card that casts it, marked or not, or of several the one that casts the
   // run's model, which the model reader reads for a builder of this agent, so a line changes its model in the Casting
   // table. A round
-  // continues its run on the run's runtime, so a marked row that casts another runtime fails when no row in force for
-  // the card casts it. The one exception is a spent program, whose ask draws another program's row (`switched`). With no
-  // row at all the round keeps data.model, the model the previous run requested, as the ask read it; data.served observes
+  // continues its run on the run's runtime. A spent program draws another program's row (`switched`). With no row
+  // casting the run's program the round keeps data.model, the model the previous run requested; data.served observes
   // what answered and is not a setting.
   // THE START READS WHAT THE ASK KEPT, and says so.
   const atTheStart = read.when === 'at the ask'
@@ -1307,9 +1312,11 @@ function theModelARoundStartsOn(
     whose = atTheStart ? `The ask after run ${record.id}` : `Run ${record.id}`
     if (read.model === null) return { fails: `${whose} names no model, so the round cannot continue its model.` }
     model = read.model
-    modelSays = atTheStart
-      ? `No Casting row was in force for ${agent.handle} in ${workspaceId} when the round was asked for, so the round keeps model ${model} from run ${record.id}.`
-      : inEnglish(saying('roundKeepsThePreviousModel', { card: read.card ?? `the role of ${agent.handle}`, project: workspaceId, model, run: record.id }))
+    modelSays = read.unmatchedRow !== undefined
+      ? inEnglish(saying('roundKeepsTheUnmatchedRun', { row: read.unmatchedRow.id, card: read.unmatchedRow.card + (atTheStart ? ' when the round was asked for' : ''), program: read.unmatchedRow.program, runtime, model, run: record.id }))
+      : atTheStart
+        ? `No Casting row was in force for ${agent.handle} in ${workspaceId} when the round was asked for, so the round keeps model ${model} from run ${record.id}.`
+        : inEnglish(saying('roundKeepsThePreviousModel', { card: read.card ?? `the role of ${agent.handle}`, project: workspaceId, model, run: record.id }))
   } else {
     const held = theHoldOn(read.row)
     if (held !== null) return { fails: held }
@@ -1367,7 +1374,7 @@ function theModelARoundStartsOn(
         `${String(row.id)}, the row the round starts on. It is not swapped for another row.`,
     }
   }
-  return { runtime, model, modelSays, effort, row, selection, ...(switched === undefined ? {} : { switched }) }
+  return { runtime, model, modelSays, effort, row, selection, ...(switched === undefined ? {} : { switched }), ...(read.row === null && read.unmatchedRow !== undefined ? { unmatchedRow: read.unmatchedRow } : {}) }
 }
 
 /**
@@ -1386,7 +1393,7 @@ function theRoundAtTheStart(
     const limited = theLimitThatCovers(theLimitsNow(), chosen.runtime, chosen.model)
     return limited === null ? chosen : { fails: `The round cannot start on ${chosen.runtime} with ${chosen.model}: ${limited}` }
   }
-  if (nextRound.row === null) return checkLimits(theModelARoundStartsOn(record, agent, workspaceId, { row: null, card: null, model: text(nextRound.model), when: 'at the ask' }))
+  if (nextRound.row === null) return checkLimits(theModelARoundStartsOn(record, agent, workspaceId, { row: null, card: null, model: text(nextRound.model), when: 'at the ask', ...(nextRound.unmatchedRow === undefined ? {} : { unmatchedRow: nextRound.unmatchedRow }) }))
   if (nextRound.row === undefined) {
     const chosen = theModelARoundStartsOn(record, agent, workspaceId, theRowTheAskReads(record, agent.id, workspaceId))
     return checkLimits('fails' in chosen ? chosen : { ...chosen, modelSays: `${chosen.modelSays} The ask was made before an ask kept its row, so the start read the row in force now.` })

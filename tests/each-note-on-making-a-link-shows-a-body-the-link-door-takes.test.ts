@@ -25,7 +25,7 @@ import type { FastifyInstance } from 'fastify'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { THE_PERSON } from '../src/shared/person.ts'
-import { apiApp, freshDb, type TestDb } from './helpers.ts'
+import { apiApp, freshDb, type TestDb, governsTheWholeProject } from './helpers.ts'
 
 let t: TestDb
 let app: FastifyInstance
@@ -94,7 +94,7 @@ async function filed(url: string, body: Record<string, unknown>): Promise<string
 }
 
 const aDecision = (title: string): Promise<string> =>
-  filed('/api/records', { kind: 'decision', title, data: { replaces: [], because: 'The beans came up in nine days.' } })
+  filed('/api/records', { kind: 'decision', title, data: { ...governsTheWholeProject(), replaces: [], because: 'The beans came up in nine days.' } })
 
 beforeAll(async () => {
   t = await freshDb()

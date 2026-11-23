@@ -35,6 +35,10 @@
  *    that would read as a measurement.
  * 3. **It reads. It never signals, kills, writes or repairs.** Asking a server what it is must be
  *    safe on somebody else's stack.
+ *
+ * WHICH AGENT TOOLS ARE INSTALLED is asked of the whole environment, and the search path in it is read
+ * by `theSearchPathIn` of the system (src/config/systems/the-system.mjs): on Windows the one name that
+ * is PATH in any case, and on Linux and the Mac `PATH` alone.
  */
 
 import { resolve } from 'node:path'
@@ -83,6 +87,7 @@ import { THE_BUILT_PAGE } from '../../config/the-built-page.mjs'
 import { THE_TEST_MARK, carriesTheTestMark } from '../../config/the-test-mark.mjs'
 import { thisSystem } from '../../config/systems/the-system.mjs'
 import { databaseFileStatus } from '../db/client.ts'
+import { theAgentsOfAHarnessWithNoAdapter } from '../db/list-participants.ts'
 import { addressText, theAddressThisProcessAnswersOn } from './bound-address.ts'
 import { aStartingEnvironmentCanBeRead, osProbe, registrationOfProcess, startingEnvironmentValue, type AProcessToRead, type OsProcess } from './resources.ts'
 import { theProcessesTheRunsInFlightRead, theWorkerWeStarted, workerRuns } from './worker.ts'
@@ -1536,7 +1541,7 @@ export function whereRunsGo(
         saysSaid: null,
       },
     ],
-    installed: installedTools(env['PATH'], AGENT_RUNTIMES, whyTheOfficeCannotStartThisRuntime),
+    installed: installedTools(env, AGENT_RUNTIMES, whyTheOfficeCannotStartThisRuntime),
   }
 }
 
@@ -1578,6 +1583,7 @@ export function runtimeRecord(): RuntimeRecord {
     worker: theWorker(),
     places: runsGo.places,
     installed: runsGo.installed,
+    harnesses: theAgentsOfAHarnessWithNoAdapter(),
     standing: standing(repo, db, facts.underTestRunner, port),
     freshness: freshness(gaps),
     settings: {

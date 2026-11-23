@@ -23,9 +23,21 @@
 ;
 ; WHAT IT KEEPS. The office keeps its settings in the per-user folder, %APPDATA%\mole-office, and its
 ; data in the data folder, by default the per-user folder's data folder. Both are outside the installed
-; folder, and neither the installer nor the uninstaller removes them. The folder page and a silent install
-; refuse the per-user folder, and any folder inside it, as the install folder, and the same for the data
-; folder and any folder that holds it, because an update and the uninstaller remove the install folder whole.
+; folder. The installer and an update remove neither, and an update never runs the uninstaller. The folder
+; page and a silent install refuse the per-user folder, and any folder inside it, as the install folder, and
+; the same for the data folder and any folder that holds it, because an update and the uninstaller remove
+; the install folder whole.
+;
+; WHAT THE UNINSTALLER REMOVES OF THE SETTINGS. Its own page, before it removes anything, has one box,
+; ticked at first, that also removes the settings: the saved keys, the .env and its backups, and the
+; window's caches. A silent uninstall takes /SETTINGS=keep or /SETTINGS=remove, and removes them when it is
+; given neither. The office's own command, `settings-folder remove`, removes them while the shipped Node is
+; still in the folder (src/config/systems/the-settings-folder-removal.mjs). It keeps every data folder, the
+; marks of where the database has been kept, and the move's mark and log. When the .env's own line chose the
+; data folder, the .env keeps that one line, with no key, so a reinstall finds the data. When the installed
+; office cannot say where its data is, the page keeps the settings and its box cannot be ticked. When the
+; command does not end with 0, the program is still removed, its words are shown and written to
+; THE_SETTINGS_NOT_REMOVED in TEMP, and the uninstaller ends with THE_SETTINGS_LEFT.
 ;
 ; WHERE THE DATA GOES (design/window/the-data-folder-move.criteria.md, DF23 to DF25). A first install on
 ; this account asks for the data folder on a page of its own, after the folder page; a silent one takes it
@@ -64,6 +76,12 @@
 ; How long `data-folder where` and `data-folder choose` may take. Each starts Node, reads one file and writes
 ; at most one; neither starts the office.
 !define THE_ASKING_WAIT_MS 30000
+; How long `settings-folder remove` may take. It removes the window's caches, which can be large.
+!define THE_REMOVING_WAIT_MS 300000
+; What `settings-folder remove` printed and its exit code, when it did not end with 0.
+!define THE_SETTINGS_NOT_REMOVED "$TEMP\${PRODUCT_FILENAME}-settings-not-removed.txt"
+; The uninstaller's exit code when it removed the program and not all of the settings it was asked to remove.
+!define THE_SETTINGS_LEFT 3
 
 ; The processes whose program is in the folder, by the path of the program itself (ExecutablePath) and
 ; never by words in a command line, so an editor or a shell that only names the folder is never stopped.
@@ -85,6 +103,7 @@ Page directory theFolderPagePre "" theFolderPageLeave
 Page custom theDataPage theDataPageLeave
 Page components theMapIsThere
 Page instfiles
+UninstPage custom un.theSettingsPage un.theSettingsPageLeave
 UninstPage instfiles
 
 ; The per-user folder, where the office keeps its .env and the window keeps its own files.
@@ -103,6 +122,12 @@ Var theFirstInstall
 Var theDataBox
 ; The folder for which theMapIsThere last decided whether the office map's part is ticked.
 Var theMapDecidedFor
+; The uninstaller's: "remove" when the settings are to be removed, and "keep" when they stay.
+Var theSettings
+; The uninstaller page's box.
+Var theSettingsBox
+; "yes" when `settings-folder remove` did not end with 0.
+Var theSettingsLeft
 
 ; The components page's words: what the office map is and where it is switched on, above the list, and what
 ; unticking it does, beside the list.
@@ -626,11 +651,122 @@ Section "-the window"
   ${EndIf}
 SectionEnd
 
+; What the uninstaller knows before its page: the per-user folder, and whether a silent uninstall keeps the
+; settings. /SETTINGS=remove says the same as giving neither, and any other value is refused before anything
+; is removed.
+Function un.onInit
+  StrCpy $thePerUserFolder "$APPDATA\${THE_DATA_FOLDER}"
+  StrCpy $theSettings "remove"
+  ${un.GetParameters} $R0
+  ClearErrors
+  ${un.GetOptions} $R0 "/SETTINGS=" $R1
+  ${IfNot} ${Errors}
+    ${If} $R1 == "keep"
+      StrCpy $theSettings "keep"
+    ${ElseIf} $R1 != "remove"
+      !insertmacro theRefusal "The uninstaller takes /SETTINGS=keep or /SETTINGS=remove, and it was given /SETTINGS=$R1. Nothing was removed."
+    ${EndIf}
+  ${EndIf}
+FunctionEnd
+
+; The data folder the installed office names, into $theDataFolder, or empty when it cannot say, with what it
+; answered in $1. It is asked as theDataFolderInUse asks it, and only when $INSTDIR holds this product. The
+; uninstaller was written by the installer of this same office, so the answer is never an older version's,
+; and it is taken when the command ended with 0 and its first line is not empty.
+Function un.theDataFolderNamed
+  StrCpy $theDataFolder ""
+  StrCpy $1 "nothing, because $INSTDIR does not hold all of ${THE_NAME}"
+  ${If} ${FileExists} "$INSTDIR\${THE_UNINSTALLER}"
+  ${AndIf} ${FileExists} "$INSTDIR\${THE_NODE}"
+  ${AndIf} ${FileExists} "$INSTDIR\${THE_COMMAND}"
+    SetOutPath "$INSTDIR\${THE_OFFICE}"
+    nsExec::ExecToStack /TIMEOUT=${THE_ASKING_WAIT_MS} `"$INSTDIR\${THE_NODE}" "$INSTDIR\${THE_COMMAND}" data-folder where`
+    Pop $1
+    Pop $2
+    SetOutPath "$TEMP"
+    ; The first line, up to the first end of a line.
+    StrCpy $R0 0
+    ${Do}
+      StrCpy $R1 $2 1 $R0
+      ${If} $R1 == ""
+      ${OrIf} $R1 == "$\r"
+      ${OrIf} $R1 == "$\n"
+        ${ExitDo}
+      ${EndIf}
+      IntOp $R0 $R0 + 1
+    ${Loop}
+    ${If} $1 == 0
+    ${AndIf} $R0 > 0
+      StrCpy $theDataFolder $2 $R0
+    ${EndIf}
+  ${EndIf}
+FunctionEnd
+
+; THE UNINSTALLER'S PAGE: one box, ticked at first, that also removes the settings, and a line that names the
+; data folder, which is not removed either way. When the installed office cannot say where its data is, the
+; settings are kept, and the box is unticked and cannot be ticked.
+Function un.theSettingsPage
+  Call un.theDataFolderNamed
+  nsDialogs::Create 1018
+  Pop $R0
+  ${If} $R0 == error
+    !insertmacro theRefusal "The uninstaller could not show the page that asks whether to remove ${THE_NAME}'s settings. Nothing was removed."
+  ${EndIf}
+  ${NSD_CreateCheckBox} 0 0 100% 30u "Also remove ${THE_NAME}'s settings: saved keys, the .env and its backups, and the window's caches. They are in $thePerUserFolder."
+  Pop $theSettingsBox
+  ${If} $theDataFolder == ""
+    StrCpy $theSettings "keep"
+    EnableWindow $theSettingsBox 0
+    ${NSD_CreateLabel} 0 36u 100% 60u "The settings in $thePerUserFolder will be kept, because the uninstaller cannot tell where ${THE_NAME}'s data is. The installed ${THE_NAME} answered $1."
+    Pop $R0
+  ${Else}
+    ${If} $theSettings == "remove"
+      ${NSD_Check} $theSettingsBox
+    ${EndIf}
+    ${NSD_CreateLabel} 0 36u 100% 60u "${THE_NAME}'s data is in $theDataFolder. It is not removed, whether the box is ticked or not. If the .env names that folder, the .env keeps that one line, and no key, so that ${THE_NAME} finds the data if it is installed again."
+    Pop $R0
+  ${EndIf}
+  nsDialogs::Show
+FunctionEnd
+
+; Leaving the page keeps the settings when the box is not ticked.
+Function un.theSettingsPageLeave
+  ${NSD_GetState} $theSettingsBox $R0
+  ${If} $R0 == ${BST_CHECKED}
+    StrCpy $theSettings "remove"
+  ${Else}
+    StrCpy $theSettings "keep"
+  ${EndIf}
+FunctionEnd
+
 Section "Uninstall"
   SetShellVarContext current
   Call un.theStop
   ${If} $0 != "stopped"
     !insertmacro theRefusal "$0 Nothing was removed."
+  ${EndIf}
+
+  ; THE SETTINGS, by the office's own command, while the shipped Node is still in the folder. When the command
+  ; does not end with 0, the program is still removed, and the uninstaller ends with THE_SETTINGS_LEFT. The file
+  ; of an earlier run is deleted first, so a file there afterwards was written by this one.
+  StrCpy $theSettingsLeft "no"
+  Delete "${THE_SETTINGS_NOT_REMOVED}"
+  ${If} $theSettings == "remove"
+    SetOutPath "$INSTDIR\${THE_OFFICE}"
+    nsExec::ExecToStack /TIMEOUT=${THE_REMOVING_WAIT_MS} `"$INSTDIR\${THE_NODE}" "$INSTDIR\${THE_COMMAND}" settings-folder remove`
+    Pop $1
+    Pop $2
+    SetOutPath "$TEMP"
+    DetailPrint "$2"
+    ${If} $1 != 0
+      StrCpy $theSettingsLeft "yes"
+      FileOpen $3 "${THE_SETTINGS_NOT_REMOVED}" w
+      FileWrite $3 "Not all of ${THE_NAME}'s settings in $thePerUserFolder were removed.$\r$\nIt answered: $1$\r$\nIt printed:$\r$\n$2$\r$\n"
+      FileClose $3
+      MessageBox MB_OK|MB_ICONEXCLAMATION "Not all of ${THE_NAME}'s settings in $thePerUserFolder were removed (it answered $1). It said: $2 The program is removed now." /SD IDOK
+    ${EndIf}
+  ${Else}
+    DetailPrint "${THE_NAME}'s settings stay in $thePerUserFolder."
   ${EndIf}
 
   ; Each Run value that starts this folder's window, as Electron writes it ("<exe>", perhaps with
@@ -678,4 +814,7 @@ Section "Uninstall"
     !insertmacro theRefusal "Some of $INSTDIR could not be removed, so ${THE_NAME} stays in Installed apps."
   ${EndIf}
   DeleteRegKey HKCU "${THE_UNINSTALL_KEY}"
+  ${If} $theSettingsLeft == "yes"
+    SetErrorLevel ${THE_SETTINGS_LEFT}
+  ${EndIf}
 SectionEnd

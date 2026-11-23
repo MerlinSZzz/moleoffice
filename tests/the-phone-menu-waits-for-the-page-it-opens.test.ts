@@ -3,6 +3,7 @@
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
+import type { Locator } from 'playwright'
 import { putTheMadeUpLabelIn } from './the-made-up-label-above-the-page.ts'
 import { familyPath, pathFor } from '../src/web/components/router.tsx'
 import { liveApp, waitForThePage, type LiveApp } from './helpers.ts'
@@ -14,6 +15,9 @@ import { liveApp, waitForThePage, type LiveApp } from './helpers.ts'
 let app:LiveApp
 beforeAll(async()=>{app=await liveApp({name:'phone-menu-page-wait',viewport:{width:390,height:844},theDevServerBecause:'The phone navigation wait is checked before the production build.'})},240_000)
 afterAll(async()=>{await app?.stop()})
+// THE LIGHT IS PUT ON THE PAGE FIRST AND PLACED AROUND MENU AT THE NEXT FRAME, so a case that looks once, as soon as the
+// light is counted, can find it where it was put and not yet where it is drawn. Every case asks again until it is placed.
+const theLightIsOverMenu=async(light:Locator,menu:Locator)=>{const frame=await light.boundingBox(),button=await menu.boundingBox();return frame!==null&&button!==null&&button.x+button.width/2>=frame.x&&button.x+button.width/2<=frame.x+frame.width&&button.y+button.height/2>=frame.y&&button.y+button.height/2<=frame.y+frame.height}
 for(const reduced of [false,true]) it(`keeps one ${reduced?'still':'travelling'} light on Menu until the chosen page answers`,async()=>{
   const films=process.env.W13Y_MENU_FILMS,theme=process.env.W13Y_MENU_THEME==='dark'?'dark':'light'
   if(films)mkdirSync(films,{recursive:true})
@@ -35,10 +39,7 @@ for(const reduced of [false,true]) it(`keeps one ${reduced?'still':'travelling'}
     const lights=page.locator('canvas[data-wait-light]')
     await expect.poll(()=>lights.count(),{timeout:10_000}).toBe(1)
     const light=lights.first()
-    await expect.poll(async()=>{
-      const frame=await light.boundingBox(),button=await menu.boundingBox()
-      return frame!==null&&button!==null&&button.x+button.width/2>=frame.x&&button.x+button.width/2<=frame.x+frame.width&&button.y+button.height/2>=frame.y&&button.y+button.height/2<=frame.y+frame.height
-    },{timeout:10_000}).toBe(true)
+    await expect.poll(()=>theLightIsOverMenu(light,menu),{timeout:10_000}).toBe(true)
     const sample=()=>light.evaluate(element=>{const canvas=element as HTMLCanvasElement;return Array.from(canvas.getContext('2d')!.getImageData(0,0,canvas.width,canvas.height).data)})
     const first=await sample()
     const lap=await page.evaluate(()=>{const word=getComputedStyle(document.documentElement).getPropertyValue('--motion-lap').trim();return parseFloat(word)*(word.endsWith('ms')?1:1000)})
@@ -77,8 +78,7 @@ it('ends the Menu light as a failure when the chosen page cannot be read',async(
     await page.locator(`.shell-side a[href="#${familyPath('notes')}"]`).first().click()
     await expect.poll(()=>held,{timeout:30_000}).toBe(true)
     await expect.poll(()=>page.locator('canvas[data-wait-light]').count(),{timeout:10_000}).toBe(1)
-    const lightBox=await page.locator('canvas[data-wait-light]').first().boundingBox(),menuBox=await menu.boundingBox()
-    expect(lightBox!==null&&menuBox!==null&&menuBox.x+menuBox.width/2>=lightBox.x&&menuBox.x+menuBox.width/2<=lightBox.x+lightBox.width&&menuBox.y+menuBox.height/2>=lightBox.y&&menuBox.y+menuBox.height/2<=lightBox.y+lightBox.height).toBe(true)
+    await expect.poll(()=>theLightIsOverMenu(page.locator('canvas[data-wait-light]').first(),menu),{timeout:10_000}).toBe(true)
     release()
     await page.locator('.px-error').first().waitFor({timeout:30_000})
     const quick=await page.evaluate(()=>{const value=getComputedStyle(document.documentElement).getPropertyValue('--motion-quick').trim();return parseFloat(value)*(value.endsWith('ms')?1:1000)})
@@ -100,8 +100,7 @@ it('waits for a page that uses a plain status line instead of loading rows',asyn
     await row.click()
     await expect.poll(()=>held,{timeout:30_000}).toBe(true)
     await expect.poll(()=>page.locator('canvas[data-wait-light]').count(),{timeout:10_000}).toBe(1)
-    const lightBox=await page.locator('canvas[data-wait-light]').first().boundingBox(),menuBox=await menu.boundingBox()
-    expect(lightBox!==null&&menuBox!==null&&menuBox.x+menuBox.width/2>=lightBox.x&&menuBox.x+menuBox.width/2<=lightBox.x+lightBox.width&&menuBox.y+menuBox.height/2>=lightBox.y&&menuBox.y+menuBox.height/2<=lightBox.y+lightBox.height).toBe(true)
+    await expect.poll(()=>theLightIsOverMenu(page.locator('canvas[data-wait-light]').first(),menu),{timeout:10_000}).toBe(true)
     release()
     await page.locator('.gq-title').waitFor({timeout:30_000})
     await expect.poll(()=>page.locator('canvas[data-wait-light]').count(),{timeout:10_000}).toBe(0)

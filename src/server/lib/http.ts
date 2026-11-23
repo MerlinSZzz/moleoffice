@@ -45,7 +45,7 @@ import {
   CREDENTIAL_HEADER,
   START_DIRECTORY_HEADER,
 } from '../../config/visitor-headers.mjs'
-import { KEY_HEADER } from '../../config/key-header.mjs'
+import { DEVICE_HALF_HEADER, KEY_HEADER } from '../../config/key-header.mjs'
 import { SEAL_READ_HEADER } from '../../config/seal-read-header.mjs'
 import { ACTOR_TYPES, type ActorType, type Change, type ChangeOp, type RecordOrigin } from '@shared/types.ts'
 import { DEFAULT_WORKSPACE } from '@shared/workspaces.ts'
@@ -235,6 +235,12 @@ const READ_HEADER_NAMES: readonly string[] = [
   // exists, and the stake is as high as the credential's: `x-mole-office-ky` unread is a request
   // that proved nothing while looking like one that proved itself.
   KEY_HEADER,
+  // THE HEADER HALF OF A BROWSER'S DEVICE KEY, which a paired page sends on every call beside the cookie half
+  // (src/config/key-header.mjs). On this list for the reason the list exists, and so that it is read at all: off it,
+  // every call a paired browser made was refused here as a misspelt header. Its value is half of a key and is kept as
+  // the key's is: it is read only where the two halves are joined into a key
+  // (src/server/db/the-key-on-this-request-was-made-for-a-run.ts), and neither refusal on this list prints a value.
+  DEVICE_HALF_HEADER,
   // A CHECK'S READ JUST BEFORE ITS VERDICT, of a git seal from its sealed commit (src/config/seal-read-header.mjs). On
   // the list so that it is read at all: every other x-mole-office name is refused here.
   SEAL_READ_HEADER,
@@ -578,9 +584,10 @@ export type WhatActorFromAsks = { proveOwnRun?: true; whoOnly?: true; runKeyFor?
  */
 const A_KEYS_RUN_IS_THE_RUN_IT_HOLDS =
   `A write may name a run in ${ACTOR_HEADERS.session} only when the key it carries holds that run: the run the key was ` +
-  `made for, a run its holder started that the key acts for, or, for an agent's own key, a running session that ` +
-  `serves the agent, ran as it, or was filed by the agent for itself and serves no other agent. The office's key and ` +
-  `the person's own keys name any run.`
+  `made for, or a run its holder started that the key acts for. An agent's own key holds a running session that ` +
+  `serves the agent, ran as it, or was filed by the agent for itself and serves no other agent. A dispatched run's ` +
+  `key holds the newest session the office's key filed for that run, while the run is claimed or running. The ` +
+  `office's key and the person's own keys name any run.`
 
 /**
  * THE REQUESTS WHOSE DOOR PROVES THE CALLER'S OWN RUN. A door that reads its caller with `proveOwnRun` refuses, in its
@@ -631,18 +638,6 @@ function refuseASessionHeaderTheKeyDoesNotHold(req: FastifyRequest, session: str
       undefined,
       undefined,
       'A request with no key may not name a run at a door to a key.',
-    )
-  }
-  if (made.is === 'a-dispatched-runs-key') {
-    throw new PanelError(
-      `${ACTOR_HEADERS.session} names "${session}". This key was made for a dispatched agent run, which ` +
-        `tools/agent-worker.mjs serves. That tool's writes cannot be tied to its run until problem J60KF9L_OR-X is ` +
-        `fixed, so a write with this key may not name a run in ${ACTOR_HEADERS.session}. Stop, and tell the person ` +
-        `who started the tool. Nothing was written.`,
-      403,
-      undefined,
-      undefined,
-      "A dispatched run's key may not name a run yet.",
     )
   }
   throw new PanelError(
@@ -1054,9 +1049,12 @@ function theActThisRouteIsGatedAs(req: FastifyRequest): ReturnType<typeof operat
 
 /**
  * THE DOORS A CALLER WITH NO KEY USES TO GET ONE, by the operation each declares. After the close
- * every other write needs a key, and these four doors are how a caller comes to hold one:
+ * every other write needs a key, and these five doors are how a caller comes to hold one:
  *
- *   - `office.pair`: POST /api/office/pairing, the loopback press that sets their key as a cookie.
+ *   - `office.pair`: POST /api/office/pairing, the loopback press that gives a browser a device key in two halves.
+ *   - `office.move-pairing`: POST /api/office/pairing/move, where a browser that sent the old cookie, which held a
+ *     whole key, moves once to two halves. The old key is the proof, and the door reads it itself, because the old
+ *     cookie is no key anywhere else.
  *   - `office.issue-credential`: POST /api/office/pairing/ask, where a browser on a trusted machine
  *     asks for their key, and POST /api/office/visitors, where a visitor asks for a credential. Each
  *     is confirmed by the person before the key it binds proves anybody.
@@ -1069,7 +1067,7 @@ function theActThisRouteIsGatedAs(req: FastifyRequest): ReturnType<typeof operat
  *
  * Refusing these for want of a key would leave no way to a key but a terminal.
  */
-const THE_DOORS_TO_A_KEY: readonly string[] = ['office.pair', 'office.issue-credential', 'agent.register-myself']
+const THE_DOORS_TO_A_KEY: readonly string[] = ['office.pair', 'office.move-pairing', 'office.issue-credential', 'agent.register-myself']
 
 /**
  * AFTER THE CLOSE, A WRITE A LISTENER CARRIED WITH NO KEY IS REFUSED. Criterion P83, points 1 and 6.
@@ -1097,7 +1095,7 @@ function refuseAKeylessWriteAfterTheClose(req: FastifyRequest, actor: Actor, win
    * THE REGISTRATION DOOR TAKES ONLY AN AGENT'S NAME. It is the one door to a key that writes a row
    * under the caller's actor: its waiting row. A keyless request in the person's name, or in nobody's,
    * is the person's claim, so that row would be written as their act (an inspector's refusal of 26
-   * September 2026). The two pairing doors write no row under the actor,
+   * September 2026). The pairing doors and the move door write no row under the actor,
    * so every claim still passes them.
    */
   if (operation?.name === 'agent.register-myself' && actor.type !== 'agent') {
@@ -1114,11 +1112,21 @@ function refuseAKeylessWriteAfterTheClose(req: FastifyRequest, actor: Actor, win
 }
 
 /**
- * THE DOORS A REQUEST THAT NOBODY PROVED MAY STILL REACH: the three doors to a key above, and the pairing page's read,
+ * THE DOORS A REQUEST THAT NOBODY PROVED MAY STILL REACH: the doors to a key above, and the pairing page's read,
  * which tells a browser whether it holds their key and how to get it. Refusing that read would leave an unpaired
  * browser no page that says what to do.
  */
 const THE_DOORS_NOBODY_NEEDS_A_KEY_FOR: readonly string[] = [...THE_DOORS_TO_A_KEY, 'office.pairing']
+
+/**
+ * WHETHER THIS REQUEST'S ROUTE IS ONE OF THE DOORS ABOVE. lib/keyheader.ts asks it too: a browser holding one half of a
+ * device key, or two halves this office has no record of, still reaches the pairing page's read and the press, which
+ * give it two new halves.
+ */
+export function aDoorNobodyNeedsAKeyFor(req: FastifyRequest): boolean {
+  const operation = theActThisRouteIsGatedAs(req)
+  return operation !== undefined && THE_DOORS_NOBODY_NEEDS_A_KEY_FOR.includes(operation.name)
+}
 
 /** A read can distinguish this refusal without changing the response sent by other doors. */
 export class UnprovedIdentityError extends PanelError {}
@@ -1143,8 +1151,7 @@ export class UnprovedIdentityError extends PanelError {}
  * for that case after the write refusal.
  */
 function refuseARequestNobodyProved(req: FastifyRequest, actor: Actor): void {
-  const operation = theActThisRouteIsGatedAs(req)
-  if (operation !== undefined && THE_DOORS_NOBODY_NEEDS_A_KEY_FOR.includes(operation.name)) return
+  if (aDoorNobodyNeedsAKeyFor(req)) return
   if (actor.type === 'agent') {
     throw new UnprovedIdentityError(
       theRefusalForARequestNobodyProved(whatThisRequestShowed(actor, req)),
@@ -1263,8 +1270,8 @@ export function actorFrom(req: FastifyRequest, options?: WhatActorFromAsks): Act
   if (supplied.length === 0) {
     /**
      * A KEY WITH NO ACTOR HEADERS IS STILL A PROOF. The local app holds the person's key and may
-     * send nothing else, and the pairing cookie arrives on requests whose JavaScript sets no actor
-     * header at all. The key decides the identity; the headers were only ever attribution.
+     * send nothing else, and a paired page may send its two halves with no actor header at all. The
+     * key decides the identity; the headers were only ever attribution.
      */
     if (proof !== undefined) {
       const keyed = proof.how === 'the-person-key'
@@ -1482,8 +1489,8 @@ export function actorFrom(req: FastifyRequest, options?: WhatActorFromAsks): Act
    * AND A REQUEST THAT NAMES THE PERSON WITH NO KEY IS THE PERSON ONLY WHERE A REQUEST THAT NAMES NOBODY WOULD BE: while the open key
    * window covers it and this computer's own program sent it. Any other such request is refused with the same
    * sentence, which says what to send; the doors to a
-   * key still pass, so an unpaired browser can still pair. Their page names them on every fetch and carries the pairing
-   * cookie once paired, and the cookie is a key, so a paired page never reaches this. Not asked where no listener
+   * key still pass, so an unpaired browser can still pair. Their page names them on every fetch and carries both halves
+   * of its device key once paired, and the two halves are a key, so a paired page never reaches this. Not asked where no listener
    * carried the request: a call inside the office's own program is the office itself (P83 point 1).
    */
   if (

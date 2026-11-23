@@ -5,7 +5,7 @@ import { afterAll, beforeAll, expect, it } from 'vitest'
 import { createI18n } from '../src/shared/i18n.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { englishWords } from '../src/shared/words/joined.ts'
-import { liveApp, waitForThePage, type LiveApp } from './helpers.ts'
+import { liveApp, waitForThePage, type LiveApp, governsTheWholeProject } from './helpers.ts'
 import { putTheMadeUpLabelIn } from './the-made-up-label-above-the-page.ts'
 
 let app: LiveApp
@@ -19,7 +19,8 @@ beforeAll(async () => {
   const agent = (await registered.json() as { agent: { id: string } }).agent.id
   const named = await fetch(`${app.api}/api/office/dead-letter-secretary`, { method: 'POST', headers, body: JSON.stringify({ agent }) })
   expect(named.status).toBe(200)
-  const decision = await fetch(`${app.api}/api/records`, { method: 'POST', headers, body: JSON.stringify({ kind: 'decision', title: 'Made-up summary thresholds', data: { replaces: [] } }) })
+  const decision = await fetch(`${app.api}/api/records`, { method: 'POST', headers, body: JSON.stringify({ kind: 'decision', title: 'Made-up summary thresholds', data: {
+    ...governsTheWholeProject(), replaces: [] } }) })
   expect(decision.status).toBe(201)
   await app.page.addInitScript(({ person }) => {
     localStorage.setItem('mole-office.actor', JSON.stringify({ type: 'human', id: person }))

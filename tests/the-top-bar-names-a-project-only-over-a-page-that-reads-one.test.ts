@@ -82,7 +82,7 @@ it('accepts Flows into Developer, names no project over it, and names the projec
   await open(page, 'all-pages', 'light', 'inspect')
   await placed(page, 'flows', 'developer')
   await open(page, 'flows', 'light', 'inspect')
-  expect(await bar(page)).toEqual({ page: 'Flows', project: null })
+  expect(await bar(page)).toEqual({ page: 'Office flows', project: null })
   // The control: a page that reads one project names it, so a bar that names nothing anywhere cannot pass.
   await open(page, 'modules')
   await expect.poll(() => bar(page), { timeout: 20_000 }).toEqual({ page: 'Modules', project: PROJECT.title })

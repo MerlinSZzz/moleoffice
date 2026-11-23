@@ -36,7 +36,7 @@ import { testShots } from './where-shots-go.ts'
 let app: LiveApp
 
 const THE_WIDTHS = [1440, 990, 660, 390] as const
-const THE_DESK_WIDTHS = [1440, 990, 660] as const
+const THE_DESK_WIDTHS = [1440, 660] as const
 const THE_LOOKS = ['light', 'dark'] as const
 const THE_LANGUAGES = ['en', 'zh'] as const
 

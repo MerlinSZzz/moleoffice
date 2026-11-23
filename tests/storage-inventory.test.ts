@@ -117,8 +117,8 @@ it('retains categories in SQLite backups and explicitly omits inventory from rea
     lib.registerStorageFile(backup, { path: 'report-files/after-restore.txt', category: 'text', bytes: 7, fingerprint: 'new-bytes' })
     expect(lib.readStorageCategories(backup).categories.find(row => row.category === 'text')!.bytes).toBe(total('text').bytes + 7)
   } finally { backup.close() }
-  const schema = await import('../src/server/db/schema.ts')
-  expect(schema.everyPartTable().filter(part => sourceTables.includes(part.name)).every(part => !part.says.exported && part.says.restore === 'may be lost')).toBe(true)
+  const { everyPartTable } = await import('../src/server/db/every-part-table.ts')
+  expect(everyPartTable().filter(part => sourceTables.includes(part.name)).every(part => !part.says.exported && part.says.restore === 'may be lost')).toBe(true)
   const exporter = await import('../src/server/lib/export.ts')
   expect(exporter.EXPORTED_REGIONS.some(region => sourceTables.includes(region))).toBe(false)
   exporter.writeExport(archive)

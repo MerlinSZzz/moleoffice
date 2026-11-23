@@ -97,6 +97,7 @@ describe('the sidebar as it was asked for, in a browser', () => {
     // The rest of round 14's rows keep their order under All projects on All pages. Words for you to confirm joined
     // after Decisions on 10 October 2026, and Flows after Checklists in wave 13p round 35. Checklists now stands in
     // front, so Flows follows Counters here.
+    // Test change (wave 13u round 242, package KN-1): Knowledge joined after Flows, the one new row the knowledge page's drawing drew.
     await page.evaluate(() => { location.hash = '#/all-pages' })
     const all = page.locator('#main .ap-group[data-group="all"]')
     await all.waitFor({ timeout: 30_000 })
@@ -109,7 +110,8 @@ describe('the sidebar as it was asked for, in a browser', () => {
       'Plans',
       'Goals',
       'Counters',
-      'Flows',
+      'Office flows',
+      'Knowledge',
       'Context bundles',
       'All records',
     ])
@@ -176,7 +178,7 @@ describe('the sidebar as it was asked for, in a browser', () => {
       { text: '', name: en.t('settingsPanel.look.dark'), hover: en.t('sidebarFeedback.lookDark') },
     ])
     // Settings shows its word beside its icon, and its hover word says what the page is for, as every row's does.
-    // Since wave 13p's keyboard shortcuts the hover word may end with the key that opens it, "(g s)".
+    // Since wave 13p's keyboard shortcuts the hover word may end with the key that opens it, "(Alt+G)".
     expect(await page.locator('.sbp-settings .shell-label').textContent()).toBe('Settings')
     const hover = await page.locator('.sbp-settings').getAttribute('title')
     expect(hover?.replace(/ \(.+\)$/, '')).toBe(en.t('nav.what.settings'))

@@ -160,6 +160,8 @@ describe('a worker whose task is released is retired, with the reason', () => {
     const rows = t.client.sqlite
       .prepare('SELECT actor_type AS kind, actor_id AS id FROM changes WHERE record_id = ? ORDER BY rowid DESC LIMIT 1')
       .get(record.id) as { kind: string; id: string }
-    expect(rows.kind, 'the retirement was filed in a person"s name').toBe('system')
+    // THE PRODUCT'S OWN WRITER OF AGENT RECORDS, which every way of retiring an agent goes through.
+    const { THE_OFFICE_WRITER_ID } = await import('../src/shared/participants.ts')
+    expect(rows, 'the retirement was filed in a person"s name').toEqual({ kind: 'agent', id: THE_OFFICE_WRITER_ID })
   })
 })

@@ -37,7 +37,7 @@
  * opened a drawing when the lanes draw the pipeline's two steps as cards, and no longer by the canvas.
  *
  * A MUTATION THAT TURNS IT RED: make the `lanes` memo in src/web/pages/PipelinePage.tsx return null.
- * The address changes and the page draws no card, and the second case goes red in both themes.
+ * The address changes and the page draws no card, and the second case goes red.
  */
 import { THE_TEST_OFFICES_OWNER } from './a-page-of-a-test-office.ts'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
@@ -100,7 +100,7 @@ async function theWaysIn(id: string): Promise<{ words: string; inTheHead: boolea
   }, id)
 }
 
-for (const theme of ['light', 'dark'] as const) {
+for (const theme of ['light'] as const) {
   describe(`a pipeline's record page, in ${theme}`, () => {
     it('carries one press to its drawing, in the head', async () => {
       await app.page.emulateMedia({ colorScheme: theme })

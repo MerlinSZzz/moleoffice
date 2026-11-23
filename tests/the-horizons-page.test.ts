@@ -361,24 +361,26 @@ describe('the page draws every state, empty ones in words', () => {
 // ============================================================================ the confirm press
 
 describe('the confirm press is the person’s alone (criterion P1)', () => {
-  it('draws the mark and the press beside it when the reader is the person', async () => {
+  // CRITERION CHANGE, as decided: the sentence under the heading is gone, so each case reads the
+  // heading's own words, which differ by reader in the same way.
+  it('draws Needs you and the press beside it when the reader is the person', async () => {
     setActor({ type: 'human', id: THE_TEST_OFFICES_OWNER.id })
     const markup = await drawingWithAnAgentsGoal()
-    expect(markup).toContain('An agent filed each goal here. You have not confirmed it yet.')
+    expect(markup).toContain(`<span>${sayInEnglish('goals.needsYou')}</span>`)
     expect(markup).toContain('Confirm this goal')
   })
 
-  it('draws the mark and no press when the reader is an agent', async () => {
+  it('draws Waiting for the person and no press when the reader is an agent', async () => {
     setActor({ type: 'agent', id: THE_TEST_OFFICES_SECRETARY.handle } satisfies WebActor)
     const markup = await drawingWithAnAgentsGoal()
-    expect(markup).toContain('An agent filed each goal here. The person has not confirmed it yet.')
+    expect(markup).toContain(`<span>${sayInEnglish('goals.waitingForThePerson')}</span>`)
     expect(markup).not.toContain('Confirm this goal')
   })
 
-  it('draws no mark and no press on a goal the person filed or has confirmed', async () => {
+  it('draws no Needs you and no press on a goal the person filed or has confirmed', async () => {
     setActor({ type: 'human', id: THE_TEST_OFFICES_OWNER.id })
     const plain = await drawing()
-    expect(plain).not.toContain('An agent filed each goal here.')
+    expect(plain).not.toContain(`<span>${sayInEnglish('goals.needsYou')}</span>`)
     expect(plain).not.toContain('Confirm this goal')
   })
 })

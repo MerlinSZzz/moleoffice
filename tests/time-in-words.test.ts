@@ -43,6 +43,7 @@ import {
   type HoursCountedTwice,
 } from '../src/shared/planning.ts'
 import { ALLOCATABLE_KINDS } from '../src/shared/work.ts'
+import { sayInEnglish, t } from '../src/shared/i18n.ts'
 import type {
   AllocationWithWork,
   PlanningIntent,
@@ -313,17 +314,12 @@ describe('words somebody wrote about time, kept where they can be found again', 
     expect(markup).not.toContain('Nothing has been scheduled from these words.')
   })
 
-  it('says in so many words that none of these is in any total', () => {
+  it('marks the kept words as not on the plan and in no total', () => {
     // THE LOAD-BEARING HALF OF THE EIGHTH RULE. A kept intent adds to no week and uses no capacity,
     // and a surface that left the reader to infer that from how the row is drawn is claiming less
     // than it must.
-    //
-    // AND THE SECOND SENTENCE IS THE OTHER HALF. Without it, "nothing came from these words" beside
-    // a week that has hours reads as one of the two being wrong. Neither is.
     const markup = keptList([intent()])
-    expect(markup).toContain('Nothing on the plan came from these words')
-    expect(markup).toContain('in no total')
-    expect(markup).toContain('The work they name may still have hours, given some other way.')
+    expect(markup).toContain(sayInEnglish('schedule.keptNotOnPlan'))
   })
 
   it('shows an interpretation beside the words and never instead of them', () => {
@@ -385,7 +381,10 @@ describe('words somebody wrote about time, kept where they can be found again', 
     // here as well would put the same hours in two places on one screen.
     const markup = keptList([intent({ said: 'sometime next week' })], { committed: 2 })
     expect(markup).toContain('sometime next week')
-    expect(markup).toContain('2 more have been scheduled')
+    // CRITERION CHANGE, as decided: the count comes back as short words, after the line that says
+    // the kept words are not on the plan. The sentence that carried it is gone.
+    expect(markup).toContain(t('schedule.scheduledCount', { n: 2 }))
+    expect(markup).not.toContain('more have been scheduled')
   })
 
   it('draws nothing at all when nothing is waiting', () => {
@@ -514,7 +513,7 @@ describe('parts that come to more than the work holding them', () => {
     // than a list item — weight in proportion to whether somebody has to act.
     const drawn = insideNote(week({ parent: 10, first: 8, second: 5 }, false))
     expect(drawn).toContain('Parts add up to more than the work holding them.')
-    expect(drawn.indexOf('Parts add up to more')).toBeLessThan(drawn.indexOf('planned at two levels'))
+    expect(drawn.indexOf('Parts add up to more')).toBeLessThan(drawn.indexOf(sayInEnglish('schedule.rowsAddUp', { rows: 23 })))
     expect(drawn).toContain('px-pl-inside-clash')
     expect(drawn).toContain('<strong>')
   })

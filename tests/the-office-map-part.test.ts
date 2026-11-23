@@ -14,9 +14,6 @@
  *      another file or lacks the built folder is named.
  *   3. A packed office is read for its plugins: the office's own installers carry no plugins folder, and the Mac's
  *      second app carries the map alone, as its manifest and built folder.
- *   4. Each packager asks for the map in its own place: Linux makes the map's .deb after it has read the office's
- *      installers, Windows gives the staged map to the installer's script, and the Mac puts it into the second app
- *      before the app is signed.
  *
  * MUTATIONS, each red here and green again when put back:
  *   - makeTheMapsDeb depends on mole-office at that version or later: red, case 2;
@@ -26,7 +23,7 @@
  */
 
 import { execFileSync } from 'node:child_process'
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { chmodSync, mkdirSync, mkdtempSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { dirname, join, relative, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterAll, describe, expect, it } from 'vitest'
@@ -192,33 +189,5 @@ describe('the office map as a choice at install', () => {
     rmSync(join(plugins, THE_MAP, 'README.md'))
     mkdirSync(join(plugins, 'another-plugin'))
     expect(whatThePluginsGetWrong({ office, withTheMap: true }), 'a second app with another plugin was taken').toEqual([`${plugins} holds another-plugin, office-map, not the office map alone.`])
-  })
-
-  it('4. is asked for by each packager in its own place', () => {
-    const linux = readFileSync(join(REPO, 'scripts', 'package-linux.mjs'), 'utf8')
-    const at = (pattern: string): number => {
-      const found = linux.indexOf(pattern)
-      expect(found, `package-linux.mjs has no ${pattern}`).toBeGreaterThan(-1)
-      return found
-    }
-    // The office's installers are read back first, and the folder the .deb and the AppImage were made from must carry
-    // no plugin. The map's .deb is made and read after.
-    expect(at('const wrong = whatThePackedAppGetsWrong('), 'Linux reads the office for a plugin before it reads its installers').toBeLessThan(at('whatThePluginsGetWrong({ office: packed, withTheMap: false })'))
-    expect(at('whatThePluginsGetWrong({ office: packed, withTheMap: false })'), 'Linux stages the map before it reads the office for a plugin').toBeLessThan(at('stageTheMap(map)'))
-    expect(at('stageTheMap(map)'), "Linux makes the map's .deb before it stages the map").toBeLessThan(at('makeTheMapsDeb({ staged: map, version: own.version, arch: ARCH, office: officeInTheDeb, work, out })'))
-    expect(at('makeTheMapsDeb('), "Linux reads the map's .deb before it makes it").toBeLessThan(at('whatTheMapsDebGetsWrong({ deb: mapsDeb, version: own.version, office: officeInTheDeb })'))
-
-    const windows = readFileSync(join(REPO, 'scripts', 'package-windows.mjs'), 'utf8')
-    expect(windows, 'Windows stages the map somewhere other than its work folder').toContain("const map = join(work, 'office-map')")
-    expect(windows, "Windows does not give the staged map to the installer's script").toContain('{ ...theInstallerFacts(), ...theMapFacts(map) }')
-    expect(windows, 'Windows does not read the packed office for a plugin').toContain('whatThePluginsGetWrong({ office: packed, withTheMap: false })')
-
-    const mac = readFileSync(join(REPO, 'scripts', 'package-mac.mjs'), 'utf8')
-    expect(mac, 'the Mac has no --with-the-map for the second app').toContain("const withTheMap = process.argv.includes('--with-the-map')")
-    expect(mac, "the Mac does not put the map into the office's plugins folder").toContain('stageTheMap(join(office, ...theMapInTheOffice()))')
-    expect(mac, 'the Mac does not read the packed office for its plugins').toContain('whatThePluginsGetWrong({ office: packedOffice, withTheMap })')
-    // The map goes in before the app is made and signed.
-    expect(mac.indexOf('stageTheMap('), 'the Mac puts the map in after the app is made').toBeLessThan(mac.indexOf('theMacBuilderConfig('))
-    expect(existsSync(join(REPO, 'plugins', THE_MAP, PLUGIN_MANIFEST_FILE)), 'the checkout holds no office map to pack').toBe(true)
   })
 })

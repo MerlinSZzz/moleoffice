@@ -20,7 +20,7 @@ import {
 } from '../lib/next-round.ts'
 import { recordInWorkspace, type Actor } from '../lib/records.ts'
 import { PanelError } from '../lib/panel-error.ts'
-import { route } from '../lib/route.ts'
+import { itChangesSomething, route } from '../lib/route.ts'
 import { THE_WORKER } from '@shared/the-worker-actor.ts'
 import { workspaceOf } from '../lib/workspaces.ts'
 
@@ -34,8 +34,8 @@ const ASK_NOTE =
   'inside by anybody but the asked agent; the door takes none inside. For a packages ask the office writes the brief ' +
   'and its declaration, <brief>.round.json naming the line and the packages, into the briefs folder of that sandbox, ' +
   'and the reply names the other inside packages that wait for the line. An ask that replaces a waiting ask naming ' +
-  'packages must name every one of them. The agent with its own key, its registered starter, a secretary proved by its ' +
-  'own key, or the person may ask. Refused, in words, for a retired ' +
+  'packages must name every one of them. The agent with its own key, its registered starter, its recorded leader proved ' +
+  'by its own key, a secretary proved by its own key, or the person may ask. Refused, in words, for a retired ' +
   "agent, a run already serving it, a missing brief, a sandbox that is not the agent's, and while the office starts " +
   'no message worker (off), because nothing would start it; a worker in merges-only mode starts it. The ask is kept on the ' +
   'last run as `nextRound`, with the brief as its path and sha256, and with the packages and their line when it named ' +
@@ -87,7 +87,7 @@ export async function nextRoundRoutes(app: FastifyInstance): Promise<void> {
 
   app.get(
     '/worker/rounds',
-    route('worker.rounds', 'local', { because: 'starts-work-on-this-machine', act: 'Reading the next rounds to start here' }, ROUNDS_NOTE),
+    itChangesSomething(route('worker.rounds', 'local', { because: 'starts-work-on-this-machine', act: 'Reading the next rounds to start here' }, ROUNDS_NOTE)),
     async () => ({ rounds: theRoundsToStartInEveryServedProject() }),
   )
 

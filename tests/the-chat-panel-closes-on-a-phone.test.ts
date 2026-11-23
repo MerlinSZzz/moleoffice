@@ -65,6 +65,11 @@ async function openThePanel(size: { width: number; height: number }): Promise<vo
     // DESIGN D'S DRAWN WAY BELOW THE WIDTH AT WHICH THE PAGE TURNS WIDE (THE_SHELL_WIDTH): THE TOP BAR'S CHAT PRESS, WHICH COVERS THE SCREEN WITH THE CHAT.
     await app.page.waitForSelector('.shell-bar .shell-chat-phone', { timeout: 20_000 })
     if ((await app.page.$('.px-chat')) === null) await app.page.click('.shell-bar .shell-chat-phone')
+    // THE CHAT OPENS THE WAY THE PERSON LAST HAD IT, and the corner window when nothing is kept. These cases are about
+    // the chat that covers the screen beside the page, so a window is put there by its own press.
+    await app.page.waitForSelector('.px-chat', { timeout: 20_000 })
+    if ((await app.page.$('.px-chat[data-where="corner"]')) !== null) await app.page.click('.px-chat[data-where="corner"] .px-chat-beside')
+    await app.page.waitForSelector('.px-chat[data-where="split"]', { timeout: 20_000 })
   } else {
     await openTheChat(app.page)
   }

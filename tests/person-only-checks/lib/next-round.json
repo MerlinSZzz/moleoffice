@@ -1,5 +1,5 @@
 {
   "sort": "a secretary's already",
   "checks": 1,
-  "why": "asking for an agent's next round: the person is one of four who may ask, and a secretary proved by its key may already (wave 13j round loop-2, plan 4uSoJQ5RySTw part \"doors\", D1)"
+  "why": "asking for an agent's next round: the person is one of five who may ask, beside the agent with its own key, its registered starter, its recorded leader and a secretary proved by its own key, so a secretary may already (wave 13j round loop-2, plan 4uSoJQ5RySTw part \"doors\", D1)"
 }

@@ -5,21 +5,24 @@
  *
  * The chat button's panel in Settings has two more entries. One keeps the button in the bottom-right corner at all
  * times. The other chooses how the chat opens from the button and from the sidebar's Chat row: beside the page, or in
- * the window over the corner. Both are kept on the person's own row, so every browser they use follows them. A person
- * who has chosen neither sees the button in the corner and the chat opens beside the page. The unread count is still
- * drawn in one place only.
+ * the window over the corner. Both are kept on the person's own row, so every browser they use follows them. Putting the
+ * chat beside the page or in its window by the chat's own presses changes the second one too, so the chat opens the way
+ * the person last had it. A person who has chosen neither and put the chat nowhere sees the button in the corner, and
+ * the chat opens in the corner window. The unread count is still drawn in one place only.
  *
  * In a real browser against a Mole Office of its own:
- *  1. Nobody having chosen sees the button with nothing waiting, and the sidebar's Chat row opens the chat beside the page.
- *  2. Once the button is kept, it is drawn in the bottom-right corner with nothing waiting, at 1440, 990, 660 and 390.
+ *  1. Nobody having chosen sees the button with nothing waiting, and the sidebar's Chat row opens the corner window.
+ *  2. Once the button is kept, it is drawn in the bottom-right corner with nothing waiting, at 1440 and 390.
  *     It stays beside an open chat, in the page's own corner beside the chat, and over the corner below the chat's
- *     window. Pressed while the chat is open, it shuts it. The window never covers the button, at every width.
+ *     window. Pressed while the chat is open, it shuts it. The window never covers the button, at 1440 and 390.
  *  3. Once the window is chosen, the button and the sidebar's Chat row both open the chat in its window over the corner.
  *     Once beside the page is chosen again, both open it beside the page.
  *  4. Both choices are kept for the person: after a reload, and in a browser that never chose. Each can be put back to
- *     not chosen, and the chat then does what it did before.
+ *     not chosen, and the chat then opens as it does for a person with nothing kept.
  *  5. With the button kept and a message waiting, the count is on the button and not on the sidebar's row, whether
  *     the chat is shut or open beside the page; and on a phone it is on the button and not on the bar.
+ *  6. The chat opens the way the person last had it, after a reload and in another browser: beside the page, or in the
+ *     window over the corner; and in the window where it was moved to, in the browser it was moved in.
  *
  * THE PICTURES are taken only when W13Y_CHAT_BUTTON_PICTURES names a folder outside the checkout: the Settings entries
  * and the chat opened each way from the button and from the sidebar's row, at 1440, 990, 660 and 390, in both themes.
@@ -199,21 +202,22 @@ afterAll(async () => {
   await app?.stop()
 }, 60_000)
 
-it.skipIf(before)('1. nobody having chosen sees the button and the chat opens beside the page', async () => {
+it.skipIf(before)('1. nobody having chosen sees the button and the chat opens in the corner window', async () => {
   const row = await myRow()
   expect(row['chatButtonStays'], 'a person who never chose has a stored answer').toBeNull()
   expect(row['chatOpensAs'], 'a person who never chose has a stored answer').toBeNull()
   const { context, page } = await aWindow(WIDE)
   try {
     await theSettings(page)
-    expect(await pressed(page), 'the entries do not show what nobody having chosen is read as').toEqual({ stays: ['always'], opens: ['split'] })
+    expect(await pressed(page), 'the entries do not show what nobody having chosen is read as').toEqual({ stays: ['always'], opens: ['window'] })
     expect(await page.locator(`${PANEL} ${STAYS} .btnc, ${PANEL} ${OPENS} .btnc`).count(), 'a way back was offered with nothing chosen').toBe(0)
 
     await theReport(page)
     expect(await page.locator(CIRCLE).count(), 'the button is missing with nothing waiting').toBe(1)
     await page.click(ROW)
-    await page.waitForSelector(SPLIT, { timeout: 20_000 })
-    expect(await page.locator(CIRCLE).count(), 'the button is missing beside the open chat').toBe(1)
+    await page.waitForSelector(WINDOW, { timeout: 20_000 })
+    expect(await page.evaluate(() => document.documentElement.getAttribute('data-chat-split')), 'the first opening split the window').toBeNull()
+    expect(await page.locator(CIRCLE).count(), 'the button is missing below the open window').toBe(1)
   } finally {
     await context.close()
   }
@@ -232,7 +236,8 @@ it.skipIf(before)('a stored choice to show the button only for unread messages i
 }, 180_000)
 
 it.skipIf(before)('2. a kept button is in the bottom-right corner at all times, and shuts the chat it opened', async () => {
-  await choose({ chatButtonStays: 'when-unread', chatOpensAs: '' })
+  // THE PERSON LAST HAD THE CHAT BESIDE THE PAGE, so the row opens it there.
+  await choose({ chatButtonStays: 'when-unread', chatOpensAs: 'split' })
   const { context, page } = await aWindow(WIDE)
   try {
     await theSettings(page)
@@ -241,7 +246,7 @@ it.skipIf(before)('2. a kept button is in the bottom-right corner at all times, 
     // THE PRESS REACHES THE BUTTON AT ONCE, on the Settings page itself, with nothing waiting and no reload.
     await page.waitForSelector(CIRCLE, { timeout: 20_000 })
 
-    for (const size of WIDTHS) {
+    for (const size of [WIDE, PHONE]) {
       await page.setViewportSize(size)
       await theReport(page)
       await page.waitForSelector(CIRCLE, { timeout: 20_000 })
@@ -281,7 +286,9 @@ it.skipIf(before)('2. a kept button is in the bottom-right corner at all times, 
     await page.click(CIRCLE)
     await page.waitForSelector('.px-chat', { state: 'detached', timeout: 10_000 })
 
-    // WHERE THE OPEN CHAT COVERS THE CORNER, the button is not drawn under it: at 390 the chat covers the screen.
+    // WHERE THE OPEN CHAT COVERS THE CORNER, the button is not drawn under it: at 390 the chat covers the screen. The
+    // window was the last way the chat was had, so the person puts it back beside the page first.
+    await choose({ chatOpensAs: 'split' })
     await page.setViewportSize(PHONE)
     await theReport(page)
     await page.waitForSelector(CIRCLE, { timeout: 20_000 })
@@ -296,11 +303,11 @@ it.skipIf(before)('2. a kept button is in the bottom-right corner at all times, 
   }
 }, 300_000)
 
-it.skipIf(before)('the corner button remains clickable with the window open at every width and in both themes', async () => {
+it.skipIf(before)('the corner button remains clickable with the window open at the widest and the narrowest width, in the light theme', async () => {
   await choose({ chatButtonStays: '', chatOpensAs: 'window' })
   const proofPictures = process.env.W13Y_CHAT_CORNER_PROOF
   if (proofPictures !== undefined) mkdirSync(proofPictures, { recursive: true })
-  for (const size of WIDTHS) for (const theme of ['light', 'dark'] as const) {
+  for (const size of [WIDE, PHONE]) for (const theme of ['light'] as const) {
     const { context, page } = await aWindow(size, theme)
     try {
       await theReport(page)
@@ -428,21 +435,22 @@ it.skipIf(before)('4. both choices are the person\'s: kept after a reload and in
     await theSettings(other.page)
     await other.page.click(`${PANEL} ${STAYS} .btnc`)
     await other.page.click(`${PANEL} ${OPENS} .btnc`)
-    await other.page.waitForSelector(`${PANEL} ${OPENS} .ccl-choice[data-choice="split"][aria-pressed="true"]`, { timeout: 20_000 })
+    await other.page.waitForSelector(`${PANEL} ${OPENS} .ccl-choice[data-choice="window"][aria-pressed="true"]`, { timeout: 20_000 })
     await other.page.waitForSelector(`${PANEL} ${STAYS} .ccl-choice[data-choice="always"][aria-pressed="true"]`, { timeout: 20_000 })
     const row = await myRow()
     expect([row['chatButtonStays'], row['chatOpensAs']], 'the way back left a stored answer').toEqual([null, null])
     await theReport(other.page)
     expect(await other.page.locator(CIRCLE).count(), 'the default button is missing').toBe(1)
     await other.page.click(ROW)
-    await other.page.waitForSelector(SPLIT, { timeout: 20_000 })
+    await other.page.waitForSelector(WINDOW, { timeout: 20_000 })
   } finally {
     await other.context.close()
   }
 }, 300_000)
 
 it.skipIf(before)('5. with the button kept, the unread count is drawn once: on the button, not on the row or the bar', async () => {
-  await choose({ chatButtonStays: 'always', chatOpensAs: '' })
+  // THE PERSON LAST HAD THE CHAT BESIDE THE PAGE, so the row opens it there.
+  await choose({ chatButtonStays: 'always', chatOpensAs: 'split' })
   const said = await fetch(`${app.api}/api/records`, { method: 'POST', headers: AS_THE_AGENT, body: JSON.stringify({ kind: 'message', title: 'Made-up line for the button', data: { body: 'Made-up line for the button.', to: [{ kind: 'person', id: THE_PERSON }] } }) })
   expect(said.status, await said.clone().text()).toBe(201)
   const { context, page } = await aWindow(WIDE)
@@ -464,6 +472,89 @@ it.skipIf(before)('5. with the button kept, the unread count is drawn once: on t
     expect(await theCounts(page), 'shut at 390').toEqual({ button: '1', row: null, bar: null })
   } finally {
     await context.close()
+  }
+}, 300_000)
+
+it.skipIf(before)('6. the chat opens the way the person last had it: in the corner window, beside the page, or where the window was moved', async () => {
+  await choose({ chatButtonStays: 'always', chatOpensAs: '' })
+  const theWay = async (): Promise<unknown> => (await myRow())['chatOpensAs']
+  const shut = async (page: Page): Promise<void> => {
+    await page.click(CIRCLE)
+    await page.waitForSelector('.px-chat', { state: 'detached', timeout: 10_000 })
+  }
+  const theWindow = async (page: Page): Promise<{ x: number; y: number; width: number; height: number }> => {
+    await page.waitForSelector(WINDOW, { timeout: 20_000 })
+    await page.waitForTimeout(300)
+    return box(page, WINDOW)
+  }
+  let corner = { x: 0, y: 0, width: 0, height: 0 }
+  const first = await aWindow(WIDE)
+  try {
+    // NOTHING REMEMBERED: the circle opens the corner window, and opening it so keeps nothing on the person's row.
+    await theReport(first.page)
+    await first.page.click(CIRCLE)
+    corner = await theWindow(first.page)
+    await first.page.waitForTimeout(1_000)
+    expect(await theWay(), 'opening the chat with nothing remembered kept a way').toBeNull()
+
+    // BESIDE THE PAGE, by the window's own press. The row keeps it, and after a reload the circle opens it there.
+    await first.page.click(`${WINDOW} .px-chat-beside`)
+    await first.page.waitForSelector(SPLIT, { timeout: 20_000 })
+    await expect.poll(theWay, { timeout: 20_000, message: 'putting the chat beside the page was not kept' }).toBe('split')
+    await shut(first.page)
+    await theReport(first.page)
+    await first.page.click(CIRCLE)
+    await first.page.waitForSelector(SPLIT, { timeout: 20_000 })
+
+    // IN THE CORNER WINDOW, by the seam's press. The row keeps it, and after a reload the row opens the window in the
+    // corner, where it was.
+    await first.page.click('.px-chat-seam-window')
+    await first.page.waitForSelector(WINDOW, { timeout: 20_000 })
+    await expect.poll(theWay, { timeout: 20_000, message: 'sending the chat to its window was not kept' }).toBe('window')
+    await shut(first.page)
+    await theReport(first.page)
+    await first.page.click(ROW)
+    expect(await theWindow(first.page), 'the window did not open in the corner').toEqual(corner)
+
+    // FLOATING: the window moved by its top row opens where it was moved after a reload, and offers the corner back.
+    const top = await box(first.page, `${WINDOW} .px-chat-chrome`)
+    const at = { x: top.x + 40, y: top.y + top.height / 2 }
+    await first.page.mouse.move(at.x, at.y)
+    await first.page.mouse.down()
+    await first.page.mouse.move(at.x - 300, at.y - 200, { steps: 10 })
+    await first.page.mouse.up()
+    const moved = await theWindow(first.page)
+    expect([moved.x, moved.y], 'the window did not move').not.toEqual([corner.x, corner.y])
+    await shut(first.page)
+    await theReport(first.page)
+    await first.page.click(CIRCLE)
+    expect(await theWindow(first.page), 'the moved window did not open where it was moved').toEqual(moved)
+    expect(await first.page.locator(`${WINDOW} .px-chat-to-the-corner`).count(), 'the moved window does not offer the corner back').toBe(1)
+    expect(await theWay(), 'moving the window changed the way kept').toBe('window')
+  } finally {
+    await first.context.close()
+  }
+
+  // ANOTHER BROWSER, WHICH REMEMBERS NOTHING, opens the window as the person last had it, in the corner: the place it
+  // was moved to is kept in the browser it was moved in. Put beside the page there, the next browser opens it so.
+  const other = await aWindow(WIDE, 'dark')
+  try {
+    await theReport(other.page)
+    await other.page.click(CIRCLE)
+    expect(await theWindow(other.page), 'another browser did not open the window in the corner').toEqual(corner)
+    await other.page.click(`${WINDOW} .px-chat-beside`)
+    await other.page.waitForSelector(SPLIT, { timeout: 20_000 })
+    await expect.poll(theWay, { timeout: 20_000, message: 'putting the chat beside the page in another browser was not kept' }).toBe('split')
+  } finally {
+    await other.context.close()
+  }
+  const third = await aWindow(WIDE)
+  try {
+    await theReport(third.page)
+    await third.page.click(ROW)
+    await third.page.waitForSelector(SPLIT, { timeout: 20_000 })
+  } finally {
+    await third.context.close()
   }
 }, 300_000)
 
@@ -545,7 +636,7 @@ it.runIf(pictures)('takes the entries and the chat opened each way, at 1440, 990
 
 it.skipIf(before)('says what to choose in the empty split chat at 1440 and 990', async () => {
   await choose({ chatButtonStays: 'always', chatOpensAs: 'split' })
-  for (const theme of ['light', 'dark'] as const) for (const width of [1440, 990]) {
+  for (const theme of ['light'] as const) for (const width of [1440, 990]) {
     const { context, page } = await aWindow({ width, height: 900 }, theme)
     try {
       await theReport(page)

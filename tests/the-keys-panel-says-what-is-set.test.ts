@@ -8,9 +8,9 @@
  * ---------------------------------------------------------------------------------------
  *
  * The claim is about what is on a screen: the office's own two keys each with a box and a press;
- * each runtime's own key asked read-only and drawn as set, not set, or nobody has looked; the
- * protection said in the operating system's own terms; and never a value anywhere. So it is measured
- * on a screen.
+ * the sandboxes' logins; the protection said in the operating system's own terms; and never a value
+ * anywhere. So it is measured on a screen.
+ * Each coding tool's line moved to the Coding tools panel, proved by tests/settings-draws-one-line-per-coding-tool-with-its-set-up-press.test.ts.
  *
  * ---------------------------------------------------------------------------------------
  * NO KEY VALUE IS EVER DRAWN, AND THE PROVIDER IS NEVER REACHED
@@ -37,6 +37,7 @@ import { mkdirSync } from 'node:fs'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { liveApp, waitForThePage, type LiveApp } from './helpers.ts'
+import { t } from '../src/shared/i18n.ts'
 
 let app: LiveApp
 
@@ -87,8 +88,8 @@ afterAll(async () => {
   await app?.stop()
 }, 60_000)
 
-describe('the keys section draws the office’s own keys and each runtime’s own', () => {
-  it('draws the title, the protection, the two office keys and the read-only rows', async () => {
+describe('the keys section draws the office’s own two keys and the sandboxes’ logins', () => {
+  it('draws the title, the protection, the two office keys and the sandboxes’ logins', async () => {
     await openTheSettings()
 
     const title = await app.page.$eval(
@@ -112,21 +113,6 @@ describe('the keys section draws the office’s own keys and each runtime’s ow
     )
     for (const state of officeStates) expect(state).toContain('not set')
 
-    // EACH RUNTIME'S OWN, asked read-only, with one of the three real answers and never a value.
-    const tools = await app.page.$$eval('.keys-row[data-tool]', (all) =>
-      all.map((one) => ({ tool: one.getAttribute('data-tool') ?? '', text: one.textContent ?? '' })),
-    )
-    expect(tools.map((one) => one.tool)).toEqual(['claude-code', 'codex', 'opencode'])
-    for (const one of tools) {
-      expect(
-        /set|not set|not looked at/i.test(one.text),
-        `${one.tool} draws no honest answer`,
-      ).toBe(true)
-    }
-    // CLAUDE CODE IS THE ONE WHOSE STORE THIS OFFICE DOES NOT READ, so it is the one that must say
-    // nobody has looked rather than guess.
-    expect(tools.find((one) => one.tool === 'claude-code')?.text).toContain('not looked at')
-
     // THE SANDBOXES' LOGINS, one row for each login the templates declare, each drawn set or not
     // set. Nothing is pressed here: the file they write is under the runner's own home.
     const logins = await app.page.$$eval('.keys-row[data-login]', (all) =>
@@ -146,7 +132,13 @@ describe('the keys section draws the office’s own keys and each runtime’s ow
       '.keys-row[data-key="openrouter"] .keys-refuse',
       (one) => one.textContent ?? '',
     )
-    expect(refused).toContain('No OpenRouter key is set')
+    expect(refused).toBe(t('settingsPanel.keys.tested.refused'))
+    // THE SERVER'S OWN SENTENCE, in Developer mode, which this file opens in: no key was there to test.
+    const said = await app.page.$eval(
+      '.keys-row[data-key="openrouter"] .px-server-note',
+      (one) => one.textContent ?? '',
+    )
+    expect(said).toContain('No OpenRouter key is set')
     await photograph('refused')
   }, 120_000)
 

@@ -7,6 +7,7 @@ import { type ClaimsOnRecordReply, type ClaimsReply, type OfficeMergeQueueOwnerR
 import type { EmergencyPushReading } from '@shared/emergency-push.ts'
 import type { MergeQueueReply } from '@shared/merge-queue-page.ts'
 import type { ProjectBoard, TheMasterPipeline } from '@shared/project-board.ts'
+import type { PeopleAndPackages } from '@shared/project-people.ts'
 import type { QueueMeasures } from '@shared/merge-queue-measures.ts'
 import type { AReadinessChecklist, ASignerRef } from '../../server/lib/readiness.ts'
 import type { HonourBoard } from '../../server/lib/honour.ts'
@@ -62,6 +63,9 @@ export const mergeQueueDoors = {
   mergeQueueMeasures: (days: number) => request<QueueMeasures & { workspaceId: string }>(`/api/merge-queue/measures?days=${String(days)}`),
   /** The project board, worked out when asked: wave 13u round 216, package BV. */
   projectBoard: (project: string) => request<ProjectBoard>(`/api/projects/${encodeURIComponent(project)}/board`),
+  /** The board's fourth tab: line by line, who acts now, under whom, and the packages counted. */
+  peopleAndPackages: (project: string) =>
+    request<PeopleAndPackages>(`/api/projects/${encodeURIComponent(project)}/people-and-packages`),
   /** Which pipeline the project marks as its master, read by the pipeline page to open on it (package BV, point BV-5). */
   masterPipeline: (project: string) => request<TheMasterPipeline>(`/api/projects/${encodeURIComponent(project)}/master-pipeline`),
 

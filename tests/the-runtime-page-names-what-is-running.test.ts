@@ -30,6 +30,7 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath, URL } from 'node:url'
 import type { Page } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { createI18n } from '../src/shared/i18n.ts'
 import { localStamp } from '../src/shared/time.ts'
 import { type LiveApp, liveApp, waitForThePage } from './helpers.ts'
 
@@ -92,28 +93,41 @@ describe('the runtime page names what is running', () => {
       return ((await answered.json()) as { addresses: { declaredApi: string; says: string | null } }).addresses
     }, app.api)
     expect(drawn).toContain(addresses.declaredApi)
-    // A SENTENCE WHEN THEY DIFFER, AND NOTHING WHEN THEY DO NOT. A scratch stack started from a
+    // A MARK WHEN THEY DIFFER, AND NOTHING WHEN THEY DO NOT. A scratch stack started from a
     // checkout with a `.env` differs from what that `.env` declares; one started from a checkout
-    // without a `.env` does not. Both are ordinary, and the page says whichever the server said.
+    // without a `.env` does not. Both are ordinary. When the server says they differ, the page
+    // marks the declared address as wrong, and the server's sentence stays in its answer.
     if (addresses.says === null) {
       expect(addresses.declaredApi).toBe(`http://127.0.0.1:${String(app.apiPort)}`)
     } else {
-      expect(drawn).toContain(addresses.says)
+      expect(await page.locator('dd.rt-value.rt-wrong').filter({ hasText: addresses.declaredApi }).count()).toBe(1)
+      expect(drawn).not.toContain(addresses.says)
     }
   })
 
   it('names the database, by path and by identity, and says whether it is the canonical one', async () => {
     // The path this test's own server was told to open.
-    const database = await page.evaluate(async (api: string) => {
+    const { path: database, canonicalPath } = await page.evaluate(async (api: string) => {
       const answered = await fetch(`${api}/api/runtime`)
-      return ((await answered.json()) as { database: { path: string } }).database.path
+      return ((await answered.json()) as { database: { path: string; canonicalPath: string } }).database
     }, app.api)
     expect(drawn).toContain(database)
     // THE IDENTITY, which is the thing that tells a copy from the file it was copied from. Sixteen
     // hexadecimal characters, the same ones the world header carries.
     expect(drawn).toMatch(/IDENTITY\s+[0-9a-f]{16}/i)
-    // A test database is not the canonical one, and the page says which it is either way.
-    expect(drawn).toContain('the canonical one is')
+    // A test database is not the canonical one. Its row says no, and the canonical file is drawn on a row of its own.
+    const en = createI18n('en')
+    const rows = await page.evaluate(
+      (labels: { canonical: string; file: string }) => {
+        const termOf = (selector: string, label: string) => [...document.querySelectorAll(selector)].find((term) => term.textContent === label)
+        return {
+          canonical: termOf('.rt-facts dt', labels.canonical)?.nextElementSibling?.textContent ?? null,
+          file: termOf('dl.code-rows dt', labels.file)?.nextElementSibling?.firstElementChild?.textContent ?? null,
+        }
+      },
+      { canonical: en.t('dev.runtime.theCanonicalOne'), file: en.t('runtime.row.canonicalFile') },
+    )
+    expect(rows).toEqual({ canonical: en.t('dev.runtime.no'), file: canonicalPath })
   })
 
   it('names the commit and whether the tree is dirty', async () => {

@@ -20,9 +20,10 @@
  *   · the Embassy's reply names the office apart, with its name, and carries no card for it;
  *   · the count of who holds each card names the office's row under no card;
  *   · the office's own page is given no card, so it draws no card and no press to give one;
- *   · the page draws the office in its own section, with the one sentence on what it sends, and
- *     with no card word on it. The page draws its rows from the reply's rows alone, so the first
- *     case is what keeps the office out of the agents' section.
+ *   · the page draws the office in its own section, with its name, and with no card word on it.
+ *     The page draws its rows from the reply's rows alone, so the first case is what keeps the
+ *     office out of the agents' section. Before, the section also drew a sentence on what the office
+ *     sends; the page draws no explanation of a row now, as decided.
  *
  * The office's row is found with `moleOffice()`, the reader every screen that draws a message asks,
  * and never by a handle written here. It is imported inside the setup, after `freshDb`.
@@ -40,7 +41,7 @@
  *   give the office's own page its card again → the profile case goes red; answer the page with no
  *     card field at all → it goes red at the read.
  *   give the office's section another group → the page case goes red at the section; drop the
- *     sentence from it → red at the sentence; draw the card key and word in it → red at the card.
+ *     name from it → red at the name; draw the card key and word in it → red at the card.
  */
 
 import { createElement as h } from 'react'
@@ -55,12 +56,10 @@ import type { WhoHoldsTheCards } from '../src/shared/roles.ts'
 import type { WhatTheEmbassySays } from '../src/shared/worlds.ts'
 
 type EmbassyModule = typeof import('../src/web/pages/EmbassyPage.tsx')
-type WordsModule = typeof import('../src/shared/i18n.ts')
 
 let t: TestDb
 let app: FastifyInstance
 let ep: EmbassyModule
-let words: WordsModule
 /** The office's own registry row, read from the office's own reader once the database is up. */
 let office: ParticipantRef
 
@@ -104,7 +103,6 @@ beforeAll(async () => {
     removeEventListener: () => {},
   }
   ep = (await import('../src/web/pages/EmbassyPage.tsx')) as EmbassyModule
-  words = (await import('../src/shared/i18n.ts')) as WordsModule
   office = (await import('../src/shared/participants.ts')).moleOffice()
 })
 
@@ -148,12 +146,12 @@ describe("the office's own page", () => {
 })
 
 describe('the Embassy page', () => {
-  it('draws the office in its own section, saying what it sends, with no card', async () => {
+  it('draws the office in its own section, by its name, with no card', async () => {
     const said = await ask<WhatTheEmbassySays>('/api/office/embassy')
     const html = renderToStaticMarkup(h(ep.TheEmbassy, { said }))
     const itself = section(html, 'office')
     expect(itself, 'the office has a section of its own').not.toBe('')
-    expect(itself, 'the section says which messages the office sends').toContain(words.t('embassyPage.theOffice.sends'))
+    expect(itself, 'the section names the office').toContain(`>${String(said.office.name)}</a>`)
     expect(itself, 'the section draws no card').not.toContain(`>${ep.EMBASSY_WORDS.card}<`)
   })
 })

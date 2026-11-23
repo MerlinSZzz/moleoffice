@@ -17,12 +17,12 @@
 
 import type { FastifyRequest } from 'fastify'
 import { sqlite } from './client.ts'
-import type { AHeldKeyRow } from '../lib/keys.ts'
+import type { AHeldKeyRow } from './types/keys.ts'
 import { createHash } from 'node:crypto'
 import type { EmbassyKey as AKeyOfAHolder, EmbassyKeyRunState as KeyRunState } from '@shared/worlds.ts'
-import type { RunState } from '../lib/agents.ts'
+import type { RunState } from './types/agents.ts'
 import { STORED_FIELDS, theWordsOfAStoredField } from './schema.ts'
-import { KEY_COOKIE, KEY_HEADER } from '../../config/key-header.mjs'
+import { DEVICE_HALF_COOKIE, DEVICE_HALF_HEADER, KEY_HEADER } from '../../config/key-header.mjs'
 import { theRunHasEnded } from '@shared/run-has-ended.ts'
 
 /**
@@ -132,9 +132,25 @@ export function whatTheKeyWithThisIdIsFor(id: string): Pick<AKeyOfAHolder, 'is' 
 }
 /** `json_extract(data, '$.extra.runKeyId')`, which every lookup of a run or a binding by its key below asks. */
 export const THE_RUN_KEY_NAMED = theWordsOfAStoredField(STORED_FIELDS.runKeyId, 'data')
-/** The key a request carries, from the header first and the cookie second, or undefined. */
+/**
+ * THE KEY A REQUEST CARRIES, or undefined. A whole key comes from the key header. Otherwise it is a browser's device
+ * key, the cookie half and the header half joined, and only when both are there: one half alone is no key, and
+ * src/server/lib/keyheader.ts refuses it in words. The old cookie, which held a whole key, is not read here: it is no
+ * key.
+ */
 export function keyOn(req: FastifyRequest): string | undefined {
-  return oneHeader(req.headers[KEY_HEADER]) ?? cookieValue(req.headers.cookie, KEY_COOKIE)
+  const whole = oneHeader(req.headers[KEY_HEADER])
+  if (whole !== undefined) return whole
+  const halves = theHalvesOn(req)
+  return halves.cookie !== undefined && halves.header !== undefined ? aDeviceKeyFrom(halves.cookie, halves.header) : undefined
+}
+/** The two halves of a browser's device key a request carries, each undefined where it was not sent. */
+export function theHalvesOn(req: FastifyRequest): { cookie: string | undefined; header: string | undefined } {
+  return { cookie: cookieValue(req.headers.cookie, DEVICE_HALF_COOKIE), header: oneHeader(req.headers[DEVICE_HALF_HEADER]) }
+}
+/** The whole device key two halves make: the cookie half, a dot, the header half. src/server/lib/visitors.ts splits it so. */
+export function aDeviceKeyFrom(cookieHalf: string, headerHalf: string): string {
+  return `${cookieHalf}.${headerHalf}`
 }
 /** The header value as one trimmed non-empty string, or undefined because it was not sent. */
 export function oneHeader(value: string | string[] | undefined): string | undefined {

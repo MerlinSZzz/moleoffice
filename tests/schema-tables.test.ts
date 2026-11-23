@@ -58,6 +58,8 @@ import { afterEach, describe, expect, it } from 'vitest'
 
 import * as schema from '../src/server/db/schema.ts'
 import { AUTHORED_TABLES, DERIVED_TABLES, MEASURED_TABLES, RECORD_TEXT_INDEX_TABLES } from '../src/server/db/schema.ts'
+import { everyPartTable } from '../src/server/db/every-part-table.ts'
+import { PERSON_LEVEL_TABLES, WORKSPACE_COLUMN } from '../src/server/db/authored-table-of.ts'
 import { aTestDatabaseFolder } from './a-test-folder.ts'
 import { TABLES_IN_A_FILE_OF_THEIR_OWN, whatTiesItToTheOfficeDatabase } from './tables-in-a-sqlite-file-of-their-own.ts'
 
@@ -293,7 +295,7 @@ const EVERY_TABLE = [
  * tests/a-schema-part-says-what-happens-to-its-tables.test.ts checks what each one says. Here each
  * is still a table schema.ts exports and a migration creates.
  */
-const PART_TABLE_NAMES = schema.everyPartTable().map((table) => table.name)
+const PART_TABLE_NAMES = everyPartTable().map((table) => table.name)
 const STORAGE_TABLE_NAMES = [schema.storageFiles, schema.storageTotals, schema.storageMeasurement].map(getTableName)
 
 /** drizzle's own bookkeeping. Not one of the twenty-four, and not part of a backup. */
@@ -778,7 +780,7 @@ describe('a table belongs to a project when something says which one', () => {
     const db = migratedDatabase()
     try {
       for (const table of AUTHORED_TABLES) {
-        const scope = schema.WORKSPACE_COLUMN[table]
+        const scope = WORKSPACE_COLUMN[table]
         const columns = columnsOf(db, table)
         if (scope === null) {
           expect(columns, `${table} has a workspace_id and is declared as belonging to no project`).not.toContain(
@@ -801,7 +803,7 @@ describe('a table belongs to a project when something says which one', () => {
             scope.table,
           )
           expect(
-            typeof schema.WORKSPACE_COLUMN[scope.table],
+            typeof WORKSPACE_COLUMN[scope.table],
             `${table} is scoped through ${scope.table}, which does not say its own project in a column`,
           ).toBe('string')
           // AND IT MUST NOT ALSO HAVE ONE OF ITS OWN. A row carrying both would be the same fact in
@@ -819,7 +821,7 @@ describe('a table belongs to a project when something says which one', () => {
   }, 60_000)
 
   it('every form is really used, so the three branches above are not two branches and a comment', () => {
-    const scopes = AUTHORED_TABLES.map((table) => schema.WORKSPACE_COLUMN[table])
+    const scopes = AUTHORED_TABLES.map((table) => WORKSPACE_COLUMN[table])
     expect(scopes.filter((s) => typeof s === 'string').length, 'no table is scoped by a column of its own').toBeGreaterThan(0)
     expect(scopes.filter((s) => s === null).length, 'no table belongs to no project').toBeGreaterThan(0)
     expect(
@@ -841,9 +843,9 @@ describe('a table belongs to a project when something says which one', () => {
         (table) =>
           table !== 'workspaces' &&
           !columnsOf(db, table).includes('workspace_id') &&
-          schema.WORKSPACE_COLUMN[table] === null,
+          WORKSPACE_COLUMN[table] === null,
       )
-      expect([...schema.PERSON_LEVEL_TABLES]).toEqual(nothingCanPlace)
+      expect([...PERSON_LEVEL_TABLES]).toEqual(nothingCanPlace)
       // Not vacuous, and not the whole database either: some tables have one and some do not.
       expect(nothingCanPlace.length).toBeGreaterThan(0)
       expect(nothingCanPlace.length).toBeLessThan(AUTHORED_TABLES.length)
@@ -852,7 +854,7 @@ describe('a table belongs to a project when something says which one', () => {
       // project" — would have put them here, and a project archive would have said a project's own
       // conversations belong to nobody.
       const throughAnother = AUTHORED_TABLES.filter((table) => {
-        const scope = schema.WORKSPACE_COLUMN[table]
+        const scope = WORKSPACE_COLUMN[table]
         return scope !== null && typeof scope !== 'string'
       })
       expect(throughAnother.length, 'no table is scoped through another one, so this proves nothing').toBeGreaterThan(0)
@@ -861,8 +863,8 @@ describe('a table belongs to a project when something says which one', () => {
           'workspace_id',
         )
         expect(
-          [...schema.PERSON_LEVEL_TABLES],
-          `${table} belongs to the project its ${String((schema.WORKSPACE_COLUMN[table] as { table: string }).table)} ` +
+          [...PERSON_LEVEL_TABLES],
+          `${table} belongs to the project its ${String((WORKSPACE_COLUMN[table] as { table: string }).table)} ` +
             'names, and is being reported as belonging to no project',
         ).not.toContain(table)
       }

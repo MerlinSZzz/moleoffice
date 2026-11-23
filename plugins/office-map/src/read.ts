@@ -91,7 +91,7 @@ export function* readViewSlices<V extends PluginReadView>(view: V, body: unknown
   const fields = view === 'people' || view === 'roster' ? ['people', 'agents'] : view === 'work' ? ['work'] : view === 'online' || view === 'asleep' ? ['agents'] : ['projects']
   // Parse the envelope once. Never spread extra body fields into the projected result.
   const header: Record<string, unknown> = { interface: raw['interface'], view: raw['view'], narrowedByPermission: raw['narrowedByPermission'] }
-  if (view === 'people' || view === 'work') header['notAgents'] = raw['notAgents']
+  if ((view === 'people' || view === 'work') && Object.hasOwn(raw, 'notAgents')) header['notAgents'] = raw['notAgents']
   for (const field of fields) { if (!Array.isArray(raw[field])) return null; header[field] = [] }
   const parsed = schemas()[view].safeParse(header)
   if (!parsed.success) return null

@@ -503,10 +503,11 @@ describe('the picker draws a tickable row per candidate, saying where each came 
     expect(html).toContain('project panelx')
   })
 
-  it('says why Mole Office does not choose the work itself', () => {
-    // Behind the small round question mark now, not a paragraph under the heading. Still in the
-    // markup and still reachable from the keyboard -- a `details`, not a tooltip.
-    expect(pick()).toContain('because a sentence can be misread')
+  it('draws the picker heading with no question mark under it', () => {
+    // The heading names the list and nothing more: the hidden paragraph about why the person
+    // chooses the work was explanation, and it is gone, not folded.
+    const html = pick()
+    expect(html).not.toContain('px-hint-mark')
   })
 
   it('names how far it looked when there were more periods than it reads', () => {

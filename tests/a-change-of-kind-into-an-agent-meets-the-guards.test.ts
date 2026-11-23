@@ -249,12 +249,24 @@ describe('a handle write that maps an agent record meets the card guard and the 
   })
 })
 
+/**
+ * Store a record as the note a change of kind away from agent left: every field under `extra`, its mapping kept. A
+ * record write no longer changes an agent record's kind, so the stored state is written straight.
+ */
+function asANoteInTheStore(recordId: string): void {
+  const held = t.client.sqlite.prepare('SELECT data FROM records WHERE id = ?').get(recordId) as { data: string }
+  const { extra, ...fields } = JSON.parse(held.data) as Record<string, unknown>
+  t.client.sqlite
+    .prepare("UPDATE records SET kind = 'note', data = ? WHERE id = ?")
+    .run(JSON.stringify({ extra: { ...(extra as object | undefined), ...fields } }), recordId)
+}
+
 describe('a record whose kind was changed away from agent is not read as its agent’s', () => {
   it('reads a secretary’s times off its agent record, not off a newer one of its records that is a note now', async () => {
     const other = file(THERE, 'agent', { handle: 'clerk' })
     expect(rowOf(other)?.id).toBe(idOf['clerk'])
-    const away = await ask('PATCH', `/api/records/${other}`, inThere(AS_THE_PERSON), { kind: 'note' })
-    expect(away.code, away.body.slice(0, 400)).toBe(200)
+    asANoteInTheStore(other)
+    expect(t.client.sqlite.prepare('SELECT kind FROM records WHERE id = ?').get(other)).toEqual({ kind: 'note' })
     // A NOTE IS WRITTEN WITH NO AGENT GUARD, so what it says is nobody's schedule.
     const written = await ask('PATCH', `/api/records/${other}`, asAgent('w-one', THERE), {
       dataPatch: { extra: { broadcastSchedule: { madeAt: '2026-10-06 00:00:00', endedAt: null, times: ['03:00'] } } },

@@ -1,5 +1,8 @@
 // Copyright © 2026 Zhengyang Shen
 // Licensed under the MIT License. See LICENSE.
+// Criterion change (wave 13s round 281, decision OQR0WDVq0FkP): Home asks one door
+// for the pipelines that stand still, and the records list in Home's shape for no pipeline and no step.
+// Before, Home asked the records list in Home's shape once for the pipelines and once for the blocks.
 /** Home reuses reads under StrictMode and asks its approved page data once per project. */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { Page, Request } from 'playwright'
@@ -110,10 +113,11 @@ describe('Home reads its five sections once', () => {
     expect(asked.filter(one => pathOf(one.url) === '/api/records' && queryOf(one.url, 'shape') === null), 'Home must not ask the full record list').toEqual([])
     // PROBLEM dfi72F0VtyK5, case 1, kept from before the five-section Home: no session records.
     expect(asked.filter(one => pathOf(one.url) === '/api/records' && queryOf(one.url, 'kind') === 'session'), 'Home must not ask for the session records').toEqual([])
-    // THIS PROJECT'S PIPELINES AND THEIR STEPS IN HOME'S SHAPE, ONCE EACH: Late or stuck reads its
-    // standing-still pipelines from them. Never every record of the project.
-    const homeRecords = asked.filter(one => pathOf(one.url) === '/api/records' && queryOf(one.url, 'shape') === 'home')
-    expect(homeRecords.map(one => queryOf(one.url, 'kind')).sort(), 'the pipelines and steps read was missing or duplicated').toEqual(['block', 'pipeline'])
+    // THIS PROJECT'S PIPELINES THAT STAND STILL, ONCE: Late or stuck asks the one door that answers them. It never asks
+    // the records list for every pipeline or every step of the project.
+    expect(asked.filter(one => pathOf(one.url) === '/api/records' && queryOf(one.url, 'shape') === 'home'), 'Home must not ask its pipelines and steps as whole kinds').toEqual([])
+    const standingStill = asked.filter(one => pathOf(one.url) === '/api/pipelines/standing-still' && one.headers['x-mole-office-workspace'] === 'default')
+    expect(standingStill, 'the pipelines standing still reading was missing or duplicated').toHaveLength(1)
     expect(asked.filter(one => pathOf(one.url) === '/api/planning/today')).toHaveLength(1)
     // THE WEEK IS NOT ASKED FOR. Home draws today only since a decision. The week's hours
     // are on the plan page.

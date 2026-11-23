@@ -8,7 +8,7 @@ import { freshDb, type TestDb } from './helpers.ts'
 import { aTestDatabaseFolder, removeThisTestFolder } from './a-test-folder.ts'
 import { DEFAULT_UPLOAD_POLICY, DESTINATION_SETTING, type Destination } from '../src/shared/storage/destinations.ts'
 import { STORAGE_STORES } from '../src/shared/storage/categories.ts'
-import { NAMES_A_PART_MAY_NOT_TAKE, everyPartTable } from '../src/server/db/schema.ts'
+import { NAMES_A_PART_MAY_NOT_TAKE, everyPartTable } from '../src/server/db/every-part-table.ts'
 let t:TestDb, folder:string, spool:string, upload:typeof import('../tools/storage/folder.ts')
 let cumulativeBase:import('../src/config/storage/receipts.ts').UploadReceipt, firstChange:import('../src/config/storage/receipts.ts').UploadReceipt, secondChange:import('../src/config/storage/receipts.ts').UploadReceipt, limitedBase:import('../src/config/storage/receipts.ts').UploadReceipt
 const now=new Date('2026-10-25T12:00:00Z')

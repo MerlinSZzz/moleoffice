@@ -10,8 +10,15 @@ export class NoRoomForAreaLabel extends Error {
 }
 
 type Area = NonNullable<Layout['villages']>[number]
-export type AreaLabelHeader = { area: Area; x: number; y: number; width: number; height: number; lines: string[]; fontSize: number; stage: string; prefix: string }
+export type AreaLabelHeader = { area: Area; x: number; y: number; width: number; height: number; lines: string[]; fontSize: number; stage: string; prefix: string; includesDirect: boolean }
 export type AreaLabelSkip = { area: Area; label: string }
+
+/** Keep sign boxes at least this many screen pixels apart. */
+export const SIGN_GAP = 6
+export function signsTooClose(a: Rect, b: Rect, zoom: number): boolean {
+  const gap = SIGN_GAP / zoom
+  return overlaps({ x: a.x - gap, y: a.y - gap, width: a.width + 2 * gap, height: a.height + 2 * gap }, b)
+}
 
 /** A house's sign where it starts: above the house at its left end, at most 160 screen pixels wide,
  *  and in an ownership map never above the map's top. The page moves it right along the house when
@@ -26,72 +33,101 @@ export function houseSign(layout: Layout, house: Rect, zoom: number): Rect {
  *  keeps drawing every other area's name. With `sleepingHouses`, as the page asks, each sleeping
  *  house also gets its plain name when no house sign is drawn: a sleeping house is in no area. */
 export function ownershipAreaLabelsOrSkips(layout: Layout, zoom: number, language: 'en' | 'zh', measure: (text: string) => number, sleepingHouses = false) {
-  const areas = layout.villages ?? [], bounds = layout.bounds, used: Rect[] = []
+  const areas = layout.villages ?? [], bounds = layout.bounds
   const houseLabels: Rect[] = layout.ownership && zoom >= .18 ? layout.houses.map(house => houseSign(layout, house, zoom)) : []
   const nameLength = (a: typeof areas[number]) => a.owner ? [...(a.label ?? '').replace(/^Secretary area · /u, '')].length : 0
   /** At close zoom the room's own sign names a one-room area, so its area header would be a second label for the same room. */
   const oneRoom = (area: typeof areas[number]) => layout.rooms.filter(r => area.signs.some(s => s.id === r.id)).length === 1
-  const headers: AreaLabelHeader[] = [], skipped: AreaLabelSkip[] = []
   // A sleeping house has little unowned margin, so reserve its name before the more flexible area names.
   const sleepers: Area[] = sleepingHouses && layout.ownership && zoom < .18 ? layout.houses.filter(house => house.type === 'sleeping-house').map((house, i) =>
     ({ x: house.x, y: house.y, width: house.width, height: house.height, id: -1 - i, column: 0, row: -2, total: 0, signs: [], label: house.label, zh: house.zh })) : []
   // Place the least flexible names first, before shorter labels occupy their clear space.
-  for (const area of [...sleepers, ...areas.filter(area => area.label && !(area.row === -1 && zoom >= .18) && !(zoom >= .18 && oneRoom(area))).sort((a, b) => nameLength(b) - nameLength(a) || Number(b.row === -1) - Number(a.row === -1) || a.row - b.row)]) {
-    const label = (language === 'zh' ? area.zh : area.label)!
-    const owner = label.replace(/^(?:Secretary area|秘书区域) · /u, '')
-    const names = [...new Set([owner, ...(!area.owner && zoom < .18 ? [owner.replace(/ \/ ownership unknown$|／归属未知$/u, '')] : [])])]
-    const count = ` · ${area.total}${area.direct === undefined ? '' : ` · ${language === 'zh' ? '直属' : 'Direct'} ${area.direct}`}`
-    const plain = count.replaceAll(' · ', ' ')
-    const sleeper = sleepers.includes(area)
-    const variants = sleeper ? [{ stage: 'sleeping-house', texts: [label] }] : [{ stage: 'full', texts: [label + count] },
-      { stage: 'prefix-words', texts: names.map(name => name + count) },
-      { stage: 'spaces', texts: names.map(name => name + plain) }]
-    if (zoom < .18 && !area.owner && area.label === 'Independent / ownership unknown') {
-      const name = language === 'zh' ? '独立' : 'Independent'
-      variants.push({ stage: 'independent-short', texts: [`${name} · ${area.total}`] },
-        { stage: 'independent-spaces', texts: [`${name} ${area.total}`] })
-    }
-    if (zoom < .18 && area.owner) {
-      const letters = [...owner]
-      for (let kept = letters.length - 1; kept >= 3; kept--) {
-        const tails = Array.from({ length: kept - 2 }, (_, i) => i + 2)
-          .sort((a, b) => Math.abs(kept - 2 * a) - Math.abs(kept - 2 * b) || a - b)
-        variants.push({ stage: 'name-ellipsis', texts: tails.map(tail => letters.slice(0, kept - tail).join('') + '…' + letters.slice(-tail).join('') + plain) })
+  const ordered = [...sleepers, ...areas.filter(area => area.label && !(area.row === -1 && zoom >= .18) && !(zoom >= .18 && oneRoom(area))).sort((a, b) => nameLength(b) - nameLength(a) || Number(b.row === -1) - Number(a.row === -1) || a.row - b.row)]
+  const place = (order: Area[], reserveHouses = true) => {
+    const used: Rect[] = [], headers: AreaLabelHeader[] = [], skipped: AreaLabelSkip[] = []
+    for (const area of order) {
+      const label = (language === 'zh' ? area.zh : area.label)!
+      const owner = label.replace(/^(?:Secretary area|秘书区域) · /u, '')
+      const names = [...new Set([owner, ...(!area.owner && zoom < .18 ? [owner.replace(/ \/ ownership unknown$|／归属未知$/u, '')] : [])])]
+      const count = ` · ${area.total}${area.direct === undefined ? '' : ` · ${language === 'zh' ? '直属' : 'Direct'} ${area.direct}`}`
+      const plain = count.replaceAll(' · ', ' ')
+      const sleeper = sleepers.includes(area)
+      const counted = area.direct !== undefined
+      const variants = sleeper ? [{ stage: 'sleeping-house', texts: [label], includesDirect: false }] : [{ stage: 'full', texts: [label + count], includesDirect: counted },
+        { stage: 'prefix-words', texts: names.map(name => name + count), includesDirect: counted },
+        { stage: 'spaces', texts: names.map(name => name + plain), includesDirect: counted }]
+      if (zoom < .18 && !area.owner && area.label === 'Independent / ownership unknown') {
+        const name = language === 'zh' ? '独立' : 'Independent'
+        variants.push({ stage: 'independent-short', texts: [`${name} · ${area.total}`], includesDirect: false },
+          { stage: 'independent-spaces', texts: [`${name} ${area.total}`], includesDirect: false })
       }
-    }
-    const rooms = layout.rooms.filter(r => area.signs.some(s => s.id === r.id))
-    const own = rooms.length ? { x: Math.min(...rooms.map(r => r.x)), y: Math.min(...rooms.map(r => r.y)),
-      width: Math.max(...rooms.map(r => r.x + r.width)) - Math.min(...rooms.map(r => r.x)),
-      height: Math.max(...rooms.map(r => r.y + r.height)) - Math.min(...rooms.map(r => r.y)) } : area
-    const gap = 2 / zoom, pad = 12 / zoom, foreign = areas.filter(a => a.id !== area.id)
-    const edges: Rect[] = [own, area, ...layout.rooms, ...houseLabels, ...areas, ...used]
-    let placed: AreaLabelHeader | null = null
-    search: for (const variant of variants) for (const fontSize of [12, 11, 10]) for (const text of variant.texts) {
-      const width = measure(text) * fontSize / 12 + pad + 1 / zoom, height = (fontSize + 9) / zoom
-      if (width > bounds.width || height > bounds.height) continue
-      const clampX = (x: number) => Math.max(bounds.x, Math.min(bounds.x + bounds.width - width, x))
-      const xs = [...new Set([own.x, own.x + own.width - width, own.x + (own.width - width) / 2,
-        ...edges.flatMap(r => [r.x, r.x + r.width - width, r.x - width - gap / 2, r.x + r.width + gap / 2])].map(clampX))]
-      const ys = [...new Set([bounds.y, own.y - height - gap, own.y,
-        ...edges.flatMap(r => [r.y, r.y + r.height - height, r.y - height - gap / 2, r.y + r.height + gap / 2])])]
-      const candidates: { box: Rect; above: boolean; distance: number; inside: boolean }[] = []
-      for (const y of ys) for (const x of xs) {
-        const box = { x, y, width, height }
-        if (x < bounds.x || x + width > bounds.x + bounds.width || y < bounds.y || y + height > bounds.y + bounds.height ||
-          x + width < area.x - gap || x > area.x + area.width + gap || y + height < area.y - gap || y > area.y + area.height + gap ||
-          layout.rooms.some(room => overlaps(box, room)) || houseLabels.some(other => overlaps(box, other)) || foreign.some(other => overlaps(box, other)) || used.some(other => overlaps(box, other)) ||
-          sleeper && sleepers.some(other => overlaps(box, other))) continue
-        const above = y + height <= own.y && x < own.x + own.width && x + width > own.x
-        const distance = Math.hypot(Math.max(own.x - x - width, x - own.x - own.width, 0), Math.max(own.y - y - height, y - own.y - own.height, 0))
-        candidates.push({ box, above, distance, inside: x >= area.x && y >= area.y && x + width <= area.x + area.width && y + height <= area.y + area.height })
+      if (zoom < .18 && area.owner) {
+        const letters = [...owner]
+        for (let kept = letters.length - 1; kept >= 3; kept--) {
+          const tails = Array.from({ length: kept - 2 }, (_, i) => i + 2)
+            .sort((a, b) => Math.abs(kept - 2 * a) - Math.abs(kept - 2 * b) || a - b)
+          variants.push({ stage: 'name-ellipsis', texts: tails.map(tail => letters.slice(0, kept - tail).join('') + '…' + letters.slice(-tail).join('') + plain), includesDirect: counted })
+        }
       }
-      candidates.sort((a, b) => Number(b.above) - Number(a.above) || Number(b.inside) - Number(a.inside) || (area.row === -1 ? Number(a.box.x > area.x) - Number(b.box.x > area.x) : 0) || a.distance - b.distance || a.box.y - b.box.y || a.box.x - b.box.x)
-      const box = candidates[0]?.box
-      if (box) { used.push(box); placed = { area, ...box, lines: [text], fontSize, stage: variant.stage, prefix: text.includes('…') ? text.split('…')[0]! : owner }; break search }
+      const rooms = layout.rooms.filter(r => area.signs.some(s => s.id === r.id))
+      const own = rooms.length ? { x: Math.min(...rooms.map(r => r.x)), y: Math.min(...rooms.map(r => r.y)),
+        width: Math.max(...rooms.map(r => r.x + r.width)) - Math.min(...rooms.map(r => r.x)),
+        height: Math.max(...rooms.map(r => r.y + r.height)) - Math.min(...rooms.map(r => r.y)) } : area
+      const gap = 2 / zoom, signGap = SIGN_GAP / zoom, pad = 12 / zoom, foreign = areas.filter(a => a.id !== area.id)
+      const edges: Rect[] = [own, area, ...layout.rooms, ...houseLabels, ...areas, ...used]
+      let placed: AreaLabelHeader | null = null
+      search: for (const variant of variants) for (const fontSize of [12, 11, 10]) for (const text of variant.texts) {
+        const width = measure(text) * fontSize / 12 + pad + 1 / zoom, height = (fontSize + 9) / zoom
+        if (width > bounds.width || height > bounds.height) continue
+        const clampX = (x: number) => Math.max(bounds.x, Math.min(bounds.x + bounds.width - width, x))
+        const xs = [...new Set([own.x, own.x + own.width - width, own.x + (own.width - width) / 2,
+          ...edges.flatMap(r => [r.x, r.x + r.width - width, r.x - width - gap / 2, r.x + r.width + gap / 2]),
+          ...used.flatMap(r => [r.x - width - signGap, r.x + r.width + signGap])].map(clampX))]
+        const ys = [...new Set([bounds.y, own.y - height - gap, own.y,
+          ...edges.flatMap(r => [r.y, r.y + r.height - height, r.y - height - gap / 2, r.y + r.height + gap / 2]),
+          ...used.flatMap(r => [r.y - height - signGap, r.y + r.height + signGap])])]
+        const candidates: { box: Rect; above: boolean; distance: number; inside: boolean }[] = []
+        for (const y of ys) for (const x of xs) {
+          const box = { x, y, width, height }
+          if (x < bounds.x || x + width > bounds.x + bounds.width || y < bounds.y || y + height > bounds.y + bounds.height ||
+            x + width < area.x - gap || x > area.x + area.width + gap || y + height < area.y - gap || y > area.y + area.height + gap ||
+            layout.rooms.some(room => overlaps(box, room)) || reserveHouses && houseLabels.some(other => overlaps(box, other)) || foreign.some(other => overlaps(box, other)) || used.some(other => signsTooClose(box, other, zoom)) ||
+            sleeper && sleepers.some(other => overlaps(box, other))) continue
+          const above = y + height <= own.y && x < own.x + own.width && x + width > own.x
+          const distance = Math.hypot(Math.max(own.x - x - width, x - own.x - own.width, 0), Math.max(own.y - y - height, y - own.y - own.height, 0))
+          candidates.push({ box, above, distance, inside: x >= area.x && y >= area.y && x + width <= area.x + area.width && y + height <= area.y + area.height })
+        }
+        candidates.sort((a, b) => Number(b.above) - Number(a.above) || Number(b.inside) - Number(a.inside) || (area.row === -1 ? Number(a.box.x > area.x) - Number(b.box.x > area.x) : 0) || a.distance - b.distance || a.box.y - b.box.y || a.box.x - b.box.x)
+        const box = candidates[0]?.box
+        if (box) { used.push(box); placed = { area, ...box, lines: [text], fontSize, stage: variant.stage, prefix: text.includes('…') ? text.split('…')[0]! : owner,
+          includesDirect: variant.includesDirect }; break search }
+      }
+      if (placed) headers.push(placed); else skipped.push({ area, label })
     }
-    if (placed) headers.push(placed); else skipped.push({ area, label })
+    return { headers, skipped }
   }
-  return { headers, skipped }
+  let best = place(ordered)
+  // Give an unplaced area first choice before accepting an omission caused by
+  // an earlier, more flexible area. Keep sleeping-house names first.
+  for (const area of ordered.filter(area => !sleepers.includes(area))) {
+    if (!best.skipped.length) break
+    if (!best.skipped.some(skip => skip.area === area)) continue
+    const attempt = place([...sleepers, area, ...ordered.filter(other => other !== area && !sleepers.includes(other))])
+    if (attempt.skipped.length < best.skipped.length) best = attempt
+  }
+  // If the old house reservations still prevent an area from fitting, let
+  // its house signs yield instead of losing the area name.
+  if (best.skipped.length && houseLabels.length) {
+    const attempt = place(ordered, false)
+    if (attempt.skipped.length < best.skipped.length) best = attempt
+    for (const area of ordered.filter(area => !sleepers.includes(area))) {
+      if (!best.skipped.length) break
+      if (!best.skipped.some(skip => skip.area === area)) continue
+      const retry = place([...sleepers, area, ...ordered.filter(other => other !== area && !sleepers.includes(other))], false)
+      if (retry.skipped.length < best.skipped.length) best = retry
+    }
+  }
+  return best
 }
 
 /** The strict reader the unit tests use: an area with no room refuses the whole call. The page

@@ -518,18 +518,22 @@ describe("8. the installer's script", () => {
     expect(CODE).not.toMatch(/HKLM|\$PROGRAMFILES|SetShellVarContext\s+all|UserInfo::|runas/i)
     expect(section('-install')).toContain('SetShellVarContext current')
     expect(section('Uninstall')).toContain('SetShellVarContext current')
-    // The office's settings, in %APPDATA%\mole-office, and its data folder are never removed. The only line
-    // that names $APPDATA reads the per-user folder, before any page. The sections never name $APPDATA, and no
-    // line of theirs that removes a file or a folder names the per-user folder or the data folder.
+    // The script itself never removes the office's settings, in %APPDATA%\mole-office, or its data folder. The
+    // uninstaller's settings go only through the office's own command, which keeps every data folder. The only
+    // lines that name $APPDATA read the per-user folder, in .onInit and un.onInit, before any page. The sections
+    // never name $APPDATA, and no line of theirs that removes a file or a folder names the per-user folder or the
+    // data folder.
     expect(section('-install')).not.toContain('$APPDATA')
     expect(section('Uninstall')).not.toContain('$APPDATA')
     const dataFolderLines = CODE.split('\n').filter((one) => one.includes('$APPDATA'))
-    expect(dataFolderLines).toHaveLength(1)
+    expect(dataFolderLines).toHaveLength(2)
     for (const line of dataFolderLines) expect(line).toMatch(/^\s*StrCpy \$thePerUserFolder "\$APPDATA\\\$\{THE_DATA_FOLDER\}"$/)
     expect(fn('.onInit')).toContain(String(dataFolderLines[0]))
-    expect(section('Uninstall')).not.toMatch(/\$thePerUserFolder|\$theDataFolder/)
-    for (const line of section('-install').split('\n').filter((one) => /RMDir|Delete /.test(one))) {
-      expect(line).not.toMatch(/\$thePerUserFolder|\$theDataFolder/)
+    expect(fn('un.onInit')).toContain(String(dataFolderLines[1]))
+    for (const name of ['-install', 'Uninstall']) {
+      for (const line of section(name).split('\n').filter((one) => /RMDir|Delete /.test(one))) {
+        expect(line).not.toMatch(/\$thePerUserFolder|\$theDataFolder/)
+      }
     }
   })
 
@@ -540,7 +544,8 @@ describe("8. the installer's script", () => {
     expect(instfiles, 'the script has the install files page').not.toBeNull()
     expect(directory!.index).toBeLessThan(instfiles!.index)
     expect(CODE.match(/^Page directory /gm)).toHaveLength(1)
-    expect(CODE.match(/^UninstPage .*$/gm)).toEqual(['UninstPage instfiles'])
+    // The uninstaller's one page of its own asks about the settings, never the folder, before its install files page.
+    expect(CODE.match(/^UninstPage .*$/gm)).toEqual(['UninstPage custom un.theSettingsPage un.theSettingsPageLeave', 'UninstPage instfiles'])
   })
 
   it('takes the folder Installed apps records as the default, from the same key the install section writes', () => {
@@ -780,7 +785,7 @@ describe("8. the installer's script", () => {
     const nsis = new Set([
       'If', 'IfNot', 'Else', 'ElseIf', 'AndIf', 'AndIfNot', 'OrIf', 'OrIfNot', 'EndIf', 'Do', 'Loop', 'ExitDo', 'FileExists', 'DirState', 'Errors',
       'Silent', 'GetParameters', 'GetOptions', 'NSD_CreateLabel', 'NSD_CreateDirRequest', 'NSD_CreateBrowseButton', 'NSD_OnClick', 'NSD_GetText',
-      'NSD_SetText', 'NSIS_MAX_STRLEN', 'un', 'sentence',
+      'NSD_SetText', 'NSD_CreateCheckBox', 'NSD_Check', 'NSD_GetState', 'BST_CHECKED', 'NSIS_MAX_STRLEN', 'un', 'sentence',
     ])
     // A section's own name for its index, as in `Section /o "Office map" theMapPart`, is the script's own.
     const parts = new Set([...CODE.matchAll(/^Section (?:\/o )?"[^"]*" (\w+)$/gm)].map((found) => String(found[1])))
@@ -1090,8 +1095,9 @@ describe('10. where the data goes at install (DF23 to DF25)', () => {
     // The answer is taken only when the command ended with 0 and its first line begins with a drive
     // letter, which theDriveComesFirst answers.
     expect(inUse).toContain(words('StrCpy $R9 $2 $R0 Call theBackslashesOff Call theDriveComesFirst ${If} $1 == 0 ${AndIf} $R8 == "yes" StrCpy $theDataFolder $R9 StrCpy $theDataFolderIsAssumed "" ${Else} StrCpy $theDataFolderIsAssumed "'))
-    // These are the only two questions the installer asks the office, besides the stop.
-    expect(CODE.match(/data-folder \w+/g)).toEqual(['data-folder where', 'data-folder choose'])
+    // These are the only questions the script asks the office about the data, besides the stop: the installer asks
+    // where the data is and chooses it, and the uninstaller asks where it is again, to name it on its settings page.
+    expect(CODE.match(/data-folder \w+/g)).toEqual(['data-folder where', 'data-folder choose', 'data-folder where'])
   })
 })
 

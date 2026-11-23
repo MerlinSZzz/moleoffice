@@ -151,13 +151,18 @@ type Asked =
   | { at: 'pressing'; reading: TheLiveRunsReading }
   | { at: 'done'; answer: TheShutDownAnswer }
 
-/** One run, in the words the question lists it in: which agent, which message, since when. */
+/**
+ * One run, in the words the question lists it in: which agent, which message, since when. A run whose state the server
+ * could not tell carries the state word "not known" beside it, in the weight of the line's other parts, because it may
+ * still be running and the pause treats it like the others.
+ */
 function RunLine({ run }: { run: ALiveRun }): React.ReactElement {
   return (
     <li className="sd-run" data-session={run.session}>
       <span className="sd-run-agent">{run.agent === null ? t('shutDown.agentNotNamed') : run.agent.handle}</span>
       <span className="sd-run-message">{run.message === null ? t('shutDown.noMessage') : run.message.title}</span>
       <span className="sd-run-since">{t('shutDown.since', { since: run.since })}</span>
+      {run.state === 'not known' ? <span className="sd-run-state">{t('shutDown.stateNotKnown')}</span> : null}
     </li>
   )
 }
@@ -278,10 +283,10 @@ const SHUT_DOWN_CSS = `
   padding: var(--pad); border: var(--border-w) solid var(--border); border-radius: var(--radius-sm); }
 .sd-run-agent { font-weight: 600; overflow-wrap: anywhere; }
 .sd-run-message { overflow-wrap: anywhere; }
-.sd-run-since { grid-column: 2; color: var(--text-2); font-size: var(--fs-1); }
+.sd-run-since, .sd-run-state { grid-column: 2; color: var(--text-2); font-size: var(--fs-1); }
 @media (max-width: 40rem) {
   .sd-run { grid-template-columns: 1fr; }
-  .sd-run-since { grid-column: 1; }
+  .sd-run-since, .sd-run-state { grid-column: 1; }
 }
 .sd-acts { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--pad); margin-top: var(--gut); }
 .sd-choice { margin: 0; padding: 0; border: 0; display: flex; flex-wrap: wrap; align-items: center; gap: var(--pad); min-width: 0; }

@@ -338,9 +338,9 @@ export function WhatASavedCommentCanDo({ note }: { note: WaitingNote }) {
           stayOpen.current = false
         }}
       />
-      {notChosen === 'a person' ? <p className="px-pane-note" role="status">{t('savedComment.aPerson')}</p> : null}
+      {notChosen === 'a person' ? <p className="px-pane-note" role="status">{t('savedComment.personRefused')}</p> : null}
       {notChosen === 'no record here' ? (
-        <p className="px-pane-note" role="status">{t('savedComment.noRecord')}</p>
+        <p className="px-pane-note" role="status">{t('savedComment.agentHasNoRecord')}</p>
       ) : null}
       {failed === null ? null : <ErrorNote message={failed.message} fault={theFaultANoteDraws(failed.fault)} label={failed.label} />}
     </div>

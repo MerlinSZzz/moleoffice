@@ -24,6 +24,10 @@
  * The office also holds a second project with more records than the first, so a never-chosen
  * browser moves to it after the list of projects answers; the race of ipeva-Ir-5by is in play too.
  *
+ * NO MODE IS STORED EITHER. Each context comes from `aContextThatStoresNoMode` (tests/helpers.ts stores
+ * Normal mode in every other one), so the page opens in the person's starting mode. A test office's
+ * person starts in Developer mode, so both looks are read in Developer mode.
+ *
  * MUTATION, run on 2 October 2026: `aWaitingRowIsARecord` in src/web/lib/waiting.ts made to answer
  * true for every row, which is what Home did before. Both cases went red, naming
  * `GET /api/records/<the credential's id>`.
@@ -31,7 +35,7 @@
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import { join } from 'node:path'
 import { THE_TEST_FIXTURE_ROOT } from './a-page-of-a-test-office.ts'
-import { liveApp, waitForThePage, type LiveApp } from './helpers.ts'
+import { aContextThatStoresNoMode, liveApp, waitForThePage, type LiveApp } from './helpers.ts'
 import { testShots } from './where-shots-go.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { DEFAULT_WORKSPACE } from '../src/shared/workspaces.ts'
@@ -103,8 +107,8 @@ const LOOKS = [
 
 it('#/ in a fresh browser draws the visiting agent\'s row and no request is answered 404', async () => {
   for (const look of LOOKS) {
-    // A NEW CONTEXT, so nothing is stored: no project chosen, no language, no look.
-    const context = await app.browser.newContext({ viewport: { width: look.width, height: look.height }, colorScheme: look.scheme })
+    // A NEW CONTEXT, so nothing is stored: no project chosen, no language, no look, no mode.
+    const context = await aContextThatStoresNoMode(app.browser, { viewport: { width: look.width, height: look.height }, colorScheme: look.scheme })
     try {
       const page = await context.newPage()
       const missing: string[] = []

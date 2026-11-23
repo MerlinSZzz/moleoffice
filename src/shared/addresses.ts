@@ -30,11 +30,14 @@
 import { parsePeriod } from '@shared/planning.ts'
 import { PANELS as SETTINGS_DECLARATION } from '@shared/settings-declaration.ts'
 import { isParticipantKind, type ParticipantKind } from '@shared/participants.ts'
+import { SET_UP_SEGMENT, theSetUpWay } from '@shared/setting-up-a-tool.ts'
 import { PROFILE_SEGMENT } from '@shared/profile.ts'
 // WHERE ONE VISITING AGENT'S CREDENTIAL LIVES. One spelling, shared with the server's refusals.
-import { VISITOR_SEGMENT } from '@shared/visitors.ts'
+import { HIS_BROWSER_SEGMENT, VISITOR_SEGMENT } from '@shared/visitors.ts'
 // THE ADDRESS OF THE STATISTICS PAGE, criterion P72. One spelling, beside the shape it draws.
 import { ROLE_CENSUS_SEGMENT } from '@shared/roles.ts'
+// THE ADDRESS OF THE OFFICE'S PAGE FOR ONE FILE. One spelling, beside the shape the file door sends it.
+import { SHOWN_FILE_SEGMENT } from '@shared/shown-file.ts'
 import { KIND_FAMILIES, type KindFamily } from '@shared/work.ts'
 // THE KIND WORD, TYPE ONLY, for the record kinds whose address is their own word. Erased before
 // anything runs, so this file still holds no runtime edge into the kinds table.
@@ -583,6 +586,12 @@ export type Route =
    */
   | { name: 'board' }
   /**
+   * THE DEPARTMENTS, wave 13s round 281. `#/departments` is the tree of the project's departments, each with its level
+   * word; `#/departments/<id>` is one department with its sub-departments and its history. The board's view by line
+   * leads to it.
+   */
+  | { name: 'departments'; id?: string }
+  /**
    * THREE PAGES THAT WERE PANELS ON SETTINGS, wave 13y round 125 (item 62). `#/gates` is the gates the office checks
    * work against, a row in the Office group.
    * `#/office-controls` is the office's runtime settings, a row at the end of the Developer group.
@@ -598,6 +607,7 @@ export type Route =
   | { name: 'allPages' }
   /** EVERY QUICK NOTE THE PERSON KEPT, in every project, the newest started first (src/web/pages/MyNotesPage.tsx). */
   | { name: 'myNotes' }
+  | { name: 'knowledge'; categoryId?: string; entryId?: string }
   /**
    * ONE PARTICIPANT'S OWN PAGE, criterion M51.
    *
@@ -605,7 +615,13 @@ export type Route =
    * way a participant is ever named in this product; a bare id would need a second lookup to say
    * which registry it is in, and the two registries may hold the same id.
    */
-  | { name: 'who'; kind: ParticipantKind; id: string }
+  | {
+      name: 'who'
+      kind: ParticipantKind
+      id: string
+      /** ONE OF THE PERSON'S BROWSERS, by its credential: their card opens at that row. Design C of early idea B9. */
+      browser?: string
+    }
   /**
    * ONE SECRETARY'S NOTEBOOK. `#/who/agent/<id>/notebook`, criteria N1 to N4.
    *
@@ -639,6 +655,21 @@ export type Route =
    * NOT A ROW OF DESTINATIONS. The sidebar draws a row for each page of a switched-on plugin, read from the office.
    */
   | { name: 'plugin'; id: string; slug: string }
+  /**
+   * ONE AGENT TOOL'S KEY PAGE, #/set-up/<tool>/<way> (wave 13u, round 242): one way of setting up one tool, a key the
+   * person pastes or the tool's own sign-in. Only the ways in src/shared/setting-up-a-tool.ts have one.
+   *
+   * NOT A ROW OF DESTINATIONS. A secretary leads the person to it, and the person's own page leads may name it.
+   */
+  | { name: 'setUpATool'; tool: string; way: string }
+  /**
+   * ONE FILE A RECORD NAMES, DRAWN AS ITS WORDS ON THE OFFICE'S OWN PAGE, #/file/<record>/<path>. A Word document, a text
+   * file or a Markdown file, drawn by the same reader as the report's file block, which leads here. The record is the
+   * one whose authority the file door reads the file on, as it is for the block.
+   *
+   * NOT A RAIL ROW. It is reached from the file block's Open press.
+   */
+  | { name: 'file'; record: string; path: string }
   | { name: 'sheet' }
   | { name: 'unknown'; path: string }
 
@@ -907,11 +938,13 @@ export type FlatRoute = Extract<
       | 'signingPackages'
       | 'honourBoard'
       | 'board'
+      | 'departments'
       | 'gates'
       | 'officeControls'
       | 'sidebarArrangement'
       | 'allPages'
       | 'myNotes'
+      | 'knowledge'
       | 'settings'
       | 'pairing'
       | 'welcome'
@@ -1063,6 +1096,8 @@ export const FLAT_ROUTES: Readonly<Record<string, FlatRoute['name']>> = {
   'honour-board': 'honourBoard',
   // THE PROJECT BOARD (wave 13u round 216). One address, no second segment.
   board: 'board',
+  // THE DEPARTMENTS. `#/departments/<id>` opens one department and is parsed below.
+  departments: 'departments',
   // THREE PAGES THAT WERE PANELS ON SETTINGS (wave 13y round 125). Each has one address, with no second segment.
   gates: 'gates',
   'office-controls': 'officeControls',
@@ -1073,6 +1108,7 @@ export const FLAT_ROUTES: Readonly<Record<string, FlatRoute['name']>> = {
   'quick-note': 'quickNote',
   // EVERY QUICK NOTE ON A PAGE OF ITS OWN (wave 13y round 167). A note opens from here; none is listed under Reports.
   'my-notes': 'myNotes',
+  knowledge: 'knowledge',
   // The component sheet's address is "#/ui" and its page is called the sheet. The address is what
   // people type; the name is what the code calls it. They are allowed to differ, here, once.
   ui: 'sheet',
@@ -1200,7 +1236,8 @@ export function parseRoute(hash: string): Route {
   // parser and not two: a page reached by its old address is the same route in every respect.
   const renamed = renamedAddress(hash)
   if (renamed !== null) return parseRoute(`#${renamed}`)
-  const path = hash.replace(/^#/, '')
+  const rawPath = hash.replace(/^#/, '')
+  const path = rawPath.startsWith('/notes?') ? '/notes' : rawPath
   const written = path.split('/').filter((s) => s.length > 0)
   // A TRAILING "edit" IS TAKEN OFF BEFORE ANYTHING ELSE READS THE ADDRESS, and `editing` carries
   // what it said. Every branch below then matches on the address without it, and each branch says
@@ -1327,6 +1364,16 @@ export function parseRoute(hash: string): Route {
     const id = idFrom(second)
     return id === null ? { name: 'unknown', path } : { name: 'counters', id }
   }
+  if (head === 'knowledge' && second !== undefined && !editing) {
+    if (second === 'entry' && parts.length === 3 && parts[2] !== undefined) {
+      const id = idFrom(parts[2])
+      return id === null ? { name: 'unknown', path } : { name: 'knowledge', entryId: id }
+    }
+    if (parts.length === 2 && second !== 'entry') {
+      const id = idFrom(second)
+      return id === null ? { name: 'unknown', path } : { name: 'knowledge', categoryId: id }
+    }
+  }
   // ONE QUICK NOTE, by its id, for the reason the counters address gives.
   if (head === THE_QUICK_NOTE_SEGMENT && second !== undefined && parts.length === 2 && !editing) {
     const id = idFrom(second)
@@ -1353,6 +1400,11 @@ export function parseRoute(hash: string): Route {
   if (head === 'signing-packages' && second !== undefined && parts.length === 2 && !editing) {
     const id = idFrom(second)
     return id === null ? { name: 'unknown', path } : { name: 'signingPackages', id }
+  }
+  // ONE DEPARTMENT OPENED, and still the departments page.
+  if (head === 'departments' && second !== undefined && parts.length === 2 && !editing) {
+    const id = idFrom(second)
+    return id === null ? { name: 'unknown', path } : { name: 'departments', id }
   }
   // ONE TOOL'S MANUAL PAGE, and still the toolset route. Two segments exactly, for the reason the
   // counters address above gives.
@@ -1399,6 +1451,17 @@ export function parseRoute(hash: string): Route {
     if (id === null) return { name: 'unknown', path }
     return { name: 'notebook', kind: second, id }
   }
+  /**
+   * ONE OF THE PERSON'S BROWSERS ON THEIR CARD, five segments exactly: `#/who/person/<id>/browser/<credential>`.
+   * Design C of early idea B9. It opens the person's card at that browser's row. Only a person's card has
+   * browser rows, so the same tail under an agent is a typo and lands on the not-found page.
+   */
+  if (head === PROFILE_SEGMENT && second === 'person' && parts.length === 5 && parts[3] === HIS_BROWSER_SEGMENT && !editing) {
+    const id = idFrom(parts[2]!)
+    const browser = idFrom(parts[4]!)
+    if (id === null || browser === null) return { name: 'unknown', path }
+    return { name: 'who', kind: 'person', id, browser }
+  }
   if (head === PROFILE_SEGMENT && second !== undefined && parts.length === 3 && !editing) {
     const third = parts[2]
     if (third === undefined || !isParticipantKind(second)) return { name: 'unknown', path }
@@ -1431,6 +1494,19 @@ export function parseRoute(hash: string): Route {
     const id = idFrom(second)
     const slug = idFrom(parts[2] ?? '')
     return id === null || slug === null ? { name: 'unknown', path } : { name: 'plugin', id, slug }
+  }
+  // ONE AGENT TOOL'S KEY PAGE. Three segments exactly, and only a way the list names, matched as written: an address for
+  // any other tool or way is a typo, and it lands on the not-found page rather than on a page with nothing to press.
+  if (head === SET_UP_SEGMENT && second !== undefined && parts.length === 3 && !editing) {
+    const one = theSetUpWay(second, parts[2] ?? '')
+    return one === null ? { name: 'unknown', path } : { name: 'setUpATool', tool: one.tool, way: one.way }
+  }
+  // ONE FILE A RECORD NAMES. Three segments exactly, for the reason the record address gives, and never edited. The
+  // stored path is one encoded segment, so its own slashes never split the address.
+  if (head === SHOWN_FILE_SEGMENT && second !== undefined && parts.length === 3 && !editing) {
+    const record = idFrom(second)
+    const file = idFrom(parts[2] ?? '')
+    return record === null || file === null ? { name: 'unknown', path } : { name: 'file', record, path: file }
   }
   if (head === VISITOR_SEGMENT && second !== undefined && parts.length === 2 && !editing) {
     const id = idFrom(second)
@@ -1470,4 +1546,11 @@ export function parseRoute(hash: string): Route {
   const family = parts.length === 1 && !editing && head !== undefined ? familyFrom(head) : null
   if (family !== null) return { name: 'family', family }
   return { name: 'unknown', path }
+}
+
+/** Address of the knowledge root, one category, or one entry. */
+export function knowledgeAddress(route: Extract<Route, { name: 'knowledge' }>): string {
+  if (route.entryId !== undefined) return `#/knowledge/entry/${encodeURIComponent(route.entryId)}`
+  if (route.categoryId !== undefined) return `#/knowledge/${encodeURIComponent(route.categoryId)}`
+  return '#/knowledge'
 }

@@ -23,7 +23,7 @@ import type { Page } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { en } from '../src/shared/words/en.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
-import { type LiveApp, liveApp, waitForThePage } from './helpers.ts'
+import { type LiveApp, liveApp, waitForThePage, governsTheWholeProject } from './helpers.ts'
 
 let app: LiveApp
 let page: Page
@@ -56,7 +56,7 @@ function aFork(title: string): Promise<string> {
 /** A decision the person made, naming the fork in its text. */
 function aDecisionNaming(fork: string): Promise<string> {
   return file('decision', 'The spring batch takes the celadon', {
-    replaces: [],
+    ...governsTheWholeProject(), replaces: [],
     decided_by: 'the owner',
     authority: 'the owner said so',
     option_taken: `The celadon, as proposal ${fork} asked.`,

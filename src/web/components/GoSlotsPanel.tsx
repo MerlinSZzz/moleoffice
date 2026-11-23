@@ -11,7 +11,7 @@
  * thing.
  *
  * A READING THE SERVER REFUSES WITH 409 is a state the office is in, not a fault of the page: the router is off, or the
- * file is one the router would not read. Its sentence is drawn as it came, and there is nothing to add until it changes.
+ * file is one the router would not read. The page says "not read", and the server's sentence is drawn in developer mode.
  */
 
 import { settingsControlWord } from '@shared/settings-declaration.ts'
@@ -23,7 +23,7 @@ import { content, t } from '@shared/i18n.ts'
 import { ApiError, api, errorMessage } from '../api.ts'
 import { useLanguage } from '../lib/language.ts'
 import { KEYS_CSS } from './KeysPanel.tsx'
-import { ErrorNote, Loading, useAsync } from './ui.tsx'
+import { ErrorNote, Loading, ServerNote, useAsync } from './ui.tsx'
 
 type Read = { slots: KeySlotsReading } | { refused: string }
 
@@ -48,13 +48,15 @@ export function KeySlotsPanel() {
         {GO_SLOTS_CSS}
       </style>
       <h3 className="keys-heading">{t('settingsPanel.keySlots.heading')}</h3>
-      <p className="keys-lead">{t('settingsPanel.keySlots.lead')}</p>
       {state.status === 'loading' ? (
         <Loading what={t('settingsPanel.keySlots.loading')} />
       ) : state.status === 'error' ? (
         <ErrorNote message={state.message} fault={state.fault} />
       ) : 'refused' in state.value ? (
-        <p className="keys-says" lang="en">{state.value.refused}</p>
+        <>
+          <p className="keys-state">{t('settingsState.notRead')}</p>
+          <ServerNote text={state.value.refused} />
+        </>
       ) : (
         <Slots said={state.value.slots} onChanged={readAgain} />
       )}
@@ -69,7 +71,9 @@ function Slots({ said, onChanged }: { said: KeySlotsReading; onChanged: () => vo
   const providers: KeySlotsProvider[] = said.providers ?? []
   return (
     <>
-      {said.slots.length === 0 ? null : (
+      {said.slots.length === 0 ? (
+        <p className="keys-state">{t('absence.none')}</p>
+      ) : (
         <div className="keys-rows">
           {said.slots.map((one) => (
             <SlotRow key={`${one.id}:${one.mark}`} one={one} onChanged={onChanged} />
@@ -77,7 +81,7 @@ function Slots({ said, onChanged }: { said: KeySlotsReading; onChanged: () => vo
         </div>
       )}
       <AddASlot providers={providers} onChanged={onChanged} />
-      <p className="keys-says" lang="en">{said.says}</p>
+      <ServerNote text={said.says} />
     </>
   )
 }

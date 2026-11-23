@@ -53,7 +53,21 @@ export function lookOnOneReadingOfEveryProcess(name: string, log: (line: string)
     }
     return
   }
-  readFirst(theStartersTheLiveRowsMayAskAbout, () => runNamed(name, log, look), { andEveryOtherProcess: true }).catch((failed: unknown) => {
+  const reading = readFirst(theStartersTheLiveRowsMayAskAbout, () => runNamed(name, log, look), { andEveryOtherProcess: true }).catch((failed: unknown) => {
     log(theLookWasNotFinished(name, failed))
   })
+  theLooksStillReading.add(reading)
+  void reading.then(() => theLooksStillReading.delete(reading))
+}
+
+/** The looks that wait for their reading of the processes, each until it has run or failed. */
+const theLooksStillReading = new Set<Promise<void>>()
+
+/**
+ * WHEN EVERY LOOK WAITING FOR ITS READING HAS RUN. A stream that closes asks for a look, and on Windows the look runs
+ * seconds later, after its reading. A stopping server waits for this before it closes the database, so the look reads
+ * the database and not a closed handle (src/server/index.ts, package SD). A look that fails has said so in the log.
+ */
+export async function theLooksAskedForHaveRun(): Promise<void> {
+  while (theLooksStillReading.size > 0) await Promise.all([...theLooksStillReading])
 }

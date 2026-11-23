@@ -82,6 +82,16 @@ it("draws a kind's own word for a field that means something else on that kind",
       : []
   })
   expect(own.map((one) => one.word), 'the message\'s read field has no word of its own').toContain('record.field.message.read')
+  // A DEPARTMENT'S FIELDS ARE NAMED AS A DEPARTMENT'S (wave 13s round 281): its parent is the department above it, its
+  // supervisor is the one agent that leads it, and its names and what it does are each in one language.
+  for (const key of ['codes', 'nameEn', 'nameZh', 'doesEn', 'doesZh', 'parent', 'supervisor', 'mergedInto', 'restsOn']) {
+    expect(own.map((one) => one.word), `the department's ${key} has no word of its own`).toContain(`record.field.department.${key}`)
+  }
+  // A KEY ITEM'S FIELDS ARE NAMED AS A KEY ITEM'S (wave 13s round 281): its place is its place in the order of the
+  // open key items, and its hours left are an estimate, with who made it and when.
+  for (const key of ['place', 'packages', 'progress', 'progressSetBy', 'progressSetAt', 'hoursLeft', 'estimatedBy', 'estimatedAt']) {
+    expect(own.map((one) => one.word), `the key item's ${key} has no word of its own`).toContain(`record.field.key_item.${key}`)
+  }
   const wrong = own.flatMap(({ word, kind, key }) => {
     const said: string[] = []
     if (!KIND_SPECS[kind].fields.some((field) => field.key === key)) said.push(`${kind}.${key} is not declared, yet ${word} names it`)

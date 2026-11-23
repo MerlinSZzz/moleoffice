@@ -20,6 +20,7 @@ import type { FastifyInstance } from 'fastify'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { apiApp, freshDb, type TestDb } from './helpers.ts'
 import { A_PAGE_MAY_SEND_ITS_COOKIE } from '../src/config/what-a-page-may-read.mjs'
+import { settings } from '../src/config/settings.mjs'
 
 const HEAD = { 'x-mole-office-workspace': 'default' }
 const THE_HEADER = 'access-control-allow-credentials'
@@ -58,8 +59,10 @@ async function bothAnswers(origin: string): Promise<{ ordinary: Headers; stream:
 
 describe('whether a page may send its cookie is one answer on the stream and on every other reply', () => {
   it('allows the cookie on both for an origin the office admits', async () => {
-    // A page served by something on this machine, which `aPageOnThisMachine` admits.
-    const origin = 'http://127.0.0.1:29845'
+    // THE DEV SERVER'S PAGE, on another port of this machine. The office takes its origin while it is not built for
+    // production, as a test builds it, because under `npm run dev` the page is there. Until SEC-2 this was any port of
+    // this machine, which `aPageOnThisMachine` took and which is now refused.
+    const origin = `http://127.0.0.1:${String(settings().webPort)}`
     const { ordinary, stream } = await bothAnswers(origin)
     // The origin really was admitted on both, or the comparison below would prove nothing.
     expect(ordinary.get('access-control-allow-origin')).toBe(origin)

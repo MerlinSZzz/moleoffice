@@ -19,6 +19,7 @@
  * this file makes to records.ts is inside a function body, so nothing of records.ts is read while it is still being
  * evaluated. records/reading.ts does not import this file, so `getRecord` is imported from it directly.
  */
+import { refuseOrdinaryKnowledgeWrite } from '../../knowledge/guard.ts'
 import { and, eq } from 'drizzle-orm'
 import { BLOCK_KIND, blockIdsOf } from '@shared/blocks.ts'
 import { HANDBOOK_KIND } from '@shared/handbooks.ts'
@@ -33,8 +34,9 @@ import { refuseAWriteThatTakesTheWordsOfAnAddedCard } from '../refuse-a-write-th
 import { ROLE_CARD_WORDS_KIND } from '../../db/the-words-records-of-each-card.ts'
 import { anyRecordForAgent } from '../../db/any-record-for-agent.ts'
 import { announce } from '../events.ts'
-import { checkNoDutiesRestOn, checkTheDutiesTakenAway, checkTheSecretaryDuties } from '../grant/secretary-duties.ts'
+import { checkNoDutiesOrDepartmentsRestOn, checkTheDutiesTakenAway, checkTheSecretaryDuties } from '../grant/secretary-duties.ts'
 import { SECRETARY_DUTIES_KIND } from '@shared/secretary-duties-record.ts'
+import { checkTheDepartment, checkTheDepartmentTakenAway, DEPARTMENT_KIND } from '../grant/departments.ts'
 import { checkAHandbookBroughtBack } from '../handbooks.ts'
 import { AGENT_KIND } from '../inbox.ts'
 import { createRunTokenStore } from '../keyrouter/run-tokens.ts'
@@ -144,6 +146,7 @@ function actorAsParticipant(actor: Actor): { kind: 'person' | 'agent'; id: strin
 export function deleteRecord(id: string, actor: Actor): DeleteResult {
   const r = db.select().from(records).where(eq(records.id, id)).get()
   if (!r) throw noRecordHasThisId(id)
+  refuseOrdinaryKnowledgeWrite(r.kind)
   const kind = r.kind as RecordKind
   if (kind === AGENT_KIND && !r.deletedAt) {
     const row = agentForRecord(id)
@@ -155,9 +158,11 @@ export function deleteRecord(id: string, actor: Actor): DeleteResult {
   // AND IS IT A CHAPTER RECORD. Only the person deletes one, until this door takes a warrant.
   refuseAChapterDeletedOrBroughtBackByAnAgent(r, actor)
   if (kind === SECRETARY_DUTIES_KIND) checkTheDutiesTakenAway({ workspaceId: r.workspaceId, data: r.data, actor, act: 'delete' })
-  // AND DO A SECRETARY'S DUTIES REST ON THIS DECISION. They are changed first, by the person or their secretary, so that
-  // no duties are left naming a decision that is gone (lib/grant/secretary-duties.ts).
-  if (kind === DECISION_KIND && !r.deletedAt) checkNoDutiesRestOn({ id, title: r.title, workspaceId: r.workspaceId }, 'delete')
+  // A DEPARTMENT IS TAKEN AWAY BY THE WRITERS WHO WRITE IT, and not while another department names it (lib/grant/departments.ts).
+  if (kind === DEPARTMENT_KIND) checkTheDepartmentTakenAway({ workspaceId: r.workspaceId, id, data: r.data, actor, act: 'delete' })
+  // AND DO A SECRETARY'S DUTIES OR A DEPARTMENT REST ON THIS DECISION. They are changed first, by the person or their
+  // secretary, so that none is left naming a decision that is gone (lib/grant/secretary-duties.ts).
+  if (kind === DECISION_KIND && !r.deletedAt) checkNoDutiesOrDepartmentsRestOn({ id, title: r.title, workspaceId: r.workspaceId }, 'delete')
   assertMayRemoveAFork({ id, kind, title: r.title }, actor)
   // AND IS IT A MESSAGE SOMEBODY ELSE WROTE, OR A NOTICE FROM THE OFFICE. See the function.
   refuseADeleteOfAMessageByAnyoneButItsWriter(r, actor, 'delete')
@@ -311,6 +316,7 @@ export function deleteRecord(id: string, actor: Actor): DeleteResult {
 export function restoreRecord(id: string, actor: Actor): PanelRecord {
   const existing = db.select().from(records).where(eq(records.id, id)).get()
   if (!existing) throw noRecordHasThisId(id)
+  refuseOrdinaryKnowledgeWrite(existing.kind)
   const kind = existing.kind as RecordKind
   // WHO MAY WRITE THIS KIND, asked through `assertMayWrite` and not restated here. The local copy
   // this replaces asked only about `actor.type`, so a request that sent no actor headers could bring
@@ -331,6 +337,8 @@ export function restoreRecord(id: string, actor: Actor): PanelRecord {
   if (kind === AGENT_KIND) refuseARestoreThatBringsBackACardOrTimes(toRecord(existing), actor)
   // DUTIES COME BACK THROUGH THE WHOLE WRITE GUARD, including the check for another live record.
   if (kind === SECRETARY_DUTIES_KIND) checkTheSecretaryDuties({ workspaceId: existing.workspaceId, data: existing.data, before: null, mine: id, actor })
+  // A DEPARTMENT COMES BACK THROUGH THE WHOLE WRITE GUARD, so a code or a supervisor taken meanwhile is not held twice.
+  if (kind === DEPARTMENT_KIND) checkTheDepartment({ workspaceId: existing.workspaceId, data: existing.data, before: null, mine: id, actor })
   // A PIPELINE COMES BACK ONLY WITH A LIST A WRITE WOULD TAKE: a block it lists may have been deleted or moved while it was gone.
   if (kind === 'pipeline') {
     const [bad] = badEntriesOf(existing.workspaceId, blockIdsOf(toRecord(existing)), (entry) => db.select().from(records).where(eq(records.id, entry)).get())

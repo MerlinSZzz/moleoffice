@@ -11,16 +11,37 @@ import { ErrorNote, Loading, Panel, useAsync } from '../ui.tsx'
 type Provider = {
   id: string; name: string; page: string; documentation: string; instructions: string; scopes?: string
   permissions?: Record<string, string[]>; otherPermissionsOff?: string; expiry?: string; trialDescription?: string
+  hiddenInSettings?: boolean
 }
 const word = (key: string) => t(settingsControlWord('settings.providerkeys', key))
+
+/** The rows the panel draws: every row the table holds but one marked as not shown in Settings. */
+export function theRowsSettingsShows<R extends { hiddenInSettings?: boolean }>(rows: readonly R[]): R[] {
+  return rows.filter((entry) => entry.hiddenInSettings !== true)
+}
+
+/**
+ * The provider box's choices, each its value and its words: the rows it is handed, in their order, and nothing after
+ * them. The table, the server's door and the guided script keep a choice of another provider; this box does not.
+ */
+export function theProviderChoices(rows: readonly { id: string }[]): { value: string; words: string }[] {
+  return rows.map((entry) => ({ value: entry.id, words: t(providerGuideWord(entry.id, 'name')) }))
+}
+
+/**
+ * WHAT THE CHOSEN ROW IS FOR (wave 13u round 242), or null with nothing chosen. The rows Settings shows are the
+ * DigitalOcean and Resend keys, which only an office that runs the Mole Office id service and sends its sign-up mail
+ * needs, so one line answers for each of them. A coding tool's key goes on its own key page, so the table's OpenAI row
+ * is kept but marked as not shown in Settings.
+ */
+export function whatTheChoiceIsFor(selected: string): string | null {
+  return selected === '' ? null : t('providerSetup.keptForTheOffice')
+}
 
 export function ProviderKeyPanel() {
   const language = useLanguage().language
   const [state] = useAsync(() => moleOfficeRequest<{ providers: Provider[]; savingAvailable: boolean }>('/api/settings/provider-keys'), [])
   const [provider, setProvider] = useState('')
-  const [name, setName] = useState('')
-  const [prefix, setPrefix] = useState('')
-  const [minimum, setMinimum] = useState(1)
   const [value, setValue] = useState('')
   const [replace, setReplace] = useState(false)
   // Set only when the office refused a save because a key is already saved there, or a trial found one too broad; the replace box is drawn only then.
@@ -29,15 +50,15 @@ export function ProviderKeyPanel() {
   const [notice, setNotice] = useState('')
   const [fault, setFault] = useState('')
   const [trialAvailable, setTrialAvailable] = useState(false)
-  const rows = state.status === 'ready' ? state.value.providers : []
+  const rows = state.status === 'ready' ? theRowsSettingsShows(state.value.providers) : []
   const selected = provider || rows[0]?.id || ''
   const row = rows.find((entry) => entry.id === selected)
+  const keptFor = whatTheChoiceIsFor(selected)
   const save = async () => {
     setBusy(true); setNotice(''); setFault('')
     try {
       const result = await moleOfficeRequest<{ saved: boolean; trialAvailable: boolean }>('/api/settings/provider-keys', {
-        method: 'POST', body: JSON.stringify({ provider: selected, value, replace, lang: language === 'zh' ? 'zh' : 'en',
-          ...(selected === 'custom' ? { customName: name, prefix, min: minimum } : {}) }),
+        method: 'POST', body: JSON.stringify({ provider: selected, value, replace, lang: language === 'zh' ? 'zh' : 'en' }),
       })
       setValue(''); setReplace(false); setExists(false); setTrialAvailable(result.trialAvailable)
       setNotice(result.trialAvailable ? t('providerSetup.saved') : t('providerSetup.local'))
@@ -57,22 +78,20 @@ export function ProviderKeyPanel() {
       else setFault(result.says)
     } catch (error) { setFault(errorMessage(error)) } finally { setBusy(false) }
   }
-  return <Panel titleIs="label" declares={{ surface: 'settings.providerkeys' }} title={t('providerSetup.title')}>
+  return <Panel titleIs="label" declares={{ surface: 'settings.providerkeys' }} title={t('settingsPanel.title.providerkeys')}>
     <style href="provider-key-setup" precedence="default">{CSS}</style>
     {state.status === 'loading' ? <Loading what={t('providerSetup.loading')} /> : state.status === 'error' ? <ErrorNote message={state.message} fault={state.fault} /> :
       <div className="pks">
         <p>{t('providerSetup.lead')}</p>{state.value.savingAvailable === false ? <p>{t('providerSetup.windows')}</p> : null}
         <label>{word('providerSetup.provider')}<select value={selected} onChange={(event) => { setProvider(event.target.value); setValue(''); setReplace(false); setExists(false); setNotice(''); setFault(''); setTrialAvailable(false) }}>
-          {rows.map((entry) => <option key={entry.id} value={entry.id}>{t(providerGuideWord(entry.id, 'name'))}</option>)}<option value="custom">{t('providerSetup.custom')}</option>
+          {theProviderChoices(rows).map((one) => <option key={one.value} value={one.value}>{one.words}</option>)}
         </select></label>
+        {keptFor === null ? null : <p className="pks-kept">{keptFor}</p>}
         {/* The office's reply says which parts a guide has; their words come from the lists. */}
         {row ? <div className="pks-guide"><p>{t(providerGuideWord(row.id, 'instructions'))}</p>{row.scopes ? <p>{t(providerGuideWord(row.id, 'scopes'))}</p> : null}
           {row.permissions ? <ul>{Object.keys(row.permissions).map((resource) => <li key={resource}>{t(providerGuideWord(row.id, `permission.${resource}`))}</li>)}</ul> : null}
           {row.otherPermissionsOff ? <p>{t(providerGuideWord(row.id, 'otherPermissionsOff'))}</p> : null}{row.expiry ? <p>{t(providerGuideWord(row.id, 'expiry'))}</p> : null}
           <p><a href={row.page} target="_blank" rel="noreferrer">{t(providerGuideWord(row.id, 'name'))}</a>{' · '}<a href={row.documentation} target="_blank" rel="noreferrer">{t('providerSetup.documentation')}</a></p></div> : null}
-        {selected === 'custom' ? <><label>{word('providerSetup.name')}<input value={name} onChange={(event) => { setName(event.target.value); setReplace(false); setExists(false) }} /></label>
-          <label>{word('providerSetup.prefix')}<input value={prefix} onChange={(event) => setPrefix(event.target.value)} /></label>
-          <label>{word('providerSetup.minimum')}<input type="number" min={1} max={4096} value={minimum} onChange={(event) => setMinimum(Number(event.target.value))} /></label></> : null}
         <label>{word('providerSetup.key')}<input type="password" autoComplete="off" spellCheck={false} value={value} onChange={(event) => setValue(event.target.value)} /></label>
         {exists ? <label className="pks-check"><input type="checkbox" checked={replace} onChange={(event) => setReplace(event.target.checked)} />{word('providerSetup.replace')}</label> : null}
         {/* The trial paragraph says what the trial button does, so it is drawn only beside that button. */}
@@ -86,6 +105,7 @@ export function ProviderKeyPanel() {
 const CSS = `
 .pks { display: flex; flex-direction: column; gap: var(--pad); min-width: 0; max-width: 48rem; }
 .pks p { margin: 0; }
+.pks .pks-kept { color: var(--text-2); }
 .pks label { display: flex; flex-direction: column; gap: 4px; }
 .pks input:not([type=checkbox]), .pks select { min-height: 32px; max-width: 28rem; width: 100%; }
 .pks .pks-check { flex-direction: row; align-items: center; }

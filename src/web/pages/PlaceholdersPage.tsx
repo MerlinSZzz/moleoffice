@@ -53,7 +53,7 @@ import { kindWord } from '../lib/words.ts'
 import { useMode, type Mode } from '../lib/mode.ts'
 import { recordPath, RouteLink } from '../components/router.tsx'
 import { RESTRICTIONS_SHEET, RESTRICTIONS_CSS } from '../components/Restrictions.tsx'
-import { Absence, ErrorNote, Explain, Loading, Panel, Tag } from '../components/ui.tsx'
+import { Absence, ErrorNote, Explain, Loading, Panel, ServerNote, Tag } from '../components/ui.tsx'
 import { useProjectAsync } from '../lib/project-async.ts'
 
 /** What the reply carries, named here so the page reads as a page. */
@@ -94,15 +94,15 @@ export function standingSaid(row: RestrictionInProject): string {
     // EVERY ONE OF THESE LEADS WITH THE FACT AND NOT WITH THE ABSENCE. "Nothing rests on it" and
     // "Its author said nothing rests on it" say the same thing, and the second one says WHOSE
     // statement it is — which is the whole of what severity is here, since Mole Office never derives it.
-    if (row.severity === 'harmless') return t('g7a.placeholders.harmless')
+    if (row.severity === 'harmless') return t('placeholdersPage.harmless')
     return row.reaches === 0
-      ? t('g7a.placeholders.noLinks')
+      ? t('placeholdersPage.noLinks')
       : t('g7a.placeholders.reaches', { n: row.reaches })
   }
   const when = row.resolvedAt === null ? '' : t('g7a.placeholders.on', { date: row.resolvedAt.slice(0, 10) })
-  if (row.severity === 'harmless') return t('g7a.placeholders.answeredHarmless', { when })
+  if (row.severity === 'harmless') return t('placeholdersPage.answeredHarmless', { when })
   if (row.owed === 0) return t('g7a.placeholders.answeredChecked', { when })
-  return t('g7a.placeholders.owed', { when, n: row.owed })
+  return t('placeholdersPage.owed', { when, n: row.owed })
 }
 
 export function PlaceholdersPage() {
@@ -139,7 +139,7 @@ function Bands({ reading, mode }: { reading: Reading; mode: Mode }) {
     <>
       {/* THE SERVER'S OWN SENTENCE ABOUT ITS OWN ANSWER. The page prints it rather than counting
           the rows again: a second count in the browser could disagree with the reply it describes. */}
-      {mode === 'inspect' ? <p className="plc-said">{reading.note}</p> : null}
+      <ServerNote text={reading.note} />
 
       <Panel titleIs="label"
         declares={{ surface: 'placeholders.open' }}
@@ -165,8 +165,6 @@ function Bands({ reading, mode }: { reading: Reading; mode: Mode }) {
         rank={2}
         actions={<Tag tone="quiet">{answered.length}</Tag>}
       >
-        <p className="rst-said">
-          {t('g7a.placeholders.validity')}</p>
         {answered.length === 0 ? (
           <Absence />
         ) : (
@@ -246,7 +244,7 @@ function Row({ row, mode }: { row: RestrictionInProject; mode: Mode }) {
           rules say so — it is on this page because somebody filed it, and the line says why it
           reaches nobody rather than leaving a reader to wonder. */}
       {row.about.length === 0 ? (
-        <Absence title={t('g7a.placeholders.noAbout')} />
+        <Absence title={t('placeholdersPage.noAbout')} />
       ) : (
         <p className="rst-about">
           {t('g7a.placeholders.about')}{' '}
@@ -267,6 +265,5 @@ function Row({ row, mode }: { row: RestrictionInProject; mode: Mode }) {
 
 const PLACEHOLDERS_CSS = `
 .plc-title { margin: 0 0 var(--pad) 0; font-size: var(--fs-4); }
-.plc-said { color: var(--text-2); font-size: var(--fs-1); margin: 0 0 var(--pad-lg) 0; max-width: var(--measure-in-box); }
 .rst-about { margin: calc(var(--pad) * 0.5) 0 0 0; color: var(--text-2); font-size: var(--fs-1); overflow-wrap: anywhere; }
 `

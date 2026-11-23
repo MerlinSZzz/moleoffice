@@ -34,10 +34,10 @@ import { settingsControlWord } from '@shared/settings-declaration.ts'
 import { t } from '@shared/i18n.ts'
 import { useLanguage } from '../lib/language.ts'
 import { MODES, modeFaults, modeIsFromAddress, setMode, useMode, type Mode } from '../lib/mode.ts'
+import { Hint } from './ui.tsx'
 
-// MODE_LABELS and MODE_NOTES in src/web/lib/mode.ts hold the same English; these keys are what the switch draws.
+// MODE_LABELS in src/web/lib/mode.ts holds the same English; these keys are what the switch draws.
 const MODE_LABEL_KEYS = { normal: 'settingsPanel.mode.normal', inspect: 'settingsPanel.mode.developer' } as const satisfies Record<Mode, string>
-const MODE_NOTE_KEYS = { normal: 'settingsPanel.mode.noteNormal', inspect: 'settingsPanel.mode.noteDeveloper' } as const satisfies Record<Mode, string>
 
 export function ViewSwitch() {
   useLanguage()
@@ -49,8 +49,11 @@ export function ViewSwitch() {
       <style href="mole-office-viewswitch" precedence="default">
         {CSS}
       </style>
-      <span className="viewswitch-label" id="viewswitch-label">
-        {t('settingsPanel.mode.label')}
+      <span className="viewswitch-head">
+        <span className="viewswitch-label" id="viewswitch-label">
+          {t('settingsPanel.mode.label')}
+        </span>
+        <Hint under>{t('settingsPanel.mode.noteNormal')}</Hint>
       </span>
       <div className="viewswitch-seg" role="group" aria-labelledby="viewswitch-label">
         {MODES.map((m) => (
@@ -59,7 +62,6 @@ export function ViewSwitch() {
           </button>
         ))}
       </div>
-      <p className="viewswitch-note">{t(MODE_NOTE_KEYS[mode])}</p>
       {modeIsFromAddress ? (
         // The address wins for this load and is deliberately not saved. Somebody who followed a
         // link and then wondered why their choice did not stick would otherwise have no way to know.
@@ -79,6 +81,11 @@ export function ViewSwitch() {
 
 const CSS = `
 .viewswitch { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+
+/* THE MARK'S WORDS OPEN UNDER THIS LINE, as wide as the switch, so they stay inside the card and the page at
+   every width. That needs a block stretched to the switch's width: a flex row lays the words out beside the
+   label, and they used to open leftward from the mark, past the card's left edge. */
+.viewswitch-head { display: block; align-self: stretch; }
 
 .viewswitch-label {
   font-size: var(--fs-1);

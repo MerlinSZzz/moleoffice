@@ -3,7 +3,7 @@
 /**
  * THE MAIN-WORLD GUARD AS A HOOK: THE PROCESS EVERY RUNTIME STARTS, END TO END.
  *
- * tools/guard/main-world-guard.mjs reads a Claude Code PreToolUse payload on standard input and
+ * for-agents/main-world-guard.mjs reads a Claude Code PreToolUse payload on standard input and
  * answers with its exit code: 0 lets the call through, 2 stops it with the reason on stderr. This
  * file starts it as a process, the way Claude Code, Codex, the dsh bridge and the OpenCode plugin
  * do, against a stand-in office started here that answers the two doors the guard reads (the
@@ -17,19 +17,23 @@
  *     inside it, and a secretary's card (grain `nothing`) is let through;
  *   - when the office does not answer, or the run did not say who it is, a delete outside the
  *     temporary directory is stopped and everything else goes on;
- *   - when the guard itself cannot load, a call that looks like a delete is stopped and anything else
- *     is let through, and stderr says which (the copy of the hook run for this has no policy beside it);
+ *   - when the guard cannot read its policy, every call is stopped with exit 2 and one line naming the
+ *     policy's file (the copy of the hook run for this has no policy beside it); when the payload cannot
+ *     be read, a call that looks like a delete is stopped;
  *   - the shapes dsh, OpenCode and Codex send (`bash` with `workdir`, `write` with `filePath`,
  *     `apply_patch`) are read as what they are;
- *   - `--mounted dsh` answers from tools/dsh-hooks/hooks.json.
+ *   - `--mounted dsh` answers from tools/dsh-hooks/hooks.json;
+ *   - A DSH HOOKS FILE MOUNTS THE GUARD ONLY BY THE GUARD'S PATH IN for-agents/. A hooks file naming
+ *     that path mounts it. One naming only the old path in tools/guard/, where no file is left, does
+ *     not mount it, and one naming neither does not.
  *
  * ---------------------------------------------------------------------------------------
  * THE MUTATIONS THIS IS WRITTEN AGAINST, each after a control run, each restored after
  * ---------------------------------------------------------------------------------------
  *
- *   make `failed` in the hook let every call through                          → the crash case is red.
+ *   make `failed` in the hook let every call through                          → the crash case is red (its unreadable payload).
  *   drop the card check from `whoIsAsking`, so nobody is exempt               → the secretary case is red.
- *   ignore `workdir` in `effectsOf` (tools/guard/what-a-call-does.mjs)          → the dsh shape case is red.
+ *   ignore `workdir` in `effectsOf` (for-agents/what-a-call-does.mjs)           → the dsh shape case is red.
  *   make `whoIsAsking` answer "exempt" when the office does not answer        → the office-down and unknown-agent cases are red.
  */
 import { spawn, spawnSync } from 'node:child_process'
@@ -37,15 +41,16 @@ import { copyFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'nod
 import { createServer, type Server } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { userInfo } from 'node:os'
-import { join } from 'node:path'
+import { basename, join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
-import { RAILING } from '../tools/guard/policy.mjs'
+import { RAILING } from '../for-agents/main-world-guard-policy.mjs'
+import { THE_GUARD, theDshHooksCarryTheGuard } from '../src/config/main-world-guard.mjs'
 
 const REPO = fileURLToPath(new URL('..', import.meta.url)).replace(/\/+$/, '')
-const GUARD = join(REPO, 'tools', 'guard', 'main-world-guard.mjs')
+const GUARD = THE_GUARD
 
 let scratch = ''
 let checkout = ''
@@ -119,6 +124,9 @@ async function hook(
   const child = spawn(process.execPath, argv, { env, stdio: ['pipe', 'pipe', 'pipe'] })
   let stderr = ''
   child.stderr.on('data', (d: Buffer) => { stderr += d.toString('utf8') })
+  // A HOOK THAT EXITS BEFORE IT READS ITS PAYLOAD, such as one that fails to load, may close the pipe
+  // under this write. Its exit and stderr are what is read, so a closed pipe here is not a failure.
+  child.stdin.on('error', () => {})
   child.stdin.end(typeof payload === 'string' ? payload : JSON.stringify(payload))
   const status = await new Promise<number | null>((done) => child.on('close', (code) => done(code)))
   return { status, stderr }
@@ -179,24 +187,26 @@ describe('when something is missing, a delete stops and the rest goes on', () =>
     expect(got.stderr).toContain('No agent in this installation answers')
   })
 
-  it('fails closed for a delete and open for everything else when the guard itself cannot load', async () => {
+  it('stops every call when the guard cannot read its policy, and a delete when the payload cannot be read', async () => {
     // A COPY OF THE HOOK WITH NOTHING BESIDE IT cannot import its policy or the settings: that is the
-    // guard crashing, for real, with no switch in the code to make it.
+    // guard failing, for real, with no switch in the code to make it. Without its policy it stops every
+    // call, a delete or not, because an exit of 0 or 1 lets the call go on in every runtime.
     const alone = join(scratch, 'alone')
     mkdirSync(alone, { recursive: true })
-    const copy = join(alone, 'main-world-guard.mjs')
+    const copy = join(alone, basename(GUARD))
     copyFileSync(GUARD, copy)
-    const del = await hook(bash('rm -rf build'), { script: copy })
-    expect(del.status, del.stderr).toBe(2)
-    expect(del.stderr).toContain('The guard itself failed')
-    const home = await hook(bash('HOME=/tmp/x npm test'), { script: copy })
-    expect(home.status, home.stderr).toBe(2)
-    const other = await hook(bash('npm test 2>&1 | tail -5'), { script: copy })
-    expect(other.status, other.stderr).toBe(0)
-    expect(other.stderr).toContain('let this call through, because it does not look like a delete')
+    for (const command of ['rm -rf build', 'HOME=/tmp/x npm test', 'npm test 2>&1 | tail -5']) {
+      const got = await hook(bash(command), { script: copy })
+      expect(got.status, `${command}: ${got.stderr}`).toBe(2)
+      expect(got.stderr.trimEnd().split('\n'), got.stderr).toHaveLength(1)
+      expect(got.stderr).toMatch(/could not read its policy \S*main-world-guard-policy\.mjs \(/)
+    }
+    // THE CRASH CASE'S OTHER HALF: a payload that is not JSON is a failure of another kind, and a call
+    // that looks like a delete is stopped.
     const unreadable = await hook('this is not a payload: rm -rf x')
     expect(unreadable.status).toBe(2)
-  })
+    expect(unreadable.stderr).toContain('The guard itself failed')
+  }, 60_000)
 })
 
 describe('every runtime’s shape is read as what it is', () => {
@@ -220,6 +230,29 @@ describe('every runtime’s shape is read as what it is', () => {
   it('answers `--mounted dsh` from the hooks file', async () => {
     const ran = spawnSync(process.execPath, [GUARD, '--mounted', 'dsh'], { encoding: 'utf8' })
     expect(ran.status, ran.stdout + ran.stderr).toBe(0)
-    expect(ran.stdout).toContain('names tools/guard/main-world-guard.mjs as a PreToolUse hook')
+    expect(ran.stdout).toContain(`names ${relative(REPO, GUARD)} as a PreToolUse hook`)
+  })
+
+  it('reads a dsh hooks file naming the new path as mounting the guard, and one naming only the old path or neither as not', () => {
+    const folder = join(scratch, 'hooks-files')
+    mkdirSync(folder, { recursive: true })
+    /** A hooks file with one PreToolUse command, below the plugin's root as tools/dsh-hooks/hooks.json names them. */
+    const aHooksFile = (name: string, path: string) => {
+      const file = join(folder, `${name}.json`)
+      const command = `node \${CLAUDE_PLUGIN_ROOT}/${path}`
+      writeFileSync(file, JSON.stringify({ hooks: { PreToolUse: [{ matcher: '', hooks: [{ type: 'command', command, timeout: 30 }] }] } }))
+      return file
+    }
+    const moved = relative(REPO, GUARD)
+    const onTheNewPath = theDshHooksCarryTheGuard(aHooksFile('new', moved))
+    expect(onTheNewPath.mounted, onTheNewPath.because).toBe(true)
+    expect(onTheNewPath.because).toContain(`names ${moved} as a PreToolUse hook`)
+    // THE GUARD'S OLD PATH, written out here because the source no longer names it. No file is left there.
+    const old = 'tools/guard/main-world-guard.mjs'
+    const onTheOldPath = theDshHooksCarryTheGuard(aHooksFile('old', old))
+    expect(onTheOldPath.mounted, onTheOldPath.because).toBe(false)
+    expect(onTheOldPath.because).toContain(`has no PreToolUse hook naming ${moved}.`)
+    const onNeither = theDshHooksCarryTheGuard(aHooksFile('neither', 'tools/dsh-hooks/post-tool-use.mjs'))
+    expect(onNeither.mounted, onNeither.because).toBe(false)
   })
 })

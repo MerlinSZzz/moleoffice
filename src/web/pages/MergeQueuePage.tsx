@@ -40,7 +40,7 @@ import { localStamp, momentOfAnInstant } from '@shared/time.ts'
 import { useState } from 'react'
 import { api, errorMessage, faultOf, getActor } from '../api.ts'
 import { recordPath } from '../components/router.tsx'
-import { Absence, Btn, ErrorNote, Explain, Loading, Panel, TextArea } from '../components/ui.tsx'
+import { Absence, Btn, ErrorNote, Loading, Panel, ServerNote, TextArea } from '../components/ui.tsx'
 import { useProjectAsync } from '../lib/project-async.ts'
 import { howThePushEnded, PUSH_CSS, PushLines, shortTime, theFollowUpOf, WhoPushed, type PushLine } from '../components/MergeQueuePush.tsx'
 import { itWaitsForAFixRound, TheFixRoundWait, theFixRoundWait } from '../components/MergeQueueFixRound.tsx'
@@ -68,10 +68,6 @@ export function MergeQueuePage() {
       <header className="mq-head">
         {/* THE NAME, TYPED: the same words as the rail row that opens this page. */}
         <h1 className="mq-title" data-title-is="its-label">{t('mergeQueuePage.nav')}</h1>
-        {/* WHAT THE PAGE IS STAYS IN SIGHT, AND WHAT A LANE AND A BUS ARE IS ONE PRESS DOWN. */}
-        <Explain declares={{ surface: null }} meaning={t('w13q.mergeQueue.meaning')} opens={t('w13q.mergeQueue.termsOpen')}>
-          <p className="mq-intro">{t('mergeQueuePage.intro')}</p>
-        </Explain>
       </header>
       {state.status === 'loading' ? <Loading label={t('mergeQueuePage.loading')} rows={3} /> : null}
       {state.status === 'error' ? <ErrorNote message={state.message} fault={state.fault ?? null} retry={reload} /> : null}
@@ -167,7 +163,6 @@ function TheEntriesTheQueueCannotRead({ entries }: { entries: readonly Unreadabl
   if (entries.length === 0) return null
   return (
     <Panel titleIs="label" declares={{ surface: 'mergequeue.unreadable' }} title={surfaceWord('mergequeue.unreadable')}>
-      <p className="mq-why">{t('mergeQueuePage.unreadable.says')}</p>
       <ul className="mq-unreadable">
         {entries.map((one) => (
           <li key={one.id} className="mq-unreadable-row" data-unreadable={one.id}>
@@ -309,7 +304,7 @@ function whileItResolves(row: QueueEntryRow, now: Date): string[] {
   if (resolution !== null && typeof resolution.at === 'string') {
     lines.push(
       anObjectIn(resolution, 'refused') === null
-        ? t('mergeQueuePage.why.handedOver', { at: shortTime(resolution.at, now) })
+        ? t('mergeQueuePage.row.handedOver', { at: shortTime(resolution.at, now) })
         : t('mergeQueuePage.why.refused', { at: shortTime(resolution.at, now) }),
     )
     const time = anObjectIn(resolution, 'refused') === null ? null : theTimeLeftToResolve(resolving, now.getTime())
@@ -338,7 +333,7 @@ function whileItFixesItsRed(row: QueueEntryRow, resolving: Partial<Record<keyof 
   if (resolution !== null && typeof resolution.at === 'string') {
     lines.push(
       anObjectIn(resolution, 'refused') === null
-        ? t('mergeQueuePage.why.fixHandedOver', { at: shortTime(resolution.at, now) })
+        ? t('mergeQueuePage.row.fixHandedOver', { at: shortTime(resolution.at, now) })
         : t('mergeQueuePage.why.fixRefused', { at: shortTime(resolution.at, now) }),
     )
     const time = anObjectIn(resolution, 'refused') === null ? null : theTimeLeftToResolve(resolving, now.getTime())
@@ -361,32 +356,32 @@ export function whyItWaits(row: QueueEntryRow, bus: LaneBus | null, name: Namer,
   // A PRESS STILL OWED IS SAID IN EVERY STATE BEFORE THE LANDING, because the entry is checked and tested while it waits.
   const press = row.pressToLand !== undefined && owesAPress(row) ? t('mergeQueuePage.why.press', { n: row.pressToLand.paths.length, paths: row.pressToLand.paths.join(', ') }) : null
   // A FEW-RED ENTRY THAT WAITS FOR A FIX ROUND is not testing: its tests ran red, and TheFixRoundWait says the rest.
-  if (row.state === 'testing' && theFixRoundWait(row.machine) === null) lines.push(t('mergeQueuePage.why.testing'))
-  if (row.state === 'testing' && itWaitsForAFixRound(row.machine)) lines.push(t('mergeQueuePage.why.fixRound'))
-  if (row.state === 'integrating') lines.push(t('mergeQueuePage.why.integrating'))
+  if (row.state === 'testing' && theFixRoundWait(row.machine) === null) lines.push(t('mergeQueuePage.row.holdsTheLane'))
+  if (row.state === 'testing' && itWaitsForAFixRound(row.machine)) lines.push(t('mergeQueuePage.row.fixRound'))
+  if (row.state === 'integrating') lines.push(t('mergeQueuePage.row.holdsTheLane'))
   if (row.state === 'landing') lines.push(t('mergeQueuePage.why.landing'))
   if (row.state === 'reinspecting') {
     const files = theFilesToCheck(row)
     // A CHECK AGAIN HOLDS THE LANE ONLY FOR AN ENTRY BACK FROM AN EARLIER ONE (wave 13u, item 53); `occupies` says which.
-    if (row.occupies !== null) lines.push(files === null ? t('mergeQueuePage.why.reinspectingUnnamed') : t('mergeQueuePage.why.reinspecting', { files: files.join(', ') }))
-    else lines.push(files === null ? t('mergeQueuePage.why.reinspectingLetGoUnnamed') : t('mergeQueuePage.why.reinspectingLetGo', { files: files.join(', ') }))
+    if (row.occupies !== null) lines.push(files === null ? t('mergeQueuePage.row.checkUnnamed') : t('mergeQueuePage.why.reinspecting', { files: files.join(', ') }))
+    else lines.push(files === null ? t('mergeQueuePage.row.letGoUnnamed') : t('mergeQueuePage.row.letGo', { files: files.join(', ') }))
   }
   if (row.state === 'resolving') lines.push(...whileItResolves(row, now))
-  if (row.state === 'submitted') lines.push(t('mergeQueuePage.why.submitted'))
+  if (row.state === 'submitted') lines.push(t('mergeQueuePage.row.submitted'))
   if (row.state === 'pinned') lines.push(t('mergeQueuePage.why.pinned'))
   const passed = itsResolutionPassed(row, now)
   if (passed !== null) lines.push(passed)
   if (row.state !== 'judged') return press === null ? lines : [...lines, press]
-  if (bus !== null && ridesTheBus(row, bus)) lines.push(t('mergeQueuePage.why.rode', { driver: name(bus.driver) }))
-  if (bus !== null && bus.passedForACheck.includes(row.id)) lines.push(t('mergeQueuePage.why.passedOver', { driver: name(bus.driver) }))
-  if (bus !== null && bus.passedAlone.includes(row.id)) lines.push(t('mergeQueuePage.why.passedAlone', { driver: name(bus.driver) }))
+  if (bus !== null && ridesTheBus(row, bus)) lines.push(t('mergeQueuePage.row.rode', { driver: name(bus.driver) }))
+  if (bus !== null && bus.passedForACheck.includes(row.id)) lines.push(t('mergeQueuePage.row.passedOver', { driver: name(bus.driver) }))
+  if (bus !== null && bus.passedAlone.includes(row.id)) lines.push(t('mergeQueuePage.row.passedAlone', { driver: name(bus.driver) }))
   const waits = row.toolWaits
-  if (waits === undefined) lines.push(t('mergeQueuePage.why.next'))
+  if (waits === undefined) lines.push(t('mergeQueuePage.row.next'))
   else if (waits.because === 'the-lane-is-held') lines.push(t('mergeQueuePage.why.laneHeld', { holder: name(waits.holder) }))
   else if (waits.because === 'deletes-not-confirmed') lines.push(t('mergeQueuePage.why.deletes', { n: waits.deletes }))
-  else if (waits.because === 'a-rider-goes-first') lines.push(t('mergeQueuePage.why.behindRider', { first: name(waits.first), driver: name(waits.driver) }))
-  else if (waits.because === 'an-entry-passed-over-for-a-check-goes-first') lines.push(t('mergeQueuePage.why.behindPassedOver', { first: name(waits.first), driver: name(waits.driver) }))
-  else if (waits.because === 'an-entry-tested-alone-goes-first') lines.push(t('mergeQueuePage.why.behindTestedAlone', { first: name(waits.first), driver: name(waits.driver) }))
+  else if (waits.because === 'a-rider-goes-first') lines.push(t('mergeQueuePage.row.behindRider', { first: name(waits.first), driver: name(waits.driver) }))
+  else if (waits.because === 'an-entry-passed-over-for-a-check-goes-first') lines.push(t('mergeQueuePage.row.behindPassedOver', { first: name(waits.first), driver: name(waits.driver) }))
+  else if (waits.because === 'an-entry-tested-alone-goes-first') lines.push(t('mergeQueuePage.row.behindTestedAlone', { first: name(waits.first), driver: name(waits.driver) }))
   else if (waits.because === 'a-moved-entry-goes-first') lines.push(t('mergeQueuePage.why.behindMoved', { first: name(waits.first) }))
   else if (waits.because === 'a-returning-entry-goes-first') lines.push(t('mergeQueuePage.why.behindReturning', { first: name(waits.first) }))
   else if (waits.because === 'the-queue-is-held') lines.push(t('mergeQueuePage.why.queueHeld'))
@@ -560,9 +555,9 @@ function OnePush({ push, now }: { push: EmergencyPushReading; now: Date }) {
  * page names ids and paths, so it says what the merge tool said as well.
  */
 export function whatBecameOfThePush(push: EmergencyPushReading, now: Date): PushLine[] {
-  const ended = howThePushEnded(push, now, true)
-  if (push.ended === null) return [{ says: t('mergeQueuePage.push.started', { at: shortTime(push.startedAt, now) }), red: false, receipt: null }, ...ended]
-  const follow = theFollowUpOf(push, true)
+  const ended = howThePushEnded(push, now)
+  if (push.ended === null) return [{ says: t('mergeQueuePage.push.started', { at: shortTime(push.startedAt, now) }), red: false, receipt: null, note: null }, ...ended]
+  const follow = theFollowUpOf(push)
   return follow === null ? ended : [...ended, follow]
 }
 
@@ -575,7 +570,7 @@ function TheBus({ testingNow, bus, name, now }: { testingNow: QueueEntryRow | nu
     <div className="mq-bus">
       {testingNow === null ? null : (
         <p className="mq-bus-now" data-testing={testingNow.id}>
-          {t('mergeQueuePage.bus.testingNow', { name: name(testingNow.id) })}
+          {t('mergeQueuePage.bus.testingNowShort', { name: name(testingNow.id) })}
         </p>
       )}
       {bus === null ? null : (
@@ -605,8 +600,8 @@ function TheBus({ testingNow, bus, name, now }: { testingNow: QueueEntryRow | nu
 
 /** Each press's door and its words: `first` moves an entry to the front, `land` lets one touching a sensitive path land. */
 const THE_DOORS = {
-  first: { send: api.moveToTheFront, open: 'mergeQueuePage.press.open', label: 'mergeQueuePage.press.label', hint: 'mergeQueuePage.press.hint', go: 'mergeQueuePage.press.send' },
-  land: { send: api.pressToLand, open: 'mergeQueuePage.landPress.open', label: 'mergeQueuePage.landPress.label', hint: 'mergeQueuePage.landPress.hint', go: 'mergeQueuePage.landPress.send' },
+  first: { send: api.moveToTheFront, open: 'mergeQueuePage.press.open', label: 'mergeQueuePage.press.label', go: 'mergeQueuePage.press.send', done: 'mergeQueuePage.row.movedToTheFront' },
+  land: { send: api.pressToLand, open: 'mergeQueuePage.landPress.open', label: 'mergeQueuePage.landPress.label', go: 'mergeQueuePage.landPress.send', done: 'mergeQueuePage.row.pressedToLand' },
 } as const
 
 /** THE PRESS: asks for a written reason, sends it, and draws the door's answer or its refusal in the door's own words. */
@@ -619,9 +614,12 @@ function ThePress({ id, door, onMoved }: { id: string; door: keyof typeof THE_DO
   const [refused, setRefused] = useState<{ message: string; fault: ReturnType<typeof faultOf> } | null>(null)
   if (says !== null) {
     return (
-      <p className="mq-press-says" role="status" data-press="answered">
-        {says}
-      </p>
+      <>
+        <p className="mq-press-says" role="status" data-press="answered">
+          {t(words.done)}
+        </p>
+        <ServerNote text={says} />
+      </>
     )
   }
   if (!open) {
@@ -654,7 +652,7 @@ function ThePress({ id, door, onMoved }: { id: string; door: keyof typeof THE_DO
       <label className="mq-press-label" htmlFor={`mq-because-${door}-${id}`}>
         {t(words.label)}
       </label>
-      <TextArea id={`mq-because-${door}-${id}`} value={because} onChange={setBecause} rows={2} placeholder={t(words.hint)} />
+      <TextArea id={`mq-because-${door}-${id}`} value={because} onChange={setBecause} rows={2} />
       {refused === null ? null : (
         <div data-press="refused">
           <ErrorNote message={refused.message} fault={refused.fault} />
@@ -686,7 +684,6 @@ export const MERGE_QUEUE_CSS = `
 .mq-crumbs [aria-current] { color: var(--text); }
 .mq-head { display: grid; gap: var(--pad); min-width: 0; margin: 0 0 var(--gut); }
 .mq-title { margin: 0; color: var(--text); font: 600 var(--fs-4)/var(--lh-tight) var(--font-ui); overflow-wrap: anywhere; }
-.mq-intro { margin: 0; max-width: 70ch; color: var(--text-2); font: var(--fs-2)/var(--lh-read) var(--font-ui); }
 .mq-body { display: grid; gap: var(--gut); min-width: 0; }
 .mq-speed { margin: 0; color: var(--text-2); font: var(--fs-2)/var(--lh-read) var(--font-ui); overflow-wrap: anywhere; }
 .mq-speed-out { color: var(--text-3); font-size: var(--fs-1); }

@@ -11,7 +11,9 @@
  * (tests/terminal-holder-stand.ts). Each agent is opened new, its terminal closed, and then opened with "resume".
  *
  *   1. claude-code gets `--disallowedTools=<the list>` before `--session-id <uuid>`, and before `--resume <uuid>`.
- *   2. codex gets `--disable <feature>` for each feature, as its only arguments, and before `resume --last`.
+ *   2. codex gets `--disable <feature>` for each feature, then the shell snapshot switch, as its only arguments, and
+ *      both before `resume --last`. The snapshot switch is CODEX_SHELL_SNAPSHOT_OFF of src/config/run-permissions.mjs,
+ *      because a Codex run writes its environment, which may hold a run key, into its shell snapshots.
  *   3. opencode gets OPENCODE_CONFIG_CONTENT denying its task tool, with its arguments unchanged, new and resumed.
  *   4. kimi is unchanged: `-S <id>` and no OpenCode config. Nobody has read whether Kimi has a subagent tool.
  *
@@ -21,6 +23,7 @@
  * MUTATIONS (each after a control run; the commit message has the runs and the logs):
  *   - lib/terminal-agents.ts withTheHarnessFeaturesOff leaves claude-code's arguments as they are: case 1 red.
  *   - the same with codex's: case 2 red. Codex's switch after its arguments: case 2 red, at the resume.
+ *   - withTheHarnessFeaturesOff's codex branch without CODEX_SHELL_SNAPSHOT_OFF: case 2 red. Written, and not run.
  *   - the same with opencode's environment: case 3 red.
  *   - kimi is given claude-code's switch: case 4 red.
  */
@@ -30,6 +33,7 @@ import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { AS_THE_PERSON, aPlace, ask, groups, startAHolder, startAServer, stopEverything, theStreamsScreen, until, type Place, type ScratchServer } from './terminal-holder-stand.ts'
 import { CLAUDE_CODE_FEATURES_OFF, CODEX_FEATURES_OFF, OPENCODE_FEATURES_OFF } from '../src/config/harness-features-off.mjs'
+import { CODEX_SHELL_SNAPSHOT_OFF } from '../src/config/run-permissions.mjs'
 
 let place: Place
 let server: ScratchServer
@@ -70,6 +74,10 @@ async function theLaunch(handle: string, resume: boolean): Promise<{ args: strin
   if (argsLine === undefined || configLine === undefined) throw new Error(`${handle}'s stand-in printed no arguments: ${lines.join(' | ')}`)
   const closed = await ask(server.api, `/api/terminals/${terminal.id}/close`, { method: 'POST', body: {} })
   if (closed.status !== 200) throw new Error(`${handle}'s terminal was not closed: ${JSON.stringify(closed.body)}`)
+  await until(async () => {
+    const record = await ask(server.api, `/api/records/${String(opened.body['session'])}`)
+    return (record.body['record'] as { data: { state: string } }).data.state
+  }, (state) => state !== 'running')
   return { args: JSON.parse(argsLine.slice(argsLine.indexOf(' ARGS ') + 6)) as string[], config: configLine.slice('OPENCODE_CONFIG_CONTENT='.length) }
 }
 
@@ -102,10 +110,13 @@ describe('every launch in the office terminal has the harness subagents off', ()
     ])
   }, 90_000)
 
-  it('2: codex gets its switch as its only arguments, and before resume', async () => {
+  it('2: codex gets its switch and then the snapshot switch as its only arguments, and both before resume', async () => {
     const fresh = await theLaunch('off-codex', false)
     const resumed = await theLaunch('off-codex', true)
-    expect([fresh.args, resumed.args]).toEqual([[...CODEX_FEATURES_OFF], [...CODEX_FEATURES_OFF, 'resume', '--last']])
+    expect([fresh.args, resumed.args]).toEqual([
+      [...CODEX_FEATURES_OFF, ...CODEX_SHELL_SNAPSHOT_OFF],
+      [...CODEX_FEATURES_OFF, ...CODEX_SHELL_SNAPSHOT_OFF, 'resume', '--last'],
+    ])
   }, 90_000)
 
   it('3: opencode gets its task tool denied in its config, with its arguments unchanged, new and resumed', async () => {

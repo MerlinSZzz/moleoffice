@@ -516,11 +516,11 @@ describe('criteria M122 to M124: the headings, the one New agent press and the f
     expect(placeholder, 'the Human heading draws no placeholder').toHaveLength(1)
     expect(await placeholder[0]?.isDisabled()).toBe(true)
 
-    // AND THE ONE PRESS OPENS THE ONE CHOOSER.
+    // AND THE ONE PRESS OPENS THE NEW AGENT DIALOG.
     await inAgent[0]?.click()
-    await app.page.waitForSelector('.px-chat-new-agent-ask', { timeout: 20_000 })
-    await app.page.click('.px-chat-new-agent-close')
-    await app.page.waitForFunction(() => document.querySelector('.px-chat-new-agent-ask') === null, undefined, {
+    await app.page.waitForSelector('.px-new-agent-dialog', { timeout: 20_000 })
+    await app.page.click('.px-new-agent-dialog-cancel')
+    await app.page.waitForFunction(() => document.querySelector('.px-new-agent-dialog') === null, undefined, {
       timeout: 20_000,
     })
   }, 300_000)

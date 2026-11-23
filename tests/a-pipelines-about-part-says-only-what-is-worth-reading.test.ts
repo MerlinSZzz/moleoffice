@@ -11,12 +11,16 @@
  *   - no sentence for developers is said (the links the drawing could not draw, the hints it does not use, and the
  *     others tests/a-pipeline-page-in-the-developer-view.ts lists by word key): the developer view says those;
  *   - the master's page draws no list of its blocks, since each block is a card or a row in its drawing;
- *   - with nothing written and nothing else to say, the About part says once that nobody has written about this
- *     pipeline, and the section after it is not drawn;
+ *   - with nothing written and nothing else to say, the About part says not written, and the section after it is
+ *     not drawn;
  *   - with a description, the About part holds the description and nothing else, and the section after it is not
  *     drawn;
- *   - when a sentence for every reader follows, the About part does not also say that nobody has written about it.
+ *   - when a sentence for every reader follows, the About part does not also say not written.
  *     That sentence is made here by failing the restriction read: a reader must know no card can show a restriction.
+ *
+ * CRITERION CHANGE, as decided: the About part's absence is the state word "not written" now, not a sentence. The
+ * summary part may draw the same word, so the word is no longer counted over the whole page; the About part's own
+ * list holding it once says it once.
  *
  * CRITERION 4 is the last case: a stored arrangement that cannot be read is a sentence for every reader, since the
  * drawing then shows none of its lanes, so the normal view still says it in the section after the About part.
@@ -143,15 +147,14 @@ async function failTheRead(theRead: (url: URL) => boolean, error: string): Promi
 }
 
 for (const each of PAGES) {
-  it(`${each.name}, with nothing written about it: the About part says once that nobody has, and nothing follows it`, async () => {
+  it(`${each.name}, with nothing written about it: the About part says not written, and nothing follows it`, async () => {
     if (each.name === 'the reel page') theAreasWereStored(reelAreas, 'the reel page')
     const page = await open(each.id())
     const body = await readTheBody(page)
     console.log(`${each.name}: About ${JSON.stringify(body.about)}; said section ${String(body.saidDrawn)} ${JSON.stringify(body.said)}`)
     expect(await notWorthReading(body), `${each.name}: no sentence for developers and no step sentence in the normal view`).toEqual([])
     expect(body.developerDrawn, `${each.name}: the normal view draws no developer section`).toBe(0)
-    expect(body.about, `${each.name}: the About part says only that nobody has written about this pipeline`).toEqual([word('pipelinePage.own.noContext')])
-    expect(timesIn(body.text, word('pipelinePage.own.noContext')), `${each.name}: that sentence is said once on the page`).toBe(1)
+    expect(body.about, `${each.name}: the About part says only not written`).toEqual([word('moduleView.context.notWritten')])
     expect(body.saidDrawn, `${each.name}: with nothing to say, the section after the About part is not drawn`).toBe(0)
     expect(timesIn(body.text, word('g7b.PipelinePage.a_step_is_not_a_module')), `${each.name}: "A step is not a module." is said by nobody`).toBe(0)
   }, 400_000)
@@ -172,33 +175,32 @@ it('the reel page, with a description: the About part holds the description and 
   const body = await readTheBody(await open(reel.pipeline))
   console.log(`the reel page with a description: About ${JSON.stringify(body.about)}; said section ${String(body.saidDrawn)} ${JSON.stringify(body.said)}`)
   expect(body.about, 'the About part holds the two paragraphs written, in order, and nothing else').toEqual(description)
-  expect(timesIn(body.text, word('pipelinePage.own.noContext')), 'nobody is said to have not written about it').toBe(0)
+  expect(body.about, 'the About part does not say not written').not.toContain(word('moduleView.context.notWritten'))
   expect(body.saidDrawn, 'with nothing to say, the section after the About part is not drawn').toBe(0)
   expect(await notWorthReading(body), 'no sentence for developers and no step sentence').toEqual([])
 }, 400_000)
 
-for (const each of PAGES.slice(0, 2)) {
-  it(`${each.name}, with nothing written and a sentence for every reader after it: the About part does not say nobody has written about it`, async () => {
-    // The restriction read answers with a failure, so the page must say that no card can show a restriction.
-    const theRead = (url: URL): boolean => url.pathname === '/api/restrictions'
-    const failure = 'Example failure of the restriction read (made up).'
-    await failTheRead(theRead, failure)
-    try {
-      const page = await open(each.id())
-      const body = await readTheBody(page)
-      console.log(`${each.name}, restriction read failed: About ${JSON.stringify(body.about)}; said section ${String(body.saidDrawn)} ${JSON.stringify(body.said)}`)
-      const failed = word('g7b.Canvas.what_restricts_these_records_could_not_be')
-      expect(body.saidDrawn, `${each.name}: the section after the About part is drawn`).toBe(1)
-      expect(body.said.filter((sentence) => sentence.startsWith(failed)), `${each.name}: it says the restriction read failed, once`).toHaveLength(1)
-      expect(body.said.filter((sentence) => sentence.startsWith(failed) && sentence.endsWith(failure)), `${each.name}: that sentence says the made-up failure, so the 500 reached the page`).toHaveLength(1)
-      expect(timesIn(body.text, word('frameFiles.api.otherWorld')), `${each.name}: the page does not say it is talking to a different Mole Office`).toBe(0)
-      expect(await notWorthReading(body), `${each.name}: no sentence for developers and no step sentence`).toEqual([])
-      expect(timesIn(body.text, word('pipelinePage.own.noContext')), `${each.name}: the About part does not also say nobody has written about it`).toBe(0)
-    } finally {
-      await app.page.unroute(theRead)
-    }
-  }, 400_000)
-}
+it('the master, with nothing written and a sentence for every reader after it: the About part does not say not written', async () => {
+  const each = PAGES[0]
+  // The restriction read answers with a failure, so the page must say that no card can show a restriction.
+  const theRead = (url: URL): boolean => url.pathname === '/api/restrictions'
+  const failure = 'Example failure of the restriction read (made up).'
+  await failTheRead(theRead, failure)
+  try {
+    const page = await open(each.id())
+    const body = await readTheBody(page)
+    console.log(`${each.name}, restriction read failed: About ${JSON.stringify(body.about)}; said section ${String(body.saidDrawn)} ${JSON.stringify(body.said)}`)
+    const failed = word('g7b.Canvas.what_restricts_these_records_could_not_be')
+    expect(body.saidDrawn, `${each.name}: the section after the About part is drawn`).toBe(1)
+    expect(body.said.filter((sentence) => sentence.startsWith(failed)), `${each.name}: it says the restriction read failed, once`).toHaveLength(1)
+    expect(body.said.filter((sentence) => sentence.startsWith(failed) && sentence.endsWith(failure)), `${each.name}: that sentence says the made-up failure, so the 500 reached the page`).toHaveLength(1)
+    expect(timesIn(body.text, word('frameFiles.api.otherWorld')), `${each.name}: the page does not say it is talking to a different Mole Office`).toBe(0)
+    expect(await notWorthReading(body), `${each.name}: no sentence for developers and no step sentence`).toEqual([])
+    expect(body.about, `${each.name}: the About part does not also say not written`).not.toContain(word('moduleView.context.notWritten'))
+  } finally {
+    await app.page.unroute(theRead)
+  }
+}, 400_000)
 
 
 // CRITERION 4. An arrangement that cannot be read is a sentence for every reader: the drawing then shows none of the

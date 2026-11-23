@@ -464,16 +464,17 @@ export interface StoredShortForm {
   madeFrom: Revision
   writtenBy: ShortFormAuthor
   /**
-   * WHO WROTE THESE WORDS, by the actor id on the request that stored them — say
-   * `claude-code/short-form-writer`, or `owner`.
+   * WHO WROTE THESE WORDS, by the registry id of the agent or person whose request stored them. Where
+   * no registry row is found, as for the office's own writer, it is the actor id on the request. A
+   * form stored before the writer was stored by id holds the actor id too, which may be a handle.
    *
    * IT IS THE NAME, WHERE `writtenBy` ABOVE IS THE KIND. `writtenBy` says whether a person or an
    * agent wrote it, which is what decides whether the form is an override. This says WHICH person
    * or which agent, because a form records who produced it.
    * Neither is derivable from the other and both are the server's record of the write.
    *
-   * IT IS NOT A FIELD A WRITER FILLS IN. Both write doors overwrite it with the actor from the
-   * request headers, for the reason `shortFormAuthor` gives about `writtenBy`: who did a thing is
+   * IT IS NOT A FIELD A WRITER FILLS IN. Both write doors overwrite it with the writer the request
+   * headers name, for the reason `shortFormAuthor` gives about `writtenBy`: who did a thing is
    * Mole Office's record of the write, never a claim the writer makes about itself.
    *
    * ABSENT ON EVERY FORM STORED BEFORE 2 SEPTEMBER 2026, and absent when a request stated no actor
@@ -681,7 +682,7 @@ export interface StoredPart {
 export interface StoredParts {
   madeFrom: Revision
   writtenBy: ShortFormAuthor
-  /** The actor id of whoever wrote it, or absent because the request stated no actor. */
+  /** Who wrote it, stored as `StoredShortForm.by` is, or absent because the request stated no actor. */
   by?: string
   /** When it was stored, local wall-clock time. Absent on anything stored before this existed. */
   at?: string

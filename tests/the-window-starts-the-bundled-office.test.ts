@@ -80,10 +80,12 @@
  *     past every door, so the update really would write to it, as tests/an-installed-office-updates-on-the-owners-press.test.ts
  *     writes one. A window run from the bundle, never paired with it, starts the office, which waits for the press. Open
  *     shows the offer in the window, with its press. Pressed there, the update gives the note its revision, and the
- *     window shows the office's first page, paired: its session holds the key's cookie. The office logged the window's
- *     read and press of its pairing door first, and every call to the door after them was a read that carried the key.
- *     The window's press of the door is answered 3 seconds late, as on Windows, where the office reads who pressed with
- *     a script of about a second, so a page that loaded before the window had paired would show the Pairing page.
+ *     window shows the office's first page, paired: its session holds the cookie half of its device key, HttpOnly, and
+ *     no old key cookie, and its page keeps the header half. The office logged three calls to its pairing door first:
+ *     the load of the window's hidden pairing page, that page's read and that page's press. Every call to the door
+ *     after them was a read that carried both halves. The window's press of the door is answered 3 seconds late, as on
+ *     Windows, where the office reads who pressed with a script of about a second, so a page that loaded before the
+ *     window had paired would show the Pairing page. The press slowed is the hidden page's, read by that page's address.
  *   - Case 2 was red with the window as it was before this round: the window showed its check page, which said the
  *     office answered but did not pair it, and not the offer.
  *   - MUTATIONS, each after a control run with the window's change in, each red in case 2:
@@ -104,7 +106,7 @@ import Database from 'better-sqlite3'
 import type { ElectronApplication } from 'playwright'
 import { afterAll, describe, expect, it } from 'vitest'
 
-import { KEY_COOKIE } from '../src/config/key-header.mjs'
+import { DEVICE_HALF_COOKIE, DEVICE_HALF_HEADER, DEVICE_HALF_KEY, KEY_COOKIE } from '../src/config/key-header.mjs'
 import { commandLineOf, theProcessAt } from '../src/config/session-process.mjs'
 import { askTheHolder, theTerminalHolderLog, theTerminalHolderSocket } from '../src/config/the-terminal-holder.mjs'
 import { theSandboxWarning } from '../src/config/the-self-check.mjs'
@@ -570,18 +572,22 @@ describe.skipIf(WHY_NOT !== null)('a window run from a bundle', () => {
       // pairing door is answered 3 seconds late, as on Windows, where the office reads who pressed with a script of about a
       // second. A page of the office that loaded before the window had paired would read the door without the key in that
       // time, and show the Pairing page.
-      await app.evaluate(({ session }, door) => {
-        const slowed = { presses: 0 }
+      // The window presses from a hidden page of its own, in the window's session, so the slowing on that session sees it.
+      // Each press slowed is kept by the address of the page that sent it, read while that page is still there.
+      const theDoor = `${address}/api/office/pairing`
+      await app.evaluate(({ session, webContents }, door) => {
+        const slowed = { from: [] as string[] }
         ;(globalThis as unknown as { theSlowedPresses: typeof slowed }).theSlowedPresses = slowed
         session.defaultSession.webRequest.onBeforeSendHeaders((request, go) => {
           if (request.method !== 'POST' || request.url !== door) {
             go({})
             return
           }
-          slowed.presses += 1
+          const sender = request.webContentsId === undefined ? undefined : webContents.fromId(request.webContentsId)
+          slowed.from.push(sender?.getURL() ?? 'no page')
           setTimeout(() => go({}), 3_000)
         })
-      }, `${address}/api/office/pairing`)
+      }, theDoor)
       await press.click()
       // The office's first page, or its Pairing page, is looked for in the page and not on the screen, because on this
       // display the page's sidebar is closed and its shut-down button is hidden.
@@ -596,21 +602,32 @@ describe.skipIf(WHY_NOT !== null)('a window run from a bundle', () => {
       expect(revisionsOfTheNote(database), 'the update did not write what the start check said it would').toBe(1)
       expect(await page.evaluate(() => window.location.hash), "the window's page went to another page").toBe('')
       expect(await page.locator('.pair').count(), 'the window showed the Pairing page').toBe(0)
-      const read = await page.evaluate(async () => ((await (await fetch('/api/office/pairing')).json()) as { paired?: unknown }).paired)
+      // THE PAGE'S READ CARRIES BOTH HALVES: the cookie half goes by itself, and the header half is the one the window's
+      // pairing page kept in the office's storage. Neither is printed.
+      const read = await page.evaluate(
+        async ({ key, header }) => {
+          const half = localStorage.getItem(key)
+          if (half === null || half === '') return 'no header half kept'
+          return ((await (await fetch('/api/office/pairing', { headers: { [header]: half } })).json()) as { paired?: unknown }).paired
+        },
+        { key: DEVICE_HALF_KEY, header: DEVICE_HALF_HEADER },
+      )
       expect(read, "the window's page is not paired").toBe(true)
       const cookies = await app.evaluate(
         async ({ session }, url) => (await session.defaultSession.cookies.get({ url })).map((one) => ({ name: one.name, httpOnly: one.httpOnly === true })),
         address,
       )
-      expect(cookies).toContainEqual({ name: KEY_COOKIE, httpOnly: true })
-      // THE WINDOW PAIRED BEFORE THE OFFICE'S PAGE ASKED: the door's first two calls were the window's read and its
-      // press, and every call after them was a read that carried the key. A page that loaded first would have read
-      // the door without the key, and shown the Pairing page.
+      expect(cookies).toContainEqual({ name: DEVICE_HALF_COOKIE, httpOnly: true })
+      expect(cookies.map((one) => one.name), 'the window holds the old key cookie').not.toContain(KEY_COOKIE)
+      // THE WINDOW PAIRED BEFORE THE OFFICE'S PAGE ASKED: the door's first three calls were the load of the window's
+      // hidden pairing page, that page's read and its press, and every call after them was a read that carried both
+      // halves, which the office logs as a key. A page that loaded first would have read the door without the key, and
+      // shown the Pairing page.
       const calls = thePairingCalls(database)
-      expect(calls.slice(0, 2).map((one) => `${one.method} ${String(one.status)}`)).toEqual(['GET 200', 'POST 200'])
-      expect(calls.slice(2).filter((one) => one.method !== 'GET' || one.identity !== 'key')).toEqual([])
-      const slowed = await app.evaluate(() => (globalThis as unknown as { theSlowedPresses: { presses: number } }).theSlowedPresses.presses)
-      expect(slowed, "the window's press of the pairing door was not slowed, so this case shows nothing of the order").toBeGreaterThan(0)
+      expect(calls.slice(0, 3).map((one) => `${one.method} ${String(one.status)}`)).toEqual(['GET 200', 'GET 200', 'POST 200'])
+      expect(calls.slice(3).filter((one) => one.method !== 'GET' || one.identity !== 'key')).toEqual([])
+      const slowed = await app.evaluate(() => (globalThis as unknown as { theSlowedPresses: { from: string[] } }).theSlowedPresses.from)
+      expect(slowed, "the window's press of the pairing door was not slowed from its pairing page, so this case shows nothing of the order").toEqual([theDoor])
       step('the window opened the office, paired')
     } finally {
       if (stillRunning(child)) child.kill('SIGKILL')

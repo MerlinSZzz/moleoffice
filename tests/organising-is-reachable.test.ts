@@ -450,10 +450,9 @@ describe('a person gets their review read, in Chromium', () => {
    * THE ONE THIS FILE IS FOR. Before this, a finished review's pane offered nothing at all that
    * would have a comment read, and the routes that do it were named by no file in src/web.
    */
-  it('offers to have the comments read, and says the answer is checked before it is kept', async () => {
+  it('offers to have the comments read, and says no reader has been asked yet', async () => {
     const said = await column()
     expect(said).toContain('Have these comments read')
-    expect(said, 'the pane does not say the answer is checked before it is kept').toContain('checks the answer before keeping any of it')
     expect(said.toLowerCase(), 'a person is not told that no reader has been asked').toContain(
       'not asked yet',
     )

@@ -9,10 +9,15 @@
  * command line and an output reader, and nothing else.
  *
  * Nothing here touches the operating system directly: `runtimes/os.ts` is the one file that does.
+ *
+ * A run's program is looked up in the whole environment it is started from, through `whereItIs` in
+ * `runtimes/os.ts`, so on Windows a search path held as `Path` is found.
  */
 
 import { readFileSync } from 'node:fs'
 import { aCommandsStartValues, aCommandsStartFromTheOffice } from '../../config/sandbox-start-values.mjs'
+import { aCommandsProgram, aRuntimeIsCodex } from '../../config/run-permissions.mjs'
+import { theEnvironmentACodexGets } from '../../config/the-environment-a-codex-gets.mjs'
 import { THE_COMPACTION_VARIABLE, theCompactionWindowGiven, theConversationsWindow } from '../../config/the-compaction-window.mjs'
 import { anAgentsToolHeaders } from '../../../for-agents/agent-key.mjs'
 
@@ -112,18 +117,20 @@ export function startRun<R extends RunStart>(
   const actualEnv = envFor(run, from, asked.env, adapter.runtime)
   const given = selected ?? aCommandsStartValues([asked.command, ...asked.args], { runtime: adapter.runtime, env: actualEnv })
   const [command, ...args] = given.command as [string, ...string[]]
-  const where = whereItIs(command, from['PATH'])
+  const where = whereItIs(command, from)
   if (where === null) {
     throw new Error(
       `${command} is not installed on this machine, so a run of ${adapter.runtime} cannot be started. ` +
         'Nothing was started and no message was marked delivered.',
     )
   }
+  const env = { ...actualEnv, ...given.env }
   const started = startInItsOwnGroup({
     command: where,
     args,
     cwd: run.cwd,
-    env: { ...actualEnv, ...given.env },
+    // A CODEX GETS ONLY THE NAMES ITS LIST KEEPS (src/config/the-environment-a-codex-gets.mjs), as the last step.
+    env: aRuntimeIsCodex(adapter.runtime) || aCommandsProgram([command]).isCodex ? theEnvironmentACodexGets(env) : env,
     outputPath: run.outputPath,
     stdin: asked.stdin,
   })

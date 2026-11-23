@@ -1,8 +1,9 @@
 // Copyright © 2026 Zhengyang Shen
 // Licensed under the MIT License. See LICENSE.
 /**
- * A browser pairs on the Pairing page, then sends a review to a new agent with the cookie the
- * office gave it. No request is intercepted and no key is copied into the browser by the test.
+ * A browser pairs on the Pairing page, then sends a review to a new agent with the two halves the
+ * office gave it: the cookie half and the header half the page keeps. No request is intercepted and
+ * no key is copied into the browser by the test.
  * A separate browser with no pairing is refused before a conversation, agent, run or message is written.
  *
  * Three-run proofs, using this whole file each time:
@@ -21,6 +22,7 @@ import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import Database from 'better-sqlite3'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { DEVICE_HALF_COOKIE } from '../src/config/key-header.mjs'
 import type { ReviewDetail, SendOutcome } from '../src/server/lib/reviews.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { liveApp, waitForThePage, type LiveApp } from './helpers.ts'
@@ -107,13 +109,15 @@ function sendRows() {
 }
 
 describe('sending a review from a browser to a new agent', () => {
-  it('pairs through the page and sends with the cookie that pairing set', async () => {
+  it('pairs through the page and sends with the two halves that pairing gave', async () => {
     await app.page.goto(`${app.site}/#/pairing`)
     await waitForThePage(app.page)
     await app.page.getByRole('button', { name: 'Pair this browser', exact: true }).click()
     await app.page.getByText('This browser is paired.', { exact: true }).waitFor()
-    const paired = (await app.context.cookies(app.api)).find((cookie) => cookie.name === 'mole-office-key')
+    const paired = (await app.context.cookies(app.api)).find((cookie) => cookie.name === DEVICE_HALF_COOKIE)
     expect(paired !== undefined && paired.httpOnly && paired.sameSite === 'Strict').toBe(true)
+    const { DEVICE_HALF_KEY } = await import('../src/web/lib/the-device-half.ts')
+    expect(await app.page.evaluate((key) => window.localStorage.getItem(key) !== null, DEVICE_HALF_KEY), 'the page keeps no header half').toBe(true)
 
     await openReview()
     const reply = await pressSend()
@@ -134,7 +138,7 @@ describe('sending a review from a browser to a new agent', () => {
 
   it('refuses an unpaired browser, names Pairing, and leaves the comment unsent', async () => {
     await openReview()
-    expect((await app.context.cookies(app.api)).some((cookie) => cookie.name === 'mole-office-key')).toBe(false)
+    expect((await app.context.cookies(app.api)).some((cookie) => cookie.name === DEVICE_HALF_COOKIE)).toBe(false)
     const before = sendRows()
     const reply = await pressSend()
     expect(reply.status()).toBe(403)

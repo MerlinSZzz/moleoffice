@@ -18,7 +18,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { KEPT_HERE, PART_OF_THE_OFFICE } from '../src/shared/toolset.ts'
 import { zh } from '../src/shared/words/zh.ts'
 import { THE_TEST_OFFICES_OWNER } from './a-page-of-a-test-office.ts'
-import { type LiveApp, liveApp, waitForThePage } from './helpers.ts'
+import { type LiveApp, liveApp, waitForThePage, governsTheWholeProject } from './helpers.ts'
+import { sayInEnglish } from '../src/shared/i18n.ts'
 
 const AS_PERSON = {
   'content-type': 'application/json',
@@ -78,7 +79,7 @@ beforeAll(async () => {
   page = app.page
 
   const decision = await file('decision', 'The builders category is confirmed', {
-    replaces: [],
+    ...governsTheWholeProject(), replaces: [],
     decided_on: '2026-09-25',
     because: 'A category for the tools that build the office.',
     decided_by: 'the owner',
@@ -189,7 +190,7 @@ describe('the toolset page in a real browser', () => {
     expect(Math.abs(a!.y - b!.y)).toBeLessThan(2)
     expect(Math.abs(a!.x - b!.x)).toBeGreaterThan(0)
 
-    for (const width of [1440, 990, 660, 390]) {
+    for (const width of [1440, 390]) {
       await page.setViewportSize({ width, height: 1000 })
       const drawnWidth = await page.evaluate(() => ({ viewport: innerWidth, page: document.documentElement.scrollWidth }))
       expect(drawnWidth.page, `sideways overflow at ${width}px`).toBeLessThanOrEqual(drawnWidth.viewport)
@@ -309,7 +310,7 @@ describe('the toolset page in a real browser', () => {
     expect(await howTo.locator('.px-panel').count()).toBe(0)
   }, 120_000)
 
-  it('gives an empty catalogue one sentence without controls', async () => {
+  it('gives an empty catalogue the state word "none" without controls', async () => {
     // THE FIRST STACK ANSWERS THIS ONE READ WITH AN EMPTY CATALOGUE, so no second office starts.
     await page.route('**/api/toolset', async (route) => {
       const response = await route.fetch()
@@ -322,7 +323,7 @@ describe('the toolset page in a real browser', () => {
     try {
       await openAddress('#/toolset')
       await page.waitForSelector('.tls-none', { timeout: 60_000 })
-      expect(await page.locator('.tls-none').innerText()).toBe('No tool is filed yet.')
+      expect(await page.locator('.tls-none').innerText()).toBe(sayInEnglish('absence.none'))
       expect(await page.locator('.tls-audience-switch,.tls-jumps').count()).toBe(0)
       expect(await page.locator('.tls button').count()).toBe(0)
     } finally {

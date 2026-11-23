@@ -8,7 +8,7 @@
  */
 
 import { whoTheRowSays } from './read-participant.ts'
-import type { WhoAnAgentIs } from '../lib/participants.ts'
+import type { WhoAnAgentIs } from './types/participants.ts'
 import { sqlite } from './client.ts'
 
 /**

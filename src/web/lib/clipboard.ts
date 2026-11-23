@@ -116,15 +116,19 @@ export function selectTheWholeText(elementId: string): string {
  *
  * WHAT IT SAYS IS WHAT IT DID, and no more. The page asks the browser to save a file; whether the
  * browser then saves it, asks first, or refuses, is the browser's own business and this cannot see
- * it. So the sentence says the file was handed over, never that it was saved.
+ * it. So when the file was handed over this returns no sentence, and the caller draws the file's
+ * name on a row of its own that says it was handed over, never that it was saved.
  *
- * @returns a sentence for the person
+ * THE FILE'S TYPE is plain text unless the caller names another, as a report saved as one HTML file does.
+ * THE CONTENTS ARE TEXT OR BYTES, so a report's PDF, which the office answers as bytes, is handed over the same way.
+ *
+ * @returns the refusal for the person when the browser will not take a file, or null when it was handed one
  */
-export function handTheTextToTheBrowserAsAFile(text: string, fileName: string): string {
+export function handTheTextToTheBrowserAsAFile(contents: BlobPart, fileName: string, type = 'text/plain;charset=utf-8'): string | null {
   if (typeof document === 'undefined' || typeof URL.createObjectURL !== 'function') {
     return t('frameFiles.clipboard.noFile')
   }
-  const address = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' }))
+  const address = URL.createObjectURL(new Blob([contents], { type }))
   const link = document.createElement('a')
   link.href = address
   link.download = fileName
@@ -135,5 +139,5 @@ export function handTheTextToTheBrowserAsAFile(text: string, fileName: string): 
   // cancels the download in Chromium, silently. A whole context bundle is tens of kilobytes and
   // keeping one alive for a second costs nothing.
   setTimeout(() => URL.revokeObjectURL(address), 1000)
-  return t('frameFiles.clipboard.handed', { fileName: content(fileName) })
+  return null
 }

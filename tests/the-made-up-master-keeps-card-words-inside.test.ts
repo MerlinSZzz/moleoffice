@@ -64,7 +64,9 @@ async function open(drawing: typeof drawings[number], theme: 'light' | 'dark') {
 // The longest case took 174,861 ms and navigation may wait 300,000 ms; 900,000 ms is about five and three times those, while 2,000,000 ms could hold a seat for 33 minutes.
 const caseAllowance = 900_000
 
-for (const width of [1440, 990, 660, 390]) for (const drawing of drawings) for (const theme of ['light', 'dark'] as const) {
+// One theme: where a card's words lie does not change with the theme.
+const theme = 'light'
+for (const width of [1440, 390]) for (const drawing of drawings) {
   it(`${width}px ${drawing.name} ${theme}: every card keeps its text inside`, async () => {
     await app.page.setViewportSize({ width, height: 1000 })
     await open(drawing, theme)

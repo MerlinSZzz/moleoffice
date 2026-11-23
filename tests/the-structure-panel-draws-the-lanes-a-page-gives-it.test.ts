@@ -27,8 +27,8 @@
  *   2. with no lanes, the same drawing loads the canvas, counts the drawing's own cards, and hands up the canvas's
  *      words and the omission said in the body, as before;
  *   3. given lanes, it opens on the "Graph" side at 390 pixels wide; with no lanes it opens on "List" there;
- *   4. given lanes, "Show all", the isolated fold and the fold on what is stored are not shown; with no lanes, on
- *      the same drawing, all three are;
+ *   4. given lanes, "Show all" and the isolated fold are not shown; with no lanes, on the same drawing, both
+ *      are;
  *   5. given lanes, "How this is shown" offers which card, its lane and its order, and none of direction, room,
  *      emphasis, folded or kept beside; with no lanes it offers all of them;
  *   6. given lanes, it hands the page an answer each time the answer changes: "reading" with nothing kept, then
@@ -36,7 +36,7 @@
  *      the editor reaches the page as "reading" with the old answer kept and then "read" with the lane, while
  *      the drawer says it is reading again, and the page's drawing shows the lane with no read of the page's
  *      own; a read again that fails reaches the page as "failed" with the problem and the last answer kept, and
- *      the panel says the problem itself.
+ *      the panel shows its state word.
  *
  * ---------------------------------------------------------------------------------------
  * THE MUTATIONS THAT TURN THIS RED, WITH A CONTROL RUN FIRST
@@ -340,7 +340,7 @@ async function twoFrames(page: Page): Promise<void> {
 
 const countTag = (page: Page) => page.locator('.gx .px-panel-actions .px-tag').innerText()
 
-function surface(id: 'structure.isolated' | 'structure.stored'): string {
+function surface(id: 'structure.isolated'): string {
   const [[name, value] = ['', '']] = Object.entries(targetAttributes({ kind: 'uiSurface', surfaceId: id }))
   return `[${name}="${value}"]`
 }
@@ -413,20 +413,18 @@ describe('the structure panel, given the lanes a page draws', () => {
     await none.close()
   }, 60_000)
 
-  it('4. given lanes, "Show all", the isolated fold and the fold on what is stored are not shown; with no lanes all three are', async () => {
+  it('4. given lanes, "Show all" and the isolated fold are not shown; with no lanes both are', async () => {
     const showAll = t('g7b.StructureView.show_all', { v1: MODULES.records.length })
     const none = await open(1440, 'modules', false, { inspect: true })
     await until(none, `document.querySelector('#stand-in-canvas') !== null`)
     expect(await none.locator('.gx-switch button', { hasText: showAll }).count(), '"Show all" with no lanes, as before').toBe(1)
     expect(await none.locator(surface('structure.isolated')).count(), 'the isolated fold with no lanes, as before').toBe(1)
-    expect(await none.locator(surface('structure.stored')).count(), 'the fold on what is stored with no lanes, as before').toBe(1)
     await none.close()
     const given = await open(1440, 'modules', true, { inspect: true })
     await until(given, `document.querySelector('#stand-in-drawing[data-at="read"]') !== null`)
     expect(await given.locator('#stand-in-drawing').count()).toBe(1)
     expect(await given.locator('.gx-switch button', { hasText: showAll }).count(), '"Show all" is not offered beside a drawing of every record').toBe(0)
     expect(await given.locator(surface('structure.isolated')).count(), 'no isolated fold when lanes are given').toBe(0)
-    expect(await given.locator(surface('structure.stored')).count(), 'no fold on the canvas’s stored places when lanes are given').toBe(0)
     expect(await countTag(given)).toBe(t('g7b.StructureView.cards', { v1: MODULES.lanes.length }))
     await given.close()
   }, 60_000)
@@ -508,8 +506,8 @@ describe('the structure panel, given the lanes a page draws', () => {
       problem: 'made-up problem',
       kept: stored.answers.at(-1)?.stored,
     })
-    expect(await page.locator('.gx-intent[data-tone="problem"]').innerText(), 'the panel says the problem itself').toBe(
-      `${t('g7b.StructureView.what_was_stored_about_how_this_drawing')}made-up problem`,
+    expect(await page.locator('.gx-intent[data-tone="problem"]').innerText(), 'the panel says the arrangement was not read').toBe(
+      t('structure.arrangementNotRead'),
     )
     await page.close()
   }, 120_000)

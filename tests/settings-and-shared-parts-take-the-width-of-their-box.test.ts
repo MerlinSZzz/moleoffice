@@ -117,9 +117,12 @@ interface Lines {
 }
 
 /**
- * Every element in the page's box that holds words of its own. STRANDED: it is drawn at the fixed
- * measure, its parent's content box is wider, and given no cap it would be wider (it wanted the space).
- * OVER: it is wider than its parent's content box, which is more than the rule allows.
+ * Every element in the page's box that holds words of its own, measured against the box it is drawn in:
+ * its nearest ancestor that is not drawn inline. A browser gives an inline element no width of its own,
+ * so its client and scroll widths read 0, and the mode hint's words sit in one when they open under its
+ * label. STRANDED: it is drawn at the fixed measure, that box's content box is wider, and given no cap it
+ * would be wider (it wanted the space). OVER: it is wider than that box's content box, which is more than
+ * the rule allows.
  */
 async function lines(root: string): Promise<Lines> {
   return app.page.evaluate((selector) => {
@@ -129,6 +132,10 @@ async function lines(root: string): Promise<Lines> {
     const measure = probe.getBoundingClientRect().width
     probe.remove()
     const name = (one: HTMLElement) => `${one.tagName.toLowerCase()}.${[...one.classList].join('.')}`
+    const inline = (one: HTMLElement) => {
+      const shown = getComputedStyle(one).display
+      return shown.startsWith('inline') || shown === 'contents'
+    }
     const stranded: string[] = []
     const over: string[] = []
     let counted = 0
@@ -138,14 +145,15 @@ async function lines(root: string): Promise<Lines> {
         if (!words) continue
         const style = getComputedStyle(one)
         if (style.display === 'none' || style.display.startsWith('inline') || style.position === 'absolute' || style.position === 'fixed') continue
-        const parent = one.parentElement
-        if (parent === null) continue
+        let drawnIn = one.parentElement
+        while (drawnIn !== null && inline(drawnIn)) drawnIn = drawnIn.parentElement
+        if (drawnIn === null) continue
         const rect = one.getBoundingClientRect()
         if (rect.width === 0) continue
         counted += 1
-        const p = getComputedStyle(parent)
-        const inner = parent.clientWidth - Number.parseFloat(p.paddingLeft) - Number.parseFloat(p.paddingRight)
-        if (parent.scrollWidth <= parent.clientWidth + 1 && rect.width > inner + 1 && p.overflowX === 'visible') over.push(`${name(one)} ${String(Math.round(rect.width))} in ${String(Math.round(inner))}`)
+        const p = getComputedStyle(drawnIn)
+        const inner = drawnIn.clientWidth - Number.parseFloat(p.paddingLeft) - Number.parseFloat(p.paddingRight)
+        if (drawnIn.scrollWidth <= drawnIn.clientWidth + 1 && rect.width > inner + 1 && p.overflowX === 'visible') over.push(`${name(one)} ${String(Math.round(rect.width))} in ${String(Math.round(inner))}`)
         if (Math.abs(rect.width - measure) < 1 && inner > measure + 8) {
           const was = { maxWidth: one.style.maxWidth, width: one.style.width }
           one.style.maxWidth = 'none'

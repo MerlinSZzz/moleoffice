@@ -34,7 +34,7 @@ import { join, resolve } from 'node:path'
 import { fileURLToPath, URL } from 'node:url'
 import { chromium, type Browser, type Page } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { commandThatStopsWithItsOwner, apiServerArguments, anApiServerOfItsOwn, waitForItsOwnVite, waitForThePage } from './helpers.ts'
+import { commandThatStopsWithItsOwner, apiServerArguments, anApiServerOfItsOwn, storeNormalModeWhereNothingIsStored, waitForItsOwnVite, waitForThePage } from './helpers.ts'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
 const TOOLSHOT = resolve(root, 'tools')
@@ -203,6 +203,7 @@ beforeAll(async () => {
 
   browser = await chromium.launch()
   page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
+  await storeNormalModeWhereNothingIsStored(page.context())
 }, 240_000)
 
 afterAll(async () => {

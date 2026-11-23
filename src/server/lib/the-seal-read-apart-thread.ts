@@ -20,6 +20,7 @@ import type { GitSubmission } from '@shared/sealed-tip.ts'
 import type { AStampNotMade, AWorktreeStamp } from './a-worktree-stamp.ts'
 import type { TheFactsBeforeTheSeal, TheOtherWorktrees, TheRunsCommitsCarried } from './before-the-seal-rules.ts'
 import type { AVerifiedSeal, verifyRunSeal } from './sealed-tip.ts'
+import type { AHeadAsk, AnOwnCommitsAsk, TheHeadRead, TheRunsOwnCommits } from './a-runs-own-commits.ts'
 import { THE_SEAL_READ_THREAD } from '@shared/the-seal-read-thread-key.ts'
 import { theSealARunNames } from '@shared/the-seal-a-run-names.ts'
 export { theSealARunNames }
@@ -34,9 +35,10 @@ export type ASealReadAsk = { id: number; runId: string; how: HowASealIsVerified 
 
 /**
  * ONE ASK OF A FINISHING WRITE: read the git of every question the write asked so far, under one stamp of each worktree
- * (./a-finish-reads-git-apart.ts says why).
+ * (./a-finish-reads-git-apart.ts says why). `heads` asks the HEAD of a directory: a run's filing or end commit
+ * (./a-runs-own-commits.ts). `own` asks a run's own commits, for its seal.
  */
-export type AFinishReadAsk = { id: number; finish: { facts: AGitFactsAsk[]; seals: ASealGitAsk[]; commits?: ACommitsPastTheCutAsk[] } }
+export type AFinishReadAsk = { id: number; finish: { facts: AGitFactsAsk[]; seals: ASealGitAsk[]; commits?: ACommitsPastTheCutAsk[]; heads?: AHeadAsk[]; own?: AnOwnCommitsAsk[] } }
 
 /** The git a seal reads: `theGitOfASeal`'s arguments. */
 export type ASealGitAsk = { directory: string; prior: GitSubmission | null; named: string | null; area: string[] }
@@ -50,9 +52,11 @@ export type TheCommitsPastTheCut = { commits: { hash: string; subject: string }[
 /**
  * The git the facts before the seal read (`theGitFactsReadHere` in ./before-the-seal.ts): the run's commits in its
  * working directory since the base it names and its start, with `look` the other worktrees as well, and with `copied`
- * the copied test words at the tip.
+ * the copied test words at the tip. `own`, for a run whose filing commit the office read, is what its own commits are
+ * read from (./a-runs-own-commits.ts): then the facts hold those commits that are not carried, and the start is not
+ * read. Absent for any other run.
  */
-export type AGitFactsAsk = { directory: string; cutFrom: string | null; startedMs: number | null; look: { tip: string | null } | null; kind: string | null; copied: boolean }
+export type AGitFactsAsk = { directory: string; cutFrom: string | null; startedMs: number | null; look: { tip: string | null } | null; kind: string | null; copied: boolean; own?: AnOwnCommitsAsk }
 
 /** What `theGitFactsReadHere` read: the commits, the HEAD they were read at, and what it looked at besides. */
 export type ACarriedGitFacts = {
@@ -76,6 +80,8 @@ export type AFinishReadOnTheThread = {
   facts: { ask: AGitFactsAsk; read: ACarriedGitFacts | { failed: string } }[]
   seals: { ask: ASealGitAsk; outcome: ASealOutcome }[]
   commits: { ask: ACommitsPastTheCutAsk; read: TheCommitsPastTheCut | { failed: string } }[]
+  heads: { ask: AHeadAsk; read: TheHeadRead | { failed: string } }[]
+  own: { ask: AnOwnCommitsAsk; read: TheRunsOwnCommits | { failed: string } }[]
 }
 
 /** The sender adds the time waiting for the thread and the number of outstanding asks. */
@@ -117,6 +123,7 @@ async function serveOnThisThread(database: string): Promise<void> {
   const sealedTip = await import('./sealed-tip.ts')
   const beforeTheSeal = await import('./before-the-seal.ts')
   const stamps = await import('./a-worktree-stamp.ts')
+  const ownCommits = await import('./a-runs-own-commits.ts')
   // THIS THREAD ONLY READS, as the attention thread does (attention-thread-worker.ts says why it is set after
   // the imports). That the imports changed no row is checked, not assumed.
   const changedOnLoad = (sqlite.prepare('SELECT total_changes() AS rows').get() as { rows: number }).rows
@@ -157,7 +164,9 @@ async function serveOnThisThread(database: string): Promise<void> {
    */
   const readAFinish = async (ask: AFinishReadAsk['finish']): Promise<AFinishReadOnTheThread> => {
     const asked = ask.commits ?? []
-    const made = [...new Set([...ask.facts.map((one) => one.directory), ...ask.seals.map((one) => one.directory), ...asked.map((one) => one.directory)])].map((directory) => stamps.aWorktreeStampOf(directory))
+    const heads = ask.heads ?? []
+    const own = ask.own ?? []
+    const made = [...new Set([...ask.facts.map((one) => one.directory), ...ask.seals.map((one) => one.directory), ...asked.map((one) => one.directory), ...heads.map((one) => one.directory), ...own.map((one) => one.directory)])].map((directory) => stamps.aWorktreeStampOf(directory))
     const read = new Map<string, { gave: GitSubmission } | { threw: unknown }>()
     const capture: typeof sealedTip.captureGit = (directory, base, area, fixedBase = false) => {
       const key = JSON.stringify([directory, base, fixedBase])
@@ -196,8 +205,16 @@ async function serveOnThisThread(database: string): Promise<void> {
         return { ask: one, read: { failed: err instanceof Error ? err.message : String(err) } }
       }
     })
+    // A RUN'S FILING OR END COMMIT, and a run's own commits, read under the same stamps as the rest.
+    const failed = (err: unknown): { failed: string } => ({ failed: err instanceof Error ? err.message : String(err) })
+    const headsRead: AFinishReading['heads'] = heads.map((one) => {
+      try { return { ask: one, read: ownCommits.theHeadReadIn(one.directory) } } catch (err) { return { ask: one, read: failed(err) } }
+    })
+    const ownRead: AFinishReading['own'] = own.map((one) => {
+      try { return { ask: one, read: ownCommits.theRunsOwnCommitsRead(one) } } catch (err) { return { ask: one, read: failed(err) } }
+    })
     const held = made.every((stamp) => 'notMade' in stamp || stamps.theStampHolds(stamp))
-    return { stamps: made, held, checkedAt: performance.timeOrigin + performance.now(), facts, seals, commits }
+    return { stamps: made, held, checkedAt: performance.timeOrigin + performance.now(), facts, seals, commits, heads: headsRead, own: ownRead }
   }
   port.on('message', (ask: ASealReadAsk | AFinishReadAsk) => {
     const began = performance.now()

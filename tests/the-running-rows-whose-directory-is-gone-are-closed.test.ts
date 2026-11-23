@@ -235,3 +235,52 @@ describe('a row whose run would be sealed on a finish', () => {
     expect(closed?.data['sealedTip'] ?? null, 'a stale close wrote a seal').toBeNull()
   })
 })
+
+
+// ================================================ a row whose launcher still holds its process row
+
+/**
+ * A RUNNING ROW IS LEFT ALONE WHILE ITS LAUNCHER'S PROCESS ROW IS OPEN, WHATEVER ITS DIRECTORY SAYS.
+ *
+ * The launcher writes the run's command as a process row marked as started by the product, and releases it when the
+ * command ends. A run whose worktree was removed while its launcher still ran was closed under the launcher by the
+ * directory reading. The closer now passes over such a row, and closes it as before once that process row is released.
+ */
+describe('a running row whose launcher still holds its process row', () => {
+  /** A running row naming a directory that is gone, with an open process row for its launcher, as the launcher registers one. */
+  async function aLaunchedRow(): Promise<{ id: string; launcher: string }> {
+    const { registerResource } = await import('../src/server/lib/resources.ts')
+    const id = aRunningRow({ workingDirectory: gone })
+    // THE TEST'S OWN PROCESS STANDS FOR THE LAUNCHED COMMAND, because the ledger takes only a pid that is running.
+    const launcher = registerResource({
+      workspaceId: 'default', sessionRecordId: id, type: 'process', key: String(process.pid), startedByTheProduct: true,
+      actor: AS_AN_AGENT,
+    }).id
+    return { id, launcher }
+  }
+
+  it('leaves the row running after a sweep while its launcher process row is open', async () => {
+    const { id } = await aLaunchedRow()
+    const pass = await closeNow()
+    expect(pass.directoryGoneRowsClosed, 'the directory reading closed a row whose launcher still holds its process row').not.toContain(id)
+    expect(t.api.getRecord(id)?.data['state']).toBe('running')
+    expect(t.api.getRecord(id)?.data['closedBecause'] ?? null).toBeNull()
+  })
+
+  it('closes the row on the next sweep once its launcher process row is released, with the cause a gone directory gets', async () => {
+    const { closeRowThatStoppedMatching } = await import('../src/server/lib/resources.ts')
+    const { theDirectoryGoneRowPatch } = await import('../src/config/own-rows.mjs')
+    const { id, launcher } = await aLaunchedRow()
+    expect((await closeNow()).directoryGoneRowsClosed).not.toContain(id)
+    // RELEASED AS THE LEDGER RECORDS A ROW WHOSE COMMAND ENDED, with no signal: the release door would stop the row's
+    // process group, which here is the test's own.
+    closeRowThatStoppedMatching(launcher, 'default', 'the test command ended', AS_AN_AGENT)
+    const pass = await closeNow()
+    expect(pass.directoryGoneRowsClosed, `${id} was not closed once its launcher process row was released`).toContain(id)
+    const row = t.api.getRecord(id)!
+    const asToday = theDirectoryGoneRowPatch(gone, '')
+    expect(row.data['state']).toBe(asToday.state)
+    expect(row.data['closedBecause']).toBe(asToday.closedBecause)
+    expect(row.data['closedHow']).toBe(asToday.closedHow)
+  })
+})

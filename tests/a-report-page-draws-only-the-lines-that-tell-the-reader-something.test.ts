@@ -31,7 +31,8 @@
  *   (g) a report's History fold is closed at load, in both modes, and open when the address names the history
  *       section. This was already so when the case was written, so the case is a guard;
  *   (i) in normal mode a report's page draws no cost line when no run is named. Developer mode keeps its fold, and
- *       every other kind keeps the line that says nobody recorded a cost.
+ *       every other kind keeps the line that says nobody recorded a cost. That line is the section's label and the
+ *       word for not recorded, drawn told apart, as decided in the explanations change.
  *
  * The words are read from the word lists by `t`, or from the export that writes them.
  *
@@ -464,15 +465,18 @@ describe('the pages, in a browser', () => {
 
   it("draws no cost line on a report's page in normal mode when no run is named, and keeps it elsewhere", async () => {
     const spent = browser.locator('main.page [data-testid="spent-on-this"]')
+    const nobodyRecordedACost = `${en('record.section.spent')} ${en('word.notRecorded')}`
     await arrive(recordPath(reportId), 'normal')
     expect(await spent.count(), 'normal: the report draws a cost line').toBe(0)
-    expect(await browser.locator('main.page').innerText(), 'normal: the report says nobody recorded a cost').not.toContain(en('g2b.spent.summaryNoRuns'))
+    expect(await browser.locator('main.page').innerText(), 'normal: the report says nobody recorded a cost').not.toContain(nobodyRecordedACost)
 
     await arrive(recordPath(reportId), 'inspect')
     expect(await browser.locator('main.page details.rd-fold[data-testid="spent-on-this"]').count(), 'developer: the report lost its cost fold').toBe(1)
 
     await arrive(recordPath(taskId), 'normal')
-    expect((await spent.textContent())?.trim(), 'normal: the task lost its cost line').toBe(en('g2b.spent.summaryNoRuns'))
+    expect((await spent.textContent())?.trim(), 'normal: the task lost its cost line').toBe(nobodyRecordedACost)
+    expect(await spent.locator('[data-edge="dashed"]').count(), 'normal: the word is not told apart as nobody having recorded it').toBe(1)
+    expect(await spent.textContent(), 'normal: the task still draws the old sentence').not.toContain(en('g2b.spent.summaryNoRuns'))
   }, 300_000)
 
   it.skipIf(!process.env[SHOTS_FOLDER])(

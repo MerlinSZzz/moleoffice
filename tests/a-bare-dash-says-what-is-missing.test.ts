@@ -119,22 +119,23 @@ describe('a bare dash says what is missing', () => {
     expectTheDashToSay(markup, sayInEnglish('g8.graph.nothingDrawn'))
   })
 
-  it("a pipeline's WHY IT IS HERE, broken and with no step", () => {
+  // CRITERION CHANGE, as decided: the row has no WHY IT IS HERE part any more. The stepless row's
+  // dash stands where the row says how far the pipeline stands, and the broken row draws its
+  // problem and the word for an unreadable pipeline, with no dash.
+  it("a pipeline's row, broken and with no step", () => {
     const broken = flow.readPipeline(pipelineRecord('b', 'Broken', {}), [], [])
     const stepless = flow.readPipeline(pipelineRecord('s', 'Stepless', { blockIds: [] }), [], [])
     // What each case is, read as it is: one cannot be drawn, the other can and holds no step.
     expect([broken.problem === null, broken.steps.length]).toEqual([false, 0])
     expect([stepless.problem === null, stepless.steps.length]).toEqual([true, 0])
     const byTitle = new Map(pipelines.orderPipelines([broken, stepless], new Map()).map((entry) => [entry.reading.record.title, entry]))
-    const why = (title: string): string => {
+    const row = (title: string): string => {
       const entry = byTitle.get(title)
       if (entry === undefined) throw new Error(`no index entry for ${title}`)
-      const markup = renderToStaticMarkup(h(pipelines.IndexRow, { entry, current: false, onPick: () => {} }))
-      const part = /<span class="pp-why">(.*?)<\/span><\/span>/.exec(markup)
-      if (part === null) throw new Error(`no WHY IT IS HERE in the row for ${title}`)
-      return `${part[1] ?? ''}</span>`
+      return renderToStaticMarkup(h(pipelines.IndexRow, { entry, current: false, onPick: () => {} }))
     }
-    expectTheDashToSay(why('Broken'), sayInEnglish('g7b.PipelinePage.it_cannot_be_drawn_what_is_wrong'))
-    expectTheDashToSay(why('Stepless'), sayInEnglish('g7b.PipelinePage.it_has_no_step'))
+    expect(dashes(row('Broken'))).toEqual([])
+    expect(row('Broken')).toContain(sayInEnglish('g7b.PipelinePage.unreadable'))
+    expectTheDashToSay(row('Stepless'), sayInEnglish('g7b.PipelinePage.it_has_no_step'))
   })
 })

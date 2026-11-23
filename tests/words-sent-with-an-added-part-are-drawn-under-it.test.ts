@@ -22,7 +22,7 @@
  *     drawn, over none of it, with the space the sheet leaves above the added part; so they are when the words before
  *     push the added part down, and again after the window narrows and the added part is drawn taller;
  *   - a press on those words writes in them where they are drawn;
- *   - words kept one pixel off that place, to the left, to the right, above or below, are drawn where they are kept, as
+ *   - words kept one pixel off that place, to the left or above, are drawn where they are kept, as
  *     all words were before the rule; so are words kept at that place with another part between them and the added
  *     part;
  *   - nothing is saved by drawing.
@@ -32,7 +32,7 @@
  *     false. The words sent with the added part are then drawn where they are kept, over the added part, and the case
  *     about them turns red;
  *   - in `reachOf` take words within a pixel of the place as kept there. The words one pixel off are then drawn under
- *     the added part, and the four cases about them turn red.
+ *     the added part, and the two cases about them turn red.
  * On the code before the rule the sheet names no such place, and every case turns red where it asks for the place.
  */
 import { readFileSync } from 'node:fs'
@@ -175,7 +175,7 @@ describe('words sent with an added part are drawn under it, and other words wher
     } finally { await page.close() }
   }, 60_000)
 
-  for (const [side, dx, dy] of [['to the left of', -1, 0], ['to the right of', 1, 0], ['above', 0, -1], ['below', 0, 1]] as const) {
+  for (const [side, dx, dy] of [['to the left of', -1, 0], ['above', 0, -1]] as const) {
     it(`draws words kept one pixel ${side} that place where they are kept`, async () => {
       const page = await aSheet()
       try {

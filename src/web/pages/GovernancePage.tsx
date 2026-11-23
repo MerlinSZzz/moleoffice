@@ -107,7 +107,7 @@ import { declaredAttributes, type Declares } from '../components/declares.ts'
 import { DRAWS_THE_NAME } from '../components/agent/pointing.ts'
 import { type SurfaceId } from '@shared/surfaces.ts'
 import { kindWord } from '@shared/words.ts'
-import { Absence, ErrorNote, Explain, Panel, useAsync, type AsyncState } from '../components/ui.tsx'
+import { Absence, ErrorNote, Explain, Panel, ServerNote, useAsync, type AsyncState } from '../components/ui.tsx'
 import { useProjectAsync } from '../lib/project-async.ts'
 import { NARROW_SCREEN, SideBySide } from '../components/SideBySide.tsx'
 
@@ -248,10 +248,7 @@ export function GovernancePage({
 
       {waiting.status === 'loading' ? <p role="status">{t('decisions.loading')}</p> : null}
       {waiting.status === 'error' ? (
-        <ErrorNote message={waiting.message} fault={waiting.fault}>
-          <span className="gq-what">
-            {t('decisions.readFailed')}</span>
-        </ErrorNote>
+        <ErrorNote message={waiting.message} fault={waiting.fault} />
       ) : null}
 
       {/* THE DECISIONS AND THE MESSAGES YOU HAVE NOT READ, SIDE BY SIDE WHERE THE PAGE IS WIDE.
@@ -362,7 +359,7 @@ export function GovernancePage({
               <ul className="gq-left">
                 {reading.excluded.map((group: WaitingReply['excluded'][number]) => (
                   <li key={group.reason}>
-                    <b className="num">{group.count}</b> {excludedWords(group.reason)}{inspect ? <p className="gq-raw">{group.sentence}</p> : null}
+                    <b className="num">{group.count}</b> {excludedWords(group.reason)}<ServerNote text={group.sentence} />
                     {/* A WITHDRAWN REQUEST IS NAMED, with who withdrew it and when (decision tFl1YWLH3eCl). One press
                         opens it, in its own project. */}
                     {group.withdrawn === undefined ? null : (
@@ -399,7 +396,7 @@ export function GovernancePage({
       >
         {forks.status === 'error' ? <ErrorNote message={forks.message} fault={forks.fault} retry={readForksAgain} /> : null}
         {forks.status === 'ready' && decided.length === 0 ? (
-          <Absence say title={t('decisions.noDecisions')} />
+          <Absence word={t('absence.none')} title={t('decisions.noDecisions')} />
         ) : null}
         {/* TWO CHOICES HERE AND FOUR ABOVE, and `lib/queueorder.ts` says why: a decision carries no
             pin, so there is no importance to rank by, and with nothing pinned and nothing held up
@@ -725,7 +722,7 @@ export function WaitingCard({
       {/* WHY IT IS HERE, IN THE SERVER'S OWN SENTENCE. A card has the room a row does not, and this
           is the sentence the row hides in its tooltip. It is `why` off the wire and is never
           rebuilt here, so the queue and the card cannot come to say different things. */}
-      {inspect ? <p className="gq-why">{row.why}</p> : null}
+      <ServerNote text={row.why} />
       {row.theAsk === undefined ? null : <TheAskItself shows={row.theAsk} />}
       {inspect ? (
         <p className="gq-raw">
@@ -793,7 +790,6 @@ export const GOVERNANCE_PAGE_CSS = `
 .gq-kind, .gq-raw { color: var(--text-3); font: var(--fs-1)/var(--lh-body) var(--font-ui); }
 /* WHY A CARD IS ON THIS PAGE, in the server's own sentence. Drawn on a card and not on a row: a
    row locates and a card has the room to explain, which is the rule the drawing chapter gives. */
-.gq-why { margin: 0; max-width: var(--measure-in-box); color: var(--text-2); font: var(--fs-1)/var(--lh-read) var(--font-ui); }
 .gq-left { margin: 0; padding-inline-start: 1.2em; color: var(--text-2); font: var(--fs-1)/var(--lh-body) var(--font-ui); }
 .gq-withdrawn { margin: .3em 0 0; padding-inline-start: 1.2em; }
 .gq-withdrawn-open { all: unset; cursor: pointer; color: var(--accent); text-decoration: underline; text-underline-offset: .16em; overflow-wrap: anywhere; }

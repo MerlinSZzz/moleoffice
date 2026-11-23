@@ -20,6 +20,11 @@ import { aCheckoutForATestRun } from './a-checkout-for-a-test-run.ts'
  *   4. ONE PASS COUNTS WHAT IT STARTED. Five in the hour and two checks queued: the pass starts one and holds the other.
  *   5. THE LANE. A run's merge entry names its lane. A run with no entry, in a project with two repositories, has no lane
  *      the office can tell, so its check is not paced, and the queue row says why.
+ *   6. THE HOUR THE CLOCKS GO BACK. A check is counted by the moment it started: the instant the worker stores beside its
+ *      `startedAt`, or, when it has none, its `created_at` read in the office's zone. In London at 02:39 GMT on 25 October
+ *      2026, a check started at 01:39 BST is two hours old and is not counted, one started at 02:00 GMT is counted, and one
+ *      with only a `created_at` of 01:45, which names two moments, is counted, because nobody can tell it is old. So the
+ *      lane has 2. Counting by the local stamp again gives 3 and turns the case red.
  *
  * WHAT WOULD MAKE EACH CASE GO RED is in the commit that adds the code, with the control run and the restore.
  *
@@ -33,12 +38,12 @@ import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import type { FastifyInstance } from 'fastify'
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { THE_TEST_OFFICES_SECRETARY } from './a-page-of-a-test-office.ts'
 import { apiApp, freshDb, type TestDb } from './helpers.ts'
 import { withoutInheritedEffort } from './without-inherited-effort.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
-import { localStamp } from '../src/shared/time.ts'
+import { clockStamp, type ClockStamp } from '../src/shared/time.ts'
 import { onePass, type WorkerSettings } from '../src/worker/index.ts'
 
 let t: TestDb
@@ -138,32 +143,52 @@ function aRunCheckedEarlier(workspaceId = WORKSPACE): string {
 
 /**
  * CHECKS STARTED EARLIER, AS THE WORKER FILES ONE: a session record whose `extra.purpose` is 'inspection' and whose
- * `extra.inspectionRun` names the run it checked. Synthetic: no tool ran for any of them.
+ * `extra.inspectionRun` names the run it checked, with the `startedAt` and `startedTime` the worker stores: one clock
+ * observation, `startedAt` its stamp. Synthetic: no tool ran for any of them.
  */
 function checksStartedEarlier(count: number, run: string, workspaceId = WORKSPACE): string[] {
-  return Array.from({ length: count }, (_, n) =>
-    t.api.createRecord({
+  return Array.from({ length: count }, (_, n) => {
+    const startedTime = clockStamp()
+    return t.api.createRecord({
       kind: 'session',
       title: `Synthetic check ${String(n + 1)} of run ${run}, started earlier`,
       workspaceId,
       actor: { type: 'agent', id: THE_WORKER },
       origin: 'fixture',
-      data: { state: 'crashed', runtime: 'inspection-tool', servingAgent: 'inspector-one', extra: { purpose: 'inspection', inspectionRun: run } },
-    }).id,
-  )
+      data: {
+        state: 'crashed',
+        runtime: 'inspection-tool',
+        servingAgent: 'inspector-one',
+        startedAt: startedTime.stamp,
+        startedTime,
+        extra: { purpose: 'inspection', inspectionRun: run },
+      },
+    }).id
+  })
+}
+
+/**
+ * Check sessions made older, as if they had started at `ms`: `created_at`, and the `startedAt` and `startedTime` of a
+ * session that has them, moved to that moment together. `updated_at` is left as it is.
+ */
+function startedAtTheMoment(ms: number, where: string, ...values: string[]): void {
+  const startedTime = clockStamp(() => new Date(ms))
+  t.client.sqlite
+    .prepare(
+      "UPDATE records SET created_at = ?, data = CASE WHEN json_extract(data, '$.startedAt') IS NULL THEN data " +
+        `ELSE json_set(data, '$.startedAt', ?, '$.startedTime', json(?)) END WHERE ${where}`,
+    )
+    .run(startedTime.stamp, startedTime.stamp, JSON.stringify(startedTime), ...values)
 }
 
 /** Every check started so far is made two hours old, so a case counts only the checks it starts itself. */
 function theHourBeforeIsEmpty(): void {
-  const twoHoursAgo = localStamp(new Date(Date.now() - 2 * 3_600_000))
-  t.client.sqlite
-    .prepare("UPDATE records SET created_at = ? WHERE kind = 'session' AND json_extract(data, '$.extra.purpose') = 'inspection'")
-    .run(twoHoursAgo)
+  startedAtTheMoment(Date.now() - 2 * 3_600_000, "kind = 'session' AND json_extract(data, '$.extra.purpose') = 'inspection'")
 }
 
 /** One session record made more than an hour old. */
 function moreThanAnHourAgo(session: string): void {
-  t.client.sqlite.prepare('UPDATE records SET created_at = ? WHERE id = ?').run(localStamp(new Date(Date.now() - 61 * 60_000)), session)
+  startedAtTheMoment(Date.now() - 61 * 60_000, 'id = ?', session)
 }
 
 interface ThePace { lane?: string; started?: number; most?: number; notPaced?: string; cannotPace?: string }
@@ -444,5 +469,64 @@ describe('the lane a check counts in', () => {
     expect(pass.started.find((one) => one.messageId === check), JSON.stringify(pass.held)).toBeDefined()
     expect(itStarted(run)).toBe(true)
     expect(itStarted(submitted.run)).toBe(false)
+  })
+})
+
+// ============================================================================ 6. the hour the clocks go back
+
+describe('the hour the clocks go back', () => {
+  it('counts each check by the moment it started, and one whose stamp names two moments as in the hour', async () => {
+    theHourBeforeIsEmpty()
+    // A LANE ONLY THIS CASE USES: a project of its own with one repository. The checks the other cases filed are stamped
+    // at the real time, which is after the made-up night here, so they would be counted in their own lanes.
+    const { theChecksStartedInTheLastHour } = await import('../src/server/lib/checks-an-hour.ts')
+    const workspaces = await import('../src/server/lib/workspaces.ts')
+    const repositories = await import('../src/server/lib/repositories.ts')
+    const project = 'the-clocks-go-back'
+    workspaces.createWorkspace({ id: project, title: 'Synthetic: the night the clocks go back', note: 'a synthetic project with a repository of its own' })
+    const itsLane = realpathSync(scratch('clocks-go-back'))
+    repositories.registerRepository({ workspaceId: project, name: 'fixture-clocks-go-back', root: itsLane, actor: { type: 'human', id: THE_PERSON } })
+    const run = aRunCheckedEarlier(project)
+
+    const theZoneBefore = process.env.TZ
+    process.env.TZ = 'Europe/London'
+    vi.useFakeTimers({ toFake: ['Date'] })
+    try {
+      /** One check, filed at the moment `instant` with the stamps the office writes then, and `started` added to its data. */
+      const aCheckFiledAt = (instant: string, started: (time: ClockStamp) => Record<string, unknown>): void => {
+        vi.setSystemTime(new Date(instant))
+        const time = clockStamp()
+        t.api.createRecord({
+          kind: 'session',
+          title: `Synthetic check of run ${run}, filed at ${instant}`,
+          workspaceId: project,
+          actor: { type: 'agent', id: THE_WORKER },
+          origin: 'fixture',
+          data: { state: 'crashed', runtime: 'inspection-tool', servingAgent: 'inspector-one', ...started(time), extra: { purpose: 'inspection', inspectionRun: run } },
+        })
+      }
+      // (a) 01:39 BST, the first time 01:39 comes: two hours before now, so not counted.
+      aCheckFiledAt('2026-10-25T00:39:00Z', (time) => ({ startedAt: time.stamp, startedTime: time }))
+      // (c) no startedAt and no startedTime, and a created_at of 01:45 GMT. 01:45 came twice that night, so nobody can tell
+      // the check is old, and it is counted.
+      aCheckFiledAt('2026-10-25T01:45:00Z', () => ({}))
+      // (b) 02:00 GMT: in the hour.
+      aCheckFiledAt('2026-10-25T02:00:00Z', (time) => ({ startedAt: time.stamp, startedTime: time }))
+      const unclear = t.client.sqlite
+        .prepare(
+          "SELECT created_at AS at FROM records WHERE kind = 'session' AND workspace_id = ? AND json_extract(data, '$.startedAt') IS NULL " +
+            "AND json_extract(data, '$.extra.inspectionRun') = ?",
+        )
+        .all(project, run) as { at: string }[]
+      expect(unclear).toEqual([{ at: '2026-10-25 01:45:00' }])
+
+      // NOW IS 02:39 GMT, so an hour ago is 01:39 GMT. Read by the local stamp alone, (a) at 01:39 is in the hour too.
+      vi.setSystemTime(new Date('2026-10-25T02:39:00Z'))
+      expect(theChecksStartedInTheLastHour().get(itsLane)).toBe(2)
+    } finally {
+      vi.useRealTimers()
+      if (theZoneBefore === undefined) delete process.env.TZ
+      else process.env.TZ = theZoneBefore
+    }
   })
 })

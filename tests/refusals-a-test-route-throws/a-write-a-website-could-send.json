@@ -1,0 +1,11 @@
+{
+  "why": "A request that changes something and carries neither a header of the office's own nor JSON (wave 13s, line 13s, SEC-3). It is refused before any door, and only when a listener carried the request: this test reaches every door by inject, which no listener carries, so no door here can meet it. tests/a-write-a-website-could-send-is-refused.test.ts meets it over a real socket, in cases 1 to 4, 9, 11 and 12.",
+  "refusals": [
+    {
+      "code": "writeWithoutTheOfficesMark",
+      "status": 403,
+      "english": "Test: the office changes nothing for a request with neither its own header nor JSON.",
+      "values": {}
+    }
+  ]
+}

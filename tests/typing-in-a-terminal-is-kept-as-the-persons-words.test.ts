@@ -189,7 +189,10 @@ describe('a line the person typed into the office\'s terminal', () => {
     const decision = (reference: string) => ({
       kind: 'decision',
       title: 'The kiln fires on Friday',
-      data: { replaces: [], decided_by: 'the owner', authority: 'the owner said so', authority_reference: reference, option_taken: 'Friday.', because: 'The person typed it.' },
+      data: {
+        governs: [{ wholeProject: true }],
+        replaces: [], decided_by: 'the owner', authority: 'the owner said so', authority_reference: reference, option_taken: 'Friday.', because: 'The person typed it.',
+      },
     })
     const cited = await ask(server.api, '/api/records', { method: 'POST', body: decision(id), headers: AS_QUILL })
     expect(cited.status, JSON.stringify(cited.body)).toBe(201)

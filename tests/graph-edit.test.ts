@@ -18,7 +18,7 @@
  *   1. WITH NOBODY EDITING there is no form on the page. Not a shortened one, not a folded one —
  *      none. That is checked by rendering the whole StructureView and counting inputs and selects.
  *   2. WITH THE DRAWER OPEN AND NO ACTION PICKED there is still no form: the drawer is a list of
- *      actions and one sentence.
+ *      actions.
  *   3. EACH ACTION OPENS ONLY ITS OWN FIELDS. Every action is rendered on its own and the fields
  *      that belong to the other seven are checked to be absent.
  *   4. PRESENTATION IS A CLOSED VOCABULARY, offered as selects. Every option value a person can
@@ -31,6 +31,10 @@
  * WHAT IS ONLY VERIFIED BY SCREENSHOT: that the drawer sits beside the drawing rather than under
  * the page at 1440, that it becomes a full-width column at 390, and that the page no longer opens
  * on a wall of forms. Those are in tools/review/, not here.
+ *
+ * CRITERION CHANGE, as decided: the sentences that explained the drawer, its fields and its actions
+ * are gone from the page. The cases that read them now read the state words that replace them, or
+ * are removed where nothing replaces them. The server's own words are read in developer mode.
  */
 
 import { createElement as h } from 'react'
@@ -47,13 +51,16 @@ import {
 import type { PanelRecord } from '../src/shared/types.ts'
 import type { GraphLink, Scope, StructureGraph } from '../src/web/components/graph/model.ts'
 import { THE_TEST_OFFICES_OWNER } from './a-page-of-a-test-office.ts'
+import { t } from '../src/shared/i18n.ts'
 
 type EditModule = typeof import('../src/web/components/graph/Edit.tsx')
 type Model = typeof import('../src/web/components/graph/model.ts')
 type View = typeof import('../src/web/components/graph/StructureView.tsx')
+type ModeModule = typeof import('../src/web/lib/mode.ts')
 let edit: EditModule
 let model: Model
 let view: View
+let modes: ModeModule
 
 beforeAll(async () => {
   // src/web/api.ts reads window.localStorage at module scope to restore who you are acting as, and
@@ -78,7 +85,18 @@ beforeAll(async () => {
   edit = await import('../src/web/components/graph/Edit.tsx')
   model = await import('../src/web/components/graph/model.ts')
   view = await import('../src/web/components/graph/StructureView.tsx')
+  modes = await import('../src/web/lib/mode.ts')
 })
+
+/** Render in developer mode, where the server's own words are drawn, and go back to normal after. */
+const inDeveloperMode = (draw: () => string): string => {
+  modes.setMode('inspect')
+  try {
+    return draw()
+  } finally {
+    modes.setMode('normal')
+  }
+}
 
 const render = (el: React.ReactElement): string => renderToStaticMarkup(el)
 
@@ -253,12 +271,9 @@ describe('with nobody editing, there is no form on the page', () => {
     expect(page).not.toContain('Change what this drawing is made of')
   })
 
-  it('offers one way in, and the way in says what it opens', () => {
-    // The words are on the button's own title, which `text()` strips along with every other
-    // attribute, so this reads the markup.
+  it('offers one way in, the Edit press', () => {
     const page = render(structureView())
     expect(page).toContain('>Edit</button>')
-    expect(page).toContain('add a module')
   })
 })
 
@@ -272,10 +287,6 @@ describe('the drawer opens on a list of actions, not on fields', () => {
     expect(count(html, '<select')).toBe(0)
   })
 
-  it('says that nothing here moves a box or picks a colour', () => {
-    expect(text(render(drawer()))).toContain('nothing here moves a box or picks a colour')
-  })
-
   it('keeps request explanations out of normal mode under 7FEOshq3mBGG', () => {
     const said = text(render(drawer()))
     expect(said).not.toContain('same requests')
@@ -283,7 +294,7 @@ describe('the drawer opens on a list of actions, not on fields', () => {
   })
 })
 
-describe('the action list is closed and each entry names what it opens', () => {
+describe('the action list is closed', () => {
   it('has eight actions, with unique ids, in the order the brief asks for', () => {
     expect(edit.ACTIONS.map((a) => a.id)).toEqual([
       'add-node',
@@ -296,13 +307,6 @@ describe('the action list is closed and each entry names what it opens', () => {
       'presentation',
     ])
     expect(new Set(edit.ACTIONS.map((a) => a.id)).size).toBe(8)
-  })
-
-  it('never labels one "more": each says what is behind it', () => {
-    for (const action of edit.ACTIONS) {
-      expect(action.opens.trim()).not.toMatch(/^(more|show more|details)$/i)
-      expect(action.opens.length).toBeGreaterThan(8)
-    }
   })
 })
 
@@ -336,9 +340,9 @@ describe('each action opens only the fields it needs', () => {
   }
 
   it('never opens two forms at once, however many actions exist', () => {
-    // One heading per open action. Two would be the wall of forms this replaced.
-    expect(count(render(drawer({ openAction: 'add-link' })), 'class="gx-form-h"')).toBe(1)
-    expect(count(render(drawer()), 'class="gx-form-h"')).toBe(0)
+    // One form per open action. Two would be the wall of forms this replaced.
+    expect(count(render(drawer({ openAction: 'add-link' })), 'class="gx-form"')).toBe(1)
+    expect(count(render(drawer()), 'class="gx-form"')).toBe(0)
   })
 })
 
@@ -361,16 +365,10 @@ function edit_ids(): readonly EditModule['ACTIONS'][number]['id'][] {
 // ============================================================================ structure and content
 
 describe('the structure edits keep the semantics that were already there', () => {
-  it('offers a gate only on a `blocks` link, and says why on every other type', () => {
+  it('offers a gate only on a `blocks` link, and says on every other type that it is not available', () => {
     // The form opens on `relates to`, where the server refuses a gate.
     const html = text(render(drawer({ openAction: 'add-link' })))
     expect(html).toContain('not available on this link type')
-    expect(html).toContain('Only a blocking relationship can say how far work may proceed.')
-  })
-
-  it('says that changing a relationship is a remove and an add, not a patch', () => {
-    const html = text(render(drawer({ openAction: 'change-link', graph: graphOf({ at: 'modules' }) })))
-    expect(html).toContain('This removes the old relationship and stores its replacement between the same two records.')
   })
 
   it('calls the deletion recoverable, because that is what it is', () => {
@@ -401,7 +399,6 @@ describe('a pipeline block keeps its identity through an edit', () => {
   it('asks nobody for an id, because the server mints one and it is unique across the project', () => {
     // 7FEOshq3mBGG keeps the record identity in the option value, away from normal text.
     const html = render(drawer({ openAction: 'step', graph: graphOf({ at: 'pipeline', recordId: 'p-hv2' }) }))
-    expect(text(html)).toContain('Renaming a block keeps its relationships intact.')
     expect(text(html), 'the form offers to make up an id').toContain('a new block at the end')
     // The two controls that would let somebody type or pick an id of their own.
     expect(html, 'the form offers a free-text id').not.toMatch(/placeholder="step-/)
@@ -419,11 +416,6 @@ describe('a pipeline block keeps its identity through an edit', () => {
   it('says that a block carried by nobody is an answer rather than a gap', () => {
     const html = render(drawer({ openAction: 'step', graph: graphOf({ at: 'pipeline', recordId: 'p-hv2' }) }))
     expect(html).toContain('class="px-absent"')
-  })
-
-  it('says that what a block waits on is a link, made where every other link is made', () => {
-    const html = text(render(drawer({ openAction: 'step', graph: graphOf({ at: 'pipeline', recordId: 'p-hv2' }) })))
-    expect(html).toContain('Use Add a relationship to say which work this block waits on.')
   })
 
   it('shows one block per row, each addressable on its own, not one array to send back', () => {
@@ -564,11 +556,12 @@ describe('every stored hint is accounted for, and none is dropped in silence', (
     // Not a `<details>`. This is the answer to "the picture did not move", and a fold would put it
     // one press behind a page that looks like it ignored the person.
     expect(html).not.toContain('<details')
+    const hints = edit.storedHintCount(INTENT)
     if (graph.report.unhonoured.length > 0) {
-      expect(text(html)).toContain('Nothing was dropped')
+      expect(text(html)).toContain(t('structure.hintsNotApplied', { n: hints, unapplied: graph.report.unhonoured.length }))
       for (const entry of graph.report.unhonoured) expect(text(html)).toContain(entry.hint)
     } else {
-      expect(text(html)).toContain('every one of them was applied')
+      expect(text(html)).toContain(t('structure.hintsApplied', { n: hints }))
     }
   })
 
@@ -584,16 +577,13 @@ describe('every stored hint is accounted for, and none is dropped in silence', (
 
   it('says when the arrangement could not be READ, whatever is being drawn', () => {
     const graph = graphOf({ at: 'modules' })
-    const html = text(
-      render(
-        h(view.IntentReport, { hints: 0, graph, problem: 'the server said no', reportHere: false }),
-      ),
-    )
+    const draw = (): string =>
+      text(render(h(view.IntentReport, { hints: 0, graph, problem: 'the server said no', reportHere: false })))
     // Printed even with `reportHere` false: only this file makes that request, so only this file
     // knows it failed, and an unreadable arrangement must never look like an empty one.
-    expect(html).toContain('could not be read')
-    expect(html).toContain('nothing was applied')
-    expect(html).toContain('the server said no')
+    expect(draw()).toContain(t('structure.arrangementNotRead'))
+    // The server's own words are drawn in developer mode only.
+    expect(inDeveloperMode(draw)).toContain('the server said no')
   })
 
   it('never lets a failed read read as an arrangement, empty or applied', () => {
@@ -602,7 +592,7 @@ describe('every stored hint is accounted for, and none is dropped in silence', (
     //
     // THIS USED TO SLICE THE CATCH HANDLER OUT OF StructureView.tsx AS TEXT and look for the word
     // `failed` in it. What a reader gets is checked instead: the two answers must not be able to
-    // look alike. A failed read draws a sentence saying the arrangement could not be read; a
+    // look alike. A failed read draws a state word saying the arrangement could not be read; a
     // successful read holding nothing draws nothing at all.
     const graph = graphOf({ at: 'modules' })
     const failed = render(h(view.IntentReport, { hints: 0, graph, problem: 'the server said no', reportHere: true }))
@@ -610,9 +600,9 @@ describe('every stored hint is accounted for, and none is dropped in silence', (
     expect(emptyButRead, 'a drawing with nothing arranged says something anyway').toBe('')
     expect(failed, 'a failed read is drawn as a drawing with nothing arranged').not.toBe('')
     expect(text(failed), 'a failed read claims the arrangement was applied').not.toContain(
-      'every one of them was applied',
+      t('structure.hintsApplied', { n: 0 }),
     )
-    expect(text(failed)).toContain('cannot say whether anything is arranged')
+    expect(text(failed)).toContain(t('structure.arrangementNotRead'))
   })
 
   it('draws a failed read as a problem, so it cannot be mistaken for a report about hints', () => {
@@ -623,11 +613,11 @@ describe('every stored hint is accounted for, and none is dropped in silence', (
     expect(hints, 'the fixture holds no hints, so this case proves nothing').toBeGreaterThan(0)
     const read = text(render(h(view.IntentReport, { hints, graph, problem: null, reportHere: true })))
     expect(read, 'a read that arrived does not say how many hints it holds').toContain(String(hints))
-    const failed = text(
-      render(h(view.IntentReport, { hints, graph, problem: 'the server said no', reportHere: true })),
+    const failed = inDeveloperMode(() =>
+      text(render(h(view.IntentReport, { hints, graph, problem: 'the server said no', reportHere: true }))),
     )
     expect(failed, 'a failed read counts hints it never read').not.toContain(`${String(hints)} stored`)
-    expect(failed, 'a failed read does not name what went wrong').toContain('the server said no')
+    expect(failed, 'a failed read does not name what went wrong, in developer mode').toContain('the server said no')
   })
 
   /**

@@ -5,6 +5,7 @@ import { getTableConfig, sqliteTable, text } from 'drizzle-orm/sqlite-core'
 import { describe, expect, it } from 'vitest'
 import { aPartTable, thePartTables } from '../src/server/db/part-tables.ts'
 import * as schema from '../src/server/db/schema.ts'
+import { everyPartTable } from '../src/server/db/every-part-table.ts'
 import * as parts from '../src/server/db/schema-parts/index.ts'
 
 const measuredTable = () => aPartTable(sqliteTable('old_measured', { id: text('id').primaryKey() }), { existingMeasured: true })
@@ -28,7 +29,7 @@ describe('a schema part using an existing measured table', () => {
 
   it('keeps the facade identities, measured names, and existing foreign key', () => {
     const bindings = ['apiCalls', 'heldKeys', 'runTokens', 'headerOnlyCalls', 'hourlyCalls', 'outsideReads', 'usageStretches', 'usageChecks'] as const
-    const partNames = new Set(schema.everyPartTable().map((part) => part.name))
+    const partNames = new Set(everyPartTable().map((part) => part.name))
     for (const binding of bindings) {
       const table = parts[binding]
       const name = getTableName(table)

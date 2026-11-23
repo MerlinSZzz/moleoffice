@@ -54,12 +54,18 @@ const APP = 'C:\\Users\\someone\\AppData\\Local\\Programs\\Mole Office'
 const INSTALLED = { from: 'bundle' as const, root: `${APP}\\resources\\office/` }
 const A_CHECKOUT = { from: 'checkout' as const, root: 'C:\\Users\\someone\\mole-office\\' }
 
-/** PowerShell, stood in, both ways: the script about a connection finds no row for it. */
+/**
+ * PowerShell, stood in, both ways: the script about connections finds no row for any of them. The script names them on
+ * its first line, as JSON.
+ */
 function noRows(script: string): WhatACommandDid {
-  if (!script.includes('Get-NetTCPConnection')) {
+  const line = /^\$asked = ConvertFrom-Json '(.+)'$/mu.exec(script)
+  if (line === null) {
     throw new Error(`This stand-in for PowerShell does not know the script that begins ${JSON.stringify(script.slice(0, 160))}.`)
   }
-  return { command: 'powershell.exe', ran: true, status: 0, stdout: `${JSON.stringify({ Before: [], Holders: [], Server: null, After: [] })}\r\n`, stderr: '' }
+  const asked = JSON.parse(line[1]!) as { Connections: { Peer: number; Ours: number }[] }
+  const said = { Connections: asked.Connections.map((one) => ({ Peer: one.Peer, Ours: one.Ours, Before: [], Holders: [], After: [] })), Server: null }
+  return { command: 'powershell.exe', ran: true, status: 0, stdout: `${JSON.stringify(said)}\r\n`, stderr: '' }
 }
 const commands = { powershell: noRows, startPowerShell: async (script: string) => noRows(script) }
 
@@ -154,8 +160,12 @@ function theSystems(): { system: string; probe: OsProbe; finds: string; offered:
 }
 
 /** One request from this computer, on a connection of its own, answered with its status and body. */
-async function send(method: string, path: string): Promise<{ status: number; body: { error?: string; offered?: boolean } }> {
-  const answer = await fetch(`${thisMachine}${path}`, { method, headers: { ...THE_PERSON, connection: 'close' } })
+async function send(method: string, path: string, body?: unknown): Promise<{ status: number; body: { error?: string; offered?: boolean } }> {
+  const answer = await fetch(`${thisMachine}${path}`, {
+    method,
+    headers: { ...THE_PERSON, connection: 'close' },
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+  })
   return { status: answer.status, body: (await answer.json()) as { error?: string; offered?: boolean } }
 }
 
@@ -186,7 +196,8 @@ describe('the sentence about pairing, on each system', () => {
       if (finds === 'no program') expect(way.pairHere, `${system}: the refusal sends the reader to a press that cannot work`).not.toContain('#/pairing')
 
       // THE PRESS'S OWN REFUSAL ENDS WITH WHO PAIRS ON THIS SYSTEM.
-      const pressed = await send('POST', '/api/office/pairing')
+      // The press names the browser, as every press must, so what refuses it is who sent it and not a missing name.
+      const pressed = await send('POST', '/api/office/pairing', { device: 'A browser on the office’s own computer' })
       expect(pressed.status, `${system}: a program nobody found was paired`).toBe(403)
       expect(pressed.body.error?.endsWith(way.whoPairs), `${system}: ${pressed.body.error ?? ''}`).toBe(true)
       if (finds === "any program of this server's user") {

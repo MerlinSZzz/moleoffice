@@ -166,7 +166,7 @@ describe('the source pages name the repository each count is from', () => {
     expect(notCounted).toContain(`“${t('settingsPanel.repos.scanNow')}”`)
     expect(notCounted).toContain('只在开发者模式下显示')
     expect(notCounted).toContain('“开发者：电脑和访问”')
-    expect(html).toContain(t('sourceRepo.totalsAreSums'))
+    expect(html).toContain(t('sourceRepo.heading'))
     expect(html).toContain(claimedLine)
     expect(html).toContain(notCounted)
     expect(html).toContain(unclaimedLine)

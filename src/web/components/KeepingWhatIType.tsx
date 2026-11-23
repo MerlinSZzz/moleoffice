@@ -79,26 +79,15 @@ export function KeepingWhatIType({ terminal }: { terminal: string }): React.Reac
       ) : null}
       {reading.kind === 'read' ? (
         <>
-          <label className="tm-keeping-switch">
+          <label className="tm-keeping-switch" data-keeping={reading.keeping.on ? 'on' : 'off'}>
             <input type="checkbox" role="switch" checked={reading.keeping.on} disabled={pressing} onChange={(e) => turn(e.target.checked)} />
             <span>{t('terminals.keeping.switch')}</span>
           </label>
           {whole ? (
-            <>
-              <p className="tm-keeping-says" data-keeping={reading.keeping.on ? 'on' : 'off'}>
-                {reading.keeping.on ? t('terminals.keeping.on') : t('terminals.keeping.off')}
-              </p>
-              <TheNote keeping={reading.keeping} />
-            </>
-          ) : (
-            <p className="tm-keeping-says" data-keeping={reading.keeping.on ? 'on' : 'off'}>
-              {reading.keeping.on ? t('terminals.keeping.onShort') : t('terminals.keeping.offShort')}
-              {reading.keeping.note === null ? null : (
-                <>
-                  {' '}
-                  <RouteLink to={recordPath(reading.keeping.note.id, 'note')}>{t('terminals.keeping.open')}</RouteLink>
-                </>
-              )}
+            <TheNote keeping={reading.keeping} />
+          ) : reading.keeping.note === null ? null : (
+            <p className="tm-keeping-says tm-keeping-open">
+              <RouteLink to={recordPath(reading.keeping.note.id, 'note')}>{t('terminals.keeping.open')}</RouteLink>
             </p>
           )}
           {reading.keeping.note !== null && reading.keeping.note.keyLike > 0 ? (
@@ -132,6 +121,5 @@ const KEEPING_CSS = `
 .tm-keeping { margin: 0.5rem 0 0 0; display: grid; gap: 0.35rem; justify-items: start; min-width: 0; }
 .tm-keeping-switch { display: inline-flex; align-items: center; gap: 0.45rem; font-weight: 600; color: var(--text); cursor: pointer; }
 .tm-keeping-says { margin: 0; color: var(--text-2); overflow-wrap: anywhere; max-width: 70ch; }
-.tm-keeping-says[data-keeping='on'] { color: var(--text); }
 .tm-keeping-key { color: var(--text); border-left: 3px solid var(--warn, var(--text-2)); padding-left: 0.5rem; }
 `

@@ -36,7 +36,7 @@
  */
 
 import type { DelegationReply } from '../api.ts'
-import { Absence, ErrorNote, Loading, Panel, Row, Tag, type AsyncState } from '../components/ui.tsx'
+import { Absence, ErrorNote, Loading, Panel, Row, ServerNote, Tag, type AsyncState } from '../components/ui.tsx'
 import { useProjectAsync } from '../lib/project-async.ts'
 import { packageParticipantNamed, readEveryPackage, TaskPackageActions, TaskPackagePanelStyle } from '../components/TaskPackagePanel.tsx'
 import { recordPath } from '../components/router.tsx'
@@ -66,11 +66,6 @@ export function TasksToTakePage() {
   )
 }
 
-/** The lead line once there is at least one task on the list. Zero is `Absence`, drawn by the caller. */
-function tasksToTakeLead(total: number): string {
-  return t('tasksToTake.lead', { n: total })
-}
-
 /**
  * The column, drawn.
  *
@@ -98,7 +93,7 @@ export function TheTasksToTake({
             title={t(reply.couldNotRead.length === 0 ? 'tasksToTake.noneTitle' : 'tasksToTake.noneReadableTitle')}
           />
         ) : (
-          tasksToTakeLead(reply.tasks.length)
+          t('tasksToTake.count', { n: reply.tasks.length })
         )}
       </p>
       {reply.tasks.length === 0 ? null : (
@@ -116,7 +111,8 @@ export function TheTasksToTake({
             {reply.couldNotRead.map((one) => (
               <div className="ttt-unreadable-row" key={one.recordId}>
                 <span className="ttt-unreadable-title">{content(one.title)}</span>
-                <span className="ttt-unreadable-why">{one.because}</span>
+                <span className="ttt-unreadable-why">{t('planning.notReadable')}</span>
+                <ServerNote text={one.because} />
               </div>
             ))}
           </div>
@@ -146,7 +142,7 @@ function TaskToTakeRow({
       target={{ kind: 'record', recordId: row.recordId, workspaceId }}
       meta={
         <>
-          {row.says === null ? null : <span className="ttt-says">{row.says}</span>}
+          {row.namedModuleCount === 0 ? <span className="ttt-says">{t('tasksToTake.noModule')}</span> : null}
           <span className="ttt-facts">
             <span className="ttt-fact">
               <span className="ttt-key">{t('tasksToTake.suits')}</span>

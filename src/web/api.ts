@@ -128,12 +128,14 @@ import {
 } from './lib/world.ts'
 // Which world this page lives in, on every request. Criterion C4.
 import { HOME_HEADER, HOME_MOVED_HEADER, VISIT_HEADER } from '../config/visit-headers.mjs'
+import { theHoldOnThisRequest, withTheDeviceHalf } from './lib/the-device-half.ts'
 // Where this page's requests go, and the trip it is on. Criterion C7.
 import {
   theVisitThisPageHolds,
   thisPageIsHome,
   thisPageIsVisiting,
   whereRequestsGo,
+  whatARequestCarries,
   type Visiting,
 } from './lib/visiting.ts'
 import type { EmbassyKey, Visit as VisitOnTheWire, WhatTheEmbassySays, World as WorldOnTheWire } from '@shared/worlds.ts'
@@ -766,9 +768,15 @@ export function setActor(next: WebActor): void {
  * by hand are still all in this file.
  */
 export async function askWhoOwnsTheOffice(query: string): Promise<Response> {
+  // Not while a press that sets the cookie half is out, and at once when none is (src/web/lib/the-device-half.ts).
+  const heldByAPress = theHoldOnThisRequest()
+  if (heldByAPress !== undefined) await heldByAPress
   // THE OFFICE THAT SERVED THIS PAGE, NEVER A WORLD IT IS VISITING: the answer is who this page acts
   // as, and a visited world's owner is not this page's person.
-  return fetch(theApiUrlFor(`/api/office/owner${query}`), { credentials: 'include', headers: { accept: 'application/json' } })
+  return fetch(theApiUrlFor(`/api/office/owner${query}`), {
+    credentials: 'include',
+    headers: withTheDeviceHalf(new Headers({ accept: 'application/json' })),
+  })
 }
 
 /** React subscribes here so the header re-renders when you switch who you are acting as. */
@@ -994,7 +1002,11 @@ async function aFetchAskedAgainWhileWindowsIsSlow(path: string, init: Omit<Reque
   const replies: Response[] = []
   try {
     return await askedAgainWhileWindowsIsSlow(async () => {
-      const reply = await fetch(whereRequestsGo(path), { ...init, headers: moleOfficeHeaders() })
+      // A CALLER THAT ASKS FOR COOKIES IS SENT AS EVERY REQUEST OF THE PAGE IS: both halves at home, neither on a trip.
+      const heldByAPress = theHoldOnThisRequest()
+      if (heldByAPress !== undefined) await heldByAPress
+      const carries = init.credentials === 'include' ? whatARequestCarries(path, moleOfficeHeaders()) : { headers: moleOfficeHeaders() }
+      const reply = await fetch(whereRequestsGo(path), { ...init, ...carries })
       replies.push(reply)
       if (reply.ok) return reply
       let body: unknown = null
@@ -1049,7 +1061,11 @@ export interface TheBytesThatAnswered {
  * exactly as every other refusal is, because the doors refuse in JSON whatever they answer on success.
  */
 async function theRequestItself<T>(path: string, init: RequestInit, reads: 'json' | 'text' | 'bytes'): Promise<T> {
-  const headers = moleOfficeHeaders(init)
+  // NOT WHILE A PRESS THAT SETS THE COOKIE HALF IS OUT, unless this is that press (src/web/lib/the-device-half.ts). When
+  // nothing holds the request it goes at once, in the same turn its caller asked for it.
+  const heldByAPress = theHoldOnThisRequest(init)
+  if (heldByAPress !== undefined) await heldByAPress
+  const carries = whatARequestCarries(path, moleOfficeHeaders(init))
 
   let res: Response
   // WHERE THE API IS, worked out from the address bar and the port this page was told. It used to be
@@ -1062,13 +1078,14 @@ async function theRequestItself<T>(path: string, init: RequestInit, reads: 'json
     // this app has always been; the same path at another world's address while this page is
     // visiting one. Criterion C7: *"enter" points the page's API at that world.*
     //
-    // AND IT CARRIES THE PAIRING COOKIE. Criterion P83, point 2. A cookie is not attached to a
-    // cross-origin request unless the page asks for credentials, and `npm run dev` serves the page
+    // AT HOME IT CARRIES THE COOKIE HALF, beside the header half. Criterion P83, point 2. A
+    // cookie is not attached to a cross-origin request unless the page asks for credentials, and `npm run dev` serves the page
     // from Vite on one port and the API on another — so without this the browser is never paired in
     // development even though the pairing press set the cookie. `npm run serve` serves the page from
     // the API itself and is same-origin, so this changes nothing there. The server's CORS
-    // registration allows credentials for exactly the origins it already admits.
-    res = await fetch(whereRequestsGo(path), { ...init, credentials: 'include', headers })
+    // registration allows credentials for exactly the origins it already admits. ON A TRIP IT CARRIES
+    // NEITHER HALF: `whatARequestCarries` in src/web/lib/visiting.ts has the rule (SEC-2's design, item 2).
+    res = await fetch(whereRequestsGo(path), { ...init, ...carries })
   } catch (err) {
     // NOTHING ANSWERED. The server process being down is the most common cause, and it is what a
     // person needs told. Status 0 means "the request never reached anyone"; the route and the
@@ -2581,7 +2598,7 @@ const theDoorsThatFetch = {
     // request uses: the page's own origin in a build, the API's own door under `npm run dev`, and the visited
     // world's address while the page is visiting one.
     // WITH THE PAIRING COOKIE, as every other request of the page carries it. Item 1 of a decision
-    // says so.
+    // says so. On a trip it carries neither half, as every other request of the page does.
     const res = await aFetchAskedAgainWhileWindowsIsSlow(url, { credentials: 'include' })
     if (!res.ok) {
       throw new Error(
@@ -2630,10 +2647,12 @@ const theDoorsThatFetch = {
     tag: string | undefined,
     answers?: 'bytes',
   ): Promise<{ status: number; tag: string | null; body: unknown } | { status: number; tag: string | null; type: string | null; bytes: ArrayBuffer | null }> => {
-    const headers = moleOfficeHeaders()
-    if (tag !== undefined) headers.set('if-none-match', tag)
     // THE SAME PATH AND QUERY THE SLOT MEASURED against READ_TARGET_LIMIT (wave 13y round 52).
-    const res = await fetch(whereRequestsGo(theTargetOfARead(view, query)), { headers, credentials: 'include', cache: 'no-store' })
+    const heldByAPress = theHoldOnThisRequest()
+    if (heldByAPress !== undefined) await heldByAPress
+    const carries = whatARequestCarries(theTargetOfARead(view, query), moleOfficeHeaders())
+    if (tag !== undefined) carries.headers.set('if-none-match', tag)
+    const res = await fetch(whereRequestsGo(theTargetOfARead(view, query)), { ...carries, cache: 'no-store' })
     // Wave 13y round 44: both forms use the same request; bytes are neither decoded nor parsed here.
     if (answers === 'bytes') {
       return {
@@ -3047,6 +3066,11 @@ export interface ParticipantOnTheWire {
   addressAsSetBy: AddressAsSetBy
   runtime?: string | null
   /**
+   * THE HARNESS THE AGENT'S RECORD NAMES, as stored, or null because it names none. Any harness's word: for one the
+   * office has no adapter for, `runtime` is null and this still names it. Absent from an older server.
+   */
+  harness?: string | null
+  /**
    * TRUE ON AN AGENT WHEN A LISTED AGENT REGISTERED EARLIER BEARS THE SAME NAME, so the chat draws a
    * small "new" mark beside this one (problem hqbovBMnTu-z). Never on a person; absent from an older
    * server.
@@ -3130,6 +3154,11 @@ export interface ParticipantOnTheWire {
   /** The chosen column layout, or null to follow the available width. */
   chatLayout?: ChatLayout | null
   /**
+   * THE MODE THEY START IN while their browser has stored none: `inspect`, Developer mode, for a person the office
+   * made, or null for a person made before the column, read as Normal mode. Never on an agent.
+   */
+  startingMode?: 'inspect' | null
+  /**
    * WHICH KEY SENDS A MESSAGE: `shift-or-alt-enter` or `enter`, or null because they have never chosen,
    * which is read as `shift-or-alt-enter` — Enter makes a new line and Shift+Enter or Alt+Enter
    * sends. Never on an agent: nothing draws a chat panel for one to type in.
@@ -3146,7 +3175,7 @@ export interface ParticipantOnTheWire {
    */
   chatLabels?: TheStoredMessageLabels
   /**
-   * THE PERSON'S OWN SETTINGS FOR THE TWO FLAGS THE OFFICE SHIPS AND FOR 'NO MARK', or null because they changed none.
+   * THE PERSON'S OWN SETTINGS FOR THE FOUR FLAGS THE OFFICE SHIPS AND FOR 'NO MARK', or null because they changed none.
    * Migration 0346. The flag's menu draws it, read by `readShippedFlags` in shared/intent-mark.ts. Never on an agent.
    */
   shippedFlags?: import('@shared/intent-mark.ts').StoredShippedFlags | null
@@ -3206,6 +3235,46 @@ export interface ParticipantOnTheWire {
    * profile page draws; absent on the roster. Absent on a person.
    */
   broadcast?: BroadcastReading | null
+  /**
+   * WHO OWNS THIS AGENT (wave 13s round 281). Present only on the read of one agent and its profile;
+   * absent on the roster and on a person. Absent means nobody recorded an owner, and broken means the
+   * row holds one that cannot be read. A held owner's name is its office name, or null because its id
+   * names nobody registered.
+   */
+  owner?: TheOwnerOfAnAgent
+}
+
+/** An agent's owner as the read of one agent says it. */
+export type TheOwnerOfAnAgent =
+  | { state: 'absent' }
+  | { state: 'broken' }
+  | { state: 'held'; kind: ParticipantKind; id: string; name: string | null }
+
+/**
+ * ONE HAND-OVER OF AN AGENT'S OWNER that the owner door kept (wave 13s round 281), as
+ * GET /api/participants/agent/:id/owner-changes gives it. The owner before is said as the read of one
+ * agent says its owner. A name is null because its id names nobody registered. `underTheGrant` is the
+ * grant an agent made it under, or null because none was used. `at` is a local stamp. The server's
+ * shape is in src/server/lib/agent-owner-changes.ts.
+ */
+export interface AnOwnerHandOver {
+  id: string
+  at: string
+  before: TheOwnerOfAnAgent
+  after: Extract<TheOwnerOfAnAgent, { state: 'held' }>
+  by: { kind: ParticipantKind; id: string; name: string | null }
+  underTheGrant: string | null
+  because: string
+}
+
+/**
+ * EVERY HAND-OVER OF ONE AGENT'S OWNER, newest first. `since` is when this office began to keep them,
+ * or null because that was not recorded.
+ */
+export interface TheOwnerHandOversOfAnAgent {
+  agent: string
+  since: string | null
+  handOvers: AnOwnerHandOver[]
 }
 
 /**

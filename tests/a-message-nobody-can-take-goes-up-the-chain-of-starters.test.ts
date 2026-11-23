@@ -398,12 +398,20 @@ beforeAll(async () => {
   anAgent('dead-hold-here')
   await hold(
     'dead-hold-here',
-    // NO servingAgent AND NO PROCESS: the hold is real and the session behind it answers nothing.
+    // NO servingAgent, AND THE BRIDGE ITS RECORD NAMES HAS ENDED: the hold is real, but a process recorded as
+    // the session's own has ended and no transcript of it grew, so the session behind it answers nothing. The pid
+    // is above any pid a Linux machine hands out, so no process runs under it. With no process recorded at all,
+    // a beating hold would read as answering.
     t.api.createRecord({
       workspaceId: WORKSPACE,
       kind: 'session',
       title: 'a session that has stopped',
-      data: { state: 'running', runtime: 'codex', providerSession: 'a-provider-session' },
+      data: {
+        state: 'running',
+        runtime: 'codex',
+        providerSession: 'a-provider-session',
+        extra: { codexBridge: { pid: 2147483004, script: 'made-up-bridge.mjs', thread: 'a-provider-session' } },
+      },
       actor: t.api.HUMAN,
     }).id,
   )
@@ -612,7 +620,7 @@ describe('the chat’s mark and the routing read one fact', () => {
     expect(nothing.how).toBe('nobody')
     expect(nothing.reach).toBe('nothing answering')
 
-    // A HOLD WHOSE SESSION IS GONE IS NOBODY, not a live session.
+    // A HOLD WHOSE RECORDED PROCESS HAS ENDED IS NOBODY, not a live session.
     const dead = await bothReadings('dead-hold-here')
     expect(dead.how).toBe('nobody')
     expect(dead.reach).toBe('nothing answering')

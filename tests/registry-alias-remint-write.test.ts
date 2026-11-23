@@ -1,13 +1,13 @@
 // Copyright © 2026 Zhengyang Shen
 // Licensed under the MIT License. See LICENSE.
 /**
- * THE RE-MINT'S WRITE STEP GIVES EACH LEGACY AGENT ITS NEW ID, REWRITES THE NINE KEYED COLUMNS TO IT AND FILES THE OLD
+ * THE RE-MINT'S WRITE STEP GIVES EACH LEGACY AGENT ITS NEW ID, REWRITES THE TEN KEYED COLUMNS TO IT AND FILES THE OLD
  * ID AS AN ALIAS, IN ONE TRANSACTION, OR REFUSES AND WRITES NOTHING. Wave 13s round 157, item 30c part 3.
  *
  * src/server/lib/registry-aliases/remint-write.ts takes a map from planTheRemint. Here a throwaway office holds made-up
- * agents, legacy and minted, and a row naming a legacy one and a row naming the minted one in each of the nine columns
+ * agents, legacy and minted, and a row naming a legacy one and a row naming the minted one in each of the ten columns
  * with a foreign key to agents.id. Cases:
- *   1. every legacy agent takes its new id; each of the nine columns names it by the new id, and no other column of
+ *   1. every legacy agent takes its new id; each of the ten columns names it by the new id, and no other column of
  *      those rows changes; each old id is an alias of the new one; the minted agent and its rows are as they were; no
  *      other table changes; the keys hold, and are checked at once again after the step;
  *   2. a legacy agent that is already an alias's target is refused by its id and handle, and nothing is written;
@@ -16,7 +16,8 @@
  *   5. a store whose keys to agents.id are already broken before the step is refused, each broken row named by its
  *      table and rowid as foreign_key_check reports it, and nothing is written.
  * The columns were seven until round 192 added agent_renames.agent_id, a new name proposed for an agent (item 42), and
- * eight until wave 13u round 186 added agent_starter_changes.agent_id, a change of who answers for an agent.
+ * eight until wave 13u round 186 added agent_starter_changes.agent_id, a change of who answers for an agent, and nine
+ * until wave 13s round 281 added agent_owner_changes.agent_id, a hand-over of an agent's owner.
  *
  * Three-run proof, using this whole file each time:
  *   node tools/run-named-tests.mjs tests/registry-alias-remint-write.test.ts
@@ -35,7 +36,7 @@
  *      after the writes finds the same rows and throws, and case 5 goes red.
  * Then copy drizzle/0319_an_agent_is_renamed_on_its_approvers_word.sql and make this change in it:
  *   7. delete the line that declares the foreign key from agent_id to agents.id: agent_renames.agent_id is no longer a
- *      column the step finds, so it rewrites eight columns and case 1 goes red.
+ *      column the step finds, so it rewrites nine columns and case 1 goes red.
  * Restore the file with cp after each, check it with cmp, and run the command again for green.
  * Every id, name and row here is made up, in a throwaway office.
  */
@@ -58,8 +59,9 @@ const RENAMED = { id: 'old-heron', handle: 'new-heron' }
 const MINTED_LIVE = { id: 'MintedLive_1', handle: 'minted-live' }
 const WHEN = '2026-10-30 10:00:00'
 
-/** The nine columns with a foreign key to agents.id, each by its table, a dot and the column. */
-const THE_NINE = [
+/** The ten columns with a foreign key to agents.id, each by its table, a dot and the column. */
+const THE_TEN = [
+  'agent_owner_changes.agent_id',
   'agent_records.agent_id',
   'agent_renames.agent_id',
   'agent_starter_changes.agent_id',
@@ -84,10 +86,11 @@ function madeUpRegistry(): void {
   anAgent(MINTED_LIVE.id, MINTED_LIVE.handle)
 }
 
-/** One row naming this agent in each of the nine columns. Every other agent such a row names is the minted one. */
+/** One row naming this agent in each of the ten columns. Every other agent such a row names is the minted one. */
 function aRowInEachKeyedColumnFor(agent: string): void {
   const other = MINTED_LIVE.id
   const s = db()
+  s.prepare('INSERT INTO agent_owner_changes (id, agent_id, from_kind, from_id, to_kind, to_id, made_by_kind, made_by_id, under_grant, because, made_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(`made-up-owner-change-of-${agent}`, agent, 'person', 'made-up-person', 'agent', other, 'person', 'made-up-person', null, 'Made-up reason', WHEN)
   s.prepare('INSERT INTO agent_records (record_id, agent_id) VALUES (?, ?)').run(`made-up-record-of-${agent}`, agent)
   s.prepare('INSERT INTO agent_renames (id, agent_id, way, old_name, new_name, proposed_by_kind, proposed_by_id, proposed_because, proposed_at, approver_kind, approver_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(`made-up-rename-of-${agent}`, agent, 'proposed', 'Made-up old name', 'Made-up new name', 'agent', other, 'Made-up reason', WHEN, 'agent', other)
   s.prepare('INSERT INTO agent_starter_changes (id, agent_id, from_kind, from_id, to_kind, to_id, asked_by_kind, asked_by_id, because, asked_at, state, applied_at, runs_not_ended) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(`made-up-starter-change-of-${agent}`, agent, 'agent', other, 'person', 'made-up-person', 'person', 'made-up-person', 'Made-up reason', WHEN, 'applied', WHEN, '[]')
@@ -128,7 +131,7 @@ async function aMap() {
 }
 
 describe('the re-mint write step', () => {
-  it('gives each legacy agent its new id, rewrites the nine keyed columns to it, files the old id as an alias, and changes nothing else', async () => {
+  it('gives each legacy agent its new id, rewrites the ten keyed columns to it, files the old id as an alias, and changes nothing else', async () => {
     const { writeTheRemint } = await write()
     const { AGENT_REGISTRY_NAMESPACE } = await aliases()
     const remint = await aMap()
@@ -136,12 +139,12 @@ describe('the re-mint write step', () => {
     const newIds = new Map(legacy.map((entry) => [entry.oldId, entry.newId]))
     const newIdOf = (value: unknown) => (typeof value === 'string' ? (newIds.get(value) ?? value) : value)
     // THE FIXTURE HAS WHAT THE CASE NEEDS: the made-up legacy agents are legacy, the minted one keeps its id, and each of
-    // the nine columns names a legacy agent and the minted one.
+    // the ten columns names a legacy agent and the minted one.
     expect([...newIds.keys()]).toEqual(expect.arrayContaining([LEGACY_LIVE, LEGACY_RETIRED, RENAMED.id]))
     expect(remint.entries.find((entry) => entry.oldId === MINTED_LIVE.id)).toMatchObject({ from: 'minted', newId: MINTED_LIVE.id })
     const before = everyRow()
     const named = (rows: Row[], column: string, ids: (id: unknown) => boolean) => rows.filter((row) => ids(row[column])).length
-    for (const site of THE_NINE) {
+    for (const site of THE_TEN) {
       expect(named(before[tableOf(site)]!, columnOf(site), (id) => id === LEGACY_LIVE), site).toBeGreaterThan(0)
       expect(named(before[tableOf(site)]!, columnOf(site), (id) => id === MINTED_LIVE.id), site).toBeGreaterThan(0)
     }
@@ -149,18 +152,18 @@ describe('the re-mint write step', () => {
     const result = writeTheRemint(db(), remint)
     if (!('written' in result)) throw new Error(result.refused.join(' '))
 
-    // THE COUNTS: one change of agents.id and one alias for each legacy agent, and in each of the nine columns the rows
-    // that named one. The columns it rewrote are the nine, read from the schema.
+    // THE COUNTS: one change of agents.id and one alias for each legacy agent, and in each of the ten columns the rows
+    // that named one. The columns it rewrote are the ten, read from the schema.
     expect(result.written.agents).toBe(legacy.length)
     expect(result.written.aliases).toBe(legacy.length)
-    expect(Object.keys(result.written.columns).sort()).toEqual(THE_NINE)
-    for (const site of THE_NINE) expect(result.written.columns[site], site).toBe(named(before[tableOf(site)]!, columnOf(site), (id) => newIds.has(id as string)))
+    expect(Object.keys(result.written.columns).sort()).toEqual(THE_TEN)
+    for (const site of THE_TEN) expect(result.written.columns[site], site).toBe(named(before[tableOf(site)]!, columnOf(site), (id) => newIds.has(id as string)))
 
     const after = everyRow()
-    // AGENTS, AND THE TABLES OF THE EIGHT COLUMNS: each row as it was, but with a legacy agent's new id in place of its
-    // old one in agents.id and in each of the nine columns, and in no other column.
+    // AGENTS, AND THE TABLES OF THE TEN COLUMNS: each row as it was, but with a legacy agent's new id in place of its
+    // old one in agents.id and in each of the ten columns, and in no other column.
     const rewritten = new Map<string, string[]>([['agents', ['id']]])
-    for (const site of THE_NINE) rewritten.set(tableOf(site), [...(rewritten.get(tableOf(site)) ?? []), columnOf(site)])
+    for (const site of THE_TEN) rewritten.set(tableOf(site), [...(rewritten.get(tableOf(site)) ?? []), columnOf(site)])
     for (const [table, columns] of rewritten) {
       expect(after[table], table).toEqual(sorted(before[table]!.map((row) => ({ ...row, ...Object.fromEntries(columns.map((column) => [column, newIdOf(row[column])])) }))))
     }
@@ -207,7 +210,7 @@ describe('the re-mint write step', () => {
   it('rolls everything back when a write fails after agents.id has changed, and throws', async () => {
     const { writeTheRemint } = await write()
     const remint = await aMap()
-    // A MADE-UP FAULT in this throwaway office: the rewrite of one of the nine columns is refused.
+    // A MADE-UP FAULT in this throwaway office: the rewrite of one of the ten columns is refused.
     db().exec("CREATE TRIGGER a_made_up_fault BEFORE UPDATE OF agent_id ON resident_sleeps BEGIN SELECT RAISE(ABORT, 'a made-up fault'); END")
     const before = everyRow()
     expect(() => writeTheRemint(db(), remint)).toThrow(/a made-up fault/)

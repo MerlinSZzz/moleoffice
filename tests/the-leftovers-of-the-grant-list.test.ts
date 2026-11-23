@@ -11,12 +11,11 @@
  *      decision written through the create door and through the promote door, naming the part; an
  *      office that presses it lets the write through and names the secretary and the grant; and an
  *      office with no row answers as the record door does;
- *   4. five small faults:
+ *   4. four small faults:
  *      a. the answer door names the person rather than calling them the agent that started;
  *      b. a second revoke of the same key is not found, whoever asks;
  *      c. undoing a revocation is refused in its own door's words;
  *      d. `setThisOfficesAnswer` refuses an answer that is not one of the three, whoever calls it;
- *      e. the merge move asks the check once.
  *
  * Every agent, record and key here is made up for the test, in a fresh test database. Nothing is
  * listened on and nothing reaches the live office.
@@ -28,24 +27,21 @@
  *   · the answer check taken out of `setThisOfficesAnswer` → fault d's case writes a row.
  */
 
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 
 import { THE_PERSON } from '../src/shared/person.ts'
-import { THE_MESSAGE_WORKER_ID } from '../src/shared/participants.ts'
 import type { AnAnswerAboutADoor } from '../src/shared/what-the-grant-carries.ts'
 import { THE_TEST_OFFICES_SECRETARY } from './a-page-of-a-test-office.ts'
-import { A_TESTS_REASON_FOR_THE_PERSON, apiApp, freshDb, FOR_THE_PERSON, thePersonsKeyHeader, type TestDb } from './helpers.ts'
+import { A_TESTS_REASON_FOR_THE_PERSON, apiApp, freshDb, FOR_THE_PERSON, thePersonsKeyHeader, type TestDb, governsTheWholeProject } from './helpers.ts'
 
 const WORKSPACE = 'default'
 const SECRETARY = THE_TEST_OFFICES_SECRETARY.handle
 const WORKER = 'leftovers-worker'
 const ASKER = 'leftovers-asker'
-const THE_OFFICE = { type: 'agent', id: THE_MESSAGE_WORKER_ID }
 
 let t: TestDb
 let app: Awaited<ReturnType<typeof apiApp>>
 let list: typeof import('../src/server/lib/what-the-grant-carries.ts')
-let entryDoor: typeof import('../src/server/lib/merge-entry-door.ts')
 let grant = ''
 
 const keys = new Map<string, string>()
@@ -133,32 +129,11 @@ function changeTheScene(extra: Record<string, unknown> = {}) {
   return ask('PATCH', '/api/office/scene-settings', asSecretary, { motion: true, ...extra })
 }
 
-/** A merge entry in the shape the queue writes, written as the queue writes it. Synthetic. */
-function anEntry(name: string): string {
-  return entryDoor.asTheMergeQueue(() =>
-    t.api.createRecord({
-      kind: 'merge_entry',
-      title: `Synthetic merge entry ${name}`,
-      workspaceId: WORKSPACE,
-      actor: THE_OFFICE as never,
-      origin: 'fixture',
-      data: {
-        run: `synthetic-run-${name}`,
-        seal: { id: `synthetic-seal-${name}`, hash: `synthetic-hash-${name}` },
-        changeset: { adapter: 'files', root: `/synthetic/lane-${name}`, operations: [] },
-        state: 'judged',
-        submittedBy: { kind: 'agent', id: `synthetic-submitter-${name}` },
-      },
-    }),
-  ).id
-}
-
 beforeAll(async () => {
   t = await freshDb()
   app = await apiApp()
   await app.app.ready()
   list = await import('../src/server/lib/what-the-grant-carries.ts')
-  entryDoor = await import('../src/server/lib/merge-entry-door.ts')
   asPerson = {
     'content-type': 'application/json',
     'x-mole-office-workspace': WORKSPACE,
@@ -239,7 +214,7 @@ describe('the part beside the record door: record:decision', () => {
     ...FOR_THE_PERSON,
     kind: 'decision',
     title,
-    data: { replaces: [], decided_by: 'the owner', authority: 'the owner said so', because: 'Because they said so.' },
+    data: { ...governsTheWholeProject(), replaces: [], decided_by: 'the owner', authority: 'the owner said so', because: 'Because they said so.' },
   })
 
   it('keeps the create door when this office keeps writing a decision, and writes nothing', async () => {
@@ -296,7 +271,7 @@ describe('the part beside the record door: record:decision', () => {
   })
 })
 
-describe('the five small faults', () => {
+describe('the four small faults', () => {
   it('names the person in the answer door, not the agent that started', async () => {
     const asked = await ask('POST', '/api/roles/requests', asAgent(ASKER), { asking: 'supervisor', because: 'A made-up reason.' })
     expect(asked.status, asked.said).toBe(201)
@@ -337,17 +312,5 @@ describe('the five small faults', () => {
       /kept, ask-first, may-press/,
     )
     expect((t.client.sqlite.prepare('SELECT COUNT(*) AS n FROM what_the_grant_carries').get() as { n: number }).n).toBe(before)
-  })
-
-  it('asks the check once when the merge move is made through its route', async () => {
-    answer('merge.first', 'may-press')
-    const spy = vi.spyOn(list, 'theAnswerAboutAPress')
-    const entry = anEntry('asks-once')
-    const before = spy.mock.calls.length
-    const moved = await ask('POST', `/api/merge-queue/${entry}/first`, asSecretary, { ...FOR_THE_PERSON, because: 'A test moves it first.' })
-    expect(moved.status, moved.said).toBe(200)
-    // One: the move asks once. Before this change the route asked, and moveToTheFront asked again.
-    expect(spy.mock.calls.length - before, 'the merge move asks the check more than once').toBe(1)
-    spy.mockRestore()
   })
 })

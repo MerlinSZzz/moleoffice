@@ -44,7 +44,7 @@
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import type { FastifyInstance } from 'fastify'
-import { apiApp, freshDb, type TestDb } from './helpers.ts'
+import { apiApp, freshDb, type TestDb, governsTheWholeProject } from './helpers.ts'
 import { THE_TEST_OFFICES_OWNER } from './a-page-of-a-test-office.ts'
 import { FORK_SETTLERS, THE_OWNER, type ForkSettler } from '../src/shared/kinds.ts'
 import type { ForksReply } from '../src/server/api/forks.ts'
@@ -269,7 +269,7 @@ describe('the two requests, run one after the other, which is how this was found
       payload: {
         kind: 'decision',
         title: 'Stay on position control',
-        data: { replaces: [],
+        data: { ...governsTheWholeProject(), replaces: [],
           because: 'The left finger has no force sensor.',
           authority: 'a measurement',
           decided_by: 'claude-code',

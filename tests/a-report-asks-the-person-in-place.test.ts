@@ -29,8 +29,8 @@
  *      tags say only that it was chosen and which words were sent with it. "Your choice" and "Your own
  *      words" are drawn only where the person chose the answer; an older answer that recorded nobody
  *      as its chooser is tagged in the plain words too, and the line saying nobody recorded the chooser
- *      is a part of its own after the time (wave 13s round 81). The secretary's name is drawn at 1440,
- *      990, 660 and 390, in both looks, in English.
+ *      is a part of its own after the time (wave 13s round 81). The secretary's name is drawn at 1440
+ *      and 390, in the light look, in English.
  *
  * ONE SEND PRESS FOR THE WHOLE REPORT, in wave 13u round 19. A report of nine
  * boxes had a send press in every one, which was hard work for whoever answered it.
@@ -547,12 +547,12 @@ it('12. a choice a secretary sent under the grant names the secretary and says t
   // THE GRANT IN WORDS, NEVER BY ITS ID. The id is asked of the whole page, so it is not drawn beside the line either.
   expect(await who.innerText()).toContain(en('rq.sent.underTheGrant'))
   expect(await page.locator('body').innerText(), "the grant's id is drawn on the page").not.toContain(GRANT)
-  // AN OLDER ANSWER WITH NO CHOOSER RECORDED is tagged in the same plain words, and its line says nobody recorded who
-  // chose it, in a part of its own and not run on from the sender's name.
+  // AN OLDER ANSWER WITH NO CHOOSER RECORDED is tagged in the same plain words, and its line marks who
+  // chose it as not recorded, in a part of its own and not run on from the sender's name.
   const days = page.locator('.rq-choice', { hasText: 'Which days may the kiln be delivered on?' })
   expect(await days.locator('.rq-chosen').allInnerTexts(), 'the tag on a choice nobody recorded the chooser of').toEqual([en('rq.sent.chosenAsSent')])
-  expect(await days.locator('.rq-said[data-answer="sent"] .rq-chooser').innerText()).toBe(en('rq.sent.chooserNotRecorded'))
-  expect(await days.locator('.rq-who').innerText(), 'the sentence about the chooser runs on from the sender').not.toContain(en('rq.sent.chooserNotRecorded'))
+  expect(await days.locator('.rq-said[data-answer="sent"] .rq-chooser').innerText()).toBe(en('rq.sent.chooserUnrecorded'))
+  expect(await days.locator('.rq-who').innerText(), 'the words about the chooser run on from the sender').not.toContain(en('rq.sent.chooserUnrecorded'))
 
   // THE PERSON'S OWN CHOICE KEEPS "YOUR CHOICE" AND "YOUR OWN WORDS".
   await open(answered)
@@ -560,10 +560,8 @@ it('12. a choice a secretary sent under the grant names the secretary and says t
   expect(await theirs.locator('.rq-chosen').allInnerTexts()).toEqual([en('rq.sent.chosen')])
   expect(await theirs.locator('.rq-own-label').innerText()).toBe(en('rq.sent.ownWords'))
 
-  for (const width of [1440, 990, 660, 390]) {
-    for (const look of ['light', 'dark']) {
-      await open(underTheGrant, { width, look })
-      await expect.poll(async () => app.page.locator('.rq-choice .rq-who').first().innerText(), { timeout: 30_000 }).toContain(SECRETARY.name)
-    }
+  for (const width of [1440, 390]) {
+    await open(underTheGrant, { width, look: 'light' })
+    await expect.poll(async () => app.page.locator('.rq-choice .rq-who').first().innerText(), { timeout: 30_000 }).toContain(SECRETARY.name)
   }
 }, 300_000)

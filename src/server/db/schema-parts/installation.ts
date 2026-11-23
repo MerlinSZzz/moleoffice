@@ -215,6 +215,13 @@ export const installation = aPartTable(sqliteTable(
      * yet. `src/server/lib/worker.ts` is the one reader and writer. Added by migration 0312.
      */
     otherProjectsMessagesSince: text('other_projects_messages_since'),
+    /**
+     * WHEN THIS OFFICE BEGAN TO KEEP THE OWNER HAND-OVERS, the rows of `agent_owner_changes`, as a local stamp. Written
+     * once, by the first start of the code that keeps them, before it serves, and never rewritten. A hand-over before it
+     * is in no row. NULL means that code has not started on this database yet. The file that writes those rows sets it
+     * and reads it, and an archive carries it. Added by migration 0356.
+     */
+    ownerChangesSince: text('owner_changes_since'),
   },
   () => [check('installation_holds_one_row', sql`only_row = 1`)],
 ), existingArchive)

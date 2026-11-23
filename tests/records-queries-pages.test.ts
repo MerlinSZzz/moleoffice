@@ -22,7 +22,7 @@
 import { createElement as h } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { beforeAll, describe, expect, it } from 'vitest'
-import { LINK_TYPES, RECORD_KINDS, type PanelRecord, type RecordKind } from '../src/shared/types.ts'
+import { RECORD_KINDS, type PanelRecord, type RecordKind } from '../src/shared/types.ts'
 import { KIND_FAMILIES, unclassifiedNote } from '../src/shared/work.ts'
 import { sectionRegionId } from '../src/shared/regions.ts'
 import { setWordLanguage, t } from '../src/shared/i18n.ts'
@@ -126,16 +126,14 @@ function record(over: Partial<RecordListItem> = {}): RecordListItem {
 const noop = () => {}
 
 /**
- * Everything a reader sees BEFORE pressing anything, and nothing else.
+ * The words behind the "?" beside a heading, and nothing else.
  *
- * The runner has no DOM, so a `<details>` cannot be opened and clicked. What CAN be checked, and
- * what the fold contract is actually about, is which words are inside a `<summary>` and which are
- * only behind one — so a test that a paragraph is folded is a test that its sentence is in the
- * markup and not in this string.
+ * The runner has no DOM, so a `<details>` cannot be opened and clicked. What CAN be checked is which
+ * words are inside the hint's body, the one sentence a reader reads after one press.
  */
-function shownAtRest(html: string): string {
+function hintOf(html: string): string {
   return (
-    [...html.matchAll(/<summary[^>]*>([\s\S]*?)<\/summary>/g)]
+    [...html.matchAll(/<div class="px-hint-body">([\s\S]*?)<\/div>/g)]
       .map((match) => match[1] ?? '')
       .join(' ')
       .replace(/<[^>]+>/g, '')
@@ -1085,42 +1083,6 @@ describe('the same record arrives at the same address from every surface that li
   })
 })
 
-// ============================================================ how many kinds, how many link types
-
-/**
- * A VOCABULARY SIZE TYPED INTO A SENTENCE IS A SECOND COPY OF AN ARRAY'S LENGTH.
- *
- * This page's own docstring said FOURTEEN, the component sheet says FOURTEEN, the sidebar says
- * FIFTEEN, and `RECORD_KINDS` holds sixteen. Nothing failed — not the type checker, not a test and
- * not the screen — because a sentence is never checked against an array. So the rule is not "the
- * number must be right": a right number drifts on the day a kind is added. The number may not be
- * typed at all.
- *
- * The list below is the files this pass owns. `ui.tsx` (the family note and the unknown-kind note)
- * and `Sidebar.tsx` (its docstring, `what:` and the modules line) carry the same defect and belong
- * on this list the moment their strings are derived.
- */
-describe('a vocabulary size is counted, never typed out', () => {
-
-  it('reads the number of link types off the table it is describing', () => {
-    const total = Object.keys(LINK_TYPES).length
-    const html = body(h(qp.QueriesPage))
-    // The visible line: "…and the 13 types". It said eleven for as long as it took somebody to add
-    // `resolves` and `about` to LINK_TYPES and not to notice this page.
-    // The visible line ends "and all 13 of them". It said "types" — the schema's word — until
-    // finding 29 of the language audit, 19 August 2026, and it may not say "kinds" either: that is
-    // Mole Office's word for a record kind and the guard above rightly rejects it. It said eleven for as
-    // long as it took somebody to add `resolves` and `about` to LINK_TYPES and not notice this
-    // page, which is what counting rather than typing the number is for.
-    expect(shownAtRest(html)).toContain(`and all ${total} of them`)
-    // The paragraph behind it names four and counts the rest, and both halves come off the table.
-    for (const named of ['consumes', 'produces', 'blocks', 'measures']) {
-      expect(html).toContain(`<code>${named}</code>`)
-    }
-    expect(html).toContain(`and ${total - 4} more`)
-  })
-})
-
 // ============================================================================ the query pages
 
 /**
@@ -1153,6 +1115,9 @@ describe('unconsumedMeta', () => {
    * 2026-08-12 moved it behind the fold with the rest of `the question` — the visible line is now
    * the limit on the count and nothing else. The rule this test exists for is the other one and it
    * still holds exactly: the reason is stated ONCE for the whole list, and no row repeats it.
+   *
+   * The notes and the visible line were then taken off the page, as decided. The limit on the count
+   * is one sentence behind the "?" beside the count, and it is still stated once.
    */
   it('leaves the rule to the one place that states it, and no row repeats it', () => {
     const html = body(
@@ -1164,10 +1129,9 @@ describe('unconsumedMeta', () => {
         ],
       }),
     )
-    // Stated for the list, in the notes, where it says what the check does. The visible line no
-    // longer sets the stored link type in monospace — finding 29, 19 August 2026 — so the fold is
-    // where the type is named, and this asserts the rule is stated once and not per row.
-    expect(html).toContain('nothing else says it uses it')
+    // Stated for the list, once, behind the "?" beside the count.
+    expect(html.match(/class="px-hint-mark"/g) ?? []).toHaveLength(1)
+    expect(hintOf(html)).toContain('Counted over')
     // AND NOT ONCE PER ROW, which is the whole rule. Three rows, and the rule appears in none of
     // them: each spends its line on what DIFFERS — its own summary.
     const rows = html.slice(html.indexOf('px-row-title'))
@@ -1179,45 +1143,35 @@ describe('unconsumedMeta', () => {
 })
 
 describe('unmetMeta tells a deleted record apart from one that was never there', () => {
-  it('names the deleted record, and leaves the way out to the panel’s own "what to do"', () => {
+  it('names the deleted record, and puts no instruction on the row', () => {
     const meta = qp.unmetMeta({ consumer: record(), missingTitle: 'grip force claim' })
     expect(meta).toContain('“grip force claim”')
     expect(meta).toContain('deleted')
-    // The instruction is identical on every row, so it is not on any row. It is in the panel's
-    // "what to do" note, where it is fuller and names the Restore button — checked below.
+    // The instruction is identical on every row, so it is not on any row.
     expect(meta.toLowerCase()).not.toContain('restore')
-    expect(body(h(qp.UnmetPanel, { items: [] }))).toContain(
-      'Restore the missing record from the consumer',
-    )
   })
 
   it('does not print "(unknown)" as if it were a title', () => {
     const meta = qp.unmetMeta({ consumer: record(), missingTitle: '(unknown)' })
     expect(meta).not.toContain('(unknown)')
-    expect(meta).toContain('not in the database at all')
+    expect(meta).toBe(t('queriesPage.missingNotInTheDatabase'))
   })
 })
 
 describe('UnconsumedPanel', () => {
-  it('explains the question, the stakes, the fix and the scope before any row', () => {
+  it('holds the limit on the count behind the "?", before any row', () => {
     const html = body(h(qp.UnconsumedPanel, { records: [] }))
-    expect(html).toContain('the question')
-    expect(html).toContain('why it matters')
-    expect(html).toContain('what to do')
-    expect(html).toContain('what it does not cover')
-    // The scope is the sentence that stops "0" being read as "nothing is wrong anywhere".
-    expect(html).toContain('claim')
-    expect(html).toContain('module')
-    expect(html).toContain('idea')
+    // The limit is the sentence that stops "0" being read as "nothing is wrong anywhere".
+    for (const kind of ['claim', 'module', 'idea']) expect(hintOf(html)).toContain(kind)
+    expect(html.indexOf('px-hint-mark')).toBeLessThan(html.indexOf('px-empty'))
   })
 
   it('writes a designed empty state, not a blank region', () => {
-    // WITH RECORDS OF THESE KINDS ON FILE, the sentence is a real answer and keeps its words. In a
-    // project with nothing in it, it was drawn in bold as if it were good news about a corpus that
-    // does not exist — finding 29, 19 August 2026 — so that case says "Nothing here yet." instead.
+    // WITH RECORDS OF THESE KINDS ON FILE, the answer is the state word "none". In a project with
+    // nothing in it, it was drawn in bold as if it were good news about a corpus that does not
+    // exist — finding 29, 19 August 2026 — so that case says "Nothing here yet." instead.
     const html = body(h(qp.UnconsumedPanel, { records: [], counted: 3 }))
-    expect(html).toContain('something else does build on')
-    expect(html).toContain('px-empty')
+    expect(html).toContain(`<span class="px-empty-text">${t('absence.none')}</span>`)
 
     const empty = body(h(qp.UnconsumedPanel, { records: [], counted: 0 }))
     expect(empty).toContain('Nothing here yet.')
@@ -1262,11 +1216,10 @@ describe('UnmetPanel', () => {
     expect(html).toMatch(/<a class="px-row-title px-nav"[^>]*href="#\/r\/q1"[^>]*>Handover demo<\/a>/)
   })
 
-  it('states that only consumes links are checked, so an empty list is not an all-clear', () => {
+  it('holds the limit behind the "?", so an empty list is not an all-clear', () => {
     const html = body(h(qp.UnmetPanel, { items: [] }))
-    expect(html).toContain('Nothing is waiting on a missing record')
-    expect(html).toContain('consumes')
-    expect(html).toContain('blocks')
+    expect(html).toContain(`<span class="px-empty-text">${t('absence.none')}</span>`)
+    expect(hintOf(html)).toBe(t('dev.queries.onlyWhatARecordSaysItUses'))
   })
 })
 
@@ -1302,16 +1255,15 @@ describe('a broken dependency and an open question are not drawn as the same kin
     expect(unmetWithRows()).not.toContain('data-rank="2"')
   })
 
-  it('keeps every row, count and scope sentence on the quiet panel', () => {
+  it('keeps every row, count and the limit on the quiet panel', () => {
     // Quieter is never "gone". This is the whole check that the rank change is a drawing and not a
     // deletion: the count, the split by kind, the visible rule and the row are all still here.
     const html = unconsumedWithRows()
     expect(html).toContain('1 record')
     expect(html).toContain('qp-kinds')
-    // The visible line is the scope — which record kinds the count was taken over. It used to be
-    // the scope with the query's implementation in front of it; the implementation is one press
-    // away now, and what a count of 0 means is still readable without pressing anything.
-    expect(shownAtRest(html)).toContain('Counted over')
+    // The limit is the scope — which record kinds the count was taken over. It is one sentence
+    // behind the "?" beside the count, as decided.
+    expect(hintOf(html)).toContain('Counted over')
     expect(html).toContain('px-row-title')
   })
 
@@ -1340,207 +1292,51 @@ describe('Records and Queries declare what they are for, in the one place that s
   })
 })
 
-// ============================================================================ scan first, explain on demand
+// ============================================================================ the title, the count and the "?"
 
 /**
- * THE FOUR NOTES ARE ONE PRESS AWAY AND NOT ONE WORD OF THEM IS GONE.
+ * A QUERY OPENS ON ITS TITLE AND ITS COUNT, AND THE LIMIT ON THE COUNT IS ONE SENTENCE BEHIND THE "?".
  *
- * Photographed at 1440 each query opened with about 330px of prose above its rows — on the unmet
- * panel, above two rows. The prose is good and the fourth note in particular is the kind of thing
- * most products never write down, so nothing is deleted: it goes behind `Explain`, which folds at
- * every width, and one line of what the list MEANS stays out in the open.
- *
- * These tests pin the bargain rather than the wording: what is visible before a press, what is
- * only behind one, and that the number on the fold is the number of things behind it.
+ * Each panel held four notes behind a fold, under one visible line. They explained the query, and
+ * they were taken off the page, as decided. The one sentence a count of 0 cannot do without, what
+ * was counted, is behind the "?" beside the count.
  */
-describe('a query opens on its title, its count and one line — the four notes are behind a press', () => {
+describe('a query opens on its title and its count, with the limit behind the "?"', () => {
   const unconsumed = () => body(h(qp.UnconsumedPanel, { records: [record({ kind: 'claim' })] }))
   const unmet = () =>
     body(h(qp.UnmetPanel, { items: [{ consumer: record({ title: 'Handover demo' }), missingTitle: 'grip force claim' }] }))
 
-  /**
-   * THE ONE VISIBLE LINE IS THE LIMIT ON THE COUNT — narrowed on 2026-08-12, and this test with it.
-   *
-   * It used to assert the whole sentence each panel opened with: "No consumes link points at these,
-   * counted over claim, module and idea records only" and "One row is one consumes link that no
-   * longer lands on a record". The first half of each is the query's own implementation, read once
-   * and furniture ever after, and standing it in front of the first result is what the UX-8 pass
-   * removed. So this pins what SURVIVES the shortening rather than the old wording: the qualifier
-   * that stops a count being read as an all-clear is still readable without pressing anything.
-   */
-  it('shows the limit on the count, before anything is pressed', () => {
+  it('holds the limit on each count behind the "?", in one sentence', () => {
     // Which record kinds the count was taken over. Without it, "0" reads as "nothing is wrong".
-    for (const kind of ['claim', 'module', 'idea']) expect(shownAtRest(unconsumed())).toContain(kind)
-    // Which link type was checked. Without it, "0 broken links" reads as a clean graph.
-    // NOT the stored link type in monospace: "Only what a record says it uses is checked."
-    expect(shownAtRest(unmet())).toContain('Only what a record says it uses is checked')
+    for (const kind of ['claim', 'module', 'idea']) expect(hintOf(unconsumed())).toContain(kind)
+    // Which links were checked. Without it, "0 broken links" reads as a clean graph.
+    expect(hintOf(unmet())).toBe(t('dev.queries.onlyWhatARecordSaysItUses'))
   })
 
-  /**
-   * WHAT THE ONE VISIBLE LINE MAY NOT BE. Two answers, and the second is new.
-   *
-   * Both panels used to open by restating themselves — "Nothing is built on these" under a heading
-   * reading "Results nothing is using". A reader who has read the title has read that clause.
-   *
-   * Then they opened by explaining themselves instead, which is the same failure one step over: how
-   * the query runs is read once and is worth a press, not a permanent line above the answer. Both
-   * sentences are still on the page, in `the question`, whole.
-   */
-  it('spends the one visible line on neither the panel’s title nor the query’s implementation', () => {
-    expect(shownAtRest(unconsumed())).not.toContain('Nothing is built on these')
-    // The implementation, in the words each panel used to open with.
-    expect(shownAtRest(unconsumed())).not.toContain('link points at these')
-    expect(shownAtRest(unmet())).not.toContain('no longer lands on a record')
-    // And it is not deleted — it is one press away, where it says the same thing at length.
-    expect(unconsumed()).toContain('nothing else says it uses it')
-    expect(unmet()).toContain('One row is one such LINK, not one record')
-  })
-
-  /**
-   * The scope is the sentence that stops a count of 0 being read as "nothing is wrong anywhere",
-   * and it was only in the fold. On the unconsumed list it covers claim, module and idea and no
-   * other kind, so a reader who never opens the notes is otherwise looking at a number over an
-   * unstated denominator. It is now on the visible line as well as in full inside the notes.
-   */
-  it('names the three kinds the unconsumed count is taken over, without opening anything', () => {
-    const shown = shownAtRest(unconsumed())
-    for (const kind of ['claim', 'module', 'idea']) expect(shown, `"${kind}" is not on the visible line`).toContain(kind)
-  })
-
-  it('keeps the count of rows visible beside the title, so the fold hides no arithmetic', () => {
+  it('keeps the count of rows visible beside the title', () => {
     expect(unconsumed()).toContain('1 record')
     expect(unmet()).toContain('1 broken link')
   })
 
-  it('does not print the four notes until the fold is opened', () => {
-    const shown = shownAtRest(unconsumed())
-    expect(shown).not.toContain('A result that nothing consumes is a finding')
-    expect(shown).not.toContain('Deleted records are not counted')
-    // The key/value block itself is behind the fold, not merely restyled.
-    expect(shown).not.toContain('qp-explain-key')
-  })
-
-  it('keeps every word of all four, so nothing is deleted — only moved one press away', () => {
-    const html = unconsumed()
-    expect(html).toContain('A result that nothing consumes is a finding that never reached the work')
-    expect(html).toContain('Deleted records are not counted')
-    expect(html).toContain('what it does not cover')
-
-    const broken = unmet()
-    expect(broken).toContain('This is the broken-link case seen from the side of the work that is stuck')
-    expect(broken).toContain('that is the one whole-graph link')
-  })
-
-  it('names what is behind the fold and never says the bare word "more"', () => {
-    const shown = shownAtRest(unconsumed())
-    expect(shown).toContain('what this checks, why it matters, and what it does not cover')
-    // The failure has a shape: an optional count, an optional verb, then a word that names
-    // nothing. `Explain` rejects it outright; this checks the words this page actually passes.
-    expect(shown).not.toMatch(/(?:^|\s)(?:\d+\s+)?(?:show|see|read|view|open)?\s*more\s*(?:…|\.\.\.)?(?:\s|$)/i)
-  })
-
-  it('counts what is behind the fold, and the count is the number of notes there are', () => {
-    const html = unconsumed()
-    const notes = (html.match(/class="qp-explain-row"/g) ?? []).length
-    expect(notes).toBe(4)
-    // "on this check", not "on this query": `query` is how the page is computed, and the address
-    // was renamed away from it for that reason. Finding 29, 19 August 2026.
-    expect(shownAtRest(html)).toContain(`${notes} notes on this check`)
-  })
-
-  it('is closed at rest on both panels, because that is the whole point of folding it', () => {
-    expect(unconsumed()).toContain('<details class="px-explain"')
-    expect(unconsumed()).not.toContain('<details class="px-explain" open')
-    expect(unmet()).not.toContain('<details class="px-explain" open')
-  })
-
-  it('says the same thing about both queries, because they hold the same four notes', () => {
-    // Two panels written by hand would drift; both read one pair of constants, and a reader who
-    // learns the control on one panel has learned it on the other.
-    const a = shownAtRest(unconsumed())
-    const b = shownAtRest(unmet())
-    expect(a).toContain('what this checks, why it matters, and what it does not cover')
-    expect(b).toContain('what this checks, why it matters, and what it does not cover')
-    expect(b).toContain('4 notes on this check')
+  it('draws no fold on either panel', () => {
+    expect(unconsumed()).not.toContain('<details class="px-explain"')
+    expect(unmet()).not.toContain('<details class="px-explain"')
   })
 })
 
 // ============================================================================ the page's own lede
 
 /**
- * Run a render with the window answering a chosen width.
+ * THE PAGE OPENS ON ITS TITLE AND ITS TWO ANSWERS, AND DRAWS NO LEDE.
  *
- * `useNarrow` asks `matchMedia`, and there is none in this runner — it FAILS to the wide answer,
- * which is the one that hides nothing. So the two states are reached by lending the window a
- * matchMedia for the duration of one render, and put back afterwards.
+ * The lede, what links are for and that neither list is stored, was a fold at the foot of the page.
+ * It explained the page, and it was taken off, as decided.
  */
-function atWidth<T>(narrow: boolean, run: () => T): T {
-  const win = globalThis.window as unknown as { matchMedia?: unknown }
-  const before = 'matchMedia' in win ? win.matchMedia : undefined
-  win.matchMedia = () => ({ matches: narrow, addEventListener: () => {}, removeEventListener: () => {} })
-  try {
-    return run()
-  } finally {
-    if (before === undefined) delete win.matchMedia
-    else win.matchMedia = before
-  }
-}
-
-/**
- * THE PAGE'S LEDE IS BEHIND A CONTROL AT EVERY WIDTH, AND IT IS NO LONGER THE FIRST THING ON THE
- * PAGE. THIS BLOCK ASSERTED THE FIRST HALF AND HAS BEEN REWRITTEN AROUND ITS RULE FOR THE SECOND.
- *
- * The lede was once `StandingNote` — rendered whole above 480px, on the argument that four lines
- * beside a 1440px screen earn their space. That was wrong for the reason `Explain` exists: a
- * paragraph is read carefully once and skipped for the next two hundred visits. So it folded at
- * every width, and this block pinned the bargain: one visible line, every word one press away.
- *
- * WHAT THE UX-8 PASS FOUND IS THAT THE VISIBLE LINE ITSELF WAS THE PROBLEM. "Both lists are derived
- * from links, not stored" is a sentence about how Mole Office works, standing above both answers, in
- * front of the first result — and a summary line is not exempt from the rule that default-visible
- * text has to earn its space. There is no line of this fold worth showing, so the fold shows none:
- * it is a plain quiet `<details>` at the FOOT of the page, after the two lists, named by what it
- * holds and by a count of the link types read off `LINK_TYPES`.
- *
- * These tests pin the surviving rules: every word is still on the page at both widths, none of it
- * is in front of the reader at either, the control names what it opens, and the number in that name
- * is counted rather than typed.
- */
-describe("the page's lede is behind a control at every width, and stands after the answer", () => {
-  it('names what it opens, and counts the link types rather than typing the number', () => {
-    for (const narrow of [false, true]) {
-      const shown = shownAtRest(atWidth(narrow, () => body(h(qp.QueriesPage))))
-      expect(shown, `at narrow=${narrow}`).toContain(
-        // "a typed link" is the schema's word and "types" is too. Finding 29, 19 August 2026.
-        `What links are for, and all ${Object.keys(LINK_TYPES).length} of them`,
-      )
-    }
-  })
-
-  it('keeps every word of the lede one press away, at both widths', () => {
-    for (const narrow of [false, true]) {
-      const html = atWidth(narrow, () => body(h(qp.QueriesPage)))
-      expect(html, `at narrow=${narrow}`).toContain('Typing them costs something every time one is made')
-      expect(html, `at narrow=${narrow}`).toContain('the only two questions')
-      // Derived-not-stored is a fact and is not deleted. It is inside the fold now, with the rest.
-      expect(html, `at narrow=${narrow}`).toContain('Neither list is stored. Both are derived from links')
-      expect(shownAtRest(html), `at narrow=${narrow}`).not.toContain('Typing them costs something')
-      expect(shownAtRest(html), `at narrow=${narrow}`).not.toContain('Neither list is stored.')
-    }
-  })
-
-  it('opens on the page title and nothing else — no commentary above the first result', () => {
-    const html = atWidth(false, () => body(h(qp.QueriesPage)))
-    // `StandingNote` renders no wrapper at all above 480px, so its absence is what proves the
-    // paragraph is not simply sitting in the flow the way it used to.
+describe("the page draws no lede", () => {
+  it('opens on the page title and nothing else, and draws no fold about links', () => {
+    const html = body(h(qp.QueriesPage))
     expect(html).not.toContain('px-standing')
-    expect(html).toContain('<details class="qp-about"')
-    expect(html).not.toContain('<details class="qp-about" open')
-    // The header is the heading and the provenance note, and the fold is after the panels: the
-    // whole of UX-8 for this page in one comparison of two offsets.
-    const head = html.slice(0, html.indexOf('</header>'))
-    expect(head).not.toContain('qp-about')
-    expect(html.indexOf('qp-about')).toBeGreaterThan(html.indexOf('</header>'))
+    expect(html).not.toContain('qp-about')
   })
 })
 
@@ -1720,12 +1516,9 @@ describe('the page opens on the answer, and says which page it is', () => {
 /**
  * EVERY STORED WORD THIS PAGE PRINTS GOES THROUGH THE WORDS LAYER.
  *
- * It printed `part_of` in the unmet panel's "what it does not cover" — a spelling a reader has
- * never been shown anywhere else in the product, on one of the pages a first-time reader hits
- * hardest. The normal-mode test carried it as a known exception naming this file; that entry
- * was deleted, and the test itself on 12 November 2026. These tests pin the two halves of the
- * bargain from this side: the reader's word in Normal, the stored word in Developer, and both read
- * off `LINK_TYPES` so neither can be typed wrong here.
+ * The notes that printed link types, `part_of` among them, were taken off the page, as decided, and
+ * the cases that read them went with them. What is left is the query's own name: the reader's
+ * English in Normal, the function's name in Developer.
  */
 describe('the stored spellings on this page are the reader’s words in Normal', () => {
   const drawn = (which: 'normal' | 'inspect', el: React.ReactElement) => {
@@ -1739,14 +1532,6 @@ describe('the stored spellings on this page are the reader’s words in Normal',
   const unmet = () => h(qp.UnmetPanel, { items: [] })
   const unconsumed = () => h(qp.UnconsumedPanel, { records: [] })
 
-  it('says "part of" to a reader and part_of to a developer', () => {
-    // Both spellings come from the one declaration, so this test cannot disagree with the product
-    // about what either of them is.
-    expect(drawn('normal', unmet())).toContain(LINK_TYPES.part_of.forward)
-    expect(drawn('normal', unmet())).not.toContain('part_of')
-    expect(drawn('inspect', unmet())).toContain('part_of')
-  })
-
   it('keeps the query’s own name for Developer mode, where it is the way to the code', () => {
     // "unconsumed" and "unmet dependencies" are the names of two functions in
     // src/server/lib/records.ts. They were drawn as an eyebrow above a title that says the same
@@ -1755,23 +1540,6 @@ describe('the stored spellings on this page are the reader’s words in Normal',
     expect(drawn('normal', unmet())).not.toContain('px-panel-kind')
     expect(drawn('inspect', unconsumed())).toContain('unconsumed')
     expect(drawn('inspect', unmet())).toContain('unmet dependencies')
-  })
-
-  it('names the same kinds on the visible line as in the note behind it', () => {
-    // THREE SENTENCES USED TO TYPE THE SAME THREE KINDS: the visible line, `the question` and
-    // `what it does not cover`. They read one list now. NOTHING IS TYPED IN THIS TEST EITHER —
-    // it pulls the kinds off the visible line and asks whether the note behind the fold names the
-    // same ones, so it fails when the two drift and passes on the day a fourth kind is added.
-    //
-    // There is still a fourth copy and it is the one that matters: `unconsumed()` in
-    // src/server/lib/records.ts filters on the same literals. That is reported to its owner
-    // rather than reached into from a browser test.
-    const html = drawn('normal', unconsumed())
-    const named = /Counted over (.+?) records only/.exec(shownAtRest(html))?.[1] ?? ''
-    expect(named, 'the visible line no longer says which kinds were counted').not.toBe('')
-    const scope = (/class="qp-explain-val qp-scope">([\s\S]*?)<\/dd>/.exec(html)?.[1] ?? '').replace(/<[^>]+>/g, '')
-    expect(scope, 'the notes hold no scope sentence').not.toBe('')
-    expect(scope, `the visible line counted over "${named}" and the scope note names a different set`).toContain(named)
   })
 })
 

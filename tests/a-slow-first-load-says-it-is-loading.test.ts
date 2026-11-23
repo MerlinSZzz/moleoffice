@@ -230,7 +230,7 @@ it('2. when the browser names a failure, the page says at once that it did not s
   try {
     await page.route(`${origin}${entry}`, (route) => route.abort())
     await page.goto(`${origin}/`, { waitUntil: 'commit' })
-    await page.locator('.boot-failure').waitFor({ state: 'visible', timeout: 2_000 })
+    await page.locator('.boot-notice[data-boot="failed"] .boot-failure').waitFor({ state: 'visible', timeout: 2_000 })
     const shown = await whatTheNoticeShows(page)
     expect(shown.text).toContain('Mole Office did not start.')
     expect(shown.text).toContain('To try again, reload the page.')
@@ -334,7 +334,7 @@ it('3b. when the office truly cannot be reached, the page says it did not start,
   try {
     await page.route(`${origin}/api/office/owner**`, (route) => route.abort('connectionrefused'))
     await page.goto(`${origin}/`)
-    await page.locator('.boot-failure').waitFor({ state: 'visible', timeout: 15_000 })
+    await page.locator('.boot-notice[data-boot="failed"] .boot-failure').waitFor({ state: 'visible', timeout: 15_000 })
     const shown = await whatTheNoticeShows(page)
     expect(shown.text).toContain('Mole Office did not start.')
     expect(shown.text).toContain('To try again, reload the page.')
@@ -798,7 +798,7 @@ it('11. when the Thai words do not arrive the page says so and stays in English,
       return passOn(route, reply)
     })
     await page.goto(`${origin}/#/welcome`)
-    await theAppHasStarted(page)
+    await page.waitForFunction(() => document.getElementById('boot-module') === null, null, { timeout: 60_000 })
     await page.locator('.wlc-languages input[value="th"]').click()
     const notice = page.getByRole('alert').filter({ hasText: missingWordsNotice('th') })
     await notice.waitFor({ timeout: 30_000 })

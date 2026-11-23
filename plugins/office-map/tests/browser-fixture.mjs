@@ -8,6 +8,8 @@ import { readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { firefox } from 'playwright'
 import { refuseALiveOfficePort } from './fixtures/the-guarded-ports.mjs'
+import { browserAnswer, setPeople, setTalk, talk, names, ids } from './fixtures/browser-answers.mjs'
+import { readsSettled, readyWords, packLoadingWords } from './fixtures/reads-settled.mjs'
 const args = Object.fromEntries(Array.from({ length: (process.argv.length - 2) / 2 }, (_, i) => [process.argv[2 + i * 2], process.argv[3 + i * 2]]))
 assert(args['--url'] && args['--output'] && args['--browser'], 'Use --url <fresh synthetic world URL> --output <folder> --browser <Firefox executable>')
 const target = new URL(args['--url'])
@@ -20,22 +22,6 @@ const headers={'content-type':'application/json','x-mole-office-workspace':'defa
 const checks=[], errors=[], requests=[], screens=[]
 const catalog=JSON.parse(readFileSync(new URL('../assets/village-catalog.json', import.meta.url),'utf8'))
 const hostAttention=JSON.parse(readFileSync(new URL('./host-attention.json',import.meta.url),'utf8'))
-const common={interface:'office-read/1',narrowedByPermission:null}
-const projects={...common,view:'projects',projects:[{id:'garden',name:'Example Garden'},{id:'library',name:'Example Library'}]}
-const names=['tuft','fringe','bun','fan','crest','helmet','waves','part','beret','knit','raincoat','apron','bowtie','backpack','roll','flower']
-function hash(v){let h=2166136261;for(const c of v){h^=c.codePointAt(0);h=Math.imul(h,16777619)}return h>>>0}
-// Deliberately choose synthetic ids that exercise all sixteen fallback looks in catalogue order.
-const ids=names.map((_,i)=>{for(let n=0;;n++){const id='sample-'+i+'-'+n;if(hash(JSON.stringify(['agent',id]))%16===i)return id}})
-function roster(count){
- const agents=Array.from({length:count},(_,i)=>({kind:'agent',id:ids[i]??'sample-'+i,handle:'example-'+i,name:'Example '+String(i+1).padStart(2,'0'),role:i%16===0?'supervisor':i%16===4?'supervisor':[8,9].includes(i%16)?'inspector':[10,11].includes(i%16)?'secretary':[12,13].includes(i%16)?null:'worker',retired:false,visitor:[14,15].includes(i%16),startedBy:null,createdAt:'2026-01-01 10:'+String(i).padStart(2,'0')+':00',projects:[i%2?'library':'garden'],appearance:{version:99,fixture:'standing-catalogue'},appearanceChosen:true,scale:{version:1,roleAtGeneration:'worker',value:.85},presence:[{project:i%2?'library':'garden',colour:'green',word:'Available'}]}))
- for(let i=0;i<agents.length;i++)if(agents[i].role==='worker')agents[i].startedBy={kind:'agent',id:agents[i%16<4?0:4]?.id??agents[0].id}
- return {...common,view:'people',people:[{kind:'person',id:'reader',handle:'reader',name:'Example Reader'}],agents}
-}
-let people=roster(16)
-const details=['executing','checking','recorded_work','waiting_check','rebuttal','reporting','queued','idle','waiting_message','paused','blocked','failed','completed','task_completed','work_open','unknown']
-function work(){return {...common,view:'work',work:people.agents.map((a,i)=>({id:'work-'+i,project:i%2?'library':'garden',agent:a.id,title:'Example work '+String(i+1).padStart(2,'0'),detail:details[i%16],recordedState:{state:'fixture'},doing:'Example activity',executing:i<2,association:'explicit synthetic work',updatedAt:'2026-10-15 08:00:00',runStanding:i%16===12?'closed':i%16===13?'closed unchecked':'working'}))}}
-const zero={candidates:0,carried:0,leftOut:0,shortened:0}
-let talk={...common,view:'talk',messages:[],last:null,more:false,subtraction:zero,leftOutGroups:[],refusal:null,withdrawn:{ids:[],last:'0',more:false,subtraction:zero,leftOutGroups:[]}}
 const current=await fetch(site+'/api/plugins',{headers}).then(r=>r.json());assert.equal(current.plugins.find(p=>p.id==='office-map').state,'off')
 const on=await fetch(site+'/api/plugins/office-map/switch',{method:'POST',headers,body:JSON.stringify({on:true})});assert(on.ok)
 const browser=await firefox.launch({executablePath:args['--browser'],firefoxUserPrefs:{'javascript.options.wasm':false,'dom.ipc.processCount':1}})
@@ -64,7 +50,7 @@ await context.addInitScript(()=>{
 })
 await context.route('**/api/plugin-read/v1/**',async route=>{
  const request=route.request(), url=new URL(request.url()),view=url.pathname.split('/').at(-1);requests.push({view,method:request.method()})
- await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(view==='projects'?projects:view==='people'?people:view==='work'?work():talk)})
+ await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(browserAnswer(view, Object.fromEntries(url.searchParams)))})
 })
 // Host attention is outside this map fixture. Starting its extra Node/tsx worker
 // exceeds the preview command's virtual-memory limit before the plugin opens.
@@ -83,7 +69,7 @@ async function open(){
  const iframe=page.locator('iframe.plgp-frame');await iframe.waitFor({timeout:15000});assert.equal(await iframe.getAttribute('sandbox'),'allow-scripts')
  const frame=await(await iframe.elementHandle()).contentFrame()
  await frame.waitForFunction(()=>window.__trace?.replies.some(r=>r.kind==='layout'),null,{polling:50,timeout:15000})
- await frame.waitForFunction(()=>document.querySelector('#art-error')?.textContent!=='Loading woodland art.'&&(shown=>shown.length===1&&shown[0].textContent.startsWith('Last read'))([...document.querySelectorAll('.read-status p')].filter(n=>n.textContent)),null,{polling:50});await new Promise(r=>setTimeout(r,150))
+ await frame.waitForFunction(readsSettled, readyWords, {polling:50});await frame.waitForFunction(loading=>!loading.includes(document.querySelector('#art-error')?.textContent),packLoadingWords,{polling:50});await new Promise(r=>setTimeout(r,150))
  return frame
 }
 async function layout(frame){return frame.evaluate(()=>window.__trace.replies.filter(r=>r.kind==='layout').at(-1).layout)}
@@ -91,7 +77,7 @@ async function photo(frame,name){await frame.locator('.map-overview').scrollInto
 try{
  let frame
  for(const count of [3,16,60]){
-  people=roster(count);frame=await open();await frame.getByRole('button',{name:'Fit office',exact:true}).click()
+  setPeople(count);frame=await open();await frame.getByRole('button',{name:'Fit office',exact:true}).click()
   const original=await layout(frame);writeFileSync(join(output,`layout-${count}.json`),JSON.stringify(original,null,2));assert.equal(Object.keys(original.seats).length,count)
   if(count===16){
    const styles=original.houses.map(h=>h.style)
@@ -172,11 +158,11 @@ try{
    await frame.getByRole('button',{name:'Locate',exact:true}).click()
    // Populate a new baseline first; it must remain still even with message metadata.
    const contact={id:'sample-contact',at:'2026-10-15 10:00:00',project:'garden',from:{kind:'agent',id:ids[0]},to:[{kind:'agent',id:ids[1]}]}
-   talk={...talk,messages:[contact],last:'2026-10-15 10:00:00~sample-contact'}
+   setTalk({...talk,messages:[contact],last:'2026-10-15 10:00:00~sample-contact'})
    await frame.getByRole('button',{name:'Refresh',exact:true}).click();await new Promise(r=>setTimeout(r,200))
    assert.equal(await frame.locator('.map-plane canvas').getAttribute('data-moving'),'0')
    checks.push({check:'populated return baseline does not animate',passed:true})
-   talk={...talk,messages:[{...contact,id:'new-contact'}],last:'2026-10-15 10:00:01~new-contact'}
+   setTalk({...talk,messages:[{...contact,id:'new-contact'}],last:'2026-10-15 10:00:01~new-contact'})
    await frame.evaluate(()=>{window.__walkTime=Date.now();window.__trace.draws=[]})
    await frame.getByRole('button',{name:'Refresh',exact:true}).click()
    await frame.waitForFunction(()=>document.querySelector('.map-plane canvas')?.dataset.moving==='1',null,{polling:20,timeout:10000})
@@ -210,7 +196,7 @@ try{
    assert.equal(await frame.evaluate(()=>window.__trace.pending.size),0)
    await photo(frame,'16-reduced-motion')
    await frame.evaluate(()=>delete window.__walkTime);await page.emulateMedia({reducedMotion:'no-preference'})
-   talk={...talk,messages:[],last:'2026-10-15 10:00:01~new-contact'}
+   setTalk({...talk,messages:[],last:'2026-10-15 10:00:01~new-contact'})
    checks.push({check:'real worker route draws A/pass/B/pass and quiet/reduced motion draw only standing, with zero pending frames',passed:true})
    for(const width of [990,660,390])for(const theme of ['light','dark']){
     await page.setViewportSize({width,height:1200});await page.emulateMedia({colorScheme:theme})
@@ -226,7 +212,7 @@ try{
    checks.push({check:'pagehide releases all map, terrain and detail canvases, workers and animation frames',passed:true})
   }
  }
- missing=true;people=roster(3);frame=await open();assert((await frame.locator('#art-error').innerText()).includes('unavailable'))
+ missing=true;setPeople(3);frame=await open();assert((await frame.locator('#art-error').innerText()).includes('unavailable'))
  await frame.getByRole('button',{name:'Fit office',exact:true}).click();await photo(frame,'missing-atlas')
  assert.equal(Object.keys((await layout(frame)).seats).length,3)
  await frame.locator('.roster-panel .roster-list button').first().click();assert((await frame.locator('.detail-panel').innerText()).includes('Example'))

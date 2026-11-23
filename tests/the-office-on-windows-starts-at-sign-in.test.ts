@@ -13,8 +13,8 @@
  *   2. the server's reading on Windows says where it is set and that signing out stops the office, and never says on or
  *      off, because the server does not read the window's setting. A Mac and Linux are unchanged;
  *   3. the press on the page refuses on Windows, says where it is set instead, and writes nothing;
- *   4. the page, drawn from the Windows reading, says where and that signing out stops the office, with no press and no
- *      Linux sentence. Developer mode adds the server's own sentence. A Mac's reading draws what it drew before.
+ *   4. the page, drawn from the Windows reading, says where, with no press and no Linux word. Developer mode adds the
+ *      server's own sentence. A Mac's reading draws what it drew before.
  * Since round W45 the menu holds New quick note after Open, so the lists of its items here name it.
  * tests/the-quick-note-key-on-each-system.test.ts holds what that item does.
  *
@@ -27,7 +27,6 @@
  *   - the reading's Windows branch is taken out, so Windows reads as "Linux only": red, cases 2 and 4;
  *   - the press's refusal on Windows no longer names the item: red, case 3;
  *   - the page reads setInTheTray as false: red, case 4;
- *   - the page drops the sign-out sentence: red, case 4;
  *   - theTrayItems leaves out New quick note (round W45, after a control run of this file and the two other files
  *     that list the tray's items, which passed): red, case 1.
  */
@@ -142,14 +141,11 @@ describe('the office on Windows starts at sign-in', () => {
     expect(existsSync(home)).toBe(false)
   })
 
-  it('4. the page on Windows says where and that signing out stops the office, with no press', () => {
+  it('4. the page on Windows says where, with no press', () => {
     const windows = readStartAtLogin({ home, office, platform: 'win32', user: 'sam' })
     const plain = drawn(windows)
     expect(plain).toContain(asDrawn(i18n.t('startAtLogin.windows.where')))
-    expect(plain).toContain(asDrawn(i18n.t('startAtLogin.windows.signOut')))
-    expect(plain).toContain('Signing out of Windows stops the office.')
-    expect(plain).not.toContain(asDrawn(i18n.t('startAtLogin.loginNotBoot')))
-    expect(plain).not.toContain(asDrawn(i18n.t('startAtLogin.state.notLinux')))
+    expect(plain).not.toContain(asDrawn(i18n.t('startAtLogin.word.notLinux')))
     expect(plain).not.toContain(asDrawn(i18n.t('startAtLogin.mac.where')))
     expect(plain).not.toContain('<button')
     expect(plain).not.toContain(asDrawn(windows.says))
@@ -157,7 +153,7 @@ describe('the office on Windows starts at sign-in', () => {
     mode.setMode('inspect')
     const developer = drawn(windows)
     expect(developer).toContain(asDrawn(windows.says))
-    expect(developer).toContain(asDrawn(i18n.t('startAtLogin.windows.signOut')))
+    expect(developer).toContain(asDrawn(i18n.t('startAtLogin.windows.where')))
     expect(developer).not.toContain('<button')
     mode.setMode('normal')
 
@@ -165,7 +161,5 @@ describe('the office on Windows starts at sign-in', () => {
     const mac = drawn(readStartAtLogin({ home, office, platform: 'darwin', user: 'sam' }))
     expect(mac).toContain(asDrawn(i18n.t('startAtLogin.mac.where')))
     expect(mac).not.toContain(asDrawn(i18n.t('startAtLogin.windows.where')))
-    expect(mac).not.toContain(asDrawn(i18n.t('startAtLogin.windows.signOut')))
-    expect(mac).not.toContain(asDrawn(i18n.t('startAtLogin.loginNotBoot')))
   })
 })

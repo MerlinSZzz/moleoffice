@@ -1,11 +1,12 @@
 // Copyright © 2026 Zhengyang Shen
 // Licensed under the MIT License. See LICENSE.
 /** The two ordinary serve-dev layouts share the bootstrap's process observations. */
-import { readdirSync, realpathSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
+import { readFileSync, readdirSync, realpathSync } from 'node:fs'
 import { join } from 'node:path'
 import { THE_HOLDER_ENTRY } from '../../src/config/settings.mjs'
 import { currentProcessRecord, discoverBootstrapTopology, observeBootstrapTopology } from './stable-bootstrap-processes.mjs'
-import { bootstrapProcessIdentity, bootstrapProcessProgram, descendantsOf, isRecordedDescendant } from './stable-bootstrap-support.mjs'
+import { bootstrapGitEnvironment, bootstrapProcessIdentity, bootstrapProcessProgram, descendantsOf, isRecordedDescendant } from './stable-bootstrap-support.mjs'
 
 const fail = message => { throw new Error(message) }
 const quietJournal = { append() {} }
@@ -51,16 +52,49 @@ function checkTopology(topology, gate, c) {
   const expected = new Set(records.map(row => row.pid))
   const owners = new Map([supervisor, server, worker].filter(Boolean).map(row => [row.pgid, row]))
   const withinTopology = row => expected.has(row.pid) || owners.has(row.pgid) && isRecordedDescendant(row.pid, owners.get(row.pgid))
-  const foreignMember = readdirSync('/proc').filter(name => /^\d+$/.test(name)).some(name => {
-    try { const row = bootstrapProcessIdentity(Number(name)); return owners.has(row.pgid) && !['Z', 'X'].includes(row.state) && !withinTopology(row) }
-    catch (error) { if (['ENOENT', 'ESRCH'].includes(error.code)) return false; throw error }
+  const foreignMembers = readdirSync('/proc').filter(name => /^\d+$/.test(name)).flatMap(name => {
+    try { const row = bootstrapProcessIdentity(Number(name)); return owners.has(row.pgid) && !['Z', 'X'].includes(row.state) && !withinTopology(row) ? [row] : [] }
+    catch (error) { if (['ENOENT', 'ESRCH'].includes(error.code)) return []; throw error }
   })
   // The holder and everything under it are accepted and never recorded, so the upgrade never signals them.
   const outside = descendantsOf(gate).filter(row => !withinTopology(row))
   const holders = outside.map(row => isTheTerminalHolder(row.pid, server, c)).filter(holder => holder !== null)
   const underAHolder = row => holders.some(holder => row.pid === holder.pid || isRecordedDescendant(row.pid, holder))
-  if (foreignMember || outside.some(row => !underAHolder(row))) fail('The ordinary topology has a process outside its supervisor, server and worker.')
+  const strangers = [...new Map([...foreignMembers, ...outside.filter(row => !underAHolder(row))].map(row => [row.pid, row])).values()]
+  if (strangers.length) fail(`The ordinary topology has a process outside its supervisor, server and worker. ${strangers.length === 1 ? 'The process outside them is' : 'The processes outside them are'} ${strangers.map(row => aProcessByItsName(row.pid)).join(', ')}.`)
   return { gate, supervisor, server, worker, holders, records }
+}
+
+/**
+ * A process as a sentence names it: its pid and its program's name as the kernel keeps it in /proc/<pid>/comm. Never
+ * its command line, which can carry a path or a key.
+ */
+export function aProcessByItsName(pid) {
+  try { return `process ${pid} (${readFileSync(`/proc/${pid}/comm`, 'utf8').trim()})` }
+  catch (error) { return `process ${pid} (${['ENOENT', 'ESRCH'].includes(error.code) ? 'it ended before its name was read' : `its name could not be read: ${error.code ?? error.message}`})` }
+}
+
+/**
+ * The ordinary start's processes under its gate, found from /proc and checked by checkTopology. When the gate is
+ * serve-dev itself, the server is serve-dev's one child with the server's entry, and the worker is the one process
+ * under it that leads its own group with the worker's entry. Otherwise serve-dev is found under the gate
+ * (discoverBootstrapTopology). `supervisor` is the serve-dev a listener named. The way back has none and passes null:
+ * its gate is always the upgrade's own, which starts serve-dev as its child.
+ */
+export function theOrdinaryTopologyUnder(gate, c, supervisor) {
+  let topology
+  if (supervisor === null || gate.pid !== supervisor.pid) topology = discoverBootstrapTopology(gate, c.stableCheckout, quietJournal)
+  else {
+    const descendants = descendantsOf(supervisor).map(row => currentProcessRecord(row.pid))
+    const servers = descendants.filter(row => row.ppid === supervisor.pid && entryIs(row, c.stableCheckout, 'src/server/index.ts'))
+    if (servers.length !== 1) fail('The ordinary topology has no single server child.')
+    // tsx runs the entry in a child Node in the same group; that child carries the entry too.
+    const workers = descendants.filter(row => row.pid === row.pgid && entryIs(row, c.stableCheckout, 'src/worker/index.ts'))
+    if (workers.length > 1) fail('The ordinary topology has more than one worker.')
+    if (descendants.some(row => entryIs(row, c.stableCheckout, 'src/worker/index.ts') && row.pgid !== workers[0]?.pgid)) fail(workers.length === 0 ? 'The ordinary worker must be the server’s guarded descendant in its own group.' : 'The ordinary topology has more than one worker.')
+    topology = { supervisor, server: servers[0], worker: workers[0] ?? null }
+  }
+  return checkTopology(topology, gate, c)
 }
 
 export function observeUpgradeTopology(runtime, group, c, journal = quietJournal) {
@@ -86,23 +120,84 @@ export function servingUpgradeTopology(pids, c) {
   const group = c.serviceGroups.find(row => row.pgid === supervisor.pgid)
   if (!group) fail('The ordinary topology has no recorded supervisor group.')
   const gate = currentProcessRecord(group.pgid)
-  let topology
-  if (gate.pid !== supervisor.pid) topology = discoverBootstrapTopology(gate, c.stableCheckout, quietJournal)
-  else {
-    const descendants = descendantsOf(supervisor).map(row => currentProcessRecord(row.pid))
-    const servers = descendants.filter(row => row.ppid === supervisor.pid && entryIs(row, c.stableCheckout, 'src/server/index.ts'))
-    if (servers.length !== 1) fail('The ordinary topology has no single server child.')
-    // tsx runs the entry in a child Node in the same group; that child carries the entry too.
-    const workers = descendants.filter(row => row.pid === row.pgid && entryIs(row, c.stableCheckout, 'src/worker/index.ts'))
-    if (workers.length > 1) fail('The ordinary topology has more than one worker.')
-    if (descendants.some(row => entryIs(row, c.stableCheckout, 'src/worker/index.ts') && row.pgid !== workers[0]?.pgid)) fail(workers.length === 0 ? 'The ordinary worker must be the server’s guarded descendant in its own group.' : 'The ordinary topology has more than one worker.')
-    topology = { supervisor, server: servers[0], worker: workers[0] ?? null }
-  }
-  const observed = checkTopology(topology, gate, c)
+  const observed = theOrdinaryTopologyUnder(gate, c, supervisor)
   const expected = [gate.pgid, observed.server.pgid, ...(observed.worker ? [observed.worker.pgid] : [])]
   if (c.serviceGroups.length !== expected.length || c.serviceGroups.some(row => !expected.includes(row.pgid))) fail('Recorded groups must be exactly the ordinary serve-dev topology groups.')
   if (pids.some(pid => ![observed.supervisor.pid, observed.server.pid].includes(pid))) fail('An ordinary listener is outside the serve-dev topology.')
   return observed
+}
+
+/**
+ * THE CLOCK TICKS IN WHICH /proc GIVES A PROCESS'S START TIME. The rate is read once, with getconf CLK_TCK, and never
+ * assumed: without it no start time can be set beside a time read from /proc/uptime.
+ */
+let theTickRate = null
+export function theClockTicksASecond() {
+  if (theTickRate !== null) return theTickRate
+  const read = spawnSync('getconf', ['CLK_TCK'], { encoding: 'utf8', timeout: 5_000, env: bootstrapGitEnvironment() })
+  const said = read.error || read.status !== 0 ? null : read.stdout.trim()
+  if (said === null || !/^[1-9]\d{0,5}$/.test(said)) fail(`The clock's ticks a second could not be read with getconf CLK_TCK (${theRateRefusal(read)}), so no process's start time can be set beside the gate's end.`)
+  theTickRate = Number(said)
+  return theTickRate
+}
+function theRateRefusal(read) {
+  if (read.error) return read.error.message
+  if (read.status !== 0) return read.stderr.trim().slice(0, 200) || `it ended with ${read.status ?? read.signal}`
+  return `it printed ${JSON.stringify(read.stdout.trim().slice(0, 20))}`
+}
+
+/** The seconds since boot, in hundredths, as /proc/uptime gives them. The kernel rounds them down. */
+export function theUptimeInHundredths() {
+  const text = readFileSync('/proc/uptime', 'utf8')
+  const seconds = /^(\d+)\.(\d{2}) /.exec(text)
+  if (seconds === null) fail(`/proc/uptime does not begin with the seconds since boot in hundredths (${JSON.stringify(text.slice(0, 32))}).`)
+  return Number(seconds[1]) * 100 + Number(seconds[2])
+}
+
+/**
+ * The last clock tick that may have begun by a reading of /proc/uptime, `hundredths`. The reading is rounded down, so
+ * the time was before the next hundredth. At 100 ticks a second, which is what Linux gives, this is the hundredths
+ * themselves.
+ */
+export function theTicksBy(hundredths) {
+  return Math.floor(((hundredths + 1) * theClockTicksASecond() - 1) / 100)
+}
+
+/** Now, as the last clock tick since boot that may have begun: the unit of each process's start time in /proc. */
+export function theTicksSinceBoot() {
+  return theTicksBy(theUptimeInHundredths())
+}
+
+/** The programs an ordinary start may leave in its gate's group: its server, its worker and serve-dev's stand-in. */
+const THE_STARTS_OWN_ENTRIES = ['src/server/index.ts', 'src/worker/index.ts', 'tools/serve-dev-stand-in.mjs']
+
+/**
+ * Why a live member of an ended gate's group is not the start's own, as a phrase that names it, or null when it is. It
+ * is the start's own when it runs as this user, it started within the gate's life, and it is the start's server, its
+ * worker or serve-dev's stand-in, known as servingUpgradeTopology knows them: by its entry, its checkout and its
+ * program, which is this Node. `gate` holds the gate's start and end, in clock ticks since boot. A member that has
+ * ended since its group was listed is no longer in the group, and is null too.
+ */
+export function whyNotTheStartsOwn(pid, gate, c) {
+  let record, uids
+  try {
+    // Not currentProcessRecord, which reads the group's leader: here the leader is the gate, and the gate has ended.
+    record = { ...bootstrapProcessIdentity(pid), cwd: realpathSync(`/proc/${pid}/cwd`), argv: readFileSync(`/proc/${pid}/cmdline`, 'utf8').split('\0').filter(Boolean) }
+    uids = /^Uid:\s+(.+)$/m.exec(readFileSync(`/proc/${pid}/status`, 'utf8'))?.[1].trim().split(/\s+/).map(Number) ?? []
+  } catch (error) {
+    if (['ENOENT', 'ESRCH'].includes(error.code)) return null
+    return `${aProcessByItsName(pid)}, which could not be read (${error.code ?? error.message})`
+  }
+  if (uids.length === 0 || uids.some(uid => uid !== process.getuid())) return `${aProcessByItsName(pid)}, which does not run as this user`
+  const started = Number(record.startTime)
+  if (started < gate.startTicks) return `${aProcessByItsName(pid)}, which started before the gate started`
+  // The gate's end is an inclusive bound: a member that started in the tick in which the gate ended counts as the
+  // start's own. A tick is 10 ms at 100 a second, and a member started in it is almost surely the start's own work. Do
+  // not make this a strict "before".
+  if (started > gate.endTicks) return `${aProcessByItsName(pid)}, which started after the gate ended`
+  const known = THE_STARTS_OWN_ENTRIES.some(entry => entryIs(record, c.stableCheckout, entry)) && record.cwd === c.stableCheckout
+    && bootstrapProcessProgram(pid).program === realpathSync(process.execPath)
+  return known ? null : `${aProcessByItsName(pid)}, which is not the start's server, its worker or serve-dev's stand-in`
 }
 
 /** An operator can retain this exact configuration for the next transaction. */

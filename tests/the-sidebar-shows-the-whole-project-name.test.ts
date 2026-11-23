@@ -7,9 +7,9 @@
  * name was held to one line and ended in an ellipsis. The name now wraps onto as many lines as it needs, and when its
  * longest word does not fit beside the Switch press, the press goes under the name.
  *
- * WHAT IS MEASURED, in a real browser on a test office of this file's own, at 1440, 990, 660 and 390, in the light and
- * the dark theme, for that name and for a name of 40 characters. Below the width where the sidebar stands beside the
- * page, it is opened from the menu first.
+ * WHAT IS MEASURED, in a real browser on a test office of this file's own, at 1440, 990 and 390, in the light theme,
+ * for that name and for a name of 40 characters. 990 stays because the long name at 1440 may take no more lines than
+ * at 990. Below the width where the sidebar stands beside the page, it is opened from the menu first.
  *   1. The name is drawn whole: its text is the project's name, nothing of it is cut (its scroll size is its drawn
  *      size), it stands inside the sidebar, and nothing is drawn over any of its lines. No word of it is split across
  *      two lines: a word may break inside itself only when it is wider than the line beside the initials, and
@@ -39,8 +39,8 @@ const PROJECTS = [
   { id: 'made-up-greenhouse', title: 'Greenhouse (made-up)' },
   { id: 'made-up-seed-library', title: 'Made-up Riverside Seed Library and Store' },
 ] as const
-const WIDTHS = [990, 1440, 660, 390] as const
-const THEMES = ['light', 'dark'] as const
+const WIDTHS = [990, 1440, 390] as const
+const THEMES = ['light'] as const
 
 let app: LiveApp
 

@@ -172,18 +172,18 @@ describe('4. the program finder and the starter on Windows', () => {
       'C:\\Users\\jory\\AppData\\Roaming\\npm\\claude',
       'C:\\Users\\jory\\AppData\\Roaming\\npm\\claude.cmd',
     ])
-    expect(whereIsThisTool('node', PATH, system)).toBe('C:\\Program Files\\nodejs\\node.exe')
-    expect(whereIsThisTool('claude', PATH, system)).toBe('C:\\Users\\jory\\AppData\\Roaming\\npm\\claude.cmd')
-    expect(whereIsThisTool('codex', PATH, system)).toBeNull()
+    expect(whereIsThisTool('node', { PATH }, system)).toBe('C:\\Program Files\\nodejs\\node.exe')
+    expect(whereIsThisTool('claude', { PATH }, system)).toBe('C:\\Users\\jory\\AppData\\Roaming\\npm\\claude.cmd')
+    expect(whereIsThisTool('codex', { PATH }, system)).toBeNull()
   })
 
   it('reads PATHEXT, its case, and a path written with either separator', () => {
     // PATHEXT's endings are tried in lower case; Windows finds a file whatever the case of its name.
     const system = aSystem('win32', ['C:\\tools\\run.ps1', 'C:\\tools\\node.exe'], '.EXE;.PS1')
-    expect(whereIsThisTool('run', 'C:\\tools', system)).toBe('C:\\tools\\run.ps1')
-    expect(whereIsThisTool('C:\\tools\\node', undefined, system)).toBe('C:\\tools\\node.exe')
-    expect(whereIsThisTool('C:\\tools\\node.exe', undefined, system)).toBe('C:\\tools\\node.exe')
-    expect(whereIsThisTool('C:/tools/missing', 'C:\\tools', system)).toBeNull()
+    expect(whereIsThisTool('run', { PATH: 'C:\\tools' }, system)).toBe('C:\\tools\\run.ps1')
+    expect(whereIsThisTool('C:\\tools\\node', {}, system)).toBe('C:\\tools\\node.exe')
+    expect(whereIsThisTool('C:\\tools\\node.exe', {}, system)).toBe('C:\\tools\\node.exe')
+    expect(whereIsThisTool('C:/tools/missing', { PATH: 'C:\\tools' }, system)).toBeNull()
   })
 
   it('starts a .cmd through cmd.exe with each word quoted, and an .exe as it is', () => {
@@ -238,11 +238,11 @@ describe('5. Linux and the Mac answer exactly as before', () => {
       expect(howToStart('worker', platform).command.endsWith(join('node_modules', '.bin', 'tsx'))).toBe(true)
 
       const system = aSystem(platform, ['/usr/bin/node', '/opt/npm/claude.cmd', '/opt/npm/codex'], '.EXE;.CMD')
-      expect(whereIsThisTool('node', '/usr/local/bin::/usr/bin', system)).toBe('/usr/bin/node')
-      expect(whereIsThisTool('codex', '/opt/npm', system)).toBe('/opt/npm/codex')
-      expect(whereIsThisTool('claude', '/opt/npm', system)).toBeNull()
-      expect(whereIsThisTool('/usr/bin/node', undefined, system)).toBe('/usr/bin/node')
-      expect(whereIsThisTool('node', '/usr/local/bin;/usr/bin', system)).toBeNull()
+      expect(whereIsThisTool('node', { PATH: '/usr/local/bin::/usr/bin' }, system)).toBe('/usr/bin/node')
+      expect(whereIsThisTool('codex', { PATH: '/opt/npm' }, system)).toBe('/opt/npm/codex')
+      expect(whereIsThisTool('claude', { PATH: '/opt/npm' }, system)).toBeNull()
+      expect(whereIsThisTool('/usr/bin/node', {}, system)).toBe('/usr/bin/node')
+      expect(whereIsThisTool('node', { PATH: '/usr/local/bin;/usr/bin' }, system)).toBeNull()
       expect(theWayToStart('/opt/npm/claude.cmd', ['say "%x%"'], system)).toEqual({
         command: '/opt/npm/claude.cmd',
         args: ['say "%x%"'],

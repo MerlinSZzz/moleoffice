@@ -357,13 +357,44 @@ export function theProviderRouterUnitPath(home) {
 }
 
 /**
- * THE UNIT'S TEXT. It holds no key: the router reads its slots file itself. A secretary runs
- * node tools/key-router/install.mjs --sandboxes <dir> on the host to install and enable it.
- * @param {{ node: string, router: string, sandboxes: string }} paths
+ * Whether `path` may go into a unit's line as it is: an absolute path of letters, digits, dots, dashes, underscores and
+ * slashes. systemd gives `%`, `$`, quotes, a backslash and a space a meaning of their own in a unit line, so a path
+ * holding one is refused, never escaped.
+ * @param {unknown} path
  */
-export function theProviderRouterUnit({ node, router, sandboxes }) {
+export function aPathAUnitLineMayHold(path) {
+  return typeof path === 'string' && /^\/[A-Za-z0-9._/-]+$/.test(path)
+}
+
+/**
+ * THE TWO LINES THAT NAME THE OFFICE THE ROUTER ASKS. A unit gives its process no environment, and the router reads the
+ * office's address from MOLE_OFFICE_API and its office key from the key file beside MOLE_OFFICE_DB. The unit used to name
+ * neither, so the router started by systemd found no address and no office key and exited at each start.
+ * tools/key-router/the-office-the-router-serves.mjs reads both from the stable unit and checks them with that office.
+ * The refusals here never print the database's path.
+ * @param {{ api: string, database: string }} office
+ * @returns {string[]}
+ */
+export function theOfficeLinesOfTheUnit(office) {
+  const { api, database } = office ?? {}
+  if (typeof api !== 'string' || !/^http:\/\/127\.0\.0\.1:[1-9][0-9]*$/.test(api)) {
+    throw new Error("The office's address cannot go into the router's unit: it must be http://127.0.0.1:<port>.")
+  }
+  if (!aPathAUnitLineMayHold(database)) {
+    throw new Error("The office's database cannot go into the router's unit: it must be an absolute path of letters, digits, dots, dashes, underscores and slashes.")
+  }
+  return [`Environment=MOLE_OFFICE_API=${api}`, `Environment=MOLE_OFFICE_DB=${database}`]
+}
+
+/**
+ * THE UNIT'S TEXT. It holds no key: the router reads its slots file itself, and its office key from the key file beside
+ * the database the unit names. A secretary runs node tools/key-router/install.mjs --sandboxes <dir> on the host to
+ * install and enable it.
+ * @param {{ node: string, router: string, sandboxes: string, office: { api: string, database: string } }} paths
+ */
+export function theProviderRouterUnit({ node, router, sandboxes, office }) {
   for (const path of [node, router, sandboxes]) {
-    if (!/^\/[A-Za-z0-9._/-]+$/.test(path)) throw new Error(`${JSON.stringify(path)} cannot go into a unit's ExecStart line: it must be an absolute path of letters, digits, dots, dashes, underscores and slashes.`)
+    if (!aPathAUnitLineMayHold(path)) throw new Error(`${JSON.stringify(path)} cannot go into a unit's ExecStart line: it must be an absolute path of letters, digits, dots, dashes, underscores and slashes.`)
   }
   return [
     '[Unit]',
@@ -371,6 +402,7 @@ export function theProviderRouterUnit({ node, router, sandboxes }) {
     '',
     '[Service]',
     'Type=simple',
+    ...theOfficeLinesOfTheUnit(office),
     `ExecStart=${node} ${router} serve --sandboxes ${sandboxes}`,
     'Restart=always',
     'RestartSec=2',

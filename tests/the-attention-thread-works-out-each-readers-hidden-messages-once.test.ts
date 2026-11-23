@@ -106,13 +106,13 @@ it("works out each reader's hidden messages once for the asks answered together,
 
   const of = (reader: typeof ada, workspaceId = HERE) => ({ workspaceId, resources: [], now: NOW, reader })
   const asks: AttentionAsk[] = [
-    { id: 1, input: of(ada), asked: { shape: 'home' } },
-    { id: 2, input: of(ada), asked: { shape: 'whole' } },
-    { id: 3, forEach: { resources: [], now: NOW, reader: ada }, each: OTHERS },
-    { id: 4, input: of(dee), asked: { shape: 'whole' } },
-    { id: 5, forEach: { resources: [], now: NOW, reader: dee }, each: OTHERS },
-    { id: 6, input: of(owner), asked: { shape: 'whole' } },
-    { id: 7, input: of(ada, OTHERS[0]), asked: { shape: 'flow' } },
+    { id: 1, sentAt: NOW, input: of(ada), asked: { shape: 'home' } },
+    { id: 2, sentAt: NOW, input: of(ada), asked: { shape: 'whole' } },
+    { id: 3, sentAt: NOW, forEach: { resources: [], now: NOW, reader: ada }, each: OTHERS },
+    { id: 4, sentAt: NOW, input: of(dee), asked: { shape: 'whole' } },
+    { id: 5, sentAt: NOW, forEach: { resources: [], now: NOW, reader: dee }, each: OTHERS },
+    { id: 6, sentAt: NOW, input: of(owner), asked: { shape: 'whole' } },
+    { id: 7, sentAt: NOW, input: of(ada, OTHERS[0]), asked: { shape: 'flow' } },
   ]
   const answers: Exclude<AttentionAnswer, { ready: true }>[] = []
   const together = traced(() => worker.answerTheseAsksTogether(asks, null, { records: R, shapes, messages }, (answer) => answers.push(answer)))

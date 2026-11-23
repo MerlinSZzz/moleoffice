@@ -50,7 +50,7 @@ import { GATES } from '../src/config/gates.mjs'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { theCardWithoutItsWords, theWordsOf, type RoleCard } from '../src/shared/roles.ts'
 import { THE_TEST_FIXTURE_ROOT } from './a-page-of-a-test-office.ts'
-import { apiApp, freshDb, FOR_THE_PERSON, theAnswerToAWriteInATestOffice, thePersonsKeyHeader, type TestDb } from './helpers.ts'
+import { apiApp, freshDb, FOR_THE_PERSON, theAnswerToAWriteInATestOffice, thePersonsKeyHeader, type TestDb, governsTheWholeProject } from './helpers.ts'
 
 const SECRETARY = 'round-v-secretary'
 const RAISED = 'round-v-raised-secretary'
@@ -424,7 +424,7 @@ describe(`${WORDS}: a warrant is asked as at block`, () => {
     await setTheGate(WORDS, 'off')
     const message = await thePersonsMessage()
     await aRecord(PERSON, 'decision', {
-      replaces: [],
+      ...governsTheWholeProject(), replaces: [],
       decided_by: 'the owner',
       authority: 'the owner said so',
       authority_reference: message,

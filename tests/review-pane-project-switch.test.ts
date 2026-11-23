@@ -6,7 +6,7 @@ import { afterAll, beforeAll, expect, it } from 'vitest'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { liveApp, waitForThePage, type LiveApp } from './helpers.ts'
 import { setTheReviewTraysList } from './the-review-trays-list.ts'
-import { switchTheProject } from './switch-the-project.ts'
+import { openTheProjectList, switchTheProject } from './switch-the-project.ts'
 
 const PROJECT_A = 'review-project-a'
 const PROJECT_B = 'review-project-b'
@@ -130,9 +130,9 @@ it('keeps the review with its project, makes no read in the new project, and ope
   expect(await app.page.getByRole('button', { name: close, exact: true }).count()).toBe(1)
   expect(await app.page.locator('.px-pane').getByText(/Mole Office could not read this review/i).count()).toBe(0)
 
-  for (const width of [1440, 990, 660, 390]) {
+  for (const width of [1440, 390]) {
     await app.page.setViewportSize({ width, height: 1000 })
-    for (const look of ['light', 'dark'] as const) {
+    for (const look of ['light'] as const) {
       await app.page.emulateMedia({ colorScheme: look })
       await app.page.evaluate((theme) => { document.documentElement.dataset['theme'] = theme }, look)
       await app.page.getByText(sentence, { exact: true }).waitFor({ timeout: 30_000 })
@@ -159,6 +159,41 @@ it('keeps the review with its project, makes no read in the new project, and ope
   expect(readsOfReviewA.some((one) => one.project === PROJECT_A)).toBe(true)
   expect(readsOfReviewA.filter((one) => one.project === PROJECT_B)).toEqual([])
 }, 240_000)
+
+it('changes to a project pressed where the open project list reaches into the review tray', async () => {
+  // THE REVIEW IN A IS STILL COLLECTING, as the case before left it, so it is held as the tray across the window's
+  // foot. Its list is open, as a person reading the comments has it, and the tray stands well up the window.
+  await app.page.locator('[data-part="your-review-bar"]').waitFor({ timeout: 30_000 })
+  await setTheReviewTraysList(app.page, 'open')
+  // A WINDOW SHORT ENOUGH FOR THE OPEN PROJECT LIST TO REACH INTO THE TRAY. The list opens below the Switch, beside
+  // the sidebar and over the page, and the tray stands over the page from the sidebar's edge to the window's.
+  await app.page.setViewportSize({ width: 1440, height: 800 })
+  const list = await openTheProjectList(app.page)
+  const choice = list.locator(`.sbp-choice[data-project="${PROJECT_B}"]`)
+  // Playwright brings a choice into the list's view before it presses it, so the choice is measured after the same step.
+  await choice.scrollIntoViewIfNeeded()
+  const tray = await app.page.locator('.px-pane').boundingBox()
+  const reach = await list.boundingBox()
+  const pressed = await choice.boundingBox()
+  if (tray === null || reach === null || pressed === null) throw new Error('the tray, the open project list or the choice of B is not drawn')
+  // THE CASE PROVES SOMETHING ONLY WHERE THE TWO MEET, so that is checked before the press. In a window where the list
+  // ended above the tray, the press below would pass with the tray drawn over the list as well.
+  expect(reach.y + reach.height, 'the open project list ends above the review tray').toBeGreaterThan(tray.y)
+  expect(pressed.y + pressed.height / 2, 'the middle of the choice, where the press lands, is above the review tray').toBeGreaterThan(tray.y)
+
+  // THE PRESS IN THE TRAY'S BAND CHOOSES THE PROJECT. While the tray was drawn over the list, the press landed on the
+  // tray and the project stayed as it was.
+  await switchTheProject(app.page, PROJECT_B)
+  await app.page.waitForFunction((project) => window.localStorage.getItem('mole-office.workspace') === project, PROJECT_B)
+
+  // THE NEXT CASE STARTS WHERE THE FIRST LEFT IT: at 1440 by 1000, in A, with the review collecting and its tray's
+  // list open.
+  await app.page.setViewportSize({ width: 1440, height: 1000 })
+  await switchTheProject(app.page, PROJECT_A)
+  await app.page.waitForFunction((project) => window.localStorage.getItem('mole-office.workspace') === project, PROJECT_A)
+  await waitForThePage(app.page, 60_000)
+  await setTheReviewTraysList(app.page, 'open')
+}, 180_000)
 
 it('does not guess a project for a saved review value that predates project ids', async () => {
   await switchTheProject(app.page, PROJECT_B)

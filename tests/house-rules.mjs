@@ -134,7 +134,6 @@ export const HOUSE_RULES = {
   'tests/the-acting-line-has-one-spacing-rule.test.ts': { class: 'H', kind: 'chinese-words', mark: 'borderline' },
   'tests/the-address-card-draws-its-refusal-in-the-page-language.test.ts': { class: 'H', kind: 'chinese-words', mark: 'borderline' },
   'tests/the-address-card-names-its-setter-in-both-languages.test.ts': { class: 'H', kind: 'chinese-words', mark: 'borderline' },
-  'tests/the-address-gate.test.ts': { class: 'P', kind: 'privacy-marker' },
   'tests/the-applied-migrations-keep-their-statements.test.ts': { class: 'S', kind: 'other' },
   'tests/the-chat-words-and-tiers.test.ts': { class: 'H', kind: 'chinese-words', mark: 'mixed' },
   'tests/the-demo-corpus-names-none-of-the-owners-work.test.ts': { class: 'P', kind: 'owner-content' },

@@ -13,9 +13,9 @@
  *   1. agents.id, from the old id to the new one;
  *   2. every column whose foreign key ties it to agents.id, on each row that holds the old id, and no other column of
  *      that row. The keys are read from the schema each time, so a key a later migration adds is rewritten with the
- *      rest. Today there are nine: resident_read_grants.resident_id and reader_id, resident_void_marks.resident_id,
+ *      rest. Today there are ten: resident_read_grants.resident_id and reader_id, resident_void_marks.resident_id,
  *      resident_space_writes.resident_id, resident_sleeps.agent_id, agent_records.agent_id, handle_holds.agent_id,
- *      agent_renames.agent_id and agent_starter_changes.agent_id;
+ *      agent_renames.agent_id, agent_starter_changes.agent_id and agent_owner_changes.agent_id;
  *   3. held_keys.whose_id, on each row whose holder is an agent, and no other column of that row. The holder is read as
  *      whomAStoredNameNames (remint-map.ts) reads a stored name: a name that one agent answers to, by its id, an old id or
  *      a handle, becomes the id the map gives that agent. A name no agent answers to, and a person's or the office's

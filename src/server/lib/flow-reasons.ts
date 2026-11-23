@@ -13,6 +13,9 @@
  * their reasons are written afterwards, step by step. Each record a source, a cause or a decision's `basis` names must
  * be there. Earlier `step_changes` entries stay as they are.
  *
+ * THE ONE WRITE LET THROUGH is the office's own copy of the default flows: a create whose stages carry no reasons or
+ * sources, because the reasons belong to the office the flows were written in, and every source is a record id of that office.
+ *
  * Whoever changes or removes a step is shown its why and sources first. A write that changes a step without a change
  * entry is refused, and the refusal quotes what the old steps said; the record page shows them in its edit form.
  *
@@ -28,12 +31,14 @@ import { db } from '../db/client.ts'
 import { readInPieces } from '../db/in-pieces.ts'
 import { records } from '../db/schema.ts'
 import { PanelError } from './panel-error.ts'
+import { theOfficeIsCopyingItsDefaults } from './records/served-doors.ts'
 import { whyTheAppliesToIsUnreadable } from '@shared/flow-applies-to.ts'
 import { whyTheRetiredMarkIsUnreadable } from '@shared/flow-retired.ts'
 import { isAProjectOnAList } from '@shared/workspaces.ts'
 import { theRoleCards } from './roles.ts'
 import { getWorkspace } from '../db/get-workspace.ts'
 import { foldTheSecondLevel, isObject, SECOND_LEVEL_PARAM, SECOND_LEVEL_SHOW, type Json, type SecondLevelHeld } from '@shared/second-level-fold.ts'
+import type { BasisEntry } from '../db/types/flow-reasons.ts'
 
 export { SECOND_LEVEL_PARAM, SECOND_LEVEL_SHOW }
 
@@ -70,6 +75,11 @@ function whatItSaid(step: Json): string {
  * steps. Nothing is written when it throws.
  */
 export function checkTheFlowSteps(next: unknown, before: unknown): void {
+  // THE OFFICE'S OWN COPY OF THE DEFAULT FLOWS is the one write let through: a create whose stages carry
+  // no reasons or sources, because the reasons belong to the office the flows were written in, and every
+  // source is a record id of that office. It is the office's own write, under the same guard as its copy of the
+  // default chapters. A create outside the copy, and every patch, still meets this check.
+  if (before === null && theOfficeIsCopyingItsDefaults) return
   const { lacks, gone } = whatTheFlowStepsLack(next, before, missingRecords)
   refuseTheFirstLack(lacks, gone)
 }
@@ -230,17 +240,6 @@ export function theSecondLevelIsAsked(query: unknown): boolean {
   )
 }
 
-/**
- * ONE RECORD A DECISION WAS BASED ON, as a reader is shown it. Its title is given only when the record is in the
- * decision's own project: a record elsewhere, a message in the message centre among them, is named by id and kind, so
- * a reply never carries the words of a record its reader may not be allowed to read.
- */
-export interface BasisEntry {
-  id: string
-  kind: string | null
-  title: string | null
-  /** Why there is no title: the record is in another project, or it is not there (deleted since, or never was). */
-  untitledBecause: 'another-project' | 'not-there' | null
-}
+export type { BasisEntry } from '../db/types/flow-reasons.ts'
 
 export { theBasisOf } from '../db/the-basis-of.ts'

@@ -117,6 +117,7 @@
   },
   {
     "id": "openai",
+    "hiddenInSettings": true,
     "name": "OpenAI",
     "page": "https://platform.openai.com/",
     "documentation": "https://help.openai.com/en/articles/9186755-managing-projects-in-the-api-platform",

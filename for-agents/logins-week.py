@@ -14,8 +14,8 @@ days declared no tool, when any did. It works nothing out itself; every figure a
 <workspace> is the project the agent is in: the office looks the handle up among that project's agents. The handle
 comes from --as or MOLE_OFFICE_AGENT, and the office's address from --api or MOLE_OFFICE_API, as for send-message.py.
 Neither has a default. The address in the environment is taken only when it was given for this copy, by the rule in
-send-message.py, which this reads from there. A key, when the agent holds one, is read from the file
-MOLE_AGENT_KEY_FILE names, or from MOLE_AGENT_KEY, by the rules of the_agent_key in send-message.py, and sent on
+send-message.py, which this reads from there. The key comes from MOLE_AGENT_KEY_FILE, MOLE_AGENT_KEY,
+or this run's office tool configuration; without one this asks nothing. It is sent on
 x-mole-office-key; it is never printed and never taken from a flag.
 
 It asks for one message (?limit=1), so the answer is small, and prints none. It changes nothing in the office: reading
@@ -80,12 +80,17 @@ def main() -> int:
         "x-mole-office-actor-id": a.handle,
     }
     try:
-        key = the_message_script().the_agent_key(os.environ, "Nothing was asked.")
+        script = the_message_script()
+        key, why = script.the_key_a_kit_tool_sends(os.environ, a.handle, os.environ.get("MOLE_OFFICE_SESSION"),
+                                                    {"agent": "--as or MOLE_OFFICE_AGENT", "session": "MOLE_OFFICE_SESSION"},
+                                                    "Nothing was asked.")
     except ValueError as refused:
         print(refused, file=sys.stderr)
         return 2
-    if key is not None:
-        headers["x-mole-office-key"] = key
+    if key is None:
+        print(script.the_no_key_line(why, os.environ), file=sys.stderr)
+        return 2
+    headers["x-mole-office-key"] = key
     req = urllib.request.Request(a.api.rstrip("/") + "/api/agent/inbox?limit=1", method="GET", headers=headers)
     try:
         with urllib.request.urlopen(req, timeout=30) as r:

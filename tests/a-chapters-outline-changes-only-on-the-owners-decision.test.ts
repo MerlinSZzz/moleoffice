@@ -33,7 +33,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { FastifyInstance } from 'fastify'
 
-import { apiApp, freshDb, theAnswerToAWriteInATestOffice, thePersonsKeyHeader, type TestDb } from './helpers.ts'
+import { apiApp, freshDb, theAnswerToAWriteInATestOffice, thePersonsKeyHeader, type TestDb, governsTheWholeProject } from './helpers.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { englishHash } from '../src/shared/english-hash.ts'
 
@@ -89,7 +89,7 @@ function thePersonsMessage(body: string): Promise<string> {
 /** A decision the person filed, resting on that message. */
 function aDecision(message: string, decidedBy: string, authority: string, headers = person, replaces: string[] = []): Promise<string> {
   return file(headers, 'decision', `Made-up decision on ${message}`, {
-    replaces,
+    ...governsTheWholeProject(), replaces,
     decided_by: decidedBy,
     authority,
     authority_reference: message,

@@ -1,0 +1,40 @@
+-- A PARTICIPANT'S MACHINES ARE FOUND BY THE PARTICIPANT, WITHOUT READING EVERY CALL.
+--
+-- The profile read of one person or agent lists the machines they were seen from (`machinesSeenFrom` in
+-- src/server/lib/participants.ts): the addresses of their calls, with the newest call and the number of calls from
+-- each. It asks `api_calls` for the calls of one actor type and one or two actor ids that carry an address. No index
+-- of the table started with `actor_type` or `actor_id`, so SQLite read every call and kept that participant's.
+--
+--   api_calls_actor_address_idx  every call with an address, by its actor type, its actor id, its address and its
+--                                time.
+--
+-- It holds every column the list asks for, in the order the list groups by, so each search reads the index alone and
+-- groups the calls as it reads them, without sorting them first.
+--
+-- PARTIAL TO THE CALLS WITH AN ADDRESS. SQLite uses a partial index for a query whose WHERE implies the index's term.
+-- `client_addr IS NOT NULL` is implied by that same term, which the list says, and by any comparison of `client_addr`
+-- with a value. No other read of this table does either, so the other reads keep the plans they had.
+--
+-- MEASURED on the made-up office built at the scale of 13 November 2026 (2,733,290 calls), its call log grown to
+-- 15,000,000 calls by copying its own call rows, on a machine with other work running (load average about 10 to 15).
+-- There the busiest agent holds 2,286,035 of the calls (15.2 %), the person 1,035,754 and a quiet agent 6,708. Each of
+-- the three made its calls from one address, so each list has one row. As the middle of five reads, the list took
+-- 1,789.1 ms before and 139.7 ms after for the busiest agent, 1,223.9 ms and 60.2 ms for the person, and 1,550.7 ms and
+-- 0.5 ms for the quiet agent, each with the same answer by hash before and after. The whole profile read,
+-- GET /api/participants/:kind/:id/profile asked as the person and timed by the server, was not measured at 15,000,000
+-- calls: each server's start deletes calls with no trace once they are older than seven days, the default. The start
+-- before deleted 10,351,404 of them, so the reads before ran on 4,648,596 calls, and the start after deleted 9,365
+-- more. As the middle of five, it took 1,574.4 ms before and 361.4 ms after for the busiest agent, 581.3 ms and
+-- 204.5 ms for the person, and 974.7 ms and 434.6 ms for the quiet agent. The machine list in the person's answer was
+-- the same by hash before and after. The other two answers were not compared, because the second start had deleted
+-- calls the first one kept. The index there is 739,631,104 bytes, about 49 a call, beside 2,610,503,680 for the table
+-- and 3,371,130,880 for its other indexes. It was built in 12,056 ms, the time of the step that applies the schema
+-- migrations, with this one the only one pending. The build's sort files took at most 735,509,125 bytes of temporary
+-- space on /, in three files. The insert costs come from one run. A call written in a statement of its own took
+-- 245.6 microseconds before and 323.5 after, 77.9 more, over 5,000 calls. In one transaction of 200,000 calls, a call
+-- took 4.8 microseconds before and 5.9 after, 1.1 more.
+--
+-- The index is not unique, and it changes no row.
+--
+-- ADDITIVE, AND IT REWRITES NOTHING. One CREATE INDEX statement and no UPDATE.
+CREATE INDEX IF NOT EXISTS `api_calls_actor_address_idx` ON `api_calls` (`actor_type`,`actor_id`,`client_addr`,`at_ms`) WHERE client_addr IS NOT NULL;

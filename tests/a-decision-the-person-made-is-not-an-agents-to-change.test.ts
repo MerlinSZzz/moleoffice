@@ -28,7 +28,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import type { FastifyInstance } from 'fastify'
 
-import { apiApp, freshDb, type TestDb } from './helpers.ts'
+import { apiApp, freshDb, type TestDb, governsTheWholeProject } from './helpers.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 
 const AS_THE_PERSON = {
@@ -92,7 +92,7 @@ beforeEach(async () => {
     payload: {
       kind: 'decision',
       title: 'Stay on the measured controller',
-      data: { replaces: [],
+      data: { ...governsTheWholeProject(), replaces: [],
         option_taken: 'a — position control',
         because: 'it is the only one that was measured',
         decided_by: THE_OWNER,

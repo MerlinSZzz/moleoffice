@@ -20,6 +20,7 @@ import { THE_TEST_FIXTURE_ROOT } from './a-page-of-a-test-office.ts'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { beforeAll, describe, expect, it } from 'vitest'
+import { createI18n, type WordKey } from '../src/shared/i18n.ts'
 import type { World } from '../src/shared/worlds.ts'
 import {
   THE_FACES_SENTENCE,
@@ -30,6 +31,7 @@ import {
 type WorldHereModule = typeof import('../src/web/pages/WorldHerePage.tsx')
 
 let page: WorldHereModule
+const en = createI18n('en')
 
 beforeAll(async () => {
   const store = new Map<string, string>()
@@ -138,5 +140,51 @@ describe('the world’s own page says what it is', () => {
     const html = body(world, true, 'ffffffffffffffff').replace(/&quot;/g, '"')
     expect(html).toContain(theWorldIsACopyTakenAtSentence(world))
     expect(html).not.toContain('not a copy')
+  })
+})
+
+/**
+ * WHEN NO WORLD ROW NAMES THE DATABASE ANSWERING HERE, the page draws that database on a row of its own, in the code
+ * style, with a state word after it, and no sentence holds it.
+ */
+describe('the world’s own page when no world row names its database', () => {
+  function theMarkup(thisWorld: string | null): string {
+    return renderToStaticMarkup(
+      createElement(page.TheWorldItself, {
+        office: {
+          worlds: [aWorld()],
+          from: 'the office' as const,
+          mirrorWrittenAt: null,
+          mirrorFile: null,
+          mirrorNote: 'the office holds this list',
+          isTheOffice: false,
+          theHomeRowBelongsTo: null,
+          thisWorld,
+          office: 'http://127.0.0.1:41601',
+        },
+        onChanged: () => {},
+      }),
+    ).replace(/<style[^>]*>[\s\S]*?<\/style>/g, '')
+  }
+
+  /** Each row's label, with the tag and text of the first element in its value and the state word after it. */
+  function theRows(markup: string): { label: string; tag: string; value: string; state: string | null }[] {
+    return [...markup.matchAll(/<dt>([^<]*)<\/dt><dd><(\w+)[^>]*>([^<]*)<\/\2>(?:<span[^>]*>([^<]*)<\/span>)?<\/dd>/g)].map((m) => ({
+      label: m[1]!, tag: m[2]!, value: m[3]!, state: m[4] ?? null,
+    }))
+  }
+
+  it('draws the database on its own row with the state word, and no sentence holds it', () => {
+    const html = theMarkup('dddddddddddddddd')
+    expect(theRows(html)).toEqual([
+      { label: en.t('worldHere.row.database' as WordKey), tag: 'code', value: 'dddddddddddddddd', state: en.t('worldHere.row.noWorldRow' as WordKey) },
+    ])
+    expect(html.replace(/<dl[\s\S]*?<\/dl>/g, ''), 'a sentence holds the database').not.toContain('dddddddddddddddd')
+  })
+
+  it('says on the row when this server could not identify its database', () => {
+    expect(theRows(theMarkup(null)).map((row) => [row.label, row.state])).toEqual([
+      [en.t('worldHere.row.database' as WordKey), en.t('worldHere.row.notIdentified' as WordKey)],
+    ])
   })
 })

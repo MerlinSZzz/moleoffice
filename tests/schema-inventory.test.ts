@@ -80,6 +80,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import * as schema from '../src/server/db/schema.ts'
 import { migrateInPlace } from '../src/server/db/migrate.ts'
 import { apiApp, freshDb, type TestDb } from './helpers.ts'
+import { A_MIGRATION_IS_WRITTEN_BY_HAND, fixUnbuilt, fixUndeclared } from './how-a-migration-is-written.ts'
 import { TABLES_IN_A_FILE_OF_THEIR_OWN, whatTiesItToTheOfficeDatabase } from './tables-in-a-sqlite-file-of-their-own.ts'
 
 const REPO = fileURLToPath(new URL('..', import.meta.url))
@@ -198,38 +199,6 @@ function unbuilt(actual: readonly string[], declared: readonly string[]): string
   return declared.filter((name) => !actual.includes(name))
 }
 
-/**
- * What to do about a table nobody declared, written so the failure is an instruction.
- *
- * A bare `toEqual([])` diff tells whoever broke this that two arrays differ, at which point they
- * have to find this file, read it, and work out what the project's rule is. The rule is four
- * sentences and it fits in the failure.
- */
-function fixUndeclared(tables: readonly string[], where: string): string {
-  const named = tables.map((t) => `"${t}"`).join(', ')
-  return (
-    `${named} ${tables.length === 1 ? 'is a table' : 'are tables'} in ${where}, and ` +
-    `${tables.length === 1 ? 'it is' : 'they are'} not declared in src/server/db/schema.ts. ` +
-    'EVERY table Mole Office has is declared there and created by a migration in drizzle/, and nothing ' +
-    'anywhere else may create one. To fix this: add the sqliteTable declaration to schema.ts, add ' +
-    'the name to AUTHORED_TABLES or DERIVED_TABLES in the same file, run `npm run db:generate`, ' +
-    'add `IF NOT EXISTS` to the generated CREATE TABLE and CREATE INDEX statements by hand, and ' +
-    'delete whatever was creating the table outside the migration system. Two definitions of one ' +
-    'table fail at runtime on INSERT, in production, with nothing failing at compile time.'
-  )
-}
-
-/** The other direction: schema.ts says a table exists and no migration ever makes it. */
-function fixUnbuilt(tables: readonly string[]): string {
-  const named = tables.map((t) => `"${t}"`).join(', ')
-  return (
-    `${named} ${tables.length === 1 ? 'is' : 'are'} declared in src/server/db/schema.ts and no ` +
-    'migration in drizzle/ creates it. A declaration with no migration is a table that exists in ' +
-    'TypeScript and not in SQLite: every read of it fails at runtime with "no such table". Run ' +
-    '`npm run db:generate` and add `IF NOT EXISTS` to the generated statements by hand.'
-  )
-}
-
 // ============================================================================ the exclusion list
 
 describe('what this file refuses to ignore', () => {
@@ -263,13 +232,23 @@ describe('the failure message', () => {
     expect(message).toContain('agent_cache')
     expect(message).toContain('src/server/db/schema.ts')
     expect(message).toContain('migration')
-    expect(message).toContain('npm run db:generate')
+    expect(message).toContain(A_MIGRATION_IS_WRITTEN_BY_HAND)
   })
 
   it('says something different when a declared table was never migrated', () => {
     const message = fixUnbuilt(['reader_anchors'])
     expect(message).toContain('reader_anchors')
     expect(message).toContain('no such table')
+  })
+
+  // CASE 2 OF THE GENERATOR'S RETIREMENT. The project has no script that generates a migration, so neither refusal
+  // may send an agent to one. Both say how a migration is written instead, and that sentence asks for its number.
+  it('2: neither refusal names the retired generator, and both say to write the migration by hand and ask for its number', () => {
+    for (const message of [fixUndeclared(['agent_cache'], 'a freshly migrated database'), fixUnbuilt(['reader_anchors'])]) {
+      expect(message).not.toContain('db:generate')
+      expect(message).toContain(A_MIGRATION_IS_WRITTEN_BY_HAND)
+    }
+    expect(A_MIGRATION_IS_WRITTEN_BY_HAND).toMatch(/\bask\b.*\bnumber\b/u)
   })
 })
 
@@ -318,10 +297,9 @@ describe('a freshly migrated database', () => {
 
   it('has no table that schema.ts does not declare', () => {
     // THE CHECK THAT CATCHES A TABLE ARRIVING THROUGH A MIGRATION NOBODY ADDED TO THE SCHEMA FILE.
-    // drizzle-kit generates migrations FROM schema.ts, so the two agree while everybody uses the
-    // generator — but a migration is a hand-editable .sql file, every one of them is hand-edited
-    // here to add `IF NOT EXISTS`, and a CREATE TABLE typed into one of them by hand reaches every
-    // database and nothing in TypeScript ever mentions it.
+    // Every migration is written by hand, and no tool writes one from schema.ts, so nothing else
+    // keeps the two in step: a CREATE TABLE typed into a migration reaches every database, and
+    // nothing in TypeScript ever mentions it.
     const db = migratedDatabase()
     const found = undeclared(tableNames(db), declaredAndIndexTables())
     expect(found, found.length === 0 ? '' : fixUndeclared(found, 'a freshly migrated database')).toEqual([])

@@ -312,9 +312,10 @@ describe('a port whose holder has gone is closed, and the process holding it now
     expect(dead.osStartedAt, 'the row has to carry the holder’s start time, or it identifies nothing').not.toBeNull()
 
     // THE CHILD DIES AND THIS PROCESS TAKES THE PORT.
+    const dying = child
     process.kill(-(child.pid as number), 'SIGKILL')
     child = null
-    await sleep(500)
+    while (dying.exitCode === null && dying.signalCode === null) await sleep(10)
     listener = createServer()
     await new Promise<void>((done, fail) => {
       listener?.on('error', fail)

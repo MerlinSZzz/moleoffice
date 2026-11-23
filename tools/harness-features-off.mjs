@@ -12,6 +12,9 @@
  *   reads. Both go in at every start, whatever its runtime, since a shell's words can start either harness.
  * OpenCode's switch is its environment, which reaches it inside a shell as well. dsh's is its --patch, and dsh reads
  * its tools from its profile, which does not take the patch yet, so a dsh started inside a shell's words has them.
+ * CODEX'S SHELL SNAPSHOT IS OFF IN BOTH PLACES AS WELL, from src/config/run-permissions.mjs: CODEX_SHELL_SNAPSHOT_OFF in
+ * the command, and the feature false in config.toml, because a snapshot copies the commands' environment, keys
+ * included, to disk.
  * tools/sandbox-start.mjs puts these into the command and the home at every start, and tools/sandbox.mjs into an
  * isolated run's, and puts the starting words first in the brief of a worker or a round.
  */
@@ -22,6 +25,10 @@ import { THE_PROGRAM_A_RUNTIME_RUNS } from '../src/config/runtime-native-provide
 import {
   CLAUDE_CODE_FEATURES_OFF, CLAUDE_CODE_TOOLS_OFF, CODEX_FEATURES_OFF, CODEX_FEATURE_NAMES_OFF, DSH_FEATURES_OFF, anOpenCodeConfigWithTheFeaturesOff,
 } from '../src/config/harness-features-off.mjs'
+import { CODEX_SHELL_SNAPSHOT_FEATURE, CODEX_SHELL_SNAPSHOT_OFF } from '../src/config/run-permissions.mjs'
+
+/** What a run's home config.toml sets false under [features]: Codex's subagent features and its shell snapshot. */
+const CODEX_FEATURES_OFF_IN_A_HOME = [...CODEX_FEATURE_NAMES_OFF, CODEX_SHELL_SNAPSHOT_FEATURE]
 
 export {
   CLAUDE_CODE_FEATURES_OFF, CLAUDE_CODE_TOOLS_OFF, CODEX_FEATURES_OFF, CODEX_FEATURE_NAMES_OFF, DSH_FEATURES_OFF, DSH_PATCH_IN_A_CHECKOUT,
@@ -172,7 +179,7 @@ export function aCommandWithTheHarnessFeaturesOff(command, env, runtime, dshPatc
   }
   const itsOwn = runtime !== null && Object.hasOwn(THE_PROGRAM_A_RUNTIME_RUNS, runtime) && program === THE_PROGRAM_A_RUNTIME_RUNS[runtime]
   if (itsOwn && runtime === 'claude-code') return after(CLAUDE_CODE_FEATURES_OFF)
-  if (itsOwn && runtime === 'codex') return after(CODEX_FEATURES_OFF)
+  if (itsOwn && runtime === 'codex') return after([...CODEX_FEATURES_OFF, ...CODEX_SHELL_SNAPSHOT_OFF])
   if (itsOwn && runtime === 'dsh' && dshPatch !== null) return after(['--patch', dshPatch])
   if (itsOwn && runtime === 'dsh') {
     return { command: [...command], env: {}, says: [
@@ -213,7 +220,7 @@ export function theHarnessFeaturesOffInAHome(home) {
   }
   if (config !== held) {
     aFileWrittenWhole(codex, config)
-    said.push(`${codex} turns Codex's subagent features off as well, so a Codex started inside a shell's words has them off.`)
+    said.push(`${codex} turns Codex's subagent features and its shell snapshot off as well, so a Codex started inside a shell's words has them off.`)
   }
   return said
 }
@@ -284,7 +291,7 @@ export function claudeCodeSettingsWithTheToolsDenied(held, file) {
  */
 function aCodexConfigWithTheFeaturesOff(text, file) {
   const refuse = (/** @type {string} */ how) => {
-    throw new Error(`${file} ${how}, so Codex's subagent features could not be turned off in it. Nothing in it was changed, and nothing was started.`)
+    throw new Error(`${file} ${how}, so Codex's subagent features and its shell snapshot could not be turned off in it. Nothing in it was changed, and nothing was started.`)
   }
   const bare = (/** @type {string} */ name) => name.trim().replace(/^"(.*)"$|^'(.*)'$/, '$1$2')
   const lines = text === '' ? [] : text.replace(/\n$/, '').split('\n')
@@ -306,7 +313,7 @@ function aCodexConfigWithTheFeaturesOff(text, file) {
         features = at
         last = at
       }
-      if (CODEX_FEATURE_NAMES_OFF.some((name) => table === `features.${name}`)) refuse(`has a [${table}] table`)
+      if (CODEX_FEATURES_OFF_IN_A_HOME.some((name) => table === `features.${name}`)) refuse(`has a [${table}] table`)
       return
     }
     const pair = /^\s*([^=#\s][^=#]*?)\s*=\s*(.*)$/.exec(line)
@@ -320,12 +327,12 @@ function aCodexConfigWithTheFeaturesOff(text, file) {
     }
     if (table === '' && key[0] === 'features') refuse(`sets its features with ${pair[1].trim()} = ..., outside a [features] table`)
     if (table !== 'features') return
-    if (CODEX_FEATURE_NAMES_OFF.includes(key[0]) && key.length > 1) refuse(`sets ${pair[1].trim()} under [features]`)
-    if (key.length === 1 && CODEX_FEATURE_NAMES_OFF.includes(key[0])) found.set(key[0], at)
+    if (CODEX_FEATURES_OFF_IN_A_HOME.includes(key[0]) && key.length > 1) refuse(`sets ${pair[1].trim()} under [features]`)
+    if (key.length === 1 && CODEX_FEATURES_OFF_IN_A_HOME.includes(key[0])) found.set(key[0], at)
   })
   const off = (/** @type {string} */ name) => `${name} = false`
   if (features < 0) {
-    return `${text}${text === '' || text.endsWith('\n') ? '' : '\n'}${text === '' ? '' : '\n'}[features]\n${CODEX_FEATURE_NAMES_OFF.map(off).join('\n')}\n`
+    return `${text}${text === '' || text.endsWith('\n') ? '' : '\n'}${text === '' ? '' : '\n'}[features]\n${CODEX_FEATURES_OFF_IN_A_HOME.map(off).join('\n')}\n`
   }
   let changed = false
   for (const [name, at] of found) {
@@ -333,7 +340,7 @@ function aCodexConfigWithTheFeaturesOff(text, file) {
     lines[at] = `${/^\s*/.exec(lines[at])?.[0] ?? ''}${off(name)}`
     changed = true
   }
-  const added = CODEX_FEATURE_NAMES_OFF.filter((name) => !found.has(name)).map(off)
+  const added = CODEX_FEATURES_OFF_IN_A_HOME.filter((name) => !found.has(name)).map(off)
   if (added.length > 0) changed = true
   lines.splice(last + 1, 0, ...added)
   return changed ? `${lines.join('\n')}\n` : text

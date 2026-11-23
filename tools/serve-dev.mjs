@@ -97,6 +97,8 @@ import { theOfficeKey } from '../src/config/office-key.mjs'
 import { THE_PAGES_ENTRY, THE_SERVER_ENTRY, THE_SERVER_FOLDERS, newestSourceBuiltFrom } from '../src/config/newest-source.mjs'
 import { forgetTheWalks, theFilesBuiltFrom } from '../src/config/import-graph.mjs'
 import { localStampOf } from '../src/config/stopped-run-cause.mjs'
+import { aWatchOnTheStarter } from '../src/config/session-process.mjs'
+import { THE_TEST_RUN_FLAG, THE_TEST_RUN_WATCH_PERIOD_MS, theTestRunToEndWith } from '../src/config/the-test-mark.mjs'
 import {
   THE_STABLE_TAG_PUT_BACK,
   THE_STABLE_TAG_REFUSAL,
@@ -549,6 +551,8 @@ export function theSlowCheckEvery() {
  * stays alive and never answers leaves every request waiting on the socket's queue with no reply.
  * After this long, `seeWhetherThisRunAnswered` stops that server by its group, starts the stand-in
  * and starts the server again as after a crash. The first start's wait for the ledger reads it too.
+ * A server whose health read is answered late, but within this time, is answering and is not stopped
+ * (`theServerAnswers`).
  * The time the server spends on its migrations is added to it (`migration-markers.mjs`), and after
  * `THE_STOPS_BEFORE_GIVING_UP` such stops in a row no new server starts until a file changes.
  *
@@ -1575,6 +1579,8 @@ export async function serveDev(options = {}) {
   // Read once, before anything starts, so a value it cannot use stops serve-dev here.
   let theAnswerLimit = aNewServerHasToAnswerWithin()
   let theMigrationLimit = theMigrationsHaveToFinishWithin()
+  // The server's heap in megabytes, or null for Node's own limit. settings.mjs refuses a value outside its range.
+  const theServerHeap = settingValue('MOLE_OFFICE_SERVER_HEAP_MB')
 
   const onThePort = await whatIsOnThePort(apiAddress)
   const refusal = whyItMayNotStart(onThePort, port, apiAddress)
@@ -2184,6 +2190,8 @@ export async function serveDev(options = {}) {
     const started = spawn(
       process.execPath,
       [
+        // A flag for Node, so it goes before --import and the entry, which tools/office-diagnostic-report.mjs reads in order.
+        ...(theServerHeap === null ? [] : [`--max-old-space-size=${theServerHeap}`]),
         '--inspect-port=0',
         '--report-exclude-env',
         '--report-exclude-network',
@@ -2608,7 +2616,7 @@ export async function serveDev(options = {}) {
     if (stopping || weAreStoppingTheChild || thisRun !== child) return
     // THE ASKING ENDS AT THE LIMIT, so the limit is when the stand-in answers, not a round later.
     const left = theTimeLeftToAnswer
-    const answered = await theServerAnswers(apiAddress, Math.max(1, Math.min(clocks.goodRun, left())), clocks)
+    const answered = await theServerAnswers(apiAddress, left(), clocks)
     if (stopping || weAreStoppingTheChild || thisRun !== child) return
     if (!answered && left() === 0) {
       await stopAServerThatDoesNotAnswer(thisRun)
@@ -3216,7 +3224,7 @@ export async function serveDev(options = {}) {
     // server is answering. The wait is bounded: a server that has not started in a minute is being
     // worked on, and this says so rather than waiting for ever.
     // A MIGRATION EXTENDS THE WAIT as it extends the limit, so a long one does not leave this unwritten.
-    while (!(await theServerAnswers(apiAddress, Math.max(1, Math.min(clocks.goodRun, theTimeLeftToAnswer())), clocks))) {
+    while (!(await theServerAnswers(apiAddress, theTimeLeftToAnswer(), clocks))) {
       if (stopping || theTimeLeftToAnswer() === 0) break
     }
   }
@@ -3313,21 +3321,34 @@ function theGroupThisSupervisorIsIn() {
 }
 
 /**
- * Wait until the API on this address answers, or until the time is up.
+ * SEND `GET /api/health` FOR AT MOST `goodRun`, AND GIVE EACH READ UNTIL THE NEW SERVER'S TIME IS UP.
+ *
+ * A new server answers when its health read has answered at all, however late. A read that is still
+ * waiting is not a refusal, so it is not given up after `healthRequest`: it is waited for until the
+ * server's time to answer ends. `healthRequest` is the least time one read is given, so a read
+ * sent just before that end still has a fair chance. A read that is refused, reset or answered with
+ * a 5xx is asked again after `healthRetry`. So a server is stopped only when every read was refused
+ * until its time was up, or when no read had answered by then.
+ *
+ * NO NEW READ IS SENT AFTER `goodRun`. So while the reads are refused, the caller sees every
+ * `goodRun` whether its server was replaced. A read that is still waiting holds the caller until it
+ * is answered, it fails or the time is up. Node's own fetch gives up on a reply after 300 s, so in a
+ * longer time a read is sent again after that.
  *
  * @param {string} apiAddress
- * @param {number} within milliseconds
- * @param {Pick<SupervisorClocks, 'healthRequest' | 'healthRetry'>} clocks
+ * @param {number} left milliseconds the server has left to answer
+ * @param {Pick<SupervisorClocks, 'goodRun' | 'healthRequest' | 'healthRetry'>} clocks
  * @returns {Promise<boolean>} whether it answered
  */
-async function theServerAnswers(apiAddress, within, clocks) {
-  const until = Date.now() + within
-  while (Date.now() < until) {
+async function theServerAnswers(apiAddress, left, clocks) {
+  const asksUntil = Date.now() + Math.max(1, Math.min(clocks.goodRun, left))
+  const timeIsUp = Date.now() + left
+  while (Date.now() < asksUntil) {
     try {
-      const reply = await fetch(`${apiAddress}/api/health`, { signal: AbortSignal.timeout(clocks.healthRequest) })
+      const reply = await fetch(`${apiAddress}/api/health`, { signal: AbortSignal.timeout(Math.max(clocks.healthRequest, timeIsUp - Date.now())) })
       if (reply.status < 500) return true
     } catch {
-      // Not up yet. The loop's own clock is what ends this, not a count of failures.
+      // Refused, reset, or still waiting when the time was up. The clocks end this, not a count of failures.
     }
     await wait(clocks.healthRetry)
   }
@@ -3369,6 +3390,10 @@ if (process.argv[1] !== undefined && process.argv[1].replaceAll('\\', '/').endsW
    *
    * ONE STOP, however many signals arrive. A second Ctrl-C used to start a second `stop`, and the
    * two then raced to signal the same group.
+   *
+   * A START THAT CARRIED THE TEST SUITE'S MARK also hands this --end-with-the-test-run=<the test run>
+   * (src/config/the-test-mark.mjs). This process watches that run once a second and stops the same
+   * way, once, when it is gone. The server it starts needs no flag of its own: it ends with this.
    */
   /** @type {(() => Promise<void>) | null} */
   let stopIt = null
@@ -3386,12 +3411,44 @@ if (process.argv[1] !== undefined && process.argv[1].replaceAll('\\', '/').endsW
       process.exit(0)
     })
   }
+  const endWithTheTestRun = (/** @type {number} */ pid) => {
+    if (goingAlready) return
+    goingAlready = true
+    const gone = `[dev] The test run that started this (process ${String(pid)}) is gone.`
+    if (stopIt === null) {
+      // Nothing outside this process group has been started yet, as for a signal before the hand-over.
+      process.stdout.write(`${gone} Nothing it started is running yet, so this ends.\n`)
+      process.exit(0)
+    } else {
+      process.stdout.write(`${gone} Stopping the server it started, by its group, and then this.\n`)
+      void stopIt().then(() => {
+        process.exit(0)
+      })
+    }
+  }
   for (const signal of /** @type {const} */ (['SIGTERM', 'SIGINT', 'SIGHUP'])) {
     process.on(signal, () => {
       bye(signal)
     })
   }
   try {
+    // The flag is read first, so a value that is not a process number is refused before anything starts.
+    const testRun = theTestRunToEndWith(process.argv)
+    if (testRun !== null) {
+      const theRun = aWatchOnTheStarter(testRun)
+      const looking = setInterval(() => {
+        const answer = theRun()
+        if (answer.state === 'there') return
+        clearInterval(looking)
+        if (answer.state === 'unreadable') {
+          // Could not look is not gone: said once, and the watch stands down, as the server's does.
+          process.stderr.write(`[dev] ${THE_TEST_RUN_FLAG}=${String(testRun)}: Mole Office cannot tell whether the test run that started this is still running (${answer.why}), so this will not end with it.\n`)
+          return
+        }
+        endWithTheTestRun(testRun)
+      }, THE_TEST_RUN_WATCH_PERIOD_MS)
+      looking.unref()
+    }
     // A DEVELOPMENT CHECKOUT WHOSE .env NAMES THE STABLE CHECKOUT does not serve the office's database (wave 13q, part
     // d). npm start, serve and dev:server are refused here, before a build or a server starts, with the way to start it.
     const refusal = whyThisCheckoutMayNotOpenTheDatabase(settings().databasePath)

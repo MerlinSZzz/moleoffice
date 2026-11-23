@@ -160,7 +160,9 @@ import {
 import { RegionsControl, REGIONS_CSS } from './RegionOverlay.tsx'
 // THE ONE FUNCTION THAT WRITES A REGION TARGET ONTO A LINE that is not a component taking `declares`.
 import { theRegion } from './sections.ts'
-import { DRAWS_THE_NAME, nameAttributes, partOfMoleOffice } from './agent/pointing.ts'
+import { DRAWS_THE_NAME, nameAttributes, partOfMoleOffice, SHOWN_PAGE_ATTRIBUTE, shownFileAttributes } from './agent/pointing.ts'
+// THE PDF READER'S TYPES ONLY. `ShownPdf` loads the reader itself, the first time a PDF is shown.
+import type { PDFPageProxy } from 'pdfjs-dist'
 import type {
   BesidePart,
   CalloutTone,
@@ -185,7 +187,9 @@ import { MAX_PREVIEW_BYTES } from '@shared/preview-limit.ts'
 import { blocksOf as planBlocksOf, whyNotRead } from '@shared/plandoc.ts'
 import { openAbout, withoutAPointer } from './agent/open.ts'
 import { api, moleOfficeHeaders, theProjectARequestNames } from '../api.ts'
-import { whereRequestsGo } from '../lib/visiting.ts'
+import { theCrossOriginOfALoad, whatARequestCarries, whereRequestsGo } from '../lib/visiting.ts'
+import { theHoldOnThisRequest } from '../lib/the-device-half.ts'
+import { AFileLink, useALoadByTicket, type AFileToOpen } from '../lib/file-tickets.tsx'
 import { aRequestSettled, aRequestStarted } from '../lib/ready.ts'
 import { Chart } from './Chart.tsx'
 import { InReach, InReachMark, reachBox, useReach } from './InReach.tsx'
@@ -193,7 +197,8 @@ import { MathText } from './MathText.tsx'
 import { Player, ReportAudio, ReportVideo } from './ReportMedia.tsx'
 import { OpensLarge } from './PictureLarge.tsx'
 import { SIGNED_TYPES } from '@shared/file-signatures.ts'
-import { theShownFileKind } from '@shared/shown-file.ts'
+import { theShownFileKind, type ShownBlock, type ShownFile, type ShownFileKind, type ShownRun } from '@shared/shown-file.ts'
+import { shownFilePath } from './router.tsx'
 // THE QUESTIONS A REPORT ASKS THE PERSON. Their words are
 // drawn here, as every block's words are; their controls and their submits are drawn there.
 import { ButtonQuestion, ChoiceQuestion, FillInQuestion, QuestionBox } from './ReportQuestions.tsx'
@@ -238,7 +243,7 @@ import {
 import { useMediaLoad, useMediaLoadWasRead } from '../lib/mediaload.ts'
 import { useInspect, useReader } from '../lib/mode.ts'
 import { NO_LONG_VERSION } from '../lib/words.ts'
-import { Absence, Hint, Select, StateChip } from './ui.tsx'
+import { Absence, Hint, Loading, Select, StateChip } from './ui.tsx'
 
 export type { SummaryBlock } from '@shared/types.ts'
 
@@ -3075,7 +3080,9 @@ function WorldHere({ block, mark }: { block: WorldBlock; mark: Record<string, un
     let stopped = false
     void (async () => {
       try {
-        const res = await fetch(whereRequestsGo('/api/resources'), { headers: moleOfficeHeaders(), credentials: 'include' })
+        const heldByAPress = theHoldOnThisRequest()
+        if (heldByAPress !== undefined) await heldByAPress
+        const res = await fetch(whereRequestsGo('/api/resources'), whatARequestCarries('/api/resources', moleOfficeHeaders()))
         if (!res.ok) throw new Error(String(res.status))
         const said = (await res.json()) as { resources?: { id: string }[] }
         if (stopped) return
@@ -3122,11 +3129,7 @@ function WorldHere({ block, mark }: { block: WorldBlock; mark: Record<string, un
         {block.webForOtherMachines === undefined ? null : <div><dt>{t('sb.world.otherMachines')}</dt><dd>{block.webForOtherMachines}</dd></div>}
       </dl>
       {block.webForOtherMachines === undefined ? <p className="sb-world-why">{t('sb.world.reachableHereOnly')}</p> : null}
-      {block.ledgerRow === undefined ? (
-        <p className="sb-world-why">{t('sb.world.notInLedger')}</p>
-      ) : (
-        <p className="sb-world-why">{t('sb.world.holdsLedgerRow', { row: block.ledgerRow })}</p>
-      )}
+      {block.ledgerRow === undefined ? null : <p className="sb-world-why">{t('sb.world.holdsLedgerRow', { row: block.ledgerRow })}</p>}
     </div>
   )
 }
@@ -3458,24 +3461,24 @@ export function isAnHtmlPage(type: string | null): boolean {
 /**
  * IS A FILE BLOCK'S FILE A PDF THE REPORT CAN READ IN PLACE?
  *
- * The same reading as `isAnHtmlPage`: the door's own content type. The frame for a PDF carries no
- * sandbox attribute, because Chromium's reader refuses to draw inside a sandboxed frame at all; the
- * PDF policy on the report's open=1&shown=1 answer is what holds the document instead.
+ * The same reading as `isAnHtmlPage`: the door's own content type. A PDF is drawn by this page
+ * itself, in `ShownPdf`, from the door's open=1&shown=1 answer.
  */
 export function isAPdf(type: string | null): boolean {
   if (type === null) return false
   return (type.split(';')[0]?.trim().toLowerCase() ?? '') === 'application/pdf'
 }
 
-/** Which of the file kinds the report draws in a frame, or null when the file keeps today's drawing. */
-export type FileShownKind = 'html' | 'pdf' | 'word' | 'text'
+/** Which of the file kinds the report draws itself, or null when the file keeps today's drawing. */
+export type FileShownKind = 'html' | 'pdf' | ShownFileKind
 
 /**
- * EVERY KIND THE REPORT DRAWS IN A FRAME, READ FROM THE DOOR'S OWN TYPE.
+ * EVERY KIND THE REPORT DRAWS ITSELF, READ FROM THE DOOR'S OWN TYPE.
  *
- * HTML and PDF are read here; a Word document and a text file are named by the shared list, because
- * the file door builds their page and the page must ask for exactly the types the door answers.
- * The kind is what decides the frame's sandbox and the sentence on it, never the file's name.
+ * HTML and PDF are read here. An HTML file is drawn in a frame, and a PDF is drawn by this page
+ * itself. A Word document, a text file and a Markdown file are named by the shared list, and drawn
+ * as their words, because the file door sends their words and the page must ask for exactly the
+ * types the door answers. The kind decides how the file is drawn, never the file's name.
  */
 export function theKindOfShownFile(type: string | null): FileShownKind | null {
   if (isAnHtmlPage(type)) return 'html'
@@ -3511,9 +3514,10 @@ export type PreviewOutcome =
    * `type` and `bytes` are what the response said about itself, kept because they are the two
    * facts that make the `undecodable` sentence below say something useful rather than "it did not
    * work". They are null on a source the browser loaded itself, where this page never saw either.
-   * `saveAt` is where a video is saved whole from, present for a video the door streams.
+   * `saveAt` is where a video is saved whole from, present for a video the door streams. `opens` is the file such a
+   * video is, for the ticket its player and its save link ask for on a paired page at home (src/web/lib/file-tickets.tsx).
    */
-  | { phase: 'shown'; src: string; type: string | null; bytes: number | null; saveAt?: string }
+  | { phase: 'shown'; src: string; type: string | null; bytes: number | null; saveAt?: string; opens?: AFileToOpen }
   /**
    * `why` IS WHAT THE BOX SAYS AND `detail` IS THE WHOLE OF IT, criterion M54.
    *
@@ -3666,18 +3670,7 @@ export function ImagePreview({ block, outcome, onFailed }: {
     //
     // WHY `<video>` RATHER THAN AN `<img>` THAT FAILS: an `<img>` given a video draws the broken
     // frame, which reads as "the file is missing" for a file that arrived whole.
-    if (isAVideo(outcome.type)) {
-      return (
-        <>
-          <video src={outcome.src} controls preload="metadata" aria-label={block.alt} />
-          {outcome.saveAt === undefined ? null : (
-            <a className="sb-video-save" href={outcome.saveAt} download>
-              {t('sb.saveWholeVideo')}
-            </a>
-          )}
-        </>
-      )
-    }
+    if (isAVideo(outcome.type)) return <StreamedVideo block={block} outcome={outcome} />
     return (
       <img
         src={outcome.src}
@@ -3687,6 +3680,14 @@ export function ImagePreview({ block, outcome, onFailed }: {
       />
     )
   }
+  return <PreviewStandBox outcome={outcome} alt={block.alt} />
+}
+
+/**
+ * THE BOX FOR EVERY OUTCOME THAT DREW NOTHING, for a picture and for a file's words alike. `previewStand` says what
+ * it says; this is the one drawing of it.
+ */
+function PreviewStandBox({ outcome, alt }: { outcome: PreviewFailure; alt: string }) {
   const stand = previewStand(outcome)
   return (
     <div className="sb-image-stand" data-preview={outcome.phase}>
@@ -3700,7 +3701,7 @@ export function ImagePreview({ block, outcome, onFailed }: {
       )}
       {/* The alt text is the only description of the picture for anyone who cannot see it, and
           here nobody can see it, so it is shown rather than hidden in an attribute. */}
-      {block.alt ? <p className="sb-image-alt">{block.alt}</p> : null}
+      {alt ? <p className="sb-image-alt">{alt}</p> : null}
     </div>
   )
 }
@@ -3809,8 +3810,11 @@ export function usePictureBytes(
         const isHead = headersOnly && !cacheMetadata
         const asked = cacheMetadata && headersOnly ? `${previewUrl(path, record)}&metadata=1` : previewUrl(path, record)
         const typeAsked = askAsSave && isHead ? `${asked}&download=1` : asked
+        // BOTH HALVES AT HOME, NEITHER ON A TRIP (`whatARequestCarries`), and not while a press sets the cookie half.
+        const heldByAPress = theHoldOnThisRequest()
+        if (heldByAPress !== undefined) await heldByAPress
         const res = await fetch(whereRequestsGo(typeAsked), {
-          method: isHead ? 'HEAD' : 'GET', headers, signal: stop.signal, credentials: 'include',
+          method: isHead ? 'HEAD' : 'GET', ...whatARequestCarries(typeAsked, headers), signal: stop.signal,
         })
         if (!live) return
         if (!res.ok) {
@@ -3821,8 +3825,10 @@ export function usePictureBytes(
           let status = res.status
           let body = isHead ? '' : await res.text()
           if (isHead && !askAsSave) {
+            const heldByAPress = theHoldOnThisRequest()
+            if (heldByAPress !== undefined) await heldByAPress
             const again = await fetch(whereRequestsGo(asked), {
-              method: 'GET', cache: 'no-store', headers, signal: stop.signal, credentials: 'include',
+              method: 'GET', cache: 'no-store', ...whatARequestCarries(asked, headers), signal: stop.signal,
             })
             if (again.ok) stop.abort()
             else [status, body] = [again.status, await again.text()]
@@ -3857,6 +3863,7 @@ export function usePictureBytes(
             type,
             bytes: Number.isSafeInteger(length) ? length : null,
             saveAt: whereALinkFetches(path, true, inProject, record),
+            opens: { path, record, project: theProjectARequestNames(inProject) },
           })
           return
         }
@@ -3973,9 +3980,14 @@ function ImageFigure({
           copy in this page, and saving that copy gives a file named after nothing. A picture at a web
           address is the browser's own to save, so it gets no link. */}
       {wanted && outcome.phase === 'shown' && !isAVideo(outcome.type) && !direct ? (
-        <a className="sb-picture-save" href={whereALinkFetches(block.path, true, undefined, marks?.recordId)} download>
+        <AFileLink
+          className="sb-picture-save"
+          file={{ path: block.path, record: marks?.recordId, project: theProjectARequestNames() }}
+          plain={whereALinkFetches(block.path, true, undefined, marks?.recordId)}
+          saves
+        >
           {t('sb.picture.save')}
-        </a>
+        </AFileLink>
       ) : null}
       {pathLine ? <PathLine path={block.path} id={`img-${keyPrefix}-${String(index)}`} machine={block.machine} /> : null}
       {block.caption ? (
@@ -4171,9 +4183,10 @@ export function FileFigure({
   // door's own type decides, as it does for a video. Its bytes are asked for only when the person's
   // media choice lets the page load them.
   const picture = wanted && outcome.phase === 'shown' && isAPictureFile(outcome.type)
-  // AN HTML FILE OR A PDF IS DRAWN IN A FRAME OF ITS OWN ON ONE PRESS, under the recorded engineering
-  // decisions that a stricter header can undo. The type is read the same way a video's is, and the
-  // frame is not created until the reader asks for it.
+  // AN HTML FILE IS DRAWN IN A FRAME OF ITS OWN ON ONE PRESS, under the recorded engineering
+  // decisions that a stricter header can undo. A PDF is drawn by this page on one press, and a Word
+  // document, a text file or a Markdown file is drawn as the page's own words on one press. The type
+  // is read the same way a video's is, and nothing of the file is asked for until the reader asks for it.
   const inPage = readType && outcome.phase === 'shown' ? theKindOfShownFile(outcome.type) : null
   // THE PATH AND THE HASH ARE FOR A DEVELOPER; a person sees the file's name and size. See ImageFigure.
   const developer = useInspect()
@@ -4262,14 +4275,14 @@ export function FileToFetch({ block, developer = false, record }: { block: FileB
     <div className="sb-file-fetch">
       <FileFacts block={block} developer={developer} />
       <p className="sb-file-address">
-        <a className="sb-file-open" href={whereALinkFetches(block.path, false, undefined, record)} target="_blank" rel="noreferrer">
+        <AFileLink className="sb-file-open" file={theFileOf(block, record)} plain={whereALinkFetches(block.path, false, undefined, record)} saves={false}>
           {t('sb.file.open')}
-        </a>
+        </AFileLink>
         {/* SAVED WHOLE, OF ANY SIZE (problem YnVxZz0Md_G4). Opening a file over the preview limit is
             refused, and an archive or a slide deck is something to take away rather than to look at. */}
-        <a className="sb-file-save" href={whereALinkFetches(block.path, true, undefined, record)} download>
+        <AFileLink className="sb-file-save" file={theFileOf(block, record)} plain={whereALinkFetches(block.path, true, undefined, record)} saves>
           {t('sb.file.save')}
-        </a>
+        </AFileLink>
         {developer ? <code className="sb-file-path">{block.path}</code> : null}
       </p>
     </div>
@@ -4277,43 +4290,23 @@ export function FileToFetch({ block, developer = false, record }: { block: FileB
 }
 
 /**
- * THE PDF VIEWER'S OWN REQUEST TO FIT THE PAGE TO THE FRAME'S WIDTH.
- *
- * Chromium reads `view=FitH` from the fragment when it opens a PDF, and draws the page at the width
- * of the page area. The fragment that reads like the same request, `zoom=page-width`, is ignored:
- * measured in full Chromium on 18 November 2026, at 1440 the document opened at 100 per cent with
- * `zoom=page-width` and at 138 per cent with `view=FitH`, and the same was true inside the report's
- * frame and under the PDF door's `default-src 'none'; sandbox` policy. Firefox and Safari have their
- * own readers and nobody in this office has looked at this frame in either of them.
- *
- * The reader opens its thumbnail panel beside the page, and `view=FitH` fits the page to what is
- * left after the panel, not to the frame. `navpanes=0` asks for the panel closed, so the page area
- * is the whole frame; the viewer keeps its toolbar and its other controls. Measured in full
- * Chromium and in an Electron BrowserWindow on 18 November 2026: with the panel open the page was
- * 73 per cent of the frame at 1440 and 67 per cent at 990, and with this fragment it was 97 to 98
- * per cent at 1440, 990, 660 and 390.
- *
- * This is the viewer's grammar, not a word the office shows, so it is not in the word list.
- */
-export const THE_PDF_FIT_WIDTH_VIEW = '#view=FitH&navpanes=0'
-
-/**
  * AN HTML FILE OR A PDF DRAWN INSIDE THE REPORT ON ONE PRESS, under the recorded engineering
- * decisions that a stricter header can undo.
+ * decisions that a stricter header can undo, AND A WORD DOCUMENT, A TEXT FILE OR A MARKDOWN FILE
+ * DRAWN AS THE PAGE'S OWN WORDS.
  *
- * Until the press, the drawing is the file's own facts and the press to save it. One press inserts
- * the frame: the file door's open=1&shown=1 answer, under the policy that holds that kind of file.
+ * Until the press, the drawing is the file's own facts and the press to save it. One press draws the
+ * file. An HTML file is a frame: the file door's open=1&shown=1 answer, under the policy that holds
+ * that kind of file. A PDF is `ShownPdf`: the bytes of the same answer, drawn by this page with each
+ * page's words laid over it. A Word document, a text file or a Markdown file is `ShownFileWords`: the
+ * door's words=1 answer, drawn as elements of this page. So the words of every kind but HTML can be
+ * selected and talked about.
  *
  * AN HTML FILE'S frame sandbox is exactly allow-scripts. Its reply allows its own inline script and
  * style and nothing else, so the file's drawing runs and nothing it does can reach the office.
  *
- * A PDF'S FRAME HAS NO SANDBOX ATTRIBUTE. Chromium's PDF reader refuses to draw in a sandboxed
- * frame; the reply's `default-src 'none'; sandbox` is what holds the document, and the frame is
- * still only created by the press.
- *
- * A WORD DOCUMENT'S AND A TEXT FILE'S FRAME HAS AN EMPTY SANDBOX: no script, no form, no navigation
- * and no same-origin reading, even though the reply carries the generated page policy as well. The
- * page is all the file's own words, escaped before it reaches the browser.
+ * EVERY KIND BUT HTML ALSO HAS AN OPEN PRESS, to the office's page for that one file, which draws
+ * the same reader. It needs the record the file block is in, so a block drawn outside a record
+ * has none. Save is still the door's own answer, the file's bytes.
  *
  * The press is the only way the file's bytes are fetched for drawing. Reading the type with a HEAD
  * is not reading the file's contents, and the page does that before the press to know which drawing
@@ -4326,6 +4319,7 @@ export function FileShownHere({ block, kind, developer = false, record }: {
   record?: string
 }) {
   const [shown, setShown] = useState(false)
+  const asWords = kind !== 'html' && kind !== 'pdf'
   return (
     <div className="sb-file-fetch">
       <FileFacts block={block} developer={developer} />
@@ -4335,30 +4329,408 @@ export function FileShownHere({ block, kind, developer = false, record }: {
             {t('sb.file.show')}
           </button>
         )}
-        <a className="sb-file-save" href={whereALinkFetches(block.path, true, undefined, record)} download>
+        {/* THE OFFICE'S OWN PAGE, IN THIS TAB: an address in this page, so it can reach no other site. */}
+        {kind !== 'html' && record !== undefined ? (
+          <a className="sb-file-open" href={`#${shownFilePath(record, block.path)}`}>
+            {t('sb.file.open')}
+          </a>
+        ) : null}
+        <AFileLink className="sb-file-save" file={theFileOf(block, record)} plain={whereALinkFetches(block.path, true, undefined, record)} saves>
           {t('sb.file.save')}
-        </a>
+        </AFileLink>
         {developer ? <code className="sb-file-path">{block.path}</code> : null}
       </p>
-      {shown ? (
+      {!shown ? null : asWords ? (
+        <ShownFileWords path={block.path} {...(record === undefined ? {} : { record })} />
+      ) : kind === 'pdf' ? (
+        <ShownPdf path={block.path} name={block.name} {...(record === undefined ? {} : { record })} />
+      ) : (
+        <TheFileFrame block={block} record={record} />
+      )}
+    </div>
+  )
+}
+
+/**
+ * THE FRAME A PRESS OF SHOW INSERTS FOR AN HTML FILE. Its address is the door's open=1&shown=1 answer, by a ticket on a
+ * paired page at home (src/web/lib/file-tickets.tsx). A frame hears no refusal, so it asks for its ticket once.
+ */
+function TheFileFrame({ block, record }: { block: FileBlock; record?: string }) {
+  const extra = '&open=1&shown=1'
+  const load = useALoadByTicket(theFileOf(block, record), `${whereALinkFetches(block.path, false, undefined, record)}${extra}`, extra)
+  return (
+    <>
+      {load.notLoaded ? (
+        <div className="sb-image-stand" data-preview="not-loaded">
+          <p>{t('w13s.file.notLoaded')}</p>
+        </div>
+      ) : (
         <iframe
           className="sb-file-frame"
-          // HTML: THE ONLY PERMISSION THE FRAME HAS. No allow-same-origin, so it can never be this
-          // page; no forms, pop-ups or top navigation. The reply's policy is the rest of the promise.
-          // PDF: NO SANDBOX ATTRIBUTE AT ALL, because Chromium's reader will not draw in one; the
-          // reply's own policy is the promise there. WORD AND TEXT: THE EMPTY SANDBOX, the strictest
-          // a frame has, and the reply's generated page policy beside it.
-          sandbox={kind === 'html' ? 'allow-scripts' : kind === 'pdf' ? undefined : ''}
+          // THE ONLY PERMISSION THE FRAME HAS. No allow-same-origin, so it can never be this page;
+          // no forms, pop-ups or top navigation. The reply's policy is the rest of the promise.
+          sandbox="allow-scripts"
           title={t('sb.file.frame', { name: block.name })}
-          // THE PDF ASKS FOR THE VIEWER'S FIT-WIDTH VIEW, because its own default is 100 per cent
-          // and that is wider than a telephone's frame. The other kinds have no such fragment, and
-          // an HTML page or a generated word page that received one would only gain a dead hash.
-          src={`${whereALinkFetches(block.path, false, undefined, record)}&open=1&shown=1${
-            kind === 'pdf' ? THE_PDF_FIT_WIDTH_VIEW : ''
-          }`}
+          src={load.src}
         />
-      ) : null}
+      )}
+    </>
+  )
+}
+
+/** The file a block names, for the ticket a paired page at home asks for its load. The page for one file asks it too. */
+export function theFileOf(block: Pick<FileBlock, 'path'>, record: string | undefined): AFileToOpen {
+  return { path: block.path, record, project: theProjectARequestNames() }
+}
+
+/**
+ * A VIDEO THE DOOR STREAMS, AND THE LINK THAT SAVES IT WHOLE. From the visited world on a trip it loads with no cookie.
+ * On a paired page at home it loads by a ticket, asks once more when a load is refused, and says not loaded after a
+ * second refusal (src/web/lib/file-tickets.tsx).
+ */
+function StreamedVideo({ block, outcome }: { block: ImageBlock; outcome: Extract<PreviewOutcome, { phase: 'shown' }> }) {
+  const load = useALoadByTicket(outcome.opens, outcome.src)
+  return (
+    <>
+      {load.notLoaded ? (
+        <div className="sb-image-stand" data-preview="not-loaded">
+          <p>{t('w13s.file.notLoaded')}</p>
+        </div>
+      ) : (
+        <video
+          src={load.src}
+          crossOrigin={theCrossOriginOfALoad()}
+          controls
+          preload="metadata"
+          aria-label={block.alt}
+          onError={load.onError}
+          onLoadedMetadata={load.onLoadedMetadata}
+        />
+      )}
+      {outcome.saveAt === undefined || outcome.opens === undefined ? null : (
+        <AFileLink className="sb-video-save" file={outcome.opens} plain={outcome.saveAt} saves>
+          {t('sb.saveWholeVideo')}
+        </AFileLink>
+      )}
+    </>
+  )
+}
+
+/** The PDF reader, pdfjs-dist, as its module is once `ShownPdf` has loaded it. */
+type PdfReader = typeof import('pdfjs-dist')
+
+/**
+ * A PDF DRAWN BY THIS PAGE ITSELF, EACH PAGE WITH ITS WORDS OVER IT, so a person can select the words
+ * and the office's right-click reaches them. A frame of the browser's own reader holds words this
+ * page cannot reach.
+ *
+ * THE BYTES STILL COME FROM THE FILE DOOR, as the open=1&shown=1 answer that carries the PDF policy,
+ * and a refusal is drawn as the door wrote it. pdf.js reads them in its own worker, which is loaded
+ * only when a PDF is first shown. Each page is drawn into a canvas as wide as the box, one under
+ * another, and the box scrolls.
+ *
+ * NOTHING IN THE FILE RUNS. Eval and XFA forms are off when the document is opened, and this page
+ * draws no annotation layer, so no script, link or form field of the file becomes an element. The
+ * words are pdf.js's own text layer: transparent text laid over the canvas, under the CSS below.
+ *
+ * WHEN THE BOX CHANGES WIDTH, THE PAGES ARE DRAWN AGAIN at the new width. A failure in the reader
+ * replaces the drawing with the reader's own words for it.
+ */
+export function ShownPdf({ path, name, record }: { path: string; name: string; record?: string }) {
+  const box = useRef<HTMLDivElement | null>(null)
+  const [failure, setFailure] = useState<PreviewFailure | { phase: 'notDrawn'; why: string } | null>(null)
+  const [drawn, setDrawn] = useState(false)
+  useEffect(() => {
+    let live = true
+    let opened: { destroy: () => Promise<void> } | null = null
+    let watcher: ResizeObserver | null = null
+    setFailure(null)
+    setDrawn(false)
+    const notDrawn = (err: unknown): void => {
+      if (live) setFailure({ phase: 'notDrawn', why: err instanceof Error ? err.message : String(err) })
+    }
+    // COUNTED AS `usePictureBytes` COUNTS ITS OWN, until every page is drawn, so nothing photographs an empty box.
+    const label = `pdf ${path}`
+    aRequestStarted(label)
+    void (async () => {
+      try {
+        // BOTH HALVES AT HOME, NEITHER ON A TRIP (`whatARequestCarries`), and not while a press sets the cookie half,
+        // as `usePictureBytes` asks. The page's own fetch carries the header half; pdf.js is handed the bytes.
+        const asked = `${previewUrl(path, record)}&open=1&shown=1`
+        const heldByAPress = theHoldOnThisRequest()
+        if (heldByAPress !== undefined) await heldByAPress
+        let res: Response
+        try {
+          res = await fetch(whereRequestsGo(asked), { method: 'GET', ...whatARequestCarries(asked, moleOfficeHeaders()) })
+        } catch (err) {
+          // The server being down, or the request never leaving. Nothing considered this request.
+          if (live) setFailure({ phase: 'unreachable', why: err instanceof Error ? err.message : String(err) })
+          return
+        }
+        if (!res.ok) {
+          const body = await res.text()
+          if (live) setFailure(previewRefusal(res.status, body))
+          return
+        }
+        const bytes = new Uint8Array(await res.arrayBuffer())
+        const reader: PdfReader = await import('pdfjs-dist')
+        const worker = await import('pdfjs-dist/build/pdf.worker.min.mjs?url')
+        if (!live) return
+        reader.GlobalWorkerOptions.workerSrc = worker.default
+        const task = reader.getDocument({ data: bytes, isEvalSupported: false, enableXfa: false })
+        opened = task
+        const pdf = await task.promise
+        const here = box.current
+        if (!live || here === null) return
+        here.replaceChildren()
+        // A LATER DRAWING STOPS AN EARLIER ONE, so a page drawn at an old width never replaces one at the new.
+        let drawing = 0
+        let drawnAt = -1
+        const drawAll = async (): Promise<void> => {
+          const mine = ++drawing
+          const width = here.clientWidth
+          drawnAt = width
+          if (width === 0) return
+          for (let number = 1; number <= pdf.numPages; number += 1) {
+            const page = await pdf.getPage(number)
+            if (!live || mine !== drawing) return
+            const sheet = await drawnPage(reader, page, number, width)
+            if (!live || mine !== drawing) return
+            const old = here.querySelector(`:scope > [${SHOWN_PAGE_ATTRIBUTE}="${String(number)}"]`)
+            if (old === null) here.append(sheet)
+            else old.replaceWith(sheet)
+            setDrawn(true)
+          }
+        }
+        await drawAll()
+        if (!live) return
+        watcher = new ResizeObserver(() => {
+          if (here.clientWidth !== drawnAt) drawAll().catch(notDrawn)
+        })
+        watcher.observe(here)
+      } catch (err) {
+        notDrawn(err)
+      } finally {
+        aRequestSettled(label)
+      }
+    })()
+    return () => {
+      live = false
+      watcher?.disconnect()
+      void opened?.destroy()
+    }
+  }, [path, record])
+  if (failure !== null) {
+    return failure.phase === 'notDrawn' ? (
+      <p className="sb-file-words-none">{t('sb.pdf.notDrawn', { why: failure.why })}</p>
+    ) : (
+      <PreviewStandBox outcome={failure} alt="" />
+    )
+  }
+  // THE OFFICE'S OWN READING STATE UNTIL A PAGE IS IN THE BOX, so the box is never empty while the PDF is on its way.
+  // The pages go in the element under it, whose children React leaves to the reader.
+  return (
+    <div className="sb-file-frame sb-file-pdf" {...shownFileAttributes(name)}>
+      {drawn ? null : <Loading {...(name === '' ? {} : { what: name })} rows={1} />}
+      <div ref={box} />
     </div>
+  )
+}
+
+/**
+ * ONE PAGE OF A PDF, DRAWN THIS MANY CSS PIXELS WIDE: its canvas, at the screen's own density so it is
+ * sharp, and pdf.js's text layer over it, which holds the page's words. The page carries its number,
+ * from 1, so a quote from it names the page.
+ */
+async function drawnPage(reader: PdfReader, page: PDFPageProxy, number: number, width: number): Promise<HTMLDivElement> {
+  const viewport = page.getViewport({ scale: width / page.getViewport({ scale: 1 }).width })
+  const sheet = document.createElement('div')
+  sheet.className = 'sb-file-pdf-page'
+  sheet.setAttribute(SHOWN_PAGE_ATTRIBUTE, String(number))
+  // THE SCALE THE TEXT LAYER IS SIZED BY. pdf.js reads these three when it sets the layer's width and height.
+  sheet.style.setProperty('--total-scale-factor', String(viewport.scale * viewport.userUnit))
+  sheet.style.setProperty('--scale-round-x', '1px')
+  sheet.style.setProperty('--scale-round-y', '1px')
+  const density = window.devicePixelRatio
+  const canvas = document.createElement('canvas')
+  canvas.width = Math.floor(viewport.width * density)
+  canvas.height = Math.floor(viewport.height * density)
+  const words = document.createElement('div')
+  words.className = 'textLayer'
+  sheet.append(canvas, words)
+  await page.render({
+    canvas,
+    viewport,
+    // A FORM FIELD IS DRAWN AS ITS LOOK, INTO THE CANVAS, and is never made into something to fill in.
+    annotationMode: reader.AnnotationMode.ENABLE,
+    ...(density === 1 ? {} : { transform: [density, 0, 0, density, 0, 0] }),
+  }).promise
+  await new reader.TextLayer({ textContentSource: page.streamTextContent(), container: words, viewport }).render()
+  return sheet
+}
+
+/**
+ * WHAT CAME OF ASKING THE FILE DOOR FOR ONE FILE'S WORDS: the words, an answer that is not them, or why
+ * there are none, as a picture's outcome says it.
+ */
+type ShownWordsOutcome = { phase: 'shown'; file: ShownFile } | { phase: 'notWords' } | PreviewFailure
+
+/**
+ * THE DOOR'S ANSWER, IF IT IS THE SHAPE THIS PAGE DRAWS, or null. The door and the page share the shape in
+ * src/shared/shown-file.ts, but the page reads it off the wire, so it looks before it draws.
+ */
+function theShownFileIn(body: string): ShownFile | null {
+  let read: unknown
+  try {
+    read = JSON.parse(body)
+  } catch {
+    return null
+  }
+  if (typeof read !== 'object' || read === null) return null
+  const file = read as Partial<Record<string, unknown>>
+  if (typeof file['name'] !== 'string') return null
+  if (file['kind'] === 'word') return Array.isArray(file['blocks']) && typeof file['picturesLeftOut'] === 'boolean' ? (read as ShownFile) : null
+  if (file['kind'] === 'text' || file['kind'] === 'markdown') return typeof file['text'] === 'string' ? (read as ShownFile) : null
+  return null
+}
+
+/**
+ * ASK THE FILE DOOR FOR ONE FILE'S WORDS, ONCE, with the headers every request here carries, and count the request
+ * as `usePictureBytes` counts its own, so nothing photographs a reader before its words arrive.
+ *
+ * BOTH HALVES AT HOME, NEITHER ON A TRIP (`whatARequestCarries`), and not while a press sets the cookie half, as
+ * `usePictureBytes` asks.
+ */
+function useShownFileWords(path: string, record?: string): ShownWordsOutcome {
+  const [outcome, setOutcome] = useState<ShownWordsOutcome>({ phase: 'asking' })
+  useEffect(() => {
+    let live = true
+    setOutcome({ phase: 'asking' })
+    const label = `file words ${path}`
+    aRequestStarted(label)
+    void (async () => {
+      try {
+        const asked = `${previewUrl(path, record)}&words=1`
+        const heldByAPress = theHoldOnThisRequest()
+        if (heldByAPress !== undefined) await heldByAPress
+        const res = await fetch(whereRequestsGo(asked), { method: 'GET', ...whatARequestCarries(asked, moleOfficeHeaders()) })
+        const body = await res.text()
+        if (!live) return
+        if (!res.ok) {
+          setOutcome(previewRefusal(res.status, body))
+          return
+        }
+        const file = theShownFileIn(body)
+        setOutcome(file === null ? { phase: 'notWords' } : { phase: 'shown', file })
+      } catch (err) {
+        if (!live) return
+        // The server being down, or the request never leaving. Nothing considered this request.
+        setOutcome({ phase: 'unreachable', why: err instanceof Error ? err.message : String(err) })
+      } finally {
+        aRequestSettled(label)
+      }
+    })()
+    return () => {
+      live = false
+    }
+  }, [path, record])
+  return outcome
+}
+
+/**
+ * A WORD DOCUMENT, A TEXT FILE OR A MARKDOWN FILE, DRAWN AS THE PAGE'S OWN WORDS.
+ *
+ * The file door answers words=1 with the file's words as data, and this draws them as elements of
+ * this page, so a person can select them and the office's right-click reaches them. A report's file
+ * block draws it on a press, and the office's page for one file draws it at once.
+ *
+ * NOTHING FROM THE FILE BECOMES MARKUP. A Word document's runs and a text file's text are React text,
+ * which the browser shows as their characters. A Markdown file goes through `renderMarkdown`, the
+ * office's one Markdown reader, which builds React elements and never an HTML string: raw HTML in the
+ * file is drawn as its characters, a picture is said and not drawn, a web link opens a new tab only
+ * when it is pressed, and a script address is no link. A Word document's links are drawn as their
+ * words, because the door never reads their addresses.
+ *
+ * THE ROOT SAYS WHICH FILE IT DRAWS, so the chip above the composer names the file a quote came from.
+ *
+ * A REFUSAL IS DRAWN AS THE DOOR WROTE IT, in the box a picture's refusal is drawn in, and no reader is
+ * drawn: a file over the page's limit says so, and nothing of it is read.
+ */
+export function ShownFileWords({ path, record }: { path: string; record?: string }) {
+  const outcome = useShownFileWords(path, record)
+  if (outcome.phase === 'notWords') return <p className="sb-file-words-none">{t('sb.file.answerNotWords')}</p>
+  if (outcome.phase !== 'shown') return <PreviewStandBox outcome={outcome} alt="" />
+  const file = outcome.file
+  return (
+    <div className={file.kind === 'word' ? 'sb-file-words sb-file-words-word' : 'sb-file-words'} {...shownFileAttributes(file.name)}>
+      {file.kind === 'word' ? (
+        <>
+          {file.blocks.length === 0 ? <p className="sb-file-words-note">{t('sb.word.nothingToShow')}</p> : <ShownWordBlocks blocks={file.blocks} />}
+          {file.picturesLeftOut ? <p className="sb-file-words-note">{t('sb.word.picturesLeftOut')}</p> : null}
+        </>
+      ) : file.kind === 'text' ? (
+        <pre>{file.text}</pre>
+      ) : (
+        renderMarkdown(file.text, 'sfw')
+      )}
+    </div>
+  )
+}
+
+/** A Word heading's level, 1 for the first, drawn from h3 as the report's own headings are, and h6 below the fourth. */
+const WORD_HEADINGS = ['h3', 'h4', 'h5', 'h6'] as const
+
+/** The blocks of a Word document, or of one table cell. */
+function ShownWordBlocks({ blocks }: { blocks: readonly ShownBlock[] }) {
+  return <>{blocks.map((block, index) => <ShownWordBlock key={index} block={block} />)}</>
+}
+
+function ShownWordBlock({ block }: { block: ShownBlock }) {
+  switch (block.kind) {
+    case 'heading': {
+      const Heading = WORD_HEADINGS[Math.min(Math.max(block.level, 1), WORD_HEADINGS.length) - 1] ?? 'h6'
+      return <Heading><ShownRuns runs={block.runs} /></Heading>
+    }
+    case 'paragraph':
+      return <p><ShownRuns runs={block.runs} /></p>
+    case 'list': {
+      const List = block.ordered ? 'ol' : 'ul'
+      // A LIST ITEM'S LEVEL IS HOW FAR IN THE DOCUMENT SETS IT, not a list inside a list: Word stores the
+      // items of every level side by side.
+      return (
+        <List>
+          {block.items.map((item, index) => (
+            <li key={index} style={{ marginInlineStart: `${item.level * 1.5}em` }}><ShownRuns runs={item.runs} /></li>
+          ))}
+        </List>
+      )
+    }
+    case 'table':
+      return (
+        <table>
+          <tbody>
+            {block.rows.map((row, r) => (
+              <tr key={r}>
+                {row.cells.map((cell, c) => (
+                  <td key={c} colSpan={cell.span}><ShownWordBlocks blocks={cell.blocks} /></td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )
+  }
+}
+
+/** One paragraph's runs, bold and italic as the document marks them. A tab and a line break stay in the text. */
+function ShownRuns({ runs }: { runs: readonly ShownRun[] }) {
+  return (
+    <>
+      {runs.map((run, index) => {
+        const words = run.italic ? <em>{run.text}</em> : run.text
+        return run.bold ? <strong key={index}>{words}</strong> : <Fragment key={index}>{words}</Fragment>
+      })}
+    </>
   )
 }
 
@@ -5610,7 +5982,7 @@ function planOfATypedTable(
         <p className="sb-note" role="note">
           {/* `norm.reason` IS COMPOSED FROM THIS BLOCK'S OWN ROWS, the same reason it stays English
               at the other `normalizeTable` call site above; marked `sb-server` there too. */}
-          {t('sb.typedTable.couldNotBeDrawn')} <span className="sb-server">{norm.reason}</span>. {t('sb.typedTable.printedAsTyped')}
+          {t('sb.typedTable.couldNotBeDrawn')} <span className="sb-server">{norm.reason}</span>.
         </p>
       ),
       typed,
@@ -6165,9 +6537,10 @@ ul.sb-list ul.sb-list { list-style: circle outside; }
 .sb-file-open:hover, .sb-file-save:hover, .sb-file-show:hover, .sb-video-save:hover, .sb-picture-save:hover { background: var(--hover); }
 .sb-file-open:focus-visible, .sb-file-save:focus-visible, .sb-file-show:focus-visible, .sb-video-save:focus-visible, .sb-picture-save:focus-visible { outline:2px solid var(--focus); outline-offset:2px; }
 .sb-video-save, .sb-picture-save { align-self:flex-start; }
-/* THE FRAME AN ATTACHED HTML FILE IS DRAWN IN. It is as wide as the report's reading column, and
-   on a telephone it takes the page's own padding too, so a page fills the window. It is as tall as
-   a reader can use on a desk and keeps a workable height on a telephone. */
+/* THE FRAME AN ATTACHED HTML FILE IS DRAWN IN, AND THE BOX THIS PAGE DRAWS A PDF IN, which has the
+   same class. It is as wide as the report's reading column, and on a telephone it takes the page's
+   own padding too, so a page fills the window. It is as tall as a reader can use on a desk and keeps
+   a workable height on a telephone. */
 .sb-reads > .sb-file[data-fit="measured"]:has(.sb-file-frame) { width: 100%; }
 .sb-file-frame { display:block; width:auto; height:clamp(420px, 70vh, 860px);
   margin-inline: calc(-1 * (var(--pad-lg) + var(--border-w)));
@@ -6176,6 +6549,36 @@ ul.sb-list ul.sb-list { list-style: circle outside; }
 @media (max-width: 480px) {
   .sb-file-frame { margin-inline: calc(-1 * (var(--pad-lg) + var(--border-w) + var(--pad))); }
 }
+/* A PDF DRAWN BY THIS PAGE: its pages one under another, each as wide as the box, and the box
+   scrolls. The gutter is kept, so a scrollbar that appears never narrows the box and draws every page
+   again. Each page's words are pdf.js's text layer, transparent text laid over the page's canvas, and
+   the rules for it below are the ones pdf.js's own viewer uses, kept to this box. A rotated page turns
+   its text layer by the attribute pdf.js sets. */
+.sb-file-pdf { overflow:auto; scrollbar-gutter: stable; user-select:text; }
+.sb-file-pdf-page { position:relative; overflow:hidden; }
+.sb-file-pdf-page canvas { display:block; width:100%; height:auto; }
+.sb-file-pdf .textLayer { position:absolute; text-align:initial; inset:0; overflow:clip; opacity:1; line-height:1;
+  text-size-adjust:none; forced-color-adjust:none; transform-origin:0 0; z-index:0;
+  --min-font-size:1; --text-scale-factor: calc(var(--total-scale-factor) * var(--min-font-size));
+  --min-font-size-inv: calc(1 / var(--min-font-size)); }
+.sb-file-pdf .textLayer > :is(span, br) { color:transparent; position:absolute; white-space:pre; cursor:text;
+  transform-origin:0% 0%; z-index:1; --font-height:0; font-size: calc(var(--text-scale-factor) * var(--font-height));
+  --scale-x:1; --rotate:0deg; transform: rotate(var(--rotate)) scaleX(var(--scale-x)) scale(var(--min-font-size-inv)); }
+.sb-file-pdf .textLayer[data-main-rotation="90"] { transform: rotate(90deg) translateY(-100%); }
+.sb-file-pdf .textLayer[data-main-rotation="180"] { transform: rotate(180deg) translate(-100%, -100%); }
+.sb-file-pdf .textLayer[data-main-rotation="270"] { transform: rotate(270deg) translateX(-100%); }
+/* A WORD DOCUMENT, A TEXT FILE OR A MARKDOWN FILE DRAWN AS THE PAGE'S OWN WORDS. Its words can be
+   selected, as the report's own are. A Word document keeps its tabs and line breaks, and a text file
+   keeps its lines but wraps a long one rather than widening the page. */
+.sb-file-words { user-select:text; padding: var(--pad) var(--pad-lg); background: var(--surface-1);
+  border: var(--border-w) solid var(--border); border-radius: var(--radius-sm); overflow-wrap:anywhere; }
+.sb-file-words-word { white-space: pre-wrap; }
+.sb-file-words > :first-child { margin-top:0; }
+.sb-file-words > :last-child { margin-bottom:0; }
+.sb-file-words pre { margin:0; white-space: pre-wrap; overflow-wrap:anywhere; font-family: var(--font-mono); font-size: var(--fs-1); }
+.sb-file-words table { border-collapse: collapse; }
+.sb-file-words td { border: var(--border-w) solid var(--border); padding: 4px 8px; vertical-align: top; }
+.sb-file-words-note, .sb-file-words-none { color: var(--text-2); font-size: var(--fs-1); }
 
 /* A TEST WORLD IN A HANDBACK. Criterion C31. It is drawn with weight because it is the one block
    that asks the reader to get up and do something: open it and decide whether what is in it is
@@ -6674,7 +7077,7 @@ ul.sb-list ul.sb-list { list-style: circle outside; }
   flex: 0 0 auto; display:inline-flex; align-items:center; gap: calc(var(--pad) / 2);
   min-height: 26px; padding: 0 var(--pad);
   border: var(--border-w) dashed var(--border-strong);
-  border-radius: var(--radius-sm); background: transparent; color: var(--muted);
+  border-radius: var(--radius-sm); background: transparent; color: var(--text-3);
   font: inherit; font-size: var(--sb-small, 0.86em); cursor: pointer;
 }
 .sb-fordev:hover, .sb-fordev:focus-visible { color: var(--text); border-style: solid; }
@@ -6686,7 +7089,7 @@ ul.sb-list ul.sb-list { list-style: circle outside; }
    other block mark, so it never changes the width of a report that has none. */
 .sb-machinery {
   margin: 0; display:flex; align-items:baseline; gap: calc(var(--pad) / 2);
-  color: var(--muted); font-size: var(--sb-small, 0.86em);
+  color: var(--text-3); font-size: var(--sb-small, 0.86em);
 }
 .sb-machinery-word {
   border: var(--border-w) dashed var(--border-strong); border-radius: var(--radius-sm);

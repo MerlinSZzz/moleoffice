@@ -7,7 +7,7 @@
  * stops writing, moving and deleting them for everybody, a secretary too: a secretary registers a tool through the
  * office's door, never by hand. Reading them is let through.
  *
- * The policy is tools/guard/policy.mjs, handed a made-up home and checkout as in
+ * The policy is for-agents/main-world-guard-policy.mjs, handed a made-up home and checkout as in
  * tests/the-main-world-guard-stops-the-accidents.test.ts. Nothing here is run; the policy only reads the command text
  * and the disk.
  *
@@ -25,7 +25,7 @@ import { fileURLToPath } from 'node:url'
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
-import { areaReasons, lookAt, theProtectedPaths, type Asker, type World } from '../tools/guard/policy.mjs'
+import { areaReasons, lookAt, theProtectedPaths, type Asker, type World } from '../for-agents/main-world-guard-policy.mjs'
 import { aTestDatabaseFolder } from './a-test-folder.ts'
 
 const REPO = fileURLToPath(new URL('..', import.meta.url)).replace(/\/+$/, '')

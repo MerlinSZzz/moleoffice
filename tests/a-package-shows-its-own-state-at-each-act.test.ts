@@ -35,7 +35,7 @@ import { THE_MESSAGE_WORKER_ID } from '../src/shared/participants.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { packageStateWord } from '../src/shared/words.ts'
 import type { DelegationReply } from '../src/web/api.ts'
-import { apiApp, freshDb, theOfficesKeyHeader, type TestDb } from './helpers.ts'
+import { apiApp, freshDb, theOfficesKeyHeader, type TestDb, governsTheWholeProject } from './helpers.ts'
 
 type TasksToTakePageModule = typeof import('../src/web/pages/TasksToTakePage.tsx')
 type TaskPackagePanelModule = typeof import('../src/web/components/TaskPackagePanel.tsx')
@@ -64,7 +64,7 @@ const asThePerson = (): Record<string, string> => ({ 'x-mole-office-actor-type':
 const asAgent = (handle: string): Record<string, string> => ({ 'x-mole-office-actor-type': 'agent', 'x-mole-office-actor-id': handle, 'x-mole-office-workspace': WORKSPACE })
 
 async function file(kind: string, title: string, data: Record<string, unknown> = {}, headers = asThePerson()): Promise<string> {
-  const reply = await app.inject({ method: 'POST', url: '/api/records', headers, payload: { kind, title, data: kind === 'decision' ? { replaces: [], ...data } : data } })
+  const reply = await app.inject({ method: 'POST', url: '/api/records', headers, payload: { kind, title, data: kind === 'decision' ? { ...governsTheWholeProject(), replaces: [], ...data } : data } })
   expect(reply.statusCode, reply.body).toBe(201)
   return String(reply.json().record.id)
 }

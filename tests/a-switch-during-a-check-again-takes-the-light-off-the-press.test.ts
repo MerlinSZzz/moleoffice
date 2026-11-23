@@ -8,7 +8,7 @@
  * until the newest read answered, so pressing Check again, holding its read, then switching project
  * put the press's light on the switch's read — a read nobody pressed for.
  *
- * A browser of its own, at 390 in each look. It holds ALPHA's Check again read, presses, then switches
+ * A browser of its own, at 390 in the light look. It holds ALPHA's Check again read, presses, then switches
  * to BETA while that read is still out and holds BETA's read too. While BETA is being read the press
  * carries no light, and it still carries none after BETA answers and after ALPHA's held answer comes.
  * The shell's own sign is the one that is drawn for the switch.
@@ -112,7 +112,7 @@ async function theLightAroundThePress(page: Page): Promise<boolean> {
   })
 }
 
-for (const theme of ['light', 'dark'] as const) {
+for (const theme of ['light'] as const) {
   it(`takes the press's light off a switch during a held Check again, in the ${theme} look`, async () => {
     const watched = await aBrowser(theme)
     const { page } = watched

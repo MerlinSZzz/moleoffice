@@ -34,7 +34,7 @@ export function setAnAgentsRunModel(
   }
   const model = change.model.trim()
   const variant = change.variant === undefined || change.variant === null || change.variant.trim() === '' ? null : change.variant.trim()
-  const refused = whyAnAgentsModelIsRefused(own.runtime, model, variant, THE_WORKER_GIVES)
+  const refused = whyAnAgentsModelIsRefused(own.runtime, model, variant, THE_WORKER_GIVES, own.harness)
   if (refused !== null) throw new PanelError(refused, 400)
   const written = patchRecord(own.record, { dataPatch: { model, variant } }, actor)
   return { ...anAgentsRunModel(agentId), ...(written.nothingWritten === undefined ? {} : { nothingWritten: nothingWrittenSentence({ kind: 'already-stored' }) }) }

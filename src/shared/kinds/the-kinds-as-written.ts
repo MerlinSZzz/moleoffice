@@ -19,6 +19,7 @@
  * ./validation.ts.
  */
 
+import { knowledgeEntryKind, knowledgeCategoryKind, knowledgeBookmarkKind, knowledgeChangeKind, knowledgeQueryKind, knowledgeRatingKind, KNOWLEDGE_SHAPES } from '../knowledge/kinds.ts'
 import { STABLE_BOOTSTRAP_SHAPES } from '../stable-bootstrap-notices.ts'
 import { WHOLE_SUITE_RECEIPT_SHAPES } from '../whole-suite-receipt.ts'
 import { DRAWN_ON_SHAPES } from './drawn-on.ts'
@@ -85,6 +86,7 @@ import { GOAL_SHAPES, goalKind } from './goal.ts'
 import { FLOW_SHAPES, flowKind } from './flow.ts'
 import { FLOW_RUN_SHAPES, flowRunKind } from './flow-run.ts'
 import { hostJobKind } from './host-job.ts'
+import { packKind } from './pack.ts'
 import { counterKind } from './counter.ts'
 import { CHECKLIST_SHAPES, checklistKind } from './checklist.ts'
 import { BOOKING_SHAPES, bookingKind } from './booking.ts'
@@ -98,6 +100,8 @@ import { designReviewKind } from './design-review.ts'
 import { DESIGN_REMINDER_SHAPES, designReminderKind } from './design-reminder.ts'
 import { toolCategoryKind } from './tool-category.ts'
 import { toolKind } from './tool.ts'
+import { departmentKind } from './department.ts'
+import { keyItemKind } from './key-item.ts'
 
 // ============================================================================ the shapes
 
@@ -283,6 +287,25 @@ export function placeShapeSpecs(): Record<string, ShapeSpec> {
           example: 'says how much a surface says',
         },
         cut,
+        {
+          key: 'file',
+          type: 'string',
+          required: false,
+          description:
+            "The name the file was shown under when the words were selected in the office's reader of one file, as " +
+            'it was at the moment of pointing, as the words are. Never empty, and no longer than a stored file\'s ' +
+            'name may be. Leave it out when the words were in no file.',
+          example: 'survey-notes.pdf',
+        },
+        {
+          key: 'page',
+          type: 'number',
+          required: false,
+          description:
+            'The page of that file the words were on, a whole number counted from 1. Only beside `file`, and only ' +
+            'when the words were on one page of a PDF the office draws.',
+          example: 2,
+        },
       ],
     },
     run: {
@@ -368,6 +391,7 @@ export function placeShapeSpecs(): Record<string, ShapeSpec> {
  */
 
 export const SHAPE_SPECS: Record<string, ShapeSpec> = {
+  ...KNOWLEDGE_SHAPES,
   ...STABLE_BOOTSTRAP_SHAPES,
   ...MAIN_SUITE_FIX_SHAPES,
   ...WHOLE_SUITE_RECEIPT_SHAPES,
@@ -431,6 +455,12 @@ export const SHAPE_SPECS: Record<string, ShapeSpec> = {
  * was and what it is for.
  */
 export const KINDS_AS_WRITTEN: Record<RecordKind, KindSpec> = {
+  knowledge_entry: knowledgeEntryKind,
+  knowledge_category: knowledgeCategoryKind,
+  knowledge_bookmark: knowledgeBookmarkKind,
+  knowledge_change: knowledgeChangeKind,
+  knowledge_query: knowledgeQueryKind,
+  knowledge_rating: knowledgeRatingKind,
   whole_suite_receipt: wholeSuiteReceipt,
   notice_rules: noticeRules,
   quick_note: quickNoteKind,
@@ -684,6 +714,7 @@ export const KINDS_AS_WRITTEN: Record<RecordKind, KindSpec> = {
   flow: flowKind,
   flow_run: flowRunKind,
   host_job: hostJobKind,
+  pack: packKind,
   counter: counterKind,
   // ------------------------------------------------------------------------ checklists
   // Anyone may make a checklist and use one, people included.
@@ -719,6 +750,14 @@ export const KINDS_AS_WRITTEN: Record<RecordKind, KindSpec> = {
   // ------------------------------------------------------------------------ the toolset catalogue
   tool_category: toolCategoryKind,
   tool: toolKind,
+  // ------------------------------------------------------------------------ one department of a project
+  // Step 1 of departments and posts, wave 13s round 281. src/server/lib/grant/departments.ts holds who may write it and
+  // what it must hold; src/server/lib/departments.ts works out its level, its teams and its leader.
+  department: departmentKind,
+  // ------------------------------------------------------------------------ one key item of a project
+  // Point HD-2c of home as a data dashboard, wave 13s round 281. src/server/lib/key-items.ts holds who may write it, what
+  // it must hold and how its progress and its estimate are read.
+  key_item: keyItemKind,
 }
 
 // ============================================================================ the gate contract

@@ -12,15 +12,15 @@
  * day. This list is what the person reads before they close the window: the callers that have not
  * been given a key yet, so the person's own tools, scripts and devices can get one first.
  *
- * IT IS WRITTEN FOR THEM AND NOT FOR AN ENGINEER. One idea per sentence, the plain word, and a
- * sentence saying what the list is for. It names CALLERS and never a secret: there is no key on this
- * page and nothing here could draw one.
+ * IT IS WRITTEN FOR THEM AND NOT FOR AN ENGINEER: the plain word, and no sentence about the list,
+ * as decided. It names CALLERS and never a secret: there is no key on this page and nothing here
+ * could draw one.
  *
  * ---------------------------------------------------------------------------------------
  * AN EMPTY LIST IS AN ANSWER, NOT A GAP
  * ---------------------------------------------------------------------------------------
  *
- * The fifth invariant: "nothing has called" is a real answer and it is drawn in words. An empty box
+ * The fifth invariant: "nothing has called" is a real answer and it is drawn as a word. An empty box
  * would read as "nobody looked", which is the one thing this list cannot say — the office keeps it.
  *
  * ---------------------------------------------------------------------------------------
@@ -42,14 +42,8 @@ import { Absence } from './ui.tsx'
 
 /** Every word this component draws that is not read off the reply. */
 export const HEADER_ONLY_WORDS = {
-  /** What the list is for. */
-  get what(): string { return t('settingsPanel.callers.what') },
-  /**
-   * The word drawn where the list is empty. It is an answer and not a gap, so `Absence` draws the
-   * word and the whole sentence below rides on the mark rather than opening a paragraph.
-   */
+  /** The word drawn where the list is empty. It is an answer and not a gap. */
   get none(): string { return t('settingsPanel.callers.none') },
-  get noneSays(): string { return t('settingsPanel.callers.noneSays') },
   /** Short labels on a row. A label, never a sentence. */
   get seen(): string { return t('settingsPanel.callers.seen') },
   get firstSeen(): string { return t('settingsPanel.callers.firstSeen') },
@@ -75,17 +69,11 @@ export function HeaderOnlyCallers({ said }: { said: WhatTheHeaderOnlyCallersSay 
       <style href="mole-office-header-only-callers" precedence="default">
         {HEADER_ONLY_CSS}
       </style>
-      <p className="hoc-says" lang="en">{said.says}</p>
-      <p className="hoc-purpose">{HEADER_ONLY_WORDS.what}</p>
       {said.callers.length === 0 ? (
-        // AN EMPTY LIST IS AN ANSWER. `Absence` draws one word where the list would be and carries
-        // the whole sentence on the mark: an emptiness nobody has to act on does not get a
-        // paragraph, and "there are none" still reads differently from "nobody looked".
+        // AN EMPTY LIST IS AN ANSWER. `Absence` draws one word where the list would be, and "there
+        // are none" still reads differently from "nobody looked".
         <p className="hoc-none" data-empty="true">
-          <Absence
-            word={HEADER_ONLY_WORDS.none}
-            title={HEADER_ONLY_WORDS.noneSays}
-          />
+          <Absence word={HEADER_ONLY_WORDS.none} />
         </p>
       ) : (
         <ul className="hoc-list">
@@ -149,8 +137,6 @@ function howManyCalls(calls: number): string {
  * NO BACKTICK ANYWHERE IN HERE, comments included: this is a template literal inside a .tsx file.
  */
 const HEADER_ONLY_CSS = `
-.hoc-says { margin: 0 0 var(--pad); color: var(--text-2); font: var(--fs-1)/var(--lh-read) var(--font-ui); }
-.hoc-purpose { margin: 0 0 var(--pad); color: var(--text); font: var(--fs-1)/var(--lh-read) var(--font-ui); }
 .hoc-none { margin: 0 0 var(--pad); color: var(--text); font: var(--fs-1)/var(--lh-read) var(--font-ui); }
 .hoc-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--pad); }
 .hoc-row {

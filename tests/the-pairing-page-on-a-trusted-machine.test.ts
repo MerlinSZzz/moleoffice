@@ -1,8 +1,8 @@
 // Copyright © 2026 Zhengyang Shen
 // Licensed under the MIT License. See LICENSE.
 /**
- * THE PAIRING PAGE ON A MACHINE THE OFFICE TRUSTS, PHOTOGRAPHED, AND THE EMBASSY ROW OF A DEVICE
- * WAITING FOR THE PERSON.
+ * THE PAIRING PAGE ON A MACHINE THE OFFICE TRUSTS, PHOTOGRAPHED, AND THE CARD OF A DEVICE WAITING
+ * FOR THE PERSON, which is on his own person card since design C of early idea B9.
  *
  * Criterion D2 and the amendment of 13 September 2026 at 18:50, and chapter 6's rule: every
  * screen is looked at at four widths and in both themes. `tools/review.mjs` cannot photograph
@@ -132,8 +132,8 @@ describe('the pairing page on a trusted machine, and the Embassy row of a device
           }
         }
 
-        // THE EMBASSY ROW OF A DEVICE WAITING. A second device asks through the credential flow's own
-        // door and is left pending, which is the state the row is for.
+        // THE CARD OF A DEVICE WAITING, ON HIS PERSON CARD. A second device asks through the credential
+        // flow's own door and is left pending, which is the state the card is for.
         const device = await fetch(`${live.api}/api/office/visitors`, {
           method: 'POST',
           headers: AS_AN_AGENT,
@@ -142,15 +142,17 @@ describe('the pairing page on a trusted machine, and the Embassy row of a device
         const deviceText = await device.text()
         expect(device.status, deviceText).toBe(201)
 
-        await live.page.goto(`${live.site}/#/embassy`, { timeout: 60_000 })
+        const { whoPath } = await import('../src/web/components/router.tsx')
+        await live.page.goto(`${live.site}/#${whoPath('person', THE_PERSON)}`, { timeout: 60_000 })
         await waitForThePage(live.page, 60_000)
-        await live.page.getByText('Safari on iOS 9c3d').first().waitFor({ timeout: 30_000 })
+        await live.page.locator('[data-target$="profile.browsers"] .emb-asking-card')
+          .getByText('Safari on iOS 9c3d').first().waitFor({ timeout: 30_000 })
         for (const width of WIDTHS) {
           for (const theme of THEMES) {
             await live.page.setViewportSize({ width, height: 1000 })
             await live.page.emulateMedia({ colorScheme: theme })
             await live.page.screenshot({
-              path: `${shots}/p83-embassy-waiting-device-${String(width)}-${theme}.png`,
+              path: `${shots}/p83-card-waiting-device-${String(width)}-${theme}.png`,
               fullPage: true,
             })
           }

@@ -7,7 +7,7 @@
 
 import { sqlite } from './client.ts'
 import { toRepository } from './list-repositories.ts'
-import type { Repository, RepoRow } from '../lib/repositories.ts'
+import type { Repository, RepoRow } from './types/repositories.ts'
 
 /** One repository by id, inside one workspace, or null. */
 export function repositoryById(id: string, workspaceId: string): Repository | null {

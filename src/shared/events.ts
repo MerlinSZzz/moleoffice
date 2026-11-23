@@ -290,6 +290,12 @@ export interface ListChanged {
    * participant and their presence, not the whole registry. Absent or null otherwise.
    */
   participant?: ParticipantRef | null
+  /**
+   * THE TERMINAL A SECRETARY HAS JUST OPENED FOR THE PERSON WITH A LINE PREPARED IN IT, and that secretary, so a page
+   * can bring the terminal up in front of the person at once. The line is not here, because these events reach every
+   * page; a page reads it from GET /api/terminals. Absent or null otherwise.
+   */
+  prepared?: { terminal: string; by: ParticipantRef } | null
   /** Why, in one sentence, for a reader of the stream. */
   because: string
 }

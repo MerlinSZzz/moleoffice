@@ -324,25 +324,30 @@ export function theLiveCodexProcessFor(thread, reads = theProcessReader()) {
  * Neither tie is invented: a thread with no process, a bridge pid that is gone, and a bridge pid
  * now running something else all answer `trusted: false` with the sentence saying what was read.
  *
+ * `ended` IS TRUE ONLY WHEN THE RECORD NAMED A BRIDGE PID AND NO PROCESS RUNS UNDER IT NOW. A thread
+ * with no live process, no bridge recorded, and a pid now running something else are not `ended`:
+ * the first two recorded no process that could end, and the third cannot show the bridge stopped.
+ *
  * @param {unknown} thread
  * @param {unknown} bridgePid
  * @param {unknown} bridgeScript
- * @returns {{ trusted: boolean, says: string }}
+ * @returns {{ trusted: boolean, ended: boolean, says: string }}
  */
 export function theCodexProcessTiedTo(thread, bridgePid, bridgeScript) {
   const fromArguments = theLiveCodexProcessFor(thread)
   if (fromArguments !== null) {
     return {
       trusted: true,
+      ended: false,
       says: `a live codex process ${String(fromArguments)} whose arguments name this session's thread is alive`,
     }
   }
   if (typeof bridgePid !== 'number' || !Number.isInteger(bridgePid) || bridgePid <= 0) {
-    return { trusted: false, says: 'no process was recorded for it' }
+    return { trusted: false, ended: false, says: 'no process was recorded for it' }
   }
   const commandLine = commandLineOf(bridgePid)
   if (commandLine === null) {
-    return { trusted: false, says: `its recorded bridge process ${String(bridgePid)} is not alive` }
+    return { trusted: false, ended: true, says: `its recorded bridge process ${String(bridgePid)} is not alive` }
   }
   const namesTheBridge =
     (typeof bridgeScript === 'string' && bridgeScript.trim() !== '' && commandLine.includes(bridgeScript)) ||
@@ -350,10 +355,11 @@ export function theCodexProcessTiedTo(thread, bridgePid, bridgeScript) {
   if (!namesTheBridge) {
     return {
       trusted: false,
+      ended: false,
       says: `its recorded bridge process ${String(bridgePid)} is not running the bridge that was recorded`,
     }
   }
-  return { trusted: true, says: `its recorded bridge process ${String(bridgePid)} is alive` }
+  return { trusted: true, ended: false, says: `its recorded bridge process ${String(bridgePid)} is alive` }
 }
 
 /**

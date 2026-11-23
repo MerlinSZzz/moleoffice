@@ -80,7 +80,7 @@ it('keeps the facts and uses the same number of statements for one and six of ea
       incomplete: recordIncompleteness(record.kind, record.data, record.summary).map((one) => ({ path: one.path, message: one.message })),
     })
   }
-  expect(answer.reportsFiled).toEqual(reports.map((id) => ({ id, aboutARun: true })))
+  expect(answer.reportsFiled).toEqual(reports.map((id) => ({ id, aboutARun: true, aboutAPage: false, namesNothingFits: false })))
   expect(six.count).toBe(one.count)
 })
 
@@ -500,27 +500,39 @@ it('keeps every finish fact as it was before the batch reads', () => {
   "reportsFiled": [
     {
       "id": "REPORT_1",
-      "aboutARun": true
+      "aboutARun": true,
+      "aboutAPage": false,
+      "namesNothingFits": false
     },
     {
       "id": "REPORT_2",
-      "aboutARun": true
+      "aboutARun": true,
+      "aboutAPage": false,
+      "namesNothingFits": false
     },
     {
       "id": "REPORT_3",
-      "aboutARun": true
+      "aboutARun": true,
+      "aboutAPage": false,
+      "namesNothingFits": false
     },
     {
       "id": "REPORT_4",
-      "aboutARun": true
+      "aboutARun": true,
+      "aboutAPage": false,
+      "namesNothingFits": false
     },
     {
       "id": "REPORT_5",
-      "aboutARun": true
+      "aboutARun": true,
+      "aboutAPage": false,
+      "namesNothingFits": false
     },
     {
       "id": "REPORT_6",
-      "aboutARun": true
+      "aboutARun": true,
+      "aboutAPage": false,
+      "namesNothingFits": false
     }
   ],
   "packagesHeld": {

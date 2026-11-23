@@ -36,7 +36,7 @@ import { anAgentsToolHeaders } from '../for-agents/agent-key.mjs'
 export { theAgentKey, anAgentsToolHeaders } from '../for-agents/agent-key.mjs'
 import { spoolAGateMet } from '../src/config/gate-count-spool.mjs'
 import { THE_LONGEST_FINISH_WAIT_MS } from '../src/config/finished.mjs'
-import { theStableCheckoutFolder } from '../src/config/sandbox-folder.mjs'
+import { howAPathMeets, theStableCheckoutFolder } from '../src/config/sandbox-folder.mjs'
 import { SANDBOX_SLICE } from '../src/config/sandbox-slice.mjs'
 import { theKeyARunsToolSends } from '../src/config/run-permissions.mjs'
 import { LAUNCHER_MODEL_COMPATIBILITY } from '../src/config/model-efforts.mjs'
@@ -152,30 +152,10 @@ export function whyAPathIsTheStableCheckout(path) {
 }
 
 /**
- * HOW A HOST PATH MEETS A FOLDER NO SANDBOX MAY MOUNT: 'is', 'is inside', 'holds', or null when it does not. Both are
- * compared as written and as they are on disk (the realpath of the nearest folder that exists, with the rest after it),
- * so a link to one cannot stand in for the other. The stable checkout is asked here, and so is the office's data folder
- * (tools/the-offices-data-folder.mjs).
- * @param {string} path an absolute host path
- * @param {string} folder an absolute host folder
- * @returns {'is' | 'is inside' | 'holds' | null}
+ * HOW A HOST PATH MEETS A FOLDER NO SANDBOX MAY MOUNT, handed on from src/config/sandbox-folder.mjs, where it moved so
+ * the service command can ask it too. Every tool that imports it from here goes on doing so.
  */
-export function howAPathMeets(path, folder) {
-  const onDisk = (given) => {
-    let held = given
-    const rest = []
-    while (!existsSync(held) && dirname(held) !== held) { rest.unshift(basename(held)); held = dirname(held) }
-    return join(realpathSync(held), ...rest)
-  }
-  const inside = (inner, outer) => { const r = relative(outer, inner); return r !== '' && !r.startsWith('..') && !isAbsolute(r) }
-  for (const one of new Set([resolve(path), onDisk(resolve(path))])) {
-    for (const other of new Set([folder, onDisk(folder)])) {
-      const how = one === other ? 'is' : inside(one, other) ? 'is inside' : inside(other, one) ? 'holds' : null
-      if (how !== null) return how
-    }
-  }
-  return null
-}
+export { howAPathMeets }
 
 /**
  * A check view has only controller-declared mounts, as its declared interface says.
@@ -918,6 +898,20 @@ export const A_RUN_IS_OVER_IN = Object.freeze(['finished', 'crashed', 'orphaned'
  */
 export function theRunEndedBeforeItsCommand(status, holdsARunKey, stateWithoutTheKey) {
   return status === 403 && holdsARunKey && typeof stateWithoutTheKey === 'string' && A_RUN_IS_OVER_IN.includes(stateWithoutTheKey)
+}
+
+/**
+ * WHERE A MESSAGE THE OFFICE STORED AND ANSWERED 409 WAITS, as a sentence to follow the told one, or null for every
+ * other answer. A send to a registered agent that nothing holds is stored, routed and answered 409, and that answer
+ * carries the stored message with its id and the list of where it was routed (theReasonOfA409Send in
+ * src/server/api/records.ts). An answer without both is a refusal, as a 409 that stored nothing is. The sentence is
+ * empty when the list holds no line. `which` names the message the sentence is about. The launcher's message to a
+ * run's starter and the folder-size warning both read the answer here.
+ */
+export function whereAStoredMessageWaits(answer, which) {
+  if (answer.status !== 409 || typeof answer.body?.record?.id !== 'string' || !Array.isArray(answer.body.routed)) return null
+  const lines = answer.body.routed.map((one) => one?.line).filter((line) => typeof line === 'string')
+  return lines.length === 0 ? '' : ` ${which} waits where the office routed it: ${lines.join(' ')}`
 }
 
 /**

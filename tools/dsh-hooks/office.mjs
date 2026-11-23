@@ -566,8 +566,8 @@ export async function runningWorkers(api, id) {
  * and the background work it started ends with it. A run that says `running` and has no seal is one whose agent has not
  * said it is done.
  */
-export async function ownRunUnfinished(api, id) {
-  const read = await ask(api, `/api/records/${encodeURIComponent(id.session)}`, { headers: theHeaders(id) })
+export async function ownRunUnfinished(api, id, runRead = undefined) {
+  const read = runRead === undefined ? await ask(api, `/api/records/${encodeURIComponent(id.session)}`, { headers: theHeaders(id) }) : runRead
   if (read === null || read.status !== 200) return { failed: read }
   const data = read.body?.record?.data
   if (data === null || typeof data !== 'object') return { failed: read }
@@ -651,19 +651,23 @@ function theOwnRunReason(session) {
 }
 
 /**
- * WHAT HOLDS THIS RUN'S STOP, AND WHY: the rules both runtimes' stop hooks follow, in one place (message
- * ro57jzXSPCR3). Read in order; the first that applies holds.
+ * WHAT HOLDS THIS RUN'S STOP, AND WHY: the rules both runtimes' stop hooks follow, in one place.
+ * Read in order; the first that applies holds.
  *   - A supervisor: a message addressed to it that is unseen, then an agent it started that still has a run in state
  *     running.
- *   - Any agent, worker or supervisor: its own run still running and unsealed (problem UbG6k-7jGLa5). A one-turn session
+ *   - Any agent, worker or supervisor: its own run still running and unsealed. A one-turn session
  *     that ended its turn to wait for background work was ended with that work; this keeps it going instead.
  * Answers `{ hold: { fingerprint, reason } }`, `{ hold: null }` to let it stop, or `{ couldNotTell: sentence }` when a
  * read gave nothing usable, which lets it stop and says what the office said. `who` begins every such sentence.
  *
- * A SUPERVISOR'S READ THAT FAILED DOES NOT LET IT GO BY ITSELF (problem RJradfGfKxlq; messages GdSoXrDumLmp and
- * 1s5mFLOPSg-4). The rules after it are still read, so its own run still running holds it, and the reason names what
- * this hook could not read so the run reads it itself. Only when nothing holds is it let go, with one sentence naming
- * every read that failed.
+ * A MESSAGE SENT BEFORE THE RUN STARTED DOES NOT HOLD IT: only when both times have the office's local time form and
+ * the message is strictly earlier is it left out. A tie or an unreadable time holds; an unreadable start is named in
+ * the reason. The read marks nothing; only the messages shown are marked delivered, and an old message keeps its mark.
+ * A failed mark is named in the reason and does not change the hold.
+ *
+ * A SUPERVISOR'S READ THAT FAILED DOES NOT LET IT GO BY ITSELF. The rules after it are still read, so its own run still
+ * running holds it, and the reason names what this hook could not read so the run reads it itself. Only when nothing
+ * holds is it let go, with one sentence naming every read that failed.
  */
 export async function whatHoldsTheStop(api, id, who) {
   const card = await ask(api, `/api/participants/agent/${encodeURIComponent(id.handle)}`, { headers: theHeaders(id) })
@@ -672,9 +676,10 @@ export async function whatHoldsTheStop(api, id, who) {
   }
   /** The reads that gave nothing usable: what the office said and about what, and for a hold's reason what to read and where. */
   const unread = []
+  let runRead
   if (card.body?.participant?.roleReadAs === 'supervisor') {
-    // THE READ MARKS EACH MESSAGE DELIVERED, as a hand-over does, and never seen: reading is the recipient's own act.
-    const unseen = await unseenMessages(api, id, true)
+    // THE READ MARKS NOTHING: the stop marks delivered only the messages it shows, and an old message keeps its mark.
+    const unseen = await unseenMessages(api, id, false)
     if ('failed' in unseen) {
       unread.push({
         said: whatTheOfficeSaid(api, unseen.failed),
@@ -683,21 +688,40 @@ export async function whatHoldsTheStop(api, id, who) {
         where: `read it yourself at GET ${THE_UNSEEN_DOOR}&full=1`,
       })
     } else if (unseen.messages.length > 0) {
-      const routed = await theAgentsIdWhenRouted(api, id, unseen.messages, card)
-      if ('failed' in routed) {
-        unread.push({
-          said: whatTheOfficeSaid(api, routed.failed),
-          about: `the id behind a routed message addressed to "${id.handle}"`,
-          what: 'the id behind a routed message',
-          where: `read the message yourself at GET ${THE_UNSEEN_DOOR}&full=1`,
-        })
-      } else {
-        const ids = unseen.messages.map((message) => message.id)
-        return {
-          hold: {
-            fingerprint: `messages:${[...ids].sort().join(',')}`,
-            reason: theMessageReason(unseen.messages, routed.me),
-          },
+      runRead = await ask(api, `/api/records/${encodeURIComponent(id.session)}`, { headers: theHeaders(id) })
+      const start = runRead?.status === 200 ? runRead.body?.record?.createdAt : null
+      const localTime = (value) => typeof value === 'string' && /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(value)
+      const hasStart = localTime(start)
+      const holding = unseen.messages.filter((message) => !hasStart || !localTime(message.sentAt) || message.sentAt >= start)
+      if (holding.length > 0) {
+        const routed = await theAgentsIdWhenRouted(api, id, holding, card)
+        if ('failed' in routed) {
+          unread.push({
+            said: whatTheOfficeSaid(api, routed.failed),
+            about: `the id behind a routed message addressed to "${id.handle}"`,
+            what: 'the id behind a routed message',
+            where: `read the message yourself at GET ${THE_UNSEEN_DOOR}&full=1`,
+          })
+        } else {
+          const ids = holding.map((message) => message.id)
+          const failedMarks = []
+          for (const message of holding) {
+            const marked = await ask(api, `/api/messages/${encodeURIComponent(message.id)}/mark`, {
+              method: 'POST', headers: theHeaders(id), body: { mark: 'delivered' },
+            })
+            if (marked === null || marked.status !== 200) {
+              const answer = marked === null ? null : { ...marked, because: marked.body?.error }
+              failedMarks.push(`${message.id}: ${whatTheOfficeSaid(api, answer)}`)
+            }
+          }
+          const markFailure = failedMarks.length === 0 ? '' :
+            ` These messages could not be marked delivered: ${failedMarks.join('; ')}.`
+          return {
+            hold: {
+              fingerprint: `messages:${[...ids].sort().join(',')}`,
+              reason: theMessageReason(holding, routed.me) + (hasStart ? '' : " Because the run's start could not be read, every unseen message holds the stop.") + markFailure,
+            },
+          }
         }
       }
     }
@@ -716,7 +740,7 @@ export async function whatHoldsTheStop(api, id, who) {
       }
     }
   }
-  const own = await ownRunUnfinished(api, id)
+  const own = await ownRunUnfinished(api, id, runRead)
   if ('failed' in own) {
     unread.push({ said: whatTheOfficeSaid(api, own.failed), about: `run ${id.session}` })
     return { couldNotTell: theStopWasAllowedUnread(who, unread) }

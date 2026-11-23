@@ -32,15 +32,17 @@ import type { ChildProcess } from 'node:child_process'
 import { spawn } from 'node:child_process'
 import type { AddressInfo } from 'node:net'
 import { fileURLToPath } from 'node:url'
+import { dirname } from 'node:path'
 
 import type { FastifyInstance } from 'fastify'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
-import { apiApp, freshDb, one, type TestDb } from './helpers.ts'
+import { apiApp, freshDb, one, aTestAgentsKeyEnvironment, type TestDb } from './helpers.ts'
 
 let t: TestDb
 let app: FastifyInstance
 let api = ''
+let keyEnv: NodeJS.ProcessEnv = {}
 let agentId = ''
 let session = ''
 const started: ChildProcess[] = []
@@ -72,7 +74,7 @@ function startTheWaiter(): { said: () => string; ended: Promise<number> } {
       '--workspace',
       'robotics',
     ],
-    { env: { ...process.env, MOLE_OFFICE_HANDLE_BEAT_SECONDS: '1' } },
+    { env: { ...keyEnv, MOLE_OFFICE_HANDLE_BEAT_SECONDS: '1' } },
   )
   started.push(child)
   let printed = ''
@@ -105,11 +107,7 @@ beforeAll(async () => {
   })
   expect(madeWorkspace.statusCode, madeWorkspace.body).toBe(201)
 
-  await post('/api/records', {
-    kind: 'agent',
-    title: 'Waiter project hand',
-    data: { handle: 'waiter-project-hand', runtime: 'claude-code', state: 'active' },
-  })
+  keyEnv = await aTestAgentsKeyEnvironment(app, 'waiter-project-hand', dirname(t.file), 'robotics')
   const listed = await app.inject({
     method: 'GET',
     url: '/api/participants',

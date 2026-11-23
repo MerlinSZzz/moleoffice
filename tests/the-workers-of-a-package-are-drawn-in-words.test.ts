@@ -9,9 +9,9 @@
  *
  * What is held:
  *   1. A worker with a run opens that run, and its numbers are drawn as measured: tokens as input, output and total, and
- *      minutes as a count. A hand-back sentence is drawn beside the count.
+ *      minutes as a count. The hand-back count is drawn.
  *   2. A worker with no receipt is never drawn as zero tokens, and a running worker's minutes are not a count.
- *   3. An ask whose worker's run was never filed is drawn with its ask's state and why its numbers are absent.
+ *   3. An ask whose worker's run was never filed is drawn with its ask's state, and its numbers as not read.
  *
  * Mutations, one at a time, restored with cp and checked with cmp:
  *   A. a missing receipt is drawn as zero tokens: case 2 goes red.
@@ -23,6 +23,7 @@ import { createElement as h } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { beforeAll, describe, expect, it } from 'vitest'
 
+import { t } from '../src/shared/i18n.ts'
 import type { AWorkerOfAPackage, TheWorkersOfAPackage } from '../src/shared/package-workers.ts'
 
 type Shown = typeof import('../src/web/components/PackageWorkers.tsx')
@@ -87,7 +88,6 @@ function rowOf(html: string, handle: string): string {
 describe('a package’s workers are drawn in words', () => {
   it('1: a worker with a run opens it and its measured tokens and minutes are drawn', () => {
     const html = renderToStaticMarkup(h(shown.TheWorkersOfAPackagePanel, { reading: READING }))
-    expect(words(html)).toContain('Every worker this package was given to')
     const row = rowOf(html, 'xp-accounted')
     expect(row).toContain(runPage('run-accounted'))
     expect(row).toContain('>Ann, a made-up builder</a>')
@@ -97,7 +97,7 @@ describe('a package’s workers are drawn in words', () => {
     expect(words(row)).toContain('These two points belong to this worker.')
     expect(words(row)).toContain('1500 in all (1000 in, 500 out)')
     expect(words(row)).toContain('30 minutes')
-    expect(words(row)).toContain('One hand-back on the package names this worker’s run.')
+    expect(row).toContain('<dd>1</dd>')
     expect(words(html)).toContain('Hand-backs: 2 in all, 1 naming a worker and 1 naming none.')
   })
 
@@ -105,7 +105,6 @@ describe('a package’s workers are drawn in words', () => {
     const html = renderToStaticMarkup(h(shown.TheWorkersOfAPackagePanel, { reading: READING }))
     const row = rowOf(html, 'xp-noreceipt')
     expect(words(row)).toContain('not read')
-    expect(words(row)).toContain('no usage receipt')
     expect(words(row), 'a missing receipt is drawn as a zero').not.toContain('0 in all')
     expect(words(row)).toContain('still running')
     expect(words(row), 'a running run is drawn with a minute count').not.toMatch(/\d+ minutes/)
@@ -119,13 +118,13 @@ describe('a package’s workers are drawn in words', () => {
     expect(words(row), 'a difficulty with no entry in the page’s own list was drawn as absent').not.toContain('not recorded')
   })
 
-  it('3: an ask whose run was never filed is drawn with its own state and why its numbers are absent', () => {
+  it('3: an ask whose run was never filed is drawn with its own state, and its numbers as not read', () => {
     const html = renderToStaticMarkup(h(shown.TheWorkersOfAPackagePanel, { reading: READING }))
     const row = rowOf(html, 'xp-nofiling')
     expect(row).not.toContain('href=')
     expect(words(row)).toContain('wanted')
     expect(words(row)).toContain('no run filed')
-    expect(words(row)).toContain('No run was filed for this ask')
-    expect(words(row)).toContain('The ask is not on a supervisor run the office can read.')
+    expect(row).toContain(`${t('packageWorkers.wanted')}<span class="pw-none">${t('word.notRecorded')}</span>`)
+    expect(words(row)).toContain(t('packageWorkers.notRead'))
   })
 })

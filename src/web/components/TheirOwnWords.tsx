@@ -10,10 +10,9 @@
  * two pages cannot word one decision two ways.
  *
  * `FileAsMyWords` is drawn on a note a secretary prepared for the person to file. The person's press files the words
- * as a note of their own, and the person reads beside it that only they can press it; anybody else reads that only the
- * person can file them. The server is what refuses an agent's press that the person's grant does not carry; this page
- * only does not offer it to an agent. The words are not quoted here: the note's own body is drawn right below, and the
- * line says so (the picture review of round 11).
+ * as a note of their own; anybody else is offered no press. The server is what refuses an agent's press that the
+ * person's grant does not carry; this page only does not offer it to an agent. The words are not quoted here: the
+ * note's own body is drawn right below (the picture review of round 11).
  *
  * THE PAGE ADDRESSES ITS READER, as "What you decided" does: the person reads "you", and an agent reading the door reads
  * "the person".
@@ -30,7 +29,7 @@ const THEIR_OWN_WORDS_CSS = `
 .tow-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--pad); min-width: 0; }
 .tow-list li { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .tow-list li > span { font-size: var(--fs-2); color: var(--text-2); overflow-wrap: anywhere; }
-.tow-what { margin: 0; font-size: var(--fs-2); color: var(--text-2); line-height: var(--lh-body); }
+.tow-line { margin: 0; font-size: var(--fs-2); color: var(--text-2); line-height: var(--lh-body); }
 .tow-acts { display: flex; flex-wrap: wrap; align-items: center; gap: var(--pad) var(--gut); }
 `
 
@@ -50,7 +49,7 @@ export function TheMarkOnADecision({ mark }: { mark: NotOnThePersonsOwnWords }) 
       <p className="tow-mark" data-part="not-on-their-own-words">
         {sayTheMark(mark)}
       </p>
-      <p className="tow-what">{sayWhatYouCanDo('page')}</p>
+      <p className="tow-line">{sayWhatYouCanDo('page')}</p>
     </Panel>
   )
 }
@@ -68,8 +67,8 @@ export function TheDecisionsNotOnTheirWords({ rows }: { rows: readonly AMarkedDe
   return (
     <Panel titleIs="label" declares={{ surface: null }} title={sayTheMarkHeading()} rank={0} tone="inferred">
       <Style />
-      <p className="tow-what">{t('ownWords.band.count', { n: rows.length })}</p>
-      <p className="tow-what">{sayWhatYouCanDo('list')}</p>
+      <p className="tow-line">{t('ownWords.band.count', { n: rows.length })}</p>
+      <p className="tow-line">{sayWhatYouCanDo('list')}</p>
       <ul className="tow-list" data-part="decisions-not-on-their-own-words">
         {rows.map((row) => (
           <li key={row.recordId}>
@@ -122,26 +121,18 @@ export function FileAsMyWords({
     >
       <Style />
       {filed !== null ? (
-        <p className="tow-what" data-part="filed-as-their-own-words">
+        <p className="tow-line" data-part="filed-as-their-own-words">
           {t(thePerson ? 'ownWords.door.filed' : 'ownWords.door.filedForOthers')} <RouteLink to={recordPath(filed.id)}>{filed.title}</RouteLink>
         </p>
       ) : (
         <>
-          {thePerson ? <p className="tow-what">{t('ownWords.door.what', { section: t('g2b.note.title') })}</p> : null}
-          <div className="tow-acts">
-            {thePerson ? (
-              <>
-                <Btn variant="primary" pending={busy} onClick={press}>
-                  {t('ownWords.door.press')}
-                </Btn>
-                <span className="tow-what" data-part="only-you-can-press">
-                  {t('ownWords.door.onlyYou')}
-                </span>
-              </>
-            ) : (
-              <span className="tow-what">{t('ownWords.door.onlyThePerson')}</span>
-            )}
-          </div>
+          {thePerson ? (
+            <div className="tow-acts">
+              <Btn variant="primary" pending={busy} onClick={press}>
+                {t('ownWords.door.press')}
+              </Btn>
+            </div>
+          ) : null}
           {failed === null ? null : <ErrorNote label={t('ownWords.door.notFiled')} message={failed.message} fault={failed.fault} />}
         </>
       )}

@@ -15,22 +15,23 @@
  * ---------------------------------------------------------------------------------------
  *
  *   1. The first write that would seal a run, sent with the run's own key, is answered with the reminder and stores
- *      nothing of the patch: the run still says running and has no sealed tip. The reminder names the changed test with
- *      no control, mutation and restore, and that no report is linked. The office keeps one quiet line about it.
+ *      nothing of the patch: the run still says running and has no sealed tip. The reminder names that no report is
+ *      linked, and asks for no control, mutation or restore of the changed test. The office keeps one quiet line
+ *      about it.
  *   2. The same write sent again seals, and is not reminded again, unless the seal's own check still finds a migration
  *      item on the branch: that item refuses the seal (claim 15).
  *   3. `remindBeforeTheSeal: false` seals at once, with no reminder and no line, unless the seal's own check still finds
  *      a migration item: then the seal is refused too (claim 15).
  *   4. Another caller's finishing write (the office's own worker) seals at once: only the run itself is reminded.
  *   5. `remindBeforeTheSeal: true` is refused.
- *   6–11. The judging, from facts handed to it: the report class, test proofs, pictures, commits, a design for the person, and
+ *   6–11. The judging, from facts handed to it: the report class, test proofs, a changed page, commits, a design for the person, and
  *      what is never counted as passed.
  *  12. The runs the check refused on 11 October, as facts (round 53): each refused item is among what the reminder says.
  *      A supervisor whose brief named seven chapters is still asked for the chapters its card names.
  *  13. The same supervisor as a real run (round 53b): registered with a seven-chapter brief, its run filed, and the facts
  *      read by `theFactsBeforeTheSealOf`, the reader the record door's reminder calls. They ask for the card's chapters.
- *  14. The real reader gets this run's stored named-tests uses, oldest first across default pages; a real proof clears the
- *      reminder, while no proof, another run's proof, an unrelated tool or a wrong-order proof does not.
+ *  14. The real reader gets this run's stored named-tests uses, oldest first across default pages; whatever those lines
+ *      show, no item asks for a control, a mutation or a restore of the changed test.
  *  15. A migration item the seal's own check still finds on the branch refuses every git seal (a mixed one, or one that
  *      names no submission, which is read as git) before anything of the write is stored — whoever sends it, with or
  *      without a reminder, and with or without `remindBeforeTheSeal: false`: no seal, no check and no revocation, and
@@ -50,8 +51,7 @@
  *
  *   - `theRunsOwnRequest` answering true for every request: case 4 goes red;
  *   - the already-reminded check (`theLineThatReminded`) taken out: the case for claims 1 and 2 goes red, at the second write;
- *   - `remindBeforeTheSeal === false` not read in api/records.ts: case 3 goes red;
- *   - the green, red, green order not asked (any green counts as proved): case 7 goes red.
+ *   - `remindBeforeTheSeal === false` not read in api/records.ts: case 3 goes red.
  *
  * Round 53: `theChaptersTheReminderWants` answering the chapters line alone, without the card's line: case 12 goes red.
  * Round 53b, the check's M3 and M4 on run AlHe0S5Kg2zQ: `theFactsBeforeTheSealOf` reading the chapters line alone, and
@@ -61,6 +61,8 @@
  * path, and the commit's subject; any change to an existing file under tests/ is a criterion change, so case 7's commit
  * has a body; and a changed page's file must be named in the report, so case 8's report names Thing. The new rules have
  * their own cases in tests/mechanical-rules-are-named-before-the-seal.test.ts.
+ * Since pictures stopped being proof (chapter 6, 18 November 2026), case 8 expects no pictures item, and case 12 no longer holds the 13t round 32 refusal, which was about pictures.
+ * Since mutation proofs stopped being proof (chapter 5, 18 November 2026), cases 1, 7, 14 and 15 expect no item asking for one, and cases 16 and 17 take their item of another kind from a named-tests line sent by hand.
  *
  * Wave 14a round 1, the hard gate, with scope 7hJCvyqbez-2. Mutations planned, each to be
  * run after the released code and recorded here as measured then:
@@ -293,7 +295,7 @@ describe('the reminder at the door', () => {
     const reminded = first.json() as { beforeTheSeal?: { sealed: boolean; items: { about: string; says: string }[]; notChecked: string[] } }
     expect(reminded.beforeTheSeal?.sealed).toBe(false)
     const items = reminded.beforeTheSeal?.items ?? []
-    expect(items.some((one) => one.about === 'test proof' && one.says.startsWith('work/made-up.test.ts changed'))).toBe(true)
+    expect(items.filter((one) => one.about === 'test proof')).toEqual([])
     expect(items.some((one) => one.about === 'report' && one.says.startsWith('No report is linked'))).toBe(true)
     expect(reminded.beforeTheSeal?.notChecked.length).toBeGreaterThanOrEqual(2)
     const after = t.api.getRecord(id)!
@@ -368,6 +370,8 @@ describe('the migration hard gate at the door', () => {
     const { id, key, b } = await aRunWithABareMigrationPrefix()
     // The run's report is in form, so the only item that refuses this seal is the migration item.
     await aReportInForm(t, id, HANDLE)
+    // A NAMED-TESTS LINE SENT BY HAND is a likely item of another kind (test-lines:not-from-the-tool), which the gate does not name.
+    await recordUse({ id, key }, 'named-tests', PROOF_LINES[0]!)
     const first = await app.inject({ method: 'PATCH', url: `/api/records/${id}`, headers: asTheRun(id, key), payload: theFinish(b) })
     expect(first.statusCode, first.body.slice(0, 600)).toBe(200)
     const reminder = theReminderOf(first.body)
@@ -396,6 +400,8 @@ describe('the migration hard gate at the door', () => {
   it('17: an amended commit that names the whole migration clears the item, and the same write then seals', async () => {
     const { id, key, b, dir } = await aRunWithABareMigrationPrefix()
     await aReportInForm(t, id, HANDLE)
+    // A NAMED-TESTS LINE SENT BY HAND is a likely item of another kind (test-lines:not-from-the-tool), which the gate does not name.
+    await recordUse({ id, key }, 'named-tests', PROOF_LINES[0]!)
     const first = await app.inject({ method: 'PATCH', url: `/api/records/${id}`, headers: asTheRun(id, key), payload: theFinish(b) })
     const migration = theMigrationItemsOf(theReminderOf(first.body).items)
     expect(migration).toHaveLength(1)
@@ -414,10 +420,10 @@ describe('the migration hard gate at the door', () => {
     expect(sealed.data['sealedTip']).toEqual(expect.any(String))
     const line = readRemindedBeforeTheSeal(sealed.data['remindedBeforeTheSeal'])
     if (line === null || !line.reminded || line.atTheSeal === null) throw new Error(`no seal on the line: ${JSON.stringify(line)}`)
-    // THE SEAL'S RECORD OF THE REMINDER AGREES WITH THE GATE: the migration item is no longer found, and the test proof
-    // of other kinds is still found and sealed over, because only migration items stop a seal.
+    // THE SEAL'S RECORD OF THE REMINDER AGREES WITH THE GATE: the migration item is no longer found, and the hand-sent
+    // line's item, of another kind, is still found and sealed over, because only migration items stop a seal.
     expect(line.atTheSeal.noLongerFound).toContain(migration[0]!.key)
-    expect(line.atTheSeal.stillFound).toContain(`test:${THE_BARE_MIGRATION_FILE}`)
+    expect(line.atTheSeal.stillFound).toContain('test-lines:not-from-the-tool')
   })
 
   it('18: remindBeforeTheSeal false does not pass a migration item, on the run\'s first write or a launcher\'s', async () => {
@@ -577,7 +583,7 @@ describe('the migration hard gate at the door', () => {
 })
 
 describe('named-test uses in a real run', () => {
-  it('14: reads the exact run oldest first across all default pages, and its complete proof clears the reminder', async () => {
+  it('14: reads the exact run oldest first across all default pages, and asks for no proof of the changed test', async () => {
     const run = await aRunWithACommit()
     for (const said of PROOF_LINES) await recordUse(run, 'named-tests', said)
     // Three proof lines come first; these unrelated rows fill more than two default pages.
@@ -593,8 +599,8 @@ describe('named-test uses in a real run', () => {
 
     const facts = factsOf(t.api.getRecord(run.id)!)
     expect(facts.testRuns).toEqual([...PROOF_LINES, LATER_NAMED_LINE])
-    // Control, red and restore in order clear the test's own item. These lines were written by hand with the run's key,
-    // so the one test-proof item left says they are not shown to have come through the tool (item 2i).
+    // No item asks for a control, a red and a restore. These lines were written by hand with the run's key, so the one
+    // test-proof item says they are not shown to have come through the tool (item 2i).
     expect(judge(facts).items.filter((item) => item.about === 'test proof').map((item) => item.key)).toEqual(['test-lines:not-from-the-tool'])
 
     const reply = await app.inject({ method: 'PATCH', url: `/api/records/${run.id}`, headers: asTheRun(run.id, run.key), payload: theFinish(run.b) })
@@ -605,7 +611,7 @@ describe('named-test uses in a real run', () => {
     expect(t.api.getRecord(run.id)?.data['state']).toBe('running')
   })
 
-  it('15: no matching uses, another run, an unrelated tool and an incomplete order leave proof missing', async () => {
+  it('15: no matching uses, another run, an unrelated tool and an incomplete order draw no test-proof item', async () => {
     const other = await aRunWithACommit('Synthetic run with proof for a different run')
     for (const said of PROOF_LINES) await recordUse(other, 'named-tests', said)
     const otherUses = await usesThroughTheDoor(other)
@@ -614,24 +620,24 @@ describe('named-test uses in a real run', () => {
     const empty = await aRunWithACommit('Synthetic run with no named-tests uses')
     const emptyFacts = factsOf(t.api.getRecord(empty.id)!)
     expect(emptyFacts.testRuns).toEqual([])
-    expect(judge(emptyFacts).items.filter((item) => item.key === `test:${TEST_PATH}`).map((item) => item.about)).toEqual(['test proof'])
+    expect(judge(emptyFacts).items.filter((item) => item.key === `test:${TEST_PATH}`)).toEqual([])
     const emptyReply = await app.inject({ method: 'PATCH', url: `/api/records/${empty.id}`, headers: asTheRun(empty.id, empty.key), payload: theFinish(empty.b) })
     expect(emptyReply.statusCode, emptyReply.body.slice(0, 600)).toBe(200)
     const emptyReminder = (emptyReply.json() as { beforeTheSeal?: { items: { about: string; says: string }[] } }).beforeTheSeal
-    expect(emptyReminder?.items.some((item) => item.about === 'test proof' && item.says.startsWith(`${TEST_PATH} changed`))).toBe(true)
+    expect(emptyReminder?.items.filter((item) => item.about === 'test proof')).toEqual([])
 
     const unrelated = await aRunWithACommit('Synthetic run with unrelated tool uses')
     for (const said of PROOF_LINES) await recordUse(unrelated, 'data-copy', said)
     const unrelatedFacts = factsOf(t.api.getRecord(unrelated.id)!)
     expect(unrelatedFacts.testRuns).toEqual([])
-    expect(judge(unrelatedFacts).items.some((item) => item.key === `test:${TEST_PATH}`)).toBe(true)
+    expect(judge(unrelatedFacts).items.some((item) => item.key === `test:${TEST_PATH}`)).toBe(false)
 
     const wrongOrder = await aRunWithACommit('Synthetic run with a wrong-order proof')
     const wrongOrderLines = [PROOF_LINES[1]!, PROOF_LINES[0]!, PROOF_LINES[2]!]
     for (const said of wrongOrderLines) await recordUse(wrongOrder, 'named-tests', said)
     const wrongOrderFacts = factsOf(t.api.getRecord(wrongOrder.id)!)
     expect(wrongOrderFacts.testRuns).toEqual(wrongOrderLines)
-    expect(judge(wrongOrderFacts).items.some((item) => item.key === `test:${TEST_PATH}`)).toBe(true)
+    expect(judge(wrongOrderFacts).items.some((item) => item.key === `test:${TEST_PATH}`)).toBe(false)
   })
 })
 
@@ -662,23 +668,19 @@ describe('what an inspector would most likely refuse', () => {
     expect(abouts({ reports: [] })).toEqual([expect.stringMatching(/^report: No report is linked/u)])
   })
 
-  it('7: a changed test needs green, then red, then green, in the lines that name it', () => {
+  it('7: a changed test draws no test-proof item, whatever its named-tests lines show', () => {
     const changed = { commits: [commit('a1', [{ path: 'tests/old.test.ts', status: 'M', removed: 0 }], 'was a, is b, because c')], existedAtTheForkBase: () => true }
     const line = (exit: number) => `named 2 files (old, other); 2 ran, exactly those; vitest exited ${String(exit)}`
-    expect(abouts({ git: changed, testRuns: [line(0), line(1), line(0)] })).toEqual([])
-    expect(abouts({ git: changed, testRuns: [line(0), line(0)] })).toEqual([expect.stringMatching(/^test proof: tests\/old\.test\.ts changed.*in that order\. Chapter 5/u)])
-    expect(abouts({ git: changed, testRuns: [line(1), line(0)] })).toHaveLength(1)
-    const hidden = abouts({ git: changed, testRuns: ['named 30 files (a, b, and 28 more); 30 ran, exactly those; vitest exited 0'] })
-    expect(hidden).toEqual([expect.stringMatching(/may be among those/u)])
+    for (const testRuns of [[], [line(0), line(1), line(0)], [line(0), line(0)], [line(1), line(0)], ['named 30 files (a, b, and 28 more); 30 ran, exactly those; vitest exited 0']]) {
+      expect(abouts({ git: changed, testRuns })).toEqual([])
+    }
   })
 
-  it('8: a changed page needs image blocks naming the four widths and both themes', () => {
+  it('8: a changed page draws no pictures item, with or without image blocks, widths and themes', () => {
     const page = { commits: [commit('a1', [{ path: 'src/web/pages/Thing.tsx', status: 'M', removed: 2 }])], existedAtTheForkBase: () => true }
-    expect(abouts({ git: page, reports: [{ id: 'r', title: 'Done', data: { chaptersRead: [1, 6, 9], blocks: [] } }] })).toEqual([expect.stringMatching(/^pictures: .*has no image blocks/u)])
-    const someWidths = [{ type: 'image', path: 'a.png', alt: '1440 light' }, { type: 'prose', text: 'Thing at 990 and 660, dark' }]
-    expect(abouts({ git: page, reports: [{ id: 'r', title: 'Done', data: { chaptersRead: [1, 6, 9], blocks: someWidths } }] })).toEqual([expect.stringMatching(/does not name 390\./u)])
-    const all = [...someWidths, { type: 'prose', text: 'and 390' }]
-    expect(abouts({ git: page, reports: [{ id: 'r', title: 'Done', data: { chaptersRead: [1, 6, 9], blocks: all } }] })).toEqual([])
+    expect(abouts({ git: page, reports: [{ id: 'r', title: 'Done', data: { chaptersRead: [1, 6, 9], blocks: [] } }] })).toEqual([])
+    const noPictures = [{ type: 'prose', text: 'No picture was taken at 1440, 990, 660 or 390, light or dark.' }]
+    expect(abouts({ git: page, reports: [{ id: 'r', title: 'Done', data: { chaptersRead: [1, 6, 9], blocks: noPictures } }] })).toEqual([])
   })
 
   it('9: a criterion change mixed with code, after code, or with a one-line message', () => {
@@ -724,10 +726,6 @@ describe('what an inspector would most likely refuse', () => {
     expect(abouts({ mustRead: supervisor, reports: listed([6, 10]) })).toEqual([expect.stringMatching(new RegExp(`^report: Report r does not list chapters ${expected.filter((n) => ![6, 10].includes(n)).join(', ')} in chaptersRead`, 'u'))])
     // 13v ROUND 18b, refusal FyPoZSvM-fiD: chapters 6, 8 and 10 missing.
     expect(abouts({ mustRead: supervisor, reports: listed([1, 2, 3, 4, 5, 7, 9]) })).toEqual([expect.stringMatching(new RegExp(`does not list chapters ${expected.filter((n) => ![1, 2, 3, 4, 5, 7, 9].includes(n)).join(', ')} in chaptersRead`, 'u'))])
-    // 13t ROUND 32, refusal 02Z-6gpa5MGd: a page changed, and the report names the widths only to say none was looked at.
-    const page = { commits: [commit('t1', [{ path: 'src/web/components/Panel.tsx', status: 'M', removed: 3 }])], existedAtTheForkBase: () => true }
-    const noPictures = [{ type: 'prose', text: 'No picture was taken at 1440, 990, 660 or 390, light or dark.' }]
-    expect(abouts({ git: page, reports: [{ id: 'r', title: 'Done', data: { chaptersRead: [1, 6, 9], blocks: noPictures } }] })).toEqual([expect.stringMatching(/^pictures: .*has no image blocks/u)])
     // 13w ROUND 25, refusal LLJxa8ZackoC: an existing test's expectation changed in the same commit as code.
     const proved = (name: string) => [0, 1, 0].map((exit) => `named 1 file (${name}); 1 ran, exactly those; vitest exited ${String(exit)}`)
     const shared = (path: string) => path === 'tests/the-machine-reading-is-shared.test.ts'

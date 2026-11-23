@@ -64,7 +64,7 @@ import { THE_TEST_OFFICES_OWNER } from './a-page-of-a-test-office.ts'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { HUMAN_ONLY_KINDS } from '../src/shared/types.ts'
-import { AGENT, apiApp, freshDb, type TestDb } from './helpers.ts'
+import { AGENT, apiApp, freshDb, type TestDb, governsTheWholeProject } from './helpers.ts'
 
 type App = Awaited<ReturnType<typeof apiApp>>['app']
 
@@ -101,7 +101,7 @@ async function createAsHuman(kind: string, title: string): Promise<string> {
     url: '/api/records',
     headers: asHuman,
     // A DECISION SAYS WHAT IT REPLACES (problem ZSWftCSVUP2r): an empty list is saying none.
-    payload: { kind, title, ...(kind === 'decision' ? { data: { replaces: [] } } : {}) },
+    payload: { kind, title, ...(kind === 'decision' ? { data: { ...governsTheWholeProject(), replaces: [] } } : {}) },
   })
   expect(res.statusCode, `creating a ${kind} as the human: ${res.body}`).toBe(201)
   const id = (JSON.parse(res.body) as { record: { id: string } }).record.id

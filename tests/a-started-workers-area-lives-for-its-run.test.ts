@@ -47,7 +47,7 @@ import { THE_MESSAGE_WORKER_ID } from '../src/shared/participants.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { roundDeclaration } from '../src/shared/round-chapters/delivery.ts'
 import { aMadeUpSandboxRepo } from './a-made-up-sandbox-repo.ts'
-import { apiApp, freshDb, theOfficesOwnId, type TestDb } from './helpers.ts'
+import { apiApp, freshDb, theOfficesOwnId, type TestDb, governsTheWholeProject } from './helpers.ts'
 import { linkSourceWithLocalRoundRules, writeRoundStartRules } from './round-chapters-fixture.ts'
 import { FAKE_DEVCONTAINER, FAKE_DF, FAKE_DOCKER, FAKE_DU, FAKE_FREE, startsOf, theFakeMachine } from './sandbox-stand-ins.ts'
 import { aTestAddress } from './the-test-commit-address.mjs'
@@ -512,7 +512,7 @@ describe('the doors and the seal', () => {
     await started('door-quill', AS_THE_PERSON, { role: 'secretary' })
     await started(BOSS, asOne('door-quill'))
     // THE WORKER CARD'S CASTING ROW, cast by the person from a made-up decision.
-    const decided = await call('POST', '/api/records', AS_THE_PERSON, { kind: 'decision', title: 'The test casts the worker card', data: { replaces: [] } })
+    const decided = await call('POST', '/api/records', AS_THE_PERSON, { kind: 'decision', title: 'The test casts the worker card', data: { ...governsTheWholeProject(), replaces: [] } })
     expect(decided.status, JSON.stringify(decided.body)).toBe(201)
     const decision = String(decided.body['record'].id)
     const cast = await call('POST', '/api/casting/worker', AS_THE_PERSON, { program: { value: 'claude-code', decision }, model: { value: MODEL, decision }, effort: { value: 'high', decision } })

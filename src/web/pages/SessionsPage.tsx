@@ -15,9 +15,8 @@
  * the page's name from the first one it found; a tag typed in prose here made it
  * report a paragraph of this docstring as the page's name. Say "the heading" in words.
  *
- * THE STORED WORD IS UNTOUCHED. A record's kind is still `session`, and `kindWord` below still
- * prints "session" for it — in Developer mode as well as Normal, because "session" is already the
- * reader's word for one record. This page's NAME is what changed, not the vocabulary for a row.
+ * THE STORED WORD IS UNTOUCHED. A record's kind is still `session`. This page's NAME is what
+ * changed, not the vocabulary for a row.
  *
  * ---------------------------------------------------------------------------------------
  * WHAT WAS WRONG WITH THE PAGE THIS REPLACES, MEASURED
@@ -41,9 +40,8 @@
  *
  *   3. AND THE EXPLANATIONS WOULD HAVE MULTIPLIED. Each state group printed its own meaning and
  *      the sentences its rows share. With a second level of grouping that is the same paragraph
- *      once per state group per project. They are said once now, at the head, measured over every
- *      run rather than over the two in one group — which is also the only scale at which
- *      "thirty-seven rows say this" means anything.
+ *      once per state group per project. They were said once, at the head, until November 2026,
+ *      when the explanations were taken off the page, as decided.
  *
  * ---------------------------------------------------------------------------------------
  * WHAT IS FOLDED, AND WHAT IS NOT
@@ -60,8 +58,7 @@
  * runs somebody wrote down as finished and they are drawn as their own groups inside it, with their
  * own counts, because they are different things: a run recorded as `unknown` is a judgement, a run
  * with no state word is a gap somebody can close, and only `finished` on a record is a person
- * saying the work is done. The fold's own summary names all three before it is opened, and the
- * arithmetic above the list says so in words.
+ * saying the work is done. The fold's own summary names all three before it is opened.
  *
  * Every fold on this page carries its exact count and names what is inside it. Nothing is behind
  * the word "more".
@@ -79,12 +76,6 @@
  * This file draws headings, panels and one sentence of arithmetic. The rows, the state chips, the
  * placement sentences and the machine surface are all components/SessionPanel.tsx.
  *
- * The one stored word this file names is the record kind `session`, and it goes through `kindWord`
- * in src/web/lib/words.ts rather than being typed out — not because "session" reads badly, it is
- * already the reader's word, but because a page naming a kind in its own spelling is how the
- * catalogue came to say `wanna_try` where its own menu one line away said "worth a try". One
- * reader, so this page cannot be the one that disagrees.
- *
  * MEASURED, rather than assumed: the normal-mode test, deleted on 12 November 2026, rendered this whole page from fixtures
  * in Normal mode — two runs, one placed under a module by a stored link and one placed nowhere,
  * plus the machine panel with an orphaned process and a lock file — and found no record id, no
@@ -94,9 +85,8 @@
 
 import { t } from '@shared/i18n.ts'
 import type { ReactNode } from 'react'
-import { useInspect, useMode } from '../lib/mode.ts'
-import { kindWord } from '../lib/words.ts'
-import { Absence, ErrorNote, Loading, Panel, Tag, UnmarkedRowsNote, surfaceEmphasis } from '../components/ui.tsx'
+import { useInspect } from '../lib/mode.ts'
+import { Absence, ErrorNote, Loading, Panel, Tag, surfaceEmphasis } from '../components/ui.tsx'
 import {
   LookForRuns,
   MachineLine,
@@ -109,7 +99,6 @@ import {
   ReadAt,
   SESSIONS_CSS,
   SearchedNote,
-  SessionExplanations,
   SessionTally,
   belongsToSession,
   placementsOf,
@@ -152,7 +141,6 @@ import { ConversationSyncPanel } from '../components/ConversationSyncPanel.tsx'
 export function SessionsPage() {
   // No polling: the page reads when it opens, when a person presses, and when they switch project.
   const machine = useMachineReading()
-  const mode = useMode()
 
   return (
     <>
@@ -206,23 +194,6 @@ export function SessionsPage() {
           conversationSync={<ConversationSyncPanel />}
         />
       )}
-
-      {/* WHAT A ROW WITH NO MARK MEANS — AFTER THE ROWS, WHICH IS WHERE A STATEMENT ABOUT A LIST
-          BELONGS. It was drawn first, above the heading, so this page opened with a sentence about
-          the rows and named itself underneath: photographed at 1440 on 15 August, "Agent runs" was
-          the second thing on the screen and a two-line footnote was the first. Every family page
-          already puts this line at the foot, for the reason written on `PageFoot` in
-          components/family/parts.tsx.
-
-          IT IS DRAWN ONLY WHEN THERE ARE ROWS. While the reading is in flight, or when it failed,
-          there is no list for it to be about. The word for the kind comes from `kindWord` and is
-          not typed here; see the head.
-
-          IT IS ABOUT THE FILED ROWS (wave 13y round 142). A run found on disk has no record, so it carries no
-          origin mark, only its "not filed" tag, and "every other session carries a mark" was untrue of it. */}
-      <div className="sx-origin-note-foot" data-has-note={machine.taken === null || machine.taken.data.lines.length === 0 ? undefined : '1'}>
-        {machine.taken === null || machine.taken.data.lines.length === 0 ? null : <UnmarkedRowsNote what={t('g6a.sessions.filedKind', { kind: kindWord('session', mode).text })} />}
-      </div>
     </>
   )
 }
@@ -343,9 +314,9 @@ export function SessionsView({
             THE LEDE UNDER IT IS GONE. It was six sentences, then two, then one, and now none:
             everything the last one said is drawn as structure a few hundred pixels below it.
             "Every agent run on file" is the count on the panel and the arithmetic line under it;
-            "under the pipeline or module it belongs to" is said precisely, with the rule it uses,
-            by `SessionExplanations`, and drawn by the project heading on every group; "with what
-            needs you first inside each one" is the band order, `need you` first, in every group. */}
+            "under the pipeline or module it belongs to" is drawn by the project heading on every
+            group; "with what needs you first inside each one" is the band order, `need you` first,
+            in every group. */}
         <h1 className="sx-page-title" data-title-is="its-label">{t('nav.sessions')}</h1>
       </header>
 
@@ -381,8 +352,8 @@ export function SessionsView({
 
           IT SAID "Every run, under the work it belongs to" FOR ONE DRAFT. Two things were wrong
           with that, and both were seen in the photographs rather than reasoned out. `SessionExplan-
-          ations`, 40px below, already says "A run is filed under the pipeline or module it is
-          linked to, or wrote to" — the same fact, said better, in the place that owns it. And at
+          ations`, 40px below, then said "A run is filed under the pipeline or module it is
+          linked to, or wrote to" — the same fact, said better, in the place that owned it. And at
           390 the longer title wrapped to two lines and pushed the count onto a third. */}
       <Panel titleIs="label" declares={{ surface: 'sessions.runs' }} title={t('g6a.sessions.every')} actions={<Tag tone="quiet">{lines.length}</Tag>}>
         <SessionTally sessions={lines} />
@@ -403,17 +374,14 @@ export function SessionsView({
           {/* ZERO GROUPS IS AN ABSENCE, NOT A SECOND COUNT. "including 0 in 0 whole folded groups" makes
               a reader check whether the zero is a fault; when no whole group is folded there is nothing
               for the clause to include, so the line says only what the reader came for. */}
-          {t(quietRows === 0 || quiet.length === 0 ? 'g6a.sessions.foldedEndedNoGroups' : 'g6a.sessions.foldedEnded', {n: ended, rows: quietRows, groups: quiet.length})}{' '}
-          {t('g6a.sessions.aRunThatHasMerelyGoneQuietIs')}
+          {t(quietRows === 0 || quiet.length === 0 ? 'g6a.sessions.foldedEndedNoGroups' : 'g6a.sessions.foldedEnded', {n: ended, rows: quietRows, groups: quiet.length})}
         </p> : null}
-
-        {inspect ? <SessionExplanations lines={lines} /> : null}
 
         {/* The unassigned group is only trustworthy if the reading behind it was complete. There
             is no per-module fetch to fail any more — the server reads the links table itself — so
             the one thing that can still be partial is the change log, and it says so here. */}
         {!inspect || !placementRead.changesCapped ? null : (
-          <p className="sx-warning">{t('g6a.sessions.thePlacementReadChangeRowsAndTheLog', { value1: (placementRead.changes) })}</p>
+          <p className="sx-warning">{t('g6a.sessions.placementReadCapped', { n: placementRead.changes })}</p>
         )}
 
         {/* The machine in one line, here, and in full at the foot. There is no link: this app reads
@@ -492,8 +460,8 @@ export function SessionsView({
           // a reply with no `orphans` key becomes a printed line in the "Not readable" panel
           // below, and both leave this panel at rank 0 in the alarm tone. What is left here is the
           // answer "the ledger was read and nothing registered has outlived its session", which a
-          // reader does nothing about. Its sentence is read out by a screen reader.
-          <p className="px-sr">{t('g6a.sessions.nothingASessionRegisteredHasOutlivedTheSession')}</p>
+          // reader does nothing about.
+          null
         ) : (
           <>
             <OrphanBlock
@@ -502,17 +470,11 @@ export function SessionsView({
               onReread={onReread}
               heading={t('g6a.sessions.orphanCount', {n: orphans.length})}
             />
-            {/* MUST ACT ON, AND IT KEEPS EVERY WORD. Something is running, nothing on this page
+            {/* MUST ACT ON, AND IT KEEPS A WHOLE SENTENCE. Something is running, nothing on this page
                 claims it, and no session is going to end and clean it up. That is a finding with
                 an action behind it, which is the one tier that pays sentence weight. */}
             {homeless.length === 0 ? null : (
-              <Absence
-                tier="must-act-on"
-                sentence={
-                  <>
-                    {homeless.length === 1 ? t('g6a.sessions.oneOfTheseIs') : t('g6a.sessions.ofTheseAre', { value1: (homeless.length) })} {' '}{t('g6a.sessions.notClaimedByAnySessionOnThisPage')}</>
-                }
-              />
+              <Absence tier="must-act-on" sentence={t('g6a.sessions.notClaimedCount', { n: homeless.length })} />
             )}
             {/* THE COUNT, AND THE ROW KEEPS THE REASON. Two reasons can take a release button away
                 — the server could not say what killing it would act on, or it is a lock file,
@@ -521,13 +483,7 @@ export function SessionsView({
                 in the place the button would have been, and the safety note about lock files is
                 there and is untouched. What a reader cannot get by looking is how many of the
                 orphans above are in that position, so that is what is left here. */}
-            {mute.length === 0 ? null : (
-              <p className="sx-empty">
-                {mute.length === 1
-                  ? t('g6a.sessions.oneOfTheseHasNoReleaseButtonAnd')
-                  : t('g6a.sessions.ofTheseHaveNoReleaseButtonAndEach', { value1: (mute.length) })}
-              </p>
-            )}
+            {mute.length === 0 ? null : <p className="sx-empty">{t('g6a.sessions.noReleaseButtonCount', { n: mute.length })}</p>}
           </>
         )}
       </Panel> : null}
@@ -537,12 +493,7 @@ export function SessionsView({
           takes are the sessions list and the sweep of this machine, and both are already named on
           screen, so the eyebrow can say which of them could not be read. */}
       {problems.length === 0 ? null : (
-        <Panel titleIs="label" declares={{ surface: 'sessions.unreadable' }} title={t('g6a.sessions.notReadable')} kind={t('g6a.sessions.fromTheSessionsListAndTheMachineSweep')} rank={0} tone="broken">
-          {/* THE COUNT AND THE RULE, and nothing between them. That these are listed rather than
-              dropped is what the panel underneath IS — every one of them is on screen, under a
-              heading in the alarm tone. The rule stays: it is why a control a reader might look for
-              is absent. */}
-          <p className="sx-empty">{t('g6a.sessions.theServerSentThisPageCouldNotRead', { value1: t('g6a.sessions.resourceCount', {n: problems.length}) })}</p>
+        <Panel titleIs="label" declares={{ surface: 'sessions.unreadable' }} title={t('g6a.sessions.notReadable')} kind={t('g6a.sessions.fromTheSessionsListAndTheMachineSweep')} rank={0} tone="broken" actions={<Tag tone="quiet">{problems.length}</Tag>}>
           <PanelProblems problems={problems} />
         </Panel>
       )}

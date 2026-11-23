@@ -31,7 +31,7 @@ import type { FastifyInstance } from 'fastify'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { THE_PERSON } from '../src/shared/person.ts'
-import { apiApp, freshDb, type TestDb } from './helpers.ts'
+import { A_SLEEP_TIME, apiApp, freshDb, type TestDb } from './helpers.ts'
 
 let t: TestDb
 let app: FastifyInstance
@@ -83,7 +83,7 @@ async function makeAResident(handle: string): Promise<void> {
     method: 'POST',
     url: '/api/residents/proposals',
     headers: as('sec-made-up'),
-    payload: { agentId: handle, because: 'It has done steady work here for weeks.' },
+    payload: { agentId: handle, because: 'It has done steady work here for weeks.', sleepTime: A_SLEEP_TIME },
   })
   expect(proposed.statusCode, proposed.body).toBe(201)
   const id = (proposed.json() as { proposal: { id: string } }).proposal.id

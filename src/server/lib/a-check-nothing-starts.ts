@@ -22,7 +22,7 @@ import {
   A_CHECK_NOTHING_STARTS, A_MARK_IS_LET_GO_BECAUSE, theMarkAsStored, theOfficeStartedNoCheckOf, theOfficeStartedNoCheckSays,
 } from '@shared/whether-a-check-would-start.ts'
 import type { PanelRecord } from '@shared/types.ts'
-import { whetherThisOfficeWouldStartACheck } from './checks-in-merges-only.ts'
+import { whetherThisOfficeWouldStartThisRunCheck } from './checks-in-merges-only.ts'
 import { theAgentOfARun, theCheckAskedFor, writeAMessage } from './inspection.ts'
 import { THE_OFFICE } from './the-office.ts'
 import { getRecord, patchRecord } from './records.ts'
@@ -69,7 +69,7 @@ function tellOrLetGo(run: PanelRecord, now: Date): boolean {
   if (stands.released !== null) return letGo(A_MARK_IS_LET_GO_BECAUSE.theRunHasItsVerdict('released'))
   if (stands.refused !== null) return letGo(A_MARK_IS_LET_GO_BECAUSE.theRunHasItsVerdict('refused'))
   if (!stands.unreleasedFinish || stands.landedByHand !== null) return letGo(A_MARK_IS_LET_GO_BECAUSE.theAskWasAnsweredWithoutACheck(stands.says))
-  const reading = whetherThisOfficeWouldStartACheck(run.workspaceId)
+  const reading = whetherThisOfficeWouldStartThisRunCheck(run.workspaceId, run.id)
   if (reading.starts) return letGo(A_MARK_IS_LET_GO_BECAUSE.theOfficeWouldStartItNow)
   const agent = theAgentOfARun(run)
   if (agent === null) return letGo(A_MARK_IS_LET_GO_BECAUSE.theRunServesNoAgentItCanName)

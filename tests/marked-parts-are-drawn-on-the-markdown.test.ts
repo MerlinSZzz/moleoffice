@@ -21,6 +21,8 @@
  *   (i) a part only on Markdown syntax or only on a link's address is not shown, and the sentence counts them.
  *   (j) a part whose quote no longer matches the words is counted as not shown.
  *   (k) the message's own page draws the parts in the reader's flags, with the same count and sentence.
+ *   (l) the count and the sentence beside it are drawn in the page's quiet text colour, not in the colour of the
+ *       words around them.
  *
  * The words are read from the word lists, never copied. Everything here is made up: the agent, the record, the
  * messages and the person's flags. In (j) the office's answer is changed in the browser, to stand for a stored part
@@ -172,6 +174,32 @@ async function thePaint(within: Locator): Promise<APaint[]> {
 /** A painted run without its drawn words, for an element whose drawn words are not its stored ones: a formula or a name. */
 function withoutTheWords(one: APaint): Omit<APaint, 'words'> {
   return { from: one.from, to: one.to, whole: one.whole, wordsColour: one.wordsColour, flagColour: one.flagColour, on: one.on }
+}
+
+/**
+ * The colour each of `selectors` is drawn in, and the colour this page draws for --text-3, both read from the page.
+ * The quiet colour is read from a probe element wearing `var(--text-3)`, never copied out of a stylesheet.
+ */
+async function theQuietColours(
+  within: Locator,
+  selectors: readonly string[],
+): Promise<{ quiet: string; labels: Record<string, string> }> {
+  return within.evaluate((root, list) => {
+    const probe = document.createElement('span')
+    probe.style.color = 'var(--text-3)'
+    probe.style.position = 'absolute'
+    probe.style.visibility = 'hidden'
+    document.body.append(probe)
+    const quiet = getComputedStyle(probe).color
+    probe.remove()
+    const labels: Record<string, string> = {}
+    for (const selector of list) {
+      const label = root.querySelector(selector)
+      if (label === null) throw new Error(`nothing in the bubble is drawn as ${selector}`)
+      labels[selector] = getComputedStyle(label).color
+    }
+    return { quiet, labels }
+  }, selectors as string[])
 }
 
 /** What the foot says: the count, and the sentence beside it or null when every part is shown. */
@@ -418,6 +446,25 @@ describe('marked parts on the Markdown of a sent message', () => {
       await words.locator('.px-chat-marked').first().waitFor({ timeout: 30_000 })
       expect(await thePaint(words)).toEqual([{ words: 'bold apricot', from: bold.from, to: bold.to, whole: false, ...PAINTED, on: null }])
       expect(await theFoot(page.locator('.mp'))).toEqual(inTheChat)
+    } finally {
+      await context.close()
+    }
+  }, 180_000)
+
+  it('(l) the count and the not-shown sentence are drawn in the page\'s quiet text colour', async () => {
+    const body = 'Quiet colours: $a^2+b^2$ and $c^2$ here.'
+    const painted = partOn(body, 'a^2+b^2')
+    const at = body.indexOf('c^2')
+    await send(body, [painted, { from: at, to: at + 1, quote: 'c', intent: 'just-ask' }])
+    const { context, page } = await aWindow()
+    try {
+      const bubble = await theBubble(page, 'Quiet colours')
+      await bubble.locator('.px-chat-words .mt').first().waitFor({ timeout: 30_000 })
+      const drawn = await theQuietColours(bubble, ['.px-chat-marked-count', '.px-chat-marked-not-shown'])
+      expect(drawn.quiet, 'the page drew no colour for --text-3').not.toBe('')
+      for (const selector of ['.px-chat-marked-count', '.px-chat-marked-not-shown']) {
+        expect(drawn.labels[selector], `${selector} is not drawn in the page's quiet text colour`).toBe(drawn.quiet)
+      }
     } finally {
       await context.close()
     }

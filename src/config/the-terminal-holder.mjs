@@ -64,7 +64,7 @@ export const THE_HOLDER_PROTOCOL = 1
  * an older holder may omit this list and continues to serve the requests it already knows.
  * The private request version describes the protocol, not host adapter readiness.
  */
-export const THE_HOLDER_REQUESTS = Object.freeze(['typeALine', 'privateLoginV1'])
+export const THE_HOLDER_REQUESTS = Object.freeze(['typeALine', 'privateLoginV1', 'prepareALine', 'nameATerminal'])
 
 /**
  * @typedef {{ from: string, root: string, build: null | { version: string | null, commit: string | null, builtAt: string | null } }} ACopy
@@ -174,6 +174,15 @@ export const THE_FIRST_SIZE = Object.freeze({ cols: 120, rows: 32 })
 export const THE_LARGEST_SIDE = 1000
 
 /**
+ * THE NAME, THE GROUP AND THE TAGS THE PERSON GIVES A TERMINAL, at most this long in characters, and at most this many
+ * tags. The holder keeps them with the terminal, in memory, so they end with it.
+ */
+export const THE_LONGEST_TERMINAL_NAME = 80
+export const THE_LONGEST_TERMINAL_GROUP = 80
+export const THE_LONGEST_TERMINAL_TAG = 40
+export const THE_MOST_TAGS_ON_A_TERMINAL = 16
+
+/**
  * THE LONGEST LINE THE HOLDER READS FROM ONE CONNECTION, in characters. A line is one request. Typing and
  * pasting go through it, so it allows a long paste, and a longer line is refused rather than held.
  */
@@ -269,9 +278,22 @@ export function theTerminalHolderLog(databasePath, env = process.env) {
  */
 export const ONE_REQUEST_MS = 3_000
 
+/**
+ * THE LONGEST AN OPEN WITH A PREPARED LINE WAITS BEFORE IT TYPES THE LINE, when the shell is never quiet (src/holder/
+ * index.mjs, typeThePreparedLine). That open answers only once the line is typed, so the server waits this much longer
+ * for it than for one request. It was not measured against a slow shell.
+ */
+export const THE_LONGEST_WAIT_TO_TYPE_A_PREPARED_LINE_MS = 1_500
+
 /** How often a wait for the holder's answer counts the time that passed, and the most one count may add. */
 const ONE_TICK_MS = 50
 const THE_MOST_ONE_TICK_COUNTS_MS = 100
+
+/**
+ * WHAT A CALLER ADDS WHEN THE ASK REFUSED A PATH TOO LONG ('too-long'). The holder's own start refuses such a path
+ * (src/holder/index.mjs), so no holder can be listening on it, and a caller reads it as no holder running.
+ */
+export const NO_HOLDER_LISTENS_ON_A_PATH_THIS_LONG = "The terminal holder's own start refuses a socket path this long, so no holder can be listening on it."
 
 /**
  * ASK THE HOLDER ONE THING AND READ ITS ONE ANSWER, on a connection made for it and closed after.
@@ -279,6 +301,11 @@ const THE_MOST_ONE_TICK_COUNTS_MS = 100
  * It resolves with the holder's answer, whether `ok` is true or false; the caller reads `ok`. It
  * rejects with a sentence when nothing answers: no socket (`code` 'absent'), nobody listening
  * ('refused'), no answer in time ('silent'), or a line that is not an answer ('garbled').
+ *
+ * A SOCKET PATH TOO LONG IS REFUSED BEFORE ANY CONNECTION ('too-long'), on every system, in the words
+ * the holder uses when it will not start on one (src/holder/index.mjs). A Unix socket's path has room
+ * for `theLongestSocketPathBytes()` bytes. Until 22 November 2026 the ask tried a longer path anyway,
+ * and its refusal named a path it had not asked.
  *
  * THE WAIT COUNTS ONLY THE TIME THIS PROCESS WAS FREE TO READ THE ANSWER. A tick every 50 ms adds the
  * time since the one before, at most 100 ms of it, so a second this process spent on other work is not
@@ -291,6 +318,19 @@ const THE_MOST_ONE_TICK_COUNTS_MS = 100
  * @returns {Promise<Record<string, unknown> & { ok: boolean }>}
  */
 export function askTheHolder(socketPath, request, waitMs = ONE_REQUEST_MS) {
+  const length = Buffer.byteLength(socketPath)
+  const longest = theLongestSocketPathBytes()
+  if (length > longest) {
+    return Promise.reject(
+      Object.assign(
+        new Error(
+          `The terminal holder's socket path ${socketPath} is ${String(length)} bytes long, and a Unix socket's path may be at ` +
+            `most ${String(longest)}. Nothing was asked. Point XDG_CONFIG_HOME (or HOME) at a shorter folder.`,
+        ),
+        { code: 'too-long' },
+      ),
+    )
+  }
   return new Promise((done, fail) => {
     const socket = createConnection(socketPath)
     let pending = ''

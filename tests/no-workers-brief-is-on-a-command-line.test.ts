@@ -27,7 +27,7 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symli
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { THE_OPENCODE_DATABASE_VARIABLE, writeInstance } from '../tools/sandbox-common.mjs'
-import { expectRoundRulesSaved, LEGACY_ROUND_CHAPTERS, linkSourceWithLocalRoundRules, writeRoundStartRules } from './round-chapters-fixture.ts'
+import { expectRoundRulesSaved, LEGACY_ROUND_CHAPTERS, linkSourceWithLocalRoundRules, THE_MADE_UP_EMPTY_OFFICE, writeRoundStartRules } from './round-chapters-fixture.ts'
 import { CONTAINER_TMP_LOADER, withAPrivateTmpToSweep } from './sandbox-stand-ins.ts'
 import { aTestAddress } from './the-test-commit-address.mjs'
 import { NAME_THE_PROCESS_THAT_LOADS_THIS, removeTheFolderOnceItsProcessesHaveEnded } from './the-processes-a-fixture-started.ts'
@@ -64,6 +64,9 @@ globalThis.fetch = async (address, init = {}) => {
   if (url.origin !== 'http://synthetic.invalid') throw new Error('test refused network: ' + url.origin)
   const path = url.pathname, method = init.method ?? 'GET'
   if (path.startsWith('/api/office/run-models/for/')) return new Response('{}', { status: 503, headers: { 'x-mole-office-stand-in': 'synthetic' } })
+  // THE TWO DOORS A ROUND'S START READS ITS RULES FROM, answered as an office that holds no chapter and no regulation.
+  const rules = ${JSON.stringify(THE_MADE_UP_EMPTY_OFFICE)}
+  if (method === 'GET' && Object.hasOwn(rules, path)) return new Response(JSON.stringify(rules[path]), { status: 200 })
   const body = init.body ? JSON.parse(init.body) : {}
   appendFileSync(join(root, 'requests'), JSON.stringify({ path, method, body }) + '\n')
   const answer = (value, status = 200) => new Response(JSON.stringify(value), { status })
@@ -128,11 +131,13 @@ if (args[0] === 'inspect') {
  * A MADE-UP claude, codex or opencode. It runs no model. It records the words it was given and its standard input in
  * seen-<run>.json. The helper gives a command its brief as a file on its standard input, so anything else there (the
  * helper's own exhausted pipe) is recorded as no standard input at all, and is never waited on. codex and opencode
- * print the thread and the session a round continues.
+ * print the thread and the session a round continues. IT HAS THE FIXTURE'S FOLDER IN ITS OWN TEXT, and not from its
+ * environment: a Codex is given only the names its list keeps (src/config/the-environment-a-codex-gets.mjs), and
+ * BRIEF_FIXTURE is not on it.
  */
 const aProgram = (program: string) => `#!${process.execPath}
 const fs = process.getBuiltinModule('node:fs'), path = process.getBuiltinModule('node:path')
-const file = path.join(process.env.BRIEF_FIXTURE, 'seen-' + process.env.MOLE_OFFICE_SESSION + '.json')
+const file = path.join(${JSON.stringify(root)}, 'seen-' + process.env.MOLE_OFFICE_SESSION + '.json')
 const stdin = fs.fstatSync(0).isFile() ? fs.readFileSync(0, 'utf8') : null
 fs.writeFileSync(file + '.part', JSON.stringify({ argv: process.argv.slice(2), stdin }))
 fs.renameSync(file + '.part', file)

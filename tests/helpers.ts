@@ -42,10 +42,11 @@ import { getCurrentTest } from '@vitest/runner'
 // Type only, and therefore erased before this file runs. Naming playwright here does not load it;
 // `liveApp` below imports it when a caller asks, so the two hundred tests that never open a
 // browser do not pay for one.
-import type { Browser, BrowserContext, Page, Route } from 'playwright'
+import type { Browser, BrowserContext, BrowserContextOptions, Page, Route } from 'playwright'
 // Type only, and therefore erased before this file runs. Naming src/server/index.ts here neither
 // imports it nor opens a database; `apiApp` below does the real import when a caller asks.
 import type { BuiltServer } from '../src/server/index.ts'
+import type { FastifyInstance } from 'fastify'
 import { SHAPE_SPECS, type FieldSpec } from '../src/shared/kinds.ts'
 import { detailKeyForSurface, type Rung } from '../src/shared/detail.ts'
 import { addressForOtherMachinesFrom, databasePathFrom, settings } from '../src/config/settings.mjs'
@@ -72,6 +73,39 @@ export { READY_ATTRIBUTE, READY_TIMEOUT_MS, waitForThePage } from '../tools/the-
 import { testWorldName } from '../src/shared/worlds.ts'
 import { THE_PRESENCE_LOOK_SETTING } from '../src/shared/presence-clock.ts'
 import { THE_SLEEP_CLOCK_SETTING } from '../src/shared/sleep-clock.ts'
+import { SLEEP_TIME_SHORTEST_MINUTES } from '../src/shared/residents.ts'
+import defaultFlows from '../src/config/default-flows.json' with { type: 'json' }
+
+/**
+ * A SLEEP TIME A PROPOSAL MAY SEND in a test that is not about sleeping. It opened a minute before this process loaded
+ * and lasts the shortest length, so a proposal confirmed now is inside a window that was set after it opened: the office
+ * begins no sleep for it today, and no other test's clock reaches tomorrow. Tests that set their own clock send their own.
+ */
+export const A_SLEEP_TIME: { startsAt: string; minutes: number } = (() => {
+  const opened = new Date(Date.now() - 60_000)
+  return {
+    startsAt: `${String(opened.getHours()).padStart(2, '0')}:${String(opened.getMinutes()).padStart(2, '0')}`,
+    minutes: SLEEP_TIME_SHORTEST_MINUTES,
+  }
+})()
+
+/** Register a test-office agent and give its waiter a private file containing that agent's own key. */
+export async function aTestAgentsKeyEnvironment(app: FastifyInstance, handle: string, folder: string, workspace = 'default', runtime = 'claude-code'): Promise<NodeJS.ProcessEnv> {
+  const reply = await app.inject({
+    method: 'POST', url: '/api/records',
+    headers: { 'x-mole-office-workspace': workspace, 'x-mole-office-actor-type': 'human', 'x-mole-office-actor-id': THE_TEST_OFFICES_OWNER.id },
+    payload: { kind: 'agent', title: handle, data: { handle, runtime, state: 'active' } },
+  })
+  if (reply.statusCode !== 201) throw new Error(`Could not register the test agent: ${reply.statusCode} ${reply.body}`)
+  const key = (reply.json() as { whatToGiveIt?: { key?: string } }).whatToGiveIt?.key
+  if (typeof key !== 'string' || key === '') throw new Error('The test agent registration answered no key')
+  const path = join(folder, `${handle}.key`)
+  writeFileSync(path, `${key}\n`, { mode: 0o600, flag: 'wx' })
+  const env: NodeJS.ProcessEnv = { ...withoutInheritedEffort(), MOLE_AGENT_KEY_FILE: path }
+  delete env.MOLE_AGENT_KEY
+  delete env.MOLE_OFFICE_TOOL_CONFIGURATION
+  return env
+}
 
 /**
  * WAIT UNTIL THE PAGE HAS DRAWN ITSELF AGAIN AFTER A CHANGE OF WIDTH OR OF LIGHT AND DARK.
@@ -369,6 +403,14 @@ async function loadAgainWhatANewTestDatabaseNeeds(): Promise<void> {
   }
 }
 
+/**
+ * THE SEARCH THREADS BEING STOPPED IN THIS PROCESS are kept in a set on the global object under this key, by
+ * src/server/lib/search-thread.ts, which does not export it. It is written out here and not imported, because importing
+ * that module loads the database client. A test of a closed test database's folder proves that this is the key the
+ * module uses.
+ */
+export const SEARCH_THREADS_BEING_STOPPED = Symbol.for('mole-office: the search threads being stopped')
+
 export async function freshDb(): Promise<TestDb> {
   await loadAgainWhatANewTestDatabaseNeeds()
 
@@ -412,7 +454,18 @@ export async function freshDb(): Promise<TestDb> {
     file,
     close() {
       client.sqlite.close()
-      removeThisTestFolder(dir)
+      // A SEARCH THREAD STILL BEING STOPPED CAN STILL OPEN THIS DATABASE. A server's close asks its search thread to stop
+      // and does not wait for it (src/server/api/search.ts), and a thread that was still loading opens the database file
+      // before it looks again whether its server has closed. Removing the folder at that moment failed with ENOTEMPTY.
+      // So while a thread is being stopped, the folder is removed once every thread being stopped now has stopped, and
+      // this close does not wait for that. A folder still waiting when the process ends is removed with every other
+      // test folder (tests/a-test-folder.ts).
+      const stops = (globalThis as typeof globalThis & { [SEARCH_THREADS_BEING_STOPPED]?: Set<Promise<void>> })[SEARCH_THREADS_BEING_STOPPED]
+      if (stops === undefined || stops.size === 0) {
+        removeThisTestFolder(dir)
+        return
+      }
+      void Promise.all(stops).then(() => removeThisTestFolder(dir))
     },
   }
 }
@@ -527,6 +580,17 @@ export const FOR_THE_PERSON = { forThePerson: { reason: A_TESTS_REASON_FOR_THE_P
 
 /** The same reason in a query, for a press with no body, such as a DELETE. Starts with neither `?` nor `&`. */
 export const FOR_THE_PERSON_IN_THE_QUERY = `forThePerson.reason=${encodeURIComponent(A_TESTS_REASON_FOR_THE_PERSON)}`
+
+/**
+ * WHAT A TEST'S DECISION GOVERNS WHEN ITS CASE IS ABOUT SOMETHING ELSE: the whole project, alone, to spread into the
+ * data of a decision filed at a door. Every door a decision is made through refuses one that names no page, no whole
+ * project and nothing in nothingFits (src/server/lib/what-a-record-names.ts). A whole-project decision with no files
+ * makes the office say nothing back, so the case reads the answer it read before. A new object at each call, so a case
+ * that changes it changes only its own.
+ */
+export function governsTheWholeProject(): { governs: { wholeProject: true }[] } {
+  return { governs: [{ wholeProject: true }] }
+}
 
 /**
  * THE PRESS AN AGENT'S ACTOR CARRIES WHEN NO ROUTE MATCHED ITS REQUEST AND IT GAVE NO REASON, as a test that hands
@@ -2085,6 +2149,9 @@ const WHAT_A_FILE_IS_SENT_AS: Readonly<Record<string, string>> = {
   '.js': 'text/javascript; charset=utf-8',
   '.json': 'application/json; charset=utf-8',
   '.map': 'application/json; charset=utf-8',
+  // THE PDF READER'S WORKER. Vite writes the pdfjs-dist worker under its own name, which ends .mjs,
+  // and the PDF tests need it sent as a script.
+  '.mjs': 'text/javascript; charset=utf-8',
   '.png': 'image/png',
   '.svg': 'image/svg+xml',
   '.txt': 'text/plain; charset=utf-8',
@@ -2254,7 +2321,9 @@ export async function theBrowserThisWorkerShares(): Promise<Browser> {
   if (record.browserComing === null) {
     const coming = (async () => {
       const { chromium } = await import('playwright')
-      return chromium.launch()
+      const launched = await chromium.launch()
+      storeNormalModeInEveryContextOf(launched)
+      return launched
     })()
     // A start that failed is not remembered, so the next test tries again rather than waiting on a
     // promise that has already been refused.
@@ -2281,6 +2350,59 @@ export async function closeTheBrowserThisWorkerShares(): Promise<void> {
   record.browser = null
   record.browserComing = null
   await browser?.close()
+}
+
+/**
+ * EVERY TEST BROWSER STORES NORMAL MODE BEFORE ITS FIRST PAGE, where nothing is stored, as decided.
+ *
+ * A person the office makes starts in Developer mode, and a test world's person is made by the office. So a browser
+ * with nothing stored would open in Developer mode once the page had read that person. The tests were written for what
+ * Normal mode draws, so they still say Normal, here, in one place: every context the shared browser makes stores
+ * `normal` under the key src/web/lib/mode.ts reads, on each document before it loads, unless a mode is stored already.
+ * A mode a test stores itself is kept, and `?mode=` in the address still decides one load.
+ *
+ * A test of what the page does with nothing stored takes its context from `aContextThatStoresNoMode`, or asks `liveApp`
+ * for `modeStored: 'nothing'`. A test that launches a Chromium of its own calls `storeNormalModeWhereNothingIsStored`
+ * on its context.
+ */
+export async function storeNormalModeWhereNothingIsStored(context: BrowserContext): Promise<void> {
+  await context.addInitScript(() => {
+    // A document with no origin of its own, such as about:blank or a sandboxed frame, refuses storage and has no mode.
+    try {
+      if (window.localStorage.getItem('mole-office.mode') === null) window.localStorage.setItem('mole-office.mode', 'normal')
+    } catch {
+      return
+    }
+  })
+}
+
+/**
+ * Playwright's own `newContext` of a shared browser, kept on the browser itself so that a test file evaluating this
+ * module again finds it.
+ */
+const PLAYWRIGHTS_OWN_NEW_CONTEXT = Symbol.for('mole-office.tests.playwrights-own-new-context')
+
+type ASharedBrowser = Browser & { [PLAYWRIGHTS_OWN_NEW_CONTEXT]?: Browser['newContext'] }
+
+function storeNormalModeInEveryContextOf(browser: Browser): void {
+  const shared = browser as ASharedBrowser
+  const make = browser.newContext.bind(browser)
+  shared[PLAYWRIGHTS_OWN_NEW_CONTEXT] = make
+  // `newPage` on the browser makes its context through this same method, so a page taken that way stores it too.
+  browser.newContext = async (options?: BrowserContextOptions) => {
+    const context = await make(options)
+    await storeNormalModeWhereNothingIsStored(context)
+    return context
+  }
+}
+
+/** A context of the shared browser that stores no mode, for a test of what the page does with nothing stored. */
+export async function aContextThatStoresNoMode(browser: Browser, options?: BrowserContextOptions): Promise<BrowserContext> {
+  const make = (browser as ASharedBrowser)[PLAYWRIGHTS_OWN_NEW_CONTEXT]
+  if (make === undefined) {
+    throw new Error('This browser is not the one this worker shares, so it stores no mode by itself. Take its context with newContext.')
+  }
+  return make(options)
 }
 
 
@@ -2423,6 +2545,11 @@ export interface LiveAppOptions {
    * minute to open rather than up to a minute more. `startTheSleepClock` in src/server/lib/sleep-windows.ts reads it.
    */
   runTheSleepClockEveryMs?: number
+  /**
+   * WHAT THE BROWSER HAS STORED AS ITS MODE BEFORE THE FIRST PAGE. Left out, `normal`, where nothing is stored yet, as
+   * `storeNormalModeWhereNothingIsStored` says. `nothing` stores nothing, for a test of what the page does then.
+   */
+  modeStored?: 'normal' | 'nothing'
 }
 
 /**
@@ -2479,6 +2606,29 @@ export async function deleteTheCopiedDefaultChapters(api: string): Promise<numbe
     if (!gone.ok) throw new Error(`DELETE of the copied chapter ${chapter.id} answered ${String(gone.status)}: ${await gone.text()}`)
   }
   return held.chapters.length
+}
+
+/**
+ * TAKE THE COPIED DEFAULT FLOWS OUT OF A TEST OFFICE. A fresh office copies the ten general
+ * office flows into its own flow records at its first start (src/server/lib/default-flows.ts,
+ * wave 13r). A test about a project that holds only the flows it files itself deletes them first,
+ * as the person would. Answers how many it deleted. The sentence every copied flow carries is read
+ * from src/config/default-flows.json, as the code reads it. The person id is read from the shared
+ * module, as every test reads it.
+ */
+export async function deleteTheCopiedDefaultFlows(api: string): Promise<number> {
+  const { THE_PERSON } = await import('../src/shared/person.ts')
+  const headers = { 'x-mole-office-workspace': 'default', 'x-mole-office-actor-type': 'human', 'x-mole-office-actor-id': THE_PERSON }
+  const read = await fetch(`${api}/api/records?kind=flow&limit=50&shape=full`, { headers })
+  if (!read.ok) throw new Error(`GET /api/records?kind=flow&limit=50 answered ${String(read.status)}: ${await read.text()}`)
+  const held = (await read.json()) as { records: { id: string; data: { declared_in?: unknown } }[] }
+  const copiedSentence = defaultFlows.flows[0]!.declared_in
+  const copied = held.records.filter((flow) => flow.data.declared_in === copiedSentence)
+  for (const flow of copied) {
+    const gone = await fetch(`${api}/api/records/${flow.id}`, { method: 'DELETE', headers })
+    if (!gone.ok) throw new Error(`DELETE of the copied flow ${flow.id} answered ${String(gone.status)}: ${await gone.text()}`)
+  }
+  return copied.length
 }
 
 /**
@@ -2761,12 +2911,13 @@ async function theStagesOfTheStack(options: LiveAppOptions, who: string, waitFor
     )
 
     const browser = await stage('Chromium to launch', () => theBrowserThisWorkerShares())
+    const asked: BrowserContextOptions = {
+      viewport: options.viewport,
+      ...(options.hasTouch === true ? { hasTouch: true } : {}),
+    }
     const made = await stage(
       'Chromium to create the browser context',
-      () => browser.newContext({
-        viewport: options.viewport,
-        ...(options.hasTouch === true ? { hasTouch: true } : {}),
-      }),
+      () => (options.modeStored === 'nothing' ? aContextThatStoresNoMode(browser, asked) : browser.newContext(asked)),
       (late) => late.close(),
     )
     context = made

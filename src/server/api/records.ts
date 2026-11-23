@@ -1,5 +1,6 @@
 // Copyright © 2026 Zhengyang Shen
 // Licensed under the MIT License. See LICENSE.
+import { reportStars, setReportStar } from '../lib/report-stars.ts'
 import { refuseANewRunWhileAStarterChangeWaits } from '../lib/agent-starter.ts'
 
 /**
@@ -110,7 +111,9 @@ import { RESOLVES_PROPOSAL } from '@shared/types.ts'
 import { decisionsNotOnThePersonsOwnWords, isPreparedForThePerson, theNoteFiledFrom } from '../lib/the-persons-own-words.ts'
 import type { NotOnThePersonsOwnWords } from '@shared/the-persons-own-words.ts'
 import type { AKeyReminder } from '@shared/message-keys.ts'
+import type { WhatTheWriteNames } from '../lib/what-a-record-names.ts'
 import { theRecordsAWriteNames, type ARecordNamed } from '../lib/message-keys.ts'
+import { leadIsReminded } from '../lib/when-a-lead-is-reminded.ts'
 import { theReportFileReminder, type AReportFileReminder } from '@shared/report-file-reminder.ts'
 import { SANDBOXES_FOLDER, WORKTREES_FOLDER } from '../../config/sandbox-folder.mjs'
 import { isAbsolute, resolve, sep } from 'node:path'
@@ -118,8 +121,12 @@ import { inside, storedPathsIn } from './files.ts'
 import { reportFileDirectory } from '../lib/reportfiles.ts'
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { z } from 'zod'
+import { createShortFormsBody } from './zoom.ts'
+import { writeShortForms } from '../lib/zoom.ts'
 import { sql, type SQL } from 'drizzle-orm'
 import {
+  END_HEAD,
+  FILING_HEAD,
   kindDeclaresShortForms,
   kindHoldsPartsLevels,
   type Incompleteness,
@@ -148,7 +155,7 @@ import {
   type ProvedHolder,
   type RecordKind,
 } from '@shared/types.ts'
-import { KIND_FAMILIES, familyOf, noHeadingHolds, type Fulfilment, type KindFamily } from '@shared/work.ts'
+import { KIND_FAMILIES, familyOf, noHeadingHolds, withArticle, type Fulfilment, type KindFamily } from '@shared/work.ts'
 import { CATALOGUE_COLUMNS, COLUMN_SORT, SORT_DIRECTIONS, sortCatalogue } from '@shared/catalogue.ts'
 import { EVERY_PROJECT, PROJECTS_QUERY } from '@shared/across-projects.ts'
 import { searchRecords, theNeedle, usableQuery } from '@shared/search.ts'
@@ -295,8 +302,13 @@ import { actsOnTheirWords, type ActOnTheirWords } from '../lib/warrants.ts'
 import { RESTRICTION_SEVERITY } from '@shared/restriction.ts'
 import { restrictionsOn, type RestrictionReading } from '../lib/restrictions.ts'
 import { boundaryReply, type BoundaryRestrictions } from '../lib/boundaries.ts'
-import { aRefusalStandsOn, aRunSaysItIsFinished, theAgentOfARunForItsSeal, theOfficeStartsTheCheck, whoMayConfirmThisReport } from '../lib/inspection.ts'
-import { ENDED_WITH_ITS_MERGE_ENTRY, NEEDS_NO_CHECK } from '@shared/releasing.ts'
+import { aRefusalStandsOn, aRunSaysItIsFinished, markARefusalAnswered, theAgentOfARunForItsSeal, theOfficeStartsTheCheck, whoMayConfirmThisReport } from '../lib/inspection.ts'
+import { ENDED_WITH_ITS_MERGE_ENTRY, NEEDS_NO_CHECK, NEEDS_NO_CHECK_RULES } from '@shared/releasing.ts'
+import { asTheDoorOf } from '../lib/check-field-doors.ts'
+import { THE_OFFICE } from '../lib/the-office.ts'
+import { whetherThisOfficesChecksAreSwitchedOff } from '../lib/checks-in-merges-only.ts'
+import { inspectorAnswersRun } from '../lib/inspector-answers-lines.ts'
+import { theReviewLevel } from '../db/the-review-level.ts'
 import { moveRecordToWorkspace, type MoveReport } from '../lib/move.ts'
 import { actorFrom, actorWithTheWordsItActsOn, namedAProject, pageFrom, takesNoInput, toChanges, type WhatActorFromAsks } from '../lib/http.ts'
 import { parse } from '../lib/parse.ts'
@@ -334,7 +346,7 @@ import { sayTheNextRoundStarted, theNextRoundThisRunStarts } from '../lib/next-r
 import { keepTheHandStart, theHandStartAskedFor, sayTheWorkerRunStarted, theRunThatAskedForThisWorker, theWorkerRunThisRunStarts, theWorkersARunStarted } from '../lib/worker-runs.ts'
 import type { TheRunThatAskedForAWorker, TheWorkersARunStarted } from '@shared/worker-runs.ts'
 import { CONFIRMED_BY, type WhereTheQuestionIs } from '@shared/confirming.ts'
-import { leadOfRecord, theRetiredAddresseesReason, type NotRoutedAddressee, type RoutedAddressee } from '@shared/messages.ts'
+import { theRetiredAddresseesReason, type NotRoutedAddressee, type RoutedAddressee } from '@shared/messages.ts'
 import { localStamp, nowStamp, parseLocalStamp } from '@shared/time.ts'
 import { THE_PATH_THAT_MOVES_A_RECORD } from '@shared/workspaces.ts'
 
@@ -359,6 +371,7 @@ import { isDeepStrictEqual } from 'node:util'
 import { aReminderBeforeTheSealFor, keepWhatTheSealDidWithTheReminder, type TheReminderBeforeTheSeal } from '../lib/before-the-seal.ts'
 import { aFinishReadsItsGitApart, timeTheFinishOf, type InOnePass } from '../lib/a-finish-reads-git-apart.ts'
 import { theCommitsNotCheckedFor } from '../lib/a-finish-reads-git-apart.ts'
+import { theEndHeadBeforeAWrite, theHeadReadApart } from '../lib/a-runs-own-commits.ts'
 import { sayThePartsOfTheCheckDoors } from '../lib/the-parts-of-a-check-door.ts'
 import { refuseTheSealOverAMissingDesign } from '../lib/design-reminders.ts'
 import { CHECK_ALSO, REMINDED_BEFORE_THE_SEAL } from '@shared/before-the-seal.ts'
@@ -373,6 +386,7 @@ import { wouldBeAccepted, writeOrCheck, type WouldBeAccepted } from '../lib/only
 import { ASK_FIRST_SENTENCE } from '@shared/ask-first.ts'
 import { openLoopsFor, POPULATION_SENTENCE, type OpenLoops } from '../lib/openloops.ts'
 import { decisionsAbout, type DecisionsAbout } from '../lib/decisionsabout.ts'
+import { RELATED_KINDS, RELATED_PAGE_MOST, RELATED_SCOPE_KINDS, relatedTo, theSubjectsOf, type RelatedAnswer } from '../lib/related.ts'
 // WHETHER PICKING THIS RUN UP AGAIN IS EXPENSIVE, criterion T6. The warning and its two measured
 // numbers come from the one library, so this page and the Embassy row cannot disagree.
 import { pickUpCostOfARun, pickUpCostThresholds } from '../lib/pick-up-cost.ts'
@@ -389,6 +403,8 @@ import { route } from '../lib/route.ts'
 import { sendTheHeldDraftsBeforeTheRunEnds, throughTheTurnDraft } from '../lib/turn-drafts.ts'
 import { theSecondLevelIsAsked } from '../lib/flow-reasons.ts'
 import { foldTheSecondLevel, SECOND_LEVEL_PARAM, type SecondLevelHeld } from '@shared/second-level-fold.ts'
+import { levelNamed, NO_SUCH_LEVEL, resultsAtTheirLevels, type TheLevelsOfAnAnswer } from '@shared/results-at-a-level.ts'
+import { theLevelSettings } from '../lib/result-levels.ts'
 import {
   compositionsAt,
   compositionsIn,
@@ -504,6 +520,7 @@ const createBody = z.strictObject({
   title,
   summary: summary.nullish(),
   data: data.optional(),
+  shortForms: createShortFormsBody.optional(),
   /**
    * The relationships this record is filed WITH, written in the same transaction as the record.
    *
@@ -788,6 +805,12 @@ const listQuery = z.strictObject({
    */
   shape: z.enum(['light', 'home', 'session', 'narrow', 'hook', 'full']).optional(),
   /**
+   * THE LEVEL EACH ROW IS GIVEN AT (src/shared/results-at-a-level.ts): 1 the label, 2 the title, 3 the conclusion, 4 to 6
+   * by part, full. A list by `kind` that names no shape and no tally is at each kind's default level without it. Not
+   * asked beside `shape` or `tally`.
+   */
+  level: z.string().refine((word) => levelNamed(word) !== null, { error: NO_SUCH_LEVEL }).optional(),
+  /**
    * WHICH RECORDS, BY ID. A page that draws a handful of names from the records its own rows refer
    * to asks for those ids, not for every record of the project. The ids are joined by commas and
    * kept in the order any other listing would keep them; at most the most rows one reply may hold.
@@ -896,6 +919,8 @@ const listQuery = z.strictObject({
  */
 const reportsAndNotesQuery = z.strictObject({
   show: z.enum(REPORTS_PAGE_SHOWS, { error: `show must be one of: ${REPORTS_PAGE_SHOWS.join(', ')}` }).optional(),
+  scope: z.string().trim().min(1).optional(),
+  filter: z.enum(['unread', 'starred']).optional(),
   limit: listQuery.shape.limit,
   offset: listQuery.shape.offset,
 })
@@ -922,6 +947,8 @@ export type ReportsAndNotesRow = RecordListItem & {
 /** What `GET /api/records/reports-and-notes` answers. Every count is over every row, not over the page. */
 export interface ReportsAndNotesReply {
   rows: ReportsAndNotesRow[]
+  scope?: { id: string; title: string; kind: 'module' | 'pipeline' }
+  modules?: { id: string; title: string }[]
   show: ReportsPageShow
   /** How many rows of the chosen kinds are in each group, over every project. */
   groups: Record<ReportsPageGroup, number>
@@ -949,6 +976,9 @@ const RECORD_LIST_NOTE =
   'or gone is not there. `ids` keeps only the records whose ids are named, joined by commas, and at most the most ' +
   'rows one reply holds; a page that draws the names its own rows refer to asks for those ids and not the project. ' +
   'An id that is not in the answer is not a live record of the projects asked, or is one this reader may not read. ' +
+  '?level= gives each row at one level (1 the label, 2 the title, 3 the conclusion, 4 to 6 by part, full), and a ' +
+  'list by `kind` with no `shape` and no `tally` is at each kind\'s default level, a setting; `levels` then says how, ' +
+  'and past the answer\'s cap the rows are titles only. A level beside a shape or a tally is refused with a 400. ' +
   'It reads only and writes nothing.'
 
 /**
@@ -1004,7 +1034,9 @@ const REPORTS_AND_NOTES_NOTE =
   'here), `this-week` (filed in the last seven days) and `earlier`; newest filed first inside each group. ' +
   'Each row is the light shape of GET /api/records with its `workspaceId`, its `group` and its stored `read` ' +
   `mark. \`groups\` and \`kinds\` are counted over every row before the page is cut. \`limit\` is ${String(REPORTS_PAGE_SIZE)} ` +
-  'when left out, and `offset` is how many rows come before this page. It reads only and writes nothing.'
+  'when left out, and `offset` is how many rows come before this page. `scope` narrows the list to the reports about ' +
+  'a module or a pipeline, and about the parts GET /api/records/<id>/related walks: its blocks and their modules, its ' +
+  'sub-modules at every depth and the runs part of any of them. It reads only and writes nothing.'
 
 /**
  * THE WINDOW `GET /api/records/created-between` READS. Both ends are required: a window with one
@@ -1322,8 +1354,8 @@ function withNoIncompleteCount(rows: PanelRecord[]): RecordListItem[] {
 const idParams = z.object({ id: z.string().min(1, { error: 'the URL must contain a record id' }) })
 
 /**
- * THE QUERY OF `GET /api/records/:id`. `shape=where` answers the record's id, kind and project only. The other keys a
- * caller sends are read where they are used, so this object passes them through.
+ * THE QUERY OF `GET /api/records/:id`. `shape=where` answers the record's id, kind and project only, and a session's
+ * runtime word. The other keys a caller sends are read where they are used, so this object passes them through.
  */
 const recordReadQuery = z.looseObject({ shape: z.enum(['where']).optional() })
 
@@ -1332,6 +1364,8 @@ interface RecordWhere {
   id: string
   kind: string
   workspaceId: string
+  /** ON A SESSION, THE HARNESS ITS RECORD NAMES, as written. Absent when it names none. The waiter reads it. */
+  runtime?: string
 }
 
 /**
@@ -1348,6 +1382,26 @@ const contextQuery = z.strictObject({
     .max(6, { error: 'reach must be 6 or less: past six links a project is one connected lump' })
     .optional(),
   rung: z.enum(RUNGS as readonly [Rung, ...Rung[]], { error: `rung must be one of: ${RUNGS.join(', ')}` }).optional(),
+  [SECOND_LEVEL_PARAM]: z.enum(['show'], { error: 'secondLevel takes one value, show' }).optional(),
+})
+
+/**
+ * WHAT `GET /api/records/:id/related` TAKES: which kind of related record, and which page of at most
+ * RELATED_PAGE_MOST rows. A decision's basis is one level down, given when `secondLevel=show` asks.
+ */
+const relatedQuery = z.strictObject({
+  kind: z.enum(RELATED_KINDS, { error: `kind must be one of: ${RELATED_KINDS.join(', ')}` }),
+  limit: z.coerce
+    .number({ error: 'limit must be a whole number of rows' })
+    .int({ error: 'limit must be a whole number of rows' })
+    .min(1, { error: 'limit must be at least 1' })
+    .max(RELATED_PAGE_MOST, { error: `limit must be ${String(RELATED_PAGE_MOST)} or less: that is the most one answer carries` })
+    .optional(),
+  offset: z.coerce
+    .number({ error: 'offset must be a whole number of rows to skip' })
+    .int({ error: 'offset must be a whole number of rows to skip' })
+    .min(0, { error: 'offset must be 0 or more' })
+    .optional(),
   [SECOND_LEVEL_PARAM]: z.enum(['show'], { error: 'secondLevel takes one value, show' }).optional(),
 })
 
@@ -1439,6 +1493,20 @@ const CONTEXT_NOTE =
   'at the length asked for, every loop says less and the reply says so. Every reply also says how many of the ' +
   "project's open loops are linked to no module at all, because a short answer under a module is otherwise " +
   'read as a quiet module. This is a read: it writes nothing and starts nothing.'
+
+const RELATED_NOTE =
+  'WHAT IS RELATED TO A MODULE OR A PIPELINE, at every depth, one kind at a time: `kind` is decisions, reports or ' +
+  'checklists. The subjects are the record itself; for a pipeline, its blocks and the modules implementing them; the ' +
+  'sub-modules of any of those at every depth, each once; and the runs part of any of them. Decisions are the ones ' +
+  'about any subject, by its governs, by a link, through a fork, or inferred from the files a module states, joined ' +
+  'into one row each; a replaced decision is left out and named in `replacedLeftOut`. Reports are those with an ' +
+  'about link to a subject, and a deleted one is counted in `deletedLeftOut`. Checklists are those with an item ' +
+  'whose links name a subject, with only those items. Each row says whether the record itself reached it ' +
+  '(`directly`) and which other subjects did (`through`), and `inferred` marks a decision nobody wrote about it. ' +
+  `Newest first, then by id. \`limit\` is ${String(RELATED_PAGE_MOST)} at most and when left out, \`offset\` is how many ` +
+  'rows come before this page, and `left` is how many come after it. `couldNotRead` names each way that could not ' +
+  'run, so a short list is not taken for a whole one. A decision\'s basis is held back until secondLevel=show asks. ' +
+  'It answers 404 for a record not in this project and 400 for one that is not a module or a pipeline. It reads only.'
 
 /**
  * The address of one checklist line: which module, which item.
@@ -1733,6 +1801,12 @@ export interface RecordListReply {
    * of this page and that is not itself a row of it, in the light shape. Not counted in `matched`, `returned` or `left`.
    */
   farEnds?: RecordListItem[]
+  /**
+   * Present only when the rows are at levels (`?level=`, or a list by kind with no shape and no tally): what the answer
+   * says about its rows' levels, its short limit and its cap. Each row then carries `atLevel`, and a row below full
+   * holds only its words up to its level (`ARowAtLevel` in src/shared/results-at-a-level.ts).
+   */
+  levels?: TheLevelsOfAnAnswer
 }
 
 /** How many records each group holds, for the Everything page's group buttons. */
@@ -1752,6 +1826,7 @@ type RecordListQuery = {
   kind?: string | undefined
   replaced?: string | undefined
   shape?: string | undefined
+  level?: string | undefined
   limit?: number | undefined
   q?: string | undefined
   family?: string | undefined
@@ -1768,6 +1843,7 @@ function nextRecordsPage(q: RecordListQuery, nextOffset: number): string {
   const params = new URLSearchParams()
   if (q.kind !== undefined) params.set('kind', q.kind)
   if (q.shape !== undefined) params.set('shape', q.shape)
+  if (q.level !== undefined) params.set('level', q.level)
   if (q.limit !== undefined) params.set('limit', String(q.limit))
   if (q.q !== undefined) params.set('q', q.q)
   if (q.family !== undefined) params.set('family', q.family)
@@ -1820,8 +1896,9 @@ export interface RecordReply {
    * the addressee, the reading's own sentence, the one participant chosen (`to` is null when that is
    * the sender), the rungs passed over and the finished line every surface prints.
    *
-   * THE STATUS FOLLOWS A DECISION. A person's send to a RETIRED addressee
-   * answers 409; every other routed send answers 201 with this field in the reply.
+   * THE STATUS FOLLOWS A DECISION. A person's send to a RETIRED addressee, and a person's or an
+   * agent's send to a registered agent nothing holds, are stored, routed and answered 409; every
+   * other routed send answers 201 with this field in the reply.
    */
   routed?: RoutedAddressee[]
   /**
@@ -1834,7 +1911,8 @@ export interface RecordReply {
   /**
    * THE WHOLE REFUSAL, when an error answer still stored the record.
    *
-   * A person's send to a retired agent stores the letter and answers 409,
+   * A person's send to a retired agent, and a person's or an agent's send to a registered agent
+   * nothing holds, store the letter and answer 409,
    * and the answer keeps the error and says the known reason, so the chat can tell the reader what
    * happened to the letter instead of showing a bare failure. This is the routed line,
    * or every routed line joined with a space, word for word; the browser draws it on the failed
@@ -1845,9 +1923,9 @@ export interface RecordReply {
    * THE SAME REFUSAL IN A FEW WORDS, when the server knows a short one.
    *
    * "Pike is retired." for a send to a retired agent, built once by `theRetiredAddresseesReason`
-   * in shared/messages.ts, criterion M113a. For a person's send to a registered agent nothing holds,
-   * the sentence the send built from the presence dot's own grey word. `theReasonOfA409Send` puts the
-   * two together. Absent on every other answer.
+   * in shared/messages.ts, criterion M113a. For a person's or an agent's send to a registered agent
+   * nothing holds, the sentence the send built from the presence dot's own grey word.
+   * `theReasonOfA409Send` puts the two together. Absent on every other answer.
    */
   reason?: string
   /**
@@ -1931,14 +2009,20 @@ export interface RecordReply {
   /** Present when a message's words seem to hold a key. The message is stored as written (lib/message-keys.ts). */
   keyReminder?: AKeyReminder
   /**
+   * Present when a decision or a report names something the write should say back: the module a whole-project decision
+   * should name instead, and to whom each new nothingFits entry was sent, or why nobody (lib/what-a-record-names.ts).
+   */
+  whatItNames?: WhatTheWriteNames
+  /**
    * Present when this write was made with a run key bound to another run of the same agent. The write is taken, and
    * the sentence names the key's run and the run it wrote; the written run carries one line, once for the pair.
    */
   runKeyReminder?: string
   /**
    * THE RECORDS THE WORDS NAME, each once as {id, kind, title, where}, with `deleted: true` on a deleted record. Always
-   * present on the 201 answer to a message or a report, on the 409 answer to a person's message to a retired addressee,
-   * which is stored all the same, and on the answer to a PATCH of a message or a report. An empty list means the words
+   * present on the 201 answer to a message or a report, on the 409 answer to a message that is stored all the same (a
+   * person's message to a retired addressee, or a person's or an agent's message to a registered agent nothing holds),
+   * and on the answer to a PATCH of a message or a report. An empty list means the words
    * were read and name no record. The 200 answer to a message already sent and the answer to a check have none.
    * lib/message-keys.ts says which words are read and which records are left out. Nothing is refused for it.
    */
@@ -2412,11 +2496,15 @@ function theStartersKeyThatMintsThisRun(kind: string, data: Record<string, unkno
  *
  * A SESSION THAT NAMES NO AGENT THE REGISTRY KNOWS IS MINTED NOTHING. The office cannot bind a key
  * to a holder it cannot name, and a run with no key still starts and behaves as it did before.
- * An inspection run is the office's own tool and is left out on purpose: it is handed no prompt
- * and keeps the office's own key.
+ * An ordinary inspection run keeps the office's own key. A reading-only inspection receives its
+ * own key so its verdict can prove which inspector run answered the package.
  */
 function mintARunKey(record: PanelRecord, actor: Actor, handParent: string | null = null): { handle: string; key: string; keySays: string } | null {
-  if (record.kind !== 'session' || record.data['state'] !== 'running' || isAnInspectionRun(record.data)) return null
+  if (record.kind !== 'session' || record.data['state'] !== 'running') return null
+  if (isAnInspectionRun(record.data)) {
+    const extra = record.data['extra'] as { inspectionRun?: unknown } | undefined
+    if (typeof extra?.inspectionRun !== 'string' || !inspectorAnswersRun(extra.inspectionRun, record.workspaceId)) return null
+  }
   refuseANewRunWhileAStarterChangeWaits(record.data, actor)
   // THE AGENT THE RUN SERVES, read the way every reader of a run reads it: `servingAgentId`, else
   // `servingAgent` as the one agent that string names. `servingAgent` is a handle, and since
@@ -2447,7 +2535,7 @@ function mintARunKey(record: PanelRecord, actor: Actor, handParent: string | nul
     // read.
     // M78: a fresh chat run carries the stored press. A resumed conversation is the office's act.
     const message = record.data['deliveringMessage']
-    const freshChat = actor.provedBy === 'the-office-key' && typeof message === 'string' && !record.data['providerSession']
+    const freshChat = !isAnInspectionRun(record.data) && actor.provedBy === 'the-office-key' && typeof message === 'string' && !record.data['providerSession']
     const proof = freshChat ? howTheMessageStartWasProved(message) : howThisCallProvesTheKeyItMakes(actor)
     const made = makeARunKey(agent.id, proof)
     recordTheOriginalRunKeyMint(record.id, made.heldKeyId, actor, startersKey ?? undefined)
@@ -2549,6 +2637,16 @@ export async function recordRoutes(app: FastifyInstance): Promise<void> {
           `or for one page at a time with limit, at most ${String(RECORD_LIST_MAX_LIMIT)}, and offset.`,
       )
     }
+    // A LEVEL BESIDE A SHAPE OR A TALLY IS REFUSED, before anything is read: each says how much of a row comes back.
+    if (q.level !== undefined && (q.shape !== undefined || q.tally !== undefined)) {
+      throw new PanelError(
+        `The query string is not usable: level and ${q.shape !== undefined ? 'shape' : 'tally'} each say how much of a row comes back, so ` +
+          'they are not asked together, and nothing was read. Ask for one of them.',
+      )
+    }
+    // EACH ROW AT A LEVEL (src/shared/results-at-a-level.ts), when a level is asked, and when one kind is listed with no
+    // shape and no tally, by the person's decision of 20 November 2026. Every other list is answered as before.
+    const atLevels = q.level !== undefined || (q.kind !== undefined && q.shape === undefined && q.tally === undefined)
     // ONLY THE MESSAGES THIS READER MAY READ, before anything is searched, counted or cut, so `matched`,
     // `left` and the tally count only what this reader may see.
     // AND A RUN'S HONOUR READING NAMES NONE OF THEM among its evidence.
@@ -2594,14 +2692,20 @@ export async function recordRoutes(app: FastifyInstance): Promise<void> {
     // NO SHAPE IS THE NARROW ROW: the effective shape is the one every cut below reads.
     const theShape = q.shape ?? 'narrow'
     const cutShape = theShape === 'light' || theShape === 'full' ? undefined : theShape
-    const reading = q.q !== undefined || q.sort === 'incomplete' ? 'whole' : cutShape !== undefined ? 'cut' : q.limit === undefined ? 'whole' : 'placed'
+    // - Rows at levels are `placed` unless a search or that sort reads them whole, with the state word and the stored
+    //   short forms, which is all a title, a label and a missing label's reason read. The rows are read whole fifty at a
+    //   time only until the answer's cap is reached.
+    const reading =
+      q.q !== undefined || q.sort === 'incomplete' ? 'whole' : atLevels ? 'placed' : cutShape !== undefined ? 'cut' : q.limit === undefined ? 'whole' : 'placed'
     const theStateWord = q.sort === 'state' ? ['state'] : []
     const listed = inTheProjectsAsked(
       reading === 'whole'
         ? listRecords({ ...which, ids: onlyThese })
         : listRecordsWithDataAs(
             { ...which, ids: onlyThese },
-            cutShape !== undefined ? theDataAShapeAnswers(cutShape, theStateWord) : theStateWord.length > 0 ? onlyTheseFieldsOf(theStateWord) : sql<string>`'{}'`,
+            atLevels
+              ? onlyTheseFieldsOf(['state', SHORT_FORMS_FIELD])
+              : cutShape !== undefined ? theDataAShapeAnswers(cutShape, theStateWord) : theStateWord.length > 0 ? onlyTheseFieldsOf(theStateWord) : sql<string>`'{}'`,
           ),
     )
     const keptByReplacement = q.kind === 'decision' && q.replaced !== 'include' ? listed.filter((record) => !replaced.has(record.id)) : listed
@@ -2683,11 +2787,29 @@ export async function recordRoutes(app: FastifyInstance): Promise<void> {
     // THE SECOND LEVEL ONLY WHEN ASKED, said once for the whole page. Each row is folded and shaped in the same pass, and
     // a row the fold hands back unchanged is shaped as it is, so no copy of the whole page is kept beside it.
     let anyHeld = false
-    const shapedPage: RecordListItem[] = []
-    for (const row of answered(page)) {
-      const one = foldTheSecondLevel(row, q.secondLevel === 'show', 'GET /api/records/<id>')
-      if (one.secondLevel !== null) anyHeld = true
-      shapedPage.push(shapeOf(one.record === row ? row : { ...row, ...one.record }))
+    let shapedPage: RecordListItem[] = []
+    let levels: TheLevelsOfAnAnswer | undefined
+    if (atLevels) {
+      // EACH ROW AT ITS LEVEL, by the rule `GET /api/search` answers its results by. A row is read whole and folded only
+      // when the rule asks for it, and the second level is said only when a row given whole held some of it.
+      const held = new Set<string>()
+      const atTheirLevels = resultsAtTheirLevels<RecordListItem>(page, q.level === undefined ? null : levelNamed(q.level), theLevelSettings(), (some) =>
+        answered([...some]).map((row): RecordListItem => {
+          const one = foldTheSecondLevel(row, q.secondLevel === 'show', 'GET /api/records/<id>')
+          if (one.secondLevel !== null) held.add(row.id)
+          return one.record === row ? row : { ...row, ...one.record }
+        }),
+      )
+      // A ROW BELOW FULL IS NOT A WHOLE RecordListItem, as a narrow row is not: `atLevel` says what it holds.
+      shapedPage = atTheirLevels.rows as unknown as RecordListItem[]
+      anyHeld = atTheirLevels.rows.some((row) => row.atLevel.given === 'full' && held.has(row.id))
+      levels = atTheirLevels.levels
+    } else {
+      for (const row of answered(page)) {
+        const one = foldTheSecondLevel(row, q.secondLevel === 'show', 'GET /api/records/<id>')
+        if (one.secondLevel !== null) anyHeld = true
+        shapedPage.push(shapeOf(one.record === row ? row : { ...row, ...one.record }))
+      }
     }
     // THE FAR ENDS, read by id through the same project reading as the rows, so a record this list could not hold
     // cannot come back as a far end either.
@@ -2723,6 +2845,7 @@ export async function recordRoutes(app: FastifyInstance): Promise<void> {
       ...(q.kind === 'decision' ? { replacedLeftOut } : {}),
       ...(across === null ? {} : { projects: across.map((project) => project.id) }),
       ...(farEnds === undefined ? {} : { farEnds }),
+      ...(levels === undefined ? {} : { levels }),
     }
   })
 
@@ -2796,13 +2919,30 @@ export async function recordRoutes(app: FastifyInstance): Promise<void> {
       const limit = q.limit ?? REPORTS_PAGE_SIZE
       const offset = q.offset ?? 0
       const now = Date.now()
+      const subject = q.scope === undefined ? null : getRecord(q.scope)
+      if (q.scope !== undefined && (subject === null || subject.deletedAt !== null)) throw new PanelError('No live record has that id.', 404)
+      if (subject !== null && subject.kind !== 'module' && subject.kind !== 'pipeline') {
+        throw new PanelError('The scope must name a module or pipeline.', 400)
+      }
+      let linked: Set<string> | null = null
+      if (subject !== null) {
+        // THE ONE WALK (src/server/lib/related.ts): the record, a pipeline's blocks and their modules, the sub-modules
+        // at every depth and the runs, so this list and the module's page agree on which reports are its.
+        const subjects = new Set(theSubjectsOf(subject).map((one) => one.id))
+        const reports = sqlite.prepare(`SELECT DISTINCT l.from_id AS id FROM links l
+          WHERE l.type = 'about' AND l.to_id IN (SELECT value FROM json_each(?))`).all(JSON.stringify([...subjects])) as { id: string }[]
+        linked = new Set(reports.map((row) => row.id))
+      }
       const kinds = {} as Record<ReportsPageKind, number>
       const kept: ReportsAndNotesRow[] = []
+      const stars = q.filter === 'starred' ? new Set(reportStars(actorFrom(req).id)) : null
       for (const kind of REPORTS_PAGE_KINDS) {
-        const rows = listRecords({ workspaceId: ACROSS_WORKSPACES, kind })
+        const rows = listRecords({ workspaceId: ACROSS_WORKSPACES, kind }).filter((record) => linked === null || (kind === 'report' && linked.has(record.id)))
         kinds[kind] = rows.length
         if (!KINDS_A_CHOICE_SHOWS[show].includes(kind)) continue
         for (const record of rows) {
+          if (q.filter === 'unread' && (record.kind !== 'report' || !reportReading(record, []).waiting)) continue
+          if (q.filter === 'starred' && (record.kind !== 'report' || !stars?.has(record.id))) continue
           kept.push({
             ...lightRecord({ ...record, incompleteCount: incompletenessOf(record).length }),
             group: reportsPageGroup(record, now),
@@ -2815,7 +2955,7 @@ export async function recordRoutes(app: FastifyInstance): Promise<void> {
       ) as Record<ReportsPageGroup, number>
       const rank = (group: ReportsPageGroup) => REPORTS_PAGE_GROUPS.indexOf(group)
       kept.sort((a, b) =>
-        rank(a.group) !== rank(b.group)
+        subject === null && rank(a.group) !== rank(b.group)
           ? rank(a.group) - rank(b.group)
           : a.createdAt !== b.createdAt
             ? a.createdAt < b.createdAt
@@ -2828,6 +2968,20 @@ export async function recordRoutes(app: FastifyInstance): Promise<void> {
       const page = kept.slice(offset, offset + limit)
       return {
         rows: page,
+        modules: sqlite.prepare(`SELECT DISTINCT m.id, m.title FROM (
+          SELECT a.to_id AS id FROM records r INDEXED BY records_kind_idx
+          CROSS JOIN links a INDEXED BY links_from_idx ON a.from_id = r.id AND a.type = 'about'
+          WHERE r.kind = 'report' AND r.deleted_at IS NULL
+          UNION
+          SELECT p.to_id AS id FROM records r INDEXED BY records_kind_idx
+          CROSS JOIN links a INDEXED BY links_from_idx ON a.from_id = r.id AND a.type = 'about'
+          CROSS JOIN links p INDEXED BY links_from_idx ON p.from_id = a.to_id AND p.type = 'part_of'
+          WHERE r.kind = 'report' AND r.deleted_at IS NULL
+        ) ids
+          CROSS JOIN records m ON m.id = ids.id
+          WHERE m.kind = 'module' AND m.deleted_at IS NULL
+          ORDER BY m.title COLLATE NOCASE, m.id`).all() as { id: string; title: string }[],
+        ...(subject === null ? {} : { scope: { id: subject.id, title: subject.title, kind: subject.kind as 'module' | 'pipeline' } }),
         show,
         groups,
         kinds,
@@ -2839,6 +2993,19 @@ export async function recordRoutes(app: FastifyInstance): Promise<void> {
       }
     },
   )
+
+  /** Read the caller's report stars. */
+  app.get('/records/report-stars', route('record.report-stars', 'remote', 'Read the report stars kept for the caller.'), async req => ({ stars: reportStars(actorFrom(req).id) }))
+  /** Keep or remove one report star. */
+  app.put('/records/report-stars/:id', route('record.set-report-star', 'remote', 'Keep or remove a report star for the person asking.'), async req => {
+    const actor = actorFrom(req)
+    if (actor.type !== 'human' || !thePersonIsProved(actor)) throw new PanelError('Only a person can change their own report stars.', 403)
+    const { id } = parse(z.object({ id: z.string().min(1) }), req.params, 'The report id is not usable:')
+    const { starred } = parse(z.strictObject({ starred: z.boolean() }), req.body, 'The star is not usable:')
+    const record = getRecord(id)
+    if (record === null || record.deletedAt !== null || record.kind !== 'report') throw new PanelError('No live report has that id.', 404)
+    return { stars: setReportStar(actor, workspaceOf(req), id, starred) }
+  })
 
   /**
    * MY NOTES: the quick notes, in every project, searched, counted and paged by src/server/lib/my-notes.ts.
@@ -3062,6 +3229,13 @@ export async function recordRoutes(app: FastifyInstance): Promise<void> {
     // in passes (lib/a-finish-reads-git-apart.ts). Every other filing runs once, as it always did.
     const filedFinished = body.kind === 'session' && data !== undefined && aRunSaysItIsFinished(data)
     if (filedFinished) timeTheFinishOf(req, `POST /api/records${only === 'check' ? '/check' : ''}`)
+    // A RUN'S FILING COMMIT IS READ BY THE OFFICE, by a git process apart from this thread, before the write. A run
+    // filed already finished reads one too, so its seal counts only the commits it made since it was filed, which are
+    // none: every commit in its working directory was there when it was filed. A check stores nothing, so it reads
+    // none. Data that names either field is refused by the create, so nothing is read for it.
+    const filingDirectory = body.kind === 'session' && data !== undefined && only !== 'check' ? data['workingDirectory'] : undefined
+    const filingHead = typeof filingDirectory === 'string' && filingDirectory !== '' && !Object.hasOwn(data ?? {}, FILING_HEAD) && !Object.hasOwn(data ?? {}, END_HEAD)
+      ? await theHeadReadApart(filingDirectory) : null
     const file = (inside: InOnePass) => inside(() => countingATerritoryRefusal(only, () => writeOrCheck(only, () => {
       const serving = body.kind === 'session' && data?.['state'] === 'running' ? theAgentARunServes(data) : null
       const hand = theHandStartAskedFor({
@@ -3093,18 +3267,32 @@ export async function recordRoutes(app: FastifyInstance): Promise<void> {
         // A DECISION SAYS WHAT IT REPLACES, at this door as at every door a decision is made through. Problem
         // ZSWftCSVUP2r; lib/replaced-decisions.ts.
         mustSayWhatItReplaces: true,
+        // AND WHAT IT GOVERNS, at every decision door as well (lib/what-a-record-names.ts).
+        mustSayWhatItGoverns: true,
         door: 'POST /api/records',
         ...(startersKey === null ? {} : { startersKey }),
+        ...(filingHead === null ? {} : { filingHead }),
       })
       // The original key binding must be revision 2: mint immediately after create,
       // before any other write to the fresh session.
-      return { created, runKey: mintARunKey(created.record, actor, hand?.run ?? null) }
+      const runKey = mintARunKey(created.record, actor, hand?.run ?? null)
+      if (body.shortForms !== undefined && created.alreadySent === undefined) {
+        const newest = listRevisions(created.record.id, 1).revisions[0]
+        if (newest === undefined) throw new Error('The newly filed record has no revision.')
+        writeShortForms(created.record.id, workspaceId, {
+          ...body.shortForms,
+          madeFrom: { seq: newest.seq, contentHash: newest.contentHash },
+        }, actor)
+        created.record = recordInWorkspace(created.record.id, workspaceId)
+      }
+      return { created, runKey }
     })))
     const { created, runKey } = filedFinished ? await aFinishReadsItsGitApart(req, file) : file((act) => act())
     // A CHECK ENDS HERE, with nothing stored: no record, no key, no message. What follows only answers a write.
     if (only === 'check') {
       // THE CHECK READS THE SAME CONDITION AND THE SAME REASON THE WRITE DOES, from `theReasonOfA409Send`: a person's
-      // send to a retired agent or to a registered agent nothing holds would answer 409, and the check says why.
+      // send to a retired agent, or a person's or an agent's send to a registered agent nothing holds, would answer 409,
+      // and the check says why.
       const refused = theReasonOfA409Send(created)
       return wouldBeAccepted(
         reply,
@@ -3145,12 +3333,16 @@ export async function recordRoutes(app: FastifyInstance): Promise<void> {
     if (created.flowRun !== undefined) answer.flowRun = created.flowRun
     // AND A REMINDER OF A PIECE OF A MESSAGE'S WORDS THAT LOOKS LIKE A KEY. The message is stored; lib/message-keys.ts says why.
     if (created.keyReminder !== undefined) answer.keyReminder = created.keyReminder
+    // AND WHAT A DECISION OR A REPORT NAMES, said back, with each nothingFits reminder sent (lib/what-a-record-names.ts).
+    if (created.whatItNames !== undefined) answer.whatItNames = created.whatItNames
     // AND THE RECORDS A MESSAGE'S OR A REPORT'S WORDS NAME, read now that the write is stored (lib/message-keys.ts).
     Object.assign(answer, theRecordsAWriteNames(created.record, theMessageReader(actorFrom(req))))
     const reportFileReminder = reportFileReminderFor(created.record)
     if (reportFileReminder !== undefined) answer.reportFileReminder = reportFileReminder
-    // AND WHEN A LEAD IS RIGHT, TO THE WRITER OF ONE. A reminder only: the message and its lead are stored as sent.
-    if (leadOfRecord(created.record) !== null) answer.leadReminder = WHEN_TO_SEND_A_LEAD
+    // AND WHEN A LEAD IS NOT RIGHT, TO THE WRITER OF ONE. The reminder is said only when the lead is not to a report
+    // written for a reader, a page, or a record waiting on the person reading it. A reminder only: the message and its
+    // lead are stored as sent.
+    if (leadIsReminded(created.record)) answer.leadReminder = WHEN_TO_SEND_A_LEAD
     // AND WHAT ELSE IS ALREADY LINKED TO THE MODULE OR BLOCK THIS RECORD WAS LINKED TO. Both keys or
     // neither, as with `similar`. Problem DVzgaTVrVW3I.
     if (created.alreadyLinkedThere !== undefined) {
@@ -3176,7 +3368,8 @@ export async function recordRoutes(app: FastifyInstance): Promise<void> {
       if (refused !== null) {
         reply.status(409)
         // THE WHOLE REFUSAL IS THE ROUTED LINE, OR LINES, WORD FOR WORD. A person's send to a
-        // retired addressee stores the letter and still answers with an error. This is the
+        // retired addressee, and a person's or an agent's send to a registered agent nothing
+        // holds, store the letter and still answer with an error. This is the
         // error the chat draws now, so the reader is told what happened instead of meeting a bare
         // failure. Criterion M113a.
         answer.error = created.routed.map((one) => one.line).join(' ')
@@ -3480,9 +3673,12 @@ export async function recordRoutes(app: FastifyInstance): Promise<void> {
       // is read. Every door here that takes a record id hands it the reader.
       const reader = theMessageReader(actorFrom(req))
       const record = recordInWorkspace(id, workspaceId, reader)
-      // WHERE THE RECORD IS, AND NOTHING ELSE, for a caller that only needs its project. The refusal and the
-      // `elsewhere` above are the same as on the whole read.
-      if (shape === 'where') return { id: record.id, kind: record.kind, workspaceId: record.workspaceId }
+      // WHERE THE RECORD IS, AND A SESSION'S RUNTIME WORD WHEN ITS RECORD NAMES ONE, for a caller that only needs its
+      // project. The refusal and the `elsewhere` above are the same as on the whole read.
+      if (shape === 'where') {
+        const runtime = record.kind === 'session' ? record.data['runtime'] : undefined
+        return { id: record.id, kind: record.kind, workspaceId: record.workspaceId, ...(typeof runtime === 'string' && runtime.trim() !== '' ? { runtime } : {}) }
+      }
       const resolution = proposalResolution(record)
       // WHICH DECISIONS REPLACED WHICH, read once for a decision's two answers below, and not at all for another kind.
       const replacements = record.kind === 'decision' ? readTheReplacements() : null
@@ -3839,6 +4035,9 @@ export async function recordRoutes(app: FastifyInstance): Promise<void> {
       // it reads onward (lib/a-finish-reads-git-apart.ts). Every other write runs once, as it always did.
       const finishes = before.kind === 'session' && whetherThisWriteFinishesTheRun(before, patch).explicitlyFinishes
       if (finishes) timeTheFinishOf(req, 'PATCH /api/records/:id')
+      // A WRITE THAT ENDS A RUN WAITS FOR THE RUN'S END COMMIT, read by a git process apart from this thread
+      // (lib/a-runs-own-commits.ts). A finish reads it at its seal.
+      const endHead = finishes ? null : await theEndHeadBeforeAWrite(before, patch)
       const write = (inside: InOnePass) =>
         readFirst(
           () => theProcessesAWriteReads(id, patch),
@@ -3846,7 +4045,7 @@ export async function recordRoutes(app: FastifyInstance): Promise<void> {
             inside(() =>
               countingATerritoryRefusal('write', () =>
                 sendTheHeldDraftsBeforeTheRunEnds(req, id, patch.dataPatch ?? patch.data, () =>
-                  throughTheRecordDoor(id, () => patchRecord(id, patch, actor, undefined, [], refuseATerritoryOverlapAtBlock(territoryRead?.changed ?? new Map()))),
+                  throughTheRecordDoor(id, () => patchRecord(id, patch, actor, undefined, [], refuseATerritoryOverlapAtBlock(territoryRead?.changed ?? new Map()), endHead ?? undefined)),
                 ),
               ),
             ),
@@ -3968,12 +4167,22 @@ export async function recordRoutes(app: FastifyInstance): Promise<void> {
       // FEATURE READY: line or a repair. A round that says not for a check is asked none and is not queued, and its next
       // round is still asked. Read before the check is asked for, so a held check is never asked.
       const sealedRound = result.record.kind === 'session' && (finishedNow || resealedARefusal) ? theCheckOfASealedRound(result.record) : null
+      const checksOffAtSeal = result.record.kind === 'session' && (finishedNow || resealedARefusal) &&
+        theReviewLevel(workspaceId) === 'full' && whetherThisOfficesChecksAreSwitchedOff(workspaceId) &&
+        !inspectorAnswersRun(result.record.id, workspaceId)
+      if (checksOffAtSeal) {
+        if (resealedARefusal) markARefusalAnswered(result.record,
+          "The worker said its work was finished again after the refusal. The office's checks were switched off, so no fresh check was asked. The refusal stays on the record: it is what the rework answered.")
+        asTheDoorOf(NEEDS_NO_CHECK, () => patchRecord(result.record.id, { dataPatch: { [NEEDS_NO_CHECK]: {
+          rule: NEEDS_NO_CHECK_RULES[1], at: nowStamp(), because: "The run sealed while the office's checks were switched off.",
+        } } }, THE_OFFICE))
+      }
       const theCheck =
-        result.record.kind === 'session' && (finishedNow || resealedARefusal) && aCheckIsAskedAtTheSeal(sealedRound)
+        result.record.kind === 'session' && (finishedNow || resealedARefusal) && !checksOffAtSeal && aCheckIsAskedAtTheSeal(sealedRound)
           ? theOfficeStartsTheCheck({ runId: result.record.id, workspaceId, actor, atTheSeal: true })
           : null
       // AND HOW THE ROUND ENDED IS KEPT ON THE RUN: sealed, with the check asked for or held. Its failure is said in the reply.
-      const roundEnded = sealedRound === null ? null : recordHowASealedRoundEnded(getRecord(result.record.id) ?? result.record, sealedRound, theCheck !== null)
+      const roundEnded = sealedRound === null ? null : recordHowASealedRoundEnded(getRecord(result.record.id) ?? result.record, sealedRound, theCheck !== null, checksOffAtSeal)
       // AND THE OFFICE PUTS THE SEALED ROUND IN THE MERGE QUEUE ITSELF, for a line that is turned on (wave 13u round 93).
       const queuedAtTheSeal = result.record.kind === 'session' && (finishedNow || resealedARefusal) && aCheckIsAskedAtTheSeal(sealedRound) ? theOfficeDecidesAtTheSeal(result.record.id) : null
       // AND THE OFFICE ASKS FOR THE LINE'S NEXT ROUND ITSELF, with the sandbox's briefs/NEXT.md (wave 13u round 94).
@@ -4014,6 +4223,7 @@ export async function recordRoutes(app: FastifyInstance): Promise<void> {
         ...(result.flowRun === undefined ? {} : { flowRun: result.flowRun }),
         ...(result.flowRunStepsNotWritten === undefined ? {} : { flowRunStepsNotWritten: result.flowRunStepsNotWritten }),
         ...(result.keyReminder === undefined ? {} : { keyReminder: result.keyReminder }),
+        ...(result.whatItNames === undefined ? {} : { whatItNames: result.whatItNames }),
         ...(result.runKeyReminder === undefined ? {} : { runKeyReminder: result.runKeyReminder }),
         // AND THE RECORDS A MESSAGE'S OR A REPORT'S WORDS NAME AFTER THE WRITE, read now that it is stored (lib/message-keys.ts).
         ...theRecordsAWriteNames(result.record, theMessageReader(actorFrom(req))),
@@ -4960,6 +5170,38 @@ export async function recordRoutes(app: FastifyInstance): Promise<void> {
         ...(asked || decided.decisions.length === 0
           ? {}
           : { secondLevel: { held: ["each decision's basis"], ask: `GET /api/records/${id}/context?secondLevel=show` } }),
+      }
+    },
+  )
+
+  /**
+   * WHAT IS RELATED TO A MODULE OR A PIPELINE, AT EVERY DEPTH (src/server/lib/related.ts). The module's and the
+   * pipeline's pages read their decisions, reports and checklists here. The context door above stays the record's own
+   * reading: a decision about a sub-module is in this answer and not in that one.
+   */
+  app.get(
+    '/records/:id/related',
+    route('record.related', 'remote', RELATED_NOTE),
+    async (req): Promise<RelatedAnswer & { secondLevel?: SecondLevelHeld }> => {
+      const workspaceId = workspaceOf(req)
+      const { id } = parse(idParams, req.params, 'The URL is not usable:')
+      // In this project, or a 404 naming the project it is really in.
+      const scope = recordInWorkspace(id, workspaceId, theMessageReader(actorFrom(req)))
+      if (scope.deletedAt !== null) throw new PanelError('No live record has that id.', 404)
+      if (!(RELATED_SCOPE_KINDS as readonly string[]).includes(scope.kind)) {
+        throw new PanelError(
+          `What is related is read for a module or a pipeline, and this record is ${withArticle(kindWord(scope.kind).text)}.`,
+          400,
+        )
+      }
+      const q = parse(relatedQuery, req.query, 'That is not a way to ask what is related here:')
+      const asked = q.secondLevel === 'show'
+      const answer = relatedTo(scope, q.kind, { limit: q.limit ?? RELATED_PAGE_MOST, offset: q.offset ?? 0, withBasis: asked })
+      return {
+        ...answer,
+        ...(asked || q.kind !== 'decisions' || answer.rows.length === 0
+          ? {}
+          : { secondLevel: { held: ["each decision's basis"], ask: `GET /api/records/${id}/related?kind=decisions&secondLevel=show` } }),
       }
     },
   )

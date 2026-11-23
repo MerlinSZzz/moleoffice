@@ -1,5 +1,5 @@
 {
-  "why": "The data folder doors' refusals (criteria DF17 to DF21). Each needs this computer's process table, a real data folder move, or a server given no way to start the mover, so no door here can safely meet them: a move here would start a process that stops an office, and a confirm would remove files. tests/the-data-folder-door.test.ts meets each press refusal through the door on a scratch office, whose mover is a process the test starts and stops itself. The stored files' refusal for an unreadable mark is met by tests/a-moved-data-folder-still-shows-its-stored-files.test.ts.",
+  "why": "The data folder doors' refusals (criteria DF17 to DF21), and the refusals of the move's own check, walk and confirm (DF4 and DF16), which the move and confirm doors send with their own codes. Each needs this computer's process table, a real data folder move, a data folder, mark or place in a given state, or a server given no way to start the mover, so no door here can safely meet them: a move here would start a process that stops an office, and a confirm would remove files. tests/the-data-folder-door.test.ts meets each press refusal through the door on a scratch office, whose mover is a process the test starts and stops itself, and some of the move's codes there too. tests/the-data-folder-move.test.ts and tests/a-windows-data-folder-is-never-on-a-network-place.test.ts give each of the move's codes from the mover, and the first checks each code's English against its template in src/config/the-data-folder-move-words.mjs. The stored files' refusal for an unreadable mark is met by tests/a-moved-data-folder-still-shows-its-stored-files.test.ts.",
   "refusals": [
     {
       "code": "dataFolderNotUnderTheGrant",
@@ -82,11 +82,322 @@
       }
     },
     {
-      "code": "dataFolderNothingToConfirm",
+      "code": "dataFolderPlaceNotAFullPathFromSlash",
       "status": 409,
-      "english": "Test: the mark does not say a move started.",
+      "english": "Test: the place is not a full path starting with /.",
       "values": {
-        "why": "Test: the mark says the move was switched back."
+        "place": "\"test/relative-place\"",
+        "example": "/home/<you>/data-folder"
+      }
+    },
+    {
+      "code": "dataFolderPlaceNotAFullPathOnWindows",
+      "status": 409,
+      "english": "Test: the place is not a full Windows path.",
+      "values": {
+        "place": "\"test\\\\relative-place\"",
+        "example": "C:\\Users\\<you>\\data-folder"
+      }
+    },
+    {
+      "code": "dataFolderPlaceNotEmpty",
+      "status": 409,
+      "english": "Test: the place is not an empty folder.",
+      "values": {
+        "to": "/test/new-data"
+      }
+    },
+    {
+      "code": "dataFolderPlaceIsTheDataFolder",
+      "status": 409,
+      "english": "Test: the place is the data folder.",
+      "values": {
+        "to": "/test/new-data"
+      }
+    },
+    {
+      "code": "dataFolderPlaceInsideTheDataFolder",
+      "status": 409,
+      "english": "Test: the place is inside the data folder.",
+      "values": {
+        "to": "/test/new-data",
+        "from": "/test/old-data"
+      }
+    },
+    {
+      "code": "dataFolderPlaceHoldsTheDataFolder",
+      "status": 409,
+      "english": "Test: the place holds the data folder.",
+      "values": {
+        "to": "/test/new-data",
+        "from": "/test/old-data"
+      }
+    },
+    {
+      "code": "dataFolderPlaceInTheInstallFolder",
+      "status": 409,
+      "english": "Test: the place is inside the install folder.",
+      "values": {
+        "to": "/test/new-data",
+        "installFolder": "/test/install"
+      }
+    },
+    {
+      "code": "dataFolderPlaceHasNoFolder",
+      "status": 409,
+      "english": "Test: the folder that would hold the place does not exist.",
+      "values": {
+        "to": "/test/new-data"
+      }
+    },
+    {
+      "code": "dataFolderPlaceHasTooLittleRoom",
+      "status": 409,
+      "english": "Test: the place's drive has too little room.",
+      "values": {
+        "to": "/test/new-data",
+        "freeBytes": 1000,
+        "folderBytes": 5000
+      }
+    },
+    {
+      "code": "dataFolderProcessEnvironmentDecides",
+      "status": 409,
+      "english": "Test: the process environment decides where the data folder is.",
+      "values": {}
+    },
+    {
+      "code": "dataFolderMoveStillRunning",
+      "status": 409,
+      "english": "Test: a data folder move is still running.",
+      "values": {
+        "mark": "/test/data-folder-move.json",
+        "state": "copying",
+        "pid": 4321,
+        "from": "/test/old-data",
+        "to": "/test/new-data"
+      }
+    },
+    {
+      "code": "dataFolderMoveNotConfirmed",
+      "status": 409,
+      "english": "Test: a data folder move has not been confirmed.",
+      "values": {
+        "to": "/test/new-data",
+        "mark": "/test/data-folder-move.json",
+        "state": "switched"
+      }
+    },
+    {
+      "code": "dataFolderMoveRunningUnknown",
+      "status": 409,
+      "english": "Test: the move mark cannot be read, so whether a move runs is not known.",
+      "values": {
+        "mark": "/test/data-folder-move.json",
+        "why": "Test: a reason given by another part of the office."
+      }
+    },
+    {
+      "code": "dataFolderPlaceInTheTemporaryFolder",
+      "status": 409,
+      "english": "Test: the place is in the temporary folder.",
+      "values": {
+        "to": "/test/new-data",
+        "folder": "/test/temp",
+        "variable": "TEMP"
+      }
+    },
+    {
+      "code": "dataFolderPlaceIsANetworkPath",
+      "status": 409,
+      "english": "Test: the place is a network path.",
+      "values": {
+        "to": "/test/new-data"
+      }
+    },
+    {
+      "code": "dataFolderPlaceOnANetworkDrive",
+      "status": 409,
+      "english": "Test: the place is on a network drive.",
+      "values": {
+        "to": "/test/new-data",
+        "drive": "E:\\"
+      }
+    },
+    {
+      "code": "dataFolderDriveNotRead",
+      "status": 409,
+      "english": "Test: the place's drive could not be read.",
+      "values": {
+        "to": "/test/new-data",
+        "drive": "E:\\",
+        "why": "Test: a reason given by another part of the office."
+      }
+    },
+    {
+      "code": "dataFolderDriveTypeUnknown",
+      "status": 409,
+      "english": "Test: Windows answered a type that is not a local drive's.",
+      "values": {
+        "to": "/test/new-data",
+        "drive": "E:\\",
+        "type": "Unknown"
+      }
+    },
+    {
+      "code": "dataFolderDriveNotAsked",
+      "status": 409,
+      "english": "Test: nobody asked Windows about the place's drive.",
+      "values": {
+        "to": "/test/new-data",
+        "drive": "E:\\"
+      }
+    },
+    {
+      "code": "dataFolderLoginUnitNotOurs",
+      "status": 409,
+      "english": "Test: a login unit another program wrote keeps the old folder.",
+      "values": {
+        "unit": "/test/.config/systemd/user/mole-office.service"
+      }
+    },
+    {
+      "code": "dataFolderLoginUnitNotOursRuns",
+      "status": 409,
+      "english": "Test: a running login unit another program wrote keeps the old folder.",
+      "values": {
+        "unit": "/test/.config/systemd/user/mole-office.service"
+      }
+    },
+    {
+      "code": "dataFolderLoginUnitInAnAppImage",
+      "status": 409,
+      "english": "Test: the AppImage's login unit keeps the old folder.",
+      "values": {
+        "unit": "/test/.config/systemd/user/mole-office.service"
+      }
+    },
+    {
+      "code": "dataFolderLoginUnitStartsAtLogin",
+      "status": 409,
+      "english": "Test: start at login is on and its unit keeps the old folder.",
+      "values": {
+        "unit": "/test/.config/systemd/user/mole-office.service"
+      }
+    },
+    {
+      "code": "dataFolderLoginUnitStartsAtLoginRuns",
+      "status": 409,
+      "english": "Test: start at login is on and its running unit keeps the old folder.",
+      "values": {
+        "unit": "/test/.config/systemd/user/mole-office.service"
+      }
+    },
+    {
+      "code": "dataFolderLoginUnitMayStartAtLogin",
+      "status": 409,
+      "english": "Test: systemd does not say start at login is off, and the unit keeps the old folder.",
+      "values": {
+        "unit": "/test/.config/systemd/user/mole-office.service"
+      }
+    },
+    {
+      "code": "dataFolderLoginUnitMayStartAtLoginRuns",
+      "status": 409,
+      "english": "Test: systemd does not say start at login is off, and the running unit keeps the old folder.",
+      "values": {
+        "unit": "/test/.config/systemd/user/mole-office.service"
+      }
+    },
+    {
+      "code": "dataFolderLoginUnitRuns",
+      "status": 409,
+      "english": "Test: the office runs from a login unit that keeps the old folder.",
+      "values": {
+        "unit": "/test/.config/systemd/user/mole-office.service"
+      }
+    },
+    {
+      "code": "dataFolderLoginUnitOff",
+      "status": 409,
+      "english": "Test: start at login is off and its unit still names the old folder.",
+      "values": {
+        "unit": "/test/.config/systemd/user/mole-office.service"
+      }
+    },
+    {
+      "code": "dataFolderWalkMetASymbolicLink",
+      "status": 409,
+      "english": "Test: the data folder holds a symbolic link.",
+      "values": {
+        "folder": "/test/old-data",
+        "name": "test-link",
+        "path": "/test/old-data/test-file"
+      }
+    },
+    {
+      "code": "dataFolderWalkMetASpecialFile",
+      "status": 409,
+      "english": "Test: the data folder holds a file that is not ordinary.",
+      "values": {
+        "folder": "/test/old-data",
+        "name": "test-link"
+      }
+    },
+    {
+      "code": "dataFolderWalkMetMoreNames",
+      "status": 409,
+      "english": "Test: a file has names outside the data folder.",
+      "values": {
+        "path": "/test/old-data/test-file",
+        "links": 2,
+        "found": 1
+      }
+    },
+    {
+      "code": "dataFolderConfirmNeedsAStartedMove",
+      "status": 409,
+      "english": "Test: the mark does not say the move started.",
+      "values": {
+        "mark": "/test/data-folder-move.json",
+        "state": "switched-back"
+      }
+    },
+    {
+      "code": "dataFolderConfirmCannotReadTheOldFolder",
+      "status": 409,
+      "english": "Test: the old data folder cannot be read.",
+      "values": {
+        "mark": "/test/data-folder-move.json",
+        "from": "/test/old-data",
+        "why": "Test: a reason given by another part of the office."
+      }
+    },
+    {
+      "code": "dataFolderConfirmNeedsTheNewDatabase",
+      "status": 409,
+      "english": "Test: the office in use does not name the new database.",
+      "values": {
+        "mark": "/test/data-folder-move.json",
+        "wanted": "/test/new-data/mole-office.db",
+        "inUse": "/test/old-data/mole-office.db"
+      }
+    },
+    {
+      "code": "dataFolderConfirmWaitsForTheMover",
+      "status": 409,
+      "english": "Test: the mover is still running.",
+      "values": {
+        "mark": "/test/data-folder-move.json",
+        "pid": 4321
+      }
+    },
+    {
+      "code": "dataFolderNoMoveToConfirm",
+      "status": 409,
+      "english": "Test: there is no data folder move mark.",
+      "values": {
+        "mark": "/test/data-folder-move.json"
       }
     }
   ]

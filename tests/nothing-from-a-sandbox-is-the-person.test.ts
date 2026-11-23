@@ -153,7 +153,8 @@ describe('who sent a claim to be the person from this computer', () => {
     expect(claimed.text).toContain('Nothing that comes from a sandbox is the person')
     const nobody = await aPersonOnlyAct({ 'content-type': 'application/json', 'x-mole-office-workspace': 'default' })
     expect(nobody.status, nobody.text.slice(0, 300)).toBe(403)
-    const paired = await ask('POST', '/api/office/pairing', { 'content-type': 'application/json' }, {})
+    // The press names the browser, as every press must, so it is refused for the sandbox and not for a missing name.
+    const paired = await ask('POST', '/api/office/pairing', { 'content-type': 'application/json' }, { device: 'A test browser in a sandbox' })
     expect(paired.status, paired.text.slice(0, 300)).toBe(403)
     expect(paired.cookie, 'the pairing press set a cookie for a sandbox').toBeNull()
     expect(paired.text).toContain('Nothing was paired')

@@ -291,11 +291,29 @@ describe('an agent is an identity, and its inbox outlives the process that serve
     // not on this machine — cannot be picked up, so a comment addressed to it is stored and refused
     // at Send. 66 of the 91 session records in the owner's corpus are that shape. The same words
     // addressed to a durable agent go, because an inbox does not need a live process.
+    //
+    // THE RUN NAMES THE AGENT IT WORKED AS. A comment addressed to a run that answers as no agent is refused before it
+    // is stored, and nothing is made up for it. What makes this run dead is that nobody recorded its transcript.
+    //
+    // AND IT STOPPED WITHOUT FINISHING. A run filed already finished that names an agent is sealed as it is filed
+    // (`runSubmitsWork` in src/server/lib/sealed-tip.ts), and the seal asks for a submission or a work area, which this
+    // run has neither of. This run has no work to seal, so it says `crashed`.
+    const worker = await ask('POST', '/api/records', {
+      kind: 'agent',
+      title: 'The agent that wrote the report',
+      data: { handle: 'the-report-run-agent', state: 'active', runtime: 'claude-code' },
+    })
+    expect(worker.status, JSON.stringify(worker.json)).toBe(201)
     const run = await ask('POST', '/api/records', {
       kind: 'session',
       title: 'The run that wrote the report',
-      data: { state: 'finished', runtime: 'claude-code' },
+      data: {
+        state: 'crashed',
+        runtime: 'claude-code',
+        ranAs: [{ workspaceId: WORKSPACE, agentId: (worker.json['record'] as { id: string }).id }],
+      },
     })
+    expect(run.status, JSON.stringify(run.json)).toBe(201)
     const runId = (run.json['record'] as { id: string }).id
     // The comparison uses the other agent, which is still active.
     const inbox = await ask('GET', '/api/agent/inbox?handle=round-nine')

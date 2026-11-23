@@ -100,7 +100,8 @@ describe('GET /api/records answers one page over every row', () => {
   it('answers exactly as before when no new parameter is sent', async () => {
     const plain = await get('/api/records?kind=note')
     expect(plain.status).toBe(200)
-    expect(Object.keys(plain.body).sort()).toEqual(['left', 'matched', 'narrowedByPermission', 'next', 'records', 'returned', 'truncated'].sort())
+    // A LIST BY KIND IS AT EACH KIND'S DEFAULT LEVEL, by the person's decision of 20 November 2026, so `levels` says how.
+    expect(Object.keys(plain.body).sort()).toEqual(['left', 'levels', 'matched', 'narrowedByPermission', 'next', 'records', 'returned', 'truncated'].sort())
     expect(plain.body['matched']).toBe(TITLES.length)
     expect('tally' in plain.body, 'a plain call gained the group counts').toBe(false)
   })

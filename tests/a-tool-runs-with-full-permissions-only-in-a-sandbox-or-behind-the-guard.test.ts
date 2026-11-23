@@ -29,6 +29,12 @@
  * 2026) this file read the guard from a `MOLE_OFFICE_GUARD` list that a launcher was to set, and
  * that nothing set; the guard piece used the same name for something else.
  *
+ * A RUN WHOSE FILES THIS OFFICE DOES NOT CARRY IS NOT STARTED. When the guard is said to be mounted, the rule first
+ * asks whether each of the guard's files for that tool is there. When one is missing it throws, naming each one. The
+ * office tool server is not asked: only the launcher in tools/ puts it in a command, and that launcher is carried
+ * wherever the server is. The case gives the rule its own answer to whether a file is there, so no file of this
+ * checkout is moved.
+ *
  * EVERY ENVIRONMENT IS BUILT HERE, never read off the machine, because the suite also runs inside a
  * sandbox (the merge queue's), where SANDBOX_DIR is set for everything.
  *
@@ -45,7 +51,10 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import {
   FULL_PERMISSIONS,
+  NOT_READ_FOR_THE_GUARD,
+  OFFICE_MCP_SERVER,
   RUNTIMES_WITH_A_FULL_FORM,
+  CODEX_SHELL_SNAPSHOT_OFF,
   aCommandsPermissions,
   aCodexContainerCommand,
   aCommandsOfficeTool,
@@ -53,7 +62,7 @@ import {
   aRuntimeIsCodex,
   thePermissionsARunGets,
 } from '../src/config/run-permissions.mjs'
-import { THE_GUARD, THE_GUARD_COMMAND, claudeCodeGuard, codexGuard, openCodeGuard, theGuardOn } from '../src/config/main-world-guard.mjs'
+import { THE_DSH_HOOKS, THE_GUARD, THE_GUARD_COMMAND, THE_OPENCODE_PLUGIN, claudeCodeGuard, codexGuard, openCodeGuard, theGuardOn } from '../src/config/main-world-guard.mjs'
 import { envFor, type RunRequest } from '../src/worker/runtimes/adapter.ts'
 import { CodexAdapter } from '../src/worker/runtimes/codex.ts'
 import { OpenCodeAdapter } from '../src/worker/runtimes/opencode.ts'
@@ -175,6 +184,63 @@ describe('the rule, in the one place it is worked out', () => {
     expect(thePermissionsARunGets('dsh', { DSH_PERMISSION_MODE: 'read-only' }).env).toEqual({})
     expect(thePermissionsARunGets('opencode', { OPENCODE_PERMISSION: OPENCODE_FULL }).env).toEqual({ OPENCODE_PERMISSION: null })
   })
+
+  it('refuses to start a run whose mounted guard this office does not carry, naming each file', () => {
+    /** Whether a file is there, as the rule asks it: every file but the ones named. */
+    const allBut = (...gone: string[]) => (path: string) => !gone.includes(path)
+    const everyFileIsThere = () => true
+    /** What the rule threw, or a failure when it threw nothing. */
+    const refusal = (ask: () => unknown): string => {
+      try {
+        ask()
+      } catch (err) {
+        return err instanceof Error ? err.message : String(err)
+      }
+      throw new Error('the rule threw nothing')
+    }
+    const mustSay = (said: string, files: string[], label: string) => {
+      for (const file of files) expect(said, label).toContain(file)
+      expect(said, label).toContain('does not carry')
+      expect(said.toLowerCase(), label).toContain('nothing was started')
+    }
+    // THE GUARD AS EACH TOOL MOUNTS IT, read off the command the way the adapters read it, and the files each mount names.
+    const mounted = {
+      'claude-code': { guard: theGuardOn('claude-code', { args: ['-p', 'x', ...claudeCodeGuard('builder-x')] }), files: [THE_GUARD] },
+      codex: { guard: theGuardOn('codex', { args: ['exec', ...codexGuard('builder-x'), 'x'] }), files: [THE_GUARD] },
+      opencode: { guard: theGuardOn('opencode', { args: ['run'], env: openCodeGuard('builder-x') }), files: [THE_OPENCODE_PLUGIN, THE_GUARD] },
+      dsh: { guard: theGuardOn('dsh', { args: [] }), files: [THE_DSH_HOOKS, THE_GUARD] },
+    } as const
+    for (const [runtime, { guard }] of Object.entries(mounted)) expect(guard.mounted, runtime).toBe(true)
+
+    // THE OFFICE TOOL SERVER IS NOT ASKED: with only it missing, every tool's answer is the one it gets with every file
+    // there, with the guard not read and with the guard mounted.
+    for (const [runtime, { guard }] of Object.entries(mounted)) {
+      for (const asked of [NOT_READ_FOR_THE_GUARD, guard]) {
+        expect(thePermissionsARunGets(runtime, {}, asked, allBut(OFFICE_MCP_SERVER)), `${runtime}, mounted ${asked.mounted}`).toEqual(
+          thePermissionsARunGets(runtime, {}, asked, everyFileIsThere),
+        )
+      }
+    }
+
+    // A GUARD SAID TO BE MOUNTED whose file is missing, one file at a time, and then every file of it.
+    for (const [runtime, { guard, files }] of Object.entries(mounted)) {
+      for (const file of files) mustSay(refusal(() => thePermissionsARunGets(runtime, {}, guard, allBut(file))), [file], `${runtime} without ${file}`)
+      mustSay(refusal(() => thePermissionsARunGets(runtime, {}, guard, allBut(...files))), [...files], `${runtime} without any`)
+      // NOT MOUNTED, its files are not asked for.
+      expect(thePermissionsARunGets(runtime, {}, NOT_READ_FOR_THE_GUARD, allBut(...files)), runtime).toEqual(thePermissionsARunGets(runtime, {}))
+    }
+
+    // WITH EVERY FILE THERE, THE ANSWER IS THE ONE THE RULE GAVE BEFORE: on the host with and without the guard, and in a
+    // sandbox.
+    for (const [runtime, { guard }] of Object.entries(mounted)) {
+      expect(thePermissionsARunGets(runtime, {}, guard, everyFileIsThere), runtime).toEqual(thePermissionsARunGets(runtime, {}, guard))
+      expect(thePermissionsARunGets(runtime, {}, guard, everyFileIsThere).full, runtime).toBe(true)
+      expect(thePermissionsARunGets(runtime, {}, NOT_READ_FOR_THE_GUARD, everyFileIsThere), runtime).toEqual(thePermissionsARunGets(runtime, {}))
+      expect(thePermissionsARunGets(runtime, { SANDBOX_DIR: A_SANDBOX }, NOT_READ_FOR_THE_GUARD, everyFileIsThere), runtime).toEqual(
+        thePermissionsARunGets(runtime, { SANDBOX_DIR: A_SANDBOX }),
+      )
+    }
+  })
 })
 
 // ============================================================================ Codex
@@ -192,9 +258,9 @@ describe('Codex', () => {
       const adapter = new CodexAdapter(env)
       const fresh = adapter.commandFor(ask('say hello'))
       expect(theGuardOn('codex', fresh).mounted).toBe(true)
-      expect(fresh.args.slice(0, 5)).toEqual(['-s', 'danger-full-access', '-a', 'never', 'exec'])
-      expect(adapter.commandFor(ask('say hello', { resume })).args.slice(0, 7)).toEqual([
-        '-s', 'danger-full-access', '-a', 'never', 'exec', 'resume', resume,
+      expect(fresh.args.slice(0, 5 + CODEX_SHELL_SNAPSHOT_OFF.length)).toEqual(['-s', 'danger-full-access', '-a', 'never', 'exec', ...CODEX_SHELL_SNAPSHOT_OFF])
+      expect(adapter.commandFor(ask('say hello', { resume })).args.slice(0, 7 + CODEX_SHELL_SNAPSHOT_OFF.length)).toEqual([
+        '-s', 'danger-full-access', '-a', 'never', 'exec', ...CODEX_SHELL_SNAPSHOT_OFF, 'resume', resume,
       ])
       // THE PROMPT GOES ON STANDARD INPUT, so the command names the word that tells Codex to read it there.
       expect(fresh.args.at(-1)).toBe('-')

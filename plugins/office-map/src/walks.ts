@@ -6,11 +6,12 @@ import type { Point, Route } from './geometry.ts'
 import type { Rect } from './viewport.ts'
 import type { SpriteFrame } from './pack.ts'
 import { bodiesOverlap, translateBody, validBody } from './visual-body.ts'
+import { IDLE_ROUTE_STEP } from './idle-route.ts'
 
 export const WALK_PIXELS_PER_SECOND = 70
 export const DEFAULT_MOLE_SCALE = .82
 export interface Walk { id: string; from: string; to: string; expires: number; points: Point[]; started: number | null; duration: number; labelWait?: number }
-export interface MovingContact { id: string; from: string; to: string; point: Point; elapsed: number; facing: 1 | -1; phase?: 'walk' | 'play' | 'wait'; paper?: boolean; labelAtSeat?: boolean }
+export interface MovingContact { id: string; from: string; to: string; point: Point; elapsed: number; facing: 1 | -1; phase?: 'walk' | 'play' | 'sit' | 'wait'; paper?: boolean; labelAtSeat?: boolean }
 export const gaitFrame = (elapsed: number): 'A' | 'pass' | 'B' => (['A', 'pass', 'B', 'pass'] as const)[Math.floor(Math.max(0, elapsed) / 200) % 4]!
 export interface WalkClock {
   now(): number
@@ -158,6 +159,11 @@ export function onRoute(points: Point[], progress: number): { point: Point; faci
 
 /** Pick every walker's place together, in a row `spacing` apart, so a reserved position never overlaps another body. */
 export const PAPER_MEETING_SPACING = 160
+// Minimum feet spacing for a sitting pair; one tile is 32 map pixels.
+export const SITTING_SPACING = 80
+export function sittingSpacing(left: Rect, right: Rect): number {
+  return Math.max(SITTING_SPACING, Math.ceil((left.x + left.width - right.x) / IDLE_ROUTE_STEP) * IDLE_ROUTE_STEP)
+}
 export const PAPER_ARC_SHIFT = 32
 export function chooseIdlePlaces(places: readonly Point[], occupied: readonly Rect[], visible: (point: Point) => boolean, bodies: readonly Rect[], offset = 0, spacing = 96, starts: readonly Point[] = [], accept: (places: readonly Point[]) => boolean = () => true): Point[] {
   if (bodies.length < 1 || bodies.length > IDLE_WALKING_CAP || !bodies.every(validBody) || !occupied.every(validBody) || !Number.isFinite(spacing) || spacing <= 0) return []
@@ -208,21 +214,23 @@ export function paperArcClear(point: Point, frame: SpriteFrame | null | undefine
   const blocked = paperArcBlockers(point, frame, blockers, shift)
   return blocked !== null && blocked.length === 0
 }
-export interface IdleActor { id: string; point: Point; phase: 'walk' | 'play' | 'wait'; partner: string; elapsed: number; facing: 1 | -1; paper: boolean; labelAtSeat: boolean }
+export interface IdleActor { id: string; point: Point; phase: 'walk' | 'play' | 'sit' | 'wait'; partner: string; elapsed: number; facing: 1 | -1; paper: boolean; labelAtSeat: boolean }
 interface IdleParticipant { agent: IdleAgent; point: Point; target: Point; arrived: boolean }
 /** `walkers` names which of the selected group go out, and in which order, when the page chose them.
  * `refusal` says why there are no places; without it, missing places mean "not ready yet". */
-export interface IdleInput { enabled: boolean; agents: IdleAgent[]; places: Point[]; walkers?: string[]; refusal?: string; occupancy?: Point[]; paper?: boolean }
+export interface IdleInput { enabled: boolean; agents: IdleAgent[]; places: Point[]; walkers?: string[]; refusal?: string; occupancy?: Point[]; paper?: boolean; sittingReady?: boolean }
 export type IdleRouteRequest = (id: string, target: Point, done: (route: Route | null) => void, start?: Point, standing?: readonly IdleStanding[]) => void
 /** With `preflight`, every walker's route is found before anybody moves, and the
  * way back is the planned route reversed, last out first back. A refused outing
  * moves nobody; its reason goes to `failure` and stays in the snapshot. With
  * `chances`, numbers in [0, 1), each turn's pair and place offset are drawn from
  * them; without, the pair and the offset follow the turn in order. */
-export interface IdleMotionOptions { preflight?: boolean; failure?: (reason: string) => void; chances?: () => number; labelWait?: (id: string, points: readonly Point[]) => number }
+export interface IdleMotionOptions { preflight?: boolean; failure?: (reason: string) => void; chances?: () => number; sitChances?: () => number; labelWait?: (id: string, points: readonly Point[]) => number }
 export interface IdleRefusal { reason: string; ids: string[] }
 /** At most this many idle moles walk at the same time, and an outing takes no more than this many out. */
 export const IDLE_WALKING_CAP = 3
+/** The shared duration and boundaries of the three sitting pictures. */
+export const SITTING_TIMING = { down: 300, sitting: 9000, up: 300 } as const
 /** The longest piece of a route covered by one box when two walks are compared. */
 const CORRIDOR_PIECE = 16
 /** Boxes that hold every position of `body` along the route: each covers the body at both ends of a
@@ -275,13 +283,15 @@ export class IdleMotion {
   private timer: number | null = null
   private moving: IdleMove[] = []
   private playing: number | null = null
-  private stage: 'out' | 'play' | 'back' = 'out'
+  private stage: 'out' | 'play' | 'sit' | 'back' = 'out'
+  private willSit = false
   private lastInput: IdleInput | null = null
   private turn = 0
   private plans: Point[][] = []
   private waves: number[][] = []
   private refusal: IdleRefusal | null = null
   private draws: { turn: number; values: number[] } | null = null
+  private sitDraw: { turn: number; value: number } | null = null
   constructor(private clock: WalkClock,
     private route: IdleRouteRequest,
     private changed: (actors: IdleActor[]) => void,
@@ -301,6 +311,11 @@ export class IdleMotion {
     return Array.from({ length: Math.min(n, size! < .5 ? IDLE_WALKING_CAP : 2) }, (_, i) => pool.splice(Math.floor(picks[i]! * pool.length), 1)[0]!)
   }
   get destinationOffset(): number { return this.options.chances ? Math.floor(this.drawn(this.options.chances)[IDLE_WALKING_CAP + 1]! * 2 ** 31) : this.turn }
+  /** A separate stream leaves every pre-existing group and destination draw in place. */
+  get wantsToSit(): boolean {
+    if (this.sitDraw?.turn !== this.turn) this.sitDraw = { turn: this.turn, value: (this.options.sitChances ?? Math.random)() }
+    return this.sitDraw.value < .5
+  }
   update(input: IdleInput): void {
     if (this.closed) return
     const agents = this.selection(input.agents)
@@ -310,10 +325,11 @@ export class IdleMotion {
     const sameAgents = agents.length > 0 && agents.length === this.actors.length && agents.every(agent => this.actors.some(actor => actor.agent.id === agent.id))
     if (this.enabled && input.enabled && !input.refusal && input.places.length === 0 && sameAgents) { this.lastInput = { ...input, paper: this.lastInput?.paper }; return }
     this.lastInput = input
-    const signature = JSON.stringify([input.enabled, agents, input.places, input.walkers, input.refusal, input.occupancy, input.paper])
+    const signature = JSON.stringify([input.enabled, agents, input.places, input.walkers, input.refusal, input.occupancy, input.paper, input.sittingReady])
     if (signature === this.signature) return
     this.reset(); this.signature = signature; this.enabled = input.enabled
     if (!this.enabled || !agents.length) return
+    this.willSit = agents.length === 2 && !!input.sittingReady && this.wantsToSit
     if (this.options.preflight) { this.plan(agents, input); return }
     if (input.places.length < agents.length) return
     this.actors = agents.map((agent, i) => ({ agent, point: agent.foot, target: input.places[i]!, arrived: false }))
@@ -328,7 +344,7 @@ export class IdleMotion {
       const at = moving ? onRoute(moving.points, progress) : { point: actor.point, facing: (index ? -1 : 1) as 1 | -1 }
       const walked = moving ? moving.total * progress : 0
       const labelAtSeat = !!moving && (moving.returning ? moving.total - walked < moving.labelWait : walked < moving.labelWait)
-      return { id: actor.agent.id, point: at.point, phase: moving ? 'walk' : this.stage === 'play' ? 'play' : 'wait', partner: this.actors[index ? index - 1 : 1]?.agent.id ?? '', elapsed: moving ? now - moving.started : this.playing === null ? 0 : now - this.playing, facing: at.facing, paper: !!this.lastInput?.paper, labelAtSeat }
+      return { id: actor.agent.id, point: at.point, phase: moving ? 'walk' : this.stage === 'play' ? 'play' : this.stage === 'sit' ? 'sit' : 'wait', partner: this.actors[index ? index - 1 : 1]?.agent.id ?? '', elapsed: moving ? now - moving.started : this.playing === null ? 0 : now - this.playing, facing: at.facing, paper: !(this.willSit && this.actors.length === 2) && !!this.lastInput?.paper, labelAtSeat }
     })
   }
   private emit(): void { this.changed(this.current()) }
@@ -364,7 +380,7 @@ export class IdleMotion {
   }
   private next(): void {
     if (!this.enabled || this.closed || !this.actors.length) return
-    if (this.stage === 'play') {
+    if (this.stage === 'play' || this.stage === 'sit') {
       this.playFrame(); return
     }
     // Planned waves come back last out, first back, so each reversed route
@@ -374,7 +390,7 @@ export class IdleMotion {
     const actor = this.actors[index]
     if (!actor) {
       if (this.stage === 'out' && this.actors.length === 1) { this.stage = 'back'; this.actors[0]!.arrived = false; this.next() }
-      else if (this.stage === 'out') { this.stage = 'play'; this.playing = this.clock.now(); this.next() }
+      else if (this.stage === 'out') { this.stage = this.willSit && this.actors.length === 2 ? 'sit' : 'play'; this.playing = this.clock.now(); this.next() }
       else { this.actors = []; this.plans = []; this.waves = []; this.emit(); this.rest() }
       return
     }
@@ -405,8 +421,9 @@ export class IdleMotion {
     }, actor.point)
   }
   private playFrame(): void {
-    if (!this.enabled || this.closed || this.stage !== 'play' || this.playing === null) return
-    if (this.clock.now() - this.playing >= 6000) { this.stage = 'back'; for (const actor of this.actors) actor.arrived = false; this.next(); return }
+    if (!this.enabled || this.closed || (this.stage !== 'play' && this.stage !== 'sit') || this.playing === null) return
+    const duration = this.stage === 'sit' ? SITTING_TIMING.down + SITTING_TIMING.sitting + SITTING_TIMING.up : 6000
+    if (this.clock.now() - this.playing >= duration) { this.stage = 'back'; for (const actor of this.actors) actor.arrived = false; this.next(); return }
     this.emit(); this.frame = this.clock.frame(() => { this.frame = null; this.playFrame() })
   }
   /** A walker who has arrived stands at its place; the next wave sets out only when the whole of this one has arrived. */
@@ -426,6 +443,6 @@ export class IdleMotion {
 }
 /** How the map builds its idle motion: every route found before anyone moves, and the group and
  * places drawn from `chances` when it is given. */
-export function idleMotionForMap(clock: WalkClock, route: IdleRouteRequest, changed: (actors: IdleActor[]) => void, cancelRoute: () => void, cycle: (() => void) | null, failure: (reason: string) => void, chances?: () => number, labelWait?: (id: string, points: readonly Point[]) => number): IdleMotion {
-  return new IdleMotion(clock, route, changed, cancelRoute, cycle, { preflight: true, failure, chances, labelWait })
+export function idleMotionForMap(clock: WalkClock, route: IdleRouteRequest, changed: (actors: IdleActor[]) => void, cancelRoute: () => void, cycle: (() => void) | null, failure: (reason: string) => void, chances?: () => number, labelWait?: (id: string, points: readonly Point[]) => number, sitChances?: () => number): IdleMotion {
+  return new IdleMotion(clock, route, changed, cancelRoute, cycle, { preflight: true, failure, chances, sitChances, labelWait })
 }

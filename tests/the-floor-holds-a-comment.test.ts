@@ -46,7 +46,7 @@ import { fileURLToPath, URL } from 'node:url'
 import type { Page } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { targetKey, type Target } from '../src/shared/targets.ts'
-import { deleteTheCopiedDefaultChapters, type LiveApp, liveApp, waitForThePage } from './helpers.ts'
+import { deleteTheCopiedDefaultChapters, deleteTheCopiedDefaultFlows, type LiveApp, liveApp, waitForThePage } from './helpers.ts'
 import { FRAME_REGIONS } from './frame-regions.ts'
 
 const ALLOWLIST = fileURLToPath(new URL('./frame-allowlist.json', import.meta.url))
@@ -96,6 +96,7 @@ beforeAll(async () => {
   // The default chapters a fresh office copies (wave 13s round 7) would make the records page taller than
   // the window, and the rail would then grow with the page by the comment's own row.
   await deleteTheCopiedDefaultChapters(app.api)
+  await deleteTheCopiedDefaultFlows(app.api)
   apiPort = app.apiPort
   webPort = app.webPort
   page = app.page

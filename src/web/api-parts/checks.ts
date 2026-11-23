@@ -14,10 +14,13 @@ export const checksDoors = {
 
   /**
    * CHECKLISTS ACROSS PROJECTS. `owner` is the door's own word: absent for the reader's own, `everyone`, or
-   * `agent:<id>` / `person:<id>` for one owner's.
+   * `agent:<id>` / `person:<id>` for one owner's. `items` is `open` for only the items not finished, with each finished
+   * one in `finishedItems` by its id; absent, every item.
    */
-  listChecklistsAcross: (choice: ProjectChoice, owner?: string) =>
-    request<ChecklistsAcrossReply>(`/api/checklists?${projectsQuery(choice)}${owner === undefined ? '' : `&owner=${encodeURIComponent(owner)}`}`),
+  listChecklistsAcross: (choice: ProjectChoice, owner?: string, items?: 'open') =>
+    request<ChecklistsAcrossReply>(
+      `/api/checklists?${projectsQuery(choice)}${owner === undefined ? '' : `&owner=${encodeURIComponent(owner)}`}${items === undefined ? '' : `&items=${items}`}`,
+    ),
 
   /** ONE CHECKLIST, in whichever project holds it. */
   readChecklistAcross: (id: string) =>
@@ -65,6 +68,25 @@ export const checksDoors = {
       method: 'PATCH',
       headers: { 'content-type': 'application/json', [WORKSPACE_HEADER]: checklist.workspaceId },
       body: JSON.stringify({ standing, ifVersion: checklist.version }),
+    }),
+
+  /**
+   * ADD ONE ITEM TO A CHECKLIST, with the words as typed, in the checklist's own project. The answer holds the item as
+   * the door stored it and the checklist read again; the door refuses empty words.
+   */
+  addChecklistItem: (checklist: ChecklistReading, words: string) =>
+    request<ChecklistItemReply>(`/api/checklists/${encodeURIComponent(checklist.id)}/items`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', [WORKSPACE_HEADER]: checklist.workspaceId },
+      body: JSON.stringify({ words }),
+    }),
+
+  /** MAKE A CHECKLIST with a title and no item, in the project named, or in the project on screen when none is named. */
+  makeChecklist: (title: string, project?: string) =>
+    request<{ checklist: ChecklistReading; says: string; workspaceId: string }>('/api/checklists', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', ...(project === undefined ? {} : { [WORKSPACE_HEADER]: project }) },
+      body: JSON.stringify({ title }),
     }),
 
   /**

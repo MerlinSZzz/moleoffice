@@ -4,6 +4,7 @@ import { useLanguage } from '../../lib/language.ts'
 import { t } from '@shared/i18n.ts'
 import { kindWord } from '@shared/words.ts'
 import { useInspect } from '../../lib/mode.ts'
+import { currentWorkspace } from '../../lib/workspace.ts'
 /**
  * THE PROJECT STRUCTURE, DRAWN. The shell around the canvas and the outline.
  *
@@ -124,7 +125,9 @@ import { useInspect } from '../../lib/mode.ts'
  * the page's own cards. Nothing about the canvas's cards is offered (no "Show all", no isolated fold,
  * no fold about stored positions), and "How this is shown" offers only lane and order, the two hints
  * lanes read. The page is handed each answer of the stored-arrangement read through `lanes.onIntent`,
- * because it draws from that answer and must not read it a second time.
+ * because it draws from that answer and must not read it a second time. The page may start the first of
+ * those reads itself, with its other reads, and give it here as `readAhead`; this panel takes it as its
+ * first read and holds its answer as before (round 238).
  */
 
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
@@ -132,7 +135,8 @@ import type { LayoutReport } from '@shared/presentation.ts'
 import type { PanelRecord } from '@shared/types.ts'
 import { errorMessage } from '../../api.ts'
 import { navigate, recordPath } from '../router.tsx'
-import { Absence, Explain, Panel, Tag, useNarrow } from '../ui.tsx'
+import { Absence, Panel, ServerNote, Tag, useNarrow } from '../ui.tsx'
+import { declaredAttributes } from '../declares.ts'
 import { DrawingControl } from './controls.tsx'
 import { Edit, presentation, storedHintCount, type StoredIntent } from './Edit.tsx'
 import { Outline } from './Outline.tsx'
@@ -170,6 +174,51 @@ export type IntentAnswer =
   | { at: 'read'; stored: StoredIntent }
   | { at: 'failed'; problem: string; kept: StoredIntent | null }
 
+/**
+ * THE FIRST READ OF ONE DRAWING'S STORED ARRANGEMENT, STARTED BY THE PAGE BEFORE THIS PANEL IS MOUNTED (round 238).
+ *
+ * A page mounts this panel only once its records and packages are read, and the panel's own first read began only then,
+ * so it waited for those reads though it needs none of them. A page may make this when it opens, start it with its
+ * other reads, and give it here as `readAhead`. The panel's first read of the same drawing then takes that request
+ * instead of sending its own. Every later read sends its own, the one after a write included. The request is handed out
+ * once, so the arrangement is still read once for the first drawing, and the panel still holds the answer.
+ */
+export interface IntentReadAhead {
+  /** Sends the read, once however often it is called. */
+  start: () => void
+  /**
+   * The read, the first time it is asked for with its own drawing's key in the project it was sent in. Null for another
+   * drawing's key, after the project has changed, and once it has been taken.
+   */
+  take: (presentationScope: string) => Promise<StoredIntent> | null
+}
+
+export function intentReadAhead(scope: Scope): IntentReadAhead {
+  const presentationScope = intentScopeKey(scope)
+  let sent: { answer: Promise<StoredIntent>; project: string } | null = null
+  let taken = false
+  const send = () => {
+    if (sent !== null) return sent
+    // The request names the project chosen when it is sent.
+    sent = { answer: presentation.read(presentationScope), project: currentWorkspace() }
+    // The panel that takes the read says its failure. A read nobody takes was drawn from by nothing, and this keeps the
+    // browser from reporting its failure as one nobody handled.
+    sent.answer.catch(() => undefined)
+    return sent
+  }
+  return {
+    start: () => {
+      send()
+    },
+    take: (asked) => {
+      if (taken || asked !== presentationScope) return null
+      taken = true
+      const { answer, project } = send()
+      return project === currentWorkspace() ? answer : null
+    },
+  }
+}
+
 export interface StructureViewProps {
   records: readonly PanelRecord[]
   links: readonly GraphLink[]
@@ -178,6 +227,8 @@ export interface StructureViewProps {
   packages?: GraphInput['packages']
   /** Which drawing to start on. */
   scope: Scope
+  /** The marked master, when the page has one. */
+  masterId?: string | null
   /**
    * The address of a drawing, so the picker can be made of LINKS rather than of buttons.
    *
@@ -212,6 +263,11 @@ export interface StructureViewProps {
     onIntent: (answer: IntentAnswer) => void
     onSaysByWord?: (sentences: readonly ASentenceAndItsWord[]) => void
   }
+  /**
+   * THE FIRST READ OF THE STORED ARRANGEMENT, when the page started it before mounting this panel (round 238). The
+   * panel's first read of `scope` takes it instead of sending its own. Left out, the panel sends its first read itself.
+   */
+  readAhead?: IntentReadAhead
 }
 
 /**
@@ -222,16 +278,16 @@ export interface StructureViewProps {
 const NO_RECORD_OF_THE_KIND = () => t('g7b.StructureView.no_record_of_the_right_kind_is')
 
 /**
- * THE MARK WHERE A DRAWING WITH NOTHING IN IT WOULD BE. Written once because two drawings draw it: the canvas, for a
+ * THE WORD WHERE A DRAWING WITH NOTHING IN IT WOULD BE. Written once because two drawings draw it: the canvas, for a
  * projection with nothing to draw, and a pipeline page's own lanes, for a pipeline with no card (wave 13u round 230).
+ * The word is none in both, because in both the drawing was made and holds nothing.
  */
-export function NothingInTheDrawing() {
-  return <p className="gx-projection"><Absence /></p>
+export function NothingInTheDrawing({ toDevelopers }: { toDevelopers?: readonly { key: string; words: string }[] } = {}) {
+  return <p className="gx-projection" data-to-developers={toDevelopers === undefined ? undefined : JSON.stringify(toDevelopers)}><Absence tier="told-apart" looked={true} word={t('absence.none')} /></p>
 }
 
-export function StructureView({ records, links, attention, scope, hrefFor, onChanged, now, onSays, packages, lanes }: StructureViewProps) {
+export function StructureView({ records, links, attention, scope, masterId, hrefFor, onChanged, now, onSays, packages, lanes, readAhead }: StructureViewProps) {
   const { language } = useLanguage()
-  const inspect = useInspect()
   const narrow = useNarrow()
   // What a reader has asked for, when they have asked. Null means "whatever this width is for",
   // which is the state a page loads in.
@@ -280,8 +336,9 @@ export function StructureView({ records, links, attention, scope, hrefFor, onCha
     let live = true
     // Kept as it is while it is already reading, so the first read is one answer and not two.
     setReading((was) => (was.at === 'reading' ? was : { at: 'reading' }))
-    presentation
-      .read(presentationScope)
+    // The first read takes the request the page started for this drawing, when it started one (round 238).
+    const asked = (reads === 0 ? readAhead?.take(presentationScope) : null) ?? presentation.read(presentationScope)
+    asked
       .then((reply) => {
         if (live) setReading({ at: 'read', scope: presentationScope, stored: reply })
       })
@@ -293,7 +350,7 @@ export function StructureView({ records, links, attention, scope, hrefFor, onCha
     return () => {
       live = false
     }
-  }, [presentationScope, reads])
+  }, [presentationScope, reads, readAhead])
   const rereadIntent = useCallback(() => setReads((n) => n + 1), [])
   /**
    * The answer FOR THE DRAWING ON SCREEN, or "still reading" when the answer held is another drawing's.
@@ -446,7 +503,7 @@ export function StructureView({ records, links, attention, scope, hrefFor, onCha
   // but a handler that changes identity on every render is worth not creating in the first place.
   const openRecord = useCallback((recordId: string) => navigate(recordPath(recordId)), [])
 
-  const pipelines = records.filter((record) => record.kind === 'pipeline')
+  const pipelines = records.filter((record) => record.kind === 'pipeline' && (scope.at !== 'pipeline' || record.id === scope.recordId || record.id === masterId))
   const choices = useMemo(
     () =>
       [...records]
@@ -474,10 +531,7 @@ export function StructureView({ records, links, attention, scope, hrefFor, onCha
                 THE TITLE ATTRIBUTE IS NOT WHERE ANY OF THIS LIVES. It is a mouse convenience and a
                 phone has no hover, so it says nothing the fold under the drawing does not — that
                 fold states the same counts in its own visible line and names every omitted card. */}
-            <Tag
-              tone="quiet"
-              title={canvasOmits ? t('g7b.StructureView.counted_and_named_under_the_drawing') : t('g7b.StructureView.every_card_in_this_drawing_is_drawn')}
-            >
+            <Tag tone="quiet">
               {canvasOmits
                 ? t('g7b.StructureView.drawn', { v1: canvas.graph.nodes.length, v2: graph.nodes.length })
                 : t('g7b.StructureView.cards', { v1: lanes === undefined ? graph.nodes.length : lanes.records.length })}
@@ -492,11 +546,6 @@ export function StructureView({ records, links, attention, scope, hrefFor, onCha
               now={editing}
               after={!editing}
               onPress={() => setEditing((on) => !on)}
-              title={
-                editing
-                  ? t('g7b.StructureView.put_the_editing_drawer_away_nothing_on')
-                  : t('g7b.StructureView.open_a_drawer_beside_the_drawing_add')
-              }
             >
               {editing ? t('g7b.StructureView.done_editing') : t('g7b.StructureView.edit')}
             </DrawingControl>
@@ -546,7 +595,6 @@ export function StructureView({ records, links, attention, scope, hrefFor, onCha
             reason={t('g7b.StructureView.already_drawn_the_drawing_is_on_screen')}
             {...(nothingToDraw === null ? {} : { unavailable: nothingToDraw })}
             onPress={() => setAsked('canvas')}
-            title={t('g7b.StructureView.boxes_and_lines_on_a_canvas_you')}
           >
             {DRAWING_WORDS.graph}
           </DrawingControl>
@@ -557,7 +605,6 @@ export function StructureView({ records, links, attention, scope, hrefFor, onCha
             after={'outline' as const}
             reason={t('g7b.StructureView.already_open_the_printed_list_is_on')}
             onPress={() => setAsked('outline')}
-            title={t('g7b.StructureView.every_card_in_the_graph_printed_in')}
           >
             {DRAWING_WORDS.list}
           </DrawingControl>
@@ -580,11 +627,6 @@ export function StructureView({ records, links, attention, scope, hrefFor, onCha
                 setDrawAll((on) => !on)
                 setAsked('canvas')
               }}
-              title={
-                drawAll
-                  ? t('g7b.StructureView.go_back_to_drawing_the_cards_a', { v1: joined.graph.nodes.length, v2: joined.omitted.length, v3: DRAWING_WORDS.list })
-                  : t('g7b.StructureView.draw_every_card_including_the_that_no', { v1: joined.omitted.length })
-              }
             >
               {drawAll
                 ? t('g7b.StructureView.draw_only_what_is_linked_of', { v1: joined.graph.nodes.length, v2: graph.nodes.length })
@@ -695,16 +737,10 @@ export function StructureView({ records, links, attention, scope, hrefFor, onCha
             "10 / 27 drawn" on the page twice, a panel apart — this codebase's most expensive
             recurring defect in its smallest form. */}
         {canvasOmits ? (
-          <Explain declares={{ surface: 'structure.isolated' }}
-            meaning={
-              <span>
-                <b className="num">{canvas.omitted.length}</b>{t('g7b.StructureView.isolated')}</span>
-            }
-            opens={t('g7b.StructureView.why_these_are_not_on_the_canvas')}
-          >
-            <p className="gx-prose">{t('g7b.StructureView.nothing_joins')}{canvas.omitted.length === 1 ? t('g7b.StructureView.this_one') : t('g7b.StructureView.these')}{t('g7b.StructureView.to_anything_else_drawn_here_which_is')}{canvas.omitted.length === 1 ? t('g7b.StructureView.it_is') : t('g7b.StructureView.they_are')}{t('g7b.StructureView.not_on_the_canvas')}{' '}
-              {canvas.omitted.length === 1 ? t('g7b.StructureView.it_is_2015') : t('g7b.StructureView.each_of_them_is')}{t('g7b.StructureView.printed_in_full_under')}<b>{DRAWING_WORDS.list}</b>{t('g7b.StructureView.its_links_its_gates_and_everything_attached')}<b>{t('g7b.StructureView.show_all_2019')}</b>{t('g7b.StructureView.draws')}{' '}
-              {canvas.omitted.length === 1 ? t('g7b.StructureView.it') : t('g7b.StructureView.them')}{t('g7b.StructureView.on_the_canvas')}</p>
+          <details className="gx-isolated" {...declaredAttributes({ surface: 'structure.isolated' })}>
+            <summary>
+              <b className="num">{canvas.omitted.length}</b>{t('g7b.StructureView.isolated')}
+            </summary>
             <ul className="gx-not-drawn">
               {canvas.omitted.map((node) => (
                 <li key={node.id}>
@@ -715,7 +751,7 @@ export function StructureView({ records, links, attention, scope, hrefFor, onCha
                 </li>
               ))}
             </ul>
-          </Explain>
+          </details>
         ) : null}
 
         {/* The CANVAS prints the whole layout report itself, including what ELK could not take — which
@@ -738,41 +774,6 @@ export function StructureView({ records, links, attention, scope, hrefFor, onCha
             (wave 13u round 217). Both stood under every drawing, and the page's body now says the
             one entry nothing else on the page says: see `says` above. */}
 
-        {/* WHERE THE PICTURE COMES FROM — SEVEN WORDS, AND THE PARAGRAPHS BEHIND THEM.
-            IT SAID "nothing stores a position" UNTIL 6 SEPTEMBER 2026, and that stopped being true
-            that day: the rule that a block's position is never stored, and is worked out again on every
-            draw, was withdrawn, so a card somebody drags is kept where they put it (criterion D19).
-            Everything else is still worked out on every draw, which is what the line says now.
-            The visible line used to be a sentence and the canvas printed a second version of the
-            same fact under every drawing ("No position here is stored; it is worked out again on
-            every draw"). One page, one thought, twice. It is said once now, here, in the smallest
-            form that still says it, with the three paragraphs that make it checkable one press
-            away — which is the only place in this app where what IS stored is written down. */}
-        {inspect && lanes === undefined ? <Explain declares={{ surface: 'structure.stored' }}
-          meaning={<span>{t('g7b.StructureView.layout_derived_except_where_somebody_moved_a')}</span>}
-          opens={t('g7b.StructureView.what_is_stored_and_what_is_not')}
-          holds={{ count: graph.notes.length + 3, what: t('g7b.StructureView.statements_about_this_drawing') }}
-        >
-          <p className="gx-prose">
-            <b>{t('g7b.StructureView.stored_and_edited_by_people_and_agents')}</b>{t('g7b.StructureView.the_records_that_are_the_cards_the')}<span>{t('g7b.dependencies')}</span>{t('g7b.StructureView.and_the_words_inside_each_that_is')}</p>
-          <p className="gx-prose">
-            <b>{t('g7b.StructureView.also_stored_and_rare_on_purpose')}</b>{t('g7b.StructureView.how_somebody_asked_for_this_structure_to')}</p>
-          <p className="gx-prose">
-            <b>{t('g7b.StructureView.and_one_place_when_somebody_drags_a')}</b>{t('g7b.StructureView.where_they_put_it_every_other_card')}</p>
-          {/* WHAT WAS DELETED HERE. Two paragraphs and a repetition. That positions are worked out
-              rather than stored was said three times on this page: once on the visible line, and
-              twice inside this fold, one of them ending "Nobody maintains a coordinate here". It is
-              a fact about the implementation with no consequence for a reader — except one, and the
-              one is what is left below. Folding is not deleting, and prose that should be deleted
-              was folded. */}
-          <p className="gx-prose">
-            <b>{t('g7b.StructureView.not_stored')}</b>{t('g7b.StructureView.where_anything_sits_adding_one_link_can')}</p>
-          {graph.notes.map((note) => (
-            <p className="gx-prose" key={note}>
-              {note}
-            </p>
-          ))}
-        </Explain> : null}
       </Panel>
     </div>
   )
@@ -844,24 +845,22 @@ export function IntentReport({
   const inspect = useInspect()
   if (problem !== null) {
     return (
-      <p className="gx-intent" data-tone="problem">{t('g7b.StructureView.what_was_stored_about_how_this_drawing')}{problem}
-      </p>
+      <>
+        <p className="gx-intent" data-tone="problem">{t('structure.arrangementNotRead')}</p>
+        <ServerNote text={problem} />
+      </>
     )
   }
   if (!reportHere || hints === 0) return null
   const report: LayoutReport = graph.report
   if (report.unhonoured.length === 0) {
     return (
-      <p className="gx-intent">
-        <b className="num">{hints}</b>{t('g7b.StructureView.stored')}{hints === 1 ? t('g7b.StructureView.hint_says') : t('g7b.StructureView.hints_say')}{t('g7b.StructureView.how_this_drawing_should_be_shown_and')}</p>
+      <p className="gx-intent">{t('structure.hintsApplied', { n: hints })}</p>
     )
   }
   return (
     <div className="gx-intent" data-tone="unhonoured">
-      <p className="gx-intent-head">
-        <b className="num">{report.unhonoured.length}</b>{t('g7b.StructureView.of_the')}<b className="num">{hints}</b>{t('g7b.StructureView.stored_2069')}{' '}
-        {hints === 1 ? t('g7b.StructureView.hint_about_how_this_drawing_should_be') : t('g7b.StructureView.hints_about_how_this_drawing_should_be')}{' '}
-        {report.unhonoured.length === 1 ? t('g7b.StructureView.was_not') : t('g7b.StructureView.were_not')}{t('g7b.StructureView.applied_nothing_was_dropped_each_one_is')}</p>
+      <p className="gx-intent-head">{t('structure.hintsNotApplied', { n: hints, unapplied: report.unhonoured.length })}</p>
       <ul className="gx-intent-list">
         {report.unhonoured.map((entry) => (
           <li key={`${entry.target} ${entry.hint}`}>
@@ -990,6 +989,8 @@ const GRAPH_CSS = `
 .gx-not-drawn a { color: var(--accent); text-decoration: none; }
 .gx-not-drawn a:hover { text-decoration: underline; text-underline-offset: .16em; }
 .gx-not-drawn-kind { color: var(--text-3); }
+.gx-isolated { margin: 0 0 var(--gut); font-size: var(--fs-1); color: var(--text-2); }
+.gx-isolated > summary { cursor: pointer; width: fit-content; }
 
 /* ---- the canvas ---- */
 /* The box is a fixed height and clips what overflows, so the line that says what the canvas is
@@ -1235,8 +1236,6 @@ const GRAPH_CSS = `
 .gx-attached-head { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; min-width: 0; }
 .gx-attached-title { font-size: var(--fs-2); font-weight: 600; color: var(--accent); overflow-wrap: anywhere; }
 .gx-attached-through { font-size: var(--fs-1); color: var(--text-3); }
-.gx-attached-why { font-size: var(--fs-1); line-height: var(--lh-read); color: var(--text-2); max-width: var(--measure-in-box); }
-.gx-attached-why b { color: var(--text-3); font-weight: 600; }
 
 /* ---- a wall ---- */
 .gx-walls { display: flex; flex-direction: column; gap: var(--pad); }
@@ -1311,12 +1310,6 @@ const GRAPH_CSS = `
 .gx-edit { display: flex; flex-direction: column; gap: var(--pad-lg); min-width: 0; }
 .gx-edit-top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--pad); }
 .gx-edit-h { font-size: var(--fs-2); font-weight: 700; color: var(--text); }
-.gx-edit-idle {
-  font-size: var(--fs-1);
-  line-height: var(--lh-read);
-  color: var(--text-3);
-  max-width: var(--measure-in-box);
-}
 
 /* The action list. Chips, not a stack of headed sections: the whole point is that choosing an
    action is small and its fields are the only large thing on screen. */
@@ -1357,13 +1350,6 @@ const GRAPH_CSS = `
   background: var(--st-inferred-row);
   border: var(--border-w) solid var(--st-inferred-line);
   border-radius: var(--radius-sm);
-}
-.gx-form-h {
-  font-size: var(--fs-1);
-  font-weight: 600;
-  letter-spacing: .06em;
-  text-transform: uppercase;
-  color: var(--text-3);
 }
 .gx-edit-row { display: flex; flex-wrap: wrap; gap: var(--pad); }
 .gx-warn { color: var(--st-failed); }

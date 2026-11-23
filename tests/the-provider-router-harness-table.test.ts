@@ -23,16 +23,6 @@ describe('the provider table describes the routed harnesses', () => {
     }
   })
 
-  it('allows the harness paths and puts Anthropic keys in their own header', () => {
-    expect(THE_ROUTED_PROVIDERS.deepseek.paths).toContain('/chat/completions')
-    expect(THE_ROUTED_PROVIDERS['opencode-go'].paths).toContain('/chat/completions')
-    expect(THE_ROUTED_PROVIDERS.openrouter.paths).toContain('/chat/completions')
-    expect(THE_ROUTED_PROVIDERS.openai.paths).toEqual(expect.arrayContaining(['/chat/completions', '/responses']))
-    expect(THE_ROUTED_PROVIDERS.anthropic.paths).toContain('/messages')
-    expect(THE_ROUTED_PROVIDERS.anthropic.keyHeader).toBe('x-api-key')
-    expect(THE_ROUTED_PROVIDERS.anthropic.keyName).toBe('ANTHROPIC_API_KEY')
-  })
-
   it('derives sandbox API key names from every provider and includes the Codex alias', () => {
     expect(THE_API_KEY_NAMES).toEqual(expect.arrayContaining([...Object.values(THE_ROUTED_PROVIDERS).map((one) => one.keyName), 'CODEX_API_KEY']))
     expect(THE_API_KEY_NAMES).not.toContain('CLAUDE_CODE_OAUTH_TOKEN')

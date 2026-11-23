@@ -26,12 +26,12 @@ import Database from 'better-sqlite3'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import type { Page } from 'playwright'
 import { THE_PERSON } from '../src/shared/person.ts'
-import { enWave13n } from '../src/shared/words/en-wave-13n.ts'
+import { t } from '../src/shared/i18n.ts'
 import { recordPath } from '../src/web/components/router.tsx'
 import { liveApp, waitForThePage, type LiveApp } from './helpers.ts'
 
-const WIDTHS = [1440, 990, 660, 390] as const
-const THEMES = ['light', 'dark'] as const
+const WIDTHS = [1440, 390] as const
+const THEMES = ['light'] as const
 const WORDS = { forTheOutside: 'Do the made-up work and hand it back.', acceptance: 'The made-up work is done.' }
 const asThePerson = (): Record<string, string> => ({ 'content-type': 'application/json', 'x-mole-office-workspace': 'default', 'x-mole-office-actor-type': 'human', 'x-mole-office-actor-id': THE_PERSON })
 const asAgent = (handle: string): Record<string, string> => ({ ...asThePerson(), 'x-mole-office-actor-type': 'agent', 'x-mole-office-actor-id': handle })
@@ -254,10 +254,11 @@ for (const theme of THEMES) for (const width of WIDTHS) {
         await open(page, recordPath(oldTask))
         const older = page.locator('#main [data-target="uiSurface/package.plan"]')
         await older.waitFor({ timeout: 60_000 })
-        expect(await older.innerText()).toContain('This plan was written before plans had a fixed shape')
+        // CRITERION CHANGE, as decided: the sentence on an old plan is gone, and the hints that were
+        // not stored are drawn as a short state word, never as none.
         expect(await older.locator('pre.pap-text').innerText()).toBe(OLD_PLAN)
-        expect(await older.innerText()).toContain("The office's hints were not stored with this alignment")
-        expect(await older.innerText(), 'an alignment with no stored hints was said to have no hint').not.toContain(enWave13n['planShape.noHints'])
+        expect(await older.locator('.pap-quiet').allInnerTexts()).toContain(t('word.notRecorded'))
+        expect(await older.locator('.pap-quiet').allInnerTexts(), 'an alignment with no stored hints was said to have no hint').not.toContain(t('absence.none'))
       }
     } finally {
       await context.close()

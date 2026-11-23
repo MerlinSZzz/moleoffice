@@ -67,6 +67,9 @@
  *     integrity fuse is set, as asked, but protects nothing yet.
  *
  * The bundled office under resources/office/ is not covered by any fuse. Signing is a later round.
+ *
+ * ar and dpkg-deb are looked up in the whole environment by `whereIsThisTool` (src/config/runtimes.mjs), which reads
+ * `PATH` alone on Linux.
  */
 
 import { spawnSync } from 'node:child_process'
@@ -155,9 +158,9 @@ const ARCH = process.arch === 'x64' ? 'x64' : process.arch === 'arm64' ? 'arm64'
 if (ARCH === null) fail(`Node publishes no Linux build for the processor ${process.arch}.`)
 // electron-builder's fpm writes the .deb with ar, from binutils. Without it the .deb cannot be made,
 // so this stops before anything is built rather than half way through.
-if (whereIsThisTool('ar', process.env['PATH']) === null) fail('The .deb is written with ar, and no ar is on PATH. Install binutils.')
+if (whereIsThisTool('ar', process.env) === null) fail('The .deb is written with ar, and no ar is on PATH. Install binutils.')
 // The .deb's version is read back from it with dpkg-deb, after it is made (step 7).
-if (whereIsThisTool('dpkg-deb', process.env['PATH']) === null) fail("The .deb's version is read back with dpkg-deb, and no dpkg-deb is on PATH. Install dpkg.")
+if (whereIsThisTool('dpkg-deb', process.env) === null) fail("The .deb's version is read back with dpkg-deb, and no dpkg-deb is on PATH. Install dpkg.")
 
 const at = process.argv.indexOf('--out')
 const out = at === -1 ? join(REPO_ROOT, 'dist', 'installers') : resolve(String(process.argv[at + 1] ?? ''))

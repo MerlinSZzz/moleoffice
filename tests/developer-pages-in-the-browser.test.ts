@@ -20,7 +20,7 @@ import { en } from '../src/shared/words/en.ts'
 import { zh } from '../src/shared/words/zh.ts'
 import { type PageLanguage } from '../src/shared/i18n.ts'
 import type { developerBrowser } from './developer-pages-browser.tsx'
-import { missingAndNotWaiting } from './words-waiting-for-translation.ts'
+import { missingAndNotWaiting, notWaitingForTranslation } from './words-waiting-for-translation.ts'
 
 declare global { interface Window { g9: typeof developerBrowser } }
 let app: LiveApp
@@ -242,6 +242,12 @@ it.each(pages)('%s draws its words from both lists without a fallback and keeps 
     expect(missingAndNotWaiting(checked.words.missingByLanguage)).toEqual({ en: [], zh: [] })
     expect(checked.words.fallbacks).toEqual([])
     if (name === 'worlds' || name === 'worldhere') {
+      // THE WORLDS PAGE A WORLD SERVED HAS NO STOP, and these readings are a world's. A page on a trip was served by
+      // the office and keeps its Stop, so the Worlds page is put on a trip before its Stop is pressed.
+      if (name === 'worlds') {
+        await page.evaluate(() => window.g9.away())
+        await draw(page, name, 'xx')
+      }
       await page.getByRole('button', { name: /Stop/ }).first().click()
       await expect.poll(() => page.getByRole('dialog').isVisible()).toBe(true)
       expect((await scan(page)).leaks).toEqual([])
@@ -257,7 +263,7 @@ it.each(pages)('%s draws its words from both lists without a fallback and keeps 
     if (shots) await page.screenshot({ path: join(shots, `${name}-1440-light-xx.png`), fullPage: true })
     await draw(page, name, 'zh')
     expect(await page.locator('h1').innerText()).toBe(zh[headings[name]])
-    expect(await page.evaluate(() => window.g9.check().fallbacks)).toEqual([])
+    expect(notWaitingForTranslation((await page.evaluate(() => window.g9.check().fallbacks)).map((one) => one.key))).toEqual([])
     if (name === 'folderreading') expect(await page.locator('.fr-title').first().innerText()).toBe('Elm observation 0')
     if (name === 'queries') expect(await page.locator('.px-row-title').first().innerText()).toContain('Elm observation')
     if (shots) {
@@ -281,6 +287,9 @@ it.each(pages)('%s draws its words from both lists without a fallback and keeps 
 it.each(['worlds', 'worldhere'] as const)('%s asks before Stop, names the world, and cancels without an act', async name => {
   const { page, context } = await open()
   try {
+    // A WORLDS PAGE A WORLD SERVED HAS NO STOP, and these readings are a world's, so the Worlds page is on a trip: a page
+    // on a trip was served by the office and keeps its Stop.
+    if (name === 'worlds') await page.evaluate(() => window.g9.away())
     await draw(page, name, 'en')
     const label = name === 'worlds' ? en['dev.worlds.stop'] : en['dev.worldhere.stop']
     const press = page.getByRole('button', { name: label, exact: true }).first()

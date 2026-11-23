@@ -1,5 +1,6 @@
 // Copyright © 2026 Zhengyang Shen
 // Licensed under the MIT License. See LICENSE.
+import { KNOWLEDGE_WORDS } from './words/en-wave-13u.ts'
 import { readStoredWord, sayInEnglish } from './i18n.ts'
 import { aUseInPercent, minute } from './logins-week.ts'
 /**
@@ -1019,6 +1020,7 @@ const THE_LINES = {
    * `src/server/lib/handbooks.ts` builds it and is the only caller.
    */
   handbooksForAFlowStart: (said: string): SystemLine => ({ line: 'Handbooks for your flow', said }),
+  knowledgeForAFlowStep: (said: string): SystemLine => ({ line: KNOWLEDGE_WORDS.flowStepLine, said }),
   /**
    * THE ONE MESSAGE A RUN'S STARTER GETS WHEN THE RUN IS SEALED. Problem VJom2joVhqjM, part 1.
    *
@@ -1127,6 +1129,12 @@ const THE_LINES = {
    * secretary to act, so it is not one of the lines that wake nobody.
    */
   theGovernsCheckFoundWork: (said: string): SystemLine => ({ line: 'The governs check found work', said }),
+  /**
+   * A DECISION OR A REPORT SAYS NO PAGE FITS IT: one line for each new nothingFits entry, sent at once to the nearest
+   * module's owner, the owner of a module implementing the nearest pipeline or block, or the module reminder secretary
+   * (src/server/lib/what-a-record-names.ts). It asks whether a page should be made, so it wakes its reader.
+   */
+  nothingFitsAPage: (said: string): SystemLine => ({ line: 'No page fits a record', said }),
   /**
    * KEY FILES LEFT IN A SANDBOX (problem 296sqTPPdWsQ; the secretary, message pEcpMdlrsJr6): the office's check for files under a
    * sandbox's out/ folder that hold a key this office made (src/server/lib/key-files.ts). The sentence names each file and
@@ -1648,6 +1656,8 @@ const THE_LINES = {
    * are read from the words the page draws them with, so a button renamed there is renamed here. The line names no door,
    * command or id (chapter 10 rule 4). A secretary's line names the two doors, with the rename's id.
    */
+  aKnowledgeChangeWaits: (id: string, reason: string): SystemLine => ({ line: KNOWLEDGE_WORDS.offer, said: KNOWLEDGE_WORDS.offerDetails(id, reason) }),
+  aKnowledgeRatingIsLow: (title: string, average: number, count: number, id: string): SystemLine => ({ line: KNOWLEDGE_WORDS.lowNotice(title, average, count, id), said: null }),
   aRenameWaitsForYou: (rename: string, oldName: string, newName: string, proposer: string, because: string, toAPerson: boolean): SystemLine => ({
     line: `A new name for ${oldName} waits for you`,
     said: toAPerson

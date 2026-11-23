@@ -57,18 +57,19 @@
  *   - src/desktop/main.mjs gives the About line no version (`w.about(null)`): case 3 red.
  *
  * ROUND W44 OF WAVE 13T: THE WINDOW PAIRS ITSELF. Before the window opens
- * an office that offers pairing and has not paired it, it presses the pairing door itself, through its own
- * Electron session. So the window never shows the Pairing page, and a web browser still does.
+ * an office that offers pairing and has not paired it, it presses the pairing door itself, from a hidden page of
+ * its own on the office's address (SW-1; W44's window pressed through its Electron session). So the window never
+ * shows the Pairing page, and a web browser still does.
  *   - Case 1: a new office opens on its first page. The page's own read of the door answers paired, the
- *     window's session holds the key's cookie, and the office logged one press, which the window's session
- *     sent. Opened again after the tray's restart, the window reads the door once more and presses nothing.
+ *     window's session holds the key's cookie, and the office logged one press, which the window's hidden pairing
+ *     page sent. Opened again after the tray's restart, the window reads the door once more and presses nothing.
  *   - Case 2: the window, closed and opened again, reads the door once and presses nothing. A browser
  *     with no cookie that opens the same office is still shown the Pairing page and its press.
  *   - Case 4: a refused press shows the check page with the refusal's words and Check again, and writes
  *     one line to the window's log. A refusal with the code senderNotReadInTime is asked again first.
  *   - Case 5: where the door does not offer pairing, nothing is pressed and the office opens as before.
  * THE ANSWERS IN CASES 4 AND 5 ARE THIS TEST'S, NOT THE OFFICE'S: `aWatchOnTheDoor` puts a stand-in in
- * front of the window's session for the door alone. What the office itself was sent is read from its
+ * front of the window's pairing page for the door alone. What the office itself was sent is read from its
  * request log, the `api_calls` table. MUTATIONS, in src/desktop/main.mjs, each after a control run of the
  * window list's six files, which passed:
  *   - the press is never made: cases 1, 2 and 4 red, and cases 1 and 2 of
@@ -148,6 +149,25 @@
  *   - a note asked for before the office page has said it opens anyway: case 8 red;
  *   - the window's log says nothing of a note asked for before the office page has said it: case 8 red;
  *   - once the office page has said it, the window does not ask the system for the key: case 7 red.
+ *
+ * SW-1, ROUND 1, OF WAVE 13T: THE WINDOW PAIRS WITH A DEVICE KEY IN TWO HALVES. The office no longer puts a whole
+ * key in a browser. Its press sets a cookie half, HttpOnly, and answers a header half, and only the two together are
+ * the person. So the window pairs from a hidden page of its own whose address is the pairing door, in the window's
+ * session. That page's script reads the door and presses it with the window's name for itself, in the window's
+ * language, and keeps the header half in the office's own storage on that address, where the office's page reads it.
+ * The window's main process sends the door nothing.
+ *   - THE WATCH IS A ROUTE ON THE WINDOW'S BROWSER CONTEXT NOW (`aWatchOnTheDoor`). It counts and answers only the
+ *     fetch and XHR requests of the hidden pairing page, told apart by that page's address. The page's own load, the
+ *     office page's own reads of the door and this test's reads go to the office. A request it gives no answer is
+ *     aborted, so the error the window gets is Chromium's own, and case 6 reads it from the check page.
+ *   - Cases 1 and 2: the window's page keeps a header half, its session holds the cookie half, HttpOnly, and no old
+ *     key cookie, and its read of the door with both halves says paired. In case 1 the office lists one credential
+ *     under the window's English name for itself, confirmed, and after the tray's restart the same one, with
+ *     nothing pressed.
+ *   - The case "ending a browser's credential leaves the window paired": a browser pairs with the same office, and
+ *     the window's page ends that browser's credential, as the person does on the Visitors page. The browser's read
+ *     with both its halves then says it is not paired. The window's read still says paired, and its own credential is
+ *     still confirmed.
  */
 
 import { type ChildProcess, spawn } from 'node:child_process'
@@ -156,9 +176,9 @@ import { createConnection, createServer } from 'node:net'
 import { join } from 'node:path'
 import { fileURLToPath, URL } from 'node:url'
 import Database from 'better-sqlite3'
-import type { ElectronApplication, Page } from 'playwright'
+import type { ElectronApplication, Page, Request } from 'playwright'
 import { afterAll, describe, expect, it } from 'vitest'
-import { KEY_COOKIE } from '../src/config/key-header.mjs'
+import { DEVICE_HALF_COOKIE, DEVICE_HALF_HEADER, DEVICE_HALF_KEY, KEY_COOKIE } from '../src/config/key-header.mjs'
 import { THE_BUILT_PAGE, missingWebBuild } from '../src/config/the-built-page.mjs'
 import { theQuickNoteAddress } from '../src/config/the-quick-note-address.mjs'
 import * as quickNoteAddress from '../src/config/the-quick-note-address.mjs'
@@ -170,8 +190,9 @@ import { executableOf, theProcessAt } from '../src/config/session-process.mjs'
 import { serviceLockPathFrom, theVersion } from '../src/config/settings.mjs'
 import { createI18n } from '../src/shared/i18n.ts'
 import { A_NOTE_ASKED_FOR_WITHOUT_THE_NOTE_PAGE, theQuickNoteKey } from '../src/desktop/the-quick-note.mjs'
-import { TEST_DATABASE_PREFIX, devStackEnvironment } from './helpers.ts'
+import { TEST_DATABASE_PREFIX, devStackEnvironment, storeNormalModeWhereNothingIsStored } from './helpers.ts'
 import { bundlePageCode } from './a-bundle-of-page-code.ts'
+import { pairTheContext } from './a-paired-context.ts'
 import { electronsBinary, stillRunning, theOfficesBackground, whyNoWindowOpensHere } from './the-window-display.ts'
 
 const REPO = fileURLToPath(new URL('..', import.meta.url))
@@ -293,6 +314,9 @@ async function aWindow(world: World, lang?: string): Promise<ElectronApplication
   child.stderr?.on('data', (chunk: Buffer) => said.push(chunk.toString()))
   const pid = child.pid
   if (pid !== undefined) electrons.set(pid, binary.path)
+  // A new office's owner starts in Developer mode. The window's office pages store Normal where nothing is stored,
+  // so that a case turns Developer mode on itself.
+  await storeNormalModeWhereNothingIsStored(app.context())
   return app
 }
 
@@ -316,73 +340,116 @@ const thePressesLogged = (world: World): number[] => thePairingCalls(world).filt
 
 /**
  * THE COOKIES THE WINDOW'S SESSION HOLDS FOR AN ADDRESS, by name and whether each is HttpOnly. Only those
- * two are read: the key's cookie holds the person's key, and its value is never read here.
+ * two are read: the cookie half is half of the window's key, and its value is never read here.
  */
 function theWindowsCookies(app: ElectronApplication, address: string): Promise<{ name: string; httpOnly: boolean }[]> {
   return app.evaluate(async ({ session }, url) => (await session.defaultSession.cookies.get({ url })).map((one) => ({ name: one.name, httpOnly: one.httpOnly === true })), address)
 }
 
 /**
- * An answer the stand-in gives in the office's place: a status and a JSON body, or, from round W45, a
- * request that fails with this sentence as its error, as a request that got no answer does.
+ * An answer the stand-in gives in the office's place: a status and a JSON body, or, from round W45, no answer at all.
+ * Since SW-1 a request given no answer is aborted, and the error the window gets is Chromium's, not this test's.
  */
-type AnAnswer = { status: number; body: unknown } | { fails: string }
+type AnAnswer = { status: number; body: unknown } | 'no answer'
+
+/** What each window's watch has seen at the pairing door, by method. Kept in this test's process. */
+const watches = new WeakMap<ElectronApplication, { GET: number; POST: number }>()
+
+/** Whether an address is the pairing door's. */
+const isThePairingDoor = (address: URL): boolean => address.pathname === '/api/office/pairing'
 
 /**
- * A WATCH ON THE WINDOW'S SESSION, AT THE PAIRING DOOR ALONE (round W44). It is put in front of `fetch` on
- * Electron's Session, in the window's main process, so it sees every request the window sends to the door
- * through its session. It counts them by method. For the nth request of a method it gives the nth answer it
- * was given for that method, if there is one, or fails as that answer says, and the office is never asked. Every other request, and every
- * request after its answers run out, goes to the office as it was sent. ITS ANSWERS ARE THIS TEST'S, NOT THE
- * OFFICE'S. Given no answers, it only counts. A request sent another way, such as Node's own fetch, is not seen.
+ * WHETHER A REQUEST CAME FROM THE WINDOW'S HIDDEN PAIRING PAGE (SW-1). That page's own address is the pairing door, and
+ * no other page in the window has that address. A request whose page cannot be read is not that page's.
+ */
+function fromThePairingPage(request: Request): boolean {
+  try {
+    return isThePairingDoor(new URL(request.frame().url()))
+  } catch {
+    return false
+  }
+}
+
+/**
+ * A WATCH ON THE WINDOW'S PAIRING PAGE, AT THE PAIRING DOOR ALONE (round W44, and SW-1). Since SW-1 the window reads and
+ * presses the door from a hidden page of its own whose address is the door, so the watch is a route on the window's
+ * whole browser context, for the door's path. It counts the fetch and XHR requests that page sends to the door, by
+ * method. For the nth request of a method it gives the nth answer it was given for that method, if there is one: a
+ * status and a JSON body, or an aborted request for no answer. The office is then never asked. The hidden page's own
+ * load, the office page's own reads of the door, this test's reads from that page, and every request after the answers
+ * run out go to the office as they were sent. ITS ANSWERS ARE THIS TEST'S, NOT THE OFFICE'S. Given no answers, it only
+ * counts.
  */
 async function aWatchOnTheDoor(app: ElectronApplication, answers: { GET: AnAnswer[]; POST: AnAnswer[] } = { GET: [], POST: [] }): Promise<void> {
-  await app.evaluate(({ session }, given) => {
-    type Fetch = (this: unknown, input: string | Request, init?: RequestInit) => Promise<Response>
-    const sessions = Object.getPrototypeOf(session.defaultSession) as { fetch: Fetch }
-    const held = globalThis as unknown as { theDoorsWatch?: { real: Fetch; seen: { GET: number; POST: number } } }
-    const real = held.theDoorsWatch?.real ?? sessions.fetch
-    const seen = { GET: 0, POST: 0 }
-    held.theDoorsWatch = { real, seen }
-    sessions.fetch = function (input, init) {
-      const address = typeof input === 'string' ? input : input.url
-      const method = (init?.method ?? (typeof input === 'string' ? 'GET' : input.method)).toUpperCase()
-      // The main process's own URL: this file imports URL, and that name does not reach the main process.
-      if (new globalThis.URL(address).pathname === '/api/office/pairing' && (method === 'GET' || method === 'POST')) {
-        const answer = given[method][seen[method]]
-        seen[method] += 1
-        if (answer !== undefined) {
-          if ('fails' in answer) return Promise.reject(new Error(answer.fails))
-          return Promise.resolve(new Response(JSON.stringify(answer.body), { status: answer.status, headers: { 'content-type': 'application/json' } }))
-        }
-      }
-      return real.call(this, input, init)
+  const seen = { GET: 0, POST: 0 }
+  watches.set(app, seen)
+  await app.context().route(isThePairingDoor, async (route) => {
+    const request = route.request()
+    const method = request.method()
+    const asked = request.resourceType() === 'fetch' || request.resourceType() === 'xhr'
+    if (!asked || (method !== 'GET' && method !== 'POST') || !fromThePairingPage(request)) {
+      await route.continue()
+      return
     }
-  }, answers)
+    const answer = answers[method][seen[method]]
+    seen[method] += 1
+    if (answer === undefined) await route.continue()
+    else if (answer === 'no answer') await route.abort()
+    else await route.fulfill({ status: answer.status, contentType: 'application/json', body: JSON.stringify(answer.body) })
+  })
 }
 
 /** The requests the watch saw at the pairing door since it was put there, by method. */
 function whatTheWatchSaw(app: ElectronApplication): Promise<{ GET: number; POST: number }> {
-  return app.evaluate(() => {
-    const held = globalThis as unknown as { theDoorsWatch?: { seen: { GET: number; POST: number } } }
-    if (held.theDoorsWatch === undefined) throw new Error('No watch was put on the pairing door.')
-    return { ...held.theDoorsWatch.seen }
-  })
+  const seen = watches.get(app)
+  if (seen === undefined) return Promise.reject(new Error('No watch was put on the pairing door.'))
+  return Promise.resolve({ ...seen })
+}
+
+/** The header half the window's pairing page kept in the office's storage, where the office's page reads it. */
+function theHeaderHalfIn(page: Page): Promise<string | null> {
+  return page.evaluate((key) => localStorage.getItem(key), DEVICE_HALF_KEY)
+}
+
+/** What the window's page reads at the pairing door, sending the header half with the cookie half its session sends. */
+function thePagesReadOfTheDoor(page: Page, half: string): Promise<unknown> {
+  return page.evaluate(
+    async ({ header, value }) => ((await (await fetch('/api/office/pairing', { headers: { [header]: value } })).json()) as { paired?: unknown }).paired,
+    { header: DEVICE_HALF_HEADER, value: half },
+  )
+}
+
+/** The credentials the office lists, read from the window's page with both halves: each one's id, name and standing. */
+function theCredentialsFrom(page: Page, half: string): Promise<{ id: string; name: string; standing: string }[]> {
+  return page.evaluate(
+    async ({ header, value }) => {
+      const reply = await fetch('/api/office/visitors', { headers: { [header]: value } })
+      if (!reply.ok) throw new Error(`The office's list of credentials answered ${String(reply.status)}.`)
+      const said = (await reply.json()) as { credentials: { id: string; name: string; standing: string }[] }
+      return said.credentials.map(({ id, name, standing }) => ({ id, name, standing }))
+    },
+    { header: DEVICE_HALF_HEADER, value: half },
+  )
 }
 
 /**
- * THE WINDOW'S PAGE IS THE OFFICE'S FIRST PAGE, AND IT IS PAIRED (round W44). The page never went to the
- * Pairing page, its own read of the door answers paired, its session holds the key's cookie, HttpOnly, and
- * it says it is the window, by the mark `markEveryPageOf` adds.
+ * THE WINDOW'S PAGE IS THE OFFICE'S FIRST PAGE, AND IT IS PAIRED (round W44, and SW-1). The page never went to the
+ * Pairing page. It keeps a header half, and its session holds the cookie half, HttpOnly, and no old key cookie. Its
+ * own read of the door with both halves answers paired. And it says it is the window, by the mark `markEveryPageOf`
+ * adds. Neither half is printed. The header half is handed back, for the case's own reads.
  */
-async function theWindowIsPairedAt(app: ElectronApplication, page: Page, address: string): Promise<void> {
+async function theWindowIsPairedAt(app: ElectronApplication, page: Page, address: string): Promise<string> {
   await page.locator('.sbp-shut-down').waitFor({ timeout: 60_000 })
-  const read = await page.evaluate(async () => ((await (await fetch('/api/office/pairing')).json()) as { paired?: unknown }).paired)
-  expect(read, "the window's page is not paired").toBe(true)
+  const half = (await theHeaderHalfIn(page)) ?? ''
+  expect(half !== '', "the window's page keeps no header half").toBe(true)
+  const cookies = await theWindowsCookies(app, address)
+  expect(cookies).toContainEqual({ name: DEVICE_HALF_COOKIE, httpOnly: true })
+  expect(cookies.map((one) => one.name), 'the window holds the old key cookie').not.toContain(KEY_COOKIE)
+  expect(await thePagesReadOfTheDoor(page, half), "the window's page is not paired").toBe(true)
   expect(await page.evaluate(() => window.location.hash), "the window's page went to another page").toBe('')
   expect(await page.locator('.pair').count(), 'the window showed the Pairing page').toBe(0)
-  expect(await theWindowsCookies(app, address)).toContainEqual({ name: KEY_COOKIE, httpOnly: true })
   expect(isTheWindow(await page.evaluate(() => navigator.userAgent)), "the window's page does not say it is the window").toBe(true)
+  return half
 }
 
 /** Wait until the window's state says what `ready` asks, and give it back. */
@@ -779,10 +846,14 @@ describe('the window finds its office, and the tray keeps it', () => {
       const first = theLock(world)
       expect(first, 'the window started no service').not.toBeNull()
       // THE WINDOW PAIRED ITSELF (round W44): the new office opens on its first page, not the Pairing page.
-      // The office was pressed once and said yes, and the press went through the window's own session.
-      await theWindowIsPairedAt(app, page, address)
+      // The office was pressed once and said yes, and the press came from the window's hidden pairing page.
+      const half = await theWindowIsPairedAt(app, page, address)
       expect(thePressesLogged(world), 'the office was not pressed once, and paired').toEqual([200])
       expect(await whatTheWatchSaw(app)).toEqual({ GET: 1, POST: 1 })
+      // THE WINDOW'S KEY IS A CREDENTIAL OF ITS OWN (SW-1): the office lists one under the window's name for itself,
+      // confirmed. The office stores confirmed as 'trusted'.
+      const theWindows = (await theCredentialsFrom(page, half)).filter((one) => one.name === WINDOW_WORDS.en.theWindowsDeviceName)
+      expect(theWindows.map((one) => one.standing), "the office does not list the window's credential once, confirmed").toEqual(['trusted'])
       await aPicture(app, 'the-first-page-in-the-window-en', 'light')
       await aPicture(app, 'the-first-page-in-the-window-en', 'dark')
 
@@ -830,10 +901,13 @@ describe('the window finds its office, and the tray keeps it', () => {
       // The restart left the window on its check page, which cannot ask; the office page is opened again, as the person would.
       await pressOpen(app)
       await page.waitForURL(`${address}/**`, { timeout: 60_000 })
-      // The restarted office is the same office, and the window is paired with it: one read, no press.
-      await theWindowIsPairedAt(app, page, address)
+      // The restarted office is the same office, and the window is paired with it: one read, no press, and the same
+      // one credential.
+      const halfAfterTheRestart = await theWindowIsPairedAt(app, page, address)
       expect(await whatTheWatchSaw(app)).toEqual({ GET: 2, POST: 1 })
       expect(thePressesLogged(world)).toEqual([200])
+      const stillTheWindows = (await theCredentialsFrom(page, halfAfterTheRestart)).filter((one) => one.name === WINDOW_WORDS.en.theWindowsDeviceName)
+      expect(stillTheWindows, "the window's credential is not the same one after the restart").toEqual(theWindows)
       // The page's press goes out after the tray's ask is answered, so the answer comes back before the window closes.
       const went = await pressTheTray(app, 'shutDown').catch(() => 'the window was gone before it answered')
       expect(went, 'the menu did not ask before it shut down').toBe('to the question')
@@ -924,6 +998,7 @@ describe('the window finds its office, and the tray keeps it', () => {
     const browser = await chromium.launch()
     try {
       const context = await browser.newContext({ locale: 'zh-CN' })
+      await storeNormalModeWhereNothingIsStored(context)
       const page = await context.newPage()
       await page.goto(`${address}/`)
       const zh = createI18n('zh')
@@ -931,7 +1006,7 @@ describe('the window finds its office, and the tray keeps it', () => {
       await page.locator('.pair .px-panel-title').getByText(zh.t('g4.pairing.titleOffered'), { exact: true }).waitFor({ timeout: 10_000 })
       await page.locator('.pair').getByRole('button', { name: zh.t('g4.pairing.press'), exact: true }).waitFor({ timeout: 10_000 })
       expect(await page.evaluate(() => window.location.hash)).toBe('#/pairing')
-      expect((await context.cookies(address)).map((one) => one.name)).not.toContain(KEY_COOKIE)
+      expect((await context.cookies(address)).map((one) => one.name)).not.toContain(DEVICE_HALF_COOKIE)
       // The Chinese heading reads as a heading: in the light look it is larger than the text under it,
       // as the English heading's capitals and weight make it read (the review of round 9).
       await page.emulateMedia({ colorScheme: 'light' })
@@ -1129,11 +1204,21 @@ describe('the window finds its office, and the tray keeps it', () => {
   // ROUND W45 OF WAVE 13T (order Taoqs_zf5qoU, after W44's check was refused). When the window's read
   // or press of the pairing door gets no answer at all, the window says it could not reach the office, and not
   // that the office answered. When the office answers the read with a refusal, the window says the office
-  // answered, and gives its reason. The failures are the watch's, in the network's place, with a sentence of
-  // this test's own.
-  const THE_STAND_INS_FAILURE = "This is the test's stand-in for a request to the pairing door that got no answer."
-  const NO_ANSWER: AnAnswer = { fails: THE_STAND_INS_FAILURE }
+  // answered, and gives its reason. The failures are the watch's, in the network's place. Since SW-1 the watch
+  // aborts the request, so the error the window gets is Chromium's own. It is not written here: it is read from the
+  // check page, between the two ends of the window's sentence, and it must not be empty.
+  const NO_ANSWER: AnAnswer = 'no answer'
   const OFFERED: AnAnswer = { status: 200, body: { paired: false, offered: true, mayAsk: false, waiting: null } }
+  const [UNREACHED_BEFORE, UNREACHED_AFTER] = WINDOW_WORDS.en.couldNotReachPairing('\u0000').split('\u0000') as [string, string]
+
+  /** The error the check page says the window got when it could not reach the door, or null when it says no such thing. */
+  const theUnreachedErrorIn = (state: WindowState): string | null => {
+    for (const line of state.check.lines) {
+      if (!('say' in line) || line.say.length < UNREACHED_BEFORE.length + UNREACHED_AFTER.length) continue
+      if (line.say.startsWith(UNREACHED_BEFORE) && line.say.endsWith(UNREACHED_AFTER)) return line.say.slice(UNREACHED_BEFORE.length, line.say.length - UNREACHED_AFTER.length)
+    }
+    return null
+  }
 
   it('says it could not reach the office when its read or press of the pairing door gets no answer, and that the office answered when it refuses the read', async () => {
     const world = await aWorld('window-pair-unreached')
@@ -1145,17 +1230,20 @@ describe('the window finds its office, and the tray keeps it', () => {
       // Three presses of Open: the first read gets no answer; the second read is answered and the press gets
       // no answer; the third read is refused.
       await aWatchOnTheDoor(app, { GET: [NO_ANSWER, OFFERED, REFUSED], POST: [NO_ANSWER] })
-      const theOfficeAnswered = WINDOW_WORDS.en.couldNotPair(THE_STAND_INS_FAILURE)
+      const errors: string[] = []
       for (const [press, seen] of [
         [1, { GET: 1, POST: 0 }],
         [2, { GET: 2, POST: 1 }],
       ] as const) {
         await pressOpen(app)
-        const shown = await waitFor(app, (state) => state.check.lines.some((line) => 'say' in line && line.say.includes(THE_STAND_INS_FAILURE)), `press ${String(press)} said`)
-        expect(shown.check.lines, `press ${String(press)}: the window said the office answered, and nothing had`).not.toContainEqual({ say: theOfficeAnswered })
-        expect(shown.check.lines).toEqual([{ say: WINDOW_WORDS.en.couldNotReachPairing(THE_STAND_INS_FAILURE) }, ...theSandboxWarning('en')])
+        const shown = await waitFor(app, (state) => theUnreachedErrorIn(state) !== null, `press ${String(press)} said`)
+        const error = theUnreachedErrorIn(shown) ?? ''
+        expect(error, `press ${String(press)}: the window gave no error of its own`).not.toBe('')
+        expect(shown.check.lines, `press ${String(press)}: the window said the office answered, and nothing had`).not.toContainEqual({ say: WINDOW_WORDS.en.couldNotPair(error) })
+        expect(shown.check.lines).toEqual([{ say: WINDOW_WORDS.en.couldNotReachPairing(error) }, ...theSandboxWarning('en')])
         expect(shown.check.offers).toEqual(['checkAgain'])
         expect(await whatTheWatchSaw(app)).toEqual(seen)
+        errors.push(error)
       }
       await pressOpen(app)
       const refused = WINDOW_WORDS.en.couldNotPair(THE_STAND_INS_REFUSAL)
@@ -1165,8 +1253,73 @@ describe('the window finds its office, and the tray keeps it', () => {
       const page = await app.firstWindow()
       expect(page.url()).toMatch(/^file:.*check\.html$/)
       expect(thePressesLogged(world)).toEqual([])
-      expect(theLinesSaying(app, WINDOW_WORDS.en.couldNotReachPairing(THE_STAND_INS_FAILURE)), "the window's log did not say each unanswered request once").toBe(2)
+      const unreached = [...new Set(errors)].map((error) => theLinesSaying(app, WINDOW_WORDS.en.couldNotReachPairing(error)))
+      expect(unreached.reduce((all, lines) => all + lines, 0), "the window's log did not say each unanswered request once").toBe(2)
       expect(theLinesSaying(app, refused), "the window's log did not say the refused read once").toBe(1)
+    } finally {
+      await app.close()
+    }
+    const stopped = await theCommand(world, 'stop')
+    expect(stopped.code, stopped.out).toBe(0)
+  }, 300_000)
+
+  // SW-1, ROUND 1, OF WAVE 13T. The window and a browser each pair with the same office, and each gets a device key of
+  // its own. The window's page ends the browser's credential, as the person does on the Visitors page. The browser is
+  // then not paired, and the window still is. The browser's name for itself is this test's own.
+  const A_BROWSERS_NAME = "This test's browser beside the window"
+
+  it("ending a browser's credential leaves the window paired", async () => {
+    const world = await aWorld('window-ends-a-browser')
+    const started = await theCommand(world, 'start')
+    expect(started.code, started.out).toBe(0)
+    const address = `http://127.0.0.1:${String(world.port)}`
+    const app = await aWindow(world)
+    try {
+      await waitFor(app, (state) => state.officeAddress !== null && state.check.answer === 'healthy' && !state.check.busy, 'the office found')
+      await pressOpen(app)
+      const page = await app.firstWindow()
+      await page.waitForURL(`${address}/**`, { timeout: 60_000 })
+      const half = await theWindowIsPairedAt(app, page, address)
+
+      // A BROWSER PAIRS WITH THE SAME OFFICE, with a key of its own in two halves.
+      const { chromium } = await import('playwright')
+      const browser = await chromium.launch()
+      try {
+        const context = await browser.newContext()
+        const paired = await pairTheContext(context, address, A_BROWSERS_NAME)
+        const before = await theCredentialsFrom(page, half)
+        const theWindows = before.filter((one) => one.name === WINDOW_WORDS.en.theWindowsDeviceName)
+        const theBrowsers = before.filter((one) => one.name === A_BROWSERS_NAME)
+        expect(theWindows.map((one) => one.standing), "the office does not list the window's credential once, confirmed").toEqual(['trusted'])
+        expect(theBrowsers.map((one) => one.standing), "the office does not list the browser's credential once, confirmed").toEqual(['trusted'])
+
+        // THE WINDOW'S PAGE ENDS THE BROWSER'S CREDENTIAL, with both of the window's halves.
+        const ended = await page.evaluate(
+          async ({ id, header, value }) => {
+            const reply = await fetch(`/api/office/visitors/${encodeURIComponent(id)}/end`, {
+              method: 'POST',
+              headers: { 'content-type': 'application/json', [header]: value },
+              body: '{}',
+            })
+            return reply.status
+          },
+          { id: theBrowsers[0]?.id ?? '', header: DEVICE_HALF_HEADER, value: half },
+        )
+        expect(ended, "the window's page could not end the browser's credential").toBe(200)
+
+        // THE BROWSER IS NOT PAIRED NOW: its read with both its halves says so.
+        const theBrowsersRead = await context.request.get(`${address}/api/office/pairing`, { headers: { [DEVICE_HALF_HEADER]: paired.headerHalf } })
+        expect(theBrowsersRead.status()).toBe(200)
+        expect(((await theBrowsersRead.json()) as { paired?: unknown }).paired, 'the browser whose credential was ended is still paired').toBe(false)
+
+        // AND THE WINDOW STILL IS: its page's read with both halves says paired, and its own credential is still confirmed.
+        expect(await thePagesReadOfTheDoor(page, half), "ending the browser's credential unpaired the window").toBe(true)
+        const after = await theCredentialsFrom(page, half)
+        expect(after.filter((one) => one.name === WINDOW_WORDS.en.theWindowsDeviceName), "the window's credential changed").toEqual(theWindows)
+        expect(after.filter((one) => one.name === A_BROWSERS_NAME).map((one) => ({ id: one.id, standing: one.standing }))).toEqual([{ id: theBrowsers[0]?.id, standing: 'ended' }])
+      } finally {
+        await browser.close()
+      }
     } finally {
       await app.close()
     }

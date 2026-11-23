@@ -3,7 +3,8 @@
 /** The actual transaction, wholly made-up services and verifier programs. No identity transformation is supplied. */
 import { expect, it } from 'vitest'
 import { spawn } from 'node:child_process'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import Database from 'better-sqlite3'
@@ -11,6 +12,7 @@ import { upgradeStable, validateUpgradeConfig, processIdentity } from '../tools/
 import { stableUpgradeFixture, baselineIsBack, remember, track, groups, children, snapshot, write, root } from './stable-upgrade-fixture.ts'
 import { LIMITS, closed, rows, unavailable } from './a-closed-stable-upgrade.ts'
 import { theResumeCommand, theUpgradeMarkPath } from '../src/config/the-upgrade-mark.mjs'
+import { readClosedVerificationResult } from '../tools/stable/closed-upgrade-verification.mjs'
 
 it('validates the explicit opt-in contract before any mutation and preserves an ordinary default', async () => {
   const f = await stableUpgradeFixture()
@@ -147,12 +149,8 @@ for (const [name, fault] of [
   ['incomplete checks', "r.checks.pop();"],
   ['unknown result field', "writeFileSync(resultPath,JSON.stringify({version:1,phase:r.phase,commit:r.commit,stateSha256:r.stateSha256,checks:Object.fromEntries(r.checks.map(n=>[n,true])),repair:true}),{mode:0o600});process.exit(0);"],
   ['rejected check', "writeFileSync(resultPath,JSON.stringify({version:1,phase:r.phase,commit:r.commit,stateSha256:r.stateSha256,checks:Object.fromEntries(r.checks.map(n=>[n,false]))}),{mode:0o600});process.exit(0);"],
-  ['wrong generation', "r.commit='0'.repeat(40);"],
   ['wrong version', "writeFileSync(resultPath,JSON.stringify({version:2,phase:r.phase,commit:r.commit,stateSha256:r.stateSha256,checks:Object.fromEntries(r.checks.map(n=>[n,true]))}),{mode:0o600});process.exit(0);"],
-  ['wrong phase', "r.phase='other';"],
-  ['wrong frozen digest', "r.stateSha256='0'.repeat(64);"],
   ['truthy nonboolean checks', "writeFileSync(resultPath,JSON.stringify({version:1,phase:r.phase,commit:r.commit,stateSha256:r.stateSha256,checks:Object.fromEntries(r.checks.map(n=>[n,'true']))}),{mode:0o600});process.exit(0);"],
-  ['extra check', "r.checks.push('undeclared');"],
   ['request mutation', "chmodSync(requestPath,0o600);writeFileSync(requestPath,'{}');"],
   ['artifact mutation disguised as success', "writeFileSync(r.repository+'/dist/web/index.html','synthetic-corruption');"],
   ['nonzero command', 'process.exit(7);'],
@@ -169,6 +167,28 @@ for (const [name, fault] of [
   expect(snapshot(f).keys).toEqual([{ id: 'private', key_hash: 'not-a-real-credential' }])
   expect(rows(result.paths.journal).some(r => r.step === 'closed-verification' && r.phase === 'recovered')).toBe(true)
   expect(readFileSync(join(f.folder, 'verified-phases'), 'utf8')).toContain('recovery\n')
+})
+
+// FOUR FAULTS OF THE RESULT ALONE, read by the verifier function with no upgrade and no snapshot recovery: the cases above
+// drive a refused result through recovery end to end. The request has the shape the transaction writes for the made-up
+// verifier's target phase. Each result is what that verifier writes once one fault is put into its copy of the request,
+// as the cases above put it, so the fault is the only difference. The same result with no fault is taken.
+it('refuses a result that differs from its request only in the phase, the commit or the frozen digest, or holds an extra check', () => {
+  const folder = mkdtempSync(join(tmpdir(), 'closed-verification-result-'))
+  try {
+    const request = { version: 1, phase: 'target', commit: 'a'.repeat(40), repository: join(folder, 'stable'), database: join(folder, 'office.db'), snapshot: join(folder, 'snapshot.db'), servicePort: 1, checks: ['synthetic-schema', 'synthetic-private-rows'], stateSha256: 'b'.repeat(64) }
+    const resultWith = (name: string, fault: (r: typeof request) => void) => {
+      const r = structuredClone(request); fault(r)
+      const path = join(folder, `${name}.json`)
+      writeFileSync(path, JSON.stringify({ version: 1, phase: r.phase, commit: r.commit, stateSha256: r.stateSha256, checks: Object.fromEntries(r.checks.map(n => [n, true])) }), { mode: 0o600 })
+      return path
+    }
+    expect(readClosedVerificationResult(resultWith('no-fault', () => {}), request)).toMatchObject({ phase: 'target', commit: request.commit, stateSha256: request.stateSha256 })
+    expect(() => readClosedVerificationResult(resultWith('wrong-phase', r => { r.phase = 'other' }), request)).toThrow('result phase does not match this frozen request')
+    expect(() => readClosedVerificationResult(resultWith('wrong-generation', r => { r.commit = '0'.repeat(40) }), request)).toThrow('result commit does not match this frozen request')
+    expect(() => readClosedVerificationResult(resultWith('wrong-frozen-digest', r => { r.stateSha256 = '0'.repeat(64) }), request)).toThrow('result stateSha256 does not match this frozen request')
+    expect(() => readClosedVerificationResult(resultWith('extra-check', r => { r.checks.push('undeclared') }), request)).toThrow('result checks must hold exactly synthetic-schema, synthetic-private-rows.')
+  } finally { rmSync(folder, { recursive: true, force: true }) }
 })
 
 it('keeps admission and the original lock closed when restoration verification fails', async () => {

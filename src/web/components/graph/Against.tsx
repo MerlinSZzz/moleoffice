@@ -35,7 +35,7 @@ import { t } from '@shared/i18n.ts'
 import { useEffect, useState } from 'react'
 import { api } from '../../api.ts'
 import { recordPath } from '../router.tsx'
-import { Absence, Empty, Explain, Tag } from '../ui.tsx'
+import { Absence, Empty, Tag } from '../ui.tsx'
 import { targetAttributes } from '@shared/targets.ts'
 import type { AgainstRow, AgainstSide, CompositionAgainst } from '@shared/composition.ts'
 import { moduleName, OriginMark, type CarrierNames } from './origin-mark.tsx'
@@ -165,21 +165,6 @@ export function PipelinesAgainst(props: PipelinesAgainstProps) {
             </li>
           ))}
         </ul>
-
-        <Explain
-          declares={{ surface: null }}
-          meaning={t('g7b.Against.two_pipelines_never_share_a_block_a')}
-          opens={t('g7b.Against.how_the_two_sides_are_paired')}
-        >
-          <ul className="ag-legend">
-            <li>
-              <strong>{t('g7b.Against.the_name_is_cut_exactly')}</strong>{t('g7b.Against.a_block_s_stored_title_begins_with')}</li>
-            <li>
-              <strong>{t('g7b.Against.one_name_on_one_side_twice')}</strong>{t('g7b.Against.paired_with_nothing_and_listed_above_by')}</li>
-            <li>
-              <strong>{t('g7b.Against.a_member_no_revision_names')}</strong>{t('g7b.Against.drawn_on_its_own_side_marked_never')}</li>
-          </ul>
-        </Explain>
       </div>
     </>
   )
@@ -283,14 +268,14 @@ export function CompareWithAnother({ recordId, workspaceId }: { recordId: string
 const AGAINST_CSS = `
 .ag-choose { margin-top: .6rem; padding-top: .5rem; border-top: 1px solid var(--hairline); }
 .ag-label { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; }
-.ag-labelword { font-size: .85rem; color: var(--muted); }
+.ag-labelword { font-size: .85rem; color: var(--text-3); }
 .ag { margin-top: .5rem; }
 .ag-heads, .ag-rows li { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; }
 .ag-heads { padding-bottom: .3rem; border-bottom: 1px solid var(--hairline); }
 .ag-head, .ag-cell { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem; min-width: 0; }
 .ag-head { font-weight: 600; }
-.ag-only, .ag-carriers, .ag-counts { color: var(--muted); font-size: .82rem; }
-.ag-pos { min-width: 1.4rem; color: var(--muted); font-size: .82rem; }
+.ag-only, .ag-carriers, .ag-counts { color: var(--text-3); font-size: .82rem; }
+.ag-pos { min-width: 1.4rem; color: var(--text-3); font-size: .82rem; }
 .ag-name { font-weight: 500; }
 .ag-counts { margin: .35rem 0; }
 .ag-rows, .ag-ambiguous { list-style: none; padding: 0; margin: 0; }

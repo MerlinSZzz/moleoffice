@@ -21,7 +21,8 @@
  * read `undefined` where the page needed the candidate list. The refusal already named that candidate, so the office
  * knew it and the page could not be told.
  *
- * THE VALUES THAT CAN CHANGE ARE READ FROM THE CODE: the kind names, the `replaces` field and the refusal code. The
+ * THE VALUES THAT CAN CHANGE ARE READ FROM THE CODE: the fork's and the decision's kind names, the `replaces` and
+ * `governs` fields and the refusal code. The module's kind is typed, because the code exports no constant for it. The
  * status numbers are HTTP's own and this repository declares no constant for them.
  *
  * Everybody and everything here is made up.
@@ -31,6 +32,7 @@ import Fastify, { type FastifyInstance } from 'fastify'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import type { ACandidate } from '../src/server/lib/replaced-decisions.ts'
+import { GOVERNS_FIELD } from '../src/shared/governs.ts'
 import { DECISION_REPLACES_UNSAID_WITH_CANDIDATES } from '../src/shared/refusal-codes.ts'
 import { THE_TEST_OFFICES_OWNER } from './a-page-of-a-test-office.ts'
 import { freshDb, type TestDb } from './helpers.ts'
@@ -134,8 +136,19 @@ async function fileFork(title = 'Which glaze goes on the spring batch?'): Promis
   return String(recordOf(res)['id'])
 }
 
-/** An earlier decision the person made, linked `about` the fork as a decision about it would be. */
+/**
+ * An earlier decision the person made, linked `about` the fork as a decision about it would be. It governs a module
+ * page of its own, because every decision door refuses a decision that names nothing it governs. The module is linked
+ * to nothing, so the fork's subjects stay the fork and this decision, and the candidate's shared subject stays the fork.
+ */
 async function anEarlierDecisionAbout(forkId: string, title = EARLIER_TITLE): Promise<string> {
+  const governed = await h.app.inject({
+    method: 'POST',
+    url: '/api/records',
+    headers: AS_HUMAN,
+    payload: { kind: 'module', title: `What "${title}" governs`, data: { context: 'The glaze of one batch, made up for this test.' } },
+  })
+  expect(governed.statusCode, governed.body).toBe(201)
   const res = await h.app.inject({
     method: 'POST',
     url: '/api/records',
@@ -143,7 +156,12 @@ async function anEarlierDecisionAbout(forkId: string, title = EARLIER_TITLE): Pr
     payload: {
       kind: h.decisionKind,
       title,
-      data: { option_taken: 'The celadon.', because: 'The bench agreed on 3 October.', [h.replacesField]: [] },
+      data: {
+        option_taken: 'The celadon.',
+        because: 'The bench agreed on 3 October.',
+        [h.replacesField]: [],
+        [GOVERNS_FIELD]: [{ record: String(recordOf(governed)['id']) }],
+      },
       links: [{ type: 'about', toId: forkId }],
     },
   })

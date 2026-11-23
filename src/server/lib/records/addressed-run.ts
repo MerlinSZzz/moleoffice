@@ -255,6 +255,37 @@ export function identityForAddressedRun(sessionId: string, actor: Actor): Addres
   return { addressable: true, namedKind: 'session', sessionId, agentId: agent.id, minted: true }
 }
 
+// ================================================== a message to a run that answers as nobody
+
+/**
+ * THE SENTENCE A MESSAGE TO A RUN THAT ANSWERS AS NOBODY IS REFUSED WITH, on every door that refuses one: the
+ * message record (`chosenRecipientAsStored` below) and a conversation's comment, written or changed
+ * (`refuseAMessageToARunThatAnswersAsNobody`).
+ */
+export function whyAMessageToThisRunWouldReachNobody(title: string, sessionId: string): string {
+  return (
+    `The run "${title}" (${sessionId}) names no agent: nothing is holding a handle for it just now, and ` +
+    'its record does not say which agent it worked as. A message addressed to it would reach nobody, so ' +
+    'nothing was written. Choose an agent that exists, or start one for this run.'
+  )
+}
+
+/**
+ * A COMMENT IN A CONVERSATION ADDRESSED TO A RUN THAT ANSWERS AS NOBODY IS REFUSED, before anything is written.
+ *
+ * `identityForAddressedRun` mints an agent from such a run's title and writes it into the run's `ranAs`. The agent
+ * that filed the run was then refused the runs it filed under it. A message record addressed to the same run is
+ * refused with 422 (`chosenRecipientAsStored` below), and the thread doors in lib/agents.ts ask this so they refuse
+ * it the same way. Only a live session record is asked. A recipient naming anything else is stored with a sentence,
+ * as before.
+ */
+export function refuseAMessageToARunThatAnswersAsNobody(sessionId: string): void {
+  const record = getRecord(sessionId)
+  if (record === null || record.deletedAt !== null || record.kind !== SESSION_KIND) return
+  if (theAgentASessionAnswersAs(record, record.workspaceId) !== null) return
+  throw new PanelError(whyAMessageToThisRunWouldReachNobody(record.title, sessionId), 422)
+}
+
 /**
  * WHO A COMMENT IS FOR, AS IT WILL BE STORED BESIDE THE CHOICE.
  *
@@ -313,12 +344,7 @@ export function chosenRecipientAsStored(
     if (record !== null && record.deletedAt === null && record.kind === SESSION_KIND) {
       const answered = theAgentASessionAnswersAs(record, record.workspaceId)
       if (answered !== null) return { ...held, agentId: answered.record ?? answered.agent.id }
-      throw new PanelError(
-        `The run "${record.title}" (${sessionId}) names no agent: nothing is holding a handle for it just now, and ` +
-          'its record does not say which agent it worked as. A message addressed to it would reach nobody, so ' +
-          'nothing was written. Choose an agent that exists, or start one for this run.',
-        422,
-      )
+      throw new PanelError(whyAMessageToThisRunWouldReachNobody(record.title, sessionId), 422)
     }
     throw new PanelError(
       `This message is addressed to the run ${sessionId}, and no run with that id is here, so it names no agent ` +

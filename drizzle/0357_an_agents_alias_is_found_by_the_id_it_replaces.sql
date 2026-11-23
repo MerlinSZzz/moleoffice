@@ -1,0 +1,12 @@
+-- AN AGENT'S ALIAS IS FOUND BY THE ID IT REPLACES, WITHOUT READING EVERY ALIAS.
+--
+-- Every read of an agent by a stored id (`theRegistryRowNamedBy` in src/server/db/registry-aliases/index.ts) asks
+-- `registry_aliases` for the rows whose `alias_id` is that id, in any namespace, so that two namespaces that own one
+-- id are refused. The table's key starts with `namespace`, so SQLite read every alias row for each such read.
+--
+--   registry_aliases_alias_idx  every alias row, by the id it replaces.
+--
+-- The index is not unique, and it changes no row.
+--
+-- ADDITIVE, AND IT REWRITES NOTHING. One CREATE INDEX statement and no UPDATE.
+CREATE INDEX IF NOT EXISTS `registry_aliases_alias_idx` ON `registry_aliases` (`alias_id`);

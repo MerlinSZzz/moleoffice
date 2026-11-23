@@ -23,7 +23,9 @@
  * evaluated. The names records.ts takes from records/reading.ts, records/territory.ts and records/run-writes.ts are
  * imported from them directly.
  */
+import { refuseOrdinaryKnowledgeWrite } from '../../knowledge/guard.ts'
 import { MESSAGE_QUOTE_POSITIONS_INVALID } from '@shared/refusal-codes.ts'
+import { GOVERNS_FIELD } from '@shared/governs.ts'
 import { refuseModulePartChanges } from '../module-requirements.ts'
 import { originalGreenFollowsRepair } from '@shared/main-suite-fix-chronology.ts'
 import { applyAWaitingStarterChangeForARunEnded, refuseARunEnteringALiveSet } from '../agent-starter.ts'
@@ -35,6 +37,8 @@ import { NEXT_ROUND, ONLY_THE_OFFICE_WRITES_THE_NEXT_ROUND } from '@shared/next-
 import {
   CUT_ASKED,
   IMAGES_GIVEN,
+  WORKER_PLACE,
+  ONLY_THE_OFFICE_WRITES_THE_WORKER_PLACE,
   WORKER_PACKAGE,
   ONLY_THE_OFFICE_WRITES_THE_CUT_ASKED,
   ONLY_THE_OFFICE_WRITES_THE_IMAGES_GIVEN,
@@ -43,6 +47,7 @@ import {
   WORKER_RUNS,
 } from '@shared/worker-runs.ts'
 import { refuseTheSealOverAFault } from '../before-the-seal.ts'
+import { refuseACarriedCommitsChange, refuseTheHeadsInAChange, thisWriteEndsTheRun, type AHeadRead } from '../a-runs-own-commits.ts'
 import { recordHowARoundEndedWithoutASeal } from '../how-a-round-ended.ts'
 import { readRunSeal, runSubmitsWork, sealFinishedRun } from '../sealed-tip.ts'
 import {
@@ -56,7 +61,7 @@ import { and, eq, inArray, isNotNull, isNull } from 'drizzle-orm'
 import { BLOCK_KIND, blockIdsOf } from '@shared/blocks.ts'
 import { INTENDED_KINDS } from '@shared/world.ts'
 import { mainSuiteFixSchema, mainSuiteFixPinned, type MainSuiteFix } from '@shared/main-suite-fix.ts'
-import { wholeSuiteReceiptIsGreen } from '@shared/whole-suite-receipt.ts'
+import { wholeSuiteReceiptIsGreen, wholeSuiteReceiptOutcome } from '@shared/whole-suite-receipt.ts'
 import { readStoredWord } from '@shared/i18n.ts'
 import { makeARunKey, revokeTheKeyNamed, revokeTheRunKeyRecordedOn, whyARunsKeyWasRevokedAtItsEnd } from '../keys.ts'
 import { theRunHasEnded } from '@shared/run-has-ended.ts'
@@ -84,8 +89,8 @@ import {
 import { pipelineScope } from '@shared/presentation.ts'
 import { validateRecordData, type Incompleteness } from '../validate.ts'
 import { canonicalise } from '../summary.ts'
-import { blocksFieldOf, KIND_SPECS, validateData } from '@shared/kinds.ts'
-import { nowStamp, parseStoredStamp } from '@shared/time.ts'
+import { blocksFieldOf, END_HEAD, KIND_SPECS, validateData } from '@shared/kinds.ts'
+import { nowStamp } from '@shared/time.ts'
 import { messageEditWindowSeconds } from '../env.ts'
 import {
   // WHICH KINDS MAY HOLD HOURS, read from the one declaration rather than through
@@ -124,6 +129,8 @@ import {
   whoAMessageIsTo,
   whyThisInjectIsRefused,
   aMessageHasGoneOut,
+  theAgentAChoiceNames,
+  theMomentAMessageWasWritten,
 } from '../messages.ts'
 import { refFrom } from '../message-pool-at-or-after.ts'
 import { answeringOfTheAgentsTheseRunsServeMayHaveChanged } from '../answering-told.ts'
@@ -138,6 +145,7 @@ import {
   theNameOfTheMark,
   THE_INTENT_MARK_IS_SET_WHEN_WRITTEN,
   THE_MARKED_PARTS_ARE_SET_WHEN_WRITTEN,
+  type AnIntentThatAsks,
 } from '@shared/intent-mark.ts'
 import { THE_LABEL_IS_SET_WHEN_WRITTEN } from '@shared/message-label.ts'
 import { fileARecordWhoseKindChanged, whereAKindChangeFilesARecord } from '../move.ts'
@@ -152,6 +160,7 @@ import {
 } from '@shared/messages.ts'
 import { whyARunsMachineIsNotKnown } from '../machines.ts'
 import { assertTheGovernedPlacesAreReal } from '../assert-the-governed-places-are-real.ts'
+import { assertTheDecisionNamesWhatItGoverns, sendsWhatItNames, whatTheWriteNames, type WhatTheWriteNames } from '../what-a-record-names.ts'
 import {
   checkTheDecisionBasis,
   checkTheFlowSteps,
@@ -185,6 +194,7 @@ import { AGENT_KIND } from '../inbox.ts'
 import {
   aCrashedRunEmptiesTheAreaSetForIt,
   keepTheAgentRegistryInStep,
+  retireThisAgent,
   whyThisIsNotYoursToRetire,
   theStarterAWriteWouldGive,
 } from '../participants.ts'
@@ -241,12 +251,13 @@ import { SESSION_KIND } from '../../db/agent-identity.ts'
 import { whoWroteRecord } from '../../db/who-wrote-record.ts'
 import { settleShortForms } from '../zoom.ts'
 import {
-  checkNoDutiesRestOn,
+  checkNoDutiesOrDepartmentsRestOn,
   checkTheSecretaryDuties,
   checkTheDutiesTakenAway,
   theActThatWouldStrandTheDuties,
 } from '../grant/secretary-duties.ts'
 import { SECRETARY_DUTIES_KIND } from '@shared/secretary-duties-record.ts'
+import { checkTheDepartment, checkTheDepartmentTakenAway, DEPARTMENT_KIND } from '../grant/departments.ts'
 import { checkTheParticipantsNamed } from '../participant-fields.ts'
 import { writeTheNextDayOfADailyObligation } from '../daily-obligations.ts'
 import { getRecord } from './reading.ts'
@@ -294,7 +305,9 @@ import {
   checkBlockIds,
   checklistLines,
   checkNobodyIsChangingAStartFolder,
+  checkNobodyIsChangingAWorkArea,
   checkNobodyIsChangingBroadcastTimes,
+  checkNobodyIsChangingWhoChoseTheCard,
   checkNobodyIsWritingTheirOwnCard,
   checkNobodyIsWritingTheirOwnCredential,
   checkNobodyIsWritingTheirOwnRaise,
@@ -420,7 +433,7 @@ function validateMainSuiteFixVerification(value: MainSuiteFix, previous: MainSui
   assertRepairAncestry(value.repository, verification.repairCommit, verification.targetCommit)
   if (verification.receipt === undefined) return
   const receipt = thePinnedSuiteReceipt(verification.receipt, workspaceId).data
-  const outcome = wholeSuiteReceiptIsGreen(receipt) ? 'green' : typeof receipt['buildExitCode'] === 'number' && receipt['buildExitCode'] !== 0 ? 'build-failed' : typeof receipt['suiteExitCode'] === 'number' && receipt['suiteExitCode'] !== 0 ? 'red' : 'incomplete'
+  const outcome = wholeSuiteReceiptOutcome(receipt)
   if (receipt['repository'] !== value.repository || receipt['commit'] !== verification.targetCommit || outcome !== verification.outcome) throw new PanelError('Verification result must match its original exact-target receipt. Nothing was written.', 409)
 }
 
@@ -764,6 +777,29 @@ function plannedAgainst(recordId: string): {
 /** "3 things" or "1 thing", so a refusal reads as a sentence rather than as a count. */
 function countedAs(n: number, one: string, many: string): string {
   return `${n} ${n === 1 ? one : many}`
+}
+
+/** Put before the retire rule's refusal when a write would make a retired agent active again. */
+const MAKING_A_RETIRED_AGENT_ACTIVE_AGAIN = 'Making a retired agent active again is allowed by the same rule as retiring it.'
+
+/**
+ * AN AGENT RECORD STAYS AN AGENT, WHOEVER ASKS.
+ *
+ * The agent's registry row follows its agent record, and only while the record is an agent. A record changed into a
+ * note kept its mapping and none of the agent's fields, so the row stayed live with no record to follow. Ending an
+ * agent is the retire door's act, and this refusal names it. The person is refused too: the door is open to them, and
+ * it is the way that keeps the row, the keys and the record in step.
+ */
+function refuseTakingAnAgentRecordOutOfItsKind(before: Pick<PanelRecord, 'id' | 'kind' | 'title'>, to: RecordKind, actor: Actor): void {
+  if (before.kind !== AGENT_KIND || to === AGENT_KIND) return
+  const row = agentForRecord(before.id)
+  throw new PanelError(
+    `"${before.title}" is an agent record. No record write changes an agent record into another kind, whoever sends ` +
+      'it, because the registry row of the agent follows the record and would be left with no record to follow. To ' +
+      `end the agent, retire it: POST /api/participants/agent/${row?.id ?? '<id>'}/retire {"because":"…"}. This ` +
+      `request was made by "${actor.id}". Nothing was written.`,
+    403,
+  )
 }
 
 /**
@@ -1382,6 +1418,11 @@ export interface PatchResult {
   sealsTheRun?: true
   /** PRESENT WHEN THE WORDS THIS PATCH CHANGED IN A MESSAGE SEEM TO HOLD A KEY. The change itself stands (lib/message-keys.ts). */
   keyReminder?: AKeyReminder
+  /**
+   * PRESENT WHEN THIS PATCH SENT WHAT A DECISION OR A REPORT NAMES AND THERE IS SOMETHING TO SAY: the module a
+   * whole-project decision should name instead, and to whom each new nothingFits entry was sent (lib/what-a-record-names.ts).
+   */
+  whatItNames?: WhatTheWriteNames
   /**
    * PRESENT WHEN THIS PATCH WAS MADE WITH A RUN KEY BOUND TO ANOTHER RUN OF THE SAME AGENT. The write is taken, and the
    * sentence names the key's run and the run it wrote; the written run carries one line saying so, once for the pair.
@@ -2043,7 +2084,7 @@ function refuseAnIntentMarkThisWriteWouldChange(
 /** The person's name for a part's flag, or the label's own word when their row no longer carries it. */
 function theFlagsNamesOfTheBrokenParts(
   data: Record<string, unknown>,
-  parts: readonly { quote: string; intent?: 'just-ask' | 'proposal-first'; label?: { text: string } }[],
+  parts: readonly { quote: string; intent?: AnIntentThatAsks; label?: { text: string } }[],
 ): { quote: string; name: string }[] {
   const who = refFrom(data['sentBy'])
   const row = who !== null && who.kind === 'person' ? readParticipant(who) : null
@@ -2254,10 +2295,12 @@ function whatAChangeToAMessageMustCarry(
   if (!wordsChange) return null
   if (!hasItGoneOut()) return null
 
-  const written = parseStoredStamp(before.createdAt)
+  // WHEN IT WAS WRITTEN IS READ AS THE MESSAGE'S OWN `wordsMayChangeUntil` READS IT, by the one function, so the window
+  // the reader shows is the window this door keeps. The refusal quotes the words that were read.
+  const { ms: written, readFrom } = theMomentAMessageWasWritten(before.createdAt, before.data)
   if (written === null) {
     throw new PanelError(
-      `Mole Office cannot tell when message ${before.id} was written: its stored time ${JSON.stringify(before.createdAt)} ` +
+      `Mole Office cannot tell when message ${before.id} was written: its stored time ${JSON.stringify(readFrom)} ` +
         'is not one Mole Office writes. So it cannot tell whether the words may still be changed, and the change is ' +
         'refused. Nothing was written.',
       409,
@@ -2483,9 +2526,13 @@ export function patchRecord(
   ledger?: LedgerLabel,
   deleting: readonly string[] = [],
   checkTerritoryBeforeWrite?: TerritoryWriteCheck,
+  /** The run's end commit, which the record door read before a write that ends the run (`theEndHeadBeforeAWrite`). */
+  endHead?: AHeadRead,
 ): PatchResult {
   const before = db.select().from(records).where(eq(records.id, id)).get()
   if (!before) throw noRecordHasThisId(id)
+  refuseOrdinaryKnowledgeWrite(before.kind)
+  if (patch.kind !== undefined) refuseOrdinaryKnowledgeWrite(patch.kind)
   // A SEALED RUN'S OWN KEY WRITES THAT RUN'S SERVED CONDITIONS AND NOTHING ELSE, AND FOR FIFTEEN
   // MINUTES AFTER A FINISH ITS USAGE RECEIPT AS WELL. A patch that is the receipt alone passes on
   // the second; any other patch with either proof meets the first, or the second's refusal where there is no first.
@@ -2531,11 +2578,17 @@ export function patchRecord(
       (patch.data && !sameJson(patch.data[IMAGES_GIVEN], (before.data as Record<string, unknown>)[IMAGES_GIVEN]))) {
     throw new PanelError(ONLY_THE_OFFICE_WRITES_THE_IMAGES_GIVEN, 403)
   }
+  if ((patch.dataPatch && Object.hasOwn(patch.dataPatch, WORKER_PLACE)) ||
+      (patch.data && !sameJson(patch.data[WORKER_PLACE], (before.data as Record<string, unknown>)[WORKER_PLACE]))) {
+    throw new PanelError(ONLY_THE_OFFICE_WRITES_THE_WORKER_PLACE, 403)
+  }
   // And the package it was started for, written by `writeTheWorkerPackage` alone.
   if ((patch.dataPatch && Object.hasOwn(patch.dataPatch, WORKER_PACKAGE)) ||
       (patch.data && !sameJson(patch.data[WORKER_PACKAGE], (before.data as Record<string, unknown>)[WORKER_PACKAGE]))) {
     throw new PanelError(ONLY_THE_OFFICE_WRITES_THE_WORKER_PACKAGE, 403)
   }
+  // And the commits a run's working directory was at when it was filed and when it ended, which the office reads itself.
+  refuseTheHeadsInAChange(before.data as Record<string, unknown>, patch.dataPatch, patch.data, sameJson)
   // THE INDEPENDENT MARK IS WRITTEN ONCE, by the door that files the criticism, and nothing the office does
   // patches it afterwards. A patch may not add or change it, whatever the caller: a `dataPatch` naming it is
   // refused, and a whole `data` that changes it or leaves it out is refused too, so the mark cannot be
@@ -2547,6 +2600,8 @@ export function patchRecord(
       throw new PanelError(ONLY_THE_CRITICISM_DOOR_WRITES_INDEPENDENT, 403)
     }
   }
+  // A SEAL'S CARRIED COMMITS ARE REFUSED IN THEIR OWN WORDS, before a seal is refused as immutable.
+  if (before.kind === 'sealed_tip') refuseACarriedCommitsChange(before.data as Record<string, unknown>, patch.dataPatch, patch.data, sameJson)
   refuseAChangeToARequestThatWaitsForThePerson(before, patch, actor)
   if (before.kind === 'sealed_tip' || patch.kind === 'sealed_tip') throw new PanelError('A sealed tip is immutable. Finish the run again to submit a new seal.', 409)
   if (patch.dataPatch && Object.hasOwn(patch.dataPatch, 'sealedTip')) throw new PanelError('The office writes sealedTip when a run finishes.', 403)
@@ -2895,6 +2950,7 @@ export function patchRecord(
       }
     } else {
       const asItStands = toRecord(before)
+      refuseTakingAnAgentRecordOutOfItsKind(asItStands, patch.kind, actor)
       refuseAKindThisRecordCannotBecome(asItStands, patch.kind, actor)
       const moved = moveWhatTheNewKindCannotHold(asItStands, patch.kind)
       // AND EVERY GUARD THAT PROTECTS THE KIND IT IS LEAVING, asked here because it needs the data
@@ -3041,13 +3097,23 @@ export function patchRecord(
   if (nextKind === 'session' && sealsTheRun && isJsonObject(dataToStore) && runSubmitsWork(id, dataToStore)) {
     refuseTheSealOverAFault({ ...toRecord(before as typeof records.$inferSelect), data: dataToStore })
   }
-  // Every record path that retires an agent asks the row's retire rule before anything is written.
+  // Every record path that retires an agent asks the row's retire rule before anything is written, and so does a write
+  // that makes a retired agent active again: undoing a retirement is the same act's to allow. A retirement allowed here
+  // is then done by `retireThisAgent` inside the write, as the retire door does it, so the agent's keys end with it.
+  // Keys revoked stay revoked when the agent is made active again.
+  let theAgentThisWriteRetires: string | null = null
+  let theReasonThisWriteGives = ''
   if (before.kind === AGENT_KIND && nextKind === AGENT_KIND && theRetireDoorIsOpen === 0) {
     const storedState = isJsonObject(before.data) ? before.data['state'] : undefined
     const nextState = isJsonObject(dataToStore) ? dataToStore['state'] : undefined
-    if (storedState !== 'retired' && nextState === 'retired') {
-      const row = agentForRecord(id)
-      if (row !== null) whyThisIsNotYoursToRetire(row, actor)
+    const retires = storedState !== 'retired' && nextState === 'retired'
+    const revives = storedState === 'retired' && nextState !== 'retired'
+    const row = retires || revives ? agentForRecord(id) : null
+    if (row !== null) whyThisIsNotYoursToRetire(row, actor, revives ? MAKING_A_RETIRED_AGENT_ACTIVE_AGAIN : undefined)
+    if (retires && row !== null) {
+      theAgentThisWriteRetires = row.id
+      const because = isJsonObject(dataToStore) ? dataToStore['retiredBecause'] : undefined
+      theReasonThisWriteGives = typeof because === 'string' ? because.trim() : ''
     }
   }
   refuseWhatOnlyTheSettlementDoorsWrite(before, { kind: nextKind, data: dataToStore as Record<string, unknown> })
@@ -3514,6 +3580,11 @@ export function patchRecord(
       // whole-object write are asked the same question, and a write that leaves the folder alone is
       // not a change.
       checkNobodyIsChangingAStartFolder(nextData, heldByTheAgent, actor)
+      // AND A WORK AREA, which only the person changes by a record write, on an agent's own record too. Anybody else goes
+      // through the work-area door. Asked the same way as the start folder.
+      checkNobodyIsChangingAWorkArea(nextData, heldByTheAgent, actor)
+      // AND WHO CHOSE THE CARD, written when the record is made and after that changed only by the person.
+      checkNobodyIsChangingWhoChoseTheCard(nextData, heldByTheAgent, actor)
       // AND WHO IS ALLOWED TO CHANGE THE CARD OR THE GRANT. `nextData` is what
       // would be stored — the merge for a dataPatch, the whole object for a data — so both bodies
       // are asked the same question, and a write that leaves the two fields as they are is not one.
@@ -3578,14 +3649,25 @@ export function patchRecord(
       (patch.summary === undefined || patch.summary === before.summary)
     checkTheSecretaryDuties({ workspaceId: before.workspaceId, data: nextData, before: onlyDataChanges ? before.data : null, mine: id, actor })
   }
-  // AND A DECISION THAT DUTIES REST ON STAYS A DECISION THE PERSON DECIDED, ON THE PERSON'S OWN WORDS, while they rest on
-  // it: a change into another kind, of `decided_by` away from the
+  // A DEPARTMENT MEETS ITS GUARD AS DUTIES DO, on every change but a write of only the short forms (lib/grant/departments.ts).
+  if (kind === DEPARTMENT_KIND && nextKind !== DEPARTMENT_KIND) {
+    checkTheDepartmentTakenAway({ workspaceId: before.workspaceId, id, data: before.data, actor, act: 'kind' })
+  }
+  if (nextKind === DEPARTMENT_KIND && aPatchWritesMoreThanShortForms(before, patch)) {
+    const nextData = dataForNewKind ?? (merged !== null ? merged.data : patch.data) ?? before.data
+    const onlyDataChanges = kind === nextKind &&
+      (patch.title === undefined || patch.title === before.title) &&
+      (patch.summary === undefined || patch.summary === before.summary)
+    checkTheDepartment({ workspaceId: before.workspaceId, data: nextData, before: onlyDataChanges ? before.data : null, mine: id, actor })
+  }
+  // AND A DECISION THAT DUTIES OR A DEPARTMENT REST ON STAYS A DECISION THE PERSON DECIDED, ON THE PERSON'S OWN WORDS,
+  // while they rest on it: a change into another kind, of `decided_by` away from the
   // owner, or of `authority_reference` to something that is not the person's own words, is refused as its delete is.
   // Asked of the data the decision will hold, so `data`, `dataPatch` and a restore of an earlier revision are judged alike.
   if (kind === DECISION_KIND) {
     const nextData = dataForNewKind ?? (merged !== null ? merged.data : patch.data) ?? before.data
     const act = theActThatWouldStrandTheDuties(id, before, { kind: nextKind, data: nextData })
-    if (act !== null) checkNoDutiesRestOn({ id, title: before.title, workspaceId: before.workspaceId }, act)
+    if (act !== null) checkNoDutiesOrDepartmentsRestOn({ id, title: before.title, workspaceId: before.workspaceId }, act)
   }
 
   // AND A TOOL OR A CATEGORY STILL NAMES WHAT IT MUST, on this path as well as on the create. Only a
@@ -3635,10 +3717,24 @@ export function patchRecord(
 
   // WHAT A DECISION GOVERNS IS THERE, as on the create door. Asked only when this write sends `governs`, so a module
   // deleted since does not refuse an unrelated change to the decision.
-  const sendsGoverns = [patch.data, patch.dataPatch].some((sent) => isJsonObject(sent) && sent['governs'] !== undefined)
+  const sendsGoverns = [patch.data, patch.dataPatch].some((sent) => isJsonObject(sent) && sent[GOVERNS_FIELD] !== undefined)
   if (nextKind === DECISION_KIND && (dataForNewKind !== null || sendsGoverns)) {
     assertTheGovernedPlacesAreReal(dataForNewKind ?? (merged !== null ? merged.data : patch.data), before.workspaceId)
   }
+
+  // AND IT NAMES WHAT IT GOVERNS, OR SAYS NO PAGE FITS, asked when this write sends `governs`, `governsFiles` or
+  // `nothingFits` (lib/what-a-record-names.ts). A report is never refused for this; its answer only says what it names.
+  const sentNames: Record<string, unknown> = {
+    ...(isJsonObject(patch.data) ? patch.data : {}),
+    ...(isJsonObject(patch.dataPatch) ? patch.dataPatch : {}),
+  }
+  const namesWhatItGoverns = sendsWhatItNames(sentNames)
+  if (nextKind === DECISION_KIND && namesWhatItGoverns) {
+    const nextData = dataForNewKind ?? (merged !== null ? merged.data : patch.data)
+    assertTheDecisionNamesWhatItGoverns(isJsonObject(nextData) ? nextData : {}, sentNames, before.workspaceId)
+  }
+  // HELD IN AN OBJECT, because the transaction below sets it and a `let` set inside a closure reads as never set.
+  const namesSaid: { whatItNames: WhatTheWriteNames | null } = { whatItNames: null }
 
   // AND A DECISION'S BASIS IS THERE, asked when this write sends `basis`, as `governs` is above.
   const sendsBasis = [patch.data, patch.dataPatch].some((sent) => isJsonObject(sent) && sent['basis'] !== undefined)
@@ -4227,15 +4323,55 @@ export function patchRecord(
        * explicit `to` or `toGroup` in the patch is a caller saying what it means, and this never
        * overrules one. What the person chose stays in `chosenRecipient`; this writes beside it what
        * Mole Office made of it, which is the eighth rule's middle layer.
+       *
+       * A COPY ROUTED UP A CHAIN OF OWNERS IS NOT AN ADDRESSEE. The create door keeps it in `routed` and gives it a
+       * delivery row, and never writes it into `to`, so it is left out here too. Read with it, a comment whose choice was
+       * taken back got the copies as its `to` at the next change of its words, and read as sent.
        */
       if (nextKind === 'message' && isJsonObject(write.data)) {
         const held = write.data
         if (!Array.isArray(held['to']) && typeof held['toGroup'] !== 'string') {
-          const reaches = whoAMessageIsTo(held, before.workspaceId)
+          const reaches = whoAMessageIsTo({ ...held, routed: undefined }, before.workspaceId)
           if (reaches.length > 0) {
             write.data = { ...held, to: reaches }
             validateRecordData(nextKind, write.data)
           }
+        }
+      }
+      /**
+       * AND A CHOICE TAKEN BACK OR CHANGED TAKES WHO IT GAVE OUT OF `to`, while the comment has not gone out.
+       *
+       * The block above writes into `to` who the choice reaches, and only while `to` is empty. Taking the choice back left
+       * that `to` behind, and a message with a `to` and no choice is one its writer sent as it was written. So the comment
+       * read as sent, its review stopped listing it, and nobody had been handed it. Choosing another agent left it behind
+       * too, so the comment stayed addressed to the first. Only the addressees the old choice gave are taken out, and the
+       * agent a new choice names is put in. A person its writer added to `to` is the writer's own address and stays. The
+       * delivery rows stay too, as they do everywhere.
+       */
+      if (nextKind === 'message' && before.kind === 'message' && isJsonObject(write.data) && isJsonObject(before.data)) {
+        const stored = before.data
+        const held = write.data
+        const named = { ...patch.data, ...patch.dataPatch }
+        const theChoiceChanged =
+          stored['chosenRecipient'] !== undefined && stored['chosenRecipient'] !== null &&
+          !sameJson(stored['chosenRecipient'], held['chosenRecipient'] ?? null)
+        const to: unknown = held['to']
+        if (theChoiceChanged && Array.isArray(to) && !Object.hasOwn(named, 'to') && !Object.hasOwn(named, 'toGroup') && !aMessageHasGoneOut(before)) {
+          const theChoiceGave = whoAMessageIsTo({ ...stored, to: undefined }, before.workspaceId)
+          const theNewChoiceNames = theAgentAChoiceNames(held['chosenRecipient'], before.workspaceId)
+          const isTheNewChoice = (one: unknown): boolean => {
+            const ref = refFrom(one)
+            return ref !== null && theNewChoiceNames !== null && sameParticipant(ref, theNewChoiceNames)
+          }
+          const kept = (to as unknown[]).filter((one) => {
+            const ref = refFrom(one)
+            return ref === null || isTheNewChoice(one) || !theChoiceGave.some((gave) => sameParticipant(gave, ref))
+          })
+          const nowTo = theNewChoiceNames === null || kept.some(isTheNewChoice) ? kept : [...kept, theNewChoiceNames]
+          const withTheNewChoice: Record<string, unknown> = { ...held, to: nowTo }
+          if (nowTo.length === 0) delete withTheNewChoice['to']
+          write.data = withTheNewChoice
+          validateRecordData(nextKind, write.data)
         }
       }
     }
@@ -4249,6 +4385,13 @@ export function patchRecord(
       Object.assign(finishedData, sealed)
       write.data = finishedData
       logChange(id, 'update', actor, 'data.sealedTip', typeof (before.data as Record<string, unknown>)['sealedTip'] === 'string' ? String((before.data as Record<string, unknown>)['sealedTip']) : null, String(finishedData['sealedTip']))
+      // A run that had no end commit is given the one its seal read (../a-runs-own-commits.ts).
+      if (sealed.endHead !== undefined) logChange(id, 'update', actor, `data.${END_HEAD}`, null, sealed.endHead)
+    }
+    // A write that ends the run stores the end commit the record door read for it (../a-runs-own-commits.ts).
+    if (endHead !== undefined && nextKind === 'session' && thisWriteEndsTheRun(before.data as Record<string, unknown>, (write.data ?? before.data) as Record<string, unknown>)) {
+      write.data = { ...(write.data ?? before.data) as Record<string, unknown>, [END_HEAD]: endHead }
+      logChange(id, 'update', actor, `data.${END_HEAD}`, null, endHead)
     }
     refuseARunEnteringALiveSet(id, before.kind === 'session' ? before.data : null, nextKind === 'session' ? (write.data ?? before.data) : null)
     // The change rows FIRST and inside this transaction, so the daily page and the revision ledger
@@ -4366,6 +4509,11 @@ export function patchRecord(
         announce(reached, aNewMessageAsToldTo(reached), thePartiesOf(id))
       }
     }
+    // AN AGENT THIS WRITE RETIRES IS RETIRED AS THE RETIRE DOOR RETIRES IT: its row, its other agent records and every
+    // live key it holds, in this transaction. This record was written above, so that retirement leaves it out.
+    if (theAgentThisWriteRetires !== null) {
+      retireThisAgent(theAgentThisWriteRetires, participantForActor(actor), theReasonThisWriteGives, id)
+    }
     // AND THE REGISTRY KEEPS UP WITH A RENAMED HANDLE, on this path as well as on the create,
     // because a rule enforced on one write path is not a rule. Read off the row that was just
     // written rather than off the patch, so a merge patch and a wholesale write are the same here.
@@ -4435,6 +4583,19 @@ export function patchRecord(
     }
     // AND A DAILY OBLIGATION THIS WRITE LEAVES FULFILLED HAS ITS NEXT DAY WRITTEN, in this transaction (lib/daily-obligations.ts).
     if (nextKind === 'obligation') writeTheNextDayOfADailyObligation(id)
+    // AND WHAT A DECISION OR A REPORT NAMES IS SAID BACK, and each nothingFits entry this write added is sent at once,
+    // in this transaction, so a write taken back sends nothing.
+    if (namesWhatItGoverns && (nextKind === DECISION_KIND || nextKind === 'report')) {
+      const now = getRecord(id)
+      if (now !== null) {
+        namesSaid.whatItNames = whatTheWriteNames(
+          { id, kind: nextKind, title: now.title, workspaceId: before.workspaceId },
+          isJsonObject(before.data) ? before.data : {},
+          isJsonObject(now.data) ? now.data : {},
+          actor,
+        )
+      }
+    }
     return { newSeq }
   })
   const touchesMainSuiteFix = (patch.dataPatch !== undefined && Object.hasOwn(patch.dataPatch, "mainSuiteFix")) || (patch.data !== undefined && (before.data as Record<string, unknown>)["mainSuiteFix"] !== undefined)
@@ -4457,6 +4618,7 @@ export function patchRecord(
     ...(sealsTheRun ? { sealsTheRun: true as const } : {}),
     ...(keyReminder === null ? {} : { keyReminder }),
     ...(runKeyReminder === null ? {} : { runKeyReminder }),
+    ...(namesSaid.whatItNames === null ? {} : { whatItNames: namesSaid.whatItNames }),
   }
 }
 

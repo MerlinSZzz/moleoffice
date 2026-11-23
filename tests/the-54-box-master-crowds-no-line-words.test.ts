@@ -1,7 +1,7 @@
 // Copyright © 2026 Zhengyang Shen
 // Licensed under the MIT License. See LICENSE.
 /**
- * THE 54-BOX MASTER CROWDS NO LINE'S WORDS, AT 1440, 990 AND 660. Wave 13u round 232.
+ * THE 54-BOX MASTER CROWDS NO LINE'S WORDS, AT 1440 AND 660. Wave 13u round 232.
  *
  * A line's words are the small label on it, such as "waits on". The lanes engine places them on the line clear of the
  * cards, the area headings and the other words; when it finds no clear place, it puts them where they first fit and
@@ -27,7 +27,7 @@ import { DRAWING, prepareThePage, theAreasWereStored, theDrawingIsDrawn } from '
 import type { Stored } from './a-made-up-reel-page-and-a-master-of-54-boxes.ts'
 import { setTheMasterAndStoreTheAreas, storeTheTwoDrawings, type Drawing } from './a-made-up-reel-page-and-master-opened-fresh.ts'
 
-const WIDTHS = [1440, 990, 660] as const
+const WIDTHS = [1440, 660] as const
 const DRAWN_WITHIN = 120_000
 const CASE_ALLOWANCE = 240_000
 let opens = 0

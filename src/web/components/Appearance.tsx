@@ -239,7 +239,7 @@ export function YourAppearance({
         THE RULES SHIP WITH THE MARKUP THEY STYLE, and they used to ship with the panel above.
         `YourAppearance` is exported and the profile page draws it (criterion M51), so on that page
         the markup arrived and the stylesheet did not: the labels lost their small capitals and ran
-        into their values — "NameJamie" at 390. Found by photograph on 6 September 2026. React
+        into their values — "NameWren" at 390. Found by photograph on 6 September 2026. React
         hoists this by `href`, so drawing it in both places is still one element.
       */}
       <style href="mole-office-appearance" precedence="default">

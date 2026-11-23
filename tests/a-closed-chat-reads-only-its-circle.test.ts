@@ -90,9 +90,10 @@ async function theContactListsNumber(): Promise<number> {
 
 beforeAll(async () => {
   app = await liveApp({ name: 'closed-chat', viewport: { width: 1440, height: 1000 } })
-  // This sidebar-count case exercises the explicit unread-only button choice.
+  // This sidebar-count case exercises the explicit unread-only button choice. The person last had the chat beside the
+  // page, so the circle opens it there and the sidebar's Chat row carries the number while it is open.
   const unreadOnly = await fetch(`${app.api}/api/participants/person/${THE_PERSON}`, {
-    method: 'PATCH', headers: AS_THE_OWNER, body: JSON.stringify({ chatButtonStays: 'when-unread' }),
+    method: 'PATCH', headers: AS_THE_OWNER, body: JSON.stringify({ chatButtonStays: 'when-unread', chatOpensAs: 'split' }),
   })
   expect(unreadOnly.status, await unreadOnly.clone().text()).toBe(200)
   const addedProject = await fetch(`${app.api}/api/workspaces`, {

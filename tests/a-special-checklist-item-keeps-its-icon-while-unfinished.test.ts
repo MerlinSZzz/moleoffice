@@ -3,7 +3,7 @@
 /**
  * A SPECIAL CHECKLIST ITEM KEEPS ITS ICON WHILE IT IS UNFINISHED, AND ITS PICKER'S SAVE SENDS NO BLANK WORDS. Wave
  * 14a, from a message of the owner's: an item that needs evidence or a passage the owner writes shows a special
- * icon in its left box. The supervisor's review h3InDqeaKlgg asked for two things beyond the
+ * icon in its left box. The supervisor's review asked for two things beyond the
  * first test file, and this is the new file that carries them, so the criterion-committed file keeps its own bytes:
  *
  *   1. AN UNFINISHED SPECIAL ITEM KEEPS THE ICON, in progress or waiting on the owner, and a finished one shows its
@@ -15,6 +15,10 @@
  *
  * MUTATIONS, one at a time, restored: the pencil drawn only for state "open" turns case 1 red; the picker sending
  * `response` whenever its box is non-empty turns case 2 red.
+ *
+ * Test change (wave 13y round 175): the page draws design E, as decided, so each checklist is a card, and the cases
+ * read the card the address `#/checklists/<id>` marks. Before, they read the one opened checklist and waited for its
+ * counts line.
  */
 
 import type { Page } from 'playwright'
@@ -48,10 +52,12 @@ async function openThePage(page: Page, id: string): Promise<void> {
   await page.goto('about:blank')
   await page.goto(`${app.site}/?lang=en#/checklists/${id}`, { timeout: 60_000 })
   await waitForThePage(page, 60_000)
-  await page.locator('.ck1 .ck1-counts').waitFor({ timeout: 30_000 })
+  await page.locator(`${MARKED} .ckp-item`).first().waitFor({ timeout: 30_000 })
 }
 
-const itemOn = (page: Page, words: string) => page.locator('.ck1 .ckp-item', { hasText: words })
+/** The card the address `#/checklists/<id>` marks on the page. */
+const MARKED = '.cks-card[data-marked="yes"]'
+const itemOn = (page: Page, words: string) => page.locator(`${MARKED} .ckp-item`, { hasText: words })
 
 beforeAll(async () => {
   app = await liveApp({ name: 'a-special-item-keeps-its-icon', viewport: { width: 1440, height: 900 }, workspace: 'default' })
@@ -88,7 +94,7 @@ describe('a special item keeps its icon while unfinished', () => {
       expect(await one.locator('.ckp-box').count(), `${state}: its box`).toBe(1)
       expect(await one.locator('.ckp-mark[data-special="yes"]').count(), `${state}: the special icon`).toBe(1)
     }
-    await page.locator('.ck1 .ckp-fold').click()
+    await page.locator(`${MARKED} .ckp-fold`).click()
     const done = itemOn(page, 'Oil the shelf')
     await done.waitFor({ timeout: 10_000 })
     expect(await done.locator('.ckp-mark[data-special="yes"]').count(), 'a done item shows its tick, not the pencil').toBe(0)

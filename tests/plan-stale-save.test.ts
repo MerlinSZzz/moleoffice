@@ -452,7 +452,7 @@ describe('what the page says when it is refused', () => {
     }
     const said = words(h(writing.PlanSaveBar, { state: shown }))
     expect(said).toContain('Somebody wrote in this plan first, so nothing was saved.')
-    expect(said).toContain('Every character you typed is still on this page')
+    // CRITERION CHANGE, as decided: the banner no longer explains that the typing is still on the page.
     expect(said).toContain('Read what is stored now')
     // TWO WAYS TO GET THE WRITING OUT OF THE BROWSER ARE ON THE BANNER, because waiting is not a
     // plan when somebody else is writing in the same document.

@@ -11,16 +11,23 @@
  * launched in a sandbox that holds this checkout, the hook prints the role, rules and handover first, appends the
  * compaction to that run, and says which office it did that in. Measured with a stand-in office and the hook itself:
  *   1. at the start, the key from a mode-600 office tool configuration lets the hook read the run and say it in one
- *      quiet line; a mode-644 file gives no key, so the warning is printed, the file is named, and no request carries
- *      the key;
+ *      quiet line; a mode-644 file gives no key, so the warning is printed, the file's path is not, and no request
+ *      carries the key;
  *   2. after a compaction, a launched run is given its role first, then its rules and handover, and its compaction is
  *      appended to the run; no stamp is read or written;
  *   3. a run with no sandbox, a run in a sandbox that does not hold this checkout, and no run named each leave the
  *      warning exactly as it is with no run named, and write nothing;
  *   4. after a compaction, the one read has the time the budget leaves after the margin kept for the reads that follow.
  *
- * Each expected sentence comes from the stand-in or from the hook's own words in another case, so no sentence of the
- * hook is copied here. Every key and record here is made up. No request goes to the live office.
+ * A SESSION THAT NAMES AN AGENT AND HOLDS NO KEY OF IT PRINTS ONE LINE MORE. In case 1b the mode-644 file gives no
+ * key. In case 3 with no run named, the office tool configuration is not read. So in both, the hook sends the agent's
+ * name alone, and its start lines end with the line that says so (aNamedAgentWithoutAKeyLine in
+ * src/config/the-entrys-agent.mjs). The warning with no agent named has no such line. So those two cases expect the
+ * warning followed by that line.
+ *
+ * Each expected sentence comes from the stand-in, from the hook's own words in another case, or from the export the
+ * hook prints it from, so no sentence of the hook is copied here. Every key and record here is made up. No request
+ * goes to the live office.
  *
  * MUTATIONS, in for-agents/session-hook.mjs, with the cases each turns red:
  *   - the key is taken only from the environment: cases 1a and 2 go red;
@@ -39,6 +46,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { A_COMPACTION_REPORTED_BY_CLAUDE_CODE } from '../src/config/a-reported-compaction.mjs'
 import { databaseIdentity } from '../src/config/database-identity.mjs'
 import { KEY_HEADER } from '../src/config/key-header.mjs'
+import { aNamedAgentWithoutAKeyLine } from '../src/config/the-entrys-agent.mjs'
 import { WORLD_HEADER, formatWorldHeader } from '../src/config/world-header.mjs'
 import { aTestDatabaseFolder } from './a-test-folder.ts'
 
@@ -256,15 +264,16 @@ describe('the hook after a compaction files into its office', () => {
     expect(out + err).not.toContain(KEY)
   })
 
-  it('1b: at the start, a mode-644 office tool configuration gives no key, so the warning is printed and the file is named', async () => {
+  it("1b: at the start, a mode-644 office tool configuration gives no key, so the warning is printed and the file's path is not", async () => {
     chmodSync(theToolFile, 0o644)
     const warning = await theWarning()
     const { out, err } = await runHook()
-    expect(out).toBe(warning.said)
+    expect(out).toBe(`${warning.said}\n${aNamedAgentWithoutAKeyLine(AGENT)}`)
     expect(carriedTheKey).not.toContain(true)
     expect(writes()).toEqual([])
     expect(existsSync(note())).toBe(false)
-    expect(err).toContain(theToolFile)
+    expect(err).toContain('MOLE_OFFICE_TOOL_CONFIGURATION')
+    expect(out + err).not.toContain(theToolFile)
     expect(out + err).not.toContain(KEY)
   })
 
@@ -309,7 +318,7 @@ describe('the hook after a compaction files into its office', () => {
   it('3: after a compaction with no run named, the warning is exactly as it is with no run named', async () => {
     const warning = await theWarning('compact')
     const { out } = await runHook({ source: 'compact', session: null })
-    expect(out).toBe(warning.said)
+    expect(out).toBe(`${warning.said}\n${aNamedAgentWithoutAKeyLine(AGENT)}`)
     expect(writes()).toEqual([])
     expect(existsSync(note())).toBe(false)
   })

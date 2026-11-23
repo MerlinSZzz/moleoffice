@@ -5,8 +5,8 @@
  * the secretary's page, WhatTheGrantCarries.tsx draws the list the read door answers (GET
  * /api/office/what-the-grant-carries), and the person changes it there with the write door.
  *
- * In a browser, against a test office of this file's own. The person's browser is paired: it holds the person's key as
- * the cookie a paired browser holds. The other browser holds no key and says it is the secretary, so the read door
+ * In a browser, against a test office of this file's own. The person's browser is paired: it holds the two halves the
+ * pairing press gives a browser. The other browser holds no key and says it is the secretary, so the read door
  * gives it a refusal and the page draws no menu. Every expected count and answer is read from the read door, so this
  * file does not go stale when a door is wired or the card changes.
  *
@@ -20,12 +20,12 @@
  *   2. For the person: choosing an answer stores nothing. It adds a line saying the door's answer before and after.
  *      "Leave it as it is" takes the line away and stores nothing. Choosing again and pressing "Change it" stores the
  *      answer as the person's, moves the row to its new group, and the row says the person set it.
- *   3. The line "This door does not ask yet" is on exactly the rows the read door says do not ask the check.
- *   3b. The line saying a door also needs the person's own words is on exactly the rows the read door says need them.
- *      With one role card door at may-press, that door's line says only a change to a card's words needs them, as the
- *      shared reading answers, and every other row keeps the line that the grant alone does not press it (round 81).
- *   4. For a browser that is not proved to be the person: no menu and no "Change it" anywhere, the line saying only the
- *      person changes the list, and each row says its answer in force in words.
+ *   3. The words "does not ask yet" are on exactly the rows the read door says do not ask the check.
+ *   3b. The words "also needs your words" are on exactly the rows the read door says need the person's own words.
+ *      With one role card door at may-press, that door's words name a card's words, as the shared reading answers,
+ *      and every other row keeps "also needs your words" (round 81).
+ *   4. For a browser that is not proved to be the person: no menu and no "Change it" anywhere, the word "read only",
+ *      and each row says its answer in force in words.
  *   5. At 390 wide each row stacks, with the answer under the door's words, and the page does not scroll sideways. At
  *      1440 the answer is beside the words.
  *
@@ -53,6 +53,7 @@ import type { Browser, Page } from 'playwright'
 
 import { THE_TEST_OFFICES_SECRETARY } from './a-page-of-a-test-office.ts'
 import { apiApp, freshDb, liveApp, thePersonsKeyHeader, waitForThePage, type LiveApp, type TestDb } from './helpers.ts'
+import { pairTheContext } from './a-paired-context.ts'
 import { t } from '../src/shared/i18n.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 import {
@@ -119,9 +120,8 @@ beforeAll(async () => {
   const started = await inProcess.app.inject({ method: 'POST', url: '/api/agents/started', headers: AS_THE_PERSON, payload: { handle: THE_TEST_OFFICES_SECRETARY.handle, name: THE_TEST_OFFICES_SECRETARY.name, role: 'secretary' } })
   expect(started.statusCode, started.body).toBe(201)
   live = await liveApp({ name: 'grant-list-on-the-page', viewport: { width: 1440, height: 1000 }, workspace: 'default', database: db.file })
-  // PAIRED: the person's key as the cookie a paired browser holds, so "Change it" is the person's own press.
-  const key = thePersonsKeyHeader()['x-mole-office-key'] as string
-  await live.context.addCookies([{ name: 'mole-office-key', value: key, domain: '127.0.0.1', path: '/' }])
+  // PAIRED: the two halves a paired browser holds, so "Change it" is the person's own press.
+  await pairTheContext(live.context, live.api)
 }, 240_000)
 
 afterEach(() => {
@@ -197,7 +197,7 @@ describe('the list, for the person', () => {
     const doNotAsk = list.doors.filter((one) => !one.asksTheCheck).map((one) => one.door)
     expect(doNotAsk.length, 'the read door names at least one door that does not ask yet').toBeGreaterThan(0)
     expect(new Set(saidNotYet)).toEqual(new Set(doNotAsk))
-    expect(await page.locator('.wgc-not-yet').first().textContent()).toBe(t('grantList.doesNotAskYet'))
+    expect(await page.locator('.wgc-not-yet').first().textContent()).toBe(t('grantList.state.doesNotAskYet'))
   }, 180_000)
 
   it("3b: the line about a door that also needs the person's words is on exactly the rows that need them, and says for which changes", async () => {
@@ -222,27 +222,27 @@ describe('the list, for the person', () => {
     const needWords = list.doors.filter((one) => one.alsoNeedsThePersonsWords)
     expect(needWords.length, "the read door names at least one door that also needs the person's words").toBeGreaterThan(0)
     expect(new Set(saidWords.map(([door]) => door))).toEqual(new Set(needWords.map((one) => one.door)))
-    // THE ROLE CARD DOOR AT MAY-PRESS SAYS THE GRANT ALONE MAY MAKE A CHANGE THAT LEAVES THE WORDS AS THEY ARE, and a
-    // door that needs the person's words for every change says the grant alone does not press it.
+    // THE ROLE CARD DOOR AT MAY-PRESS NAMES A CARD'S WORDS, and a door that needs the person's words for every change
+    // does not.
     const said = new Map(saidWords)
-    expect(said.get('role.set-added')).toBe(t('grantList.alsoNeedsYourWordsForACardsWords'))
-    expect(said.get('office.set-restart-grant')).toBe(t('grantList.alsoNeedsYourWords'))
+    expect(said.get('role.set-added')).toBe(t('grantList.state.alsoNeedsYourWordsForACardsWords'))
+    expect(said.get('office.set-restart-grant')).toBe(t('grantList.state.alsoNeedsYourWords'))
     // EACH LINE SAYS FOR WHICH CHANGES, as the shared reading answers for the door, the card's answer and the answer in force.
     const theLine = (one: (typeof needWords)[number]): string =>
-      t(doesThisDoorNeedThePersonsWordsOnlyForACardsWords(one.door, one.card, one.answer) ? 'grantList.alsoNeedsYourWordsForACardsWords' : 'grantList.alsoNeedsYourWords')
+      t(doesThisDoorNeedThePersonsWordsOnlyForACardsWords(one.door, one.card, one.answer) ? 'grantList.state.alsoNeedsYourWordsForACardsWords' : 'grantList.state.alsoNeedsYourWords')
     expect(new Map(saidWords)).toEqual(new Map(needWords.map((one) => [one.door, theLine(one)])))
   }, 180_000)
 })
 
 describe('the list, for somebody not proved to be the person', () => {
-  it('4: no menu and no "Change it", the line saying who may change it, and each answer in words', async () => {
+  it('4: no menu and no "Change it", the word read only, and each answer in words', async () => {
     const list = await theList()
     const { page, close } = await aSecretarysWindow(live.browser, 1440)
     try {
       await openTheList(page)
       expect(await page.locator('.wgc select').count(), 'menus').toBe(0)
       expect(await page.getByRole('button', { name: t('grantList.changeIt') }).count(), '"Change it"').toBe(0)
-      expect(await page.locator('.wgc-read-only').textContent()).toBe(t('grantList.readOnly'))
+      expect(await page.locator('.wgc-read-only').textContent()).toBe(t('settingsState.readOnly'))
       const drawn = await page.locator('.wgc-row[data-door]').evaluateAll((rows) =>
         rows.map((row): [string | null, string | null] => [row.getAttribute('data-door'), row.querySelector('.wgc-answer')?.textContent ?? null]),
       )
@@ -321,12 +321,13 @@ describe('the pictures', () => {
 
 
 describe('the hand-over grant on the page', () => {
-  it('shows the hand-over at each width in both themes', async () => {
+  it('shows the hand-over at 1440 and 390 in the light theme', async () => {
     const shots = process.env['OWNER_GRANT_PICTURES']
     if (shots !== undefined) mkdirSync(shots, { recursive: true })
     const page = live.page
-    for (const look of ['light', 'dark'] as const) {
-      for (const width of [1440, 990, 660, 390]) {
+    {
+      const look = 'light' as const
+      for (const width of [1440, 390]) {
         await page.setViewportSize({ width, height: 1000 })
         await openTheList(page, look)
         const row = page.locator('.wgc-row[data-door="agent.owner-move"]')

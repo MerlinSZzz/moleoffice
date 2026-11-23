@@ -75,6 +75,7 @@ import {
   type PreviewOutcome,
 } from './SummaryBlocks.tsx'
 import { useMessagePictures } from '../lib/messagepictures.ts'
+import { AFileLink } from '../lib/file-tickets.tsx'
 // EACH PICTURE SAYS WHICH PART OF ITS MESSAGE IT IS, so a right-click takes that picture. Problem
 // DowO7yEioWp0. The id is spelled by the one writer the server's region tree also uses.
 import { messagePictureRegionId } from '@shared/regions.ts'
@@ -155,9 +156,14 @@ function OnePicture({
           {/* A PICTURE IS SAVED FROM THE DOOR, as a report's is: the one on screen is a copy in this page. A picture at a
               web address is the browser's own to save. */}
           {whole.outcome.phase === 'shown' && !head.direct ? (
-            <a className="sb-picture-save" href={whereALinkFetches(block.path, true, inProject, ofMessage)} download>
+            <AFileLink
+              className="sb-picture-save"
+              file={{ path: block.path, record: ofMessage, project: inProject }}
+              plain={whereALinkFetches(block.path, true, inProject, ofMessage)}
+              saves
+            >
               {t('sb.picture.save')}
-            </a>
+            </AFileLink>
           ) : null}
           {/* BYTES THAT ARRIVED AND WOULD NOT DRAW are still a file, so it is offered as one beside the reason. */}
           {whole.outcome.phase === 'undecodable' ? <TheFile block={block} inProject={inProject} said={said} ofMessage={ofMessage} /> : null}
@@ -194,6 +200,7 @@ function TheFile({
   ofMessage?: string
 }) {
   const bytes = said?.bytes ?? null
+  const file = { path: block.path, record: ofMessage, project: inProject }
   return (
     <div className="sb-file-fetch px-chat-file">
       <span className="px-chat-pic-alt">{block.alt}</span>
@@ -208,12 +215,12 @@ function TheFile({
         </div>
       </dl>
       <p className="sb-file-address">
-        <a className="sb-file-open" href={whereAFileOpens(block.path, inProject, ofMessage)} target="_blank" rel="noreferrer">
+        <AFileLink className="sb-file-open" file={file} plain={whereAFileOpens(block.path, inProject, ofMessage)} saves={false} extra="&open=1">
           {t('sb.file.open')}
-        </a>
-        <a className="sb-file-save" href={whereALinkFetches(block.path, true, inProject, ofMessage)} download>
+        </AFileLink>
+        <AFileLink className="sb-file-save" file={file} plain={whereALinkFetches(block.path, true, inProject, ofMessage)} saves>
           {t('sb.file.save')}
-        </a>
+        </AFileLink>
       </p>
     </div>
   )

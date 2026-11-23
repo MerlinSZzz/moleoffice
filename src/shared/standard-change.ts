@@ -24,6 +24,7 @@
 import { HOUSE_RULES_PATH } from './merge-class.ts'
 import { A_DOCUMENT, whyItLandsAfterAPress } from './merge-queue.ts'
 import { aPluginOnlyChange, PLUGINS_FOLDER } from './plugin-change.ts'
+import { LANGUAGES } from './languages.ts'
 
 /** The four kinds of standard change, in the order the regulations list them. */
 export const STANDARD_KINDS = ['one-plugin', 'words', 'tests', 'documents'] as const
@@ -64,8 +65,15 @@ export function isAStandardKind(value: unknown): value is StandardKind {
   return typeof value === 'string' && (STANDARD_KINDS as readonly string[]).includes(value)
 }
 
-/** The word files: the English and Chinese word lists under src/shared/words/, and the word sources of the settings. */
-const A_WORD_LIST = /^src\/shared\/words\/(?:en|zh)(?:-[a-z0-9-]+)?\.ts$/u
+/**
+ * The word files: the word lists of every page language in src/shared/languages.ts, their made-from records and wave
+ * parts among them, and the word sources of the settings. The pattern is built from the list of page languages, so a
+ * language added there is matched with no edit to this rule.
+ */
+export function aWordListPattern(codes: readonly string[]): RegExp {
+  return new RegExp(`^src\\/shared\\/words\\/(?:${codes.join('|')})(?:-[a-z0-9-]+)?\\.ts$`, 'u')
+}
+const A_WORD_LIST = aWordListPattern(Object.keys(LANGUAGES))
 const THE_WORD_SOURCES = 'src/config/word-sources.mjs'
 
 /** Whether a path is a file of words: a word list or the word sources. The files that join or wait on them are code. */

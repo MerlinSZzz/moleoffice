@@ -231,7 +231,7 @@ describe('a session takes back a row it should never have written', () => {
     const otherSession = session()
     const stopped = aRowFor(other, otherSession)
     process.kill(-(other.pid as number), 'SIGKILL')
-    await new Promise((ok) => setTimeout(ok, 300))
+    while (other.exitCode === null && other.signalCode === null) await new Promise((ok) => setTimeout(ok, 10))
     const released = await h.app.inject({
       method: 'POST',
       url: `/api/resources/${stopped}/release`,

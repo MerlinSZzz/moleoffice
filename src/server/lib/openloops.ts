@@ -67,10 +67,10 @@
  * numbers, and a drought is never presented as an answer.
  */
 
-import { aProjectCounted, aProjectCountedWithoutMessageIds, allLinks, getRecord, liveRecordsOfKinds, whoFiled } from './records.ts'
+import { aProjectCounted, aProjectCountedLessItsMessages, aProjectCountedWithoutMessageIds, allLinks, getRecord, liveRecordsOfKinds, whoFiled } from './records.ts'
 import { PanelError } from './panel-error.ts'
 import { readForks, type ForksRead } from './forks.ts'
-import { refuseAMessageThisReaderMayNotRead, theMessagesThisReaderMayRead, type AMessageReader } from './messages.ts'
+import { refuseAMessageThisReaderMayNotRead, theLiveMessagesOfAProjectAReaderIsAPartyTo, theMessagesThisReaderMayRead, type AMessageReader } from './messages.ts'
 import { MOVE_ACTORS, type MoveActor } from '@shared/kinds.ts'
 import { progressOf, readWorkState, theWorkHasEnded, type Progress, type WorkStateSource } from '@shared/work.ts'
 import { createI18n } from '@shared/i18n.ts'
@@ -561,11 +561,18 @@ export function openLoopsInProject(workspaceId: string, forksRead: ForksRead = r
     open,
     leftOut: { finished, shelved, settled },
     unsettledForks,
+    // A READER LIMITED TO ITS OWN MESSAGES IS COUNTED FROM THOSE MESSAGES. The count is the project's live records that
+    // are not messages, and the project's live messages this reader is a party to. Counting from every message of the
+    // project's view would read the id of each one only to keep the reader's own. This gives the number that count
+    // gives, as `theLiveMessagesOfAProjectAReaderIsAPartyTo` says. A reader who reads every message, and a reader with
+    // no participant, are counted as before.
     readableCount: (reader) => {
       if (reader === undefined || reader.readsEveryMessage) return aProjectCountedWithoutMessageIds(workspaceId)
-      const counted = aProjectCounted(workspaceId)
-      const messages = theMessagesThisReaderMayRead(reader, counted.messageIds).size
-      return counted.notMessages + messages
+      if (reader.who === null) {
+        const counted = aProjectCounted(workspaceId)
+        return counted.notMessages + theMessagesThisReaderMayRead(reader, counted.messageIds).size
+      }
+      return aProjectCountedLessItsMessages(workspaceId) + theLiveMessagesOfAProjectAReaderIsAPartyTo(reader.who, workspaceId).size
     },
     modulesOf,
     neighbours,

@@ -1,5 +1,7 @@
 // Copyright © 2026 Zhengyang Shen
 // Licensed under the MIT License. See LICENSE.
+import { ReportsScope } from '../components/ReportsScope.tsx'
+import { ChecklistItemsHere, DecisionFacts, RelatedList, type RelatedReading } from '../components/RelatedHere.tsx'
 import { consumePreparedPage, peekPreparedPage } from '../lib/prepared-page.ts'
 import { t, type WordKey } from '@shared/i18n.ts'
 import { stateWord } from '@shared/words.ts'
@@ -79,9 +81,8 @@ import {
   type PipelineReading,
   type StepAttention,
 } from '../components/PipelineFlow.tsx'
-import { NothingInTheDrawing, StructureView, type IntentAnswer } from '../components/graph/StructureView.tsx'
+import { NothingInTheDrawing, StructureView, intentReadAhead, type IntentAnswer } from '../components/graph/StructureView.tsx'
 import type { ASentenceAndItsWord } from '../components/graph/restrictions-and-presence.ts'
-import { useInspect } from '../lib/mode.ts'
 import { readEveryPackage } from '../components/TaskPackagePanel.tsx'
 import { lanesInputFor, readEveryPipeline } from '../components/graph/lanes/from-records.ts'
 import { LanesDrawing } from '../components/graph/lanes/LanesDrawing.tsx'
@@ -109,6 +110,8 @@ import {
   type PanelState,
 } from '../components/ui.tsx'
 import { useProjectAsync } from '../lib/project-async.ts'
+// THE FOLD OF A MODULE'S RELATED LISTS, so the lists here fold at the same number.
+import { OPEN_LOOPS_DRAWN } from './RecordPage.tsx'
 
 // ============================================================================ reading the reply
 
@@ -541,8 +544,6 @@ function PipelineDrawingPage({ id }: { id?: string }) {
   // WHAT RESTRICTS THE LANES' RECORDS AND WHO IS WORKING ON THEM, each sentence with its word key, as StructureView
   // hands it up while the lanes are on screen (16 November 2026).
   const [recordsSay, setRecordsSay] = useState<readonly ASentenceAndItsWord[]>([])
-  // The developer view, asked for in the address, says what the normal view does not.
-  const inspect = useInspect()
 
   /**
    * The last answer that arrived, kept so a WRITE does not blank the page.
@@ -580,6 +581,13 @@ function PipelineDrawingPage({ id }: { id?: string }) {
   // one is kept; failed with nothing kept draws no lanes, and the body says so. The page is mounted afresh for each
   // address, so an answer here is always this pipeline's.
   const [intent, setIntent] = useState<IntentAnswer>(NOTHING_READ_YET)
+  // ITS FIRST READ STARTS WITH THE PAGE'S OTHER READS (round 238). StructureView is mounted only once the records and
+  // the packages are read, and its first read used to start only then. It now takes this request as that first read,
+  // and hands its answer up as before. `#/pipeline/drawing` starts none, and its drawing sends its own first read.
+  const readAhead = useMemo(() => (id === undefined ? null : intentReadAhead(scope)), [id, scope])
+  useEffect(() => {
+    readAhead?.start()
+  }, [readAhead])
   // WHICH LEVEL THE MASTER'S DRAWING SHOWS. It opens at Boxes; every other pipeline is drawn at its steps.
   const [level, setLevel] = useState<LanesTree['level']>('boxes')
 
@@ -633,23 +641,6 @@ function PipelineDrawingPage({ id }: { id?: string }) {
   // card, as a pipeline with no step has, draw the canvas's empty mark there instead of an empty frame (round 230).
   const noBoxes = isMaster && level === 'boxes' && lanes !== null && !lanes.input.records.some((record) => record.role === 'box')
   const noCard = lanes !== null && !noBoxes && lanes.input.records.length === 0
-  const lanesShown =
-    own === undefined
-      ? null
-      : {
-          drawing:
-            lanes === null ? null : (
-              <>
-                {isMaster ? <MasterLevel level={level} onLevel={setLevel} /> : null}
-                {noBoxes
-                  ? <p className="pp-no-boxes">{t('bigMap.noBoxes')}</p>
-                  : noCard ? <NothingInTheDrawing /> : <LanesDrawing input={lanes.input} onSays={setLanesSay} />}
-              </>
-            ),
-          records: lanes === null || noBoxes ? [] : lanes.input.records.map((record) => record.id),
-          onIntent: setIntent,
-          onSaysByWord: setRecordsSay,
-        }
   // THE BODY'S SENTENCES (16 November 2026): those a reader needs to trust the page, in the section after the About
   // part, and the rest in the developer view only. They are the arrangement that could not be read, what the input
   // could not draw, what the lanes drawing hands up while it is shown, and what restricts the drawn records and who is
@@ -664,6 +655,24 @@ function PipelineDrawingPage({ id }: { id?: string }) {
     ...said,
   ]
   const toDevelopers = [...(lanes === null ? [] : lanes.toDevelopers), ...handedUp.filter(forDevelopers)]
+  const keptForDevelopers = toDevelopers.filter((line) => line.key !== 'lanes.noRoute')
+  const lanesShown =
+    own === undefined
+      ? null
+      : {
+          drawing:
+            lanes === null ? null : (
+              <>
+                {isMaster ? <MasterLevel level={level} onLevel={setLevel} /> : null}
+                {noBoxes
+                  ? <p className="pp-no-boxes" data-to-developers={JSON.stringify(keptForDevelopers)}>{t('absence.none')}</p>
+                  : noCard ? <NothingInTheDrawing toDevelopers={keptForDevelopers} /> : <LanesDrawing input={lanes.input} onSays={setLanesSay} toDevelopers={keptForDevelopers} />}
+              </>
+            ),
+          records: lanes === null || noBoxes ? [] : lanes.input.records.map((record) => record.id),
+          onIntent: setIntent,
+          onSaysByWord: setRecordsSay,
+        }
 
   return (
     <div className="pp">
@@ -683,8 +692,10 @@ function PipelineDrawingPage({ id }: { id?: string }) {
         records={loaded.records}
         links={loaded.links}
         {...(packages.status === 'ready' && packages.value !== null ? { packages: packages.value.tasks } : {})}
+        {...(readAhead === null ? {} : { readAhead })}
         attention={loaded.attention}
         scope={scope}
+        masterId={masterId}
         hrefFor={hrefFor}
         onChanged={reloadAndWait}
         now={now}
@@ -693,6 +704,9 @@ function PipelineDrawingPage({ id }: { id?: string }) {
         {...(lanesShown === null ? { onSays: setSaid } : { lanes: lanesShown })}
       />
 
+      {own === undefined ? null : <ReportsScope id={own.id} title={own.title} />}
+      {own === undefined ? null : <RelatedToThePipeline id={own.id} title={own.title} kind="decisions" />}
+      {own === undefined ? null : <RelatedToThePipeline id={own.id} title={own.title} kind="checklists" />}
       <PipelineDetail entries={entries} picked={picked} master={masterId} attention={attention} onScope={onScope} />
 
       {own === undefined ? null : <PipelineOwnWords record={own} part="context" followed={facts.length > 0} />}
@@ -701,12 +715,48 @@ function PipelineDrawingPage({ id }: { id?: string }) {
           has no drawing to say anything about, so it draws neither. */}
       {own === undefined && id !== undefined ? null : <PipelineSaid facts={facts} />}
 
-      {inspect ? <PipelineToDevelopers lines={toDevelopers} /> : null}
     </div>
   )
 }
 
 const NOTHING_READ_YET: IntentAnswer = { at: 'reading', kept: null }
+
+/**
+ * THE DECISIONS AND THE CHECKLISTS ABOUT THIS PIPELINE AND ITS PARTS, under its reports.
+ *
+ * The related door (GET /api/records/:id/related) walks the pipeline's steps, the modules that implement them, their
+ * sub-modules at every depth and their runs. ReportsScope above reads the reports by the same walk. Each list folds
+ * where a module's lists fold, and draws a row as a module's page draws it.
+ */
+function RelatedToThePipeline({ id, title, kind }: { id: string; title: string; kind: 'decisions' | 'checklists' }) {
+  const [state, reload] = useProjectAsync(
+    () => api.related(id, kind === 'decisions' ? { kind, secondLevel: 'show' } : { kind }),
+    [id, kind],
+  )
+  const heading = t(kind === 'decisions' ? 'w13s.related.decisionsFor' : 'w13s.related.checklistsFor', { title })
+  const reading: RelatedReading | null =
+    state.status === 'loading'
+      ? null
+      : state.status === 'error'
+        ? { status: 'error', message: state.message, fault: state.fault }
+        : { status: 'ready', value: state.value }
+  return (
+    <section className="related-scope" data-kind={kind}>
+      <h2>{heading}</h2>
+      {reading === null ? (
+        <Loading label={heading} rows={1} />
+      ) : (
+        <RelatedList
+          reading={reading}
+          fold={OPEN_LOOPS_DRAWN}
+          drawRow={(row) => (kind === 'decisions' ? <DecisionFacts row={row} /> : <ChecklistItemsHere row={row} />)}
+          workspaceId={currentWorkspace()}
+          retry={reload}
+        />
+      )}
+    </section>
+  )
+}
 
 /**
  * THE MASTER'S TWO LEVELS (wave 13u round 230): Boxes draws a row of the block pipelines' boxes for each master step,
@@ -746,7 +796,7 @@ export function PipelineOwnWords({ record, part, followed = false }: { record: P
       <section className="pp-own" data-pipeline-part="summary">
         <h2 className="pp-own-title wrap-anywhere">{record.title}</h2>
         {words === '' ? (
-          <p className="pp-own-none">{t('pipelinePage.own.noSummary')}</p>
+          <p className="pp-own-none">{t('moduleView.context.notWritten')}</p>
         ) : (
           <p className="pp-own-words wrap-anywhere">{words}</p>
         )}
@@ -759,7 +809,7 @@ export function PipelineOwnWords({ record, part, followed = false }: { record: P
     <section className="pp-own" data-pipeline-part="context">
       <h2 className="pp-own-heading">{t('pipelinePage.own.context')}</h2>
       {context === '' ? (
-        followed ? null : <p className="pp-own-none">{t('pipelinePage.own.noContext')}</p>
+        followed ? null : <p className="pp-own-none">{t('moduleView.context.notWritten')}</p>
       ) : (
         // A blank line in the stored text starts a new paragraph; nothing else in it is read as markup.
         context.split(/\n\s*\n/).map((paragraph, at) => (
@@ -788,28 +838,6 @@ export function PipelineSaid({ facts }: { facts: readonly string[] }) {
         <p key={at} className="wrap-anywhere">{fact}</p>
       ))}
     </div>
-  )
-}
-
-/**
- * WHAT THE DEVELOPER VIEW ALONE SAYS ABOUT THE DRAWING (16 November 2026): what it could not draw or does not use, and
- * the like, one line each, the word key that writes the sentence first and then the sentence. Drawn right after the
- * body's section, or after the body when that section is not drawn, and only when there is a line.
- */
-export function PipelineToDevelopers({ lines }: { lines: readonly { key: string; words: string }[] }) {
-  if (lines.length === 0) return null
-  return (
-    <section className="pp-developer" data-pipeline-part="developer">
-      <h2 className="pp-own-heading">{t('pipelinePage.developer')}</h2>
-      <ul>
-        {/* Keyed by place, as the body's sentences are. */}
-        {lines.map((line, at) => (
-          <li key={at} className="wrap-anywhere">
-            <code>{line.key}</code> {line.words}
-          </li>
-        ))}
-      </ul>
-    </section>
   )
 }
 
@@ -1044,17 +1072,14 @@ export function PipelineDetail({
                   raw id as the subject of the sentence and the phrase "Nothing was substituted for
                   it" immediately before a sentence saying what was drawn instead, which read as a
                   contradiction. The id is in the address bar, where the reader typed it. */}
-              <b>{t('g7b.PipelinePage.there_is_no_pipeline_at_that_address')}</b>{t('g7b.PipelinePage.the_pipelines_in_this_project_are_listed')}{' '}
-              {shown?.reading.record.title ?? t('g7b.PipelinePage.none')}{t('g7b.PipelinePage.is_drawn_below_because_it_is_first')}</p>
+              <b>{t('g7b.PipelinePage.there_is_no_pipeline_at_that_address')}</b></p>
           ) : null}
 
           <Explain declares={{ surface: 'pipeline.index' }}
-            meaning={<span>{t('g7b.PipelinePage.ordered_by_how_much_of_each_one')}</span>}
+            meaning={<span>{t('g7b.PipelinePage.pipelines_140')}</span>}
             opens={t('g7b.PipelinePage.the_index_with_where_each_pipeline_is')}
             holds={{ count: entries.length, what: t(entries.length === 1 ? 'g7b.PipelinePage.pipeline_on_file' : 'g7b.PipelinePage.pipelines_on_file') }}
           >
-            <p className="pp-order">{t('g7b.PipelinePage.first_anything_holding_a_step_whose_stored')} {t('g7a.pipelines.blockedNotCounted')}</p>
-
             {entries.map((entry) => (
               <IndexRow
                 key={entry.reading.record.id}
@@ -1073,7 +1098,6 @@ export function PipelineDetail({
               href="#/records"
               what={t('g7b.PipelinePage.pipelines')}
               linkText={t('g7b.PipelinePage.open_every_record_of_every_kind')}
-              note={t('g7b.PipelinePage.every_pipeline_on_file_is_in_this')}
             />
           </Explain>
 
@@ -1162,7 +1186,7 @@ export function IndexRow({ entry, current, onPick }: { entry: PipelineEntry; cur
   const meta =
     reading.problem !== null
       ? reading.problem
-      : entry.total === 0 ? <Absence /> : at === null
+      : entry.total === 0 ? <Absence title={t('g7b.PipelinePage.it_has_no_step')} /> : at === null
         ? t('g7b.PipelinePage.all_done', { v1: plural(entry.total, t('g7b.PipelinePage.step_is'), t('g7b.PipelinePage.steps_are')) })
         : t('g7b.PipelinePage.standing_on_of', { v1: stepNumber(at.index), v2: entry.total, v3: at.step.name, v4: stateWord(at.step.state).text })
 
@@ -1177,18 +1201,7 @@ export function IndexRow({ entry, current, onPick }: { entry: PipelineEntry; cur
         // a hand-copied indent. Row reserves a fixed column for the state chip and that width is
         // ui.tsx's to choose; a number copied here to line up with it would be two places that must
         // agree, which is this codebase's most expensive recurring defect.
-        meta={
-          <>
-            <span className="pp-standing">{meta}</span>
-            <span className="pp-why">
-              <span className="pp-why-lead">{t('g7b.PipelinePage.why_it_is_here')}</span>
-              {entry.total === 0 ? <Absence title={reading.problem !== null ? entry.why : t('g7b.PipelinePage.it_has_no_step')} /> : entry.why}
-              {entry.topScore === null ? null : (
-                <span className="pp-why-score">{t('g7b.PipelinePage.best_score_the_server_gave_one_of')}{entry.topScore}.</span>
-              )}
-            </span>
-          </>
-        }
+        meta={<span className="pp-standing">{meta}</span>}
         right={
           reading.problem !== null ? (
             <span className="pp-count">{t('g7b.PipelinePage.unreadable')}</span>
@@ -1246,17 +1259,6 @@ const PIPELINES_CSS = `
   max-width: var(--measure-in-box);
 }
 .pp-said p::first-letter { text-transform: uppercase; }
-/* What the developer view alone says: each line a word key in code type, and then its sentence. */
-.pp-developer { display: flex; flex-direction: column; gap: var(--pad); min-width: 0; }
-.pp-developer ul { display: flex; flex-direction: column; gap: var(--pad); margin: 0; padding: 0; list-style: none; }
-.pp-developer li {
-  font-size: var(--fs-1);
-  line-height: var(--lh-body);
-  color: var(--text-2);
-  max-width: var(--measure-in-box);
-}
-.pp-developer code { font-family: var(--font-mono); font-size: 0.94em; color: var(--text); }
-
 .pp-rereading {
   padding: var(--pad) var(--pad-lg);
   font-size: var(--fs-1);
@@ -1266,7 +1268,7 @@ const PIPELINES_CSS = `
   border: var(--border-w) solid var(--st-inferred-line);
   border-radius: var(--radius-sm);
 }
-.pp-order, .pp-missing, .pp-unreadable {
+.pp-missing, .pp-unreadable {
   font-size: var(--fs-1);
   line-height: var(--lh-body);
   color: var(--text-2);
@@ -1294,23 +1296,6 @@ const PIPELINES_CSS = `
 .pp-entry[data-current='1'] { background: var(--sel); border-radius: var(--radius-sm); }
 
 .pp-standing { display: block; color: var(--text-2); font-weight: 600; }
-.pp-why {
-  display: block;
-  margin-top: 4px;
-  font-size: var(--fs-1);
-  line-height: var(--lh-body);
-  color: var(--text-2);
-  max-width: var(--measure-in-box);
-}
-.pp-why-lead {
-  display: block;
-  font-size: var(--fs-1);
-  font-weight: 600;
-  letter-spacing: .06em;
-  text-transform: uppercase;
-  color: var(--text-3);
-}
-.pp-why-score { color: var(--text-3); }
 
 /* Sits under the row rather than inside it, because a link and a button inside a row that is
    itself clickable is two answers to one press. It lines up with the row's own left padding, which

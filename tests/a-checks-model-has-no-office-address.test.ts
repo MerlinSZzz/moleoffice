@@ -53,6 +53,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { apiApp, freshDb, type TestDb } from './helpers.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
+import { localStamp } from '../src/shared/time.ts'
 import { settings } from '../src/config/settings.mjs'
 import { historicalSession } from './synthetic-submission-fixtures.ts'
 import { aMadeUpCheckSession, inspectorFixture, writeManyRecordsFixture } from './inspector-tool-fixture.ts'
@@ -403,7 +404,7 @@ describe('T3 — the window door lists what was created inside the window and no
     const a = (first.json() as { record: { id: string; createdAt: string } }).record
 
     // A SECOND MOMENT, so the two records are in different seconds and the window can tell them apart.
-    await sleep(1_100)
+    while (localStamp(new Date()) <= a.createdAt) await sleep(20)
     const second = await app.inject({ method: 'POST', url: '/api/records', headers: asAgent('builder-c'), payload: { kind: 'session', title: 'A record written after the window', data: { state: 'running' } } })
     expect(second.statusCode, second.body).toBe(201)
     const b = (second.json() as { record: { id: string; createdAt: string } }).record

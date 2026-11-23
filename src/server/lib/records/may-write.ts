@@ -26,12 +26,15 @@ import { theBookingDoorsAreWriting } from '../booking-door.ts'
 import { refuseACardWordsActOffTheOwnersDecision } from '../card-words.ts'
 import { theChecklistDoorsAreWriting } from '../checklist-door.ts'
 import { theCounterDoorsAreWriting } from '../counter-door.ts'
+import { theKeyItemDoorsAreWriting } from '../key-item-door.ts'
 // WHETHER THE DRAFT SEND DOOR IS THE WRITER. That module imports nothing, so reading it here starts no
 // loop. `assertMayWrite` asks it.
 import { theDraftSendDoorIsWriting } from '../draft-door.ts'
 import { theOfficeIsWritingAFlowRun } from '../flow-run-door.ts'
 import { gateMet, gateMetOnceTheWriteIsTakenBack } from '../gate-counts.ts'
 import { theOfficeIsWritingAHostJob } from '../host-job-door.ts'
+import { thePackFilingIsWriting } from '../pack/filing-mark.ts'
+import { PACK_KIND } from '../../../shared/kinds/pack.ts'
 import { theKeyWithThisIdIsItsHoldersOwn } from '../keys.ts'
 // WHETHER THE MERGE QUEUE IS THE WRITER. Sandbox v1, piece P6. That module imports nothing, so
 // reading it here starts no loop; `assertMayWrite` below is the one place that asks it.
@@ -73,6 +76,7 @@ import { whoMayDoThePersonsActsHere } from '../worldauthority.ts'
 // WHICH AGENT A `to`, A `sentBy` OR A `who` IN THE BODY NAMES. Criterion I2: those are arriving
 // references, so they go through the one resolver and what is stored is the id it answers.
 import { type RegisteredAgent } from '../participants.ts'
+import { isItsRecordedLeader } from '../agent-owner.ts'
 import { type Actor } from './actor.ts'
 import { whoFiled } from './change-log.ts'
 import { aSignedItemDoesNotCarryARegulation, holdsTheInspectorCard, theChainOfStartersAbove, theCoreOfADecisionIsItsMakers, theDecisionItselfWouldChange, theDecisionWasRecordedBy, thePersonIsFilingThisSession } from './decision-core.ts'
@@ -97,6 +101,7 @@ import { aSentDraftStandsAsItWasSent, DRAFT_KIND, sentAsOf } from '@shared/draft
 import { A_PUSH_IS_WRITTEN_BY_ITS_DOORS, EMERGENCY_PUSH_KIND, THE_PUSH_DOORS } from '@shared/emergency-push.ts'
 import { A_FLOW_RUN_IS_WRITTEN_BY_THE_OFFICE, FLOW_RUN_KIND, THE_FLOW_RUN_DOORS } from '@shared/flow-run.ts'
 import { A_HOST_JOB_IS_WRITTEN_BY_ITS_DOORS, HOST_JOB_KIND, THE_HOST_JOB_DOORS } from '@shared/host-jobs.ts'
+import { A_KEY_ITEM_IS_WRITTEN_BY_ITS_DOORS, KEY_ITEM_KIND, THE_KEY_ITEM_DOORS } from '@shared/key-items.ts'
 import { A_MERGE_ENTRY_IS_WRITTEN_BY_ITS_DOORS, MERGE_ENTRY_KIND, THE_MERGE_QUEUE_DOORS } from '@shared/merge-queue.ts'
 import { sameParticipant } from '@shared/messages.ts'
 import { named } from '@shared/named.ts'
@@ -483,6 +488,9 @@ export function assertMayWrite(
   if (kind === HOST_JOB_KIND && verb !== 'move' && !theOfficeIsWritingAHostJob()) {
     throw new PanelError(A_HOST_JOB_IS_WRITTEN_BY_ITS_DOORS, 403, THE_HOST_JOB_DOORS, undefined, 'Only its own doors write a host job.')
   }
+  if (kind === PACK_KIND && verb !== 'move' && !thePackFilingIsWriting()) {
+    throw new PanelError('Only the pack filing function writes a pack record. Nothing was written.', 403)
+  }
   // AND A CHECKLIST IS WRITTEN BY ITS OWN DOORS AND BY NOTHING ELSE, whoever is asking — the person
   // included. The office writes the owner from the caller, and only
   // the owner switches an item's reminder on. The general doors can keep neither. Its own writes set
@@ -495,6 +503,12 @@ export function assertMayWrite(
   // write through the general doors could put two bookings on more card memory than there is.
   if (kind === BOOKING_KIND && !theBookingDoorsAreWriting()) {
     throw new PanelError(A_BOOKING_IS_WRITTEN_BY_ITS_DOORS, 403, THE_BOOKING_DOORS, undefined, 'Only its own doors write a booking.')
+  }
+  // AND A KEY ITEM IS WRITTEN BY ITS OWN DOORS AND BY NOTHING ELSE, whoever is asking — the person included. Its doors
+  // let only the person and a secretary writing as itself through, and write who set its progress and made its
+  // estimate, and when, from the key and the office's clock; the general doors would take both as typed.
+  if (kind === KEY_ITEM_KIND && !theKeyItemDoorsAreWriting()) {
+    throw new PanelError(A_KEY_ITEM_IS_WRITTEN_BY_ITS_DOORS, 403, THE_KEY_ITEM_DOORS, undefined, 'Only its own doors write a key item.')
   }
   // AND A PROJECT CHAPTER, A DESIGN REVIEW AND A DESIGN REMINDER ARE WRITTEN BY THEIR OWN DOORS AND BY NOTHING ELSE,
   // whoever is asking — the person included (the design-first build of wave 13s's requirements). The chapter's door asks
@@ -894,9 +908,11 @@ function theCallerSubmittedTheEntryThisCheckIsFor(data: unknown, me: Participant
  * `everyAgentASessionsDataNames`) is accepted only from:
  *   1. that agent;
  *   2. an agent above it in its chain of starters (`theChainOfStartersAbove`, the chain the parent rule reads);
- *   3. the person, proved (`thePersonIsFilingThisSession`). A request that only says it is the person, with no key of theirs,
+ *   3. its recorded leader (`isItsRecordedLeader`, lib/agent-owner.ts): the agent's owner, held and an agent. The
+ *      leader's own leader is not asked, and an absent or broken owner allows nothing;
+ *   4. the person, proved (`thePersonIsFilingThisSession`). A request that only says it is the person, with no key of theirs,
  *      is not the person here, except at their press that admits a registration;
- *   4. the office itself (`theCallerIsTheOfficeItself`).
+ *   5. the office itself (`theCallerIsTheOfficeItself`).
  * A SESSION FOR THE INSPECTOR may also be filed by a secretary (`theSecretaryOfThisOffice`) or by whoever submitted a
  * merge entry the check is for.
  *
@@ -926,17 +942,18 @@ function whyThisCallerMayNotFileASessionFor(data: unknown, before: unknown, acto
     const theInspector = holdsTheInspectorCard(agent)
     if (theInspector && (theSecretaryOfThisOffice(actor) || theCallerSubmittedTheEntryThisCheckIsFor(data, me, workspaceId))) continue
     const row = readParticipant(agent) as RegisteredAgent | null
+    if (me !== null && me.kind === 'agent' && row !== null && isItsRecordedLeader(row, me)) continue
     const name = row?.handle ?? agent.id
     const caller = actor.type === 'agent' ? (theCallersAgentRow(actor)?.handle ?? actor.id) : actor.id
     return (
       `This session names the agent "${name}", and ${actor.type} "${caller}" may not file or change a session for it. ` +
-      'A session for an agent is filed only by that agent, an agent above it in its chain of starters, the person with their key, or the office itself.' +
+      'A session for an agent is filed only by that agent, an agent above it in its chain of starters, its recorded leader, the person with their key, or the office itself.' +
       (theInspector ? ` A session for the inspector may also be filed by a secretary, or by whoever submitted the merge entry the check is for.` : '') +
       aClaimToBeThePerson(actor) +
       // WHAT TO DO INSTEAD, for an agent: the road of filing runs for a worker it did not register is not
       // used any more, and these are the two that are.
       (actor.type === 'agent'
-        ? ' To start a run for an agent you did not register, ask a secretary to file it, or register the agent yourself, as its starter.'
+        ? ' To start a run for an agent you did not register and are not the recorded leader of, ask a secretary to file it, or register the agent yourself, as its starter.'
         : '') +
       ' Nothing was written.'
     )

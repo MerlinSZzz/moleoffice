@@ -17,6 +17,9 @@ import { FAKE_DF, FAKE_DU } from './sandbox-stand-ins.ts'
 let scratch: string, sandboxes: string, server: Server, api: string
 let messages: { body: any; headers: Record<string, unknown> }[]
 let failSend: boolean
+/** The send's 409: 'stored', the office's answer when it stored the warning and routed it because nothing holds a
+ * registered agent it was to, or 'refused', a 409 that stored nothing. Undefined for a 201. */
+let conflict: 'stored' | 'refused' | undefined
 let folderLimitMs: number | undefined
 /** MOLE_OFFICE_SANDBOX_DISK_WATCHERS for the launcher: two made-up agents, or empty for nobody. Never left out, because the
  * launcher reads the main checkout's .env under its environment, and an office may name watchers there. */
@@ -51,12 +54,17 @@ beforeEach(async () => {
   mkdirSync(sandboxes); mkdirSync(join(scratch, 'bin'))
   writeFileSync(join(scratch, 'bin', 'du'), FAKE_DU, { mode: 0o755 })
   writeFileSync(join(scratch, 'bin', 'df'), FAKE_DF, { mode: 0o755 })
-  state(); messages = []; failSend = false; folderLimitMs = undefined; watchers = 'wren,lark'
+  state(); messages = []; failSend = false; conflict = undefined; folderLimitMs = undefined; watchers = 'wren,lark'
   server = createServer(async (req, res) => {
     let body = ''; for await (const chunk of req) body += chunk
     if (req.method !== 'POST' || req.url !== '/api/records') { res.writeHead(404).end(); return }
     if (failSend) { res.writeHead(503, { 'content-type': 'application/json' }).end(JSON.stringify({ error: 'synthetic message refusal' })); return }
+    if (conflict === 'refused') { res.writeHead(409, { 'content-type': 'application/json' }).end(JSON.stringify({ error: 'synthetic refusal that stored nothing' })); return }
     messages.push({ body: JSON.parse(body), headers: req.headers })
+    if (conflict === 'stored') {
+      res.writeHead(409, { 'content-type': 'application/json' }).end(JSON.stringify({ record: { id: 'synthetic-message' }, routed: [{ line: 'Synthetic routed line.' }], error: 'Synthetic routed line.' }))
+      return
+    }
     res.writeHead(201, { 'content-type': 'application/json' }).end(JSON.stringify({ record: { id: 'synthetic-message' } }))
   })
   await new Promise<void>((done) => server.listen(0, '127.0.0.1', done))
@@ -116,6 +124,21 @@ it('mutation SEND_RETRY: a refused message leaves warning state unchanged and th
   const failed = await sizes('--tell'); expect(failed.code).not.toBe(0); expect(failed.err).toContain('synthetic message refusal')
   expect(readFileSync(file, 'utf8')).toBe(before)
   failSend = false; expect((await sizes('--tell')).code).toBe(0); expect(messages).toHaveLength(1)
+})
+// A WARNING THE OFFICE STORED AND ANSWERED 409 IS SENT: a send to a registered agent that nothing holds is stored, routed
+// and answered 409 with the stored message and where it was routed. The folder counts as told, and the next run sends
+// nothing. A 409 that stored nothing is still a refusal, and the warning state is left as it was.
+it('mutation STORED_409: a warning the office stored and answered 409 is sent, and a 409 that stored nothing is refused', async () => {
+  folder('large', 50 * GB); await sizes('--tell')
+  const file = join(sandboxes, '.sizes.json'), before = readFileSync(file, 'utf8')
+  folder('large', 61 * GB); conflict = 'refused'
+  const refused = await sizes('--tell'); expect(refused.code).not.toBe(0); expect(refused.err).toContain('synthetic refusal that stored nothing')
+  expect(readFileSync(file, 'utf8')).toBe(before); expect(messages).toEqual([])
+  conflict = 'stored'
+  const stored = await sizes('--tell'); expect(stored.code, stored.err).toBe(0); expect(messages).toHaveLength(1)
+  expect(stored.err).toContain(`The size warning for ${join(sandboxes, 'large')} was stored as message synthetic-message, and the office answered 409. The warning waits where the office routed it: Synthetic routed line.`)
+  expect(JSON.parse(readFileSync(file, 'utf8'))).toEqual({ large: true })
+  const again = await sizes('--tell'); expect(again.code, again.err).toBe(0); expect(messages).toHaveLength(1)
 })
 // NOBODY NAMED: the sizes are still listed, nobody is told and the tool says so, and the folder's warning state is left as
 // it was, so the first run with a watcher named tells (decision ZP-7AFoCvp1L). A crossing told to nobody fails the run, so

@@ -7,8 +7,7 @@
  * allow only block, so nobody can move them: the pinned commit is what was sealed, a resolution is replayed from its
  * own ref, the tested clone is the integrated result, and a withdrawn entry's tool stops. Two allow block and remind,
  * stand at remind in both kinds of office, and may be moved by the person or a secretary, never to off: the plugin
- * pages are built before a landing, and the office is healthy after it. Where each is counted is in
- * tests/the-merge-tool-gates-are-counted-rows.test.ts.
+ * pages are built before a landing, and the office is healthy after it.
  *
  * WHAT GOES RED. Control run first. Give a block-only row remind, or give one of the two remind rows off, or start one
  * at block, or let only the person move it, and a case here turns red.

@@ -97,8 +97,6 @@ export interface RuntimeKeyOnScreen {
   label: string
   /** Which provider's key it is, e.g. `OpenAI`. */
   provider: string
-  /** What this key is for, in one plain sentence. */
-  means: string
   state: RuntimeKeyState
   /** One plain sentence saying what was found, or that nobody has looked. */
   says: string
@@ -137,25 +135,21 @@ export const RUNTIME_KEY_ROWS: ReadonlyArray<{
   runtime: string
   label: string
   provider: string
-  means: string
 }> = [
   {
     runtime: 'claude-code',
     label: 'Claude Code',
     provider: 'Anthropic',
-    means: 'Claude Code finds this through its own login, and the office passes it no key.',
   },
   {
     runtime: 'codex',
     label: 'Codex',
     provider: 'OpenAI',
-    means: 'Codex finds this through its own login, and the office passes it no key.',
   },
   {
     runtime: 'opencode',
     label: 'OpenCode',
     provider: 'Zhipu for GLM',
-    means: 'OpenCode finds this in its own store, and the office passes it no key.',
   },
 ]
 

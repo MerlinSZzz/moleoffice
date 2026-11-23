@@ -20,13 +20,12 @@ import { stateWord } from '@shared/words.ts'
 import type { AWorkerOfAPackage, TheWorkersOfAPackage } from '@shared/package-workers.ts'
 import { api } from '../api.ts'
 import { RouteLink, recordPath } from './router.tsx'
-import { ErrorNote, Loading, Panel, useAsync } from './ui.tsx'
+import { ErrorNote, Loading, Panel, ServerNote, useAsync } from './ui.tsx'
 import { taskHasAPackage } from './TaskPackagePanel.tsx'
 
 const PACKAGE_WORKERS_SHEET = 'mole-office-package-workers'
 
 export const PACKAGE_WORKERS_CSS = `
-.pw-intro { margin: 0 0 var(--pad) 0; font-size: var(--fs-1); color: var(--text-2); }
 .pw-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
 .pw-one { padding: var(--pad) 0; border-top: 1px solid var(--border); min-width: 0; }
 .pw-one:first-child { border-top: none; padding-top: 0; }
@@ -63,8 +62,7 @@ export function PackageWorkers({ record }: { record: PanelRecord }) {
 export function TheWorkersOfAPackagePanel({ reading }: { reading: TheWorkersOfAPackage }) {
   return (
     <>
-      <p className="pw-intro">{t('packageWorkers.intro')}</p>
-      {reading.workers.length === 0 ? <p className="pw-none">{t('packageWorkers.none')}</p> : null}
+      {reading.workers.length === 0 ? <p className="pw-none">{t('absence.none')}</p> : null}
       <ul className="pw-list">
         {reading.workers.map((worker, index) => (
           <OneWorker key={`${worker.agent ?? 'no-agent'}:${String(index)}`} worker={worker} />
@@ -77,7 +75,6 @@ export function TheWorkersOfAPackagePanel({ reading }: { reading: TheWorkersOfAP
           notNaming: String(reading.handbacks.notNamingAWorker),
         })}
       </p>
-      <p className="pw-says">{reading.says}</p>
     </>
   )
 }
@@ -101,7 +98,7 @@ function OneWorker({ worker }: { worker: AWorkerOfAPackage }) {
         <Fact label={t('packageWorkers.asked')}>
           {theAskWord(worker.asked)}
           {worker.askedOn === null ? (
-            <span className="pw-says">{t('packageWorkers.asksNone')}</span>
+            <span className="pw-none">{t('word.notRecorded')}</span>
           ) : (
             <span className="pw-says">
               {t('packageWorkers.askedOn', { title: worker.askedOn.title ?? worker.askedOn.run })}
@@ -117,7 +114,6 @@ function OneWorker({ worker }: { worker: AWorkerOfAPackage }) {
         <Fact label={t('packageWorkers.minutes')}>{theMinutes(worker)}</Fact>
         <Fact label={t('packageWorkers.wentBack')}>
           {String(worker.wentBack)}
-          <span className="pw-says">{worker.wentBackSays}</span>
         </Fact>
       </dl>
     </li>
@@ -175,13 +171,13 @@ function theTokens(worker: AWorkerOfAPackage): ReactNode {
       ) : (
         t('packageWorkers.tokenCount', { total: String(total), input: String(input ?? 0), output: String(output ?? 0) })
       )}
-      {notRead === null ? null : <span className="pw-says">{notRead}</span>}
+      {notRead === null ? null : <ServerNote text={notRead} />}
     </>
   )
 }
 
 function theMinutes(worker: AWorkerOfAPackage): ReactNode {
-  const { minutes, running, notCounted } = worker.minutes
+  const { minutes, running } = worker.minutes
   return (
     <>
       {minutes === null ? (
@@ -189,7 +185,6 @@ function theMinutes(worker: AWorkerOfAPackage): ReactNode {
       ) : (
         t('packageWorkers.minuteCount', { n: String(minutes) })
       )}
-      {notCounted === null ? null : <span className="pw-says">{notCounted}</span>}
     </>
   )
 }

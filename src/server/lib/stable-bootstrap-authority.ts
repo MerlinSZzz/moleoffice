@@ -16,6 +16,7 @@ import { readWarrant, warrantAsStored } from '@shared/warrant.ts'
 import { RESOLVES_PROPOSAL } from '@shared/types.ts'
 import { moleOffice } from '@shared/participants.ts'
 import { sqlite } from '../db/client.ts'
+import { THE_FIRST_UPGRADE_NOTICE_INDEX, theFirstRevisionOfAnUpgradeNotice } from '../db/schema.ts'
 import { asStableUpgradeNoticeDoor, createRecord, everyAgentAStoredStampCouldName, type Actor } from './records.ts'
 import { PanelError } from './panel-error.ts'
 import { enWave13q } from '@shared/words/en-wave-13q.ts'
@@ -302,9 +303,13 @@ function moveNoticeWriter(row: Revision, caller: { agent: string; run: string })
   const authors = everyAgentAStoredStampCouldName(row.actorId)
   if (authors.length !== 1 || authors[0]!.id !== caller.agent || row.sessionId !== caller.run) noticeRefusal()
 }
+/**
+ * The three reads of a move notice by its send id read migration 0301's index of first upgrade notices, by name and with
+ * its own WHERE. Without the name, SQLite picks the index of revisions by kind and reads every revision of every message.
+ */
 export function lookupDataFolderMoveNotice(project: string, sendId: string, actor: Actor) {
   const caller = moveCaller(project, actor)
-  const rows = sqlite.prepare("SELECT record_id FROM revisions WHERE seq=1 AND kind='message' AND json_extract(data,'$.extra.stableUpgradeNotice.version')=3 AND json_extract(data,'$.extra.stableUpgradeNotice.project')=? AND json_extract(data,'$.extra.stableUpgradeNotice.request.sendId')=? LIMIT 2").all(project, sendId) as { record_id: string }[]
+  const rows = sqlite.prepare(`SELECT record_id FROM revisions INDEXED BY ${THE_FIRST_UPGRADE_NOTICE_INDEX} WHERE ${theFirstRevisionOfAnUpgradeNotice()} AND json_extract(data,'$.extra.stableUpgradeNotice.version')=3 AND json_extract(data,'$.extra.stableUpgradeNotice.project')=? AND json_extract(data,'$.extra.stableUpgradeNotice.request.sendId')=? LIMIT 2`).all(project, sendId) as { record_id: string }[]
   if (!rows.length) return null
   if (rows.length !== 1) return noticeRefusal()
   const saved = moveNoticeOriginal(rows[0]!.record_id, project); moveNoticeWriter(saved.row, caller)
@@ -323,7 +328,7 @@ export function fileDataFolderMoveNotice(project: string, input: unknown, actor:
   return sqlite.transaction(() => {
     const found = lookupDataFolderMoveNotice(project, request.sendId, actor)
     if (found) { if (!same(found.notice.event.request, request)) return noticeRefusal(); return found.notice }
-    if (sqlite.prepare("SELECT 1 FROM revisions WHERE seq=1 AND kind='message' AND json_extract(data,'$.extra.stableUpgradeNotice.project')=? AND json_extract(data,'$.extra.stableUpgradeNotice.request.sendId')=? LIMIT 1").get(project, request.sendId)) return noticeRefusal()
+    if (sqlite.prepare(`SELECT 1 FROM revisions INDEXED BY ${THE_FIRST_UPGRADE_NOTICE_INDEX} WHERE ${theFirstRevisionOfAnUpgradeNotice()} AND json_extract(data,'$.extra.stableUpgradeNotice.project')=? AND json_extract(data,'$.extra.stableUpgradeNotice.request.sendId')=? LIMIT 1`).get(project, request.sendId)) return noticeRefusal()
     let text: string
     if (request.stage === 'before') {
       const a = request.announcement
@@ -336,7 +341,7 @@ export function fileDataFolderMoveNotice(project: string, input: unknown, actor:
     } else {
       const before = moveNoticeOriginal(request.before.id, project); moveNoticeWriter(before.row, caller)
       if (!same(before.original, request.before) || before.event.request.stage !== 'before') return noticeRefusal()
-      if (sqlite.prepare("SELECT 1 FROM revisions WHERE seq=1 AND kind='message' AND json_extract(data,'$.extra.stableUpgradeNotice.project')=? AND json_extract(data,'$.extra.stableUpgradeNotice.request.before.id')=? LIMIT 1").get(project, before.original.id)) return noticeRefusal()
+      if (sqlite.prepare(`SELECT 1 FROM revisions INDEXED BY ${THE_FIRST_UPGRADE_NOTICE_INDEX} WHERE ${theFirstRevisionOfAnUpgradeNotice()} AND json_extract(data,'$.extra.stableUpgradeNotice.project')=? AND json_extract(data,'$.extra.stableUpgradeNotice.request.before.id')=? LIMIT 1`).get(project, before.original.id)) return noticeRefusal()
       const a = before.event.request.announcement, reservation = moveReservation(project, a.decision)
       if (!reservation || !same(reservation.pin, a.reservation) || !same(reservation.initiator, caller)) return noticeRefusal()
       const targetDatabase = a.scope.targetFolder + '/' + a.scope.database.split('/').at(-1)

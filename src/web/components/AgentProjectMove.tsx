@@ -86,7 +86,7 @@ export function AgentProjectMove({ agentId, fromProject, toProject, onMoved }: {
           {move.staying.map((one) => (
             <li key={one.id}>
               <span className="am-kind">{kindWord(one.kind, mode).text}</span> {content(one.title)}
-              <span className="am-why"> · {t(`agentMove.stays.${one.why}`)}</span>
+              <span className="am-aside"> · {t(`agentMove.stayWord.${one.why}`)}</span>
             </li>
           ))}
         </ul>
@@ -118,7 +118,7 @@ export function AgentProjectMove({ agentId, fromProject, toProject, onMoved }: {
     projects === null ? (
       <Loading what={t('agentMove.to')} rows={1} />
     ) : others.length === 0 ? (
-      <p className="al-line">{t('agentMove.noOther')}</p>
+      <p className="al-line">{t('agentMove.noOtherWord')}</p>
     ) : (
       <label className="am-choice">
         <span>{t('agentMove.to')}</span>
@@ -174,13 +174,12 @@ export function AgentProjectMove({ agentId, fromProject, toProject, onMoved }: {
                 </>
               )}
               {one.forcedBy === null ? null : (
-                <span className="am-why"> · {t('agentMove.comesWith', { title: content(cameWith(one.id) ?? one.forcedBy.withId) })}</span>
+                <span className="am-aside"> · {t('agentMove.comesWith', { title: content(cameWith(one.id) ?? one.forcedBy.withId) })}</span>
               )}
             </li>
           ))}
         </ul>
         {staying(move)}
-        <p className="al-line">{t('agentMove.messages')}</p>
         {move.crossing.length === 0 ? null : (
           <>
             <p className="al-line" role="alert">
@@ -218,7 +217,6 @@ export function AgentProjectMove({ agentId, fromProject, toProject, onMoved }: {
       <style href="mole-office-agent-project-move" precedence="default">
         {AGENT_PROJECT_MOVE_CSS}
       </style>
-      <p className="al-line am-says">{t('agentMove.says')}</p>
       {toProject === undefined ? choice : null}
       {moved === null ? null : (
         <p className="al-line" role="status">
@@ -236,14 +234,13 @@ export function AgentProjectMove({ agentId, fromProject, toProject, onMoved }: {
 }
 
 const AGENT_PROJECT_MOVE_CSS = `
-.am-says { margin-bottom: 0.5rem; }
 .am-choice { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; min-width: 0; }
 .am-choice select { min-width: 0; max-width: 100%; }
 .am-heading { margin: 0.6rem 0 0.25rem 0; font-size: 0.95em; }
 .am-list { margin: 0 0 0.4rem 0; padding-left: 1.2rem; }
 .am-list li { overflow-wrap: anywhere; margin-bottom: 0.15rem; }
 .am-kind { color: var(--text-3); }
-.am-why { color: var(--text-2); }
+.am-aside { color: var(--text-2); }
 .am-said { margin-top: 0.4rem; }
 .am-press { margin-top: 0.5rem; }
 `

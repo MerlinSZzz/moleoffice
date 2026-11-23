@@ -82,8 +82,9 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { THE_TEST_OFFICES_OWNER } from './a-page-of-a-test-office.ts'
 import { at } from './helpers.ts'
-import { PAUSE_STANDING_SENTENCES, computeAttention, type AttentionResult } from '../src/shared/attention.ts'
+import { computeAttention, type AttentionResult } from '../src/shared/attention.ts'
 import { ATTENTION_PART_ROWS, attentionPartOf, questionsOf } from '../src/shared/attention-first-page.ts'
+import { createI18n } from '../src/shared/i18n.ts'
 import type { Link, PanelRecord, RecordKind } from '../src/shared/types.ts'
 import { unclassifiedNote } from '../src/shared/work.ts'
 
@@ -313,6 +314,17 @@ function behindAFold(html: string): string {
   return html.replace(/<summary[^>]*>[\s\S]*?<\/summary>/g, '')
 }
 
+/** The English words, read from the word list by their keys. */
+const en = createI18n('en').t
+
+/** The text of some markup, for words that `Counted` splits round their numbers. */
+const textOf = (html: string): string => html.replace(/<[^>]+>/g, '')
+
+/** The line under the strip that names the paused records on the attention list, or null when there is none. */
+function listedLine(html: string): string | null {
+  return /<p class="att-questions-listed">([\s\S]*?)<\/p>/.exec(html)?.[1] ?? null
+}
+
 // ============================================================================ the fixture itself
 
 describe('the fixture exercises what the page has to draw', () => {
@@ -360,9 +372,10 @@ describe('the questions the record leaves open', () => {
 
   it('keeps “no state at all” apart from “a word nobody has classified”', () => {
     const html = questions()
+    const { noState } = questionsOf(RULE)
     expect(html).toContain('with no state word at all')
-    expect(html).toContain('are of a kind that carries a state and nobody wrote one')
-    expect(html).toContain('are of a kind that has no state field')
+    // The three ways it splits are three counts, each with its own words.
+    expect(html).toContain(esc(en('home.noStateSplit', { written: noState.written, noField: noState.noField, unknown: noState.unknownKind })))
   })
 
   it('shows a pause with its reason and what should bring it back', () => {
@@ -383,45 +396,39 @@ describe('the questions the record leaves open', () => {
     const html = questions({ paused: owedAndPaused })
     // The group is empty, because the one pause on file is not a question any more.
     expect(html).toContain('>0</span>')
-    // And the arithmetic is stated both ways round, with the record named and openable.
-    expect(html).toContain('of the <span class="num">1</span> pauses on file')
-    expect(html).toContain('on the attention list instead')
-    expect(html).toContain(esc(at(RULE.paused, 0, 'paused row').title))
+    // And the line under the strip counts it against the pauses on file, with the record named and openable.
+    const listed = listedLine(html)
+    expect(listed).not.toBeNull()
+    expect(textOf(listed ?? '')).toContain(en('home.pausesListed', { n: 1, total: 1 }))
+    expect(listed).toContain(esc(at(RULE.paused, 0, 'paused row').title))
   })
 
   /**
-   * THE CORRECTION STAYS OUT IN THE OPEN. THE EXPLANATION BEHIND IT DOES NOT.
+   * THE PAUSED RECORDS ON THE ATTENTION LIST ARE NAMED IN THE OPEN, and nothing about them is folded.
    *
-   * A count that has had something taken out of it has to say so where the count is read — that is
-   * one clause and it is not foldable. WHICH records were taken out, and why a pause stops being a
-   * question at all, are five more lines of prose standing under a strip of three numbers, and they
-   * are explanation. So the clause is visible and the rest is one press away, named and counted,
-   * like every other fold on this page.
+   * The line is a count and the records' names. There is no sentence about why a pause stops being a
+   * question, so there is nothing to put behind a press: the only folds are the two groups with members.
    */
-  it('keeps the correction visible and puts which records and why behind one press', () => {
+  it('names the paused records on the attention list in the open, behind no press', () => {
     const owedAndPaused = [{ ...at(RULE.paused, 0, 'paused row'), onList: true }]
     const html = questions({ paused: owedAndPaused })
-    const scan = scanned(html)
-    expect(scan).toContain('not counted above')
-    expect(scan).toContain('on the attention list instead')
-    // The reason a pause stops being a question is explanation, and it is behind the press.
-    expect(scan).not.toContain('A pause stops being a question')
-    expect(behindAFold(html)).toContain('A pause stops being a question')
-    // The records themselves are named behind the same press, with an exact count on the control.
-    expect(behindAFold(html)).toContain(esc(at(RULE.paused, 0, 'paused row').title))
-    expect(scan).toContain('1 pause, openable')
+    expect(listedLine(html)).toContain(esc(at(RULE.paused, 0, 'paused row').title))
+    // The unclassified and no-state groups fold onto their rows; the paused group is empty and the line is open.
+    expect(html.match(/<details/g) ?? []).toHaveLength(2)
   })
 
-  it('says nothing about records on the list when none of the pauses is on it', () => {
-    // The correction only appears when there is something to correct. A line saying "0 of 6 are
-    // not counted above" is furniture that reads like a warning.
-    expect(questions()).not.toContain('on the attention list instead')
+  it('draws no line about records on the list when none of the pauses is on it', () => {
+    // The line only appears when there is something to count. "0 of 6 on the attention list" is
+    // furniture that reads like a warning.
+    expect(listedLine(questions())).toBeNull()
   })
 
-  it('says which of the three answers Mole Office has about each pause', () => {
+  it('shows on each paused row the standing of its pause, as a word', () => {
     const html = pausedRows()
     const row = at(RULE.paused, 0, 'paused row')
-    expect(html).toContain(esc(PAUSE_STANDING_SENTENCES[row.standing]))
+    // The fixture's pause has a date that is still ahead on the fixture's clock.
+    expect(row.standing).toBe('waiting-for-date')
+    expect(html).toContain(esc(en('home.pauseStanding.dateAhead')))
   })
 
   /**

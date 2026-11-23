@@ -360,11 +360,11 @@ describe('a filed line that was taken out of the plan', () => {
     expect(said).not.toMatch(/2026-W\d\d/)
     expect(screen(page, 'inspect')).toMatch(/3 hours in 2026-W\d\d/)
     expect(said).toContain('Project')
-    expect(said).toContain('Nothing was deleted. All of it is still on the work, unchanged.')
+    // CRITERION CHANGE, as decided: the notice no longer says that nothing was deleted, or what
+    // filing the line again would make. It lists what the plan can no longer see.
     // THE OFFER IS STILL THE POINT OF THE NOTICE. A warning that replaced the repair would be a
     // worse notice than the one that said nothing.
     expect(said).toContain('Point that line at it')
-    expect(said).toContain('makes a second, separate piece of work')
   })
 
   it('still says it after a reload, because a warning in one tab is not a warning', async () => {

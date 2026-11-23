@@ -51,6 +51,7 @@ import type { FlowRunStep } from './flow-runs.ts'
 import { gateMet } from './gate-counts.ts'
 import { nameOf } from './groups.ts'
 import { sendTheHandbooksOfAFlowStart, type HandbooksAtAStart } from './handbooks.ts'
+import { sendKnowledgeForFlowStep } from '../knowledge/flow-step.ts'
 import { participantForActor } from './participant-for-actor.ts'
 import { aPlanningItemChangedByHand } from './planning-flow.ts'
 import { createRecordWithReport, getRecord, patchRecord, recordInWorkspace, type Actor } from './records.ts'
@@ -328,6 +329,7 @@ export function enterAFlow(input: { workspaceId: string; flowId: string; about: 
       itemLinks: [about.id],
     })
     const handbooks = sendTheHandbooksOfAFlowStart({ flow: flow.id, flowRun: filed.flowRun.id, run, workspaceId: input.workspaceId, to: () => agent })
+    sendKnowledgeForFlowStep({ project: input.workspaceId, flow: flow.id, step: 1, flowRun: filed.flowRun.id, run, to: () => agent })
     return {
       flowRun: filed.flowRun.id,
       flow: flow.id,

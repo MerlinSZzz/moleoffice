@@ -18,9 +18,29 @@ import type { FastifyInstance } from 'fastify'
 import { replacedDecisionIds } from '../lib/replaced-decisions.ts'
 import { z } from 'zod'
 import { TWELVE_ID_CHARACTERS } from '@shared/messages.ts'
-import { saysIt, searchRecord, theNeedle, theRecordsThatSay, usableQuery, type SearchResult } from '@shared/search.ts'
+import {
+  FIELD_RANK,
+  inTheSearchOrder,
+  saysIt,
+  searchRecord,
+  theBestFieldAsStored,
+  theDataSays,
+  theNeedle,
+  theRecordsThatSay,
+  usableQuery,
+  type SearchResult,
+} from '@shared/search.ts'
 import { RECORD_KINDS, type PanelRecord } from '@shared/types.ts'
-import { ACROSS_WORKSPACES, aProjectCounted, listRecordIdsKindsAndProjects, listRecords } from '../lib/records.ts'
+import {
+  ACROSS_WORKSPACES,
+  aProjectCounted,
+  getRecordsWithIds,
+  listRecordIdsKindsAndProjects,
+  listRecords,
+  THE_LISTED_ORDER,
+  theRecordsListed,
+  type WhichRecords,
+} from '../lib/records.ts'
 import { incompletenessOf } from '@shared/incompleteness-of.ts'
 import { PanelError } from '../lib/panel-error.ts'
 import { theRecordsThatMaySay } from '../lib/record-text-index.ts'
@@ -38,14 +58,17 @@ import {
   withEachNarrowingWorkedOutOnce,
   type AMessageReader,
 } from '../lib/messages.ts'
-import { recordsWithTheHonourThisReaderMaySee } from '../lib/honour.ts'
+import { recordsWithTheHonourThisReaderMaySee, theHonourMayChangeARecordOfThisKindForThisReader } from '../lib/honour.ts'
 import { workspaceOf } from '../lib/workspaces.ts'
 import { listWorkspaces } from '../db/list-workspaces.ts'
 import { endTheSearchThread, prepareTheSearchThread, searchOnItsOwnThread } from '../lib/search-thread.ts'
 import { eq } from 'drizzle-orm'
-import { db } from '../db/client.ts'
+import { db, sqlite } from '../db/client.ts'
 import { records as recordsTable } from '../db/schema.ts'
 import { route } from '../lib/route.ts'
+import { levelNamed, NO_SUCH_LEVEL, resultsAtTheirLevels, type ARowAtLevel, type LevelSettings, type TheLevelsOfAnAnswer } from '@shared/results-at-a-level.ts'
+import type { Rung } from '@shared/detail.ts'
+import { theLevelSettings } from '../lib/result-levels.ts'
 
 /**
  * Could this be a record id at all?
@@ -89,6 +112,8 @@ const searchQuery = z.strictObject({
   /** One kind at a time, the same word `GET /api/records?kind=` takes. */
   kind: z.enum(RECORD_KINDS, { error: `kind must be one of: ${RECORD_KINDS.join(', ')}` }).optional(),
   limit: z.coerce.number().int().min(1).max(500).optional(),
+  /** THE LEVEL EACH RESULT IS GIVEN AT, or each kind's own default when left out (src/shared/results-at-a-level.ts). */
+  level: z.string().refine((word) => levelNamed(word) !== null, { error: NO_SUCH_LEVEL }).optional(),
   /**
    * WHICH PROJECTS ARE SEARCHED. Left out, the project the
    * `x-mole-office-workspace` header names, exactly as before. `all` searches every project the
@@ -155,8 +180,10 @@ export interface SearchReply {
    * know where to go, and nothing that would make this a way to read another project.
    */
   elsewhere: { workspaceId: string; title: string; matched: number }[]
-  /** Results, best field first. Empty means nothing matched — which is an answer. */
-  results: SearchResult<RecordListItem>[]
+  /** Results, best field first, each at its level. Empty means nothing matched — which is an answer. */
+  results: SearchResultAtLevel[]
+  /** What the answer says about its results' levels, its short limit and its cap. */
+  levels: TheLevelsOfAnAnswer
   counts: {
     /** How many records matched, whatever `limit` returned. The true number either way. */
     matched: number
@@ -168,6 +195,9 @@ export interface SearchReply {
   /** What happened, in words, including the two cases that are not "no". */
   note: string
 }
+
+/** A result of a search, with its record at the level it is given at. */
+export type SearchResultAtLevel = Omit<SearchResult<RecordListItem>, 'record'> & { record: ARowAtLevel<RecordListItem> }
 
 export const SEARCH_ROUTE_NOTE =
   'Which records say this: GET /api/search?q=<the text>, within the project x-mole-office-workspace names. ' +
@@ -185,7 +215,10 @@ export const SEARCH_ROUTE_NOTE =
   'either way. An empty q is refused rather than answered with everything, because a request that did not ' +
   'say what to look for is not a search that found nothing. ?projects=all searches every project instead of the ' +
   'header\'s one, and ?projects=<project id> searches that one project; `elsewhere` then counts only the projects ' +
-  'that were not searched.'
+  'that were not searched. ?level= gives each result at one level (1 the label, 2 the title, 3 the conclusion, 4 to 6 ' +
+  'by part, full); without it each kind is at its own default level, a setting. A short record is given whole, a ' +
+  'missing level falls back to a shorter one and says so, and past the answer\'s cap the results are titles only: ' +
+  '`levels` says how.'
 
 /** WHAT THE SEARCH THREAD IS ASKED: one search, as the request thread read it from the request. */
 export interface SearchAsk {
@@ -195,6 +228,10 @@ export interface SearchAsk {
   q: string
   kind: z.infer<typeof searchQuery>['kind']
   limit: number | undefined
+  /** The level the request named, or null for each kind's default. */
+  level: Rung | null
+  /** The three settings the levels read, read on the request's thread. */
+  levels: LevelSettings
   reader: AMessageReader
   /** The projects `?projects=` asked for, or null when it was not sent. */
   asked: Workspace[] | null
@@ -235,7 +272,92 @@ export function theSearchAsk(workspaceId: string, rawQuery: unknown, whoReads: (
   // THE PROJECTS SEARCHED: the header's one project, or what `?projects=` asks for, from the one
   // place that says which projects a reader may read (src/server/lib/across-projects.ts).
   const asked = query.projects === undefined ? null : theProjectsAsked(query.projects, reader)
-  return { workspaceId, q, kind: query.kind, limit: query.limit, reader, asked }
+  return { workspaceId, q, kind: query.kind, limit: query.limit, level: query.level === undefined ? null : levelNamed(query.level), levels: theLevelSettings(), reader, asked }
+}
+
+/**
+ * A RECORD AS A SEARCH THE INDEX COULD NOT NARROW READ IT: what tells who may see it, its age, and the best field that
+ * says the query, or null. `data` is its stored body, kept only where `theRecordsAsStoredThatSay` must look in it again.
+ */
+interface AStoredRow {
+  id: string
+  kind: string
+  workspaceId: string
+  createdAt: string
+  rank: number | null
+  data: string | null
+}
+
+/**
+ * WHICH RECORDS SAY THIS, AND IN WHICH FIELD, read from their stored text without making a record of any of them. It is
+ * for a search the index of the records' text cannot narrow (`theRecordsThatMaySay` gives undefined), which looks in
+ * every record listed. Each is listed as `listRecords(which)` lists it, in its order, and looked in by
+ * `theBestFieldAsStored`, which gives what `theBestFieldThatSays` gives for the record made from it. `mayBeSeen` keeps
+ * the ones the reader may see; `searched` is how many it kept, and the matches are among them, in the listed order.
+ *
+ * Every record listed was made a record before, every column of it, to look in it and send a few.
+ *
+ * A RUN'S HONOUR READING IS LOOKED IN AGAIN AS THIS READER MAY SEE IT. WHETHER THE HONOUR FILTER MAY CHANGE A RECORD IS
+ * READ FROM `theHonourMayChangeARecordOfThisKindForThisReader` (src/server/lib/honour.ts), the one place that says it.
+ * `recordsWithTheHonourThisReaderMaySee` changes nothing for a reader who reads every message, and otherwise only takes
+ * ids out of a record's `data.honour`. So it can take away a match in such a record's body, and can give no record a
+ * match. The body of a record the filter may change that says the query only in its body is kept for this reader, and
+ * looked in again once the ids are out.
+ */
+function theRecordsAsStoredThatSay(
+  which: WhichRecords,
+  q: string,
+  reader: AMessageReader,
+  mayBeSeen: (rows: AStoredRow[]) => AStoredRow[],
+): { searched: number; matches: { record: AStoredRow; rank: number }[] } {
+  const query = db
+    .select({
+      id: recordsTable.id,
+      kind: recordsTable.kind,
+      workspaceId: recordsTable.workspaceId,
+      createdAt: recordsTable.createdAt,
+      title: recordsTable.title,
+      summary: recordsTable.summary,
+      data: recordsTable.data,
+    })
+    .from(recordsTable)
+    .where(theRecordsListed(which))
+    .orderBy(...THE_LISTED_ORDER)
+    .toSQL()
+  const listed: AStoredRow[] = []
+  // ONE ROW AT A TIME, so only the rows kept are held. Nothing else is asked of the database until the last row: the
+  // connection runs no other statement while this one is being read.
+  const rows = sqlite.prepare(query.sql).raw(true).iterate(...query.params) as IterableIterator<[string, string, string, string, string, string | null, string]>
+  for (const [id, kind, workspaceId, createdAt, title, summary, data] of rows) {
+    const rank = theBestFieldAsStored({ title, summary, data }, q)
+    const lookAgain = rank === FIELD_RANK.data && theHonourMayChangeARecordOfThisKindForThisReader(kind, reader)
+    listed.push({ id, kind, workspaceId, createdAt, rank, data: lookAgain ? data : null })
+  }
+  const seen = mayBeSeen(listed)
+  const again = seen.filter((row) => row.data !== null)
+  const asSeen = recordsWithTheHonourThisReaderMaySee(
+    again.map((row) => ({ kind: row.kind, data: (JSON.parse(row.data!) as Record<string, unknown> | null) ?? {} })),
+    reader,
+  )
+  const noLongerSaysIt = new Set(again.filter((_row, at) => !theDataSays(asSeen[at]!.data, q)))
+  const matches = seen.flatMap((row) => (row.rank === null || noLongerSaysIt.has(row) ? [] : [{ record: row, rank: row.rank }]))
+  return { searched: seen.length, matches }
+}
+
+/**
+ * THE RECORDS SENT, MADE WHOLE, in the order of `ids`, each as `listRecords` gives it and with its run's honour reading
+ * as this reader may see it. Read by id after `theRecordsAsStoredThatSay` found them, so only these are made records.
+ */
+function theRecordsSentWhole(ids: string[], reader: AMessageReader): PanelRecord[] {
+  const byId = getRecordsWithIds(ids)
+  return recordsWithTheHonourThisReaderMaySee(
+    ids.map((id) => {
+      const record = byId.get(id)
+      if (record === undefined) throw new Error(`The record ${id} was found to say it and then could not be read, so the search was not answered.`)
+      return record
+    }),
+    reader,
+  )
 }
 
 /**
@@ -280,7 +402,10 @@ export function theSearchAnswer(ask: SearchAsk): SearchReply {
     // THE INDEX OF THE RECORDS' TEXT CHOOSES WHICH RECORDS ARE READ, by id, and the search below still looks in each of
     // them as it looked in every record before (src/server/lib/record-text-index.ts). It may keep too many, never too few.
     const mayHoldIt = theRecordsThatMaySay(theNeedle(q))
-    const mayBeSeen = theOnesTheReaderMaySee(listRecords({ ...which, ids: mayHoldIt }))
+    // WHEN THE INDEX CANNOT NARROW, every record listed is looked in from its stored text, and none is made a record
+    // until it is sent (`theRecordsAsStoredThatSay`). The matches, their order and the count searched are the same.
+    const asStored = mayHoldIt === undefined ? theRecordsAsStoredThatSay(which, q, reader, theOnesTheReaderMaySee) : null
+    const mayBeSeen = asStored === null ? theOnesTheReaderMaySee(listRecords({ ...which, ids: mayHoldIt })) : []
     // SO HOW MANY RECORDS WERE SEARCHED is counted apart, from every record the reader may see, read without its data:
     // which records a reader may see never depends on their data. When the index was not asked, every record was read
     // above, and reading them again cost about 600 ms a search across every project at the 22 October scale.
@@ -291,8 +416,8 @@ export function theSearchAnswer(ask: SearchAsk): SearchReply {
     // made-up office of the live shape for a search across every project, and the same rows with only these three, read
     // apart in no order, 153 to 176 ms (round 167).
     const searched =
-      mayHoldIt === undefined
-        ? mayBeSeen.length
+      asStored !== null
+        ? asStored.searched
         : asked === null && ask.kind === undefined
           ? theReadableCountOf(aProjectCounted(workspaceId))
           : theOnesTheReaderMaySee(listRecordIdsKindsAndProjects(which)).length
@@ -303,15 +428,24 @@ export function theSearchAnswer(ask: SearchAsk): SearchReply {
     // count a records row carries, and every place it says the query. Every match was made whole before, with its snippets:
     // about 1.0 to 2.4 s of a search for a word 170,067 records say, on the made-up office of the live shape, against
     // 0.16 to 0.21 s to tell only whether each says it (wave 13y round 167). The matches and their order are the same.
-    const everyMatch = theRecordsThatSay(recordsWithTheHonourThisReaderMaySee(mayBeSeen, reader), q)
+    const readWhole = asStored === null ? theRecordsThatSay(recordsWithTheHonourThisReaderMaySee(mayBeSeen, reader), q) : []
+    const everyMatch: { record: { id: string }; rank: number }[] = asStored === null ? readWhole : inTheSearchOrder(asStored.matches)
     const all = everyMatch.filter((match) => !replaced.has(match.record.id))
     const replacedMatched = everyMatch.length - all.length
     const limit = ask.limit ?? SEARCH_RESULTS
-    const results = all.slice(0, limit).map(({ record }): SearchResult<RecordListItem> => {
+    const toSend = all.slice(0, limit)
+    const whole = asStored === null ? new Map(readWhole.map(({ record }) => [record.id, record])) : null
+    const sentWhole = whole === null ? theRecordsSentWhole(toSend.map((match) => match.record.id), reader) : toSend.map((match) => whole.get(match.record.id)!)
+    const sent = toSend.map((match, i): SearchResult<RecordListItem> => {
+      const record = sentWhole[i]!
       const result = searchRecord<RecordListItem>({ ...record, incompleteCount: incompletenessOf(record).length }, q)
       if (result === null) throw new Error(`The record ${record.id} was found to say "${q}" and then found not to, so the search was not answered.`)
+      if (result.rank !== match.rank) throw new Error(`The record ${record.id} was found to say "${q}" in one field and then in another, so the search was not answered.`)
       return result
     })
+    // EACH RESULT AT ITS LEVEL, by the rule `GET /api/records` answers its rows by.
+    const atLevels = resultsAtTheirLevels(sent.map((result) => result.record), ask.level, ask.levels)
+    const results = sent.map((result, i): SearchResultAtLevel => ({ ...result, record: atLevels.rows[i]! }))
     const leftOutGroups: LeftOutGroup<SearchResultsBucket>[] = [{
       cause: 'budget', bucket: 'row_limit', count: all.length - results.length,
       ids: all.slice(limit).map((match) => match.record.id),
@@ -325,6 +459,11 @@ export function theSearchAnswer(ask: SearchAsk): SearchReply {
     const elsewhere = listWorkspaces()
       .filter((w) => !searchedIds.has(w.id))
       .map((w) => {
+        // Looked in from the stored text when the index cannot narrow, as the project searched is.
+        if (mayHoldIt === undefined) {
+          const asStoredThere = theRecordsAsStoredThatSay({ workspaceId: w.id, ...kindAsked }, q, reader, (rows) => onlyTheMessagesThisReaderMayRead(reader, rows))
+          return { workspaceId: w.id, title: w.title, matched: asStoredThere.matches.length }
+        }
         const rows = recordsWithTheHonourThisReaderMaySee(onlyTheMessagesThisReaderMayRead(reader, listRecords({
           workspaceId: w.id,
           ...kindAsked,
@@ -399,6 +538,7 @@ export function theSearchAnswer(ask: SearchAsk): SearchReply {
       ...(asked === null ? {} : { projects: asked.map((project) => project.id) }),
       elsewhere,
       results,
+      levels: atLevels.levels,
       counts: { matched: all.length, returned: results.length, searched },
       truncated: all.length > results.length,
       note,

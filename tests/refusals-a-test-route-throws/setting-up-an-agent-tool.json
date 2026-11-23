@@ -1,0 +1,92 @@
+{
+  "why": "Setting up an agent tool's refusals: its first install on the person's own message, its key given to its own login, its account sign-in, and the person's ask to a secretary to set one up. Each needs an agent tool on the PATH the office's terminals get, which here would be this computer's real tools, or a sandbox, or the person's proved message, or registered secretaries. They are met through their doors with made-up tools on a made-up PATH in the tests named for them, such as tests/a-key-reaches-the-tools-own-login-on-stdin-only.test.ts and tests/the-set-up-press-asks-one-secretary-in-the-persons-words.test.ts.",
+  "refusals": [
+    {
+      "code": "harnessNoSuchTool",
+      "status": 400,
+      "english": "Test: no agent tool has that id.",
+      "values": {}
+    },
+    {
+      "code": "harnessInASandbox",
+      "status": 409,
+      "english": "Test: this office runs in a sandbox.",
+      "values": {}
+    },
+    {
+      "code": "harnessMessageTimeUnread",
+      "status": 500,
+      "english": "Test: when the message was written could not be read.",
+      "values": {}
+    },
+    {
+      "code": "harnessNotInstalled",
+      "status": 409,
+      "english": "Test: the tool is not installed.",
+      "values": {}
+    },
+    {
+      "code": "harnessNoKeyLogin",
+      "status": 400,
+      "english": "Test: the tool has no key login.",
+      "values": {}
+    },
+    {
+      "code": "harnessSignsInWithAnAccount",
+      "status": 409,
+      "english": "Test: the tool signs in with an account.",
+      "values": {}
+    },
+    {
+      "code": "harnessKeyShape",
+      "status": 400,
+      "english": "Test: the key was not sent in the door's shape.",
+      "values": {}
+    },
+    {
+      "code": "harnessKeyProvider",
+      "status": 400,
+      "english": "Test: the tool has no such provider.",
+      "values": {}
+    },
+    {
+      "code": "harnessKeyLoginNotThisVersion",
+      "status": 409,
+      "english": "Test: the tool's key login was checked on another version.",
+      "values": {
+        "found": "1.18.30",
+        "checked": "1.18.31"
+      }
+    },
+    {
+      "code": "harnessKeyLoginFailed",
+      "status": 502,
+      "english": "Test: the tool's own key login did not work.",
+      "values": {}
+    },
+    {
+      "code": "harnessNoSignIn",
+      "status": 400,
+      "english": "Test: the tool has no account sign-in.",
+      "values": {}
+    },
+    {
+      "code": "harnessSignInFailed",
+      "status": 502,
+      "english": "Test: the tool's own sign-in did not start.",
+      "values": {}
+    },
+    {
+      "code": "harnessSetUpIsThePersons",
+      "status": 403,
+      "english": "Test: only the person may ask a secretary to set up a tool.",
+      "values": {}
+    },
+    {
+      "code": "harnessNoSecretary",
+      "status": 409,
+      "english": "Test: no secretary is registered.",
+      "values": {}
+    }
+  ]
+}

@@ -12,6 +12,7 @@ export interface LaneArea {
   columns: number | null // Stored lane column count.
   beside: { side: 'left' | 'right'; of: string } | null // Stored lane beside and of fields.
   tint: string | null // Stored lane tint token, --area-1 through --area-6.
+  frame?: 'solid' | 'dashed' // Explicit frame style, or absent for the usual frame rule.
   items: ({ record: string } | { area: LaneArea })[] // Page orders record ids and child lanes from stored lane and order fields.
 }
 
@@ -53,4 +54,6 @@ export interface LanesInput {
   records: DrawnRecord[] // Page gathers records for this drawing.
   links: DrawnLink[] // Page gathers links for this drawing.
   tree: LanesTree // Page builds the tree from stored lanes and records.
+  blockLegend?: { id: string; title: string; place: number; pipelines: { title: string; href: string }[] }[] // Blocks and their pipeline links for the layered master.
+  byStep?: boolean // The untiered master is drawn by step.
 }

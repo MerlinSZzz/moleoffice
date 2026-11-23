@@ -22,7 +22,8 @@
  *           A Codex check's is tests/a-codex-check-takes-its-one-key-from-a-provider-row.test.ts's.
  *      V3.  The key is masked, under its own name, in what the view answers and in what it leaves.
  *   B. the launcher, tools/sandbox.mjs exec --check-view, with the check-view docker stand-in, each case once with dsh's
- *      two names and once with a Codex check's (THE_CODEX_PROVIDER_VARIABLES):
+ *      two names and once with a Codex check's (THE_CODEX_PROVIDER_VARIABLES), except that V6a runs on the none network
+ *      alone under a Codex check's names:
  *      V4.  The command sees the key and the base address and no other key-like name. The file is gone before docker
  *           runs, the env file holds each name once and is gone after, and the start names the address and not the key.
  *           The value is in no file the run leaves and in no request to the ledger.
@@ -383,7 +384,7 @@ async function completed(started: Awaited<ReturnType<typeof launch>>) {
 
 // A CODEX CHECK'S NAMES are read from the module's namespace and not by name, so that where they are not there only the
 // cases with them fail.
-describe.each([['dsh', NAMES], ['a Codex check', inspectorSandbox.THE_CODEX_PROVIDER_VARIABLES]] as const)('B. with the two names of %s, the launcher reads the provider key file once, refuses a wrong one, and leaves the value nowhere', (_who, NAMES) => {
+describe.each([['dsh', NAMES], ['a Codex check', inspectorSandbox.THE_CODEX_PROVIDER_VARIABLES]] as const)('B. with the two names of %s, the launcher reads the provider key file once, refuses a wrong one, and leaves the value nowhere', (who, NAMES) => {
   beforeEach(async () => {
     handedNames = NAMES
     root = realpathSync(mkdtempSync(join(tmpdir(), 'mole-office-provider-key-file-')))
@@ -486,12 +487,16 @@ describe.each([['dsh', NAMES], ['a Codex check', inspectorSandbox.THE_CODEX_PROV
     const before = readFileSync(file)
     const through = await launch({ flags: [FLAG, join(link, 'a-check.env')] })
     expect(through.code).not.toBe(0)
-    expect(through.err).toMatch(/folder.*link/)
-    expect(through.err).not.toMatch(/600|two lines|mounts or writes/)
+    // A REFUSAL ENDS WITH THE PATH OF ITS DETAILS, which holds a millisecond stamp and a process id, so "600" or "link"
+    // can stand in it by chance. Every word is looked for with that path taken out, so the path can neither fail the
+    // case nor pass it.
+    const words = (err: string): string => err.replace(/Details: \S+/g, 'Details: <path>')
+    expect(words(through.err)).toMatch(/folder.*link/)
+    expect(words(through.err)).not.toMatch(/600|two lines|mounts or writes/)
     const direct = await launch({ flags: [FLAG, file] })
     expect(direct.code).not.toBe(0)
-    expect(direct.err).toMatch(/mounts or writes/)
-    expect(direct.err).not.toMatch(/link/)
+    expect(words(direct.err)).toMatch(/mounts or writes/)
+    expect(words(direct.err)).not.toMatch(/link/)
     expect(readFileSync(file)).toEqual(before)
     expect(runs()).toEqual([])
   }, 60_000)
@@ -510,7 +515,11 @@ describe.each([['dsh', NAMES], ['a Codex check', inspectorSandbox.THE_CODEX_PROV
 
   const LOOPBACK = ['127.0.0.1', 'localhost', '[::1]']
 
-  it.each([['none', /none/], ['bridge', /bridge/], ['default', /bridge/]])("V6a. refuses a loopback base address on docker's %s network, naming the network, and takes another", async (mode, network) => {
+  // UNDER A CODEX CHECK'S NAMES V6a RUNS ON THE NONE NETWORK ALONE. The launcher finds the base address by its _BASE_URL
+  // ending and refuses a loopback host by the network alone, so bridge and default would repeat dsh's runs. The none run
+  // stays, so a run with these names still shows that its base address is found and refused at all.
+  const NETWORKS: [string, RegExp][] = [['none', /none/], ['bridge', /bridge/], ['default', /bridge/]]
+  it.each(who === 'dsh' ? NETWORKS : NETWORKS.slice(0, 1))("V6a. refuses a loopback base address on docker's %s network, naming the network, and takes another", async (mode, network) => {
     onTheNetwork(mode)
     for (const host of LOOPBACK) {
       const file = aKeyFile({ address: `http://${host}:8080/v1` })

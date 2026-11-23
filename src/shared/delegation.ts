@@ -158,6 +158,7 @@ export interface PackageActs {
   alignmentAnswers: readonly PackageAlignmentAnswer[]
   handedBack: readonly InsideTake[]
   acceptances: readonly PackageAcceptance[]
+  selfCompletions?: readonly PackageSelfCompletion[]
 }
 
 /**
@@ -169,7 +170,8 @@ export interface PackageActs {
  * TWO READINGS, IN ONE PLACE. An act written since order numbers were given (`order`) is read in that order: a take
  * gives `taken`, an answer to a restatement gives `aligned` or `taken`, a restatement while aligned gives `taken` again
  * and moves no other state, a hand-back gives `handed_back`, and an
- * acceptance gives `done` once the maker has accepted every point, `returned` when it sent a point back, and leaves the
+ * acceptance or self-completion gives `done` once every point is accepted or completed. A returned or reopened point
+ * gives `returned` and undoes that point's completion; an answer leaves the
  * state as it was otherwise. An entry written before order numbers has none. Those are read first, by the rule of their
  * day, furthest along wins: a hand-back, then an aligned answer, then a return from outside, then a take outside or
  * inside or a live claim, then nothing. A completed task is `done` whatever its acts say.
@@ -183,12 +185,12 @@ export function packageStateOf(facts: PackageFacts): PackageState {
   else if (facts.returned) state = 'handed_back'
   else if (facts.outside || facts.claimed || (acts !== undefined && acts.takenInside.some(isOrderless))) state = 'taken'
   if (acts === undefined) return state
-  const answers = new Map<string, PackageAcceptedPoint['answer']>()
+  const answers = new Map<string, PointAnswer>()
   for (const act of theOrderedActsOf(acts)) {
-    if (act.kind === 'acceptance') {
-      for (const point of act.entry.points) answers.set(point.pointId, point.answer)
-      if (acts.pointIds.every((pointId) => answers.get(pointId) === 'accepted')) state = 'done'
-      else if (act.entry.points.some((point) => point.answer === 'returned')) state = 'returned'
+    if (act.kind === 'acceptance' || act.kind === 'selfCompletion') {
+      answerThePoints(answers, act)
+      if (acts.pointIds.every((pointId) => pointIsDone(answers.get(pointId)))) state = 'done'
+      else if (act.entry.points.some((point) => point.answer === 'returned' || point.answer === 'reopened')) state = 'returned'
     } else if (state === 'done') {
       continue
     } else if (act.kind === 'take') {
@@ -202,6 +204,22 @@ export function packageStateOf(facts: PackageFacts): PackageState {
     }
   }
   return state
+}
+
+/** Points done by either kind of answer, without describing self-completion as acceptance. */
+export function thePointsDoneFromActs(acts: PackageActs): string[] {
+  const answers = new Map<string, PointAnswer>()
+  for (const act of theOrderedActsOf(acts)) {
+    if (act.kind === 'acceptance' || act.kind === 'selfCompletion') answerThePoints(answers, act)
+  }
+  return acts.pointIds.filter(pointId => pointIsDone(answers.get(pointId)))
+}
+
+type PointAnswer = 'accepted' | 'returned' | 'completed' | 'reopened'
+const pointIsDone = (answer: PointAnswer | undefined): boolean => answer === 'accepted' || answer === 'completed'
+/** Apply each ordered point answer, replacing the previous answer to that point. */
+function answerThePoints(answers: Map<string, PointAnswer>, act: Extract<AnOrderedAct, { kind: 'acceptance' | 'selfCompletion' }>): void {
+  for (const point of act.entry.points) answers.set(point.pointId, point.answer)
 }
 
 /**
@@ -241,6 +259,7 @@ type AnOrderedAct =
   | { kind: 'answer'; order: number; entry: PackageAlignmentAnswer }
   | { kind: 'handBack'; order: number; entry: InsideTake }
   | { kind: 'acceptance'; order: number; entry: PackageAcceptance }
+  | { kind: 'selfCompletion'; order: number; entry: PackageSelfCompletion }
 
 function theOrderedActsOf(acts: PackageActs): AnOrderedAct[] {
   const ordered = <K extends AnOrderedAct['kind'], E extends { order?: number }>(kind: K, list: readonly E[]) =>
@@ -251,6 +270,7 @@ function theOrderedActsOf(acts: PackageActs): AnOrderedAct[] {
     ...ordered('answer', acts.alignmentAnswers),
     ...ordered('handBack', acts.handedBack),
     ...ordered('acceptance', acts.acceptances),
+    ...ordered('selfCompletion', acts.selfCompletions ?? []),
   ] as AnOrderedAct[]).sort((a, b) => a.order - b.order)
 }
 
@@ -302,6 +322,8 @@ export interface PackageCheck extends InsideTake { answer: 'holds' | 'refused'; 
 export interface PackageAcceptedPoint { pointId: string; answer: 'accepted' | 'returned'; words?: string }
 /** One answer of the maker, or of the person, to the points of a hand-back. */
 export interface PackageAcceptance extends InsideTake { points: PackageAcceptedPoint[] }
+export interface PackageSelfCompletion extends InsideTake { points: { pointId: string; answer: 'completed' | 'reopened'; evidence: string }[] }
+export interface PackageAuditVerdict extends InsideTake { audit: string; verdict: 'pass' | 'fail' | 'unknown'; evidence: string; words: string }
 export interface InsideDelegation {
   waiting: boolean
   takenBy: ParticipantRef | null
@@ -325,7 +347,7 @@ export interface InsideDelegation {
  * written before this shape existed is shown as the words it was.
  */
 /** The keys a structured plan may hold. `steps` is not one of them: a worker's steps are its own. */
-export const PACKAGE_PLAN_KEYS = ['workers', 'waves', 'waits'] as const
+export const PACKAGE_PLAN_KEYS = ['workers', 'waves', 'waits', 'work'] as const
 /** The keys one worker's line may hold. There is deliberately no field for the worker's own steps. */
 export const PLANNED_WORKER_KEYS = [
   'worker',
@@ -337,6 +359,10 @@ export const PLANNED_WORKER_KEYS = [
   'model',
   'modelWhy',
 ] as const
+export const PACKAGE_WORK_ENTRY_KEYS = {
+  package: ['package', 'module', 'item'],
+  audit: ['audit', 'scope', 'evidence', 'inspector'],
+} as const
 
 export interface PlannedWorker {
   /** The worker's name, as its starter will start it. */
@@ -363,7 +389,9 @@ export interface PackagePlanShape {
   waves: number
   /** For each wave after the first, the thing outside the line it waits for. Empty entries are hints. */
   waits: string[]
+  work?: PackageWorkEntry[]
 }
+export type PackageWorkEntry = { package: string; module: string; item: string } | { audit: string; scope: string; evidence: string; inspector: string }
 
 /** A stored plan: the older free text, or the shape above. */
 export type StoredPlan =
@@ -403,6 +431,17 @@ function readAPlannedWorker(value: unknown): PlannedWorker | null {
   }
 }
 
+/** Read one work entry without filling missing keys or accepting extra keys. */
+export function readAWorkEntry(value: unknown): PackageWorkEntry | null {
+  if (!isABag(value)) return null
+  const isPackage = Object.hasOwn(value, 'package')
+  const keys = isPackage ? PACKAGE_WORK_ENTRY_KEYS.package : PACKAGE_WORK_ENTRY_KEYS.audit
+  if (Object.keys(value).length !== keys.length || !onlyTheseKeys(value, keys) || !keys.every(key => nonEmptyWords(value[key]))) return null
+  return isPackage
+    ? { package: (value['package'] as string).trim(), module: (value['module'] as string).trim(), item: (value['item'] as string).trim() }
+    : { audit: (value['audit'] as string).trim(), scope: (value['scope'] as string).trim(), evidence: (value['evidence'] as string).trim(), inspector: (value['inspector'] as string).trim() }
+}
+
 /**
  * READ ONE STORED PLAN, AND NEVER GUESS. A string is the older free text and is returned whole. An
  * object is the shape above and is returned only when every key and every value is in it. Anything
@@ -414,12 +453,16 @@ export function readAStoredPlan(value: unknown): StoredPlan | null {
   const workers = value['workers']
   const waves = value['waves']
   const waits = value['waits']
+  const work = value['work']
   if (!Array.isArray(workers) || workers.length === 0) return null
   if (typeof waves !== 'number' || !Number.isInteger(waves) || waves < 1) return null
   if (waits !== undefined && (!Array.isArray(waits) || !waits.every(wait => typeof wait === 'string'))) return null
+  if (work !== undefined && !Array.isArray(work)) return null
+  const workEntries = work === undefined ? undefined : work.map(readAWorkEntry)
+  if (workEntries?.some(entry => entry === null)) return null
   const read = workers.map(readAPlannedWorker)
   if (read.some(worker => worker === null)) return null
-  return { kind: 'shape', plan: { workers: read as PlannedWorker[], waves, waits: ((waits ?? []) as string[]).map(wait => wait.trim()) } }
+  return { kind: 'shape', plan: { workers: read as PlannedWorker[], waves, waits: ((waits ?? []) as string[]).map(wait => wait.trim()), ...(workEntries === undefined ? {} : { work: workEntries as PackageWorkEntry[] }) } }
 }
 
 /**

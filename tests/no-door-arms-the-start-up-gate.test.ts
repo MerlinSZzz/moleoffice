@@ -64,6 +64,7 @@ import {
 import { SURFACE_IDS } from '../src/shared/surfaces.ts'
 import { operationNamed } from '../src/shared/ops.ts'
 import { ROUND_SEVEN_ENDED } from '../src/server/db/review-migration.ts'
+import { handleFromTitle } from '../src/server/db/agent-identity.ts'
 import type { ApiRoute } from '../src/server/api/kinds.ts'
 import { fileURLToPath } from 'node:url'
 import { existsSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, rmSync } from 'node:fs'
@@ -901,19 +902,33 @@ describe('every kind of target, through every door, and a server still starts', 
  * throw is a failure with the message printed.
  */
 
-/** A run Mole Office could really pick up again, so Send has somewhere to go. */
+/**
+ * A run Mole Office could really pick up again, so Send has somewhere to go.
+ *
+ * It names the agent it worked as in `ranAs`, with a handle read from its title. A comment addressed to a run that
+ * answers as no agent is refused before it is stored, and nothing is made up for it. Only the person with their key
+ * may file a session for an agent.
+ */
 async function aResumableRun(title: string, externalId: string): Promise<string> {
   const logPath = fakeTranscript(externalId)
-  const res = await app.inject({
+  const agent = await app.inject({
     method: 'POST',
     url: '/api/records',
     headers: HUMAN,
+    payload: { kind: 'agent', title: `The agent of ${title}`, data: { handle: handleFromTitle(title), state: 'active', runtime: 'claude-code' } },
+  })
+  expect(agent.statusCode, agent.body).toBe(201)
+  const res = await app.inject({
+    method: 'POST',
+    url: '/api/records',
+    headers: { ...HUMAN, ...thePersonsKeyHeader() },
     payload: {
       kind: 'session',
       title,
       data: {
         state: 'idle',
         runtime: 'claude-code',
+        ranAs: [{ workspaceId: WORKSPACE, agentId: (agent.json() as { record: { id: string } }).record.id }],
         extra: {
           discovered: {
             tool: 'claude-code',
@@ -1006,8 +1021,9 @@ describe('choosing who a comment is for leaves a database a server can still sta
     expect(chose.statusCode, chose.body).toBe(200)
     expect(theServerWouldStart(), 'after the recipient was chosen').toBe('SERVES')
 
-    // AND THE RUN REALLY GOT ITS IDENTITY, which is the fact behind the decision above. Asked of the
-    // rows rather than of the decision, so a gate that stopped counting would not pass this.
+    // AND THE MESSAGE IS FILED UNDER THE IDENTITY THE RUN WORKS AS, which is the fact behind the decision
+    // above. The run named its agent when `aResumableRun` filed it, and nothing is minted for it now.
+    // Asked of the rows rather than of the decision, so a gate that stopped counting would not pass this.
     const bound = t.client.sqlite
       .prepare("SELECT json_extract(data, '$.ranAs') FROM records WHERE id = ?")
       .pluck()
@@ -1020,8 +1036,8 @@ describe('choosing who a comment is for leaves a database a server can still sta
       .pluck()
       .get(run) as string | null
     expect(filed, 'the message was not filed under the identity its run works as').toBe(agentId)
-    // AND THE TWO RECORDS THE MINT WROTE EACH KEPT A REVISION, which is the second of the three
-    // things the migration would otherwise have had to do.
+    // AND THE RUN AND ITS AGENT EACH KEPT A REVISION, which is the second of the three things the
+    // migration would otherwise have had to do.
     for (const id of [run, agentId ?? '']) {
       const revisions = t.client.sqlite
         .prepare('SELECT count(*) FROM revisions WHERE record_id = ?')

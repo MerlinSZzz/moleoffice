@@ -44,7 +44,8 @@
  *   --api <url>        which office. Default: the one this checkout is set to.
  *   --detail "..."     what the seat is for, in a few words (acquire and run; run defaults to the
  *                      command itself).
- *   --every <s>        how often a waiter asks again, in seconds. Default 10.
+ *   --every <s>        how often a waiter asks again, in seconds. Default 10, or a test's
+ *                      SLOT_ASK_EVERY_S_FOR_A_TEST (theDefaultAskInterval, below).
  *   --for <s>          the longest a waiter waits before it leaves the line and exits 4. Default: no
  *                      limit, because a suite queue is measured in tens of minutes.
  *
@@ -64,6 +65,18 @@ import { officeHeaders } from './sandbox-common.mjs'
 
 /** How long one request may take. A slot request is small; a server this slow is not answering. */
 const REQUEST_TIMEOUT_MS = 30_000
+
+/**
+ * How often a waiter asks again when no --every is given: 10 s. A SHORTER INTERVAL, FOR A TEST ONLY:
+ * SLOT_ASK_EVERY_S_FOR_A_TEST in this process's own environment, in seconds, never below 1 s. tools/sandbox-start.mjs
+ * asks for its seat without --every, and tools/sandbox.mjs passes the variable into the container only when its own
+ * environment has it; a test of the launcher sets it (tests/sandbox-launcher.test.ts), and nothing else does. Unset, or
+ * not a number above 0, the interval is 10 s.
+ */
+function theDefaultAskInterval() {
+  const asked = Number(process.env['SLOT_ASK_EVERY_S_FOR_A_TEST'])
+  return Number.isFinite(asked) && asked > 0 ? Math.max(asked, 1) : 10
+}
 
 function usage(problem) {
   process.stderr.write(
@@ -278,7 +291,7 @@ async function commandAcquire() {
     // message _iMt4wd4EzGo).
     holder = { pid, startedAt: clockStamp(() => at).instant }
   }
-  const every = seconds(chosen.every, '--every', 10)
+  const every = seconds(chosen.every, '--every', theDefaultAskInterval())
   const limit = chosen.for === undefined ? null : seconds(chosen.for, '--for', null)
   let mine = null
   const leaveTheLine = async (code) => {
@@ -332,7 +345,7 @@ async function commandRun() {
   const pool = chosen.target ?? usage('Say which pool: node tools/slot.mjs run <pool> -- <command...>.')
   if (chosen.command.length === 0) usage('Say what to run, after --: node tools/slot.mjs run <pool> -- <command...>.')
   writeHeaders()
-  const every = seconds(chosen.every, '--every', 10)
+  const every = seconds(chosen.every, '--every', theDefaultAskInterval())
   const limit = chosen.for === undefined ? null : seconds(chosen.for, '--for', null)
 
   const gate = 'IFS= read -r word; [ "$word" = go ] || exit 111; exec "$@"'

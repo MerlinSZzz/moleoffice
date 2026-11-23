@@ -188,7 +188,7 @@ export function AgentLiveSteps({ agentId }: { agentId: string }): React.ReactEle
               ))}
             </ol>
           )}
-          {ended ? <p className="al-line al-ended" role="status">{t('agentLive.steps.ended')}</p> : null}
+          {ended ? <p className="al-line al-ended" role="status">{t('agentLive.steps.endedWord')}</p> : null}
           <div className="al-message">
             <label htmlFor={`al-message-${agentId}`}>{t('agentLive.message.label', { handle: watching.answer.agent.handle })}</label>
             <textarea id={`al-message-${agentId}`} rows={3} value={message} onChange={(event) => {

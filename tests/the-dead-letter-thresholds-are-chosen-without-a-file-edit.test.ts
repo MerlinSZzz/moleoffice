@@ -3,7 +3,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { FastifyInstance } from 'fastify'
 import { THE_PERSON } from '../src/shared/person.ts'
-import { apiApp, freshDb, type TestDb } from './helpers.ts'
+import { apiApp, freshDb, type TestDb, governsTheWholeProject } from './helpers.ts'
 
 const names = ['MOLE_OFFICE_DEAD_LETTER_AFTER_DAYS', 'MOLE_OFFICE_DEAD_LETTER_AFTER_COUNT'] as const
 const owner = { 'x-mole-office-actor-type': 'human', 'x-mole-office-actor-id': THE_PERSON, 'x-mole-office-workspace': 'default' }
@@ -141,7 +141,7 @@ describe('the dead-letter thresholds are chosen without a file edit', () => {
     for (const because of ['', '   ', 'x'.repeat(501)]) expect((await post({ days: 2, count: 30, because })).statusCode).toBe(400)
     expect((await app.inject({ method: 'GET', url })).json()).toMatchObject({ ownerDecided: true, decision: null, because: null })
     const filed = await app.inject({ method: 'POST', url: '/api/records', headers: owner,
-      payload: { kind: 'decision', title: 'Made-up threshold decision', data: { replaces: [] } } })
+      payload: { kind: 'decision', title: 'Made-up threshold decision', data: { ...governsTheWholeProject(), replaces: [] } } })
     expect(filed.statusCode, filed.body).toBe(201)
     const decision = filed.json().record.id
     expect((await post({ days: 2, count: 30, decision: 'not-a-decision' })).json().code).toBe('deadLetterThresholdsBadDecision')

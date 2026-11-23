@@ -133,17 +133,19 @@ describe('the page exists and says what it is', () => {
     expect(html).toContain('How long agents spent working')
   })
 
-  it('says an outside read is something an agent said, at the top of the band that draws them', async () => {
+  it('holds that an outside read is something an agent said, behind the "?" on the heading of the band that draws them', async () => {
     const html = await draw(NOTHING)
     // THE ONE SENTENCE THIS TABLE MAY NOT LOSE. Every row under it is a claim, and a reader who
     // took it for a measurement would read an agent's habit as evidence about Mole Office.
-    expect(html).toContain(sayInEnglish('dev.usage.everyRowHereIsSomethingAnAgent'))
-    expect(html.slice(html.indexOf(sayInEnglish('dev.usage.whatAgentsWentOutsideMoleOfficeFor'))), 'the sentence is not under the band heading').toContain(sayInEnglish('dev.usage.everyRowHereIsSomethingAnAgent'))
+    const band = html.slice(html.indexOf(sayInEnglish('dev.usage.whatAgentsWentOutsideMoleOfficeFor')))
+    const hint = /<div class="px-hint-body">([\s\S]*?)<\/div>/.exec(band.slice(0, band.indexOf('</header>')))?.[1]
+    expect(hint, 'the band heading has no "?" holding the sentence').toBe(sayInEnglish('dev.usage.agentsOwnReports'))
   })
 
-  it('says nothing is filed automatically, where the crossings are drawn', async () => {
+  it('draws no line under the heading of the band where the crossings are drawn', async () => {
     const html = await draw(NOTHING)
-    expect(html).toContain(sayInEnglish('dev.usage.nothingHereIsFiledForYouA'))
+    const band = html.slice(html.indexOf(sayInEnglish('dev.usage.whatHasCrossedAThreshold')))
+    expect(band.slice(0, band.indexOf('</section>'))).not.toContain('class="usage-note"')
   })
 })
 
@@ -165,12 +167,11 @@ describe('a folded count says which part of it was folded', () => {
   }
   const A_STORED = { ...A_FOLDED, operation: 'record.list', calls: 5, foldedCalls: 0, bytes: 100 }
 
-  it('draws the folded part and the sentence saying what a counted-by-the-hour count is', async () => {
+  it('draws the folded part, counted by the hour', async () => {
     const { Operations } = await import('../src/web/pages/UsagePage.tsx')
     const html = drawPart(
       createElement(Operations, {
         rows: [A_FOLDED, A_STORED],
-        threshold: { share: 0.3, occurrences: 20, traces: 3 },
         showAll: true,
         onShowAll: () => {},
         developer: false,
@@ -178,7 +179,6 @@ describe('a folded count says which part of it was folded', () => {
     )
     expect(html).toContain('handle.waiting')
     expect(html, 'the folded count does not say it was folded').toContain('120 calls counted by the hour')
-    expect(html).toContain(sayInEnglish('dev.usage.someOperationsAreCountedOnceAnHour'))
     // AND THE UNFOLDED ROW IS DRAWN THE WAY IT ALWAYS WAS, so the folded branch is not the only one.
     expect(html).toContain('5 calls · 100 bytes')
   })
@@ -188,14 +188,13 @@ describe('a folded count says which part of it was folded', () => {
     const html = drawPart(
       createElement(Operations, {
         rows: [A_STORED],
-        threshold: { share: 0.3, occurrences: 20, traces: 3 },
         showAll: true,
         onShowAll: () => {},
         developer: false,
       }),
     )
-    // THE CONTROL. A page that drew the sentence unconditionally would pass the case above and be
-    // wrong about every operation that is stored the ordinary way.
+    // THE CONTROL. A page that drew "counted by the hour" on every row would pass the case above and
+    // be wrong about every operation that is stored the ordinary way.
     expect(html).not.toContain('counted by the hour')
   })
 })
@@ -252,9 +251,8 @@ describe('whether anything has enforced the windows, told apart from a tidy that
       }),
     )
 
-    // NOBODY HAS TIDIED. The word and the sentence a reader meets, and no claim that anything ran.
+    // NOBODY HAS TIDIED. The word a reader meets, and no claim that anything ran.
     expect(nobodyLooked).toContain('nothing tidied away yet')
-    expect(nobodyLooked).toContain(sayInEnglish('dev.usage.nothingHasBeenTidiedAwaySinceThis'))
     expect(nobodyLooked, 'a prune that never ran is being reported as one that ran').not.toContain('Last tidied at')
 
     // SOMEBODY LOOKED AND THERE WAS NOTHING PAST EITHER WINDOW. A row of zeroes is an answer.
@@ -271,17 +269,14 @@ describe('whether anything has enforced the windows, told apart from a tidy that
 })
 
 describe('the lifecycle band refuses to invent a duration', () => {
-  it('says Mole Office cannot answer how much working time this campaign took, and draws no zero', async () => {
+  it('draws "never recorded" for the working time this campaign took, and draws no zero', async () => {
     const html = await draw(NOTHING)
     // *DO NOT FABRICATE HISTORICAL TRANSITION TIMESTAMPS THAT PANELX NEVER OBSERVED.* A zero here
     // would be invented precision wearing a tidy face: it says the answer is none, when the answer
     // is that nobody ever recorded it.
-    expect(html).toContain(sayInEnglish('dev.usage.workingTimeIsCountedFromTheMoment'))
-    // THE ABSENCE IS A WORD AND ITS SENTENCE SURVIVES ON THE TOOLTIP, which is where a reader who
-    // wants the reason finds it and where a screen reader reads it out.
-    expect(html).toContain('never recorded')
-    expect(html).toContain('has never recorded when an agent became Working')
-    expect(html).toContain('no attachment has ever been filed here')
+    // THE ABSENCE IS A WORD, the state of each row, and no sentence stands under the band's heading.
+    expect(html).toContain(sayInEnglish('dev.usage.neverRecorded'))
+    expect(html).toContain(sayInEnglish('dev.usage.neverFiled'))
     expect(html).not.toContain('0 minutes working')
   })
 
@@ -290,29 +285,27 @@ describe('the lifecycle band refuses to invent a duration', () => {
     // THE REQUEST LOG HOLDS THIS TIME, and no read sends it to the page (wave 13y round 142). So the row says the
     // page does not show it. "never recorded" would be false, and a count of requests does not say when.
     expect(html).toContain(sayInEnglish('dev.usage.notShownOnThisPageYet'))
-    expect(html).toContain(sayInEnglish('dev.usage.theRequestLogHoldsThisTimeBut'))
   })
 })
 
-describe('the tools band says its empty line', () => {
-  it('draws the sentence when nothing has called, where a phone with no hover can read it', async () => {
+describe('the tools band draws its empty state word', () => {
+  it('draws "none" when nothing has called, where a phone with no hover can read it', async () => {
     const { Frameworks } = await import('../src/web/pages/UsagePage.tsx')
     const html = drawPart(createElement(Frameworks, { reading: { byFramework: [] } as never }))
     // WHAT A READER SEES: the screen reader's copy and every tag taken out, so a sentence only on the hover is not seen.
     const seen = html.replace(/<span class="px-sr">[\s\S]*?<\/span>/g, '').replace(/<[^>]+>/g, '')
-    expect(seen).toContain(sayInEnglish('dev.usage.nothingHasCalledMoleOfficeInThis'))
+    expect(seen).toBe(sayInEnglish('absence.none'))
   })
 })
 
 describe('the hotspot section draws rows only when the read said which window it honoured', () => {
-  it('draws none, and says why, for the read as it exists today', async () => {
-    const { hotspotRows, HOTSPOTS_ANSWER_ABOUT_NOW } = await import('../src/web/pages/UsagePage.tsx')
+  it('draws no rows for the read as it exists today', async () => {
+    const { hotspotRows } = await import('../src/web/pages/UsagePage.tsx')
     // THE FIXTURE IS THE ROUTE AS IT IS: present, 200, no window echoed, and a list of overlaps that
     // are open NOW. This is the failure that would actually have happened, and it is not an absent
     // route — it is a present one answering a different question under the right-looking heading.
     const rows = hotspotRows({ overlaps: [{ key: 'a|b|src/shared/time.ts', overlapClass: 'write_write' }] })
     expect(rows).toBeNull()
-    expect(HOTSPOTS_ANSWER_ABOUT_NOW).toBe(sayInEnglish('dev.usage.hotspotsNow'))
   })
 
   it('draws them the day the read echoes a window, so this is a rule and not a switch left off', async () => {

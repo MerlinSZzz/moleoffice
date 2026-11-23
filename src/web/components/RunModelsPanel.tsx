@@ -8,15 +8,16 @@
  * ---------------------------------------------------------------------------------------
  *
  * One group: the run the office starts by itself to answer a message. A notice starts no run, so
- * it has no row, and one line says so.
+ * it has no row.
  *
  * A BUILDER'S MODEL FOR EACH ROLE, AND THE CHECK'S, ARE ON THE CASTING PAGE.
  * They were rows here until migration 0189 moved them into the Casting table, so one fact is kept in
- * one place. Where they were, one line says so, with a link to the Casting page.
+ * one place. Where they were, a link leads to the Casting page, as decided.
  *
- * The row shows what is set here, what a run there gets now and why, a press to save and a press
- * to clear. The server writes every sentence about what is in force (`theModelARunGets`), so this
- * file draws and never works out a layer itself. An agent's own model is set on its profile.
+ * The row shows what is set here, what a run there gets now, a press to save and a press to clear.
+ * Why a run gets it is the server's sentence, shown only in Developer mode. The server writes every
+ * sentence about what is in force (`theModelARunGets`), so this file draws and never works out a
+ * layer itself. An agent's own model is set on its profile.
  *
  * ---------------------------------------------------------------------------------------
  * A PRESS BY AN AGENT IS REFUSED, AND THE PANEL SAYS SO IN WORDS
@@ -36,7 +37,7 @@ import {
   type RunModelsReading,
   type TheRuntimesTheWorkerGives,
 } from '@shared/run-models.ts'
-import { Absence, ErrorNote, Loading, Panel, useAsync } from './ui.tsx'
+import { Absence, ErrorNote, Loading, Panel, ServerNote, useAsync } from './ui.tsx'
 import { RouteLink, castingPath } from './router.tsx'
 import { TieredPress } from './TieredPress.tsx'
 import { api, errorMessage } from '../api.ts'
@@ -69,10 +70,8 @@ function RunModels({ said, onChanged }: { said: RunModelsReading; onChanged: () 
   useLanguage()
   return (
     <div className="rm">
-      <p className="rm-lead">{t('settingsPanel.runModels.lead')}</p>
       <div className="rm-half">
         <h3 className="rm-heading">{t('settingsPanel.runModels.placesHeading')}</h3>
-        <p className="rm-note">{t('settingsPanel.runModels.notices')}</p>
         <div className="rm-rows">
           {said.places.map((one) => (
             // KEYED BY THE SLOT ALONE, so a Clear's offer to undo outlives the reading that follows it.
@@ -81,9 +80,9 @@ function RunModels({ said, onChanged }: { said: RunModelsReading; onChanged: () 
         </div>
       </div>
       <div className="rm-half">
-        {/* WHERE THE BUILDER ROWS AND THE CHECK WERE: one line and a link. */}
-        <p className="rm-note">
-          {t('settingsPanel.runModels.castingLine')} <RouteLink to={castingPath()}>{t('settingsPanel.runModels.castingLink')}</RouteLink>
+        {/* WHERE THE BUILDER ROWS AND THE CHECK WERE: a link. */}
+        <p className="rm-casting">
+          <RouteLink to={castingPath()}>{t('settingsPanel.runModels.castingLink')}</RouteLink>
         </p>
       </div>
     </div>
@@ -161,7 +160,7 @@ function SlotRow({ one, gives, onChanged }: { one: RunModelSlotReading; gives: T
         <p className="rm-set">
           {t('settingsPanel.runModels.setHere')}{' '}
           {one.set === null ? (
-            <Absence word={t('settingsPanel.runModels.nothingSet')} title={t('settingsPanel.runModels.nothingSetTitle')} />
+            <Absence word={t('settingsPanel.runModels.nothingSet')} />
           ) : (
             pairInWords(one.set)
           )}
@@ -169,12 +168,12 @@ function SlotRow({ one, gives, onChanged }: { one: RunModelSlotReading; gives: T
         <p className="rm-inforce">
           {t('settingsPanel.runModels.getsNow')}{' '}
           {one.inForce.model === null ? (
-            <Absence word={t('settingsPanel.runModels.noModel')} title={one.inForce.says} />
+            <Absence word={t('settingsPanel.runModels.noModel')} />
           ) : (
             aChoiceInWords(one.inForce.model, one.inForce.runtime, one.inForce.variant)
           )}
         </p>
-        <p className="rm-says" lang="en">{content(one.inForce.says)}</p>
+        <ServerNote text={one.inForce.says} />
       </div>
       <div className="rm-control">
         <label className="rm-box" htmlFor={`${id}-runtime`}>
@@ -266,10 +265,9 @@ function SlotRow({ one, gives, onChanged }: { one: RunModelSlotReading; gives: T
 /** The section's own rules. Every value is a token, so a preset swap re-skins it with everything else. */
 const RUN_MODELS_CSS = `
 .rm { display: flex; flex-direction: column; gap: var(--gut); min-width: 0; }
-.rm-lead { margin: 0; max-width: var(--measure-in-box); font: var(--fs-2)/var(--lh-read) var(--font-ui); color: var(--text-2); }
 .rm-half { display: flex; flex-direction: column; gap: var(--pad); min-width: 0; padding-top: var(--gut); border-top: var(--border-w) solid var(--border); }
 .rm-heading { margin: 0; font: 600 var(--fs-1)/var(--lh-tight) var(--font-ui); color: var(--text); }
-.rm-note { margin: 0; max-width: var(--measure-in-box); font: var(--fs-2)/var(--lh-body) var(--font-ui); color: var(--text-3); }
+.rm-casting { margin: 0; max-width: var(--measure-in-box); font: var(--fs-2)/var(--lh-body) var(--font-ui); color: var(--text-3); }
 .rm-rows { display: flex; flex-direction: column; gap: var(--pad); min-width: 0; }
 .rm-row {
   display: flex; flex-wrap: wrap; align-items: flex-start; gap: 4px var(--gut);
@@ -280,7 +278,6 @@ const RUN_MODELS_CSS = `
 .rm-words { flex: 1 1 22rem; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .rm-label { margin: 0; font: 600 var(--fs-1)/var(--lh-tight) var(--font-ui); color: var(--text); }
 .rm-set, .rm-inforce { margin: 0; max-width: var(--measure-in-box); font: var(--fs-1)/var(--lh-body) var(--font-ui); color: var(--text-2); overflow-wrap: anywhere; }
-.rm-says { margin: 0; max-width: var(--measure-in-box); font: var(--fs-2)/var(--lh-tight) var(--font-ui); color: var(--text-3); overflow-wrap: anywhere; }
 .rm-control { flex: 0 1 auto; max-width: 100%; display: flex; flex-wrap: wrap; align-items: center; gap: var(--pad); min-width: 0; }
 .rm-box { display: flex; align-items: center; gap: var(--pad); min-width: 0; max-width: 100%; }
 .rm-box-name { font-size: var(--fs-2); color: var(--text-2); }

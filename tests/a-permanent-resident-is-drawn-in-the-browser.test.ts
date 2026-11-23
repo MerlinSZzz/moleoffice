@@ -37,12 +37,15 @@ import { build } from 'esbuild'
 import type { Page } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
+import { createI18n } from '../src/shared/i18n.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
-import { theResizeIsDrawn, liveApp, thePersonsKeyHeader, type LiveApp, waitForThePage } from './helpers.ts'
+import { A_SLEEP_TIME, theResizeIsDrawn, liveApp, thePersonsKeyHeader, type LiveApp, waitForThePage } from './helpers.ts'
 
 const SHOTS = process.env['R4_SHOTS'] ?? null
 const WIDTHS = SHOTS === null ? [1440, 390] : [1440, 990, 660, 390]
 const THEMES = SHOTS === null ? (['light'] as const) : (['light', 'dark'] as const)
+/** The English word for none, which Needs you draws when nothing waits. */
+const NONE = createI18n('en').t('absence.none')
 
 let app: LiveApp
 let page: Page
@@ -87,7 +90,7 @@ async function started(handle: string, name: string, role: string): Promise<void
 }
 
 async function propose(handle: string, because: string): Promise<string> {
-  const reply = await call('POST', '/api/residents/proposals', as('sec-test'), { agentId: handle, because })
+  const reply = await call('POST', '/api/residents/proposals', as('sec-test'), { agentId: handle, because, sleepTime: A_SLEEP_TIME })
   return String(reply['proposal'].id)
 }
 
@@ -195,11 +198,11 @@ afterAll(async () => {
  * Read after the waiting list has been read again, which a press asks for.
  */
 async function needsYou(): Promise<{ count: string; nothing: boolean; genericRows: number }> {
-  return page.evaluate(() => ({
+  return page.evaluate((none) => ({
     count: (document.querySelector('.hm-needs-count')?.textContent ?? '').trim(),
-    nothing: (document.querySelector('.hm-needs')?.textContent ?? '').includes('Nothing needs you.'),
+    nothing: (document.querySelector('.hm-needs .hm-empty')?.textContent ?? '').trim() === none,
     genericRows: document.querySelectorAll('.hm-needs-list > li').length,
-  }))
+  }), NONE)
 }
 
 /**
@@ -326,9 +329,14 @@ describe('the Embassy', () => {
 
 describe('the resident section', () => {
   /**
-   * THE HARNESS IS SERVED FROM A SERVER OF ITS OWN ON LOOPBACK, because a page the browser was handed by the test
-   * (page.route) is not on loopback, and the browser refuses it the API on loopback ("local network access").
+   * THE HARNESS PAGE IS AT app.site, AND ITS BYTES COME FROM A SERVER OF ITS OWN ON LOOPBACK. The office's Origin check
+   * takes a page at app.site, and it refuses a page on the harness server's own port. A page that page.route fulfils
+   * comes from no network address, so the browser counts it outside loopback and refuses it the API on loopback ("local
+   * network access"). So a route on app.site continues each harness request to the harness server: the page's address
+   * stays app.site, and its bytes come from a real loopback socket.
    */
+  const HARNESS = '/harness'
+  const HARNESS_SCRIPT = '/harness.js'
   let harnessServer: Server
   let harnessSite: string
 
@@ -366,9 +374,9 @@ describe('the resident section', () => {
     const style = readFileSync('src/web/tokens.css', 'utf8') + readFileSync('src/web/styles.css', 'utf8').replace(/@import[^;]+;/g, '') + '\nbody { padding: var(--gut); }'
     const html =
       '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">' +
-      `<style>${style}</style></head><body><main id="test" class="page"></main><script type="module" src="/harness.js"></script></body></html>`
+      `<style>${style}</style></head><body><main id="test" class="page"></main><script type="module" src="${HARNESS_SCRIPT}"></script></body></html>`
     harnessServer = createServer((req, res) => {
-      if (req.url?.startsWith('/harness.js')) {
+      if (req.url?.startsWith(HARNESS_SCRIPT)) {
         res.writeHead(200, { 'content-type': 'text/javascript; charset=utf-8' })
         res.end(script)
         return
@@ -378,6 +386,14 @@ describe('the resident section', () => {
     })
     await new Promise<void>((done) => harnessServer.listen(0, '127.0.0.1', done))
     harnessSite = `http://127.0.0.1:${String((harnessServer.address() as AddressInfo).port)}`
+    // The route goes when app.stop() closes the page's context.
+    await page.route(
+      (url) => url.origin === app.site && (url.pathname === HARNESS || url.pathname === HARNESS_SCRIPT),
+      (route) => {
+        const u = new URL(route.request().url())
+        return route.continue({ url: `${harnessSite}${u.pathname}${u.search}` })
+      },
+    )
   }, 240_000)
 
   afterAll(async () => {
@@ -397,7 +413,7 @@ describe('the resident section', () => {
     await page.setViewportSize({ width, height: 900 })
     await page.emulateMedia({ colorScheme: theme })
     const query = `agent=${agents.get(agent)!.id}&lang=${language}${asAgent === undefined ? '' : `&as=${asAgent}`}`
-    await page.goto(`${harnessSite}/?${query}`, { timeout: 60_000 })
+    await page.goto(`${app.site}${HARNESS}?${query}`, { timeout: 60_000 })
   }
 
   it('draws a resident’s space for the person: a void file, an earlier version, the origins and the grants', async () => {

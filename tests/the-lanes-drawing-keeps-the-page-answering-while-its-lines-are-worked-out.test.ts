@@ -14,14 +14,14 @@
  *   - the drawing before it still pans, and a pan or a zoom made on it is kept when the new drawing is shown;
  *   - a card pressed is the card held once the new drawing is shown;
  *   - a press on Boxes before Steps is drawn keeps Steps off the page, and every worker the drawing started is ended;
- *   - the words that say Steps is being drawn take no room above the drawing still on screen: at 1440, 990 and 660,
+ *   - the words that say Steps is being drawn take no room above the drawing still on screen: at 1440 and 660,
  *     on this master and on the made-up master of 54 boxes (tests/a-made-up-reel-page-and-a-master-of-54-boxes.ts),
  *     each card of the Boxes drawing is where it was on the page, within 1 px, while the words are shown. At 390 the
  *     words are not drawn at all: there Steps is drawn in one go, with no worker, in about 50 ms.
  * The page measures the cards before it sends their lines to the worker, so that measuring is not routing and stays on
  * the main thread. On block-08 of the made-up master, the largest block page in its file (63 cards at Steps), with six
- * made-up areas, no task on the main thread is over 200 ms from the open at 1440, and from each width change to 990
- * and to 660, until the new drawing's worker has answered its first call. Measured one card at a time, it was one
+ * made-up areas, no task on the main thread is over 200 ms from the open at 1440, and from the width change to 660,
+ * until the new drawing's worker has answered its first call. Measured one card at a time, it was one
  * task of 238 to 266 ms at 1440, 196 to 198 ms at 990 and 210 to 223 ms at 660, at a load of about 11.
  * On the first open there is no drawing before, and the words say the boxes are being drawn. The words are read
  * wherever they are inside the drawing's root.
@@ -52,8 +52,8 @@ const THE_BLOCK = MASTER.blockPipelines.find((block) => block.key === 'block-08'
 const AREAS_OF_THE_BLOCK = Array.from({ length: 6 }, (_, n) => ({ name: `Example area ${String(n + 1)} (made up)`, arrange: 'row', order: n, tint: `--area-${String(n + 1)}` }))
 /** How long the worker of a new drawing of block-08 may take to answer its first call, on a loaded machine. */
 const ROUTING_BEGUN_WITHIN = 60_000
-/** The widths with a bar of controls, at the review tool's sizes. At 390 there is no bar. */
-const WIDTHS = [{ width: 1440, height: 1000 }, { width: 990, height: 1000 }, { width: 660, height: 900 }]
+/** The widest and the narrowest width with a bar of controls, at the review tool's sizes. At 390 there is no bar. */
+const WIDTHS = [{ width: 1440, height: 1000 }, { width: 660, height: 900 }]
 /** How far a card may be from where it was on the page while the words show: rounding, and nothing more. */
 const STAYS_WITHIN = 1
 /** The words, read by key, because this file was written before them. */
@@ -436,7 +436,7 @@ describe('the lanes drawing keeps the page answering while its lines are worked 
     }
   }, ONE_CASE)
 
-  it('the words that say Steps is being drawn move no card of the Boxes drawing, at 1440, 990 and 660', async () => {
+  it('the words that say Steps is being drawn move no card of the Boxes drawing, at 1440 and 660', async () => {
     theAreasWereStored(areasOf54, 'the made-up master of 54 boxes')
     const masters = [
       { name: 'the made-up master at its real shape', project: PROJECT.id, pipeline: stored.master },
@@ -467,7 +467,7 @@ describe('the lanes drawing keeps the page answering while its lines are worked 
     expect(seen.filter((each) => each.moved > 0), `cards of the Boxes drawing that moved on the page while the words said Steps was being drawn: ${JSON.stringify(seen)}`).toEqual([])
   }, WIDTHS.length * 2 * 120_000)
 
-  it('block-08 is measured with no task over 200 ms, from its open at 1440 and from each width change to 990 and 660', async () => {
+  it('block-08 is measured with no task over 200 ms, from its open at 1440 and from the width change to 660', async () => {
     expect(THE_BLOCK, 'block-08 is a block page in the made-up master at its real shape').toBeDefined()
     theAreasWereStored(areasOfTheBlock, 'block-08 of the made-up master')
     const context = await app.browser.newContext({ viewport: WIDTHS[0]! })

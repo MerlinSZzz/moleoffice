@@ -30,7 +30,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import type { FastifyInstance } from 'fastify'
 
-import { apiApp, freshDb, type TestDb } from './helpers.ts'
+import { apiApp, freshDb, type TestDb, governsTheWholeProject } from './helpers.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 
 const AS_THE_PERSON = {
@@ -81,7 +81,7 @@ beforeEach(async () => {
     payload: {
       kind: 'decision',
       title: 'A decision the person recorded',
-      data: { replaces: [],
+      data: { ...governsTheWholeProject(), replaces: [],
         option_taken: 'a — as proposed',
         because: 'measured in the terminal',
         decided_by: 'the owner',
@@ -128,7 +128,9 @@ describe('the agent that recorded a decision may change its own core', () => {
       payload: {
         kind: 'decision',
         title: 'A decision this agent made',
-        data: { replaces: [], option_taken: 'b — force control', because: 'reversible this week', decided_by: A, authority: 'a measurement' },
+        data: {
+          ...governsTheWholeProject(),
+          replaces: [], option_taken: 'b — force control', because: 'reversible this week', decided_by: A, authority: 'a measurement' },
       },
     })
     expect(made.statusCode, made.body.slice(0, 400)).toBe(201)

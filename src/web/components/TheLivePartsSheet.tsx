@@ -7,7 +7,6 @@
  * what is shown of it are the office's own records: nothing here is made up.
  */
 
-import { t } from '@shared/i18n.ts'
 import { AgentLiveSteps } from './AgentLiveSteps.tsx'
 import { AgentLiveTerminal } from './AgentLiveTerminal.tsx'
 import { AgentQuickInputs } from './AgentQuickInputs.tsx'
@@ -26,9 +25,8 @@ export function TheLivePartsSheet({ agentId }: { agentId: string }): React.React
   return (
     <div className="al-sheet">
       <style href="mole-office-live-parts-sheet" precedence="default">
-        {`.al-sheet { display: grid; gap: var(--pad); min-width: 0; max-width: 72rem; } .al-sheet-says { margin: 0; color: var(--text-2); }`}
+        {`.al-sheet { display: grid; gap: var(--pad); min-width: 0; max-width: 72rem; }`}
       </style>
-      <p className="al-sheet-says">{t('sheet.liveParts.says', { agent: agentId })}</p>
       <AgentLiveTerminal agentId={agentId} />
       <AgentLiveSteps agentId={agentId} />
       <AgentQuickInputs agentId={agentId} />

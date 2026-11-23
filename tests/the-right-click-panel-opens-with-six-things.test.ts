@@ -18,6 +18,8 @@
  *      contact press, with Contact chosen. More is read by the presses it holds, and the case waits until those presses
  *      are drawn, not only until its last line is. Test change (the same round, point RC-4): Organise leaves More,
  *      because nothing done in it reaches anyone. More holds "Take me there with …" and the line with the count.
+ *      Test change (wave 13y round 175, point CK-1 of the right-click box): the head draws Copy after the quote bar
+ *      and before the pin, because the box copies the selected words or the text of the thing it is about.
  *   3. The contacts are the chat's contacts as a short list: one row each, a filter box, no group
  *      headings, no New and no Edit. The filter narrows by name and an empty answer is the short
  *      mark. Choosing a row sets To.
@@ -216,6 +218,7 @@ describe('at open', () => {
     expect(read.quoteIsTheChatsBlock).toBe(true)
     expect(read.box).toBe(1)
     expect(await visiblePresses()).toEqual([
+      'Copy',
       'Pin this box open',
       'Close',
       t('talk.sendTo.contact'),
@@ -236,9 +239,7 @@ describe('at open', () => {
     await page.locator('.px-talk textarea').fill('Check how the mast is clamped.')
     await sleep(300)
     expect(await page.locator('.px-talk .px-talk-note').count()).toBe(0)
-    expect(await page.locator('.px-talk .px-talk-refusal').innerText()).toBe(
-      'Say who this is for. Mole Office will not pick one for you.',
-    )
+    expect(await page.locator('.px-talk .px-talk-refusal').innerText()).toBe(t('talk.sayWhoFirst'))
     await page.keyboard.press('Escape')
   }, 180_000)
 })

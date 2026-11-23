@@ -2,10 +2,9 @@
 // Licensed under the MIT License. See LICENSE.
 import type { OutsideSpend, ReceiptTotal, ReceiptUsage, UsageNumber, UsageReceipt as Receipt } from '../../shared/usage-receipts.ts'
 import { PAID_BY_THE_LOGIN_IN, RAN_IN_THE_SANDBOX, RAN_ON_THE_HOST, RECEIPT_NOT_REPORTED } from '../../shared/usage-receipts.ts'
-import { thePriceUnitSentence } from '../../shared/price-table.ts'
 import { wallTime } from '../../shared/spent.ts'
 import type { ReactNode } from 'react'
-import { Absence, Explain, Stamp } from './ui.tsx'
+import { Absence, ServerNote, Stamp } from './ui.tsx'
 import { count as countWord, t } from '@shared/i18n.ts'
 import { saidOnThePage } from '@shared/dev-sayings.ts'
 import { gapBetween } from '@shared/spacing.ts'
@@ -62,7 +61,7 @@ export function UsageReceipt({ receipt }: { receipt?: Receipt }) {
     <dl style={{ display: 'grid', gridTemplateColumns: 'max-content minmax(0, 1fr)', gap: '.25rem 1rem' }}>
       {fields.map(([name, value]) => <div key={name} style={{ display: 'contents' }}><dt>{name}</dt><dd style={{ margin: 0 }}>{value}</dd></div>)}
     </dl>
-    {receipt?.says ? <p className="rd-sub">{receipt.says}</p> : null}
+    <ServerNote text={receipt?.says} />
   </div>
 }
 
@@ -92,7 +91,8 @@ function measuredCost(row: ReceiptTotal): string {
 /** The number worked out from the person's table, or the short answer that there is none. */
 function estimatedCost(row: ReceiptTotal): string {
   const estimate = row.estimate
-  return estimate.total === null || estimate.currency === null ? t('devWords.receipt.noEstimate') : t('devWords.receipt.amount', { amount: money(estimate.total), currency: estimate.currency })
+  if (estimate.currency === null) return t('usageReceipt.noPriceTable')
+  return estimate.total === null ? t('devWords.receipt.noEstimate') : t('devWords.receipt.amount', { amount: money(estimate.total), currency: estimate.currency })
 }
 
 /**
@@ -119,7 +119,7 @@ function GroupRow({ row, overallSays, emptyName = t('devWords.receipt.notGiven')
     <div style={{ fontWeight: 600, overflowWrap: 'anywhere' }}>{row.name ?? emptyName}</div>
     {/* The row's own answer for why there is no number, unless the page already gave it once above. */}
     {row.estimate.says !== null && row.estimate.says !== overallSays
-      ? <p className="rd-sub" style={{ margin: '.15rem 0 .35rem' }}>{saidOnThePage(row.estimate.said, row.estimate.says)}</p>
+      ? <ServerNote text={saidOnThePage(row.estimate.said, row.estimate.says)} />
       : null}
     <dl style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(9rem, 1fr))', gap: '.35rem .9rem', margin: 0 }}>
       {metrics.map(([name, value]) => <div key={name}>
@@ -134,17 +134,12 @@ export function ReceiptTotals({ reading }: { reading: ReceiptUsage }) {
   const overall = reading.overall
   return <div data-testid="receipt-totals">
     <p><Labelled label={t('devWords.receipt.runs')} value={String(reading.runs)} /> · <Labelled label={t('devWords.receipt.withoutAReceipt')} value={String(reading.missingReceipts)} /></p>
-    <Explain declares={{ surface: 'usage.receipts.counting' }} meaning={t('devWords.receipt.whatTheseTotalsInclude')} opens={t('devWords.receipt.countingRules')}>
-      <p>{t('devWords.receipt.rulesCount')}</p>
-      <p>{t('devWords.receipt.rulesRecords')}</p>
-    </Explain>
     {/*
       THE PRICE TABLE, SAID ONCE FOR THE WHOLE READING. When nobody has set one the absence
       sentence is the honest answer and it is the one declared in src/shared/price-table.ts. The
       row cells below then say only what is true of that row.
     */}
-    {overall.estimate.says !== null ? <p className="rd-sub" data-testid="receipt-estimate-says">{saidOnThePage(overall.estimate.said, overall.estimate.says)}</p> : null}
-    {overall.estimate.currency !== null ? <p className="rd-sub">{thePriceUnitSentence()}</p> : null}
+    {overall.estimate.says !== null ? <ServerNote text={saidOnThePage(overall.estimate.said, overall.estimate.says)} /> : null}
     {/* THE TWO COSTS, SIDE BY SIDE. One is measured by the runtime; the other is worked out from
         the person's table. The labels say which is which and they are never added. */}
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.25rem 1.5rem', margin: '.4rem 0' }}>
@@ -158,7 +153,7 @@ export function ReceiptTotals({ reading }: { reading: ReceiptUsage }) {
       <summary>{t(`devWords.receipt.${title}`)}</summary>
       <div>
         {/* THE RUNTIME GROUP'S EMPTY ROW is the runs that declared no tool Mole Office adapts (problem uh6-H72Zik9H). */}
-        {rows.length === 0 ? <Absence word={t('absence.none')} title={t('devWords.receipt.noRunCounted')} /> : rows.map(row => <GroupRow key={row.name ?? 'unknown'} row={row} overallSays={overall.estimate.says} {...(title === 'byRuntime' ? { emptyName: t('dev.usage.notDeclared') } : {})} />)}
+        {rows.length === 0 ? <Absence word={t('absence.none')} /> : rows.map(row => <GroupRow key={row.name ?? 'unknown'} row={row} overallSays={overall.estimate.says} {...(title === 'byRuntime' ? { emptyName: t('dev.usage.notDeclared') } : {})} />)}
       </div>
     </details>)}
   </div>

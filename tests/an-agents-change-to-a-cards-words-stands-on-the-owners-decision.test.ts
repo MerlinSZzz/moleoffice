@@ -61,7 +61,7 @@ import { readFileSync } from 'node:fs'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import type { FastifyInstance, InjectOptions } from 'fastify'
 
-import { apiApp, freshDb, thePersonsKeyHeader, theAnswerToAWriteInATestOffice, type TestDb } from './helpers.ts'
+import { apiApp, freshDb, thePersonsKeyHeader, theAnswerToAWriteInATestOffice, type TestDb, governsTheWholeProject } from './helpers.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 
 let t: TestDb
@@ -158,7 +158,7 @@ function thePersonsMessage(): Promise<string> {
 /** A decision of the owner's that rests on one message, filed by the person. `over` changes its fields. */
 function theOwnersDecisionOn(message: string, over: Record<string, unknown> = {}): Promise<string> {
   return file(AS_THE_PERSON, 'decision', 'MADE-UP: the cards say more', {
-    replaces: [],
+    ...governsTheWholeProject(), replaces: [],
     decided_by: 'the owner',
     authority: 'the owner said so',
     authority_reference: message,
@@ -428,7 +428,7 @@ describe('no decision of the owner’s on the message', () => {
   it('refuses them when the decision that cites them is the agent’s own', async () => {
     const message = await thePersonsMessage()
     await file(asAgent(THE_AGENT), 'decision', 'MADE-UP: the agent decides', {
-      replaces: [],
+      ...governsTheWholeProject(), replaces: [],
       decided_by: THE_AGENT,
       authority: 'reversible engineering judgement',
       authority_reference: message,

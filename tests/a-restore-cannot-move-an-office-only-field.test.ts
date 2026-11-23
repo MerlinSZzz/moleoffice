@@ -50,7 +50,7 @@ const asPerson = {
 const FIELDS = [
   {
     field: NEEDS_NO_CHECK,
-    refusal: "The office writes needsNoCheck when it files a run for a secretary's design/-only merge entry. Nothing was written.",
+    refusal: "The office writes needsNoCheck when it files a run for a secretary's design/-only merge entry, at a seal while its checks are switched off, or at its start while its checks are switched off. Nothing was written.",
     one: { decision: 'synthetic-decision-one', at: '2026-09-25 09:00:00', because: 'Synthetic: the first value.' },
     other: { decision: 'synthetic-decision-two', at: '2026-09-25 09:30:00', because: 'Synthetic: the second value.' },
   },

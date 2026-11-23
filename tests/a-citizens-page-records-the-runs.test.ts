@@ -39,6 +39,12 @@
  *   · on a Chinese page each of those sentences is drawn in Chinese;
  *   · the timeline's place says the timeline is not built and names 11 September 2026.
  *
+ * AS DECIDED IN NOVEMBER 2026 (the runs list, option A): the page draws each run as one row, its title, state and
+ * time, and the run's own page holds its model, effort, receipt and compactions. The compactions summed on the agent
+ * are a short state of the server's counts, with its sentence behind a "?", and the timeline's sentence stays in the
+ * reply and is not drawn. So the drawing cases now ask for the declared models and efforts, the totals and that state;
+ * the reply cases are as they were.
+ *
  * ---------------------------------------------------------------------------------------
  * THE MUTATIONS THAT TURN THIS RED, EACH AFTER A CONTROL RUN, EACH RESTORED BYTE-IDENTICAL
  * ---------------------------------------------------------------------------------------
@@ -50,9 +56,11 @@
  *      the agent goes red — the by-agent row is 0, not 300.
  *   2. DRAW A ZERO FOR A COMPACTION (src/web/components/TheAgentsRuns.tsx): draw `0` where
  *      `run.compactions.length === 0` instead of the sentence. The compaction case goes red.
+ *      (Since the runs list of November 2026 the page draws no per-run compaction; the case asks the
+ *      summed state for no zero.)
  *   3. DRAW A TIMELINE (src/web/components/TheAgentsRuns.tsx): replace the timeline sentence with a
  *      short list of steps. The timeline case goes red, because the sentence naming the withdrawal
- *      is gone.
+ *      is gone. (Since November 2026 the case asks that the page draws no timeline at all.)
  *   4. COUNT A MISSING RECEIPT AS A SUPPLIED ZERO (src/server/lib/usage-receipts.ts): drop the
  *      `if (!receipt) missingReceipts += 1` line. The missing-receipt case goes red, because the
  *      page no longer says one run had no receipt.
@@ -70,7 +78,8 @@
  *   8. THE PAIR BY MODEL ALONE (src/server/lib/agent-runs.ts, the declared sum): count a pair by its
  *      model only. The declared cases go red on the agent whose runs declared one model at two efforts.
  *   9. DRAW THE SERVER'S ENGLISH (src/web/components/TheAgentsRuns.tsx): draw a run's compaction
- *      sentence as it came, not through sentenceOnThePage. The Chinese case goes red.
+ *      sentence as it came, not through sentenceOnThePage. The Chinese case goes red. (Since November
+ *      2026 the page draws the summed state from its own words, and the case asks for no English.)
  *
  * The file was restored byte-identical after each mutation (sha256 before and after).
  */
@@ -90,14 +99,12 @@ import { A_COMPACTION_REPORTED_BY_CLAUDE_CODE } from '../src/config/a-reported-c
 type ProfileModule = typeof import('../src/web/pages/ProfilePage.tsx')
 
 /**
- * THE PAGE'S OWN WORD READER, and the two readers that draw a server sentence. `freshDb` resets the module
- * registry, so the page imported after it reads another copy of src/shared/i18n.ts than one imported at the top
- * of this file. The Chinese case sets the language on the page's copy, imported beside the page.
+ * THE PAGE'S OWN WORD READER. `freshDb` resets the module registry, so the page imported after it reads another copy
+ * of src/shared/i18n.ts than one imported at the top of this file. The Chinese case sets the language on the page's
+ * copy, imported beside the page.
  */
 interface ThePagesWords {
   words: typeof import('../src/shared/i18n.ts')
-  sentences: typeof import('../src/web/lib/server-sentences.ts')
-  sayings: typeof import('../src/shared/dev-sayings.ts')
 }
 let pages: ThePagesWords
 
@@ -272,8 +279,6 @@ beforeAll(async () => {
   mode = await import('../src/web/lib/mode.ts')
   pages = {
     words: await import('../src/shared/i18n.ts'),
-    sentences: await import('../src/web/lib/server-sentences.ts'),
-    sayings: await import('../src/shared/dev-sayings.ts'),
   }
 }, 60_000)
 
@@ -316,7 +321,7 @@ describe('the citizen’s page records each run, and sums the agent', () => {
     expect(reading.totals.byModel.find((row) => row.name === 'model-two')?.values.inputTokens).toBe(200)
   })
 
-  it('draws each run’s model, effort and tokens, and the sum on the agent', async () => {
+  it('draws each model and effort its runs declared, and the sum on the agent', async () => {
     const drawn = drawnProfile(await profileOf('two-models'))
     expect(drawn, 'the first run’s declared model').toContain('model-one')
     expect(drawn, 'the second run’s declared model').toContain('model-two')
@@ -333,7 +338,7 @@ const ONLY_CLAUDE_CODE = 'The session hook records a compaction only on a Claude
 const COMPACTIONS_ZERO = new RegExp(`${AGENT_RUNS_WORDS.compactions}:\\s*0`)
 
 describe('a compaction is never inferred, and the count says which runs it can see', () => {
-  it('gives each run the sentence its runtime earns, and draws the recorded times', async () => {
+  it('gives each run the sentence its runtime earns, with the recorded times', async () => {
     const reading = runsIn(await profileOf('compacted'))
     expect(reading.runs.map((one) => one.id)).toEqual(compactedRuns)
     const sentences = [
@@ -344,10 +349,7 @@ describe('a compaction is never inferred, and the count says which runs it can s
     ]
     expect(reading.runs.map((one) => one.compactionsSay)).toEqual(sentences)
     expect(reading.runs[3]?.compactions.map((one) => one.at)).toEqual(['2026-10-14 07:20:04', '2026-10-14 07:28:07'])
-    const drawn = drawnProfile(await profileOf('compacted'))
-    for (const sentence of sentences) expect(drawn).toContain(sentence)
-    expect(drawn).toContain('2026-10-14 07:28:07')
-    expect(drawn).not.toMatch(COMPACTIONS_ZERO)
+    expect(drawnProfile(await profileOf('compacted'))).not.toMatch(COMPACTIONS_ZERO)
   })
 
   it('says a Claude Code run with none recorded is that, and not that its runtime reports none', async () => {
@@ -361,7 +363,7 @@ describe('a compaction is never inferred, and the count says which runs it can s
       `No compaction is recorded on its Claude Code runs. The count covers its 2 Claude Code runs. ${ONLY_CLAUDE_CODE}`,
     )
     const drawn = drawnProfile(await profileOf('two-models'))
-    expect(drawn).toContain(AGENT_RUNS_WORDS.noneRecordedOnClaudeCode)
+    expect(drawn).toContain(pages.words.t('agentRuns.compactions.counted', { n: 0, runs: 2 }))
     expect(drawn).not.toContain(AGENT_RUNS_WORDS.notReportedByThisRuntime)
     expect(drawn).not.toMatch(COMPACTIONS_ZERO)
   })
@@ -378,7 +380,10 @@ describe('a compaction is never inferred, and the count says which runs it can s
       '1 run did not say its runtime, so it is not counted.'
     expect(counted.says).toBe(says)
     expect(allInEnglish(counted.said), 'the codes say what the English says').toBe(says)
-    expect(drawnProfile(await profileOf('compacted'))).toContain(says)
+    const drawn = drawnProfile(await profileOf('compacted'))
+    expect(drawn).toContain(pages.words.t('agentRuns.compactions.counted', { n: 2, runs: 2 }))
+    expect(drawn).toContain(pages.words.t('agentRuns.compactions.otherRuntime', { n: 1 }))
+    expect(drawn).toContain(pages.words.t('agentRuns.compactions.noRuntime', { n: 1 }))
   })
 
   it('gives no number where it can see no run, and says why', async () => {
@@ -394,7 +399,8 @@ describe('a compaction is never inferred, and the count says which runs it can s
       '1 run on another runtime is not counted, because nothing records its compactions.'
     expect(counted.says).toBe(says)
     const drawn = drawnProfile(await profileOf('only-codex'))
-    expect(drawn).toContain(says)
+    expect(drawn).toContain(pages.words.t('agentRuns.compactions.noClaudeCodeRun'))
+    expect(drawn).toContain(pages.words.t('agentRuns.compactions.otherRuntime', { n: 1 }))
     expect(drawn).not.toContain('No compaction is recorded')
     expect(drawn).not.toMatch(/\b0 compactions\b/)
     expect(drawn).not.toMatch(COMPACTIONS_ZERO)
@@ -447,7 +453,7 @@ describe('the sum on the agent says the models and efforts its runs declared', (
 describe('the runs panel on a Chinese page', () => {
   afterEach(() => pages.words.setWordLanguage('en'))
 
-  it('draws every compaction sentence, per run and summed, in Chinese', async () => {
+  it('draws no English compaction sentence, and the summed state in the page’s words', async () => {
     const said = await profileOf('compacted')
     const counted = runsIn(said).compactionsCounted
     const perRun = [
@@ -460,25 +466,20 @@ describe('the runs panel on a Chinese page', () => {
     pages.words.setWordLanguage('zh')
     const drawn = drawnProfile(said)
     for (const english of [...perRun, ...counted.said.map(inEnglish)]) expect(drawn, english).not.toContain(english)
-    for (const english of perRun) {
-      expect(pages.sentences.sentenceOnThePage(english), english).toMatch(/[一-鿿]/)
-      expect(drawn, english).toContain(pages.sentences.sentenceOnThePage(english))
-    }
-    const inChinese = pages.sayings.saidOnThePage(counted.said, counted.says)
-    expect(inChinese).toMatch(/[一-鿿]/)
-    expect(drawn).toContain(inChinese)
+    expect(drawn).toContain(pages.words.t('agentRuns.compactions.counted', { n: 2, runs: 2 }))
   })
 })
 
 // ============================================================ 3. the timeline's place says why it is empty
 
-describe('the timeline’s place says it is not built', () => {
-  it('names the withdrawal and the day, and draws no timeline', async () => {
-    const drawn = drawnProfile(await profileOf('two-models'))
-    expect(drawn).toContain('not built')
-    expect(drawn).toContain('step log')
-    expect(drawn).toContain('11 September 2026')
-    expect(runsIn(await profileOf('two-models')).timelineSays).toBe(AGENT_RUNS_WORDS.timeline)
+describe('the timeline is not built', () => {
+  it('the reply names the withdrawal, and the page draws no timeline', async () => {
+    expect(drawnProfile(await profileOf('two-models'))).not.toContain('run-timeline')
+    const says = runsIn(await profileOf('two-models')).timelineSays
+    expect(says).toBe(AGENT_RUNS_WORDS.timeline)
+    expect(says).toContain('not built')
+    expect(says).toContain('step log')
+    expect(says).toContain('11 September 2026')
   })
 })
 
@@ -496,7 +497,6 @@ describe('a run with no receipt says so and is not counted as zero', () => {
     expect(agent?.supplied.inputTokens, 'only the one run supplied a count').toBe(1)
     expect(agent?.values.inputTokens, 'the missing run added nothing').toBe(50)
     const drawn = drawnProfile(await profileOf('no-receipt'))
-    expect(drawn).toContain(AGENT_RUNS_WORDS.noReceipt)
     // The markup puts the count in its own element, so the sentence and the number are asserted
     // across that boundary rather than as one unbroken string.
     expect(drawn).toMatch(/Without a receipt:<\/strong>\s*1/)

@@ -71,10 +71,14 @@ export function theLoopWatchNow(): RuntimeLoopWatch {
     : { watching: true, ...active, lastStall }
 }
 
-/** Nothing can arrive while the thread is held; a request closed before it began was not across it. */
+/**
+ * A request is across the hold when it arrived before the hold ended and had not closed before it began. The start
+ * here is the watch's last sample, the earliest the work can have begun: other work between that sample and a
+ * request's arrival puts the arrival after it, and that request can be the one that then held the thread.
+ */
 function acrossTheHold(heldMs: number, endedAt: number, open: readonly OpenAtTheHold[]): OpenAtTheHold[] {
   const began = endedAt - heldMs
-  return open.filter((one) => one.startedAt <= began && (one.closedAt === null || one.closedAt >= began))
+  return open.filter((one) => one.startedAt < endedAt && (one.closedAt === null || one.closedAt >= began))
 }
 
 function requestAtTheHold(one: OpenAtTheHold, endedAt: number): RuntimeStallRequest {

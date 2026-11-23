@@ -24,7 +24,7 @@
  *      that does not reach the comment, or one that does not start, is not a whole success and ends with no flash and
  *      no fade.
  *   7. Recipients' Find them. `one` proves the words name one agent; `many` and `none` are refusals drawn as the
- *      product working, so they fade and their own sentence is drawn. No page mounts this box at 1adcfbcb2, so it is
+ *      product working, so they fade and their own count or state word is drawn. No page mounts this box at 1adcfbcb2, so it is
  *      drawn in a root of its own on a real page of the live app; the press, its light and its server answer are real.
  *
  * EACH CASE HOLDS THE SERVER'S ANSWER, watches the press's light while it is in flight, then answers by `page.route`
@@ -35,6 +35,7 @@
 import { build } from 'esbuild'
 import type { ElementHandle, Locator, Page } from 'playwright'
 import { afterAll, beforeAll, expect, it } from 'vitest'
+import { HEADERS_A_PAGE_MAY_READ } from '../src/config/what-a-page-may-read.mjs'
 import { WORLD_HEADER } from '../src/config/world-header.mjs'
 import { t } from '../src/shared/i18n.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
@@ -64,7 +65,12 @@ let manyAnswer: unknown
 let noneAnswer: unknown
 let recipientsBundle = ''
 let worldAnswered = ''
-let exposedHeaders = ''
+/**
+ * The reply headers a page is allowed to read: the office's own list, joined as the office joins it for a page it
+ * takes. A reply to a request with no Origin carries no CORS headers, so the test process's own health read has none
+ * to copy.
+ */
+const exposedHeaders = HEADERS_A_PAGE_MAY_READ.join(', ')
 
 const saved: Record<'sendRefused' | 'sendWorked' | 'save' | 'removeRefused' | 'removeWorked' | 'noRecord', string> = {
   sendRefused: '',
@@ -130,7 +136,6 @@ beforeAll(async () => {
   app = await liveApp({ name: 'comment-talk-button-outcomes', viewport: { width: 1440, height: 1000 }, workspace: 'default' })
   const health = await fetch(`${app.api}/api/health`)
   worldAnswered = health.headers.get(WORLD_HEADER) ?? ''
-  exposedHeaders = health.headers.get('access-control-expose-headers') ?? ''
   if (worldAnswered === '') throw new Error('the test office did not say which world answered GET /api/health')
 
   await post('/api/records', { kind: 'agent', title: CONTACT, data: { handle: HANDLE, runtime: 'claude-code', state: 'active' } })
@@ -571,7 +576,7 @@ it('Send on a saved comment ends plainly when the chosen agent has no record and
     if (pressed === null) throw new Error('the press is not drawn')
     await recordThePressLights(page, pressed)
     await pressed.click()
-    await row.getByText(t('savedComment.noRecord'), { exact: true }).waitFor({ timeout: 20_000 })
+    await row.getByText(t('savedComment.agentHasNoRecord'), { exact: true }).waitFor({ timeout: 20_000 })
     // THE PATH WROTE NOTHING, SO IT IS NEITHER A SUCCESS NOR A FAILURE. The cached read answers at once, so the light
     // may never be drawn; either way it is not painted as a success and not faded as a failure. The column reads
     // again after the press, and a light of that read is not the press's.
@@ -882,7 +887,7 @@ it('Start review ends with no flash and no fade when the review does not reach t
     await expect.poll(() => held, { timeout: 30_000 }).toBe(true)
     await watchTheLight(page, pressed)
     release()
-    await talk.getByText(t('talk.state.keptNotInTheReview'), { exact: true }).waitFor({ timeout: 30_000 })
+    await talk.getByText(t('talk.state.notInThisReview'), { exact: true }).waitFor({ timeout: 30_000 })
     await theLightHasGone(page)
     expect(await howTheLightEnded(page), 'a review that does not reach the comment is not a whole success').toEqual({ flash: null, fade: null })
     await closeTheWrittenDownBox(talk)
@@ -971,7 +976,7 @@ it('Start review fades after a refused write, with no flash, and keeps its failu
 
 // ------------------------------------------------------------------ recipients: find them
 
-it('Find them flashes for one named agent and fades for a refusal, naming what the answer said', async () => {
+it('Find them flashes for one named agent and fades for a refusal, counting the matches', async () => {
   const { page, close } = await aPage()
   let release: () => void = () => {}
   try {
@@ -1006,10 +1011,10 @@ it('Find them flashes for one named agent and fades for a refusal, naming what t
     expect((await howTheLightEnded(page)).flash, 'one named agent is a success').toBe('yes')
     const matched = page.locator('#recipients-test .px-pick-matched')
     await matched.waitFor({ timeout: 30_000 })
-    expect(await matched.innerText()).toBe((oneAnswer as { note: string }).note)
+    expect(await matched.innerText()).toBe(t('recipients.say.matches', { n: 1 }))
     await theLightHasGone(page)
 
-    // MANY: a refusal naming every candidate, drawn as the product working.
+    // MANY: a refusal counting every candidate, drawn as the product working.
     answer = manyAnswer
     held = false
     await forgetTheLastLight(page)
@@ -1020,10 +1025,11 @@ it('Find them flashes for one named agent and fades for a refusal, naming what t
     await expect.poll(async () => (await howTheLightEnded(page)).fade, { timeout: 10_000 }).toBe(await token(page, '--motion-quick'))
     expect((await howTheLightEnded(page)).flash, 'many named agents is a refusal, not a success').toBeNull()
     const refused = page.locator('#recipients-test .px-pick-refused')
-    await expect.poll(async () => (await refused.innerText()).trim(), { timeout: 30_000 }).toBe((manyAnswer as { note: string }).note)
+    const many = (manyAnswer as { candidates: unknown[] }).candidates.length
+    await expect.poll(async () => (await refused.innerText()).trim(), { timeout: 30_000 }).toBe(t('recipients.say.matches', { n: many }))
     await theLightHasGone(page)
 
-    // NONE: the other refusal, offering a new agent.
+    // NONE: the other refusal, the state word alone.
     answer = noneAnswer
     held = false
     await forgetTheLastLight(page)
@@ -1033,8 +1039,7 @@ it('Find them flashes for one named agent and fades for a refusal, naming what t
     release()
     await expect.poll(async () => (await howTheLightEnded(page)).fade, { timeout: 10_000 }).toBe(await token(page, '--motion-quick'))
     expect((await howTheLightEnded(page)).flash, 'no named agent is a refusal, not a success').toBeNull()
-    await expect.poll(async () => (await refused.innerText()).trim(), { timeout: 30_000 }).toBe((noneAnswer as { note: string }).note)
-    expect(await page.locator('#recipients-test .px-pick-why').innerText()).toContain((noneAnswer as { startANewAgent: string }).startANewAgent)
+    await expect.poll(async () => (await refused.innerText()).trim(), { timeout: 30_000 }).toBe(t('recipients.say.noMatch'))
     await theLightHasGone(page)
   } finally {
     release()

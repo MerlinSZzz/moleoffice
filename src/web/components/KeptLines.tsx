@@ -51,9 +51,7 @@ export function KeptLines({ record, editable, onChanged }: { record: PanelRecord
         {KEPT_LINES_CSS}
       </style>
       <p className="kl-heading">{t('terminals.keeping.lines')}</p>
-      {lines.length === 0 ? (
-        <p className="kl-says">{t('terminals.keeping.noLines')}</p>
-      ) : (
+      {lines.length === 0 ? null : (
         <ol className="kl-lines">
           {lines.map((line, i) => (
             <li key={`${i}:${line}`} className="kl-line">

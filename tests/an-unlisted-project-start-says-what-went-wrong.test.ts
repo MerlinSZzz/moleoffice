@@ -8,7 +8,9 @@
  *      was drawn over Home's clock and Today lines, so neither could be read;
  *   2. the top bar said "server unreachable" while the server was answering every read;
  *   3. Home's red box said the answer "did not carry a reports list at all", blaming the reply
- *      when the reply was a refusal of the project;
+ *      when the reply was a refusal of the project. The reports part has since left Home, and a
+ *      refused read must still not be drawn as an empty one: Home's key items, the one part that
+ *      says both what failed and what is not there, must say the read failed;
  *   4. the chat button, then a floating button in the corner, was drawn empty, with no picture and no word.
  *
  * Every read of the refused project is refused, the count too, so no corner circle is drawn here. Since
@@ -22,7 +24,11 @@
  *   - the refusal sentence's own computed background and border, read from the page, because a
  *     sentence with no box is the fault;
  *   - the top bar's words, read from the word lists rather than written here;
- *   - Home's box, which must no longer carry the reports-list sentence;
+ *   - every box on the page, none of which may carry the reports-list sentence;
+ *   - Home's key items, whose read names the refused project: the words for a failed read, and not
+ *     the words for no key item, both read from the word lists by their keys. The other parts that
+ *     read the page's project have no words for nothing there, or draw nothing when their read
+ *     fails, so they are not read here;
  *   - the top bar's chat press: drawn once, with its shape and its word.
  */
 import { afterAll, beforeAll, expect, it } from 'vitest'
@@ -96,15 +102,24 @@ it('says the project was refused rather than blaming the server or the reply, at
         WORDS['frameWords.pill.projectRefused'],
       )
 
-      // 3. HOME'S BOX NAMES THE REFUSAL, NOT A REPLY WITHOUT A REPORTS LIST. ErrorNote draws a
-      //    refusal at this place quietly, so the box may be the alarm panel or the quiet one.
-      const homeBox = page.locator('.px-error, .px-empty').filter({ hasText: UNLISTED }).first()
-      await homeBox.waitFor({ timeout: 30_000 })
-      const homeWords = (await homeBox.innerText()).trim()
-      expect(homeWords, `${String(width)} ${theme}: Home's box still blames the reply`).not.toContain(
-        WORDS['home.reportListMissing'],
+      // 3. A REFUSED READ IS NOT DRAWN AS AN EMPTY ONE. The key items' read names the refused
+      //    project, so the part says its read failed, in its mark's words, and does not say that no
+      //    key item is kept. Its mark is waited for first, so the reads have answered before the
+      //    boxes are read.
+      const keyItems = page.locator('[data-home-section="keyItems"]')
+      const failed = keyItems.locator('.px-mark').first()
+      await failed.waitFor({ timeout: 30_000 })
+      expect(await failed.getAttribute('title'), `${String(width)} ${theme}: the key items do not say their read failed`).toBe(
+        WORDS['home.keyItems.notRead'],
       )
-      expect(homeWords, `${String(width)} ${theme}: Home's box does not name the refused project`).toContain(UNLISTED)
+      const keyItemsWords = (await keyItems.innerText()).trim()
+      expect(keyItemsWords, `${String(width)} ${theme}: the key items say none is kept`).not.toContain(
+        WORDS['home.keyItems.none'],
+      )
+      expect(await keyItems.locator('[data-home-key-items-none]').count(), `${String(width)} ${theme}: the key items draw their empty line`).toBe(0)
+      // AND NO BOX ON THE PAGE BLAMES A REPLY WITHOUT A REPORTS LIST, the fault this file was made for.
+      const blaming = page.locator('.px-error, .px-empty').filter({ hasText: WORDS['home.reportListMissing'] })
+      expect(await blaming.count(), `${String(width)} ${theme}: a box still blames the reply`).toBe(0)
 
       // 4. EVERY READ OF THE REFUSED PROJECT IS REFUSED, THE COUNT TOO, SO NO CORNER CIRCLE IS DRAWN
       // HERE. THE TOP BAR'S CHAT PRESS CARRIES THE CHAT AT 660 AND 390, WITH ITS OWN SHAPE AND WORD.

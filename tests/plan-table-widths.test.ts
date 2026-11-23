@@ -37,6 +37,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { freshDb, type TestDb, THIS_TEST_ONLY_DRAWS_THE_TABLE } from './helpers.ts'
 import type { PlanBlocksReply } from '../src/web/api.ts'
+import { t } from '../src/shared/i18n.ts'
 
 type WebApi = typeof import('../src/web/api.ts')
 type PlanTableModule = typeof import('../src/web/components/plans/PlanTable.tsx')
@@ -224,11 +225,12 @@ describe('the table draws every column at a width it was given', () => {
    * AND A STORED LAYOUT THIS BUILD CANNOT USE IS ANNOUNCED ON THE SCREEN, not only in the reading.
    * The rule is only worth anything if the person is told.
    */
-  it('says on the screen when it dropped a layout it could not use, and takes it out of storage', async () => {
+  it('draws a state word on the screen when it dropped a layout it could not use, and takes it out of storage', async () => {
     store.set(planTable.widthsKey(), '{"what":"as wide as you like"}')
     const reply = await read()
     const said = words(h(planTable.PlanTable, { versionToWriteOn: THIS_TEST_ONLY_DRAWS_THE_TABLE, plan: planId, lines: reply.lines }))
-    expect(said).toContain('The column widths could not be saved or restored')
+    // CRITERION CHANGE, as decided: a short state word, not a sentence.
+    expect(said).toContain(t('planTable.widthsNotKept'))
     expect(store.get(planTable.widthsKey()), 'the unusable value is still stored, so it will complain again').toBeUndefined()
   })
 

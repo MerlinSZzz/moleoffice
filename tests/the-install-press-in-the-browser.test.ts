@@ -7,8 +7,9 @@
  * office beside a real terminal holder, and what a person sees is checked:
  *
  *   1. Each agent tool is a row with its installed version, its newest version, and "A newer version exists."
- *      only on the row where both were read and the newest is larger. A tool with no install command says why,
- *      and a newest version that could not be read says so.
+ *      only on the row where both were read and the newest is larger. A tool with no install command draws a short
+ *      state word for it, and a newest version that could not be read draws "Could not be read." (as decided, the
+ *      panel draws no explanation, so the sentences that said why are gone).
  *   2. At rest the panel shows no tick box. Choose tools to install shows one box for each tool that has an
  *      install command, and none for the others.
  *   3. Ticking two tools and pressing Install opens the installer's terminal in the page: its screen shows each
@@ -58,10 +59,15 @@ let app: LiveApp | null = null
 let place: Place
 let registry: StandInRegistry
 
-/** Start liveApp with the place's homes, the stand-ins first on its PATH and the stand-in registry, and put the variables back after. */
+/**
+ * Start liveApp with the place's homes, the stand-ins first on its PATH and the stand-in registry, and put the variables
+ * back after. It starts with no SANDBOX_DIR, because the office refuses every install press inside a sandbox, and case 3
+ * presses Install.
+ */
 async function liveAppWithTheStandIns(standIns: string): Promise<LiveApp> {
-  const names = ['XDG_CONFIG_HOME', 'HOME', 'LANG', 'PATH', 'MOLE_OFFICE_HARNESS_REGISTRY'] as const
+  const names = ['XDG_CONFIG_HOME', 'HOME', 'LANG', 'PATH', 'MOLE_OFFICE_HARNESS_REGISTRY', 'SANDBOX_DIR'] as const
   const was = Object.fromEntries(names.map((name) => [name, process.env[name]]))
+  delete process.env['SANDBOX_DIR']
   process.env['XDG_CONFIG_HOME'] = place.config
   process.env['HOME'] = place.home
   process.env['LANG'] = 'C.UTF-8'
@@ -218,11 +224,11 @@ describe('the agent tools panel', () => {
     expect(await codex.innerText()).not.toContain(t('harnesses.newer.yes'))
     // A NEWER ONE IS SAID ON CLAUDE, OPENCODE AND KIMI, whose stand-ins are older than the registry's, and nowhere else.
     expect(await page.locator('.ih-newer[data-newer="yes"]').count()).toBe(3)
-    expect(await row(page, 'kimi').innerText()).toContain(t('harnesses.noInstall.vendorArchivedIt'))
+    expect(await row(page, 'kimi').innerText()).toContain(t('harnesses.state.archived'))
     const dsh = row(page, 'dsh')
-    expect(await dsh.innerText()).toContain(t('harnesses.noInstall.installedSeparately'))
-    expect(await dsh.locator('[data-fact="newest"]').innerText()).toContain(t('harnesses.newestUnread'))
-    expect(await dsh.innerText()).toContain(t('harnesses.newer.newestUnread'))
+    expect(await dsh.innerText()).toContain(t('harnesses.state.installedSeparately'))
+    expect(await dsh.locator('[data-fact="newest"]').innerText()).toContain(t('harnesses.versionNotRead'))
+    expect(await dsh.innerText()).toContain(t('harnesses.state.newerNotKnown'))
   }, 120_000)
 
   it('2. no tick box at rest; Choose shows one for each tool with an install command', async () => {

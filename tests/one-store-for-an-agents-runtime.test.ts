@@ -13,7 +13,9 @@
  *
  *   · a runtime changed once, on the record, is the SAME word from GET /api/participants/agent/<handle>,
  *     from GET /api/participants, and from GET /api/records/<record>;
- *   · a word outside the closed list is refused, and the refusal names the list;
+ *   · a word outside the list of adapters is taken as written: the record keeps it, and both participants doors
+ *     give it as the agent's harness and give no runtime, because no adapter serves it;
+ *   · a word longer than the one bound is refused, the refusal says the bound, and nothing is written;
  *   · a row that still carries the old column answers the RECORD's word and not the row's, so the
  *     dead copy can never win again.
  *
@@ -27,6 +29,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { FastifyInstance } from 'fastify'
 import { apiApp, freshDb, type TestDb } from './helpers.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
+import { RUNTIME_WORD_MAX, whyThatIsNoRuntimeWord } from '../src/shared/participants.ts'
 
 let t: TestDb
 let app: FastifyInstance
@@ -62,21 +65,24 @@ async function register(
   return String((reply.json() as { record: string }).record)
 }
 
-async function readOne(handle: string): Promise<string | null> {
+/** `harness` is the word as the record stores it; `runtime` is that word only when the product has an adapter for it. */
+type Field = 'runtime' | 'harness'
+
+async function readOne(handle: string, field: Field = 'runtime'): Promise<string | null> {
   const reply = await app.inject({
     method: 'GET',
     url: `/api/participants/agent/${handle}`,
     headers: AS_THE_PERSON,
   })
   expect(reply.statusCode, reply.body).toBe(200)
-  return (reply.json() as { participant: { runtime: string | null } }).participant.runtime
+  return (reply.json() as { participant: Record<Field, string | null> }).participant[field]
 }
 
-async function readTheList(handle: string): Promise<string | null> {
+async function readTheList(handle: string, field: Field = 'runtime'): Promise<string | null> {
   const reply = await app.inject({ method: 'GET', url: '/api/participants', headers: AS_THE_PERSON })
   expect(reply.statusCode, reply.body).toBe(200)
-  const agents = (reply.json() as { agents: { handle: string; runtime: string | null }[] }).agents
-  return agents.find((one) => one.handle === handle)?.runtime ?? null
+  const agents = (reply.json() as { agents: ({ handle: string } & Record<Field, string | null>)[] }).agents
+  return agents.find((one) => one.handle === handle)?.[field] ?? null
 }
 
 async function readTheRecord(recordId: string): Promise<string | null> {
@@ -126,18 +132,33 @@ describe('one store: the record is the runtime both doors answer', () => {
     expect(await readTheRecord(record)).toBe('claude-code')
   })
 
-  it('refuses a word outside the closed list, and names every word on it', async () => {
-    const record = await register('runtime-refused', 'claude-code', THE_TEST_OFFICES_SECRETARY.handle)
-    const before = await readOne('runtime-refused')
+  it('takes a word outside the list of adapters as written, and refuses one longer than the bound', async () => {
+    const record = await register('runtime-any-harness', 'claude-code', THE_TEST_OFFICES_SECRETARY.handle)
+    const word = 'a-runtime-nobody-declared'
 
-    const refused = await patchRuntime(record, 'a-runtime-nobody-declared')
+    const taken = await patchRuntime(record, word)
+
+    // ANY HARNESS'S WORD IS TAKEN. The record keeps it as written. Both participants doors give the same word as the
+    // agent's harness, and give no runtime, because no adapter serves it.
+    expect(taken.code, taken.said).toBe(200)
+    expect(await readTheRecord(record)).toBe(word)
+    expect(await readOne('runtime-any-harness', 'harness')).toBe(word)
+    expect(await readTheList('runtime-any-harness', 'harness')).toBe(word)
+    expect(await readOne('runtime-any-harness')).toBeNull()
+    expect(await readTheList('runtime-any-harness')).toBeNull()
+
+    // ONE BOUND STAYS: a word longer than it is refused, and the refusal says why in the one place that decides it.
+    const tooLong = 'h'.repeat(RUNTIME_WORD_MAX + 1)
+    const why = whyThatIsNoRuntimeWord(tooLong)
+    expect(why, 'the word is not over the bound, so the case proves nothing').not.toBeNull()
+    const refused = await patchRuntime(record, tooLong)
 
     expect(refused.code, refused.said).toBe(400)
-    for (const word of ['claude-code', 'codex', 'dsh', 'opencode', 'kimi']) {
-      expect(refused.said, `the refusal does not name "${word}"`).toContain(word)
-    }
-    // A REFUSAL WRITES NOTHING.
-    expect(await readOne('runtime-refused')).toBe(before)
+    expect(refused.said).toContain(why)
+    // A REFUSAL WRITES NOTHING: all three reads still give the word taken above.
+    expect(await readTheRecord(record)).toBe(word)
+    expect(await readOne('runtime-any-harness', 'harness')).toBe(word)
+    expect(await readTheList('runtime-any-harness', 'harness')).toBe(word)
   })
 
   it('answers the record, not a stale value on the row the column still carries', async () => {

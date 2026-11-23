@@ -33,6 +33,10 @@
  * the route says it draws. Either half alone can be made green by writing the same mistake twice.
  * So every number below is read off the screen first and then asked of the route, and the test is
  * the comparison rather than either reading.
+ *
+ * AND THE TWO LABELS THIS PAGE DRAWS READ QUIETER THAN THE WORDS AROUND THEM: the count a normal
+ * reader sees, and the mark a developer sees beside a block written for developers. Each is drawn in
+ * the colour the page itself draws for --text-3, read from a probe on the page and never copied here.
  */
 import type { Page } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
@@ -79,6 +83,8 @@ interface Drawn {
   parts: { regionId: string; px: number }[]
   /** How wide the one block inside the part everybody is shown was drawn. */
   openBlock: number
+  /** The colour --text-3 draws, and the colours the developer count and the machinery mark are drawn in. */
+  quiet: { quiet: string; fordev: string | null; machinery: string | null }
 }
 
 /**
@@ -118,6 +124,20 @@ async function drawn(as: 'normal' | 'developer', width: number): Promise<Drawn> 
         px: w(el),
       })),
       openBlock: w(document.querySelector('[data-drawn-from="data.blocks[#b-mixed].parts[#p-open].blocks[#bo]"]')),
+      quiet: (() => {
+        const probe = document.createElement('span')
+        probe.style.color = 'var(--text-3)'
+        probe.style.position = 'absolute'
+        probe.style.visibility = 'hidden'
+        document.body.append(probe)
+        const quiet = getComputedStyle(probe).color
+        probe.remove()
+        const colourOf = (selector: string): string | null => {
+          const el = document.querySelector(selector)
+          return el === null ? null : getComputedStyle(el).color
+        }
+        return { quiet, fordev: colourOf('.sb-fordev'), machinery: colourOf('.sb-machinery') }
+      })(),
     }
   })
 }
@@ -200,6 +220,20 @@ describe('the layout route answers about the reader who asked', () => {
         `${BOTH}.parts[#p-b]`,
       ])
     }
+  })
+
+  /** The count and the mark a developer sees are drawn in the colour the page draws for --text-3. */
+  it('draws the count, and the machinery mark, in the page\'s quiet text colour', async () => {
+    const asANormalReader = await drawn('normal', 1440)
+    expect(asANormalReader.quiet.fordev, 'a normal reader was not drawn the count').not.toBe(null)
+    expect(asANormalReader.quiet.fordev, 'the count is not drawn in the page\'s quiet text colour').toBe(
+      asANormalReader.quiet.quiet,
+    )
+    const asADeveloper = await drawn('developer', 1440)
+    expect(asADeveloper.quiet.machinery, 'a developer was not drawn the machinery mark').not.toBe(null)
+    expect(asADeveloper.quiet.machinery, 'the machinery mark is not drawn in the page\'s quiet text colour').toBe(
+      asADeveloper.quiet.quiet,
+    )
   })
 
   /**

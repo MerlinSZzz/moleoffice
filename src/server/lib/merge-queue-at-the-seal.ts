@@ -2,7 +2,7 @@
 // Licensed under the MIT License. See LICENSE.
 /**
  * THE OFFICE PUTS A SEALED ROUND IN THE MERGE QUEUE ITSELF, WAITS FOR THE LINE'S EARLIER ENTRY, AND HOLDS (wave 13u
- * round 93, item 30 steps 1 to 4). Proved by tests/the-office-queues-a-sealed-round.test.ts.
+ * round 93, item 30 steps 1 to 4).
  *
  * A LINE is an agent whose record says `queuesAtTheSeal.on`. The person or a secretary with its own key turns it on or
  * off at POST /api/merge-queue/lines, with a reason, and the agent record keeps each change in its revisions.
@@ -40,7 +40,7 @@ import { gatePosition } from '../../config/settings.mjs'
 import { sqlite } from '../db/client.ts'
 import { anyRecordForAgent } from '../db/any-record-for-agent.ts'
 import { gateMet } from './gate-counts.ts'
-import { theAgentOfARun, writeAMessage } from './inspection.ts'
+import { theAgentOfARun, theOfficeNameOf, writeAMessage } from './inspection.ts'
 import { THE_OFFICE } from './the-office.ts'
 import { asTheOfficeAtTheSeal, eachHasAPlace, submitAMergeEntry, theQueueIsHeld } from './merge-queue.ts'
 import { theRepositoryNamed } from './the-repository-named.ts'
@@ -307,8 +307,8 @@ export function turnALine(input: { workspaceId: string; agent: string; on: boole
     line,
     ...(nothingWritten === undefined ? {} : { nothingWritten }),
     says: nothingWritten ?? (input.on
-      ? `The line of ${found.agent.handle} is turned on: its sealed rounds go to ${repository!} once the office queues at the seal.`
-      : `The line of ${found.agent.handle} is turned off: the office puts none of its sealed rounds in the merge queue.`),
+      ? `The line of ${theOfficeNameOf(found.agent)} is turned on: its sealed rounds go to ${repository!} once the office queues at the seal.`
+      : `The line of ${theOfficeNameOf(found.agent)} is turned off: the office puts none of its sealed rounds in the merge queue.`),
   }
 }
 

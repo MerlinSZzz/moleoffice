@@ -48,6 +48,11 @@ async function draw(one = selected, actor = 'human', language = 'en') {
 async function press(name: string) { await page.getByRole('button', { name, exact: true }).click(); expect(errors).toEqual([]) }
 async function value(name: string, text: string) { await page.getByLabel(name, { exact: true }).fill(text) }
 async function calls() { return page.evaluate(() => (window as any).calls) }
+const en = createI18n('en').t
+/** One of the editor's presses, by its word key. */
+const aPress = (key: WordKey): Locator => page.getByRole('button', { name: en(key), exact: true })
+/** The box for the reason, which is drawn only once a preview has passed. */
+const theReason = (): Locator => page.getByLabel(en('chapterEdit.reason'), { exact: true })
 /**
  * Every text an element draws, piece by piece, leaving out what a box holds: a sentence drawn beside a part is one piece
  * more. It reads a copy with its neighbouring texts joined, so `1.1` is one piece and the page itself is not touched.
@@ -68,7 +73,7 @@ async function piecesOf(where: Locator): Promise<string[]> {
 /** The label a box is written in, as a locator. */
 const labelOf = (box: Locator): Locator => box.locator('xpath=ancestor::label[1]')
 
-it('keeps typed words through refusals and conflicts, requires fresh preview and a record choice, and draws a part whose Chinese waits in its English alone', async () => {
+it('keeps typed words through refusals and conflicts, shows the preview alone until a preview passes, requires a record choice, and draws a part whose Chinese waits in its English alone', async () => {
   await draw()
   await press('Edit chapter')
   await value('English text for r-1', 'Made-up new English.')
@@ -81,7 +86,10 @@ it('keeps typed words through refusals and conflicts, requires fresh preview and
   await page.evaluate(() => { (window as any).problems = ['The chapter needs a rule.'] })
   await press('Preview chapter')
   expect(await page.locator('[data-chapter-preview]').innerText()).toContain('The chapter needs a rule.')
-  expect(await page.getByRole('button', { name: 'Apply chapter', exact: true }).isDisabled()).toBe(true)
+  // A PREVIEW THAT NAMES A PROBLEM is not a done step: the preview stays the one press, with no reason and no Apply.
+  expect(await aPress('chapterEdit.preview').count()).toBe(1)
+  expect(await aPress('chapterEdit.apply').count()).toBe(0)
+  expect(await theReason().count()).toBe(0)
   await page.evaluate(() => { (window as any).problems = [] })
   await press('Preview chapter')
   expect(await page.locator('[data-chapter-preview]').innerText()).toContain('2300 bytes of the 32768 byte limit')
@@ -89,12 +97,19 @@ it('keeps typed words through refusals and conflicts, requires fresh preview and
   expect(await page.locator('[data-chapter-preview]').innerText()).toContain('Made-up new English.')
   expect(await page.locator('[data-chapter-preview]').innerText()).toContain('浏览器中的新规则。')
   expect(await page.locator('[data-chapter-preview]').innerText()).toContain('车间规则')
-  expect(await page.getByRole('button', { name: 'Apply chapter', exact: true }).isDisabled()).toBe(true)
+  // A PREVIEW THAT PASSES is the done step: the reason and Apply, and the preview press is gone. Apply waits for the reason.
+  expect(await aPress('chapterEdit.preview').count()).toBe(0)
+  expect(await theReason().count()).toBe(1)
+  expect(await aPress('chapterEdit.apply').isDisabled()).toBe(true)
   await value('Why change this chapter?', 'Made-up reason.')
   await value('English text for r-1', 'Words retained after a refusal.')
   expect(await page.locator('[data-chapter-preview]').count()).toBe(0)
-  expect(await page.getByRole('button', { name: 'Apply chapter', exact: true }).isDisabled()).toBe(true)
+  // AN EDIT makes a new draft, so the preview comes back and the reason and Apply go. The reason typed is kept.
+  expect(await aPress('chapterEdit.preview').count()).toBe(1)
+  expect(await aPress('chapterEdit.apply').count()).toBe(0)
+  expect(await theReason().count()).toBe(0)
   await press('Preview chapter')
+  expect(await theReason().inputValue()).toBe('Made-up reason.')
   await page.evaluate(() => { (window as any).fail = 'refusal' })
   await press('Apply chapter')
   await page.getByText('A required rule is missing. Nothing was changed.', { exact: true }).waitFor()
@@ -104,7 +119,8 @@ it('keeps typed words through refusals and conflicts, requires fresh preview and
   await page.getByText('This chapter changed after you read it. Read it again before applying your words.', { exact: true }).waitFor()
   await press('Read chapter again')
   expect(await page.getByLabel('English text for r-1', { exact: true }).inputValue()).toBe('Words retained after a refusal.')
-  expect(await page.getByRole('button', { name: 'Apply chapter', exact: true }).isDisabled()).toBe(true)
+  expect(await aPress('chapterEdit.preview').count()).toBe(1)
+  expect(await aPress('chapterEdit.apply').count()).toBe(0)
   expect(await page.getByRole('status').innerText()).toContain('Your words are kept here')
   await page.evaluate(() => { (window as any).fail = '' })
   await press('Preview chapter')
@@ -127,12 +143,14 @@ it('keeps typed words through refusals and conflicts, requires fresh preview and
   await draw(duplicate)
   expect(await page.getByRole('alert').innerText()).toContain('The office is reading the shipped chapter.')
   expect(await page.getByRole('alert').getByRole('link', { name: 'second-record' }).getAttribute('href')).toContain('second-record')
-  await press('Edit chapter'); await value('Why change this chapter?', 'Keep this record.')
+  await press('Edit chapter')
   expect(await page.getByRole('button', { name: 'Preview chapter', exact: true }).isDisabled()).toBe(true)
-  expect(await page.getByRole('button', { name: 'Apply chapter', exact: true }).isDisabled()).toBe(true)
+  expect(await aPress('chapterEdit.apply').count()).toBe(0)
+  expect(await theReason().count()).toBe(0)
   await page.getByLabel('Which record should keep this chapter?', { exact: true }).selectOption('second-record')
-  expect(await page.getByRole('button', { name: 'Apply chapter', exact: true }).isDisabled()).toBe(true)
+  expect(await aPress('chapterEdit.apply').count()).toBe(0)
   await press('Preview chapter')
+  await theReason().fill('Keep this record.')
   expect((await calls()).filter((call: any) => call.kind === 'preview').at(-1).keep).toBe('second-record')
   await page.getByLabel('Which record should keep this chapter?', { exact: true }).selectOption('made-up-chapter')
   expect(await page.locator('[data-chapter-preview]').count()).toBe(0)
@@ -144,10 +162,12 @@ it('keeps typed words through refusals and conflicts, requires fresh preview and
   await page.locator('[data-chapter-history] article').waitFor()
   expect(await page.locator('[data-chapter-history]').innerText()).toContain('made-up-caretaker')
   expect(await page.locator('[data-chapter-history]').getByRole('link', { name: 'made-up-chapter', exact: true }).getAttribute('href')).toContain('made-up-chapter')
-  await press('Restore version 7'); await value('Why change this chapter?', 'Restore this record.')
-  expect(await page.getByRole('button', { name: 'Restore chapter', exact: true }).isDisabled()).toBe(true)
+  await press('Restore version 7')
+  expect(await aPress('chapterEdit.restore').count()).toBe(0)
+  expect(await theReason().count()).toBe(0)
   await page.getByLabel('Which record should keep this chapter?', { exact: true }).selectOption('made-up-chapter')
   await press('Preview chapter')
+  await theReason().fill('Restore this record.')
   expect((await calls()).filter((call: any) => call.kind === 'restore-preview').at(-1)).toMatchObject({ from: 7, keep: 'made-up-chapter' })
   await press('Restore chapter')
   expect((await calls()).filter((call: any) => call.kind === 'restore').at(-1)).toMatchObject({ from: 7, keep: 'made-up-chapter' })

@@ -24,6 +24,9 @@
  *
  * A TEST RUNS A SYNTHETIC TOOL INSTEAD, named by `MOLE_OFFICE_FAKE_MERGE_TOOL`, as the check tool's test
  * does with `MOLE_OFFICE_FAKE_INSPECTION_TOOL`. The run's own record names the script when it is set.
+ *
+ * ITS PROGRAM IS LOOKED UP IN THE WHOLE ENVIRONMENT IT WAS GIVEN, through `whereItIs` in ./os.ts, so on Windows a
+ * search path held as `Path` is found.
  */
 
 import { existsSync } from 'node:fs'
@@ -93,7 +96,7 @@ export class MergeAdapter {
    * the office wants merged is held with this sentence rather than started into a failure.
    */
   whyItCannotStart(checkout: string): string | null {
-    if (whereItIs(this.command, this.from['PATH']) === null) {
+    if (whereItIs(this.command, this.from) === null) {
       return `node is not installed on this machine, so the merge tool was not started for merge entry ${this.entry}.`
     }
     const script = this.script(checkout)

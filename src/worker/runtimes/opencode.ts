@@ -69,6 +69,9 @@ import { openCodeUsage } from './usage.ts'
  * is collected, in order, and joined. When that comes to nothing, the whole output is reported as
  * the run's words with a sentence saying no text part was found in it — the same run's output
  * either way, and the reader is told which reading they are looking at.
+ *
+ * ITS PROGRAM IS LOOKED UP IN THE WHOLE ENVIRONMENT IT WAS GIVEN, through `whereItIs` in ./os.ts, so on Windows a
+ * search path held as `Path` is found.
  */
 
 import { choreModelIn, choreVariantIn } from '../../config/chores.mjs'
@@ -157,7 +160,7 @@ export class OpenCodeAdapter implements RuntimeAdapter {
   }
 
   whereItIs(): string | null {
-    return whereItIs(this.command, this.from['PATH'])
+    return whereItIs(this.command, this.from)
   }
 
   commandFor(run: RunRequest): CommandLine {

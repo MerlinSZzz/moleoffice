@@ -58,16 +58,11 @@ export const REVIEW_LEVEL_PANEL_WORDS = {
   get setting(): string { return t(settingsControlWord('settings.reviewlevel', 'settingsPanel.review.setting')) },
 }
 
-/** Each level's word and what it does. The English lives once, in `REVIEW_LEVEL_WORDS` and `REVIEW_LEVEL_SAYS`. */
+/** Each level's word. The English lives once, in `REVIEW_LEVEL_WORDS`. */
 const LEVEL_WORD = {
   none: 'settingsPanel.review.level.none',
   light: 'settingsPanel.review.level.light',
   full: 'settingsPanel.review.level.full',
-} as const satisfies Record<ReviewLevel, string>
-const LEVEL_SAYS = {
-  none: 'settingsPanel.review.says.none',
-  light: 'settingsPanel.review.says.light',
-  full: 'settingsPanel.review.says.full',
 } as const satisfies Record<ReviewLevel, string>
 
 export function ReviewLevelPanel() {
@@ -125,7 +120,7 @@ export function ReviewLevelPanel() {
         <p className="rvl-none">
           <span className="rvl-label">{REVIEW_LEVEL_PANEL_WORDS.showing}</span>
           <span className="rvl-value">
-            {developer ? t('settingsPanel.review.noProjectNamed', { id: content(here) }) : t('settingsPanel.review.noProject')}
+            {developer ? t('settingsPanel.review.noProjectNamed', { id: content(here) }) : t('settingsState.notFound')}
           </span>
         </p>
       ) : null}
@@ -144,7 +139,6 @@ export function ReviewLevelPanel() {
                 }}
               >
                 <span className="rvl-word">{t(settingsControlWord('settings.reviewlevel', LEVEL_WORD[which]))}</span>
-                <span className="rvl-says">{t(LEVEL_SAYS[which])}</span>
               </button>
             ))}
           </div>
@@ -161,7 +155,6 @@ export function ReviewLevelPanel() {
       {project === null ? null : (
         <section className="rvl-package-inspection" aria-label={t('delegation.inspection.setting')}>
           <h3>{t('delegation.inspection.setting')}</h3>
-          <p>{t('delegation.inspection.settingSays')}</p>
           <div className="rvl-choices" role="group" aria-label={t('delegation.inspection.setting')}>
             {[true, false].map((enabled) => (
               <button key={String(enabled)} type="button" className="rvl-choice" aria-pressed={packageInspectionOf(project.packageInspection) === enabled} onClick={() => pickPackageInspection(enabled)}>
@@ -213,7 +206,6 @@ const CSS = `
 .rvl-choice[aria-pressed="true"] { border-color: var(--chosen-edge); color: var(--chosen-ink); background: var(--chosen-bg); box-shadow: var(--chosen-shadow); }
 
 .rvl-word { font-size: var(--fs-2); font-weight: 600; }
-.rvl-says { font-size: var(--fs-1); color: var(--text-3); }
 
 .rvl-fault { margin: var(--pad) 0 0 0; font-size: var(--fs-2); color: var(--st-failed); }
 `

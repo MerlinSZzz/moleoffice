@@ -34,7 +34,8 @@ import { RAIL_WORD_KEYS } from '@shared/surfaces.ts'
  * the other is a gap nobody has filled. They are Home's own words, read from the same keys.
  */
 
-import { useState } from 'react'
+import { useLayoutEffect } from 'react'
+import { ReportStar } from '../../components/ReportStar.tsx'
 import { targetAttributes } from '@shared/targets.ts'
 import {
   REPORTS_PAGE_GROUPS,
@@ -48,11 +49,13 @@ import type { WorkspacesReply } from '../../../server/api/workspaces.ts'
 import { api, type ReportsAndNotesReply, type ReportsAndNotesRow } from '../../api.ts'
 import { FamilyHead, PageFoot, QuickFile, RowMarks } from '../../components/family/parts.tsx'
 import { Pager } from '../../components/Pager.tsx'
-import { pathFor, recordPath, RouteLink } from '../../components/router.tsx'
-import { Absence, ErrorNote, Explain, Loading, Stamp } from '../../components/ui.tsx'
+import { navigate, pathFor, recordPath, RouteLink } from '../../components/router.tsx'
+import { Absence, ErrorNote, Loading, Stamp, useAsync } from '../../components/ui.tsx'
 import { useProjectAsync } from '../../lib/project-async.ts'
 import { projectName } from '../../lib/projects.ts'
+import { useReportsCount } from '../../lib/report-count.ts'
 import { SideBySide } from '../../components/SideBySide.tsx'
+import { putThePageAt, thePlaceOnThePage } from '../../lib/page-scroll.ts'
 
 /** The heading word of each group. */
 const GROUP_HEADINGS: Readonly<Record<ReportsPageGroup, WordKey>> = {
@@ -68,26 +71,37 @@ const SHOW_WORDS: Readonly<Record<ReportsPageShow, WordKey>> = {
   notes: 'reports.show.notes',
 }
 
-/** Why the list is empty, for each choice: the count is over every project, so each says "no project". */
-const NONE_WORDS: Readonly<Record<ReportsPageShow, WordKey>> = {
-  both: 'reports.none',
-  reports: 'reports.none.reports',
-  notes: 'reports.none.notes',
+export function NotesPage({ onFiled }: { onFiled: () => void }) {
+  return <NotesAtAddress key={window.location.hash} onFiled={onFiled} />
 }
 
-export function NotesPage({ onFiled }: { onFiled: () => void }) {
-  const [show, setShow] = useState<ReportsPageShow>('both')
-  const [offset, setOffset] = useState(0)
+function NotesAtAddress({ onFiled }: { onFiled: () => void }) {
+  const address = window.location.hash
+  const params = new URLSearchParams(address.split('?')[1] ?? '')
+  const choice = params.get('show')
+  const show: ReportsPageShow = REPORTS_PAGE_SHOWS.find((value) => value === choice) ?? 'both'
+  const rawOffset = Number(params.get('offset') ?? 0)
+  const offset = Number.isSafeInteger(rawOffset) && rawOffset >= 0 ? rawOffset : 0
+  const scope = params.get('scope') || undefined
+  const rawFilter = params.get('filter')
+  const filter = rawFilter === 'unread' || rawFilter === 'starred' ? rawFilter : undefined
+  const go = (changes: Record<string, string | null>) => {
+    const next = new URLSearchParams(window.location.hash.split('?')[1] ?? '')
+    for (const [key, value] of Object.entries(changes)) value === null ? next.delete(key) : next.set(key, value)
+    const query = next.toString()
+    navigate(`/notes${query === '' ? '' : `?${query}`}`)
+  }
   const [state, reload] = useProjectAsync(
     () =>
       Promise.all([
-        api.reportsAndNotes({ show, limit: REPORTS_PAGE_SIZE, offset }),
+        api.reportsAndNotes({ show, limit: REPORTS_PAGE_SIZE, offset, ...(scope === undefined ? {} : { scope }), ...(filter === undefined ? {} : { filter }) }),
         // THE PROJECT NAMES. A row says which project it is in, and only this reply knows what each
         // project is called. Both requests fail together, so no row is drawn with an id for a name.
         api.listWorkspaces(),
       ]),
-    [show, offset],
+    [show, offset, scope, filter],
   )
+  const [starState, reloadStars] = useAsync(() => api.reportStars(), [])
 
   const filed = () => {
     onFiled()
@@ -96,16 +110,25 @@ export function NotesPage({ onFiled }: { onFiled: () => void }) {
 
   if (state.status === 'ready') {
     return (
+      <>
+      <ReportsPosition key={address} address={address} />
       <ReportsList
         reply={state.value[0]}
         projects={state.value[1]}
+        stars={starState.status === 'ready' && starState.reReadError === undefined ? starState.value.stars : null}
+        starFailed={starState.status === 'error' || (starState.status === 'ready' && starState.reReadError !== undefined)}
+        filter={filter}
+        onFilter={(next) => go({ filter: next === filter ? null : next, offset: null })}
+        onModule={(id) => go({ scope: id, offset: null })}
+        onStarChanged={() => { reload(); reloadStars() }}
         onShow={(next) => {
-          setShow(next)
-          setOffset(0)
+          go({ show: next, offset: null })
         }}
-        onGo={setOffset}
+        onGo={(next) => go({ offset: next === 0 ? null : String(next) })}
+        onClearScope={() => go({ scope: null, offset: null })}
         onFiled={filed}
       />
+      </>
     )
   }
   return (
@@ -113,12 +136,40 @@ export function NotesPage({ onFiled }: { onFiled: () => void }) {
       <ReportsHead onFiled={filed} />
       {state.status === 'loading' ? <Loading label={t(RAIL_WORD_KEYS['rail.notes'])} rows={6} /> : null}
       {state.status === 'error' ? (
-        <ErrorNote message={state.message} fault={state.fault} retry={reload}>
-          <span className="fam-what">{t('g7a.family.failedRead')}</span>
-        </ErrorNote>
+        <ErrorNote message={state.message} fault={state.fault} retry={reload} />
       ) : null}
     </>
   )
+}
+
+/** Keep a return from a report in this tab at the place its list was left. */
+function ReportsPosition({ address }: { address: string }) {
+  useLayoutEffect(() => {
+    let frame = 0
+    const restore = () => {
+      const top: unknown = window.history.state?.reportsPlace
+      if (window.location.hash !== address || typeof top !== 'number' || !Number.isFinite(top) || top < 0) return
+      cancelAnimationFrame(frame)
+      frame = requestAnimationFrame(() => {
+        if (window.location.hash === address) putThePageAt(top)
+      })
+    }
+    restore()
+    // The router moves to the top on hashchange; restore after its listener has run too.
+    window.addEventListener('hashchange', restore)
+    const opening = (event: MouseEvent) => {
+      const target = event.target
+      if (window.location.hash !== address || !(target instanceof Element) || target.closest('.rpts-row') === null) return
+      window.history.replaceState({ ...window.history.state, reportsPlace: thePlaceOnThePage() }, '')
+    }
+    document.addEventListener('click', opening, true)
+    return () => {
+      cancelAnimationFrame(frame)
+      window.removeEventListener('hashchange', restore)
+      document.removeEventListener('click', opening, true)
+    }
+  }, [address])
+  return null
 }
 
 /** The page's head: the sidebar row's own word, and "Write a note", the one primary press. */
@@ -141,33 +192,50 @@ function ReportsHead({ onFiled }: { onFiled: () => void }) {
  * The groups are the server's. A heading's count is the group's count over every page, and a page
  * draws only the groups that have rows on it. Needs you is the one group that says when it is
  * empty ("Nothing needs you"), and only on the first page. When only notes are shown it is not drawn
- * at all, because a note has no read mark and can never be in it.
+ * at all, because a note has no read mark and can never be in it. Only the Needs you number counts
+ * unread reports, so only that number follows the unread report count switch; This week and Earlier
+ * count every row and keep their numbers.
  */
 export function ReportsList({
   reply,
   projects,
   onShow,
+  stars = [],
+  starFailed = false,
+  filter,
+  onFilter,
+  onModule,
+  onStarChanged,
   onGo,
+  onClearScope,
   onFiled,
 }: {
   reply: ReportsAndNotesReply
   projects: WorkspacesReply
   onShow: (show: ReportsPageShow) => void
+  stars?: string[] | null
+  starFailed?: boolean
+  filter?: 'unread' | 'starred'
+  onFilter?: (filter: 'unread' | 'starred') => void
+  onModule?: (id: string) => void
+  onStarChanged?: () => void
   onGo: (offset: number) => void
+  onClearScope?: () => void
   onFiled: () => void
 }) {
   const names = new Map(projects.workspaces.map((workspace) => [workspace.id, workspace.title]))
   const sayKind = reply.show === 'both'
+  const reportsCountShown = useReportsCount()
   const needsYou = reply.show === 'notes' ? [] : reply.rows.filter((row) => row.group === 'needs-you')
   const groupOf = (group: ReportsPageGroup, rows: readonly ReportsAndNotesRow[]) => (
     <section key={group} className="rpts-group" data-group={group}>
       <h2 className="rpts-head">
         <span>{t(GROUP_HEADINGS[group])}</span>
-        <span className="rpts-count num">{reply.groups[group]}</span>
+        {group === 'needs-you' && !reportsCountShown ? null : <span className="rpts-count num">{reply.groups[group]}</span>}
       </h2>
       <ul className="rpts-list">
         {rows.map((row) => (
-          <ReportRow key={row.id} row={row} project={projectName(row.workspaceId, names.get(row.workspaceId))} sayKind={sayKind} />
+          <ReportRow key={row.id} row={row} project={projectName(row.workspaceId, names.get(row.workspaceId))} sayKind={sayKind} starred={stars === null ? null : stars.includes(row.id)} onStarChanged={onStarChanged} />
         ))}
       </ul>
     </section>
@@ -181,6 +249,12 @@ export function ReportsList({
           {REPORTS_CSS}
         </style>
 
+        {reply.scope === undefined ? null : (
+          <div className="rpts-scope">
+            <h2>{t('reports.scope.heading', { title: reply.scope.title })}</h2>
+            <a href="#/notes" onClick={(event) => { if (onClearScope !== undefined) { event.preventDefault(); onClearScope() } }}>{t('reports.scope.clear')}</a>
+          </div>
+        )}
         <div className="rpts-choose" role="group" aria-label={t('reports.show.label')}>
           {REPORTS_PAGE_SHOWS.map((option) => (
             <button key={option} type="button" aria-pressed={option === reply.show} onClick={() => onShow(option)}>
@@ -189,14 +263,20 @@ export function ReportsList({
           ))}
         </div>
 
+        <div className="rpts-filters" role="group" aria-label={t('reports.filter.label')}>
+          <button type="button" aria-pressed={filter === 'unread'} onClick={() => onFilter?.('unread')}>{t('reports.filter.unread')}</button>
+          <button type="button" aria-pressed={filter === 'starred'} onClick={() => onFilter?.('starred')}>{t('reports.filter.starred')}</button>
+          <details className="rpts-modules">
+            <summary aria-label={reply.scope?.kind === 'module' ? t('reports.filter.moduleChosen', { title: reply.scope.title }) : t('reports.filter.module')}>{reply.scope?.kind === 'module' ? t('reports.filter.moduleChosen', { title: reply.scope.title }) : t('reports.filter.module')}</summary>
+            <div>{(reply.modules ?? []).map(module => <button type="button" key={module.id} onClick={() => onModule?.(module.id)}>{module.title}</button>)}</div>
+          </details>
+        </div>
+
         {/* WHERE MESSAGES ARE. They are not on this page, and the sidebar has no Messages row any more
             they are read in the chat, and the chat opens the Messages page.
             The two links are the sidebar's own words for those places. */}
         {/* WHERE MESSAGES ARE READ AND THE TWO PRESSES STAY IN SIGHT, and the rest is one press down. */}
         <div className="rpts-where">
-          <Explain declares={{ surface: null }} meaning={t('w13q.notes.whereMessagesMeaning')} opens={t('w13q.notes.whereMessagesOpens')}>
-            <p className="rpts-where-why">{t('w13q.notes.whereMessages')}</p>
-          </Explain>
           <p className="rpts-where-go">
             <RouteLink to={pathFor('chat')}>{t('nav.chat')}</RouteLink>
             {' · '}
@@ -204,9 +284,10 @@ export function ReportsList({
           </p>
         </div>
 
+        {starFailed ? <p role="alert">{t('reports.star.failed')}</p> : null}
         {reply.matched === 0 ? (
           <p className="rpts-empty">
-            <Absence title={t(NONE_WORDS[reply.show])} />
+            <Absence word={t('absence.none')} />
           </p>
         ) : null}
 
@@ -249,7 +330,7 @@ export function ReportsList({
 }
 
 /** One row: the whole row opens the record, and its facts sit at its right. */
-function ReportRow({ row, project, sayKind }: { row: ReportsAndNotesRow; project: string; sayKind: boolean }) {
+function ReportRow({ row, project, sayKind, starred, onStarChanged }: { row: ReportsAndNotesRow; project: string; sayKind: boolean; starred: boolean | null; onStarChanged?: () => void }) {
   return (
     <li>
       <a
@@ -270,6 +351,7 @@ function ReportRow({ row, project, sayKind }: { row: ReportsAndNotesRow; project
           <RowMarks record={row} />
         </span>
       </a>
+      {row.kind === 'report' && starred !== null ? <ReportStar id={row.id} initial={starred} onChanged={onStarChanged} /> : null}
     </li>
   )
 }
@@ -281,7 +363,7 @@ function ReportRow({ row, project, sayKind }: { row: ReportsAndNotesRow; project
 function ReadMark({ row }: { row: ReportsAndNotesRow }) {
   if (row.kind !== 'report' || row.read === 'read') return null
   if (row.read === 'unread') return <span className="rpts-unread">{t('home.reportUnread')}</span>
-  return <Absence tier="told-apart" looked={false} word={t('home.notMarkedRead')} title={t('home.reportReadUnknown')} />
+  return <Absence tier="told-apart" looked={false} word={t('home.notMarkedRead')} />
 }
 
 /**
@@ -312,7 +394,7 @@ export const REPORTS_CSS = `
 
 .rpts-empty, .rpts-quiet { margin: 0; color: var(--text-3); font-size: var(--fs-2); }
 .rpts-where { margin: 0; color: var(--text-2); font-size: var(--fs-2); display: grid; gap: var(--pad); }
-.rpts-where-why, .rpts-where-go { margin: 0; }
+.rpts-where-go { margin: 0; }
 
 .rpts-group { display: flex; flex-direction: column; min-width: 0; }
 .rpts-head {
@@ -325,7 +407,15 @@ export const REPORTS_CSS = `
 .rpts-count { font-size: var(--fs-1); font-weight: 600; color: var(--text-3); letter-spacing: 0; text-transform: none; font-variant-numeric: tabular-nums; }
 
 .rpts-list { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--border); }
-.rpts-list > li { border-bottom: 1px solid var(--border); }
+.rpts-list > li { border-bottom: 1px solid var(--border); display: flex; align-items: center; min-width: 0; }
+.rpts-list > li > .rpts-row { flex: 1; min-width: 0; }
+.rpts-filters { display: flex; flex-wrap: wrap; gap: var(--pad); align-items: flex-start; }
+.rpts-filters button, .rpts-modules summary { cursor: pointer; font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--border-strong); border-radius: var(--radius); padding: 6px 10px; }
+.rpts-filters button[aria-pressed="true"] { background: var(--accent); color: var(--accent-text); }
+.rpts-modules { max-width: 100%; position: relative; }
+.rpts-modules summary { overflow-wrap: anywhere; }
+.rpts-modules > div { position: absolute; z-index: 2; background: var(--panel); border: 1px solid var(--border-strong); max-height: 16rem; overflow: auto; width: min(18rem, 75vw); display: grid; }
+.rpts-modules > div button { text-align: left; overflow-wrap: anywhere; }
 .rpts-row {
   display: grid; grid-template-columns: minmax(0, 1fr) 11rem 4.5rem 9.5rem 6.5rem 8.5rem; align-items: center; gap: var(--pad) var(--gut);
   min-height: 44px; padding: var(--pad) var(--pad);

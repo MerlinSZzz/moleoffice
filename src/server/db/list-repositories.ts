@@ -7,7 +7,7 @@
  */
 
 import { sqlite } from './client.ts'
-import type { Repository, RepoRow } from '../lib/repositories.ts'
+import type { Repository, RepoRow } from './types/repositories.ts'
 
 /** Every repository in one workspace, in name order. */
 export function listRepositories(workspaceId: string): Repository[] {

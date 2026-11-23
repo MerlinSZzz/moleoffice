@@ -8,14 +8,16 @@
  * database keeps a write-ahead log, which does not work on a network share, so a UNC path and a drive Windows reports
  * as a network drive are refused. A drive whose type Windows cannot tell is refused too, and never taken as local.
  * There is no Windows here: the move's refusal is asked with the facts a Windows machine would hand it, the drive's
- * reading is asked of a stand-in for PowerShell, and the installer is read as text.
+ * reading is asked of a stand-in for PowerShell, and the installer is read as text. The move refuses with a code and its
+ * values, and a case that reads the words reads the English of that code, as the move gives it.
  *
  * Its cases:
  *   1. a UNC path, in both of its forms, is refused as a network place and not as a place that is not a full path,
  *      while a `\\?\` drive path is not a network path;
- *   2. a place on a drive Windows reports as a network drive is refused with the network sentence;
+ *   2. a place on a drive Windows reports as a network drive is refused with the network drive's code;
  *   3. a drive whose type could not be read, a drive nobody asked about, and a type that is not a local drive's are
- *      each refused with the sentence that says Windows could not tell, before the temporary folder is asked;
+ *      each refused with a code of its own whose English says Windows could not tell, before the temporary folder is
+ *      asked;
  *   4. a removable drive, a fixed drive, a CD drive and a RAM disk are allowed;
  *   5. the drive is read with PowerShell started and waited for, never with the call that holds the thread, and only
  *      on Windows for a place that begins with a drive letter; a run that failed, a status that is not 0 and an answer
@@ -72,7 +74,7 @@ function windowsFacts(overrides: Partial<Facts> = {}): Facts {
     placeEmpty: false,
     holderExists: true,
     leaveOut: [],
-    loginUnit: { unit: 'none', unitPath: '', startsAtLogin: false, activeWord: null },
+    loginUnit: { unit: 'none', unitPath: '', startsAtLogin: false, activeWord: null, fromAnAppImage: false },
     refusedFolders: [],
     drive: { root: 'C:\\', type: 'Fixed' },
     ...overrides,
@@ -120,9 +122,11 @@ it('DF4: a UNC path, in both of its forms, is refused as a network place and not
 
   for (const to of ['\\\\a-server\\a-share\\mole-office', '\\\\?\\UNC\\a-server\\a-share\\mole-office', '\\\\?\\unc\\a-server\\a-share\\mole-office']) {
     expect(move.isAWindowsNetworkPath(to), to).toBe(true)
-    const why = move.whyAMoveThereIsRefused(to, facts)
-    expect(why, to).toBe(move.theWindowsPlaceIsOnANetworkWords(to, null))
-    expect(why, to).not.toBe(move.thePlaceIsNotAFullPathWords(to, 'win32'))
+    const refused = move.whyAMoveThereIsRefused(to, facts)
+    expect(refused, to).toEqual({ code: 'dataFolderPlaceIsANetworkPath', values: { to } })
+    expect(refused, to).toEqual(move.theWindowsPlaceIsOnANetworkRefusal(to, null))
+    expect(refused, to).not.toEqual(move.thePlaceIsNotAFullPathRefusal(to, 'win32'))
+    const why = move.theRefusalInEnglish(refused!)
     expect(why, to).toContain('write-ahead log')
     expect(why, to).toContain('network share')
     expect(why, to).toContain('nothing was changed')
@@ -131,7 +135,8 @@ it('DF4: a UNC path, in both of its forms, is refused as a network place and not
   // A `\\?\` or `\\.\` path to a drive is not a network path, so it is answered as a place that is not a full path.
   for (const to of ['\\\\?\\D:\\mole-office', '\\\\.\\D:\\mole-office']) {
     expect(move.isAWindowsNetworkPath(to), to).toBe(false)
-    expect(move.whyAMoveThereIsRefused(to, facts), to).toBe(move.thePlaceIsNotAFullPathWords(to, 'win32'))
+    expect(move.whyAMoveThereIsRefused(to, facts), to).toEqual(move.thePlaceIsNotAFullPathRefusal(to, 'win32'))
+    expect(move.whyAMoveThereIsRefused(to, facts)?.code, to).toBe('dataFolderPlaceNotAFullPathOnWindows')
   }
   expect(move.isAWindowsNetworkPath('D:\\mole-office')).toBe(false)
 })
@@ -139,9 +144,11 @@ it('DF4: a UNC path, in both of its forms, is refused as a network place and not
 it('DF4: a place on a drive Windows reports as a network drive is refused, with a sentence that names the drive', async () => {
   const move = await theMove()
   const to = 'N:\\mole-office'
-  const why = move.whyAMoveThereIsRefused(to, windowsFacts({ drive: { root: 'N:\\', type: 'Network' } }))
+  const refused = move.whyAMoveThereIsRefused(to, windowsFacts({ drive: { root: 'N:\\', type: 'Network' } }))
 
-  expect(why).toBe(move.theWindowsPlaceIsOnANetworkWords(to, 'N:\\'))
+  expect(refused).toEqual({ code: 'dataFolderPlaceOnANetworkDrive', values: { to, drive: 'N:\\' } })
+  expect(refused).toEqual(move.theWindowsPlaceIsOnANetworkRefusal(to, 'N:\\'))
+  const why = move.theRefusalInEnglish(refused!)
   expect(why).toContain(to)
   expect(why).toContain('N:\\')
   expect(why).toContain('write-ahead log')
@@ -154,26 +161,33 @@ it('DF4: a drive whose type Windows cannot tell is refused, and is never taken a
   const to = 'E:\\mole-office'
   const temporary = [{ kind: 'temporary' as const, variable: 'TEMP', folder: 'E:\\', names: ['E:\\'] }]
 
+  // The reason the drive's reading gives is carried as it came.
   const unread = move.whyAMoveThereIsRefused(to, windowsFacts({ drive: { root: 'E:\\', unread: 'PowerShell could not be started' } }))
-  expect(unread).toBe(move.theWindowsDriveCannotBeToldWords(to, 'E:\\', 'PowerShell could not be started'))
-  expect(unread).toContain('could not tell')
+  expect(unread).toEqual({ code: 'dataFolderDriveNotRead', values: { to, drive: 'E:\\', why: 'PowerShell could not be started' } })
+  expect(unread).toEqual(move.theWindowsDriveCannotBeToldRefusal(to, 'E:\\', { unread: 'PowerShell could not be started' }))
+  expect(move.theRefusalInEnglish(unread!)).toContain('could not tell')
+  expect(move.theRefusalInEnglish(unread!)).toContain('(PowerShell could not be started)')
 
-  // A move whose drive nobody asked Windows about is refused in the same words, and not let through.
+  // A move whose drive nobody asked Windows about is refused too, and not let through.
   const notAsked = move.whyAMoveThereIsRefused(to, windowsFacts({ drive: null }))
-  expect(notAsked).toBe(move.theWindowsDriveCannotBeToldWords(to, 'E:\\', 'nobody asked Windows'))
+  expect(notAsked).toEqual({ code: 'dataFolderDriveNotAsked', values: { to, drive: 'E:\\' } })
+  expect(notAsked).toEqual(move.theWindowsDriveCannotBeToldRefusal(to, 'E:\\', null))
+  expect(move.theRefusalInEnglish(notAsked!)).toContain('could not tell')
+  expect(move.theRefusalInEnglish(notAsked!)).toContain('(nobody asked Windows)')
 
   for (const type of ['Unknown', 'NoRootDirectory']) {
-    expect(move.whyAMoveThereIsRefused(to, windowsFacts({ drive: { root: 'E:\\', type } })), type).toBe(
-      move.theWindowsDriveCannotBeToldWords(to, 'E:\\', `Windows answered ${type}`),
-    )
+    const refused = move.whyAMoveThereIsRefused(to, windowsFacts({ drive: { root: 'E:\\', type } }))
+    expect(refused, type).toEqual({ code: 'dataFolderDriveTypeUnknown', values: { to, drive: 'E:\\', type } })
+    expect(refused, type).toEqual(move.theWindowsDriveCannotBeToldRefusal(to, 'E:\\', { type }))
+    expect(move.theRefusalInEnglish(refused!), type).toContain(`(Windows answered ${type})`)
   }
 
   // The drive is asked before the temporary folder, so a drive that cannot be told is not answered as that folder.
-  expect(move.whyAMoveThereIsRefused(to, windowsFacts({ drive: { root: 'E:\\', type: 'Unknown' }, refusedFolders: temporary }))).toBe(
-    move.theWindowsDriveCannotBeToldWords(to, 'E:\\', 'Windows answered Unknown'),
+  expect(move.whyAMoveThereIsRefused(to, windowsFacts({ drive: { root: 'E:\\', type: 'Unknown' }, refusedFolders: temporary }))).toEqual(
+    move.theWindowsDriveCannotBeToldRefusal(to, 'E:\\', { type: 'Unknown' }),
   )
-  expect(move.whyAMoveThereIsRefused(to, windowsFacts({ drive: { root: 'E:\\', type: 'Fixed' }, refusedFolders: temporary }))).toBe(
-    move.theWindowsPlaceIsInTheTemporaryFolderWords(to, 'E:\\', 'TEMP'),
+  expect(move.whyAMoveThereIsRefused(to, windowsFacts({ drive: { root: 'E:\\', type: 'Fixed' }, refusedFolders: temporary }))).toEqual(
+    move.theWindowsPlaceIsInTheTemporaryFolderRefusal(to, 'E:\\', 'TEMP'),
   )
 })
 
@@ -243,7 +257,7 @@ it('DF4: the move asks the drive of its place before it stops anything', async (
       },
       start: async () => ({ ok: true, says: '' }),
       theRuntimeDatabase: async () => null,
-      theLoginUnit: async () => ({ unit: 'none', unitPath: '', startsAtLogin: false, activeWord: null }),
+      theLoginUnit: async () => ({ unit: 'none', unitPath: '', startsAtLogin: false, activeWord: null, fromAnAppImage: false }),
       theDrive: async (place) => {
         asked.push(place)
         throw new Error('the stand-in for the drive was asked')

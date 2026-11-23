@@ -44,7 +44,7 @@ import { typeOfBytes } from '../src/shared/file-signatures.ts'
 import { defaultAvatarAssetId } from '../src/shared/participants.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { portraitAddress, smallPortrait } from '../src/shared/portraits.ts'
-import { apiApp, freshDb, type TestDb } from './helpers.ts'
+import { A_SLEEP_TIME, apiApp, freshDb, type TestDb } from './helpers.ts'
 
 const AS_THE_PERSON = {
   'content-type': 'application/json',
@@ -158,7 +158,7 @@ beforeAll(async () => {
   resident = (await started('res-pictures', 'worker')).id
   const proposed = await app.inject({
     method: 'POST', url: '/api/residents/proposals', headers: asAgent('sec-pictures', secretary.key),
-    payload: { agentId: 'res-pictures', because: 'It has done steady work here for weeks.' },
+    payload: { agentId: 'res-pictures', because: 'It has done steady work here for weeks.', sleepTime: A_SLEEP_TIME },
   })
   expect(proposed.statusCode, proposed.body).toBe(201)
   const confirmed = await app.inject({

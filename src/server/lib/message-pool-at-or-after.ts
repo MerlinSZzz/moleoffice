@@ -5,7 +5,8 @@
  * `TALK_COLUMNS` was moved byte for byte out of src/server/lib/messages.ts, with no change of behaviour.
  * `talkEntriesOf` was moved byte for byte out of src/server/lib/messages.ts, with no change of behaviour.
  * `refFrom` was moved byte for byte out of src/server/lib/messages.ts, with no change of behaviour.
- * `deliveriesOfMany` was moved byte for byte out of src/server/lib/messages.ts, with no change of behaviour.
+ * `deliveriesOfMany` was moved byte for byte out of src/server/lib/messages.ts, with no change of behaviour. Since then
+ * its rows come from `deliveryRowsOfMany`, which reads them through SQLite and builds them by hand.
  * `aDeliveryOnTheWire` was moved byte for byte out of src/server/lib/messages.ts, with no change of behaviour.
  * `theRecipientsOf` was moved byte for byte out of src/server/lib/messages.ts, with no change of behaviour.
  * `itIsNotSentYet` was moved byte for byte out of src/server/lib/messages.ts, with no change of behaviour.
@@ -15,7 +16,7 @@
  */
 
 import { and, desc, gte, sql, inArray } from 'drizzle-orm'
-import { db } from '../db/client.ts'
+import { db, sqlite } from '../db/client.ts'
 import { records, messageDelivery } from '../db/schema.ts'
 import { theViewFromAMoment, theViewsHoldingIt } from './message-centre.ts'
 import { readOrigin } from '@shared/types.ts'
@@ -112,24 +113,74 @@ export const refFrom = oneParticipantRef
  * READ IN PIECES (src/server/db/in-pieces.ts), because a pool read names every message of the office and one
  * statement cannot bind that many. Every row of one message is in the piece that names it, so each
  * message's list is still in the order of its moment and id. Only the order of the map's keys differs
- * from one read, and every caller looks a message up by its id.
+ * from one read, and every caller looks a message up by its id. The rows come from `deliveryRowsOfMany`.
  */
 export function deliveriesOfMany(messageIds: readonly string[]): Map<string, DeliveryOnTheWire[]> {
   const out = new Map<string, DeliveryOnTheWire[]>()
-  const rows = readInPieces(messageIds, (piece) =>
-    db
-      .select()
-      .from(messageDelivery)
-      .where(inArray(messageDelivery.messageId, piece))
-      .orderBy(messageDelivery.at, messageDelivery.id)
-      .all(),
-  )
-  for (const row of rows) {
+  for (const row of deliveryRowsOfMany(messageIds)) {
     const list = out.get(row.messageId) ?? []
     list.push(aDeliveryOnTheWire(row))
     out.set(row.messageId, list)
   }
   return out
+}
+/** ONE DELIVERY ROW AS SQLITE HANDS IT BACK: every column of `messageDelivery`, under its name in the table. */
+interface AStoredDeliveryRow {
+  id: string
+  message_id: string
+  recipient_kind: string
+  recipient_id: string
+  mark: string
+  at: string
+  because: string | null
+  run: string | null
+  inferred_by: string | null
+  offer_put_off_at: string | null
+  remind_at: string | null
+  remind_set_by_kind: string | null
+  remind_set_by_id: string | null
+  reminded_at: string | null
+  carried_in: string | null
+}
+/**
+ * THE DELIVERY ROWS OF THESE MESSAGES, whole, in the order of their moment and then their id, read in pieces.
+ *
+ * THE STATEMENT IS DRIZZLE'S OWN, taken with `toSQL()`, and SQLite runs it with no drizzle between. Each row is then
+ * built here by hand, with every column under the name drizzle gives it, so this hands back what
+ * `db.select().from(messageDelivery)` hands back. The reason is time. In a profile of the contact read, over a made-up
+ * office of 35,701 messages, drizzle's read of these rows took 102 ms, and SQLite's part of that was 36 ms. Those are
+ * times from a profile, not a measure. The rest was drizzle building the rows.
+ *
+ * EVERY COLUMN IS NAMED HERE. A column added to the table and left out here fails the type check in this function,
+ * because `DeliveryRow` is drizzle's type of the table's row.
+ */
+export function deliveryRowsOfMany(messageIds: readonly string[]): DeliveryRow[] {
+  return readInPieces(messageIds, (piece) => {
+    const { sql: statement, params } = db
+      .select()
+      .from(messageDelivery)
+      .where(inArray(messageDelivery.messageId, piece))
+      .orderBy(messageDelivery.at, messageDelivery.id)
+      .toSQL()
+    const stored = sqlite.prepare(statement).all(...params) as AStoredDeliveryRow[]
+    return stored.map((row) => ({
+      id: row.id,
+      messageId: row.message_id,
+      recipientKind: row.recipient_kind,
+      recipientId: row.recipient_id,
+      mark: row.mark,
+      at: row.at,
+      because: row.because,
+      run: row.run,
+      inferredBy: row.inferred_by,
+      offerPutOffAt: row.offer_put_off_at,
+      remindAt: row.remind_at,
+      remindSetByKind: row.remind_set_by_kind,
+      remindSetById: row.remind_set_by_id,
+      remindedAt: row.reminded_at,
+      carriedIn: row.carried_in,
+    }))
+  })
 }
 /** ONE DELIVERY ROW AS EVERY POOL HANDS IT OUT. A mark the office does not know is read as `queued`. */
 export function aDeliveryOnTheWire(row: DeliveryRow): DeliveryOnTheWire {

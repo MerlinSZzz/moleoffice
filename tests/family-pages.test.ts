@@ -48,6 +48,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { MODULE_STATES } from '../src/shared/kinds.ts'
 import type { PanelRecord } from '../src/shared/types.ts'
+import { createI18n } from '../src/shared/i18n.ts'
 import { englishWords } from '../src/shared/words/joined.ts'
 import type { RecordListItem, ReportsAndNotesReply } from '../src/web/api.ts'
 import { THE_TEST_OFFICES_OWNER } from './a-page-of-a-test-office.ts'
@@ -623,17 +624,16 @@ describe('#/ideas is a reading list: newest first, and one keystroke to file', (
  * its tests with it.
  */
 
-describe('the Reports page says why its list is empty in words true for the choice', () => {
-  // THE COUNT IS OVER EVERY PROJECT AND ONLY OVER THE CHOSEN KINDS, so an empty list of notes says
-  // that no project has a note, and never that no project has a report or a note.
+describe('the Reports page says none when its list is empty', () => {
+  // THE SAME SHORT WORD FOR EVERY CHOICE. The choice above the list already names the kind.
+  const { t } = createI18n('en')
   const empty = (show: 'both' | 'reports' | 'notes') =>
     body(h(notes.ReportsList, { reply: { ...reportsReply([]), show }, projects: NO_PROJECTS, onShow: noop, onGo: noop, onFiled: noop }))
 
-  it('names the kind that is missing, and only that kind', () => {
-    expect(empty('notes')).toContain('No project has a note yet.')
-    expect(empty('reports')).toContain('No project has a report yet.')
-    expect(empty('both')).toContain('No project has a report or a note yet.')
-    expect(empty('notes')).not.toContain('a report or a note')
+  it('draws the none word for each of the three choices', () => {
+    for (const show of ['both', 'reports', 'notes'] as const) {
+      expect(empty(show), show).toContain(`<span class="px-absent">${t('absence.none')}</span>`)
+    }
   })
 })
 

@@ -100,7 +100,7 @@ it('names the report it filed for nobody before the reason, when the tick also f
   expect(f.run).not.toHaveBeenCalled()
 })
 
-// THE LIST LEAVES OUT AN ENTRY IT CANNOT READ (tests/one-entry-the-queue-cannot-read-does-not-hide-the-others.test.ts),
+// THE LIST LEAVES OUT AN ENTRY IT CANNOT READ,
 // and that entry may be the one testing, so the lane is not taken to be quiet.
 it('starts nothing, and says why, while the merge queue names an entry of the lane it cannot read', async () => {
   const why = 'Merge entry made-up-unreadable does not hold what the merge queue writes: it names nobody as its submitter.'

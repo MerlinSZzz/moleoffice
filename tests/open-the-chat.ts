@@ -10,7 +10,7 @@
  * row is the button design D draws, and the corner circle when it is there.
  *
  * IT TELLS THE OLD ROW FROM THE NEW ONE BY WHAT IT IS, not by a version number: before design D the sidebar's Chat row
- * was a link to the chat page, and design D makes it a button that opens the split. A link is never pressed here, so a
+ * was a link to the chat page, and design D makes it a button that opens the chat. A link is never pressed here, so a
  * browser still on the old drawing waits for its circle and opens the panel the way that page always did.
  *
  * It is a test helper and nothing in src/ reads it. The call it replaces was `if (no .px-chat) click('.px-chat-circle')`
@@ -32,10 +32,11 @@ async function waitForTheChat(page: Page): Promise<void> {
  * Open the chat the way the page offers it, without choosing the frame.
  *
  * A waiting message is not made up for this: the helper does not write a message to make the circle appear, because a
- * test that opens the chat is not a test about what waits. It uses the way the person has without a message.
+ * test that opens the chat is not a test about what waits. It uses the way the person has without a message. It says
+ * whether it pressed an opener, which is false when the chat was open or the browser remembered it open.
  */
-export async function openTheChatBeside(page: Page): Promise<void> {
-  if (await theChatIsOpen(page)) return
+async function openTheChatAsItOpens(page: Page): Promise<boolean> {
+  if (await theChatIsOpen(page)) return false
   // THE SHELL IS DRAWN BEFORE THE CHAT IS. Without this a page that has not rendered yet has no sidebar row and no
   // circle, and the helper would wait for a circle that design D does not draw.
   await page.locator('.shell-side, .px-chat').first().waitFor({ state: 'attached', timeout: 30_000 })
@@ -52,7 +53,7 @@ export async function openTheChatBeside(page: Page): Promise<void> {
   })
   if (remembered === 'yes' || remembered === 'split') {
     await waitForTheChat(page)
-    return
+    return false
   }
 
   // THE PHONE'S BAR SHAPE, below 1024 px. It is attached only where the bar is drawn.
@@ -60,7 +61,7 @@ export async function openTheChatBeside(page: Page): Promise<void> {
   if ((await phone.count()) > 0 && (await phone.isVisible())) {
     await phone.click()
     await waitForTheChat(page)
-    return
+    return true
   }
 
   // THE SIDEBAR'S CHAT ROW, WHEN IT IS DESIGN D'S BUTTON. An anchor is the old chat-page link and is left alone.
@@ -68,7 +69,7 @@ export async function openTheChatBeside(page: Page): Promise<void> {
   if ((await sidebar.count()) > 0 && (await sidebar.isVisible()) && (await sidebar.evaluate((one) => one.tagName === 'BUTTON'))) {
     await sidebar.click()
     await waitForTheChat(page)
-    return
+    return true
   }
 
   // THE CORNER CIRCLE, which the old page always drew and design D draws while a message waits. Waiting for it is also
@@ -77,17 +78,30 @@ export async function openTheChatBeside(page: Page): Promise<void> {
   if ((await circle.count()) === 0) await circle.waitFor({ state: 'attached', timeout: 30_000 })
   await circle.click()
   await waitForTheChat(page)
+  return true
+}
+
+/**
+ * OPEN THE CHAT BESIDE THE PAGE, the frame design D opened from shut. The chat now opens the way the person last had it,
+ * and the corner window when nothing is kept, so a chat that opened from shut in its window is put beside the page by
+ * the window's own press. A browser that remembers the chat open is left as it opens.
+ */
+export async function openTheChatBeside(page: Page): Promise<void> {
+  if (!(await openTheChatAsItOpens(page))) return
+  if ((await page.locator('.px-chat[data-where="corner"]').count()) === 0) return
+  await page.locator('.px-chat[data-where="corner"] .px-chat-beside').click()
+  await page.locator('.px-chat[data-where="split"]').waitFor({ state: 'attached', timeout: 20_000 })
 }
 
 /**
  * OPEN THE CHAT IN THE CORNER WINDOW, which is the frame every test written before design D means by "the chat".
  *
- * Design D opens the split from the sidebar and the phone's bar, and its own test takes the split directly. The older
- * tests press the window's grips, its full-screen press and its close, so this opens the chat the person's way and
- * sends it to its own window when the split was what opened. A browser that remembers the window open needs nothing.
+ * The chat opens the way the person last had it, which a case may have made the split. The older tests press the
+ * window's grips, its full-screen press and its close, so this opens the chat the person's way and sends it to its own
+ * window when the split was what opened. A browser that remembers the window open needs nothing.
  */
 export async function openTheChat(page: Page): Promise<void> {
-  await openTheChatBeside(page)
+  await openTheChatAsItOpens(page)
   if ((await page.locator('.px-chat[data-where="split"]').count()) > 0) {
     const ownWindow = page.locator('.px-chat-seam-window')
     // BELOW 1024 PIXELS THE SPLIT HAS NO OWN-WINDOW SHAPE: design D covers the screen there and the seam carries only

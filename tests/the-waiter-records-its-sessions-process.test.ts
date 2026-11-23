@@ -53,6 +53,7 @@
 import type { ChildProcess } from 'node:child_process'
 import { spawn } from 'node:child_process'
 import { existsSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import type { Server } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -62,11 +63,15 @@ import type { FastifyInstance } from 'fastify'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { THE_PERSON } from '../src/shared/person.ts'
-import { apiApp, freshDb, type TestDb } from './helpers.ts'
+import { aRelayThatNamesTheOffice } from './a-relay-that-names-the-office.ts'
+import { apiApp, freshDb, aTestAgentsKeyEnvironment, type TestDb } from './helpers.ts'
 
 let t: TestDb
 let app: FastifyInstance
 let api = ''
+/** The relay the third case's waiter reaches the office through, closed when the file ends. */
+let theRelay: Server | undefined
+let keyEnv: NodeJS.ProcessEnv = {}
 
 /** The conversation the fake claude's command line names, and one it does not. */
 const ITS_CONVERSATION = '32444539-7b2c-4f1a-9d3e-0a1b2c3d4e5f'
@@ -190,7 +195,7 @@ function startTheWaiter(input: {
     'default',
   ]
   const environment: Record<string, string> = {
-    ...(process.env as Record<string, string>),
+    ...(keyEnv as Record<string, string>),
     MOLE_OFFICE_HANDLE_BEAT_SECONDS: '1',
     CLAUDE_PID: String(input.claudePid),
   }
@@ -266,16 +271,14 @@ beforeAll(async () => {
   await app.ready()
   await app.listen({ host: '127.0.0.1', port: 0 })
   api = `http://127.0.0.1:${String((app.server.address() as AddressInfo).port)}`
-  await post('/api/records', {
-    kind: 'agent',
-    title: 'Held One',
-    data: { handle: 'held-one', runtime: 'claude-code', state: 'active' },
-  })
+  keyEnv = await aTestAgentsKeyEnvironment(app, 'held-one', scratch)
 }, 60_000)
 
 afterAll(async () => {
   delete process.env[BEAT]
   for (const one of started) stop(one.pgid)
+  theRelay?.closeAllConnections()
+  theRelay?.close()
   await app.close()
   t.close()
   rmSync(scratch, { recursive: true, force: true })
@@ -373,8 +376,13 @@ describe('the waiter records its session’s process', () => {
         because: 'the case that took it has finished',
       })
     }
-    const asAnAddress = api.replace('127.0.0.1', '0.0.0.0')
-    expect(asAnAddress).not.toBe(api)
+    // THE OFFICE ANSWERS ONLY TO A HOST THAT NAMES IT, and `0.0.0.0` does not. So the waiter is given `0.0.0.0` and a
+    // relay's port as the office's address. That reaches the relay on this machine, which names the office in each
+    // request it sends on.
+    theRelay = aRelayThatNamesTheOffice((app.server.address() as AddressInfo).port)
+    const relay = theRelay
+    await new Promise<void>((ok) => relay.listen(0, '127.0.0.1', ok))
+    const asAnAddress = `http://0.0.0.0:${String((relay.address() as AddressInfo).port)}`
 
     const waiter = startTheWaiter({
       session,

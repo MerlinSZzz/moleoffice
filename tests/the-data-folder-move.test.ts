@@ -11,6 +11,12 @@
  *
  * THE OLD FOLDER IS NEVER THE OWNER'S. It is a folder this file made, named by `mkdtempSync`, and the
  * `.env` and the mark are in folders this file made too.
+ *
+ * THE CHECK, THE WALK AND THE CONFIRM REFUSE WITH A CODE AND ITS VALUES, so the page can draw the refusal in its own
+ * language. A case compares those forms, and a case that reads the words reads the English of the form, as the mover
+ * gives it. The walk still throws, with the English as its message and the form beside it. One case checks that the
+ * words file, src/config/the-data-folder-move-words.mjs, holds one template for each of the move's codes, with that
+ * code's value names, filled as an English page fills the code's word.
  */
 import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
@@ -37,6 +43,8 @@ import { setTheLine } from '../src/config/env-file-line.mjs'
 import { databaseDirectoryFrom, databasePathFrom, envFileValues, forgetWhatTheEnvFileSupplied, loadEnvFileIntoProcess, serviceLockPathFrom } from '../src/config/settings.mjs'
 import { theProcessAt } from '../src/config/session-process.mjs'
 import { localStampOf } from '../src/config/stopped-run-cause.mjs'
+import { createI18n, type WordKey } from '../src/shared/i18n.ts'
+import { DATA_FOLDER_REFUSAL_CODES } from '../src/shared/refusal-codes.ts'
 
 const ROOT = resolve(fileURLToPath(new URL('..', import.meta.url)))
 
@@ -70,6 +78,7 @@ type ALoginUnit = {
   unitPath: string
   startsAtLogin: boolean | null
   activeWord: string | null
+  fromAnAppImage: boolean
 }
 
 /** A start-at-login reading, as the service command and the door hand it to the move. */
@@ -79,6 +88,7 @@ function aLoginUnit(overrides: Partial<ALoginUnit> = {}): ALoginUnit {
     unitPath: '/a/home/.config/systemd/user/mole-office.service',
     startsAtLogin: false,
     activeWord: null,
+    fromAnAppImage: false,
     ...overrides,
   }
 }
@@ -352,57 +362,95 @@ function aFacts(overrides: Partial<Facts> = {}): Facts {
   }
 }
 
-it('DF4: every place the criteria refuse is refused with its own sentence, and an empty place answers null', async () => {
+it('DF4: every place the criteria refuse is refused with its own code and values, and an empty place answers null', async () => {
   const move = await theMove()
   const facts = aFacts()
   const to = '/a/new/data'
 
   expect(move.whyAMoveThereIsRefused(to, facts)).toBeNull()
-  expect(move.whyAMoveThereIsRefused('a/relative/place', facts)).toBe(move.thePlaceIsNotAFullPathWords('a/relative/place', 'linux'))
-  expect(move.whyAMoveThereIsRefused('/a/new/data/', facts)).toBe(move.thePlaceIsNotAFullPathWords('/a/new/data/', 'linux'))
-  expect(move.whyAMoveThereIsRefused(to, aFacts({ placeExists: true, placeIsAFolder: true, placeEmpty: false }))).toBe(
-    move.thePlaceIsNotEmptyWords(to),
+  expect(move.whyAMoveThereIsRefused('a/relative/place', facts)).toEqual({
+    code: 'dataFolderPlaceNotAFullPathFromSlash',
+    values: { place: '"a/relative/place"', example: '/home/<you>/data-folder' },
+  })
+  expect(move.whyAMoveThereIsRefused('/a/new/data/', facts)).toEqual(move.thePlaceIsNotAFullPathRefusal('/a/new/data/', 'linux'))
+  expect(move.whyAMoveThereIsRefused('a/relative/place', aFacts({ platform: 'darwin' }))).toEqual({
+    code: 'dataFolderPlaceNotAFullPathFromSlash',
+    values: { place: '"a/relative/place"', example: '/Users/<you>/data-folder' },
+  })
+  expect(move.whyAMoveThereIsRefused('a\\relative\\place', aFacts({ platform: 'win32' }))).toEqual({
+    code: 'dataFolderPlaceNotAFullPathOnWindows',
+    values: { place: '"a\\\\relative\\\\place"', example: 'C:\\Users\\<you>\\data-folder' },
+  })
+  // THE ENGLISH OF THE FORM IS THE SENTENCE THE MOVE ALWAYS GAVE, with the example written as each system writes it.
+  expect(move.theRefusalInEnglish(move.thePlaceIsNotAFullPathRefusal('a/relative/place', 'linux'))).toBe(
+    'The place "a/relative/place" is not a full path written the way this system writes one (starting with /, such as /home/<you>/data-folder), so the move was refused and nothing was changed.',
   )
-  expect(move.whyAMoveThereIsRefused(to, aFacts({ placeExists: true, placeIsAFolder: false }))).toBe(move.thePlaceIsNotEmptyWords(to))
+  expect(move.theRefusalInEnglish(move.thePlaceIsNotAFullPathRefusal('a\\place', 'win32'))).toBe(
+    'The place "a\\\\place" is not a full path written the way this system writes one (such as C:\\Users\\<you>\\data-folder), so the move was refused and nothing was changed.',
+  )
+  expect(move.whyAMoveThereIsRefused(to, aFacts({ placeExists: true, placeIsAFolder: true, placeEmpty: false }))).toEqual({
+    code: 'dataFolderPlaceNotEmpty',
+    values: { to },
+  })
+  expect(move.whyAMoveThereIsRefused(to, aFacts({ placeExists: true, placeIsAFolder: false }))).toEqual(move.thePlaceIsNotEmptyRefusal(to))
 
   const emptyPlace = { placeExists: true, placeIsAFolder: true, placeEmpty: true }
-  expect(move.whyAMoveThereIsRefused('/a/old/data', aFacts(emptyPlace))).toBe(
-    move.thePlaceIsAroundTheDataFolderWords('/a/old/data', '/a/old/data', 'same'),
-  )
-  expect(move.whyAMoveThereIsRefused('/a/old/data/inside', aFacts(emptyPlace))).toBe(
-    move.thePlaceIsAroundTheDataFolderWords('/a/old/data/inside', '/a/old/data', 'inside'),
-  )
-  expect(move.whyAMoveThereIsRefused('/a/old', aFacts(emptyPlace))).toBe(
-    move.thePlaceIsAroundTheDataFolderWords('/a/old', '/a/old/data', 'holds'),
-  )
-  expect(move.whyAMoveThereIsRefused('/a/install/office', facts)).toBe(
-    move.thePlaceIsInTheInstallFolderWords('/a/install/office', '/a/install'),
-  )
-  expect(move.whyAMoveThereIsRefused('/a/gone/data', aFacts({ holderExists: false }))).toBe(move.thePlaceHasNoFolderWords('/a/gone/data'))
-  expect(move.whyAMoveThereIsRefused(to, aFacts({ freeBytes: 999, folderBytes: 1_000 }))).toBe(
-    move.thePlaceHasTooLittleRoomWords(to, 999, 1_000),
-  )
-  expect(move.whyAMoveThereIsRefused(to, aFacts({ processEnv: { MOLE_OFFICE_DB: '/a/shell/data.db' } }))).toBe(
-    move.theProcessEnvironmentDecidesWords(),
-  )
+  expect(move.whyAMoveThereIsRefused('/a/old/data', aFacts(emptyPlace))).toEqual({
+    code: 'dataFolderPlaceIsTheDataFolder',
+    values: { to: '/a/old/data' },
+  })
+  expect(move.whyAMoveThereIsRefused('/a/old/data/inside', aFacts(emptyPlace))).toEqual({
+    code: 'dataFolderPlaceInsideTheDataFolder',
+    values: { to: '/a/old/data/inside', from: '/a/old/data' },
+  })
+  expect(move.whyAMoveThereIsRefused('/a/old', aFacts(emptyPlace))).toEqual({
+    code: 'dataFolderPlaceHoldsTheDataFolder',
+    values: { to: '/a/old', from: '/a/old/data' },
+  })
+  expect(move.whyAMoveThereIsRefused('/a/install/office', facts)).toEqual({
+    code: 'dataFolderPlaceInTheInstallFolder',
+    values: { to: '/a/install/office', installFolder: '/a/install' },
+  })
+  expect(move.whyAMoveThereIsRefused('/a/gone/data', aFacts({ holderExists: false }))).toEqual({
+    code: 'dataFolderPlaceHasNoFolder',
+    values: { to: '/a/gone/data' },
+  })
+  expect(move.whyAMoveThereIsRefused(to, aFacts({ freeBytes: 999, folderBytes: 1_000 }))).toEqual({
+    code: 'dataFolderPlaceHasTooLittleRoom',
+    values: { to, freeBytes: 999, folderBytes: 1_000 },
+  })
+  expect(move.whyAMoveThereIsRefused(to, aFacts({ processEnv: { MOLE_OFFICE_DB: '/a/shell/data.db' } }))).toEqual({
+    code: 'dataFolderProcessEnvironmentDecides',
+    values: {},
+  })
 
   const markFolder = made('data-folder-move-refusal-mark-')
   const markPath = join(markFolder, 'data-folder-move.json')
   const markEnvFile = join(markFolder, '.env')
   const living = aMarkOfThisProcess('copying', facts.from, to)
-  expect(move.whyAMoveThereIsRefused(to, aFacts({ envFile: markEnvFile, mark: { state: 'read', mark: living } }))).toBe(
-    move.theMoveIsStillRunningWords(markPath, living),
-  )
+  expect(move.whyAMoveThereIsRefused(to, aFacts({ envFile: markEnvFile, mark: { state: 'read', mark: living } }))).toEqual({
+    code: 'dataFolderMoveStillRunning',
+    values: { mark: markPath, state: 'copying', pid: process.pid, from: facts.from, to },
+  })
   const switched = aMarkOfThisProcess('started', facts.from, to)
-  expect(move.whyAMoveThereIsRefused(to, aFacts({ envFile: markEnvFile, mark: { state: 'read', mark: switched } }))).toBe(
-    move.theMoveIsNotConfirmedWords(markPath, switched),
-  )
-  expect(move.whyAMoveThereIsRefused(to, aFacts({ envFile: markEnvFile, mark: { state: 'unreadable', why: 'not json' } }))).toBe(
-    move.theUnreadableMarkWords(markPath, 'not json'),
-  )
+  expect(move.whyAMoveThereIsRefused(to, aFacts({ envFile: markEnvFile, mark: { state: 'read', mark: switched } }))).toEqual({
+    code: 'dataFolderMoveNotConfirmed',
+    values: { to, mark: markPath, state: 'started' },
+  })
+  // THE MARK'S REASON GOES IN AS IT CAME, English made where the mark was read.
+  expect(move.whyAMoveThereIsRefused(to, aFacts({ envFile: markEnvFile, mark: { state: 'unreadable', why: 'not json' } }))).toEqual({
+    code: 'dataFolderMoveRunningUnknown',
+    values: { mark: markPath, why: 'not json' },
+  })
 
-  const refusedWalk = move.theFolderHoldsASymbolicLinkWords('/a/old/data', 'a-link', '/a/old/data/a-link')
-  expect(move.whyAMoveThereIsRefused(to, aFacts({ walk: refusedWalk }))).toBe(refusedWalk)
+  const refusedWalk = move.theFolderHoldsASymbolicLinkRefusal('/a/old/data', 'a-link', '/a/old/data/a-link')
+  expect(refusedWalk).toEqual({
+    code: 'dataFolderWalkMetASymbolicLink',
+    values: { folder: '/a/old/data', name: 'a-link', path: '/a/old/data/a-link' },
+  })
+  expect(move.whyAMoveThereIsRefused(to, aFacts({ walk: refusedWalk }))).toEqual(refusedWalk)
+  const anOsError = { code: 'dataFolderMoveRefused', values: { why: "EACCES: permission denied, scandir '/a/old/data'" } }
+  expect(move.whyAMoveThereIsRefused(to, aFacts({ walk: anOsError }))).toEqual(anOsError)
 
   const windows = aFacts({
     platform: 'win32',
@@ -472,14 +520,18 @@ it('DF4: on Windows a place in the temporary folder is refused, by the name its 
     })
   const windows = factsOf(folders)
 
-  expect(move.whyAMoveThereIsRefused('C:\\Users\\me\\AppData\\Local\\Temp', windows)).toBe(
-    move.theWindowsPlaceIsInTheTemporaryFolderWords('C:\\Users\\me\\AppData\\Local\\Temp', five.TEMP, 'TEMP'),
+  expect(move.whyAMoveThereIsRefused('C:\\Users\\me\\AppData\\Local\\Temp', windows)).toEqual({
+    code: 'dataFolderPlaceInTheTemporaryFolder',
+    values: { to: 'C:\\Users\\me\\AppData\\Local\\Temp', folder: five.TEMP, variable: 'TEMP' },
+  })
+  expect(move.theWindowsPlaceIsInTheTemporaryFolderRefusal('C:\\Users\\me\\AppData\\Local\\Temp', five.TEMP, 'TEMP')).toEqual(
+    move.whyAMoveThereIsRefused('C:\\Users\\me\\AppData\\Local\\Temp', windows),
   )
-  expect(move.whyAMoveThereIsRefused('C:\\Users\\me\\AppData\\Local\\Temp\\office', windows)).toBe(
-    move.theWindowsPlaceIsInTheTemporaryFolderWords('C:\\Users\\me\\AppData\\Local\\Temp\\office', five.TEMP, 'TEMP'),
+  expect(move.whyAMoveThereIsRefused('C:\\Users\\me\\AppData\\Local\\Temp\\office', windows)).toEqual(
+    move.theWindowsPlaceIsInTheTemporaryFolderRefusal('C:\\Users\\me\\AppData\\Local\\Temp\\office', five.TEMP, 'TEMP'),
   )
-  expect(move.whyAMoveThereIsRefused('C:\\Users\\me\\AppData\\Local\\Temp2\\office', windows)).toBe(
-    move.theWindowsPlaceIsInTheTemporaryFolderWords('C:\\Users\\me\\AppData\\Local\\Temp2\\office', five.TMP, 'TMP'),
+  expect(move.whyAMoveThereIsRefused('C:\\Users\\me\\AppData\\Local\\Temp2\\office', windows)).toEqual(
+    move.theWindowsPlaceIsInTheTemporaryFolderRefusal('C:\\Users\\me\\AppData\\Local\\Temp2\\office', five.TMP, 'TMP'),
   )
   // A place in a folder a OneDrive variable names may go on.
   expect(move.whyAMoveThereIsRefused('C:\\Users\\me\\OneDrive\\office', windows)).toBeNull()
@@ -487,8 +539,8 @@ it('DF4: on Windows a place in the temporary folder is refused, by the name its 
   expect(move.whyAMoveThereIsRefused('C:\\Users\\me\\OneDrive-Commercial\\office', windows)).toBeNull()
 
   // The long name of a short TEMP is refused by the folder the variable writes, not by the long name.
-  expect(move.whyAMoveThereIsRefused('C:\\Users\\me\\Temporary folder\\office', factsOf(short))).toBe(
-    move.theWindowsPlaceIsInTheTemporaryFolderWords('C:\\Users\\me\\Temporary folder\\office', 'C:\\Users\\me\\TEMP~1', 'TEMP'),
+  expect(move.whyAMoveThereIsRefused('C:\\Users\\me\\Temporary folder\\office', factsOf(short))).toEqual(
+    move.theWindowsPlaceIsInTheTemporaryFolderRefusal('C:\\Users\\me\\Temporary folder\\office', 'C:\\Users\\me\\TEMP~1', 'TEMP'),
   )
 
   // A place outside every refused folder may go on.
@@ -496,8 +548,8 @@ it('DF4: on Windows a place in the temporary folder is refused, by the name its 
 
   // A temporary folder outside the profile folder is refused with the temporary folder's sentence.
   const outside = { ...factsOf(move.theFoldersADataFolderIsRefusedIn({ TEMP: 'D:\\Temp' }, longNameOf)), drive: { root: 'D:\\', type: 'Fixed' } }
-  expect(move.whyAMoveThereIsRefused('D:\\Temp\\office', outside)).toBe(
-    move.theWindowsPlaceIsInTheTemporaryFolderWords('D:\\Temp\\office', 'D:\\Temp', 'TEMP'),
+  expect(move.whyAMoveThereIsRefused('D:\\Temp\\office', outside)).toEqual(
+    move.theWindowsPlaceIsInTheTemporaryFolderRefusal('D:\\Temp\\office', 'D:\\Temp', 'TEMP'),
   )
 
   // A drive-relative TEMP names no folder, so a place in it is not refused.
@@ -512,21 +564,93 @@ it('DF4: on Windows a place in the temporary folder is refused, by the name its 
   expect(here.refusedFolders).toEqual([])
 })
 
-it('DF4: the walk refuses a symbolic link and a file with a name outside the folder', async () => {
+/** What the walk of a folder threw: its message, and the code and values it carries beside it. */
+function theWalksError(move: TheMove, folder: string): { message: string; refusal: unknown } {
+  try {
+    move.theFilesOf(folder, [])
+  } catch (error) {
+    return { message: (error as Error).message, refusal: (error as { refusal?: unknown }).refusal }
+  }
+  throw new Error(`the walk of ${folder} refused nothing`)
+}
+
+/**
+ * The walk the facts keep, and the check's answer, for a move from a data folder this case made. The process
+ * environment names the folder, so the facts walk it; the check is handed none, so the `.env` line chose the folder and
+ * the check goes on to the walk.
+ */
+function theChecksAnswerAbout(move: TheMove, old: ADataFolder): { walk: unknown; refused: unknown } {
+  const envFile = anEnvFile(old.database)
+  process.env['MOLE_OFFICE_DB'] = old.database
+  const { target } = aTarget()
+  const facts = move.theFactsOfAMove(target, aLoginUnit(), envFile)
+  return { walk: facts.walk, refused: move.whyAMoveThereIsRefused(target, { ...facts, processEnv: {} }) }
+}
+
+it('DF4: the walk refuses a symbolic link and a file with a name outside the folder, with the English as its error and the code beside it', async () => {
   const move = await theMove()
   const folder = made('data-folder-move-walk-')
   const outside = made('data-folder-move-walk-outside-')
   symlinkSync(join(folder, 'nowhere'), join(folder, 'a-link'))
 
-  expect(() => move.theFilesOf(folder, [])).toThrow(
-    move.theFolderHoldsASymbolicLinkWords(folder, 'a-link', join(folder, 'a-link')),
-  )
+  const link = move.theFolderHoldsASymbolicLinkRefusal(folder, 'a-link', join(folder, 'a-link'))
+  expect(link).toEqual({ code: 'dataFolderWalkMetASymbolicLink', values: { folder, name: 'a-link', path: join(folder, 'a-link') } })
+  expect(theWalksError(move, folder)).toEqual({ message: move.theRefusalInEnglish(link), refusal: link })
   rmSync(join(folder, 'a-link'))
 
   writeFileSync(join(folder, 'one-name.txt'), 'shared bytes\n')
   linkSync(join(folder, 'one-name.txt'), join(outside, 'another-name.txt'))
-  expect(() => move.theFilesOf(folder, [])).toThrow(move.theFileHasMoreNamesWords(join(folder, 'one-name.txt'), 2, 1))
+  const moreNames = move.theFileHasMoreNamesRefusal(join(folder, 'one-name.txt'), 2, 1)
+  expect(moreNames).toEqual({ code: 'dataFolderWalkMetMoreNames', values: { path: join(folder, 'one-name.txt'), links: 2, found: 1 } })
+  expect(theWalksError(move, folder)).toEqual({ message: move.theRefusalInEnglish(moreNames), refusal: moreNames })
 })
+
+it.skipIf(process.platform === 'win32')('DF4: the walk refuses a special file, with the English as its error and the code beside it (skipped on Windows, which has no mkfifo)', async () => {
+  const move = await theMove()
+  const folder = made('data-folder-move-walk-special-')
+  expect(spawnSync('mkfifo', [join(folder, 'a-pipe')]).status, 'mkfifo made the pipe').toBe(0)
+
+  const special = move.theFolderHoldsASpecialFileRefusal(folder, 'a-pipe')
+  expect(special).toEqual({ code: 'dataFolderWalkMetASpecialFile', values: { folder, name: 'a-pipe' } })
+  expect(theWalksError(move, folder)).toEqual({ message: move.theRefusalInEnglish(special), refusal: special })
+})
+
+it.skipIf(process.platform === 'win32')(
+  "DF4: the check answers the walk's own code, and any other error of the walk as dataFolderMoveRefused with the error's own words (skipped on Windows, where a link and a pipe need more than a test has)",
+  async () => {
+    const move = await theMove()
+
+    const linked = aDataFolder()
+    symlinkSync(join(linked.folder, 'nowhere'), join(linked.folder, 'a-link'))
+    const link = move.theFolderHoldsASymbolicLinkRefusal(linked.folder, 'a-link', join(linked.folder, 'a-link'))
+    expect(theChecksAnswerAbout(move, linked)).toEqual({ walk: link, refused: link })
+
+    const piped = aDataFolder()
+    expect(spawnSync('mkfifo', [join(piped.folder, 'a-pipe')]).status, 'mkfifo made the pipe').toBe(0)
+    const special = move.theFolderHoldsASpecialFileRefusal(piped.folder, 'a-pipe')
+    expect(theChecksAnswerAbout(move, piped)).toEqual({ walk: special, refused: special })
+
+    const shared = aDataFolder()
+    linkSync(join(shared.folder, 'keys.json'), join(made('data-folder-move-walk-outside-'), 'keys.json'))
+    const moreNames = move.theFileHasMoreNamesRefusal(join(shared.folder, 'keys.json'), 2, 1)
+    expect(theChecksAnswerAbout(move, shared)).toEqual({ walk: moreNames, refused: moreNames })
+
+    // A DATA FOLDER THAT IS NOT THERE: the walk's error is the file system's, and it goes in as it came.
+    const goneFolder = join(made('data-folder-move-gone-'), 'data')
+    let why = ''
+    try {
+      readdirSync(goneFolder)
+    } catch (error) {
+      why = error instanceof Error ? error.message : String(error)
+    }
+    expect(why, 'the folder is not there').not.toBe('')
+    const asItCame = { code: 'dataFolderMoveRefused', values: { why } }
+    expect(theChecksAnswerAbout(move, { folder: goneFolder, database: join(goneFolder, 'mole-office.db') })).toEqual({
+      walk: asItCame,
+      refused: asItCame,
+    })
+  },
+)
 
 it('DF4: on Linux a login unit that starts at login refuses the move and names the unit', async () => {
   const move = await theMove()
@@ -534,17 +658,97 @@ it('DF4: on Linux a login unit that starts at login refuses the move and names t
   const loginUnit = aLoginUnit({ unit: 'current', startsAtLogin: true, activeWord: 'inactive' })
 
   const refused = move.whyAMoveThereIsRefused(to, aFacts({ loginUnit }))
+  const english = move.theRefusalInEnglish(refused!)
 
-  expect(refused).toBe(move.theLoginUnitKeepsTheOldFolderWords(loginUnit))
-  expect(refused).toContain(loginUnit.unitPath)
+  expect(refused).toEqual(move.theLoginUnitKeepsTheOldFolderRefusal(loginUnit))
+  expect(english).toContain(loginUnit.unitPath)
+})
+
+// IN AN APPIMAGE THE READING ASKS SYSTEMD NOTHING, so it gives no start at login and no active word. On refuses
+// there, so the sentence asks for Off and never for On again.
+it('DF4: in an AppImage a unit a press wrote refuses the move and asks for Off only', async () => {
+  const move = await theMove()
+
+  for (const unit of ['current', 'out of date'] as const) {
+    const loginUnit = aLoginUnit({ unit, startsAtLogin: null, activeWord: null, fromAnAppImage: true })
+
+    const refused = move.whyAMoveThereIsRefused('/a/new/data', aFacts({ loginUnit }))
+    const english = move.theRefusalInEnglish(refused!)
+
+    expect(refused, unit).toEqual(move.theLoginUnitKeepsTheOldFolderRefusal(loginUnit))
+    expect(english, unit).toContain(loginUnit.unitPath)
+    expect(english, unit).toContain('Turn start at login off in Settings')
+    expect(english, unit).not.toContain('on again')
+    expect(english, unit).not.toContain('turn start at login on')
+    expect(english.replaceAll(loginUnit.unitPath, '<the unit>'), unit).not.toContain('systemd')
+  }
+})
+
+it('DF4: in an AppImage a unit the press did not write refuses the move and asks for the file to be removed', async () => {
+  const move = await theMove()
+  const loginUnit = aLoginUnit({ unit: 'not ours', startsAtLogin: null, activeWord: null, fromAnAppImage: true })
+
+  const refused = move.whyAMoveThereIsRefused('/a/new/data', aFacts({ loginUnit }))
+  const english = move.theRefusalInEnglish(refused!)
+
+  expect(refused).toEqual(move.theLoginUnitKeepsTheOldFolderRefusal(loginUnit))
+  expect(english).toContain(loginUnit.unitPath)
+  expect(english).toContain('Settings does not remove')
+  expect(english).not.toContain('names the database it opens')
+  expect(english).not.toContain('Turn start at login off')
+  expect(english).not.toContain('on again')
+})
+
+// OFF AN APPIMAGE THE READING DOES NOT ASK SYSTEMD WHETHER A UNIT THE PRESS DID NOT WRITE STARTS AT LOGIN, and Settings
+// draws no Off for it, so the sentence is the one an AppImage gets.
+it('DF4: off an AppImage a unit the press did not write that does not run gets the AppImage sentence', async () => {
+  const move = await theMove()
+  const loginUnit = aLoginUnit({ unit: 'not ours', startsAtLogin: null, activeWord: null, fromAnAppImage: false })
+
+  const refused = move.whyAMoveThereIsRefused('/a/new/data', aFacts({ loginUnit }))
+  const english = move.theRefusalInEnglish(refused!)
+
+  expect(refused).toEqual(move.theLoginUnitKeepsTheOldFolderRefusal(loginUnit))
+  expect(english).toContain(loginUnit.unitPath)
+  expect(english).toContain('Settings does not remove')
+  expect(english).not.toContain('names the database it opens')
+  expect(english).not.toContain('Turn start at login off')
+  expect(english).not.toContain('on again')
+  expect(english.replaceAll(loginUnit.unitPath, '<the unit>')).not.toContain('systemd')
+  expect(refused).toEqual(move.theLoginUnitKeepsTheOldFolderRefusal({ ...loginUnit, fromAnAppImage: true }))
+})
+
+it('DF4: off an AppImage a unit the press did not write that runs asks to remove it and start the computer again', async () => {
+  const move = await theMove()
+  const loginUnit = aLoginUnit({ unit: 'not ours', startsAtLogin: null, activeWord: 'active', fromAnAppImage: false })
+
+  const refused = move.whyAMoveThereIsRefused('/a/new/data', aFacts({ loginUnit }))
+  const english = move.theRefusalInEnglish(refused!)
+
+  expect(refused).toEqual(move.theLoginUnitKeepsTheOldFolderRefusal(loginUnit))
+  expect(english).toContain('remove that file')
+  expect(english).toContain('start the computer again')
+  expect(english).not.toContain('Turn start at login off')
+  expect(english).not.toContain('on again')
+})
+
+it('DF4: off an AppImage the refusal still asks to turn start at login on again', async () => {
+  const move = await theMove()
+  const loginUnit = aLoginUnit({ unit: 'current', startsAtLogin: true, activeWord: 'inactive', fromAnAppImage: false })
+
+  const refused = move.whyAMoveThereIsRefused('/a/new/data', aFacts({ loginUnit }))
+  const english = move.theRefusalInEnglish(refused!)
+
+  expect(refused).toEqual(move.theLoginUnitKeepsTheOldFolderRefusal(loginUnit))
+  expect(english).toContain('turn start at login on again')
 })
 
 it('DF4: a login unit that systemd does not call disabled refuses the move', async () => {
   const move = await theMove()
   const loginUnit = aLoginUnit({ unit: 'not ours', startsAtLogin: null, activeWord: null })
 
-  expect(move.whyAMoveThereIsRefused('/a/new/data', aFacts({ loginUnit }))).toBe(
-    move.theLoginUnitKeepsTheOldFolderWords(loginUnit),
+  expect(move.whyAMoveThereIsRefused('/a/new/data', aFacts({ loginUnit }))).toEqual(
+    move.theLoginUnitKeepsTheOldFolderRefusal(loginUnit),
   )
 })
 
@@ -552,11 +756,11 @@ it('DF4: a disabled login unit that runs refuses the move and says the office ru
   const move = await theMove()
   const loginUnit = aLoginUnit({ unit: 'current', startsAtLogin: false, activeWord: 'active' })
 
-  expect(move.whyAMoveThereIsRefused('/a/new/data', aFacts({ loginUnit }))).toBe(
-    move.theLoginUnitKeepsTheOldFolderWords(loginUnit),
+  expect(move.whyAMoveThereIsRefused('/a/new/data', aFacts({ loginUnit }))).toEqual(
+    move.theLoginUnitKeepsTheOldFolderRefusal(loginUnit),
   )
-  expect(move.theLoginUnitKeepsTheOldFolderWords(loginUnit)).not.toBe(
-    move.theLoginUnitKeepsTheOldFolderWords(aLoginUnit({ unit: 'current', startsAtLogin: false, activeWord: 'inactive' })),
+  expect(move.theLoginUnitKeepsTheOldFolderRefusal(loginUnit)).not.toEqual(
+    move.theLoginUnitKeepsTheOldFolderRefusal(aLoginUnit({ unit: 'current', startsAtLogin: false, activeWord: 'inactive' })),
   )
 })
 
@@ -575,6 +779,37 @@ it('DF4: a disabled login unit that does not run, or no unit, lets the move go o
       aFacts({ loginUnit: aLoginUnit({ unit: 'none', startsAtLogin: false, activeWord: null }) }),
     ),
   ).toBeNull()
+})
+
+// EACH WHOLE SENTENCE A LOGIN UNIT'S REFUSAL CAN SAY HAS A CODE OF ITS OWN, so a language that builds its sentences
+// another way writes each one whole. The last, a unit systemd says is off and that does not run, is not reached
+// through the check, which lets that unit through, and the refusal still gives it.
+it('DF4: each sentence a login unit refuses with is its own code, with the unit as its one value', async () => {
+  const move = await theMove()
+  const unitPath = '/a/home/.config/systemd/user/mole-office.service'
+  const sentences: [Partial<ALoginUnit>, string][] = [
+    [{ unit: 'not ours', startsAtLogin: null, activeWord: null }, 'dataFolderLoginUnitNotOurs'],
+    [{ unit: 'not ours', startsAtLogin: null, activeWord: 'active' }, 'dataFolderLoginUnitNotOursRuns'],
+    [{ unit: 'current', startsAtLogin: null, activeWord: null, fromAnAppImage: true }, 'dataFolderLoginUnitInAnAppImage'],
+    [{ unit: 'current', startsAtLogin: true, activeWord: 'inactive' }, 'dataFolderLoginUnitStartsAtLogin'],
+    [{ unit: 'current', startsAtLogin: true, activeWord: 'active' }, 'dataFolderLoginUnitStartsAtLoginRuns'],
+    [{ unit: 'out of date', startsAtLogin: null, activeWord: null }, 'dataFolderLoginUnitMayStartAtLogin'],
+    [{ unit: 'out of date', startsAtLogin: null, activeWord: 'activating' }, 'dataFolderLoginUnitMayStartAtLoginRuns'],
+    [{ unit: 'current', startsAtLogin: false, activeWord: 'active' }, 'dataFolderLoginUnitRuns'],
+    [{ unit: 'current', startsAtLogin: false, activeWord: 'inactive' }, 'dataFolderLoginUnitOff'],
+  ]
+  for (const [reading, code] of sentences) {
+    const loginUnit = aLoginUnit({ ...reading, unitPath })
+    expect(move.theLoginUnitKeepsTheOldFolderRefusal(loginUnit), code).toEqual({ code, values: { unit: unitPath } })
+    expect(move.whyAMoveThereIsRefused('/a/new/data', aFacts({ loginUnit })), code).toEqual(
+      code === 'dataFolderLoginUnitOff' ? null : { code, values: { unit: unitPath } },
+    )
+  }
+  const english = sentences.map(([reading]) =>
+    move.theRefusalInEnglish(move.theLoginUnitKeepsTheOldFolderRefusal(aLoginUnit({ ...reading, unitPath }))),
+  )
+  expect(new Set(english).size).toBe(sentences.length)
+  for (const one of english) expect(one).toContain(unitPath)
 })
 
 it('DF4: off Linux the login unit is not asked', async () => {
@@ -604,7 +839,7 @@ it('DF4: the login unit is asked before the process environment', async () => {
       '/a/new/data',
       aFacts({ loginUnit, processEnv: { MOLE_OFFICE_DB: '/a/shell/data.db' } }),
     ),
-  ).toBe(move.theLoginUnitKeepsTheOldFolderWords(loginUnit))
+  ).toEqual(move.theLoginUnitKeepsTheOldFolderRefusal(loginUnit))
 })
 
 // The mover reads the unit through its ways and hands it to the check, so a move from the command line is refused
@@ -616,10 +851,44 @@ it.skipIf(process.platform !== 'linux')('DF4: the mover hands the check the logi
   harness.ways.theLoginUnit = async () => loginUnit
 
   expect(await move.moveTheDataFolder(harness.target, harness.ways)).toEqual({
-    refused: move.theLoginUnitKeepsTheOldFolderWords(loginUnit),
+    refused: move.theRefusalInEnglish(move.theLoginUnitKeepsTheOldFolderRefusal(loginUnit)),
   })
   expect(harness.calls).toEqual({ stop: 0, start: 0, runtime: 0, startedWith: [] })
   expect(existsSync(harness.markPath)).toBe(false)
+})
+
+// THE WORDS FILE AND THE CODES AGREE. The door's own refusals are not the move's, so their words are written in the
+// word lists alone; every other data folder code is one the check, the walk or the confirm can give.
+it('DF4: the words file holds one template for each of the move\'s codes, with its value names, filled as an English page fills it', async () => {
+  const { THE_DATA_FOLDER_MOVE_WORDS, filledIn } = await import('../src/config/the-data-folder-move-words.mjs')
+  const THE_DOORS_OWN = [
+    'dataFolderOnlyThePerson',
+    'dataFolderTestWorld',
+    'dataFolderNoWayToStart',
+    'dataFolderNotABundle',
+    'dataFolderRunsAtWork',
+    'dataFolderMoveStarting',
+    'dataFolderMoverEnded',
+    'dataFolderMoverNotSeen',
+    'dataFolderNotUnderTheGrant',
+    'dataFolderMarkUnreadable',
+  ]
+  const declared: Record<string, Record<string, 'string' | 'number'>> = DATA_FOLDER_REFUSAL_CODES
+  const theMovesCodes = Object.keys(declared).filter((code) => !THE_DOORS_OWN.includes(code))
+  expect(THE_DOORS_OWN.filter((code) => !(code in declared)), 'a door code the list does not declare').toEqual([])
+  expect(Object.keys(THE_DATA_FOLDER_MOVE_WORDS).sort()).toEqual(theMovesCodes.sort())
+
+  const en = createI18n('en')
+  const words: Record<string, string> = THE_DATA_FOLDER_MOVE_WORDS
+  for (const code of theMovesCodes) {
+    const template = words[code] as string
+    const places = [...template.matchAll(/\{(\w+)\}/g)].map((found) => found[1])
+    expect(new Set(places), code).toEqual(new Set(Object.keys(declared[code] ?? {})))
+    const values: Record<string, string | number> = {}
+    for (const [name, type] of Object.entries(declared[code] ?? {})) values[name] = type === 'number' ? 42 : `Test ${name}`
+    expect(filledIn(template, values), code).toBe(en.t(`server.${code}` as WordKey, values))
+    expect(filledIn(template, values), code).not.toMatch(/\{\w+\}/)
+  }
 })
 
 // ============================================================ DF5 to DF12, the move itself
@@ -1440,7 +1709,7 @@ it('DF16: the confirm removes only the names whose bytes still match, names what
   writeFileSync(join(old.folder, 'report-files', 'stored.txt'), 'changed after the move\n')
 
   const answer = move.confirmTheMove(harness.markPath, harness.newDatabase)
-  if ('refused' in answer) throw new Error(`the confirm was refused: ${answer.refused}`)
+  if ('refused' in answer) throw new Error(`the confirm was refused: ${move.theRefusalInEnglish(answer.refused)}`)
 
   expect(answer.removed.sort()).toEqual(Object.keys(manifest).filter((name) => name !== 'report-files/stored.txt').sort())
   expect(answer.kept.sort()).toEqual(['report-files/added.txt', 'report-files/stored.txt'])
@@ -1479,7 +1748,7 @@ it.skipIf(process.platform === 'win32' || process.getuid?.() === 0)(
       chmodSync(unreadFile, 0o600)
     }
 
-    if ('refused' in answer) throw new Error(`the confirm was refused: ${answer.refused}`)
+    if ('refused' in answer) throw new Error(`the confirm was refused: ${move.theRefusalInEnglish(answer.refused)}`)
     expect(answer.kept).toEqual(['backups/', 'report-files/stored.txt'])
     expect(answer.removed.sort()).toEqual(
       Object.keys(manifest).filter((name) => name !== 'report-files/stored.txt' && !name.startsWith('backups/')).sort(),
@@ -1517,7 +1786,10 @@ it.skipIf(process.platform === 'win32' || process.getuid?.() === 0)(
     }
 
     expect(why, 'mode 0 stops the read here').not.toBe('')
-    expect(answer).toEqual({ refused: move.theOldFolderCannotBeReadWords(harness.markPath, old.folder, why) })
+    expect(answer).toEqual({
+      refused: { code: 'dataFolderConfirmCannotReadTheOldFolder', values: { mark: harness.markPath, from: old.folder, why } },
+    })
+    expect(answer).toEqual({ refused: move.theOldFolderCannotBeReadRefusal(harness.markPath, old.folder, why) })
     expect(readFileSync(harness.markPath, 'utf8')).toBe(markBefore)
     expect(existsSync(join(old.folder, 'keys.json'))).toBe(true)
     expect(readFileSync(join(old.folder, 'report-files', 'stored.txt'), 'utf8')).toBe('a stored file\n')
@@ -1548,10 +1820,34 @@ it('DF16: a confirm is refused while the mark says the move was switched back', 
   const before = readFileSync(markPath, 'utf8')
 
   expect(move.confirmTheMove(markPath, '/a/new/data/mole-office.db')).toEqual({
-    refused: move.theConfirmNeedsAStartedMoveWords(markPath, 'switched-back'),
+    refused: { code: 'dataFolderConfirmNeedsAStartedMove', values: { mark: markPath, state: 'switched-back' } },
+  })
+  expect(move.theConfirmNeedsAStartedMoveRefusal(markPath, 'switched-back')).toEqual({
+    code: 'dataFolderConfirmNeedsAStartedMove',
+    values: { mark: markPath, state: 'switched-back' },
   })
   expect(existsSync(join(old.folder, 'report-files', 'stored.txt'))).toBe(true)
   expect(readFileSync(markPath, 'utf8')).toBe(before)
+})
+
+it('DF16: a confirm with no mark, or a mark it cannot read, is refused with its own code and changes nothing', async () => {
+  const move = await theMove()
+  const folder = made('data-folder-move-confirm-')
+  const markPath = join(folder, 'data-folder-move.json')
+
+  expect(move.confirmTheMove(markPath, '/a/new/data/mole-office.db')).toEqual({
+    refused: { code: 'dataFolderNoMoveToConfirm', values: { mark: markPath } },
+  })
+  expect(existsSync(markPath)).toBe(false)
+
+  writeFileSync(markPath, '{"version": 99}\n')
+  const read = move.readTheMoveMark(markPath)
+  if (read.state !== 'unreadable') throw new Error(`a mark of another version reads as ${read.state}`)
+  expect(read.why, 'the reason is the mover\'s own English, carried as a value').toBe('it is not a mark this version writes')
+  expect(move.confirmTheMove(markPath, '/a/new/data/mole-office.db')).toEqual({
+    refused: { code: 'dataFolderMoveRunningUnknown', values: { mark: markPath, why: read.why } },
+  })
+  expect(readFileSync(markPath, 'utf8')).toBe('{"version": 99}\n')
 })
 
 it.skipIf(process.platform === 'win32' || process.getuid?.() === 0)(
@@ -1574,7 +1870,7 @@ it.skipIf(process.platform === 'win32' || process.getuid?.() === 0)(
       chmodSync(held, 0o700)
     }
 
-    if ('refused' in answer) throw new Error(`the confirm was refused: ${answer.refused}`)
+    if ('refused' in answer) throw new Error(`the confirm was refused: ${move.theRefusalInEnglish(answer.refused)}`)
     expect(existsSync(join(held, 'inner', 'kept-copy.txt')), 'the copied file was removed').toBe(false)
     expect(answer.kept).toContain('held/inner/')
     expect(answer.kept).not.toContain('held/')
@@ -1599,7 +1895,7 @@ it('DF21: a confirm at switched is taken when its mover has ended and the new da
 
   const answer = move.confirmTheMove(harness.markPath, harness.newDatabase)
 
-  if ('refused' in answer) throw new Error(`the confirm was refused: ${answer.refused}`)
+  if ('refused' in answer) throw new Error(`the confirm was refused: ${move.theRefusalInEnglish(answer.refused)}`)
   expect(existsSync(join(old.folder, 'keys.json')), 'the copied file was removed').toBe(false)
   expect(answer.removed).toEqual(['keys.json'])
   const read = move.readTheMoveMark(harness.markPath)
@@ -1620,7 +1916,11 @@ it('DF21: a confirm at switched waits while its mover is alive and removes nothi
   const before = readFileSync(harness.markPath, 'utf8')
 
   expect(move.confirmTheMove(harness.markPath, harness.newDatabase)).toEqual({
-    refused: move.theConfirmWaitsForTheMoverWords(harness.markPath, mark.mover.pid),
+    refused: { code: 'dataFolderConfirmWaitsForTheMover', values: { mark: harness.markPath, pid: mark.mover.pid } },
+  })
+  expect(move.theConfirmWaitsForTheMoverRefusal(harness.markPath, mark.mover.pid)).toEqual({
+    code: 'dataFolderConfirmWaitsForTheMover',
+    values: { mark: harness.markPath, pid: mark.mover.pid },
   })
   expect(existsSync(join(old.folder, 'keys.json'))).toBe(true)
   expect(readFileSync(harness.markPath, 'utf8')).toBe(before)
@@ -1637,7 +1937,14 @@ it('DF21: a confirm at switched with another database in use is refused and remo
   move.writeTheMoveMark(harness.markPath, mark)
 
   expect(move.confirmTheMove(harness.markPath, old.database)).toEqual({
-    refused: move.theConfirmNeedsTheNewDatabaseWords(harness.markPath, harness.newDatabase, old.database),
+    refused: {
+      code: 'dataFolderConfirmNeedsTheNewDatabase',
+      values: { mark: harness.markPath, wanted: harness.newDatabase, inUse: old.database },
+    },
+  })
+  expect(move.theConfirmNeedsTheNewDatabaseRefusal(harness.markPath, harness.newDatabase, old.database)).toEqual({
+    code: 'dataFolderConfirmNeedsTheNewDatabase',
+    values: { mark: harness.markPath, wanted: harness.newDatabase, inUse: old.database },
   })
   expect(existsSync(join(old.folder, 'keys.json'))).toBe(true)
 })

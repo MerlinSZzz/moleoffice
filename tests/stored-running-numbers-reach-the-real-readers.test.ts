@@ -10,31 +10,7 @@ let t:TestDb,app:FastifyInstance
 const headers={'x-mole-office-actor-type':'human','x-mole-office-actor-id':THE_TEST_OFFICES_OWNER.id,'x-mole-office-workspace':'default'}
 beforeEach(async()=>{t=await freshDb();app=(await apiApp()).app;await app.ready()})
 afterEach(async()=>{await app.close();t.close()})
-const cap='MOLE_OFFICE_BUS_MOST_ENTRIES',delay='MOLE_OFFICE_BUS_LEAVES_AFTER_SECONDS'
 async function change(changes:object[]){return app.inject({method:'POST',url:'/api/office/settings',headers,payload:{changes,because:'Made-up running choice'}})}
-function realBus(){
- const script="process.argv=['node','made-up-reader','--entry','made-up-bus','--session','made-up-run','--api','http://127.0.0.1:0','--workdir',process.env.MADE_UP_BUS_DIR]; const {THE_BUS_READS}=await import('./tools/merge-tool/arguments.mjs'); const {theBusRules}=await import('./tools/merge-tool/pairs.mjs'); console.log(JSON.stringify(theBusRules(THE_BUS_READS)))"
- const output=execFileSync(process.execPath,['--input-type=module','-e',script],{env:{...process.env,MADE_UP_BUS_DIR:t.file.slice(0,t.file.lastIndexOf('/')),MOLE_OFFICE_DB:t.file,[cap]:'3',[delay]:'20'},timeout:15_000,encoding:'utf8'})
- return JSON.parse(output.trim().split('\n').at(-1)!)
-}
-it('uses protected saved numbers in the real merge bus, checks integer and timer bounds atomically, and resets to the shipped value explicitly',async()=>{
- expect((await change([{name:cap,value:'12'},{name:delay,value:'0'}])).statusCode).toBe(200)
- expect(realBus()).toEqual({most:12,leavesAfterSeconds:0})
- for(const value of ['65','1e1','4.0','0','9007199254740993']){
-  const refusal=await change([{name:delay,value:'99'},{name:cap,value}]);expect(refusal.statusCode,refusal.body).toBe(400);expect(refusal.json().code).toBe('runtimeSettingsBadValue');expect(realBus()).toEqual({most:12,leavesAfterSeconds:0})
- }
- expect((await change([{name:delay,value:'2147484'}])).statusCode).toBe(400)
- const read=(await app.inject({method:'GET',url:'/api/office/settings'})).json().settings
- const shipped=read.find((s:{name:string})=>s.name===cap).shippedValue
- expect(shipped).toBe('8')
- expect((await change([{name:cap,value:shipped}])).statusCode).toBe(200);expect(realBus().most).toBe(8)
- const {slotPools}=await import('../src/server/lib/slots.ts')
- expect((await change([{name:'MOLE_OFFICE_BROWSER_TEST_SLOTS',value:'5'}])).statusCode).toBe(200)
- expect(slotPools().find(p=>p.name==='browser-tests')?.capacity).toBe(5)
- const audit=t.client.sqlite.prepare('SELECT old_value,new_value FROM changes WHERE record_id=?').all('setting:runtime:'+cap) as {old_value:string;new_value:string}[]
- expect(audit).toHaveLength(2);expect(JSON.parse(audit[1]!.old_value).value).toBe('12');expect(JSON.parse(audit[1]!.new_value).chosen).toBe('8')
-})
-
 it('reads the stored edit window once per message pool, and a later press changes every expiry',async()=>{
  const name='MOLE_OFFICE_MESSAGE_EDIT_WINDOW_SECONDS'
  expect((await change([{name,value:'60'}])).statusCode).toBe(200)
@@ -53,17 +29,6 @@ it('reads the stored edit window once per message pool, and a later press change
  for(const row of bigger.rows){const later=next.rows.find(r=>r.id===row.id)!;expect(row.wordsMayChangeUntil).not.toBeNull();expect(Date.parse(later.wordsMayChangeUntil!)-Date.parse(row.wordsMayChangeUntil!)).toBe(60_000)}
 })
 
-it('accepts exact owner words for a bus cap, and refuses a different value or an unbound secretary',async()=>{
- const made=await app.inject({method:'POST',url:'/api/agents/started',headers,payload:{handle:'numbers-clerk',name:'Made-up number clerk',role:'secretary'}});expect(made.statusCode).toBe(201)
- const {agentByHandle}=await import('../src/server/lib/participants.ts'),{makeAnAgentKey}=await import('../src/server/lib/keys.ts')
- const clerk=agentByHandle('numbers-clerk')!
- const asClerk={...headers,'x-mole-office-actor-type':'agent','x-mole-office-actor-id':'numbers-clerk','x-mole-office-key':makeAnAgentKey(clerk.id,null)}
- const press=(value:string,warrant?:object)=>app.inject({method:'POST',url:'/api/office/settings',headers:asClerk,payload:{changes:[{name:cap,value}],because:'Made-up exact words',...(warrant?{warrant}:{})}})
- expect((await press('12')).statusCode).toBe(403)
- const warrant={saidBy:THE_TEST_OFFICES_OWNER.id,words:'Made-up words: set the bus cap to twelve.',where:'terminal',when:'2026-10-12 10:00',for:['office.set-settings:'+JSON.stringify([{name:cap,value:'12',effective:'12',decision:null}])]}
- expect((await press('13',warrant)).statusCode).toBe(403)
- expect((await press('12',warrant)).statusCode).toBe(200);expect(realBus().most).toBe(12)
-})
 function realBudget(){
  // The reader checks both runner files before the cap. These synthetic ones pass that check; nothing runs them or calls Modal.
  const dir=t.file.slice(0,t.file.lastIndexOf('/')),token=dir+'/made-up-token.toml',python=dir+'/made-up-python'

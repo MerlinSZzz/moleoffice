@@ -37,10 +37,11 @@
  *
  *   - A NEW OFFICE (no records and no person yet): the owner is MOLE_OFFICE_OWNER_ID, or `owner`
  *     when nothing said. The name is MOLE_OFFICE_OWNER_NAME, or none: the row holds the placeholder
- *     and the mark says `unnamed`.
+ *     and the mark says `unnamed`. The row's `starting_mode` is `inspect`, so the owner starts in
+ *     Developer mode.
  *   - AN OFFICE THAT ALREADY HOLDS WORK (records, or a person): both settings must be set. Where it
  *     holds no person yet (records from before people had rows), the owner's row is written from
- *     them. Otherwise the id must be a person already in it and the name the name that person
+ *     them, with no starting mode, because that person has been using the office. Otherwise the id must be a person already in it and the name the name that person
  *     already has; then the mark is written on that row and nothing else changes. Anything else
  *     stops the migrate with a sentence naming what to set. It never picks an owner for an office by itself, because
  *     that would silently give somebody's work to a person nobody named.
@@ -94,6 +95,15 @@ function setOrNull(value: string | null): string | null {
 function hasColumn(sqlite: Database.Database): boolean {
   const columns = sqlite.prepare("SELECT name FROM pragma_table_info('people')").all() as { name: string }[]
   return columns.some((one) => one.name === 'office_owner')
+}
+
+/**
+ * Whether `people` has the column `starting_mode`, read from the table itself. The check exists for an office one
+ * migration behind: a test that migrates to a point before the column, whose owner's row is written without it.
+ */
+function hasTheStartingModeColumn(sqlite: Database.Database): boolean {
+  const columns = sqlite.prepare("SELECT name FROM pragma_table_info('people')").all() as { name: string }[]
+  return columns.some((one) => one.name === 'starting_mode')
 }
 
 function hasTable(sqlite: Database.Database, table: string): boolean {
@@ -156,7 +166,7 @@ function whySettingsAreRefused(settings: OwnerSettings): string | null {
 type OwnerPlan =
   | { kind: 'already'; owner: OfficeOwnerRow }
   | { kind: 'mark-existing'; id: string; mark: OfficeOwnerMark }
-  | { kind: 'write-new'; id: string; name: string; mark: OfficeOwnerMark }
+  | { kind: 'write-new'; id: string; name: string; mark: OfficeOwnerMark; newOffice: boolean }
   | { kind: 'refuse'; why: string }
 
 function planTheOwner(sqlite: Database.Database, settings: OwnerSettings): OwnerPlan {
@@ -177,8 +187,8 @@ function planTheOwner(sqlite: Database.Database, settings: OwnerSettings): Owner
   }
   if (!holdsWork(sqlite)) {
     const id = settings.id ?? THE_OWNER_ID_WHEN_NOTHING_SAID
-    if (settings.name === null) return { kind: 'write-new', id, name: THE_OWNER_PLACEHOLDER.en, mark: 'unnamed' }
-    return { kind: 'write-new', id, name: settings.name.trim(), mark: 'named-by-the-installer' }
+    if (settings.name === null) return { kind: 'write-new', id, name: THE_OWNER_PLACEHOLDER.en, mark: 'unnamed', newOffice: true }
+    return { kind: 'write-new', id, name: settings.name.trim(), mark: 'named-by-the-installer', newOffice: true }
   }
   if (settings.id === null || settings.name === null) {
     const missing = [settings.id === null ? 'MOLE_OFFICE_OWNER_ID' : null, settings.name === null ? 'MOLE_OFFICE_OWNER_NAME' : null]
@@ -195,7 +205,9 @@ function planTheOwner(sqlite: Database.Database, settings: OwnerSettings): Owner
   const people = peopleIn(sqlite)
   // RECORDS AND NOBODY REGISTERED: an office from before people had rows (migration 0114). Its records
   // were filed under an id the installer now names, so the owner's row is written with both settings.
-  if (people.length === 0) return { kind: 'write-new', id: settings.id, name: settings.name.trim(), mark: 'named-by-the-installer' }
+  if (people.length === 0) {
+    return { kind: 'write-new', id: settings.id, name: settings.name.trim(), mark: 'named-by-the-installer', newOffice: false }
+  }
   if (!people.includes(settings.id)) {
     return {
       kind: 'refuse',
@@ -263,6 +275,11 @@ export function settleTheOfficeOwner(
     case 'write-new':
       writeRow(plan.id, plan.name)
       sqlite.prepare('UPDATE people SET office_owner = ? WHERE id = ?').run(plan.mark, plan.id)
+      // A NEW OFFICE'S OWNER STARTS IN DEVELOPER MODE. The owner of an office that already holds records keeps NULL,
+      // read as Normal mode, because they have been using the office in it.
+      if (plan.newOffice && hasTheStartingModeColumn(sqlite)) {
+        sqlite.prepare("UPDATE people SET starting_mode = 'inspect' WHERE id = ?").run(plan.id)
+      }
       return { owner: readTheOfficeOwner(sqlite) as OfficeOwnerRow, did: 'written' }
   }
 }

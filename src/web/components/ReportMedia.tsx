@@ -43,6 +43,8 @@ import { t } from '@shared/i18n.ts'
 import type { MediaLoadChoice } from '@shared/mediaload.ts'
 import { playerForType } from '@shared/reportmedia.ts'
 import type { AudioBlock, FileBlock, ImageBlock, VideoBlock } from '@shared/types.ts'
+import { AFileLink, useALoadByTicket } from '../lib/file-tickets.tsx'
+import { theCrossOriginOfALoad } from '../lib/visiting.ts'
 import { FileFacts, ImagePreview, usePictureBytes, type BlockMark } from './SummaryBlocks.tsx'
 
 /** What the person's media choice says for one figure. The shape `useMediaChoice` in SummaryBlocks.tsx returns. */
@@ -120,13 +122,36 @@ export function Player({ block, outcome }: {
     )
   }
   if (block.type === 'video') return <ImagePreview block={picture} outcome={outcome} />
+  return <Sound alt={block.alt} outcome={outcome} />
+}
+
+/**
+ * A SOUND THE DOOR STREAMS, AND THE LINK THAT SAVES IT WHOLE, as `ImagePreview` draws a video: from the visited world
+ * on a trip with no cookie, and on a paired page at home by a ticket (src/web/lib/file-tickets.tsx).
+ */
+function Sound({ alt, outcome }: { alt: string; outcome: Extract<ReturnType<typeof usePictureBytes>['outcome'], { phase: 'shown' }> }) {
+  const load = useALoadByTicket(outcome.opens, outcome.src)
   return (
     <>
-      <audio src={outcome.src} controls preload="metadata" aria-label={block.alt} />
-      {outcome.saveAt === undefined ? null : (
-        <a className="sb-video-save" href={outcome.saveAt} download>
+      {load.notLoaded ? (
+        <div className="sb-image-stand" data-preview="not-loaded">
+          <p>{t('w13s.file.notLoaded')}</p>
+        </div>
+      ) : (
+        <audio
+          src={load.src}
+          crossOrigin={theCrossOriginOfALoad()}
+          controls
+          preload="metadata"
+          aria-label={alt}
+          onError={load.onError}
+          onLoadedMetadata={load.onLoadedMetadata}
+        />
+      )}
+      {outcome.saveAt === undefined || outcome.opens === undefined ? null : (
+        <AFileLink className="sb-video-save" file={outcome.opens} plain={outcome.saveAt} saves>
           {t('reportMedia.saveWholeAudio')}
-        </a>
+        </AFileLink>
       )}
     </>
   )

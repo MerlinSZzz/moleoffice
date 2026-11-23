@@ -67,18 +67,20 @@ import { type UnreadablePlace, describeReadFailure } from './adapters/types.ts'
 // file kept its own copy of the last two until 2026-08-12; see `PERSON_LEVEL_REGIONS` below.
 import {
   ARCHIVED_TABLES,
-  AUTHORED_TABLE_OF,
   DERIVED_TABLES,
   LEFT_OUT_OF_BACKUPS_AND_EXPORTS,
   MEASURED_TABLES,
-  PERSON_LEVEL_TABLES,
-  WORKSPACE_COLUMN,
   whyATableBelongsToNoProject,
   type ArchivedTable,
-  type ScopedThroughAnotherTable,
-  everyPartTable,
-  type WorkspaceScope,
 } from '../db/schema.ts'
+import {
+  AUTHORED_TABLE_OF,
+  PERSON_LEVEL_TABLES,
+  WORKSPACE_COLUMN,
+  type ScopedThroughAnotherTable,
+  type WorkspaceScope,
+} from '../db/authored-table-of.ts'
+import { everyPartTable } from '../db/every-part-table.ts'
 import type { PartTable } from '../db/part-tables.ts'
 import { readRegistryAliases, REGISTRY_ALIAS_ARCHIVE_VERSION } from './registry-aliases/index.ts'
 import { theKeyProvedTheRowsOwnWriter } from './agent-references.ts'
@@ -521,7 +523,7 @@ const REGION_COLUMNS = {
   // All three are somebody's own words about their own work and exist nowhere else.
   //
   // A THREAD SAYS WHICH PROJECT IT IS ABOUT AND THE OTHER TWO DO NOT. A message and a run belong to
-  // the project their thread names, which is why `WORKSPACE_COLUMN` in db/schema.ts answers for them
+  // the project their thread names, which is why `WORKSPACE_COLUMN` in db/authored-table-of.ts answers for them
   // with the thread rather than with a column, and why a project-scoped archive reads them through
   // it. There is no `workspaceId` line on either of them, and adding one would be the same fact in
   // two places.
@@ -808,10 +810,13 @@ const REGION_COLUMNS = {
     // AND THE PERSON'S OWN MESSAGE LABELS, from migration 0341. The same reason: words and colours
     // somebody chose, which nothing can work out again.
     'chatLabels',
-    // AND THE PERSON'S OWN SETTINGS FOR THE TWO SHIPPED FLAGS AND 'NO MARK', from migration 0346. The same
+    // AND THE PERSON'S OWN SETTINGS FOR THE FOUR SHIPPED FLAGS AND 'NO MARK', from migration 0346. The same
     // reason: words and colours somebody chose, which nothing can work out again.
     'shippedFlags',
     'chatLayout',
+    // AND THE MODE THE PERSON STARTS IN, from migration 0354. Carried because nothing can work it out again: a restore
+    // that dropped it would put a person the office made back on Normal mode, read from NULL.
+    'startingMode',
     // AND THE PERSON'S CHOSEN LOOK AND THE THEMES THEY MADE, from migration 0347. The same reason:
     // a choice and colours somebody made, which nothing can work out again.
     'themes',
@@ -1048,6 +1053,10 @@ const REGION_COLUMNS = {
     // because it is a moment, and nothing can recreate a moment: a restore that dropped it would set it again at the next
     // reading of the queue, and a message written in another project between the two would wait for a press.
     'otherProjectsMessagesSince',
+    // WHEN THIS OFFICE BEGAN TO KEEP THE HAND-OVERS OF AN AGENT'S OWNER, wave 13s round 281, added by 0356. Carried
+    // because it is a moment: a restore that dropped it would set it again at the next start, and the page would say the
+    // list began after hand-overs it holds.
+    'ownerChangesSince',
   ],
   // EVERY WORLD THIS INSTALLATION HAS EVER HAD. Carried because a world appearing and a world
   // disappearing are moments, and nothing can recreate a moment.
@@ -1191,6 +1200,7 @@ const REGION_COLUMNS = {
     'runtime',
     'claimedAt',
     'lastHeardAt',
+    'lastHeardInstant',
     'releasedAt',
     'releasedBecause',
   ],
@@ -1201,7 +1211,8 @@ const REGION_COLUMNS = {
   one_press_requests: ['id', 'workspaceId', 'act', 'inputs', 'askedBy', 'shows', 'because', 'state', 'askedAt', 'answeredAt', 'answeredByKind', 'answeredById', 'outcome'],
   // ONE USE OF A TOOL, ONE ROW, migration 0231 (wave 13s round 33).
   // AND WHAT THE USE DOOR FOUND WHEN IT CHECKED THE LINE'S PROOF, added by migration 0300 (wave 13n round R, item 2i).
-  tool_uses: ['id', 'workspaceId', 'runId', 'seq', 'at', 'tool', 'said', 'actorType', 'actorId', 'movedAt', 'proof'],
+  // AND THE MOMENT OF ITS STAMP AS AN INSTANT WITH ITS OFFSET, added by migration 0358.
+  tool_uses: ['id', 'workspaceId', 'runId', 'seq', 'at', 'tool', 'said', 'actorType', 'actorId', 'movedAt', 'proof', 'atInstant'],
   test_file_runs: ['id', 'workspaceId', 'useId', 'file', 'result', 'seconds', 'testFileHash', 'treeCommit', 'treeChange'],
   // A HANDOVER DOCUMENT FOR AN AGENT, migration 0232.
   handovers: ['id', 'agentId', 'workspaceId', 'text', 'writtenAt', 'writtenByKind', 'writtenById', 'sessionId'],
@@ -1403,7 +1414,7 @@ function tableOf(region: AuthoredRegion) {
   return isPartRegion(region) ? partTableOf(region).table : AUTHORED_TABLE_OF[region]
 }
 
-/** How a row of a region is scoped to a project, as `WORKSPACE_COLUMN` in schema.ts answers. */
+/** How a row of a region is scoped to a project, as `WORKSPACE_COLUMN` in authored-table-of.ts answers. */
 function workspaceScopeOf(region: AuthoredRegion): WorkspaceScope {
   return isPartRegion(region) ? partTableOf(region).workspaceColumn : WORKSPACE_COLUMN[region]
 }
@@ -1830,7 +1841,7 @@ function draftsLeftBehind(): string | null {
   )
 }
 
-function readMigrations(): { rows: { hash: string; when: number; tag: string | null }[]; note: string | null } {
+export function readMigrations(): { rows: { hash: string; when: number; tag: string | null }[]; note: string | null } {
   const applied = sqlite
     .prepare('SELECT hash, created_at AS whenMs FROM __drizzle_migrations ORDER BY created_at')
     .all() as { hash: string; whenMs: number }[]
@@ -1981,9 +1992,8 @@ function theAliasClosure(
 /**
  * Build every file the export produces, without touching the disk.
  *
- * Separated from writing so that a test can compare two builds, an endpoint can report what an
- * export WOULD contain without producing it, and the mirror can be given a tree rather than a
- * directory.
+ * Separated from writing so that a test can compare two builds and the mirror can be given a tree
+ * rather than a directory. It holds every file, so a door that only counts calls `countExport` below.
  *
  * `workspaceId` NARROWS IT TO ONE PROJECT — every region is read with that project's rows and no
  * others, including the `workspaces` region itself, so the archive is self-contained: it declares
@@ -1997,6 +2007,17 @@ export function buildExport(opts: { workspaceId?: string } = {}): {
   const files: ExportFile[] = []
   const report = inOneReading(() => exportFileByFile(opts, (file) => files.push(file)))
   return { files: sortBy(files, (f) => f.path), report }
+}
+
+/**
+ * What an export would contain, counted as each file is made and keeping none of them.
+ *
+ * IT MAKES EVERY FILE, by the code that writes them, so its files and bytes are the ones an export
+ * would write. It keeps no file, so a store larger than the server's heap can be counted.
+ * `workspaceId` narrows it to one project, as in `buildExport`.
+ */
+export function countExport(opts: { workspaceId?: string } = {}): Omit<ExportReport, 'root' | 'written' | 'unchanged' | 'removed'> {
+  return inOneReading(() => exportFileByFile(opts, () => {}))
 }
 
 /**
@@ -3977,6 +3998,8 @@ function exportFileByFile(
       'never said who wrote each line.',
       '`proof` is what the use door found when it checked that tools/use-line.mjs sent the line: `matches`, `none` or',
       '`does not match`. It is empty on a row written before migration 0300, when the door did not check.',
+      '`atInstant` is the same moment as `at`, as an instant with its offset. It is empty on a row written before',
+      'migration 0358 and on a row moved out of a run\'s list.',
       '',
     ]
     if (sorted.length === 0) {
@@ -5272,7 +5295,7 @@ function walk(dir: string, unreadable: UnreadablePlace[]): string[] {
   }
   for (const entry of entries) {
     const full = join(dir, entry.name)
-    if (entry.isDirectory()) out.push(...walk(full, unreadable))
+    if (entry.isDirectory()) for (const path of walk(full, unreadable)) out.push(path)
     else out.push(full)
   }
   return out

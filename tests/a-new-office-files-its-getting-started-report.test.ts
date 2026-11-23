@@ -13,7 +13,7 @@
  *   1. An office whose person was named before files nothing. The naming door refuses a second name with 409, and
  *      GET /api/getting-started says there is no first entry, with no report, checklist or item.
  *   2. The person names a new office in English. The office files one report, written by the office, for the name
- *      given, in the English words. It holds two pictures, which are files of public/ that GET /api/file serves, each
+ *      given, in the English words. It holds three pictures, which are files of public/ that GET /api/file serves, each
  *      captioned as a made-up office. Its words name the Embassy and the admitting press by the words those
  *      pages draw. The office puts one standing item on one new checklist of the person's. The item links the report
  *      and names it in its words. GET /api/getting-started says the first entry is on and shows, and names all three.
@@ -28,19 +28,42 @@
  *      checklist.
  *   6. With no first entry, the press that ends one is refused with 409, and nothing is written.
  *   7. A first entry whose report was taken away does not show, so it cannot hold the person behind its layer.
+ *   8. The English report asks the person to try right-click, after the admit picture and before the part that says
+ *      the report stays on the checklist. The part is a heading "Try right-click?" and its words, then one picture of
+ *      the whole box a right-click opens, with its alt and the made-up caption. Then comes one bulleted list with a
+ *      line for each of the box's eight items, in the box's order: Copy, the pin, the close mark, the box you write
+ *      in, Contact or Note with the chooser, Send, Start review and More. Each line that names a press names it by
+ *      the word the box draws.
  *
  * MUTATIONS, each after a green control run, then restored: listed in round 138's report.
+ *
+ * Test change (wave 13y round 175): the report gains a part that asks the person to try right-click, as the owner
+ * asked, with one picture of the whole box a right-click opens and a line for each of its eight items. Case 2 now
+ * counts three pictures: the two of the way in and that one. Before, it counted two. It fails on main's code, which
+ * files two. Case 8 is new, and holds what the part says and where it is. It fails on main's code, which files no
+ * such part.
+ *
+ * Test change (wave 13y round 175, the translation round): cases 9 and 10 are new.
+ *   9. The list of the report's words holds the ten words the report takes from other pages: the box's six presses,
+ *      the Embassy's name, the menu's name and the two presses of an ask. So the check of whether a language holds the
+ *      whole report reads them too. It fails on main's code, whose list lacks all ten.
+ *  10. The person names a new office in Chinese, and the report is in Chinese: its title, the heading and words of each
+ *      text block, the alt and caption of each picture, and the eight lines of the right-click part are the Chinese
+ *      words, and each picture is from the Chinese folder. The checklist's title and its item are in Chinese too. The
+ *      case does not read what the checkout holds, so it fails until Chinese holds every word and picture of the
+ *      report. It fails on main, which lacks Chinese for eleven of the report's own words and for three of the box's
+ *      words the report names, and has no Chinese pictures.
  */
 
 import type { FastifyInstance } from 'fastify'
 import { existsSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { basename, dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { THE_GETTING_STARTED_FOLDER } from '../src/shared/getting-started.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
-import { sayInEnglish, WORD_LISTS, type WordKey } from '../src/shared/i18n.ts'
+import { createI18n, sayInEnglish, WORD_LISTS, type WordKey } from '../src/shared/i18n.ts'
 import { apiApp, freshDb, thePersonsKeyHeader, type TestDb } from './helpers.ts'
 
 const REPO = fileURLToPath(new URL('..', import.meta.url))
@@ -172,7 +195,8 @@ describe('the getting-started report and the first entry', () => {
     expect(words).toContain(NAME)
 
     const pictures = (report['data']['blocks'] as Record<string, any>[]).filter((block) => block['type'] === 'image')
-    expect(pictures).toHaveLength(2)
+    // TWO PICTURES OF THE WAY IN AND ONE OF THE WHOLE RIGHT-CLICK BOX.
+    expect(pictures).toHaveLength(3)
     for (const picture of pictures) {
       const path = String(picture['path'])
       expect(path.startsWith(`${join(PICTURES, 'en')}/`), path).toBe(true)
@@ -286,5 +310,159 @@ describe('the getting-started report and the first entry', () => {
     const gone = await theFirstEntry()
     expect(gone).toMatchObject({ state: 'on', shows: false, report: on['report'] })
     expect(String(gone['says'])).not.toBe(String(on['says']))
+  })
+
+  it('8: the report asks the person to try right-click, with one picture of the whole box and a line for each of its eight items, after the way in', async () => {
+    anUnnamedOffice()
+    expect((await call('POST', '/api/office/owner', PERSON, { name: NAME, language: 'en' })).status).toBe(200)
+    const report = await aRecord((await theFirstEntry())['report'])
+    const blocks = report['data']['blocks'] as Record<string, any>[]
+    const words = (key: string, values?: Record<string, string>): string => sayInEnglish(key as WordKey, values)
+    // EACH PRESS IS NAMED BY THE WORD THE BOX DRAWS FOR IT, so a press renamed in the box is renamed here too.
+    const press = {
+      copy: sayInEnglish('talk.copy'),
+      contact: sayInEnglish('talk.sendTo.contact'),
+      note: sayInEnglish('talk.sendTo.note'),
+      send: sayInEnglish('talk.send'),
+      startReview: sayInEnglish('talk.startReview'),
+      more: sayInEnglish('talk.more'),
+    }
+    // THE HEADING AND ITS WORDS, ONE PICTURE OF THE WHOLE BOX, THEN ONE BULLETED LINE FOR EACH ITEM IN THE BOX'S ORDER:
+    // Copy, the pin, the close mark, the box you write in, Contact or Note with the chooser, Send, Start review, More.
+    const expected = [
+      { type: 'text', heading: 'Try right-click?', text: words('gettingStarted.report.rightClick.text') },
+      { type: 'image', file: 'right-click-box.png', alt: words('gettingStarted.report.rightClick.alt'), caption: words('gettingStarted.report.madeUp') },
+      {
+        type: 'list',
+        ordered: false,
+        items: [
+          words('gettingStarted.report.rightClick.copy', { copy: press.copy }),
+          words('gettingStarted.report.rightClick.pin'),
+          words('gettingStarted.report.rightClick.close'),
+          words('gettingStarted.report.rightClick.write'),
+          words('gettingStarted.report.rightClick.sendTo', { contact: press.contact, note: press.note }),
+          words('gettingStarted.report.rightClick.send', { send: press.send }),
+          words('gettingStarted.report.rightClick.startReview', { startReview: press.startReview }),
+          words('gettingStarted.report.rightClick.more', { more: press.more }),
+        ],
+      },
+    ]
+    const asRead = (block: Record<string, any>): Record<string, unknown> =>
+      block['type'] === 'image'
+        ? { type: 'image', file: basename(String(block['path'])), alt: block['alt'], caption: block['caption'] }
+        : block['type'] === 'list'
+          ? { type: 'list', ordered: block['ordered'] === true, items: block['items'] }
+          : { type: block['type'], heading: block['heading'] ?? null, text: block['text'] }
+    const admitPicture = blocks.findIndex((block) => block['type'] === 'image' && block['alt'] === words('gettingStarted.report.admit.alt'))
+    const stays = blocks.findIndex((block) => block['type'] === 'text' && block['heading'] === words('gettingStarted.report.stays.heading'))
+    expect(admitPicture, 'the picture of an agent asking at the Embassy').toBeGreaterThan(-1)
+    expect(stays, 'the part that says the report stays on the checklist comes after it').toBeGreaterThan(admitPicture)
+    expect(blocks.slice(admitPicture + 1, stays).map(asRead)).toEqual(expected)
+    // A WORD NOBODY WROTE IS DRAWN AS ITS BRACKETED KEY, here and in the report alike, so the two would agree.
+    expect(JSON.stringify(expected), 'a word the part is written in is missing').not.toContain('⟦')
+    for (const picture of blocks.slice(admitPicture + 1, stays).filter((block) => block['type'] === 'image')) {
+      expect(String(picture['path']).startsWith(`${join(PICTURES, 'en')}/`), String(picture['path'])).toBe(true)
+    }
+  })
+
+  it("9: the list of the report's words holds the ten words it takes from other pages", async () => {
+    const { THE_GETTING_STARTED_WORDS: LISTED } = await import('../src/shared/getting-started.ts')
+    const listed: readonly string[] = LISTED
+    // THE BOX'S SIX PRESSES, THE EMBASSY'S NAME, THE MENU'S NAME AND THE TWO PRESSES OF AN ASK: the report says each one,
+    // so a language that lacks one of them does not hold the whole report.
+    const taken = ['talk.copy', 'talk.sendTo.contact', 'talk.sendTo.note', 'talk.send', 'talk.startReview', 'talk.more', 'nav.embassy', 'frameWords.menu', 'g6b.ask.admit', 'g6b.ask.refuse']
+    expect(taken.filter((key) => !listed.includes(key)), "words the report says that its list lacks").toEqual([])
+  })
+
+  it('10: naming a new office in Chinese files the report in Chinese, every word and picture of it', async () => {
+    // EACH WORD THE CASE EXPECTS IS ASKED OF THE CHINESE LIST FIRST. The word reader answers the English for a key with
+    // no Chinese, and so would a report filed in English, so without this the case could pass on English.
+    const keys: readonly WordKey[] = [
+      'gettingStarted.report.title', 'gettingStarted.report.welcome.heading', 'gettingStarted.report.welcome.text',
+      'gettingStarted.report.embassy.heading', 'gettingStarted.report.embassy.text', 'gettingStarted.report.embassy.alt',
+      'gettingStarted.report.admit.heading', 'gettingStarted.report.admit.text', 'gettingStarted.report.admit.alt',
+      'gettingStarted.report.rightClick.heading', 'gettingStarted.report.rightClick.text', 'gettingStarted.report.rightClick.alt',
+      'gettingStarted.report.rightClick.copy', 'gettingStarted.report.rightClick.pin', 'gettingStarted.report.rightClick.close',
+      'gettingStarted.report.rightClick.write', 'gettingStarted.report.rightClick.sendTo', 'gettingStarted.report.rightClick.send',
+      'gettingStarted.report.rightClick.startReview', 'gettingStarted.report.rightClick.more',
+      'gettingStarted.report.stays.heading', 'gettingStarted.report.stays.text', 'gettingStarted.report.madeUp',
+      'gettingStarted.checklist.title', 'gettingStarted.item.words',
+      'talk.copy', 'talk.sendTo.contact', 'talk.sendTo.note', 'talk.send', 'talk.startReview', 'talk.more',
+      'nav.embassy', 'frameWords.menu', 'g6b.ask.admit', 'g6b.ask.refuse',
+    ]
+    expect(keys.filter((key) => WORD_LISTS.zh[key] === undefined), "the report's words with no Chinese").toEqual([])
+    const zh = createI18n('zh').t
+
+    anUnnamedOffice()
+    const named = await call('POST', '/api/office/owner', PERSON, { name: NAME, language: 'zh' })
+    expect(named.status, named.text).toBe(200)
+    const entry = await theFirstEntry()
+    expect(entry).toMatchObject({ state: 'on', shows: true })
+    const report = await aRecord(entry['report'])
+    expect(report['title']).toBe(zh('gettingStarted.report.title'))
+
+    const press = {
+      copy: zh('talk.copy'),
+      contact: zh('talk.sendTo.contact'),
+      note: zh('talk.sendTo.note'),
+      send: zh('talk.send'),
+      startReview: zh('talk.startReview'),
+      more: zh('talk.more'),
+    }
+    // EACH PICTURE IS FROM THE CHINESE FOLDER, with its Chinese alt and the Chinese made-up caption.
+    const picture = (id: string, file: string, alt: WordKey) => ({
+      id,
+      type: 'image',
+      folder: join(PICTURES, 'zh'),
+      file,
+      alt: zh(alt),
+      caption: zh('gettingStarted.report.madeUp'),
+    })
+    const asRead = (block: Record<string, any>): Record<string, unknown> =>
+      block['type'] === 'image'
+        ? { id: block['id'], type: 'image', folder: dirname(String(block['path'])), file: basename(String(block['path'])), alt: block['alt'], caption: block['caption'] }
+        : block['type'] === 'list'
+          ? { id: block['id'], type: 'list', ordered: block['ordered'] === true, items: block['items'] }
+          : { id: block['id'], type: block['type'], heading: block['heading'] ?? null, text: block['text'] }
+    expect((report['data']['blocks'] as Record<string, any>[]).map(asRead)).toEqual([
+      { id: 'welcome', type: 'text', heading: zh('gettingStarted.report.welcome.heading', { name: NAME }), text: zh('gettingStarted.report.welcome.text') },
+      {
+        id: 'embassy',
+        type: 'text',
+        heading: zh('gettingStarted.report.embassy.heading'),
+        text: zh('gettingStarted.report.embassy.text', { embassy: zh('nav.embassy'), menu: zh('frameWords.menu') }),
+      },
+      picture('embassy-picture', 'the-embassy-in-the-list.png', 'gettingStarted.report.embassy.alt'),
+      {
+        id: 'admit',
+        type: 'text',
+        heading: zh('gettingStarted.report.admit.heading'),
+        text: zh('gettingStarted.report.admit.text', { admit: zh('g6b.ask.admit'), refuse: zh('g6b.ask.refuse') }),
+      },
+      picture('admit-picture', 'an-agent-asking-at-the-embassy.png', 'gettingStarted.report.admit.alt'),
+      { id: 'right-click', type: 'text', heading: zh('gettingStarted.report.rightClick.heading'), text: zh('gettingStarted.report.rightClick.text') },
+      picture('right-click-picture', 'right-click-box.png', 'gettingStarted.report.rightClick.alt'),
+      {
+        id: 'right-click-items',
+        type: 'list',
+        ordered: false,
+        items: [
+          zh('gettingStarted.report.rightClick.copy', { copy: press.copy }),
+          zh('gettingStarted.report.rightClick.pin'),
+          zh('gettingStarted.report.rightClick.close'),
+          zh('gettingStarted.report.rightClick.write'),
+          zh('gettingStarted.report.rightClick.sendTo', { contact: press.contact, note: press.note }),
+          zh('gettingStarted.report.rightClick.send', { send: press.send }),
+          zh('gettingStarted.report.rightClick.startReview', { startReview: press.startReview }),
+          zh('gettingStarted.report.rightClick.more', { more: press.more }),
+        ],
+      },
+      { id: 'stays', type: 'text', heading: zh('gettingStarted.report.stays.heading'), text: zh('gettingStarted.report.stays.text') },
+    ])
+
+    const list = await aChecklist(entry['checklist'])
+    expect(list['title']).toBe(zh('gettingStarted.checklist.title'))
+    expect(list['items']).toHaveLength(1)
+    expect(list['items'][0]['words']).toBe(zh('gettingStarted.item.words', { report: entry['report'] }))
   })
 })

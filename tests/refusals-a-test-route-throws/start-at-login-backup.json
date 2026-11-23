@@ -1,5 +1,5 @@
 {
-  "why": "The start-at-login press's refusals at its backup and at its write (wave 13t, round W26), and, since round W28, a first unit whose file beside it is left and a file where a folder of the unit goes, and, since round W29, a unit kept whose file beside it is left and a unit kept whose copy and file beside it are both left: no door here can safely meet them, because each needs this computer's HOME and systemd. tests/the-office-starts-at-login-by-the-persons-press.test.ts meets each with a scratch home and a stand-in systemctl.",
+  "why": "The start-at-login press's refusals at its backup and at its write (wave 13t, round W26), and, since round W28, a first unit whose file beside it is left and a file where a folder of the unit goes, and, since round W29, a unit kept whose file beside it is left and a unit kept whose copy and file beside it are both left, and the press On in an AppImage, which is refused because a unit would name the folder the AppImage is mounted at, and, since round 2 of package PH-T, the press Off in an AppImage whose unit could not be copied, could not be removed, or was removed while systemd would not read its units again: no door here can safely meet them, because each needs this computer's HOME and systemd, or a server run from an AppImage. tests/the-office-starts-at-login-by-the-persons-press.test.ts meets each with a scratch home and a stand-in systemctl, and the AppImage's with an AppImage folder given to the press; the press Off's removal is met with a stand-in for it.",
   "refusals": [
     {
       "code": "startAtLoginNotBackedUp",
@@ -56,6 +56,36 @@
       "english": "Test: a file stands where a folder of the unit goes.",
       "values": {
         "path": "/test/systemd"
+      }
+    },
+    {
+      "code": "startAtLoginInAnAppImage",
+      "status": 409,
+      "english": "Test: this office runs from an AppImage.",
+      "values": {}
+    },
+    {
+      "code": "startAtLoginOffNotCopied",
+      "status": 409,
+      "english": "Test: the unit was disabled and could not be copied.",
+      "values": {
+        "path": "/test/mole-office.service.mole-office-backup"
+      }
+    },
+    {
+      "code": "startAtLoginOffNotRemoved",
+      "status": 409,
+      "english": "Test: the unit was disabled and copied, and could not be removed.",
+      "values": {
+        "path": "/test/mole-office.service.mole-office-backup"
+      }
+    },
+    {
+      "code": "startAtLoginOffNotReloaded",
+      "status": 409,
+      "english": "Test: the unit was disabled, copied and removed, and systemd did not read its units again.",
+      "values": {
+        "path": "/test/mole-office.service.mole-office-backup"
       }
     }
   ]

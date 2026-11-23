@@ -70,7 +70,7 @@ afterAll(async () => {
 })
 
 describe('the running Reports and notes list holds reports and notes, and not messages', () => {
-  it('draws the report and the note, leaves the annotation and the message out, and says where messages are', async () => {
+  it('draws the report and the note, leaves the annotation and the message out, and leads to where messages are', async () => {
     await live.page.goto(`${live.site}/#/notes`, { waitUntil: 'domcontentloaded' })
     await live.page.getByText('Round four, measured').first().waitFor({ timeout: 30_000 })
 
@@ -86,12 +86,9 @@ describe('the running Reports and notes list holds reports and notes, and not me
     // Criterion change, by a decision. This was `expect(text).toContain('Messages')` over
     // the whole body, and the only 'Messages' there was the sidebar's Messages row. That row is gone:
     // messages are read in the chat, which filters by project, and the chat opens the Messages page.
-    // So the page itself must say so. The pointer is looked for inside the page, not the sidebar.
+    // So the page itself must lead there. The two links are looked for inside the page, not the sidebar.
     const pointer = live.page.locator('.rpts-where')
-    expect(await pointer.count(), 'the page no longer says where messages are').toBe(1)
-    expect(await pointer.textContent(), 'the pointer does not say that messages are read in the chat').toContain(
-      'Messages are read in the chat',
-    )
+    expect(await pointer.count(), 'the page no longer leads to where messages are').toBe(1)
     expect(await pointer.locator('a[href="#/chat"]').textContent(), 'the pointer does not lead to the chat').toBe('Chat')
     expect(await pointer.locator('a[href="#/messages"]').textContent(), 'the pointer does not lead to the Messages page').toBe(
       'Messages',

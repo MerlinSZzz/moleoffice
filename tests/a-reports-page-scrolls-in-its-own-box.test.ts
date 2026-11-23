@@ -41,7 +41,7 @@ import { THE_PERSON } from '../src/shared/person.ts'
 import { TARGET_ATTRIBUTE, targetAttributeValue } from '../src/shared/targets.ts'
 import { CHAT_OPEN_KEY } from '../src/web/lib/chat-split.ts'
 import { THE_SHELL_WIDTH } from '../src/web/lib/the-shell-width.ts'
-import { liveApp, openRecordPagesAt, waitForThePage, type LiveApp } from './helpers.ts'
+import { liveApp, openRecordPagesAt, storeNormalModeWhereNothingIsStored, waitForThePage, type LiveApp } from './helpers.ts'
 import { putThePageAt, thePageAtRest, toTheEndOfThePage, whereThePageIs } from './the-page-scroller.ts'
 
 const PERSON = {
@@ -76,6 +76,8 @@ type Start = { with?: string; review?: 'open' | 'shut'; collecting?: string }
 async function aWindow(size: Size, start: Start = {}): Promise<{ context: BrowserContext; page: Page }> {
   if (drawsBars === undefined) throw new Error('the browser that draws scrollbars is not started')
   const context = await drawsBars.newContext({ viewport: size })
+  // This Chromium is the file's own, so it stores Normal mode as the shared one does: see the helper.
+  await storeNormalModeWhereNothingIsStored(context)
   await openRecordPagesAt(context, 'full')
   await context.addInitScript(
     ([chatOpen, chatWith, review, collecting]) => {
@@ -188,6 +190,10 @@ beforeAll(async () => {
   drawsBars = await chromium.launch({ ignoreDefaultArgs: ['--hide-scrollbars'] })
   const filed = await fetch(`${app.api}/api/records`, { method: 'POST', headers: PERSON, body: JSON.stringify({ kind: 'agent', title: AGENT.name, data: { handle: AGENT.handle, runtime: 'claude-code', state: 'active' } }) })
   expect(filed.status, await filed.clone().text()).toBe(201)
+  // THE PERSON LAST HAD THE CHAT BESIDE THE PAGE. The chat opens the way the person last had it, and every case here
+  // opens it beside the page.
+  const beside = await fetch(`${app.api}/api/participants/person/${THE_PERSON}`, { method: 'PATCH', headers: PERSON, body: JSON.stringify({ chatOpensAs: 'split' }) })
+  expect(beside.status, await beside.clone().text()).toBe(200)
   const agents = ((await (await fetch(`${app.api}/api/participants`, { headers: PERSON })).json()) as { agents: { id: string; handle: string }[] }).agents
   const agentId = agents.find((one) => one.handle === AGENT.handle)?.id ?? ''
   expect(agentId).not.toBe('')

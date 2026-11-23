@@ -30,6 +30,8 @@ export interface RoundChapters {
   pack?: RoundStartPack
   /** The delegations the declaration names, as the office gave them. Absent when it names none. */
   delegations?: RoundDelegations
+  /** The person's live regulations, read with the chapters when the round started. Absent when CODE.md was read from the worktree. */
+  regulations?: RoundRegulations
 }
 /** The file a line's items were read from before they were records, which a round reads when the office has none. */
 export const REQUIREMENTS_FILE = 'briefs/REQUIREMENTS.md'
@@ -65,6 +67,41 @@ export interface DelegationGiven { task: string; title: string; parent: PackageP
  * is one entry for each, in that order. No field is ever null, as the record writers drop nested nulls.
  */
 export interface RoundDelegations { line: string; named: string[]; tasks: DelegationGiven[]; answerRequired?: boolean }
+/** The door a round's start reads the chapters from. */
+export const THE_CHAPTERS_DOOR = '/api/office-regulations/chapters'
+/** The door a round's start reads the person's regulations from. */
+export const THE_REGULATIONS_DOOR = '/api/office-regulations'
+/** Where a round's CODE.md came from, when its start read the chapters from the office at `at`: the door and the time. */
+export function theChaptersReadAt(at: string): string { return `GET ${THE_CHAPTERS_DOOR}, read at ${at}` }
+/** One live regulation of the person, as its record holds it. `role` and `since` are absent when the record holds none. */
+export interface GivenRegulation { id: string; title: string; sentence: string; binds: 'person' | 'role' | 'unknown'; role?: string; since?: string }
+/**
+ * WHAT A ROUND WAS GIVEN OF THE PERSON'S REGULATIONS: every live one, whole, as GET /api/office-regulations answered at
+ * `at`, when the round started. `text` is what the round was given. No field is ever null, as the record writers drop
+ * nested nulls.
+ */
+export interface RoundRegulations { at: string; live: GivenRegulation[]; text: string; bytes: number }
+const WHOM_IT_BINDS: Record<GivenRegulation['binds'], true> = { person: true, role: true, unknown: true }
+
+/** Whom one regulation binds, in a sentence. */
+function whomItBinds(one: GivenRegulation): string {
+  if (one.binds === 'person') return 'It binds the person.'
+  if (one.binds === 'role') return one.role === undefined ? 'It binds a role its record does not name.' : `It binds the role ${one.role}.`
+  return 'Whom it binds is not recorded.'
+}
+
+/** The part of a brief that gives the person's live regulations, worked out from the regulations it was read from. */
+export function regulationsText(at: string, live: GivenRegulation[]): string {
+  if (live.length === 0) return `The office's records hold no live regulation of the person: GET ${THE_REGULATIONS_DOOR} was read at ${at}, when this round started.`
+  return [
+    `THE PERSON'S REGULATIONS. The office's records hold ${live.length} live ${live.length === 1 ? 'regulation' : 'regulations'} of the person, ` +
+      `read with GET ${THE_REGULATIONS_DOOR} at ${at}, when this round started. Each is given whole, in the person's own words.`,
+    ...live.map((one, i) => [
+      `${i + 1}. "${one.title}" (record ${one.id}). ${whomItBinds(one)} ${one.since === undefined ? 'Since when is not recorded.' : `Since ${one.since}.`}`,
+      one.sentence,
+    ].join('\n')),
+  ].join('\n\n')
+}
 export const bytes = (text: string) => Buffer.byteLength(text, 'utf8')
 export const hash = (text: string) => createHash('sha256').update(text).digest('hex')
 const object = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -104,6 +141,7 @@ export function readRoundChapters(value: unknown): RoundChapters {
   if (m.backlog !== undefined) readBacklog(m.backlog)
   if (m.standing !== undefined) readStanding(m.standing)
   if (m.delegations !== undefined) readDelegations(m.delegations)
+  if (m.regulations !== undefined) readRegulations(m.regulations, m.sources[0]!.path)
   if (m.pack !== undefined && (!object(m.pack) || typeof m.pack.line !== 'string' || !Array.isArray(m.pack.missing) || !m.pack.missing.every(one => typeof one === 'string') || typeof m.pack.text !== 'string' || m.pack.bytes !== bytes(m.pack.text))) bad('invalid round-start pack')
   if (!Array.isArray(m.chapters)) bad('missing CODE chapter entries')
   const seen = new Set<number>()
@@ -147,6 +185,18 @@ function readStanding(s: unknown): void {
     ? s['role'] !== undefined && s['says'] === undefined && s['text'] === standingStagesText(String(s['role']), flows)
     : s['text'] === '' && s['says'] !== undefined
   if (!given) bad('the standing stages\' text is not the text their flows give')
+}
+
+function readRegulations(r: unknown, codePath: string): void {
+  const words = (value: unknown) => typeof value === 'string' && value.trim() !== ''
+  if (!object(r) || !words(r['at']) || !Array.isArray(r['live']) || typeof r['text'] !== 'string' || r['bytes'] !== bytes(r['text'])) bad('invalid regulations')
+  for (const one of r['live'] as unknown[]) {
+    if (!object(one) || !words(one['id']) || typeof one['title'] !== 'string' || typeof one['sentence'] !== 'string' ||
+        typeof one['binds'] !== 'string' || !Object.hasOwn(WHOM_IT_BINDS, one['binds']) ||
+        (one['role'] !== undefined && !words(one['role'])) || (one['since'] !== undefined && typeof one['since'] !== 'string')) bad('invalid regulation')
+  }
+  if (r['text'] !== regulationsText(String(r['at']), r['live'] as GivenRegulation[])) bad('the regulations\' text is not the text their records give')
+  if (codePath !== theChaptersReadAt(String(r['at']))) bad('the regulations were not read with the chapters CODE.md names')
 }
 
 /**
@@ -239,25 +289,34 @@ export function savedChaptersLine(manifest: RoundChapters): TheChaptersLine {
 }
 
 export function roundChaptersList(manifest: RoundChapters): string {
-  return roundChaptersListGiven(manifest, null)
+  return roundChaptersListGiven(manifest, null, null)
 }
 
 const THE_SAVED_SELECTION_HOLDS_CODE_IN_FULL = 'The saved selection holds CODE.md in full; this text gives it at outline.'
+/** Said beside the list when the saved selection holds TERRITORIES.md whole and the round is given its line's part of it. */
+export const THE_SAVED_SELECTION_HOLDS_TERRITORIES_IN_FULL = "The saved selection holds TERRITORIES.md in full; this text gives the line's own section and its fallback rule."
 
-/** The list a start is given, with the code source at outline when `outline` is given, and the saved selection as stored. */
-function roundChaptersListGiven(manifest: RoundChapters, outline: string | null): string {
+/**
+ * The list a start is given, with the code source at outline when `outline` is given, TERRITORIES.md as `territory`'s
+ * sections when they are given, and the saved selection as stored.
+ */
+function roundChaptersListGiven(manifest: RoundChapters, outline: string | null, territory: Section[] | null): string {
   const code = manifest.sources[0]!
+  const given = (source: SavedSource) => (territory !== null && source.name === 'TERRITORIES.md' ? territory : source.sections)
   return [
     `Round kind: ${manifest.kind ?? '(missing)'}. Territory: ${manifest.territory?.join(', ') ?? '(missing)'}.`,
     ...(manifest.notice ? [manifest.notice, ...(outline !== null && code.fullFile ? [THE_SAVED_SELECTION_HOLDS_CODE_IN_FULL] : [])] : []),
+    ...(territory !== null ? [THE_SAVED_SELECTION_HOLDS_TERRITORIES_IN_FULL] : []),
     ...(manifest.backlog ? [backlogLine(manifest.backlog)] : []),
     ...(manifest.standing ? [standingStagesLine(manifest.standing)] : []),
     'Exact delivered rule sections (saved manifest version 1):',
     ...manifest.sources.flatMap(source => [
       outline !== null && source.name === 'CODE.md'
         ? `CODE.md — ${source.path} — SHA-256 ${source.sha256} — given here at outline (${bytes(outline)} bytes); the saved selection, which the check reads, holds ${source.bytes} delivered bytes`
-        : `${source.name} — ${source.path} — SHA-256 ${source.sha256} — ${source.bytes} delivered bytes`,
-      ...(source.sections.length ? source.sections.map(s => `- ${s.path.join(' / ') || s.title} (${s.bytes} bytes)`) : ['- (no sections selected)']),
+        : territory !== null && source.name === 'TERRITORIES.md'
+          ? `TERRITORIES.md — ${source.path} — SHA-256 ${source.sha256} — given here as the line's own section and its fallback rule (${bytes(territory.map(s => s.text).join(''))} bytes); the saved selection, which the check reads, holds ${source.bytes} delivered bytes`
+          : `${source.name} — ${source.path} — SHA-256 ${source.sha256} — ${source.bytes} delivered bytes`,
+      ...(given(source).length ? given(source).map(s => `- ${s.path.join(' / ') || s.title} (${s.bytes} bytes)`) : ['- (no sections selected)']),
     ]),
     'CODE reading levels: ' + (manifest.chapters.map(c => `${c.chapter} at ${c.level} (${c.bytes} bytes)`).join(', ') || 'none'),
   ].join('\n')
@@ -294,8 +353,9 @@ export function roundChaptersText(manifest: RoundChapters): string {
 
 /**
  * THE CODE SOURCE AT OUTLINE: each chapter the saved sections hold, in their order, as its heading line and its first
- * line that is not empty, then one sentence naming the door that gives the full chapters and the whole file's path. It
- * is made from the saved sections, never from the file on disk, so a delivered brief can be rebuilt from the record.
+ * line that is not empty, then one sentence naming the door that gives the full chapters and, when CODE.md was read
+ * from the worktree, the whole file's path. It is made from the saved sections, never from the file on disk, so a
+ * delivered brief can be rebuilt from the record.
  */
 export function roundChaptersOutline(manifest: RoundChapters): string {
   const code = manifest.sources[0]!
@@ -305,7 +365,9 @@ export function roundChaptersOutline(manifest: RoundChapters): string {
   })
   return [
     ...chapters,
-    `This is each chapter's title and first line. The full chapters are read with GET /api/office-regulations, and the whole file is at ${code.path}.`,
+    manifest.regulations !== undefined
+      ? `This is each chapter's title and first line. The full chapters are read with GET ${THE_REGULATIONS_DOOR}.`
+      : `This is each chapter's title and first line. The full chapters are read with GET ${THE_REGULATIONS_DOOR}, and the whole file is at ${code.path}.`,
   ].join('\n\n')
 }
 
@@ -314,11 +376,13 @@ export function roundChaptersOutline(manifest: RoundChapters): string {
  * part is the outline its saved sections make. The list says CODE.md is given here at outline, with the outline's
  * bytes, and that the saved selection, which the check reads, holds its stated bytes. Where the saved notice says
  * CODE.md is delivered in full, one sentence beside it says the saved selection holds it in full and this text gives
- * it at outline. The saved manifest itself is unchanged.
+ * it at outline. With `territory`, TERRITORIES.md's part is those sections, and the list says so in the same way. The
+ * saved manifest itself is unchanged.
  */
-export function roundChaptersGivenText(manifest: RoundChapters): string {
+export function roundChaptersGivenText(manifest: RoundChapters, territory: Section[] | null = null): string {
   const outline = roundChaptersOutline(manifest)
-  return THE_SAVED_SELECTION_HEAD + '\n\n' + roundChaptersListGiven(manifest, outline) + '\n\n' + manifest.sources.map(s => `Source: ${s.name}\n\n${s.name === 'CODE.md' ? outline : s.text}`).join('\n\n')
+  const part = (s: SavedSource) => (s.name === 'CODE.md' ? outline : territory !== null && s.name === 'TERRITORIES.md' ? territory.map(one => one.text).join('') : s.text)
+  return THE_SAVED_SELECTION_HEAD + '\n\n' + roundChaptersListGiven(manifest, outline, territory) + '\n\n' + manifest.sources.map(s => `Source: ${s.name}\n\n${part(s)}`).join('\n\n')
 }
 
 /**
@@ -333,13 +397,15 @@ export const WHERE_A_NAME_IS_DEFINED =
   'For any other search, such as every use of a name, search as you would.'
 
 /**
- * A round's standing stages and its line's items go between its brief and the rest, in that order. A round given no
- * standing stage, or with no line declared, gets no part for them.
+ * A round's regulations, its standing stages and its line's items go between its brief and the rest, in that order. A
+ * round whose start read no regulations, given no standing stage, or with no line declared, gets no part for them. A
+ * round whose start found no live regulation gets the one sentence that says so.
  */
 export function deliveredRoundBrief(manifest: RoundChapters): string {
+  const regulations = manifest.regulations ? manifest.regulations.text + '\n\n---\n\n' : ''
   const standing = manifest.standing?.text ? manifest.standing.text + '\n\n---\n\n' : ''
   const backlog = manifest.backlog ? manifest.backlog.text + '\n\n---\n\n' : ''
-  return manifest.brief.text + '\n\n---\n\n' + standing + backlog + WHERE_A_NAME_IS_DEFINED + '\n\n' + (manifest.pack?.text ?? roundChaptersGivenText(manifest))
+  return manifest.brief.text + '\n\n---\n\n' + regulations + standing + backlog + WHERE_A_NAME_IS_DEFINED + '\n\n' + (manifest.pack?.text ?? roundChaptersGivenText(manifest))
 }
 
 /** Bounds chapter claims without rewriting the inspector's actual reported levels. */

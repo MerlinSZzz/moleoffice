@@ -161,7 +161,7 @@ testing. These are distinct uses of the sandbox mechanism.
 
 Containers and their processes are recorded in the resources ledger. The sandbox tool registers
 and stops them through the API. Outside a sandbox, the
-[main-world guard](../tools/guard/policy.mjs) restricts destructive operations and access to
+[main-world guard](../for-agents/main-world-guard-policy.mjs) restricts destructive operations and access to
 protected databases, keys and credentials; runtime permissions depend on a sandbox or that guard.
 
 ## The message worker

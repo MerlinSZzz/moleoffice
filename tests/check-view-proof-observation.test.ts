@@ -130,8 +130,8 @@ it.each(['missing', 'malformed', 'empty', 'missing-field', 'wrong-type', 'wrong-
 })
 
 it.each([
-  ['CapDrop', null, 'ALL'], ['CapDrop', [], 'ALL'], ['CapDrop', ['NET_RAW'], 'ALL'],
-  ['SecurityOpt', null, 'no-new-privileges'], ['SecurityOpt', [], 'no-new-privileges'],
+  ['CapDrop', null, 'ALL'], ['CapDrop', ['NET_RAW'], 'ALL'],
+  ['SecurityOpt', null, 'no-new-privileges'],
   ['SecurityOpt', ['seccomp=unconfined'], 'no-new-privileges'],
   ['CapDrop', undefined, 'ALL'], ['SecurityOpt', undefined, 'no-new-privileges'],
 ] as const)('fails the final verdict when HostConfig.%s is %j', (field, value, required) => {

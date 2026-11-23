@@ -17,6 +17,10 @@ import { readTheHookDetails } from './hook-details.ts'
  * other read the hook makes at its usual speed. `Atomics.wait` holds the thread; nothing runs meanwhile.
  *
  * Case names name the source mutation tried against each assertion.
+ *
+ * THE AGENT HOLDS THE KEY ITS REGISTRATION GAVE, and the hook is given it. A session that names an agent and holds no
+ * key of it sends the name alone, and the office lets no name alone stamp a run or record its compaction, so the
+ * hook's lines would carry those refusals beside what this file reads.
  */
 import { execFile } from 'node:child_process'
 import { mkdtempSync, rmSync } from 'node:fs'
@@ -83,6 +87,8 @@ let t: TestDb
 let server: Awaited<ReturnType<typeof apiApp>>
 let url = ''
 let scratch = ''
+/** The key the office gave AGENT when it was registered. Every run of the hook is given it. */
+let agentsKey = ''
 
 const AS_THE_PERSON = {
   'content-type': 'application/json',
@@ -118,11 +124,13 @@ async function runHook(conversation: string, source: string): Promise<{ out: str
     MOLE_OFFICE_WORKSPACE: WORKSPACE,
     MOLE_OFFICE_DB: t.file,
     MOLE_OFFICE_AGENT: AGENT,
+    MOLE_AGENT_KEY: agentsKey,
     HOME: scratch,
     MOLE_HOOK_DETAILS_FOLDER: join(scratch, 'details'),
   }
   delete env['TMUX_PANE']
   delete env['MOLE_OFFICE_SESSION']
+  delete env['MOLE_AGENT_KEY_FILE']
   const began = performance.now()
   const out = await new Promise<string>((resolve, reject) => {
     const child = execFile('node', [HOOK, 'start'], { encoding: 'utf8', env }, (error, stdout) => {
@@ -153,6 +161,8 @@ beforeAll(async () => {
     payload: { handle: AGENT, name: 'Arriving Agent', role: 'worker' },
   })
   expect(registered.statusCode, registered.body).toBe(201)
+  agentsKey = String((registered.json() as { whatToGiveIt?: { key?: string } }).whatToGiveIt?.key ?? '')
+  expect(agentsKey, 'the registration gave the agent no key').not.toBe('')
 }, 60_000)
 
 beforeEach(() => {

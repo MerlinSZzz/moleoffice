@@ -267,6 +267,8 @@ describe('a card keeps its held drag', () => {
     const { t } = await import('../src/shared/i18n.ts')
     const phone = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true })
     try {
+      // This Chromium is the file's own, so it stores Normal mode as the shared one does: see the helper.
+      await (await import('./helpers.ts')).storeNormalModeWhereNothingIsStored(phone)
       await phone.addInitScript(() => localStorage.setItem('mole-office.detail.reportContent', 'full'))
       const view = await phone.newPage()
       await view.goto(`${app.site}/?lang=en#/r/${report}`, { timeout: 60_000 })
@@ -332,6 +334,8 @@ describe('a card keeps its held drag', () => {
   it('still closes for an outside touch without a selection and for a mouse press on selected text', async () => {
     const phone = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true })
     try {
+      // This Chromium is the file's own, so it stores Normal mode as the shared one does: see the helper.
+      await (await import('./helpers.ts')).storeNormalModeWhereNothingIsStored(phone)
       await phone.addInitScript(() => localStorage.setItem('mole-office.detail.reportContent', 'full'))
       const view = await phone.newPage()
       for (const pointerType of ['touch', 'mouse'] as const) {

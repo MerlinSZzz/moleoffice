@@ -18,9 +18,8 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { stateWord } from '@shared/words.ts'
 import { HomeProjects, ProjectTag } from '../components/home/ProjectTag.tsx'
 import { HomeSections } from '../components/home/HomeSections.tsx'
+import { HomePairingRequests, usePairingRequests } from '../components/home/HomePairingRequests.tsx'
 import { HomeWeek, useTheWeek } from '../components/home/HomeWeek.tsx'
-import { pipelineLine, standsStill } from '../components/home/pipeline-line.ts'
-import { pipelinePosition } from '@shared/blocks.ts'
 import type { Change, ItemState, PanelRecord } from '@shared/types.ts'
 import { progressOf } from '@shared/work.ts'
 import {
@@ -43,9 +42,6 @@ import type { AllocationWithWork } from '../../server/lib/planning.ts'
 import type { Rung } from '@shared/detail.ts'
 /** The list of projects, for the same reason: one declaration, read by the frame and by this page. */
 import type { WorkspacesReply } from '../../server/api/workspaces.ts'
-import {
-  ReportsForYou,
-} from '../components/AttentionPanel.tsx'
 import { DecisionQueue } from '../components/DecisionQueue.tsx'
 import { ResidentProposals } from '../components/ResidentProposals.tsx'
 // The one reading's shape, for the prop above. Type-only: this page draws the number through the
@@ -63,7 +59,7 @@ import { useInspect, useMode } from '../lib/mode.ts'
 import { useDetail } from '../lib/detailchoice.ts'
 // THE DOORS THIS PAGE AND THE FRAME BOTH NEED, ASKED ONCE. See the module for why one answer for
 // the whole page is the only way the two cannot be two clocks.
-import { hurryTheAttentionHomeAsk, readWorkspacesOnce, oneRead } from '../lib/oneread.ts'
+import { readWorkspacesOnce, oneRead } from '../lib/oneread.ts'
 import { useSharedRead } from '../lib/homereads.ts'
 import { wordsAt } from '@shared/detailsource.ts'
 // EVERY STORED WORD REACHES A SCREEN THROUGH HERE. One reader, so a change row on this page and
@@ -88,7 +84,6 @@ import {
   ServerNote,
   StoredState,
   Tag,
-  ageAlarm,
   useAsync,
   OriginMark,
   type AsyncState,
@@ -97,11 +92,8 @@ import { useProjectAsync } from '../lib/project-async.ts'
 import { declaredAttributes, type Declares } from '../components/declares.ts'
 import {
   anchorState,
-  readPipelines,
   relativeToNow,
   type AnchorAnswer,
-  type PipelineInfo,
-  type RecordProblem,
 } from '../lib/attention.ts'
 
 // ---------------------------------------------------------------------------- constants
@@ -136,7 +128,7 @@ const plural = (n: number, word: 'step' | 'hour') => word === 'step' ? t('home.s
  * The server writes a good paragraph for each of the three answers, with the counts and the stamp
  * in it, and at 1440 it was six lines of prose above eight change rows. Six lines to say that
  * nobody has marked a reading point is six lines a reader pays for on every visit. So the
- * paragraph moved behind one press — whole and unedited — and this is what stands in its place.
+ * paragraph moved to Developer mode — whole and unedited — and this is what stands in its place.
  *
  * THE HONESTY THAT MUST SURVIVE THE SHORTENING is the first answer. "No reading point recorded"
  * must never read as "nothing has changed", and the rows drawn under it are the newest writes in
@@ -144,13 +136,8 @@ const plural = (n: number, word: 'step' | 'hour') => word === 'step' ? t('home.s
  * behind the press: the line names what the rows are and says in the same breath what they are not.
  */
 export function sinceLead(answer: AnchorAnswer, sinceAnchor: number | null, drawn: number): string {
-  if (answer === 'never-looked') return drawn === 0 ? t('home.noWrites') : t('home.newestWrites', { n: drawn })
-  return answer === 'nothing-since' ? t('home.noWritesSince') : t('home.writesSince', { n: sinceAnchor ?? 0 })
-}
-
-/** What the fold beside that line holds, named. The first answer needs two sentences, not one. */
-export function sinceOpens(answer: AnchorAnswer): string {
- return answer === 'never-looked' ? t('home.readingPointWhy') : t('home.readingPointWhere')
+  if (answer === 'never-looked') return drawn === 0 ? t('absence.none') : t('home.since.newest', { n: drawn })
+  return answer === 'nothing-since' ? t('home.since.none') : t('home.since.changes', { n: sinceAnchor ?? 0 })
 }
 
 // ---------------------------------------------------------------------------- many writes, one row
@@ -413,7 +400,7 @@ function SinceYouLooked({
   return (
     <AlsoColumn
       title={t('home.recentWrites')}
-      /* One line, and behind the press the same thing said in the reader's words.
+      /* One line, and the server's paragraph in Developer mode.
          WHAT USED TO BE HERE, AND WHY IT IS NOT. The server's own paragraph was printed whole,
          on the grounds that a second wording would be two places free to disagree. It said:
 
@@ -423,14 +410,14 @@ function SinceYouLooked({
 
          That paragraph is right and it is written for somebody reading JSON. `human:<id>` is a
          composite key, `anchor` is a table, and `PUT /api/anchor` is an HTTP method offered as the
-         instruction — twenty pixels above the button that does exactly that. So the press now holds
-         the sentence a person needs, naming the button, and `ServerNote` keeps the server's own
-         paragraph one mode away, whole and unedited, for an agent and for Developer mode. */
+         instruction — twenty pixels above the button that does exactly that. So `ServerNote` keeps
+         the server's own paragraph one mode away, whole and unedited, for an agent and for
+         Developer mode. */
       lead={
-        <Explain declares={{ surface: 'home.since' }} meaning={all.length === 0 ? <Absence title={sinceLead(state.answer, state.sinceAnchor, all.length)} /> : sinceLead(state.answer, state.sinceAnchor, all.length)} opens={sinceOpens(state.answer)}>
-          <p className="hp-note">{state.answer === 'never-looked' ? t('home.readingPointStart') : t('home.readingPointSaved')}</p>
+        <>
+          {all.length === 0 ? <Absence word={sinceLead(state.answer, state.sinceAnchor, all.length)} /> : sinceLead(state.answer, state.sinceAnchor, all.length)}
           <ServerNote text={state.sentence} />
-        </Explain>
+        </>
       }
       foot={
         <Btn
@@ -438,7 +425,6 @@ function SinceYouLooked({
           variant="ghost"
           onClick={mark}
           pending={pending}
-          title={t('home.markReadHint')}
         >
           {t('home.markRead')}
         </Btn>
@@ -613,117 +599,6 @@ export function StepStrip({ steps }: { steps: readonly { id: string; name: strin
         />
       ))}
     </span>
-  )
-}
-
-/**
- * Where each pipeline is standing, in one row each.
- *
- * COMPACT ON PURPOSE. This block used to draw every step of every pipeline as a chip, which is a
- * whole-page answer to a question Home only asks in passing. The step-by-step view, the modules
- * that carry each step and the gates between them are the pipeline page's job, and the link is
- * right here.
- */
-function PipelinesBlock({
-  pipelines,
-  problems,
-  now,
-  cap,
-}: {
-  pipelines: readonly PipelineInfo[]
-  problems: readonly RecordProblem[]
-  /** One clock for the block, so two rows cannot disagree about how old a stop is. */
-  now: number
-  /** How many rows this may draw. What the cap cuts is stated under them, exactly. */
-  cap: number
-}) {
-  const drawn = pipelines.slice(0, cap)
-  return (
-    <>
-      {/* WHAT THIS SAID BEFORE WAS AN API LESSON. "Create a record of kind pipeline, then add its
-          blocks with POST /api/records/<id>/blocks" is two lines of instructions on a home page,
-          shown to somebody who did not ask how to make one. The fact — there are none — is the
-          answer, and it fits in three words. */}
-      {pipelines.length === 0 ? (
-        // ORDINARY EMPTINESS. A project with no pipelines is a normal project, and the reader does
-        // nothing about it, so it is two dimmed words under the heading rather than a bold sentence
-        // in a box. It is drawn at all — never as a blank — because a column that drew nothing
-        // would leave "there are none" and "this block did not load" looking identical.
-        <Absence title={t('home.noPipelines')} />
-      ) : (
-        drawn.map((pipeline) => {
-          const at = pipelinePosition(pipeline.blocks)
-          const done = pipeline.blocks.filter((step) => step.state === 'done').length
-          return (
-            <Row
-              key={pipeline.record.id}
-              state={at === null ? 'done' : at.state}
-              // How loud, from the same scale everything else on this page uses. Without it eight
-              // pipelines drew eight full-strength alarm rails together — the exact competition
-              // approved decision 2 exists to remove. The stamp is the
-              // record's own updated stamp, which is the best this block has; the pipelines page
-              // has the server's per-step answer and uses that instead.
-              {...(() => {
-                const level = ageAlarm(progressOf(at === null ? 'done' : at.state), pipeline.record.updatedAt, now)
-                return level === undefined ? {} : { alarm: level }
-              })()}
-              title={content(pipeline.record.title)}
-              // The state word is NOT repeated here. It is in the severity chip at the head of the
-              // row, and a row that prints "— blocked" beside a chip saying Blocked is one row
-              // saying one thing twice.
-              meta={pipelineLine(pipeline.blocks)}
-              right={
-                <span className="hp-prog">
-                  <StepStrip steps={pipeline.blocks} />
-                  <span className="num">
-                    {done}/{pipeline.blocks.length}
-                  </span>
-                </span>
-              }
-              href={`#${recordPath(pipeline.record.id, pipeline.record.kind)}`}
-              target={{ kind: 'record', recordId: pipeline.record.id, workspaceId: pipeline.record.workspaceId }}
-            />
-          )
-        })
-      )}
-      {/* WHAT THE CAP CUT. Never a bare "more": the exact numbers and the route to all of them. */}
-      {pipelines.length > drawn.length ? (
-        <p className="hp-more">
-          {t('home.pipelinesShown', { n: drawn.length, total: pipelines.length })} ·
-          <RouteLink to="/pipeline" className="hp-link">
-            {t('home.allPipelines')}
-          </RouteLink>
-        </p>
-      ) : null}
-      {/* A RECORD THAT CANNOT BE READ IS NOT FURNITURE, so it survives the cap and the band: it is
-          drawn however many there are, and it is the one thing in this column that is loud. */}
-      {problems.map((problem) => (
-        <ErrorNote
-          key={`${problem.record.id}:${problem.problem}`}
-          // Not "Failed.": nothing failed. The record is stored and is missing the one field that
-          // makes a pipeline a pipeline, which is a thing to go and fill in.
-          label={t('home.cannotDraw')}
-          /* THE SENTENCE FOR A PERSON, NOT THE READING FOR AN AGENT. This printed `problem.said`'s
-             sibling — *"block 16 of 16 (lfLve4F30JIy): its state is undefined, which is not one of
-             todo, doing, done, failed, blocked"* — in the only red panel on the default page of the
-             default project. An id, a field name, a JavaScript value and a stored union, in one
-             sentence, with three colons in it, and nothing a reader could act on. Both halves are
-             built together in src/shared/blocks.ts; the long one is in Developer mode. */
-          message={
-            // The pipeline is named unless the sentence has already named it. A step's stored title
-            // is "<its pipeline> › <its own name>", so a sentence about a step can already carry the
-            // pipeline's title, and adding it again prints the same title twice in one line.
-            t('home.pipelineFailed', { title: content(problem.record.title) })
-          }
-        >
-          {/* THE STEP THAT IS WRONG, WHERE THERE IS ONE. "Open it" opened the pipeline, so a reader
-              told about step 16 had to count to it. */}
-          <RouteLink to={recordPath(problem.openId ?? problem.record.id)} className="hp-link">
-            {t('home.openIt')}
-          </RouteLink>
-        </ErrorNote>
-      ))}
-    </>
   )
 }
 
@@ -1566,6 +1441,8 @@ export function HomePage({ waiting, onWaitingChanged, attention, onAttentionChan
   onAttentionChanged: () => void
 }) {
   const inspect = useInspect()
+  // THE PAIRING REQUESTS ARE READ ONCE, for the part that draws them and for Needs you, which leaves out their rows.
+  const pairing = usePairingRequests(waiting)
   // THE MINUTE'S RE-READ. The frame holds the waiting door's and this project's attention readings,
   // and Home asks it to read both again; Today, the records and the developer parts re-read on `tick`.
   // The callbacks are held in a ref so a new function from the frame does not restart the timer.
@@ -1592,50 +1469,28 @@ export function HomePage({ waiting, onWaitingChanged, attention, onAttentionChan
     homeHasReadTheProjects = true
     return read
   }, [], { keep: 'home.projects' })
-  // THIS PROJECT'S PIPELINES THAT STAND STILL, for Late or stuck: every
-  // unfinished step paused. Read from the records in Home's shape, as the old pipelines band did;
-  // it is this project only, as that band was, and an earlier round's report says so.
+  // THIS PROJECT'S PIPELINES THAT STAND STILL, for Late or stuck: every unfinished step paused. It is this project
+  // only, as the old pipelines band was, and an earlier round's report says so.
   //
-  // ONLY THE PIPELINES AND THEIR STEPS ARE ASKED FOR, not every record of the project. A pipeline's
-  // steps are its `block` records, and `readPipelines` reads nothing else. Home asked for the whole
-  // project every minute; on the office made up for round 31 of wave 13k that was 237 KB a minute,
-  // most of it the project's runs and messages, for a band that draws at most four rows.
-  const [records] = useProjectAsync(
-    () =>
-      Promise.all([api.listRecords('pipeline', 'home'), api.listRecords('block', 'home')]).then(([pipelines, steps]) => [
-        ...pipelines.records,
-        ...steps.records,
-      ]),
+  // ONE DOOR ANSWERS THEM, AND ONLY THE ROWS LATE OR STUCK DRAWS. The server works out which pipelines stand still,
+  // and answers the first as many as the section draws, with how many there are in all (wave 13s round 281). Before,
+  // Home asked the records list for every pipeline and every step of the project and worked it out here. Until the
+  // door has answered, no pipeline is drawn as standing still, as before.
+  const [standingStill] = useProjectAsync(
+    () => api.pipelinesStandingStill(),
     [tick],
     // AND READ AGAIN WHEN A PIPELINE OR A STEP CHANGES, at most once in 5 seconds (item 87 of wave 13y).
     { follows: { kinds: ['pipeline', 'block'], atMostEveryMs: 5000 } },
   )
   const stillPipelines = useMemo(
-    () =>
-      records.status !== 'ready'
-        ? []
-        : readPipelines(records.value)
-            .pipelines.filter((pipeline) => standsStill(pipeline.blocks) !== null)
-            .map((pipeline) => ({
-              id: pipeline.record.id,
-              title: pipeline.record.title,
-              workspaceId: pipeline.record.workspaceId,
-              line: pipelineLine(pipeline.blocks),
-            })),
-    [records],
+    () => (standingStill.status === 'ready' ? standingStill.value : { rows: [], total: 0 }),
+    [standingStill],
   )
   const homeDetail = useDetail('home', null)
   const projectName = useMemo(
     () => projectNameOn(projects.status === 'ready' ? projects.value : null),
     [projects],
   )
-  // REPORTS ARE A PART ONLY WHEN THE PROJECT HOLDS ONE. The office's answer counts the reports waiting and the ones
-  // already read; when both are none, the part is not drawn at all rather than drawing a dash. While the answer is on
-  // its way nothing is drawn there yet, and when it failed the part says why, both as before.
-  const reportsHeld = attention.status === 'ready'
-    ? attention.value.reportCounts.waiting + attention.value.reportCounts.read
-    : null
-
   return (
     <HomeSections
       title={t(RAIL_WORD_KEYS['rail.home'])}
@@ -1649,23 +1504,15 @@ export function HomePage({ waiting, onWaitingChanged, attention, onAttentionChan
       today={<><ScheduleWeek again={tick + todayTries} projectName={projectName} onRetry={readTodayAgain} /><ProgressCard tick={tick} /><DayBand reloadKey={tick + todayTries} projectName={projectName} homeRung={homeDetail.rung} onRetry={readTodayAgain} /></>}
       // A PROPOSAL TO MAKE AN AGENT A PERMANENT RESIDENT, with the person's Confirm and Not now on its row.
       presses={<ResidentProposals onAnswered={onWaitingChanged} />}
+      // A BROWSER OR DEVICE OF THE PERSON'S ASKING TO PAIR, as a card with Confirm and Refuse, above the parts.
+      pairing={<HomePairingRequests requests={pairing} onWaitingChanged={onWaitingChanged} />}
+      pairingCards={pairing.drawn}
       projectName={projectName}
       // THE THISPROJECT LINE'S PLACE. The drawing's line under the title says the day and that Home is
       // about all projects; every part that reads one project names it (claims, the reports band's
       // project, the project cards).
-      lead={t('home.leadLine', { day: dayUnderTheTitle(readAt), scope: t('home.leadAllProjects') })}
-      // THE REPORTS WAITING FOR THE PERSON, capped at five (REPORTS_SHOWN).
-      // They read this project's attention answer, as the old band did. A REPORT MARKED READ IS THE READER'S
-      // ACT, so the answer that takes its row out is asked at once and not at the pace of Home's minute.
-      reports={
-        attention.status === 'ready'
-          ? reportsHeld === 0
-            ? null
-            : <ReportsForYou reply={attention.value} onMarkedRead={() => { hurryTheAttentionHomeAsk(); onAttentionChanged() }} />
-          : attention.status === 'error'
-            ? <ErrorNote message={t('home.reportListMissing')} fault={attention.fault ?? null} retry={onAttentionChanged} />
-            : null
-      }
+      day={dayUnderTheTitle(readAt)}
+      // NO REPORT LIST IS ON HOME, by the person's decision; the reports are on their own page.
       // WHAT HAS BEEN SAID AND THE QUESTIONS ABOUT THE RECORDS ARE ONE PRESS AWAY in Developer mode, each on its own
       // page. What is running is on the Agent runs page.
       developer={
@@ -2059,10 +1906,7 @@ html:not([data-mode="inspect"]) .hp-page :is(.rid-card, .rid-text) { display: no
 /* The sentence that says what the one row stands for. It sits above the originals it is about. */
 .hp-collapsed { margin: 0; padding: 0; }
 
-/* ---- one pipeline's steps, in order, in the right-hand cell.
-   The strip and the exact count sit together: the strip says what SHAPE the run is in and the
-   number says exactly how much of it is done, and neither is a substitute for the other. */
-.hp-prog { display: flex; align-items: center; gap: var(--pad); font-variant-numeric: tabular-nums; }
+/* ---- one pipeline's steps, in order, as StepStrip draws them. */
 /* FIXED WIDTH, whatever the step count, so a five-step pipeline and a twelve-step one can be
    compared straight down the column. The segments share the width between them. */
 .hp-steps { display: flex; align-items: flex-end; gap: 2px; width: 84px; height: 12px; flex: none; }

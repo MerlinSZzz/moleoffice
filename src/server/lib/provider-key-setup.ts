@@ -25,6 +25,8 @@ export interface ProviderSetupRow {
   expiry?: string
   trial: { url: string; method: string; answers?: { status: number; name?: string; means: string }[] } | null
   trialDescription?: string
+  /** True on a row the table keeps that Settings does not show: Add a provider key leaves it out, and saving and trying it work as before. */
+  hiddenInSettings?: boolean
 }
 export interface ProviderKeyInput {
   provider: string
@@ -51,8 +53,8 @@ export function createProviderKeySetup(options: { home?: string; providers?: Pro
   }
   return {
     list() {
-      return rows.map(theGuideInSettings).map(({ id, name, page, documentation, instructions, scopes, permissions, otherPermissionsOff, expiry, trialDescription }) => ({
-        id, name, page, documentation, instructions, scopes, permissions, otherPermissionsOff, expiry, trialDescription,
+      return rows.map(theGuideInSettings).map(({ id, name, page, documentation, instructions, scopes, permissions, otherPermissionsOff, expiry, trialDescription, hiddenInSettings }) => ({
+        id, name, page, documentation, instructions, scopes, permissions, otherPermissionsOff, expiry, trialDescription, hiddenInSettings,
       }))
     },
     /** False where the shared writer refuses to save, so the page says so before the person types a key. */

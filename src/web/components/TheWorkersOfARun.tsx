@@ -32,7 +32,6 @@ import { Panel, type PanelProps } from './ui.tsx'
 const WORKERS_SHEET = 'mole-office-workers-of-a-run'
 
 const WORKERS_CSS = `
-.wr-intro { margin: 0 0 var(--pad) 0; font-size: var(--fs-1); color: var(--text-2); }
 .wr-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
 .wr-one { padding: var(--pad) 0; border-top: 1px solid var(--border); min-width: 0; }
 .wr-one:first-child { border-top: none; padding-top: 0; }
@@ -45,7 +44,7 @@ const WORKERS_CSS = `
 .wr-fact dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
 .wr-none { color: var(--text-2); }
 .wr-more { margin: var(--pad) 0 0 0; font-size: var(--fs-1); color: var(--text-2); }
-.wr-asked-says { margin: 0 0 0.3rem 0; overflow-wrap: anywhere; }
+.wr-asked-who { margin: 0 0 0.3rem 0; overflow-wrap: anywhere; }
 .wr-asked-run { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
 `
 
@@ -63,7 +62,6 @@ export function TheWorkersOfARun({
         {WORKERS_CSS}
       </style>
       <Panel declares={{ surface: null }} title={t('record.section.workerRuns')} titleIs={titleIs}>
-        <p className="wr-intro">{t('w13j.workers.intro')}</p>
         <ul className="wr-list">
           {workers.workers.map((worker) => (
             <OneWorker key={worker.agent} worker={worker} />
@@ -91,9 +89,7 @@ export function TheRunThatAskedForIt({
       </style>
       <Panel declares={{ surface: null }} title={t('w13j.askedFor.title')} titleIs={titleIs}>
         <div className="wr-asked">
-          <p className="wr-asked-says">
-            {askedForBy.askerName === null ? t('w13j.askedFor.saysNoName') : t('w13j.askedFor.says', { name: askedForBy.askerName })}
-          </p>
+          <p className="wr-asked-who">{askedForBy.askerName ?? t('w13j.askedFor.notInRegistry')}</p>
           <p className="wr-asked-run">
             <RouteLink to={recordPath(askedForBy.run, 'session')}>{askedForBy.title}</RouteLink>
           </p>
@@ -154,13 +150,13 @@ function theState({ run, runId, asked, failedSays }: AWorkerARunAskedFor): React
   if (run !== null) return run.state === null ? nobodyRecordedOne() : stateWord(run.state, 'normal', 'session').text
   switch (asked) {
     case 'wanted':
-      return t('w13j.workers.wanted')
+      return t('w13j.workers.wantedWord')
     case 'starting':
       return t('w13j.workers.starting')
     case 'failed':
-      return failedSays === null ? t('w13j.workers.failedNoReason') : t('w13j.workers.failed', { says: failedSays })
+      return failedSays === null ? t('w13j.workers.failedNoReasonWord') : t('w13j.workers.failed', { says: failedSays })
     case 'started':
-      return runId === null ? t('w13j.workers.noRunNamed') : t('w13j.workers.runNotHere', { id: runId })
+      return runId === null ? t('w13j.workers.noRunNamedWord') : t('w13j.workers.runNotHereWord', { id: runId })
   }
 }
 

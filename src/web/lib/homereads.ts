@@ -12,8 +12,8 @@
  * 3.3 s, because the bands that make those requests are only mounted once the page's first two big
  * reads — `/api/records?shape=home` and `/api/attention?machine=omit` — have both answered. The
  * third wave started at 4.2 s and the Waiting and Today bands did not appear until 7.1 s. The page
- * asks `shape=home` now only together with `kind=pipeline` and `kind=block`, in the project read
- * that fills Late or stuck in `HomePage.tsx`.
+ * asks `/api/records?shape=home` for no kind now: Late or stuck asks
+ * `/api/pipelines/standing-still` in `HomePage.tsx` (wave 13s round 281).
  *
  * NOTHING ABOUT THE DOORS WAS SLOW. Alone, each answered in a fraction of a second. The delay was
  * the ORDER: a band's read could not be asked for until the page it lives on had finished reading

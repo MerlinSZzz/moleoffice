@@ -55,7 +55,7 @@ import { MERGE_QUEUE_SNAPSHOT_CHANGING } from '@shared/merge-queue-snapshot.ts'
 
 import { actorFrom, takesNoBody } from '../lib/http.ts'
 import { parse } from '../lib/parse.ts'
-import { route } from '../lib/route.ts'
+import { itChangesSomething, route } from '../lib/route.ts'
 import { theMergeEntry } from '../lib/merge-queue.ts'
 import { aWaitingStarterChangeSays } from '../lib/agent-starter.ts'
 import { sqlite } from '../db/client.ts'
@@ -315,7 +315,10 @@ export async function workerRoutes(app: FastifyInstance): Promise<void> {
 
   app.get(
     '/worker/queue',
-    route('worker.queue', 'local', { because: 'starts-work-on-this-machine', act: 'Reading the work waiting for a run here' }, QUEUE_NOTE),
+    itChangesSomething(
+      route('worker.queue', 'local', { because: 'starts-work-on-this-machine', act: 'Reading the work waiting for a run here' }, QUEUE_NOTE),
+      (query) => query.markDelivered === '1',
+    ),
     async (req) => {
       const workspaceId = workspaceOf(req)
       const q = parse(fullQuery, req.query, 'The query string is not usable:')

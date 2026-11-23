@@ -3,9 +3,8 @@
 /**
  * THE WAITER IN tools/kit/ KEEPS THE HANDLE HELD AFTER A HAND-OVER.
  *
- * This is tests/the-kits-waiter-keeps-holding-after-a-hand-over.test.ts, proved again on
- * `tools/kit/waiter.sh`, the copy with no personal default. That file goes on
- * testing `design/agents/kit/waiter.sh`, which live agents still run by its path.
+ * It is proved on `tools/kit/waiter.sh`, the copy with no personal default. Live agents still run
+ * `design/agents/kit/waiter.sh` by its path.
  *
  * Problem `TZD7KatHAtEV`, measured by the office's secretary on 23 September 2026: the kit's waiter
  * (then the copy under design/agents/kit) ran `tools/hold-the-handle.mjs`, and when the tool handed a

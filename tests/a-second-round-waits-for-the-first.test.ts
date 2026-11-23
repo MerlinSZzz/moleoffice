@@ -23,13 +23,14 @@ import { constants as fsConstants, openSync, closeSync, fstatSync, statSync, rea
 import { tmpdir } from 'node:os'
 import { basename, dirname, join, resolve } from 'node:path'
 import { theCodexRolloutFor } from '../src/config/codex-log.mjs'
+import { CODEX_SHELL_SNAPSHOT_OFF } from '../src/config/run-permissions.mjs'
 import { spoolAGateMet } from '../src/config/gate-count-spool.mjs'
 import { clockStamp, momentOfAnInstant, nowStamp } from '../src/shared/time.ts'
 import { fileURLToPath } from 'node:url'
 import type { AddressInfo } from 'node:net'
 import type { FastifyInstance } from 'fastify'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { apiApp, freshDb, type TestDb } from './helpers.ts'
+import { apiApp, freshDb, type TestDb, governsTheWholeProject } from './helpers.ts'
 import { FAKE_DF, FAKE_FREE, FAKE_DU, FAKE_DEVCONTAINER, FAKE_DOCKER, aFakeNpm, aMadeUpPackage, startsOf, theFakeMachine, theFakeState, theNpmCalls } from './sandbox-stand-ins.ts'
 import { LAUNCHER_MODEL_COMPATIBILITY, THE_MODELS_START_VALUES, THE_RUNTIMES_FAST_MODE } from '../src/config/model-efforts.mjs'
 import { CLAUDE_CODE_FEATURES_OFF, CODEX_FEATURES_OFF, THE_STARTING_WORDS } from '../tools/harness-features-off.mjs'
@@ -740,7 +741,7 @@ describe('worker and round', () => {
 
     // THE PERSON MARKS A CASTING FOR THE ROLE CARD: claude is given its model, and the line names the casting and its decision.
     const asThePerson = { type: 'human', id: THE_TEST_OFFICES_OWNER.id }
-    const decided = await ask('POST', '/api/records', { kind: 'decision', title: 'The test casts the worker role', data: { replaces: [] } }, asThePerson)
+    const decided = await ask('POST', '/api/records', { kind: 'decision', title: 'The test casts the worker role', data: { ...governsTheWholeProject(), replaces: [] } }, asThePerson)
     expect(decided.status, JSON.stringify(decided.body)).toBe(201)
     const decision = String(decided.body.record.id)
     const cast = await ask('POST', '/api/casting/worker', { program: { value: 'claude-code', decision }, model: { value: 'the-cast-model', decision } }, asThePerson)
@@ -1047,7 +1048,8 @@ describe('Codex worker and round', () => {
     const seen = join(dir, 'out', 'codex-' + first.run + '.json')
     await until('the stand-in Codex argv record', () => existsSync(seen))
     const given = JSON.parse(readFileSync(seen, 'utf8'))
-    expect(given.argv).toEqual(first.command.slice(1))
+    // The sandbox's codex (tools/codex-in-a-sandbox.mjs) puts the snapshot switch in front of the command's words.
+    expect(given.argv).toEqual([...CODEX_SHELL_SNAPSHOT_OFF, ...first.command.slice(1)])
     expect(given.env.MOLE_OFFICE_AGENT).toBe(CODEX_WORKER)
     expect(given.env.MOLE_OFFICE_SESSION).toBe(first.run)
     expect(given.cwd).toBe(first.cwd)
@@ -1090,7 +1092,8 @@ describe('Codex worker and round', () => {
     expect(second.run).not.toBe(first.run)
     const seen = join(dir, 'out', 'codex-' + second.run + '.json')
     await until('the resumed stand-in argv record', () => existsSync(seen))
-    expect(JSON.parse(readFileSync(seen, 'utf8'))).toMatchObject({ argv: second.command.slice(1), brief: readFileSync(second.stdin, 'utf8') })
+    // The sandbox's codex puts the snapshot switch in front of a resumed thread's words too.
+    expect(JSON.parse(readFileSync(seen, 'utf8'))).toMatchObject({ argv: [...CODEX_SHELL_SNAPSHOT_OFF, ...second.command.slice(1)], brief: readFileSync(second.stdin, 'utf8') })
     await codexEnded(second)
     const record = (await ask('GET', '/api/records/' + second.run)).body
     expect(record.record.data).toMatchObject({ runtime: 'codex', model: CODEX_MODEL, workingDirectory: first.cwd })
@@ -2142,9 +2145,10 @@ process.stdout.write(bytes)
   }, 60_000)
 })
 
+// 'forward' has the named-worktree prior, so a named-worktree prior and a changed lockfile run together in one case.
+// 'source-already-at-cut' runs a changed lockfile after a worktree prior.
 for (const scenario of [
-  { name: 'forward', prior: 'worktree', installed: '1.0.0', cut: '2.0.0' },
-  { name: 'backward', prior: 'named-worktree', installed: '2.0.0', cut: '1.0.0' },
+  { name: 'forward', prior: 'named-worktree', installed: '1.0.0', cut: '2.0.0' },
   { name: 'unchanged', prior: 'named-worktree', installed: '1.0.0', cut: '1.0.0' },
   { name: 'source-already-at-cut', prior: 'worktree', installed: '1.0.0', cut: '2.0.0' },
   { name: 'missing-install-marker', prior: 'named-worktree', installed: '1.0.0', cut: '1.0.0' },
@@ -2164,7 +2168,7 @@ for (const scenario of [
   expect(up.status, up.err).toBe(0)
   const dir = JSON.parse(up.out.trim()).folder as string
   // The round start reads the line's two rule files from this sandbox's briefs folder, and beforeAll writes them only
-  // into the shared sandbox. CODE.md is read from the sealed run's own checkout.
+  // into the shared sandbox. A fresh round checks CODE.md against its own new worktree, made at its cut.
   for (const file of RULE_FILES.filter(one => one !== 'CODE.md')) writeFileSync(join(dir, 'briefs', file), ROUND_START_RULES[file])
   const repo = join(dir, 'repo')
   const installedCopy = dirname(realpathSync(join(repo, 'node_modules')))

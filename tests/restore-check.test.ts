@@ -137,8 +137,8 @@ import {
   workspaces,
   workWindows,
   folderReadings,
-  everyPartTable,
 } from '../src/server/db/schema.ts'
+import { everyPartTable } from '../src/server/db/every-part-table.ts'
 
 const NOW = Date.UTC(2026, 7, 10, 12, 0, 0)
 

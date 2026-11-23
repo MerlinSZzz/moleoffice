@@ -51,7 +51,7 @@ import { THE_OWNER } from '../src/shared/kinds.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { PROJECT_RULE_CHECK_NAMES } from '../src/shared/project-rules.ts'
 import { THE_TEST_OFFICES_OWNER } from './a-page-of-a-test-office.ts'
-import { apiApp, freshDb, thePersonsKeyHeader, type TestDb } from './helpers.ts'
+import { apiApp, freshDb, thePersonsKeyHeader, type TestDb, governsTheWholeProject } from './helpers.ts'
 
 const ROBOTICS = 'made-up-robotics'
 const OTHER = 'made-up-other'
@@ -110,7 +110,8 @@ async function dutiesFor(secretary: string, project: string): Promise<void> {
   const decision = await call('POST', '/api/records', inProject(PERSON, project), {
     kind: 'decision',
     title: 'A made-up decision the duties rest on',
-    data: { option_taken: 'The made-up secretary looks after made-up rules.', because: 'A made-up reason.', decided_by: THE_OWNER, replaces: [] },
+    data: { option_taken: 'The made-up secretary looks after made-up rules.', because: 'A made-up reason.', decided_by: THE_OWNER,
+      ...governsTheWholeProject(), replaces: [] },
   })
   expect(decision.status, decision.raw).toBe(201)
   const duties = await call('POST', '/api/records', inProject(PERSON, project), {

@@ -56,9 +56,11 @@
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { liveApp, waitForThePage, type LiveApp, theAnswerToAWriteInATestOffice } from './helpers.ts'
+import { createI18n } from '../src/shared/i18n.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 
 let app: LiveApp
+const { t } = createI18n('en')
 
 /** What the comment says. Long enough that finding it on a page is not an accident. */
 const WHAT_THEY_WROTE = 'This step still assumes the human lets go first.'
@@ -182,8 +184,8 @@ describe('pressing the count on a card shows the comment', () => {
     const said = (await app.page.textContent('.px-pane')) ?? ''
     expect(said).toContain(WHAT_WAS_WRITTEN_ON_THE_MODULE)
     // AND IT IS NOT THE LIST OF REVIEWS, which is what the press used to open. That pane's own
-    // absence line is the sentence the owner was left looking at.
-    expect(said).not.toContain('No review of this project yet.')
+    // absence word is what the owner was left looking at.
+    expect(said).not.toContain(t('review.pane.none.yet'))
   }, 240_000)
 })
 
@@ -219,7 +221,7 @@ describe('the same comment is in the conversation it was sent to, and stays afte
     const comments = (JSON.parse(await read.text()) as { comments: { id: string }[] }).comments
     expect(comments.map((one) => one.id)).toContain(commentId)
 
-    const conversation = await fetch(`${app.api}/api/messages/conversation?kind=agent&id=reader-y`)
+    const conversation = await fetch(`${app.api}/api/messages/conversation?kind=agent&id=reader-y`, { headers: { 'content-type': 'application/json' } })
     const said = await conversation.text()
     expect(conversation.status, said).toBe(200)
     expect(said).toContain(WHAT_THEY_WROTE)

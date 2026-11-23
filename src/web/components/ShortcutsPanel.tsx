@@ -1,14 +1,15 @@
 // Copyright © 2026 Zhengyang Shen
 // Licensed under the MIT License. See LICENSE.
 /**
- * `Keyboard shortcuts` — WHICH SHORTCUTS ARE ON. It follows item 5 of a decision, on the proposal
- * in report hbu756wTdJnz, in its Settings group, block b-9.
+ * `Keyboard shortcuts` — WHICH SHORTCUTS ARE ON, in their Settings group.
  *
- * THREE THINGS, in the order the proposal draws them:
+ * THREE THINGS, in this order:
  *   1. a press that opens the list of every key, which is the way to it on a phone;
- *   2. ONE SWITCH FOR EVERY SINGLE-LETTER KEY, on by default (question 3);
+ *   2. ONE SWITCH FOR EVERY ALT KEY, the keys that work only outside a text box, on by default. On
+ *      a Mac the Alt keys are Option keys. The switch is the stored `singleKeys`, kept by its old
+ *      name, and the two Ctrl keys do not answer to it;
  *   3. one row per shortcut: what it does, its keys, a switch, and "Later" where changing the key
- *      would go (question 7: on and off now, changing a key later).
+ *      would go. A person turns a key on and off now; changing a key comes later.
  *
  * THE PANEL HOLDS THE CONTROLS AND NOT THE RULE. The keys and their words are the table in
  * `src/web/lib/shortcuts.ts`; the stored shape is `ShortcutSettings` in `@shared/participants.ts`.
@@ -75,7 +76,7 @@ export function ShortcutsPanel() {
         </button>
       </p>
 
-      <h3 className="scp-sec">{t('shortcuts.settings.singleTitle')}</h3>
+      <h3 className="scp-sec">{t('shortcuts.settings.outsideTitle')}</h3>
       <label className="scp-single" data-on={settings.singleKeys ? 'yes' : 'no'}>
         <input
           type="checkbox"
@@ -87,8 +88,7 @@ export function ShortcutsPanel() {
           onChange={(event) => write({ singleKeys: event.target.checked, off: settings.off })}
         />
         <span className="scp-words">
-          <span className="scp-word">{t(settingsControlWord('settings.shortcuts', 'shortcuts.settings.singleSwitch'))}</span>
-          <span className="scp-does">{t('shortcuts.settings.singleNote')}</span>
+          <span className="scp-word">{t(settingsControlWord('settings.shortcuts', 'shortcuts.settings.outsideSwitch'))}</span>
         </span>
       </label>
 
@@ -103,14 +103,14 @@ export function ShortcutsPanel() {
         {SHORTCUT_IDS.map((id) => {
           const chords = chordsOf(id)
           const rowOn = !settings.off.includes(id)
-          // A ROW WHOSE EVERY KEY IS A SINGLE KEY is stopped by the switch above even while its own
-          // switch is on, and it says so.
+          // A ROW WHOSE EVERY KEY IS AN ALT KEY is stopped by the switch above even while its own
+          // switch is on, and a short state word says so.
           const stopped = rowOn && chords.every((chord) => !isOn(id, chord, settings))
           return (
             <div className="scp-row" role="row" key={id} data-shortcut={id} data-on={rowOn ? 'yes' : 'no'}>
               <span role="cell" className="scp-what">
                 {t(settingsControlWord('settings.shortcuts', SHORTCUT_SETTING_WORDS[id]))}
-                {stopped ? <span className="scp-stopped">{t('shortcuts.settings.stopped')}</span> : null}
+                {stopped ? <span className="scp-stopped">{t(mac ? 'shortcuts.state.optionKeysOff' : 'shortcuts.state.altKeysOff')}</span> : null}
               </span>
               <span role="cell" className="scp-keys">
                 <ChordsKeys chords={chords} mac={mac} offs={chords.map((chord) => !isOn(id, chord, settings))} />
@@ -159,7 +159,6 @@ const SHORTCUTS_PANEL_CSS = `
 .scp-single { display: flex; align-items: flex-start; gap: 10px; max-width: var(--measure-in-box); cursor: pointer; }
 .scp-words { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .scp-word { font: 600 var(--fs-1)/var(--lh-tight) var(--font-ui); }
-.scp-does { color: var(--text-3); font: var(--fs-1)/var(--lh-body) var(--font-ui); }
 .scp-switch {
   appearance: none; flex: none; position: relative; width: 34px; height: 20px; margin: 0;
   border: var(--border-w) solid var(--border-strong); border-radius: var(--radius-pill);

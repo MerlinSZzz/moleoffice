@@ -241,7 +241,7 @@ import { periodsInWords } from '../../components/Planning.tsx'
 import { navigate, plansPath } from '../../components/router.tsx'
 import { clearStored, readStored, writeStored } from '../../lib/store.ts'
 import { useInspect } from '../../lib/mode.ts'
-import { Absence, Btn, ErrorNote, Hint, parseStamp, Stamp } from '../../components/ui.tsx'
+import { Absence, Btn, ErrorNote, Hint, parseStamp, ServerNote, Stamp } from '../../components/ui.tsx'
 import { bodyOfLines } from '@shared/plandoc.ts'
 // THE FOUR THINGS A LINE CAN CARRY, and the reader of the syntax, both from the one file that
 // declares them. The presses above the box are built from `PLANNING_KEYS`, so a fifth key added
@@ -2032,22 +2032,7 @@ export function PlanWriting({ state }: { state: PlanWritingState }) {
               keyboard could not get out of, so the plan is indented with spaces and the box is
               monospaced to make them countable. It was a paragraph under the box and the owner
               asked for standing instructions to go behind help; every word is still here. */}
-          <Hint label={t('g8.writing.whatTheKeysDo')}>
-            <p>
-              <strong>{t('g8.writing.altAndTheUpOrDownArrow')}</strong> {t('g8.writing.moveTheLineTheCursorIsInTogetherWith')}</p>
-            <p>
-              <strong>{t('g8.writing.ctrlS')}</strong> {t('g8.writing.savesAndSoDoesTheSaveNowPress')}</p>
-            {/* THE ONE SENTENCE HERE THAT TAUGHT SOMETHING UNTRUE, AND WHAT IT SAYS NOW.
-                It read "Indent with spaces instead." and stopped there, on the only help this
-                surface has. Three people who had never seen Mole Office read it, indented an outline
-                with spaces, and made a plan of nothing but prose: indentation on its own is not an
-                item, it only puts one item under another. The correction is the second half of the
-                sentence; the shape of an item itself is shown in the empty box rather than
-                explained here. */}
-            <p>
-              <strong>{t('g8.writing.tab')}</strong> {t('g8.writing.movesOutOfThisBoxToTheNextPress')}</p>
-            <p>{t('g8.writing.everythingElseSelectingUndoCutCopyPasteSelectAll')}</p>
-          </Hint>
+          <Hint label={t('g8.writing.whatTheKeysDo')}>{t('planWriting.keysHint')}</Hint>
           {/* WHAT A LINE CAN CARRY, OFFERED WHERE THE WRITING IS.
               Each press names the value it adds at the end of the current line,
               and leaves the cursor where the words go. See `valueOnLine`.
@@ -2160,9 +2145,6 @@ function WhatTheseLinesBecame({ state }: { state: PlanWritingState }) {
   return (
     <div className="pw-became">
       <h3 className="pw-became-head" data-title-is="its-label">{t('g8.writing.whatTheseLinesBecame')}</h3>
-      {!inspect ? null : (
-        <p className="pw-became-say">{t('g8.writing.filingALineMovedTheseOffItSoThey')}</p>
-      )}
       <ul className="pw-became-list">
         {rows.map((entry) => (
           <li key={entry.line.id} className="pw-became-row">
@@ -2421,10 +2403,7 @@ function RemovedWork({ state }: { state: PlanWritingState }) {
     <div className="pw-lost" role="status">
       {count === 0 ? null : (
         <>
-          <p className="pw-lost-say">{t('g8.writing.filedAsWorkNoLongerInThisPlanSo', { n: count })}</p>
-          {/* THE SENTENCE THAT STOPS THE DUPLICATE. The press that makes one is in the table beside
-              this box, it is the obvious next thing to do, and nothing over there can say this. */}
-          <p className="pw-lost-say">{t('g8.writing.pointALineAtItAgainBelowFilingIt')}</p>
+          <p className="pw-lost-say">{t('planWriting.lostCount', { n: count })}</p>
           <ul className="pw-lost-list">
             {state.removed.map((one, at) => (
               <LostLine
@@ -2436,11 +2415,11 @@ function RemovedWork({ state }: { state: PlanWritingState }) {
               />
             ))}
           </ul>
-          <p className="pw-lost-keep">
-            {state.removedFault === null
-              ? t('g8.writing.thisStaysOnThePageUntilYouDealWith')
-              : inspect ? state.removedFault : t('g8.writing.cannotRememberLostLines')}
-          </p>
+          {state.removedFault === null ? null : (
+            <p className="pw-lost-keep">
+              {inspect ? state.removedFault : t('g8.writing.cannotRememberLostLines')}
+            </p>
+          )}
           {/* IT SAYS WHAT IT DOES AND NOT WHAT IT MEANS. This press stops Mole Office remembering the
               loss; it does not mend anything and it does not touch the work. "Got it" used to sit
               here, which reads as agreement and was the only press on the notice. */}
@@ -2506,7 +2485,7 @@ function LostLine({
       </p>
       <WhatItNoLongerReaches lost={lost.lost} />
       {free.length === 0 ? (
-        <p className="pw-lost-none">{t('g8.writing.thereIsNoLineHereToGiveItEvery')}</p>
+        <p className="pw-lost-none">{t('planWriting.noFreeLine')}</p>
       ) : (
         <div className="pw-lost-fix">
           <label className="pw-lost-pick">
@@ -2603,7 +2582,6 @@ function WhatItNoLongerReaches({ lost }: { lost: readonly LostValue[] | null }) 
           </div>
         ))}
       </dl>
-      <p className="pw-lost-cost-none">{t('g8.writing.nothingWasDeletedAllOfItIsStillOn')}</p>
     </div>
   )
 }
@@ -2650,10 +2628,7 @@ function SaveSay({ state }: { state: PlanWritingState }) {
           // TRYING AGAIN CANNOT HELP A NAME SOMEBODY ELSE CHANGED: it would be refused the same way. The two presses
           // below are the ways on instead.
           {...(fault.storedName === undefined ? { retry: () => void state.saveNow() } : {})}
-        >
-          {/* THAT SENTENCE TELLS THE READER TO PRESS RETRY, so it is drawn only where there is a Retry. */}
-          {fault.storedName === undefined ? <span className="pw-keep">{t('g8.writing.everyCharacterIsStillOnThisPageKeepThis')}</span> : null}
-        </ErrorNote>
+        />
         {fault.storedName === undefined ? null : <StoredNameChoice state={state} stored={fault.storedName} />}
         <WaysOut state={state} />
         {/* IT SITS UNDER THE PRESSES AND NOT ABOVE THEM, AND THAT IS NOT A TASTE. Pressing one of
@@ -2680,7 +2655,6 @@ function SaveSay({ state }: { state: PlanWritingState }) {
           {state.lastKnown.how === 'sent' ? t('g8.writing.sentAndAccepted') : t('g8.writing.readFromTheServer')}{' '}
           <Stamp at={state.lastKnown.at} />
         </span>
-        <Hint label={t('g8.writing.whyThisSaysWhenItWas')}>{t('g8.writing.moleOfficeHasNotAskedTheServerAboutThis')}</Hint>
       </div>
     </div>
   )
@@ -2730,7 +2704,6 @@ function upperFirst(words: string): string {
  * somebody who was writing a plan. Every word of it is still here, one press away.
  */
 function SomebodyElseWrote({ state, conflict }: { state: PlanWritingState; conflict: PlanConflict }) {
-  const inspect = useInspect()
   const [busy, setBusy] = useState<'read' | 'replace' | null>(null)
   const [said, setSaid] = useState<{ words: string; at: string } | null>(null)
 
@@ -2762,14 +2735,11 @@ function SomebodyElseWrote({ state, conflict }: { state: PlanWritingState; confl
             ? t('g8.writing.theTableBesideYourWritingChangedALineWhileAt2644')
             : t('g8.writing.somebodyWroteInThisPlanFirstSoNothingWas')}
         </p>
-        <p className="pw-clash-say">{t('g8.writing.everyCharacterYouTypedIsStillOnThisPage')}</p>
         <div className="pw-clash-when">
           <span>
             {t('g8.writing.refused')}<Stamp at={conflict.at} />
           </span>
-          {inspect ? <Hint label={conflict.cause === 'table' ? t('g8.writing.whatChanged') : t('g8.writing.whatTheServerSaid')}>
-            {conflict.why}
-          </Hint> : null}
+          <ServerNote text={conflict.why} />
         </div>
         <div className="pw-out-acts">
           <Btn size="sm" variant="secondary" onClick={() => void read()} pending={busy === 'read'}>
@@ -2980,7 +2950,6 @@ const PLAN_WRITING_CSS = `
   color: var(--text-3);
   min-width: 0;
 }
-.pw-keep { display: block; font-size: var(--fs-2); line-height: var(--lh-body); }
 
 /* A save that will not go through: the note, then the ways of getting the writing out. The whole
    block takes its own row of the bar, because it is the only thing worth reading while it is up. */
@@ -3057,7 +3026,7 @@ const PLAN_WRITING_CSS = `
 .pw-box:focus { outline: var(--border-w) solid var(--accent); outline-offset: 2px; }
 /* The shape of a plan, in the empty box. Quiet enough to read as an example and never as writing,
    and it is gone at the first keystroke. */
-.pw-box::placeholder { color: var(--text-3); opacity: 1; }
+.pw-box::placeholder { color: var(--placeholder); opacity: 1; }
 
 @media (max-width: 60rem) {
   .pw-box { min-height: 40vh; }
@@ -3089,7 +3058,7 @@ const PLAN_WRITING_CSS = `
   line-height: var(--lh-body);
   color: var(--text);
 }
-.pw-clash-say, .pw-clash-warn, .pw-clash-fault, .pw-clash-said, .pw-clash-head {
+.pw-clash-warn, .pw-clash-fault, .pw-clash-said, .pw-clash-head {
   margin: 0;
   font-size: var(--fs-2);
   line-height: var(--lh-body);
@@ -3153,12 +3122,6 @@ const PLAN_WRITING_CSS = `
   font-weight: 600;
   line-height: var(--lh-body);
   color: var(--text);
-}
-.pw-became-say {
-  margin: 0;
-  font-size: var(--fs-1);
-  line-height: var(--lh-body);
-  color: var(--text-3);
 }
 .pw-became-list {
   list-style: none;

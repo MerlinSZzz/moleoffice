@@ -5,16 +5,16 @@
  * SETTINGS PAGE. Wave 13y round 137, item 79b. The two settings are round 136's, read and written in
  * src/server/lib/usage-notices.ts.
  *
- * WHAT IS DRAWN. First, one line saying what the notices are. Then one row for each setting. Each row says what is set
- * now and where that came from, then the reason given with the newest change when one was given, then the presses that
- * change it, and last who changed it most recently.
+ * WHAT IS DRAWN. One row for each setting. Each row draws, in short words as decided, what is set now and where that
+ * came from, then the reason given with the newest change when one was given, then the presses that change it, and last
+ * who changed it most recently.
  *   - The secretary for the notices: a picker with "The first secretary appointed" first, which stores no choice, then
  *     every secretary that can take them, first appointed first, and one press.
  *   - What the notice at 80% says to do: the words, the usage decision they come from, a press that sets both, and a
  *     press that sets nothing. The words are sent as typed: no full stop is added, and none is needed. The decision is
  *     named by its title. It is chosen from the ten newest decisions of every project, with ten more on each press, or
  *     found by a word of its title with the record picker (round 140, item 79d). The decision chosen is named above the
- *     list until Save, and the one set is named in the row's sentence, with its link.
+ *     list until Save, and the one set is named in the row's state, with its link.
  *
  * THE STATE DRAWN IS THE STORED ONE. After a press the row reads the door's answer, so it moves only once the office has
  * stored the change. A refused press leaves the row where it was and draws the refusal under it.
@@ -22,17 +22,18 @@
 
 import { useState } from 'react'
 
-import { content, t } from '@shared/i18n.ts'
+import { content, t, type WordKey } from '@shared/i18n.ts'
 import { settingsControlWord } from '@shared/settings-declaration.ts'
 import type { RecordKind } from '@shared/types.ts'
-import type { TheUsageDecision, TheUsageNoticeSecretary, TheUsageNoticeSecretaryInForce } from '../../server/lib/usage-notices.ts'
+import type { TheUsageDecision, TheUsageNoticeSecretary, TheUsageNoticeSecretaryInForce, WhyTheChosenCannotTakeThem } from '../../server/lib/usage-notices.ts'
 import { api, errorMessage, faultOf, type Fault, type RecordListItem } from '../api.ts'
 import { useLanguage } from '../lib/language.ts'
 import { RouteLink, recordPath } from './router.tsx'
-import { ErrorNote, Loading, Panel, Select, TextArea, drawnDayWithTime, useAsync } from './ui.tsx'
+import { ErrorNote, Loading, Panel, TextArea, drawnDayWithTime, useAsync } from './ui.tsx'
 import { SettingChangedLine } from './SettingChangedLine.tsx'
 import { ProjectName, useProjectTitles } from './ProjectChoice.tsx'
 import { RecordPicker } from './RecordPicker.tsx'
+import { AgentPicker } from './agent/AgentPicker.tsx'
 
 export function UsageNoticesPanel() {
   useLanguage()
@@ -46,7 +47,6 @@ export function UsageNoticesPanel() {
         {USAGE_NOTICES_CSS}
       </style>
       <div className="usn">
-        <p className="usn-what">{t('usageNotices.panel.what')}</p>
         <ul className="usn-rows">
           <WhoTakesThem first={who} />
           <WhatItSays first={what} />
@@ -58,25 +58,18 @@ export function UsageNoticesPanel() {
 
 const nameOf = (agent: { name: string; handle: string }): string => agent.name || agent.handle
 
-/** Who takes the notices, in the page's language, built from the same fields and word keys the server's English sentence is. */
+const CANNOT_WORDS: Record<WhyTheChosenCannotTakeThem, WordKey> = {
+  retired: 'settingsState.retired',
+  'not a secretary': 'settingsState.notASecretary',
+  'not registered': 'settingsState.notRegistered',
+}
+
+/** Who takes the notices, in short words: who and where that came from, then the agent chosen here when it cannot take them. */
 function whoTakesThemNow(inForce: TheUsageNoticeSecretaryInForce): string {
-  if (inForce.from === 'set here') return t('usageNotices.secretary.setHere', { who: content(nameOf(inForce.agent)) })
-  if (inForce.from === 'no secretary') {
-    return inForce.chosen === null
-      ? t('usageNotices.secretary.noSecretary')
-      : t('usageNotices.secretary.chosenAndNoSecretary', { chosen: content(inForce.chosen.storedName) })
-  }
-  const who = content(nameOf(inForce.agent))
-  if (inForce.chosen === null) return t('usageNotices.secretary.firstAppointed', { who })
-  const chosen = content(inForce.chosen.storedName)
-  switch (inForce.chosen.cannotBecause) {
-    case 'retired':
-      return t('usageNotices.secretary.chosenRetired', { chosen, who })
-    case 'not a secretary':
-      return t('usageNotices.secretary.chosenNotASecretary', { chosen, who })
-    case 'not registered':
-      return t('usageNotices.secretary.chosenNotRegistered', { chosen, who })
-  }
+  if (inForce.from === 'set here') return `${content(nameOf(inForce.agent))} · ${t('settingsState.chosenHere')}`
+  const who = inForce.from === 'no secretary' ? t('absence.none') : `${content(nameOf(inForce.agent))} · ${t('usageNotices.state.firstAppointed')}`
+  if (inForce.chosen === null) return who
+  return `${who} · ${t('usageNotices.state.chosenCannot', { chosen: content(inForce.chosen.storedName), state: t(CANNOT_WORDS[inForce.chosen.cannotBecause]) })}`
 }
 
 function WhoTakesThem({ first }: { first: TheUsageNoticeSecretary }) {
@@ -106,18 +99,14 @@ function WhoTakesThem({ first }: { first: TheUsageNoticeSecretary }) {
   }
 
   const cannot = reading.inForce.from === 'set here' ? null : reading.inForce.chosen
-  const options = [
-    { value: '', label: t(settingsControlWord('settings.usagenotices', 'usageNotices.panel.pickNobody')) },
-    // EACH BY ITS NAME ALONE, or by its handle where its row holds no name. The handle is added beside a name only
-    // where two of them carry the same name, so the two can still be told apart.
-    ...reading.mayBeChosen.map((one) => {
-      const name = nameOf(one)
-      const shared = reading.mayBeChosen.filter((other) => other.name === one.name).length > 1
-      return { value: one.id, label: shared && name !== one.handle ? `${name} (${one.handle})` : name }
-    }),
+  const fixed = [
+    { value: '', name: t(settingsControlWord('settings.usagenotices', 'usageNotices.panel.pickNobody')) },
     // THE AGENT CHOSEN HERE, WHEN IT CANNOT TAKE THEM NOW, stays in the list so the picker shows what is stored.
-    ...(cannot === null ? [] : [{ value: cannot.stored, label: cannot.storedName }]),
+    ...(cannot === null ? [] : [{ value: cannot.stored, name: cannot.storedName }]),
   ]
+  // THE SECRETARIES THE DOOR OFFERS, each by its name, or by its handle where its row holds no name. Every row draws
+  // its handle beside its name, so two secretaries of one name can still be told apart.
+  const candidates = reading.mayBeChosen.map((one) => ({ kind: 'agent' as const, id: one.id, name: nameOf(one) }))
 
   return (
     <li className="usn-row" data-setting="usage-notice-secretary">
@@ -127,10 +116,13 @@ function WhoTakesThem({ first }: { first: TheUsageNoticeSecretary }) {
       </p>
       {reading.because === null ? null : <p className="usn-because">{t('usageNotices.panel.because', { because: content(reading.because) })}</p>}
       <div className="usn-presses">
-        <label className="usn-field">
-          <span>{t(settingsControlWord('settings.usagenotices', 'usageNotices.panel.pick'))}</span>
-          <Select value={chosen} onChange={setChosen} options={options} aria-label={t(settingsControlWord('settings.usagenotices', 'usageNotices.panel.pick'))} />
-        </label>
+        <AgentPicker
+          label={t(settingsControlWord('settings.usagenotices', 'usageNotices.panel.pick'))}
+          candidates={candidates}
+          chosen={chosen}
+          onChoose={setChosen}
+          fixed={fixed}
+        />
         <button className="usn-button" data-press="choose" type="button" disabled={busy || chosen === (reading.stored ?? '')} onClick={save}>
           {t(settingsControlWord('settings.usagenotices', 'usageNotices.panel.save'))}
         </button>
@@ -193,9 +185,7 @@ function WhatItSays({ first }: { first: TheUsageDecision }) {
     <li className="usn-row" data-setting="usage-decision">
       <p className="usn-name">{t('usageNotices.panel.whatToDo')}</p>
       <p className="usn-state usn-says" data-from={reading.inForce.from}>
-        {stored === null
-          ? t('usageNotices.decision.notSet')
-          : t('usageNotices.decision.setHere', { title: content(stored.title), whatToDo: content(stored.whatToDo) })}
+        {stored === null ? t('settingsState.notSet') : t('usageNotices.state.decisionSet', { title: content(stored.title), whatToDo: content(stored.whatToDo) })}
       </p>
       {stored === null ? null : (
         <p className="usn-link">
@@ -207,11 +197,10 @@ function WhatItSays({ first }: { first: TheUsageDecision }) {
         <span>{t(settingsControlWord('settings.usagenotices', 'usageNotices.panel.words'))}</span>
         <TextArea value={words} onChange={setWords} rows={2} growTo={8} aria-label={t(settingsControlWord('settings.usagenotices', 'usageNotices.panel.words'))} />
       </label>
-      <p className="usn-hint">{t('usageNotices.panel.wordsHint')}</p>
       <div className="usn-choice">
         <p className="usn-label">{t('usageNotices.panel.decision')}</p>
         <p className="usn-chosen" data-chosen={chosen?.id ?? ''}>
-          {chosen === null ? t('usageNotices.panel.noneChosen') : t('usageNotices.panel.chosen', { title: content(chosen.title) })}
+          {t('usageNotices.panel.chosen', { title: chosen === null ? t('absence.none') : content(chosen.title) })}
         </p>
         <TheNewestDecisions chosen={chosen?.id ?? null} titles={titles} onChoose={setChosen} />
         <div className="usn-find">
@@ -277,7 +266,7 @@ function TheNewestDecisions({ chosen, titles, onChoose }: { chosen: string | nul
     <div className="usn-newest">
       <p className="usn-label">{t('usageNotices.panel.newest')}</p>
       {rows.length === 0 ? (
-        <p className="usn-hint">{t('usageNotices.panel.noDecisions')}</p>
+        <p className="usn-hint">{t('absence.none')}</p>
       ) : (
         <ul className="usn-decisions">
           {rows.map((row) => (
@@ -312,7 +301,6 @@ function TheNewestDecisions({ chosen, titles, onChoose }: { chosen: string | nul
 /** The panel's own rules. Every value is a token, so a preset swap re-skins it. No backtick inside. */
 const USAGE_NOTICES_CSS = `
 .usn { display: flex; flex-direction: column; gap: var(--pad); min-width: 0; }
-.usn-what { margin: 0; max-width: var(--measure-in-box); overflow-wrap: anywhere; font: var(--fs-1)/var(--lh-body) var(--font-ui); color: var(--text-2); text-wrap: pretty; }
 .usn-rows { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--pad); min-width: 0; }
 .usn-row { display: flex; flex-direction: column; gap: 4px; min-width: 0; padding-top: var(--pad); border-top: var(--border-w) solid var(--border); }
 .usn-row:first-child { padding-top: 0; border-top: 0; }
@@ -323,7 +311,7 @@ const USAGE_NOTICES_CSS = `
 .usn-presses { display: flex; flex-wrap: wrap; align-items: end; gap: var(--pad); min-width: 0; }
 .usn-field { display: flex; flex-direction: column; gap: 4px; min-width: 0; max-width: 100%; color: var(--text-2); font: 600 var(--fs-1)/var(--lh-tight) var(--font-ui); }
 .usn-words { max-width: var(--measure-in-box); }
-.usn-field .px-select, .usn-field .px-input { max-width: 100%; }
+.usn-field .px-input { max-width: 100%; }
 .usn-button { min-height: var(--row-h); max-width: 100%; padding: 2px var(--pad); border: var(--border-w) solid var(--border-strong); border-radius: var(--radius-sm); background: var(--panel); color: var(--text); box-shadow: var(--button-shadow); font: var(--button-weight) var(--fs-1)/var(--lh-tight) var(--font-ui); cursor: pointer; overflow-wrap: anywhere; }
 .usn-button:hover:not(:disabled) { background: var(--hover); }
 .usn-button:focus-visible { outline: var(--focus-w) solid var(--focus); outline-offset: var(--focus-offset); }

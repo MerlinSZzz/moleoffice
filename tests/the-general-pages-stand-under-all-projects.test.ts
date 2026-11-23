@@ -114,12 +114,14 @@ describe('the sidebar and the category page, drawn without a browser', () => {
     // Checklists joined after Counters on 9 October 2026, in wave 13n round 52.
     // Criterion change (wave 13p round 35): Flows joined after Checklists, the place a
     // decision gave it.
+    // Test change (wave 13u round 242, package KN-1): Knowledge joined after Flows, the one new row the knowledge page's drawing drew.
     expect(all?.keys).toEqual([
       ...ALREADY_THERE,
       'horizons',
       'counters',
       'checklists',
       'flows',
+      'knowledge',
       'bundles',
       'records',
     ])

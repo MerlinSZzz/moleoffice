@@ -36,9 +36,13 @@ for(const reduced of [false,true]) it(`rings for somebody else's new item ${redu
     await expect.poll(async()=>Number.parseInt((await count.textContent())??'',10),{timeout:30_000}).toBeGreaterThan(0)
     const initial=Number.parseInt((await count.textContent())??'',10)
     expect(await ring.count()).toBe(0)
+    // EVERY RING IS NOTED AS IT IS PUT ON THE PAGE. A ring lasts the linger period and is gone before the look 1700 ms
+    // after the count moves, so that look alone would pass with the person's own item ringing.
+    await page.evaluate(()=>{new MutationObserver(records=>{for(const record of records)for(const node of record.addedNodes)if(node instanceof HTMLElement&&node.dataset.checklistArrival!==undefined)document.documentElement.dataset.testChecklistRang='yes'}).observe(document.body,{childList:true,subtree:true})})
     await post(`/api/checklists/${checklist}/items`,{words:`The person's invented item ${reduced?'still':'moving'}`})
     await expect.poll(async()=>Number.parseInt((await count.textContent())??'',10),{timeout:30_000}).toBe(initial+1)
     await page.waitForTimeout(1700)
+    expect(await page.locator('html').getAttribute('data-test-checklist-rang'),"the person's own item rang the press").toBeNull()
     expect(await ring.count()).toBe(0)
     await post(`/api/checklists/${checklist}/items`,{words:`The agent's invented item ${reduced?'still':'moving'}`},agent)
     await expect.poll(async()=>Number.parseInt((await count.textContent())??'',10),{timeout:30_000}).toBe(initial+2)

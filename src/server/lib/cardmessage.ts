@@ -71,6 +71,7 @@ import { createI18n, isLanguage, type Language } from '@shared/i18n.ts'
 import { theLanguagesToSend } from '@shared/handbooks.ts'
 import { anAgentsChecklistTitle } from '@shared/planning-flow.ts'
 import { THE_TOOLSET_SENTENCE } from '@shared/toolset.ts'
+import { KNOWLEDGE_WORDS } from '@shared/words/en-wave-13u.ts'
 import { moleOffice, type ParticipantRef } from '@shared/participants.ts'
 import { sqlite } from '../db/client.ts'
 import { STORED_FIELDS, theWordsOfAStoredField } from '../db/schema.ts'
@@ -177,7 +178,8 @@ export function theCardMessageSaidFor(
   // THE DUTIES, THEN THE TOOLSET SENTENCE, on every path, by a decision. Every agent's
   // introduction says the toolset exists. The idle reminder reads theRoleAndDutiesOf alone, so it does not
   // carry the sentence.
-  const opening = `${theRoleAndDutiesOf(word)} ${THE_TOOLSET_SENTENCE}`
+  // The knowledge library's sentence comes after the toolset sentence on every path; the idle reminder does not carry it either.
+  const opening = `${theRoleAndDutiesOf(word)} ${THE_TOOLSET_SENTENCE} ${KNOWLEDGE_WORDS.introduction}`
   const card = decl === null ? null : cardFor(decl, word)
   if (decl === null || card === null) return opening
 

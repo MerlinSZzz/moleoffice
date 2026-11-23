@@ -75,6 +75,8 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
 /** The agent this test files the forms as, which is what the composer must name. */
 const WRITER = 'short-form-writer'
+/** The name it is registered under, which the reading gives beside the stored id. */
+const WRITERS_NAME = 'Short Form Writer'
 
 const AS_THE_WRITER = {
   'content-type': 'application/json',
@@ -133,6 +135,8 @@ let app: LiveApp
 let page: Page
 /** The run this test writes as, filed as a session record so there is something to link to. */
 let session: string
+/** The writer's registry id, as its registration answered it. A stored form names its writer by this. */
+let writerId: string
 /** The report whose forms were written by a run that named itself in its headers. */
 let named: string
 /** The report whose forms were written by an actor that named no run. */
@@ -189,9 +193,10 @@ beforeAll(async () => {
   const registered = await fetch(`${app.api}/api/agents/started`, {
     method: 'POST',
     headers: AS_A_PERSON,
-    body: JSON.stringify({ handle: WRITER, name: 'Short Form Writer' }),
+    body: JSON.stringify({ handle: WRITER, name: WRITERS_NAME }),
   })
   if (!registered.ok) throw new Error(`registering the writer answered ${String(registered.status)}: ${await registered.text()}`)
+  writerId = ((await registered.json()) as { agent: { id: string } }).agent.id
 
   // THE RUN, FILED FIRST, because a form's `session` is the id of a session record and a reference
   // that names nothing is stored as nothing. This is the record the composer's link goes to.
@@ -385,14 +390,19 @@ describe('right-clicking a short form opens a composer that names who wrote it',
  * THE STORED FIELD AND THE DRAWN LINK ARE ASSERTED SEPARATELY, because they fail separately: a
  * write door that stamps nothing leaves the page nothing to link, and a page that draws no link
  * leaves the stored fact unreachable. Between them they are the whole of the criterion.
+ *
+ * A STORED FORM NAMES ITS WRITER BY REGISTRY ID, though the writer sent its handle, and the reading
+ * gives the writer's name beside it. The summary column's writer is read off the revision ledger as
+ * the request sent it, so the phrase the composer draws there is still the handle.
  */
 describe('the composer links a form to the run that wrote it', () => {
   it('reports the run beside who wrote it and when, on GET short-forms', async () => {
     const read = (await (
       await fetch(`${app.api}/api/records/${named}/short-forms`, { headers: AS_A_PERSON })
-    ).json()) as { levels: { level: string | null; by: string | null; at: string | null; session: string | null }[] }
+    ).json()) as { levels: { level: string | null; by: string | null; byName: string | null; at: string | null; session: string | null }[] }
     const label = read.levels.find((one) => one.level === 'label')
-    expect(label?.by, 'the reading lost who wrote it').toBe(WRITER)
+    expect(label?.by, 'the reading lost who wrote it').toBe(writerId)
+    expect(label?.byName, 'the reading does not name who wrote it').toBe(WRITERS_NAME)
     expect(label?.at, 'the reading lost when it was written').not.toBeNull()
     expect(label?.session, 'the reading does not say which run wrote it').toBe(session)
   }, 60_000)
@@ -400,10 +410,11 @@ describe('the composer links a form to the run that wrote it', () => {
   it('reports the run on the by-part structure as well', async () => {
     const read = (await (
       await fetch(`${app.api}/api/records/${named}/short-forms`, { headers: AS_A_PERSON })
-    ).json()) as { levels: { rung: string; by: string | null; session: string | null }[] }
+    ).json()) as { levels: { rung: string; by: string | null; byName: string | null; session: string | null }[] }
     for (const rung of ['outline', 'sketch', 'digest']) {
       const here = read.levels.find((one) => one.rung === rung)
-      expect(here?.by, `${rung} lost who wrote the parts`).toBe(WRITER)
+      expect(here?.by, `${rung} lost who wrote the parts`).toBe(writerId)
+      expect(here?.byName, `${rung} does not name who wrote the parts`).toBe(WRITERS_NAME)
       expect(here?.session, `${rung} does not say which run wrote the parts`).toBe(session)
     }
   }, 60_000)
@@ -413,7 +424,7 @@ describe('the composer links a form to the run that wrote it', () => {
       await fetch(`${app.api}/api/records/${noRun}/short-forms`, { headers: AS_A_PERSON })
     ).json()) as { levels: { level: string | null; by: string | null; session: string | null }[] }
     const label = read.levels.find((one) => one.level === 'label')
-    expect(label?.by, 'the reading lost who wrote it').toBe(WRITER)
+    expect(label?.by, 'the reading lost who wrote it').toBe(writerId)
     expect(label?.session, 'a run was invented for a write that named none').toBeNull()
   }, 60_000)
 

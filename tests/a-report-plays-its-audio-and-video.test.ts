@@ -32,8 +32,9 @@
  * WAVE 13n ROUND F: each player is played, seeked and saved once, in English. The Chinese page is read once for its
  * save links and file facts, because playing does not change with the language.
  *
- * PICTURES: set REPORT_MEDIA_SHOTS to a folder, and the report is photographed there at 1440, 990,
- * 660 and 390 pixels wide, light and dark. Nothing is written anywhere when it is not set.
+ * PICTURES: set REPORT_MEDIA_SHOTS to a folder, and the report is photographed there at 1440 and 390
+ * pixels wide, in the light look. Nothing is written anywhere when it is not set. The dark look and the
+ * widths 990 and 660 are not drawn: whether a player fits the page does not depend on the colours.
  */
 
 import { mkdirSync, rmSync } from 'node:fs'
@@ -312,14 +313,15 @@ for (const language of ['en'] as const) {
 
 
 describe('the pictures', () => {
-  it('draws both players inside the page at every width, and photographs them when asked', async () => {
+  it('draws both players inside the page at 1440 and 390 in the light look, and photographs them when asked', async () => {
     const output = process.env['REPORT_MEDIA_SHOTS']
     if (output !== undefined) mkdirSync(output, { recursive: true })
-    for (const look of ['light', 'dark'] as const) {
+    {
+      const look = 'light' as const
       await app.page.emulateMedia({ colorScheme: look })
       await open('')
       await app.page.evaluate((value) => document.documentElement.setAttribute('data-theme', value), look)
-      for (const width of [1440, 990, 660, 390]) {
+      for (const width of [1440, 390]) {
         await app.page.setViewportSize({ width, height: 1000 })
         await app.page.locator('figure[data-media="video"] video').waitFor({ timeout: 30_000 })
         await app.page.locator('figure[data-media="audio"] audio').waitFor({ timeout: 30_000 })

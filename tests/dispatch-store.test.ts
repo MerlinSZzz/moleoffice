@@ -591,11 +591,17 @@ describe('a comment is filed under a durable identity only when its recipient ha
     })
     expect(agent.statusCode, agent.body).toBe(201)
     const agentId = (agent.json() as { record: { id: string } }).record.id
+    // THE RUN SAYS WHICH AGENT IT WORKED AS, in its `ranAs` for this project. A comment addressed to a
+    // run that names no agent is refused before anything is written, and this walk needs the row.
     const session = await app.inject({
       method: 'POST',
       url: '/api/records',
       headers: HUMAN,
-      payload: { kind: 'session', title: 'Round ten run', data: { state: 'idle', runtime: 'claude-code' } },
+      payload: {
+        kind: 'session',
+        title: 'Round ten run',
+        data: { state: 'idle', runtime: 'claude-code', ranAs: [{ workspaceId: WORKSPACE, agentId }] },
+      },
     })
     expect(session.statusCode, session.body).toBe(201)
     const sessionId = (session.json() as { record: { id: string } }).record.id

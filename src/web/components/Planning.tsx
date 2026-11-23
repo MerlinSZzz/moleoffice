@@ -96,6 +96,7 @@ import {
   Hint,
   Loading,
   OriginMark,
+  ServerNote,
   StoredState,
   Tag,
   TextArea,
@@ -649,11 +650,10 @@ function PartsInsideNote({
   /** True when the hours boxes are already on the rows below, so no press is needed to reach them. */
   editing?: boolean
 }) {
-  const inspect = useInspect()
   if (load.envelopes === null) {
     return (
       <p className="px-pl-inside">
-        {t('schedule.containmentUnknown', { unit: unitWord(unit) })}
+        {t('schedule.partsNotChecked')}
       </p>
     )
   }
@@ -680,7 +680,7 @@ function PartsInsideNote({
       {trees.length === 0 ? null : (
         <>
           <p className="px-pl-inside-lede">
-            {t('schedule.twoLevels', { unit: unitWord(unit), total: load.plannedHours, rows: load.rowHours })}
+            {t('schedule.rowsAddUp', { rows: load.rowHours })}
           </p>
           <ul className="px-pl-inside-list">
             {trees.map((tree) => (
@@ -692,12 +692,13 @@ function PartsInsideNote({
       {couldNotPlace.length === 0 ? null : (
         <>
           <p className="px-pl-inside-lede">
-            {t('schedule.unplacedParts', { n: couldNotPlace.length })}
+            {t('schedule.parentsNotRead', { n: couldNotPlace.length })}
           </p>
           <ul className="px-pl-inside-list">
             {couldNotPlace.map((row) => (
               <li key={row.recordId}>
-                “{row.title}”: {inspect ? row.why : t('schedule.parentUnread')}
+                “{row.title}”
+                <ServerNote text={row.why} />
               </li>
             ))}
           </ul>
@@ -828,7 +829,7 @@ function CapacityBar({
             // The hatched bar can be read without being narrated. Finding 25, 19 August 2026.
             <span className="px-pl-hint">
               {' '}
-              {t('schedule.unstatedTotal', { n: unstated })}
+              {t('schedule.unstatedCount', { n: unstated })}
             </span>
           ) : null}
         </p>
@@ -1150,46 +1151,6 @@ function noHoursOn(name: string): string {
 /** The same clause as a whole sentence, which is what every panel of hours wants. */
 function noHoursOnYet(name: string): string {
   return `${noHoursOn(name)}${endOfSentence()}`
-}
-
-/**
- * THE BLOCKS ON THE BOARD GIVE NO HOURS, SAID IN THE PANEL WHERE THE HOURS ARE.
- *
- * ---------------------------------------------------------------------------------------
- * THE DEFECT, MEASURED ON `#/plan/2026-W35` ON 18 AUGUST 2026
- * ---------------------------------------------------------------------------------------
- *
- * One screen said all three of these at once:
- *
- *     When work happens this week   1 block, Mon 24 – Thu 27 August, 4 days
- *     Hours on this week            0, and "0h planned this week"
- *                                   "Nothing is on next week yet"
- *
- * A tester said this was the one that would stop them trusting the numbers. Two of the three were
- * true: **a window carries no hours by design**, so a week with a block and no allocation really
- * does hold no hours. The third was false and `noHoursOn` above is where that was fixed.
- *
- * ---------------------------------------------------------------------------------------
- * WHY A TRUE SENTENCE WAS STILL NOT ENOUGH
- * ---------------------------------------------------------------------------------------
- *
- * "0h planned this week" beside a block covering four days is two facts with nothing joining them,
- * and a reader who cannot join them concludes the product is broken. So this says the joining fact
- * where the total is, in one sentence: what the board shows is not hours and this panel counts
- * hours. The board says the same thing about itself in `BOARD_HELP`; a reader who came in at the
- * hours panel never met that line.
- *
- * IT SAYS NOTHING WHILE THE BLOCKS HAVE NOT BEEN READ, and nothing when there are none. There is no
- * defect to explain on a week with no blocks, and a page cannot honestly say how many blocks it has
- * before it knows — see `placedOnTheBoard`.
- */
-export function BlocksGiveNoHours({ placed }: { placed: number | null }) {
-  if (placed === null || placed === 0) return null
-  return (
-    <p className="px-pl-hint">
-      {t(placed === 1 ? 'schedule.blockNoHours' : 'schedule.blocksNoHours', { n: placed })}
-    </p>
-  )
 }
 
 /**
@@ -2146,7 +2107,7 @@ function AboveIt({ row }: { row: WorkRow }) {
       {/* WHY THE CHAIN IS NOT THE WHOLE CHAIN, in the server's own words. A row whose containment
           could not be read is still offered — the hours are about the work, not about its chain —
           and saying nothing would draw it as though it sat under what is shown. */}
-      {row.aboveStopped === null ? null : <span className="px-pl-stopped"> · {inspect ? row.aboveStopped : t('schedule.parentUnread')}</span>}
+      {row.aboveStopped === null ? null : <span className="px-pl-stopped"> · {inspect ? row.aboveStopped : t('schedule.parentNotRead')}</span>}
     </span>
   )
 }
@@ -2197,7 +2158,7 @@ export function WorkOffer(props: WorkOfferProps) {
       <span className="px-pl-was" />
       <div className="px-pl-acts">
         {allocatable !== null && !allocatable.includes(row.kind) ? (
-          <span className="px-pl-hint">{t('schedule.allocatableKinds', { kinds: listJoined(allocatable.map(kind => kindWord(kind).text.toLowerCase())) })}</span>
+          <span className="px-pl-hint">{t('schedule.cannotBePlanned')}</span>
         ) : 'action' in props ? (
           props.action
         ) : (
@@ -2297,9 +2258,6 @@ function AddFromWork({
         <Narrow label={t('schedule.project')} value={project} choices={projectsOf(all).map(choice => choice.key === ANY ? choice : { ...choice, label: scheduleProjectName(projects, choice.key, inspect) })} onChange={setProject} />
         <Narrow label={t('schedule.level')} value={level} choices={levelsOf(all)} onChange={setLevel} />
       </div>
-      <p className="px-pl-hint">
-        {/* WHAT THE WORDS BOX MATCHES, said where it is typed. It narrows this list; it does not
-            read the text of records the way the project search does. */}{t('schedule.searchHelp')}</p>
 
       {/* THE CUT IS NEVER SILENT, and neither is a cut the server made. `leftOut` is how many
           pieces of work did not fit in the reply at all, which is a different absence from the
@@ -2318,7 +2276,7 @@ function AddFromWork({
             order, reads as the ten that matter most, and nothing in this list knows that. */}
         {shown.length === 0 ? <Absence title={t('schedule.noMatch', { n: all.length })} /> : <>
           {narrowed ? t('schedule.matches', { shown: shown.length, total: all.length }) : t('schedule.workCount', { n: all.length })}
-          {shown.length > RESULTS_SHOWN ? t('schedule.firstResults', { n: RESULTS_SHOWN }) : ''}
+          {shown.length > RESULTS_SHOWN ? t('schedule.firstShown', { n: RESULTS_SHOWN }) : ''}
         </>}
       </p>
 
@@ -2631,12 +2589,14 @@ export function WordsKept({
       <summary>
         {t('schedule.keptCount', { n: kept.length })}
       </summary>
-      {/* THE ONE PLACE THIS IS SAID, AND IT NAMES WHAT IT IS ABOUT: the words. It used to be said
-          here AND again on every row, and the row's copy stood a few lines under a total reading
-          "12h planned this week" — so a person read "nothing has been scheduled" beside hours that
-          were scheduled. The second sentence is what lets both be true at once: these words are not
-          on the plan, and the work they name may have hours that came from somewhere else. */}
-      <p className="px-pl-hint">{t('schedule.keptWordsHelp')}{reply.counts.committed === 0 ? '' : t('schedule.scheduledMore', { n: reply.counts.committed })}
+      {/* THE ONE PLACE THIS IS SAID: the words of `schedule.keptNotOnPlan`, that these phrases are
+          not on the plan and are in no total, and how many more were scheduled when some were. It
+          is said once, here, and not on every row. A copy on each row stood a few lines under a
+          total of planned hours, and a person read it as "no hours are planned". The work these
+          phrases name may still have hours from somewhere else. */}
+      <p className="px-pl-hint">
+        {t('schedule.keptNotOnPlan')}
+        {reply.counts.committed > 0 ? <>{' · '}{t('schedule.scheduledCount', { n: reply.counts.committed })}</> : null}
       </p>
       <ul className="px-pl-kept">
         {kept.map((intent) => (
@@ -2850,37 +2810,6 @@ export const BOARD_TITLE = en['schedule.boardTitle']
  * more field the shape in this file cannot come to disagree with the shape in `src/web/api.ts`.
  */
 export type WindowsOnDays = Awaited<ReturnType<typeof api.windows>>
-
-/**
- * HOW MANY BLOCKS ARE DRAWN ON THESE DAYS, or null while nobody knows yet.
- *
- * NULL IS "NOT READ", AND IT IS NOT ZERO. A panel that said "no blocks give hours here" before the
- * blocks had come back would be answering a question nobody had the facts for, which is the fifth
- * invariant. Every caller draws nothing at all while this is null.
- *
- * It counts what `boardOf` DRAWS, so the sentence in the hours panel and the number on the board's
- * own heading are one count read once.
- *
- * IT IS HANDED THE ANSWER THE BOARD IS DRAWING, NOT THE STATE OF THE REQUEST, and that is a fix
- * rather than a tidy-up. It used to read the request state directly while the board drew the answer
- * it was holding, and the two came apart: measured in Chromium on 18 August 2026, for one frame
- * after a block was moved off the week, the board drew one block and this sentence said there were
- * two. One answer, counted once, is what stops that.
- */
-export function placedOnTheBoard(answer: WindowsOnDays | null, days: readonly string[]): number | null {
-  if (answer === null) return null
-  return boardOf(days, answer.windows, answer.owners ?? {}).length
-}
-
-/**
- * HOW TO WORK THE BOARD, IN THE INTERFACE RATHER THAN IN A MANUAL.
- *
- * It says the keys because a board that can only be driven with a mouse fails this repository's
- * accessibility standard, and a keyboard equivalent nobody can find is the same failure with an
- * extra step. It says the narrow shape because seven columns do not fit a phone and a reader who
- * met the list without being told would think the board had gone.
- */
-export const BOARD_HELP = en['schedule.boardHelp']
 
 /** What one span is called, in days a person reads. Nothing here turns days into hours. */
 export function windowSaid(window: Pick<WorkWindow, 'startsOn' | 'endsOn'>): string {
@@ -3169,7 +3098,6 @@ function DoneForWork({ work, recordId, onWrote }: {
           ))}
         </div>
       ) : null}
-      {choosing && !complete ? <span className="px-pl-hint">{t('schedule.chooseEnding', { kind: kindWord(work.kind).text })}</span> : null}
     </div>
   )
 }
@@ -3311,9 +3239,6 @@ export function OpenBlock({
       {block.owner == null ? null : <p className="px-pl-bowner">{owner(block.owner)}</p>}
       <p className="px-pl-openwhen">
         <strong>{windowSaid(win)}</strong>
-        {/* THE ONE SENTENCE THIS SURFACE MUST NEVER STOP SAYING. A span is when, not how much, and
-            a reader who took it for hours would think the week was full. */}
-        <span className="px-pl-hint">{t('schedule.windowMeaning')}</span>
       </p>
       {win.state === 'planned' ? null : (
         <p className="px-pl-hint">
@@ -3612,7 +3537,7 @@ export function WeekBoard({
   const lanes = blocks.reduce((n, one) => Math.max(n, one.lane + 1), 0)
 
   return (
-    <PlanSection declares={{ surface: 'plan.board' }} title={t('schedule.boardTitle')} actions={<span className="px-pl-section-count">{t('scheduleDesign.blocks', { n: blocks.length })}</span>}>
+    <PlanSection declares={{ surface: 'plan.board' }} title={t('schedule.boardTitle')} actions={<>{blocks.length === 0 ? null : <Hint>{t('schedule.boardKeysHint')}</Hint>}<span className="px-pl-section-count">{t('scheduleDesign.blocks', { n: blocks.length })}</span></>}>
       <PlanningStyle />
       {/* HOW TO WORK THE BOARD, ONLY WHERE THERE IS SOMETHING TO WORK. With nothing placed, this
           was fifty-five words about a control the reader cannot see, above the sentence saying
@@ -3802,15 +3727,6 @@ export function WeekBoard({
           />
         )}
       />
-      {/* HOW TO WORK THE BOARD, AS A CLOSED FOLD AT THE FOOT, AND ONLY WHERE THERE IS SOMETHING TO
-          WORK. Rule R7 of report n9Mjk3c_sJRu: an explanation is a closed one-line fold at the foot of
-          its section. With nothing placed there is no control to explain (finding 27, 19 August 2026). */}
-      {blocks.length === 0 ? null : (
-        <details className="px-pl-foot">
-          <summary>{t('scheduleDesign.howBlocksMove')}</summary>
-          <p className="px-pl-hint px-pl-boardhelp">{t('schedule.boardHelp')}</p>
-        </details>
-      )}
     </PlanSection>
   )
 }
@@ -3858,7 +3774,6 @@ function PlacedAcrossThisDay({
   return (
     <>
       <span data-title-is="its-label" className="px-pl-sub">{t('schedule.placedDay')}</span>
-      <p className="px-pl-hint">{t('schedule.placedDayHelp')}</p>
       <ul className="px-pl-rows">
         {state.value.windows.map(({ window: win, work }) => (
           <li key={win.id} className="px-pl-row">
@@ -4027,13 +3942,6 @@ export interface WeekProps {
   planned: readonly string[]
   /** Kinds a plan may hold, from the reply — never a second list written here. */
   allocatable: readonly string[]
-  /**
-   * How many blocks are on this week's board, or null while nobody has read them yet.
-   *
-   * IT IS NEVER ADDED TO ANYTHING. It exists so the panel of hours can say, in one sentence, that
-   * the blocks above it give no hours — see `BlocksGiveNoHours`.
-   */
-  placed: number | null
   hoursText: string
   setHoursText: (next: string) => void
   hours: HoursBoxRead
@@ -4155,7 +4063,6 @@ export function WeekBuild({
     retryReview,
     planned: reply.entries.map((e) => e.allocation.recordId),
     allocatable: reply.allocatableKinds,
-    placed: placedOnTheBoard(board, days),
     hoursText,
     setHoursText,
     hours: readHoursBox(hoursText),
@@ -4218,8 +4125,6 @@ function ReadWeek(props: WeekProps & { part: 'hours' | 'work' }) {
     return (
       <>
         <WeekGauge reply={reply} said={said} editing={false} />
-        {/* WHY THE BOARD AND THIS TOTAL DISAGREE, said where the total is. */}
-        <BlocksGiveNoHours placed={props.placed} />
         {/* WHAT THE WEEK HOLDS, OR THAT NOBODY HAS SAID — the same pair the month and the day draw,
             in the same order. The field that answers it is behind the plan press, so while reading
             this is a quiet mark and never a second sentence about the gauge above. */}
@@ -4443,8 +4348,6 @@ function BuildWeek(props: WeekProps & { part: 'hours' | 'work' }) {
     return (
       <>
         <WeekGauge reply={reply} said={said} editing />
-        {/* WHY THE BOARD AND THIS TOTAL DISAGREE, said where the total is. */}
-        <BlocksGiveNoHours placed={props.placed} />
         <CapacityLine
           horizon="week"
           period={reply.period}
@@ -4864,10 +4767,6 @@ export function MonthReview({
             <>
               <span data-title-is="its-label" className="px-pl-sub">
                 {t('schedule.carryInto', { period: nextSaid.name.toLowerCase() })}
-                {/* THE SURPRISE THIS LIST HOLDS, kept but taken out of the reading line: the same
-                    row can be in the list above as finished and in this one as still to carry,
-                    because the hours and the work they were spent on are two different things. */}
-                <Hint label={t('schedule.carryReason')}>{t('schedule.carryHelp')}</Hint>
               </span>
               {review.value.carried.length === 0 ? (
                 <NothingOn sentence={nothingToCarry(t('schedule.thisMonthLower'))} />
@@ -5426,10 +5325,9 @@ export function ProjectSplit({ entries, load }: { entries: AllocationWithWork[];
   return (
     <div className="px-pl-split">
       <PlanningStyle />
-      {ordered.length > 1 ? <p className="px-pl-hint">{t('schedule.oneCapacity')}</p> : null}
       {countedOnce === null ? null : (
         <p className="px-pl-hint px-pl-splitsum">
-          {t('schedule.projectSum', { rows: countedOnce.rowHours, total: countedOnce.plannedHours })}
+          {t('schedule.rowsAddUp', { rows: countedOnce.rowHours })}
         </p>
       )}
       <ul className="px-pl-projects">
@@ -5655,10 +5553,6 @@ const PLANNING_CSS = `
 /* THE SECOND NUMBER, ON PARTICULAR DAYS OR WEEKS, behind a dashed rule and under its own words, so
    it is never read as part of the first. */
 .px-pl-particular { padding-top: 8px; border-top: var(--border-w) dashed var(--border-strong); max-width: var(--measure-in-box); }
-/* AN EXPLANATION, AS A CLOSED ONE-LINE FOLD AT THE FOOT OF ITS SECTION (rule R7). */
-.px-pl-foot { margin-top: 8px; font-size: var(--fs-1); color: var(--text-2); }
-.px-pl-foot > summary { cursor: pointer; color: var(--text-2); text-decoration: underline; min-height: 24px; }
-.px-pl-foot > p { margin: 8px 0 0 0; max-width: var(--measure-in-box); }
 /* WHAT THE PERIOD WORKS TOWARD: rows split by a thin line, the whole row opens the goal (rule R11). */
 .px-pl-toward-line { margin: 0 0 4px 0; }
 .px-pl-toward { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
@@ -5948,7 +5842,6 @@ const PLANNING_CSS = `
    columns do not fit a phone, and a board that scrolled sideways would fail the one layout rule
    this product measures on every page. */
 .px-pl-board { display: flex; flex-direction: column; gap: var(--pad); margin-bottom: var(--pad-lg); }
-.px-pl-boardhelp { max-width: var(--measure-in-box); margin-bottom: var(--pad); }
 /* WHERE A BLOCK WENT WHEN IT LEFT THIS WEEK. It sits at the top of the board because that is where
    the block was, and it is drawn in the accent so it is not read as one more line of help. It takes
    focus when the press that moved the block has gone with it, so the outline is deliberate: it is

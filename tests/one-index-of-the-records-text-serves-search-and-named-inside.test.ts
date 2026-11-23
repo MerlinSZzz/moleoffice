@@ -19,9 +19,10 @@
  *    ids, and when the index keeps more than it reads by id, it reads every record as it did before the index. The
  *    index is asked first, and its keys are read as it gives them, so the question stops at that number.
  * 4. The named-inside door narrows by a folder whose last segment has no Latin letter, and still finds the record
- *    that names it. It reads by id up to the same number, and by its condition of round 63 past it. It asks about a
- *    store's name only for a folder at or above that store, so a folder elsewhere is still read by id when many records
- *    name a store. It reads each record it keeps whole once and asks its condition once, and counts the same (round 72).
+ *    that names it. It reads by id up to a larger number of its own (wave 14c round 9), and by its condition of
+ *    round 63 past that number or when the index cannot be asked. It asks about a store's name only for a folder at
+ *    or above that store, so a folder elsewhere is still read by id when many records name a store. It reads each
+ *    record it keeps whole once and asks its condition once, and counts the same (round 72).
  * 5. A project's read given ids starts from the ids. Its condition holds the project's view of the messages, and
  *    SQLite answered that by reading every message of the office for each piece of ids (wave 13y round 64).
  *
@@ -356,13 +357,20 @@ describe('the named-inside door', () => {
     expect(await theDoorLists(asked)).toEqual([naming])
   })
 
-  it('reads by its condition of round 63 when the index keeps more records than it reads by id, and lists the same', async () => {
-    const { AT_MOST_READ_BY_ID } = await import('../src/server/lib/record-text-index.ts')
-    const asked = '/test-worktrees/夹具标定'
-    copiesOf(report('Synthetic note on 夹具标定', { text: 'Synthetic: the 夹具标定 bench, with no path' }), AT_MOST_READ_BY_ID)
+  it('reads by the ids the index keeps past the number search reads by id, the same records in the same order as its condition of round 63', async () => {
+    const { AT_MOST_READ_BY_ID, theRecordsThatMayHoldOneOf, theRecordsThatMaySay } = await import('../src/server/lib/record-text-index.ts')
+    const asked = '/test-worktrees/pebble-tray'
+    copiesOf(report('Synthetic note on pebble-tray', { text: 'Synthetic: the /other-shelf/pebble-tray bench, in another folder' }), AT_MOST_READ_BY_ID)
     const naming = report('Synthetic folder-naming report', { blocks: [{ id: 'evidence', type: 'image', path: `${asked}/evidence.txt` }] })
-    const { whichRecordsCouldNameIt } = await import('../src/server/api/reportfiles.ts')
-    expect(whichRecordsCouldNameIt(asked), 'the index keeps more records than it reads by id').not.toHaveProperty('ids')
+    const { whichRecordsCouldNameIt, theRecordsThatCouldNameIt } = await import('../src/server/api/reportfiles.ts')
+    const which = whichRecordsCouldNameIt(asked)
+    expect(which, 'the door reads by the ids the index keeps').toHaveProperty('ids')
+    const listed = (more: object) => t.api.listRecords({ workspaceId: t.api.ACROSS_WORKSPACES, includeDeleted: false, ...more }).map((record) => record.id)
+    const byTheIndex = listed(which)
+    expect(byTheIndex).toHaveLength(AT_MOST_READ_BY_ID + 2)
+    expect(byTheIndex, 'the same records in the same order as its condition keeps').toEqual(listed({ alsoWhere: theRecordsThatCouldNameIt(asked) }))
+    expect(theRecordsThatMayHoldOneOf(['pebble-tray']), 'search and the reminders still read every record past their number').toBeUndefined()
+    expect(theRecordsThatMaySay('pebble-tray'), 'search still reads every record past its number').toBeUndefined()
     expect(await theDoorLists(asked)).toEqual([naming])
   })
 
@@ -426,7 +434,6 @@ describe('the named-inside door', () => {
   // Before round 72 the door read every record it kept whole twice: this project's for its list, and every project's
   // again only to count the ones it could not list. In the read by condition that was two passes over the stored text.
   it('reads each record it keeps whole once and asks its condition once, by id and by its condition, and counts the same', async () => {
-    const { AT_MOST_READ_BY_ID } = await import('../src/server/lib/record-text-index.ts')
     const { createWorkspace } = await import('../src/server/lib/workspaces.ts')
     createWorkspace({ id: 'elsewhere', title: 'Synthetic other project' })
     const asked = '/test-worktrees/bench-72'
@@ -443,10 +450,15 @@ describe('the named-inside door', () => {
     expect(byId.readWhole.length, 'the door read no record whole, so this proved nothing').toBeGreaterThan(0)
     expect(twice(byId.readWhole), 'records the door read whole twice, by id').toEqual([])
 
-    copiesOf(aRecord('Synthetic note on bench-72', null, { text: 'Synthetic: the bench-72 bench, with no path' }), AT_MOST_READ_BY_ID)
-    expect(whichRecordsCouldNameIt(asked), 'the second read is not by its condition').toMatchObject({ alsoWhere: expect.anything() })
-    const byCondition = await whatTheDoorRead(asked)
-    expect(byCondition.answer).toEqual(expected)
+    // Past the number the door reads by id, it reads by its condition. That number is too many records to write in a
+    // test, so the condition is reached by a folder whose last segment is too short to ask the index about.
+    const short = `${asked}/b7`
+    const namingShort = report('Synthetic short-folder folder-naming report', { blocks: [{ id: 'evidence', type: 'image', path: `${short}/evidence.txt` }] })
+    report('Synthetic short-folder report in another project', { blocks: [{ id: 'evidence', type: 'image', path: `${short}/other.txt` }] }, 'elsewhere')
+    aRecord('Synthetic short-folder note naming the folder in its text', null, { text: `Synthetic: the log is ${short}/run.log.` })
+    expect(whichRecordsCouldNameIt(short), 'the second read is not by its condition').toMatchObject({ alsoWhere: expect.anything() })
+    const byCondition = await whatTheDoorRead(short)
+    expect(byCondition.answer).toEqual({ records: [namingShort], hiddenCount: 2, leftOut: [] })
     expect(byCondition.askedTheText, 'statements that asked the condition on the stored text').toBe(1)
     expect(twice(byCondition.readWhole), 'records the door read whole twice, by its condition').toEqual([])
   })

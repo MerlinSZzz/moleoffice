@@ -22,7 +22,7 @@ import { useState } from 'react'
 
 import type { AnAgentsRunModel, TheModelARunGets } from '@shared/run-models.ts'
 import { saidOnThePage } from '@shared/dev-sayings.ts'
-import { ErrorNote } from './ui.tsx'
+import { ErrorNote, ServerNote } from './ui.tsx'
 import { useProjectAsync } from '../lib/project-async.ts'
 import { api, errorMessage } from '../api.ts'
 
@@ -102,14 +102,11 @@ function TheModel({ said, agent, mayPress, onChanged }: { said: AnAgentsRunModel
             ? t('g6b.model.none')
             : t('g6b.model.here', { what: modelSaid(said) })}
         </span>
-        {/* IN THE PAGE'S LANGUAGE (wave 13k round 35): each sentence is the server's codes, drawn by the words, and
-            the label and the sentence are one word, so a Chinese page joins them with its own colon. */}
-        <span className="prof-says-inline">
-          {t('g6b.model.line', { label: builderLabel(said.builder), says: saidOnThePage(said.builder.said, said.builder.says) })}
-        </span>
-        <span className="prof-says-inline">
-          {t('g6b.model.line', { label: conversationLabel(said.conversation), says: saidOnThePage(said.conversation.said, said.conversation.says) })}
-        </span>
+        {/* IN THE PAGE'S LANGUAGE (wave 13k round 35): each sentence is the server's codes, drawn by the words. */}
+        <span className="tmr-gets">{builderLabel(said.builder)}</span>
+        <ServerNote text={saidOnThePage(said.builder.said, said.builder.says)} />
+        <span className="tmr-gets">{conversationLabel(said.conversation)}</span>
+        <ServerNote text={saidOnThePage(said.conversation.said, said.conversation.says)} />
         {!mayPress ? null : !editing ? (
           <span className="tmr-control">
             <button
@@ -193,6 +190,7 @@ function TheModel({ said, agent, mayPress, onChanged }: { said: AnAgentsRunModel
 /** Its own few rules. Every value is a token, so a preset swap re-skins it with everything else. */
 const AGENT_MODEL_CSS = `
 .tmr-value { display: flex; flex-direction: column; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
+.tmr-gets { font-size: var(--fs-1); color: var(--text-3); }
 .tmr-control { display: flex; flex-wrap: wrap; align-items: center; gap: var(--pad); margin-top: 4px; min-width: 0; }
 .tmr-input {
   width: 14rem; max-width: 100%; min-height: 30px; padding: 0 var(--pad);

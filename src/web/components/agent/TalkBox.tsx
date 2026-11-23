@@ -110,6 +110,7 @@ import {
   type DraftChange,
 } from '../../lib/drafts.ts'
 import { openReview, reviewChanged, useReviewChanges } from '../../lib/review.ts'
+import { putOnTheClipboard, type ClipboardWrite } from '../../lib/clipboard.ts'
 // START REVIEW starts the review the column's own press starts, from one statement of what this page is about.
 import { startThisPagesReview } from './this-page.ts'
 // WHICH KEY SENDS A MESSAGE. By a decision, the comment composer asks the one shared rule, so its
@@ -152,7 +153,7 @@ import {
 // THE CONTACTS, READ AS THE CHAT READS THEM. By option B of a decision, the panel draws the
 // chat's contacts as a short list, so the name and the dot of a row come from the chat's own
 // file.
-import { Dot, theNameBesideItsDate, theNameOfAContact } from '../ContactChooser.tsx'
+import { Dot, theNameBesideItsDate, theNameOfAContact, theTypedWordsFindARow } from '../ContactChooser.tsx'
 // WHERE A MESSAGE GOES AND WHO THE CONTACTS ARE: the shared reads, so the panel and the chat ask
 // once between them, and the chat event that opens a conversation.
 import { readContactsOnce, readParticipantsOnce, readPresenceForAMinute } from '../../lib/oneread.ts'
@@ -422,12 +423,9 @@ export type SelectedWords = 'placed' | 'across' | 'nowhere'
  *
  * Exported so a test can put the question without a browser.
  */
-export function wordsNotPlacedNote(words: SelectedWords, thing: string): { word: string; detail: string } | null {
+export function wordsNotPlacedNote(words: SelectedWords, thing: string): string | null {
   if (words === 'placed') return null
-  if (words === 'across') {
-    return { word: t('talk.whole', { thing }), detail: t('talk.whole.across', { thing }) }
-  }
-  return { word: t('talk.whole', { thing }), detail: t('talk.whole.nowhere', { thing }) }
+  return t('talk.whole', { thing })
 }
 
 /**
@@ -495,7 +493,7 @@ export function whoWouldGetIt(
 export function whyNotSendIt(body: string, recipient: ContactRef | null): string | null {
   const words = whyNotWriteItDown(body)
   if (words !== null) return words
-  if (recipient === null) return t('talk.whyNotSend')
+  if (recipient === null) return t('talk.sayWhoFirst')
   return null
 }
 
@@ -600,6 +598,14 @@ export interface TalkBoxProps {
    */
   selectedWords?: SelectedWords
   /**
+   * THE NAME OF THE FILE THE WORDS WERE SELECTED IN, when they were drawn by the office's reader of one file. The chip
+   * calls the quote by that name, because the file's words are held in no record and the quote alone does not say
+   * where they came from. Left out everywhere else. See `SHOWN_FILE_ATTRIBUTE` in pointing.ts.
+   */
+  inFile?: string
+  /** THE PAGE OF A PDF THE WORDS WERE SELECTED ON, counted from 1, so the chip names it too. See `SHOWN_PAGE_ATTRIBUTE`. */
+  inPage?: number
+  /**
    * ONE MORE ELEMENT THAT COUNTS AS INSIDE THIS BOX: the control that turns pointing on.
    *
    * IT IS NOT INSIDE THE BOX IN THE TREE AND IT IS PART OF THE BOX TO THE PERSON. Everything that
@@ -663,6 +669,8 @@ export function TalkBox({
   about,
   at,
   selectedWords = 'placed',
+  inFile,
+  inPage,
   alsoInside,
   changing = null,
   onDoneChanging,
@@ -788,6 +796,22 @@ export function TalkBox({
    * to a note.
    */
   const [more, setMore] = useState(false)
+  /**
+   * WHAT COPY TAKES, read by open.ts when the box opened, because opening the box can move the selection. Null only
+   * when no box is open, and then Copy is not drawn.
+   */
+  const copies = useComposer().opened?.copies ?? null
+  /** WHAT THE LAST COPY CAME TO, with the words it was given. Nothing else in the box is changed by a copy. */
+  const [copied, setCopied] = useState<{ words: string; came: ClipboardWrite } | null>(null)
+  /**
+   * THE ANSWER IS SAID ONLY ABOUT THE WORDS IT WAS GIVEN. The same subject right-clicked again keeps this box, so a copy
+   * of the words selected before is not said to be a copy of the words selected now.
+   */
+  const lastCopy = copied !== null && copied.words === copies ? copied.came : null
+  const copy = async (words: string): Promise<void> => {
+    setCopied(null)
+    setCopied({ words, came: await putOnTheClipboard(words) })
+  }
   /** WHICH PRESS IS WAITING. One press at a time: only that press draws the light, and the others are off. */
   const [sending, setSending] = useState<'send' | 'add' | 'keep' | 'note' | null>(null)
   /**
@@ -841,10 +865,18 @@ export function TalkBox({
   // A PART OF A MESSAGE IS CALLED THAT. A sentence, a picture or a quoted line of a chat message is a
   // region of the message's record (problem DowO7yEioWp0), and the region's own noun, "part of a
   // record", says less and is not in the word lists.
+  //
+  // WORDS QUOTED FROM A FILE THE OFFICE DRAWS ARE CALLED BY THE FILE'S NAME. The kind of the block or record that holds
+  // the file says less, and the quote beside it does not say which file it is from. Words from a page of a PDF are
+  // called by the page as well, because the quote does not say which page they are on.
   const chipWord =
-    context.target.kind === 'region' && theRecordItIsIn?.kind === 'message'
-      ? t('chatPoint.partOfAMessage')
-      : wordOnTheChip(context, theRecordItIsIn?.kind ?? null, mode)
+    inFile !== undefined && wordsNamedBy(context) !== null
+      ? inPage === undefined
+        ? t('chatPoint.wordsOfAFile', { name: content(inFile) })
+        : t('chatPoint.wordsOfAFilePage', { name: content(inFile), page: inPage })
+      : context.target.kind === 'region' && theRecordItIsIn?.kind === 'message'
+        ? t('chatPoint.partOfAMessage')
+        : wordOnTheChip(context, theRecordItIsIn?.kind ?? null, mode)
 
   const remember = (next: {
     intent?: MessageIntent
@@ -1176,10 +1208,7 @@ export function TalkBox({
               named, which the frame's own title already says: this is the comment now. Saving and
               sending are two acts, and a person who saved is not waiting for anything to arrive. */}
           {inReview === null || (inReview.did !== 'started' && inReview.did !== 'added' && inReview.did !== 'held') ? (
-            <span title={t('talk.state.keptNotSent.detail')}>
-              {t('talk.state.keptNotSent')}
-              <span className="px-sr"> {t('talk.state.keptNotSent.detail')}</span>
-            </span>
+            <span>{t('talk.state.keptNotSent')}</span>
           ) : (
             <span data-part="in-the-review">
               {inReview.did === 'started'
@@ -1190,10 +1219,10 @@ export function TalkBox({
             </span>
           )}
         </p>
-        {inReview?.did === 'not-in-it' ? <p className="px-talk-note">{t('talk.state.keptNotInTheReview')}</p> : null}
+        {inReview?.did === 'not-in-it' ? <p className="px-talk-note">{t('talk.state.notInThisReview')}</p> : null}
         {inReview?.did === 'held-by-none' ? <p className="px-talk-note">{t('talk.state.noReviewHoldsIt')}</p> : null}
-        {carried === 'a person' ? <p className="px-talk-note" data-part="recipient-not-carried">{t('talk.state.reviewGoesToAgentsOnly')}</p> : null}
-        {carried === 'no record here' ? <p className="px-talk-note" data-part="recipient-not-carried">{t('talk.state.recipientHasNoRecord')}</p> : null}
+        {carried === 'a person' ? <p className="px-talk-note" data-part="recipient-not-carried">{t('talk.state.reviewNotToAPerson')}</p> : null}
+        {carried === 'no record here' ? <p className="px-talk-note" data-part="recipient-not-carried">{t('talk.state.recipientNoRecordHere')}</p> : null}
         {carried !== null && typeof carried === 'object' ? (
           <ErrorNote message={carried.failed} fault={carried.fault} label={t('talk.state.recipientNotKept')} />
         ) : null}
@@ -1263,24 +1292,54 @@ export function TalkBox({
              it sends look alike. The block's look is the chat's own stylesheet,
              drawn here by the same tag; the kind word and the words are this panel's reading of what was
              pointed at. */
-          <div className="px-talk-quote-holder" {...partOfMoleOffice({ surface: 'composer.subject' })}>
-            <style href="mole-office-chat-quotes" precedence="default">
-              {QUOTES_CSS}
-            </style>
-            <blockquote className="px-chat-quote px-talk-quote">
-              <span className="px-chat-quote-inside">
-                {chipWord === null ? null : <span className="px-chat-quote-name px-talk-chip-kind">{chipWord}</span>}
-                <span className="px-chat-quote-words px-talk-chip-what" title={scope.whole}>
-                  {wordsNamedBy(context) === null ? scope.words : `“${scope.words}”`}
-                  {scope.shortened ? <span className="px-talk-chip-cut">{CUT_MARK}</span> : null}
+          <>
+            <div className="px-talk-quote-holder" {...partOfMoleOffice({ surface: 'composer.subject' })}>
+              <style href="mole-office-chat-quotes" precedence="default">
+                {QUOTES_CSS}
+              </style>
+              <blockquote className="px-chat-quote px-talk-quote">
+                <span className="px-chat-quote-inside">
+                  {chipWord === null ? null : <span className="px-chat-quote-name px-talk-chip-kind">{chipWord}</span>}
+                  <span className="px-chat-quote-words px-talk-chip-what" title={scope.whole}>
+                    {wordsNamedBy(context) === null ? scope.words : `“${scope.words}”`}
+                    {scope.shortened ? <span className="px-talk-chip-cut">{CUT_MARK}</span> : null}
+                  </span>
+                  <TheSubjectIsSomewhereElse />
                 </span>
-                <TheSubjectIsSomewhereElse />
-              </span>
-            </blockquote>
-          </div>
+              </blockquote>
+            </div>
+            {/* COPY, BESIDE WHAT THE BOX IS ABOUT, because it copies that: the selected words, or the text of the thing
+                right-clicked. It is in the head and not in the press row, because the row is what is done with the
+                words written here. The short word Copied is said beside it once the clipboard took the words. */}
+            {copies === null ? null : (
+              <>
+                <Btn
+                  size="sm"
+                  onClick={() => copy(copies)}
+                  pendingSucceeded={lastCopy?.wrote === true}
+                  pendingFailed={lastCopy?.wrote === false}
+                  {...(copies === '' ? { disabled: true, reason: t('talk.copyHasNoText') } : {})}
+                >
+                  {t('talk.copy')}
+                </Btn>
+                {lastCopy?.wrote === true ? (
+                  <span className="px-talk-note" role="status" style={{ alignSelf: 'center' }}>
+                    {t('talk.copied')}
+                  </span>
+                ) : null}
+              </>
+            )}
+          </>
         }
         declares={{ surface: 'composer' }}
       >
+      {/* A REFUSED COPY IS SAID IN ONE LINE UNDER THE HEAD, in the clipboard's own sentence: that nothing was copied,
+          and why. Copied is not said then. */}
+      {lastCopy === null || lastCopy.wrote ? null : (
+        <p className="px-talk-refusal" role="status" style={{ margin: 0 }}>
+          {lastCopy.because}
+        </p>
+      )}
       {/* WHAT THIS PROJECTION STANDS FOR, WHEN THE THING POINTED AT IS ONE. The owner's acceptance Act 3:
           at the shortest reading length, right-clicking the summary must name which parts of the
           full report it stands for, and View original must land on those parts. */}
@@ -1306,12 +1365,7 @@ export function TalkBox({
       {/* SAID BEFORE ANYTHING IS TYPED, because it changes what this comment will be about. */}
       {(() => {
         const said = wordsNotPlacedNote(selectedWords, objectWord(context).toLowerCase())
-        return said === null ? null : (
-          <p className="px-talk-warn" title={said.detail}>
-            {said.word}
-            <span className="px-sr"> {said.detail}</span>
-          </p>
-        )
+        return said === null ? null : <p className="px-talk-warn">{said}</p>
       })()}
 
       {/* THE BOX SAYS WHAT IT IS, WHICH IS WHAT MAKES AN UNSENT INSTRUCTION SOMETHING YOU CAN POINT
@@ -1477,7 +1531,7 @@ export function TalkBox({
               onClick={() => setPickingNote((v) => !v)}
             >
               {theNote === null
-                ? t('talk.note.new')
+                ? <NewNoteWords />
                 : theNote !== undefined
                   ? theNotesOwnName(theNote)
                   : lastNote.status === 'error'
@@ -1833,11 +1887,9 @@ export function TheChatContacts({
       .filter((line) => !isPinned(line.who))
       .map((line) => ({ line, relation: null })),
   ]
-  // THE FILTER NARROWS BY THE NAME A ROW DRAWS, the chat's own `theNameOfAContact`, so the two
-  // filters match the same rows for the same words.
-  const needle = filter.trim().toLocaleLowerCase()
-  const shown =
-    needle === '' ? rows : rows.filter(({ line }) => theNameOfAContact(line, everybody).toLocaleLowerCase().includes(needle))
+  // THE FILTER NARROWS BY THE NAME A ROW DRAWS AND AN AGENT'S HANDLE, the chat's own `theTypedWordsFindARow`, so the
+  // two filters match the same rows for the same words.
+  const shown = rows.filter(({ line }) => theTypedWordsFindARow(line, everybody, filter))
   return (
     <div className="px-talk-chooser">
       <input
@@ -1911,6 +1963,22 @@ function theNotesOwnName(note: Pick<PanelRecord, 'title'>): string {
 }
 
 /**
+ * THE WORDS NEW NOTE, WITH A PLUS IN A CIRCLE BEFORE THEM, which sets them apart from the person's notes. The words say
+ * what the plus is, so the drawing is hidden from a reader.
+ */
+function NewNoteWords() {
+  return (
+    <span className="px-talk-new-note">
+      <svg className="px-talk-note-sign" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <circle cx="12" cy="12" r="8.5" />
+        <path d="M12 8v8M8 12h8" />
+      </svg>
+      <span className="px-talk-notes-name">{t('talk.note.new')}</span>
+    </span>
+  )
+}
+
+/**
  * THE NOTES SEND CAN GO INTO, the list the press on the right of Note opens: New note, then one page of My notes, the
  * newest started first, as the my-notes door answers it. A line says how many older notes it does not list, and My notes
  * lists them. A list that could not be read says so, and still offers New note.
@@ -1923,9 +1991,9 @@ function TheNotes({ chosen, onChoose }: { chosen: PanelRecord | null | undefined
   return (
     <div className="px-talk-notes" aria-busy={read.status === 'loading' ? true : undefined}>
       <ul className="px-talk-notes-list" role="listbox" aria-label={t('talk.notes')}>
-        <li>
+        <li className="px-talk-notes-new">
           <button type="button" role="option" aria-selected={chosen === null} className="px-talk-notes-one" onClick={() => onChoose(null)}>
-            <span className="px-talk-notes-name">{t('talk.note.new')}</span>
+            <NewNoteWords />
           </button>
         </li>
         {notes.map((note) => (
@@ -2154,7 +2222,11 @@ function WhatThisStandsFor({ context }: { context: MessageContext }) {
   // stands for, and `tests/view-original-lands-where-it-says.test.ts` counts those to know what the
   // box said before and after *View original* was pressed. This is a different fact, so it is a
   // different element rather than a third one of those.
-  const wrote = whoWroteItHere(here.by, here.at)
+  //
+  // THE WRITER'S NAME WHERE THE READING GIVES ONE, AND WHAT IS STORED WHERE IT DOES NOT. A stored form
+  // holds its writer's registry id, which says nothing to a person, and `byName` is that writer's name.
+  // A form stored before the writer was stored by id, and a column, give no name, and draw as before.
+  const wrote = whoWroteItHere(here.byName ?? here.by, here.at)
   const session = here.session
   return (
     <div className="px-talk-stands">
@@ -2266,7 +2338,8 @@ function listHere(names: readonly string[]): string {
 
 /**
  * WHO WROTE A FORM AND WHEN, IN THE PAGE LANGUAGE, or null when nobody recorded either. The same
- * four cases as `whoWroteIt` in src/shared/zoom.ts. The writer and the time are the stored values.
+ * four cases as `whoWroteIt` in src/shared/zoom.ts. The writer is the name the reading gives, or the
+ * stored value where it gives none, and the time is the stored value.
  */
 function whoWroteItHere(by: string | null, at: string | null): string | null {
   if (by !== null && at !== null) return t('chatEnglish.wrote.byAndAt', { by: content(by), at: content(at) })

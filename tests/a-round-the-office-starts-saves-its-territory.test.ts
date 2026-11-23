@@ -31,11 +31,12 @@ import { ROUND_LAUNCHER_RUNTIME } from '../src/shared/next-round.ts'
 import * as backlog from '../src/shared/round-chapters/backlog.ts'
 import * as delivery from '../src/shared/round-chapters/delivery.ts'
 import * as manifest from '../src/shared/round-chapters/manifest.ts'
+import * as roundStartRules from '../src/shared/round-start-rules.ts'
 import { THE_LAUNCHER_ASKS_AS } from '../src/worker/runtimes/round.ts'
 import { aRunWithNoTitleARoundCanTakeWords, officeHeaders, theAgentsOwnWorktree, whyARunMayNotWorkIn } from '../tools/sandbox-common.mjs'
 import { THE_TEST_OFFICES_OWNER } from './a-page-of-a-test-office.ts'
 import { apiApp, freshDb, theOfficesKeyHeader, thePersonsKeyHeader, type TestDb } from './helpers.ts'
-import { madeUpRound } from './round-chapters-fixture.ts'
+import { madeUpRound, theMadeUpOfficesAnswer, THE_MADE_UP_OFFICE_WITH_CHAPTER_2 } from './round-chapters-fixture.ts'
 
 const launcher = resolve('tools/sandbox.mjs')
 const standingFile = resolve('src/shared/round-chapters/standing.ts')
@@ -123,7 +124,7 @@ describe('a round the office starts itself', () => {
     let filed: { id: string; key: string | null } | null = null
     const who = { agent: THE_LAUNCHER_ASKS_AS, session: launcherRun }
     const globals: Record<string, any> = {
-      ...delivery, ...manifest, ...backlog, ...existsSync(standingFile) ? await import(standingFile) : {}, ...existsSync(delegationsFile) ? await import(delegationsFile) : {}, Buffer, existsSync, statSync, readFileSync, join, resolve, officeHeaders,
+      ...delivery, ...manifest, ...backlog, ...roundStartRules, ...existsSync(standingFile) ? await import(standingFile) : {}, ...existsSync(delegationsFile) ? await import(delegationsFile) : {}, Buffer, existsSync, statSync, readFileSync, join, resolve, officeHeaders,
       chosen: { runtime: 'claude-code', agent: line, brief: f.brief, continues: before }, A_WORKERS_RUNTIME: 'claude-code',
       aWorkersWords: () => 'synthetic', theAddressARunCommitsAt: () => {}, whoIsAsking: () => who,
       // THE COMPACTION WINDOW, which the real one reads from the office's settings, is made up: no Claude Code is started here.
@@ -140,10 +141,13 @@ describe('a round the office starts itself', () => {
       THE_PROGRAM_A_RUNTIME_RUNS, theStartValues: async (command: string[]) => ({ command, env: {}, start: null }), theClaudeCodeEnvironment: () => ({}), theSecretsFor: () => ({ lines: [] }),
       api: 'http://made-up-office.invalid',
       askTheOffice: (_api: string, path: string, options: any) => ask(path, options),
-      // THE STANDING STAGES ARE READ FROM THE MADE-UP OFFICE, as the launcher's ask reads them.
+      // THE STANDING STAGES ARE READ FROM THE MADE-UP OFFICE, as the launcher's ask reads them. ITS TWO RULES DOORS ANSWER
+      // AS A MADE-UP OFFICE THAT HOLDS ONLY A MADE-UP CHAPTER 2, the chapter the round's policy selects, which this test
+      // office does not hold.
       askTheOfficeWhileItRestarts: (_api: string, path: string, options: any) => {
         if (path.startsWith('/api/backlog')) throw new Error('The made-up brief names no line, so no backlog is asked.')
-        return ask(path, options)
+        const rules = theMadeUpOfficesAnswer(path, THE_MADE_UP_OFFICE_WITH_CHAPTER_2)
+        return rules !== null ? Promise.resolve({ status: 200, body: rules }) : ask(path, options)
       },
       // FILED AS tools/register-a-run.mjs FILES IT: as the caller, its session the parent, derived from the run it continues.
       anAgentsRunFiledHere: async (sb: { workspace: string }, asker: typeof who, args: Record<string, any>) => {

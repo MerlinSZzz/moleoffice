@@ -1387,6 +1387,48 @@
       "when": 1793300000052,
       "tag": "0352_a_remint_keeps_the_manifests_it_rewrites",
       "breakpoints": true
+    },
+    {
+      "idx": 353,
+      "version": "6",
+      "when": 1793300000053,
+      "tag": "0353_each_records_revisions_are_counted_from_an_index",
+      "breakpoints": true
+    },
+    {
+      "idx": 354,
+      "version": "6",
+      "when": 1793300000054,
+      "tag": "0354_a_person_keeps_the_mode_it_starts_in",
+      "breakpoints": true
+    },
+    {
+      "idx": 355,
+      "version": "6",
+      "when": 1793300000055,
+      "tag": "0355_a_participants_machines_are_found_by_index",
+      "breakpoints": true
+    },
+    {
+      "idx": 356,
+      "version": "6",
+      "when": 1793300000056,
+      "tag": "0356_an_agent_keeps_its_owner_hand_overs",
+      "breakpoints": true
+    },
+    {
+      "idx": 357,
+      "version": "6",
+      "when": 1793300000057,
+      "tag": "0357_an_agents_alias_is_found_by_the_id_it_replaces",
+      "breakpoints": true
+    },
+    {
+      "idx": 358,
+      "version": "6",
+      "when": 1793300000058,
+      "tag": "0358_a_hold_and_a_use_keep_their_moment",
+      "breakpoints": true
     }
   ]
 }

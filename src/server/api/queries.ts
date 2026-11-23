@@ -66,6 +66,7 @@ import {
   readerOf,
   readingSinceAnchor,
   sessionFilterValues,
+  theHiddenMessagesTheRowsName,
   unconsumed,
   unconsumedOver,
   unmetDependencies,
@@ -491,16 +492,26 @@ export async function queryRoutes(app: FastifyInstance): Promise<void> {
     // session resolution below are all about the same project — three reads that could disagree
     // are exactly how a truncated list ends up beside a count of somebody else's rows.
     const workspaceId = workspaceOf(req)
+    const asked = q.session ?? q.sessionId
+    const ref = asked === undefined ? undefined : resolveSessionRef(asked, workspaceId)
+    const matchedValues = ref === undefined ? undefined : sessionFilterValues(ref)
     // NO ROW NAMING A MESSAGE THIS READER MAY NOT READ is listed or counted. Such a
     // message asked for by id is answered as an id naming nothing is: no rows, and nothing spent on it.
+    // ONLY THE MESSAGES THE ROWS COULD NAME ARE ASKED ABOUT: those of the record's whole change log when a record is
+    // asked, because what was spent on it is read over that, and those of the whole filter otherwise. Every list and
+    // count below reads some of those rows, so this one list serves them all.
     const reader = theMessageReader(actorFrom(req))
-    const hidden = everyMessageHiddenFrom(reader, workspaceId)
+    const hidden = theHiddenMessagesTheRowsName(
+      q.recordId === undefined
+        ? { workspaceId, since: q.since, until: q.until, session: matchedValues, field: q.field, value: q.value }
+        : { workspaceId, recordId: q.recordId },
+      reader,
+    )
     // T2 IS ABOUT ONE RECORD, so it is read only when one was asked for. The read is over the
     // record's whole change log, which is why it is not taken from the capped `rows` below.
     const spent = q.recordId === undefined ? undefined : spentOnRecord(q.recordId, workspaceId, hidden)
 
-    const asked = q.session ?? q.sessionId
-    if (asked === undefined) {
+    if (ref === undefined || matchedValues === undefined) {
       const filter = { workspaceId, recordId: q.recordId, since: q.since, until: q.until, field: q.field, value: q.value, hidden }
       const rows = listChanges({ ...filter, limit: q.limit })
       // Counted over the same filter rather than measured off the list, so the cap is a fact the
@@ -515,8 +526,6 @@ export async function queryRoutes(app: FastifyInstance): Promise<void> {
       }
     }
 
-    const ref = resolveSessionRef(asked, workspaceId)
-    const matchedValues = sessionFilterValues(ref)
     const filter = { workspaceId, recordId: q.recordId, since: q.since, until: q.until, session: matchedValues, field: q.field, value: q.value, hidden }
     const rows = listChanges({ ...filter, limit: q.limit })
     const matched = countChangesMatching(filter)

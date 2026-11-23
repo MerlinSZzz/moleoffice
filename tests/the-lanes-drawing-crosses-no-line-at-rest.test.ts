@@ -37,7 +37,7 @@
  * meetings are counted apart and printed, and they fail nothing.
  *
  * WHAT IS PROVED, case by case: on the master at its Boxes level and on the reel, at 1440 by 1000, in the light theme
- * and in the dark one (four cases),
+ * (two cases; where lines cross does not change with the theme),
  *   - the areas of that pipeline were stored;
  *   - no card is selected, at least one link is drawn at rest, and every line at rest names a link drawn at rest;
  *   - every link between two records that are cards on that drawing is named at rest or for a selection;
@@ -455,7 +455,7 @@ const DRAWINGS = [
 ] as const
 
 for (const drawing of DRAWINGS) {
-  for (const theme of ['light', 'dark'] as const) {
+  for (const theme of ['light'] as const) {
     it(`criterion 2: no line crosses another at rest on the ${drawing.name}, at 1440, ${theme}`, async () => {
       theAreasWereStored(stored[drawing.name], `the ${drawing.name}`)
       await openThePage(app, pipelinePath(id[FILE[drawing.pipeline].pipeline.key]!), theme)

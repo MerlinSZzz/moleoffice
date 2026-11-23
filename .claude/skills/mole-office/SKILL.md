@@ -155,10 +155,10 @@ warrant's shape, the four places it may cite, and which writes take one are chap
 
 ## When somebody asks you to take them to a page
 
-**Answer with a lead, not a link.** Write your reply the usual way, `POST /api/records` with kind
-`message` addressed to whoever asked, and add a field called `lead` beside the body. It says what to
-take them to: a record or a page, and a region inside either. Read its shape from `GET /api/kinds`,
-under the message kind. Name the record in your words as well. Chapter 7 rule 2 says the rest.
+**A message's lead is only for a report written for the reader or a page where they must act; for
+anything else, put a plain link in the body.** A lead is a field called `lead` beside the body of a
+`message` record sent by `POST /api/records`; its shape is in `GET /api/kinds`, under the message kind.
+Name the record in your words too. Chapter 7 rule 2 says the rest.
 
 ## How a message is handed to you
 

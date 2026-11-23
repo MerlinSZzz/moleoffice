@@ -17,9 +17,13 @@
  *   3. The page's own form changes one language's text with a reason. The server takes it, and the versions list then
  *      names both versions, each with its own reason.
  *   4. A flow's page lists the handbook under Handbooks with where it stands, and the step it hangs on counts it.
- *   5. A record of another kind at the address is not drawn as a handbook: the page says so and links to its record.
- *   6. A handbook with no "for" and no text says nobody recorded whom it is for, that it holds no text, and that its
- *      first version holds none, not that the version changed the text with no reason.
+ *   5. A record of another kind at the address is not drawn as a handbook: the page draws "Not a handbook" and links to
+ *      its record.
+ *   6. A handbook with no "for" and no text draws "not recorded" for whom it is for, and "No text" for its text and for
+ *      its first version, not that the version changed the text with no reason.
+ *
+ * Before, the page drew a sentence for each of these states and a sentence for where it stands. It draws a short state
+ * word for each now, as decided, and this file reads each word from its key.
  *
  * Every word the page draws is read from the word list in English, so a change of the words does not turn this red.
  *
@@ -111,7 +115,7 @@ describe('a handbook at #/handbook/<id>', () => {
     expect(await page.locator('h1.hbk-title').textContent()).toBe(TITLE)
     const facts = (await page.locator('dl.hbk-facts').textContent()) ?? ''
     expect(facts).toContain('The made-up agent of this test.')
-    expect(facts).toContain(words('handbookPage.state.draft'))
+    expect(facts).toContain(words('handbookPage.stateNamed.draft'))
     const place = page.locator(`dl.hbk-facts a[href="#${flowsPath(flow)}"]`)
     await place.waitFor({ timeout: 30_000 })
     await expect.poll(async () => place.textContent(), { timeout: 30_000 }).toBe(words('handbookPage.place.step', { n: 2, flow: FLOW_TITLE }))
@@ -160,18 +164,18 @@ describe('a handbook at #/handbook/<id>', () => {
     expect(await stages.nth(1).locator('.flw-stage-handbooks').textContent()).toBe(words('flows.handbooks.onTheStep', { n: 1 }))
   })
 
-  it('5. says a record of another kind is not a handbook, and links to its record', async () => {
+  it('5. draws "Not a handbook" for a record of another kind, and links to its record', async () => {
     const { page } = app
     await page.goto(`${app.site}/#${handbookPath(flow)}`, { timeout: 60_000 })
     await waitForThePage(page, 60_000)
     const says = page.locator('.hbk-says')
     await says.waitFor({ timeout: 30_000 })
-    expect(await says.textContent()).toContain(words('handbookPage.notAHandbook'))
+    expect(await says.textContent()).toContain(words('handbookPage.isNotAHandbook'))
     expect(await says.locator(`a[href="#${recordPath(flow)}"]`).count()).toBe(1)
     expect(await page.locator('h1.hbk-title').count()).toBe(0)
   })
 
-  it('6. says nobody recorded whom it is for, and that a handbook with no text holds none, in its text and in its first version', async () => {
+  it('6. draws "not recorded" for whom it is for, and "No text" for a handbook with no text, in its text and in its first version', async () => {
     const { page } = app
     // NO "FOR", NO TEXT AND NO PLACE: each is left out, which the shape takes as an incomplete record. A blank "for" is
     // refused at the door, and tests/a-handbook-is-a-record.test.ts measures the reading of one.
@@ -179,10 +183,10 @@ describe('a handbook at #/handbook/<id>', () => {
     await page.goto(`${app.site}/#${handbookPath(empty)}`, { timeout: 60_000 })
     await waitForThePage(page, 60_000)
     await page.locator('h1.hbk-title').waitFor({ timeout: 30_000 })
-    expect(await page.locator('dl.hbk-facts .hbk-fact').first().locator('dd').textContent(), 'the "for" left out').toBe(words('handbookPage.forNotSaid'))
-    expect(await page.locator('section.hbk-text .hbk-says').textContent(), 'the text part').toBe(words('handbookPage.noText'))
+    expect(await page.locator('dl.hbk-facts .hbk-fact').first().locator('dd').textContent(), 'the "for" left out').toBe(words('g6a.common.notRecorded'))
+    expect(await page.locator('section.hbk-text .hbk-says').textContent(), 'the text part').toBe(words('handbookPage.textNone'))
     const rows = page.locator('ol.hbk-rows > li')
     await expect.poll(async () => rows.count(), { timeout: 30_000 }).toBe(1)
-    expect(await rows.nth(0).locator('.hbk-row-why').textContent(), 'the first version').toBe(words('handbookPage.noText'))
+    expect(await rows.nth(0).locator('.hbk-row-why').textContent(), 'the first version').toBe(words('handbookPage.textNone'))
   })
 })

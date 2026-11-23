@@ -35,6 +35,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { freshDb, one, type TestDb } from './helpers.ts'
 import { completenessOf } from '@shared/kinds.ts'
+import { PACK_KIND } from '@shared/kinds/pack.ts'
 import { RECORD_KINDS, type PanelRecord } from '@shared/types.ts'
 import {
   blockIdsOf,
@@ -199,7 +200,7 @@ const NOT_IN_THE_DEMO: Readonly<Record<string, string>> = {
   sealed_tip: 'Historical demo runs carry no invented submission; the finish writer and dedicated seal fixtures exercise this immutable kind.',
   merge_entry:
     'A merge entry is a sealed run submitted to the merge queue, written only by the queue\'s doors. A seeded one ' +
-    'would say a changeset is waiting to land in a directory when nothing is; tests/merge-queue-doors.test.ts makes real ones.',
+    'would say a changeset is waiting to land in a directory when nothing is.',
   emergency_push:
     'An emergency push is one commit pushed straight to main while the owner\'s emergency switch is on, written only by ' +
     'its two doors. A seeded one would say main was moved past the queue when nothing moved it, and would name who ' +
@@ -208,6 +209,7 @@ const NOT_IN_THE_DEMO: Readonly<Record<string, string>> = {
     'A host job is one registered tool the office ran on the host for a run that asked for it, written only by its own ' +
     'doors. A seeded one would say a tool ran and a run got its result when nothing ran; ' +
     'tests/a-sandboxed-agent-asks-the-office-for-a-registered-host-tool.test.ts makes real ones in a test office.',
+  [PACK_KIND]: 'A pack records a file that was made and checked. A seeded one would name a file that does not exist.',
   proposal: 'A proposal is a live question put to the owner. Seeding one would put a decision in front of the owner that nobody is actually asking for.',
   report: 'A report is finished writing for a person. There is none to write.',
   draft:
@@ -262,6 +264,14 @@ const NOT_IN_THE_DEMO: Readonly<Record<string, string>> = {
     "A secretary's duties are the share of the work the person gave one real secretary, resting on the person's own " +
     'decisions. Seeding one would show duties nobody gave, resting on a decision nobody made. ' +
     'tests/secretary-duties.test.ts writes them in a test world.',
+  department:
+    "A department is a real part of the person's organisation, named by the person or by a secretary on the person's " +
+    'words. Seeding one would show a department nobody set up, led by a supervisor nobody chose. ' +
+    'tests/departments-are-records-of-their-own.test.ts files them in a test world.',
+  key_item:
+    'A key item is one of the few things the person keeps in front of them, with its progress and an estimate of the ' +
+    'time left that somebody made. Seeding one would show an estimate nobody made, of work nobody named. ' +
+    'tests/key-items-carry-progress-and-a-time-left-estimate.test.ts files them in a test world.',
   watch:
     'A watch says a program is running on this computer for a real agent, and when it was last seen alive. Seeding ' +
     'one would show a program nobody started, seen alive at a time nobody looked. tests/a-watch-is-a-record.test.ts ' +
@@ -273,6 +283,25 @@ const NOT_IN_THE_DEMO: Readonly<Record<string, string>> = {
     'A handbook is sent to a real agent that starts a flow or takes a card, as guidance somebody wrote for it. Seeding ' +
     'one would show guidance nobody wrote, hanging on a flow nobody runs. tests/a-handbook-is-a-record.test.ts files ' +
     'them in a test world.',
+  knowledge_entry:
+    'A knowledge entry is guidance written only through the knowledge doors into the shared knowledge workspace, ' +
+    'never into the project the demo seeds. Seeding one would show guidance nobody wrote. ' +
+    'tests/knowledge-entries-and-changes.test.ts writes real ones in a test world.',
+  knowledge_category:
+    'A knowledge category is a shelf written only through the knowledge doors into the shared knowledge workspace, ' +
+    'never into the project the demo seeds. tests/knowledge-entries-and-changes.test.ts writes real ones in a test world.',
+  knowledge_bookmark:
+    'A knowledge bookmark records a use only through the knowledge doors into the shared knowledge workspace, ' +
+    'never into the project the demo seeds. tests/knowledge-entries-and-changes.test.ts writes real ones in a test world.',
+  knowledge_change:
+    'A knowledge change records a review only through the knowledge doors into the shared knowledge workspace, ' +
+    'never into the project the demo seeds. tests/knowledge-entries-and-changes.test.ts writes real ones in a test world.',
+  knowledge_query:
+    'A knowledge query records what a run asked the library, only through the knowledge doors into the shared knowledge workspace, ' +
+    'never into the project the demo seeds. tests/knowledge-query-and-word-search.test.ts writes real ones in a test world.',
+  knowledge_rating:
+    'A knowledge rating records what a run said about an entry it read, only through the knowledge doors into the shared knowledge workspace, ' +
+    'never into the project the demo seeds. tests/knowledge-ratings-and-counts.test.ts writes real ones in a test world.',
   project_chapter:
     "A project chapter holds the rules the person or a project's own secretary wrote for one real project, and only " +
     'its own doors write one. Seeding one would show rules nobody wrote, for a project nobody runs. ' +

@@ -12,7 +12,7 @@ import { join } from 'node:path'
 import { expect, it } from 'vitest'
 import { processIdentity, resumeStableUpgrade, upgradeStable } from '../tools/stable/stable-upgrade-transaction.mjs'
 import { theResumeCommand, theUpgradeMarkPath, whyAnUpgradeKeepsTheOfficeClosed, writeTheUpgradeMark } from '../src/config/the-upgrade-mark.mjs'
-import { candidateTag, children, folders, groups, out, port, remember, root, stableUpgradeFixture } from './stable-upgrade-fixture.ts'
+import { children, folders, groups, out, port, remember, root, stableUpgradeFixture } from './stable-upgrade-fixture.ts'
 import { aStartOfTheMadeUpOffice, closed, crashTheUpgradeAt, rows, unavailable } from './a-closed-stable-upgrade.ts'
 import { commandUnderTheOwnerWatchingGate } from './the-owner-watching-gate.ts'
 import { copyBootstrapSettings } from './stable-bootstrap-clone-fixture.ts'
@@ -35,7 +35,7 @@ it('refuses a restart after the migration and before the check with the sentence
   const restart = await aStartOfTheMadeUpOffice(f)
   expect(restart.code, restart.stderr).toBe(1)
   expect(restart.stderr).toBe(`${whyAnUpgradeKeepsTheOfficeClosed(f.database, f.stable, 'ordinary')}\n`)
-  expect(restart.stderr).toContain(`the stable upgrade from ${f.baseline} to ${f.target} (tag ${candidateTag})`)
+  expect(restart.stderr).toContain(`the stable upgrade from ${f.baseline} to ${f.target} (tag ${f.config.candidateTag})`)
   expect(restart.stderr).toContain(`; node ${join(f.stable, 'tools/stable/upgrade-stable.mjs')} --resume ${lock} resumes it`)
   await unavailable(f)
   expect(existsSync(join(f.folder, 'verified-phases'))).toBe(false)

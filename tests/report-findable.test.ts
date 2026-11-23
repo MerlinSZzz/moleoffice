@@ -21,7 +21,8 @@
  *      waiting, and never as a row of the ranked list.
  *
  *   3. A MODULE'S PAGE SHOWS THE REPORTS WRITTEN ABOUT IT, read from the `about` links, because
- *      that is the only place what a report is about is stored.
+ *      that is the only place what a report is about is stored. The related door reads them for the
+ *      module and for its parts at every depth.
  *
  * ---------------------------------------------------------------------------------------
  * THE EMPTY STATES ARE TESTED HARDER THAN THE FULL ONES, AND THAT IS DELIBERATE
@@ -352,96 +353,60 @@ describe('Home shows a report written for a person', () => {
 // ============================================================================ 3. a module page
 
 describe('a module page shows the reports written about it', () => {
-  it('says it was not told which record this is, rather than drawing an empty list', () => {
+  it('draws not looked at when it was not told which record this is, rather than an empty list', () => {
     const html = renderToStaticMarkup(h(mv.ReportsAbout, { declares: SEE_THROUGH, what: 'module' }))
-    expect(html).toContain('Mole Office has not looked.')
-    const expected = en['moduleView.reportsAbout.notLookedBody']
-      .replaceAll('{what}', 'module')
-      .replaceAll("'", '&#x27;')
-    expect(html).toContain(expected)
+    expect(html).toContain(en['absence.notLooked'])
     expect(html).not.toContain('Nobody has written a report about this module.')
   })
 
-  it('reads the reports from the module’s incoming `about` links, and their subjects from their own', async () => {
-    const detail = (id: string) => {
-      if (id === 'rec-mod') {
-        return Promise.resolve({
-          record: MODULE,
-          incomplete: [],
-          changes: [],
-          links: [
-            {
-              linkId: 'l-1',
-              type: 'about',
-              label: 'subject of',
-              isBacklink: true,
-              inferred: false,
-              broken: false,
-              other: { id: 'rep-1', kind: 'report', title: REPORT_UNREAD.title, summary: null, origin: null },
-              gate: null,
-              gateLabel: null,
-              gateProblem: null,
-            },
-            // A report about this module that somebody deleted. Counted, never dropped.
-            {
-              linkId: 'l-2',
-              type: 'about',
-              label: 'subject of',
-              isBacklink: true,
-              inferred: false,
-              broken: true,
-              other: { id: 'rep-gone', kind: 'report', title: 'A review that was deleted', summary: null, origin: null },
-              gate: null,
-              gateLabel: null,
-              gateProblem: null,
-            },
-            // Not a report, so not this panel's business.
-            {
-              linkId: 'l-3',
-              type: 'about',
-              label: 'subject of',
-              isBacklink: true,
-              inferred: false,
-              broken: false,
-              other: { id: 'rec-prob', kind: 'problem', title: 'A problem', summary: null, origin: null },
-              gate: null,
-              gateLabel: null,
-              gateProblem: null,
-            },
-          ],
-        })
-      }
+  it('reads the reports from the related door, which reaches every depth, and counts the deleted ones', async () => {
+    // THE DOOR, NOT THE MODULE'S OWN LINKS: a report about a sub-module or a run is the module's too, and only the
+    // related door walks that far. The stub answers as the door does, so the reader is read on the door's shape.
+    const asked: { id: string; query: unknown }[] = []
+    const springs = { id: 'rec-sub', kind: 'module', title: 'Tray clamp springs' }
+    const related = (id: string, query: unknown) => {
+      asked.push({ id, query })
       return Promise.resolve({
-        record: REPORT_UNREAD,
-        incomplete: [],
-        changes: [],
-        links: [
+        scope: { id: 'rec-mod', kind: 'module', title: MODULE.title },
+        kind: 'reports',
+        rows: [
           {
-            linkId: 'l-1',
-            type: 'about',
-            label: 'about',
-            isBacklink: false,
+            id: 'rep-1',
+            kind: 'report',
+            title: REPORT_UNREAD.title,
+            date: REPORT_UNREAD.createdAt,
+            directly: false,
+            through: [springs],
             inferred: false,
-            broken: false,
-            other: { id: 'rec-mod', kind: 'module', title: MODULE.title, summary: null, origin: null },
-            gate: null,
-            gateLabel: null,
-            gateProblem: null,
+            report: reportReading(REPORT_UNREAD, [{ recordId: springs.id, title: springs.title }]),
           },
         ],
+        matched: 1,
+        returned: 1,
+        left: 0,
+        offset: 0,
+        limit: 25,
+        replacedLeftOut: [],
+        // A report about this module that somebody deleted. Counted, never dropped.
+        deletedLeftOut: 1,
+        couldNotRead: [],
       })
     }
-    const original = webApi.api.getRecord
-    ;(webApi.api as { getRecord: unknown }).getRecord = detail as unknown as typeof original
+    const original = webApi.api.related
+    ;(webApi.api as { related: unknown }).related = related as unknown as typeof original
     try {
-      const read = await mv.readReportsAbout('rec-mod')
-      expect(read.rows.map((row) => row.recordId)).toEqual(['rep-1'])
-      expect(read.rows[0]?.for).toBe(`${THE_TEST_OFFICES_OWNER.name}, who asked for the review`)
-      expect(read.rows[0]?.about).toEqual([{ recordId: 'rec-mod', title: 'Tray clamp calibration' }])
+      const read = await mv.readTheRelatedReports('rec-mod')
+      expect(asked).toHaveLength(1)
+      expect(asked[0]).toMatchObject({ id: 'rec-mod', query: { kind: 'reports' } })
+      expect(read.rows.map((row) => row.report.recordId)).toEqual(['rep-1'])
+      expect(read.rows[0]?.report.for).toBe(`${THE_TEST_OFFICES_OWNER.name}, who asked for the review`)
+      expect(read.rows[0]?.report.about).toEqual([{ recordId: 'rec-sub', title: 'Tray clamp springs' }])
+      expect(read.rows[0]?.through, 'the part it came through stays on the row').toEqual([springs])
+      expect(read.rows[0]?.directly).toBe(false)
       // The deleted one is a number the page prints, not a row it silently loses.
       expect(read.deleted).toBe(1)
     } finally {
-      ;(webApi.api as { getRecord: unknown }).getRecord = original
+      ;(webApi.api as { related: unknown }).related = original
     }
   })
 })

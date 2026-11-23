@@ -16,7 +16,7 @@
  *
  * THE SECOND CASE is why the plugins a worker loads cannot change the cap: OpenCode hands a step's options, the cap among
  * them, to the plugins' chat.params hook before it asks the model, and no plugin the launcher names
- * (tools/opencode-go-limit-plugin.mjs, tools/guard/opencode-plugin.mjs and, since 13q round 57,
+ * (tools/opencode-go-limit-plugin.mjs, for-agents/opencode-plugin.mjs and, since 13q round 57,
  * tools/opencode-shell-without-provider-keys-plugin.mjs) has one.
  *
  * MUTATIONS, each planted after a control run and then restored:
@@ -76,7 +76,7 @@ it("sends a worker's model a cap of 64,000 output tokens on each step", async ()
 }, LIMIT_MS + 30_000)
 
 it('the plugins the launcher names for an OpenCode run hold no chat.params hook, the one through which a plugin could change the cap', async () => {
-  for (const file of ['../tools/opencode-go-limit-plugin.mjs', '../tools/guard/opencode-plugin.mjs', '../tools/opencode-shell-without-provider-keys-plugin.mjs']) {
+  for (const file of ['../tools/opencode-go-limit-plugin.mjs', '../for-agents/opencode-plugin.mjs', '../tools/opencode-shell-without-provider-keys-plugin.mjs']) {
     const plugin = await import(file) as Record<string, (context: unknown) => Promise<Record<string, unknown>>>
     const exported = Object.values(plugin).filter(value => typeof value === 'function')
     expect(exported.length, file).toBeGreaterThan(0)

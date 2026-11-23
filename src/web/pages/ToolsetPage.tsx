@@ -35,7 +35,6 @@ export const TOOLSET_WORDS = {
   get fileMissing() { return t('r15.toolset.state.fileMissing') },
   get runsByItself() { return t('r15.toolset.serviceRuns') },
   get confirm() { return t('r15.toolset.confirm') },
-  get empty() { return t('r15.toolset.empty') },
   manual: {
     get whenToUse() { return t('r15.toolset.manual.whenToUse') },
     get whenNotToUse() { return t('r15.toolset.manual.whenNotToUse') },
@@ -105,7 +104,7 @@ function TheToolset({
   const hasNoToolsForThisReader = cardCount === 0 && said.partsOfTheOffice.length === 0 && who !== null
 
   if (trulyEmpty) {
-    return <p className="tls-none">{TOOLSET_WORDS.empty}</p>
+    return <p className="tls-none">{t('absence.none')}</p>
   }
 
   const jumps: { label: string; target: string }[] = []
@@ -223,7 +222,6 @@ function ToolGroup({ category, workspaceId }: { category: ToolsetCategory; works
       <header className="tls-category-head">
         <h2 className="tls-group-title tls-category-name">{category.name}</h2>
         <span className="tls-count num">{counted(category.tools.length)}</span>
-        {category.says === null ? null : <p className="tls-category-says">{category.says}</p>}
       </header>
       <div className="tls-cards">
         {category.tools.map((row) => (
@@ -288,7 +286,7 @@ function NeedsCategory({
                     size="sm"
                     pending={busy}
                     disabled={why.trim() === ''}
-                    reason={t('g6b.toolset.reason')}
+                    reason={t('toolsetPage.noReasonWritten')}
                     onClick={() => void confirm()}
                   >
                     {TOOLSET_WORDS.confirm}
@@ -371,7 +369,7 @@ function iconGlyph(groupId: string): ReactNode {
 }
 
 function WhoTag({ forWhom }: { forWhom: string | null }) {
-  if (forWhom === null) return <span className="tls-audience"><Absence title={t('g6b.toolset.notFilledIn')} /></span>
+  if (forWhom === null) return <span className="tls-audience"><Absence tier="told-apart" looked={false} word={t('g6b.toolset.notFilledIn')} /></span>
   const word = TOOLSET_WORDS.audiences[forWhom as keyof typeof TOOLSET_WORDS.audiences]
   return word === undefined
     ? <span className="tls-audience"><Absence title={t('g6b.toolset.unknownAudience')} /></span>
@@ -384,7 +382,7 @@ function StateTag({ row }: { row: ToolsetRow }) {
   if (row.state === 'not built yet') return <Tag tone="warn">{TOOLSET_WORDS.notBuilt}</Tag>
   return (
     <span className="tls-state">
-      <Absence title={t('g6b.toolset.stateSays')} />
+      <Absence title={t('g6a.common.notRecorded')} />
     </span>
   )
 }
@@ -541,7 +539,7 @@ export const TOOLSET_CSS = `
 .tls-who[aria-pressed="true"] { border-color: var(--accent); background: var(--accent); color: var(--accent-text); }
 .tls-groups { display: grid; gap: var(--gut); min-width: 0; }
 .tls-group, .tls-needs-you, .tls-how-office { min-width: 0; scroll-margin-top: var(--gut); }
-.tls-needs-you { padding: var(--pad); border: var(--border-w) solid var(--ask-line); border-radius: var(--radius-md); background: var(--ask-row); }
+.tls-needs-you { padding: var(--pad); border: var(--border-w) solid var(--ask-line); border-radius: var(--radius); background: var(--ask-row); }
 .tls-group-title { margin: 0; color: var(--text); font: 600 var(--fs-3)/var(--lh-tight) var(--font-ui); overflow-wrap: anywhere; }
 .tls-category-name { overflow-wrap: anywhere; }
 .tls-category-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px var(--pad); margin: 0 0 var(--pad); min-width: 0; }
@@ -558,7 +556,7 @@ export const TOOLSET_CSS = `
 .tls-card {
   display: grid; grid-template-columns: 2.5rem minmax(0, 1fr); align-content: start; gap: 8px var(--pad);
   min-width: 0; min-height: 7.5rem; padding: var(--gut); border: var(--border-w) solid var(--border);
-  border-radius: var(--radius-md); background: var(--panel); color: var(--text); text-decoration: none;
+  border-radius: var(--radius); background: var(--panel); color: var(--text); text-decoration: none;
 }
 .tls-card:hover { border-color: var(--border-strong); background: var(--hover); text-decoration: none; }
 .tls-card-unavailable { color: var(--text-2); }

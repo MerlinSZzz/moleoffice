@@ -14,7 +14,7 @@
  */
 
 import type { TheFiledAliases } from '../lib/registry-aliases/runs.ts'
-import type { TheseAgentsOnly } from '../lib/presence.ts'
+import type { TheseAgentsOnly } from './types/presence.ts'
 import { sql, type SQL, type SQLWrapper } from 'drizzle-orm'
 import { records, STORED_FIELDS } from './schema.ts'
 import { sqlite } from './client.ts'

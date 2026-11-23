@@ -36,10 +36,11 @@ describe('reading a report', () => {
       blocks: [],
     })
   })
-  it('reads the writer of the short-form parts only when an agent wrote them', async () => {
+  it('reads the writer of the short-form parts as a stamp only when an agent wrote them', async () => {
     const { readRecordIdentities } = await reader()
-    const parts = (writtenBy: string) => readRecordIdentities(t.client.sqlite, 'report', { shortForms: { parts: { madeFrom: { seq: 1, contentHash: 'synthetic' }, writtenBy, by: alias, parts: [] } } })
-    expect(parts('agent')).toEqual({ found: [{ path: 'data.shortForms.parts.by', as: 'value', stored: alias, canonical, site: 'ReportParts.by', parse: 'actor-pair' }], blocks: [] })
+    const parts = (writtenBy: string, by: string = alias) => readRecordIdentities(t.client.sqlite, 'report', { shortForms: { parts: { madeFrom: { seq: 1, contentHash: 'synthetic' }, writtenBy, by, parts: [] } } })
+    expect(parts('agent', canonical)).toEqual({ found: [{ path: 'data.shortForms.parts.by', as: 'value', stored: canonical, canonical, site: 'ReportParts.by', parse: 'stamp' }], blocks: [] })
+    expect(parts('agent')).toEqual({ found: [], blocks: [{ path: 'data.shortForms.parts.by', reason: 'cannot-tell', why: expect.any(String) }] })
     expect(parts('human')).toEqual({ found: [], blocks: [] })
   })
   it('blocks a button or a box that names its receiver, because a handle and an id are stored alike there', async () => {

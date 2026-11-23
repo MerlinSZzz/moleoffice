@@ -9,7 +9,7 @@
  *   stand under All projects through a decision, so six remain.
  *   One list decides which pages stand there: the `project` group of the effective railGroups(). The block, the
  *   project's own page and the tabs above its pages all read it.
- * - The Switch press opens the list of projects downward, inside the block, the current one ticked.
+ * - The Switch press opens the list of projects downward, the current one ticked.
  * - Nothing in the sidebar opens upward. The foot is fixed: the owner's initial and name, a light or dark
  *   switch and Settings. Settings is in no group, so the Office page has no card for it.
  * - The foot's switch writes the same stored theme the look controls on the Settings page write.
@@ -21,6 +21,10 @@
  * pages, on that round's answer. It draws a row only for a project page the person pinned, so with nothing kept it
  * draws none, and the project's pages are listed under This project on All pages. The narrow press now stands in the
  * foot.
+ *
+ * Test change (wave 13y round 175, as decided): the Switch's list is drawn as a layer over the page and no longer in
+ * the sidebar's flow, so it ends where the window ends, not where the block ends. It still stands in the block, below
+ * its press, and the block keeps its height when the list opens.
  */
 import { THE_TEST_FIXTURE_ROOT } from './a-page-of-a-test-office.ts'
 import { createElement as h } from 'react'
@@ -163,10 +167,13 @@ describe('the block and the foot in a browser', () => {
 
   // Test change (wave 13y round 165): with nothing pinned the block draws no row, so the list is not measured against
   // one here. each-person-pins-the-pages-in-front measures it against a pinned row.
-  it('opens the Switch list downward inside the block, with the current project ticked', async () => {
+  // Test change (wave 13y round 175, as decided): the list is a layer, so it is held to the window and the block's
+  // height, not to the block's bottom.
+  it('opens the Switch list downward as a layer inside the window, with the current project ticked', async () => {
     const page = app.page
     await open('lang=en', '/modules')
     expect(await page.locator('.sbp-choices').isVisible()).toBe(false)
+    const closedBlock = await page.locator('.sbp-block').evaluate((one) => one.getBoundingClientRect().height)
     await page.locator('.sbp-switch').click()
     await page.locator('.sbp-choices').waitFor()
     const boxes = await page.evaluate(() => {
@@ -176,11 +183,15 @@ describe('the block and the foot in a browser', () => {
         block: box('.sbp-block'),
         press: box('.sbp-switch'),
         list: box('.sbp-choices'),
+        window: { width: window.innerWidth, height: window.innerHeight },
       }
     })
     expect(boxes.inside).toBe(true)
     expect(boxes.list.top).toBeGreaterThanOrEqual(boxes.press.bottom)
-    expect(boxes.list.bottom).toBeLessThanOrEqual(boxes.block.bottom)
+    expect(boxes.block.height, 'the block keeps its height with the list open').toBe(closedBlock)
+    expect(boxes.list.left, 'the list within the window').toBeGreaterThanOrEqual(0)
+    expect(boxes.list.right, 'the list within the window').toBeLessThanOrEqual(boxes.window.width)
+    expect(boxes.list.bottom, 'the list within the window').toBeLessThanOrEqual(boxes.window.height)
     const ticked = await page.locator('.sbp-choice[aria-current]').evaluateAll((all) => all.map((one) => one.getAttribute('data-project')))
     expect(ticked).toEqual(['test-orchard'])
     expect(await page.locator('.sbp-choice[aria-current] .sbp-tick').count()).toBe(1)

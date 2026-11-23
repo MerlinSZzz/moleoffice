@@ -41,7 +41,6 @@ import { keysPathFrom } from '../src/config/settings.mjs'
 import { THE_TEST_MARK } from '../src/config/the-test-mark.mjs'
 import { OFFICE_KEY_MEANS } from '../src/shared/office-keys.ts'
 import { localStamp } from '../src/shared/time.ts'
-import { chineseWords } from '../src/shared/words/joined.ts'
 import { ANSWER_TOKEN_CAP, dollars, THE_SLUG, theEstimate } from '../tools/openrouter.mjs'
 import { aTestDatabaseFolder, removeThisTestFolder } from './a-test-folder.ts'
 
@@ -611,11 +610,9 @@ const CODEX = 'The Codex subscription carries GPT-6 Astra and GPT-6.1 Sol, so us
 /** Each id, and the exact words of its refusal. */
 const CARRIED: [string, string][] = [
   ['openai/gpt-6-astra', `openai/gpt-6-astra is a GPT-6 model. ${CODEX} ${ELSEWHERE}`],
-  ['openai/gpt-6.1-sol', `openai/gpt-6.1-sol is a GPT-6 model. ${CODEX} ${ELSEWHERE}`],
   ['~openai/gpt-astra-latest', `~openai/gpt-astra-latest is a GPT-6 model. ${CODEX} ${ELSEWHERE}`],
   ['openai/gpt-6-luna', `openai/gpt-6-luna is a GPT-6 Luna model. ${LUNA} ${ELSEWHERE}`],
   ['~openai/gpt-luna-latest', `~openai/gpt-luna-latest is a GPT-6 Luna model. ${LUNA} ${ELSEWHERE}`],
-  ['moonshotai/kimi-k3', `moonshotai/kimi-k3 is a Kimi model. The OpenCode Go subscription carries Kimi, so use it through opencode. ${ELSEWHERE}`],
   ['moonshotai/kimi-k4', `moonshotai/kimi-k4 is a Kimi model. The OpenCode Go subscription carries Kimi, so use it through opencode. ${ELSEWHERE}`],
   ['z-ai/glm-5v-turbo', `z-ai/glm-5v-turbo is a GLM model. The OpenCode Go subscription carries GLM, so use it through opencode. ${ELSEWHERE}`],
   ['xiaomi/mimo-v2.6-pro', `xiaomi/mimo-v2.6-pro is a MiMo model. The OpenCode Go subscription carries MiMo, so use it through opencode. ${ELSEWHERE}`],
@@ -767,8 +764,8 @@ describe('a process the test suite started cannot reach OpenRouter itself', () =
 
 // ============================================================================ the Settings page
 
-describe("the Settings page names every tool that spends the office's OpenRouter key", () => {
-  it('names video review beside the two picture tools, in English and in Chinese, and no other tool reads the key', () => {
+describe("the sentence about the office's OpenRouter key names every tool that spends it", () => {
+  it('names video review beside the two picture tools, and no other tool reads the key', () => {
     // WHO READS THE OFFICE'S KEYS: every tool that imports the one reader. A new one goes red here. When it spends the
     // OpenRouter key, the sentence below is the one to change with it. tools/the-inspector.mjs reads only the entry a dsh
     // check's Casting provider row names, and a row may not name openrouter (theKeyName in
@@ -780,6 +777,5 @@ describe("the Settings page names every tool that spends the office's OpenRouter
       .sort()
     expect(readers).toEqual(['avatars-from-openrouter.mjs', 'openrouter.mjs', 'portraits-from-openrouter.mjs', 'the-inspector.mjs'])
     expect(OFFICE_KEY_MEANS.openrouter).toBe('The office uses this for its OpenRouter tools: the two picture tools for avatars and portraits, and video review.')
-    expect(chineseWords()['settingsPanel.keys.means.openrouter']).toBe('办公室的 OpenRouter 工具用它：两个生成头像和肖像的图片工具，以及视频审阅。')
   })
 })

@@ -11,13 +11,13 @@
  *
  * THIS FILE IMPORTS `commonFields`, `unionOf` AND THE `KindSpec` AND `ShapeSpec` TYPES FROM
  * ./kind-common.ts, AND `ENTERED_FLOW_ENDS_ON`, `FLOW_RUN_ENDINGS`, `FLOW_RUN_HOWS`,
- * `FLOW_RUN_OUTCOMES`, `NO_FLOW_NAMED`, `OFFICE_STEP_DOES` AND `OFFICE_STEP_EVIDENCE` FROM
+ * `FLOW_RUN_OUTCOMES`, `FLOW_STARTING_EVENTS`, `NO_FLOW_NAMED`, `OFFICE_STEP_DOES` AND `OFFICE_STEP_EVIDENCE` FROM
  * ../flow-run.ts. IT IMPORTS NOTHING FROM THE CENTRAL FILE.
  */
 import { commonFields, unionOf, type KindSpec, type ShapeSpec } from './kind-common.ts'
 // A RUN'S FLOW RUN: ITS HOWS, ITS OUTCOMES AND ITS SENTENCES. Wave 1 of the office flow, M1; ../flow-run.ts
 // is the only place they live.
-import { ENTERED_FLOW_ENDS_ON, FLOW_RUN_ENDINGS, FLOW_RUN_HOWS, FLOW_RUN_OUTCOMES, NO_FLOW_NAMED, OFFICE_STEP_DOES, OFFICE_STEP_EVIDENCE } from '../flow-run.ts'
+import { ENTERED_FLOW_ENDS_ON, FLOW_RUN_ENDINGS, FLOW_RUN_HOWS, FLOW_RUN_OUTCOMES, FLOW_STARTING_EVENTS, NO_FLOW_NAMED, OFFICE_STEP_DOES, OFFICE_STEP_EVIDENCE } from '../flow-run.ts'
 export const flowRunKind: KindSpec = {
     kind: 'flow_run',
     purpose:
@@ -66,8 +66,8 @@ export const flowRunKind: KindSpec = {
         type: 'string',
         required: false,
         description:
-          "The flow id the run named in its `flow` field, kept even when no flow record has it. Absent means the run " +
-          'named no flow.',
+          "The flow id the run named in its `flow` field, kept even when no flow record has it. When the run named no " +
+          'flow, the one live flow of its project whose `starts_on` lists `startedAs`. Absent means neither.',
         example: 'Xq3flowRec01',
       },
       {
@@ -75,8 +75,8 @@ export const flowRunKind: KindSpec = {
         type: 'FlowRevisionAtStart',
         required: false,
         description:
-          "The flow record's newest revision when the run was filed. Present only when the run named a flow and a flow " +
-          'record has that id; otherwise `noFlow` says why it is absent.',
+          "The flow record's newest revision when the run was filed. Present only when `flow` is and a flow record has " +
+          'that id; otherwise `noFlow` says why it is absent.',
         example: { seq: 3, contentHash: '98c195fdafae1388' },
       },
       {
@@ -84,10 +84,22 @@ export const flowRunKind: KindSpec = {
         type: 'string',
         required: false,
         description:
-          `Present exactly when \`flowRevision\` is absent: "${NO_FLOW_NAMED}", or a sentence naming the id the run ` +
-          'named that no flow record has. On a planning flow run, a sentence saying that no flow record, or more than ' +
-          'one, says it is governed by the planning code. The office never puts a guessed flow in its place.',
+          `Present exactly when \`flowRevision\` is absent: "${NO_FLOW_NAMED}", a sentence naming the id the run ` +
+          'named that no flow record has, or a sentence naming the start in `startedAs` and each live flow that lists ' +
+          'it, when there are two or more. On a planning flow run, a sentence saying that no flow record, or more than ' +
+          'one, says it is governed by the planning code. The office never puts a guessed flow in its place. A flow ' +
+          'named from `startedAs` is not a guess: the flow itself lists that start.',
         example: NO_FLOW_NAMED,
+      },
+      {
+        key: 'startedAs',
+        type: unionOf(FLOW_STARTING_EVENTS),
+        required: false,
+        description:
+          'How the run started, as the office read it when it filed the flow run of a run that named no flow: one of ' +
+          FLOW_STARTING_EVENTS.join(', ') +
+          '. Absent means no start was read: the run named its own flow, or it started as none of these.',
+        example: FLOW_STARTING_EVENTS[2],
       },
       {
         key: 'ended',

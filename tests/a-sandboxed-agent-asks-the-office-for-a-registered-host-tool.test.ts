@@ -195,7 +195,7 @@ import { askTheOffice } from '../tools/office-request.mjs'
 import { runOnce, runWithTheOffice, THE_RUNNERS_WORDS } from '../tools/run-the-host-jobs.mjs'
 import { THE_TEST_OFFICES_SECRETARY } from './a-page-of-a-test-office.ts'
 import { aTestDatabaseFolder } from './a-test-folder.ts'
-import { apiApp, freshDb, type TestDb } from './helpers.ts'
+import { apiApp, freshDb, type TestDb, governsTheWholeProject } from './helpers.ts'
 
 /**
  * A STAND-IN FOR systemd-run AND systemctl, the two commands the runner holds a job in a scope with. The runner starts
@@ -483,9 +483,10 @@ function aRunnerThatWaits(): ReturnType<typeof spawn> {
   return spawn(process.execPath, [script], { stdio: 'ignore' })
 }
 
-/** The runner's grace between TERM and KILL in this file, and the pause of the runner the office starts, short so a case does not wait. */
+/** The runner's grace between TERM and KILL in this file, and the pause and the watch of the runner the office starts, short so a case does not wait. */
 const A_SHORT_GRACE_MS = 300
 const A_SHORT_PAUSE_MS = 200
+const A_SHORT_WATCH_MS = 200
 
 function theRunner(over: { api?: string; reads?: ReturnType<typeof theProcessReader>; runtimeFolders?: string } = {}): Promise<number> {
   return runOnce({
@@ -540,7 +541,9 @@ beforeAll(async () => {
   const decided = await send('POST', '/api/records', AS_THE_PERSON, {
     kind: 'decision',
     title: 'The office runs registered stand-in host tools',
-    data: { replaces: [], option_taken: 'register the stand-ins', because: 'this test office needs them', decided_by: THE_OWNER, authority: 'the owner said so', authority_reference: words.body.record.id },
+    data: {
+      ...governsTheWholeProject(),
+      replaces: [], option_taken: 'register the stand-ins', because: 'this test office needs them', decided_by: THE_OWNER, authority: 'the owner said so', authority_reference: words.body.record.id },
   })
   expect(decided.status, decided.text.slice(0, 300)).toBe(201)
   theDecision = decided.body.record.id
@@ -920,7 +923,7 @@ describe('the file of tools', () => {
     const itsOwn = await send('POST', '/api/records', asTheSecretary, {
       kind: 'decision',
       title: 'Register a stand-in on my own word',
-      data: { replaces: [], decided_by: THE_TEST_OFFICES_SECRETARY.handle, authority: 'a measurement', because: 'a stand-in is needed' },
+      data: { ...governsTheWholeProject(), replaces: [], decided_by: THE_TEST_OFFICES_SECRETARY.handle, authority: 'a measurement', because: 'a stand-in is needed' },
     })
     expect(itsOwn.status, itsOwn.text.slice(0, 400)).toBe(201)
     const notTheirOwn = await send('POST', '/api/host-tools', asTheSecretary, { declaration, decision: itsOwn.body.record.id })
@@ -1334,9 +1337,13 @@ describe('the runner', () => {
     const officePid = Number(office.pid)
     const real = theProcessReader()
     let reading: 'as it is' | 'cannot be read' | 'began an hour later' | 'runs another command' = 'as it is'
+    // THE RUNNER READS THE OFFICE'S PROCESS once as it starts and once at each tick of its watch, so this count is how
+    // the case waits for a tick, and not a fixed time.
+    let officeReads = 0
     const reads = {
       ...real,
       processAt: (pid: number) => {
+        if (pid === officePid) officeReads += 1
         const now = real.processAt(pid)
         if (pid !== officePid || reading === 'as it is' || reading === 'runs another command') return now
         if (reading === 'cannot be read') return { here: true as const, unreadable: 'a made-up reading that could not look' }
@@ -1352,9 +1359,15 @@ describe('the runner', () => {
     const out = vi.spyOn(process.stdout, 'write').mockImplementation(keep)
     const err = vi.spyOn(process.stderr, 'write').mockImplementation(keep)
     const theRunnerWithTheOffice = (): Promise<number> =>
-      runWithTheOffice({ api, key: A_MADE_UP_OFFICE_KEY, folder: runnerFolder, toolsFile, officePid, graceMs: A_SHORT_GRACE_MS, pauseMs: A_SHORT_PAUSE_MS, reads })
+      runWithTheOffice({ api, key: A_MADE_UP_OFFICE_KEY, folder: runnerFolder, toolsFile, officePid, graceMs: A_SHORT_GRACE_MS, pauseMs: A_SHORT_PAUSE_MS, watchMs: A_SHORT_WATCH_MS, reads })
     const within = (ran: Promise<number>, ms: number): Promise<number | 'still running'> =>
       Promise.race([ran, new Promise<'still running'>((done) => setTimeout(() => done('still running'), ms))])
+    /** Whether a watch tick read the office's process after the `seen` reads, within 3 s. */
+    const aWatchTickAfter = async (seen: number): Promise<boolean> => {
+      const until = Date.now() + 3_000
+      while (officeReads <= seen && Date.now() < until) await new Promise((done) => setTimeout(done, 20))
+      return officeReads > seen
+    }
     const started = `${THE_RUNNERS_WORDS.itAsksEvery(A_SHORT_PAUSE_MS, officePid)}\n`
     const gone = `${THE_RUNNERS_WORDS.theOfficeHasGone(officePid)}\n`
     const cannotTell = `${THE_RUNNERS_WORDS.theOfficesStartCannotBeReadNow(officePid)}\n`
@@ -1364,11 +1377,18 @@ describe('the runner', () => {
         reading = 'as it is'
         said.length = 0
         running = theRunnerWithTheOffice()
-        expect(await within(running, 1_500), 'the runner goes on while its office is the process it read').toBe('still running')
+        expect(await aWatchTickAfter(officeReads), "no watch tick read the office's process within 3 s of the start").toBe(true)
+        expect(said, 'the runner goes on while its office is the process it read').not.toContain(gone)
+        expect(await within(running, 0), 'the runner goes on while its office is the process it read').toBe('still running')
         expect(said, ending).toContain(started)
         if (ending === 'runs another command') {
           reading = 'cannot be read'
-          expect(await within(running, 2_500), 'a start that cannot be read is not gone').toBe('still running')
+          const until = Date.now() + 3_000
+          while (!said.includes(cannotTell) && Date.now() < until) await new Promise((done) => setTimeout(done, 20))
+          expect(said, 'the runner never said within 3 s that it cannot tell when the office began').toContain(cannotTell)
+          expect(await aWatchTickAfter(officeReads), "no watch tick read the office's process again within 3 s after it said it cannot tell").toBe(true)
+          expect(said, 'a start that cannot be read is not gone').not.toContain(gone)
+          expect(await within(running, 0), 'a start that cannot be read is not gone').toBe('still running')
           expect(said.filter((line) => line === cannotTell), 'it says once that it cannot tell').toHaveLength(1)
         }
         reading = ending

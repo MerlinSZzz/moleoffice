@@ -88,6 +88,7 @@
  */
 import { existsSync, mkdirSync, readFileSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
+import { theLineThatSetsTheKeyFile } from './agent-key.mjs'
 import { settingValue, transientToolContext } from '../src/config/settings.mjs'
 import { howAFullPathIsWritten, isAnAbsolutePath } from '../src/config/the-paths-of-a-system.mjs'
 import { readAFullList } from './a-full-list-read.mjs'
@@ -96,6 +97,8 @@ import {
   RUN_IS_OVER_STATES,
   aConversationANoteCanName,
   theRecordTheNoteNames,
+  theSessionNote,
+  theWaitersKeyFileAndOffice,
   writeTheSessionNote,
 } from '../src/config/the-session-note.mjs'
 
@@ -120,8 +123,10 @@ function usage(problem) {
       '  --name       what a reader sees. Required.',
       '  --dir        the absolute directory this session started in. Required: the door matches it',
       '               against the registered repositories and work areas to find the project.',
-      '  --runtime    which runtime serves this session. A visitor is only an agent from another',
-      '               machine; on this machine the runtime no longer decides anything.',
+      '  --runtime    the name of the harness serving this session. Any harness\'s word is taken:',
+      '               claude-code, codex, workbuddy or another. Mole Office starts runs itself only in',
+      '               the harnesses it has an adapter for. Whether this is a visitor is not decided by',
+      '               it: a visitor is only an agent from another machine.',
       '  --area       a repository-relative folder this session is there to change. Repeat it.',
       '  --role       the card this session asks for. It GRANTS nothing: a rung above worker waits',
       '               for the person to press. Leaving it out registers a worker.',
@@ -358,10 +363,13 @@ async function pointTheSessionNote(conversation, as) {
   const at = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`
   try {
     // THE PROJECT OF EACH RECORD THE NOTE NAMES (problem yIh8EGfyZXMH): both came from the one list read above, in the
-    // project this agent was registered in, so the hook reads them there, whatever project its folder maps to.
+    // project this agent was registered in, so the hook reads them there, whatever project its folder maps to. The key
+    // file of the session's waiter and the office that waiter held, when the note names them, are carried: they are the
+    // conversation's, not the record's.
     out.path = writeTheSessionNote(conversation, record, at, supersedes, {
       workspace: as.workspace,
       supersedesWorkspace: supersedes === null ? null : as.workspace,
+      ...theWaitersKeyFileAndOffice(theSessionNote(conversation)),
     })
   } catch (err) {
     out.says.push(
@@ -503,7 +511,7 @@ const sessionNote =
 
 if (chosen.json) {
   process.stdout.write(
-    `${key === null && secretSaid === null ? text : JSON.stringify({ ...said, ...(key === null ? {} : { keyWrittenTo: chosen.keyFile }), ...(secretSaid === null ? {} : { askSecretWrittenTo: chosen.secretFile }), ...(sessionNote === null ? {} : { sessionNote }) })}\n`,
+    `${key === null && secretSaid === null ? text : JSON.stringify({ ...said, ...(key === null ? {} : { keyWrittenTo: chosen.keyFile, setTheKeyFile: theLineThatSetsTheKeyFile(resolve(chosen.keyFile)) }), ...(secretSaid === null ? {} : { askSecretWrittenTo: chosen.secretFile }), ...(sessionNote === null ? {} : { sessionNote }) })}\n`,
   )
 } else {
   console.log(`register-myself: ${res.status} ${res.statusText}`)
@@ -523,5 +531,6 @@ if (chosen.json) {
   if (said.says !== undefined) console.log(`  ${said.says}`)
   if (said.keySays !== undefined && said.keySays !== null) console.log(`  ${said.keySays}`)
   for (const line of sessionNote?.says ?? []) console.log(`  ${line}`)
+  if (key !== null) console.log(theLineThatSetsTheKeyFile(resolve(chosen.keyFile)))
 }
 if (res.status >= 400) process.exit(1)

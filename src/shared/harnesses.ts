@@ -51,3 +51,57 @@ export interface HarnessReading extends HarnessListing {
    */
   beingReadAgain: { installed: string | null; newest: string | null }
 }
+
+/** Why it is not known whether an agent tool is signed in. */
+export type SignedInUnreadCode = 'notInstalled' | 'noStatusCommand' | 'didNotRun' | 'notUnderstood'
+
+/**
+ * WHETHER AN AGENT TOOL IS SIGNED IN, as its own status command says on the environment the office's terminals get
+ * (src/server/lib/setting-up-an-agent-tool.ts). `asked` is the command run, in words; what the tool printed is never
+ * answered. 'notReadable' says why nothing could be read, and is never a guess at yes or no.
+ */
+export type SignedIn =
+  | { answer: 'yes' | 'no'; asked: string }
+  | { answer: 'notReadable'; why: SignedInUnreadCode; asked: string | null }
+
+/** Why the Set up press went to the secretary it went to (src/server/lib/the-set-up-press.ts). */
+export type WhyThisSecretary = 'holdsTheDuty' | 'theOnlySecretary' | 'writtenToLast' | 'registeredFirst'
+
+/** The Set up press's answer: the tool, the secretary the person's message went to, why that one, and the message's id. */
+export interface TheSetUpSent {
+  harness: string
+  secretary: { id: string; name: string }
+  why: WhyThisSecretary
+  message: string
+}
+
+/** Why a page may open no address for an account sign-in. */
+export type NoSignInAddressCode = 'printedNone' | 'notAnAddress' | 'notHttps' | 'hasAUser' | 'hasAPort' | 'anotherHost'
+
+/**
+ * WHAT THE SIGN-IN DOOR ANSWERS, POST /api/harnesses/:id/sign-in (src/server/lib/setting-up-an-agent-tool.ts).
+ * `id` names the sign-in this press started, and the code door takes it. `address` is the one address a page may open,
+ * worked out on the server: a tool's declared device page, or the address it printed when that passed the check. When
+ * there is none, `noAddress` says why, in a code and one English sentence. `code` is the device code the tool printed, as
+ * text, or null. `takesACode` says the sign-in waits for the code the sign-in page shows the person, given at
+ * POST /api/harnesses/:id/sign-in/code. `aSecondTabMayOpen` says the tool may open the system's browser itself as well,
+ * where the office does not know its browser to be stopped.
+ */
+export interface SignInStarted {
+  harness: string
+  id: string
+  address: string | null
+  noAddress: { code: NoSignInAddressCode; says: string } | null
+  code: string | null
+  takesACode: boolean
+  aSecondTabMayOpen: boolean
+  started: string
+  already: boolean
+}
+
+/** What the code door answers, POST /api/harnesses/:id/sign-in/code. The code itself is never answered. */
+export interface SignInCodeGiven {
+  harness: string
+  signIn: string
+  codeGiven: true
+}

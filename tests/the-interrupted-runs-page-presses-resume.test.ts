@@ -27,6 +27,7 @@ import { join } from 'node:path'
 import { fileURLToPath, URL } from 'node:url'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import { THE_PERSON } from '../src/shared/person.ts'
+import { t } from '../src/shared/i18n.ts'
 import { liveApp, waitForThePage, type LiveApp, theAnswerToAWriteInATestOffice } from './helpers.ts'
 
 /** The checkout this test's office serves from, which is the folder a resumable run must have worked in. */
@@ -99,13 +100,13 @@ it('draws a run that cannot resume with its reason and no button, and presses re
   await waitForThePage(app.page)
   await expect.poll(() => app.page.locator('h1.ir-title').textContent()).toBe('Interrupted runs')
 
-  // THE RUN THAT CANNOT RESUME: its reason, in words, and no button anywhere in it.
+  // THE RUN THAT CANNOT RESUME: its reason, as a short state, and no button anywhere in it.
   const cannot = app.page.locator(`.ir-run[data-run="${stopped}"]`)
   await cannot.waitFor()
   expect(await cannot.getAttribute('data-can-resume')).toBe('no')
-  expect(await cannot.locator('.ir-cannot strong').textContent()).toBe('Cannot be resumed.')
+  expect(await cannot.locator('.ir-cannot strong').textContent()).toBe(t('w13t.interrupted.cannot'))
   expect(await cannot.locator('.ir-cannot').textContent()).toBe(
-    'Cannot be resumed.Its conversation was never recorded, so its tool has nothing to resume.',
+    `${t('w13t.interrupted.cannot')}${t('w13t.interrupted.cannotState.no-conversation')}`,
   )
   expect(await cannot.getByRole('button').count()).toBe(0)
   expect(await cannot.textContent()).toContain('Synthetic: a person stopped this run mid-turn.')
@@ -115,12 +116,12 @@ it('draws a run that cannot resume with its reason and no button, and presses re
   expect(await can.getAttribute('data-can-resume')).toBe('yes')
   expect(await can.textContent()).toContain('Synthetic message a shutdown interrupted')
   expect(await can.textContent()).toContain('Synthetic: the office was shut down for the night.')
-  expect(await can.textContent()).toContain('Measured: after this tool was killed mid-turn, its resume carried the conversation on.')
+  expect(await can.textContent()).toContain(t('w13t.interrupted.measuredState.resumes'))
   await can.getByRole('button', { name: 'Resume', exact: true }).click()
 
   // THE PRESS WAS SENT AND WRITTEN: the page says the resume was asked, and the run's record says who asked.
   await can.locator('.ir-asked').waitFor()
-  expect(await can.locator('.ir-asked').textContent()).toContain('Resume asked. The message worker starts it on its next pass.')
+  expect(await can.locator('.ir-asked').textContent()).toContain(t('w13t.interrupted.resumeAsked'))
   expect(await can.getByRole('button').count()).toBe(0)
   const record = await call<{ record: { data: Record<string, unknown> } }>('GET', `/api/records/${paused}`)
   expect((record.record.data['resume'] as { askedBy: unknown }).askedBy).toEqual({ kind: 'person', id: THE_PERSON })

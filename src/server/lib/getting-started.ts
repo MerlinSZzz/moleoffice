@@ -19,18 +19,20 @@
 import { existsSync } from 'node:fs'
 
 import { whereThePublicFileIs } from '../../config/settings.mjs'
-import { createI18n, sayInEnglish, WORD_LISTS, type Language, type Say, type WordKey } from '@shared/i18n.ts'
+import { createI18n, sayInEnglish, WORD_LISTS, type Language, type Say, type WordValues } from '@shared/i18n.ts'
 import {
   THE_FIRST_ENTRY_SETTING,
   THE_GETTING_STARTED_FOLDER,
   THE_GETTING_STARTED_PICTURES,
   THE_GETTING_STARTED_WORDS,
+  THE_RIGHT_CLICK_ITEMS,
+  type GettingStartedWordKey,
   type TheFirstEntry,
   type TheFirstEntryKept,
 } from '@shared/getting-started.ts'
 import { moleOffice } from '@shared/participants.ts'
 import { nowStamp } from '@shared/time.ts'
-import type { ImageBlock, TextBlock } from '@shared/types.ts'
+import type { ImageBlock, ListBlock, TextBlock } from '@shared/types.ts'
 import { DEFAULT_WORKSPACE } from '@shared/workspaces.ts'
 import { makeAChecklist } from './checklists.ts'
 import { createRecord, getRecord, theLastChangeOfASetting, writeDownASettingChange, type Actor } from './records.ts'
@@ -61,7 +63,10 @@ function holdsAllOfIt(language: Language): boolean {
 export function fileTheGettingStartedReport(input: { person: string; name: string; language: Language | null }): TheFirstEntryKept {
   const asked = input.language ?? 'en'
   const language: Language = holdsAllOfIt(asked) ? asked : 'en'
-  const say: Say = language === 'en' ? sayInEnglish : createI18n(language).t
+  const reader: Say = language === 'en' ? sayInEnglish : createI18n(language).t
+  // THE REPORT SAYS ONLY THE WORDS ON ITS LIST. holdsAllOfIt chose the language from that list, so a word said here and
+  // missing from it could be drawn in English in a report filed as Chinese.
+  const say = (key: GettingStartedWordKey, values?: WordValues): string => reader(key, values)
   // A PICTURE THE INSTALL DOES NOT HOLD IS A BROKEN INSTALL, said here rather than filed as a picture that is not there.
   for (const file of THE_GETTING_STARTED_PICTURES) {
     const path = wherePictureIs(language, file)
@@ -69,7 +74,7 @@ export function fileTheGettingStartedReport(input: { person: string; name: strin
       throw new Error(`The getting-started picture ${path} is not in this install, so the report that shows it could not be filed. Nothing was changed.`)
     }
   }
-  const picture = (id: string, file: string, alt: WordKey): ImageBlock => ({
+  const picture = (id: string, file: string, alt: GettingStartedWordKey): ImageBlock => ({
     id,
     type: 'image',
     path: wherePictureIs(language, file),
@@ -77,13 +82,26 @@ export function fileTheGettingStartedReport(input: { person: string; name: strin
     caption: say('gettingStarted.report.madeUp'),
   })
   const text = (id: string, heading: string, words: string): TextBlock => ({ id, type: 'text', heading, text: words })
-  const [embassyPicture, admitPicture] = THE_GETTING_STARTED_PICTURES
-  const blocks: (TextBlock | ImageBlock)[] = [
+  // THE RIGHT-CLICK PART: one picture of the whole box, then one line for each of its items,
+  // in the box's order. A line names a press by the word the box draws for it, so a renamed press is renamed here too.
+  const presses = {
+    copy: say('talk.copy'),
+    contact: say('talk.sendTo.contact'),
+    note: say('talk.sendTo.note'),
+    send: say('talk.send'),
+    startReview: say('talk.startReview'),
+    more: say('talk.more'),
+  }
+  const [embassyPicture, admitPicture, boxPicture] = THE_GETTING_STARTED_PICTURES
+  const blocks: (TextBlock | ImageBlock | ListBlock)[] = [
     text('welcome', say('gettingStarted.report.welcome.heading', { name: input.name }), say('gettingStarted.report.welcome.text')),
     text('embassy', say('gettingStarted.report.embassy.heading'), say('gettingStarted.report.embassy.text', { embassy: say('nav.embassy'), menu: say('frameWords.menu') })),
     picture('embassy-picture', embassyPicture, 'gettingStarted.report.embassy.alt'),
     text('admit', say('gettingStarted.report.admit.heading'), say('gettingStarted.report.admit.text', { admit: say('g6b.ask.admit'), refuse: say('g6b.ask.refuse') })),
     picture('admit-picture', admitPicture, 'gettingStarted.report.admit.alt'),
+    text('right-click', say('gettingStarted.report.rightClick.heading'), say('gettingStarted.report.rightClick.text')),
+    picture('right-click-picture', boxPicture, 'gettingStarted.report.rightClick.alt'),
+    { id: 'right-click-items', type: 'list', items: THE_RIGHT_CLICK_ITEMS.map((key) => say(key, presses)) },
     text('stays', say('gettingStarted.report.stays.heading'), say('gettingStarted.report.stays.text')),
   ]
   const report = createRecord({

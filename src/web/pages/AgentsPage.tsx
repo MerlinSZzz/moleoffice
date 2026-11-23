@@ -44,7 +44,7 @@ import { behaviorForJump } from '../lib/motion.ts'
  * nowhere.
  */
 
-import { t } from '@shared/i18n.ts'
+import { t, type WordKey } from '@shared/i18n.ts'
 import { useEffect, useRef, useState, type RefObject } from 'react'
 import { faultOf, api, errorMessage } from '../api.ts'
 import { AGENT_CSS } from '../components/agent/agent-css.ts'
@@ -68,7 +68,7 @@ import { navigate, recordPath, planPath } from '../components/router.tsx'
 import { declaredAttributes } from '../components/declares.ts'
 /** The one place a page's name is written. See the note beside the Agent runs link below. */
 import { RecordId } from '../components/RecordId.tsx'
-import { Absence, Btn, ErrorNote, Loading, Panel, TextArea } from '../components/ui.tsx'
+import { Absence, Btn, ErrorNote, Loading, Panel, ServerNote, TextArea } from '../components/ui.tsx'
 import { useProjectAsync } from '../lib/project-async.ts'
 import { reviewChanged, useReviewChanges } from '../lib/review.ts'
 import { useInspect } from '../lib/mode.ts'
@@ -132,7 +132,6 @@ export function AgentsPage() {
       <header className="px-ac-head">
         <div className="px-ac-head-copy">
           <h1 className="px-ag-title" data-title-is="its-label">{t(RAIL_WORD_KEYS['rail.agents'])}</h1>
-          <p className="px-ag-lead">{t('agentsPage.lead')}</p>
         </div>
         <Btn variant="primary" onClick={startFromWork}>{t('agentsPage.start')}</Btn>
       </header>
@@ -168,7 +167,7 @@ export function AgentsPage() {
                 {otherThreads.length > 0 ? (
                   <ConversationRows threads={otherThreads} selectedId={selectedId} onOpen={setOpened} />
                 ) : threadRows.length === 0 ? (
-                  <Absence title={t('g6a.agents.emptyThreadsReason')} />
+                  <Absence title={t('g6a.agents.noThreads')} />
                 ) : null}
               </section>
             </>
@@ -180,7 +179,7 @@ export function AgentsPage() {
             <span aria-hidden="true">←</span> {t('agentsPage.allConversations')}
           </button>
           {selectedId === null ? (
-            <Absence title={t('g6a.agents.emptyThreadsReason')} />
+            <Absence title={t('g6a.agents.noThreads')} />
           ) : (
             <OneThread id={selectedId} />
           )}
@@ -334,7 +333,6 @@ const AGENT_CONVERSATIONS_CSS = `
 .px-ac-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--gut); min-width: 0; }
 .px-ac-head-copy { min-width: 0; }
 .px-ac-head .px-ag-title { margin: 0; }
-.px-ac-head .px-ag-lead { margin: 4px 0 0; }
 /* THE LIST AND THE OPEN CONVERSATION FOLLOW THE PRODUCT'S ONE WIDTH RULE, components/SideBySide.tsx:
    side by side on a wide screen, the list the narrower of the two. Below the switch a conversation
    is a screen of its own with a way back, which is the stacked form of this page. */
@@ -361,6 +359,8 @@ const AGENT_CONVERSATIONS_CSS = `
 .px-ac-state[data-state='failed'], .px-ac-state[data-state='crashed'], .px-ac-state[data-state='declined'] { border-color: var(--st-failed-line); color: var(--st-failed); }
 .px-ac-state[data-state='running'], .px-ac-state[data-state='claimed'], .px-ac-state[data-state='queued'] { border-color: var(--st-running-line); color: var(--st-running); }
 .px-ac-quiet { margin: var(--pad-lg) 0 0; color: var(--text-3); font-size: var(--fs-2); }
+.px-ac-word { margin: 0; font-size: var(--fs-1); font-weight: 600; color: var(--text-2); }
+.px-run-error { margin: 0; font-size: var(--fs-1); color: var(--text); line-height: var(--lh-body); overflow-wrap: anywhere; }
 .px-ac-back { display: none; }
 .px-ac-work-head { padding-bottom: var(--pad); border-bottom: var(--border-w) solid var(--border-strong); }
 .px-ac-search { display: block; width: min(28rem, 100%); min-height: 44px; margin: var(--pad) 0; padding: 8px 12px; border: var(--border-w) solid var(--border-strong); border-radius: var(--radius-sm); background: var(--panel); color: var(--text); font: inherit; }
@@ -457,19 +457,23 @@ function OneThread({ id }: { id: string }) {
   const answeredAbove = thread.messages.flatMap((one) => (one.runId === null ? [] : [one.runId]))
   return (
     <div className="px-ac-open-thread">
-    <Panel declares={{ surface: null }} title={thread.thread.title}>
+    <Panel
+      declares={{ surface: null }}
+      title={thread.thread.title}
+      actions={<span className="px-ac-state" data-state={thread.thread.state}>{THREAD_STATE_WORDS[thread.thread.state]}</span>}
+    >
       {/* A RE-READ THAT FAILED IS SAID, ABOVE WHAT WAS KEPT. Silently going on drawing the last
           answer would make a broken connection look like a conversation nobody has added to. */}
       {detail.status === 'error' ? (
         <ErrorNote message={detail.message} fault={detail.fault} label={t('g6a.agents.lastRead')} />
       ) : null}
-      <p className="px-review-note">{thread.says}</p>
+      <ServerNote text={thread.says} />
 
       {thread.messages.map((message) => (
         <MessageLine key={message.id} message={message} names={names} />
       ))}
 
-      {/* WHERE THIS CONVERSATION STANDS IS SAID ONCE, ABOVE, BY THE SERVER. This used to draw its
+      {/* WHERE THIS CONVERSATION STANDS IS SAID ONCE, ABOVE, as its state word. This used to draw its
           own sentence whenever there were no runs, which worked the same fact out a second time and
           could contradict the first: a dispatched conversation with no run reads "This was
           dispatched and no run was written" above and would have read "nothing has been sent" here.
@@ -484,11 +488,7 @@ function OneThread({ id }: { id: string }) {
           conversation was the sidebar's "Ask agent" on some other page.
           A DROPPED CONVERSATION TAKES NO MORE. The server refuses it, and a box that accepted words
           it would then have to throw away is worse than no box. */}
-      {thread.thread.state === 'abandoned' ? (
-        <p className="px-review-note">{t('g6a.agents.abandoned')}</p>
-      ) : (
-        <ReplyBox thread={thread} names={names} />
-      )}
+      {thread.thread.state === 'abandoned' ? null : <ReplyBox thread={thread} names={names} />}
     </Panel>
     {inspect ? <p className="px-ac-dev">{t('agentsPage.developerConversation', { id: thread.thread.id, runs: thread.runs.length })}</p> : null}
     </div>
@@ -575,7 +575,7 @@ function ReplyBox({ thread, names }: { thread: ThreadDetail; names: AgentNames }
           tier="told-apart"
           looked={false}
           word={t('g6a.agents.noAgent')}
-          title={t('g6a.agents.noAgentReason')}
+          title={t('g6a.agents.noAgentNamed')}
         />
       ) : (
         <p className="px-reply-to">{t('g6a.agents.replyTo', {name: agentName(names, backTo)})}</p>
@@ -624,6 +624,13 @@ function ReplyBox({ thread, names }: { thread: ThreadDetail; names: AgentNames }
       </div>
     </div>
   )
+}
+
+/** The short word for where the words a message was about stand, when they are not still there. */
+const READING_WORDS: Readonly<Record<'changed' | 'gone' | 'unknown', WordKey>> = {
+  changed: 'g6a.agents.reading.changed',
+  gone: 'g6a.agents.reading.gone',
+  unknown: 'g6a.agents.reading.unknown',
 }
 
 /**
@@ -675,12 +682,16 @@ export function MessageLine({ message, names }: { message: AgentMessageView; nam
       <div className="px-msg-head">
         <span className="px-review-intent">{who ?? INTENT_WORDS[message.intent].label}</span>
         {stillWaiting ? <span className="px-msg-waiting">{t('g6a.agents.unsent')}</span> : null}
+        {noRunBehindIt ? <span className="px-ac-word">{t('g6a.agents.noRunBehindIt')}</span> : null}
         {message.reading === null ? (
           <span className="px-msg-about"><Absence title={t('g6a.agents.noSubject')} /></span>
         ) : (
           <span className="px-msg-about" data-state={message.reading.state} title={inspect ? message.reading.says : withoutIds(message.reading.says, message.context)}>
             {inspect ? message.reading.about : withoutIds(message.reading.about, message.context)}
           </span>
+        )}
+        {message.reading === null || message.reading.state === 'there' ? null : (
+          <span className="px-ac-word">{t(READING_WORDS[message.reading.state])}</span>
         )}
         {who !== null ? null : (
           <span className="px-review-to">
@@ -702,17 +713,14 @@ export function MessageLine({ message, names }: { message: AgentMessageView; nam
       </p>
       {message.reading !== null && message.reading.state !== 'there' ? (
         // WHAT IT WAS ABOUT HAS MOVED. Mole Office does not move the comment onto different words and
-        // does not pretend the offsets still hold; it says which of the two happened.
-        <p className="px-run-says">{inspect ? message.reading.says : withoutIds(message.reading.says, message.context)}</p>
+        // does not pretend the offsets still hold; the word in the head says which of the two happened.
+        <ServerNote text={message.reading.says} />
       ) : null}
       {/* WHY IT HAS NOT GONE, IN THE SERVER'S OWN WORDS. `delivery.says` is the one answer to that
-          question in this product: the screen shows it, the reply to a write carries it, and
+          question in this product: developer mode shows it, the reply to a write carries it, and
           dispatch acts on `canSend`. Working out a second sentence here would be two answers to one
           question, which is the defect this repository names as its own. */}
-      {stillWaiting ? <p className="px-run-says">{message.delivery.says}</p> : null}
-      {noRunBehindIt ? (
-        <p className="px-run-says">{t('g6a.agents.unconfirmed')}</p>
-      ) : null}
+      {stillWaiting ? <ServerNote text={message.delivery.says} /> : null}
       {inspect ? <p className="px-ac-dev">{t('agentsPage.developerMessage', { id: message.id })}</p> : null}
     </div>
   )
@@ -746,22 +754,24 @@ export function RunLine({
   const said = answerOf(run.result)
   // A read of what is on the page, not an assumption about the thread. See OneThread.
   const answer = answeredAbove.includes(run.id) ? null : said
+  const stopped = run.state === 'failed' || run.state === 'crashed' || run.state === 'declined' || run.state === 'withdrawn'
   return (
     <div className="px-run">
       <div className="px-run-head">
         <span className="px-run-state">{RUN_STATE_WORDS[run.state]}</span>
         <span className="px-review-to">{t('g6a.agents.to', {name: agentName(names, run.recipientSessionId)})}</span>
       </div>
-      {/* NO SPINNER, EVER. The state word above and this sentence are the whole answer, including
-          when the answer is that nobody has taken it. */}
-      <p className="px-run-says">{run.says}</p>
+      {/* NO SPINNER, EVER. The state word above is the whole answer, including when the answer is
+          that nobody has taken it. A run that stopped keeps its error, as decided. */}
+      {stopped && run.error !== null ? <p className="px-run-error">{run.error}</p> : null}
+      <ServerNote text={run.says} />
 
       {answer === null ? null : <p className="px-run-answer">{answer}</p>}
 
       {run.focus === null ? null : (
         <div className="px-run-focus">
-          <p className="px-run-says">{run.focus.says}</p>
-          {run.focus.resolves ? <FocusPress asked={run.focus.asked} /> : null}
+          {run.focus.resolves ? <FocusPress asked={run.focus.asked} /> : <p className="px-ac-word">{t('g6a.agents.focusCannotOpen')}</p>}
+          <ServerNote text={run.focus.says} />
         </div>
       )}
 
@@ -805,16 +815,9 @@ function FocusPress({ asked }: { asked: unknown }) {
   }
   const plan = focus['plan']
   if (typeof plan === 'string' && plan !== '') {
-    const line = focus['line']
     return (
-      <>
-        <Btn size="sm" variant="secondary" onClick={() => navigate(planPath(plan))}>
-          {t('g6a.agents.openPlan')}</Btn>
-        {typeof line === 'string' && line !== '' ? (
-          <p className="px-run-says">
-            {t('g6a.agents.planPosition')}</p>
-        ) : null}
-      </>
+      <Btn size="sm" variant="secondary" onClick={() => navigate(planPath(plan))}>
+        {t('g6a.agents.openPlan')}</Btn>
     )
   }
   return null

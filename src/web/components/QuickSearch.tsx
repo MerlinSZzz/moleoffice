@@ -3,7 +3,7 @@
 /**
  * THE QUICK SEARCH: AN ID OPENS ITS RECORD, AND A NAME FINDS A PAGE OR A RECORD, OVER ANY PAGE.
  *
- * The sidebar's press and the key f open it, by the event OPEN_THE_QUICK_SEARCH (src/web/lib/shortcuts.ts). It is one
+ * The sidebar's press and Alt and X open it, by the event OPEN_THE_QUICK_SEARCH (src/web/lib/shortcuts.ts). It is one
  * field over the page being read.
  *
  * A PASTED ID OPENS ITS RECORD'S PAGE AT ONCE. The search door looks every text of an id's shape up by its key, in every
@@ -32,7 +32,6 @@ import { isARecordId } from '@shared/messages.ts'
 import { RECORD_KINDS, type RecordKind } from '@shared/types.ts'
 import { kindWord } from '@shared/words.ts'
 import { MESSAGE_CENTRE } from '@shared/workspaces.ts'
-import type { SearchReply } from '../../server/api/search.ts'
 import { api, errorMessage } from '../api.ts'
 import { useLanguage } from '../lib/language.ts'
 import { useMode } from '../lib/mode.ts'
@@ -49,7 +48,7 @@ const RECORDS_DRAWN = 8
 /** The fewest characters asked of the office. */
 const FEWEST = 2
 
-type Answer = { q: string; reply: SearchReply } | { q: string; failed: string }
+type Answer = { q: string; reply: Awaited<ReturnType<typeof api.search>> } | { q: string; failed: string }
 
 /** Listens for the event that opens it, and draws it while it is open. */
 export function QuickSearch() {

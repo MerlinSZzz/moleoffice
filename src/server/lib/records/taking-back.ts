@@ -14,7 +14,7 @@ import { thePersonIsProved } from '@shared/the-person-proved.ts'
 import { db, sqlite } from '../../db/client.ts'
 import { records, revisions } from '../../db/schema.ts'
 // WHO WRITES A SECRETARY'S DUTIES, AND WHAT THEY HOLD.
-import { checkNoDutiesRestOn, theActThatWouldStrandTheDuties } from '../grant/secretary-duties.ts'
+import { checkNoDutiesOrDepartmentsRestOn, theActThatWouldStrandTheDuties } from '../grant/secretary-duties.ts'
 import { PanelError } from '../panel-error.ts'
 import { restoreRevision } from '../revisions.ts'
 import type { Actor } from './actor.ts'
@@ -207,14 +207,14 @@ export function revokeAnActOnTheirWords(recordId: string, seq: number, actor: Ac
 
 /** Retract the decision a promotion filed, which is what puts the fork back on the owner's list. */
 function retract(decisionId: string, title: string, actor: Actor): string {
-  // NOT WHILE A SECRETARY'S DUTIES REST ON IT. `deleteRecord` refuses it too; this asks
-  // first so the refusal says the order at this door: the duties, then the revoke.
+  // NOT WHILE A SECRETARY'S DUTIES OR A DEPARTMENT REST ON IT. `deleteRecord` refuses it too; this asks
+  // first so the refusal says the order at this door: the duties or the department, then the revoke.
   const decision = db
     .select({ title: records.title, workspaceId: records.workspaceId })
     .from(records)
     .where(and(eq(records.id, decisionId), eq(records.kind, DECISION_KIND), isNull(records.deletedAt)))
     .get()
-  if (decision !== undefined) checkNoDutiesRestOn({ id: decisionId, ...decision }, 'revoke')
+  if (decision !== undefined) checkNoDutiesOrDepartmentsRestOn({ id: decisionId, ...decision }, 'revoke')
   deleteRecord(decisionId, actor)
   return (
     `The decision "${title}" was retracted, so the fork it settled is open again and back on your list. ` +
@@ -247,7 +247,7 @@ function putBack(recordId: string, seq: number, title: string, actor: Actor, und
     .get()
   if (now !== undefined && earlier !== undefined) {
     const act = theActThatWouldStrandTheDuties(recordId, now, earlier)
-    if (act !== null) checkNoDutiesRestOn({ id: recordId, title: now.title, workspaceId: now.workspaceId }, act, new Set(), seq)
+    if (act !== null) checkNoDutiesOrDepartmentsRestOn({ id: recordId, title: now.title, workspaceId: now.workspaceId }, act, new Set(), seq)
   }
   restoreRevision(
     recordId,

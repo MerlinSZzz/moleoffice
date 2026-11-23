@@ -134,7 +134,8 @@ const SAID_ON_A_CARD = {
   'their-card': ['g6b.notebook.noNotebook', 'g6b.cardUnchosen', 'g6b.profile.periodNothingYet'],
 } as const
 const saidOnACard = (which: keyof typeof SAID_ON_A_CARD, language: 'en' | 'zh' | 'xx') => SAID_ON_A_CARD[which].map((key) => createI18n(language).t(key))
-const contentSelectors = '.tc-chosen-by,.prof-name,.prof-when,.tc-card-name,.tc-card-duties,.tc-value,.yc-value,.nb-words,.nb-when,.rol-name,.rol-for,.hiw,.rol-power,.rol-says,.rol-elev-says,.rol-tree-name,.rol-node-name,.rol-tree-acts,.tls-name,.tls-does,.tls-title:not([data-title-is]),.tls-facts,.tls-fact-value,.tls-category-name,.tls-jump,.tls-category-says,.tls-part-text,.tls-part,.tls-developer-field dd,.tls-how-list,.px-panel-title:not([data-title-is]),.px-avatar,.avatar,.rol-tree-note,.rol-standing'
+// .prof-owner-name is an agent's owner on its page: a participant's name, and so content (wave 13s round 281).
+const contentSelectors = '.tc-chosen-by,.prof-name,.prof-when,.tc-card-name,.tc-card-duties,.tc-value,.yc-value,.nb-words,.nb-when,.rol-name,.rol-for,.hiw,.rol-power,.rol-says,.rol-elev-says,.rol-tree-name,.rol-node-name,.rol-tree-acts,.tls-name,.tls-does,.tls-title:not([data-title-is]),.tls-facts,.tls-fact-value,.tls-category-name,.tls-jump,.tls-category-says,.tls-part-text,.tls-part,.tls-developer-field dd,.tls-how-list,.px-panel-title:not([data-title-is]),.px-avatar,.avatar,.rol-tree-note,.rol-standing,.prof-owner-name'
 it.each(pages)('%s passes the four page checks in Chinese and the test language, including ordinary gaps', async (which) => {
   for(const empty of [false,true])for(const language of ['zh','xx'] as const) {
     await draw(which,language,empty)

@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react'
 import { content, endOfSentence, listJoined, t, type WordKey } from '@shared/i18n.ts'
 import { readDayKey } from '@shared/planning.ts'
 import { errorMessage, faultOf, moleOfficeRequest } from '../api.ts'
+import { CodeRows } from '../lib/code-rows.tsx'
 import { useLanguage } from '../lib/language.ts'
 import { useInspect } from '../lib/mode.ts'
 import { drawnDay, ErrorNote, Loading, Panel, useAsync } from './ui.tsx'
@@ -79,7 +80,7 @@ function Spool({ spool, afterTheHandOver }: { spool: NonNullable<GatesReading['s
   }
   return <section className="gates-spool" data-gate-spool aria-labelledby="gates-spool-title">
     <h3 id="gates-spool-title">{t('gates.spool.title')}</h3>
-    <p>{t('gates.spool.owned', { folder: content(spool.folder), theirs: content(spool.itsWorld), ours: content(spool.thisWorld) })}</p>
+    <CodeRows rows={[{ label: 'gates.spool.row.folder', value: spool.folder }, { label: 'gates.spool.row.belongsTo', value: spool.itsWorld }, { label: 'gates.spool.row.thisOffice', value: spool.thisWorld }]} />
     <p>{t('gates.spool.what')}</p>
     <p>{t('gates.spool.who')}</p>
     {!editing ? <button type="button" className="px-btn" disabled={!spool.mayPress} onClick={() => setEditing(true)}>{t('pagesFromSettings.edit')}</button> : <fieldset disabled={!spool.mayPress || busy}>

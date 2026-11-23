@@ -31,7 +31,7 @@
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
-import { apiApp, freshDb, thePersonsKeyHeader, FOR_THE_PERSON, type TestDb } from './helpers.ts'
+import { apiApp, freshDb, thePersonsKeyHeader, FOR_THE_PERSON, type TestDb, governsTheWholeProject } from './helpers.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { thePress } from '../src/shared/the-press.ts'
 import type { BuiltServer } from '../src/server/index.ts'
@@ -99,7 +99,7 @@ async function aDecisionTheyWrote(): Promise<string> {
   const made = await ask('POST', '/api/records', AS_THE_PERSON, {
     kind: 'decision',
     title: 'The answer, written down',
-    data: { replaces: [],
+    data: { ...governsTheWholeProject(), replaces: [],
       decided_by: 'the owner',
       authority: 'the owner said so',
       because: 'The person answered in the terminal on 15 September.',

@@ -5,27 +5,24 @@
  *
  * Item 99 (8 Nov 2026, from item 84's pictures), wave 13y round 156.
  *
- * (a) The finished-written group's sentence said "folded with the three above because none of the four asks for
- *     anything today" whatever the page held. It now says what the group is and no count at all, so a page with one
- *     folded group cannot print a claim about four.
  * (b) A row holding one fact read "1 facts". It now reads the singular.
  * (c) The ended band holding one record read "1 of these 1 were written down as finished". It now says the plain
  *     sentence from its own key.
  * (d) Every row saying the same thing read "2 of these 2 say the same thing". It now says "Both say the same thing:"
  *     for two rows and "All N say the same thing:" for more.
  * (e) The folded-ended line kept "including 0 in 0 whole folded groups". It now leaves that clause out when it is zero.
- * (f) The developer note under the This machine box was drawn on the box's bottom edge, with the border and shadow
- *     crossing its words. It now begins below the box, by the page's own gap.
  * (g) The tool name in an ended row touched the origin pill. The two marks now keep the page's chip gap.
  *
- * The tests read every word from its key; only the false number words "three" and "four" are named here, because they
- * are the fault this round removes.
+ * Items (a), the finished group's sentence, and (f), the developer note under the This machine box, went with the
+ * explanations taken off the page in November 2026, as decided.
+ *
+ * The tests read every word from its key.
  *
  * The picture case is the made-up Sessions page item 84's pictures came from: two made-up runs on a page intercepted
  * at the sessions door, with their session records made through the office's own write door. It photographs the page,
- * its ended fold, the placement note, the arithmetic line, the finished-written note and the machine box's foot at
- * 1440, 990, 660 and 390 in both themes, and refuses a dark picture that is the light one. Set TEST_SHOTS to a folder
- * outside the checkout to take them.
+ * its ended fold, the placement note and the arithmetic line at 1440 and 390 in the light theme. Set TEST_SHOTS to a
+ * folder outside the checkout to take them. The dark theme and the widths 990 and 660 are not drawn: the words and the
+ * gap do not depend on the colours, and 1440 and 390 are the wide page and the phone.
  */
 import { join } from 'node:path'
 import { createElement as h } from 'react'
@@ -122,20 +119,6 @@ function aProject(lines: readonly SessionLine[]) {
   const placements = new Map<string, Placement>()
   return sp.projectSessions(lines, placements, NOW)[0]!
 }
-
-describe('the finished group says what it means and no count it cannot know', () => {
-  it('does not claim three or four groups when the page holds one or two', () => {
-    const lines = [
-      aSession({ id: 'written', state: 'finished', written: { kind: 'classified', word: 'finished', progress: 'finished' } }),
-      aSession({ id: 'no-state', state: 'unknown', written: { kind: 'none' } }),
-    ]
-    const shown = seen(body(h(sp.SessionExplanations, { lines })))
-    const finished = t('g6a.sessions.theWordFinishedIsOnEachRecordWritten')
-    expect(shown).toContain(finished)
-    expect(finished.toLowerCase()).not.toContain('three')
-    expect(finished.toLowerCase()).not.toContain('four')
-  })
-})
 
 describe('a count of one takes the singular', () => {
   it('says one fact, not one facts', () => {
@@ -287,41 +270,20 @@ async function openSessions(page: Page, site: string): Promise<void> {
   // A HASH CHANGE IN THE SAME DOCUMENT IS NOT A VISIT. Open a blank page first, as every browser test here does, so
   // the sessions address is the page that is loaded rather than a scroll inside Home.
   await page.goto('about:blank')
-  // INSPECT MODE IS WHERE THE PAGE SAYS WHAT EACH STATE GROUP MEANS; item 99(a) is one of those sentences.
+  // INSPECT MODE: the page as a developer reads it.
   await page.goto(`${site}/?lang=en&mode=inspect#/sessions`, { timeout: 60_000 })
   await waitForThePage(page, 60_000)
   await page.waitForSelector('.sx-proj', { timeout: 30_000 })
 }
 
-/** The picture of the machine box together with the line under it, because the fault is where those two meet. */
-async function theMachineFootShot(page: Page, path: string): Promise<Buffer> {
-  await page.evaluate(() => window.scrollTo(0, 0))
-  const box = await page.evaluate(() => {
-    const panel = document.querySelector('#machine') as HTMLElement | null
-    const foot = document.querySelector('.sx-origin-note-foot') as HTMLElement | null
-    const there = panel ?? foot
-    if (there === null) throw new Error('the machine panel and the note under it are both missing')
-    const panelBox = panel === null ? null : panel.getBoundingClientRect()
-    const footBox = foot === null ? null : foot.getBoundingClientRect()
-    const top = Math.min(panelBox?.top ?? footBox!.top, footBox?.top ?? panelBox!.top)
-    const bottom = Math.max(panelBox?.bottom ?? footBox!.bottom, footBox?.bottom ?? panelBox!.bottom + 80)
-    const left = Math.min(panelBox?.left ?? footBox!.left, footBox?.left ?? panelBox!.left)
-    const right = Math.max(panelBox?.right ?? footBox!.right, footBox?.right ?? panelBox!.right)
-    return { x: left + window.scrollX, y: top + window.scrollY, width: right - left, height: bottom - top }
-  })
-  return page.screenshot({ path, fullPage: true, clip: box })
-}
-
-/** One measured pass over the two spacing faults: where the note meets the box, and where the two marks meet. */
+/** One measured pass over the spacing fault: where the two marks meet. */
 interface SpacingMeasured {
   look: string
   width: number
-  machine: { panelBottom: number; noteTop: number; notePad: number; found: boolean }
   marks: { display: string; columnGap: number; rowGap: number; gapX: number; gapY: number; sameLine: boolean }
 }
 
 interface Said {
-  note: string
   fact: string
   ended: string
   place: string
@@ -334,15 +296,13 @@ interface Pass {
   said: Said
   page: Buffer
   ended: Buffer
-  note: Buffer
   place: Buffer
   arithmetic: Buffer
-  machine: Buffer
   spacing: SpacingMeasured
 }
 
 describe('the made-up Sessions page item 84 drew', () => {
-  it('draws its true counts, keeps both spacing faults closed, and photographs them at four widths in both themes', async () => {
+  it('draws its true counts, keeps the spacing fault closed, and photographs them at 1440 and 390 in the light theme', async () => {
     const app: LiveApp = await liveApp({ name: 'sessions-counts-truly', viewport: { width: 1440, height: 1000 }, workspace: 'default' })
     const passes: Pass[] = []
     try {
@@ -360,18 +320,15 @@ describe('the made-up Sessions page item 84 drew', () => {
       await app.page.route('**/api/resources/orphans', async (route) =>
         route.fulfill({ response: await route.fetch(), status: 200, contentType: 'application/json', body: JSON.stringify({ orphans: [], searched: [] }) }),
       )
-      for (const look of ['light', 'dark']) {
-        for (const width of [1440, 990, 660, 390]) {
+      {
+        const look = 'light'
+        for (const width of [1440, 390]) {
           const where = `${look} ${String(width)}`
           await app.page.setViewportSize({ width, height: width === 390 ? 844 : 1000 })
           await app.page.goto(`${app.site}/?lang=en`)
           await app.page.evaluate((theme) => localStorage.setItem('mole-office.preset.theme', theme), look)
           await openSessions(app.page, app.site)
           expect(await app.page.locator('html').getAttribute('data-theme'), `${where}: the theme`).toBe(look)
-
-          const finishedLabel = t('g6a.sessions.writtenDownAsFinishedByAPerson')
-          const note = app.page.locator('.sx-note-group', { hasText: finishedLabel }).first()
-          const noteText = (await note.textContent()) ?? ''
 
           const row = app.page.locator('.px-scan', { hasText: 'A made-up run with one fact' }).first()
           const fact = (await row.locator('.px-scan-holds').textContent()) ?? ''
@@ -386,12 +343,6 @@ describe('the made-up Sessions page item 84 drew', () => {
           const arithmeticText = (await arithmetic.textContent()) ?? ''
 
           const spacing = await app.page.evaluate((): Omit<SpacingMeasured, 'look' | 'width'> => {
-            const panel = document.querySelector('#machine') as HTMLElement | null
-            const foot = document.querySelector('.sx-origin-note-foot') as HTMLElement | null
-            const note = foot?.querySelector('.px-origin-note') as HTMLElement | null
-            const box = panel?.getBoundingClientRect()
-            const noteBox = note?.getBoundingClientRect()
-            const pad = foot === null ? 0 : parseFloat(getComputedStyle(foot).paddingTop)
             const lead = document.querySelector('details[data-band="ended"] .sx-line .px-scan-lead') as HTMLElement | null
             const tag = lead?.querySelector('.px-tag') as HTMLElement | null
             const pill = lead?.querySelector('.px-origin[data-origin="unrecorded"]') as HTMLElement | null
@@ -400,12 +351,6 @@ describe('the made-up Sessions page item 84 drew', () => {
             const pillBox = pill?.getBoundingClientRect() ?? null
             const sameLine = tagBox !== null && pillBox !== null ? pillBox.top < tagBox.bottom - 1 : false
             return {
-              machine: {
-                panelBottom: box?.bottom ?? Number.NaN,
-                noteTop: noteBox?.top ?? Number.NaN,
-                notePad: Number.isFinite(pad) ? pad : 0,
-                found: panel !== null && note !== null,
-              },
               marks: {
                 display: leadStyle?.display ?? 'none',
                 columnGap: leadStyle === null ? 0 : parseFloat(leadStyle.columnGap),
@@ -422,13 +367,8 @@ describe('the made-up Sessions page item 84 drew', () => {
           const endedShot = SHOTS === undefined ? Buffer.alloc(0) : await ended.screenshot({ path: join(SHOTS, `sessions-counts-ended-${look}-${String(width)}.png`) })
           const placeShot = SHOTS === undefined ? Buffer.alloc(0) : await place.screenshot({ path: join(SHOTS, `sessions-counts-place-${look}-${String(width)}.png`) })
           const arithmeticShot = SHOTS === undefined ? Buffer.alloc(0) : await arithmetic.screenshot({ path: join(SHOTS, `sessions-counts-arithmetic-${look}-${String(width)}.png`) })
-          // THE EXPLANATIONS ARE A FOLD OF THEIR OWN. Open it so the finished group's sentence is in the picture.
-          const explanations = app.page.locator('details', { hasText: t('g6a.sessions.howARunIsPlacedAndWhatEach') }).first()
-          if ((await explanations.count()) > 0) await explanations.locator('summary').first().click()
-          const noteShot = SHOTS === undefined ? Buffer.alloc(0) : await note.screenshot({ path: join(SHOTS, `sessions-counts-note-${look}-${String(width)}.png`) })
-          const machineShot = SHOTS === undefined ? Buffer.alloc(0) : await theMachineFootShot(app.page, join(SHOTS, `sessions-counts-machine-${look}-${String(width)}.png`))
 
-          passes.push({ look, width, said: { note: noteText, fact, ended: endedText, place: placeText, arithmetic: arithmeticText }, page: pageShot, ended: endedShot, note: noteShot, place: placeShot, arithmetic: arithmeticShot, machine: machineShot, spacing: { look, width, ...spacing } })
+          passes.push({ look, width, said: { fact, ended: endedText, place: placeText, arithmetic: arithmeticText }, page: pageShot, ended: endedShot, place: placeShot, arithmetic: arithmeticShot, spacing: { look, width, ...spacing } })
         }
       }
 
@@ -436,9 +376,6 @@ describe('the made-up Sessions page item 84 drew', () => {
       // words cannot stop the spacing evidence being captured.
       for (const pass of passes) {
         const where = `${pass.look} ${String(pass.width)}`
-        expect(pass.said.note, `${where}: the finished group's meaning`).toContain(t('g6a.sessions.theWordFinishedIsOnEachRecordWritten'))
-        expect(pass.said.note.toLowerCase(), `${where}: a fixed count in the finished note`).not.toContain('three')
-        expect(pass.said.note.toLowerCase(), `${where}: a fixed count in the finished note`).not.toContain('four')
         expect(pass.said.fact, `${where}: the row's one fact`).toBe(`1 ${t('g6a.sessions.oneFact')}`)
         expect(pass.said.ended, `${where}: the ended band's one-run sentence`).toContain(t('g6a.sessions.itWasWrittenDownAsFinished'))
         expect(pass.said.ended, `${where}: the old fraction is gone`).not.toContain(t('g6a.sessions.confirmedOne', { confirmed: 1, total: 1 }))
@@ -446,30 +383,6 @@ describe('the made-up Sessions page item 84 drew', () => {
         expect(pass.said.place, `${where}: the old fraction is gone from the placement note`).not.toContain(t('g6a.sessions.ofThese'))
         expect(pass.said.arithmetic, `${where}: no including clause at zero`).toContain(t('g6a.sessions.foldedEndedNoGroups', { n: 1 }))
         expect(pass.said.arithmetic, `${where}: the old including clause is gone`).not.toContain(t('g6a.sessions.foldedEnded', { n: 1, rows: 0, groups: 0 }))
-      }
-
-      // THE PICTURES ARE THE PROOF, and a light picture that equals the dark one proves nothing about the dark theme.
-      if (SHOTS !== undefined) {
-        for (const width of [1440, 990, 660, 390]) {
-          const light = passes.find((one) => one.look === 'light' && one.width === width)
-          const dark = passes.find((one) => one.look === 'dark' && one.width === width)
-          expect(light !== undefined && dark !== undefined, `${String(width)}: a picture pass is missing`).toBe(true)
-          expect(dark!.page.equals(light!.page), `${String(width)}: the dark page is the light page`).toBe(false)
-          expect(dark!.ended.equals(light!.ended), `${String(width)}: the dark ended fold is the light one`).toBe(false)
-          expect(dark!.note.equals(light!.note), `${String(width)}: the dark note is the light one`).toBe(false)
-          expect(dark!.place.equals(light!.place), `${String(width)}: the dark placement note is the light one`).toBe(false)
-          expect(dark!.arithmetic.equals(light!.arithmetic), `${String(width)}: the dark arithmetic line is the light one`).toBe(false)
-          expect(dark!.machine.equals(light!.machine), `${String(width)}: the dark machine foot is the light one`).toBe(false)
-        }
-      }
-
-      // THE LAST LINE UNDER THE MACHINE BOX BEGINS BELOW THE BOX, BY THE PAGE'S OWN GAP, so neither its border nor
-      // its shadow can cross the words. Measured, not eyeballed: the gap is the note's own top padding.
-      for (const pass of passes.map((one) => one.spacing)) {
-        const where = `${pass.look} ${String(pass.width)}`
-        expect(pass.machine.found, `${where}: the machine box and the line under it`).toBe(true)
-        expect(pass.machine.notePad, `${where}: the note's gap below the machine box`).toBeGreaterThan(0)
-        expect(pass.machine.noteTop, `${where}: the note begins below the machine box`).toBeGreaterThanOrEqual(pass.machine.panelBottom + pass.machine.notePad - 0.5)
       }
 
       // THE TOOL NAME AND THE ORIGIN PILL ARE TWO MARKS, NOT ONE WORD. If they share a line the gap is the lead's

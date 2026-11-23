@@ -118,25 +118,30 @@ function fromAddress(): Mode | null {
   return MODES.find((m) => m === asked) ?? null
 }
 
-function restore(): { mode: Mode; faults: StoreFault[] } {
+/**
+ * `nothingStored` is true only when the address named no mode and the store was read and held nothing. Then the page
+ * is in Normal mode until it has read its person, and takes that person's starting mode (src/web/lib/starting-mode.ts).
+ * A store it cannot read and a word it does not know stay in Normal mode.
+ */
+function restore(): { mode: Mode; faults: StoreFault[]; nothingStored: boolean } {
   const faults: StoreFault[] = []
   const override = fromAddress()
-  if (override !== null) return { mode: override, faults }
-  if (typeof window === 'undefined') return { mode: 'normal', faults }
+  if (override !== null) return { mode: override, faults, nothingStored: false }
+  if (typeof window === 'undefined') return { mode: 'normal', faults, nothingStored: false }
 
   const read = readStored(KEY)
   if (!read.ok) {
     faults.push(storeFault(KEY, 'frameWords.mode.cannotRead', { reason: content(read.reason) }))
-    return { mode: 'normal', faults }
+    return { mode: 'normal', faults, nothingStored: false }
   }
-  if (read.value === null) return { mode: 'normal', faults }
+  if (read.value === null) return { mode: 'normal', faults, nothingStored: true }
   const found = MODES.find((m) => m === read.value)
   if (found === undefined) {
     faults.push(storeFault(KEY, 'frameWords.mode.unknownView', { value: content(read.value) }))
     clearStored(KEY)
-    return { mode: 'normal', faults }
+    return { mode: 'normal', faults, nothingStored: false }
   }
-  return { mode: found, faults }
+  return { mode: found, faults, nothingStored: false }
 }
 
 /**
@@ -160,6 +165,16 @@ export function modeFaults(): StoreFault[] {
 }
 
 /**
+ * Whether this browser has stored no mode: nothing was stored when the page loaded with no mode in its address, and
+ * nothing is stored now. A mode the person chose while the page was reading is stored, so it is never replaced.
+ */
+export function nothingIsStored(): boolean {
+  if (!BOOT.nothingStored) return false
+  const read = readStored(KEY)
+  return read.ok && read.value === null
+}
+
+/**
  * Change the mode.
  *
  * Applies first and persists second, so the visible result never depends on whether the browser
@@ -172,16 +187,33 @@ export function setMode(next: Mode): void {
   // The attribute is for CSS and belongs to the document; the memory belongs to the browser. They
   // are separate conditions because they fail separately — a test has a window and no document.
   if (typeof document !== 'undefined') document.documentElement.setAttribute('data-mode', next)
-  if (typeof window !== 'undefined') {
-    const written = writeStored(KEY, next)
-    faults = written.ok
-      ? faults.filter((f) => f.key !== KEY)
-      : [
-          ...faults.filter((f) => f.key !== KEY),
-          storeFault(KEY, 'frameWords.mode.cannotWrite', { reason: content(written.reason) }),
-        ]
-  }
+  remember(next)
   broadcast.announce()
+}
+
+/**
+ * Take the person's starting mode, for a browser that has stored no mode (src/web/lib/starting-mode.ts). Unlike
+ * `setMode`, it stores the mode even when the page is already in it, so the next load reads it from the store.
+ */
+export function takeAStartingMode(next: Mode): void {
+  if (next !== mode) {
+    setMode(next)
+    return
+  }
+  remember(next)
+  broadcast.announce()
+}
+
+/** Write the mode into the browser's memory, or say that the browser refused. */
+function remember(next: Mode): void {
+  if (typeof window === 'undefined') return
+  const written = writeStored(KEY, next)
+  faults = written.ok
+    ? faults.filter((f) => f.key !== KEY)
+    : [
+        ...faults.filter((f) => f.key !== KEY),
+        storeFault(KEY, 'frameWords.mode.cannotWrite', { reason: content(written.reason) }),
+      ]
 }
 
 /** The current mode, re-rendering the component when it changes. */

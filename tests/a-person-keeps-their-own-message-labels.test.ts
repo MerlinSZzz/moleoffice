@@ -14,7 +14,7 @@
  *      are refused, and so is an agent changing them, each with nothing written.
  *   3. THE SETTINGS PANEL keeps its words, presses and boxes inside its card with the chat beside the page, at 1024
  *      and at 390.
- *   4. THE FLAG'S LIST holds the three marks first, then the person's labels in their order. Choosing a label shows its
+ *   4. THE FLAG'S LIST holds the four shipped flags first, then the person's labels in their order. Choosing a label shows its
  *      word on the flag, in its colour.
  *   5. A MESSAGE SENT WITH A LABEL carries the label's word and colour, and shows the word in that colour under the
  *      message, readable in the light theme and in the dark one. The flag is back at no mark after the send.
@@ -39,6 +39,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { deliveryEnvelope, participantKey } from '../src/shared/messages.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { enWave13n } from '../src/shared/words/en-wave-13n.ts'
+import { enWave13y } from '../src/shared/words/en-wave-13y.ts'
 import { OPEN_AT } from '../src/web/lib/open-chat.ts'
 import { type LiveApp, liveApp, theAnswerToAWriteInATestOffice, waitForThePage } from './helpers.ts'
 
@@ -278,7 +279,7 @@ describe('a person\'s own labels in Settings', () => {
 })
 
 describe('a person\'s own label on a message', () => {
-  it('4. stands in the flag\'s list after the three marks, and the flag shows its word in its colour once chosen', async () => {
+  it('4. stands in the flag\'s list after the four shipped flags, and the flag shows its word in its colour once chosen', async () => {
     expect(await changeTheLabels(AS_THE_OWNER, [TODAY, LATER])).toBe(200)
     const { context, page } = await aWindow(1440, 'light')
     try {
@@ -286,10 +287,12 @@ describe('a person\'s own label on a message', () => {
       await openTheConversation(page)
       const flag = page.locator('.px-chat-write .px-chat-intent')
       await flag.click()
-      await page.locator('.px-menu .px-menu-item').nth(4).waitFor({ timeout: 15_000 })
+      await page.locator('.px-menu .px-menu-item').nth(6).waitFor({ timeout: 15_000 })
       expect(await page.locator('.px-menu .px-menu-item .px-chat-intent-line-name').allTextContents()).toEqual([
         enWave13n['message.intent.name.justAsk'],
         enWave13n['message.intent.name.proposalFirst'],
+        enWave13y['message.intent.name.align'],
+        enWave13y['message.intent.name.giveOptions'],
         TODAY.text,
         LATER.text,
         enWave13n['chat.intent.name.none'],

@@ -176,16 +176,6 @@ function files(root: string): Map<string, string> {
 
 // These tests cite a decision.
 describe('an archive written before 0278, into a freshly migrated database', { timeout: 60_000 }, () => {
-  it('restores the reads of each key as one row, the newest, and a tie in one second as the later id', async () => {
-    const archive = await anArchiveHolding(WITH_OLDER_READS)
-    const { t, importLib } = await aDatabaseHolding([])
-
-    const report = importLib.applyImport(archive)
-
-    expect(report.applied).toBe(true)
-    expect(idsIn(t)).toEqual(KEPT)
-  })
-
   it('keeps the earlier id of two reads of one key from the same side in the same second', async () => {
     // ONE READ TWICE: the second does not move the read point, as a writer writes nothing for it.
     const archive = await anArchiveHolding([

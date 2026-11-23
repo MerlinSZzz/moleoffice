@@ -171,13 +171,15 @@ export function facilityPlan(ids: readonly string[], group: string, compactRooms
     // plant can stand beside the last desk without tightening any desk spacing.
     const col = i % columns, x = count <= 1 ? 80 : origin(col) + [-8, 10, -14, 6][Math.floor(i / columns) % 4]! - (count === 8 ? 13 : 0), y = cursor[col]!
     // Leave a passing aisle beside each stationary full-size moving envelope.
-    const offsets = count >= 5 && count <= 8 ? [[0, 0], [264, 0], [528, 0], [792, 0]] : count === 2 ? [[0, 0], [262, 0]] : count > 1 && count <= 4 ? [[0, 0], [264, 0], [10, 220], [274, 220]] : [[0, 0], [352, 0], [10, 140], [362, 140]]
+    // In rooms of more than eight, the lower desks stand 184 px below the upper
+    // ones so the stool above clears the band a mole walks along as it leaves.
+    const offsets = count >= 5 && count <= 8 ? [[0, 0], [264, 0], [528, 0], [792, 0]] : count === 2 ? [[0, 0], [262, 0]] : count > 1 && count <= 4 ? [[0, 0], [264, 0], [10, 220], [274, 220]] : [[0, 0], [352, 0], [10, 184], [362, 184]]
     for (const [dx, dy] of offsets.slice(0, n)) {
       const desk = { x: x + dx!, y: y + dy! - (count <= 1 ? 24 : 0), width: 144, height: 73 }, foot = { x: desk.x + (count <= 1 ? 190 : count <= 8 ? 188 : 190), y: desk.y + (count <= 1 ? 121 : 74) }
       plan.pieces.push(piece('worker-desk', desk.x, desk.y, group, 'object', desk.y + desk.height), ...deskThingPieces(desk, group, feet.length, atDesk({ desk, foot }).x - desk.x))
       addSeat(foot.x, foot.y, `${group}/desks-${i}`, desk)
     }
-    cursor[col] = y + (n > 2 ? (count >= 5 && count <= 8 ? 220 : count <= 4 ? 280 : 360) : count <= 1 ? 156 : 220)
+    cursor[col] = y + (n > 2 ? (count >= 5 && count <= 8 ? 220 : count <= 4 ? 280 : 404) : count <= 1 ? 156 : 220)
     if (nextGathering < sizes.length && (i % columns === col && i >= columns - 1)) {
       const serial = nextGathering++, outside = serial === 0 && plan.apron > 0
       gatherings.push({ n: sizes[serial]!, col, y: cursor[col]!, outside, serial })

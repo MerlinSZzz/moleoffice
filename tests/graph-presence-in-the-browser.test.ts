@@ -66,7 +66,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { Page } from 'playwright'
 import { type LiveApp, liveApp, waitForThePage } from './helpers.ts'
 import { sayInEnglish } from '../src/shared/i18n.ts'
-import { DEVELOPER } from './a-pipeline-page-in-the-developer-view.ts'
+import { DEVELOPER, theDeveloperLines } from './a-pipeline-page-in-the-developer-view.ts'
 
 let app: LiveApp
 let page: Page
@@ -216,13 +216,13 @@ describe('what a person sees on the drawing', () => {
     await page.waitForSelector('[data-drawing="lanes"]', { timeout: 30_000 })
     const sentence = sayInEnglish('drawingWithNoMarks.workDomain', { n: 1, titles: '“Collect boards”' })
     await expect
-      .poll(async () => (await page.locator(`${DEVELOPER} li`).allInnerTexts()).filter((line) => line.includes(sentence)), {
+      .poll(async () => (await theDeveloperLines(page)).filter((line) => line.words.includes(sentence)), {
         timeout: 30_000,
         message: 'the developer view says nothing about who is working on its steps, so a failed read reads as nobody here',
       })
       .toHaveLength(1)
-    const [line] = (await page.locator(`${DEVELOPER} li`).allInnerTexts()).filter((one) => one.includes(sentence))
-    expect(line, 'the line names the sentence by its key first').toMatch(/^\s*drawingWithNoMarks\.workDomain\s/)
+    const [line] = (await theDeveloperLines(page)).filter((one) => one.words.includes(sentence))
+    expect(line?.key, 'the line names the sentence by its key').toBe('drawingWithNoMarks.workDomain')
 
     // The normal view, once the presence read has answered and the page has drawn its answer.
     const read = page.waitForResponse((reply) => reply.url().includes('/api/work-domains/presence?'), { timeout: 30_000 })

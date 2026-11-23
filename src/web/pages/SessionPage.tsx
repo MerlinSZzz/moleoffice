@@ -71,6 +71,7 @@ import { TheRunThatAskedForIt, TheWorkersOfARun } from '../components/TheWorkers
 import { RouteLink, recordPath, sessionPath, whoPath } from '../components/router.tsx'
 import { ItsProcessMark, placementSentence } from '../components/SessionPanel.tsx'
 import { SideBySide } from '../components/SideBySide.tsx'
+import { ConversationExportPress } from '../components/ConversationExportPress.tsx'
 import { Crumbs } from './RecordPage.tsx'
 import { titleOrSentence, useRecordTitles } from '../lib/titles.ts'
 import { useInspect } from '../lib/mode.ts'
@@ -393,6 +394,8 @@ export function TheRunView({
           </Fact>
         </dl>
       </Panel>
+
+      <ConversationExportPress run={record.id} />
 
       {/* ON A WORKER'S RUN, THE SUPERVISOR'S RUN THAT ASKED FOR IT, leading to that run. Wave 13j round loop-5. The panel
           draws nothing on a run no run asked for. */}

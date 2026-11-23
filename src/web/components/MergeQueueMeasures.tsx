@@ -10,17 +10,17 @@
 import { listJoined, t } from '@shared/i18n.ts'
 import { MEASURED_FIGURES, MEASURES_DAYS, type MeasuredDay, type MeasuredFigure, type MeasuredWait, type QueueMeasures } from '@shared/merge-queue-measures.ts'
 import { BOUNCE_REASONS, type BounceReason } from '@shared/merge-queue.ts'
-import { Fragment, type ReactNode } from 'react'
+import { type ReactNode } from 'react'
 import { api } from '../api.ts'
 import { InReach } from './InReach.tsx'
 import { recordPath } from './router.tsx'
-import { ErrorNote, Loading, Panel } from './ui.tsx'
+import { ErrorNote, Loading, Panel, ServerNote } from './ui.tsx'
 import { useProjectAsync } from '../lib/project-async.ts'
 
 export const MEASURES_CSS = `
 .mq-measures { min-width: 0; }
 .mq-measures-body { display: grid; gap: var(--pad); min-width: 0; }
-.mq-measures-what, .mq-measures-stable, .mq-measures-left { margin: 0; max-width: 70ch; color: var(--text-2); font: var(--fs-1)/var(--lh-read) var(--font-ui); overflow-wrap: anywhere; }
+.mq-measures-stable, .mq-measures-left { margin: 0; max-width: 70ch; color: var(--text-2); font: var(--fs-1)/var(--lh-read) var(--font-ui); overflow-wrap: anywhere; }
 .mq-measures-scroll { overflow-x: auto; min-width: 0; }
 .mq-measures-table { border-collapse: collapse; font: var(--fs-1)/var(--lh-read) var(--font-ui); color: var(--text); }
 .mq-measures-table th, .mq-measures-table td { padding: 4px 8px; border-bottom: var(--border-w) solid var(--border); text-align: left; vertical-align: top; }
@@ -30,15 +30,6 @@ export const MEASURES_CSS = `
 .mq-measures-table td[data-figure='landed'], .mq-measures-table td[data-figure='handBacks'], .mq-measures-table td[data-figure='takeBacks'] { min-width: 3em; }
 .mq-measures-line { display: block; }
 .mq-measures-line + .mq-measures-line { margin-top: 2px; color: var(--text-2); }
-.mq-measures-from { display: grid; grid-template-columns: minmax(8em, max-content) minmax(0, 1fr); gap: 4px 12px; margin: 0; max-width: 90ch; font: var(--fs-1)/var(--lh-read) var(--font-ui); }
-.mq-measures-from dt { color: var(--text); font-weight: 600; }
-.mq-measures-from dd { margin: 0; color: var(--text-2); overflow-wrap: anywhere; }
-.mq-measures-heading { margin: 0; color: var(--text); font: 600 var(--fs-1)/var(--lh-read) var(--font-ui); }
-.mq-measures-not { margin: 0; padding-left: 1.2em; max-width: 70ch; color: var(--text-2); font: var(--fs-1)/var(--lh-read) var(--font-ui); }
-@media (max-width: 480px) {
-  .mq-measures-from { grid-template-columns: minmax(0, 1fr); }
-  .mq-measures-from dd { margin-bottom: 4px; }
-}
 `
 
 /** The figures the table draws, a row each. The stable office as read now is said below the table. */
@@ -128,7 +119,7 @@ function theCell(day: MeasuredDay, figure: (typeof ROWS)[number]): ReactNode {
       )
     case 'stableAtDayEnd': {
       const stable = day.stableAtDayEnd
-      if (stable.state === 'unknown') return stable.why
+      if (stable.state === 'unknown') return <>{t('mergeQueueMeasures.notKnown')}<ServerNote text={stable.why} /></>
       return lines(
         t('mergeQueueMeasures.stableDayBehind', { n: stable.behind, behind: String(stable.behind) }),
         t('mergeQueueMeasures.stableDayCommits', { serving: short(stable.serving), main: short(stable.main) }),
@@ -153,7 +144,6 @@ export function TheMeasuresTable({ measures }: { measures: QueueMeasures }) {
   const { stable } = measures
   return (
     <div className="mq-measures-body">
-      <p className="mq-measures-what">{t('mergeQueueMeasures.what')}</p>
       <InReach box="mq-measures-scroll" name={t('mergeQueueMeasures.heading', { days: String(measures.days) })} shape={measures.measures.map((one) => one.day).join(',')}>
         <table className="mq-measures-table">
           <thead>
@@ -183,25 +173,11 @@ export function TheMeasuresTable({ measures }: { measures: QueueMeasures }) {
       <p className="mq-measures-stable" data-figure="stable">
         {stable.state === 'read'
           ? t('mergeQueueMeasures.stableBehind', { n: stable.behind, behind: String(stable.behind), serving: short(stable.serving), main: short(stable.main) })
-          : stable.why}
+          : t('mergeQueueMeasures.stableNotKnown')}
       </p>
-      {measures.receiptsNotPlaced.length > 0 ? <p className="mq-measures-left">{t('mergeQueueMeasures.notPlaced', { n: measures.receiptsNotPlaced.length })}</p> : null}
-      {measures.undated > 0 ? <p className="mq-measures-left">{t('mergeQueueMeasures.undated', { n: measures.undated })}</p> : null}
-      <h3 className="mq-measures-heading">{t('mergeQueueMeasures.fromHeading')}</h3>
-      <dl className="mq-measures-from">
-        {MEASURED_FIGURES.map((figure) => (
-          <Fragment key={figure}>
-            <dt>{figureName(measures, figure)}</dt>
-            <dd>{measures.sources[figure]}</dd>
-          </Fragment>
-        ))}
-      </dl>
-      <h3 className="mq-measures-heading">{t('mergeQueueMeasures.notGivenHeading')}</h3>
-      <ul className="mq-measures-not">
-        {measures.notGiven.map((words) => (
-          <li key={words}>{words}</li>
-        ))}
-      </ul>
+      {stable.state === 'read' ? null : <ServerNote text={stable.why} />}
+      {measures.receiptsNotPlaced.length > 0 ? <p className="mq-measures-left">{t('mergeQueueMeasures.notPlacedCount', { n: measures.receiptsNotPlaced.length })}</p> : null}
+      {measures.undated > 0 ? <p className="mq-measures-left">{t('mergeQueueMeasures.undatedCount', { n: measures.undated })}</p> : null}
     </div>
   )
 }

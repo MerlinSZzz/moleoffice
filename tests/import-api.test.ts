@@ -161,7 +161,7 @@ describe('GET /api/import says what would happen and writes nothing', () => {
     // importer's one write loop reads (src/server/lib/import.ts:1383, applied at :3771). Working it
     // out here from the same declarations means a part table declared for an archive cannot be left
     // out of the reply, and a table no archive carries cannot be added to it.
-    const { ARCHIVED_TABLES, everyPartTable } = (await import('../src/server/db/schema.ts')) as typeof import('../src/server/db/schema.ts')
+    const { ARCHIVED_TABLES } = (await import('../src/server/db/schema.ts')) as typeof import('../src/server/db/schema.ts')
     const declared = [
       ...ARCHIVED_TABLES,
       ...everyPartTable()

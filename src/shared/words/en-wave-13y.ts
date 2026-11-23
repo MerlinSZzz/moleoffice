@@ -2,22 +2,183 @@
 // Licensed under the MIT License. See LICENSE.
 // The English list's place for wave 13y's new words, in English only. Their Chinese is written in
 // the translation round before a version, and until then a Chinese page shows the English. joined.ts reads this file.
+import type { TerminalPreparedRefusalCode } from '../refusal-codes.ts'
 import { SURFACES } from '../surfaces.ts'
 import { englishWord } from '../words.ts'
 
 export const enWave13y = {
+  'reports.scope.heading': 'Reports for {title}',
+  'reports.scope.counts': 'Reports linked about this record, its parts at every depth or their runs. A pipeline\'s parts are its steps and their modules.',
+  'reports.scope.clear': 'Show all reports and notes',
+  'reports.scope.view': 'View all matching reports',
+  'reports.scope.total': 'Matching reports: {n}',
+
+  'home.pausesListed': 'On the attention list ({n} of {total}):',
+  'home.pausesHolding': '{n} of {total} holding',
+  'home.noStateSplit': '{written} not written · {noField} no state field · {unknown} kind not known',
+  'home.pauseUntil': 'until {date}',
+  'home.waitsOn': 'waits on',
+  'home.pauseStanding.dateAhead': 'date ahead',
+  'home.pauseStanding.dateUnreadable': 'date not readable',
+  'home.pauseStanding.notChecked': 'not checked',
+  'home.blocksCount': { one: '{n} block', other: '{n} blocks' },
+  'home.since.newest': { one: '{n} newest write · no reading mark', other: '{n} newest writes · no reading mark' },
+  'home.since.none': 'None since your reading mark',
+  'home.since.changes': { one: '{n} change since your reading mark', other: '{n} changes since your reading mark' },
+  'home.pairingRequests': { one: 'Pairing request', other: 'Pairing requests' },
+  'home.queue.here': '{n} of {total} here',
+  'home.queue.forksHere': '{n} of {forks} forks here · {total} waiting',
+  'record.links.notConfirmed': '{n} of {total} not confirmed',
+  'record.history.inNoVersion': 'Current content: in no saved version',
+  'g2b.field.writtenElsewhere': 'written elsewhere',
+  'g2b.field.noBox': 'no box for this field',
+  'g2b.deadline.oneSizeCounted': 'Only one size of period is counted.',
+  'g2b.obligation.saySettled': 'Say what settled it.',
+  'rq.sent.chooserUnrecorded': 'chooser not recorded',
+  'decisions.governing.unplaced': 'No place named: {n} of {of} decisions',
+  'decisions.governing.modulesNotRead': 'Modules that claim it: not read',
+  'firstEntry.notWritten': 'The office could not write down that you opened the report: {why}',
+  'frameFiles.fault.noPress': 'Nothing pressed',
+  'frameFiles.fault.problem': 'problem',
+  'frameFiles.fault.problemWriting': 'being written down',
+  'frameFiles.fault.problemWritten': 'written down',
+  'frameFiles.fault.problemNotWritten': 'not written down',
+  'nav.readingName': 'Reading {name}',
+
   'gates.row.package-alignment-answer': 'Ask for an answer to a package plan before work continues, and remind the maker when a hand-back is not aligned.',
   'roundStart.startAfterPlan': 'Start work after writing the restatement and plan.',
   'roundStart.answerPending': 'The restatement has been written. Continue the work.',
   'roundStart.waitForAnswer': 'The parent answers there, aligned or differs. The hand-back waits for an aligned answer.',
   'roundStart.badAnswerSetting': 'answerRequired is not a boolean',
   'g6a.sessions.readIsAlreadyOut': 'A reading of the new project is already under way. Its answer will replace these rows.',
+
+  // The terminal's keeping words, as short states.
+  'terminals.keep.notShownWord': 'Not shown on the screen',
+  'terminals.keep.tooLongWord': 'Longer than 2,000 characters',
+
+  // The inject switch's default label and its one hint, and the label any switch draws before a choice.
+  'switch.byDefault': 'default',
+  'settingsPanel.inject.goesFirst': 'An injected message goes before every other waiting message, and an agent may not inject another until the person has read it.',
+
+  // The terminal pages' short states.
+  'terminals.noneOpen': 'No terminal is open',
+  'terminals.agent.noKeyWord': 'Opened without a run key',
+  'terminals.profile.notListed': 'An agent started in a terminal you opened yourself is not listed here.',
+  'agentLive.pane.noRun': 'No run',
+  'agentLive.pane.inASandbox': 'In a sandbox',
+  'agentLive.pane.notRunning': 'Not running',
+  'agentLive.pane.notInATerminal': 'Not in a terminal',
+  'agentLive.pane.notInTmux': 'Not in tmux',
+  'agentLive.pane.noTmux': 'tmux is not installed',
+
+  // An agent's live parts, as short states.
+  'agentLive.quickInputs.nextLabel': 'Next input',
+  'agentLive.quickInputs.nextNowWord': 'now',
+  'agentLive.quickInputs.noneRecorded': 'None recorded',
+  'agentLive.steps.endedWord': 'This run has ended',
+  'agentLive.back.noRunWord': 'No run recorded',
+  'agentLive.back.noneWord': 'No command brings it back',
+  'agentLive.back.inItsSandbox': 'Run this inside its sandbox.',
+  'agentMove.noOtherWord': 'No other project',
+  'agentMove.stayWord.still-going': 'still going',
+  'agentMove.stayWord.paused': 'paused',
+  'agentMove.stayWord.orphaned': 'without its process',
+  'agentMove.stayWord.state-not-known': 'state not recorded',
+  'agentMove.stayWord.duties': 'duties you granted here',
+  'resident.flow.noRunWord': 'No run in this project',
+  'resident.flow.noneWord': 'No office flow on record',
+  'resident.sleep.time.notASecretaryWord': 'Not a secretary',
+  'resident.sleep.time.noneSet': 'None set',
+  'resident.naming.notChosen': 'Not chosen yet. Asked for at {when}.',
+  'newAgentKeys.madeAs': 'New agent made: {handle}',
+
+  // An agent's card, as short states and one-sentence titles.
+  'roleCard.goneTitle': 'This is the copy taken while the card was still declared.',
+  'roleCard.notActingTitle': 'Nobody holding this card is acting for the person.',
+  'agentPage.model.noRunWord': 'No run in this project',
+  'g6b.profile.cardNotDeclaredTitle': 'The declaration this office runs on holds no card by this name.',
+  'g6b.profile.periodEndedWord': 'This period has ended',
+
+  // An agent's runs, newest ten, and the compactions summed as a short state.
+  'agentRuns.all': 'All {n} runs',
+  'agentRuns.compactions.counted': 'Recorded: {n}. Claude Code runs counted: {runs}.',
+  'agentRuns.compactions.noClaudeCodeRun': 'Not counted: no Claude Code run.',
+  'agentRuns.compactions.otherRuntime': 'Runs on another runtime, not counted: {n}.',
+  'agentRuns.compactions.noRuntime': 'Runs that did not say their runtime, not counted: {n}.',
+
+  // A run's stop and wait, as state lines.
+  'w13s.stop.sessionLimitWord': 'Session limit reached',
+  'w13s.stop.quotaWord': 'Usage limit reached',
+  'w13s.stop.loginWord': 'Not logged in',
+  'w13s.stop.otherWord': 'Stopped: {kind}',
+  'w13s.wait.waitingWord': 'Waiting for the limit to reset',
+  'w13s.wait.notGoingWord': 'Marked as waiting, not as running',
+
+  // A run's workers, as short states.
+  'w13j.askedFor.notInRegistry': 'An agent not in the registry',
+  'w13j.workers.wantedWord': 'Asked for, not started',
+  'w13j.workers.failedNoReasonWord': 'Not started, no reason kept',
+  'w13j.workers.noRunNamedWord': 'Started, no run named',
+  'w13j.workers.runNotHereWord': 'Started; run {id} is not live here',
+
+  // The check on a run, as short states.
+  'chk.notAskedYetWord': 'Not asked yet',
+  'chk.reviewLevelWord': 'Review level: {level}',
+  'chk.noWorkingDirectoryWord': 'No working directory recorded',
+  'chk.notAssembledWord': 'Not assembled yet',
+  'chk.noVerdictYetWord': 'No answer yet',
+  'chk.noGroupWord': 'No group opened',
+  'chk.finishedAgainAt': 'Finished again at {at}.',
+  'chk.reportedToNobody': 'Reported to nobody.',
+  'chk.noWorktreeNamedWord': 'No worktree named',
+  'chk.notItsOwnTreeWarning': 'This check did not read a worktree of its own.',
+  'chk.sayWhatFirst': 'Say what you are confirming first.',
+
+  // An agent's page: the release switch and the short states left on it.
+  'releaseReading.wake': 'Wake it on release',
+  'releaseReading.switchOn': 'On',
+  'releaseReading.switchOff': 'Off',
+  'g6b.profile.registeredBeforeTheRules': 'Registered before the new rules',
+  'g6b.profile.notYoursToRetire': 'Not yours to retire',
+  'g6b.profile.retireWriteWhyFirst': 'Write why first.',
+  'handoverPlace.notShown': 'Not shown to this reader',
+
+  // The agents page's state words.
+  'g6a.agents.noThreads': 'No conversations yet.',
+  'g6a.agents.noAgentNamed': 'Nobody recorded which agent answered, so no reply can be sent to it.',
+  'g6a.agents.reading.changed': 'Moved',
+  'g6a.agents.reading.gone': 'No longer there',
+  'g6a.agents.reading.unknown': 'Not known if still there',
+  'g6a.agents.noRunBehindIt': 'No run produced this',
+  'g6a.agents.focusCannotOpen': 'Cannot be opened',
+
+  // The sessions page's counts and failure line.
+  'g6a.sessions.placementReadCapped': 'Placement read only the newest {n} change rows.',
+  'g6a.sessions.notClaimedCount': { one: 'One of these is not claimed by any session on this page.', other: '{n} of these are not claimed by any session on this page.' },
+  'g6a.sessions.noReleaseButtonCount': '{n} without a release button',
+  'g6a.sessions.readFailed': 'The check at {failedAt} failed: {message}',
+  'g6a.sessions.notFiledCount': '{n} not filed',
+
+  // The interrupted runs page's short states.
+  'w13t.interrupted.cannotState.no-conversation': 'No conversation recorded',
+  'w13t.interrupted.cannotState.another-folder': 'Worked in another folder',
+  'w13t.interrupted.cannotState.message-gone': 'Message no longer on file',
+  'w13t.interrupted.cannotState.agent-gone': 'Agent no longer on file',
+  'w13t.interrupted.measuredState.resumes': 'Resume measured: it carries on',
+  'w13t.interrupted.measuredState.takes-the-id': 'Resume measured in part',
+  'w13t.interrupted.measuredState.not-measured': 'Resume not measured',
+  'w13t.interrupted.resumeAsked': 'Resume asked',
+  'w13t.interrupted.noLongerOnFile': 'No longer on file',
+
+  // The roles pages' short states and one-sentence titles.
+  'census.legendNoCard': 'the row names no card',
+  'census.nobodyTitle': 'The card is declared and nobody holds it.',
+  'addedRoles.notEnforced': 'Nothing enforces this card.',
+
   'delegation.inspection.setting': 'Inspect handed-back packages',
-  'delegation.inspection.settingSays': 'The inspector gives an opinion on each point of a handed-back package.',
   'delegation.inspection.on': 'On',
   'delegation.inspection.off': 'Off',
   'delegation.inspection.points': 'Handed-back points',
-  'delegation.inspection.notLookedAt': 'The inspector has not checked this point.',
   'delegation.inspection.rulesKept': 'Rules kept',
   'delegation.inspection.rulesNotKept': 'Rules not kept',
   'delegation.inspection.outcome.done': 'Done',
@@ -70,12 +231,19 @@ export const enWave13y = {
   'newAgentKeys.nothingToCarry': 'There is nothing to carry for this agent.',
   // The refusal of the door that keeps a person's pages in front of the sidebar: src/server/api/sidebar-pins.ts.
   'server.sidebarPinsRefused': '{reason} Nothing was changed.',
+  // The refusal of the door that keeps whether a person sees how many reports are unread: src/server/api/report-count.ts.
+  'server.reportCountRefused': '{reason} Nothing was changed.',
+  // The Settings panel that keeps whether a person sees how many reports are unread.
+  'settingsPanel.title.reportcount': 'Unread reports',
+  'settingsPanel.reportcount.show': 'Show how many reports are unread',
+  'settingsPanel.reportcount.on': 'On',
+  'settingsPanel.reportcount.off': 'Off',
+  'settingsPanel.reportcount.what': 'The number of reports you have not read is drawn on the sidebar’s Reports row, on the Reports page and on All pages.',
   // Home's words: its layout, the bars of Agents at work and the week of Schedule (wave 13y).
   'server.homeLayoutRefused': '{reason} Nothing was changed.',
   'home.layout.reading': 'your layout of Home',
-  'home.layout.unreadable': 'Your kept layout of Home could not be read. Home shows its parts in one column until you move one.',
-  'home.layout.notRead': 'Your kept layout of Home could not be read. Home shows its parts in one column.',
-  'home.layout.notKept': 'This move was not kept. Home shows the layout kept before it.',
+  'home.layout.keptNotRead': 'Kept layout: not read',
+  'home.layout.moveNotKept': 'Move not kept',
   'home.layout.move': 'Move',
   'home.layout.moveThePart': 'Move {part}',
   'home.layout.drag': 'Drag to move {part}',
@@ -141,7 +309,6 @@ export const enWave13y = {
   'chat.split.swap': 'Swap sides',
   'chat.split.window': 'Open the chat in its own window',
   'chat.split.away': 'Put the chat away',
-  'chat.split.seam': "Drag to change the chat's width. Double-click to give the page its reading width.",
   'chat.split.beside': 'Put the chat beside the page',
   'chat.split.back': 'Back to the page',
   'chat.split.open': 'Open the chat',
@@ -158,7 +325,7 @@ export const enWave13y = {
   'chat.circle.opensWindow': 'In a window',
   'chat.circle.opensWindowSays': 'Over the corner of the page',
   'chat.circle.backStays': 'If saved, the button shows only while something is unread.',
-  'chat.circle.backOpens': 'If saved, the chat opens beside the page.',
+  'chat.circle.backOpens': 'If saved, the chat opens in a window over the corner of the page.',
   // Design D's quote: the shape that takes the words selected on the page into the next message,
   // the chip above the writing box, and the press that takes the quote back out (wave 13y).
   'chat.quote.press': 'Quote the selected words',
@@ -222,7 +389,6 @@ export const enWave13y = {
     'This writer is not registered, and its messages carry no name for it. There is nothing to write back to. If it registers, everything here moves under its contact.',
   // Under an agent's name in the chat and on its profile, when the secretaries' duties could not be read; {why} is the
   // failure: TheDutyLine in src/web/components/ChatDuty.tsx.
-  'chat.duty.unread': 'Its duty line could not be read: {why}',
   // In the open conversation, in place of "Reading this conversation…", when its read failed; {why} is the failure: the
   // conversation's half in src/web/components/Chat.tsx (wave 13y round 91).
   'chat.conversationUnread': 'This conversation could not be read: {why}',
@@ -238,7 +404,6 @@ export const enWave13y = {
   'chat.setYourStatus': 'Set your status',
   // The hover text of the chat panel's top row, which moves the panel when it is dragged: the top row in
   // src/web/components/Chat.tsx (wave 13y round 113; no hold since round 166).
-  'chat.move.hold': 'Drag here to move the chat',
   // The same row's words once the panel was unlocked by a hold. Since round 166 nothing is unlocked and nothing
   // draws these words; the key stays because its translations are kept with it.
   'chat.move.drag': 'Drag to move',
@@ -253,21 +418,12 @@ export const enWave13y = {
   'settingsPanel.plugins.officeMap.settings': 'Office map settings',
   'settingsPanel.plugins.officeMap.loading': "the office map's settings",
   'settingsPanel.plugins.officeMap.motion': 'Motion on the office map',
-  'settingsPanel.plugins.officeMap.moves': 'The office map may move. A browser that asks for less motion still tells it to keep still.',
-  'settingsPanel.plugins.officeMap.still': 'The office map is told to keep still, in every browser.',
-  'settingsPanel.plugins.officeMap.notYours': 'Only the person, or a secretary the person has authorized, can change whether the office map moves.',
-  // Above the office map's frame when whether it may move could not be read; {why} is the failure: PluginFrame in
-  // src/web/pages/PluginPage.tsx (wave 13y round 119).
-  'pluginPage.officeMap.unread': 'Whether the office map may move could not be read, so it is told to keep still: {why}',
   // The name of each thing Agents at work can find missing, by the code working.ts sends: the list under "Why this is
   // empty" in src/web/pages/WorkingPage.tsx (wave 13y round 121).
   'g6a.working.absence.registeredAgent': 'Registered agents',
   'g6a.working.absence.assignableAgent': 'Agents free for new work',
   'g6a.working.absence.statedWork': 'Stated work',
   'g6a.working.absence.openDomain': 'Open work domains',
-  // What a backup is, in one line, at the top of the What is kept panel in src/web/components/WhatIsKept.tsx. The full
-  // sentences, settingsPanel.kept.whatABackupIs, are drawn under it in developer mode only (wave 13y round 121).
-  'settingsPanel.kept.backupInShort': 'A backup: a full copy of the office database and its files, to restore from.',
   // Round 124, item 61: the recipient slot under a comment, when the reply could not say who it is.
   'review.pane.row.recipientNotKnown': 'Recipient not known',
   // WAVE 13Y ROUND 125, ITEM 62: Settings in layout A, and the three panels that became pages of their own.
@@ -305,14 +461,12 @@ export const enWave13y = {
   // 121, item 56), so the row's name, the picker's first choice and the sentences above say what is chosen and what happens.
   get 'settingsPanel.title.usagenotices'(): string { return SURFACES['settings.usagenotices'] },
   'usageNotices.panel.loading': 'the usage-notice settings',
-  'usageNotices.panel.what': "When the sandboxes' Claude login has used 50% or 80% of its seven days, the office writes a notice to one secretary. The notice at 80% also says what a usage decision says to do.",
   'usageNotices.panel.who': 'The secretary for the notices',
   'usageNotices.panel.pick': 'Secretary',
   'usageNotices.panel.pickNobody': 'The first secretary appointed',
   'usageNotices.panel.save': 'Save',
   'usageNotices.panel.whatToDo': 'What the notice at 80% says to do',
   'usageNotices.panel.words': 'Words from the usage decision',
-  'usageNotices.panel.wordsHint': 'The notice shows these words on a line of their own, exactly as written here.',
   'usageNotices.panel.decision': 'The usage decision the words come from',
   'usageNotices.panel.clear': 'Set nothing',
   'usageNotices.panel.openDecision': 'Open the usage decision',
@@ -320,10 +474,8 @@ export const enWave13y = {
   // Round 140, item 79d: the decision is chosen from the newest ten, with ten more on each press, or found by its title
   // with the record picker. Their Chinese waits for the language line.
   'usageNotices.panel.chosen': 'Chosen: {title}',
-  'usageNotices.panel.noneChosen': 'No decision is chosen yet.',
   'usageNotices.panel.newest': 'The newest decisions, in every project',
   'usageNotices.panel.loadingDecisions': 'the newest decisions',
-  'usageNotices.panel.noDecisions': 'No decision is listed. The office has none, or a later decision replaced each one.',
   'usageNotices.panel.choose': 'Choose',
   'usageNotices.panel.chosenPress': 'Chosen',
   'usageNotices.panel.more': 'Show {n} more',
@@ -331,10 +483,10 @@ export const enWave13y = {
   // Round 138, item 74: the report a new office files when its person gives their name, and its checklist item
   // (src/server/lib/getting-started.ts). The report is filed in a language only when that language holds every one of
   // these words (src/shared/getting-started.ts), so a new one here goes on that list too.
-  'gettingStarted.report.title': 'Getting started: where the Embassy is, and how you let an agent in',
+  'gettingStarted.report.title': 'Getting started: the Embassy, letting an agent in, and trying right-click',
   'gettingStarted.report.welcome.heading': 'Welcome, {name}',
   'gettingStarted.report.welcome.text':
-    'Mole Office filed this report when you gave your name. It shows two things to know first: where the Embassy is, and how you let an agent in.',
+    'Mole Office filed this report when you gave your name. It shows three things to know first: where the Embassy is, how you let an agent in, and what a right-click opens.',
   'gettingStarted.report.embassy.heading': 'Where the Embassy is',
   'gettingStarted.report.embassy.text':
     'The Embassy is a page in the list on the left, under the name "{embassy}". On a narrow screen, the list opens from the "{menu}" button at the top. An agent that asks to work in your office waits there for your answer.',
@@ -348,24 +500,38 @@ export const enWave13y = {
     'The office put this report on your checklist, at the top right of every page. It stays there until you ask an agent to take it off.',
   'gettingStarted.report.madeUp': 'A picture of a made-up office. Every name in it is made up.',
   'gettingStarted.checklist.title': 'Getting started',
-  'gettingStarted.item.words': 'Read this report: {report}. It shows where the Embassy is and how you let an agent in.',
+  'gettingStarted.item.words': 'Read this report: {report}. It shows where the Embassy is, how you let an agent in, and what a right-click opens.',
+  // Round 175: the report's part that asks the person to try right-click (src/server/lib/getting-started.ts): its
+  // heading and words, the alt of its one picture of the whole box, and one line for each of the box's eight items
+  // (THE_RIGHT_CLICK_ITEMS in src/shared/getting-started.ts). A line names a press by the word the box draws. These are on
+  // the report's list of words too.
+  'gettingStarted.report.rightClick.heading': 'Try right-click?',
+  'gettingStarted.report.rightClick.text':
+    'Select a few words in this report and right-click them. A box opens about those words. This is what each part of it does.',
+  'gettingStarted.report.rightClick.alt': 'The box a right-click opens about a few selected words, with a made-up line written in it.',
+  'gettingStarted.report.rightClick.copy': '"{copy}" copies the words you selected.',
+  'gettingStarted.report.rightClick.pin': 'The pin keeps the box open while you click elsewhere on the page.',
+  'gettingStarted.report.rightClick.close': 'The ✕ closes the box.',
+  'gettingStarted.report.rightClick.write': 'In the box under the words, write what you want to say about them.',
+  'gettingStarted.report.rightClick.sendTo':
+    'Choose "{contact}" to send what you wrote to a person or an agent, or "{note}" to add it to one of your notes. The press beside them says who, or which note; press it to choose another.',
+  'gettingStarted.report.rightClick.send':
+    '"{send}" sends what you wrote to the contact you chose, about the words you selected. With a note chosen, it adds them to that note instead.',
+  'gettingStarted.report.rightClick.startReview':
+    '"{startReview}" keeps what you wrote in this page\'s review, without sending it. Nothing is sent until you send the review.',
+  'gettingStarted.report.rightClick.more': '"{more}" opens more things you can do from here, when there are any.',
   // Round 138, item 74: the two steps of a new office's first entry (src/web/lib/first-entry.tsx).
   'firstEntry.label': 'Getting started',
   'firstEntry.chat.title': 'This is the chat',
   'firstEntry.chat.text': 'Your agents write to you here, and you answer them here. No buttons need pressing.',
   'firstEntry.next': 'Next',
   'firstEntry.checklist.title': 'This is your checklist',
-  'firstEntry.checklist.text': 'Open it, then press the name of the report in it. The report shows where the Embassy is and how you let an agent in.',
-  'firstEntry.checklist.switchedOn':
-    'The checklist was switched off on this computer. It is on now, and you can switch it off again on the Checklists page.',
-  'firstEntry.failed': 'The office could not write down that you opened the report, so these steps will show again next time. What it said: {why}',
+  'firstEntry.checklist.text':
+    'Open it, then press the name of the report in it. The report shows where the Embassy is, how you let an agent in, and what a right-click opens.',
   'firstEntry.close': 'Close',
   // Round 142, item 66: Agent use's last lifecycle row and the line that says why a piece of work ended (src/web/pages/UsagePage.tsx).
   'dev.usage.notShownOnThisPageYet': 'not shown on this page yet',
-  'dev.usage.theRequestLogHoldsThisTimeBut': 'The request log holds this time, but this page does not read it yet.',
   'dev.usage.whyItEnded': 'Why it ended: {why}',
-  // Round 142, item 66: an empty group of a usage receipt says why it has no rows (src/web/components/UsageReceipt.tsx).
-  'devWords.receipt.noRunCounted': 'No run was counted, so this group has no rows.',
   // Round 142, item 69: Sessions' tool tag, its release press's error, its unreadable panel, an unclaimed process's numbers and the note
   // about rows with no mark (src/web/components/SessionPanel.tsx, src/web/pages/SessionsPage.tsx).
   'g6a.sessions.noToolRecorded': 'no tool recorded',
@@ -373,7 +539,6 @@ export const enWave13y = {
   'g6a.sessions.fromTheSessionsListAndTheMachineSweep': 'from the sessions list and the machine sweep',
   'g6a.sessions.itsPid': ' · pid {pid}',
   'g6a.sessions.itsProcessGroup': ', process group {pgid}',
-  'g6a.sessions.filedKind': 'filed {kind}',
   // Round 157, item 99: the ended band's sentences and the folded-ended line, said plainly at one and at all
   // (src/web/components/SessionPanel.tsx, src/web/pages/SessionsPage.tsx).
   'g6a.sessions.itWasWrittenDownAsFinished': 'It was written down as finished.',
@@ -386,13 +551,8 @@ export const enWave13y = {
   'record.anotherWriter.couldNotHear': 'Whether somebody else changed this record could not be read',
   'record.anotherWriter.see': 'See their version',
   'record.anotherWriter.hide': 'Hide their version',
-  'record.anotherWriter.noComparison':
-    "The record's history holds no version with what this form was opened from, so the two cannot be compared.",
   'record.anotherWriter.question': 'This record changed after you opened it',
   'record.anotherWriter.who': '{who} changed it {when}. Your change is not saved yet.',
-  'record.anotherWriter.saveMineMeans':
-    "Save mine puts your change on their version. Where you both changed the same thing, yours replaces theirs, and theirs stays in the record's history.",
-  'record.anotherWriter.keepTheirsMeans': 'Keep theirs drops your change and shows their version.',
   'record.anotherWriter.notNow': 'Back to the form',
   'record.anotherWriter.keepTheirs': 'Keep theirs',
   'record.anotherWriter.saveMine': 'Save mine',
@@ -422,7 +582,6 @@ export const enWave13y = {
   'review.sentMarks.ask': 'Marks of comments once sent',
   'review.sentMarks.show': 'Keep showing them',
   'review.sentMarks.hide': 'Hide them completely',
-  'review.sentMarks.unsentAlways': 'A comment you have not sent still shows its mark, whatever this choice says.',
   // Round 153, the decision of 8 November 2026: the pin that keeps the comment box open, and the words that
   // keep a half-written comment from looking like a sent one (src/web/components/agent/TalkBox.tsx,
   // src/web/components/agent/SavedComment.tsx).
@@ -537,10 +696,11 @@ export const enWave13y = {
   // The short word the flag left of Send shows for the chosen mark. "No mark" shows no word.
   'chat.intent.short.justAsk': 'Ask',
   'chat.intent.short.proposalFirst': 'Plan',
+  'chat.intent.short.align': 'Align',
+  'chat.intent.short.giveOptions': 'Options',
   // A person's own labels: the Settings panel in src/web/components/ChatLabelsPanel.tsx, and their lines in the flag's list.
   get 'settingsPanel.title.chatlabels'(): string { return SURFACES['settings.chatlabels'] },
-  'settingsPanel.chatLabels.what': 'Words of your own to put on a message. The flag left of Send lists them after its three marks. The agent reads the word with your message.',
-  'settingsPanel.chatLabels.none': 'You have no labels yet.',
+  'settingsPanel.chatLabels.what': 'Words of your own to put on a message. The flag left of Send lists them after its five marks. The agent reads the word with your message.',
   'settingsPanel.chatLabels.loading': 'your labels',
   'settingsPanel.chatLabels.list': 'Your labels',
   'settingsPanel.chatLabels.new': 'A new label',
@@ -555,12 +715,15 @@ export const enWave13y = {
   'settingsPanel.chatLabels.colour.green': 'Green',
   'settingsPanel.chatLabels.colour.blue': 'Blue',
   'settingsPanel.chatLabels.colour.purple': 'Purple',
+  'settingsPanel.chatLabels.colour.pink': 'Pink',
+  'settingsPanel.chatLabels.colour.light-blue': 'Light blue',
+  'settingsPanel.chatLabels.colour.orange': 'Orange',
+  'settingsPanel.chatLabels.colour.forest-green': 'Forest green',
   'settingsPanel.chatLabels.added': 'Added “{word}”.',
   'settingsPanel.chatLabels.saved': 'Saved “{word}”.',
   'settingsPanel.chatLabels.removed': 'Removed “{word}”.',
   'settingsPanel.chatLabels.noWord': 'Type a word first.',
   'settingsPanel.chatLabels.noColour': 'Choose a colour first.',
-  'settingsPanel.chatLabels.unreadable': 'The labels the office keeps cannot be read by this version. Adding a label replaces the list it keeps.',
   'settingsPanel.chatLabels.unreadableNotText': 'The labels kept for this person are not stored as text, so they cannot be read.',
   'settingsPanel.chatLabels.unreadableNotJson': 'The labels kept for this person are not written as JSON, so they cannot be read.',
   'chat.label.selectorNow': 'Your label: {word}',
@@ -597,7 +760,6 @@ export const enWave13y = {
   'quickNote.moveSheet': 'Move sheet',
   'quickNote.myNotes': 'My notes',
   'quickNote.keptIn': 'Kept in {myNotes}',
-  'quickNote.notKeptYet': 'Kept in {myNotes} as soon as you write or draw.',
   'quickNote.writtenFrom': 'Written from the office page: {page}',
   'quickNote.saving': 'Saving…',
   'quickNote.saved': 'Saved {time}',
@@ -625,7 +787,6 @@ export const enWave13y = {
   // My notes, the page of every quick note: src/web/pages/MyNotesPage.tsx.
   get 'myNotes.title'(): string { return SURFACES['rail.mynotes'] },
   'myNotes.loading': 'your notes',
-  'myNotes.none': 'There is no note yet. Every note you write is listed here, whichever project it is in.',
   'myNotes.noneHoldIt': 'No note holds these words.',
   'myNotes.noneOfThisChoice': 'No note that holds these words is of this choice.',
   'myNotes.search': 'Search my notes',
@@ -657,7 +818,6 @@ export const enWave13y = {
   // The sidebar's press that opens a new quick note (src/web/lib/open-a-quick-note.ts), and the note beside the page
   // when the browser blocks its window (src/web/components/QuickNoteBeside.tsx).
   get 'nav.newNote'(): string { return SURFACES['rail.quicknote'] },
-  'quickNotes.windowWasBlocked': 'The browser blocked the window, so your note stayed here.',
   'quickNotes.popOut': 'Open in a window',
   'quickNote.returnFailed': 'The office window did not answer, so the note stayed open. Try Back again.',
   // Send with Note chosen in the right-click box (src/web/components/agent/TalkBox.tsx, src/web/lib/add-to-a-note.ts).
@@ -689,6 +849,8 @@ export const enWave13y = {
   'record.field.quotePositions': 'Quote positions',
   'agent.quote.from': 'QUOTE FROM {source}:',
   'agent.quote.fromField': 'QUOTE FROM {source}, field {field}:',
+  'agent.quote.fromFilePage': 'QUOTE FROM the file {file}, page {page}, in {source}:',
+  'agent.quote.fromFile': 'QUOTE FROM the file {file}, in {source}:',
   'agent.quote.empty': 'QUOTE FROM {source}, no words chosen.',
   'agent.quote.end': 'END QUOTE',
   'server.messageQuotePositionsInvalid': 'The quote positions are not valid. Nothing was saved.',
@@ -717,16 +879,13 @@ export const enWave13y = {
   'review.delivery.move': 'Move agent into this project',
   'review.delivery.finding': 'Finding the agent’s project…',
   'review.delivery.notFound': 'The agent’s project could not be identified.',
-  'review.delivery.ambiguousProject': 'The agent does not have exactly one other project to move from. Choose another recipient or inspect the agent’s projects.',
   'review.delivery.recoveryStarter': 'Only the person or agent who started this review may recover its unsent comments. Nothing was changed.',
   'review.delivery.recoveryQueue': 'This review conversation has other messages waiting. Resolve those messages before recovering this review. Nothing was changed.',
   'review.delivery.recoveryChanged': 'The review or its recipients changed while it was being recovered. Nothing was changed by this press; read it again.',
   'review.delivery.recoveryHanded': 'A comment has already been handed over. Read the review again before recovering it. Nothing was changed.',
   'review.delivery.recoveryWords': 'The waiting message and its original comments no longer have the same words. They are still saved; review the message before sending it elsewhere.',
   'review.delivery.recoveryShared': 'This waiting message holds other comments too. Send the shared comments together; nothing was changed.',
-  'review.delivery.sessionMove': 'Moving the agent alone may leave this run in its original project. After moving, choose the agent as the recipient; moving it does not make this run deliverable.',
   'review.delivery.recoveryAll': 'This older review can be recovered only when every remaining comment can go together. Resolve the remaining comments first. Nothing was changed.',
-  'review.delivery.sharedMessage': 'If this comment shares a waiting message with others, the new recipient applies to all of them.',
   'review.delivery.unresolved': 'This comment cannot go because its recipient could not be identified: {why}',
   'review.delivery.unresolvedSaid': 'This comment cannot go because {said} did not identify one recipient.',
   'review.delivery.unresolvedSaidWhy': 'This comment cannot go because {said} did not identify one recipient: {why}',
@@ -735,13 +894,15 @@ export const enWave13y = {
   'review.delivery.cannotChange': 'This comment cannot be addressed here.',
   'review.delivery.failed': 'The recipient could not be changed.',
   'sendPlan.line.runInAnotherProject': 'It is addressed to "{title}", which is a run in "{where}".',
-  // The one press that draws an attached HTML file inside the report, and the frame's own name
-  // (src/web/components/SummaryBlocks.tsx).
+  // The one press that draws an attached file inside the report, and the name of the frame an HTML
+  // file is drawn in (src/web/components/SummaryBlocks.tsx).
   'sb.file.show': 'Show it here',
   'sb.file.frame': 'The file {name}, drawn inside this report',
-  // A file too large to show whole, and the pages generated for a Word document or a text file
-  // (src/server/api/files.ts and src/server/lib/word-document.ts).
+  // A file too large to show whole, a file of a kind the page does not draw as words, and the
+  // refusals and notes for a Word document or a text file the page draws as its words
+  // (src/server/api/files.ts, src/server/lib/word-document.ts and src/web/components/SummaryBlocks.tsx).
   'sb.file.tooLargeToShow': 'This file is too large to show in the page. It is refused whole rather than cut, and Save reads all of it. The page shows files up to {limit} bytes.',
+  'sb.file.notShownAsWords': 'The page draws only a Word document, a text file or a Markdown file as its words, and this file is none of them. Nothing of it was read.',
   'sb.word.notAWord': 'That file is not a Word document this office can read. Nothing of it was shown.',
   'sb.word.multiDisk': 'That Word document is in several pieces the office does not join. Nothing of it was shown.',
   'sb.word.zip64': 'That Word document uses a ZIP form this office does not read. Nothing of it was shown.',
@@ -753,16 +914,27 @@ export const enWave13y = {
   'sb.word.picturesLeftOut': 'Pictures in this file are not shown. This page shows the words, lists and tables only.',
   'sb.word.nothingToShow': 'This Word document has no words, lists or tables this office can show.',
   'sb.word.notText': 'That file is not text this office can read. Nothing of it was shown.',
+  // A file door answer that is not a file's words, which the page draws instead of the file
+  // (src/web/components/SummaryBlocks.tsx).
+  'sb.file.answerNotWords': "The file door answered with something other than this file's words, so nothing of it is shown.",
+  // A PDF the office's page could not draw, with the PDF reader's own words for why
+  // (src/web/components/SummaryBlocks.tsx).
+  'sb.pdf.notDrawn': 'The office could not draw this PDF: {why}',
+  // The office's page for one file a record names, and that page's name in the page titles
+  // (src/web/pages/FilePage.tsx and src/web/components/Sidebar.tsx).
+  'filePage.title': 'File',
+  // The kind on the chip above the composer, when the words quoted are from a file the office draws
+  // (src/web/components/agent/TalkBox.tsx).
+  'chatPoint.wordsOfAFile': 'The file {name}',
+  // The same, when the words are from one page of a PDF the office draws.
+  'chatPoint.wordsOfAFilePage': 'The file {name}, page {page}',
   // The sign on a page that still draws the project just left, while the chosen project's answer is
   // read (src/web/components/ReReadStrip.tsx).
   'frameFiles.reread.anotherProject': 'Reading {project}…',
-  'frameFiles.reread.anotherProjectKept': 'The dimmed page still shows the project you left.',
   // The two presses under a comment a review would otherwise wait for, what each press did, and why one is refused
   // (src/server/lib/reviews.ts, takeOutOfTheReview, and src/web/components/agent/ReviewBar.tsx).
   'review.takeOut.answerMyself': 'I answer this myself',
   'review.takeOut.remove': 'Remove from this review',
-  'review.takeOut.yoursWhy': 'The review waits for this comment until you say you answer it yourself.',
-  'review.takeOut.missingWhy': 'The review waits for this comment until you remove it.',
   'review.takeOut.answered': 'You answer this comment yourself. The review no longer waits for it, and the comment stays here.',
   'review.takeOut.removed': 'This comment is out of the review. Nothing was sent for it.',
   'review.takeOut.stillWaits': { one: ' This review still waits for {n} comment.', other: ' This review still waits for {n} comments.' },
@@ -786,4 +958,574 @@ export const enWave13y = {
   // Beside a sent message's count of marked parts, how many of them cannot be painted where the words are drawn
   // (src/web/components/chat/MarkedWords.tsx).
   'chat.markedPartsNotShown': { one: '{n} is not shown in the words', other: '{n} are not shown in the words' },
+  'reports.star.add': 'Star report',
+  'reports.star.remove': 'Remove star from report',
+  'reports.star.failed': 'The report star could not be saved or read.',
+  'reports.export.press': 'Export',
+  'reports.export.html': 'HTML file',
+  'reports.export.pdf': 'PDF file',
+  'reports.export.working': 'Exporting…',
+  'reports.export.fileUnread': 'Not exported: the file {name} could not be read ({reason}). Nothing was saved.',
+  'reports.export.sheetUnread': 'Not exported: a style sheet of the page could not be read ({address}). Nothing was saved.',
+  'reports.export.styleFileUnread': 'Not exported: a file the page\'s style uses could not be read ({address}). Nothing was saved.',
+  'reports.export.pointsHere': 'Not exported: a part of the report points at this office, and the file cannot hold it ({tag}). Nothing was saved.',
+  'reports.export.notFound': 'Not exported: the report was not found on this page. Nothing was saved.',
+  'reports.export.drawing': 'Not exported: the report holds a drawing that cannot be copied into a file yet. Nothing was saved.',
+  'reports.export.drawingUsesThePage': 'Not exported: a drawing in the report uses a part of the page that is not in the report. Nothing was saved.',
+  'reports.export.untitled': 'Report',
+  'server.reportPdfNoDisplay': 'Not exported: this office runs on a computer with no screen, so it cannot print a PDF. Nothing was saved.',
+  'server.reportPdfBusy': 'Not exported: another PDF is being printed. Try again in a minute. Nothing was saved.',
+  'server.reportPdfTimedOut': 'Not exported: the office\'s own program did not finish printing the PDF within {seconds} seconds. It can still be exported as an HTML file. Nothing was saved.',
+  'server.reportPdfCouldNotStart': 'Not exported: the office could not start its own program to print the PDF. It can still be exported as an HTML file. Nothing was saved.',
+  'server.reportPdfWroteNoPdf': 'Not exported: the office\'s own program ended without writing the PDF. It can still be exported as an HTML file. Nothing was saved.',
+  'server.reportPdfExited': 'Not exported: the office\'s own program ended with exit code {code} before it printed the PDF. It can still be exported as an HTML file. Nothing was saved.',
+  'server.reportPdfExitedSaying': 'Not exported: the office\'s own program ended with exit code {code} before it printed the PDF. Its last line was "{line}". It can still be exported as an HTML file. Nothing was saved.',
+  'server.reportPdfSignalled': 'Not exported: the office\'s own program was stopped by the signal {signal} before it printed the PDF. It can still be exported as an HTML file. Nothing was saved.',
+  'server.reportPdfSignalledSaying': 'Not exported: the office\'s own program was stopped by the signal {signal} before it printed the PDF. Its last line was "{line}". It can still be exported as an HTML file. Nothing was saved.',
+  'server.reportPdfTooLarge': 'Not exported: this report is too large to print as a PDF. The office prints at most {megabytes} MB. It can still be exported as an HTML file. Nothing was saved.',
+  'reports.filter.label': 'Quick filters',
+  'reports.filter.unread': 'Unread',
+  'reports.filter.starred': 'Starred',
+  'reports.filter.module': 'Module',
+  'reports.filter.moduleChosen': 'Module: {title}',
+  // The one agent picker (src/web/components/agent/AgentPicker.tsx): its search box, the line under it, the two groups
+  // the chat's contact list has no word for, and the lines and the press inside the open list.
+  'agentPicker.typeHere': 'Type a name or handle',
+  'agentPicker.chosen': 'Chosen: {name}',
+  'agentPicker.nothingChosen': 'Nothing is chosen yet.',
+  'agentPicker.group.working': 'Working now',
+  'agentPicker.group.rest': 'Other agents',
+  'agentPicker.more': { one: '{count} more matches. Type more of a name or handle to find it.', other: '{count} more match. Type more of a name or handle to find them.' },
+  'agentPicker.showRetired': { one: 'Show {count} retired agent', other: 'Show {count} retired agents' },
+  'agentPicker.hideRetired': 'Hide retired agents',
+  'agentPicker.nothingFound': 'No name or handle here holds "{typed}".',
+  'agentPicker.nobodyToChoose': 'Nobody can be chosen here.',
+  'agentPicker.presenceReading': 'Reading which agents are working now. Until it is read, every agent is under Other agents.',
+  'agentPicker.presenceFailed': 'Which agents are working now could not be read, so every agent is under Other agents.',
+  // THE CHECKLISTS PAGE AND WINDOW IN DESIGN E: a card's progress as a number, its row that adds an item, and the press
+  // that makes a new checklist.
+  'checklists.progressNumber': '{done} / {total}',
+  'checklists.addItem': 'Add an item',
+  'checklists.addItemTo': 'Add an item to {title}',
+  'checklists.newChecklist': 'New checklist',
+  'checklists.newChecklistTitle': 'Title of the new checklist',
+  // THE PRESS AT THE START OF THE CHECKLISTS WINDOW'S HEAD that shows the names in the cards' place.
+  'checklists.window.back': 'Back',
+  // AN ITEM WAITING ON THE OWNER, on the checklists page and in the window: the reader is the owner it waits on.
+  'checklists.state.waitsOnYou': 'Waits on you',
+  // The short state words that stand where the chat and its windows explained themselves.
+  'record.anotherWriter.cannotCompare': 'Cannot be compared',
+  'chat.duty.notRead': 'Duty not read',
+  'settingsPanel.window.noKeyHere': 'This browser holds no key.',
+  'settingsPanel.window.agentsWithNoKey': { one: '{n} live agent holds no proved key.', other: '{n} live agents hold no proved key.' },
+  'decisionsAsks.fromUnknown': 'sender unknown',
+  'quickNotes.windowBlocked': 'The browser blocked the window.',
+  'settingsPanel.marks.notUsedYet': 'Not used on any page yet',
+  'saidHere.writerUnknown': 'unknown',
+  'savedComment.personRefused': 'A person cannot be chosen here.',
+  'savedComment.agentHasNoRecord': 'This agent has no record in this project.',
+  'recipients.say.matches': { one: '{n} match', other: '{n} matches' },
+  'recipients.say.noMatch': 'no match',
+  'talk.sayWhoFirst': 'Say who this is for.',
+  'talk.state.notInThisReview': "Not in this page's review",
+  'talk.state.reviewNotToAPerson': 'The review does not go to the person under To.',
+  'talk.state.recipientNoRecordHere': 'The agent under To has no record here.',
+  'review.b.changedNothingSent': 'Nothing was sent. The review had changed.',
+  'review.pane.read.readOnce': 'Read once already',
+  'review.delivery.noSingleProject': 'The agent does not have exactly one other project.',
+  'review.pane.reading.isEmpty': 'The reading is empty.',
+  'review.pane.paste.unreadable': 'Mole Office could not read that.',
+  'review.pane.paste.notAboutThese': 'That is not an answer about these comments.',
+  'chat.group.memberRemoved': 'Member removed',
+  'chat.group.youLeft': 'You left the group',
+  'chat.line.cleared': 'Line cleared',
+  'chat.officeNotices.readOnly': 'Read only',
+  'chat.notAnsweringYet': 'Nothing is answering as {who} yet.',
+  'chat.split.seamName': 'Chat width',
+  // The press at the end of the sidebar's Switch list that opens the form for making a project
+  // (src/web/components/Sidebar.tsx).
+  'sidebarProject.newProject': 'New project',
+  // The label of the name field in the form New project opens in the sidebar's Switch list
+  // (src/web/components/Sidebar.tsx).
+  'sidebarProject.newProjectName': 'Name',
+  // The short state words the Settings panels and the plugin page draw in place of their explanations, as
+  // decided. A settingsState word is shared by more than one panel.
+  'settingsState.unavailable': 'unavailable',
+  'settingsState.fromEnv': 'from .env',
+  'settingsPanel.notify.outcome.told': 'Test: sent',
+  'settingsPanel.notify.outcome.gone': 'Test: device gone',
+  'settingsPanel.notify.outcome.refused': 'Test: refused',
+  'settingsPanel.notify.outcome.unreachable': 'Test: not reached',
+  'settingsState.notRead': 'not read',
+  'conversation.sync.state.on': 'Sync: on',
+  'conversation.sync.state.off': 'Sync: off',
+  'conversation.sync.state.last': 'Last copy: {at} · {synced} copied',
+  'conversation.sync.state.none': 'Copied: none',
+  'dataFolder.state.notABundle': 'runs from source code',
+  'dataFolder.state.otherIdentity': 'Another office answered.',
+  'dataFolder.state.stopped': 'office stopped for the move',
+  'dataFolder.state.chosenBy.default': 'Chosen by: default',
+  'dataFolder.state.chosenBy.envLine': 'Chosen by: settings file',
+  'dataFolder.state.chosenBy.processEnvironment': 'Chosen by: how the office was started',
+  'dataFolder.state.lastMoveNone': 'Last move: none',
+  'dataFolder.state.lastMoveNotRead': 'Last move: not read',
+  'settingsState.chosenHere': 'chosen here',
+  'settingsState.retired': 'retired',
+  'settingsState.notRegistered': 'not registered',
+  'harnesses.state.waitingForSignatures': 'Waiting for signatures',
+  'harnesses.state.checklistNotRead': 'Checklist: not read',
+  'harnesses.state.notWaiting': 'No longer waiting',
+  'harnesses.state.notFound': 'Not found',
+  'harnesses.state.newerNotKnown': 'Newer version: not known',
+  'harnesses.state.archived': 'Archived by its vendor',
+  'harnesses.state.installedSeparately': 'Installed separately',
+  'settingsState.written': 'written',
+  'settingsState.unchanged': 'unchanged',
+  'settingsPanel.mailtool.state.anotherFile': 'Another service file',
+  'settingsPanel.mailtool.state.keyFails': 'Key does not work',
+  'settingsPanel.mailtool.state.notRunning': 'Stopped',
+  'settingsPanel.mailtool.state.starting': 'Starting',
+  'settingsPanel.mailtool.state.isOff': 'Off',
+  'settingsPanel.mailtool.done.nowInstalled': 'Installed',
+  'settingsPanel.mailtool.done.unchanged': 'Unchanged',
+  'settingsPanel.mailtool.done.nowOff': 'Turned off',
+  'settingsPanel.mailtool.key.takenBackState': 'Key taken back',
+  'settingsPanel.mailtool.throughTheOffice.state.noAddress': 'Tool: not reached',
+  'settingsPanel.mailtool.throughTheOffice.state.noAnswer': 'Tool: no answer',
+  'settingsPanel.mailtool.throughTheOffice.state.refused': 'Tool: refused',
+  'settingsPanel.mailtool.throughTheOffice.state.notTheTool': 'Tool: another program answered',
+  'settingsPanel.mailtool.tool.pageOrigin': 'Page: {origin}',
+  'settingsPanel.mailtool.reading.state.noKey': 'No key',
+  'settingsPanel.mailtool.reading.state.keyRefused': 'Key refused',
+  'settingsPanel.mailtool.reading.state.officeSilent': 'Office did not answer',
+  'settingsPanel.mailtool.lastMailedNone': 'Last summons mailed: none',
+  'settingsPanel.mailtool.lastSend.notSentYet': 'Last summons: not sent yet',
+  'settingsPanel.mailtool.addresses.notSaved.notAnAddress': 'Not saved: “{which}” is not a mail address.',
+  'settingsPanel.mailtool.addresses.notSaved.tooMany': 'Not saved: {count} addresses, at most {most}.',
+  'settingsPanel.mailtool.test.notSentEmpty': 'Not sent: the list is empty.',
+  'settingsState.notASecretary': 'not a secretary',
+  'moduleReminders.state.envNotRead': '.env line: not read',
+  'settingsPanel.ownThemes.state.lookNotRead': 'Kept look: not read',
+  'settingsPanel.ownThemes.checkFailsCount': '{failing} of {all} pairs are too faint to read.',
+  'pluginState.refused': 'refused',
+  'pluginPage.state.noFolder': 'No plugins folder',
+  'pluginState.notFound': 'not found',
+  'pluginState.neverSwitchedOn': 'never switched on',
+  'pluginPage.state.noSuchPage': 'no page "{slug}"',
+  'pluginPage.openTheSwitches': 'Open the plugin switches',
+  'pluginPage.state.notLoaded': 'Not loaded',
+  'pluginPage.state.frameClosed': 'Frame closed',
+  'pluginPage.state.motionUnread': 'Office map motion: not read · kept still',
+  'pluginPage.state.notAnswering': 'Not ready after {seconds} seconds',
+  'settingsState.notSet': 'not set',
+  'settingsState.readOnly': 'read only',
+  'quickInputs.state.setByUnknown': 'Set by: not recorded',
+  'g2d.restrictions.reach.direct': 'Reach: direct',
+  'g2d.restrictions.reach.carried': 'Reach: carried ({through})',
+  'g2d.restrictions.reach.away': { one: 'Reach: {steps} link away', other: 'Reach: {steps} links away' },
+  'g2d.restrictions.state.none': 'Restrictions: none',
+  'g2d.restrictions.state.notChecked': 'Not checked: {what}',
+  'g2d.restrictions.state.skippedDeleted': 'Deleted records skipped: {n}',
+  'g2d.restrictions.state.noMark': 'unknown mark',
+  'g2d.restrictions.state.field': 'Field: {field}',
+  'g2d.restrictions.state.recorded': 'Recorded',
+  'settingsState.notFound': 'not found',
+  'settingsPanel.logins.countSet': '{set} of {total} set',
+  'settingsPanel.keys.fallback': 'Fallback: {setting}',
+  'settingsPanel.keys.notTestable': 'not testable',
+  'settingsPanel.keys.tested.answered': 'Test: accepted',
+  'settingsPanel.keys.tested.refused': 'Test: refused',
+  'settingsPanel.keys.tested.unreachable': 'Test: not checked',
+  'sandboxCap.state.onAt': 'on: {cap} GB',
+  'sandboxCap.state.setTo': 'set to {gb} GB',
+  'sandboxCap.state.noAnswer': 'no answer in time',
+  'sandboxCap.state.waiting': 'waiting for your password',
+  'sandboxCap.commandOnLabel': 'Command to turn it on, as administrator',
+  'sandboxCap.commandOffLabel': 'Command to take it away, as administrator',
+  'settingsState.cancelled': 'cancelled',
+  'settingsState.notPermitted': 'not permitted',
+  'settingsState.failed': 'failed',
+  'settingsState.turnedOn': 'turned on',
+  'settingsState.turnedOff': 'turned off',
+  'settingsState.on': 'on',
+  'settingsState.notKnown': 'not known',
+  'startAtLogin.word.notLinux': 'Linux only',
+  'startAtLogin.word.notOurs': 'set by another program',
+  'startAtLogin.word.onOutOfDate': 'on, out of date',
+  'startAtLogin.word.lastStartFailed': 'last start failed',
+  'startAtLogin.afterLogout.notKnown': 'After logout: not known',
+  'startAtLogin.afterLogout.keepsRunning': 'After logout: keeps running',
+  'startAtLogin.afterLogout.stopsAtLogout': 'After logout: stops',
+  'terminalHolder.heldByCopy': 'Held by another copy: {copy}',
+  'terminalHolder.endsNone': 'Terminals to end: none',
+  'terminalHolder.rowState.running': 'running',
+  'terminalHolder.rowState.ended': 'ended',
+  'settingsState.restarting': 'restarting',
+  'terminalHolder.restartedEnded': { one: 'Restarted · {n} terminal asked to end', other: 'Restarted · {n} terminals asked to end' },
+  'terminalHolder.restartedNone': 'Restarted · none was running',
+  'usageNotices.state.firstAppointed': 'first secretary appointed',
+  'usageNotices.state.chosenCannot': 'chosen here: {chosen}, {state}',
+  'usageNotices.state.decisionSet': '{title}: {whatToDo}',
+  'settingsPanel.kept.setHere': '{n}, set here',
+  'grantList.state.doesNotAskYet': 'does not ask yet',
+  'grantList.state.alsoNeedsYourWords': 'also needs your words',
+  'grantList.state.alsoNeedsYourWordsForACardsWords': "also needs your words for a card's words",
+  'planning.notReadable': 'not readable',
+  'tasksToTake.count': { one: '{n} task', other: '{n} tasks' },
+  'tasksToTake.noModule': 'no module named',
+  'tpp.notListed': 'not listed',
+  'tpp.wasPutBack': 'put back',
+  'tpp.wasConfirmed': 'confirmed',
+  'tpp.screenFindings': { one: '{n} finding', other: '{n} findings' },
+  'projectGraph.coverage.noMap': 'no source map',
+  'projectGraph.coverage.notRead': 'source map not read',
+  'projectGraph.lanes.none': 'no modules, pipelines or blocks',
+  'structure.arrangementNotRead': 'arrangement not read',
+  'structure.hintsApplied': { one: '{n} stored hint applied', other: '{n} stored hints applied' },
+  'structure.hintsNotApplied': { one: '{unapplied} of {n} stored hint not applied', other: '{unapplied} of {n} stored hints not applied' },
+  'pipelineFlow.fact.noModule': '{v1} no module recorded as carrying {v2}',
+  'pipelineFlow.fact.noDependency': '{v1} no dependency recorded either way',
+  'pipelineFlow.noDependencies': 'no dependencies recorded',
+  'pipelineFlow.legend.stepOrder': 'step order',
+  'pipelineFlow.legend.cleared': 'cleared',
+  'bundles.allGoIn': 'All {n} go in.',
+  'governance.notRead': 'not read',
+  'moduleSource.claimsNotCounted': 'claims not counted',
+  'moduleSource.noClaims': 'no files claimed',
+  'moduleView.condition.notCounted': { one: '{n} not counted', other: '{n} not counted' },
+  'moduleView.reportsAbout.deletedCount': '{n} deleted',
+  'schedule.partsNotChecked': 'parts not checked · the total may count some hours twice',
+  'schedule.rowsAddUp': 'rows add up to {rows}h',
+  'schedule.parentsNotRead': { one: 'parent not read for {n} row · the total may be too high', other: 'parent not read for {n} rows · the total may be too high' },
+  'schedule.parentNotRead': 'parent not read',
+  'schedule.unstatedCount': { one: '· {n} more with no hours', other: '· {n} more with no hours' },
+  'schedule.cannotBePlanned': 'cannot be planned',
+  'schedule.firstShown': ' · the first {n} shown',
+  'schedule.keptNotOnPlan': 'not on the plan · in no total',
+  'schedule.scheduledCount': { one: '{n} more scheduled', other: '{n} more scheduled' },
+  'schedule.boardKeysHint': 'Move a block with the left and right arrow keys; hold Shift to move its last day.',
+  'planTable.total.nothingSized': 'nothing sized',
+  'planTable.total.none': 'no total',
+  'planTable.widthsNotKept': 'column widths not saved',
+  'planTable.partsOver': ' · parts add up to more: {atLeast}',
+  'planTable.sizedInPlanOnly': ' · {n} sized in the plan only',
+  'planTable.proseLines': ' · {n} {lines} of prose',
+  'planTable.unreadLines': ' · {n} {lines} not read',
+  'planWriting.keysHint': 'Alt with the up or down arrow moves a line and the lines under it; Ctrl+S saves; Tab leaves the box.',
+  'planWriting.lostCount': { one: '{n} filed line is no longer in this plan', other: '{n} filed lines are no longer in this plan' },
+  'planWriting.noFreeLine': 'no free line',
+  'onePlan.ended': 'Ended',
+  'flows.tally.counted': { one: '{n} run counted', other: '{n} runs counted' },
+  // A short state word where a page drew a sentence before (part 6 of the explanations taken off the pages).
+  // The merge queue's measures (src/web/components/MergeQueueMeasures.tsx).
+  'mergeQueueMeasures.notKnown': 'not known',
+  'mergeQueueMeasures.stableNotKnown': 'Stable office against main: not known',
+  'mergeQueueMeasures.notPlacedCount': { one: '{n} receipt with no readable moment', other: '{n} receipts with no readable moment' },
+  'mergeQueueMeasures.undatedCount': { one: '{n} event with no readable date', other: '{n} events with no readable date' },
+  // The push lines of the merge queue and of a push's own page (src/web/components/MergeQueuePush.tsx).
+  'pushPage.onward.none': 'Main did not move.',
+  // The usage receipt's totals (src/web/components/UsageReceipt.tsx).
+  'usageReceipt.noPriceTable': 'No price table set',
+  // The panel that moves a record into another project (src/web/components/projects.tsx).
+  'moveToProject.noOtherProject': 'No other project',
+  'moveToProject.checking': 'Checking…',
+  'moveToProject.wouldBeRefused': 'Would be refused',
+  // The counters page (src/web/pages/CountersPage.tsx).
+  'countersPage.quietSinceNotRecorded': 'Quiet since: not recorded',
+  'countersPage.pauseSaved': 'The counter "{title}" is paused.',
+  // A handbook's own page (src/web/pages/HandbookPage.tsx).
+  'handbookPage.isNotAHandbook': 'Not a handbook.',
+  'handbookPage.textNone': 'No text',
+  'handbookPage.textSame': 'Text unchanged',
+  'handbookPage.textPutBackShort': 'Earlier text put back',
+  'handbookPage.textChangedNoWhy': 'Text changed, no reason recorded',
+  'handbookPage.textChangeUnknown': 'Change not known',
+  'handbookPage.versionsNotListed': '{n} not listed',
+  'handbookPage.change.openingMost': 'At most {most} words.',
+  'handbookPage.change.noWhy': 'No reason given.',
+  'handbookPage.change.sameText': 'The text did not change.',
+  // The honour board (src/web/pages/HonourBoardPage.tsx).
+  'honourBoardPage.readCost': '{records} records read in {ms} ms',
+  // The signing packages page (src/web/pages/SigningPackagesPage.tsx).
+  'signingPackagesPage.allStruck': 'Every item is struck',
+  // The merge queue's rows, its bus box and its presses (src/web/pages/MergeQueuePage.tsx).
+  'mergeQueuePage.row.holdsTheLane': 'Holds the lane.',
+  'mergeQueuePage.row.submitted': 'Just submitted.',
+  'mergeQueuePage.row.next': 'Nothing holds it back.',
+  'mergeQueuePage.row.rode': 'Rode the last bus, driven by {driver}.',
+  'mergeQueuePage.row.passedOver': 'The last bus, driven by {driver}, passed it over. It needs a new check.',
+  'mergeQueuePage.row.passedAlone': 'The last bus, driven by {driver}, passed it over: it is tested alone.',
+  'mergeQueuePage.row.behindRider': 'Waits behind {first}, which rode the bus driven by {driver}.',
+  'mergeQueuePage.row.behindPassedOver': 'Waits behind {first}, which the bus driven by {driver} passed over.',
+  'mergeQueuePage.row.behindTestedAlone': 'Waits behind {first}, which the bus driven by {driver} passed over because it is tested alone.',
+  'mergeQueuePage.row.checkUnnamed': 'Holds the lane and needs a new check. Files: not recorded.',
+  'mergeQueuePage.row.letGo': 'Let the lane go while a check of {files} runs.',
+  'mergeQueuePage.row.letGoUnnamed': 'Let the lane go while a new check runs. Files: not recorded.',
+  'mergeQueuePage.row.handedOver': 'A resolution was handed over at {at}.',
+  'mergeQueuePage.row.fixHandedOver': 'A fix was handed over at {at}.',
+  'mergeQueuePage.row.fixRound': 'Red in a few feature test files; waits for a fix round.',
+  'mergeQueuePage.row.movedToTheFront': 'Moved to the front',
+  'mergeQueuePage.row.pressedToLand': 'Pressed to land',
+  'mergeQueuePage.bus.testingNowShort': 'Testing now: {name}.',
+  // The placeholders page (src/web/pages/PlaceholdersPage.tsx).
+  'placeholdersPage.harmless': 'Its author said nothing rests on it.',
+  'placeholdersPage.noLinks': 'Linked to no record yet.',
+  'placeholdersPage.answeredHarmless': 'Answered{when}. Its author said nothing rested on it.',
+  'placeholdersPage.owed': { one: 'Answered{when}. {n} piece of work still needs review.', other: 'Answered{when}. {n} pieces of work still need review.' },
+  'placeholdersPage.noAbout': 'No work linked yet.',
+  // The queries page: the far end of a broken link that has no record at all.
+  'queriesPage.missingNotInTheDatabase': 'needs a record that is not in the database',
+  // The regulations page: short state words in place of its sentences, and the copy line without "You may change any of them."
+  'regulationsPage.notInUse': 'Stored chapters not in use',
+  'regulationsPage.copiedAtTheStart': 'These chapters were copied from the default regulations when this office first started, on {date}.',
+  'regulationsPage.copiedAndAddedLater': {
+    one: 'Chapter {numbers} was added later. The other chapters were copied from the default regulations when this office first started, on {date}.',
+    other: 'Chapters {numbers} were added later. The other chapters were copied from the default regulations when this office first started, on {date}.',
+  },
+  'regulationsPage.laterStartCopied': {
+    one: 'Chapter {numbers} was copied from the default regulations at a later start, on {date}.',
+    other: 'Chapters {numbers} were copied from the default regulations at a later start, on {date}.',
+  },
+  'regulationsPage.project.noRules': 'No rules',
+  'regulationsPage.project.unread': { one: '{n} stored rule could not be read', other: '{n} stored rules could not be read' },
+  'regulationsPage.revisionNone': 'No revision',
+  'regulationsPage.bindsNotRecorded': 'Binds: not recorded',
+  'regulationsPage.onlyForThisOffice': 'Only for this office',
+  // The resources page: a short state word where a running booking has no expected end.
+  'resourcesPage.noProgress': 'No progress reported',
+  'resourcesPage.noneDoneYet': 'None of {of} done yet at {when}',
+  // The runtime page: the office's own load before its first reading.
+  'dev.runtime.load.notYet': 'No reading yet',
+  // The source page: the count of unclaimed paths missing from the file list, and the rest of a rebuild report's list.
+  'sourcePage.unlisted': { one: '{n} path not in the file list', other: '{n} paths not in the file list' },
+  'sourcePage.report.more': 'and {n} more',
+  // The toolset page: why the confirm press waits, in a few words.
+  'toolsetPage.noReasonWritten': 'No reason written',
+  // The usage page: the hint on the outside reads, the untraced count, the calls under "not declared", and the runs with no first write.
+  'dev.usage.agentsOwnReports': 'Each row is an agent’s own report, not a measurement.',
+  'dev.usage.untracedDidNot': ' {untracedCalls} did not.',
+  'dev.usage.notDeclaredCount': '{value1} in {value2} under "not declared".',
+  'dev.usage.noFirstWrite': '{value1} with no first write.',
+  // The version history page: a first handoff, a release that owes nothing, a notice edited later, and each notice state.
+  'versionHistoryPage.handedOff': 'First handoff completed.',
+  'versionHistoryPage.owesNothing': 'Owes no follow-up receipt and no report.',
+  'versionHistoryPage.editedLater': 'The announcement or outcome message was edited later.',
+  'versionHistoryPage.noticeChanged': 'Current notice has changed.',
+  'versionHistoryPage.noticeDeleted': 'Current notice was deleted.',
+  'versionHistoryPage.noticeMissing': 'Current notice is missing.',
+  // The worlds pages: what a Stop press did, and a copy of the main world found.
+  'worldsPage.stopped': 'Stopped.',
+  'worldsPage.partlyStopped': { one: 'Stopped; {n} process could not be stopped.', other: 'Stopped; {n} processes could not be stopped.' },
+  'worldsPage.copyFound': 'Its home row names the database {home}, and this database is {current}. Start a second world on an empty database instead.',
+  // The page of words waiting for the person: what a "Not what I said" press did.
+  'yourWordsPage.markedNotWhatISaid': 'Marked as not what you said.',
+  // The data folder panel: the labels of its rows, which hold the paths, and its sentences, which no longer do.
+  'dataFolder.row.folder': 'Folder in use',
+  'dataFolder.row.from': 'From',
+  'dataFolder.row.to': 'To',
+  'dataFolder.lastMove.moving': 'The data folder is being moved.',
+  'dataFolder.lastMove.didNotFinish': 'A move ended before it finished. Its last step was this: {step}',
+  'dataFolder.lastMove.started': 'The data folder was moved. The old folder is kept until you confirm that the office works from the new one.',
+  'dataFolder.lastMove.confirmed': 'The data folder was moved, and the copied files were removed from the old folder.',
+  'dataFolder.lastMove.stoppedBeforeTheSwitch': 'A move stopped before the office was switched to the new folder, so the office still uses the old one.',
+  'dataFolder.lastMove.switchedBack': 'The office did not start from the new folder, so the move tried to switch it back to the old one. Both folders are kept.',
+  'dataFolder.lastMove.switchedAndEnded': 'The move switched the office to the new folder, and its mover ended before it saw the office start. The confirm ends the move when the office runs from the new folder.',
+  'dataFolder.check.thisFolderIsFine': 'A move to this folder would go ahead.',
+  'dataFolder.check.thisFolderIsRefused': 'A move to this folder would be refused:',
+  // The storage destinations panel: the label of the row that holds the credentials file, and its state before it is made.
+  'storageDestinations.row.credentialsFile': 'Credentials file',
+  'storageDestinations.row.notMadeYet': 'not made yet',
+  // The gates panel's spool block: the labels of the rows that hold its folder and the two worlds.
+  'gates.spool.row.folder': 'Folder',
+  'gates.spool.row.belongsTo': 'Belongs to world',
+  'gates.spool.row.thisOffice': 'This office’s world',
+  // A run's next-round note at the seal: the labels of the rows that hold when the office asked and its brief.
+  'nextAtTheSeal.row.askedAt': 'Asked at',
+  'nextAtTheSeal.row.brief': 'Brief',
+  // The logins' week panel: the labels of the rows that hold a round and its times, and their states.
+  'loginsWeek.row.readAt': 'Read at',
+  'loginsWeek.row.round': 'Round',
+  'loginsWeek.row.shapeNotKnown': 'shape not known',
+  'loginsWeek.row.newerRound': 'Newer round',
+  'loginsWeek.row.noEvent': 'no rate-limit event',
+  'loginsWeek.row.lastWritten': 'Last written',
+  // The worlds page's notice of a copy of the main world: the labels of its two database rows, a state, and the way out.
+  'worldsPage.copy.row.homeRow': 'Database in the home row',
+  'worldsPage.copy.row.thisDatabase': 'This database',
+  'worldsPage.copy.row.notIdentified': 'not identified',
+  'worldsPage.copy.wayOut': 'Start a second world on an empty database instead.',
+  // The world's own page: the label of the row that holds the database answering here, and its states.
+  'worldHere.row.database': 'Database answering here',
+  'worldHere.row.noWorldRow': 'no world row',
+  'worldHere.row.notIdentified': 'not identified',
+  // The runtime page: the labels of the rows that hold the canonical database, the newest file and the answering script.
+  'runtime.row.canonicalFile': 'Canonical database file',
+  'runtime.row.newestServerFile': 'Newest server file',
+  'runtime.row.answeredBy': 'Script answering messages',
+  // A module's source scan: the labels of the rows that hold the scanned folder and the scan's facts, and a state.
+  'moduleSource.row.scannedFolder': 'Scanned folder',
+  'moduleSource.row.skippedNothing': 'nothing skipped',
+  'moduleSource.row.scannedAt': 'Scanned at',
+  'moduleSource.row.scannedBy': 'Scanned by',
+  'moduleSource.row.files': 'Files',
+  'moduleSource.row.scanTook': 'Scan took',
+  // A task's package: the labels of the rows that say where its criteria were copied from.
+  'tpp.row.copiedFrom': 'Copied from',
+  'tpp.row.criterion': 'Criterion',
+  'tpp.row.commit': 'Commit',
+  // The check on a run, in developer mode: the labels of the rows that hold its paths, and their states.
+  'chk.row.officeRun': 'Office run',
+  'chk.row.log': 'Log',
+  'chk.row.workFolder': 'Work folder',
+  'chk.row.noBranchRead': 'no branch read',
+  'chk.row.cutFrom': 'Cut from',
+  'chk.row.worktree': 'Worktree',
+  'chk.row.tip': 'Tip',
+  'chk.row.tipNotRecorded': 'tip not recorded',
+  // A text or a zip handed to the browser as a file: the label of the row that holds its name.
+  'frameFiles.row.handed': 'Handed to your browser',
+  // A plan's progress: planned or spent hours when no allocation states a number.
+  'g8.progress.hoursNotStated': 'not stated',
+  // A plan's progress: the label for when each line first appeared and why, which nothing records.
+  'g8.progress.lineHistory': 'Line history',
+  // The counters page: a counter's last firing, when it has never fired.
+  'g7a.counters.notFiredYet': 'not fired yet',
+  // The check on a run: a run waiting for a check when nothing names the inspector the office asked.
+  'chk.waitsNoInspectorWord': 'waiting for a check · no inspector named',
+  // The resources page: the graphics card's now column, and the booking window's, when no booking is running.
+  'resources.noRunningBooking': 'no running booking',
+  // The resources page: the test seat's now column, when nobody holds the seat.
+  'resources.seat.freeNow': 'free now',
+  // A record's page: the line under the title when the record has no summary.
+  'record.noSummaryWord': 'no summary',
+  // An emergency push: its ended row, when the push did not go on to the private copy and the mirror.
+  'pushPage.onward.notCopied': 'not copied onward',
+  // An emergency push: its follow-up row, when no whole-suite run on main has tested it yet.
+  'mergeQueuePage.push.followUp.notTested': 'not tested on main yet',
+  // The corner an opened note is resized by (src/web/components/QuickNoteBeside.tsx).
+  'quickNote.resizeNote': 'Resize the note',
+  // The field a note asks for its title in; empty, it shows the title the note's words give (src/web/components/QuickNote.tsx).
+  'quickNote.titleField': 'Title',
+  // The corner a thing added to a note from a page is resized by (src/web/components/QuickNoteSheet.tsx).
+  'quickNote.resizeAdded': 'Resize what was added',
+  // A shipped flag's short description, shown to the person under its name in the flag's menu until they write their own.
+  'chat.intent.description.justAsk': 'Answer only. Change nothing.',
+  'chat.intent.description.proposalFirst': 'Come back with a proposal. Build only after my yes.',
+  'chat.intent.description.align': 'Agree first. Restate what we agreed. Act after my yes to it.',
+  'chat.intent.description.giveOptions': 'Come back with several options. Build only the one I choose.',
+  // ---- the third shipped flag, Align: its name, the instruction an agent is handed, and its choice on a record page ----
+  'message.intent.name.align': 'Align',
+  'message.intent.align':
+    "Align: first agree on the work, asking about what is unclear; then restate what was agreed, which design or " +
+    "option with which of the person's changes; wait for the person's yes to that restatement; only then act. A yes " +
+    'given after comments is a yes to the restated version, never to the first design.',
+  'record.option.message.intent.align': 'Align',
+  // ---- the fourth shipped flag, Give options: its name, the instruction an agent is handed, and its choice on a record page ----
+  'message.intent.name.giveOptions': 'Give options',
+  'message.intent.giveOptions':
+    'Give options: come back with two or three whole options, each with its cost and one marked as your ' +
+    'recommendation; build nothing until the person chooses one.',
+  'record.option.message.intent.give-options': 'Give options',
+  // The right-click box: the press in its head that copies the selected words, or the text of what was right-clicked.
+  'talk.copy': 'Copy',
+  // The right-click box: the short word beside Copy once the clipboard took the words.
+  'talk.copied': 'Copied',
+  // The right-click box: why Copy is off, when what was right-clicked draws no text.
+  'talk.copyHasNoText': 'There is no text here to copy.',
+  // The Mac's name for the Alt key, on a key cap in the list of keys and in Settings (src/web/lib/shortcuts.ts).
+  'shortcuts.key.option': 'Option',
+  // Settings, Keyboard shortcuts: the heading over the one switch for the Alt keys (src/web/components/ShortcutsPanel.tsx).
+  'shortcuts.settings.outsideTitle': 'Keys outside a text box',
+  // Settings, Keyboard shortcuts: the words of the one switch. It turns every Alt key on or off, and the two Ctrl keys stay on.
+  'shortcuts.settings.outsideSwitch': 'Alt and a letter, outside a text box. On a Mac, Option and a letter.',
+  // Settings, Keyboard shortcuts: the state word on a row that is on, while the one switch has turned the Alt keys off.
+  'shortcuts.state.altKeysOff': 'Alt keys off',
+  // The same state word on a Mac, where the Alt keys are Option keys.
+  'shortcuts.state.optionKeysOff': 'Option keys off',
+  // A secretary opening a terminal for the person with a line prepared in it, the person naming a terminal, and one
+  // reading of several terminals (src/server/api/terminals.ts). Each refusal says that nothing was opened, changed or read.
+  ...{
+    'server.terminalPreparedLineHasAKey':
+      'A prepared line is one line of text, with no Enter, Tab, Escape or other key in it, and it is not empty. Nothing was opened.',
+    'server.terminalPreparedLineWithACommand':
+      'A terminal with a prepared line opens the shell, so no command or arguments may be sent beside the line. Nothing was opened.',
+    'server.terminalPreparedLineFromThePerson':
+      'A line is prepared by a secretary for you to run. You type your own line in the terminal. Nothing was opened.',
+    'server.terminalPreparingWordsRefused':
+      "The person's words that the secretary sent do not let it open a terminal with this line in this folder. Nothing was opened.",
+    'server.terminalHolderTooOldToPrepare':
+      'The terminal holder that runs now is older than this office, so it cannot open a terminal with a line prepared in it. Nothing was opened. Restarting the holder ends every terminal you have open.',
+    'server.terminalHolderTooOldToName':
+      'The terminal holder that runs now is older than this office, so it cannot keep a name, a group or tags for a terminal. Nothing was changed. Restarting the holder ends every terminal you have open.',
+    'server.terminalNameRefused':
+      "A terminal's name is a short line of text with no key such as Enter in it, or none. This one is blank, too long or holds a key. Nothing was changed.",
+    'server.terminalGroupRefused':
+      "A terminal's group is a short line of text with no key such as Enter in it, or none. This one is blank, too long or holds a key. Nothing was changed.",
+    'server.terminalTagsRefused':
+      "A terminal's tags are a few short words, each with no key such as Enter in it, and no tag twice. One of these is blank, too long, holds a key or is there twice, or there are too many. Nothing was changed.",
+    'server.terminalsReadingRefused':
+      'One reading names one terminal or more, each once and not too many, as terminals=<id>,<id>. Nothing was read.',
+  } satisfies Record<`server.${TerminalPreparedRefusalCode}`, string>,
+  // The switch that chooses what a right-click inside a view does (src/web/components/RightClickSwitch.tsx): its name, {box} being the box's own name.
+  'rightClick.switch.name': 'Right-click opens {box}',
+  // The same switch, the words it shows when a right-click opens Mole Office's box.
+  'rightClick.switch.office': 'Right-click: {box}',
+  // The same switch on a terminal, the words it shows when a right-click is the terminal's own.
+  'terminals.view.rightClickOwn': 'Right-click: copy and paste',
+  // The new agent dialog (src/web/components/NewAgentDialog.tsx): its labels, the two places it opens, its two
+  // presses, and the state words a list shows while it is not there.
+  'newAgentDialog.name': 'Name',
+  'newAgentDialog.harness': 'Agent tool',
+  'newAgentDialog.role': 'Role',
+  'newAgentDialog.project': 'Project',
+  'newAgentDialog.opensIn': 'Opens in',
+  'newAgentDialog.opensIn.office': "The office's terminal",
+  'newAgentDialog.opensIn.outside': 'A terminal outside',
+  'newAgentDialog.create': 'Create',
+  'newAgentDialog.cancel': 'Cancel',
+  'newAgentDialog.reading': 'reading',
+  'newAgentDialog.notRead': 'not read',
+  'newAgentDialog.none': 'none',
+  'newAgentDialog.notSet': 'not set',
+  // What the new agent dialog's Create says: while its answer is out, and how it ended (src/web/components/NewAgentDialog.tsx).
+  'newAgentDialog.creating': 'making',
+  'newAgentDialog.opened': 'made and opened',
+  'newAgentDialog.madeNotOpened': 'made, not opened',
+  'newAgentDialog.refused': 'refused',
+  'newAgentDialog.nameTaken': 'name taken',
+  'newAgentDialog.notOnThisSystem': 'not on this system',
+  'newAgentDialog.notMade': 'not made',
+  'newAgentDialog.notKnown': 'not known',
+  // A note's tags, in the note and on My notes, and the sort My notes offers by them.
+  'quickNote.tags': 'Tags',
+  'quickNote.addATag': 'Add a tag',
+  'quickNote.removeTag': 'Take off the tag {tag}',
+  'quickNote.tagTooLong': 'A tag holds at most {n} characters.',
+  'quickNote.tagTwice': 'This note has that tag already.',
+  'quickNote.tagsFull': 'A note holds at most {n} tags.',
+  'myNotes.sortBy': 'Sort by',
+  'myNotes.newestFirst': 'Newest first',
+  'myNotes.tagAToZ': 'Tag, A to Z',
+  'myNotes.ofTheShown': 'Of the notes shown so far. Show more adds the rest.',
+
+  'progressCard.lines.title': 'Lines',
+  'progressCard.lines.reading': 'Reading the lines…',
+  'progressCard.lines.failed': 'Could not read the lines.',
+  'progressCard.lines.column.line': 'Line',
+  'progressCard.lines.column.department': 'Department · secretary',
+  'progressCard.lines.column.running': 'Agents running (supervisor + N workers)',
+  'progressCard.lines.column.packages': 'Packages',
+  'progressCard.lines.column.notTaken': 'Not taken',
+  'progressCard.lines.column.inProgress': 'In progress',
+  'progressCard.lines.column.handedBack': 'Handed back',
+  'progressCard.lines.column.accepted': 'Accepted',
+  'progressCard.lines.column.blocked': 'Blocked',
+  'progressCard.lines.notRecorded': 'Line not recorded',
+  'progressCard.lines.total': 'Total',
+  'progressCard.lines.running': '{all} ({parts})',
+  'progressCard.lines.resting': '{all} (resting)',
+  'progressCard.lines.oneSupervisor': 'supervisor',
+  'progressCard.lines.supervisors': '{n} supervisors',
+  'progressCard.lines.workers': { one: '{n} worker', other: '{n} workers' },
+  'progressCard.lines.others': { one: '{n} other', other: '{n} others' },
 } as const

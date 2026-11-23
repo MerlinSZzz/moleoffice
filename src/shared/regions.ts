@@ -80,6 +80,7 @@ import {
   titleOfSection,
   SUMMARY_LINE_FIELD,
   SUMMARY_LINE_KEY,
+  theGovernsSectionDecides,
   TITLE_LINE_FIELD,
   TITLE_LINE_KEY,
   type SectionSpec,
@@ -1297,12 +1298,22 @@ export function spellRegionId(read: { root: RegionRoot; steps: readonly RegionSt
  * pair of ids the corpus derives, so "same characters then a separator" and "same steps then more
  * steps" are shown to be the same question rather than assumed to be.
  *
+ * IT BUILDS NO STRING IN A CALL. The test in tests/one-parser-for-one-region-grammar.test.ts asks
+ * it for every ordered pair of ids the corpus derives, so it reads the one character after the
+ * prefix — 46 for `.` and 91 for `[` — and compares that, rather than making a new string for each
+ * separator. It tests the exact match first, then the length and the one character after the prefix,
+ * and the prefix last, so most pairs that cannot be inside are refused before the prefix is compared.
+ *
  * A CHARACTER COUNT IS NOT A STEP AND SO IS NOT INSIDE. `data.summary@0` is not inside
  * `data.summary`: there is no region called `data.summary` — the field is a place ids are cut from,
  * not a region — and the paragraph's own parent is the section that declares the field.
  */
 export function isInsideRegionId(inner: RegionId, outer: RegionId): boolean {
-  return inner === outer || inner.startsWith(`${outer}.`) || inner.startsWith(`${outer}[`)
+  if (inner === outer) return true
+  if (inner.length <= outer.length) return false
+  const next = inner.charCodeAt(outer.length)
+  if (next !== 46 && next !== 91) return false
+  return inner.startsWith(outer)
 }
 
 /**
@@ -2467,9 +2478,12 @@ export function sectionsOnThisRecord(source: RecordRegionSource): readonly Secti
       // draws *No question was written here* over an unwritten one, exactly as the Paths panel of a
       // module with no paths draws its own "none linked": an absence somebody can read is not a
       // place in the record, and a target on it would name a region this record does not have.
+      //
+      // A DECISION'S GOVERNS SECTION IS ASKED BY ITS THREE PARTS. It is filled by the pages, the files or what no page fits,
+      // and the files and what no page fits are drawn inside it rather than as places of their own.
       case 'field':
       case 'headlineField':
-        return isWritten(source.data[spec.key])
+        return theGovernsSectionDecides(source.kind, spec.key, source.data) ?? isWritten(source.data[spec.key])
       // THE ONE-LINE SUMMARY, WHEN THERE IS ONE. The header draws *No summary was written for this
       // record* when there is not, and that paragraph declares nothing for the reason above.
       case 'summaryLine':
@@ -2678,6 +2692,10 @@ export function recordRegionsOf(source: RecordRegionSource): Region {
         // INSIDE IT. A module's `parts` is a list of objects with their own checklist items, drawn
         // by the Parts panel in ModuleView; cutting paragraphs out of it would mean writing
         // "[object Object]" into a region's text and calling it something somebody wrote.
+        //
+        // A SECTION FILLED ONLY BY THE FIELDS DRAWN INSIDE IT has no words of its own to cut. A decision's Governs
+        // section is on the page when only its files or what no page fits are written, and its own field is then unwritten.
+        if (!isWritten(value)) continue
         if (!drawableAsWords(source.kind, spec.key, value)) continue
         // A LIST OF DATED WORDS: one region for each entry's words, at the path that names them.
         if (holdsDatedWords(source.kind, spec.key)) {
@@ -2776,6 +2794,8 @@ export function recordRegionsOf(source: RecordRegionSource): Region {
       // the one above it: the panel draws OTHER records' titles — decisions, and the forks they
       // settled — and each row names the record it is about. Nothing in it is this record's writing.
       case 'decidedHere':
+      // THE CHECKLISTS ABOUT A MODULE, in this arm for the reason above: each row is another record's title and items.
+      case 'checklistsAbout':
       case 'whereItLives':
       case 'madeOf':
       // A RUN'S TOOL USES, added in wave 13s round 33. The rows are in `tool_uses`, not in this record, so the

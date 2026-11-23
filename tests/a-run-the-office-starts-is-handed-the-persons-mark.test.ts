@@ -4,11 +4,11 @@ import { withoutInheritedEffort } from './without-inherited-effort.ts'
 /**
  * A RUN THE OFFICE STARTS FOR A MESSAGE IS HANDED THE PERSON'S MARK, AS THE WAITER HANDS IT.
  *
- * The person may mark a message to an agent Just ask or Proposal first, and the agent must follow the mark. The waiter
- * and the dsh hooks hand the mark over as one line of the envelope, last before the words. A run the worker starts for
- * the message is handed the same line in its prompt, on each of the three paths that start a run for a message: from
- * the queue, as the carry-on of a run a restart cut off, and as the resume the person pressed. The line is worked out
- * once, by `deliveryEnvelope` in src/shared/messages.ts, from the mark the message record holds.
+ * The person may mark a message to an agent Just ask, Proposal first, Align or Give options, and the agent must follow
+ * the mark. The waiter and the dsh hooks hand the mark over as one line of the envelope, last before the words. A run
+ * the worker starts for the message is handed the same line in its prompt, on each of the three paths that start a run
+ * for a message: from the queue, as the carry-on of a run a restart cut off, and as the resume the person pressed. The
+ * line is worked out once, by `deliveryEnvelope` in src/shared/messages.ts, from the mark the message record holds.
  *
  * WHAT IS PROVED HERE, against a real office on a free port, the real waiter and the real worker pass, with the fake
  * runtime keeping every prompt it is given:
@@ -16,10 +16,13 @@ import { withoutInheritedEffort } from './without-inherited-effort.ts'
  *   (a) A message the person marked Just ask, from the queue: the run's prompt holds the mark line, and it is the line
  *       the waiter hands over for the same message. In both it is the last line before the words.
  *   (b) The same for Proposal first.
+ *   (f) The same for Align, the third flag the office ships.
+ *   (g) The same for Give options, the fourth flag the office ships. On the code before that flag, its message is
+ *       refused when it is sent, so (g) and the cases that share its messages fail there.
  *   (c) A message with no mark gives a prompt with no mark line, and the waiter hands over none either. The prompt for
  *       (a) with its mark line taken out equals the prompt for (c), once each message's own id and each run's own id
- *       are replaced by one word, so the mark changes nothing else in the prompt. The three messages have the same
- *       words, sender and recipients, and all three are sent before any of their runs starts. Both runs must have
+ *       are replaced by one word, so the mark changes nothing else in the prompt. The five messages have the same
+ *       words, sender and recipients, and all five are sent before any of their runs starts. Both runs must have
  *       been handed the brief: a run whose brief read is late starts without it, and that difference is not the mark.
  *   (d) A run a restart cut off, for a message marked Just ask: the run that carries it on is handed the mark line,
  *       last before the words.
@@ -68,9 +71,11 @@ const FAKE = fileURLToPath(new URL('./fake-runtime.mjs', import.meta.url))
 
 const JUST_ASK: IntentMark = 'just-ask'
 const PROPOSAL_FIRST: IntentMark = 'proposal-first'
+const ALIGN: IntentMark = 'align'
+const GIVE_OPTIONS: IntentMark = 'give-options'
 
 /**
- * The words of (a), (b) and (c), the same in all three. The fake runtime waits on them until it is stopped, so each case
+ * The words of (a), (b), (c), (f) and (g), the same in all five. The fake runtime waits on them until it is stopped, so each case
  * stops its run as the person does before the next starts. A run that answers and ends could not be filed here: its agent
  * has no work area, and the office refuses the ending of a run with neither a submission nor a work area.
  */
@@ -113,6 +118,8 @@ async function inject(
 async function started(handle: string): Promise<string> {
   const reply = await inject('POST', '/api/agents/started', AS_THE_PERSON, { handle, name: handle, runtime: 'claude-code' })
   expect(reply.status, reply.text).toBe(201)
+  const key = (reply.json['whatToGiveIt'] as { key: string }).key
+  writeFileSync(join(scratch, `${handle}.key`), key, { mode: 0o600 })
   return (reply.json['agent'] as { id: string }).id
 }
 
@@ -153,7 +160,7 @@ async function runData(session: string): Promise<Record<string, unknown>> {
 /** Start the waiter for one handle, and answer what it printed once it has stopped. */
 async function theWaiterSays(handle: string, session: string): Promise<string> {
   const child = spawn(process.execPath, [WAITER, '--agent', handle, '--session', session, '--api', api, '--workspace', 'default'], {
-    env: { ...withoutInheritedEffort(), MOLE_OFFICE_HANDLE_BEAT_SECONDS: '1' },
+    env: { ...withoutInheritedEffort(), MOLE_AGENT_KEY: '', MOLE_OFFICE_TOOL_CONFIGURATION: '', MOLE_AGENT_KEY_FILE: join(scratch, `${handle}.key`), MOLE_OFFICE_HANDLE_BEAT_SECONDS: '1' },
   })
   waiters.push(child)
   let printed = ''
@@ -215,7 +222,7 @@ function theLastLineBeforeTheWords(text: string, messageId: string, words: strin
 
 /** How many lines of some text are the sentence of a mark. */
 function markLines(text: string): number {
-  const sentences = [whatTheMarkAsks(JUST_ASK), whatTheMarkAsks(PROPOSAL_FIRST)]
+  const sentences = [whatTheMarkAsks(JUST_ASK), whatTheMarkAsks(PROPOSAL_FIRST), whatTheMarkAsks(ALIGN), whatTheMarkAsks(GIVE_OPTIONS)]
   return text.split('\n').filter((line) => sentences.includes(line.trim())).length
 }
 
@@ -341,12 +348,12 @@ afterAll(async () => {
 
 describe('a run the office starts from the queue is handed the mark the waiter hands over', () => {
   /**
-   * THE THREE MESSAGES, (c), (a) and (b), each with the same words to the same two agents, all sent before any run
+   * THE FIVE MESSAGES, (c), (a), (b), (f) and (g), each with the same words to the same two agents, all sent before any run
    * starts. So each run reads the same office: the brief a run is handed carries the person's latest messages, and a
    * message sent between two runs would make their prompts differ for a reason that is not the mark.
    */
   const sent = new Map<IntentMark | null, string>()
-  /** What the waiter handed over, the three messages in one hand-over. */
+  /** What the waiter handed over, the five messages in one hand-over. */
   let waiter = ''
   /** What each run was handed, and the run's own id. */
   const handed = new Map<IntentMark | null, { prompt: string; session: string }>()
@@ -354,7 +361,9 @@ describe('a run the office starts from the queue is handed the mark the waiter h
   beforeAll(async () => {
     const byRun = await started('mark-reads-by-run')
     const byWaiter = await started('mark-reads-by-waiter')
-    for (const intent of [null, JUST_ASK, PROPOSAL_FIRST]) sent.set(intent, await thePersonSends([byRun, byWaiter], THE_SAME_WORDS, intent))
+    for (const intent of [null, JUST_ASK, PROPOSAL_FIRST, ALIGN, GIVE_OPTIONS]) {
+      sent.set(intent, await thePersonSends([byRun, byWaiter], THE_SAME_WORDS, intent))
+    }
     waiter = await theWaiterSays('mark-reads-by-waiter', await aSession('the waiting terminal'))
     for (const messageId of sent.values()) expect(waiter, waiter).toContain(DELIVERY_ENVELOPE.whatItAnswers(messageId))
   }, 90_000)
@@ -398,6 +407,28 @@ describe('a run the office starts from the queue is handed the mark the waiter h
       theLastLineBeforeTheWords(waiter, proposal.messageId, THE_SAME_WORDS),
     )
     expect(markLines(proposal.prompt), proposal.prompt).toBe(1)
+  }, 120_000)
+
+  it('(f) Align: the prompt holds the waiter\'s mark line, last before the words in both', async () => {
+    const aligned = await theRunIsHanded(ALIGN)
+    const line = whatTheMarkAsks(ALIGN)
+    expect(line).not.toBeNull()
+    expect(theLastLineBeforeTheWords(waiter, aligned.messageId, THE_SAME_WORDS).trim(), waiter).toBe(line)
+    expect(theLastLineBeforeTheWords(aligned.prompt, aligned.messageId, THE_SAME_WORDS), aligned.prompt).toBe(
+      theLastLineBeforeTheWords(waiter, aligned.messageId, THE_SAME_WORDS),
+    )
+    expect(markLines(aligned.prompt), aligned.prompt).toBe(1)
+  }, 120_000)
+
+  it('(g) Give options: the prompt holds the waiter\'s mark line, last before the words in both', async () => {
+    const options = await theRunIsHanded(GIVE_OPTIONS)
+    const line = whatTheMarkAsks(GIVE_OPTIONS)
+    expect(line).not.toBeNull()
+    expect(theLastLineBeforeTheWords(waiter, options.messageId, THE_SAME_WORDS).trim(), waiter).toBe(line)
+    expect(theLastLineBeforeTheWords(options.prompt, options.messageId, THE_SAME_WORDS), options.prompt).toBe(
+      theLastLineBeforeTheWords(waiter, options.messageId, THE_SAME_WORDS),
+    )
+    expect(markLines(options.prompt), options.prompt).toBe(1)
   }, 120_000)
 
   it('(c) the prompt for Just ask with its mark line taken out is the prompt for no mark', () => {

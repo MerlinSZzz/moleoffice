@@ -1,0 +1,65 @@
+{
+  "why": "The door a secretary opens a terminal with one line prepared through, the door the person names a terminal through and the one reading of several terminals refuse in these words. Each needs a terminal holder running, or a secretary under the person's grant or carrying the person's words for one folder and line, and this test's office holds neither. So a test route throws each. tests/a-secretary-prepares-a-terminal-the-person-runs.test.ts and tests/one-reading-carries-several-terminals.test.ts meet every one through the doors, against a real holder and an older one.",
+  "refusals": [
+    {
+      "code": "terminalPreparedLineHasAKey",
+      "status": 400,
+      "english": "Test: the prepared line holds a key such as Enter.",
+      "values": {}
+    },
+    {
+      "code": "terminalPreparedLineWithACommand",
+      "status": 400,
+      "english": "Test: a prepared line was sent with a command.",
+      "values": {}
+    },
+    {
+      "code": "terminalPreparedLineFromThePerson",
+      "status": 400,
+      "english": "Test: the person sent a prepared line.",
+      "values": {}
+    },
+    {
+      "code": "terminalPreparingWordsRefused",
+      "status": 403,
+      "english": "Test: the person's words do not name this folder and this line.",
+      "values": {}
+    },
+    {
+      "code": "terminalHolderTooOldToPrepare",
+      "status": 409,
+      "english": "Test: the terminal holder is too old to prepare a line.",
+      "values": {}
+    },
+    {
+      "code": "terminalHolderTooOldToName",
+      "status": 409,
+      "english": "Test: the terminal holder is too old to name a terminal.",
+      "values": {}
+    },
+    {
+      "code": "terminalNameRefused",
+      "status": 400,
+      "english": "Test: the terminal's name is not kept.",
+      "values": {}
+    },
+    {
+      "code": "terminalGroupRefused",
+      "status": 400,
+      "english": "Test: the terminal's group is not kept.",
+      "values": {}
+    },
+    {
+      "code": "terminalTagsRefused",
+      "status": 400,
+      "english": "Test: the terminal's tags are not kept.",
+      "values": {}
+    },
+    {
+      "code": "terminalsReadingRefused",
+      "status": 400,
+      "english": "Test: the list of terminals to read is not usable.",
+      "values": {}
+    }
+  ]
+}

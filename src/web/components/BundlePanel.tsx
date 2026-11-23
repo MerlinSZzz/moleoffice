@@ -97,6 +97,7 @@ import { useProjectAsync } from '../lib/project-async.ts'
 import { DRAWS_THE_NAME } from './agent/pointing.ts'
 import { drawnStamp } from '@shared/time.ts'
 import { handTheTextToTheBrowserAsAFile, putOnTheClipboard, selectTheWholeText } from '../lib/clipboard.ts'
+import { CodeRows } from '../lib/code-rows.tsx'
 import { exportFileName } from '@shared/zip-export/manifest.ts'
 import { handTheZipToTheBrowserAsAFile, theFileCountsSaid } from './zip-export/download.ts'
 import { useInspect, useMode } from '../lib/mode.ts'
@@ -216,6 +217,8 @@ interface WaysOut {
 function TakeItAnotherWay({ couldNot }: { couldNot: WaysOut }) {
   /** What the last of these four presses came to, in its own words, or null before any of them. */
   const [said, setSaid] = useState<string | null>(null)
+  /** The name of the file this block last handed to the browser, drawn on its own row; null when the last press handed none. */
+  const [handed, setHanded] = useState<string | null>(null)
   /** Whether the text box is open. It is a press, and it starts shut, like the chooser above. */
   const [inABox, setInABox] = useState(false)
   /**
@@ -260,12 +263,23 @@ function TakeItAnotherWay({ couldNot }: { couldNot: WaysOut }) {
         </pre>
       ) : null}
       <div className="bx-take">
-        <button type="button" className="bx-look" onClick={() => setSaid(selectTheWholeText(textId))}>
+        <button
+          type="button"
+          className="bx-look"
+          onClick={() => {
+            setHanded(null)
+            setSaid(selectTheWholeText(textId))
+          }}
+        >
           {t('g7a.bundles.selectAll')}</button>
         <button
           type="button"
           className="bx-look"
-          onClick={() => setSaid(handTheTextToTheBrowserAsAFile(couldNot.text, couldNot.fileName))}
+          onClick={() => {
+            const refused = handTheTextToTheBrowserAsAFile(couldNot.text, couldNot.fileName)
+            setSaid(refused)
+            setHanded(refused === null ? couldNot.fileName : null)
+          }}
         >
           {t('g7a.bundles.saveFile')}</button>
         {/* AN ANCHOR AND NOT A BUTTON, because it goes to a page. A real link can be opened in a new
@@ -281,6 +295,7 @@ function TakeItAnotherWay({ couldNot }: { couldNot: WaysOut }) {
             setInABox(true)
             setAsked((n) => n + 1)
             setSaid(null)
+            setHanded(null)
           }}
         >
           {inABox ? t('g7a.bundles.selectAgain') : t('g7a.bundles.textBox')}
@@ -303,6 +318,7 @@ function TakeItAnotherWay({ couldNot }: { couldNot: WaysOut }) {
         />
       ) : null}
       {said === null ? null : <p className="bx-nocopy-said">{said}</p>}
+      {handed === null ? null : <CodeRows rows={[{ label: 'frameFiles.row.handed', value: handed }]} />}
     </div>
   )
 }
@@ -342,10 +358,7 @@ function whatLevelThisPartGot(part: PreviewPart): React.ReactNode {
       <strong>{levelWord(level)}</strong>
       {moved === null ? null : <span className="bx-part-says">{moved}</span>}
       {top === null ? null : (
-        <span
-          className="bx-part-says"
-          title={t('g7a.bundles.levelHint')}
-        >
+        <span className="bx-part-says">
           {t('g7a.bundles.writtenTop', { level: levelWord(top) })}
         </span>
       )}
@@ -453,7 +466,7 @@ export function BundlePanel() {
    * `where` IS `preview` FOR A PRESS ON THE COPY, or a filed bundle's own id for a press on its
    * row — the same word `couldNotCopy` carries, for the same reason and read the same way.
    */
-  const [said, setSaid] = useState<{ where: string; text: string } | null>(null)
+  const [said, setSaid] = useState<{ where: string; text: string; file?: string } | null>(null)
   const [query, setQuery] = useState('')
   const [typedName, setTypedName] = useState<string | null>(null)
   const [filing, setFiling] = useState(false)
@@ -985,9 +998,9 @@ export function BundlePanel() {
         // cannot be called something the entry does not say.
         const fileName = exportFileName(done.title, done.n)
         const handed = handTheZipToTheBrowserAsAFile(done.bytes, fileName)
-        // THE COUNTS ARE TRUE WHEN THE ZIP WAS MADE, but the handed-over sentence is true only when
-        // the browser took the file. A browser that will not take one hears its refusal alone.
-        setSaid({ where, text: handed.handed ? `${handed.said} ${theFileCountsSaid(done)}` : handed.said })
+        // THE COUNTS ARE TRUE WHEN THE ZIP WAS MADE, but the row naming the file is true only when
+        // the browser took it. A browser that will not take one hears its refusal alone.
+        setSaid(handed.handed ? { where, text: theFileCountsSaid(done), file: fileName } : { where, text: handed.said })
         forgetTheFilesAnswer(where)
         again()
         return
@@ -1075,7 +1088,6 @@ export function BundlePanel() {
       <header className="bxp-head">
         <div className="bxp-headwords">
           <h1 data-title-is="its-label">{t('nav.bundles')}</h1>
-          <p className="px-lede">{t('g7a.bundles.lede')}</p>
         </div>
         <div className="bxp-primary">
           <Btn
@@ -1418,7 +1430,7 @@ export function BundlePanel() {
                     <>
                       <p className="bx-part-says">
                         {namedHere === null
-                          ? t('g7a.bundles.allStructure', { n: theStructure.value.length })
+                          ? t('bundles.allGoIn', { n: theStructure.value.length })
                           : t('g7a.bundles.someStructure', { n: namedHere.length, total: theStructure.value.length })}
                       </p>
                       {theStructure.value.map((one) => (
@@ -1539,11 +1551,6 @@ export function BundlePanel() {
               </div>
               {/* WHAT THIS PRESS CAME TO, UNDER THIS PRESS. The third criterion of bundle-5. */}
               {said === null || said.where !== 'filing' ? null : <p className="bx-said">{said.text}</p>}
-              {/* THE EXPLANATION, closed, at the form's foot (rule R7). */}
-              <details className="bxp-fold">
-                <summary>{t('bundlesPage.keepFold')}</summary>
-                <p>{t('bundlesPage.keepMeaning')}</p>
-              </details>
             </div>
           </div>
         </section>
@@ -1596,8 +1603,7 @@ export function BundlePanel() {
               )}
               <p className="bx-size">
                 {t('g7a.bundles.previewSize', { size: sizeInWords(preview), tokens: preview.tokensEstimated, n: preview.carried.length })}{' '}
-                {t(preview.fits ? 'g7a.bundles.fits' : 'g7a.bundles.over')}{' '}
-                {t('bundlesPage.tokensEstimate', { n: preview.charsPerTokenAssumed })}
+                {t(preview.fits ? 'g7a.bundles.fits' : 'g7a.bundles.over')}
               </p>
               {/* HOW MANY WERE DRAWN SHORTER THAN ASKED. Criterion B11: the person choosing the level
                   needs to know the level did not happen for most of what they hand over. */}
@@ -1655,6 +1661,7 @@ export function BundlePanel() {
               {/* WHAT THE PRESS CAME TO, BESIDE THE PRESS THAT MADE IT. The third criterion of
                   bundle-5, with the size of what was handed over (B31). */}
               {said === null || said.where !== 'preview' ? null : <p className="bx-said">{said.text}</p>}
+              {said === null || said.where !== 'preview' || said.file === undefined ? null : <CodeRows rows={[{ label: 'frameFiles.row.handed', value: said.file }]} />}
               {/* THE OTHER WAYS OUT, WHETHER OR NOT ANYTHING FAILED. Criteria B28, B29 and the
                   second criterion of bundle-5. */}
               {theWaysOut === null ? null : <TakeItAnotherWay couldNot={theWaysOut} />}
@@ -1712,6 +1719,7 @@ export function BundlePanel() {
                 {inspect ? <RecordId id={row.id} where="card" /> : null}
                 {/* WHAT THE PRESS ON THIS ROW CAME TO, on this row. The third criterion of bundle-5. */}
                 {said === null || said.where !== row.id ? null : <p className="bx-said">{said.text}</p>}
+                {said === null || said.where !== row.id || said.file === undefined ? null : <CodeRows rows={[{ label: 'frameFiles.row.handed', value: said.file }]} />}
                 {/* AND WHERE THE CLIPBOARD WAS NOT THERE, the other ways out, on this row. B28. */}
                 {couldNotCopy === null || couldNotCopy.where !== row.id ? null : (
                   <TakeItAnotherWay couldNot={couldNotCopy} />
@@ -1731,18 +1739,13 @@ export function BundlePanel() {
           <h2 className="bxp-h">
             <span data-title-is="its-label" {...DRAWS_THE_NAME}>{t('g7a.bundles.brief')}</span>
           </h2>
-          {/* THE PROJECT THE BRIEF WAS READ FOR once it is read, and the one it would be read for before. */}
-          <p className="bx-forwhat">
-            {t('g7a.bundles.briefHint', { project: titles.get(brief?.project ?? theProject) ?? brief?.project ?? theProject })}
-          </p>
           {brief === null ? (
             <button type="button" className="bx-look" onClick={() => void readTheBrief()}>
               {t('g7a.bundles.readBrief')}</button>
           ) : (
             <>
               <p className="bx-size">
-                {t('g7a.bundles.briefSize', { size: sizeInWords(brief.size), tokens: brief.size.tokensEstimated })}{' '}
-                {t('bundlesPage.tokensEstimate', { n: brief.size.charsPerTokenAssumed })}
+                {t('g7a.bundles.briefSize', { size: sizeInWords(brief.size), tokens: brief.size.tokensEstimated })}
               </p>
               {brief.leftOut.length === 0 ? (
                 <p className="bx-clean">
@@ -1831,11 +1834,6 @@ const BUNDLES_CSS = `
 /* THE COPY'S TEXT A SIZE SMALLER in the preview column, so its ruled lines of eighty characters fit
    the column at 1440 instead of wrapping one character onto a line of its own. */
 .bxp-preview .bx-text { font-size: var(--fs-1); }
-
-/* THE EXPLANATION: one closed line at the form's foot (rule R7). */
-.bxp-fold { color: var(--text-2); font: var(--fs-1)/var(--lh-read) var(--font-ui); }
-.bxp-fold summary { cursor:pointer; color: var(--accent); width: fit-content; }
-.bxp-fold p { margin: var(--pad) 0 0; max-width: var(--measure-read); }
 
 /* A KEPT BUNDLE'S ROW: its name and what it is for at the left, when it was handed over and its one
    press at the right, rows split by a thin line. */

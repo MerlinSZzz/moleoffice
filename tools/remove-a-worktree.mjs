@@ -6,6 +6,7 @@
  * Usage: node tools/remove-a-worktree.mjs <worktree> [--answer <file>] [--even-so "<because>"]
  * Exit codes: 0 removed, 1 refused or failed, 2 kept because records name files inside.
  * Exit 1 is also a worktree no record names, kept because no branch, keep ref or main contains its HEAD.
+ * Exit 1 is also a worktree kept because it holds ignored files that no build, install or render makes again.
  *
  * THE TOOL ASKS THE OFFICE ONLY WITH THE RUN'S KEY (wave 13s round 118). A shell with no key gives --answer <file>
  * instead, and a shell with a key may not. With neither, the tool refuses before it sends any request: a request with no
@@ -39,10 +40,16 @@
  * 13s round 116, qVdARm06Ryrk). A removal leaves that commit on no ref whether or not a record names the folder.
  * The tool says the same sentence a named worktree gets and exits 1, because exit 2 says that records name files inside.
  * Before round 116 a worktree no record names went whatever held its commit.
+ *
+ * AN IGNORED FILE THAT NO BUILD, INSTALL OR RENDER MAKES AGAIN KEEPS THE WORKTREE TOO. Git's --force deletes ignored
+ * files with the worktree, and nothing makes a run's logs, a test office or a .env again. So the tool lists the ignored
+ * paths, by name only, and lets the worktree go only when every one is on MADE_AGAIN below. Every other ignored path is
+ * named, and the tool exits 1, as it does for work outside the commit; --even-so does not answer for it. A .env is named
+ * by its path and never opened. Exit 2 stays for records that name files inside.
  */
 import { existsSync, readFileSync, realpathSync } from 'node:fs'
 import { join } from 'node:path'
-import { whatTheIndexHoldsApart } from '../src/config/outside-the-commit.mjs'
+import { inGroups, theNamesIn, whatTheIndexHoldsApart } from '../src/config/outside-the-commit.mjs'
 import { guardedGit, guardedGitBytes, guardedGitRun, outsideTheCommit } from './sandbox-git.mjs'
 import { theAgentKey } from './sandbox-common.mjs'
 import { apiAddressForThisProcess, theEnvironmentsAddressIsForAnotherCopy } from '../src/config/settings.mjs'
@@ -72,6 +79,59 @@ function theWorkOutsideTheCommit(folder, head) {
     ...submodules.filter((path) => existsSync(join(folder, path, '.git'))).map((path) => `a submodule is checked out at ${path}`),
   ]
   return lines.length === 0 && outside.notCompared.length === 0 ? null : { head, lines, notCompared: outside.notCompared }
+}
+
+/**
+ * WHAT A BUILD, AN INSTALL OR A RENDER MAKES AGAIN FROM TRACKED FILES, as paths from the worktree's root. Only an ignored
+ * path on this list may go with a worktree. A pattern ending in a slash is that folder and everything under it; any other
+ * pattern is that one path. A leading double star and slash is any folders or none, and a single star stays inside one
+ * name. node_modules is a link in a worktree and a folder in a checkout, and only the one at the root is on the list.
+ * The list is exact paths and globs, not a guess at what looks built: a new entry comes from the infrastructure agent,
+ * who keeps the sandbox tools, and is never added here on a guess.
+ */
+const MADE_AGAIN = [
+  'node_modules', 'node_modules/', '.cache/', 'dist/', '**/__pycache__/', '**/*.pyc',
+  'tools/shots/', 'tools/review/', '_judge_shots/', '_viz_demo/', 'design/shots/', 'design/index.html', 'design/**/*.png',
+]
+
+/** The avatar and portrait sets .gitignore keeps. Nothing under them is made again, whatever MADE_AGAIN says. */
+const NEVER_MADE_AGAIN = ['design/avatars/png/', 'design/avatars/generated/', 'design/avatars/circle/', 'design/portraits/']
+
+/** One MADE_AGAIN entry as a regular expression over a path as git lists it, where a folder ends in a slash. */
+function asAPattern(entry) {
+  const body = entry.replace(/\/$/, '').split(/(\*\*\/|\*)/).map((piece) =>
+    piece === '**/' ? '(?:[^/]+/)*' : piece === '*' ? '[^/]*' : piece.replace(/[.+?^${}()|[\]\\]/g, '\\$&')).join('')
+  return new RegExp(entry.endsWith('/') ? `^${body}/` : `^${body}$`)
+}
+
+const MADE_AGAIN_PATTERNS = MADE_AGAIN.map(asAPattern)
+
+/** Whether `path`, as git lists it, is on MADE_AGAIN and outside the kept sets. */
+function isMadeAgain(path) {
+  if (NEVER_MADE_AGAIN.some((kept) => path.startsWith(kept))) return false
+  return MADE_AGAIN_PATTERNS.some((pattern) => pattern.test(path))
+}
+
+/**
+ * The ignored paths in the worktree at `folder` that are not on MADE_AGAIN, sorted. Git lists a wholly ignored folder
+ * as one entry ending in a slash. A folder not on the list is listed again file by file, so a folder holding both kinds
+ * is judged by each file. A repository or worktree nested in it stays one entry, and is named. A folder whose second
+ * listing has nothing under it is named itself. Only names are read: no file is opened.
+ * @param {string} folder
+ * @returns {string[]}
+ */
+function theIgnoredFilesNothingMakesAgain(folder) {
+  const ignored = (args) => theNamesIn(guardedGitBytes(folder, ['ls-files', '-z', '--others', '--ignored', '--exclude-standard', ...args],
+    { before: ['--literal-pathspecs'], workTree: folder }))
+  const listed = ignored(['--directory', '--no-empty-directory'])
+  const named = new Set(listed.filter((path) => !path.endsWith('/') && !isMadeAgain(path)))
+  const folders = listed.filter((path) => path.endsWith('/') && !isMadeAgain(path))
+  for (const group of inGroups(folders)) {
+    const inside = ignored(['--', ...group])
+    for (const path of inside) if (!isMadeAgain(path)) named.add(path)
+    for (const one of group) if (!inside.some((path) => path.startsWith(one))) named.add(one)
+  }
+  return [...named].sort()
 }
 
 /** The worktree's HEAD commit, in full. */
@@ -193,17 +253,22 @@ async function main(args) {
   if (common.error || common.status !== 0) throw new Error(common.error?.message ?? common.stderr)
   const repository = common.stdout.trim()
   const outside = theWorkOutsideTheCommit(folder, head)
+  const said = []
   if (outside !== null) {
     const commit = outside.head.slice(0, 12)
-    const said = []
     if (outside.lines.length) said.push(`${folder} contains modified or untracked files, which are not in its commit ${commit}:\n${atMostTwenty(outside.lines)}`)
     if (outside.notCompared.length) {
       said.push(`${String(outside.notCompared.length)} file${outside.notCompared.length === 1 ? '' : 's'} in ${folder} could not be compared with its commit ${commit}. ` +
         'Git converts them on checkout, by an attribute that names a filter, eol=crlf, ident or a working-tree-encoding, and their bytes are not the committed ones. ' +
         `This tool does not run that conversion, so it cannot tell whether they hold work, and it keeps the worktree. Look at each yourself:\n${atMostTwenty(outside.notCompared)}`)
     }
-    throw new Error(said.join('\n'))
   }
+  const ignored = theIgnoredFilesNothingMakesAgain(folder)
+  if (ignored.length) {
+    said.push(`${folder} holds ignored files that no build, install or render makes again, and removing it would delete them. ` +
+      `Only their names were read:\n${ignored.join('\n')}`)
+  }
+  if (said.length) throw new Error(said.join('\n'))
   const removed = guardedGitRun(repository, ['worktree', 'remove', '--force', folder], { before: ['--git-dir', repository] })
   if (removed.stdout) process.stdout.write(removed.stdout)
   if (removed.error || removed.status !== 0) throw new Error(removed.error?.message ?? removed.stderr)

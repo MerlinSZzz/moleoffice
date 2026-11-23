@@ -73,6 +73,7 @@ import {
   waitForThePage,
   whatThePageWouldBeBuiltFrom,
   type LiveApp,
+  governsTheWholeProject,
 } from './helpers.ts'
 import {
   THE_API_PORT_TAG,
@@ -96,7 +97,11 @@ async function fileADecisionIn(app: LiveApp, title: string): Promise<string> {
   const filed = await fetch(`${app.api}/api/records`, {
     method: 'POST',
     headers: AS_THEM,
-    body: JSON.stringify({ kind: 'decision', title, data: { replaces: [], because: 'A browser test filed it to see whether the page reads this database.' } }),
+    body: JSON.stringify({
+      kind: 'decision',
+      title,
+      data: { ...governsTheWholeProject(), replaces: [], because: 'A browser test filed it to see whether the page reads this database.' },
+    }),
   })
   const said = (await filed.json()) as { record?: { id: string } }
   expect(filed.status, JSON.stringify(said)).toBe(201)

@@ -41,7 +41,7 @@
 import { spawn, execFileSync } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, readlinkSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
-import { connect, createServer, type Socket } from 'node:net'
+import { createServer } from 'node:net'
 import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -50,6 +50,7 @@ import type { FastifyInstance } from 'fastify'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { THE_WORKER } from '../src/shared/roles.ts'
+import { aRelayThatNamesTheOffice } from './a-relay-that-names-the-office.ts'
 import { apiApp, freshDb, thePersonsKeyHeader, type TestDb } from './helpers.ts'
 import { FAKE_DEVCONTAINER, FAKE_DF, FAKE_DOCKER, FAKE_DU, FAKE_FREE, startsOf, theFakeMachine } from './sandbox-stand-ins.ts'
 import { linkSourceWithLocalRoundRules } from './round-chapters-fixture.ts'
@@ -112,13 +113,7 @@ async function anOfficeThatRestarts(): Promise<ARestart> {
   const port = (probe.address() as AddressInfo).port
   await new Promise<void>((ok) => probe.close(() => ok()))
   const target = (app.server.address() as AddressInfo).port
-  const relay = createServer((inbound: Socket) => {
-    const outbound = connect(target, '127.0.0.1')
-    inbound.pipe(outbound)
-    outbound.pipe(inbound)
-    inbound.on('error', () => outbound.destroy())
-    outbound.on('error', () => inbound.destroy())
-  })
+  const relay = aRelayThatNamesTheOffice(target)
   let listen: NodeJS.Timeout | undefined
   closers.push(() => {
     clearTimeout(listen)

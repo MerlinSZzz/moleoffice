@@ -322,13 +322,13 @@ describe('what these lines became, in Inspect', () => {
    * Deleting these sentences instead of moving them would be a different change from the one the
    * owner asked for.
    */
-  it('still says where each value is stored, and what filing moved', async () => {
+  it('still says where each value is stored', async () => {
     mode.setMode('inspect')
     try {
       const panel = wordsOf(panelOf(body(await writingView())))
       expect(panel).toContain('Stored in the estimate on the work this line is filed as')
       expect(panel).toContain('Stored in the hours given to this work')
-      expect(panel).toContain('Filing a line moved these off it')
+      // CRITERION CHANGE, as decided: the sentence on what filing moved is gone in both modes.
       expect(panel).toContain('kept exactly as you wrote it')
     } finally {
       mode.setMode('normal')

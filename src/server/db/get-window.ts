@@ -10,7 +10,7 @@ import { eq } from 'drizzle-orm'
 import type { WorkWindow, WindowState } from '@shared/planning.ts'
 import { db } from './client.ts'
 import { workWindows } from './schema.ts'
-import type { WindowRow } from '../lib/windows.ts'
+import type { WindowRow } from './types/windows.ts'
 
 /** One window by id, or null. */
 export function getWindow(id: string): WorkWindow | null {

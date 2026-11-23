@@ -31,7 +31,7 @@ import { createElement as h } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import type { FastifyInstance } from 'fastify'
-import { apiApp, freshDb, type TestDb } from './helpers.ts'
+import { apiApp, freshDb, type TestDb, governsTheWholeProject } from './helpers.ts'
 import { historicalSession } from './synthetic-submission-fixtures.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { writerIn } from '../src/shared/sections.ts'
@@ -168,14 +168,14 @@ beforeAll(async () => {
     kind: 'decision',
     title: 'The made-up archive keeps its scans for a year',
     summary: 'A made-up decision for this test.',
-    data: { replaces: [], authority: 'the owner said so', authority_reference: noteId },
+    data: { ...governsTheWholeProject(), replaces: [], authority: 'the owner said so', authority_reference: noteId },
   })
   byTheAgent = await filed(asTheAgent(), {
     kind: 'decision',
     title: 'The made-up archive is read on Mondays',
     summary: 'A made-up decision an agent wrote down for this test.',
     data: {
-      replaces: [],
+      ...governsTheWholeProject(), replaces: [],
       decided_by: 'the owner',
       authority: 'the owner said so',
       authority_reference: noteId,

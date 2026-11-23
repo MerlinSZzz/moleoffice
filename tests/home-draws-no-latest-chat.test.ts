@@ -11,7 +11,7 @@
  *
  * WHAT THIS FILE PROVES, in a real browser against an office of its own. A made-up agent has
  * written to the person, so a card would have something to show. Home then:
- *   1. draws Needs you first, and does not show the message's words anywhere on the page;
+ *   1. draws its key items first, and does not show the message's words anywhere on the page;
  *   2. asks GET /api/messages/contacts zero times while the chat panel is closed.
  * THE CONTROLS: the chat panel really is closed, the page did read the circle door (so requests are
  * being counted), and the message really is in the contact list.
@@ -24,6 +24,7 @@ import { afterAll, beforeAll, expect, it } from 'vitest'
 import { liveApp, waitForThePage, type LiveApp } from './helpers.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { en } from '../src/shared/words/en.ts'
+import { createI18n } from '../src/shared/i18n.ts'
 
 let app: LiveApp
 const asked: string[] = []
@@ -77,7 +78,7 @@ it('draws no latest-chat card and never reads the contact list', async () => {
 
   // THE TWO CHECKS ARE SOFT, so a mutation shows each one failing, not only the first.
   // 1. NO CARD.
-  expect.soft(await app.page.locator('.hp-page [data-home-section] h2').first().textContent()).toContain('Needs you')
+  expect.soft(await app.page.locator('.hp-page [data-home-section] h2').first().textContent()).toContain(createI18n('en').t('home.keyItems.title'))
   expect.soft(await app.page.locator('.hp-page').innerText()).not.toContain(SAID)
 
   // 2. NO READ FOR IT.

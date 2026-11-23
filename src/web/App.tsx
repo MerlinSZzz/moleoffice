@@ -117,6 +117,7 @@ import { thePage } from './components/agent/pointing.ts'
 import { api } from './api.ts'
 import { SHELL_BAND_QUERY } from './lib/shell-layout.ts'
 import { THE_PAGE_BOX_FROM, THE_PAGE_LAYER, THE_PAGE_SCROLLS_IN_ITS_BOX } from './lib/page-scroll.ts'
+import { THE_PLUGIN_PAGE } from './pages/PluginPage.tsx'
 import { THE_NARROW_FROM, THE_WIDE_FROM } from './lib/the-shell-width.ts'
 import { currentWorkspace, openingWorkspace, setWorkspace, subscribeWorkspace, thePageWaitsForItsProject, workspaceSight } from './lib/workspace.ts'
 // THE DOORS THE FRAME AND THE PAGE BOTH NEED, ASKED ONCE. See the module for the measurements and
@@ -132,6 +133,8 @@ import { needsSomebodyNow } from './lib/attention.ts'
 import { railCount, type WaitingReply } from './lib/waiting.ts'
 import { useLanguage } from './lib/language.ts'
 import { WordReadNotice } from './components/WordReadNotice.tsx'
+import { TheMoveNotice } from './components/TheMoveNotice.tsx'
+import { moveThisBrowserOnce, theMove } from './lib/the-old-cookie.ts'
 // THE KIND OF THE RECORD ON SCREEN, so the rail can mark the row it belongs to.
 import type { RecordKind } from '@shared/types.ts'
 import {
@@ -167,6 +170,7 @@ import { thePageFromTheList, type TheShellsReadings } from './lib/pagelist.tsx'
 import { CategoryPage, WhereThisPageIs } from './pages/CategoryPage.tsx'
 import { QuickNotePage } from './pages/QuickNotePage.tsx'
 import { QuickNoteBeside } from './components/QuickNoteBeside.tsx'
+import { WebPage } from './components/WebPage.tsx'
 /**
  * THE REVIEW PANE IS PART OF THE FRAME, and it has to be.
  *
@@ -732,6 +736,12 @@ function Shell({ workspace }: { workspace: string }) {
   const offeredThePage = useRef(false)
   useEffect(() => {
     if (pairing.status !== 'ready' || pairing.value === null) return
+    // A BROWSER PAIRED BEFORE SEC-2 MOVES FIRST, ONCE A LOAD (lib/the-old-cookie.ts), and the read is asked again, so
+    // a browser that moved is not offered the page. The notice in the page says it once. Item 7 of SEC-2's design.
+    if (pairing.value.mayMove && theMove().state === 'not tried') {
+      void moveThisBrowserOnce().then(() => readPairingAgain())
+      return
+    }
     if (!pairing.value.offered && !pairing.value.mayAsk) return
     if (offeredThePage.current) return
     offeredThePage.current = true
@@ -1084,6 +1094,7 @@ function Shell({ workspace }: { workspace: string }) {
           <div className="shell-main">
           <main className="page" id="main" tabIndex={-1}>
             <WordReadNotice />
+            <TheMoveNotice />
             {/* A PAGE THAT FAILS SAYS SO IN WORDS, WHERE THE PAGE WAS. Criterion E4, and the owner's
                 ruling of 8 September 2026: a blank page is only one way of failing loudly, and what
                 matters is that a failure is loud. A fault while a page is being drawn used to
@@ -1156,6 +1167,9 @@ function Shell({ workspace }: { workspace: string }) {
             <div className={THE_PAGE_LAYER} />
           </main>
 
+          {/* A WEB PAGE THE WINDOW DRAWS, in the body or a column beside it. It is part of the shell, so it keeps its place
+              while the page changes route, and it draws nothing until one is open. components/WebPage.tsx. */}
+          <WebPage />
           <ReviewPane />
           {/* A NOTE FLOATS OVER THE PAGE until it is closed or opened in its own window. It draws nothing when no note
               is open. components/QuickNoteBeside.tsx. */}
@@ -1197,7 +1211,7 @@ function Shell({ workspace }: { workspace: string }) {
             you draws, so the two cannot disagree. components/OnePress.tsx. */}
         <OnePressPopup waiting={waiting} readWaitingAgain={readWaitingAgain} />
 
-        {/* THE QUICK SEARCH, over any page: the sidebar's press and the key f open it. A pasted id opens its record, and
+        {/* THE QUICK SEARCH, over any page: the sidebar's press and Alt and X open it. A pasted id opens its record, and
             words find pages and records by name. components/QuickSearch.tsx. */}
         <QuickSearch />
 
@@ -1310,6 +1324,10 @@ const SHELL_CSS = `
 
 .shell-main > .page { flex: 1 1 auto; min-width: 0; }
 
+/* A plugin window reaches the bottom of the browser; the corner chat button floats over it. */
+:root[${THE_PLUGIN_PAGE}] .shell-main,
+:root[${THE_PLUGIN_PAGE}] .shell-main > .page { padding-bottom: 0; }
+
 /* The page and pane stack when the shell has no room for both columns. The named container
    measures the space left by the rail. SHELL_BAND_QUERY supplies the same condition here and in
    ReviewBar, so the two layouts cannot choose different thresholds.
@@ -1350,9 +1368,10 @@ ${SHELL_BAND_QUERY} {
   top: 0;
   z-index: var(--z-bar);
   display: flex;
-  /* THE COUNTS WRAP, NOT THE CHAT, ON A PHONE. The name column below keeps its whole width, so the project and page
-     lines are not cut. On a phone the bar's markup puts the counts after the chat press, so a row too short for both
-     counts puts them on a second row and keeps the chat press on the menu press's row. */
+  /* THE COUNTS WRAP, NOT THE CHAT, ON A PHONE. On a phone the name column below keeps its whole width where it fits
+     beside the menu press and the chat press, so the project and page lines are not cut. The bar's markup puts the
+     counts after the chat press there, so a count with no room on the first row goes to a second row and the chat
+     press stays on the menu press's row. */
   flex-wrap: wrap;
   align-items: center;
   gap: var(--pad);
@@ -1425,9 +1444,12 @@ ${SHELL_BAND_QUERY} {
 /* Two lines in one 48px bar: which project, then which page. The project is set a size below the
    page and in the quiet text tone — it is the ground the page stands on, not a second heading. */
 .shell-bar-where {
-  /* THE NAME KEEPS ITS WHOLE WIDTH. The column takes its content width, so the project and page lines are not cut; on a
-     phone the counts take the second row rather than the name being squeezed. */
-  flex: 1 1 auto;
+  /* THE NAME GIVES WAY, NOT THE CHAT PRESS. At every width that draws the bar, the chat press stays on the menu
+     press's row whatever the name is: a name wider than the room the presses leave it ends in an ellipsis, and a name
+     that fits is drawn whole. Off a phone the column starts at no width and takes what the presses leave, so the bar
+     is one row wherever the presses fit on it. On a phone the counts take the second row instead, and the phone rules
+     below give the column its whole width up to the room between the menu press and the chat press. */
+  flex: 1 1 0;
   min-width: 0;
   display: flex;
   flex-direction: column;
@@ -1492,10 +1514,16 @@ ${SHELL_BAND_QUERY} {
   /* ON A PHONE MENU, DECISIONS AND THE CHAT ARE SQUARE PRESSES WITH AN ICON (wave 13y round 165). With their words
      drawn, the three took about 380px of the 290px a phone's bar has beside its checklist press, and the bar wrapped
      to two rows. Each keeps its word for a screen reader, and the page's name keeps the room. */
+  .shell-bar { --shell-press: 44px; }
   .shell-menu, .shell-bar-status.shell-bar-entry, .shell-chat-phone {
-    position: relative; width: 44px; min-height: 44px; padding: 0; justify-content: center;
+    position: relative; width: var(--shell-press); min-height: var(--shell-press); padding: 0; justify-content: center;
   }
-  .shell-chat-phone { height: 44px; }
+  .shell-chat-phone { height: var(--shell-press); }
+  /* ON A PHONE THE NAME KEEPS ITS WHOLE WIDTH, UP TO THE ROOM BESIDE THE MENU PRESS AND THE CHAT PRESS. The column
+     starts at its content width, so the counts take the second row rather than the name being squeezed. It is at most
+     the bar's width less those two presses and their two gaps, so the three always share the first row: a longer name
+     ends in an ellipsis there, and a name that fits is drawn whole. */
+  .shell-bar-where { flex-basis: auto; max-width: calc(100% - 2 * (var(--shell-press) + var(--pad))); }
   .shell-menu .shell-bar-word, .shell-bar-entry .shell-bar-word {
     position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap;
   }

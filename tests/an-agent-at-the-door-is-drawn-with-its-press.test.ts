@@ -12,10 +12,11 @@
  * switcher. Then:
  *   - the Embassy draws a row for every ask, with who asks, the card, which computer it came from
  *     and the project, and the press;
- *   - Home's Needs you draws a row for every ask, with who asks and the project, and one press, the
- *     row itself, which opens the ask's own page under the Embassy, the approved Home: the card, the
- *     computer and the Let it in press are on the Embassy's side;
- *   - Home's number counts exactly the asks it draws (nothing else waits in this office);
+ *   - Home's Needs you draws the first NEEDS_SHOWN asks, each with who asks and the project, and one press,
+ *     the row itself, which opens the ask's own page under the Embassy, the approved Home: the card, the
+ *     computer and the Let it in press are on the Embassy's side. The line under the rows says how many of
+ *     how many it draws, and its link opens the Needs you page, which draws every ask;
+ *   - Home's number counts every ask, not only the rows it draws (nothing else waits in this office);
  *   - the ask from the other project is admitted from Home's row, on the page that row opens;
  *   - after the press on the ask's own page, the page says what the press did and what the admitted
  *     agent can do now, where the press was, naming the agent by the office name it registered;
@@ -26,6 +27,17 @@
  *   - a role request's own page is marked under the Embassy in the sidebar, and its middle crumb leads to the Embassy
  *     and says the rail row's word;
  *   - Everything still lists a role request, and its Reports and notes group does not.
+ *
+ * HOME DRAWS ONLY THE FIRST ROWS OF NEEDS YOU: the first NEEDS_SHOWN rows of the waiting reading, and under them a
+ * line that says how many of how many, with a link to the Needs you page. Three asks wait here, more than Home draws,
+ * so the case that reads Home's rows waits for the Needs you card and the rows Home draws, and checks that each is one
+ * of the asks. It reads every ask on the Needs you page, which draws every row with the same component and the same
+ * row markup. It opens that page by the link's own address, so a link to another page turns the case red. Home's
+ * number still counts every ask. With no layout kept, Home shows every project, so the project in the switcher does
+ * not narrow the rows. The admission case reads the row of the ask from the other project on Home. The reading puts
+ * the asks that have waited longest first, and that ask is filed first. An ask's time is stamped to the second, and
+ * asks of one second are ordered by their random ids. So the setup files hermit-crab's ask more than a second before
+ * the others, which makes it the ask that waited longest, and the case on Home checks that Home draws it.
  *
  * MUTATIONS (after a green control), each red:
  *   1. give Home's waiting rows no link (HomeSections.tsx, WaitingRow);
@@ -49,7 +61,10 @@
  */
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import type { Locator } from 'playwright'
 import { liveApp, waitForThePage, type LiveApp } from './helpers.ts'
+import type { Route } from '../src/shared/addresses.ts'
+import { NEEDS_SHOWN } from '../src/web/components/home/HomeSections.tsx'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { AN_ASK_THAT_PROVED_NOTHING } from '../src/shared/what-an-ask-proved.ts'
 import { createI18n, sayInEnglish } from '../src/shared/i18n.ts'
@@ -61,6 +76,9 @@ let app: LiveApp
 /** The project in the switcher, and a made-up second project. */
 const HERE = 'default'
 const ELSEWHERE = 'greenhouse'
+
+/** How long the setup waits after the ask from the other project, in milliseconds: more than a second. */
+const A_LATER_SECOND_MS = 1_100
 
 const AS_THE_PERSON = {
   'content-type': 'application/json',
@@ -132,6 +150,19 @@ const row = (handle: string) => app.page.locator(`.door-ask[data-door-ask="${han
 /** Home's Needs you row for one ask, found by the ask's id. */
 const homeRow = (id: string) => app.page.locator(`[data-home-section="needs"] .hm-needs-item:has([data-home-waiting-id="${id}"])`)
 const homeCount = () => app.page.locator('[data-home-section="needs"] .hm-needs-count')
+/** The page that draws every row of Needs you, named as the app names its pages. */
+const NEEDS_YOU: Route['name'] = 'needsyou'
+
+/** A Needs you row says who asks and the project, and has one press, the row itself, which opens the ask's own page. */
+async function saysWhoAndWhereWithOnePress(one: Locator, item: Waiting): Promise<void> {
+  const said = await one.innerText()
+  expect(said, 'the row does not say who asks').toContain(item.thePress!.handle)
+  expect(said, 'the row does not say which project the ask is in').toContain(item.workspaceTitle)
+  // ONE PRESS, THE ROW ITSELF, and it opens the ask's own page, where the press to let it in is.
+  const presses = one.locator('a, button')
+  expect(await presses.count(), 'a Needs you row has more than one press, or none').toBe(1)
+  expect(await presses.first().getAttribute('href')).toBe(`#/r/${item.id}`)
+}
 
 let farAsk = ''
 let askedAsks: string[] = []
@@ -145,6 +176,9 @@ beforeAll(async () => {
   })
   expect(made.status, await made.text()).toBeLessThan(300)
   farAsk = await askToRegister('hermit-crab', ELSEWHERE)
+  // AN ASK'S SINCE IS ITS RECORD'S createdAt, stamped to the second, and asks of one second are ordered by their random ids.
+  // The wait puts the other two asks in a later second, so hermit-crab's ask has waited longest and is the first row Home draws.
+  await new Promise((resolve) => setTimeout(resolve, A_LATER_SECOND_MS))
   askedAsks = [await askToRegister('barn-owl', HERE), await askToRegister('field-mouse', HERE)]
   // THE SWITCHER READS THE PROJECT THE ASKS WERE NOT ALL FILED IN, in normal mode and the light look.
   await app.page.addInitScript((here) => {
@@ -186,21 +220,36 @@ describe('an agent at the door', () => {
     const items = (await waitingOnThem()).filter((item) => item.thePress !== undefined)
     expect(items).toHaveLength(3)
     await open('/')
+    // HOME DRAWS THE FIRST NEEDS_SHOWN ROWS OF NEEDS YOU, and each of them is one of the asks.
+    const needs = app.page.locator('[data-home-section="needs"]')
+    await needs.waitFor({ state: 'visible', timeout: 30_000 })
+    const rows = needs.locator('.hm-needs-item')
+    await rows.nth(NEEDS_SHOWN - 1).waitFor({ state: 'visible', timeout: 30_000 })
+    expect(await rows.count(), 'rows in Needs you on Home').toBe(NEEDS_SHOWN)
+    const drawn: Waiting[] = []
+    for (const item of items) if ((await homeRow(item.id).count()) === 1) drawn.push(item)
+    expect(drawn, 'a row Home draws is not one of the asks').toHaveLength(NEEDS_SHOWN)
+    expect(drawn.map((item) => item.id), 'the ask that waited longest is not among the rows Home draws').toContain(farAsk)
+    for (const item of drawn) await saysWhoAndWhereWithOnePress(homeRow(item.id), item)
+    // HOME'S NUMBER COUNTS EVERY ASK, not only the rows drawn.
+    expect(await homeCount().textContent()).toBe(String(items.length))
+    // THE LINE UNDER THE ROWS SAYS HOW MANY OF HOW MANY, and its link opens the page that draws every ask.
+    const more = needs.locator('[data-home-needs-more]')
+    expect(await more.locator('.hm-section-count').innerText()).toBe(sayInEnglish('home.lateShown', { n: NEEDS_SHOWN, total: items.length }))
+    const link = more.locator('a')
+    expect(await link.count(), 'the line under the rows has one link').toBe(1)
+    const address = String(await link.getAttribute('href'))
+    expect(address, 'the link is not an address in this app').toMatch(/^#\//)
+    await open(address.slice(1))
+    const onThePage = app.page.locator(`[data-away-from-home="${NEEDS_YOU}"] [data-home-section="needs"]`)
+    await onThePage.waitFor({ state: 'visible', timeout: 30_000 })
     for (const item of items) {
-      const one = homeRow(item.id)
+      const one = onThePage.locator(`.hm-needs-item:has([data-home-waiting-id="${item.id}"])`)
       await one.waitFor({ state: 'visible', timeout: 30_000 })
-      const said = await one.innerText()
-      expect(said, 'the row does not say who asks').toContain(item.thePress!.handle)
-      expect(said, 'the row does not say which project the ask is in').toContain(item.workspaceTitle)
-      // ONE PRESS, THE ROW ITSELF, and it opens the ask's own page, where the press to let it in is.
-      const presses = one.locator('a, button')
-      expect(await presses.count(), 'a Home row has more than one press, or none').toBe(1)
-      expect(await presses.first().getAttribute('href')).toBe(`#/r/${item.id}`)
+      await saysWhoAndWhereWithOnePress(one, item)
     }
     expect(items.find((item) => item.thePress!.handle === 'hermit-crab')?.workspaceTitle).toBe('Greenhouse')
-    expect(await app.page.locator('[data-home-section="needs"] .hm-needs-item').count(), 'rows in Needs you').toBe(3)
-    // HOME'S NUMBER COUNTS EXACTLY THE ROWS DRAWN.
-    expect(await homeCount().textContent()).toBe('3')
+    expect(await onThePage.locator('.hm-needs-item').count(), 'rows on the Needs you page').toBe(items.length)
   }, 180_000)
 
   it('shows where the ask came from in whole in developer mode, on the Embassy', async () => {

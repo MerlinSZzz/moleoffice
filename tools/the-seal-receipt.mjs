@@ -52,7 +52,7 @@ import { theCredentialsFile, theLoginThatPaid } from '../src/config/claude-code-
 import { theHomeNamedIn } from '../src/config/the-paths-of-a-system.mjs'
 import { localStampOf, theMomentOfALocalStamp } from '../src/config/stopped-run-cause.mjs'
 import { claudeTranscriptUsage, codexRolloutUsage, dshTranscriptUsage, keepingTheOutsideSpend, RECEIPT_NOT_REPORTED, whereItRan } from '../src/config/usage.mjs'
-import { textOfTheTranscript, theTranscriptOfTheSession } from './dsh-hooks/served.mjs'
+import { theTextOfTheTranscript, theTranscriptOfTheSession } from './dsh-hooks/served.mjs'
 
 /** The most of a Codex run's output file read for its thread.started line, in bytes. */
 const THE_MOST_OF_THE_OUTPUTS_HEAD = 64 * 1024
@@ -217,9 +217,9 @@ export function theSealsReceipt({ record, env, cwd = process.cwd(), limits }) {
     const read = theLastBytesOf(found.path, limits)
     if (!read.ok) return inWords(`${read.why}.`)
     if (!read.whole) return inWords(`the transcript of the run's dsh session is longer than ${String(limits?.most ?? THE_MOST_OF_A_LOG_READ)} bytes, and a part of it would give a total that is too small.`)
-    const text = textOfTheTranscript(found.path, read.bytes)
-    if (text === null) return inWords('the transcript of the run\'s dsh session could not be decoded.')
-    return fromTheLog(found.path, dshTranscriptUsage(text))
+    const decoded = theTextOfTheTranscript(found.path, read.bytes)
+    if (decoded.text === null) return inWords(`the transcript of the run's dsh session was not read: ${decoded.why}.`)
+    return fromTheLog(found.path, dshTranscriptUsage(decoded.text))
   }
   if (runtime !== 'claude-code' && runtime !== 'codex') return inWords(`this office tool has no reader of ${theOwnLogOfARunOn(runtime)}.`)
   const sinceMs = theMomentOfALocalStamp(String(record?.createdAt ?? ''))

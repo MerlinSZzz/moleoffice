@@ -6,15 +6,22 @@ import type {
   CastingSettingsRefusalCode,
   PackageWorkerAskRefusalCode,
   ProviderTableRefusalCode,
+  SealOwnCommitsRefusalCode,
 } from '../refusal-codes.ts'
 
 import { SURFACES } from '../surfaces.ts'
-import { NOTICE_WORDS } from '../../config/word-sources.mjs'
+import { NOTICE_WORDS, SETTING_WORDS } from '../../config/word-sources.mjs'
 
 /** tests/coded-refusals-keep-the-server-english.test.ts reads every server.<code> in this file as the server's own sentence. */
 export const THE_WORDS_ARE_THE_SERVERS_SENTENCE = true
 
 export const enWave13n = {
+  'inspectorAnswers.waitTitle': 'The hand-back of {title} needs an answer',
+  'inspectorAnswers.waitBody': 'The inspector found that the points of package {task} hold. {why} The package waits for the maker or the person to answer.',
+  'inspectorAnswers.waitPart': 'At least one point was handed back as partly done or not done.',
+  'inspectorAnswers.waitRules': 'The inspector did not find that every point kept the rules. {why}',
+  'settingsWords.MOLE_OFFICE_LINES_THE_INSPECTOR_ANSWERS': SETTING_WORDS.MOLE_OFFICE_LINES_THE_INSPECTOR_ANSWERS,
+  'chk.says.checksOffNeedsNoCheck': "The office's checks were switched off, so the office closed this run with no check, and nothing waits on it.",
   'casting.native': 'Native fields',
   'casting.nativeModel': 'Native model',
   'casting.nativeProvider': 'Native provider',
@@ -32,7 +39,6 @@ export const enWave13n = {
   'casting.nativeWhat':
     "Native fields are the model, provider and variant that the program itself is given. This page does not check them against the program. A run's start checks them, and refuses in words what the program cannot take.",
   'casting.nativeEmpties': 'Spaces at the start and end are taken off. A provider or variant left empty is stored as none.',
-  'casting.nativeAddEmpties': 'Leave all three empty to add the row without native fields.',
   'casting.nativeModelNeeded': 'Write the native model first. Nothing was sent.',
   'casting.nativeClear': 'Clear the native fields',
   'casting.nativeClearHold': 'Clear the hold',
@@ -45,7 +51,6 @@ export const enWave13n = {
   'chat.projects.all': 'All projects',
   'chat.projects.more': '+{n}',
   'chat.projects.markTitle': 'Written in or about: {names}',
-  'chat.projects.noneInThisList': 'No conversation in this list has a message in {name}.',
   // ---- w13n round 49: the mark the person puts on a message to an agent ----
   'record.section.intent': 'Intent',
   'message.intent.name.justAsk': 'Just ask',
@@ -61,7 +66,6 @@ export const enWave13n = {
   'chat.intent.selectorNow': 'What the agent may do: {mark}',
   'chat.intent.name.none': 'No mark',
   'chat.intent.markBroken': 'Mark broken',
-  'chat.intent.markBrokenTitle': 'This reply did not do what your "{mark}" mark asked. Files a problem and tells the agent.',
   'chat.intent.markBrokenSending': 'Filing…',
   'chat.intent.markBrokenFiled': 'Problem filed. The agent was told.',
   'chat.intent.markBrokenAlready': 'Already reported. Nothing new was written.',
@@ -143,11 +147,6 @@ export const enWave13n = {
   'review.b.goingToTheWriter': "going to {name}, this page's writer, because no recipient was chosen",
   'review.b.goingToTheWriterUnnamed':
     "going to this page's writer, an agent with a name Mole Office could not read, because no recipient was chosen",
-  'review.leave.toTheWriter': "Send sends them to {name}, this page's writer, because no recipient was chosen.",
-  'talk.state.reviewGoesToAgentsOnly':
-    'A review goes only to an agent, so it does not go to the person under To. The review column says who it goes to.',
-  'talk.state.recipientHasNoRecord':
-    'The agent under To has no record here, so the review cannot go to it. The review column says who it goes to.',
   'talk.state.recipientNotKept': 'The comment is in the review, but who it goes to was not saved',
   // ---- w13n round 58: Shutdown in the window and in the browser, for criteria W5 and W6 ----
   'server.shutDownOnlyTheOwner': 'Only the owner may shut Mole Office down, or a secretary holding the owner\'s grant where this office\'s list of what the grant carries says so. Nothing was stopped.',
@@ -209,9 +208,12 @@ export const enWave13n = {
   'theUpdate.page.couldNotRead': 'This page could not read what Mole Office found. It tries again every two seconds.',
   'theUpdate.page.found':
     'This version of Mole Office keeps its database in a newer shape than the one on this computer. It checked what bringing the database up to date would do, on a copy.',
+  'theUpdate.page.foundOnThisFile':
+    'This version of Mole Office would change some rows of the database on this computer. It found which rows by making the change in the database itself and undoing it at once. Nothing it changed was kept.',
   'theUpdate.page.holdsHeading': 'What the database holds',
   'theUpdate.page.nothingChangedHeading': 'What has changed',
   'theUpdate.page.nothingChanged': 'Nothing yet. No row of the database has been written, and nothing is written until the owner presses below.',
+  'theUpdate.page.nothingKept': 'Nothing yet. Every row is as it was, and nothing is kept until the owner presses below.',
   'theUpdate.page.willDoHeading': 'What the update will do, in the migrations\' own words',
   'theUpdate.page.whatThePressDoes': 'One press does four things, in order, and stops at the first that fails:',
   'theUpdate.page.step1': 'It backs the database up into {backups}, and checks the backup.',
@@ -248,6 +250,7 @@ export const enWave13n = {
   'record.section.heldByItsFiler': 'Held by its filer',
   // ---- w13n round DM: the images a Codex worker's run was given at its start ----
   'record.section.imagesGiven': 'Images given',
+  'record.section.workerPlace': 'Worker place',
   // ---- w13n round DP: a check the office queued that nothing in the office would start ----
   'record.section.aCheckNothingStarts': 'A check nothing starts',
   // ---- w13n round BC: a Codex run that answers a message takes its model from its agent's Casting row ----
@@ -268,6 +271,7 @@ export const enWave13n = {
   'devWords.said.effortTheRunIsRefused': 'The run is refused, so no effort is set.',
   // ---- w13n round BJ: a next round takes its model from the role's Casting row in force ----
   'devWords.said.roundKeepsThePreviousModel': 'No Casting row is in force for {card} in {project}, so the round keeps model {model} from run {run}.',
+  "devWords.said.roundKeepsTheUnmatchedRun": "Casting row {row}, in force for {card}, casts {program}, and no row in force casts {runtime}, the run's program, so the round keeps runtime {runtime} and model {model} from run {run}.",
   'devWords.said.roundRowCastsAnotherRuntime': 'Casting row {row}, in force for {card}, casts {program} with {model}, and the round continues run {run} on {runtime}, so it cannot take its model from that row.',
   // ---- w13n round BL: a second check of a run that ends with no verdict files a problem for the run's starter ----
   'noticeWords.aNoVerdictProblemWasFiled': "It tells a run's starter that a problem was filed because two check sessions of the run ended with no verdict.",
@@ -394,12 +398,9 @@ export const enWave13n = {
   'delegation.hint.strongModelNoModel': '{worker} is judged {difficulty} and is given {model}, with no reason written for that model. The rows for that label give no model, so the office does not guess one. A model matches a row when it is the row\'s model as written, or the part of it after its last "/", with upper and lower case taken as the same.',
   'delegation.hint.difficultyNotALabel': '{worker} is judged "{difficulty}", which is not a label the office knows. The labels are {labels}.',
   'delegation.hint.missingDifficultyOrReason': '{worker} is missing {missing}.',
-  'delegation.hint.moreThanOneWave': 'The package takes {waves} waves. A second wave should wait on something outside the line.',
+  'delegation.hint.moreThanOneWave': 'The package takes {waves} waves. A second wave should wait on something outside the team.',
   'delegation.hint.waveWaitsForNothing': 'Wave {wave} names nothing outside the line that it waits for.',
   'planShape.title': 'The plan',
-  'planShape.noPlan': 'No plan has been sent with an alignment yet.',
-  'planShape.unreadable': 'The plan could not be read in either shape, so it is not shown.',
-  'planShape.oldPlan': 'This plan was written before plans had a fixed shape. It is shown as it was.',
   'planShape.restated': 'The restatement',
   'planShape.worker': 'Worker',
   'planShape.outcome': 'Outcome',
@@ -414,16 +415,12 @@ export const enWave13n = {
   'planShape.wave': 'Wave {n}',
   'planShape.waitsFor': 'Waits for',
   'planShape.hints': 'The office\'s hints',
-  'planShape.noHints': 'The office has no hint about this plan.',
-  'planShape.hintsNotStored': 'The office\'s hints were not stored with this alignment, so this page does not say whether it had any.',
   'planShape.goOnWhy': 'Why the supervisor went on',
   'planShape.answer': 'The answer',
   'planShape.aligned': 'Aligned',
   'planShape.differs': 'Differs',
   'planShape.waiting': 'Waiting for an answer',
   'packageWorkers.title': 'Its workers',
-  'packageWorkers.intro': 'Every worker this package was given to, oldest ask first. A worker with no run filed is listed too, so nobody is dropped without a word.',
-  'packageWorkers.none': 'No worker has been started for this package.',
   'packageWorkers.noneRecorded': 'not recorded',
   'packageWorkers.worker': 'worker',
   'packageWorkers.asked': 'asked',
@@ -442,9 +439,20 @@ export const enWave13n = {
   'packageWorkers.minuteCount': { one: '{n} minute', other: '{n} minutes' },
   'packageWorkers.handbacks': 'Hand-backs: {total} in all, {byWorkers} naming a worker and {notNaming} naming none.',
   'packageWorkers.askedOn': 'Asked on {title}.',
-  'packageWorkers.asksNone': 'The ask is not on a supervisor run the office can read.',
   'packageWorkers.wanted': 'wanted',
   'packageWorkers.starting': 'starting',
   'packageWorkers.started': 'started',
   'packageWorkers.failed': 'failed',
+
+  // A SEAL COUNTS ONLY ITS RUN'S OWN COMMITS: the fields only the office writes, and the seal's refusals.
+  'record.hint.session.filingHead': "The commit the run's working directory was at when the run was filed, and when the office read it, or why it could not. Only the office writes it.",
+  'record.hint.session.endHead': "The commit the run's working directory was at when the run ended, and when the office read it, or why it was not read. Only the office writes it.",
+  ...{
+    'server.onlyTheOfficeWritesTheFilingHead': "Only the office writes the commit a run was filed at, so nothing was written.",
+    'server.onlyTheOfficeWritesTheEndHead': "Only the office writes the commit a run ended at, so nothing was written.",
+    'server.onlyTheOfficeWritesTheCarriedCommits': "Only the office writes the commits a seal names as carried, so nothing was written.",
+    'server.sealHoldsCommitsNotTheRunsOwn': "The seal would hold commits this run did not make, so nothing was sealed.",
+    'server.sealLeavesOutTheRunsOwnCommits': "A records seal would leave out commits this run made, so nothing was sealed.",
+    'server.sealWorkingDirectoryUnread': "The office could not read the run's working directory as the repository the run was filed in, so nothing was sealed.",
+  } satisfies Record<`server.${SealOwnCommitsRefusalCode}`, string>,
 } as const

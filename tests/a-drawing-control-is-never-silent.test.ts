@@ -68,6 +68,7 @@ import { createElement as h } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import type { Locator, Page } from 'playwright'
 import { THE_TEST_OFFICES_OWNER } from './a-page-of-a-test-office.ts'
+import { sayInEnglish } from '../src/shared/i18n.ts'
 import { deleteTheCopiedDefaultChapters, type LiveApp, liveApp, waitForThePage } from './helpers.ts'
 import { theDrawingHasSettled } from './the-drawing-has-settled.ts'
 import { theDrawingIsDrawn } from './a-made-up-office-drawn-in-lanes.ts'
@@ -278,8 +279,8 @@ describe('a drawing with no card on it says why, and what would put one there', 
     // button whose press set the state the page was already in.
     await openTheDrawing('pipeline/drawing', false)
     const sentence = await page.locator('.gx-projection').first().innerText()
-    // Plan 7FEOshq3mBGG uses the short mark for ordinary emptiness.
-    expect(sentence).toBe('—')
+    // The empty drawing draws the state word for none, read by its key.
+    expect(sentence).toBe(sayInEnglish('absence.none'))
 
     // AND THE OTHER THING THAT WOULD FILL IT. Show all is beside this sentence and puts every card
     // on the canvas in one press; the sentence named only the link nobody had made, so a reader was
@@ -306,7 +307,7 @@ describe('a drawing with no card on it says why, and what would put one there', 
     await theDrawingHasSettled(page)
     const cards = await page.locator('.gx-card').count()
     expect(cards, 'Show all drew nothing on the canvas').toBe(4)
-    expect(sentence).toBe('—')
+    expect(sentence).toBe(sayInEnglish('absence.none'))
     expect(await page.locator('.react-flow__edge').count(), 'a line was drawn between cards nothing joins').toBe(0)
   }, 300_000)
 
@@ -415,7 +416,7 @@ describe('a drawing with no card on it says why, and what would put one there', 
       })
       .toBeGreaterThan(0)
     const sentence = await page.locator('.gx-projection').first().innerText()
-    expect(sentence).toBe('—')
+    expect(sentence).toBe(sayInEnglish('absence.none'))
     // NO SHOW ALL HERE. On the canvas, Show all 1 drew the pipeline's own box. No pipeline's lanes offer
     // Show all, because the lanes draw every step the pipeline has, so there is no button to read.
     expect(

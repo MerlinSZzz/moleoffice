@@ -23,7 +23,7 @@
  * EVERY LOCK, TREE, SUITE AND RUN HERE IS MADE UP. The runs alone are real calls of runAlone through
  * tests/stand-in-sandbox-tool.mjs, whose test command is a small report writer. The door is the merge tool's own,
  * calling tests/stand-in-cloud-suite-door.mjs. The suites are the real testGit, with the sandbox, the office and the
- * door stood in for as in tests/the-whole-suite-red-gate.test.ts. The related tests' list comes from a made-up
+ * door stood in for. The related tests' list comes from a made-up
  * run-named-tests.mjs in the made-up tool folder, which names the one made-up test file.
  *
  * MUTATION PROOF (logs named in the report of the run that added each case), each alone after a green control:

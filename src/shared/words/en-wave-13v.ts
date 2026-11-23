@@ -8,7 +8,6 @@ export const enWave13v = {
   // {who} is an agent's name or handle and is never translated. {because} is the reason given, as it was written.
   get 'settingsPanel.title.gpuwatcher'(): string { return SURFACES['settings.gpuwatcher'] },
   'gpuWatcher.loading': 'the GPU watcher',
-  'gpuWatcher.what': 'The agent, besides you, that may report GPU readings and record a cut-in step on a GPU booking. A .env line that names one comes before the choice here.',
   'gpuWatcher.inForce.env': '{who} is the GPU watcher. The .env line names it, and that line comes before the choice here.',
   'gpuWatcher.inForce.envNoAgent': 'The .env line names {who} as the GPU watcher, and no agent here has that handle. That line comes before the choice here, so no agent may hand in readings of the card.',
   'gpuWatcher.inForce.setHere': '{who} is the GPU watcher, chosen here.',
@@ -19,7 +18,6 @@ export const enWave13v = {
   'gpuWatcher.pick': 'GPU watcher',
   'gpuWatcher.pickNobody': 'None',
   'gpuWatcher.save': 'Save',
-  'gpuWatcher.nobodyQualifies': 'No agent is registered here, so none can be chosen.',
 
   // ---- the zip export's question: src/web/components/BundlePanel.tsx and TaskPackagePanel.tsx ----
   // {title} and {fileName} are a record's title and the name the server gave the download. {n} is a

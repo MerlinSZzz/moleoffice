@@ -5,9 +5,12 @@
  * A PLACE.
  *
  * What is proved, in a browser against a test office of its own, in English and in Chinese:
- *   1. a decision's Governs section draws a module by its title, linked to it, and a path as the path;
- *   2. the lookup on the Decisions page, asked about a file, lists the decisions that reach it newest first, marks the
- *      replaced one with what replaced it, and says how many decisions say nothing in governs.
+ *   1. a decision's Governs section draws a module by its title, linked to it, and then the files part, governsFiles,
+ *      in the same list. A decision that names no page and says what no page fits draws that entry in its Governs
+ *      section, which its files part or its nothingFits alone fills;
+ *   2. the lookup on the Decisions page, asked about a file, lists the decisions whose files part reaches it newest
+ *      first, marks the replaced one with what replaced it, and says how many decisions say nothing in governs: one
+ *      that says no page fits it is one of them.
  *
  * Set W13Q_R40_SHOTS to a folder to photograph both at 1440, 990, 660 and 390, light and dark, in both languages.
  *
@@ -22,7 +25,7 @@ import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { BrowserContext, Page } from 'playwright'
-import { liveApp, waitForThePage, type LiveApp } from './helpers.ts'
+import { liveApp, waitForThePage, type LiveApp, governsTheWholeProject } from './helpers.ts'
 import { createI18n } from '../src/shared/i18n.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 
@@ -53,7 +56,8 @@ const file = async (kind: string, title: string, data: Record<string, unknown>):
  */
 async function decide(title: string, extra: Record<string, unknown>): Promise<string> {
   await new Promise((resolve) => setTimeout(resolve, 1_100))
-  return file('decision', title, { option_taken: title, because: 'A made-up reason for a test office.', replaces: [], ...extra })
+  const data = { option_taken: title, because: 'A made-up reason for a test office.', ...governsTheWholeProject(), replaces: [], ...extra }
+  return file('decision', title, data)
 }
 
 async function aWindow(width: number, theme: 'light' | 'dark' = 'light'): Promise<Page> {
@@ -64,9 +68,9 @@ async function aWindow(width: number, theme: 'light' | 'dark' = 'light'): Promis
   return context.newPage()
 }
 
-/** The decision's page with its Governs section open. */
-async function theDecision(page: Page, language: 'en' | 'zh'): Promise<void> {
-  await page.goto(`${app.site}/?lang=${language}#/r/${String(ids['placed'])}`)
+/** The decision's page with its Governs section open: the one that names a module and a file, unless another is named. */
+async function theDecision(page: Page, language: 'en' | 'zh', which = 'placed'): Promise<void> {
+  await page.goto(`${app.site}/?lang=${language}#/r/${String(ids[which])}`)
   await waitForThePage(page, 30_000)
   const heading = createI18n(language).t('record.section.governs')
   await page.getByText(heading, { exact: true }).last().click()
@@ -89,15 +93,20 @@ beforeAll(async () => {
   app = await liveApp({ name: 'what-it-governs', workspace: 'default', viewport: { width: 1440, height: 900 } })
   if (shots) mkdirSync(shots, { recursive: true })
   ids['module'] = await file('module', 'Test: the path rules module', { context: 'A made-up module for a test office.' })
-  ids['older'] = await decide('Test: shared code stays free of server imports', { governs: [{ path: 'src/shared' }] })
+  ids['older'] = await decide('Test: shared code stays free of server imports', { governsFiles: ['src/shared'] })
   ids['placed'] = await decide('Test: one path rule for every caller', {
-    governs: [{ record: ids['module'] }, { path: 'src/shared/paths.ts' }],
+    governs: [{ record: ids['module'] }],
+    governsFiles: ['src/shared/paths.ts'],
   })
   ids['replacing'] = await decide('Test: shared code may import the word lists', {
-    governs: [{ path: 'src/shared/words' }],
+    governsFiles: ['src/shared/words'],
     replaces: [ids['older']],
   })
-  await decide('Test: a decision that says nothing about where it applies', {})
+  // NOTHING IN GOVERNS: a decision door refuses one that names nothing, so this one says no page fits it.
+  ids['nothing'] = await decide('Test: a decision that says nothing about where it applies', {
+    governs: undefined,
+    nothingFits: [{ missing: 'module', what: 'Where it applies, which no page names' }],
+  })
 }, 240_000)
 
 afterAll(async () => {
@@ -106,7 +115,7 @@ afterAll(async () => {
 }, 60_000)
 
 describe('what a decision governs, drawn', () => {
-  it('1: the decision page draws a module by its title and a path as the path, in both languages', async () => {
+  it('1: the decision page draws a module by its title and then its file, and what no page fits, in both languages', async () => {
     for (const language of ['en', 'zh'] as const) {
       const page = await aWindow(1440)
       await theDecision(page, language)
@@ -115,7 +124,15 @@ describe('what a decision governs, drawn', () => {
       const module = rows.nth(0).locator('a')
       expect((await module.innerText()).trim()).toBe('Test: the path rules module')
       expect(await module.getAttribute('href')).toContain(String(ids['module']))
+      expect(await rows.nth(1).getAttribute('data-governs')).toBe('file')
       expect((await rows.nth(1).innerText()).trim()).toBe('src/shared/paths.ts')
+
+      // NO PAGE, NO FILE: the Governs section is still drawn, and it draws what no page fits.
+      await theDecision(page, language, 'nothing')
+      const unplaced = page.locator('ul.rd-governs > li')
+      expect(await unplaced.count()).toBe(1)
+      expect(await unplaced.nth(0).getAttribute('data-governs')).toBe('nothing-fits')
+      expect(await unplaced.nth(0).innerText()).toContain('Where it applies, which no page names')
     }
   }, 120_000)
 
@@ -134,7 +151,7 @@ describe('what a decision governs, drawn', () => {
       expect((await replaced.innerText()).replace(/\s+/g, ' ').trim()).toBe(
         `${words.t('decisions.governing.replacedBy')} Test: shared code may import the word lists`,
       )
-      expect((await panel.locator('.dg-note').first().innerText()).trim()).toBe(words.t('decisions.governing.notPlaced', { n: 1, of: 4 }))
+      expect((await panel.locator('.dg-state').first().innerText()).trim()).toBe(words.t('decisions.governing.unplaced', { n: 1, of: 4 }))
     }
 
     if (shots) {

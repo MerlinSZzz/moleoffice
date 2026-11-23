@@ -102,7 +102,7 @@ async function hook(argv: string[], command: string, sandbox: string | null = nu
 describe('the hook of a paired office is told the office’s paths', () => {
   it('is given the development checkout’s database, keys file and backups by the worker', () => {
     expect(theWorkersCommandLine()).toEqual([
-      process.execPath, join(stable, 'tools', 'guard', 'main-world-guard.mjs'), '--agent', 'builder-x',
+      process.execPath, join(stable, 'for-agents', 'main-world-guard.mjs'), '--agent', 'builder-x',
       '--database', database, '--keys', keys, '--backups', backups,
     ])
   })

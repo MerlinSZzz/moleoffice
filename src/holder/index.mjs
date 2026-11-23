@@ -54,7 +54,9 @@
  *   hello                   who this holder is: { protocol, pid, startedAt, database, understands }, where
  *                                       understands names the requests newer than the protocol (UNDERSTANDS)
  *   list                    every terminal it holds: { terminals }
- *   open                    start one: { who, agent, project, command, args, folder, env, cols, rows, keeping } -> { terminal }
+ *   open                    start one: { who, agent, project, command, args, folder, env, cols, rows, keeping, prepared? }
+ *                                       -> { terminal }, where prepared is { line, by }: one line a secretary prepared,
+ *                                       typed in once the shell is quiet and never entered (prepareALine)
  *   watch   { terminal }    the screen now, then its output on this connection: { terminal, screen }
  *   write   { terminal, data }          -> { linesToTake }: how many ended lines wait to be taken
  *   quickInput { terminal, input }      type one line the office was asked for, then Enter, and never read it as
@@ -68,6 +70,8 @@
  *   keeping { terminal, on }            turn keeping what the person types on or off -> { terminal }
  *   takeLines { terminal }              the ended lines the screen has been asked about, given once and then let go:
  *                                       { lines: [{ text, at } | { left: 'not-shown' | 'edited' | 'typed-by-another', at }], waiting }
+ *   nameATerminal { terminal, name, group, tags }   the name, the group and the tags the person gives it, kept with it
+ *                                       in memory until it is closed or the holder ends -> { terminal }
  *
  * A watcher that cannot keep up is let go rather than buffered without end: when more than
  * THE_MOST_A_WATCHER_MAY_FALL_BEHIND bytes wait for it, its connection is closed. A viewer that comes
@@ -84,15 +88,22 @@ import { dirname, isAbsolute, resolve } from 'node:path'
 import pty from 'node-pty'
 import headless from '@xterm/headless'
 import serialize from '@xterm/addon-serialize'
-import { startTimeOf } from '../config/session-process.mjs'
+import { aWatchOnTheStarter, startTimeOf } from '../config/session-process.mjs'
 import { thisSystem } from '../config/systems/the-system.mjs'
 import { isTheProgramRun, THE_HOLDER_ENTRY } from '../config/settings.mjs'
 import { localStampOf } from '../config/stopped-run-cause.mjs'
+import { THE_TEST_RUN_FLAG, THE_TEST_RUN_WATCH_PERIOD_MS, theTestRunToEndWith } from '../config/the-test-mark.mjs'
+import { A_CONTROL_CHARACTER } from '../config/a-control-character.mjs'
 import {
   THE_HOLDER_PROTOCOL,
   THE_HOLDER_REQUESTS as UNDERSTANDS,
   THE_LARGEST_SIDE,
   THE_LONGEST_REQUEST_CHARACTERS,
+  THE_LONGEST_TERMINAL_GROUP,
+  THE_LONGEST_TERMINAL_NAME,
+  THE_LONGEST_TERMINAL_TAG,
+  THE_LONGEST_WAIT_TO_TYPE_A_PREPARED_LINE_MS,
+  THE_MOST_TAGS_ON_A_TERMINAL,
   THE_SCROLLBACK_LINES,
   theCopyThisIs,
   theLongestSocketPathBytes,
@@ -124,6 +135,7 @@ const SOCKET_CHECK_MS = 2_000
  *   id: string, who: unknown, agent: unknown, project: string, command: string, args: string[], folder: string,
  *   envNames: string[], cols: number, rows: number, openedAt: string,
  *   endedAt: string | null, exit: Exit | null, closed: boolean, keeping: boolean, typing: Typing,
+ *   prepared: Prepared | null, name: string | null, group: string | null, tags: string[],
  *   pty: import('node-pty').IPty, screen: import('@xterm/headless').Terminal,
  *   serializer: import('@xterm/addon-serialize').SerializeAddon, watchers: Set<import('node:net').Socket>,
  * }} Held
@@ -152,6 +164,11 @@ const SOCKET_CHECK_MS = 2_000
  * holder's own Enter ends it, it waits nowhere, as before: it was never the person's typing. When the person typed onto
  * either in the pause, `clean` is false until the line ends, so no later line is typed onto it (round 98).
  *
+ * A PREPARED LINE (prepareALine) is on the screen before the person has typed anything: a secretary prepared it and the
+ * holder typed it, with no Enter. So a terminal opened with one starts with the mark on and `clean` false. No line is
+ * typed onto it, and when the person ends it with their Enter it waits as typed by another and is never their last line.
+ *
+ * @typedef {{ line: string, by: { kind: 'agent', id: string } }} Prepared
  * @typedef {{ text: string | null, at: string, shown: boolean | null, byAnother?: true }} Ended
  * @typedef {{
  *   buffer: string, clean: boolean, byAnother: boolean, last: { text: string, at: string, shown: boolean } | null,
@@ -187,8 +204,87 @@ const SHOWN_AFTER_MS = 300
  */
 const QUICK_INPUT_PAUSE_MS = 100
 
-/** A character a terminal reads as a key rather than as text: a control character, or DEL. */
-const A_CONTROL_CHARACTER = /[\u0000-\u001f\u007f]/u
+/**
+ * WHEN A PREPARED LINE IS TYPED: once the shell has written something, such as its prompt, and has then been quiet for
+ * PREPARED_QUIET_MS, or after THE_LONGEST_WAIT_TO_TYPE_A_PREPARED_LINE_MS when it never is. A line typed before the
+ * shell reads its input can be shown twice, once by the terminal and once by the shell. Neither number was measured
+ * against a slow shell; a shell that starts later than the longest wait reads the line from what waits for it.
+ */
+const PREPARED_QUIET_MS = 150
+
+/**
+ * THE PREPARED LINE OF AN OPEN, checked here although the server checked it first: the holder types it into a terminal
+ * the person runs, so a key in it would run it before their Enter. It is one line of text with no key in it
+ * (A_CONTROL_CHARACTER), prepared by a named agent. None is null.
+ *
+ * @param {unknown} prepared
+ * @returns {Prepared | null}
+ */
+function thePreparedLine(prepared) {
+  if (prepared === undefined || prepared === null) return null
+  const refused = () =>
+    new Error('open refuses the prepared line: it must be one line of text with no key such as Enter in it, and name the agent that prepared it. Nothing was opened.')
+  if (typeof prepared !== 'object' || Array.isArray(prepared)) throw refused()
+  const { line, by } = /** @type {Record<string, unknown>} */ (prepared)
+  if (typeof line !== 'string' || line === '' || A_CONTROL_CHARACTER.test(line)) throw refused()
+  if (by === null || typeof by !== 'object' || Array.isArray(by)) throw refused()
+  const { kind, id } = /** @type {Record<string, unknown>} */ (by)
+  if (kind !== 'agent' || typeof id !== 'string' || id === '') throw refused()
+  return { line, by: { kind, id } }
+}
+
+/**
+ * WHETHER THE HOLDER KEEPS A NAME, A GROUP OR A TAG AS IT CAME. The server trims what the person wrote and checks it
+ * first; the holder keeps only a value already in that form: some text with no space at either end, no key in it and
+ * at most `longest` characters.
+ *
+ * @param {unknown} value
+ * @param {number} longest
+ * @returns {value is string}
+ */
+function aKeptLabel(value, longest) {
+  return typeof value === 'string' && value !== '' && value === value.trim() && Array.from(value).length <= longest && !A_CONTROL_CHARACTER.test(value)
+}
+
+/**
+ * ONE NAME OR GROUP THE PERSON GIVES A TERMINAL, or null for none.
+ *
+ * @param {unknown} value
+ * @param {string} what
+ * @param {number} longest
+ * @returns {string | null}
+ */
+function aTerminalLabel(value, what, longest) {
+  if (value === null) return null
+  if (!aKeptLabel(value, longest)) {
+    throw new Error(
+      `nameATerminal needs ${what} as null or as 1 to ${String(longest)} characters, with no space at either end and no key such as Enter. Nothing was changed.`,
+    )
+  }
+  return value
+}
+
+/**
+ * THE TAGS THE PERSON GIVES A TERMINAL: at most THE_MOST_TAGS_ON_A_TERMINAL, each kept as a name is (aKeptLabel), and
+ * none twice.
+ *
+ * @param {unknown} tags
+ * @returns {string[]}
+ */
+function theTerminalTags(tags) {
+  const refused = () =>
+    new Error(
+      `nameATerminal needs tags as a list of at most ${String(THE_MOST_TAGS_ON_A_TERMINAL)} different tags, each of 1 to ${String(THE_LONGEST_TERMINAL_TAG)} characters with no space at either end and no key such as Enter. Nothing was changed.`,
+    )
+  if (!Array.isArray(tags) || tags.length > THE_MOST_TAGS_ON_A_TERMINAL) throw refused()
+  /** @type {string[]} */
+  const kept = []
+  for (const tag of tags) {
+    if (!aKeptLabel(tag, THE_LONGEST_TERMINAL_TAG) || kept.includes(tag)) throw refused()
+    kept.push(tag)
+  }
+  return kept
+}
 
 /** @param {string} line */
 function log(line) {
@@ -261,6 +357,10 @@ export function aHolder(options) {
     endedAt: t.endedAt,
     exit: t.exit,
     keeping: t.keeping,
+    prepared: t.prepared,
+    name: t.name,
+    group: t.group,
+    tags: t.tags,
   })
 
   /** @param {string} id */
@@ -296,8 +396,40 @@ export function aHolder(options) {
     }
   }
 
+  /**
+   * TYPE A PREPARED LINE INTO A TERMINAL THAT HAS JUST OPENED, with no Enter, once the shell is quiet (PREPARED_QUIET_MS
+   * above). Nothing is typed into a terminal that ended or was closed first.
+   *
+   * @param {Held} t
+   * @param {string} line
+   * @returns {Promise<void>}
+   */
+  const typeThePreparedLine = (t, line) =>
+    new Promise((done) => {
+      /** @type {ReturnType<typeof setTimeout> | undefined} */
+      let quiet
+      let typed = false
+      const type = () => {
+        if (typed) return
+        typed = true
+        clearTimeout(quiet)
+        clearTimeout(longest)
+        heard.dispose()
+        if (!t.closed && t.exit === null) t.pty.write(line)
+        done()
+      }
+      const longest = setTimeout(type, THE_LONGEST_WAIT_TO_TYPE_A_PREPARED_LINE_MS)
+      const heard = t.pty.onData(() => {
+        clearTimeout(quiet)
+        quiet = setTimeout(type, PREPARED_QUIET_MS)
+      })
+    })
+
   /** @param {Record<string, unknown>} request */
   const open = (request) => {
+    // THE PREPARED LINE FIRST, before anything else is read, so a line with a key in it is refused in its own words
+    // whatever else the request holds.
+    const prepared = thePreparedLine(request['prepared'])
     const command = request['command']
     const args = request['args'] ?? []
     const folder = request['folder']
@@ -347,7 +479,12 @@ export function aHolder(options) {
       exit: null,
       closed: false,
       keeping,
-      typing: { buffer: '', clean: true, byAnother: false, last: null, ended: [] },
+      // A PREPARED LINE IS NOT THE PERSON'S TYPING, so it starts marked as typed by another (`Typing` above).
+      typing: { buffer: '', clean: prepared === null, byAnother: prepared !== null, last: null, ended: [] },
+      prepared,
+      name: null,
+      group: null,
+      tags: [],
       pty: child,
       screen,
       serializer,
@@ -381,7 +518,10 @@ export function aHolder(options) {
       })
     })
     log(`terminal ${t.id} opened: process ${child.pid > 0 ? String(child.pid) : 'not known yet'}, command ${command}, in ${folder}`)
-    return { terminal: describe(t) }
+    if (prepared === null) return { terminal: describe(t) }
+    // THE ANSWER COMES ONCE THE LINE IS TYPED, so an open that answers with a prepared line has typed it. The line is
+    // not written to the log: keys can land in a terminal.
+    return typeThePreparedLine(t, prepared.line).then(() => ({ terminal: describe(t) }))
   }
 
   /**
@@ -649,6 +789,16 @@ export function aHolder(options) {
       if (last === null) return { line: null, why: 'none' }
       if (!last.shown) return { line: null, why: 'not-shown' }
       return { line: { text: last.text, at: last.at }, why: null }
+    }
+    if (op === 'nameATerminal') {
+      const t = theTerminal(/** @type {string} */ (request['terminal']))
+      const name = aTerminalLabel(request['name'], 'name', THE_LONGEST_TERMINAL_NAME)
+      const group = aTerminalLabel(request['group'], 'group', THE_LONGEST_TERMINAL_GROUP)
+      const tags = theTerminalTags(request['tags'])
+      t.name = name
+      t.group = group
+      t.tags = tags
+      return { terminal: describe(t) }
     }
     if (op === 'resize') {
       const t = theTerminal(/** @type {string} */ (request['terminal']))
@@ -926,10 +1076,12 @@ export function theStopsLastLine(stillRunning, system = thisSystem()) {
  * The stop is begun once. An ask by another way after it begins nothing more. A second SIGTERM, or a second SIGINT,
  * finds no listener, so Node ends the holder at once.
  *
- * `system`, `signals`, `say` and `exit` are this process's own unless a test hands in its own.
+ * `system`, `signals`, `say` and `exit` are this process's own unless a test hands in its own. It answers the stop it
+ * begins, so the watch on a test run asks the same way, once, as a signal does.
  *
  * @param {{ stop: () => Promise<{ stillRunning: (number | null)[] }> }} holder
  * @param {{ system?: import('../config/systems/the-system.mjs').ASystem, signals?: Pick<NodeJS.EventEmitter, 'once'>, say?: (line: string) => void, exit?: (code: number) => void }} [options]
+ * @returns {(way: string) => void}
  */
 export function stopWhenAsked(holder, { system = thisSystem(), signals = process, say = log, exit = (code) => process.exit(code) } = {}) {
   let asked = false
@@ -945,11 +1097,38 @@ export function stopWhenAsked(holder, { system = thisSystem(), signals = process
   signals.once('SIGTERM', () => stopBecause('SIGTERM'))
   signals.once('SIGINT', () => stopBecause('SIGINT'))
   system.groups.listenForAStopRequest(() => stopBecause(A_REQUEST_ON_ITS_STOP_PIPE), say)
+  return stopBecause
 }
 
-/** Run as a program: listen, and stop when asked. */
+/**
+ * THE HOLDER ENDS WITH THE TEST RUN THAT STARTED IT, when its start carried the test suite's mark and so gave it
+ * --end-with-the-test-run (src/config/the-test-mark.mjs). It looks once a second, as the server's watch does, and stops
+ * the normal way when the run is gone. Could not look is not gone: it says so once and stops looking.
+ *
+ * @param {number} pid
+ * @param {ReturnType<typeof aWatchOnTheStarter>} look the watch, begun when the holder started
+ * @param {(way: string) => void} stopBecause
+ */
+function endWithTheTestRun(pid, look, stopBecause) {
+  const watch = setInterval(() => {
+    const answer = look()
+    if (answer.state === 'there') return
+    clearInterval(watch)
+    if (answer.state === 'unreadable') {
+      log(`${THE_TEST_RUN_FLAG}=${String(pid)}: Mole Office cannot tell whether the test run that started this holder is still running (${answer.why}), so the holder will not end with it`)
+      return
+    }
+    stopBecause(`the end of the test run that started it, process ${String(pid)}`)
+  }, THE_TEST_RUN_WATCH_PERIOD_MS)
+  watch.unref()
+}
+
+/** Run as a program: listen, and stop when asked, or when the test run it was told to end with is gone. */
 async function main() {
   const database = theDatabaseNamed(process.argv.slice(2))
+  const testRun = theTestRunToEndWith(process.argv.slice(2))
+  // The run is read now, so a run that ends while the holder starts is found gone at the first look.
+  const theRun = testRun === null ? null : aWatchOnTheStarter(testRun)
   // THE LOGIN PRESS IS BUILT ONCE, HERE, from the host's installation record. Without one both adapters are null and
   // the press answers Unavailable until the holder is started again.
   const installed = theInstalledLogin()
@@ -961,7 +1140,8 @@ async function main() {
   }
   log(`the terminal holder is process ${String(process.pid)}, listening on ${holder.socketPath}, for the database ${database}`)
   log(installed.why === null ? 'the login press is installed: both its adapters are built from the installation record' : `the login press is unavailable, because ${installed.why}`)
-  stopWhenAsked(holder)
+  const stopBecause = stopWhenAsked(holder)
+  if (testRun !== null && theRun !== null) endWithTheTestRun(testRun, theRun, stopBecause)
   return null
 }
 

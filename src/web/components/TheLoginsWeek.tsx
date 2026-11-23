@@ -14,6 +14,7 @@
 import { t } from '@shared/i18n.ts'
 import { aUseInPercent, minute, type AWindowRead, type LoginsWeek, type LoginWeekReading, type OwnEventReading } from '@shared/logins-week.ts'
 import { momentOfStampInZone } from '@shared/time.ts'
+import { CodeRows } from '../lib/code-rows.tsx'
 import { Panel } from './ui.tsx'
 
 /** A sum of US dollars with two decimals and its thousands grouped, as the server's sentence writes it. */
@@ -52,9 +53,12 @@ function TheNewerRound({ one }: { one: OwnEventReading }) {
   const newer = one.newerRoundWithNoEvent
   if (newer === null) return null
   return (
-    <p className="prof-run-says" data-testid="logins-week-newer">
-      {t('loginsWeek.newerRound', { round: `${newer.sandbox}/${newer.folder}`, at: minute(newer.at), zone: one.zone })}
-    </p>
+    <CodeRows
+      rows={[
+        { label: 'loginsWeek.row.newerRound', value: `${newer.sandbox}/${newer.folder}`, state: 'loginsWeek.row.noEvent' },
+        { label: 'loginsWeek.row.lastWritten', value: `${minute(newer.at)} ${one.zone}` },
+      ]}
+    />
   )
 }
 
@@ -78,13 +82,16 @@ function TheOwnEventReading({ one, at }: { one: OwnEventReading; at: string }) {
   if (one.state === 'unreadable') {
     return (
       <>
-        <p className="prof-run-says" data-testid="logins-week-state">
-          {t('loginsWeek.unreadable', {
-            at: one.readAt === null ? '' : minute(one.readAt),
-            zone: one.zone,
-            round: one.round === null ? '' : `${one.round.sandbox}/${one.round.folder}`,
-          })}
-        </p>
+        <CodeRows
+          rows={[
+            { label: 'loginsWeek.row.readAt', value: one.readAt === null ? '' : `${minute(one.readAt)} ${one.zone}` },
+            {
+              label: 'loginsWeek.row.round',
+              value: one.round === null ? '' : `${one.round.sandbox}/${one.round.folder}`,
+              state: 'loginsWeek.row.shapeNotKnown',
+            },
+          ]}
+        />
         <TheNewerRound one={one} />
       </>
     )
@@ -97,9 +104,12 @@ function TheOwnEventReading({ one, at }: { one: OwnEventReading; at: string }) {
       <WindowLine label={t('loginsWeek.sevenDays')} window={one.sevenDays} at={at} zone={one.zone} />
       <WindowLine label={t('loginsWeek.fiveHours')} window={one.fiveHours} at={at} zone={one.zone} />
       {one.readAt === null || one.round === null ? null : (
-        <p className="prof-run-says" data-testid="logins-week-read">
-          {t('loginsWeek.read', { at: minute(one.readAt), zone: one.zone, round: `${one.round.sandbox}/${one.round.folder}` })}
-        </p>
+        <CodeRows
+          rows={[
+            { label: 'loginsWeek.row.readAt', value: `${minute(one.readAt)} ${one.zone}` },
+            { label: 'loginsWeek.row.round', value: `${one.round.sandbox}/${one.round.folder}` },
+          ]}
+        />
       )}
       <TheStatusLine one={one} />
       <TheNewerRound one={one} />

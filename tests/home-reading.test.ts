@@ -11,7 +11,7 @@
  * than deleted. This file pins the part of each that a screenshot cannot check.
  *
  *   "SINCE YOU LAST LOOKED" spent six lines of the server's paragraph saying, most of the time,
- *   that no reading point has ever been marked. The paragraph is now one press away, whole, and a
+ *   that no reading point has ever been marked. The paragraph is now in Developer mode, whole, and a
  *   single line stands in its place. THE HONESTY IS THE WHOLE POINT OF THE TESTS BELOW: "no
  *   reading point recorded" must never be drawn as "nothing has changed", and the rows under that
  *   line are the newest writes in the log rather than the ones you have not seen. Both halves of
@@ -97,55 +97,38 @@ function step(id: string, name: string, state: ItemState) {
 // ============================================================================ since you last looked
 
 describe('the one line that stands where the server’s paragraph stood', () => {
-  it('never lets “no reading point” read as “nothing has changed”', () => {
+  it('never lets “no reading mark” read as “nothing has changed”', () => {
     const line = hp.sinceLead('never-looked', null, 8)
-    // The two things that must not be confused, said apart, in the same line.
-    expect(line).toContain('Nothing marks where you read to')
+    // The two things that must not be confused, apart, in the same line.
+    expect(line).toBe(t('home.since.newest', { n: 8 }))
     expect(line).not.toMatch(/nothing (has )?(changed|happened)/i)
   })
 
-  it('says what the rows under it are, and in the same breath what they are not', () => {
+  it('counts the rows under it as the newest writes, and not as changes since a mark', () => {
     const line = hp.sinceLead('never-looked', null, 8)
-    expect(line).toContain('8 newest writes')
-    // Without this clause the eight rows read as eight new things, which is the failure. It is two
-    // short sentences now rather than one sentence with a clause hung off a dash, which is the
-    // owner's plain-language rule applied to the one line on Home that must not be misread.
-    expect(line).toContain('may not be new to you')
+    // Without the words for "no reading mark" the eight rows read as eight new things, which is the failure.
+    expect(line).toContain('8')
+    expect(line).not.toBe(t('home.since.changes', { n: 8 }))
   })
 
   it('does not claim eight newest writes when the log is empty', () => {
     const line = hp.sinceLead('never-looked', null, 0)
-    // NOTHING HAS EVER BEEN WRITTEN is the whole answer here, and the clause about a reading point
-    // is dropped on purpose: there is nothing for a mark to be behind, so saying so was a second
-    // absence stated beside the first.
-    expect(line).toContain('Nothing has ever been written')
-    expect(line).not.toContain('0 newest')
+    // NOTHING HAS EVER BEEN WRITTEN is the whole answer here, as the word for none.
+    expect(line).toBe(t('absence.none'))
+    expect(line).not.toContain('0')
   })
 
   it('keeps “nothing since your mark” apart from “no mark at all”', () => {
     const nothingSince = hp.sinceLead('nothing-since', 0, 0)
-    expect(nothingSince).toContain('since you marked it')
     // It is the one of the three that IS allowed to say nothing has been written, because a mark
     // exists and the count against it really is zero.
-    expect(nothingSince).toContain('Nothing has been written')
-    expect(nothingSince).not.toContain('Nothing marks where you read to')
+    expect(nothingSince).toBe(t('home.since.none'))
+    expect(nothingSince).not.toBe(hp.sinceLead('never-looked', null, 0))
   })
 
-  it('gives the exact count when there is a mark to count from, and gets the plural right', () => {
-    expect(hp.sinceLead('changes-since', 12, 8)).toContain('12 changes since you marked it')
-    expect(hp.sinceLead('changes-since', 1, 1)).toContain('1 change since you marked it')
-  })
-
-  it('names what the fold holds differently for the answer that needs two sentences', () => {
-    // The first answer's fold holds the server's paragraph AND the note about what the rows are.
-    // The other two hold one paragraph, and a control promising two would be wrong about itself.
-    expect(hp.sinceOpens('never-looked')).toContain('why these rows may not be new')
-    expect(hp.sinceOpens('nothing-since')).not.toContain('why these rows may not be new')
-    expect(hp.sinceOpens('changes-since')).toContain('where your reading point is kept')
-    // Never the bare word "more" — `Explain` throws on it, and these are the strings it is given.
-    for (const answer of ['never-looked', 'nothing-since', 'changes-since'] as const) {
-      expect(hp.sinceOpens(answer).trim()).not.toMatch(/^(?:\d+\s+)?(?:show|see|read|view|open)?\s*more$/i)
-    }
+  it('gives the exact count when there is a mark to count from, in its own plural', () => {
+    expect(hp.sinceLead('changes-since', 12, 8)).toBe(t('home.since.changes', { n: 12 }))
+    expect(hp.sinceLead('changes-since', 1, 1)).toBe(t('home.since.changes', { n: 1 }))
   })
 })
 
@@ -639,15 +622,10 @@ describe('what one module row says', () => {
     expect(html).toContain('px-chip-stored')
   })
 
-  it('keeps the selection rule off the page in Normal, and states it exactly in Inspect', () => {
-    // A rule is a claim about which five of twenty-seven, and it has to be checkable. It does not
-    // have to be the first prose a reader meets on a page about work.
-    expect(panel()).not.toContain(t('home.moduleRule'))
-    const html = inspectPanel()
-    expect(scanned(html)).toContain(t('home.moduleRule'))
-    const fold = behindAFold(html)
-    expect(fold).toContain('newest writes in the change log touched it')
-    expect(fold).toContain('Nothing here is scored')
+  it('draws no selection rule, in Normal or in Inspect', () => {
+    // The page draws the count of what is shown, and no sentence about how the list was chosen.
+    expect(panel()).not.toContain('mp-rule')
+    expect(inspectPanel()).not.toContain('mp-rule')
   })
 
   it('states how many of how many are drawn, names the rest, and links to all of them', () => {

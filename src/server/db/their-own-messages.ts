@@ -11,7 +11,7 @@
 import { sql, and, eq, inArray, type SQL } from 'drizzle-orm'
 import { db } from './client.ts'
 import type { ParticipantRef, ParticipantKind } from '@shared/participants.ts'
-import type { TheirOwnMessages } from '../lib/messages.ts'
+import type { TheirOwnMessages } from './types/messages.ts'
 import { ONE_KIND_WRITTEN_OUT, STORED_FIELDS, messageDelivery, records } from './schema.ts'
 
 export function theirOwnMessages(who: ParticipantRef): TheirOwnMessages {

@@ -161,10 +161,20 @@ const LOCAL_ONLY: ReadonlyArray<readonly [string, string]> = [
   // THE PERSON'S TYPING KEPT WITH NO PRESS, wave 13u round 4.
   ['GET /api/terminals/:id/keeping', 'it reads from the holder on this machine whether a terminal keeps what the person types'],
   ['PUT /api/terminals/:id/keeping', 'it tells the holder on this machine to keep, or stop keeping, what the person types into a terminal'],
+  // ONE READING OF SEVERAL TERMINALS, AND A TERMINAL'S NAME, GROUP AND TAGS, kept in the holder on this machine.
+  ['GET /api/terminals/stream', "it reads several terminals' screens, which can hold a key, from the holder on this machine"],
+  ['POST /api/terminals/:id/name', 'it tells the holder on this machine the name, the group and the tags the person gives a terminal'],
   // THE INSTALL PRESS, wave 13u round 3. The list runs each agent tool's --version on this machine, and the press opens
   // a terminal here that installs programs into this machine's home.
   ['GET /api/harnesses', 'it runs each agent tool on the machine Mole Office runs on to read its version'],
   ['POST /api/harnesses/install', 'it opens a terminal on the machine Mole Office runs on that installs programs there'],
+  // SETTING UP AN AGENT TOOL, wave 13u round 242. Each door runs one agent tool on this machine, under this server's login.
+  ['GET /api/harnesses/:id/signed-in', "it runs one agent tool's own status command on the machine Mole Office runs on"],
+  ['POST /api/harnesses/:id/key', "it gives a key to one agent tool's own login on the machine Mole Office runs on, which keeps it in this machine's home"],
+  ['POST /api/harnesses/:id/sign-in', "it starts one agent tool's own account sign-in on the machine Mole Office runs on, which waits there until the person finishes it in a browser"],
+  ['POST /api/harnesses/:id/sign-in/code', "it writes a code to the standard input of one agent tool's own sign-in running on the machine Mole Office runs on"],
+  // THE SET UP PRESS, wave 13u round 242. It asks a secretary to set up an agent tool on this machine.
+  ['POST /api/harnesses/:id/set-up', 'it asks a secretary to install and set up an agent tool on the machine Mole Office runs on'],
   // A READINESS CHECKLIST, wave 13u round 13. The last signature runs the gated operation, and both gated operations
   // act on this machine: the install opens a terminal here, and the stop signals processes here.
   ['POST /api/readiness', 'raising a checklist signs it, and the signature that completes it runs a gated operation on the machine Mole Office runs on'],
@@ -188,6 +198,8 @@ const LOCAL_ONLY: ReadonlyArray<readonly [string, string]> = [
   ['GET /api/office/sandbox-memory-cap', "it asks this computer's systemd how much memory the sandboxes together may use"],
   ['POST /api/office/sandbox-memory-cap', "it runs pkexec on this computer, whose password dialog appears on this computer's screen, to set a limit on this computer's systemd"],
   ['POST /api/terminals/agents', 'it starts an agent program in a terminal on the machine Mole Office runs on, and hands it a key of that agent'],
+  // THE NEW AGENT DIALOG'S CREATE: it makes the agent and starts its program in a terminal on this machine, the office's or the system's.
+  ['POST /api/agents/new', "it makes an agent and starts its program in a terminal on the machine Mole Office runs on, the office's own or the system's"],
   // THE WAY BACK, wave 13u round 10: the read looks at this machine's processes for one still running the run, and the
   // press starts the run's program again in a terminal here, with a key of that agent.
   ['GET /api/terminals/agents/:agent/way-back', "it reads this machine's processes to say whether an agent's run still runs here"],
@@ -289,6 +301,11 @@ const LOCAL_ONLY: ReadonlyArray<readonly [string, string]> = [
     'POST /api/office/install-the-entry',
     'it writes the skill link and three hook lines into the owner\'s home directory on this computer',
   ],
+  // AND THE STATE OF THE KEY THAT PRESS GIVES THIS COMPUTER'S ENTRY AGENT, read from two files beside the office's key file.
+  [
+    'GET /api/office/install-the-entry/this-computers-key',
+    "it reads whether the entry agent's key file beside the office's key file on this computer holds a key the office takes",
+  ],
   // THE SAME ENTRY, FOR CODEX AND OPENCODE. The piece that split the skill, F15 point 5. The plan is a read of
   // this computer's disk — Codex's and OpenCode's own home directories are only meaningful here —
   // and the write is the person's press for the same reason the entry above is.
@@ -301,7 +318,7 @@ const LOCAL_ONLY: ReadonlyArray<readonly [string, string]> = [
     "it writes Codex's or OpenCode's global instructions file into the owner's home directory on this computer",
   ],
   // THE SANDBOXES' LOGINS. The file they are kept in is on this computer and the
-  // sandboxes that read it run here, so reading which are set, setting one and clearing one all stay here.
+  // sandboxes that read it run here, so reading which are set, setting one, clearing one and testing one all stay here.
   [
     'GET /api/office/sandbox-logins',
     "it reads which logins the sandboxes' secrets file on this computer holds",
@@ -313,6 +330,10 @@ const LOCAL_ONLY: ReadonlyArray<readonly [string, string]> = [
   [
     'POST /api/office/sandbox-logins/clear',
     "it takes one login out of the sandboxes' secrets file on this computer",
+  ],
+  [
+    'POST /api/office/sandbox-logins/test',
+    "it reads one login from the sandboxes' secrets file on this computer and sends it to its provider's own address",
   ],
   // THE PROVIDER ROUTER'S KEY SLOTS, item 12 of the key layer. The slots file is in the owner's home on this computer and
   // the router that reads it runs here, so reading the slots, adding one and removing one all stay here.
@@ -414,6 +435,15 @@ const LOCAL_ONLY: ReadonlyArray<readonly [string, string]> = [
   ['POST /api/roles/elevation/:handle', 'it hands the person’s own acts to an agent, and it is the person’s press'],
   ['DELETE /api/roles/elevation/:handle', 'it takes them back, and only the person may'],
   ['POST /api/roles/card/:handle', 'it gives an agent a role card, which is the person’s press, and an agent’s only within its own rank'],
+  // THE CONVERSATION SYNC'S THREE PRESSES. Turning it on and running it read the coding tools' conversation files
+  // in this computer's home folder, and a restore writes a copy into it. The two reads of stored copies stay remote.
+  ['POST /api/conversations/sync', 'it turns on a sync that reads the conversation files in this computer’s home folder'],
+  ['POST /api/conversations/sync/run', 'it reads the conversation files in this computer’s home folder'],
+  ['POST /api/conversations/:run/restore', 'it writes a conversation copy into this computer’s home folder'],
+  // THE EXPORT OF ONE RUN'S CONVERSATION, wave 13s point C1A-2. The look first and the export both read the run's
+  // conversation file in this computer's home folder, and the agent's personal space and memory folder beside it.
+  ['GET /api/conversations/:run/export', 'it reads a conversation file, a personal space and a memory folder on this computer'],
+  ['POST /api/conversations/:run/export', 'it carries a conversation file, a personal space and a memory folder off this computer'],
 ]
 
 let t: TestDb

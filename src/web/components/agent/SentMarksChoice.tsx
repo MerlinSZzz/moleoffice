@@ -46,7 +46,6 @@ export function SentMarksChoice() {
           </label>
         ))}
       </fieldset>
-      <p className="smk-note">{t('review.sentMarks.unsentAlways')}</p>
       {fault === null ? null : <p className="smk-fault" role="status">{fault}</p>}
     </>
   )
@@ -72,12 +71,6 @@ const SENT_MARKS_CSS = `
 .smk-one:has(> .smk-pick:focus-visible) { outline: var(--focus-w) solid var(--focus); outline-offset: var(--focus-offset); }
 .smk-pick { margin-top: 2px; }
 .smk-word { font: 600 var(--fs-1)/var(--lh-tight) var(--font-ui); }
-/* THE UNSENT MARK ALWAYS SHOWS, whatever this choice says. Said under the two answers, because a person
-   turning the sent mark off should know the comment they are still writing will not disappear with it. */
-.smk-note {
-  margin: var(--pad) 0 0; max-width: 48ch;
-  color: var(--text-2); font: var(--fs-1)/var(--lh-body) var(--font-ui);
-}
 .smk-fault {
   margin: var(--pad) 0 0; max-width: 40ch;
   padding: 2px var(--pad);

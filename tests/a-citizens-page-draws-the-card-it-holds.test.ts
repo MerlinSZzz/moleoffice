@@ -207,8 +207,7 @@ describe('the citizen’s page', () => {
     // THE DECISION'S ANSWER 4: the duties and How it works are on the Role cards page now.
     expect(drawn, 'the duties are not drawn here').not.toContain(card.duties.split('.')[0])
     expect(drawn).not.toContain(PROFILE_WORDS.cardDuties)
-    expect(drawn, 'the row that opens the Role cards page').toContain('Its duties and how it works, on the Role cards page')
-    expect(drawn).toContain('href="#/roles"')
+    expect(drawn, 'the row that opens the Role cards page').toContain('href="#/roles"')
   })
 
   it('draws the card beside the press that gives another, not instead of it', async () => {

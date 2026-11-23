@@ -151,11 +151,11 @@ beforeAll(async () => {
 })
 afterAll(async () => { await browserApp?.stop(); browserDb?.close() })
 
-it('Home at 390 keeps its full title column and places exact Developer provenance below the state in both themes', async () => {
+it('Home at 390 keeps its full title column and places exact Developer provenance below the state in the light theme', async () => {
   const app = browserApp!
   const observations: unknown[] = []
   const violations: string[] = []
-  for (const theme of ['light', 'dark']) {
+  for (const theme of ['light']) {
     const context = await app.browser.newContext({ viewport: { width: 390, height: 1000 } })
     try {
       await context.addInitScript(value => localStorage.setItem('mole-office.preset.theme', value), theme)

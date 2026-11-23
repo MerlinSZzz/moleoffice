@@ -12,9 +12,10 @@
  *
  * The office's key, the person's key file and the person's own device and tool keys are taken as given. A visitor's
  * credential is not the person. A finished or sealed run's own key may name its own run after the end, and no other
- * ended run. A dispatched run's key (agent_runs) is refused, and the refusal names problem J60KF9L_OR-X. A terminal's run
- * key is bound when the run is opened, and bound again when it is opened again, in the transaction that revokes the old
- * key; only the newest binding counts. A request with no key and a session header is unchanged, except at a door to a
+ * ended run. A dispatched run's key (agent_runs) holds one session: the newest one the office's key filed naming its run
+ * in `extra.agentRun`, as tools/agent-worker.mjs files it, while the run is claimed or running. Any other session is
+ * refused. A terminal's run key is bound when the run is opened, and bound again when it is opened again, in the
+ * transaction that revokes the old key; only the newest binding counts. A request with no key and a session header is unchanged, except at a door to a
  * key, where it is refused.
  *
  * Every request goes through the real doors with `app.inject`. No assertion prints a key.
@@ -34,7 +35,8 @@
  *   e. Any binding admitted rather than the newest: "after a reopen" goes red on the old key's words.
  *   f. The revoke's answer not checked in `replaceTheRunKeyOfAReopenedRun` (src/server/lib/records.ts): "a reopen whose
  *      revoke fails" goes red.
- *   g. The dispatched refusal without the problem's id: its words case goes red.
+ *   g. Gone with the refusal it proved: a dispatched run's key now holds the session its worker filed. Its cases are
+ *      under "a dispatched run's key", and no mutation of them has been run.
  *   h. The finished-run branch admits any session: "a finished run's own key" goes red on the sibling.
  *   i. The person's device kind held to the rule: "the person's key and device key" goes red.
  *   j. The filer's clause taken out: "is named by the agent's own key" goes red.
@@ -433,37 +435,132 @@ describe("a finished run's own key, after its end", () => {
   })
 })
 
+/**
+ * A DISPATCHED RUN'S KEY, AS tools/agent-worker.mjs SERVES THE RUN.
+ *
+ * The person dispatches a conversation. The office's key claims the run for the worker's own session, and then files
+ * the run's session naming the run in `extra.agentRun` and the worker as its parent, as `fileThisRunsRecord` does.
+ * The run writes with the key its dispatch made and that session in its header.
+ *
+ *   1. The session the office's key filed for the run: accepted, and the change row names that session.
+ *   2. A newer session filed the same way takes the key, and the older one is refused. A session the run's own key
+ *      filed, or the person's key filed, naming the run, is refused. A session the office's key filed for another
+ *      dispatched run is refused, and that run's own key holds it. Once the run is declined, so it is no longer
+ *      claimed or running while its key stays live, its session is refused.
+ */
 describe("a dispatched run's key", () => {
-  it('may not name a run, and the refusal names the problem and says to stop and tell the person who started the tool', async () => {
-    const person = { 'content-type': 'application/json', 'x-mole-office-workspace': 'panelx', 'x-mole-office-actor-type': 'human', 'x-mole-office-actor-id': THE_PERSON, 'x-mole-office-key': personKey }
-    const thread = await ask('POST', '/api/agent/threads', person, { title: 'Synthetic dispatched brief', mode: 'review' })
+  type ADispatchedRun = { id: string; actorId: string; key: string }
+  const THE_OFFICES_WORKER = 'mole-office/the-message-worker'
+  let worker = ''
+  let first: ADispatchedRun
+  let other: ADispatchedRun
+  let firstSession = ''
+
+  const thePerson = (): Record<string, string> => ({
+    'content-type': 'application/json',
+    'x-mole-office-workspace': 'panelx',
+    'x-mole-office-actor-type': 'human',
+    'x-mole-office-actor-id': THE_PERSON,
+    'x-mole-office-key': personKey,
+  })
+  /** The office's key, as the worker sends it: in the project it files in, under the worker's own session. */
+  const theWorker = (session?: string): Record<string, string> => asAgent(THE_OFFICES_WORKER, officeKey, session, 'panelx')
+  /** The office's key at the run doors, which take no project. */
+  const theWorkerAtTheRunDoors = (): Record<string, string> => ({
+    'content-type': 'application/json',
+    'x-mole-office-actor-type': 'agent',
+    'x-mole-office-actor-id': THE_OFFICES_WORKER,
+    'x-mole-office-key': officeKey,
+  })
+  /** The run's own writes: its writer, the key its dispatch made, and the session it names. */
+  const asTheRun = (run: ADispatchedRun, session: string): Record<string, string> => asAgent(run.actorId, run.key, session, 'panelx')
+
+  /** One conversation dispatched by the person, and its run claimed for the worker's session by the office's key. */
+  async function dispatchedAndClaimed(title: string): Promise<ADispatchedRun> {
+    const thread = await ask('POST', '/api/agent/threads', thePerson(), { title, mode: 'review' })
     expect(thread.status, said(thread.body)).toBe(201)
     const threadId = String((thread.body['thread'] as { id: string }).id)
-    const message = await ask('POST', `/api/agent/threads/${threadId}/messages`, person, { intent: 'change', body: 'File a synthetic note in this test office.', recipient: { kind: 'new' } })
+    const message = await ask('POST', `/api/agent/threads/${threadId}/messages`, thePerson(), { intent: 'change', body: 'File a synthetic note in this test office.', recipient: { kind: 'new' } })
     expect(message.status, said(message.body)).toBe(201)
-    const dispatched = await ask('POST', `/api/agent/threads/${threadId}/dispatch`, person)
+    const dispatched = await ask('POST', `/api/agent/threads/${threadId}/dispatch`, thePerson())
     expect(dispatched.status, said(dispatched.body)).toBe(201)
-    const runId = String((dispatched.body['runs'] as { id: string }[])[0]!.id)
-    const request = JSON.parse((t.client.sqlite.prepare('SELECT request FROM agent_runs WHERE id = ?').get(runId) as { request: string }).request) as { actorId: string }
-    const key = readFileSync(join(dirname(t.file), 'agent-run-keys', runId), 'utf8')
-    // THE TOOL'S OWN SESSION RECORD, filed as tools/agent-worker.mjs files it: with the run's key and no session header.
-    const filed = await ask('POST', '/api/records', asAgent(request.actorId, key, undefined, 'panelx'), {
+    const id = String((dispatched.body['runs'] as { id: string }[])[0]!.id)
+    const claimed = await ask('POST', `/api/agent/runs/${id}/claim`, theWorkerAtTheRunDoors(), { worker })
+    expect(claimed.status, said(claimed.body)).toBe(200)
+    const key = String(claimed.body['runKey'])
+    expect(isAKey(key), 'the claim answered no run key').toBe(true)
+    const request = JSON.parse((t.client.sqlite.prepare('SELECT request FROM agent_runs WHERE id = ?').get(id) as { request: string }).request) as { actorId: string }
+    return { id, actorId: request.actorId, key }
+  }
+
+  /** A session naming the run in `extra.agentRun`, filed with the headers given; by default as the worker files it. */
+  async function aSessionFor(run: string, headers: Record<string, string> = theWorker(worker), parent: string | null = worker): Promise<string> {
+    const filed = await ask('POST', '/api/records', headers, {
       kind: 'session',
-      title: `agent run ${runId}`,
-      data: { state: 'running', runtime: 'claude-code', doing: `serving agent run ${runId}`, extra: { agentRun: runId } },
+      title: `agent run ${run}`,
+      data: {
+        state: 'running',
+        runtime: 'claude-code',
+        doing: `serving agent run ${run}`,
+        ...(parent === null ? {} : { parentAttachment: parent }),
+        extra: { agentRun: run },
+      },
     })
     expect(filed.status, said(filed.body)).toBe(201)
-    const session = String((filed.body['record'] as { id: string }).id)
-    const wrote = await ask('POST', '/api/records', asAgent(request.actorId, key, session, 'panelx'), { kind: 'note', title: 'the dispatched run in its run', data: { body: 'a note' } })
-    expect(wrote.status, said(wrote.body)).toBe(403)
-    const words = said(wrote.body)
-    expect(words).toContain(`"${session}"`)
-    expect(words).toContain('tools/agent-worker.mjs')
-    expect(words).toContain('problem J60KF9L_OR-X')
-    expect(words).toContain('Stop, and tell the person who started the tool.')
-    // NO WAY AROUND IT IS OFFERED: not leaving the header off, not another key.
-    expect(words).not.toMatch(/without (the |a |an |x-mole-office-)?session/i)
-    expect(words).not.toMatch(/leave (the|it|x-mole-office-session) off/i)
+    return String((filed.body['record'] as { id: string }).id)
+  }
+
+  beforeAll(async () => {
+    const filed = await ask('POST', '/api/records', theWorker(), {
+      kind: 'session',
+      title: 'the agent worker',
+      data: { state: 'running', runtime: 'claude-code', doing: 'serves dispatched runs' },
+    })
+    expect(filed.status, said(filed.body)).toBe(201)
+    worker = String((filed.body['record'] as { id: string }).id)
+    first = await dispatchedAndClaimed('Synthetic dispatched brief')
+    other = await dispatchedAndClaimed('Another synthetic dispatched brief')
+  }, 120_000)
+
+  it("1. holds the session the office's key filed for its run, and the change row names that session", async () => {
+    firstSession = await aSessionFor(first.id)
+    const wrote = await writeANote(asTheRun(first, firstSession), 'a dispatched run writes in its session')
+    expect(wrote.status, said(wrote.body)).toBe(201)
+    expect(wrote.row?.session).toBe(firstSession)
+  })
+
+  it('2. a newer session filed the same way takes the key, and the older one is refused', async () => {
+    const newer = await aSessionFor(first.id)
+    const title = 'a dispatched run writes in its older session'
+    expectRefused(await writeANote(asTheRun(first, firstSession), title), firstSession, title)
+    const wrote = await writeANote(asTheRun(first, newer), 'a dispatched run writes in its newer session')
+    expect(wrote.status, said(wrote.body)).toBe(201)
+    expect(wrote.row?.session).toBe(newer)
+    firstSession = newer
+  })
+
+  it("2. a session another key filed naming the run, or the office's key filed for another run, is refused", async () => {
+    const byItsOwnKey = await aSessionFor(first.id, asAgent(first.actorId, first.key, undefined, 'panelx'), null)
+    const ownTitle = 'a dispatched run writes in a session its own key filed'
+    expectRefused(await writeANote(asTheRun(first, byItsOwnKey), ownTitle), byItsOwnKey, ownTitle)
+    const byThePerson = await aSessionFor(first.id, thePerson(), null)
+    const personTitle = 'a dispatched run writes in a session the person filed'
+    expectRefused(await writeANote(asTheRun(first, byThePerson), personTitle), byThePerson, personTitle)
+    const forTheOther = await aSessionFor(other.id)
+    const otherTitle = "a dispatched run writes in another run's session"
+    expectRefused(await writeANote(asTheRun(first, forTheOther), otherTitle), forTheOther, otherTitle)
+    const itsOwn = await writeANote(asTheRun(other, forTheOther), 'the other dispatched run writes in its session')
+    expect(itsOwn.status, said(itsOwn.body)).toBe(201)
+    // NEITHER OF THE TWO FILINGS BY ANOTHER KEY MOVED THE KEY: the newest the office's key filed still holds it.
+    const still = await writeANote(asTheRun(first, firstSession), 'a dispatched run still writes in its newest session')
+    expect(still.status, said(still.body)).toBe(201)
+  })
+
+  it('2. once its run is declined, no longer claimed or running while its key stays live, the session is refused', async () => {
+    const declined = await ask('POST', `/api/agent/runs/${first.id}/result`, theWorkerAtTheRunDoors(), { error: 'This worker cannot serve this run.', declined: true })
+    expect(declined.status, said(declined.body)).toBe(200)
+    const title = 'a declined run writes in its session'
+    expectRefused(await writeANote(asTheRun(first, firstSession), title), firstSession, title)
   })
 })
 

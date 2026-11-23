@@ -3,6 +3,7 @@
 // Owner: line 13y, pages and speed. The note page's doors: filing a quick note, and storing a picture or a film it holds.
 // src/web/api-parts/join.ts joins every part into `api`.
 import { json, request, type RecordChangeReply, type RecordReply } from '../api.ts'
+import { WORKSPACE_HEADER } from '../lib/workspace.ts'
 
 /** The four facts POST /api/report-files hands back about a file it has stored. A note's picture part keeps all four. */
 export interface AStoredFile {
@@ -32,11 +33,24 @@ export const quickNotesDoors = {
    *
    * `leaving` says the page is being hidden or closed. The save is then sent so that it goes on after the page has
    * gone (`keepalive`), which a browser does only for a body under 64 KiB, so the page asks for it only below that.
+   *
+   * `workspaceId` NAMES THE PROJECT THE NOTE IS KEPT IN, as the office said when the note was read or filed. A note
+   * stays open while the person switches project, and a save that named the switcher's project was refused as a note
+   * in another project, so nothing after the switch was kept.
    */
-  changeAQuickNote: (id: string, change: { title?: string; parts: unknown[]; ifVersion: string }, leaving = false) =>
+  changeAQuickNote: (
+    id: string,
+    change: { title?: string; parts: unknown[]; tags?: string[]; ifVersion: string; workspaceId?: string },
+    leaving = false,
+  ) =>
     request<RecordChangeReply>(`/api/records/${encodeURIComponent(id)}`, {
       method: 'PATCH',
-      body: json({ ...(change.title === undefined ? {} : { title: change.title }), dataPatch: { parts: change.parts }, ifVersion: change.ifVersion }),
+      body: json({
+        ...(change.title === undefined ? {} : { title: change.title }),
+        dataPatch: { parts: change.parts, ...(change.tags === undefined ? {} : { tags: change.tags }) },
+        ifVersion: change.ifVersion,
+      }),
+      ...(change.workspaceId === undefined ? {} : { headers: { [WORKSPACE_HEADER]: change.workspaceId } }),
       ...(leaving ? { keepalive: true } : {}),
     }),
 

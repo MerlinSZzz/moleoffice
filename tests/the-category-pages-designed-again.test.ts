@@ -8,7 +8,7 @@
  *   1. Needs you comes first, and holds only what the pages below count as needing the owner. Today only
  *      the Embassy counts such a thing (its visitors asking to come in and its asks at the door), so
  *      only the Office page draws Needs you; Agents and This project draw none (rule R6).
- *   2. Each card shows the page's name, its one line, and its count when its page has a count of its
+ *   2. Each card shows the page's name, and its count when its page has a count of its
  *      own, as item 4 of a decision says. The Embassy card shows the count of what
  *      needs the owner.
  *   3. A count that cannot be read is the short mark with its reason on hover, never 0. A card whose
@@ -95,9 +95,9 @@ async function markIn(selector: string): Promise<{ mark: string; title: string |
 it('draws Needs you first on the Office page, with only what the Embassy counts, and none on the other two', async () => {
   const page = app.page
   await open('#/office')
-  // First: the title, its line, then Needs you, then the cards.
+  // First: the title, then Needs you, then the cards.
   const order = await page.locator('.px-category > *:not(style)').evaluateAll((all) => all.map((one) => one.className))
-  expect(order).toEqual(['px-category-title', 'px-category-line', 'px-category-needs', 'px-category-cards'])
+  expect(order).toEqual(['px-category-title', 'px-category-needs', 'px-category-cards'])
   expect(await page.locator('.px-category-needs-title').textContent()).toBe(en.t('categoryPages.needs.heading'))
   const rows = await page.locator('.px-category-needs-row').evaluateAll((all) =>
     all.map((one) => ({ name: one.querySelector('.px-category-needs-name')?.textContent, href: one.getAttribute('href') })),
@@ -118,14 +118,13 @@ it('draws Needs you first on the Office page, with only what the Embassy counts,
   }
 }, 240_000)
 
-it('shows on each card the page’s name, its line, and a count only where the page has its own', async () => {
+it('shows on each card the page’s name, and a count only where the page has its own', async () => {
   const page = app.page
   await open('#/project')
   const cards = await page.locator('.px-category-card').evaluateAll((all) =>
     all.map((one) => ({
       key: one.getAttribute('data-card'),
       title: one.querySelector('.px-category-card-title')?.textContent ?? '',
-      what: one.querySelector('.px-category-card-what')?.textContent ?? '',
       count: one.querySelector('.px-category-glance')?.textContent ?? null,
     })),
   )
@@ -145,13 +144,11 @@ it('shows on each card the page’s name, its line, and a count only where the p
   const counted = new Set(['shelved'])
   for (const card of cards) {
     expect(card.title, String(card.key)).not.toBe('')
-    expect(card.what, String(card.key)).not.toBe('')
     if (counted.has(String(card.key))) expect(card.count, String(card.key)).not.toBe(null)
     else expect(card.count, String(card.key)).toBe(null)
     // Never a bare zero: an empty count is the short mark.
     expect(card.count ?? '', String(card.key)).not.toMatch(/^0\b/)
   }
-  expect(await page.locator('.px-category-line').textContent()).toBe(en.t('categoryPages.line.project'))
 }, 120_000)
 
 // THE TWO READINGS MADE TO FAIL, whatever the query after the address.

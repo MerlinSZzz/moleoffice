@@ -56,6 +56,8 @@
 import type { Page } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { type LiveApp, liveApp, waitForThePage } from './helpers.ts'
+import { sayInEnglish } from '../src/shared/i18n.ts'
+import { shortenToWords } from '../src/shared/shortening.ts'
 
 let app: LiveApp
 let page: Page
@@ -114,17 +116,24 @@ afterAll(async () => {
 
 // ---------------------------------------------------------------------------- reading the screen
 
-/** What the composer's subject line draws: the kind of thing, and the words it names. */
-async function subject(): Promise<{ kind: string | null; words: string | null }> {
+/**
+ * What the composer's subject line draws: the kind of thing, and the words it names. The title is
+ * the chip's tooltip. It holds the words before the chip shortens them, so it can hold more than
+ * the chip draws.
+ */
+type Subject = { kind: string | null; words: string | null; title: string | null }
+async function subject(): Promise<Subject> {
   return page.evaluate(() => {
     const talk = [...document.querySelectorAll<HTMLElement>('.px-talk')].find(
       (one) => one.getAttribute('data-target') === 'uiSurface/composer',
     )
     const chip = talk?.querySelector('[data-target$="composer.subject"] .px-talk-quote') ?? null
     const words = (e: Element | null) => (e === null ? null : (e.textContent ?? '').trim())
+    const what = chip?.querySelector('.px-talk-chip-what') ?? null
     return {
       kind: words(chip?.querySelector('.px-talk-chip-kind') ?? null),
-      words: words(chip?.querySelector('.px-talk-chip-what') ?? null),
+      words: words(what),
+      title: what?.getAttribute('title') ?? null,
     }
   })
 }
@@ -143,7 +152,7 @@ async function closeIt(): Promise<void> {
  * The deepest match is taken, because every ancestor of a sentence also contains it and the point
  * of this file is which element the press is about.
  */
-async function rightClickOn(needle: string): Promise<{ kind: string | null; words: string | null }> {
+async function rightClickOn(needle: string): Promise<Subject> {
   const at = await page.evaluate((needle) => {
     const main = document.getElementById('main')
     if (main === null) throw new Error('the page has not rendered')
@@ -168,6 +177,15 @@ async function go(route: string): Promise<void> {
   await page.locator('[data-target="uiSurface/rail.decisions"]').waitFor({ timeout: 30_000 })
 }
 
+/** The one sentence the board's heading holds behind its "?", opened the way a person opens it. */
+const BOARD_KEYS = sayInEnglish('schedule.boardKeysHint')
+async function openTheBoardHint(): Promise<void> {
+  await page
+    .locator('section', { has: page.locator('h2', { hasText: sayInEnglish('schedule.boardTitle') }) })
+    .locator(`summary[aria-label="${sayInEnglish('ui.hintLabel')}"]`)
+    .click()
+}
+
 // ---------------------------------------------------------------------------- the sentences
 
 describe('a sentence Mole Office wrote about itself', () => {
@@ -178,10 +196,15 @@ describe('a sentence Mole Office wrote about itself', () => {
     // CRITERION CHANGE (wave 13j round 12): the sentence was drawn open above the board. It is a
     // closed fold at the foot of the board now (rule R7 of report n9Mjk3c_sJRu), so the fold is
     // opened first, the way a person reaches the sentence.
-    await page.locator('summary', { hasText: 'How blocks work' }).click()
-    const drawn = await rightClickOn('A block is a span of days')
-    expect(drawn.words).toContain('A block is a span of days')
-    expect(drawn.words).not.toBe('When work happens this week')
+    // CRITERION CHANGE, as decided: the fold of help is gone. The one sentence left is the board
+    // heading's hint on the keys, so that hint is opened and its sentence is the one pressed.
+    await openTheBoardHint()
+    const drawn = await rightClickOn(BOARD_KEYS)
+    // CRITERION CHANGE: the chip draws a long sentence shortened and keeps what it has in its title.
+    // A press keeps only the opening of a sentence this long, cut where the composer cuts it, so the
+    // title holds that opening and not the whole sentence.
+    expect(drawn.title).toBe(shortenToWords(BOARD_KEYS).words)
+    expect(drawn.words).not.toBe(sayInEnglish('schedule.boardTitle'))
     await closeIt()
   }, 120_000)
 
@@ -221,11 +244,15 @@ describe('a cell of a plan table, which is a fact about a line Mole Office store
 describe('words somebody selected on a part of Mole Office’s own screen', () => {
   it('are the words the composer draws', async () => {
     await go('/plan')
-    const at = await page.evaluate(() => {
+    // CRITERION CHANGE, as decided: the board's help paragraph is gone, so the words selected are
+    // the first three of the hint on its heading, opened first.
+    await openTheBoardHint()
+    const firstWords = BOARD_KEYS.split(' ').slice(0, 3).join(' ')
+    const at = await page.evaluate(({ sentence, length }) => {
       const main = document.getElementById('main')
       if (main === null) throw new Error('the page has not rendered')
       const found = [...main.querySelectorAll('*')].filter(
-        (one) => one.children.length === 0 && (one.textContent ?? '').includes('A block is a span of days'),
+        (one) => one.children.length === 0 && (one.textContent ?? '').includes(sentence),
       )
       const el = found[found.length - 1]
       if (el === undefined) throw new Error('the board drew no sentence to select')
@@ -233,20 +260,20 @@ describe('words somebody selected on a part of Mole Office’s own screen', () =
       if (text === null) throw new Error('the sentence holds no text')
       const range = document.createRange()
       range.setStart(text, 0)
-      range.setEnd(text, 7)
+      range.setEnd(text, length)
       const selection = getSelection()
       if (selection === null) throw new Error('this browser reports no selection')
       selection.removeAllRanges()
       selection.addRange(range)
       const box = range.getBoundingClientRect()
       return { x: box.x + box.width / 2, y: box.y + box.height / 2, words: range.toString() }
-    })
-    expect(at.words).toBe('A block')
+    }, { sentence: BOARD_KEYS, length: firstWords.length })
+    expect(at.words).toBe(firstWords)
     await page.mouse.click(at.x, at.y, { button: 'right' })
     await expect.poll(async () => (await subject()).words, { timeout: 15_000 }).not.toBe(null)
     const drawn = await subject()
-    expect(drawn.words).toContain('A block')
-    expect(drawn.words).not.toBe('When work happens this week')
+    expect(drawn.words).toContain(firstWords)
+    expect(drawn.words).not.toBe(sayInEnglish('schedule.boardTitle'))
     await closeIt()
   }, 120_000)
 })
@@ -299,7 +326,7 @@ describe('the gap between two closed folds of Settings', () => {
     if (at === null) throw new Error('no gap between two folds of Settings is under the pointer anywhere on the page')
     await page.mouse.click(at.x, at.y, { button: 'right' })
     await expect.poll(async () => (await subject()).words, { timeout: 15_000 }).not.toBe(null)
-    expect(await subject()).toEqual({ kind: 'Page', words: 'Settings' })
+    expect(await subject()).toMatchObject({ kind: 'Page', words: 'Settings' })
     await closeIt()
   }, 120_000)
 })

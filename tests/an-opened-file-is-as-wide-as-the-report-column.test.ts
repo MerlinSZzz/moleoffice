@@ -20,8 +20,9 @@
  * The tolerance is one CSS pixel. Both edges are read from the same drawn layout, so only the
  * rounding of a subpixel box can move an edge, and it moves it by less than a pixel.
  *
- * HTML is the kind of file used because the existing HTML attachment test proves it draws in the
- * Chromium this test runs in; a PDF is proved only in full Chromium.
+ * HTML is the kind of file used here. A PDF is drawn by the office's own page in a box with the
+ * same class, so the box takes the same edges; tests/a-pdf-opens-fitted-to-the-frame.test.ts reads
+ * a PDF's page against the inside of that box.
  */
 
 import { afterAll, beforeAll, expect, it } from 'vitest'

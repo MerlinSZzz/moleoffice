@@ -60,7 +60,7 @@ it('a preview and Apply on the sidebar arrangement page reach the rail, both cat
     // Native selects and buttons are keyboard controls. Empty Agents and move its first page to Office first.
     const agents = (await read()).arrangement.groups.find(group => group.key === 'agents')!.keys
     for (const key of agents) await panel.locator(`[data-sidebar-page="${key}"] select`).selectOption('office')
-    await panel.getByRole('button', { name: 'Move Flows up', exact: true }).focus(); await app.page.keyboard.press('Enter')
+    await panel.getByRole('button', { name: 'Move Office flows up', exact: true }).focus(); await app.page.keyboard.press('Enter')
     const original = await read()
     await panel.getByRole('button', { name: 'Preview', exact: true }).click()
     const preview = panel.locator('[data-sidebar-preview]')

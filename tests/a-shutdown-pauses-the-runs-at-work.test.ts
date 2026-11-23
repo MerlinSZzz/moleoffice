@@ -66,7 +66,7 @@ import { spawn } from 'node:child_process'
 import { existsSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath, URL } from 'node:url'
-import { afterAll, afterEach, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 
 import { readTheServiceLock } from '../src/config/the-service-lock.mjs'
 import { theProcessAt } from '../src/config/session-process.mjs'
@@ -74,8 +74,13 @@ import { serviceLockPathFrom } from '../src/config/settings.mjs'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { aCheckoutForATestRun } from './a-checkout-for-a-test-run.ts'
 import { aFreePortBelowTheEphemeralRange } from './a-free-port-below-the-ephemeral-range.ts'
-import { TEST_DATABASE_PREFIX, devStackEnvironment } from './helpers.ts'
+import { TEST_DATABASE_PREFIX, devStackEnvironment, theCheckoutsPageBuiltAtThisCommit } from './helpers.ts'
 import { aWholePassSince, stopTheGroups, theRuntimesOf } from './the-runtimes-a-test-office-started.ts'
+
+beforeAll(async () => {
+  // This test starts an office with the mole-office command, which runs in production and serves the built page, so the page must be built at this commit first.
+  await theCheckoutsPageBuiltAtThisCommit()
+}, 300_000)
 
 const REPO = fileURLToPath(new URL('..', import.meta.url))
 const THE_COMMAND = join(REPO, 'src', 'config', 'the-service-command.mjs')

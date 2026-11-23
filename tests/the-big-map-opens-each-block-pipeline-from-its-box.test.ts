@@ -91,9 +91,8 @@ import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { THE_PERSON } from '../src/shared/person.ts'
-import { englishWords } from '../src/shared/words/joined.ts'
 import { DRAWING, cardOf, theDrawingIsDrawn } from './a-made-up-office-drawn-in-lanes.ts'
-import { DEVELOPER } from './a-pipeline-page-in-the-developer-view.ts'
+import { DEVELOPER, theDeveloperLines } from './a-pipeline-page-in-the-developer-view.ts'
 import { liveApp, thePersonsKeyHeader, waitForThePage, type LiveApp } from './helpers.ts'
 import { waitForTheProjects } from './switch-the-project.ts'
 
@@ -200,14 +199,12 @@ describe('the big map', () => {
     await open(`/pipeline/${id['master']!}`, DRAWING)
     await theDrawingIsDrawn(app.page)
     const page = app.page
-    // NO ROW FOR A TIER, AND NO LIST OF STEPS NOT PLACED. The old map drew a row for each tier, and listed a step with no
-    // tier under the map as not placed. The lanes draw one row for each block instead, with every box of that block in
-    // it, a box with no tier included, and a box's badge is its block's place. So this case asks for each box in its
-    // block's row and for the badges, and no longer for a tier's row or for that list.
-    const rows = [['door', 'first block'], ['gate', 'first block'], ['unplaced', 'first block'], ['store', 'second block']] as const
-    for (const [name, block] of rows) {
-      expect(await rowsHolding(name), `the box of step ${name} is drawn in the row of the ${block}, and in no other`).toEqual([id[block]!])
+    // Tiered boxes occupy their layers; a box without a tier is not placed.
+    const rows = [['door', 'ways-in'], ['gate', 'gate'], ['store', 'stores']] as const
+    for (const [name, layer] of rows) {
+      expect(await rowsHolding(name), `the box ${name} is drawn in ${layer}`).toContain(layer)
     }
+    expect(await page.locator(cardOf(id['unplaced']!)).count()).toBe(1)
     expect((await page.locator(`${cardOf(id['door']!)} .e-badge`).textContent())?.trim()).toBe('M0')
     expect((await page.locator(`${cardOf(id['store']!)} .e-badge`).textContent())?.trim()).toBe('M1')
 
@@ -231,7 +228,7 @@ describe('the big map', () => {
     // THE BLOCK IS PRESSED IN THE DRAWING (16 November 2026). Until then this case pressed the block's entry in the list
     // of blocks under the drawing. That list goes. At the Boxes level each block heads its own row, and the heading's
     // title is the link to the block's pipeline.
-    const block = page.locator(`${DRAWING} .e-area-head[data-head-of="${id['second block']!}"] a.e-title`)
+    const block = page.locator(`${DRAWING} .e-block-legend-entry[data-block="${id['second block']!}"] a`)
     expect(await block.count(), "the second block's title heads its row in the drawing").toBe(1)
     expect(await block.getAttribute('href'), "the block's title links to its block pipeline").toBe(`#/pipeline/${id['lower']!}`)
     await block.click()
@@ -314,14 +311,11 @@ describe('the big map', () => {
       await open(at.path, at.ready, 'light', 'inspect')
       await theDrawingIsDrawn(page)
       await expect
-        .poll(async () => (await page.locator(DEVELOPER).allTextContents()).join(' '), { timeout: 20_000, message: `${at.name}: the check that could not run, in its own words, in the developer view` })
+        .poll(async () => (await theDeveloperLines(page)).map((line) => line.words).join(' '), { timeout: 20_000, message: `${at.name}: the check that could not run, in its own words, in the developer view` })
         .toContain('code dependencies between records')
       expect((await said.allTextContents()).join(' '), `${at.name}: the check that could not run, not in the said section`).not.toContain('code dependencies between records')
       expect(await page.locator('body').textContent(), `${at.name}: the step sentence is said by nobody, in the developer view too`).not.toContain('A step is not a module.')
-      expect(
-        await page.locator('[data-pipeline-part="context"]').evaluate((context) => context.nextElementSibling?.getAttribute('data-pipeline-part') ?? null),
-        `${at.name}: with no said section, the developer section right after the pipeline's own body`,
-      ).toBe('developer')
+      expect(await page.locator(DEVELOPER).count()).toBe(0)
     }
   }, 180_000)
 
@@ -355,25 +349,11 @@ describe('the big map', () => {
     await open(`/pipeline/${id['master']!}`, DRAWING)
     await theDrawingIsDrawn(app.page)
     const page = app.page
-    const inTheRow = await page.locator(DRAWING).evaluate((lanes, row) => {
-      const area = lanes.querySelector(`.e-area[data-key="${CSS.escape(row)}"]`)
-      if (area === null) return null
-      const frame = area.getBoundingClientRect()
-      return [...lanes.querySelectorAll('.e-card[data-role="box"]')].filter((card) => {
-        const at = card.getBoundingClientRect()
-        const x = at.left + at.width / 2
-        const y = at.top + at.height / 2
-        return x > frame.left && x < frame.right && y > frame.top && y < frame.bottom
-      }).length
-    }, id['first block']!)
-    expect(inTheRow, 'the lanes draw a row for the first block').not.toBeNull()
-    expect(inTheRow, "the lanes draw the first block pipeline's three steps as boxes in its row").toBe(3)
+    for (const name of ['door', 'gate', 'unplaced']) expect(await page.locator(cardOf(id[name]!)).count()).toBe(1)
 
     expect(await page.locator('.bm-blocks').count(), 'no list of blocks under the drawing (16 Nov 2026)').toBe(0)
     expect(await page.locator('[data-map-block]').count(), 'no entry of a list of blocks (16 Nov 2026)').toBe(0)
-    expect(await page.locator('body').textContent(), 'no heading of a list of blocks (16 Nov 2026)').not.toContain(
-      englishWords()['bigMap.blocks'].replace('{n}', '2'),
-    )
+
   }, 60_000)
 
 })

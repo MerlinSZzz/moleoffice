@@ -25,8 +25,9 @@
  * 1. Neither sentence carries a key from the reply, and both name what was not looked at.
  * 2. The two sentences say that part in the SAME words, so a second wording cannot come back
  *    quietly. Two copies is the state this test exists to fail on.
- * 3. The record page draws it, and what a person reads there has no key name in it either. The
- *    Placeholders page prints the route's sentence unchanged, so assertion 1 is that page's too.
+ * 3. The record page draws "Not checked: <what>" for each gap, and Developer mode alone the
+ *    server's reason; what a person reads there has no key name in it either. The Placeholders
+ *    page prints the route's sentence unchanged, so assertion 1 is that page's too.
  * 4. More than one gap is named, not counted.
  */
 
@@ -35,22 +36,23 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import type { FastifyInstance } from 'fastify'
 import { createElement as h } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
+import { t } from '@shared/i18n.ts'
 import { whatCouldNotBeCheckedSaid } from '@shared/restriction.ts'
 import { apiApp, freshDb, type TestDb } from './helpers.ts'
 
 const HUMAN = { 'x-mole-office-actor-type': 'human', 'x-mole-office-actor-id': THE_TEST_OFFICES_OWNER.id, 'x-mole-office-workspace': 'default' }
 
-let t: TestDb
+let db: TestDb
 let app: FastifyInstance
 
 beforeAll(async () => {
-  t = await freshDb()
+  db = await freshDb()
   app = (await apiApp()).app
   await app.ready()
 }, 60_000)
 afterAll(async () => {
   await app.close()
-  t.close()
+  db.close()
 })
 
 interface Reply {
@@ -132,11 +134,21 @@ describe('the sentence a person reads names what could not be checked', () => {
       h(mod.RestrictionsHere, { recordId: result, reading, onJudged: () => {} } as never),
     )
     const said = drawnText(html)
-    for (const gap of reading.couldNotCheck) expect(said).toContain(gap.what)
-    // THE PAGE QUOTES THE SERVER'S `because` WHOLE, whatever its words are, so no reader depends on
-    // one wording of it (wave 13q round 47 shortened them).
-    for (const gap of reading.couldNotCheck) expect(said).toContain(gap.because)
+    for (const gap of reading.couldNotCheck) expect(said).toContain(t('g2d.restrictions.state.notChecked', { what: gap.what }))
     expect(said, 'a key from the JSON reply is drawn on the record page').not.toContain('couldNotCheck')
+    // DEVELOPER MODE QUOTES THE SERVER'S `because` WHOLE, whatever its words are, so no reader depends
+    // on one wording of it (wave 13q round 47 shortened them).
+    const { setMode } = await import('../src/web/lib/mode.ts')
+    setMode('inspect')
+    try {
+      const inspected = drawnText(renderToStaticMarkup(
+        h(mod.RestrictionsHere, { recordId: result, reading, onJudged: () => {} } as never),
+      ))
+      for (const gap of reading.couldNotCheck) expect(inspected).toContain(gap.because)
+      expect(inspected, 'a key from the JSON reply is drawn on the record page').not.toContain('couldNotCheck')
+    } finally {
+      setMode('normal')
+    }
   })
 
   it('more than one gap is named, not counted', () => {

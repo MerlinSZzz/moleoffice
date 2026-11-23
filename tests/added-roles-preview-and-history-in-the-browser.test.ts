@@ -6,7 +6,11 @@ import type { Locator } from 'playwright'
 import { freshDb, liveApp, waitForThePage, type LiveApp, type TestDb } from './helpers.ts'
 import { THE_TEST_OFFICES_OWNER } from './a-page-of-a-test-office.ts'
 import { putTheMadeUpLabelIn } from './the-made-up-label-above-the-page.ts'
+import { createI18n, type WordKey } from '../src/shared/i18n.ts'
 let app: LiveApp, db: TestDb
+const en = createI18n('en').t
+/** One of the editor's presses, by its word key. */
+const aPress = (key: WordKey) => app.page.getByRole('button', { name: en(key), exact: true })
 const headers = { 'content-type': 'application/json', 'x-mole-office-workspace': 'default', 'x-mole-office-actor-type': 'human', 'x-mole-office-actor-id': THE_TEST_OFFICES_OWNER.id }
 const fixtureCard = (name: string) => ({ name, rung: null, duties: 'Made-up archive duties.', powers: ['Reading everything'], appointedBy: 'the person', appoints: 'nobody', mustRead: { chapters: [{ chapter: 1, level: 'full' }], andWhatItsStarterNames: null }, reportsTo: 'The person.', whatEndsIt: 'When the archive is read.', workArea: { grain: 'folders', most: 'no limit', says: 'Name the archive folders.' } })
 beforeAll(async () => {
@@ -41,7 +45,17 @@ it('previews, applies, edits, puts back history and removes through the page pre
   expect(await app.page.locator('[data-role-preview]').innerText()).not.toContain('appointedBy')
   expect(await app.page.locator('[data-role-preview] pre').count()).toBe(0)
   expect((await cards()).cards).toEqual([])
+  // A PREVIEW THAT PASSES is the done step: the reason and Apply, and the Preview press is gone. Apply waits for the reason.
+  expect(await aPress('addedRoles.preview').count()).toBe(0)
+  expect(await app.page.getByLabel(en('addedRoles.reason'), { exact: true }).count()).toBe(1)
   expect(await app.page.getByRole('button', { name: 'Apply', exact: true }).isDisabled()).toBe(true)
+  // A CHANGE TO THE CARD is a new card, so Preview comes back and the reason and Apply go.
+  await app.page.getByLabel(en('roleCard.part.duties'), { exact: true }).fill('Made-up browser archive duties, changed.')
+  expect(await aPress('addedRoles.preview').count()).toBe(1)
+  expect(await aPress('addedRoles.apply').count()).toBe(0)
+  expect(await app.page.getByLabel(en('addedRoles.reason'), { exact: true }).count()).toBe(0)
+  await app.page.getByLabel(en('roleCard.part.duties'), { exact: true }).fill('Made-up browser archive duties.')
+  await preview()
   await apply(); expect((await cards()).cards[0].name).toBe('browser-archivist')
   await open('roles/added/browser-archivist')
   expect(await app.page.getByLabel('Name', { exact: true }).isDisabled()).toBe(true)
@@ -64,7 +78,7 @@ it('previews, applies, edits, puts back history and removes through the page pre
   await open('roles/added/browser-archivist/remove'); await app.page.locator('[data-role-preview]').waitFor(); await apply()
 }, 120_000)
 
-it('draws locked, added and left-out cards, reminders, a refusal and edit history at four widths in both themes', async () => {
+it('draws locked, added and left-out cards, reminders, a refusal and edit history at the widest and the narrowest width in the light theme', async () => {
   await seed('archivist')
   const folder = process.env.W13R_ROLE_SHOTS
   if (folder) mkdirSync(folder, { recursive: true })
@@ -90,7 +104,8 @@ it('draws locked, added and left-out cards, reminders, a refusal and edit histor
         if (scene === 'new-refusal') await app.page.getByLabel('Duties', { exact: true }).fill('')
         await preview()
         expect(await app.page.locator('[data-role-preview]').innerText()).toContain(scene === 'new-preview' ? 'Only the person gives this card.' : 'does not say what its duties are')
-        if (scene === 'new-refusal') expect(await app.page.getByRole('button', { name: 'Apply', exact: true }).isDisabled()).toBe(true)
+        // A preview that names a problem keeps Preview as the one press: Apply is not drawn until a preview passes.
+        if (scene === 'new-refusal') expect([await aPress('addedRoles.preview').count(), await aPress('addedRoles.apply').count()]).toEqual([1, 0])
       }
       expect(await app.page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `${scene} ${width} ${theme}`).toBe(true)
       if (folder) {
@@ -102,7 +117,7 @@ it('draws locked, added and left-out cards, reminders, a refusal and edit histor
           await shoot(scene === 'edit-history' ? app.page.locator('[data-role-history]') : app.page.locator('[data-role-preview]'), `${scene}-${width}-${theme}`)
           await shoot(app.page.locator('h1').first(), `${scene}-form-${width}-${theme}`)
           if (scene === 'edit-history') await shoot(app.page.getByRole('button', { name: 'Put back', exact: true }), `${scene}-changes-${width}-${theme}`)
-          if (scene.startsWith('new')) await shoot(app.page.getByRole('button', { name: 'Apply', exact: true }), `${scene}-changes-${width}-${theme}`)
+          if (scene === 'new-preview') await shoot(aPress('addedRoles.apply'), `${scene}-changes-${width}-${theme}`)
         }
       }
     }

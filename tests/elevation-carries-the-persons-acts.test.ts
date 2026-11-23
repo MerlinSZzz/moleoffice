@@ -57,7 +57,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 
 import { THE_TEST_OFFICES_OWNER, THE_TEST_OFFICES_SECRETARY } from './a-page-of-a-test-office.ts'
-import { apiApp, freshDb, thePersonsKeyHeader, A_TESTS_REASON_FOR_THE_PERSON, FOR_THE_PERSON, type TestDb } from './helpers.ts'
+import { apiApp, freshDb, thePersonsKeyHeader, A_TESTS_REASON_FOR_THE_PERSON, FOR_THE_PERSON, type TestDb, governsTheWholeProject } from './helpers.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 import type { BuiltServer } from '../src/server/index.ts'
 import type { Actor } from '../src/server/lib/records.ts'
@@ -176,7 +176,7 @@ async function aSettledForkWithAHumanLink(): Promise<{
   const decision = await ask('POST', '/api/records', AS_THE_PERSON, {
     kind: 'decision',
     title: 'The answer the owner gave',
-    data: { replaces: [], decided_by: 'the owner', authority: 'the owner said so', because: 'One of them.' },
+    data: { ...governsTheWholeProject(), replaces: [], decided_by: 'the owner', authority: 'the owner said so', because: 'One of them.' },
   })
   expect(decision.status, decision.said).toBe(201)
   const proposalId = String((proposal.body['record'] as { id: string }).id)
@@ -458,7 +458,7 @@ describe('the same acts through the app, so the route and the guard agree', () =
     const done = await ask('POST', '/api/records', asAgent(THE_TEST_OFFICES_SECRETARY.handle), {
       kind: 'decision',
       title: 'A decision under the press',
-      data: { replaces: [], decided_by: 'the owner', authority: 'the owner said so', because: 'Because.' },
+      data: { ...governsTheWholeProject(), replaces: [], decided_by: 'the owner', authority: 'the owner said so', because: 'Because.' },
       ...FOR_THE_PERSON,
     })
     expect(done.status, done.said).toBe(201)

@@ -195,22 +195,21 @@ it('previews a message link without its record id in normal mode, as the chat dr
 }, 120_000)
 
 it('keeps Row record ids out of normal mode and draws them in developer mode', async () => {
-  // One pipeline page per theme, loaded in Normal mode, then the mode changed on it and the
-  // pipeline address reached again in the same page.
-  for (const theme of ['light', 'dark']) {
-    await open(app.page, pipelinePage(), 'en', theme, 'normal')
-    const row = app.page.locator(`.px-row[data-target^="record/${pipelineId}"]`)
-    await row.first().waitFor()
-    expect(await app.page.locator('.px-row .rid-text').count()).toBe(0)
-    for (const text of await row.allInnerTexts()) expect(text).not.toContain(pipelineId)
-    await switchMode(app.page, 'inspect')
-    await goTo(app.page, pipelinePage())
-    await openThePipelineIndex(app.page)
-    await row.first().locator('.rid-text').waitFor()
-    expect(await row.first().locator('.rid-text').isVisible()).toBe(true)
-    expect(await row.locator('.rid-text').allTextContents()).toEqual(Array(await row.count()).fill(pipelineId))
-    if (shots) await app.page.screenshot({ path: join(shots, `pipeline-developer-1440-${theme}-en.png`), fullPage: true })
-  }
+  // One pipeline page, in the light theme, loaded in Normal mode, then the mode changed on it and the
+  // pipeline address reached again in the same page. Whether an id is drawn does not depend on the colours.
+  const theme = 'light'
+  await open(app.page, pipelinePage(), 'en', theme, 'normal')
+  const row = app.page.locator(`.px-row[data-target^="record/${pipelineId}"]`)
+  await row.first().waitFor()
+  expect(await app.page.locator('.px-row .rid-text').count()).toBe(0)
+  for (const text of await row.allInnerTexts()) expect(text).not.toContain(pipelineId)
+  await switchMode(app.page, 'inspect')
+  await goTo(app.page, pipelinePage())
+  await openThePipelineIndex(app.page)
+  await row.first().locator('.rid-text').waitFor()
+  expect(await row.first().locator('.rid-text').isVisible()).toBe(true)
+  expect(await row.locator('.rid-text').allTextContents()).toEqual(Array(await row.count()).fill(pipelineId))
+  if (shots) await app.page.screenshot({ path: join(shots, `pipeline-developer-1440-${theme}-en.png`), fullPage: true })
 }, 60_000)
 
 async function columns(page: Page, selector = '.px-row:not(.px-skel), .px-scan-sum') {
@@ -246,30 +245,29 @@ async function checkColumnsAt(path: string, theme: string, width: number) {
 }
 
 it('keeps the title column at least eight characters wide on the sheet and a default-row page at 660 and 990', async () => {
-  // One sheet and one pipeline page per theme. The two widths are reached by resizing that page,
-  // and Developer mode by the switch, rather than loading each combination again.
-  for (const theme of ['light', 'dark']) {
-    await app.page.setViewportSize({ width: 660, height: 1000 })
-    await open(app.page, '/ui', 'en', theme)
-    await checkColumnsAt('/ui', theme, 660)
-    await app.page.setViewportSize({ width: 990, height: 1000 })
-    await checkColumnsAt('/ui', theme, 990)
-    await goTo(app.page, pipelinePage())
-    await openThePipelineIndex(app.page)
-    await checkColumnsAt(pipelinePage(), theme, 990)
-    await app.page.setViewportSize({ width: 660, height: 1000 })
-    await checkColumnsAt(pipelinePage(), theme, 660)
-    await switchMode(app.page, 'inspect')
-    await goTo(app.page, pipelinePage())
-    await openThePipelineIndex(app.page)
-    await app.page.locator(`.px-row[data-target^="record/${pipelineId}"]`).first().waitFor()
-    for (const width of [990, 660]) {
-      await app.page.setViewportSize({ width, height: 1000 })
-      const withId = await columns(app.page, `.px-row[data-target^="record/${pipelineId}"]`)
-      expect(withId.length).toBeGreaterThan(0)
-      for (const row of withId) expect(row.titleWidth, `${theme} inspect ${width}: ${JSON.stringify(row)}`).toBeGreaterThanOrEqual(row.eightCharacters)
-      measurements.push({ theme, width, path: pipelinePage(), mode: 'inspect', rows: withId })
-    }
+  // One sheet and one pipeline page, in the light theme: a column's width does not depend on the colours. The two
+  // widths are reached by resizing that page, and Developer mode by the switch, rather than loading each combination again.
+  const theme = 'light'
+  await app.page.setViewportSize({ width: 660, height: 1000 })
+  await open(app.page, '/ui', 'en', theme)
+  await checkColumnsAt('/ui', theme, 660)
+  await app.page.setViewportSize({ width: 990, height: 1000 })
+  await checkColumnsAt('/ui', theme, 990)
+  await goTo(app.page, pipelinePage())
+  await openThePipelineIndex(app.page)
+  await checkColumnsAt(pipelinePage(), theme, 990)
+  await app.page.setViewportSize({ width: 660, height: 1000 })
+  await checkColumnsAt(pipelinePage(), theme, 660)
+  await switchMode(app.page, 'inspect')
+  await goTo(app.page, pipelinePage())
+  await openThePipelineIndex(app.page)
+  await app.page.locator(`.px-row[data-target^="record/${pipelineId}"]`).first().waitFor()
+  for (const width of [990, 660]) {
+    await app.page.setViewportSize({ width, height: 1000 })
+    const withId = await columns(app.page, `.px-row[data-target^="record/${pipelineId}"]`)
+    expect(withId.length).toBeGreaterThan(0)
+    for (const row of withId) expect(row.titleWidth, `${theme} inspect ${width}: ${JSON.stringify(row)}`).toBeGreaterThanOrEqual(row.eightCharacters)
+    measurements.push({ theme, width, path: pipelinePage(), mode: 'inspect', rows: withId })
   }
   if (shots) {
     for (const theme of ['light', 'dark']) for (const width of [1440, 990, 660, 390]) {

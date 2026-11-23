@@ -14,6 +14,7 @@ import { type Actor } from '../lib/records.ts'
 import { PanelError } from '../lib/panel-error.ts'
 import { route } from '../lib/route.ts'
 import { THE_WORKER } from '@shared/the-worker-actor.ts'
+import { FOR_THE_PERSON } from '@shared/worker-runs.ts'
 import {
   keepTheHandStart,
   theHandStartAskedFor,
@@ -22,12 +23,14 @@ import {
   theRunOfAServedProject,
   theWorkerRunsLauncherEnded,
   theWorkerRunsToStartInEveryServedProject,
+  OutsidePlaceRequired,
 } from '../lib/worker-runs.ts'
 import { workspaceOf } from '../lib/workspaces.ts'
 import { sqlite } from '../db/client.ts'
 
 // The reply refuses nothing for a count.
 const ASK_NOTE =
+  'An outside supervisor names place as {"kind":"worktree","repository":"<name>","folder":"<path>"} or {"kind":"folder","folder":"<path>"}. ' +
   'A SUPERVISOR IN A SANDBOX ASKS THE OFFICE TO START A WORKER OF ITS OWN: {"brief": "<absolute path of a file inside ' +
   "the supervisor's sandbox folder>\", \"runtime\": \"…\", \"model\": \"…\", \"cutFrom\": \"…\", \"clone\": \"…\", \"paths\": [\"…\"], \"images\": [\"…\"], \"package\": \"<a packaged task>\", \"points\": [\"…\"], \"difficulty\": \"hard|simple\", \"why\": \"…\"}. The runtime and the model are named " +
   'together or not at all, and a Casting row of the worker card in force for the project must cast them. With neither named, the worker is ' +
@@ -110,6 +113,10 @@ const asked = z
     // NOT TRIMMED: a path is checked as it was written, and one that is not plain is refused in words.
     paths: z.array(z.string().max(300)).max(50).optional(),
     images: z.array(z.string().max(300)).max(50).optional(),
+    place: z.discriminatedUnion('kind', [
+      z.object({ kind: z.literal('worktree'), repository: z.string().trim().min(1), folder: z.string().min(1) }).strict(),
+      z.object({ kind: z.literal('folder'), folder: z.string().min(1) }).strict(),
+    ]).optional(),
     // THE PACKAGE IT WORKS ON, with the points, difficulty and why that go with it. All four together, or none of them.
     package: z.string().trim().min(1).max(200).optional(),
     points: z.array(z.string().trim().min(1).max(200)).min(1).max(200).optional(),
@@ -119,7 +126,7 @@ const asked = z
   .strict()
 const starting = z.object({ agent: z.string().trim().min(1), wrapper: z.string().trim().min(1) }).strict()
 const ended = z
-  .object({ agent: z.string().trim().min(1), wrapper: z.string().trim().min(1), ok: z.boolean(), says: z.string().trim().min(1).max(2000) })
+  .object({ agent: z.string().trim().min(1), wrapper: z.string().trim().min(1), ok: z.boolean(), says: z.string().trim().min(1).max(2000), beforeRuntime: z.literal(true).optional() })
   .strict()
 const handAsked = z.object({
   askedBy: z.string().trim().min(1).optional(),
@@ -146,24 +153,33 @@ export async function workerRunRoutes(app: FastifyInstance): Promise<void> {
     })()
   })
   app.post<{ Params: { agent: string } }>('/agents/:agent/worker-run', route('agent.worker-run', 'remote', ASK_NOTE), async (req, reply) => {
-    const body = parse(asked, req.body ?? {}, 'The worker run asked for')
-    const answer = askForAWorkerRun({
-      agent: req.params.agent,
-      brief: body.brief,
-      ...(body.runtime === undefined ? {} : { runtime: body.runtime }),
-      ...(body.model === undefined ? {} : { model: body.model }),
-      ...(body.cutFrom === undefined ? {} : { cutFrom: body.cutFrom }),
-      ...(body.clone === undefined ? {} : { clone: body.clone }),
-      ...(body.paths === undefined ? {} : { paths: body.paths }),
-      ...(body.images === undefined ? {} : { images: body.images }),
-      ...(body.package === undefined ? {} : { package: body.package }),
-      ...(body.points === undefined ? {} : { points: body.points }),
-      ...(body.difficulty === undefined ? {} : { difficulty: body.difficulty }),
-      ...(body.why === undefined ? {} : { why: body.why }),
-      workspaceId: workspaceOf(req),
-      actor: actorFrom(req),
-    })
-    return reply.code(202).send(answer)
+    try {
+      const body = parse(asked, req.body ?? {}, 'The worker run asked for')
+      const answer = askForAWorkerRun({
+        agent: req.params.agent,
+        brief: body.brief,
+        ...(body.runtime === undefined ? {} : { runtime: body.runtime }),
+        ...(body.model === undefined ? {} : { model: body.model }),
+        ...(body.cutFrom === undefined ? {} : { cutFrom: body.cutFrom }),
+        ...(body.clone === undefined ? {} : { clone: body.clone }),
+        ...(body.paths === undefined ? {} : { paths: body.paths }),
+        ...(body.images === undefined ? {} : { images: body.images }),
+        ...(body.place === undefined ? {} : { place: body.place }),
+        ...(body.package === undefined ? {} : { package: body.package }),
+        ...(body.points === undefined ? {} : { points: body.points }),
+        ...(body.difficulty === undefined ? {} : { difficulty: body.difficulty }),
+        ...(body.why === undefined ? {} : { why: body.why }),
+        workspaceId: workspaceOf(req),
+        actor: actorFrom(req),
+      })
+      return reply.code(202).send(answer)
+    } catch (error) {
+      const namesPlace = typeof req.body === 'object' && req.body !== null && Object.hasOwn(req.body, 'place')
+      if (error instanceof OutsidePlaceRequired || (namesPlace && error instanceof PanelError)) {
+        return reply.code(error.status).send({ error: error.message, forThePerson: FOR_THE_PERSON })
+      }
+      throw error
+    }
   })
 
   app.get(
@@ -198,7 +214,7 @@ export async function workerRunRoutes(app: FastifyInstance): Promise<void> {
       const run = theRunOfAServedProject(req.params.run)
       const body = parse(ended, req.body ?? {}, "How a worker run's launcher ended")
       return {
-        workerRun: theWorkerRunsLauncherEnded({ run: req.params.run, agent: body.agent, wrapper: body.wrapper, ok: body.ok, says: body.says, workspaceId: run.workspaceId }),
+        workerRun: theWorkerRunsLauncherEnded({ run: req.params.run, agent: body.agent, wrapper: body.wrapper, ok: body.ok, says: body.says, workspaceId: run.workspaceId, ...(body.beforeRuntime === true ? { beforeRuntime: true } : {}) }),
       }
     },
   )

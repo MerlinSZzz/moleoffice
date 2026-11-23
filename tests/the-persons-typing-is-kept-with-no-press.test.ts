@@ -121,7 +121,10 @@ describe('what the person types into the office\'s terminal, with keeping on', (
       body: {
         kind: 'decision',
         title: 'The kiln fires on Friday',
-        data: { replaces: [], decided_by: 'the owner', authority: 'the owner said so', authority_reference: kept.note!.id, option_taken: 'Friday.', because: 'The person typed it.' },
+        data: {
+          governs: [{ wholeProject: true }],
+          replaces: [], decided_by: 'the owner', authority: 'the owner said so', authority_reference: kept.note!.id, option_taken: 'Friday.', because: 'The person typed it.',
+        },
       },
     })
     expect(cited.status, JSON.stringify(cited.body)).toBe(201)

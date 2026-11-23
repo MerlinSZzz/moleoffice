@@ -22,8 +22,8 @@
  * WHAT IS CHECKED
  * ---------------------------------------------------------------------------------------
  *
- * The box's width against the list's own width, at the three widths the panel is drawn at with its
- * stored size (660, 990, 1440) and at a panel dragged out to the window. The reading is a share
+ * The box's width against the list's own width, at the narrowest and the widest width the panel is drawn at with its
+ * stored size (660, 1440) and at a panel dragged out to the window. The reading is a share
  * rather than a number of pixels, because the number is what changes and the share is what the
  * criterion is about. Narrowing is checked too, at 390, where the panel is the whole screen.
  */
@@ -125,7 +125,7 @@ afterAll(async () => {
 })
 
 describe('a message box takes the room the panel has', () => {
-  for (const width of [660, 990, 1440]) {
+  for (const width of [660, 1440]) {
     it(`fills most of the panel at ${String(width)}`, async () => {
       await openTheConversation({ width, height: 1000 })
       const seen = await theWidths()

@@ -49,6 +49,12 @@ export interface RouteDeclaration {
    * .
    */
   theDoorAsksTheCard?: true
+  /**
+   * THE DOOR CHANGES SOMETHING THOUGH ITS METHOD IS GET, always (`true`) or when its query asks it to (the
+   * function). Set by `itChangesSomething` below and by nothing else. A request a listener carried to such a door must
+   * carry the office's mark, as every other method must: lib/a-write-a-website-could-send.ts.
+   */
+  changesSomething?: true | ((query: Readonly<Record<string, unknown>>) => boolean)
 }
 
 /**
@@ -108,4 +114,15 @@ export function route(
  */
 export function theDoorAsksTheCard(declared: { config: RouteDeclaration }): { config: RouteDeclaration } {
   return { config: { ...declared.config, theDoorAsksTheCard: true } }
+}
+
+/**
+ * MARK A GET ROUTE WHOSE DOOR CHANGES SOMETHING. See `changesSomething` above. With no `when`, every request to the
+ * door changes something; with one, a request changes something when `when` says so of its query.
+ */
+export function itChangesSomething(
+  declared: { config: RouteDeclaration },
+  when?: (query: Readonly<Record<string, unknown>>) => boolean,
+): { config: RouteDeclaration } {
+  return { config: { ...declared.config, changesSomething: when ?? true } }
 }

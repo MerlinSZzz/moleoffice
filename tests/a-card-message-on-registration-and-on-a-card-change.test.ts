@@ -51,6 +51,8 @@ import type { FastifyInstance, InjectOptions } from 'fastify'
 
 import { apiApp, freshDb, theOfficesOwnId, type TestDb } from './helpers.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
+import { THE_TOOLSET_SENTENCE } from '../src/shared/toolset.ts'
+import { KNOWLEDGE_WORDS } from '../src/shared/words/en-wave-13u.ts'
 import { SYSTEM_LINES } from '../src/shared/groups.ts'
 import { A_ROW_WITH_NO_ROLE_READS_AS } from '../src/shared/roles.ts'
 import { theRoleCardsFile } from '../src/server/lib/roles.ts'
@@ -219,6 +221,7 @@ describe('a registration writes the new agent one message about its card', () =>
     expect(message.sentById, 'the message is not from the office').toBe(theOfficesOwnId(t))
     // AND THE SENTENCE CARRIES THE CARD'S OWN WORDS, read from the file here and never retyped.
     expect(message.saidInFull, 'the card’s duties are not in the message').toContain(card!.duties)
+    expect(message.saidInFull).toContain(`${THE_TOOLSET_SENTENCE} ${KNOWLEDGE_WORDS.introduction}`)
     for (const power of thePowersOf(decl, card!)) {
       expect(message.saidInFull, `the power "${power}" is not in the message`).toContain(power)
     }

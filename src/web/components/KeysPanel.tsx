@@ -1,22 +1,24 @@
 // Copyright © 2026 Zhengyang Shen
 // Licensed under the MIT License. See LICENSE.
 /**
- * `Keys and runtimes` — THE OFFICE'S OWN KEYS, AND EACH RUNTIME'S OWN ASKED READ-ONLY. Criterion U2.
+ * `Keys and runtimes` — THE OFFICE'S OWN KEYS, AND THE SANDBOXES' LOGINS. Criterion U2.
  *
  * ---------------------------------------------------------------------------------------
  * ONE QUESTION, TWO MECHANISMS, AND THE PANEL SHOWS THE DIFFERENCE
  * ---------------------------------------------------------------------------------------
  *
  * A reader arrives with one question: which keys does this office have? The answer has two halves
- * and they work in different ways, so the panel draws them apart and says so.
+ * and they work in different ways, so the panel draws them apart, each under its own heading.
  *
  *   THE OFFICE'S OWN. Two keys, OpenRouter and Moonshot, both written from this page into one file
  *   beside the database. Each has a box to set it and a press to test it. The office answers only
  *   whether one is set: no reply and no row here ever carries a value.
  *
- *   EACH RUNTIME'S OWN. claude-code, codex and opencode keep their own keys, and the office never
- *   copies one. It asks each tool read-only through the tool's own command where there is one, and
- *   shows set, not set, or nobody has looked.
+ *   THE SANDBOXES' LOGINS, in a file of their own (src/web/components/SandboxLoginsHalf.tsx).
+ *
+ *   EACH CODING TOOL'S OWN KEY WAS A THIRD HALF HERE, read-only rows that said set, not set or nobody
+ *   has looked. Since wave 13u round 242 each tool has one line, with its Set up press, in a panel of
+ *   its own that is not developer-only (src/web/components/settings/CodingToolsPanel.tsx).
  *
  *   THE SUMMONS MAIL'S THREE SETTINGS WERE HERE until the mail left the office for the mail tool, by
  *   two decisions of theirs. The tool is
@@ -36,7 +38,7 @@
  *
  * The sentence comes from the server. It names mode 600 on Linux and Mac, and on Windows an access
  * list with one entry, this user's, with the words "unverified on Windows". The panel claims nothing
- * more than the operating system gives.
+ * more than the operating system gives, and shows the sentence only in Developer mode, as decided.
  */
 
 import { settingsControlWord } from '@shared/settings-declaration.ts'
@@ -47,35 +49,22 @@ import { content, t, type WordKey } from '@shared/i18n.ts'
 import { SandboxLoginsHalf } from './SandboxLoginsHalf.tsx'
 import { SETTINGS_NARROW } from './SettingsFolds.tsx'
 import {
+  type KeyTestOutcome,
   type KeyTestResult,
   type OfficeKeyOnScreen,
   type OfficeKeyProvider,
-  type RuntimeKeyOnScreen,
   type TheKeys,
 } from '@shared/office-keys.ts'
-import { Absence, ErrorNote, Loading, Panel, useAsync } from './ui.tsx'
+import { Absence, ErrorNote, Loading, Panel, ServerNote, useAsync } from './ui.tsx'
 import { api, errorMessage } from '../api.ts'
 import { useLanguage } from '../lib/language.ts'
 
-/** Each office key's words, by provider. The English is the shared table's, read through a getter. */
-const OFFICE_KEY_WORDS: Record<OfficeKeyProvider, { means: WordKey; set: WordKey; notSet: WordKey }> = {
-  openrouter: {
-    means: 'settingsPanel.keys.means.openrouter',
-    set: 'settingsPanel.keys.says.openrouter.set',
-    notSet: 'settingsPanel.keys.says.openrouter.notSet',
-  },
-  moonshot: {
-    means: 'settingsPanel.keys.means.moonshot',
-    set: 'settingsPanel.keys.says.moonshot.set',
-    notSet: 'settingsPanel.keys.says.moonshot.notSet',
-  },
-}
-
-/** Each runtime's words, by the runtime word. A runtime not listed here is drawn in the server's words. */
-const RUNTIME_WORDS: Readonly<Record<string, { provider: WordKey; means: WordKey }>> = {
-  'claude-code': { provider: 'settingsPanel.keys.runtime.claudeCode.provider', means: 'settingsPanel.keys.runtime.claudeCode.means' },
-  codex: { provider: 'settingsPanel.keys.runtime.codex.provider', means: 'settingsPanel.keys.runtime.codex.means' },
-  opencode: { provider: 'settingsPanel.keys.runtime.opencode.provider', means: 'settingsPanel.keys.runtime.opencode.means' },
+/** A test press's outcome as a short word. The server's own sentence is shown only in Developer mode. */
+const TESTED_WORDS: Record<KeyTestOutcome, WordKey> = {
+  answered: 'settingsPanel.keys.tested.answered',
+  refused: 'settingsPanel.keys.tested.refused',
+  unreachable: 'settingsPanel.keys.tested.unreachable',
+  'cannot-be-tested-without-spending': 'settingsPanel.keys.notTestable',
 }
 
 export function KeysPanel() {
@@ -93,16 +82,14 @@ export function KeysPanel() {
   )
 }
 
-/** The whole section: what protects the file, the office's own keys, and each runtime's own. */
+/** The whole section: the office's own keys, and the sandboxes' logins. */
 function Keys({ said, onChanged }: { said: TheKeys; onChanged: () => void }) {
   useLanguage()
-  // THE PROTECTION SENTENCE is the shared constant the server sends, so the page says it in its own language.
   return (
     <div className="keys">
-      <p className="keys-protection">{t('settingsPanel.keys.protection')}</p>
+      <ServerNote text={said.protection} />
       <div className="keys-half">
         <h3 className="keys-heading">{t('settingsPanel.keys.officeHeading')}</h3>
-        <p className="keys-lead">{t('settingsPanel.keys.officeLead')}</p>
         <div className="keys-rows">
           {said.office.map((one) => (
             <OfficeKeyRow
@@ -114,15 +101,6 @@ function Keys({ said, onChanged }: { said: TheKeys; onChanged: () => void }) {
         </div>
       </div>
       <SandboxLoginsHalf />
-      <div className="keys-half">
-        <h3 className="keys-heading">{t('settingsPanel.keys.toolsHeading')}</h3>
-        <p className="keys-lead">{t('settingsPanel.keys.toolsLead')}</p>
-        <div className="keys-rows">
-          {said.runtimes.map((one) => (
-            <RuntimeKeyRow key={one.runtime} one={one} />
-          ))}
-        </div>
-      </div>
     </div>
   )
 }
@@ -175,17 +153,13 @@ function OfficeKeyRow({ one, onChanged }: { one: OfficeKeyOnScreen; onChanged: (
       })
   }
 
-  const words = OFFICE_KEY_WORDS[one.provider]
-  const says = t(one.set ? words.set : words.notSet)
   return (
     <div className="keys-row" data-key={one.provider}>
       <div className="keys-words">
         <p className="keys-label">{content(one.label)}</p>
-        <p className="keys-means">{t(words.means)}</p>
         <p className="keys-setting">
-          {/* One sentence with the setting's name inside it. Splitting a translated sentence around a
-              code element would cut it in a place another language does not have. */}
-          {t('settingsPanel.keys.fallsBack', { setting: content(one.setting) })}
+          {/* One word with the setting's name inside it, so another language may put the two in its own order. */}
+          {t('settingsPanel.keys.fallback', { setting: content(one.setting) })}
         </p>
       </div>
       <div className="keys-control">
@@ -213,46 +187,19 @@ function OfficeKeyRow({ one, onChanged }: { one: OfficeKeyOnScreen; onChanged: (
             {t(settingsControlWord('settings.keys', 'settingsPanel.keys.test'))}
           </button>
         ) : (
-          <span className="keys-untestable">{t('settingsPanel.keys.untestable')}</span>
+          <span className="keys-untestable">{t('settingsPanel.keys.notTestable')}</span>
         )}
       </div>
       <p className={one.set ? 'keys-state' : 'keys-missing'}>
-        {one.set ? t(settingsControlWord('settings.keys', 'settingsPanel.keys.set')) : <Absence word={t('settingsPanel.keys.notSet')} title={says} />}
+        {one.set ? t(settingsControlWord('settings.keys', 'settingsPanel.keys.set')) : <Absence word={t('settingsPanel.keys.notSet')} />}
       </p>
-      <p className="keys-says">{says}</p>
       {fault === null ? null : <p className="keys-refuse">{fault}</p>}
       {test === null ? null : (
-        <p className={test.outcome === 'answered' ? 'keys-state' : 'keys-refuse'} lang="en">{content(test.says)}</p>
+        <>
+          <p className={test.outcome === 'answered' ? 'keys-state' : 'keys-refuse'}>{t(TESTED_WORDS[test.outcome])}</p>
+          <ServerNote text={test.says} />
+        </>
       )}
-    </div>
-  )
-}
-
-/** One runtime's own key, asked read-only. Set, not set, or nobody has looked. */
-function RuntimeKeyRow({ one }: { one: RuntimeKeyOnScreen }) {
-  useLanguage()
-  const words = RUNTIME_WORDS[one.runtime]
-  return (
-    <div className="keys-row" data-tool={one.runtime}>
-      <div className="keys-words">
-        <p className="keys-label">{content(one.label)}</p>
-        <p className="keys-means">
-          {words === undefined
-            ? t('settingsPanel.keys.providerAndMeans', { provider: one.provider, means: one.means })
-            : t('settingsPanel.keys.providerAndMeans', { provider: t(words.provider), means: t(words.means) })}
-        </p>
-      </div>
-      <div className="keys-readonly">
-        {one.state === 'set' ? (
-          <span className="keys-state">{t(settingsControlWord('settings.keys', 'settingsPanel.keys.set'))}</span>
-        ) : one.state === 'not-set' ? (
-          <Absence tier="told-apart" looked word={t('settingsPanel.keys.notSet')} title={one.says} />
-        ) : (
-          <Absence tier="told-apart" looked={false} word={t('settingsPanel.keys.nobodyLooked')} title={one.says} />
-        )}
-      </div>
-      <p className="keys-says" lang="en">{content(one.says)}</p>
-      <p className="keys-asked">{t('settingsPanel.keys.askedWith', { asked: one.asked })}</p>
     </div>
   )
 }
@@ -260,13 +207,8 @@ function RuntimeKeyRow({ one }: { one: RuntimeKeyOnScreen }) {
 /** The section's own rules. Every value is a token, so a preset swap re-skins it with everything else. The OpenCode Go slots, drawn after it, wear them too. */
 export const KEYS_CSS = `
 .keys { display: flex; flex-direction: column; gap: var(--gut); min-width: 0; }
-.keys-protection {
-  margin: 0; max-width: var(--measure-in-box);
-  font: var(--fs-2)/var(--lh-read) var(--font-ui); color: var(--text-2);
-}
 .keys-half { display: flex; flex-direction: column; gap: var(--pad); min-width: 0; padding-top: var(--gut); border-top: var(--border-w) solid var(--border); }
 .keys-heading { margin: 0; font: 600 var(--fs-1)/var(--lh-tight) var(--font-ui); color: var(--text); }
-.keys-lead { margin: 0; max-width: var(--measure-in-box); font: var(--fs-2)/var(--lh-body) var(--font-ui); color: var(--text-3); }
 .keys-rows { display: flex; flex-direction: column; gap: var(--pad); min-width: 0; }
 .keys-row {
   display: flex; flex-wrap: wrap; align-items: flex-start; gap: 4px var(--gut);
@@ -276,7 +218,6 @@ export const KEYS_CSS = `
 }
 .keys-words { flex: 1 1 22rem; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .keys-label { margin: 0; font: 600 var(--fs-1)/var(--lh-tight) var(--font-ui); color: var(--text); }
-.keys-means { margin: 0; max-width: var(--measure-in-box); font: var(--fs-1)/var(--lh-body) var(--font-ui); color: var(--text-2); }
 .keys-setting { margin: 0; max-width: var(--measure-in-box); font: var(--fs-1)/var(--lh-tight) var(--font-ui); color: var(--text-3); }
 .keys-setting code { font-family: var(--font-mono, monospace); }
 /* THE CONTROL AND ITS BOX MAY BE NARROWER THAN THEY WANT: in a narrow card the box shrinks to the row, and the
@@ -304,11 +245,9 @@ export const KEYS_CSS = `
 .keys-stack .keys-box { justify-content: space-between; }
 .keys-stack .keys-box-name { min-width: 7rem; }
 .keys-presses { display: flex; gap: var(--pad); }
-.keys-readonly { flex: none; display: flex; align-items: center; gap: var(--pad); }
 .keys-state { flex: 1 1 100%; margin: 0; max-width: var(--measure-in-box); font: var(--fs-1)/var(--lh-tight) var(--font-ui); color: var(--text-2); }
 .keys-missing { flex: 1 1 100%; margin: 0; max-width: var(--measure-in-box); font: var(--fs-1)/var(--lh-tight) var(--font-ui); color: var(--text-3); }
-.keys-says { flex: 1 1 100%; margin: 0; max-width: var(--measure-in-box); font: var(--fs-2)/var(--lh-tight) var(--font-ui); color: var(--text-3); }
-.keys-asked { flex: 1 1 100%; margin: 0; max-width: var(--measure-in-box); font: var(--fs-2)/var(--lh-tight) var(--font-ui); color: var(--text-3); }
+.keys-count { flex: 1 1 100%; margin: 0; max-width: var(--measure-in-box); font: var(--fs-2)/var(--lh-tight) var(--font-ui); color: var(--text-3); }
 .keys-refuse {
   flex: 1 1 100%; margin: 0; max-width: 40ch; padding: 2px var(--pad);
   color: var(--st-failed); background: var(--st-failed-bg);

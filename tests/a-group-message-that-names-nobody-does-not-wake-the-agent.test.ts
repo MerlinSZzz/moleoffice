@@ -23,6 +23,8 @@
  */
 
 import { spawn, type ChildProcess } from 'node:child_process'
+import { writeFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
 import type { AddressInfo } from 'node:net'
 import { fileURLToPath } from 'node:url'
 
@@ -148,6 +150,8 @@ async function inject(method: 'GET' | 'POST', url: string, headers: Record<strin
 async function started(handle: string, name: string): Promise<string> {
   const reply = await inject('POST', '/api/agents/started', AS_THE_PERSON, { handle, name, runtime: 'claude-code' })
   expect(reply.status, reply.text).toBe(201)
+  const key = (reply.json['whatToGiveIt'] as { key: string }).key
+  writeFileSync(join(dirname(t.file), `${handle}.key`), key, { mode: 0o600 })
   return (reply.json['agent'] as { id: string }).id
 }
 
@@ -171,8 +175,10 @@ const inTheGroup = (body: string, headers = asAgent(WRITER)): Promise<string> =>
 /** Run the waiter tool for the quiet agent until it hands over, and answer what it printed. */
 async function theToolSays(keptByTheKit: boolean): Promise<string> {
   const env: Record<string, string | undefined> = { ...process.env, MOLE_OFFICE_HANDLE_BEAT_SECONDS: '1' }
-  // NO KEY OF THE SHELL'S GOES TO THE TEST'S OFFICE: the tool sends the test office's own key, read beside its database.
+  // The tool receives the registered agent's own key, never a key inherited from the shell.
   for (const name of Object.keys(env)) if (/KEY|TOKEN|CREDENTIAL/u.test(name)) delete env[name]
+  delete env.MOLE_OFFICE_TOOL_CONFIGURATION
+  env.MOLE_AGENT_KEY_FILE = join(dirname(t.file), `${QUIET}.key`)
   const child = spawn(process.execPath, [TOOL, '--agent', QUIET, '--session', session, '--api', api, '--workspace', 'default', ...(keptByTheKit ? ['--kept-by-the-kit'] : [])], { env })
   tools.push(child)
   let printed = ''

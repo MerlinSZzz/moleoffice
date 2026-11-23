@@ -67,9 +67,6 @@ export function MachineNamesPanel() {
           </div>
         )}
 
-        <p className="mn-purpose">{t('settingsPanel.machineNames.purpose')}</p>
-        <p className="mn-history">{t('settingsPanel.machineNames.history')}</p>
-
         <form
           className="mn-add"
           onSubmit={(event) => {
@@ -123,9 +120,8 @@ function MachineNameRow({ machine, busy, save }: {
 
 const MACHINE_NAMES_CSS = `
 .mn { display: flex; flex-direction: column; gap: var(--pad); min-width: 0; }
-.mn-purpose, .mn-history, .mn-empty, .mn-saved { margin: 0; max-width: var(--measure-in-box); overflow-wrap: anywhere; font: var(--fs-1)/var(--lh-body) var(--font-ui); }
-.mn-purpose, .mn-empty { color: var(--text-2); }
-.mn-history { color: var(--text-3); }
+.mn-empty, .mn-saved { margin: 0; max-width: var(--measure-in-box); overflow-wrap: anywhere; font: var(--fs-1)/var(--lh-body) var(--font-ui); }
+.mn-empty { color: var(--text-2); }
 .mn-list { display: flex; flex-direction: column; gap: var(--pad); min-width: 0; }
 .mn-row { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr) auto auto; align-items: end; gap: var(--pad); min-width: 0; padding-bottom: var(--pad); border-bottom: var(--border-w) solid var(--border); }
 .mn-address { min-width: 0; overflow-wrap: anywhere; color: var(--text-2); font: var(--fs-1)/var(--lh-body) var(--font-mono); }

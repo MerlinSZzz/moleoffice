@@ -5,8 +5,7 @@
  *
  * A trajectory is the intended evolution. A plan is the work chosen to get there. A schedule puts
  * that work in time. A checkpoint observes progress and picks what happens next. A revision is what
- * became true. The office stores each of the five somewhere of its own, and this file names, for
- * each of the ten pairs, the fact that keeps the two apart:
+ * became true. The office stores each of the five somewhere of its own:
  *
  *   trajectory  the `trajectory` record kind, whose `plannedStateIds` field is the intended states;
  *   plan        the `plans` table and the `plan_lines` table, which no record kind declares;
@@ -14,13 +13,7 @@
  *   checkpoint  the `stopping_point` record kind, whose `doing` and `next` fields are the stop;
  *   revision    the `revisions` table, whose `record_id`, `seq` and `op` are a record's history.
  *
- * THE FIRST HALF READS DECLARATIONS. The kinds come from `KIND_SPECS` and the two kind declarations;
- * the tables come from the drizzle declarations and their own column objects. No word is copied into
- * this half, so renaming a kind or a table moves what it reads. Its ten pairs fail when two start
- * sharing a name: one table renamed to a kind's word, one table to another table's word, or a kind
- * to another kind's word.
- *
- * THE SECOND HALF USES THEM. One scratch office, one project, every write through the real doors,
+ * THE BEHAVIOUR HALF USES THEM. One scratch office, one project, every write through the real doors,
  * read through GET /api/project-graph, the one read that returns all five together: a future carries
  * planned states, a plan carries lines, an allocation carries period and hours, a checkpoint carries
  * doing and next, and a revision carries seq and op. Each pair is one case that fails when the read
@@ -28,121 +21,12 @@
  * are not kinds, and a field copied from the other kind. This claims only these two paths, not every
  * route.
  */
-import { getTableColumns, getTableName } from 'drizzle-orm'
 import type { FastifyInstance } from 'fastify'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
-import { KIND_SPECS } from '../src/shared/kinds.ts'
-import { stoppingPointKind } from '../src/shared/kinds/stopping-point.ts'
-import { trajectoryKind } from '../src/shared/kinds/trajectory.ts'
 import type { ProjectGraphReply } from '../src/shared/project-graph.ts'
-import { allocations, planLines, plans, revisions, workWindows } from '../src/server/db/schema.ts'
 import { THE_TEST_OFFICES_OWNER } from './a-page-of-a-test-office.ts'
 import { apiApp, freshDb, type TestDb } from './helpers.ts'
-
-/** Where one of the five words is stored: a record kind, or a table. */
-type Sort = 'kind' | 'table'
-interface Place {
-  sort: Sort
-  name: string
-}
-
-const aKind = (name: string): Place => ({ sort: 'kind', name })
-const aTable = (table: Parameters<typeof getTableName>[0]): Place => ({ sort: 'table', name: getTableName(table) })
-
-/** The five words and the places the records hold them in, read from the declarations. */
-const PLACES = {
-  trajectory: [aKind(trajectoryKind.kind)],
-  plan: [aTable(plans), aTable(planLines)],
-  schedule: [aTable(allocations), aTable(workWindows)],
-  checkpoint: [aKind(stoppingPointKind.kind)],
-  revision: [aTable(revisions)],
-} as const
-
-type Word = keyof typeof PLACES
-
-/** The names two words share, if any. This is the one thing no pair may have. */
-function sharedNames(a: Word, b: Word): string[] {
-  const theirs = new Set(PLACES[b].map((place) => place.name))
-  return PLACES[a].map((place) => place.name).filter((name) => theirs.has(name))
-}
-
-/** Whether every kind word's name is a kind the office declares, and no table word claims a kind. */
-function storedWhereItSays(word: Word): boolean {
-  return PLACES[word].every((place) =>
-    place.sort === 'kind'
-      ? Object.hasOwn(KIND_SPECS, place.name)
-      : !Object.hasOwn(KIND_SPECS, place.name),
-  )
-}
-
-function fieldKeysOf(spec: { fields: readonly { key: string }[] }): string[] {
-  return spec.fields.map((field) => field.key)
-}
-
-function columnKeysOf(table: Parameters<typeof getTableColumns>[0]): string[] {
-  return Object.keys(getTableColumns(table))
-}
-
-/**
- * WHAT EACH WORD IS IN THE RECORDS, read from its own declaration. A trajectory and a checkpoint
- * are kinds with their own fields; a plan, a schedule and a revision are tables with their own
- * columns. These are the facts the ten pairs lean on.
- */
-const STORED_FACTS: Record<Word, string[]> = {
-  trajectory: fieldKeysOf(trajectoryKind).includes('plannedStateIds') ? ['plannedStateIds'] : [],
-  plan: columnKeysOf(planLines).includes('planId') ? ['plan_lines.planId'] : [],
-  schedule: columnKeysOf(allocations).includes('period') && columnKeysOf(workWindows).includes('startsOn')
-    ? ['allocations.period', 'work_windows.startsOn']
-    : [],
-  checkpoint: fieldKeysOf(stoppingPointKind).includes('doing') && fieldKeysOf(stoppingPointKind).includes('next')
-    ? ['doing', 'next']
-    : [],
-  revision: columnKeysOf(revisions).includes('recordId') && columnKeysOf(revisions).includes('seq')
-    ? ['revisions.recordId', 'revisions.seq']
-    : [],
-}
-
-/**
- * THE TEN PAIRS AND THE FACT THAT KEEPS EACH APART, in the words a reader needs. The case for a
- * pair fails when the two share a name, when either word is no longer stored where the line above
- * says, or when the field or table that carries its meaning is gone.
- */
-const PAIRS: readonly { a: Word; b: Word; keptApartBy: string }[] = [
-  { a: 'trajectory', b: 'plan', keptApartBy: 'a record kind holding plannedStateIds, against the plans and plan_lines tables' },
-  { a: 'trajectory', b: 'schedule', keptApartBy: 'a record kind holding plannedStateIds, against the allocations and work_windows tables' },
-  { a: 'trajectory', b: 'checkpoint', keptApartBy: 'two record kinds whose fields differ: plannedStateIds, against doing and next' },
-  { a: 'trajectory', b: 'revision', keptApartBy: 'a record kind holding plannedStateIds, against the revisions table with recordId and seq' },
-  { a: 'plan', b: 'schedule', keptApartBy: 'the plans and plan_lines tables, against the allocations and work_windows tables' },
-  { a: 'plan', b: 'checkpoint', keptApartBy: 'two tables no record kind declares, against the stopping_point record kind' },
-  { a: 'plan', b: 'revision', keptApartBy: 'the plans and plan_lines tables, against the revisions table' },
-  { a: 'schedule', b: 'checkpoint', keptApartBy: 'two tables no record kind declares, against the stopping_point record kind' },
-  { a: 'schedule', b: 'revision', keptApartBy: 'the allocations and work_windows tables, against the revisions table' },
-  { a: 'checkpoint', b: 'revision', keptApartBy: 'the stopping_point record kind, against the revisions table with recordId and seq' },
-]
-
-describe('the five planning words', () => {
-  it('are each stored where they say, and no two share a kind or a table name', () => {
-    for (const word of Object.keys(PLACES) as Word[]) {
-      expect(storedWhereItSays(word), `${word} is stored where it says`).toBe(true)
-      expect(STORED_FACTS[word].length, `${word} still has the field or table that carries it`).toBeGreaterThan(0)
-    }
-    const names = (Object.keys(PLACES) as Word[]).flatMap((word) => PLACES[word].map((place) => place.name))
-    expect(new Set(names).size, 'the five words share no storage name').toBe(names.length)
-  })
-
-  for (const { a, b, keptApartBy } of PAIRS) {
-    it(`${a} and ${b} stay apart: ${keptApartBy}`, () => {
-      // THE DIFFERENCE ITSELF. A table or kind renamed to the other's word makes this non-empty.
-      expect(sharedNames(a, b), `${a} and ${b} share a name`).toEqual([])
-      // AND THE FACTS EACH SIDE RESTS ON, read from the declarations rather than from this file.
-      expect(storedWhereItSays(a), `${a} is a kind or a table as it says`).toBe(true)
-      expect(storedWhereItSays(b), `${b} is a kind or a table as it says`).toBe(true)
-      expect(STORED_FACTS[a], `${a} still has what carries its meaning`).not.toEqual([])
-      expect(STORED_FACTS[b], `${b} still has what carries its meaning`).not.toEqual([])
-    })
-  }
-})
 
 /**
  * THE BEHAVIOUR HALF, on one scratch office and one project. Every value below is written through

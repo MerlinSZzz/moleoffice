@@ -32,6 +32,10 @@
  * keep another agent from the input it needs.
  */
 
+// THE ONE TEST OF A KEY, which the holder asks of the same line, so that a quick input the list keeps is never one the
+// holder refuses.
+import { A_CONTROL_CHARACTER } from '../config/a-control-character.mjs'
+
 /** At most one quick input is typed for one agent in this many milliseconds: ten minutes. */
 export const ONE_QUICK_INPUT_EVERY_MS = 10 * 60 * 1000
 
@@ -51,9 +55,6 @@ export type QuickInputListReading = { state: 'none' } | { state: 'set'; inputs: 
 export function theNoQuickInputListSentence(): string {
   return 'There is no list of quick inputs now, so the office types nothing into an agent\'s terminal when the agent asks.'
 }
-
-/** A character a terminal reads as a key rather than as text: a control character, or DEL. */
-const A_CONTROL_CHARACTER = /[\u0000-\u001f\u007f]/u
 
 /** The most characters of one input the refusal sentence shows. */
 const THE_MOST_CHARACTERS_SHOWN_OF_AN_INPUT = 40

@@ -17,6 +17,15 @@ const backupPath = new URL('../src/server/lib/backup.ts', import.meta.url).pathn
 const commit = 'a'.repeat(40), tree = 'b'.repeat(40)
 const pin = { id: 'synthetic-original', seq: 1, contentHash: 'c'.repeat(16) }
 export type Event = { step: string; phase: string }
+/**
+ * THE MADE-UP ELECTRON BINARY. This fixture runs no command. So when the bootstrap's step fetch-electron-binary starts
+ * its group, the stand-in writes what the electron package's install.js would write in the stable checkout:
+ * node_modules/electron/path.txt, naming THE_MADE_UP_ELECTRON_BINARY, and that file in node_modules/electron/dist,
+ * holding THE_MADE_UP_ELECTRON_BYTES. The name and the bytes are made up. They are no program, and nothing is
+ * downloaded. A test that calls writeNoElectronPath() gets no path.txt.
+ */
+export const THE_MADE_UP_ELECTRON_BINARY = 'synthetic-electron'
+export const THE_MADE_UP_ELECTRON_BYTES = 'Synthetic per-step stand-in for the Electron binary. Nothing was downloaded.\n'
 
 afterEach(() => {
   vi.doUnmock(dependency('stable/stable-bootstrap-support.mjs')); vi.doUnmock(dependency('stable/stable-bootstrap-storage.mjs'))
@@ -43,7 +52,7 @@ export async function fixture(faults: Event[] = [], mismatch: 'missing-publicati
   const c: any = { version: 1, mode: 'rehearsal', developmentRepository: dev, stableCheckout: stable, database, targetCommit: commit, targetTree: tree, candidateTag, recoveryRoot: recovery, serviceHome: join(folder, 'home'), serviceSettings: { TZ: 'UTC' }, topology, servicePort: 41111, releaseCheckPort: 41112, listeners: [{ address: '127.0.0.1', port: 41111, role: 'api' }, { address: '127.0.0.1', port: 41113, role: 'redirect' }], evidence: { recordId: pin.id, seq: 1, contentHash: pin.contentHash }, notices: { before: { text: 'Synthetic before words.', approval: pin }, after: { text: 'Synthetic after words.', approval: pin } }, noticeSendIds: { before: 'synthetic-before', after: 'synthetic-after' }, stopAuthority: null, health: { attempts: 1, intervalMs: 1, timeoutMs: 100, stopTimeoutMs: 100, commandTimeoutMs: 100 } }
   const events: Event[] = [], groups: any[] = [], artifacts = { paths: [], plugins: ['example'], identities: {} }
   const settingsChecks: Array<{ prepared: boolean; paired: boolean; expectRefusal: boolean; line: boolean; sha256: string; serving: string | null }> = []
-  let rejectPairedProof = false
+  let rejectPairedProof = false, electronWritesNoPath = false
   let serving: string | null = dev, check: any = null, nextPid = 200, original: any = null
   const remainingFaults = [...faults]
   let faultsArmed = true
@@ -104,14 +113,22 @@ export async function fixture(faults: Event[] = [], mismatch: 'missing-publicati
   vi.doMock(backupPath, () => ({ takeTheBackup: async (source: string, target: string) => { copyFileSync(source, target); return { taken: true } } }))
   const actualProcesses = await import(/* @vite-ignore */ dependency('stable/stable-bootstrap-processes.mjs'))
   vi.doMock(dependency('stable/stable-bootstrap-processes.mjs'), () => ({ ...actualProcesses,
-    startGatedBootstrapGroup: async ({ name, cwd, args, env, journal, owned, onStep: hook }: any) => journal.step(name, async () => {
+    startGatedBootstrapGroup: async ({ name, cwd, command, args, env, journal, owned, onStep: hook }: any) => journal.step(name, async () => {
       if (name === 'recover-development' && !readFileSync(envFile).equals(originalEnv)) throw new Error('Original start ran before settings rollback.')
-      const group: any = { env, name, gate: recorded(++nextPid, cwd), exit: null, ended: Promise.resolve(), released: { child: false, channel: false } }
+      const group: any = { env, command, args, name, gate: recorded(++nextPid, cwd), exit: null, ended: Promise.resolve(), released: { child: false, channel: false } }
       group.child = { connected: false, unref() { group.released.child = true }, channel: { unref() { group.released.channel = true } } }
       groups.push(group); owned.push(group); journal.append(name, 'group-recorded', { process: group.gate }); await hook?.({ step: name, phase: 'gated', process: group.gate })
       if (name.includes('write-excluded-check')) check = { port: Number(env.MOLE_OFFICE_PORT), database: env.MOLE_OFFICE_DB, group }
       else if (args.includes('--prepared')) { serving = cwd; ordinaryName = name }
-      else group.exit = { code: 0 }
+      else {
+        if (name === 'fetch-electron-binary') {
+          const electron = join(cwd, 'node_modules/electron')
+          mkdirSync(join(electron, 'dist'), { recursive: true })
+          if (!electronWritesNoPath) writeFileSync(join(electron, 'path.txt'), THE_MADE_UP_ELECTRON_BINARY)
+          writeFileSync(join(electron, 'dist', THE_MADE_UP_ELECTRON_BINARY), THE_MADE_UP_ELECTRON_BYTES)
+        }
+        group.exit = { code: 0 }
+      }
       return group
     }),
     awaitBootstrapCommand: async () => undefined,
@@ -151,5 +168,16 @@ export async function fixture(faults: Event[] = [], mismatch: 'missing-publicati
     c.prepared = result.prepared; c.stopAuthority = { kind: 'owner-decision', decision: pin }; events.length = 0; faultsArmed = true
     return runStableBootstrap(valid, { ...options, phase: 'handoff' })
   }
-  return { folder, database, envFile, originalEnv, envHash, paths, events, settingsChecks, failPairedProof: () => { rejectPairedProof = true }, remainingFaults, prepare, handoff, serving: () => serving, groups, valid }
+  return { folder, database, envFile, originalEnv, envHash, paths, events, settingsChecks, failPairedProof: () => { rejectPairedProof = true }, writeNoElectronPath: () => { electronWritesNoPath = true }, remainingFaults, prepare, handoff, serving: () => serving, groups, valid }
+}
+
+/**
+ * A failed preparation or handoff left the original office serving: the result says it is unchanged or restored, the
+ * development settings are as they were, and every group the bootstrap started has ended, except the original's restart.
+ */
+export function theOriginalServesOn(f: Awaited<ReturnType<typeof fixture>>, failed: any, label: string) {
+  expect(['unchanged', 'restored'], `${label}: ${JSON.stringify(failed)}`).toContain(failed.state)
+  expect(f.serving()).toContain('development')
+  expect(f.envHash()).toBe(createHash('sha256').update(f.originalEnv).digest('hex'))
+  expect(f.groups.every(group => group.exit !== null || group.name === 'recover-development')).toBe(true)
 }

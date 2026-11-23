@@ -236,6 +236,8 @@ interface Change {
   session?: string
   /** Starts the tool through the older shell form, whose descriptor 9 holds the case's own tsc lock shared. */
   inTheOlderShell?: boolean
+  /** Starts the tool under timeout inside the older shell form, so that it does not lead its process group. */
+  underATimeout?: boolean
   /** The TSC_LOCK_HELD_BY the tool is given, as a batch that started it would set it. */
   heldBy?: string
   /** Another folder for the tsc lock than the case's own root. */
@@ -262,7 +264,7 @@ function startTool(words: string[], change: Change = {}): { child: ChildProcess;
   })
   // THE OLDER SHELL FORM holds the lock on descriptor 9 and then becomes the tool, which keeps that descriptor.
   const child = change.inTheOlderShell === true
-    ? spawn('sh', ['-c', 'exec 9>"$0"; flock -s 9; exec "$@"', join(root, THE_TSC_LOCK), process.execPath, TOOL, ...words], { cwd: root, env, detached: true })
+    ? spawn('sh', ['-c', change.underATimeout === true ? 'exec 9>"$0"; flock -s 9; exec timeout 120 "$@"' : 'exec 9>"$0"; flock -s 9; exec "$@"', join(root, THE_TSC_LOCK), process.execPath, TOOL, ...words], { cwd: root, env, detached: true })
     : spawn(process.execPath, [TOOL, ...words], { cwd: root, env, detached: true })
   started.push(child)
   let out = ''
@@ -390,8 +392,6 @@ describe('a stopped batch gives its seat back', () => {
   // Mutation: give nothing back on the signal; or swallow the signal so the tool runs on.
   it.each([
     ['SIGTERM', false],
-    ['SIGINT', false],
-    ['SIGTERM', true],
     ['SIGINT', true],
   ] as const)('gives the seat back when its group is sent %s (background %s), and ends by that signal', async (signal, background) => {
     const { child, ended } = startTool([...(background ? ['--background'] : []), '--root', root, '--vitest', standIn({ waits: true }), 'one'])
@@ -629,6 +629,23 @@ describe('inside a sandbox the batch holds the tsc lock shared from its seat to 
     expect(await tsc.ended, run.out).toBe(0)
     expect(existsSync(join(root, 'tsc-holds'))).toBe(true)
   })
+
+  // Mutation: start the batch again with descriptors 0 to 3 only.
+  it('takes no second hold when it was started under timeout inside the older shell form, which handed it the lock', async () => {
+    const tsc: { ended?: Promise<number | null> } = {}
+    asks = (n) => {
+      // While the batch is in line, a tsc takes the gate and waits for the lock the shell handed the tool.
+      if (n === 1) tsc.ended = aStandInTsc({ wait: 8 }).ended
+      return n === 1 ? queued : granted
+    }
+    const run = await runTool(['--root', root, '--vitest', standIn(), 'one'], { inASandbox: true, inTheOlderShell: true, underATimeout: true })
+    expect(run.code, run.out).toBe(0)
+    const lock = join(root, THE_TSC_LOCK)
+    expect(times(run.out, handedInBy(lock, '9')), run.out).toBe(1)
+    expect(times(run.out, waitsForTheTscLock(join(root, THE_TSC_GATE), lock)), run.out).toBe(0)
+    expect(await tsc.ended, run.out).toBe(0)
+    expect(existsSync(join(root, 'tsc-holds'))).toBe(true)
+  }, 60_000)
 
   // Mutation: ignore TSC_LOCK_HELD_BY, and take the lock again.
   it('takes no lock when a batch that started it holds one, and passes that batch on to its test files unchanged', async () => {

@@ -52,7 +52,7 @@ import { and, desc, eq, isNull, sql } from 'drizzle-orm'
 import { anOfficeId } from './ids.ts'
 import { gatePosition } from '../../config/settings.mjs'
 
-import { nowStamp, parseAnyStamp } from '@shared/time.ts'
+import { clockStamp, momentOfAStampAndItsInstant, nowStamp, parseAnyStamp } from '@shared/time.ts'
 import {
   HOLD,
   heldBySomebodyElse,
@@ -62,7 +62,7 @@ import {
   type HoldOnTheWire,
   type HoldState,
 } from '@shared/handles.ts'
-import { isAgentRuntime, theRuntimeWordsSaid } from '@shared/participants.ts'
+import { aHarnessWithNoAdapter, whatTheOfficeDoesForAHarnessWithNoAdapter } from '@shared/participants.ts'
 import type { ParticipantRef } from '@shared/participants.ts'
 import { theReasonAsOneSentence, writtenInOf } from '@shared/messages.ts'
 import type { VisitorCredential } from '@shared/visitors.ts'
@@ -97,6 +97,7 @@ interface Stored {
   runtime: string
   claimedAt: string
   lastHeardAt: string
+  lastHeardInstant: string | null
   releasedAt: string | null
   releasedBecause: string | null
 }
@@ -109,11 +110,17 @@ interface Stored {
  * criterion M81 it answered the lapse window exactly, and `stateOf` asked whether the quiet was
  * LONGER than the lapse, so an unreadable stamp read as fresh — the opposite of what this sentence
  * has always said it did. It is one past the longest window now, so the two agree.
+ *
+ * THE STAMP IS READ WITH THE INSTANT BESIDE IT (`last_heard_instant`, migration 0358), by the rule of
+ * `momentOfAStampAndItsInstant`. On the night the clocks go back the stamp alone reads a beat in the second pass of the
+ * hour from 01:00 as the first, an hour early, and the hold lapsed while its session beat. An instant that names the
+ * stamp gives that second in its offset, and one that names it and cannot be read is a stamp that cannot be read. A row
+ * with no instant, or whose stamp was changed without it, is read from its stamp, as before.
  */
-function quietFor(lastHeardAt: string, now: number): number {
-  const when = parseAnyStamp(lastHeardAt)
+function quietFor(row: Pick<Stored, 'lastHeardAt' | 'lastHeardInstant'>, now: number): number {
+  const when = momentOfAStampAndItsInstant(row.lastHeardAt, row.lastHeardInstant, (stamp) => parseAnyStamp(stamp)?.getTime() ?? null)
   if (when === null) return handleGraceSeconds() + 1
-  return Math.max(0, Math.round((now - when.getTime()) / 1000))
+  return Math.max(0, Math.round((now - when) / 1000))
 }
 
 /**
@@ -126,7 +133,7 @@ function quietFor(lastHeardAt: string, now: number): number {
  */
 function stateOf(row: Stored, now: number): HoldState {
   if (row.releasedAt !== null) return 'released'
-  const quiet = quietFor(row.lastHeardAt, now)
+  const quiet = quietFor(row, now)
   if (quiet <= handleLapsesAfterSeconds()) return 'fresh'
   return quiet <= handleGraceSeconds() ? 'kept' : 'lapsed'
 }
@@ -147,7 +154,7 @@ function onTheWire(row: Stored, now: number = Date.now(), registered?: Registere
     runtime: row.runtime,
     claimedAt: row.claimedAt,
     lastHeardAt: row.lastHeardAt,
-    quietFor: quietFor(row.lastHeardAt, now),
+    quietFor: quietFor(row, now),
     state: stateOf(row, now),
     releasedAt: row.releasedAt,
     releasedBecause: row.releasedBecause,
@@ -217,7 +224,7 @@ export function theLiveHoldOn(agentId: string, readOnly = false, at: number = Da
   const row = liveRowFor(agentId)
   if (row === undefined) return null
   if (stillHeld(row, at)) return onTheWire(row, at)
-  if (!readOnly) releaseAHold(row.id, wentQuiet(quietFor(row.lastHeardAt, at), handleGraceSeconds()))
+  if (!readOnly) releaseAHold(row.id, wentQuiet(quietFor(row, at), handleGraceSeconds()))
   return null
 }
 
@@ -269,7 +276,7 @@ export function theLiveHoldOnSession(
   if (row === undefined) return null
   const state = stateOf(row, at)
   if (state === 'fresh' || state === 'kept') return onTheWire(row, at)
-  if (!readOnly) releaseAHold(row.id, wentQuiet(quietFor(row.lastHeardAt, at), handleGraceSeconds()))
+  if (!readOnly) releaseAHold(row.id, wentQuiet(quietFor(row, at), handleGraceSeconds()))
   return null
 }
 
@@ -292,7 +299,7 @@ export function everyHold(): HoldOnTheWire[] {
   const out: HoldOnTheWire[] = []
   for (const row of rows) {
     if (stateOf(row, now) === 'lapsed') {
-      out.push(releaseAHold(row.id, wentQuiet(quietFor(row.lastHeardAt, now), handleGraceSeconds())))
+      out.push(releaseAHold(row.id, wentQuiet(quietFor(row, now), handleGraceSeconds())))
       continue
     }
     out.push(onTheWire(row, now))
@@ -358,6 +365,13 @@ export interface Claimed {
   tookOverFrom: HoldOnTheWire | null
   /** What the office did with a run asked for that has ended, or null because it has not ended. See `EndedRunAsked`. */
   endedRunAsked: EndedRunAsked | null
+  /**
+   * ONE SENTENCE FOR A HARNESS THE OFFICE HAS NO ADAPTER FOR, or null because the office has one.
+   *
+   * Any harness's word is held and stored as written. The office cannot start such a harness by itself, so this
+   * says that the agent's messages wait for its own waiter. The waiter prints it once, after the hold.
+   */
+  cannotStart: string | null
 }
 
 // ============================================================================ a run asked for that has ended
@@ -465,13 +479,10 @@ export function holdTheHandle(asked: Claiming): Claimed {
       409,
     )
   }
-  if (!isAgentRuntime(asked.runtime)) {
-    throw new PanelError(
-      `"${asked.runtime}" is not a runtime this product has an adapter for. It is one of ` +
-        `${theRuntimeWordsSaid()}. Nothing was written.`,
-      400,
-    )
-  }
+  // ANY HARNESS'S WORD IS HELD. A word the office has no adapter for is stored as written, and the answer says once
+  // that the office cannot start that harness.
+  const harness = aHarnessWithNoAdapter(asked.runtime)
+  const cannotStart = harness === null ? null : whatTheOfficeDoesForAHarnessWithNoAdapter(harness)
   // THE SESSION RECORD IS READ FIRST, so a hold can never name a run nobody can open. A hold whose
   // session cannot be shown would put a record id on a screen that leads nowhere.
   const askedFor = recordInWorkspace(asked.session, asked.workspaceId)
@@ -507,7 +518,7 @@ export function holdTheHandle(asked: Claiming): Claimed {
         standing.id,
         // THE NUMBER IS THE GRACE WINDOW, because that is the window that was actually exceeded:
         // `stateOf` reads `lapsed` only past both. Criterion M81.
-        takenOverBy(quietFor(standing.lastHeardAt, now), handleGraceSeconds(), session),
+        takenOverBy(quietFor(standing, now), handleGraceSeconds(), session),
       )
     }
   }
@@ -528,16 +539,18 @@ export function holdTheHandle(asked: Claiming): Claimed {
       409,
     )
   }
-  const at = nowStamp()
+  // THE STAMP AND ITS MOMENT FROM ONE READING OF THE CLOCK, so the two cannot name different moments.
+  const reading = clockStamp()
+  const at = reading.stamp
   if (held !== null) {
     // THE SAME SESSION, STARTING ITS WAITER AGAIN. Beating the hold it already has, rather than
     // writing a second row, is what keeps "one live hold per agent" true through every wake.
     db.update(handleHolds)
-      .set({ lastHeardAt: at, machine: asked.machine, runtime: asked.runtime })
+      .set({ lastHeardAt: at, lastHeardInstant: reading.instant, machine: asked.machine, runtime: asked.runtime })
       .where(eq(handleHolds.id, held.id))
       .run()
     answeringMayHaveChanged([agent.id])
-    return { hold: onTheWire(rowOf(held.id) as Stored), tookOverFrom, endedRunAsked }
+    return { hold: onTheWire(rowOf(held.id) as Stored), tookOverFrom, endedRunAsked, cannotStart }
   }
   const id = anOfficeId()
   db.insert(handleHolds)
@@ -549,13 +562,14 @@ export function holdTheHandle(asked: Claiming): Claimed {
       runtime: asked.runtime,
       claimedAt: at,
       lastHeardAt: at,
+      lastHeardInstant: reading.instant,
       releasedAt: null,
       releasedBecause: null,
     })
     .run()
   if (askedFor.kind === 'session' && !theRunHasEnded(askedFor.data['state'])) beginNoticeWorkTurn({ kind: 'agent', id: agent.id }, session)
   answeringMayHaveChanged([agent.id])
-  return { hold: onTheWire(rowOf(id) as Stored), tookOverFrom, endedRunAsked }
+  return { hold: onTheWire(rowOf(id) as Stored), tookOverFrom, endedRunAsked, cannotStart }
 }
 
 /**
@@ -590,8 +604,8 @@ export function beatTheHold(handle: string, session: string, keyHolder?: string 
       409,
     )
   }
-  const at = nowStamp()
-  db.update(handleHolds).set({ lastHeardAt: at }).where(eq(handleHolds.id, held.id)).run()
+  const reading = clockStamp()
+  db.update(handleHolds).set({ lastHeardAt: reading.stamp, lastHeardInstant: reading.instant }).where(eq(handleHolds.id, held.id)).run()
   return onTheWire(rowOf(held.id) as Stored)
 }
 

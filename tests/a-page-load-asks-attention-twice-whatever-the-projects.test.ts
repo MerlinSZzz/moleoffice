@@ -14,7 +14,8 @@
  *     screen, and draw every other project from that reply.
  *
  * This file loads each page on an office of three projects and counts the requests, and checks that what
- * the other projects hold is drawn: their rows in Late or stuck, and their counts on the cards.
+ * the other projects hold is drawn: their rows in Late or stuck, and their counts on the cards. Home's key items,
+ * the person's checklists and the forks he settled are each asked once for every project together, too.
  *
  * MUTATION PROOF, in the commit message: read each other project again under its own header, and both
  * counts go red; draw no other project from the one read, and both drawing checks go red; hand the cards
@@ -28,6 +29,7 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { Request } from 'playwright'
+import { EVERY_PROJECT, PROJECTS_QUERY } from '../src/shared/across-projects.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { liveApp, waitForThePage, type LiveApp } from './helpers.ts'
 
@@ -116,8 +118,33 @@ describe('one load of a page that draws every project', () => {
     expect(sorted(asked), JSON.stringify(asked)).toEqual(TWO_READS)
     // WHAT THE OTHER PROJECTS HOLD IS DRAWN, from that one read: their blocked tasks in Late or stuck.
     const late = app.page.locator('[data-home-section="late"]')
+    // Late or stuck is one number, and pressing it opens its list.
+    await late.locator('summary').click({ timeout: 20_000 })
     for (const one of OTHERS) {
       await expect.poll(() => late.locator('.hm-alarm-row .hm-row-meta', { hasText: one.title }).count(), { timeout: 20_000 }).toBeGreaterThan(0)
+    }
+  }, 180_000)
+
+  it('Home asks its key items, his checklists and his decisions once each, for every project in one read', async () => {
+    const asked: URL[] = []
+    const HOMES_OWN = ['/api/key-items', '/api/checklists', '/api/figures/my-decisions']
+    const onRequest = (request: Request): void => {
+      const url = new URL(request.url())
+      // A checklist read that names an owner is the sidebar's, not Home's.
+      // The checklists window's read names none, and Home's checklist count and the window share that one read.
+      if (HOMES_OWN.includes(url.pathname) && !url.searchParams.has('owner')) asked.push(url)
+    }
+    app.page.on('request', onRequest)
+    try {
+      await attentionReadsOfOneLoad('#/')
+      await app.page.locator('[data-home-section="keyItems"]').waitFor({ timeout: 30_000 })
+      await app.page.locator('[data-home-section="myDecisionTime"]').waitFor({ timeout: 30_000 })
+    } finally {
+      app.page.removeListener('request', onRequest)
+    }
+    expect(asked.map((url) => url.pathname).sort(), asked.map(String).join(' ')).toEqual([...HOMES_OWN].sort())
+    for (const url of asked) {
+      expect(url.searchParams.get(PROJECTS_QUERY), `${url.pathname} is asked for every project at once`).toBe(url.pathname === '/api/key-items' ? 'every' : EVERY_PROJECT)
     }
   }, 180_000)
 

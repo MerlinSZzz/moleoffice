@@ -52,7 +52,6 @@
  * disagree with the lines themselves.
  */
 
-import { statSync, readFileSync } from 'node:fs'
 import { and, eq, inArray, isNull, sql } from 'drizzle-orm'
 import { db, sqlite } from '../db/client.ts'
 import { ONE_KIND_WRITTEN_OUT, STORED_FIELDS, records } from '../db/schema.ts'
@@ -60,7 +59,7 @@ import { moleOffice } from '@shared/participants.ts'
 import { localStamp, parseAnyStamp } from '@shared/time.ts'
 import { SYSTEM_LINES } from '@shared/groups.ts'
 import { ENTERED_FLOW_FIELD, OFFICE_STEP_DOES, OFFICE_STEP_SENTENCES_ONCE_WRITTEN } from '@shared/flow-run.ts'
-import { claudeCodeTokensSoFar, THE_TOKENS_COUNTED } from '../../config/tokens-so-far.mjs'
+import { claudeCodeTokensSoFarReadOn, THE_TOKENS_COUNTED, type AConversationRead } from '../../config/tokens-so-far.mjs'
 import { stepReminderMinutes, stepReminderTokens } from './env.ts'
 import { writeASystemLineToOne } from './groups.ts'
 import { theFlowRunsOf, type FlowRunStep } from './flow-runs.ts'
@@ -246,10 +245,11 @@ function theStepsHeldWhenWatchingBegan(flowRun: string, watchingSince: Date): nu
 }
 
 /**
- * A SANDBOXED CLAUDE CODE RUN'S CONVERSATION FILE, read again only when its size or its time changed. Entries for files
- * no running run names any longer are dropped at the end of each pass.
+ * A SANDBOXED CLAUDE CODE RUN'S CONVERSATION FILE, read again only when its size or its time changed, and then only from
+ * where the last read of it ended (claudeCodeTokensSoFarReadOn). Entries for files no running run names any longer are
+ * dropped at the end of each pass.
  */
-const readConversations = new Map<string, { size: number; mtimeMs: number; sinceMs: number; tokens: TheTokens }>()
+const readConversations = new Map<string, AConversationRead>()
 
 /**
  * A run's tokens so far, from its conversation file or its record, or no count with the reason. Beside the count, when
@@ -273,12 +273,11 @@ function theTokensOf(run: string, data: Record<string, unknown>, filesRead: Set<
     const file = conversation.file
     filesRead.add(file)
     try {
-      const { size, mtimeMs } = statSync(file)
-      const kept = readConversations.get(file)
-      if (kept !== undefined && kept.size === size && kept.mtimeMs === mtimeMs && kept.sinceMs === sinceMs) return { count: kept.tokens, conversationChangedMs: mtimeMs }
-      const tokens: TheTokens = claudeCodeTokensSoFar(readFileSync(file, 'utf8'), sinceMs)
-      readConversations.set(file, { size, mtimeMs, sinceMs, tokens })
-      return { count: tokens, conversationChangedMs: mtimeMs }
+      // Only the bytes added since the last read of this file are read, because a working run's file grows at every
+      // pass, and reading the whole of it each time held the server for as long as the whole file took to read.
+      const read = claudeCodeTokensSoFarReadOn(file, sinceMs, readConversations.get(file))
+      readConversations.set(file, read)
+      return { count: read.tokens, conversationChangedMs: read.mtimeMs }
     } catch (err) {
       return noFile({ tokens: null, why: `Read ${conversation.says}: ${(err as Error).message}` })
     }
@@ -412,7 +411,11 @@ export function sendTheStepRemindersThatAreDue(workspaceId: string, now: Date, w
           ? `${minutes} minutes have passed since ${since}. Its tokens are not known, so it is reminded by time only: ${count.why.replace(/\.$/, '')}.`
           : spent === null
             ? `${minutes} minutes have passed since ${since}. Its tokens so far are ${count.tokens}, but its count ${sinceAReminder ? 'at the last reminder of its step' : 'when the step began'} is not known, so this step is reminded by time until a reminder carries a count. ${count.read}`
-            : `${minutes} minutes and ${spent} tokens have passed since ${since}. ${count.read}`
+            : // A COUNT THAT WENT DOWN is not of the same tokens as the count it is compared with, for example when a
+              // newer conversation file was read. Its difference would be a negative number of tokens, so none is said.
+              spent < 0
+              ? `${minutes} minutes have passed since ${since}. Its tokens so far are ${count.tokens}, fewer than the ${String(base)} counted ${sinceAReminder ? 'at the last reminder of its step' : 'when the step began'}. A count of tokens spent cannot go down, so the two counts are not of the same tokens, and the tokens this step has spent are not known. The tokens after this reminder are counted from ${count.tokens}. ${count.read}`
+              : `${minutes} minutes and ${spent} tokens have passed since ${since}. ${count.read}`
       remind(
         { flowRun: current.flowRun.id, step: current.position, why: byTokens && byMinutes ? 'tokens and minutes' : byTokens ? 'tokens' : 'minutes', at: stamp, tokens: count.tokens },
         `Run ${run.id} is still on its current step, ${aStepSaid(current.flowRun, current.position)}. ${howMuch}`,

@@ -1,6 +1,7 @@
 // Copyright © 2026 Zhengyang Shen
 // Licensed under the MIT License. See LICENSE.
 import { STORAGE_REFUSAL_CODES } from './storage/refusals.ts'
+import { CONVERSATION_EXPORT_REFUSAL_CODES } from './conversation-export.ts'
 import type { WordValues } from './i18n.ts'
 
 /** Page refusals and the values each one needs, on plan 7FEOshq3mBGG. */
@@ -226,6 +227,7 @@ export const RESIDENT_REFUSAL_CODES = {
   residentNoSuchSuccessor: {},
   residentSuccessorIsItself: {},
   residentSuccessorNotAnAgent: {},
+  residentProposalHasNoSleepTime: {},
   residentProposalHasItsOwnDoors: {},
 } as const
 
@@ -345,6 +347,25 @@ export const REPORT_FILES_REFUSAL_CODES = {
 } as const
 
 /**
+ * The PDF door's refusals (POST /api/report-pdf, src/server/api/report-pdf.ts): no screen to print on, another print
+ * running, a page past the door's limit, and each way a print gives no PDF. A print did not finish in time, could
+ * not start, or wrote no PDF; or it ended with an exit code or a signal, each with the program's last line where it
+ * wrote one.
+ */
+export const REPORT_PDF_REFUSAL_CODES = {
+  reportPdfNoDisplay: {},
+  reportPdfBusy: {},
+  reportPdfTimedOut: { seconds: 'number' },
+  reportPdfCouldNotStart: {},
+  reportPdfWroteNoPdf: {},
+  reportPdfExited: { code: 'number' },
+  reportPdfExitedSaying: { code: 'number', line: 'string' },
+  reportPdfSignalled: { signal: 'string' },
+  reportPdfSignalledSaying: { signal: 'string', line: 'string' },
+  reportPdfTooLarge: { megabytes: 'number' },
+} as const
+
+/**
  * The install press's refusals (wave 13u round 3, src/server/api/terminal-harnesses.ts), which the panel on Terminal
  * management draws. The refusals of the terminal holder it can also meet are TERMINAL_REFUSAL_CODES above.
  */
@@ -354,6 +375,32 @@ export const HARNESS_REFUSAL_CODES = {
   harnessHasNoInstaller: {},
   harnessNoneTicked: {},
   harnessNoHome: {},
+} as const
+
+/**
+ * Setting up an agent tool (wave 13u round 242, src/server/lib/setting-up-an-agent-tool.ts): its first install on the
+ * person's own message, its key given to its own login, and its account sign-in, at src/server/api/terminal-harnesses.ts.
+ */
+export const AGENT_TOOL_SETUP_REFUSAL_CODES = {
+  harnessNoSuchTool: {},
+  harnessInASandbox: {},
+  harnessMessageTimeUnread: {},
+  harnessNotInstalled: {},
+  harnessNoKeyLogin: {},
+  harnessSignsInWithAnAccount: {},
+  harnessKeyShape: {},
+  harnessKeyProvider: {},
+  harnessKeyLoginNotThisVersion: { found: 'string', checked: 'string' },
+  harnessKeyLoginFailed: {},
+  harnessNoSignIn: {},
+  harnessSignInFailed: {},
+  harnessSetUpIsThePersons: {},
+  harnessNoSecretary: {},
+  harnessSignInCodeShape: {},
+  harnessNoSuchSignIn: {},
+  harnessSignInTakesNoCode: {},
+  harnessSignInEnded: {},
+  harnessSignInCodeGiven: {},
 } as const
 
 /**
@@ -383,7 +430,10 @@ export const START_AT_LOGIN_REFUSAL_CODES = {
  * cannot be written (wave 13t, round W26, src/config/start-at-login.mjs). Each path is the file the refusal names.
  * Round W28 added two: a first unit whose write failed and whose file beside it could not be removed, and a file where
  * a folder of the unit goes. Their words are in wave 13t's place in the word lists, in English only until the
- * translation round.
+ * translation round. The press's refusal in an AppImage is here for the same reason: the list above is typed against
+ * the core English and the Chinese lists, and its words are in English only, in wave 13t's place. So are the three
+ * refusals of the press Off in an AppImage, which disables a unit a press wrote, copies it and removes it: its copy
+ * failed, its removal failed, or systemd would not read its units again. Each path is the copy, or the name it failed at.
  */
 export const START_AT_LOGIN_BACKUP_REFUSAL_CODES = {
   startAtLoginNotBackedUp: { path: 'string' },
@@ -393,15 +443,24 @@ export const START_AT_LOGIN_BACKUP_REFUSAL_CODES = {
   startAtLoginCopyAndFileLeft: { path: 'string', beside: 'string' },
   startAtLoginFileLeft: { path: 'string' },
   startAtLoginUnderAFile: { path: 'string' },
+  startAtLoginInAnAppImage: {},
+  startAtLoginOffNotCopied: { path: 'string' },
+  startAtLoginOffNotRemoved: { path: 'string' },
+  startAtLoginOffNotReloaded: { path: 'string' },
 } as const
 
 /**
- * The data folder doors' refusals (criteria DF17 to DF21, src/server/api/data-folder.ts and the stored files' reader in
- * src/server/api/files.ts). The move's three refusals name the runs at work, the check's own sentence, or the end of the
- * mover's log; the confirm's names the sentence the mover's own check gave it; and the last two name the group and the
- * log the mover was started with. The grant's check's refusal carries its own sentence, and an unreadable move mark's
- * refusal carries the mark's path and why. Their words sit in wave 13t's place in the word lists, in English only until
- * the translation round.
+ * The data folder doors' refusals (criteria DF4 and DF17 to DF21, src/server/api/data-folder.ts and the stored files'
+ * reader in src/server/api/files.ts). The door's own refusals name the runs at work, the end of the mover's log, or the
+ * group and the log the mover was started with. The grant's check's refusal carries its own sentence, and an unreadable
+ * move mark's refusal at the door carries the mark's path and why.
+ *
+ * From dataFolderPlaceNotAFullPathFromSlash on, the codes are the refusals of the move's check, its walk and its
+ * confirm. Their English is written once, in src/config/the-data-folder-move-words.mjs. A sentence the mover picks
+ * from several has a code of its own, so no words the mover picks are sent as a value. A value that holds words made
+ * elsewhere keeps them as they came: the place as it was written, a mark's or a drive's reason, and a file system's
+ * error. dataFolderMoveRefused carries any other error of the walk that way, and its words are in that file too.
+ * Their words sit in wave 13t's place in the word lists.
  */
 export const DATA_FOLDER_REFUSAL_CODES = {
   dataFolderOnlyThePerson: {},
@@ -413,9 +472,44 @@ export const DATA_FOLDER_REFUSAL_CODES = {
   dataFolderMoveRefused: { why: 'string' },
   dataFolderMoverEnded: { log: 'string' },
   dataFolderMoverNotSeen: { group: 'string', log: 'string' },
-  dataFolderNothingToConfirm: { why: 'string' },
   dataFolderNotUnderTheGrant: { why: 'string' },
   dataFolderMarkUnreadable: { mark: 'string', why: 'string' },
+  dataFolderPlaceNotAFullPathFromSlash: { place: 'string', example: 'string' },
+  dataFolderPlaceNotAFullPathOnWindows: { place: 'string', example: 'string' },
+  dataFolderPlaceNotEmpty: { to: 'string' },
+  dataFolderPlaceIsTheDataFolder: { to: 'string' },
+  dataFolderPlaceInsideTheDataFolder: { to: 'string', from: 'string' },
+  dataFolderPlaceHoldsTheDataFolder: { to: 'string', from: 'string' },
+  dataFolderPlaceInTheInstallFolder: { to: 'string', installFolder: 'string' },
+  dataFolderPlaceHasNoFolder: { to: 'string' },
+  dataFolderPlaceHasTooLittleRoom: { to: 'string', freeBytes: 'number', folderBytes: 'number' },
+  dataFolderProcessEnvironmentDecides: {},
+  dataFolderMoveStillRunning: { mark: 'string', state: 'string', pid: 'number', from: 'string', to: 'string' },
+  dataFolderMoveNotConfirmed: { to: 'string', mark: 'string', state: 'string' },
+  dataFolderMoveRunningUnknown: { mark: 'string', why: 'string' },
+  dataFolderPlaceInTheTemporaryFolder: { to: 'string', folder: 'string', variable: 'string' },
+  dataFolderPlaceIsANetworkPath: { to: 'string' },
+  dataFolderPlaceOnANetworkDrive: { to: 'string', drive: 'string' },
+  dataFolderDriveNotRead: { to: 'string', drive: 'string', why: 'string' },
+  dataFolderDriveTypeUnknown: { to: 'string', drive: 'string', type: 'string' },
+  dataFolderDriveNotAsked: { to: 'string', drive: 'string' },
+  dataFolderLoginUnitNotOurs: { unit: 'string' },
+  dataFolderLoginUnitNotOursRuns: { unit: 'string' },
+  dataFolderLoginUnitInAnAppImage: { unit: 'string' },
+  dataFolderLoginUnitStartsAtLogin: { unit: 'string' },
+  dataFolderLoginUnitStartsAtLoginRuns: { unit: 'string' },
+  dataFolderLoginUnitMayStartAtLogin: { unit: 'string' },
+  dataFolderLoginUnitMayStartAtLoginRuns: { unit: 'string' },
+  dataFolderLoginUnitRuns: { unit: 'string' },
+  dataFolderLoginUnitOff: { unit: 'string' },
+  dataFolderWalkMetASymbolicLink: { folder: 'string', name: 'string', path: 'string' },
+  dataFolderWalkMetASpecialFile: { folder: 'string', name: 'string' },
+  dataFolderWalkMetMoreNames: { path: 'string', links: 'number', found: 'number' },
+  dataFolderConfirmNeedsAStartedMove: { mark: 'string', state: 'string' },
+  dataFolderConfirmCannotReadTheOldFolder: { mark: 'string', from: 'string', why: 'string' },
+  dataFolderConfirmNeedsTheNewDatabase: { mark: 'string', wanted: 'string', inUse: 'string' },
+  dataFolderConfirmWaitsForTheMover: { mark: 'string', pid: 'number' },
+  dataFolderNoMoveToConfirm: { mark: 'string' },
 } as const
 
 /**
@@ -460,6 +554,17 @@ export const TERMINAL_AGENT_REFUSAL_CODES = {
   terminalAgentTrustUnsafe: {},
   terminalAgentProgramMissing: {},
   terminalAgentNothingToResume: {},
+} as const
+
+/**
+ * The refusals when a run still runs as an agent's terminal is opened. In a list of their own so their words sit in
+ * wave 13u's own place in the word lists.
+ */
+export const TERMINAL_AGENT_STILL_RUNS_REFUSAL_CODES = {
+  terminalAgentRunsHere: { run: 'string', pid: 'number' },
+  terminalAgentInTheOfficesTerminal: { run: 'string', terminal: 'string' },
+  terminalAgentRunsInASandbox: { run: 'string' },
+  terminalAgentRunsInAnotherProject: { project: 'string' },
 } as const
 
 /**
@@ -783,6 +888,27 @@ export const TERMINAL_TYPED_FOR_ANOTHER_REFUSAL_CODES = {
 } as const
 
 /**
+ * A secretary opening a terminal for the person with a line prepared in it, the person naming a terminal, and one
+ * reading of several terminals (src/server/api/terminals.ts). A prepared line with a key in it, a prepared line beside a
+ * command, a prepared line the person sent, owner's words that do not name this folder and this line, and a holder
+ * older than this office: nothing was opened in any of them. A name, a group or tags the office will not keep, and a
+ * holder too old to keep them: nothing was changed. A reading that names no terminal, one twice or too many: nothing was
+ * read.
+ */
+export const TERMINAL_PREPARED_REFUSAL_CODES = {
+  terminalPreparedLineHasAKey: {},
+  terminalPreparedLineWithACommand: {},
+  terminalPreparedLineFromThePerson: {},
+  terminalPreparingWordsRefused: {},
+  terminalHolderTooOldToPrepare: {},
+  terminalHolderTooOldToName: {},
+  terminalNameRefused: {},
+  terminalGroupRefused: {},
+  terminalTagsRefused: {},
+  terminalsReadingRefused: {},
+} as const
+
+/**
  * The commit a worker's worktree is cut from, refused at the worker-run door (wave 13j, the round after loop-10): a
  * commit no branch or tag of the sandbox's repository reaches, the asking run's own commit that could not be read, and
  * a cut named while the worker's worktree is there already, and a clone that is not one of the sandbox's own (the clone
@@ -794,6 +920,22 @@ export const WORKER_CUT_REFUSAL_CODES = {
   workerCutHeadUnread: {},
   workerCutWorktreeAlreadyThere: {},
   workerCloneNotOfTheSandbox: {},
+} as const
+
+/**
+ * A seal that counts only its run's own commits (wave 13n): the three fields only the office writes (a run's
+ * filing HEAD and end HEAD, and the commits a seal names as carried), a seal that would hold commits not the run's own,
+ * a records seal that would leave the run's own commits out, and a working directory git cannot read at the seal or that
+ * no longer holds the commit read at the run's filing. No page draws them yet. The full English refusal names each
+ * commit by its full hash and subject, or the directory and what git said, and the write that finishes the run.
+ */
+export const SEAL_OWN_COMMITS_REFUSAL_CODES = {
+  onlyTheOfficeWritesTheFilingHead: {},
+  onlyTheOfficeWritesTheEndHead: {},
+  onlyTheOfficeWritesTheCarriedCommits: {},
+  sealHoldsCommitsNotTheRunsOwn: {},
+  sealLeavesOutTheRunsOwnCommits: {},
+  sealWorkingDirectoryUnread: {},
 } as const
 
 /**
@@ -840,6 +982,87 @@ export const PROVIDER_TABLE_REFUSAL_CODES = {
   codexProviderWhileTheRouterIsOn: { row: 'string', provider: 'string' },
 } as const
 
+/**
+ * A request whose Host header is not a name this office answers to on the listener that carried it (wave 13s, line
+ * 13s). It is refused before every other request hook, and nothing is done. The port is the one the request's socket
+ * came in on, which the words give with the office's loopback address. The Host itself is never repeated.
+ */
+export const HOST_REFUSAL_CODES = {
+  hostIsNotThisOffice: { port: 'number' },
+} as const
+
+/**
+ * A request that changes something and carries neither a header of the office's own nor JSON, which a website could
+ * have sent (wave 13s, line 13s). It is refused before any door, and nothing is done. The words name nothing the
+ * request said, so there are no values.
+ */
+export const OFFICES_MARK_REFUSAL_CODES = {
+  writeWithoutTheOfficesMark: {},
+} as const
+
+/**
+ * THE DECISIONS A DEPARTMENT RESTS ON (wave 13s, step 1b of departments and posts). Two refusals:
+ * - a secretary taking a department away while it rests on a decision a department may no longer rest on. The full
+ *   English names what is wrong with the decision and the way to take the department away: rest it on a decision that
+ *   stands first;
+ * - an act on a decision (delete, move, change of kind, of who decided it or of what it cites, or a revoke that puts
+ *   one of those back) while a department, merged or not, rests on it. `resting` is the ids of every department and
+ *   duties that rest on it, duties first; the full English names the door that changes each.
+ *
+ * EACH CODE IS NAMED ONCE, here, so the guard that throws it and the tests that read it cannot disagree about its
+ * spelling. src/server/lib/grant/departments.ts, src/server/lib/grant/secretary-duties.ts and the tests import these
+ * constants.
+ */
+export const DEPARTMENT_TAKEN_AWAY_ON_A_DECISION_IT_MAY_NOT_REST_ON = 'departmentTakenAwayOnADecisionItMayNotRestOn'
+export const DEPARTMENTS_REST_ON_THE_DECISION = 'departmentsRestOnTheDecision'
+
+export const DEPARTMENT_DECISION_REFUSAL_CODES = {
+  [DEPARTMENT_TAKEN_AWAY_ON_A_DECISION_IT_MAY_NOT_REST_ON]: { department: 'string', decision: 'string' },
+  [DEPARTMENTS_REST_ON_THE_DECISION]: { decision: 'string', resting: 'string' },
+} as const
+
+/**
+ * WHAT A DECISION NAMES, at every decision door (src/server/lib/what-a-record-names.ts). A decision names the pages it
+ * governs, or the whole project alone, or says in nothingFits that no page fits. The full English refusal says what to
+ * send instead.
+ */
+export const DECISION_NAMES_REFUSAL_CODES = {
+  decisionNamesNothingItGoverns: {},
+  decisionGovernsIsEmpty: {},
+  decisionGovernsNamesAPath: { path: 'string' },
+  decisionGovernsTheWholeProjectBesideOthers: {},
+  decisionNearestIsNotALivePage: { nearest: 'string' },
+} as const
+
+/**
+ * A request that carries one half of a browser's device key and not the other (wave 13s, line 13s). Neither half alone
+ * proves anything, so it is refused before every door but the pairing page's, and nothing is done. And a press that
+ * would give a browser a key, sent by a page on another site: refused before a cookie is set or a half answered. And a
+ * move of the old cookie that finds no key this office holds as the person's in it: nothing is moved.
+ */
+export const DEVICE_HALF_REFUSAL_CODES = {
+  oneHalfOfADeviceKey: {},
+  aPressFromAnotherSite: {},
+  nothingToMove: {},
+} as const
+
+/**
+ * A request whose Origin is not one of this office's own pages (wave 13s, line 13s). It is refused before any door, and
+ * nothing is done. The words never repeat the Origin.
+ */
+export const ORIGIN_REFUSAL_CODES = {
+  originIsNotThisOffice: {},
+} as const
+
+/**
+ * The file tickets (wave 13s, line 13s): a ticket asked without both halves of a paired browser's device key, so none
+ * is made, and a load whose ticket this office does not honour, so nothing is read or written.
+ */
+export const FILE_TICKET_REFUSAL_CODES = {
+  fileTicketNeedsTwoHalves: {},
+  fileTicketNotHonoured: {},
+} as const
+
 export const DEAD_LETTER_THRESHOLD_REFUSAL_CODES = {
   deadLetterThresholdsNotAllowed: {},
   deadLetterThresholdsBadValue: {},
@@ -875,6 +1098,7 @@ export const REFUSAL_CODES = {
   sidebarSettingRefused: { reason: 'string' },
   homeLayoutRefused: { reason: 'string' },
   sidebarPinsRefused: { reason: 'string' },
+  reportCountRefused: { reason: 'string' },
   chapterEditRefused: { reason: 'string' },
   addedRoleRefused: { reason: 'string' },
   noticeRulesRefused: { reason: 'string' },
@@ -920,7 +1144,9 @@ export const REFUSAL_CODES = {
   ...TERMINAL_GRANT_REFUSAL_CODES,
   ...TERMINAL_FOLDER_REFUSAL_CODES,
   ...REPORT_FILES_REFUSAL_CODES,
+  ...REPORT_PDF_REFUSAL_CODES,
   ...HARNESS_REFUSAL_CODES,
+  ...AGENT_TOOL_SETUP_REFUSAL_CODES,
   ...READINESS_REFUSAL_CODES,
   ...START_AT_LOGIN_REFUSAL_CODES,
   ...START_AT_LOGIN_BACKUP_REFUSAL_CODES,
@@ -929,6 +1155,7 @@ export const REFUSAL_CODES = {
   ...SENDER_READING_REFUSAL_CODES,
   ...SANDBOX_CAP_REFUSAL_CODES,
   ...TERMINAL_AGENT_REFUSAL_CODES,
+  ...TERMINAL_AGENT_STILL_RUNS_REFUSAL_CODES,
   ...WAY_BACK_REFUSAL_CODES,
   ...AGENT_PANE_REFUSAL_CODES,
   ...AGENT_STEPS_REFUSAL_CODES,
@@ -952,8 +1179,18 @@ export const REFUSAL_CODES = {
   ...MASTER_PIPELINE_REFUSAL_CODES,
   ...MAP_DICTIONARY_REFUSAL_CODES,
   ...TERMINAL_TYPED_FOR_ANOTHER_REFUSAL_CODES,
+  ...TERMINAL_PREPARED_REFUSAL_CODES,
   ...WORKER_CUT_REFUSAL_CODES,
   ...PROVIDER_TABLE_REFUSAL_CODES,
+  ...HOST_REFUSAL_CODES,
+  ...OFFICES_MARK_REFUSAL_CODES,
+  ...DEPARTMENT_DECISION_REFUSAL_CODES,
+  ...DECISION_NAMES_REFUSAL_CODES,
+  ...SEAL_OWN_COMMITS_REFUSAL_CODES,
+  ...DEVICE_HALF_REFUSAL_CODES,
+  ...ORIGIN_REFUSAL_CODES,
+  ...FILE_TICKET_REFUSAL_CODES,
+  ...CONVERSATION_EXPORT_REFUSAL_CODES,
 } as const
 
 export type AddressAndRecordRefusalCode = keyof typeof ADDRESS_AND_RECORD_REFUSAL_CODES
@@ -980,6 +1217,7 @@ export type TerminalRefusalCode = keyof typeof TERMINAL_REFUSAL_CODES
 export type TerminalGrantRefusalCode = keyof typeof TERMINAL_GRANT_REFUSAL_CODES
 export type TerminalFolderRefusalCode = keyof typeof TERMINAL_FOLDER_REFUSAL_CODES
 export type HarnessRefusalCode = keyof typeof HARNESS_REFUSAL_CODES
+export type AgentToolSetupRefusalCode = keyof typeof AGENT_TOOL_SETUP_REFUSAL_CODES
 export type ReadinessRefusalCode = keyof typeof READINESS_REFUSAL_CODES
 export type StartAtLoginRefusalCode = keyof typeof START_AT_LOGIN_REFUSAL_CODES
 export type StartAtLoginBackupRefusalCode = keyof typeof START_AT_LOGIN_BACKUP_REFUSAL_CODES
@@ -988,6 +1226,7 @@ export type MailToolRefusalCode = keyof typeof MAIL_TOOL_REFUSAL_CODES
 export type SenderReadingRefusalCode = keyof typeof SENDER_READING_REFUSAL_CODES
 export type SandboxCapRefusalCode = keyof typeof SANDBOX_CAP_REFUSAL_CODES
 export type TerminalAgentRefusalCode = keyof typeof TERMINAL_AGENT_REFUSAL_CODES
+export type TerminalAgentStillRunsRefusalCode = keyof typeof TERMINAL_AGENT_STILL_RUNS_REFUSAL_CODES
 export type WayBackRefusalCode = keyof typeof WAY_BACK_REFUSAL_CODES
 export type AgentPaneRefusalCode = keyof typeof AGENT_PANE_REFUSAL_CODES
 export type AgentStepsRefusalCode = keyof typeof AGENT_STEPS_REFUSAL_CODES
@@ -1011,8 +1250,12 @@ export type TerminalHolderRestartRefusalCode = keyof typeof TERMINAL_HOLDER_REST
 export type MasterPipelineRefusalCode = keyof typeof MASTER_PIPELINE_REFUSAL_CODES
 export type MapDictionaryRefusalCode = keyof typeof MAP_DICTIONARY_REFUSAL_CODES
 export type TerminalTypedForAnotherRefusalCode = keyof typeof TERMINAL_TYPED_FOR_ANOTHER_REFUSAL_CODES
+export type TerminalPreparedRefusalCode = keyof typeof TERMINAL_PREPARED_REFUSAL_CODES
 export type WorkerCutRefusalCode = keyof typeof WORKER_CUT_REFUSAL_CODES
+export type SealOwnCommitsRefusalCode = keyof typeof SEAL_OWN_COMMITS_REFUSAL_CODES
 export type ProviderTableRefusalCode = keyof typeof PROVIDER_TABLE_REFUSAL_CODES
+export type DepartmentDecisionRefusalCode = keyof typeof DEPARTMENT_DECISION_REFUSAL_CODES
+export type DecisionNamesRefusalCode = keyof typeof DECISION_NAMES_REFUSAL_CODES
 export type RefusalCode = keyof typeof REFUSAL_CODES
 export type RefusalValues<C extends RefusalCode> = {
   readonly [K in keyof (typeof REFUSAL_CODES)[C]]: (typeof REFUSAL_CODES)[C][K] extends 'number'

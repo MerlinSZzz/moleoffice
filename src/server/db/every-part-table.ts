@@ -1,7 +1,8 @@
 // Copyright © 2026 Zhengyang Shen
 // Licensed under the MIT License. See LICENSE.
 import type { SQLiteTable } from 'drizzle-orm/sqlite-core'
-import { AUTHORED_TABLE_OF, sourceFiles, sourceIndex, sourceFileHashes, implementationFindings, apiCalls, heldKeys, runTokens, headerOnlyCalls, hourlyCalls, outsideReads, usageStretches, usageChecks, gateCounts, gateCountSpoolReads } from './schema.ts'
+import { sourceFiles, sourceIndex, sourceFileHashes, implementationFindings, apiCalls, heldKeys, runTokens, headerOnlyCalls, hourlyCalls, outsideReads, usageStretches, usageChecks, gateCounts, gateCountSpoolReads } from './schema.ts'
+import { AUTHORED_TABLE_OF } from './authored-table-of.ts'
 import { IRREPLACEABLE_TABLES } from './migration-declared-tables.ts'
 import { thePartTables, type PartTable } from './part-tables.ts'
 import * as everyPart from './schema-parts/index.ts'
@@ -23,10 +24,10 @@ export const NAMES_A_PART_MAY_NOT_TAKE: readonly string[] = [
 /**
  * Every table the schema parts declare, with what each says about itself.
  *
- * A FUNCTION, READ WHEN ASKED, and not a list made while this file loads. A part file imports
- * schema.ts for a table it references. When that part file is imported first, schema.ts's last line
- * runs before the part's own tables exist, and reading them then throws a ReferenceError (measured
- * at the foot of schema.ts on 23 October 2026 with a part table referencing `workspaces`).
+ * A FUNCTION, READ WHEN ASKED, and not a list made while this file loads. It was made one while schema.ts re-exported
+ * this file: a part file that imports schema.ts, imported first, made schema.ts load this file before the part's own
+ * tables existed, and reading them then threw a ReferenceError (measured at the foot of schema.ts on 23 October 2026
+ * with a part table referencing `workspaces`). schema.ts no longer re-exports this file.
  */
 export function everyPartTable(): readonly PartTable[] {
   const derived = new Map<string, SQLiteTable>([

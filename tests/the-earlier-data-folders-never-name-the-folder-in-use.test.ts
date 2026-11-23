@@ -68,7 +68,7 @@ async function aMoveTo(move: TheMove, to: string, envFile: string) {
     stop: async () => ({ ok: true, says: '' }),
     start: async () => ({ ok: true, says: '' }),
     theRuntimeDatabase: async () => join(to, 'mole-office.db'),
-    theLoginUnit: async () => ({ unit: 'none', unitPath: '', startsAtLogin: false, activeWord: null }),
+    theLoginUnit: async () => ({ unit: 'none', unitPath: '', startsAtLogin: false, activeWord: null, fromAnAppImage: false }),
   })
   if ('refused' in last) throw new Error(`the move to ${to} was refused: ${last.refused}`)
   return last
@@ -78,7 +78,7 @@ async function aMoveTo(move: TheMove, to: string, envFile: string) {
 function theConfirm(move: TheMove, envFile: string, to: string) {
   const markPath = move.theMoveMarkPath(envFile)
   const answer = move.confirmTheMove(markPath, join(to, 'mole-office.db'))
-  if ('refused' in answer) throw new Error(`the confirm was refused: ${answer.refused}`)
+  if ('refused' in answer) throw new Error(`the confirm was refused: ${move.theRefusalInEnglish(answer.refused)}`)
   const read = move.readTheMoveMark(markPath)
   if (read.state !== 'read') throw new Error(`the mark after the confirm is ${read.state}`)
   return { answer, mark: read.mark }

@@ -16,6 +16,8 @@
  *     release and the confirmation are exactly as they were; a second record is refused;
  *   · a run never submitted to the queue is read in the project's one registered repository, and refused while the
  *     project has none;
+ *   · with several checkouts, a run never submitted is read in the repository named by name or id, and a missing,
+ *     unknown or checkout-less choice is refused; an entry's lane cannot be overridden by a body repository;
  *   · refused, 409 or 403, nothing written: a commit that is not on main; a commit on main that does not hold the run's
  *     commit; a run that is not released; a run whose merge entry merged; a caller who is neither the person nor a
  *     holder of the secretary card.
@@ -142,12 +144,12 @@ async function aRunLandedByHand(name: string, parts: { released?: boolean; entry
   return { run, lane, sealed, onMain: git(lane, 'rev-parse', 'HEAD'), mainOwn }
 }
 
-async function record(run: string, commitName: string, headers = asAgent(THE_TEST_OFFICES_SECRETARY.handle)): Promise<{ code: number; said: Record<string, unknown> }> {
+async function record(run: string, commitName: string, headers = asAgent(THE_TEST_OFFICES_SECRETARY.handle), extra: Record<string, unknown> = {}): Promise<{ code: number; said: Record<string, unknown> }> {
   const reply = await app.inject({
     method: 'POST',
     url: `/api/checks/${run}/landed-by-hand`,
     headers,
-    payload: { commit: commitName, because: `The queue could not land it, so ${THE_TEST_OFFICES_SECRETARY.handle} landed it by hand.` },
+    payload: { commit: commitName, because: `The queue could not land it, so ${THE_TEST_OFFICES_SECRETARY.handle} landed it by hand.`, ...extra },
   })
   return { code: reply.statusCode, said: reply.json() as Record<string, unknown> }
 }
@@ -156,6 +158,16 @@ async function record(run: string, commitName: string, headers = asAgent(THE_TES
 async function expectRefused(run: string, commitName: string, status: number, headers: Record<string, string>, ...words: string[]): Promise<void> {
   const before = JSON.stringify(t.api.getRecord(run)!.data)
   const { code, said } = await record(run, commitName, headers)
+  expect(code, JSON.stringify(said)).toBe(status)
+  const why = String(said['error'])
+  for (const word of words) expect(why).toContain(word)
+  expect(why).toContain('Nothing was written.')
+  expect(JSON.stringify(t.api.getRecord(run)!.data)).toBe(before)
+}
+
+async function expectRefusedWith(run: string, commitName: string, extra: Record<string, unknown>, status: number, ...words: string[]): Promise<void> {
+  const before = JSON.stringify(t.api.getRecord(run)!.data)
+  const { code, said } = await record(run, commitName, asAgent(THE_TEST_OFFICES_SECRETARY.handle), extra)
   expect(code, JSON.stringify(said)).toBe(status)
   const why = String(said['error'])
   for (const word of words) expect(why).toContain(word)
@@ -341,6 +353,37 @@ describe('a released run whose content reached main by hand', () => {
     const { code, said } = await record(run, onMain)
     expect(code, JSON.stringify(said)).toBe(201)
     expect((t.api.getRecord(run)!.data['theCheck'] as Record<string, any>)['landedByHand']).toMatchObject({ commit: onMain, lane })
+  })
+
+  it('is read in the repository the body names, when the project has two with a checkout, and asks for it when it names none', async () => {
+    const { run, lane, onMain } = await aRunLandedByHand('two-repositories', { entry: null })
+    const repositories = await import('../src/server/lib/repositories.ts')
+    const actor = { type: 'human' as const, id: THE_PERSON }
+    repositories.registerRepository({ workspaceId: WORKSPACE, name: 'fixture-two-repositories-a', root: lane, actor })
+    repositories.registerRepository({ workspaceId: WORKSPACE, name: 'fixture-two-repositories-b', root: aLane('two-repositories-other').lane, actor })
+    await expectRefusedWith(run, onMain, {}, 409, 'was never submitted as a git entry to the merge queue', 'fixture-two-repositories-a (', 'fixture-two-repositories-b (', 'Name the one that holds this run\'s main as "repository" in the body, by its id or its name.')
+    await expectRefusedWith(run, onMain, { repository: 'no-such-repository' }, 400, 'This project has no repository called or numbered "no-such-repository"')
+    const named = await record(run, onMain, undefined, { repository: 'fixture-two-repositories-a' })
+    expect(named.code, JSON.stringify(named.said)).toBe(201)
+    expect((t.api.getRecord(run)!.data['theCheck'] as Record<string, any>)['landedByHand']).toMatchObject({ commit: onMain, lane })
+
+    const byId = await aRunLandedByHand('two-repositories-by-id', { entry: null })
+    const repository = repositories.registerRepository({ workspaceId: WORKSPACE, name: 'fixture-two-repositories-c', root: byId.lane, actor })
+    const recorded = await record(byId.run, byId.onMain, undefined, { repository: repository.id })
+    expect(recorded.code, JSON.stringify(recorded.said)).toBe(201)
+    expect((t.api.getRecord(byId.run)!.data['theCheck'] as Record<string, any>)['landedByHand']).toMatchObject({ lane: byId.lane })
+  })
+
+  it('refuses a named repository that has no checkout', async () => {
+    const repositories = await import('../src/server/lib/repositories.ts')
+    repositories.registerRepository({ workspaceId: WORKSPACE, name: 'fixture-no-checkout', root: null, actor: { type: 'human', id: THE_PERSON } })
+    const { run, onMain } = await aRunLandedByHand('no-checkout', { entry: null })
+    await expectRefusedWith(run, onMain, { repository: 'fixture-no-checkout' }, 409, 'has no checkout on this machine, so there is no main to read in it')
+  })
+
+  it('refuses a repository in the body where the run\'s merge entries already name the lane', async () => {
+    const { run, onMain } = await aRunLandedByHand('entry-and-repository')
+    await expectRefusedWith(run, onMain, { repository: 'fixture-two-repositories-a' }, 409, 'so the office reads main there and takes no repository from the body. Send no repository.')
   })
 
   it('refuses a caller who is neither the person nor a holder of the secretary card', async () => {

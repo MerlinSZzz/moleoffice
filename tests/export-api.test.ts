@@ -32,7 +32,8 @@ import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { FastifyInstance } from 'fastify'
 import { apiApp, freshDb, type TestDb } from './helpers.ts'
-import { ARCHIVED_TABLES, DERIVED_TABLES, everyPartTable } from '../src/server/db/schema.ts'
+import { ARCHIVED_TABLES, DERIVED_TABLES } from '../src/server/db/schema.ts'
+import { everyPartTable } from '../src/server/db/every-part-table.ts'
 
 let t: TestDb
 let app: FastifyInstance

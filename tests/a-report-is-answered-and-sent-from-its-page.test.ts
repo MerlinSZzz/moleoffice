@@ -23,8 +23,6 @@
  * the words in the fill-in box stay unsent. Case 2 said: the whole report's submit then sends only the
  * fill-in box. There is no box submit now, so case 1 says the one press sends both in one message, and
  * case 2 holds "only what is unsent" with an answer changed after it was sent.
- * Then it photographs the answered report at 1440 and 390 in the light look, and at 1440 in
- * Chinese, into its own folder (testShots).
  *
  * MUTATIONS, proved on 2 October 2026:
  *   - `keepAnAnswer` in src/web/api.ts sending to a wrong path: case 1 goes red (nothing is kept, nothing sent);
@@ -39,7 +37,6 @@
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { liveApp, waitForThePage, type LiveApp } from './helpers.ts'
-import { testShots } from './where-shots-go.ts'
 
 const PERSON = {
   'content-type': 'application/json',
@@ -49,7 +46,6 @@ const PERSON = {
 }
 const AS = (handle: string) => ({ ...PERSON, 'x-mole-office-actor-type': 'agent', 'x-mole-office-actor-id': handle })
 const KILN = { name: 'Kiln planning agent', handle: 'kiln-planner' }
-const shots = testShots('a-report-is-answered-and-sent-from-its-page')
 
 let app: LiveApp
 let reportId = ''
@@ -236,13 +232,3 @@ it('3. the button asks once more, then sends its press at once, on its own', asy
   expect(messages).toHaveLength(3)
   expect(messages.find((body) => body.includes('Fire the kiln tonight'))).toBeDefined()
 }, 120_000)
-
-it('photographs the answered report at 1440 and 390 in the light look, and at 1440 in Chinese', async () => {
-  const views: { lang: string; width: number; look: string }[] = []
-  for (const width of [1440, 390]) for (const look of ['light']) views.push({ lang: 'en', width, look })
-  views.push({ lang: 'zh', width: 1440, look: 'light' })
-  for (const { lang, width, look } of views) {
-    await openTheReport(width, look, lang)
-    await app.page.screenshot({ path: `${shots}/answered-${lang}-${String(width)}-${look}.png`, fullPage: true })
-  }
-}, 600_000)

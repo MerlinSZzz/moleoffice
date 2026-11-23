@@ -1,17 +1,20 @@
 // Copyright © 2026 Zhengyang Shen
 // Licensed under the MIT License. See LICENSE.
 /**
- * A SESSION THE HOOK FILED UNDER AN AGENT'S NAME IS HELD BY THAT AGENT'S OWN KEY, AND BY NO OTHER.
+ * A SESSION THE HOOK FILES UNDER AN AGENT'S NAME, WITH NO KEY OF THE AGENT'S, IS FILED BY THE NAME ALONE, AND NO
+ * AGENT'S KEY HOLDS IT. A SESSION THE OFFICE'S KEY FILES FOR AN AGENT WITH `heldByItsFiler` IS HELD BY THAT AGENT'S KEY.
  *
- * At a session's start the session hook knows the session's agent by name, and often not the agent's key. It then files
- * the session with the office's key under the agent's name, and says `heldByItsFiler: true` in that filing
- * (for-agents/session-hook.mjs). The rule for a keyed session header (src/server/lib/the-run-a-key-holds.ts) reads it
- * from the session's first revision: the agent named there may then write to its session with its own key. Before
- * this, that write was refused, because nothing said the office filed the session for that agent.
+ * At a session's start the session hook knows the session's agent by name, and often not the agent's key. It then
+ * sends the name alone, with no key, on every computer (for-agents/session-hook.mjs). It no longer files the session
+ * with the office's key under the agent's name, and no longer says `heldByItsFiler: true` in that filing. A name alone
+ * proves nothing, so the agent's own key does not hold that session, and the office lets no name alone stamp or end it
+ * (`assertMayChangeARun` in src/server/lib/records/patching.ts): the hook's end is refused and the session stays running.
  *
- * The field gives holding and nothing else. It is not `servingAgent`, so the session is not work handed in: the office
- * does not seal it when it ends and tells nobody. Only the office's own key writes it, as true, in the write that files
- * a session; every other write that would set, change or drop it is refused (src/server/lib/held-by-its-filer.ts).
+ * THE FIELD STAYS THE OFFICE'S. Only the office's own key writes it, as true, in the write that files a session under an
+ * agent's name, and every other write that would set, change or drop it is refused (src/server/lib/held-by-its-filer.ts).
+ * The rule for a keyed session header (src/server/lib/the-run-a-key-holds.ts) reads it from the session's first
+ * revision: the agent named there may then write to its session with its own key. The cases of the field file such a
+ * session through the office's key directly, as the hook did before.
  *
  * WHAT IS REAL. Two agents are registered at the real starter door. The hook is spawned as Claude Code spawns it, from
  * tools/session-hook.mjs, with a payload on stdin, against this file's own office on a free port, with a home folder
@@ -19,28 +22,21 @@
  * test reaches it. Every write after that goes through the real doors with `app.inject`. No assertion prints a key.
  *
  * MUTATIONS, each alone, after a green control:
- *   1. The hook files without `heldByItsFiler`: "the agent the hook named writes to it with its own key" goes red, and
- *      so do the three cases after it on the same session, and both cases of "a hook newer than its office", where the
- *      first filing no longer carries the field.
+ *   1. The hook files with the office's key under the agent's name again: "the hook files it under the name alone"
+ *      goes red.
  *   2. The create door's guard taken out (src/server/lib/records.ts): "nor set it when it files a session itself"
  *      goes red.
  *   3. The patch door's guard taken out (src/server/lib/records.ts): "may not drop the field from the session it
- *      holds" and "may not add the field to a session it does not hold" go red, and so does "stays an ordinary session
- *      when it ends", because the field was dropped the case before.
+ *      holds" and "may not add the field to a session it does not hold" go red.
  *   4. The rule takes any first revision the office's key wrote under the agent's name, without reading the field
  *      (src/server/lib/the-run-a-key-holds.ts): "a session the office's key filed under its name without the field"
- *      goes red, and so does "an office whose session kind does not declare the field", whose session A's key then
- *      holds.
- *   5. The hook's second filing without the field taken out: "an office whose session kind does not declare the field"
  *      goes red.
- *   6. The hook files again without the field on any 400: "an office that refuses the filing for another reason" goes
- *      red.
+ *   5. The hook files a session under an agent's name with `heldByItsFiler` again: "an office whose session kind does
+ *      not declare the field" goes red, because that office refuses the filing.
  *
- * AN OFFICE OLDER THAN THE HOOK refuses the field as a key its session kind does not declare. The hook then files the
- * session once more without it, as before the field, and says so, so that a hook newer than its office does not lose
- * the session's record. It does that on that one refusal only. That office is this file's own, with the field taken out
- * of its session kind for the one run of the hook, behind a stand-in that forwards every request whole and writes down
- * each filing.
+ * AN OFFICE OLDER THAN THE HOOK does not declare the field. The hook no longer sends it, so such an office takes the
+ * filing at once. That office is this file's own, with the field taken out of its session kind for the one run of the
+ * hook, behind a stand-in that forwards every request whole and writes down each filing.
  */
 import { execFile } from 'node:child_process'
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
@@ -266,10 +262,6 @@ async function anOfficeThatCountsFilings(
   }
 }
 
-/** The line the hook prints when the office refused the field and the session was filed again without it. */
-const NOT_HELD_LINE =
-  "This office does not take heldByItsFiler yet, so the session is filed as before, and the agent's own key does not hold it."
-
 const aConversation = (what: string): string => `held-${what}-${String(Date.now())}-${String(Math.random()).slice(2)}`
 
 beforeAll(async () => {
@@ -294,23 +286,28 @@ describe('a session the hook filed under an agent’s name, with no key of the a
   const conversation = aConversation('named')
   let run = ''
 
-  it('the agent the hook named writes to it with its own key', async () => {
-    run = await runTheHook('start', conversation, A)
-    expect(theFirstWriteOf(run), 'the hook did not file it with the office’s key under the agent’s name').toEqual({
-      actorId: A,
-      provedBy: 'the-office-key',
-    })
+  it('the hook files it under the name alone, and the agent’s own key does not hold it', async () => {
+    const { aNamedAgentWithoutAKeyLine } = await import('../src/config/the-entrys-agent.mjs')
+    const ran = await theHookRunsAt(url, 'start', conversation, A)
+    expect(ran.id, `the hook filed no record, so it wrote no note. It said:\n${ran.out}`).not.toBeNull()
+    run = ran.id!
+    expect(theFirstWriteOf(run), 'the hook did not file it by the agent’s name alone').toEqual({ actorId: A, provedBy: null })
+    expect(theDataOf(run)['heldByItsFiler'], 'the hook still says the session is held by its filer').toBeUndefined()
+    expect(ran.out).toContain(aNamedAgentWithoutAKeyLine(A))
+    // The hook files every session with a doing line of its own, so a refused write must leave that line as it was.
+    const doingBefore = theDataOf(run)['doing']
     const wrote = await ask('PATCH', `/api/records/${run}`, asAgent(A, keyOfA, run), {
       title: 'Agent A says what this session is',
-      dataPatch: { doing: 'Agent A is writing to the session the hook filed for it.' },
+      dataPatch: { doing: 'Agent A is writing to the session the hook filed by its name.' },
     })
-    expect(wrote.status, said(wrote.body)).toBe(200)
-    const record = t.client.sqlite.prepare('SELECT title FROM records WHERE id = ?').get(run) as { title: string }
-    expect(record.title).toBe('Agent A says what this session is')
-    expect(theDataOf(run)['doing']).toBe('Agent A is writing to the session the hook filed for it.')
+    expect(wrote.status, said(wrote.body)).toBe(403)
+    expect(said(wrote.body)).toContain(THE_RULE)
+    expect(said(wrote.body)).toContain(`"${run}"`)
+    expect(theDataOf(run)['doing'], 'the refused write changed the doing line').toBe(doingBefore)
   }, 60_000)
 
   it('another agent’s own key is refused there, in the rule’s words', async () => {
+    const doingBefore = theDataOf(run)['doing']
     const wrote = await ask('PATCH', `/api/records/${run}`, asAgent(B, keyOfB, run), {
       title: 'Agent B takes this session',
       dataPatch: { doing: 'Agent B is writing to a session it does not hold.' },
@@ -319,28 +316,56 @@ describe('a session the hook filed under an agent’s name, with no key of the a
     expect(said(wrote.body)).toContain(THE_RULE)
     expect(said(wrote.body)).toContain(`"${run}"`)
     expect(said(wrote.body)).toContain(`that run does not serve "${B}"`)
-    expect(theDataOf(run)['doing']).toBe('Agent A is writing to the session the hook filed for it.')
+    expect(theDataOf(run)['doing'], 'the refused write changed the doing line').toBe(doingBefore)
+  })
+
+  it('the hook’s end under the name alone is refused, so the session stays running and is not sealed', async () => {
+    const before = messagesStored()
+    await theHookRunsAt(url, 'end', conversation, A)
+    const data = theDataOf(run)
+    expect(data['state'], 'a name alone ended the session').toBe('running')
+    expect(data['heldByItsFiler']).toBeUndefined()
+    for (const field of ['servingAgent', 'servingAgentId', 'ranAs', 'submission', 'sealedTip', 'atTheSeal']) {
+      expect(data[field], `the session carries ${field}`).toBeUndefined()
+    }
+    expect(messagesStored(), 'a message was stored when the session was asked to end').toBe(before)
+  }, 60_000)
+})
+
+describe('a session the office’s key filed for an agent, with the field', () => {
+  let held = ''
+
+  it('the agent named in the filing writes to it with its own key', async () => {
+    const filed = await ask('POST', '/api/records', asAgent(A, officeKey), {
+      kind: 'session',
+      title: 'Filed for agent A by the office, with the field',
+      data: { state: 'running', runtime: 'claude-code', heldByItsFiler: true },
+    })
+    expect(filed.status, said(filed.body)).toBe(201)
+    held = String((filed.body['record'] as { id?: string } | undefined)?.id ?? '')
+    expect(theFirstWriteOf(held)).toEqual({ actorId: A, provedBy: 'the-office-key' })
+    const wrote = await ask('PATCH', `/api/records/${held}`, asAgent(A, keyOfA, held), {
+      title: 'Agent A says what this session is',
+      dataPatch: { doing: 'Agent A is writing to the session the office filed for it.' },
+    })
+    expect(wrote.status, said(wrote.body)).toBe(200)
+    expect(theDataOf(held)['doing']).toBe('Agent A is writing to the session the office filed for it.')
+  })
+
+  it('another agent’s own key is refused there, in the rule’s words', async () => {
+    const wrote = await ask('PATCH', `/api/records/${held}`, asAgent(B, keyOfB, held), { dataPatch: { doing: 'Agent B is writing.' } })
+    expect(wrote.status, said(wrote.body)).toBe(403)
+    expect(said(wrote.body)).toContain(THE_RULE)
+    expect(said(wrote.body)).toContain(`that run does not serve "${B}"`)
+    expect(theDataOf(held)['doing']).toBe('Agent A is writing to the session the office filed for it.')
   })
 
   it('the agent’s own key may not drop the field from the session it holds', async () => {
-    const wrote = await ask('PATCH', `/api/records/${run}`, asAgent(A, keyOfA, run), { dataPatch: { heldByItsFiler: false } })
+    const wrote = await ask('PATCH', `/api/records/${held}`, asAgent(A, keyOfA, held), { dataPatch: { heldByItsFiler: false } })
     expect(wrote.status, said(wrote.body)).toBe(403)
     expect(said(wrote.body)).toContain(ONLY_THE_OFFICES_KEY)
-    expect(theDataOf(run)['heldByItsFiler']).toBe(true)
+    expect(theDataOf(held)['heldByItsFiler']).toBe(true)
   })
-
-  it('stays an ordinary session when it ends: not sealed, and nobody is told', async () => {
-    const before = messagesStored()
-    const ended = await runTheHook('end', conversation, A)
-    expect(ended).toBe(run)
-    const data = theDataOf(run)
-    expect(data['state']).toBe('finished')
-    expect(data['heldByItsFiler']).toBe(true)
-    for (const field of ['servingAgent', 'servingAgentId', 'ranAs', 'submission', 'sealedTip', 'atTheSeal']) {
-      expect(data[field], `the ended session carries ${field}`).toBeUndefined()
-    }
-    expect(messagesStored(), 'a message was stored when the session ended').toBe(before)
-  }, 60_000)
 })
 
 describe('a session no agent holds by its filing', () => {
@@ -391,7 +416,7 @@ describe('a session no agent holds by its filing', () => {
 })
 
 describe('a hook newer than its office', () => {
-  it('an office whose session kind does not declare the field gets two filings, the second without it, and the hook says so', async () => {
+  it('an office whose session kind does not declare the field takes the hook’s one filing under an agent’s name', async () => {
     // THE OFFICE'S SESSION KIND WITHOUT THE FIELD, as an office from before it: the same module the server reads.
     const { KIND_SPECS } = await import('../src/shared/kinds.ts')
     const fields = KIND_SPECS.session.fields
@@ -406,21 +431,14 @@ describe('a hook newer than its office', () => {
       fields.splice(at, 0, taken!)
       await office.close()
     }
-    expect(office.filings.map((filing) => filing.data['heldByItsFiler'])).toEqual([true, undefined])
-    expect(office.filings[0]!.status).toBe(400)
-    expect(office.filings[0]!.said).toContain('unknown key "heldByItsFiler" — ')
-    expect(office.filings[1]!.status, office.filings[1]!.said).toBe(201)
-    expect(ran.out).toContain(NOT_HELD_LINE)
+    expect(office.filings.map((filing) => filing.data['heldByItsFiler'])).toEqual([undefined])
+    expect(office.filings[0]!.status, office.filings[0]!.said).toBe(201)
     expect(ran.id, 'the hook filed no record, so it wrote no note').not.toBeNull()
-    expect(theDataOf(ran.id!)['heldByItsFiler']).toBeUndefined()
-    const wrote = await ask('PATCH', `/api/records/${ran.id!}`, asAgent(A, keyOfA, ran.id!), { dataPatch: { doing: 'Agent A is writing.' } })
-    expect(wrote.status, said(wrote.body)).toBe(403)
-    expect(said(wrote.body)).toContain(THE_RULE)
+    expect(theFirstWriteOf(ran.id!)).toEqual({ actorId: A, provedBy: null })
   }, 60_000)
 
-  it('an office that refuses the filing for another reason is not asked again without the field', async () => {
-    // ANOTHER REFUSAL IN THE SAME WORDS FOR ANOTHER KEY, from the real office: the closest a refusal comes to the one the
-    // hook files again on, without being it.
+  it('an office that refuses the filing is never sent the field, on the hook’s first try or its second', async () => {
+    // A REFUSAL FROM THE REAL OFFICE for a key its session kind does not declare, the refusal the hook once filed again on.
     const office = await anOfficeThatCountsFilings((data) => {
       data['notAFieldOfASession'] = true
     })
@@ -434,9 +452,8 @@ describe('a hook newer than its office', () => {
     for (const filing of office.filings) {
       expect(filing.status).toBe(400)
       expect(filing.said).toContain('unknown key "notAFieldOfASession" — ')
+      expect(filing.data['heldByItsFiler']).toBeUndefined()
     }
-    expect(office.filings.map((filing) => filing.data['heldByItsFiler'])).toEqual(office.filings.map(() => true))
-    expect(ran.out).not.toContain(NOT_HELD_LINE)
     expect(ran.id).toBeNull()
   }, 60_000)
 })

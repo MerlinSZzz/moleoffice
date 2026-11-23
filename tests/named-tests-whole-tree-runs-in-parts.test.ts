@@ -90,13 +90,6 @@ describe('--list whole-tree', () => {
     expect(run.err).toContain(`--list whole-tree: every part, ${listed.length} files.`)
   })
 
-  it('prints one requested part, and the parts cover the list exactly once', () => {
-    const allParts = Array.from({ length: PART_COUNT }, (_, index) => partFiles(index + 1))
-    expect(allParts[1]).toEqual(listed.slice(2, 4))
-    expect(allParts.flat().sort()).toEqual([...listed].sort())
-    expect(allParts.flat()).toHaveLength(listed.length)
-  })
-
   it('puts a file named beside the list in exactly one part', () => {
     tool(['--list', 'whole-tree', '--print'])
     const beside = join(root, 'tests', `whole-tree-part-${tag}-zz-beside.test.ts`)

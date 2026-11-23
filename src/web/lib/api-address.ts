@@ -40,11 +40,11 @@
  * ---------------------------------------------------------------------------------------
  *
  * A page on port 5173 calling the API on MOLE_OFFICE_PORT is a different origin, so the browser
- * applies CORS. The API allows exactly the origins `originsAPageMayBeOn` in src/config/settings.mjs
- * declares — both ports, both spellings of loopback, and the two addresses for other machines — and
- * it exposes the three headers this app reads off a reply. Criterion R2 and problem `a36N9Ivqf46H`
- * built that, and a page on the address for other machines has been reading its world header across
- * origins since.
+ * applies CORS. The API takes the origins of its own pages and, while it is not built for production,
+ * the dev server's (src/server/lib/an-origin-that-is-not-this-office.ts), and it exposes the headers
+ * this app reads off a reply. Criterion R2 built that: the API names the headers this app reads in every
+ * reply, so a page on another origin can read them, and a page on the address for other machines has been
+ * reading its world header across origins since.
  */
 /**
  * THE PORT IS HANDED IN, NOT IMPORTED HERE, and that is the same rule `src/web/lib/world.ts` and

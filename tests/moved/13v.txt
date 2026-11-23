@@ -47,7 +47,6 @@ tests/a-level-nobody-wrote-says-so.test.ts
 tests/a-line-between-two-intentions.test.ts
 tests/a-live-session-holds-its-handle.test.ts
 tests/a-lost-key-is-given-again-by-the-person-or-its-starter.test.ts
-tests/a-merges-only-worker-starts-the-merge-tool-and-no-agent-run.test.ts
 tests/a-message-nobody-can-take-goes-up-the-chain-of-starters.test.ts
 tests/a-message-to-a-chosen-session-reaches-its-handle.test.ts
 tests/a-message-to-a-dsh-worker-waits-and-says-why.test.ts
@@ -93,7 +92,6 @@ tests/a-second-check-is-not-refused-by-the-first.test.ts
 tests/a-second-project-registration-answers-no-key.test.ts
 tests/a-secretary-claims-dead-letters-per-addressee.test.ts
 tests/a-secretary-retires-a-supervisor-and-a-worker.test.ts
-tests/a-secretarys-office-filed-run-waits-on-nobody.test.ts
 tests/a-sender-addresses-an-agent-by-its-id.test.ts
 tests/a-share-is-not-a-measure.test.ts
 tests/a-short-form-says-who-wrote-it.test.ts
@@ -310,7 +308,6 @@ tests/the-waiter-names-the-project-it-was-started-with.test.ts
 tests/the-waiter-sends-the-agents-own-key.test.ts
 tests/the-walk-steps-past-the-bash-tools-shell.test.ts
 tests/the-work-a-decision-creates-is-owed-by-nobody.test.ts
-tests/the-worker-runs-the-merge-tool-in-its-own-slot.test.ts
 tests/the-world-page-says-it-is-a-copy.test.ts
 tests/three-readings-of-one-pipeline-give-one-number.test.ts
 tests/trace-headers.test.ts

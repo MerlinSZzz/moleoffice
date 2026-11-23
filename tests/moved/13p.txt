@@ -74,8 +74,6 @@ tests/the-office-reminds-idle-agents-and-runs-past-their-expected-time.test.ts
 tests/the-person-answers-the-questions-in-a-report.test.ts
 tests/the-persons-acts-are-declared-once.test.ts
 tests/the-process-start-time-is-the-real-one.test.ts
-tests/the-queue-moves-that-need-no-record.test.ts
-tests/the-real-merge-tool-in-test-folders.mjs
 tests/the-registry-makes-the-person-hold-the-key.test.ts
 tests/the-review-pane-at-390.test.ts
 tests/the-review-pane-names-which-part.test.ts

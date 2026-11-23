@@ -5,13 +5,15 @@
  *
  * By a decision, as wave 13n round 48 proposed it and as it was approved, a button left of Send says what the agent may
  * do with the next message: No mark, Just ask or Proposal first. Round 49 put the mark on the
- * message record and built the "mark broken" door; this is the page.
+ * message record and built the "mark broken" door; this is the page. A third flag, Align, came later, and a fourth,
+ * Give options, after it, so the menu now has five lines.
  *
  * WHAT IS PROVED HERE, in a real browser against a test office with its own database.
  *
  * 1. The keyboard path: Shift+Tab from Send reaches the button, which stands just left of Send in the row of presses
  *    under the box (wave 13y). Enter opens the menu at the line in force, the arrows move,
- *    Enter chooses, and Escape closes the menu and gives focus back to the button. Space opens it too.
+ *    Enter chooses and gives focus back to the box, and Escape closes the menu and gives focus back to the button.
+ *    Space opens it too.
  * 2. The button sets the mark the server stores: "just-ask", then "none" for a message sent at No mark (the composer
  *    writes none, so the record keeps the difference from a message sent where no button was offered), then
  *    "proposal-first".
@@ -30,6 +32,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { Page } from 'playwright'
 import { goKeeping, liveApp, waitForThePage, type LiveApp } from './helpers.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
+import { t } from '../src/shared/i18n.ts'
 import { openTheChat } from './open-the-chat.ts'
 
 let app: LiveApp
@@ -149,22 +152,37 @@ describe('the button left of Send', () => {
 
     await page.keyboard.press('Enter')
     await page.waitForSelector('.px-menu[aria-label="What the agent may do"]', { timeout: 10_000 })
-    // IT OPENS AT THE LINE IN FORCE, with that line ticked. No mark is the last line.
+    // IT OPENS AT THE LINE IN FORCE, with that line ticked. No mark is the last line. The menu has five lines: the four
+    // flags the office ships, in the order the code gives them, and then No mark.
     expect(await focused(page)).toContain('No mark')
     expect(await page.$$eval('.px-menu .px-menu-item', (all) => all.map((el) => el.getAttribute('aria-checked')))).toEqual([
       'false',
       'false',
+      'false',
+      'false',
       'true',
+    ])
+    expect(await page.locator('.px-menu .px-menu-item .px-chat-intent-line-name').allTextContents()).toEqual([
+      'Just ask',
+      'Proposal first',
+      'Align',
+      'Give options',
+      'No mark',
     ])
     await page.keyboard.press('ArrowDown')
     expect(await focused(page)).toContain('Just ask')
     await page.keyboard.press('Enter')
     await page.waitForSelector('.px-menu', { state: 'detached', timeout: 10_000 })
-    expect(await focused(page)).toMatch(/^px-chat-intent px-label-ink\|Just ask/)
+    // A CHOICE GIVES THE FOCUS BACK TO THE BOX, so the person goes on writing where they were.
+    expect(await page.evaluate(() => document.activeElement === document.querySelector('.px-chat-write textarea'))).toBe(true)
     expect(await button.getAttribute('data-chosen')).toBe('yes')
     expect(await button.getAttribute('aria-label')).toBe('What the agent may do: Just ask')
 
-    // SPACE OPENS IT TOO, AND ESCAPE CLOSES IT WITHOUT CHANGING ANYTHING, focus back on the button.
+    // SPACE OPENS IT TOO, AND ESCAPE CLOSES IT WITHOUT CHANGING ANYTHING, focus back on the button. The button is
+    // reached again the way it was first reached, by Shift+Tab from Send.
+    await page.focus('.px-chat-write .px-chat-send')
+    await page.keyboard.press('Shift+Tab')
+    expect(await focused(page)).toMatch(/^px-chat-intent px-label-ink\|Just ask/)
     await page.keyboard.press(' ')
     await page.waitForSelector('.px-menu', { timeout: 10_000 })
     expect(await focused(page)).toContain('Just ask')
@@ -234,9 +252,8 @@ describe('"mark broken"', () => {
     const page = app.page
     const reply = theBubble(page, BUILT_IT)
     await reply.waitFor({ timeout: 30_000 })
-    const press = reply.locator('.px-chat-mark-broken')
+    const press = reply.getByRole('button', { name: t('chat.intent.markBroken') })
     await expect.poll(() => press.count(), { timeout: 30_000 }).toBe(1)
-    expect(await press.getAttribute('title')).toContain('"Proposal first"')
     await press.click()
     await reply.locator('.px-chat-mark-broken-said[data-filed="yes"]').waitFor({ timeout: 30_000 })
 

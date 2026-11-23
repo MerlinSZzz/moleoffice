@@ -17,13 +17,15 @@
  *
  * HOW ANOTHER MACHINE EXISTS IN ONE PROCESS, as tests/the-pairing-page-on-a-trusted-machine.test.ts
  * does it: the server's second listener is on 127.0.0.2, the page is opened there, and the browser
- * pairs through the product's own pairing page, so it holds the key as a cookie, as the browser on the owner's other computer
- * would. The report is filed in a project that is not `default`. Each save link is pressed, and what
- * is measured is the browser's own download: it finished, and it holds every byte of the file. The
+ * pairs through the product's own pairing page, so it holds the cookie half of a device key and the page keeps the header
+ * half, as the browser on the owner's other computer would. The report is filed in a project that is not `default`.
+ * Each save link is pressed, and what is measured is the browser's own download: it finished, and it holds every byte of the file. The
  * file block's archive is over the preview limit, as the owner's 134 MB archive was.
  *
- * MUTATION PROOF: in src/web/components/SummaryBlocks.tsx, `whereALinkFetches` made to return the bare
- * `previewUrl(path)` again turns the picture and file cases red, and the video case with them.
+ * MUTATION PROOF: none is recorded for these cases as they run now. The browser is paired, so each link's own address
+ * is the record's page, and a press asks src/web/lib/file-tickets.tsx for a ticketed address and hands that to the
+ * browser. A press on a paired page does not read `whereALinkFetches` in src/web/components/SummaryBlocks.tsx. So the
+ * proof this paragraph named, `whereALinkFetches` made to return the bare `previewUrl(path)`, no longer reaches them.
  */
 
 import { createHash } from 'node:crypto'
@@ -35,6 +37,7 @@ import { crc32, deflateSync } from 'node:zlib'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { recordPath } from '../src/web/components/router.tsx'
+import { addressForTheBrowser, previewUrl } from '../src/web/components/SummaryBlocks.tsx'
 import { THE_TEST_OFFICES_OWNER } from './a-page-of-a-test-office.ts'
 import { type LiveApp, liveApp, waitForThePage } from './helpers.ts'
 import { scrollThePageBy } from './the-page-scroller.ts'
@@ -45,6 +48,8 @@ const CHECKOUT = fileURLToPath(new URL('..', import.meta.url)).replace(/\/$/, ''
 const PROJECT = 'robotics'
 /** The address the server listens on for other machines, in this test's stack. */
 const OTHER_MACHINE = '127.0.0.2'
+/** The file door's own path, read from the product's builder of a file's plain address. */
+const THE_FILE_DOOR = new URL(previewUrl(''), `http://${OTHER_MACHINE}`).pathname
 
 /** A real PNG, 320 by 180 and one colour, large enough to be seen above its save press. */
 const A_PICTURE = aPng(320, 180, [91, 141, 239])
@@ -187,50 +192,115 @@ afterAll(async () => {
   if (OURS !== '') rmSync(OURS, { recursive: true, force: true })
 }, 60_000)
 
-/** Press one save link and wait for the browser's own download; the bytes it saved, or why there are none. */
-async function saved(selector: string): Promise<Buffer> {
+/** An address as a message may name it, by its origin and its path, so that a ticket in it is never printed. */
+function whereItGoes(address: string): string {
+  const at = new URL(address)
+  return `${at.origin}${at.pathname}`
+}
+
+/**
+ * A LINK'S OWN ADDRESS ON THIS PAIRED PAGE IS THE RECORD'S PAGE, and it holds no file address, so a link copied out of
+ * the page opens the record and not the file.
+ */
+async function itsOwnAddressIsTheRecordsPage(selector: string): Promise<void> {
+  const href = await app.page.locator(selector).first().getAttribute('href', { timeout: 30_000 })
+  expect(href, `the own address of ${selector}`).toBe(`#${recordPath(recordId)}`)
+  expect(href, `the own address of ${selector} holds a file address`).not.toContain(THE_FILE_DOOR)
+}
+
+/**
+ * THE ADDRESS A PRESS HANDED THE BROWSER goes to the file door on the other machine, and it holds every part of the
+ * plain address that the product builds for the same file in the report's project and with the report's record
+ * (`addressForTheBrowser` in src/web/components/SummaryBlocks.tsx). So a save holds the download part, and an open does
+ * not hold it. No part's name is copied here.
+ */
+function theDoorWasHanded(address: string, path: string, { saves }: { saves: boolean }): void {
+  const handed = new URL(address)
+  const plain = new URL(addressForTheBrowser(path, PROJECT, saves, recordId), handed.origin)
+  expect([...plain.searchParams.values()], 'the plain address names the project and the record').toEqual(
+    expect.arrayContaining([PROJECT, recordId]),
+  )
+  expect(handed.origin, 'the press goes to the API on the other machine').toBe(`http://${OTHER_MACHINE}:${String(app.apiPort)}`)
+  expect(handed.pathname, 'the press goes to the file door').toBe(plain.pathname)
+  for (const [part, value] of plain.searchParams) {
+    expect(handed.searchParams.getAll(part), `the part ${part} of the address the press handed`).toEqual([value])
+  }
+  if (!saves) {
+    const asASave = new URL(addressForTheBrowser(path, PROJECT, true, recordId), handed.origin)
+    for (const [part] of asASave.searchParams) {
+      if (!plain.searchParams.has(part)) expect(handed.searchParams.has(part), `an open holds ${part}, which only a save holds`).toBe(false)
+    }
+  }
+}
+
+/** Press one save link and wait for the browser's own download: the address the press handed it, and the bytes it saved. */
+async function aPressSaves(selector: string): Promise<{ address: string; bytes: Buffer }> {
   const link = app.page.locator(selector).first()
   await link.waitFor({ timeout: 30_000 })
-  const href = (await link.getAttribute('href')) ?? ''
   const [download] = await Promise.all([
     app.page.waitForEvent('download', { timeout: 20_000 }).catch(() => {
-      throw new Error(`pressing ${selector} (${href}) started no download`)
+      throw new Error(`pressing ${selector} started no download`)
     }),
     link.click(),
   ])
+  const address = download.url()
   const failure = await download.failure()
-  expect(failure, `the download from ${href} failed`).toBeNull()
+  expect(failure, `the download from ${whereItGoes(address)} failed`).toBeNull()
   const at = await download.path()
   expect(statSync(at).isFile()).toBe(true)
-  return readFileSync(at)
+  return { address, bytes: readFileSync(at) }
+}
+
+/** Press one save link; the bytes the browser saved, or why there are none. */
+async function saved(selector: string): Promise<Buffer> {
+  return (await aPressSaves(selector)).bytes
+}
+
+/**
+ * Press one open link and catch the tab it opens: the address the press handed that tab. The tab is closed before this
+ * returns, so the next case finds the report's page alone.
+ */
+async function theAddressATabOpens(selector: string): Promise<string> {
+  const link = app.page.locator(selector).first()
+  await link.waitFor({ timeout: 30_000 })
+  const [tab] = await Promise.all([
+    app.page.context().waitForEvent('page', { timeout: 20_000 }).catch(() => {
+      throw new Error(`pressing ${selector} opened no tab`)
+    }),
+    link.click(),
+  ])
+  try {
+    const theApiThere = `http://${OTHER_MACHINE}:${String(app.apiPort)}/`
+    await expect
+      .poll(() => tab.url().startsWith(theApiThere), { timeout: 20_000, message: 'the tab the press opened went to the API on the other machine' })
+      .toBe(true)
+    return tab.url()
+  } finally {
+    await tab.close()
+  }
 }
 
 describe('a report in another project, opened on another machine', () => {
   it('saves its picture whole, from the door, in its own project', async () => {
     await app.page.waitForSelector('.sb-image img', { timeout: 30_000 })
-    const href = await app.page.locator('a.sb-picture-save').first().getAttribute('href')
-    expect(href).toContain(`http://${OTHER_MACHINE}:${String(app.apiPort)}/api/file?path=`)
-    expect(href).toContain(`&workspace=${PROJECT}`)
-    expect(href).toContain(`&record=${recordId}`)
-    expect(href).toContain('&download=1')
-    expect((await saved('a.sb-picture-save')).equals(A_PICTURE)).toBe(true)
+    await itsOwnAddressIsTheRecordsPage('a.sb-picture-save')
+    const got = await aPressSaves('a.sb-picture-save')
+    theDoorWasHanded(got.address, PICTURE, { saves: true })
+    expect(got.bytes.equals(A_PICTURE)).toBe(true)
   }, 120_000)
 
   it("saves a file block's archive whole, over the preview limit", async () => {
-    const href = await app.page.locator('.sb-file a.sb-file-save').first().getAttribute('href')
-    expect(href).toContain(`&record=${recordId}`)
-    const bytes = await saved('.sb-file a.sb-file-save')
-    expect(bytes.length).toBe(AN_ARCHIVE.length)
-    expect(bytes.equals(AN_ARCHIVE)).toBe(true)
+    await itsOwnAddressIsTheRecordsPage('.sb-file a.sb-file-save')
+    const got = await aPressSaves('.sb-file a.sb-file-save')
+    theDoorWasHanded(got.address, ARCHIVE, { saves: true })
+    expect(got.bytes.length).toBe(AN_ARCHIVE.length)
+    expect(got.bytes.equals(AN_ARCHIVE)).toBe(true)
   }, 120_000)
 
   it('opens a file block from the door in its own project', async () => {
-    const href = await app.page.locator('.sb-file a.sb-file-open').first().getAttribute('href')
-    expect(href).toContain(`http://${OTHER_MACHINE}:${String(app.apiPort)}/api/file?path=`)
-    expect(href).toContain(`&workspace=${PROJECT}`)
-    expect(href).toContain(`&record=${recordId}`)
-    expect(href).not.toContain('download=1')
-  }, 60_000)
+    await itsOwnAddressIsTheRecordsPage('.sb-file a.sb-file-open')
+    theDoorWasHanded(await theAddressATabOpens('.sb-file a.sb-file-open'), ARCHIVE, { saves: false })
+  }, 120_000)
 
   it('saves its video whole, as it did before', async () => {
     expect((await saved('a.sb-video-save')).equals(A_RECORDING)).toBe(true)

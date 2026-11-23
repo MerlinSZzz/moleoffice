@@ -21,7 +21,7 @@
  *
  * A DIGEST'S "=" NEVER STANDS ALONE ON A LINE (wave 13q round 62). At 390 the page broke each digest after 43 of its 44
  * characters, so its last line held the "=" alone. A digest is drawn whole on one line, or in two halves of 22, at
- * each of the four widths every screen is looked at.
+ * the widest and the narrowest width.
  *
  * ---------------------------------------------------------------------------------------
  * MUTATIONS, NAMED, EACH AFTER A CONTROL RUN
@@ -258,10 +258,10 @@ const WIDTHS = [1440, 990, 660, 390]
 /** Where the four-width, two-theme pictures go when this run wants them. */
 const shots = process.env.W13Q_HOST_JOB_SHOTS
 
-it('6: draws each digest whole on one line, or in two halves, at 1440, 990, 660 and 390, so its "=" never stands alone', async () => {
+it('6: draws each digest whole on one line, or in two halves, at the widest and the narrowest width, so its "=" never stands alone', async () => {
   const digests = [base64Of(PROGRAM), base64Of(OUTPUTS.returned.sha256), base64Of(OUTPUTS.tooLarge.sha256)]
   try {
-    for (const width of WIDTHS) {
+    for (const width of [1440, 390]) {
       await app.page.setViewportSize({ width, height: 1000 })
       await opened(ids.finished, 'normal')
       const drawn = app.page.locator('article.rp [data-job-fact="digests"] [data-digest]')

@@ -50,6 +50,7 @@ import { type LiveApp, liveApp, waitForThePage } from './helpers.ts'
 import { periodKey } from '../src/shared/planning.ts'
 import { en } from '../src/shared/words/en.ts'
 import { zh } from '../src/shared/words/zh.ts'
+import { sayInEnglish } from '../src/shared/i18n.ts'
 
 /** The week this test plans in: the one the schedule opens on, so no address has to be invented. */
 const THIS_WEEK = periodKey('week', new Date())
@@ -149,14 +150,9 @@ describe('a week with hours, and words nobody has scheduled, on one screen', () 
     expect(read).not.toContain('Nothing has been scheduled from these words')
   })
 
-  it('says what is unscheduled about the words, once, naming the words as the subject', () => {
-    expect(read).toContain('Nothing on the plan came from these words')
+  it('marks the words as not on the plan, once', () => {
     // Once, not once per row: the row used to repeat it.
-    expect(read.split('Nothing on the plan came from these words').length - 1).toBe(1)
-  })
-
-  it('says how both facts can be true, which is what stops the pair reading as a contradiction', () => {
-    expect(read).toContain('The work they name may still have hours, given some other way.')
+    expect(read.split(sayInEnglish('schedule.keptNotOnPlan')).length - 1).toBe(1)
   })
 
   it('still shows the words as written and what Mole Office made of them', () => {

@@ -2,7 +2,8 @@
 // Licensed under the MIT License. See LICENSE.
 import Database from 'better-sqlite3'
 import { renameSync, rmSync } from 'node:fs'
-import { NAMES_A_PART_MAY_NOT_TAKE, everyPartTable, RECORD_TEXT_INDEX_TABLES, LEFT_OUT_OF_BACKUPS_AND_EXPORTS } from '../../src/server/db/schema.ts'
+import { RECORD_TEXT_INDEX_TABLES, LEFT_OUT_OF_BACKUPS_AND_EXPORTS } from '../../src/server/db/schema.ts'
+import { NAMES_A_PART_MAY_NOT_TAKE, everyPartTable } from '../../src/server/db/every-part-table.ts'
 import { NOT_CARRIED_TABLES, COLUMNS_A_COPY_CLEARS, emptyAndScrub, hashesFoundInTheBytesOf } from '../../src/config/what-a-copy-must-not-carry.mjs'
 import type { UploadPolicy } from '../../src/shared/storage/destinations.ts'
 export const OPTIONAL_TABLES = {

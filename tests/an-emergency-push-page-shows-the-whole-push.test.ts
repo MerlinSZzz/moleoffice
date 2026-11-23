@@ -174,23 +174,24 @@ it('says the switch was on, until when, and when it was thrown, and says so in w
 }, 120_000)
 
 it('says a push has not ended yet, says when one ended without moving main, and draws what the tool said in developer mode only', async () => {
-  expect(linesOf(await theRow('pushing', 'ended'))).toEqual([say('pushPage.ended.not'), say('mergeQueuePage.push.moving')])
+  expect(linesOf(await theRow('pushing', 'ended'))).toEqual([say('pushPage.ended.not')])
   const stopped = linesOf(await theRow('stopped', 'ended'))
   expect(stopped).toHaveLength(2)
   expect(stopped[0]).toMatch(sayWithATime('mergeQueuePage.push.ended', 'at'))
-  expect(stopped[1]).toBe(say('mergeQueuePage.push.onward.none'))
+  expect(stopped[1]).toBe(say('pushPage.onward.none'))
   const pushed = linesOf(await theRow('pushed', 'ended'))
   expect(pushed).toHaveLength(2)
-  expect(pushed[1]).toBe(say('pushPage.onward.failed'))
+  expect(pushed[1]).toBe(say('pushPage.onward.notCopied'))
   // NORMAL MODE SHOWS NO MACHINE WORD anywhere in the panel: the tool's sentences, the push's id, its checkout's path.
   for (const push of ['pushing', 'stopped', 'pushed'] as const) {
     const { panel } = await thePanel(push, 'normal')
     for (const never of [TOOL_SAID.stopped, TOOL_SAID.pushed, ONWARD_SAID, ids[push], ids.message, ROOT, COMMIT, CHANGE]) expect(panel, `${push}: ${never}`).not.toContain(never)
   }
-  // DEVELOPER MODE ADDS WHAT THE MERGE TOOL SAID, after the lines normal mode draws.
+  // DEVELOPER MODE ADDS WHAT THE MERGE TOOL SAID: the onward push's own words under its short line, and the tool's
+  // sentence after the lines normal mode draws.
   expect(linesOf(await theRow('stopped', 'ended', 'developer'))).toEqual([...stopped, say('pushPage.ended.toolSaid', { says: TOOL_SAID.stopped })])
   expect(linesOf(await theRow('pushed', 'ended', 'developer'))).toEqual([
-    pushed[0], say('mergeQueuePage.push.onward.failed', { says: ONWARD_SAID }), say('pushPage.ended.toolSaid', { says: TOOL_SAID.pushed }),
+    pushed[0], say('pushPage.onward.notCopied'), ONWARD_SAID, say('pushPage.ended.toolSaid', { says: TOOL_SAID.pushed }),
   ])
 }, 120_000)
 
@@ -198,6 +199,6 @@ it('says what the follow-up run found, or in words why there is none', async () 
   expect(linesOf(await theRow('pushing', 'followUp'))).toEqual([say('pushPage.followUp.notYet')])
   expect(linesOf(await theRow('stopped', 'followUp'))).toEqual([say('pushPage.followUp.notOwed')])
   const pushed = await theRow('pushed', 'followUp')
-  expect(linesOf(pushed)).toEqual([say('mergeQueuePage.push.followUp.missing')])
+  expect(linesOf(pushed)).toEqual([say('mergeQueuePage.push.followUp.notTested')])
   expect(pushed.red).toBe(false)
 }, 120_000)

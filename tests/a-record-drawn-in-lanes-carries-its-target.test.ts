@@ -27,9 +27,11 @@
  *       title the heading draws. The list of words under a heading carries the same target as the heading: its
  *       record's when a record heads the area, and none when no record does. At least one such list is read.
  *   (b) at 1440: a comment stored on a step's block, at its surface, in the shape
- *       tests/a-comment-on-the-drawing-is-one-comment-everywhere.test.ts writes, draws its circle beside that step's
- *       lanes card: to the right of the card, within one circle's width of it, level with the card. Pressing the circle
- *       opens the comment's own words.
+ *       tests/a-comment-on-the-drawing-is-one-comment-everywhere.test.ts writes, draws its circle inside that step's
+ *       lanes card. The circle is inside the card's box. It is in the card's top-right corner: its right edge and its
+ *       top edge are each less than half its width from the card's. It overlaps no other card of the drawing. The owner
+ *       chose the corner inside the card, and the drawing's layout does not change for it. Pressing the circle opens the
+ *       comment's own words.
  *   (c) at 1440: a right-click on the card, away from its title, opens the composer about the card's record. The
  *       composer's quote names that record's title, and no other drawn record's title or the pipeline's.
  *
@@ -202,7 +204,7 @@ it('(a) at 390: every card and every heading of the outline that draws one recor
 
 // ========================================================================================================== (b)
 
-it('(b) at 1440: a comment on a step draws its circle beside the step\'s card, and the circle opens the comment\'s words', async () => {
+it('(b) at 1440: a comment on a step draws its circle inside the top-right corner of the step\'s card, on no other card, and the circle opens the comment\'s words', async () => {
   theAreasWereStored(office.areas, 'the pipeline drawn in areas')
   await openThePage(app, pipelinePath(office.id['drawn']!))
   await theDrawingIsDrawn(app.page)
@@ -211,18 +213,31 @@ it('(b) at 1440: a comment on a step draws its circle beside the step\'s card, a
   expect(drawn, `the comment on the step "${COMMENTED}" draws a circle (${circle})`).toBe(true)
   await app.page.waitForFunction(() => document.documentElement.getAttribute('data-comment-circles') === 'placed', undefined, { timeout: 30_000 })
 
-  const at = await app.page.evaluate(({ card, circle }) => {
-    const box = (selector: string) => {
-      const r = document.querySelector(selector)!.getBoundingClientRect()
+  const at = await app.page.evaluate(({ drawing, card, circle }) => {
+    const box = (element: Element) => {
+      const r = element.getBoundingClientRect()
       return { left: r.left, right: r.right, top: r.top, bottom: r.bottom, width: r.width }
     }
-    return { card: box(card), circle: box(circle) }
-  }, { card: cardOf(office.id[COMMENTED]!), circle })
-  const said = `the circle ${JSON.stringify(at.circle)} beside the card ${JSON.stringify(at.card)}`
-  expect(at.circle.left, `${said}: to the right of the card`).toBeGreaterThanOrEqual(at.card.right - 0.5)
-  expect(at.circle.left - at.card.right, `${said}: within one circle's width of it`).toBeLessThanOrEqual(at.circle.width)
-  expect(at.circle.top, `${said}: level with the card`).toBeGreaterThanOrEqual(at.card.top - 0.5)
-  expect(at.circle.top, `${said}: level with the card`).toBeLessThan(at.card.bottom)
+    const commented = document.querySelector(card)!
+    const others = [...document.querySelectorAll(`${drawing} .e-card`)].filter((one) => one !== commented)
+    return {
+      card: box(commented),
+      circle: box(document.querySelector(circle)!),
+      others: others.map((one) => ({ id: one.getAttribute('data-id') ?? '', ...box(one) })),
+    }
+  }, { drawing: DRAWING, card: cardOf(office.id[COMMENTED]!), circle })
+  const said = `the circle ${JSON.stringify(at.circle)} on the card ${JSON.stringify(at.card)}`
+  expect(at.circle.left, `${said}: inside the card, by its left edge`).toBeGreaterThanOrEqual(at.card.left - 0.5)
+  expect(at.circle.right, `${said}: inside the card, by its right edge`).toBeLessThanOrEqual(at.card.right + 0.5)
+  expect(at.circle.top, `${said}: inside the card, by its top edge`).toBeGreaterThanOrEqual(at.card.top - 0.5)
+  expect(at.circle.bottom, `${said}: inside the card, by its bottom edge`).toBeLessThanOrEqual(at.card.bottom + 0.5)
+  expect(at.card.right - at.circle.right, `${said}: in the card's top-right corner, by the right edge`).toBeLessThan(at.circle.width / 2)
+  expect(at.circle.top - at.card.top, `${said}: in the card's top-right corner, by the top edge`).toBeLessThan(at.circle.width / 2)
+  expect(at.others.length, `${said}: the other cards of the drawing, to read`).toBeGreaterThan(0)
+  for (const other of at.others) {
+    const overlaps = at.circle.left < other.right && other.left < at.circle.right && at.circle.top < other.bottom && other.top < at.circle.bottom
+    expect(overlaps, `${said}: on no other card, so not on the card of ${other.id} ${JSON.stringify(other)}`).toBe(false)
+  }
 
   await app.page.click(circle)
   const opened = await app.page

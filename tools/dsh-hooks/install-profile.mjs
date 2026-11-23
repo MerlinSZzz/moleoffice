@@ -13,10 +13,10 @@
  * bash-sandbox timeout patch — plus the `@deepseek-ai/dsh-hooks-claude-code` bridge, mounted with
  * its `configPath` at this checkout's `tools/dsh-hooks/hooks.json`.
  *
- * THE MAIN-WORLD GUARD COMES WITH THE BRIDGE. `hooks.json` names `tools/guard/main-world-guard.mjs`
+ * THE MAIN-WORLD GUARD COMES WITH THE BRIDGE. `hooks.json` names `for-agents/main-world-guard.mjs`
  * as a PreToolUse hook, so every dsh run on this profile has the guard
  * mounted, and nothing here needs writing again for it: the bridge reads `hooks.json` when dsh
- * starts. `node tools/guard/main-world-guard.mjs --mounted dsh` says whether it is mounted.
+ * starts. `node for-agents/main-world-guard.mjs --mounted dsh` says whether it is mounted.
  *
  * AND THE OFFICE'S OWN TOOL, office_request (problem jgTM-z-63Vls, 28 September 2026). dsh keeps MOLE_AGENT_KEY out of
  * every command it runs, so a worker's curl could not write to the office. The tool runs inside the dsh process and asks
@@ -55,6 +55,11 @@
  * `dependencies: {}`. Where that farm does not hold the package, this prints the one command that
  * puts it in the profile and changes nothing else.
  *
+ * Each package in the farm is a link into the dsh installation. For a sandbox's dsh home read from the host, that
+ * installation is inside the container, so the link leads nowhere from here. Then whether the bridge is installed is
+ * unknown from here, and this says so and prints no command, because adding the bridge again would put a second copy
+ * into the farm.
+ *
  * ---------------------------------------------------------------------------------------
  * USAGE
  * ---------------------------------------------------------------------------------------
@@ -64,7 +69,7 @@
  * `DSH_HOME` defaults to `~/.cache/mole-office/dsh/home`. Run it with a scratch
  * `DSH_HOME` first if you only want to see the tree it makes.
  */
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
+import { existsSync, lstatSync, mkdirSync, readlinkSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -176,6 +181,16 @@ function theCordisPatch(CHECKOUT, HOOKS_JSON) {
   ].join('\n')
 }
 
+/** Where the link at `path` points, or null when there is no link at `path`. */
+function theLinkAt(path) {
+  try {
+    return lstatSync(path).isSymbolicLink() ? readlinkSync(path) : null
+  } catch (error) {
+    if (error?.code === 'ENOENT') return null
+    throw error
+  }
+}
+
 export function installOfficeProfile(home = DSH_HOME, checkout = CHECKOUT) {
   const PROFILE_DIR = join(home, 'profiles/office')
   const HOOKS_JSON = join(checkout, 'tools/dsh-hooks/hooks.json')
@@ -198,6 +213,7 @@ export function installOfficeProfile(home = DSH_HOME, checkout = CHECKOUT) {
   writeFileSync(pluginFile, theOfficeToolPlugin(OFFICE_TOOL))
 
   const shared = existsSync(SHARED_FARM)
+  const aLinkToNothingHere = shared ? null : theLinkAt(SHARED_FARM)
   const lines = [
     `Wrote ${packageFile}`,
     `Wrote ${patchFile}`,
@@ -210,8 +226,14 @@ export function installOfficeProfile(home = DSH_HOME, checkout = CHECKOUT) {
     shared
       ? `The bridge ${BRIDGE} resolves from the shared farm at ${SHARED_FARM}, so the profile needs no ` +
         'dependency of its own and there is no command to run.'
-      : `The bridge ${BRIDGE} is not at ${SHARED_FARM}, so run this once after this installer: ` +
-        `dsh plugin --profile office add ${BRIDGE}`,
+      : aLinkToNothingHere !== null
+        ? `The bridge ${BRIDGE} at ${SHARED_FARM} is a link to ${aLinkToNothingHere}, and nothing is at ` +
+          `${aLinkToNothingHere} from here. dsh makes that link into its own installation, which can be where this ` +
+          "process cannot see, such as inside a sandbox's container. So whether the bridge is installed is unknown " +
+          'from here. Run this installer where dsh runs to find out. No command to add the bridge is printed, ' +
+          'because the farm may hold it already.'
+        : `The bridge ${BRIDGE} is not at ${SHARED_FARM}, so run this once after this installer: ` +
+          `dsh plugin --profile office add ${BRIDGE}`,
   ]
   return lines
 }

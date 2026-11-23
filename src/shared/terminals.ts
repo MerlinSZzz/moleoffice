@@ -40,7 +40,20 @@ export interface TerminalReading {
   exit: { code: number; signal: number | null } | null
   /** Whether what the person types here is kept as their notes (wave 13u, round 4). On when a terminal opens. */
   keeping: boolean
+  /**
+   * THE LINE A SECRETARY PREPARED when it opened this terminal for the person, whole, and the secretary that prepared it.
+   * The holder typed it in with no Enter, and the person runs it with their own Enter. Null when none was; absent from
+   * a holder older than this office.
+   */
+  prepared?: { line: string; by: TerminalParty } | null
+  /** The name, the group and the tags the person gave it: null and an empty list for none, absent from an older holder. */
+  name?: string | null
+  group?: string | null
+  tags?: string[]
 }
+
+/** The most terminals one reading of several carries (GET /api/terminals/stream). */
+export const THE_MOST_TERMINALS_IN_ONE_READING = 16
 
 /**
  * WHERE THE TERMINAL HOLDER STANDS, in one of four states.

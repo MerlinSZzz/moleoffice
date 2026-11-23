@@ -14,7 +14,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { FastifyInstance } from 'fastify'
 
-import { apiApp, freshDb, type TestDb } from './helpers.ts'
+import { apiApp, freshDb, type TestDb, governsTheWholeProject } from './helpers.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 
 /** The cut on a reply: past this many characters an agent's tool shows nothing. */
@@ -101,7 +101,8 @@ beforeAll(async () => {
     made.push({ id, context: data.context, summary: summary === null ? null : data.summary!, blocks })
   }
   for (const [n, bytes] of LIVE_DECISION_BYTES.entries()) {
-    await post({ kind: 'decision', title: madeUp(90, n), data: { option_taken: madeUp(Math.max(50, bytes - 300), n), replaces: [] } })
+    await post({ kind: 'decision', title: madeUp(90, n), data: { option_taken: madeUp(Math.max(50, bytes - 300), n),
+      ...governsTheWholeProject(), replaces: [] } })
   }
 }, 120_000)
 

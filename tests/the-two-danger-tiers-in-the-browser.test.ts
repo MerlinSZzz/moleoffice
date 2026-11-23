@@ -91,11 +91,12 @@ it('revokes at once, counts down, and brings the key back when Undo is pressed',
     const keyId = confirmed.deviceKey.id as string
     const read = async () => (await (await fetch(`${live.api}/api/office/embassy`, { headers: owner })).json()) as WhatTheEmbassySays
     const key = async () => (await read()).rows.find((row) => row.name === 'Scribe')?.heldKeys[0]?.id ?? null
-    // A DEVICE'S KEY IS REVOKED ON ITS OWN PAGE, the credential page its Embassy row opens, question 15 of
-    // report n9Mjk3c_sJRu. The Embassy row no longer carries the press.
-    await live.page.goto(`${live.site}/#/visitor/${asked.credential.id as string}`)
+    // A DEVICE'S KEY IS REVOKED ON ITS ROW ON THE PERSON'S CARD. A device is one of the person's browsers,
+    // and since design C of early idea B9 its row and the press are there. Its old address forwards there.
+    const { hisBrowserPath } = await import('../src/web/components/router.tsx')
+    await live.page.goto(`${live.site}/#${hisBrowserPath(asked.credential.id as string)}`)
     await waitForThePage(live.page)
-    const row = live.page.locator('.cred-presses')
+    const row = live.page.locator(`[data-browser="${asked.credential.id as string}"]`)
     await row.getByRole('button', { name: 'Revoke its own key', exact: true }).waitFor()
     await live.page.clock.install()
     await live.page.clock.pauseAt(new Date())

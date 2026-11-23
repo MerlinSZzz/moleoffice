@@ -3,8 +3,9 @@
 import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs'
 import { basename, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { bytes, codeChapters, deliveredRoundBrief, hash, hasRoundChaptersAcknowledgement, readableChaptersLine, readRoundChapters, REQUIREMENTS_FILE, roundChaptersAcknowledgement, roundChaptersGivenText, ROUND_CHAPTERS, RULE_FILES, type RoundBacklog, type RoundChapters, type RoundDelegations, type RuleFile, type Section, type StandingStages } from './manifest.ts'
-import { NEXT_FILE, nextWhole, THE_FALLBACK_RULE, THE_RULES_PART, withTheRoundStartPack } from '../round-start-pack.ts'
+import { bytes, codeChapters, deliveredRoundBrief, hash, hasRoundChaptersAcknowledgement, readableChaptersLine, readRoundChapters, REQUIREMENTS_FILE, roundChaptersAcknowledgement, ROUND_CHAPTERS, RULE_FILES, theChaptersReadAt, type RoundBacklog, type RoundChapters, type RoundDelegations, type RuleFile, type Section, type StandingStages } from './manifest.ts'
+import { THE_FALLBACK_RULE, withTheRoundStartPack } from '../round-start-pack.ts'
+import type { TheRoundsRules } from '../round-start-rules.ts'
 
 type Selector = { chapter: number; descendants: true } | { path: string[]; descendants?: boolean }
 type Selection = '*' | Selector[]
@@ -86,7 +87,10 @@ function ownTerritory(text: string, sandbox: string): Section[] | null {
   return index < text.indexOf(heading.text) ? [paragraph, ...own] : [...own, paragraph]
 }
 
-/** The rules file a round reads its chapters from, in the round's worktree. */
+/**
+ * The rules file a worktree must hold for a round to work in it. prepareRoundChapters reads the chapters from it, in
+ * the round's worktree, only when it is given no `rules`; the launcher always gives them, read from the office.
+ */
 export const A_ROUNDS_RULES = 'src/config/rules/CODE.md'
 
 /** Resolve only inside this sandbox (including symlinks); never search a sibling sandbox or the checkout. */
@@ -246,8 +250,12 @@ export function theSameWorkArea(one: readonly string[], other: readonly string[]
   return one.length === other.length && one.every(path => other.includes(path))
 }
 
-/** The single round-start addition. All runtimes consume the returned derived brief. */
-export function prepareRoundChapters(input: { sandboxDir: string; worktree: string; brief: string; territory?: unknown; backlog?: RoundBacklog | null; standing?: StandingStages | null; delegations?: RoundDelegations | null }): { manifest: RoundChapters; brief: string; workArea: string[] | null } {
+/**
+ * The single round-start addition. All runtimes consume the returned derived brief. With `rules`, CODE.md is the text
+ * the start made from the office's chapters, under the door and the time it read them at, and the person's live
+ * regulations are saved and given; without, CODE.md is read from the worktree.
+ */
+export function prepareRoundChapters(input: { sandboxDir: string; worktree: string; brief: string; territory?: unknown; backlog?: RoundBacklog | null; standing?: StandingStages | null; delegations?: RoundDelegations | null; rules?: TheRoundsRules | null }): { manifest: RoundChapters; brief: string; workArea: string[] | null } {
   const root = realpathSync(input.sandboxDir)
   const original = resolve(input.brief)
   let task: string
@@ -282,8 +290,9 @@ export function prepareRoundChapters(input: { sandboxDir: string; worktree: stri
       mapping[name] = base === '*' || added === '*' ? '*' : [...base, ...added]
     }
   }
+  const rules = input.rules ?? null
   const paths: Record<RuleFile, string> = {
-    'CODE.md': inside(root, join(input.worktree, A_ROUNDS_RULES)),
+    'CODE.md': rules === null ? inside(root, join(input.worktree, A_ROUNDS_RULES)) : theChaptersReadAt(rules.regulations.at),
     'LINE-common.md': inside(root, join(root, 'briefs/LINE-common.md')),
     'TERRITORIES.md': inside(root, join(root, 'briefs/TERRITORIES.md')),
   }
@@ -309,7 +318,7 @@ export function prepareRoundChapters(input: { sandboxDir: string; worktree: stri
   if (unclassified && own) fallback = false
   const savedKind = unclassified && own && kind === null ? 'unclassified' : kind
   const sources = RULE_FILES.map(name => {
-    const text = readFileSync(paths[name], 'utf8')
+    const text = rules !== null && name === 'CODE.md' ? rules.code : readFileSync(paths[name], 'utf8')
     const sections = name === 'TERRITORIES.md' && own ? own : selectSections(name, markdownSections(text), mapping?.[name] ?? '*')
     const selected = sections.map(s => s.text).join('')
     return { name, path: paths[name], sha256: hash(text), sourceBytes: bytes(text), fullFile: !(name === 'TERRITORIES.md' && own) && (mapping === null || mapping[name] === '*'), sections, text: selected, bytes: bytes(selected) }
@@ -321,19 +330,11 @@ export function prepareRoundChapters(input: { sandboxDir: string; worktree: stri
     ...(backlog === null ? {} : { backlog }),
     ...(input.standing == null ? {} : { standing: input.standing }),
     ...(delegations === null ? {} : { delegations }),
+    ...(rules === null ? {} : { regulations: rules.regulations }),
   })
-  // The existing pack adds NEXT and the one-read-away paths. The round is given CODE.md at outline, with the full
-  // chapters one read away; its check is given the saved selection. Replace the pack's rules part with that text, so
-  // the round sees what its start gives and the check keeps the saved selection.
-  const packed = withTheRoundStartPack(chosen, root)
-  let manifest = packed
-  if (packed.pack) {
-    const start = packed.pack.text.indexOf(THE_RULES_PART)
-    const next = packed.pack.text.indexOf('\n\n' + nextWhole(join(root, NEXT_FILE)), start)
-    if (start < 0) fail('the round-start pack has no recognizable rules section')
-    const text = packed.pack.text.slice(0, start) + roundChaptersGivenText(chosen) + (next < 0 ? '' : packed.pack.text.slice(next))
-    manifest = readRoundChapters({ ...packed, pack: { ...packed.pack, text, bytes: bytes(text) } })
-  }
+  // The pack gives CODE.md at outline, with the full chapters one read away, and the line's part of TERRITORIES.md; its
+  // check is given the saved selection.
+  const manifest = withTheRoundStartPack(chosen, root)
   const folder = theDeliveryFolder(root)
   const stamp = hash(JSON.stringify(manifest))
   const brief = join(folder, `${stamp}.md`)

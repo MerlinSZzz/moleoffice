@@ -14,7 +14,7 @@ import { aPartTable } from '../part-tables.ts'
  * back. `because` always reads the same sentence, because there is only one thing to say.
  *
  * NO `workspace_id`. A row belongs to the project its annotation belongs to, one row along, and
- * `SCOPED_THROUGH` in schema.ts is where that is declared. Without that entry these
+ * `SCOPED_THROUGH` in authored-table-of.ts is where that is declared. Without that entry these
  * rows would be read as belonging to no project at all, beside the planning layer, which they are
  * not.
  */

@@ -40,7 +40,8 @@ import { createElement as h } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { beforeAll, describe, expect, it } from 'vitest'
 import type { DelegationRow } from '../src/shared/delegation.ts'
-import { sayInEnglish } from '../src/shared/i18n.ts'
+import { createI18n, sayInEnglish, type WordKey } from '../src/shared/i18n.ts'
+import type { PanelRecord } from '../src/shared/types.ts'
 import { actorTypeWord } from '../src/shared/words.ts'
 import type { AsyncState } from '../src/web/components/ui.tsx'
 import type { ParticipantsNamed } from '../src/web/lib/participant-lookup.ts'
@@ -50,9 +51,11 @@ import type { DelegationReply } from '../src/web/api.ts'
 
 type TasksToTakePageModule = typeof import('../src/web/pages/TasksToTakePage.tsx')
 type TaskPackagePanelModule = typeof import('../src/web/components/TaskPackagePanel.tsx')
+type ModeModule = typeof import('../src/web/lib/mode.ts')
 
 let page: TasksToTakePageModule
 let panel: TaskPackagePanelModule
+let modes: ModeModule
 
 beforeAll(async () => {
   const store = new Map<string, string>()
@@ -70,7 +73,18 @@ beforeAll(async () => {
   }
   page = await import('../src/web/pages/TasksToTakePage.tsx')
   panel = await import('../src/web/components/TaskPackagePanel.tsx')
+  modes = await import('../src/web/lib/mode.ts')
 })
+
+/** Render in developer mode, where the server's own sentences are drawn, and go back to normal after. */
+const inDeveloperMode = (draw: () => string): string => {
+  modes.setMode('inspect')
+  try {
+    return draw()
+  } finally {
+    modes.setMode('normal')
+  }
+}
 
 /** The markup a person reads, with the hoisted stylesheet stripped. */
 const strip = (html: string): string => html.replace(/<style[^>]*>[\s\S]*?<\/style>/g, '')
@@ -139,7 +153,7 @@ describe('the first line of Tasks to take states its own numbers, or says there 
         h(page.TheTasksToTake, { reply: reply({ tasks: [packagedTask({ recordId: 'r1', title: 'A task' })] }) }),
       ),
     )
-    expect(html).toContain('1 task packaged in this project, newest first.')
+    expect(html).toContain(sayInEnglish('tasksToTake.count', { n: 1 }))
   })
 
   it('states more than one task in the plural', () => {
@@ -155,7 +169,7 @@ describe('the first line of Tasks to take states its own numbers, or says there 
         }),
       ),
     )
-    expect(html).toContain('2 tasks packaged in this project, newest first.')
+    expect(html).toContain(sayInEnglish('tasksToTake.count', { n: 2 }))
   })
 })
 
@@ -198,7 +212,7 @@ describe('a row draws heldBy and outsideName as two different facts', () => {
     expect(html).toContain('ChatGPT (my own account)')
   })
 
-  it('draws the server’s own row sentence once, and writes no second one', () => {
+  it('draws no module named once in place of the server’s own row sentence', () => {
     const html = strip(
       renderToStaticMarkup(
         h(page.TheTasksToTake, {
@@ -208,18 +222,19 @@ describe('a row draws heldBy and outsideName as two different facts', () => {
         }),
       ),
     )
-    expect(html.match(/Taken by an agent, and it suits desk work\./g)?.length).toBe(1)
+    expect(html.split(sayInEnglish('tasksToTake.noModule')).length - 1).toBe(1)
+    expect(html).not.toContain('Taken by an agent, and it suits desk work.')
   })
 
-  it('draws no sentence for a row the server gives none', () => {
-    // A package that names a module has no sentence: its tag and facts say the rest. The second row
-    // has one, so the count shows the page still draws a sentence where there is one.
+  it('draws no module named only on the row that names no module', () => {
+    // A package that names a module has no state word: its tag and facts say the rest. The second row
+    // names none, so the count shows the page still draws the word where it belongs.
     const html = strip(
       renderToStaticMarkup(
         h(page.TheTasksToTake, {
           reply: reply({
             tasks: [
-              packagedTask({ recordId: 'r1', title: 'A task in a named module', says: null }),
+              packagedTask({ recordId: 'r1', title: 'A task in a named module', says: null, namedModuleCount: 1 }),
               packagedTask({ recordId: 'r2', title: 'A task in no module' }),
             ],
           }),
@@ -243,7 +258,8 @@ describe('a row draws heldBy and outsideName as two different facts', () => {
     )
     expect(html).toContain('Packages we could not read')
     expect(html).toContain('A broken package')
-    expect(html).toContain('its package field is not an object')
+    expect(html).toContain(sayInEnglish('planning.notReadable'))
+    expect(html).not.toContain('its package field is not an object')
   })
 })
 
@@ -292,17 +308,59 @@ describe('a task with no package draws nothing at all', () => {
   })
 })
 
+/**
+ * WHERE A PACKAGE'S CRITERIA WERE COPIED FROM IS DRAWN ON ROWS OF ITS OWN. The panel said it in one sentence,
+ * "copied from {file}, criterion {criterion}, commit {commit}", and the file sat in the sentence. The sentence goes:
+ * the file, the criterion and the commit are each a labelled row in the office's code style.
+ */
+describe('where the acceptance criteria were copied from is drawn on rows of its own', () => {
+  const en = (key: string): string => createI18n('en').t(key as WordKey)
+  const A_SOURCE = { file: 'design/flows/ACCEPTANCE.md', criterion: 'F16', commit: '2d7f256e' }
+
+  function aPackagedTask(): PanelRecord {
+    return {
+      id: 'r1', workspaceId: 'panelx', kind: 'task', title: 'A task', summary: null,
+      data: {
+        package: {
+          bundleId: 'b1', forTheOutside: 'Build the module on its own.', suits: 'own_module',
+          acceptance: 'The module runs on its own.', acceptanceSource: A_SOURCE,
+          at: '2026-09-14 18:55:00', by: { actorType: 'agent', actorId: 'f16-package' },
+        },
+      },
+      origin: 'authored' as const, createdAt: '2026-09-14 18:55:00', updatedAt: '2026-09-14 18:55:00', deletedAt: null, ownerId: null,
+    } as unknown as PanelRecord
+  }
+
+  /** The acceptance block alone, from its start to the end of its element. */
+  function theAcceptance(html: string): string {
+    const at = html.indexOf('class="tpp-acceptance"')
+    expect(at, 'the acceptance block was not drawn').toBeGreaterThan(-1)
+    return html.slice(html.lastIndexOf('<', at), html.indexOf('</div>', at) + '</div>'.length)
+  }
+
+  it('draws the file, the criterion and the commit as rows, and no sentence holds the file', () => {
+    const block = theAcceptance(strip(renderToStaticMarkup(h(panel.TaskPackagePanel, { record: aPackagedTask() }))))
+    const rows = [...block.matchAll(/<dt>([^<]*)<\/dt><dd><(\w+)[^>]*>([^<]*)<\/\2>/g)].map((m) => ({ label: m[1], tag: m[2], value: m[3] }))
+    expect(rows).toEqual([
+      { label: en('tpp.row.copiedFrom'), tag: 'code', value: A_SOURCE.file },
+      { label: en('tpp.row.criterion'), tag: 'code', value: A_SOURCE.criterion },
+      { label: en('tpp.row.commit'), tag: 'code', value: A_SOURCE.commit },
+    ])
+    for (const said of block.matchAll(/<p[^>]*>([\s\S]*?)<\/p>/g)) expect(said[1], 'a sentence holds the file').not.toContain(A_SOURCE.file)
+  })
+})
+
 // ---------------------------------------------------------------------------- 4. no code named
 
-describe('a package whose task names no code says so in a plain sentence', () => {
+describe('a package whose task names no code draws none beside code stated', () => {
   const row = (over: Partial<DelegationRow> = {}) => packagedTask({ recordId: 'r1', title: 'A task', ...over })
+  const noCode = `<p class="tpp-code"><span class="tpp-key">${sayInEnglish('tpp.codeStated')}</span>${sayInEnglish('absence.none')}</p>`
 
-  it('draws the plain sentence when statedCodeCount is zero, and draws no code-count fact beside it', () => {
+  it('draws none beside code stated when statedCodeCount is zero', () => {
     const html = strip(
       renderToStaticMarkup(h(panel.TaskPackageComputed, { reply: reply({ tasks: [row()] }), recordId: 'r1' })),
     )
-    expect(html).toContain('This package names no code.')
-    expect(html, 'a zero-code fact was drawn beside the plain sentence').not.toContain('code stated')
+    expect(html).toContain(noCode)
   })
 
   it('draws the count instead, once code is stated', () => {
@@ -311,7 +369,7 @@ describe('a package whose task names no code says so in a plain sentence', () =>
         h(panel.TaskPackageComputed, { reply: reply({ tasks: [row({ statedCodeCount: 3 })] }), recordId: 'r1' }),
       ),
     )
-    expect(html).not.toContain('This package names no code.')
+    expect(html).not.toContain(noCode)
     expect(html).toContain('3 relationships')
   })
 
@@ -331,18 +389,21 @@ describe('a package whose task names no code says so in a plain sentence', () =>
     expect(many).toContain('4 times')
   })
 
-  it('draws who is responsible and the sentence saying how that was worked out', () => {
-    const html = strip(
-      renderToStaticMarkup(
-        h(panel.TaskPackageComputed, {
-          reply: reply({ tasks: [row({ responsible: { kind: 'agent', id: 'made-up-secretary-id' }, responsibleWhy: 'the secretary created it' })] }),
-          recordId: 'r1',
-          names: registries,
-        }),
-      ),
-    )
+  it('draws who is responsible, and how that was worked out only in developer mode', () => {
+    const drawn = () =>
+      strip(
+        renderToStaticMarkup(
+          h(panel.TaskPackageComputed, {
+            reply: reply({ tasks: [row({ responsible: { kind: 'agent', id: 'made-up-secretary-id' }, responsibleWhy: 'the secretary created it' })] }),
+            recordId: 'r1',
+            names: registries,
+          }),
+        ),
+      )
+    const html = drawn()
     expect(html).toContain(`${actorTypeWord('agent').text} A made-up secretary`)
-    expect(html).toContain('the secretary created it')
+    expect(html).not.toContain('the secretary created it')
+    expect(inDeveloperMode(drawn)).toContain('the secretary created it')
   })
 
   it('draws an ordinary absence, not a guess, when the change log cannot say who is responsible', () => {
@@ -355,21 +416,25 @@ describe('a package whose task names no code says so in a plain sentence', () =>
     expect(html).toContain('px-absent')
   })
 
-  it('reads the reason from couldNotRead when the row itself is missing', () => {
-    const html = strip(
-      renderToStaticMarkup(
-        h(panel.TaskPackageComputed, {
-          reply: reply({ couldNotRead: [{ recordId: 'r1', title: 'A task', because: 'its package field could not be read' }] }),
-          recordId: 'r1',
-        }),
-      ),
-    )
-    expect(html).toContain('its package field could not be read')
+  it('draws not readable when the row itself is missing, and the reason from couldNotRead only in developer mode', () => {
+    const drawn = () =>
+      strip(
+        renderToStaticMarkup(
+          h(panel.TaskPackageComputed, {
+            reply: reply({ couldNotRead: [{ recordId: 'r1', title: 'A task', because: 'its package field could not be read' }] }),
+            recordId: 'r1',
+          }),
+        ),
+      )
+    const html = drawn()
+    expect(html).toContain(sayInEnglish('planning.notReadable'))
+    expect(html).not.toContain('its package field could not be read')
+    expect(inDeveloperMode(drawn)).toContain('its package field could not be read')
   })
 
-  it('says plainly that the column has no row for this task, when neither list names it', () => {
+  it('draws not listed when neither list names the task', () => {
     const html = strip(renderToStaticMarkup(h(panel.TaskPackageComputed, { reply: reply(), recordId: 'r1' })))
-    expect(html).toContain(sayInEnglish('tpp.noRowForTask'))
+    expect(html).toContain(sayInEnglish('tpp.notListed'))
   })
 })
 

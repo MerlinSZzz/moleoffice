@@ -8,7 +8,7 @@
  *   - tests/the-lanes-drawing-draws-every-link-of-a-reel-page-and-a-master-of-54-boxes.test.ts opens each drawing once
  *     and reads what it draws. The suite runs it.
  *   - tests/the-lanes-drawing-is-first-drawn-within-3-seconds.test.ts opens each drawing five times and times it.
- *   - tests/the-lanes-legend-covers-nothing-on-the-reel-or-the-54-box-master.test.ts opens each drawing at three widths
+ *   - tests/the-lanes-legend-covers-nothing-on-the-reel-or-the-54-box-master.test.ts opens each drawing at two widths
  *     and reads its legend.
  * Each file calls liveApp itself, so tests/the-test-lists.ts counts it as a browser file.
  *
@@ -16,14 +16,18 @@
  * PRODUCTION" in tests/helpers.ts says how).
  *
  * HOW AN OPEN IS TIMED. Each open is a new browser context and page on the shared browser, at 1440 by 1000, light,
- * so the page keeps nothing from the open before. The clock starts just before the page is asked for. It stops when
- * the drawing writes data-fit, which is its last write, after its plan is chosen and its lines are drawn. A script the
- * page runs before its own notes each drawing that begins (data-drawing="lanes" written), each plan chosen
- * (data-not-drawn written) and each data-fit, with its time. After the drawing the page keeps has written data-fit,
- * the open waits 3 s, and waits again for as long as another drawing began in that time. The clock stops at the last
- * data-fit of the drawing the page keeps. While a drawing's lines are worked out, the drawing before it stays on the
- * page with its own data-fit, and the page's root says so with data-being-drawn, so an open counts only once no
- * element has data-being-drawn.
+ * so the page keeps nothing from the open before. The first clock starts just before the page is asked for; the
+ * second starts when the loading screen ends. Both stop when the drawing writes data-fit, which is its last write,
+ * after its plan is chosen and its lines are drawn. A script the page runs before its own notes each drawing that
+ * begins (data-drawing="lanes" written), each plan chosen (data-not-drawn written) and each data-fit, with its time.
+ * It also notes the first change after which the loading screen, the element with class boot-loading, having been in
+ * the document, is no longer in it: React replaces the contents of #root when the app renders, which removes it.
+ * Earlier moments do not count: before the parser reaches it, it is not there yet; until the inline script sets
+ * data-boot it is hidden; and the slow and failed notices hide it while the app has not rendered. After the drawing
+ * the page keeps has written data-fit, the open waits 3 s, and waits again for as long as another drawing
+ * began in that time. Both clocks stop at the last data-fit of the drawing the page keeps. While a drawing's lines are
+ * worked out, the drawing before it stays on the page with its own data-fit, and the page's root says so with
+ * data-being-drawn, so an open counts only once no element has data-being-drawn.
  *
  * WHAT AN OPEN READS, once the page has kept its drawing: the links named in data-not-drawn; the file's links that are
  * neither drawn at rest, with a line and a name in data-drawn-links, nor named for a selection in data-on-selection;
@@ -74,6 +78,8 @@ export async function setTheMasterAndStoreTheAreas(app: LiveApp, db: TestDb, pro
 /** What the script the page runs before its own notes, in the order it happened. */
 interface TheNotes {
   events: { kind: 'began' | 'planned' | 'fit'; drawing: number; at: number }[]
+  /** When the loading screen was first gone or no longer shown, or null until then. */
+  bootEndedAt: number | null
   /** The number of the drawing the page holds now, or null when it holds none. */
   kept(): number | null
 }
@@ -90,21 +96,34 @@ function noteTheDrawings(project: string): void {
   }
   const notes: TheNotes = {
     events: [],
+    bootEndedAt: null,
     kept: () => {
       const kept = document.querySelector('[data-drawing="lanes"]')
       return kept === null ? null : numberOf(kept)
     },
   }
   ;(window as unknown as { lanesNotes: TheNotes }).lanesNotes = notes
+  let theLoadingScreenWasThere = false
+  const theLoadingScreenHasEnded = (): boolean => {
+    const loading = document.querySelector('.boot-loading')
+    if (loading !== null) {
+      theLoadingScreenWasThere = true
+      return false
+    }
+    return theLoadingScreenWasThere
+  }
   const kinds: Record<string, TheNotes['events'][number]['kind']> = { 'data-drawing': 'began', 'data-not-drawn': 'planned', 'data-fit': 'fit' }
   new MutationObserver((changes) => {
     const at = Date.now()
+    if (notes.bootEndedAt === null && theLoadingScreenHasEnded()) notes.bootEndedAt = at
     for (const change of changes) {
+      const kind = kinds[change.attributeName!]
+      if (kind === undefined) continue
       const element = change.target as Element
       if (element.getAttribute('data-drawing') !== 'lanes') continue
-      notes.events.push({ kind: kinds[change.attributeName!]!, drawing: numberOf(element), at })
+      notes.events.push({ kind, drawing: numberOf(element), at })
     }
-  }).observe(document, { subtree: true, attributes: true, attributeFilter: Object.keys(kinds) })
+  }).observe(document, { subtree: true, attributes: true, childList: true, attributeFilter: [...Object.keys(kinds), 'data-boot'] })
 }
 
 // ======================================================================================================== an open
@@ -112,6 +131,8 @@ function noteTheDrawings(project: string): void {
 export interface AnOpen {
   /** From asking for the page to the last data-fit of the drawing the page keeps. */
   ms: number
+  /** From the end of the loading screen to the same last data-fit: the page's own time. */
+  ownMs: number
   /** The one-minute load just before the page was asked for. */
   load: number
   began: number
@@ -144,7 +165,7 @@ export async function openOnce(app: LiveApp, project: string, one: Stored, drawi
         const last = its.at(-1)
         const began = notes.events.filter((event) => event.kind === 'began').length
         const planned = notes.events.filter((event) => event.kind === 'planned').length
-        return { fittedAt: last?.kind === 'fit' ? last.at : null, began, planned }
+        return { fittedAt: last?.kind === 'fit' ? last.at : null, bootEndedAt: notes.bootEndedAt, began, planned }
       })
     const itIsDrawn = () =>
       page.waitForFunction(
@@ -181,8 +202,12 @@ export async function openOnce(app: LiveApp, project: string, one: Stored, drawi
     const keyOf = new Map(Object.entries(one.id).map(([key, id]) => [id, key]))
     const drawnCards = new Set(read.cards.map((card) => card.id))
     const oldCards = new Set(one.cards)
+    if (seen.bootEndedAt === null) {
+      throw new Error(`open ${String(n)} of the ${drawing}: the end of the loading screen was not noted, so the page's own time is not known`)
+    }
     return {
       ms: seen.fittedAt! - asked,
+      ownMs: seen.fittedAt! - seen.bootEndedAt,
       load,
       began: seen.began,
       planned: seen.planned,

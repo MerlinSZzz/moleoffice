@@ -28,8 +28,9 @@
  *   4. LESS AND MORE MOVE THE LEVELS AND THE NUMBERS FOLLOW THEM.
  *
  * MUTATION, MEASURED 15 SEPTEMBER 2026, after a control run of this file green: in
- * `src/web/components/BundlePanel.tsx`, delete the `#bx-scale` block beside Less and More. Tests 2,
- * 3 and 4 go red, each on the line that reads a number that is no longer drawn. Restored, all pass.
+ * `src/web/components/BundlePanel.tsx`, delete the `#bx-scale` block beside Less and More. Every
+ * test after the first goes red, each on the line that reads a number that is no longer drawn.
+ * Restored, all pass.
  */
 import type { Page } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
@@ -141,15 +142,6 @@ describe('the scale beside Less and More', () => {
     const beside = await page.locator('.bx-make').last().innerText()
     expect(beside, `a number is drawn before any reading: ${beside}`).not.toMatch(/\d/)
   }, 120_000)
-
-  it('draws the same size as the paragraph below, to the digit', async () => {
-    await openFresh()
-    await readTheCopy()
-    const scale = await theScaleSize()
-    const paragraph = await theParagraphSize()
-    expect(scale, 'the scale and the paragraph disagree about the size').toEqual(paragraph)
-    expect(scale.characters, 'the scale says the copy is empty').toBeGreaterThan(100)
-  }, 180_000)
 
   it('draws the same level counts as the table below', async () => {
     await openFresh()

@@ -1,0 +1,8 @@
+{
+  "why": "One index of the calls with an address, partial to them and keyed by actor type, actor id, address and time, so the list of the machines a person or an agent was seen from searches that participant's calls instead of reading every call, and no table, column, trigger or row changes.",
+  "indexesAddedAfterTheRebuild": {
+    "api_calls": [
+      "api_calls_actor_address_idx"
+    ]
+  }
+}

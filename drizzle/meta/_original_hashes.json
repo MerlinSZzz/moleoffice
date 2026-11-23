@@ -1,0 +1,70 @@
+{
+ "what": "The migration files the public version changed. An office counts each as applied when it holds either hash: the one the file had before the change, or the one it ships with.",
+ "migrations": [
+  {
+   "tag": "0000_uneven_molly_hayes",
+   "original": "999c7e6d1a2ee01581482836088af2b846b458ba4f869fb071fda72ba5968ab7",
+   "shipped": "7d1264974ae7c7591b95ccf1733539cc368dc2348553e96c4c7aaf7ccb9097a8"
+  },
+  {
+   "tag": "0004_drop_the_utc_stamp_defaults",
+   "original": "5d557049309724ecae208d5665b90a50e18a679f7de149b3dec13129077bc9bc",
+   "shipped": "aa7d6d03fc42bf50f25371069d73f61a39aad2b4926547cc4ceebb9a35018fcd"
+  },
+  {
+   "tag": "0165_held_keys_and_header_only_calls",
+   "original": "ebd8f0a65fedd7c5b825a7b72b7f0940aebe5e25a5ac74bfec749a54eba8ca06",
+   "shipped": "ab163a974862f36f6c3de6af62287fc6d8b7681d4352f4a20c113b7f5516b258"
+  },
+  {
+   "tag": "0200_not_now_puts_a_lead_offer_off",
+   "original": "d09313b08188dfad7bf899a6e9fd04dcb65c210e51a4d00b21253066b4476cee",
+   "shipped": "047458a4d350404214c4d07793b4e47951198628da14cd4f986b0f5c00c6ba2d"
+  },
+  {
+   "tag": "0212_a_flows_runs_are_found_by_their_flow",
+   "original": "2dd767b4ac7b2a5f991f4b60212aeed58db5ff5b8cd3422443932d9d5b9838e1",
+   "shipped": "b02bf5c823cbbff7a7f9cedd10d80714073470f652acb6c8041bb42556fca09e"
+  },
+  {
+   "tag": "0213_whether_the_related_tests_run_first",
+   "original": "82b63b7f90bcf4f6591b3dcd79e92dcf1c1303d5579b34e8c6174a50d64cdb82",
+   "shipped": "2f603bfcb8273497ca9b79f81d408b6831ff691278d88c6b85584309898fd586"
+  },
+  {
+   "tag": "0230_the_ranges_of_the_offices_own_load",
+   "original": "9c7e1cfdfe7f8fcf165a34dfb506a27f70d0df52141741a5b209487419133e62",
+   "shipped": "4cebb795e9f7e7e4e9e795f87e53973bbd38d2d5d02eae953d53cbbc005b2b55"
+  },
+  {
+   "tag": "0232_a_handover_for_every_agent",
+   "original": "b929ed8d29e2f7ff44580be666d170df1220b6d516a0d795a0f95b35e069698d",
+   "shipped": "3a2f906fdb431fe4fa6d8f93e841d76c2ff2117561f268ce8c83b6cb91408b82"
+  },
+  {
+   "tag": "0233_a_resident_sleeps_and_is_named",
+   "original": "9f8b474f1b56d8ecee42467d2ee5c7c11faa8d4082d040f71e4b6f01dd680e51",
+   "shipped": "9e245e2aa238ec9adb9c88d60dc9169049b9b453af4cf65d2ab1f8a17ab19c44"
+  },
+  {
+   "tag": "0234_which_plugins_are_switched_on",
+   "original": "945aed95b4ade10ae11969c6fa55f05fed373652aa08db1f71b1dc7bf595b0c0",
+   "shipped": "6478c13f60b121bf4fa165dc8fe5fe1e9178760dfeb80346fb87f92d5c1348b6"
+  },
+  {
+   "tag": "0252_a_readiness_checklist_and_its_signatures",
+   "original": "24f8263845068f696a4fe47d3b2cbb07be29498da519d7cd3493496cbe15742a",
+   "shipped": "c1a0fa9cf371cfe854937b681f77a487810488e06c931ab559ad904ac299ce85"
+  },
+  {
+   "tag": "0253_a_sent_reviews_waiting_runs_are_withdrawn",
+   "original": "d47f9eb56f0f9bac4364b9a253a71294f232244666e4c81522a1114b25f98463",
+   "shipped": "e6f44f5bd747d0c8068126f1531d1d9a7ee60de18549432140a48b11c8aae27a"
+  },
+  {
+   "tag": "0270_a_signing_package_and_its_items",
+   "original": "74efde25b07e04c114bbab2b594b27be57f691bde1ad28ea43374a36668e0215",
+   "shipped": "274b679dee6c83cd762b59d1263bb39288a0b73674d1c42ca4b99ae6ecec7600"
+  }
+ ]
+}

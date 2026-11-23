@@ -19,9 +19,9 @@
  *      MUTATION: in src/web/components/MessagePictures.tsx, `whereAFileOpens` returns the plain address, without
  *      `&open=1`. Red at both widths: Open asks without open=1, so no answer to an open comes and the wait for it times
  *      out.
- *   4. Pictures of the chat in the light and dark looks at 1440, 990, 660 and 390, each fitting its width: the whole
- *      chat, and then each of the four files moved into the middle of the chat and in view, one picture each. A dark
- *      picture equal to its light one is refused. They are kept in the folder W13Y_ATTACHMENT_SHOTS names, when it is set.
+ *   4. Pictures of the chat in the light look at 1440 and 390, each fitting its width: the whole
+ *      chat, and then each of the four files moved into the middle of the chat and in view, one picture each.
+ *      They are kept in the folder W13Y_ATTACHMENT_SHOTS names, when it is set.
  *
  * MADE-UP DATA ONLY. The picture, the large picture and the film are drawn and recorded in this test's own browser,
  * and every file is written into a temporary folder of this test in the checkout's .logs/. The one preview root is a
@@ -45,7 +45,7 @@ import { type LiveApp, liveApp, waitForThePage } from './helpers.ts'
 import { openTheChat } from './open-the-chat.ts'
 
 const CHECKOUT = fileURLToPath(new URL('..', import.meta.url)).replace(/\/$/, '')
-const WIDTHS = [1440, 990, 660, 390] as const
+const WIDTHS = [1440, 390] as const
 /** The four files of the message, in its order, as each one's own picture is named. */
 const PARTS = ['picture', 'film', 'large-picture', 'large-file'] as const
 const AGENT = 'attachment-sender'
@@ -320,14 +320,12 @@ describe('an attachment in the chat opens and saves', () => {
     }, 240_000)
   }
 
-  it('is photographed at 1440, 990, 660 and 390 in both looks, each fitting its width', async () => {
+  it('is photographed at 1440 and 390 in the light look, each fitting its width', async () => {
     const output = process.env.W13Y_ATTACHMENT_SHOTS
     if (output !== undefined && output !== '') mkdirSync(output, { recursive: true })
     try {
       for (const width of WIDTHS) {
-        let light: Buffer | null = null
-        const lightParts: Buffer[] = []
-        for (const theme of ['light', 'dark'] as const) {
+        for (const theme of ['light'] as const) {
           await page.setViewportSize({ width, height: 1000 })
           await page.goto(`${app.site}/#/`)
           await page.evaluate((look) => localStorage.setItem('mole-office.preset.theme', look), theme)
@@ -343,10 +341,7 @@ describe('an attachment in the chat opens and saves', () => {
               return box.left >= 0 && box.right <= innerWidth
             }))
           expect(fits, `${theme} at ${String(width)} fits its width`).toBe(true)
-          const shot = await page.screenshot({ ...(output === undefined || output === '' ? {} : { path: join(output, `chat-attachments-${String(width)}-${theme}.png`) }) })
-          if (theme === 'light') light = shot
-          // A DARK PICTURE THAT IS THE LIGHT ONE says the stored look was never applied.
-          else expect(light !== null && shot.equals(light), `the dark picture at ${String(width)} is the light one`).toBe(false)
+          await page.screenshot({ ...(output === undefined || output === '' ? {} : { path: join(output, `chat-attachments-${String(width)}-${theme}.png`) }) })
 
           // EACH FILE IN VIEW, one picture each: in the whole chat above, only the last of them is.
           for (const [index, part] of PARTS.entries()) {
@@ -360,10 +355,7 @@ describe('an attachment in the chat opens and saves', () => {
               return Math.min(box.bottom, view.bottom) - Math.max(box.top, view.top) >= Math.min(box.height, view.bottom - view.top) - 2
             })
             expect(shown, `${part} is in view, ${theme} at ${String(width)}`).toBe(true)
-            const one = await page.screenshot({ ...(output === undefined || output === '' ? {} : { path: join(output, `chat-attachments-${String(width)}-${theme}-${part}.png`) }) })
-            const itsLight = lightParts[index]
-            if (theme === 'light') lightParts[index] = one
-            else expect(itsLight !== undefined && one.equals(itsLight), `the dark picture of ${part} at ${String(width)} is the light one`).toBe(false)
+            await page.screenshot({ ...(output === undefined || output === '' ? {} : { path: join(output, `chat-attachments-${String(width)}-${theme}-${part}.png`) }) })
           }
         }
       }

@@ -64,7 +64,6 @@ export const enWave13j = {
   // ---- w13j round 51: the planning flow's first real use (report FRsTZ627KvQQ) ----
   'record.section.ended': 'Ended',
   'server.plannerNamedByAnother': 'Only the person, a secretary or the agent that made this module may name its planner. Nothing was changed.',
-  'g2b.field.elsewhere.planning': 'The office writes this when the planner says the plan step is done and when the plan is submitted.',
   // ---- w13j round 52: any flow an agent enters is on its checklist ----
   'server.flowNotAFlow': 'Only a flow record can be entered, and this record is not one. Nothing was changed.',
   'server.flowAboutNotHere': 'The record the flow would be about is not in this project. Nothing was changed.',
@@ -153,16 +152,11 @@ export const enWave13j = {
   get 'word.link.forward.coexists_with'(): string { return englishWord('word.link.forward.coexists_with') },
   get 'word.link.reverse.coexists_with'(): string { return englishWord('word.link.reverse.coexists_with') },
   // ---- w13j round loop-4: the workers a supervisor's run asked for, drawn in words on the run's pages ----
-  'w13j.workers.intro': 'The workers this run asked the office to start, oldest first.',
   'w13j.workers.seal': 'Seal',
   'w13j.workers.cost': 'Cost',
   'w13j.workers.modelGiven': '{model}, the model its launcher was given',
-  'w13j.workers.wanted': 'Asked for. Nothing has started yet.',
   'w13j.workers.starting': 'Its launcher is starting it.',
   'w13j.workers.failed': 'Nothing was started: {says}',
-  'w13j.workers.failedNoReason': 'Nothing was started, and no reason was kept.',
-  'w13j.workers.runNotHere': 'Started, but its run {id} is not a live run in this project.',
-  'w13j.workers.noRunNamed': 'Marked as started, but it names no run.',
   'w13j.workers.sealed': 'Sealed',
   'w13j.workers.notSealed': 'Not sealed',
   'w13j.workers.noReceipt': 'No receipt',
@@ -187,8 +181,6 @@ export const enWave13j = {
   // ---- w13j round loop-5, item 2: a worker's run names the supervisor's run that asked for it. {name} is the asker's
   // registered name; the run's title is drawn after the sentence as a link. ----
   'w13j.askedFor.title': 'Who asked for this run',
-  'w13j.askedFor.says': '{name} asked the office to start this run as one of its workers. It asked from this run of its own:',
-  'w13j.askedFor.saysNoName': 'An agent the registry does not hold asked the office to start this run as one of its workers. It asked from this run of its own:',
   // ---- w13j round loop-5, item 0 part a: a standing checklist item, such as the owner's experiment manual, has no done
   // box. ----
   'w13j.checklistStanding.name': 'Standing item',

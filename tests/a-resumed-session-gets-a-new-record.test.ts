@@ -33,6 +33,10 @@
  * with HOME set to a scratch folder. "Behind the claude program" is a shell script called `claude`
  * above the hook, the way tests/the-hook-writes-down-which-conversation-this-is.test.ts does it.
  *
+ * THE AGENT THE RUNS ANSWER AS HOLDS A KEY OF ITS OWN, from the door that registers it, and every run of the hook
+ * is given it. A session that names an agent and holds no key of it sends the name alone, and the office lets no
+ * name alone end a run, so the end these cases read would not close anything without the key.
+ *
  * ---------------------------------------------------------------------------------------
  * CONTROL, MUTATION, RESTORE
  * ---------------------------------------------------------------------------------------
@@ -59,6 +63,12 @@ const CHECKOUT = fileURLToPath(new URL('..', import.meta.url))
 const HOOK = join(CHECKOUT, 'tools', 'session-hook.mjs')
 const NOTES = join(CHECKOUT, '.logs')
 const TESTER = 'resume-tester'
+const AS_THE_PERSON = {
+  'content-type': 'application/json',
+  'x-mole-office-workspace': 'default',
+  'x-mole-office-actor-type': 'human',
+  'x-mole-office-actor-id': THE_PERSON,
+}
 
 let t: TestDb
 let server: Awaited<ReturnType<typeof apiApp>>
@@ -67,21 +77,25 @@ let scratch: string
 const notesWritten: string[] = []
 /** The session records that were already in the office when this case began. */
 let heldAtTheStart = new Set<string>()
+/** The key the office gave TESTER when it was registered. Every run of the hook is given it. */
+let testersKey = ''
 
 beforeAll(async () => {
   t = await freshDb()
   server = await apiApp()
   await server.app.listen({ port: 0, host: '127.0.0.1' })
   url = `http://127.0.0.1:${String((server.app.server.address() as AddressInfo).port)}`
-  // THE AGENT THESE RUNS ANSWER AS, filed once. The scratch folder is outside the checkout, and a run
-  // there that nothing names prints only that it does not know who it answers as.
-  t.api.createRecord({
-    workspaceId: 'default',
-    kind: 'agent',
-    title: TESTER,
-    data: { handle: TESTER, state: 'active', runtime: 'claude-code' },
-    actor: { type: 'human', id: THE_PERSON },
+  // THE AGENT THESE RUNS ANSWER AS, registered once, with a key of its own. The scratch folder is outside the
+  // checkout, and a run there that nothing names prints only that it does not know who it answers as.
+  const registered = await server.app.inject({
+    method: 'POST',
+    url: '/api/agents/started',
+    headers: AS_THE_PERSON,
+    payload: { handle: TESTER, name: TESTER, runtime: 'claude-code' },
   })
+  expect(registered.statusCode, registered.body).toBe(201)
+  testersKey = String((registered.json() as { whatToGiveIt?: { key?: string } }).whatToGiveIt?.key ?? '')
+  expect(testersKey, 'the registration gave TESTER no key').not.toBe('')
 }, 60_000)
 
 beforeEach(() => {
@@ -124,8 +138,10 @@ async function runHook(mode: 'start' | 'end', payload: Record<string, unknown>, 
     MOLE_OFFICE_DB: t.file,
     MOLE_HOOK_DETAILS_FOLDER: join(scratch, 'hook-details'),
     MOLE_OFFICE_AGENT: TESTER,
+    MOLE_AGENT_KEY: testersKey,
   }
   delete env['TMUX_PANE']
+  delete env['MOLE_AGENT_KEY_FILE']
   let program = 'node'
   if (behindClaude) {
     program = join(scratch, 'claude')

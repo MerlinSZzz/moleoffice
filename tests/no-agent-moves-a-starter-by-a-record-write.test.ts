@@ -21,6 +21,14 @@
  *   6. Inside a test world, its starter holds the person's authority there (criterion P84). It moves a starter through
  *      the door, as the person does, and its record write is refused. Another agent in the same world is refused at
  *      the door.
+ *   7. An agent that did not start another one is refused three record writes on it: its work area, who chose its
+ *      card, and making it active again after it was retired. The record and the row are unchanged, and the work-area
+ *      refusal names the work-area door.
+ *   8. An agent is refused a record write of its own work area too, and the refusal names the same door.
+ *   9. The starter of a retired worker makes it active again by a record write, as it could retire it. The keys the
+ *      retirement revoked stay revoked. Another worker is refused the same write.
+ *  10. A record write that changes an agent record's kind away from agent is refused, from the starter and from the
+ *      person.
  *
  * Every agent, project and name here is made up.
  */
@@ -41,6 +49,7 @@ const OFFICE_KEY = randomBytes(32).toString('hex')
 let t: TestDb
 let app: FastifyInstance
 let theStarterDoor = ''
+let theWorkAreaDoor = ''
 const keys: Record<string, string> = {}
 
 type Headers = Record<string, string>
@@ -91,6 +100,23 @@ async function start(handle: string, headers: Headers, role?: string): Promise<v
   if (made.body.whatToGiveIt?.key !== undefined) keys[handle] = String(made.body.whatToGiveIt.key)
 }
 
+/**
+ * An agent's record and what its registry row takes from a record, as they are stored, to show a refused write changed
+ * neither. The row's other columns are left out, because a request may mark when its sender was last seen.
+ */
+function theStoredAgent(handle: string, workspace = 'default'): unknown {
+  return {
+    record: t.client.sqlite.prepare('SELECT kind, data FROM records WHERE id = ?').get(theRecordOf(handle, workspace)),
+    row: t.client.sqlite
+      .prepare('SELECT handle, role, card_chosen_by, work_area, started_by_kind, started_by_id, retired, retired_because FROM agents WHERE id = ?')
+      .get(idOf(handle)),
+  }
+}
+
+/** How many keys the agent holds that are not revoked. */
+const liveKeysOf = (handle: string): number =>
+  (t.client.sqlite.prepare("SELECT COUNT(*) AS n FROM held_keys WHERE whose_kind = 'agent' AND whose_id = ? AND revoked_at IS NULL").get(idOf(handle)) as { n: number }).n
+
 /** One write of `data.startedBy` on an agent's record, and the row's starter before and after it. */
 async function moveTheStarter(headers: Headers, handle: string, to: unknown): Promise<{ status: number; said: string; error: string; before: unknown; after: unknown }> {
   const before = theStarterOf(handle)
@@ -110,6 +136,7 @@ describe('no agent moves a starter by an ordinary record write', () => {
     // runs where the code does not have it yet, and fails there on the case that asks for it.
     const records = await import('../src/server/lib/records.ts')
     theStarterDoor = String(Reflect.get(records, 'THE_STARTER_DOOR') ?? '')
+    theWorkAreaDoor = String(Reflect.get(records, 'THE_WORK_AREA_DOOR') ?? '')
     const made = await call('POST', '/api/workspaces', asThePerson(), { id: SECOND, title: 'A made-up second project' })
     expect(made.status, made.said).toBe(201)
     await start('top-a', asThePerson(), 'supervisor')
@@ -193,6 +220,67 @@ describe('no agent moves a starter by an ordinary record write', () => {
     expect(t.client.sqlite.prepare('SELECT retired FROM agents WHERE id = ?').get(idOf('under-a-two'))).toEqual({ retired: 1 })
     for (const record of [theRecordOf('under-a-two'), second]) {
       expect(t.client.sqlite.prepare("SELECT data ->> '$.state' AS state FROM records WHERE id = ?").get(record), record).toEqual({ state: 'retired' })
+    }
+  })
+
+  it('7: an agent that did not start another is refused its work area, who chose its card, and making it active again', async () => {
+    await start('under-b', asAgent('top-b'))
+    const area = theStoredAgent('under-b')
+    const toTheArea = await call('PATCH', `/api/records/${theRecordOf('under-b')}`, asAgent('under-a'), { dataPatch: { workArea: ['src'] } })
+    expect.soft(toTheArea.status, toTheArea.said).toBe(403)
+    expect.soft(String(toTheArea.body?.error ?? ''), 'the refusal does not name the work-area door').toContain(theWorkAreaDoor)
+    expect.soft(theStoredAgent('under-b'), 'its work area').toEqual(area)
+
+    const card = theStoredAgent('under-b')
+    const toTheCard = await call('PATCH', `/api/records/${theRecordOf('under-b')}`, asAgent('under-a'), {
+      dataPatch: { cardChosenBy: { how: 'a-starter', who: anAgentNamed('under-a') } },
+    })
+    expect.soft(toTheCard.status, toTheCard.said).toBe(403)
+    expect.soft(theStoredAgent('under-b'), 'who chose its card').toEqual(card)
+
+    // UNDER-A-TWO WAS RETIRED IN CASE 5, and under-a did not start it.
+    expect(t.client.sqlite.prepare('SELECT retired FROM agents WHERE id = ?').get(idOf('under-a-two')), 'case 5 left it retired').toEqual({ retired: 1 })
+    const retired = theStoredAgent('under-a-two')
+    const toActive = await call('PATCH', `/api/records/${theRecordOf('under-a-two')}`, asAgent('under-a'), { dataPatch: { state: 'active' } })
+    expect.soft(toActive.status, toActive.said).toBe(403)
+    expect.soft(theStoredAgent('under-a-two'), 'making it active again').toEqual(retired)
+    expect(theWorkAreaDoor, 'records.ts exports no THE_WORK_AREA_DOOR for the refusal to name').not.toBe('')
+  })
+
+  it('8: an agent is refused a record write of its own work area, and the refusal names the work-area door', async () => {
+    const before = theStoredAgent('under-a')
+    const sent = await call('PATCH', `/api/records/${theRecordOf('under-a')}`, asAgent('under-a'), { dataPatch: { workArea: ['src'] } })
+    expect(sent.status, sent.said).toBe(403)
+    expect(String(sent.body?.error ?? ''), 'the refusal does not name the work-area door').toContain(theWorkAreaDoor)
+    expect(theStoredAgent('under-a')).toEqual(before)
+    expect(theWorkAreaDoor, 'records.ts exports no THE_WORK_AREA_DOOR for the refusal to name').not.toBe('')
+  })
+
+  it('9: the starter of a retired worker makes it active again, its revoked keys stay revoked, and another worker is refused', async () => {
+    const record = theRecordOf('under-a-two')
+    expect(t.client.sqlite.prepare('SELECT retired FROM agents WHERE id = ?').get(idOf('under-a-two')), 'case 5 left it retired').toEqual({ retired: 1 })
+    expect(liveKeysOf('under-a-two'), 'case 5 left a key of it live').toBe(0)
+    const before = theStoredAgent('under-a-two')
+    const refused = await call('PATCH', `/api/records/${record}`, asAgent('under-a'), { dataPatch: { state: 'active' } })
+    expect(refused.status, refused.said).toBe(403)
+    expect(theStoredAgent('under-a-two')).toEqual(before)
+    const revived = await call('PATCH', `/api/records/${record}`, asAgent('top-a'), { dataPatch: { state: 'active' } })
+    expect(revived.status, revived.said).toBe(200)
+    expect(t.client.sqlite.prepare('SELECT retired FROM agents WHERE id = ?').get(idOf('under-a-two'))).toEqual({ retired: 0 })
+    expect(liveKeysOf('under-a-two'), 'making it active again brought a revoked key back').toBe(0)
+  })
+
+  it("10: a record write that changes an agent record's kind away from agent is refused, from the starter and from the person", async () => {
+    const record = theRecordOf('under-a')
+    const senders: [string, Headers][] = [
+      ['its starter', asAgent('top-a')],
+      ['the person', asThePerson()],
+    ]
+    for (const [who, headers] of senders) {
+      const before = theStoredAgent('under-a')
+      const sent = await call('PATCH', `/api/records/${record}`, headers, { kind: 'note' })
+      expect.soft(sent.status, `${who}: ${sent.said}`).toBe(403)
+      expect.soft(theStoredAgent('under-a'), who).toEqual(before)
     }
   })
 })

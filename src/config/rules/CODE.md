@@ -6,7 +6,7 @@ The rules an agent reads when the work touches a subject. The general file — `
 `AGENTS.md` generated from it — carries the invariants and one pointer line per chapter; this file
 carries the chapters themselves.
 
-Exported from the shipped default chapters in src/config/rules/default-regulations.json on 2026-11-19 19:46:53. Usable chapter records are the authority.
+Exported from the shipped default chapters in src/config/rules/default-regulations.json on 2026-11-23 19:38:31. Usable chapter records are the authority.
 A stored chapter this release cannot use is named beside its shipped recovery content.
 An absent chapter stays absent. Change the chapters in Mole Office, then export them again.
 
@@ -145,15 +145,15 @@ How a write into Mole Office is addressed, shaped and attributed. Read this befo
 
 12. **Write the reason with the rule**
 
-   A rule is written with its reason. A rule stated with no reason reads as a ban that nobody can argue with. In the office, the rule's record links the record it stands on, so the rule can be traced and reopened.
+   A rule is written with its reason. A rule stated with no reason reads as a ban that nobody can argue with. Write the reason in words beside the rule. Do not write the id of the record that holds it there, because no record id goes into a file kept in the repository. In the office, the rule's record links the record it stands on, so the rule can be traced and reopened.
 
 ## Chapter 5 — Tests and gates
 
-**A test ships with the code and is proved by mutation, after a control run**
+**The supervisor checks each package as soon as its worker hands it in**
 
-A test is proved by mutation, after a control run. Read this before you add a test or change a criterion.
+Workers run no tests. As soon as a worker hands in a package, the supervisor runs that package's tests, the ten gates, the type check and the build, and seals it when they pass. There is no joined check before the pass. Measuring, mutation proofs and pictures are not proof. Read this before you add a test or change a criterion.
 
-*Why it exists.* A test that would pass with its feature deleted is not a test. A run that never started reads like a run that failed, so a proof made without a control run can record nothing as a catch. A commit that rewrites the criterion it is judged by can claim anything.
+*Why it exists.* Measurements, mutation proofs, pictures and type checks were made package by package and again by the supervisor, and they took more time than the work. On 18 November 2026 the owner stopped them as proof and gave the joined checks to the supervisor at fixed times. On 20 November 2026 the owner moved the checks to each package, as soon as its worker hands it in.
 
 *Where its rules live in the checkout.* src/config/rules/default-regulations.json
 
@@ -161,17 +161,17 @@ A test is proved by mutation, after a control run. Read this before you add a te
 
 ### The rules
 
-1. **A new test is proved by mutation after a control run, and ships with the code**
+1. **Only the supervisor runs the checks, on each package as soon as it is handed in**
 
-   Prove a new test in three runs: the unchanged code (green), one guarded line broken (red), and the line restored (green). A run that never started looks like a run that failed, and the first run tells them apart. A test that would pass with its feature deleted is not a test. The test ships with the code.
+   A worker runs no tests. As soon as a worker hands in a package, the supervisor runs that package's tests, the ten gates, the type check and the build, and seals the package when they pass. There is no joined check of several packages before the pass; the whole suite runs on main after the push. Measuring, mutation proofs and pictures are not proof and are not done. A new test ships with the code it tests.
 
 ## Chapter 6 — Screens
 
-**A thing on screen is named by what it is to the reader**
+**Pictures are not proof, and a screen is named by what it is to the reader**
 
-Name a thing by what it is to the reader. Read this before you change a page.
+Pictures are not proof and are not taken. A worker takes no pictures. The rules for the CSS backtick, naming a thing by what it is to the reader, a list that locates and the weight of a state still hold. Read this before you change a page.
 
-*Why it exists.* A person reads a screen to decide what to do next. A label taken from the code that produced it makes the person translate it first, and a label that needs a metaphor is a sign that the design is wrong.
+*Why it exists.* Pictures were taken as proof that a screen was right, and the proof cost more time than the change. On 18 November 2026 the owner stopped pictures as proof. The rules for how a screen is made and named still hold.
 
 *Where its rules live in the checkout.* src/config/rules/default-regulations.json
 
@@ -181,7 +181,7 @@ Name a thing by what it is to the reader. Read this before you change a page.
 
 1. **Name a thing by what it is to the reader, not by the mechanism that produced it**
 
-   Name a thing on screen or in a report by what it is to the reader, as they would say it, because a person reads a state to decide what to do next. Never name it after the mechanism or the stored value that produces it. If a label needs a metaphor, change the design, not the label.
+   Name a thing on screen or in a report by what it is to the reader, as they would say it, because a person reads a state to decide what to do next. Never name it after the mechanism or the stored value that produces it.
 
 ## Chapter 7 — The chat and messages
 
@@ -201,7 +201,7 @@ Who may write to a person, and how to lead somebody to a page. Read this before 
 
    Register before you write. A message from an agent no registry holds is refused, whether it is sent to a person or to an agent, and the refusal says to register first. Whoever started an agent manages it and reports for it, up the chain.
 
-2. **Take me there is a lead, not a link**
+2. **Take me there only for a report written for the reader or a page they must act on; everything else is a link**
 
    When somebody asks to be taken to a page or a record, file a `lead` on your reply, and also name the record in your words. A record id or a page path alone is a link they have to notice and press, which is what they asked you not to make them do. You never move anybody's page yourself. A person who is following you is taken there at once. Anyone else sees your words and one button, and nothing moves until they press it. A lead may name a page or a record in another project, and the offer names the project first. A comment never crosses to another project.
 
@@ -315,9 +315,9 @@ Plain language, and where finished writing for the owner is published. Read this
 
 ### The rules
 
-1. **Write in plain language, on everything a person reads**
+1. **Write in plain language in what is handed to a person**
 
-   Write in plain language on everything a person reads: one idea per sentence, the conclusion first, the plain word, no metaphors, and an invented term defined the first time. Be faithful to the meaning. Keep every number, unit, name, condition, negation, uncertainty and limit. Never invent intent, cause, validation, agreement or coverage. Keep what was measured apart from what was inferred. Give every "it" and "they" a noun the reader can find. Order a paragraph as fact, reason, what it means, then the limit or next step. Match the language the person asked for. Never shorten by deleting words: a fragment is not shorter than a sentence once the reader has finished guessing. Short and plain at the same time.
+   Write in plain language in what is handed to a person, such as a report, a decision the person must make or a conversation: one idea per sentence, the conclusion first, the plain word, no metaphors, and an invented term defined the first time. Be faithful to the meaning. Keep every number, unit, name, condition, negation, uncertainty and limit. Never invent intent, cause, validation, agreement or coverage. Keep what was measured apart from what was inferred. Give every "it" and "they" a noun the reader can find. Order a paragraph as fact, reason, what it means, then the limit or next step. Match the language the person asked for. Never shorten by deleting words: a fragment is not shorter than a sentence once the reader has finished guessing. Short and plain at the same time. This rule does not govern how a page is designed.
 
 2. **Publish finished writing for a person inside Mole Office**
 
@@ -363,7 +363,7 @@ The secretary follows the person’s work, delegates large tasks, and brings bac
 
 4. **Confirm the requirement before handing work to a supervisor.**
 
-   The secretary writes what is wanted, why, what completion means, and what is outside the task. It preserves the person’s words with their source. It answers the supervisor’s questions until both confirm the requirement, then records it on the work’s record. It writes no round brief for a supervisor: the supervisor plans its own rounds.
+   The secretary writes what is wanted, why, what completion means, and what is outside the task. It preserves the person’s words with their source. It answers the supervisor’s questions until both confirm the requirement, then records it on the work’s record. It writes no round brief for a supervisor: the supervisor plans its own rounds. The secretary decides what is to be made and how it is accepted. It gives that to the supervisor as the package the supervisor answers for, and answers the supervisor's questions until both confirm it.
 
 5. **Keep decisions attached to the questions they settle.**
 
@@ -419,11 +419,11 @@ The secretary follows the person’s work, delegates large tasks, and brings bac
 
 ## Chapter 12 — Supervisor duties
 
-**The supervisor leads one piece of work through completion**
+**The supervisor takes its line's packages and leads each through completion**
 
-The supervisor plans, assigns, checks and joins the work, and answers for its agents.
+The supervisor plans, hands out work, checks each package as soon as it is handed in and gatekeeps, and answers for its agents.
 
-*Why it exists.* Assigned pieces need one agent responsible for the result. Planning, checking and escalation remain with the supervisor while workers build their pieces.
+*Why it exists.* Assigned pieces need one agent responsible for the result. A line's packages arrive as they come, and one supervisor takes each and leads it through completion, with no rounds between the secretary and the supervisor. Planning, checking and escalation remain with the supervisor while workers build their pieces. On 18 November 2026 the owner made the checking one joined run at fixed times and made hand-backs and reports one line per point, because repeated proof and long reports had taken the time the work needed. On 20 November 2026 the owner moved the checking to each package, as soon as its worker hands it in.
 
 *Where its rules live in the checkout.* src/config/rules/default-regulations.json
 
@@ -433,7 +433,7 @@ The supervisor plans, assigns, checks and joins the work, and answers for its ag
 
 1. **Register the area and confirm the assigned requirement.**
 
-   A secretary or the person starts a supervisor for one piece of work. The supervisor registers one directory and gives its workers folders within it. It asks about unclear or conflicting requirements before building. It reports to the secretary, or to the person where there is no secretary.
+   A secretary or the person starts a supervisor for a line; it takes the line's packages as they come, with no rounds between the secretary and it. The supervisor registers one directory and gives its workers folders within it. It asks about unclear or conflicting requirements before building. It reports to the secretary, or to the person where there is no secretary.
 
 2. **Plan the work and challenge the plan before assigning tasks.**
 
@@ -441,7 +441,7 @@ The supervisor plans, assigns, checks and joins the work, and answers for its ag
 
 3. **Give each worker a complete brief and a clear boundary.**
 
-   The supervisor starts and registers its workers, and writes each worker’s brief for each round. Each brief gives the whole assigned piece, the folders the worker may change, the rules to read and where its final report goes. The worker’s last message comes to the supervisor. In development work, the workers write the code and run the tests, and the supervisor reviews what they return. Paid calls remain with the supervisor; a worker holds no paid key.
+   The supervisor starts and registers its workers, and writes each worker’s brief for each round. Each brief gives the whole assigned piece, the folders the worker may change, the rules to read and where its final report goes. The worker’s last message comes to the supervisor. In development work, the workers write the code and run no tests, type check, build or pictures; the supervisor runs the checks. Paid calls remain with the supervisor; a worker holds no paid key.
 
 4. **Choose a worker for the task and record the outcome.**
 
@@ -451,37 +451,37 @@ The supervisor plans, assigns, checks and joins the work, and answers for its ag
 
    The supervisor opens the work’s group and names its members. It answers its workers’ questions and records problems it finds. It decides what its role and the situation allow. It passes what it cannot settle to its starter, normally the secretary. It answers for what its agents did.
 
-6. **Read, join and check the work returned by workers.**
+6. **Join the work, check each package as soon as it is handed in, and gatekeep.**
 
-   The supervisor reads what each worker returns and decides how to correct wrong work. It may check and release the worker or ask an inspector to check it. It joins the work on one linear branch and checks every changed output itself. When a required check needs access it lacks, the role with that access returns the evidence to it. Responsibility stays with the supervisor.
+   The supervisor reads what each worker returns and decides how to correct wrong work. It joins the work on one linear branch. As soon as a worker hands in a package, it runs that package's tests, the ten gates, the type check and the build. It gatekeeps: it may check and release the worker or ask an inspector to check it. When a required check needs access it lacks, the role with that access returns the evidence to it. Responsibility stays with the supervisor.
 
 7. **Report each round and answer its check before continuing.**
 
-   The supervisor records the round’s result, compares it with the plan and seals it for checking. It accepts a refusal and opens a fix round, or answers with evidence in the check’s group. It prepares the next brief before ending the round. A refused check makes the fix come first.
+   The supervisor records the round’s result, compares it with the plan and seals it for checking. Its hand-back and report are one line per point: what was done and in which commit. It accepts a refusal and opens a fix round, or answers with evidence in the check’s group. It prepares the next brief before ending the round. A refused check makes the fix come first.
 
 8. **Get the secretary’s release before submitting finished work.**
 
    When the requirement is met, the supervisor sends one handover message to its secretary for review. It submits the work only after the secretary releases it. It confirms each round’s inspection release before submission.
 
-9. **Confirm new checks and handle a returned submission.**
+9. **Confirm new checks, and finish the packages given.**
 
-   The supervisor confirms a scoped recheck of content no earlier check read. When its submission is returned, it fixes the cause and submits again. It follows the landing result until the work has landed.
+   The supervisor confirms a scoped recheck of content no earlier check read. Its job is to finish the packages it was given. What happens after the merge is the secretary's.
 
 10. **Have an edition’s claims checked independently before release.**
 
    The supervisor has each number and claim checked against its archived source by someone who did not write it. Unverified claims are marked, and a claim with one source names that source. It reviews the draft, layout and output, with a second review where the brief requires it. An error found after publication receives a correction in the next edition.
 
-11. **Stay until the work and its running agents are settled.**
+11. **Keep taking packages until retired.**
 
-   The supervisor ends when its work is finished or handed back, or its starter or the person retires it. It stays while an agent it started is still running. It waits for its workers within its own turn.
+   The supervisor does not end when a package is handed in or handed back. It takes its line's next package at once, and with none to take it waits within its own turn and looks again. It ends only when its starter or the person retires it. It stays while an agent it started is still running. It waits for its workers within its own turn.
 
 ## Chapter 13 — Worker duties
 
 **The worker completes one assigned task within its boundary**
 
-The worker does its assigned task, records what it finds, and reports for checking.
+The worker writes the code, runs no tests, type check, build or pictures, and reports for checking.
 
-*Why it exists.* A worker needs a clear task and limits. Finding a nearby fault or finishing its own work does not give it authority to widen the task or release the run.
+*Why it exists.* A worker needs a clear task and limits. Finding a nearby fault or finishing its own work does not give it authority to widen the task or release the run. On 18 November 2026 the owner moved every check to the supervisor's joined run at fixed times, so a worker writes the code and runs no tests, type check, build or pictures.
 
 *Where its rules live in the checkout.* src/config/rules/default-regulations.json
 
@@ -497,17 +497,17 @@ The worker does its assigned task, records what it finds, and reports for checki
 
    The worker registers with the office before it writes and names one or more work folders. A root file must be named on its own where the card’s root-file permission is supported. It does not register the repository root or a file with a path as a folder. It reads the role, powers, rules and reporting line the office sends.
 
-3. **Record measurements and problems as they happen.**
+3. **Record problems as they happen.**
 
-   The worker records each measurement and each problem when it happens. A problem says what happens and how to reproduce it. It judges whether its role and the situation let it decide. If it cannot, it hands the problem to its starter. A fault outside the task is recorded without expanding the task.
+   The worker records each problem when it happens. A problem says what happens and how to reproduce it. It judges whether its role and the situation let it decide. If it cannot, it hands the problem to its starter. A fault outside the task is recorded without expanding the task. Measuring is not proof and is not done.
 
 4. **Leave starting agents and writing plans to a supervisor.**
 
    A worker may read the office and file or change records. Starting agents and writing plans are supervisor powers. The worker sends a needed paid call to its supervisor.
 
-5. **Test the changed work and report what remains.**
+5. **Write the code, run no tests, and report what remains.**
 
-   The worker builds and tests the work it touched. It reports what it did, what it could not do and the evidence. It files the report in the office, links it to its run, and sends its last message to its starter.
+   The worker writes the code for the work it touched. It runs no tests, type check, build or pictures; the supervisor checks each package as soon as it is handed in. It reports what it did, what it could not do, and one line per point: what was done and in which commit. It files the report in the office, links it to its run, and sends its last message to its starter.
 
 6. **Wait for a check and release before the run ends.**
 

@@ -19,6 +19,7 @@
  *   POST /api/residents/:agentId/wake                     the resident or the person: it wakes, and is handed what was held
  *   POST /api/residents/:agentId/sleep/postpone           the resident itself postpones a sleep; nobody is told
  *   PUT  /api/residents/:agentId/sleep-time               the resident or the person: when its own sleep begins and how long
+ *   PUT  /api/residents/:agentId/package-reminder-every   a secretary or the person: how often it is reminded of waiting packages
  *   POST /api/residents/:agentId/named                    the resident or the person: its picture and name are chosen
  *
  * NOTHING HERE REPEATS A RULE. Who may do what, the path rules, the limit and the session-origin file are in
@@ -74,6 +75,9 @@ import {
   type TheResidentsList,
 } from '../lib/residents.ts'
 import { SLEEP_TIME_LONGEST_MINUTES, SLEEP_TIME_SHORTEST_MINUTES } from '@shared/residents.ts'
+import { sayInEnglish } from '@shared/i18n.ts'
+import { setAPackageReminderInterval, thePackageReminderIntervalOf, type APackageReminderInterval } from '../lib/package-reminders.ts'
+import { PACKAGE_REMINDER_DEFAULT_HOURS, PACKAGE_REMINDER_FEWEST_HOURS, PACKAGE_REMINDER_MOST_HOURS } from '@shared/package-reminders.ts'
 
 // ============================================================================ the sentences
 
@@ -81,27 +85,34 @@ const LIST_NOTE =
   'EVERY PERMANENT RESIDENT, AND EVERY RESIDENCY PROPOSAL THE OWNER HAS NOT ANSWERED. A resident is an agent the ' +
   'secretary proposed and the owner confirmed; each has a personal space of its own. ' +
   'Answers {residents:[{agentId, handle, name, since, retired, successor}], openProposals:[{id, workspaceId, title, ' +
-  'agentId, handle, name, proposedAt, proposedBy, because, facts, settled}], limit}, where limit is the most bytes one ' +
-  'space may hold. Writes nothing.'
+  'agentId, handle, name, proposedAt, proposedBy, because, facts, area, sleepTime, settled}], limit}, where limit is the ' +
+  'most bytes one space may hold, and sleepTime is {startsAt, minutes} or null for a proposal filed before one was ' +
+  'asked for. Writes nothing.'
 
 const PROPOSE_NOTE =
   'A SECRETARY PROPOSES AN AGENT AS A PERMANENT RESIDENT. Body {"agentId":"<id or handle>","because":"<why, in your ' +
-  'own words>","area"?:"<its long-term area of responsibility, one line of at most 200 characters>"}. Only an agent holding the secretary card, not retired, with its own key sent as x-mole-office-key. ' +
+  'own words>","sleepTime":{"startsAt":"<time of day>","minutes":<how long>}, "area"?:"<its long-term area of ' +
+  'responsibility, one line of at most 200 characters>"}. Only an agent holding the secretary card, not retired, with ' +
+  'its own key sent as x-mole-office-key. Every permanent resident has a sleep time, so the proposal must name one: ' +
+  'startsAt is hours and minutes on the office\'s clock, such as "03:00", "3:00" or "3.00", and is kept as HH:MM; ' +
+  'minutes is a whole number from ' +
+  `${String(SLEEP_TIME_SHORTEST_MINUTES)} to ${String(SLEEP_TIME_LONGEST_MINUTES)}. ` +
   'It files a `proposal` record in this project with one option, and the office adds the facts it measured: days ' +
   'since the agent became a citizen, days with a run, runs, records written, compactions its runs reported, retired ' +
-  'or not, home world. The evidence then says whether each part of the decided criterion is met: three days with a ' +
-  'run, five compactions reported, and a long-term area named. Nothing is refused for falling short of it; the ' +
-  'person judges. An agent ' +
-  'that is retired, already a resident, not a citizen of this world, or the mail tool is refused, and so is a second ' +
-  'open proposal for the same agent. Answers 201 {proposal}.'
+  'or not, home world, and the sleep time. The evidence then says whether each part of the decided criterion is met: ' +
+  'three days with a run, five compactions reported, and a long-term area named. Nothing is refused for falling short ' +
+  'of it; the person judges. An agent that is retired, already a resident, not a citizen of this world, or the mail ' +
+  'tool is refused, and so is a second open proposal for the same agent. Answers 201 {proposal}.'
 
 const CONFIRM_NOTE =
   'THE OWNER CONFIRMS A RESIDENCY PROPOSAL. No body. The person, with a proved request, or a secretary holding the ' +
   'person\'s grant where this office\'s list of what the grant carries says it may press this door. The grant never ' +
   'presses it for the agent that filed the proposal, so the agent that proposes can never also confirm. Under the grant ' +
   'the residency names the secretary as the one who confirmed it. In one act it files a `decision` ' +
-  'settling the proposal, writes the residency on the agent, and makes the personal space with its session-origin ' +
-  'file. If the folder cannot be made, nothing is recorded and the answer says why. In the same act a row asking for ' +
+  'settling the proposal, writes the residency and the sleep time the proposal named on the agent, and makes the ' +
+  'personal space with its session-origin file. A proposal filed before a proposal had to name a sleep time cannot be ' +
+  'confirmed: it is refused with code residentProposalHasNoSleepTime, and declining it needs no time. ' +
+  'If the folder cannot be made, nothing is recorded and the answer says why. In the same act a row asking for ' +
   'a picture and a name for the new resident is put on GET /api/waiting, until POST /api/residents/:agentId/named; ' +
   'right after it the resident is sent one office line saying it may choose its own picture. If that line could ' +
   'not be written, `reminder.agent` says why and so does `said`. Answers {resident, decision:{id, title}, ' +
@@ -118,7 +129,7 @@ const ONE_NOTE =
   'a session holds its handle now, when the hold last beat, whether it lapsed) and its sleep (asleep since, when its ' +
   'last sleep ended, and its postponed sleeps, newest first, at most five; when the office ends a sleep it began at the ' +
   'sleep time, and the sleep time itself with when the next sleep begins) and whether it holds the secretary card ' +
-  '(`holdsTheSecretaryCard`, which a sleep time needs). For a caller that may read the space (the resident with its own key, ' +
+  '(`holdsTheSecretaryCard`). For a caller that may read the space (the resident with its own key, ' +
   'the owner, an agent holding leave, the successor once the resident is retired) it also answers the space: the ' +
   'bytes used and the limit, every grant, every void mark, and whether the session-origin file is up to date. Any ' +
   'other caller is told only that the space is private: {space:{mayRead:false, private}}. Reading it brings the ' +
@@ -180,11 +191,11 @@ const POSTPONE_NOTE =
   'Answers 201 {said, sleep}.'
 
 const SLEEP_TIME_NOTE =
-  'A SECRETARY SETS ITS OWN SLEEP TIME. Body {"startsAt":"<time of day>","minutes":<how long>}. startsAt is hours ' +
+  'A RESIDENT SETS ITS OWN SLEEP TIME. Body {"startsAt":"<time of day>","minutes":<how long>}. startsAt is hours ' +
   'and minutes on the office\'s clock, such as "03:00", "3:00" or "3.00", and is kept as HH:MM; minutes is a whole ' +
   `number from ${String(SLEEP_TIME_SHORTEST_MINUTES)} to ${String(SLEEP_TIME_LONGEST_MINUTES)}. ` +
-  'The resident with its own key, or the person, for a resident that holds the secretary card ' +
-  'and is not retired; either may change it. Setting it begins no sleep. Each day when the time opens the office ' +
+  'The resident with its own key, or the person, for a permanent resident that is not retired; either may change it. ' +
+  'The secretary card is not needed. Setting it begins no sleep. Each day when the time opens the office ' +
   'begins the sleep, sends the resident one message asking it to update its memory, notes and handover and to tidy ' +
   'its work, and ends the sleep when the minutes are over. A resident already asleep is not put to sleep again, and one ' +
   'at work may postpone the sleep (POST /api/residents/:agentId/sleep/postpone). Answers {said, sleep}, where said ' +
@@ -232,10 +243,17 @@ export interface TheSpaceListing {
 
 // ============================================================================ what a caller sends
 
-const proposalSent = z.object({ agentId: z.string().min(1), because: z.string(), area: z.string().max(200).optional() }).strict()
+const proposalSent = z.object({
+  agentId: z.string().min(1),
+  because: z.string(),
+  area: z.string().max(200).optional(),
+  sleepTime: z.object({ startsAt: z.string().max(40), minutes: z.number() }).strict().optional(),
+}).strict()
 const sleepSent = z.object({ because: z.string().max(500).optional() }).strict()
 const postponeSent = z.object({ because: z.string().max(500) }).strict()
 const sleepTimeSent = z.object({ startsAt: z.string().max(40), minutes: z.number() }).strict()
+// EACH KEY IS CHECKED IN lib/package-reminders.ts, so a missing reason or a bad interval is refused with its sentence.
+const packageReminderSent = z.object({ hours: z.unknown(), because: z.unknown() }).strict()
 const declineSent = z.object({ because: z.string().optional() }).strict()
 const residentPath = z.object({ agentId: z.string().min(1) }).strict()
 const proposalPath = z.object({ id: z.string().min(1) }).strict()
@@ -344,9 +362,10 @@ export async function residentsRoutes(app: FastifyInstance): Promise<void> {
     return { decision: { id: decision.id, title: decision.title } }
   })
 
-  app.get('/residents/:agentId', route('resident.one', 'remote', ONE_NOTE), async (req) => {
+  app.get('/residents/:agentId', route('resident.one', 'remote', `${ONE_NOTE} ${sayInEnglish('packageReminder.readingNote')}`), async (req) => {
     const asked = parse(residentPath, req.params, 'The resident')
-    return oneResident(theResidentNamed(asked.agentId, 'reading'), actorFrom(req))
+    const residency = theResidentNamed(asked.agentId, 'reading')
+    return { ...oneResident(residency, actorFrom(req)), packageReminderEvery: thePackageReminderIntervalOf(residency.agentId) }
   })
 
   app.get('/residents/:agentId/space', route('resident.space', 'remote', SPACE_NOTE), async (req): Promise<TheSpaceListing> => {
@@ -444,6 +463,12 @@ export async function residentsRoutes(app: FastifyInstance): Promise<void> {
     const sent = parse(sleepTimeSent, req.body ?? {}, 'The sleep time')
     const time = readTheSleepTime(sent)
     return setASleepTime(theResidentToActOn(asked.agentId, HAVING_A_SLEEP_TIME), time, actorFrom(req))
+  })
+
+  app.put('/residents/:agentId/package-reminder-every', route('resident.package.reminder.every', 'remote', sayInEnglish('packageReminder.doorNote', { fewest: PACKAGE_REMINDER_FEWEST_HOURS, most: PACKAGE_REMINDER_MOST_HOURS, hours: PACKAGE_REMINDER_DEFAULT_HOURS })), async (req): Promise<APackageReminderInterval> => {
+    const asked = parse(residentPath, req.params, 'The resident')
+    const sent = parse(packageReminderSent, req.body ?? {}, sayInEnglish('packageReminder.bodyLabel'))
+    return setAPackageReminderInterval(asked.agentId, sent, actorFrom(req), workspaceOf(req))
   })
 
   app.post('/residents/:agentId/named', route('resident.named', 'remote', NAMED_NOTE), async (req): Promise<TheNamedReply> => {

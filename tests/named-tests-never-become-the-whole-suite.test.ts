@@ -165,4 +165,27 @@ describe('tools/q.mjs', () => {
     expect(first).toContain(`${command.slice(0, 300)} …(+${command.length - 300} chars)`)
     expect(first).not.toContain(long)
   })
+
+  it('exits only when its log holds every line of a long output, as many lines as its last line counts', () => {
+    // About 2.3 MB in one write, and the script ends straight after. q receives it in many pieces, and its log stream
+    // holds back each piece that comes while an earlier one is still being written. A q that exits without waiting
+    // for the stream loses the pieces it still holds, which are the end of the output.
+    const COUNT = 200_000
+    const print = join(folder, 'print-lines.mjs')
+    writeFileSync(print, `let text = ''\nfor (let n = 1; n <= ${COUNT}; n++) text += 'line ' + n + '\\n'\nprocess.stdout.write(text)\n`)
+    const ran = spawnSync(process.execPath, [join(REPO, 'tools', 'q.mjs'), process.execPath, print], {
+      cwd: folder,
+      encoding: 'utf8',
+    })
+    expect(ran.status, ran.stdout + ran.stderr).toBe(0)
+    const last = ran.stdout.trimEnd().split('\n').at(-1)!
+    const said = /\[(?:all|\d+ of) (\d+) lines · full output: (.+)\]$/.exec(last)
+    expect(said, last).not.toBeNull()
+    expect(Number(said![1])).toBe(COUNT)
+    // Every line ends in a newline, so the log splits into its lines and one empty piece after the last.
+    const lines = readFileSync(join(folder, said![2]!), 'utf8').split('\n')
+    expect(lines.length - 1, `the log ends ${JSON.stringify(lines.slice(-2))}`).toBe(Number(said![1]))
+    const firstWrong = lines.findIndex((line, index) => line !== (index < COUNT ? `line ${index + 1}` : ''))
+    expect(firstWrong, `the first wrong line is ${JSON.stringify(lines[firstWrong])}`).toBe(-1)
+  }, 20_000)
 })

@@ -756,8 +756,22 @@ async function seed(t: TestDb): Promise<void> {
   // AND EVERY NULLABLE COLUMN ON A RUN IS FILLED ON ONE ROW AND NULL ON ANOTHER: one run was
   // answered, one was declined by a worker that could not serve it, and one is still waiting with
   // every stamp null — which is what a careless import fills in.
+  //
+  // AND EACH RUN SAYS WHICH AGENT IT WORKED AS, the way the office records it: an agent record filed
+  // for that run, named in the run's `ranAs` for its own project. A comment addressed to a run that
+  // names no agent is refused before anything is written, so without this the two comments below
+  // are never stored. The agent record holds what the door used to make from a run's title: a
+  // handle, the state active and the run's runtime.
   const agents = (await import('../src/server/lib/agents.ts')) as typeof import('../src/server/lib/agents.ts')
-  const stamped = (title: string, externalId: string): string =>
+  const workedAs = (title: string, handle: string): string =>
+    t.api.createRecord({
+      workspaceId: 'default',
+      kind: 'agent',
+      title,
+      data: { handle, state: 'active', runtime: 'claude-code' },
+      actor: HUMAN,
+    }).id
+  const stamped = (title: string, externalId: string, agentId: string): string =>
     t.api.createRecord({
       workspaceId: 'default',
       kind: 'session',
@@ -765,6 +779,7 @@ async function seed(t: TestDb): Promise<void> {
       data: {
         state: 'idle',
         runtime: 'claude-code',
+        ranAs: [{ workspaceId: 'default', agentId }],
         // What discovery stamps on a session record. `stampOf` in lib/sessions.ts is the one reader
         // of it, and a session Mole Office has no id for is refused at dispatch by name.
         extra: {
@@ -784,8 +799,16 @@ async function seed(t: TestDb): Promise<void> {
       },
       actor: HUMAN,
     }).id
-  const calibrationRun = stamped('The run that measured the gripper', 'aaaa1111-0000-0000-0000-00000000aaaa')
-  const writingRun = stamped('The run that wrote the submission plan', 'bbbb2222-0000-0000-0000-00000000bbbb')
+  const calibrationRun = stamped(
+    'The run that measured the gripper',
+    'aaaa1111-0000-0000-0000-00000000aaaa',
+    workedAs('Roundtrip calibration', 'roundtrip-calibration'),
+  )
+  const writingRun = stamped(
+    'The run that wrote the submission plan',
+    'bbbb2222-0000-0000-0000-00000000bbbb',
+    workedAs('Roundtrip writing', 'roundtrip-writing'),
+  )
   made['calibrationRun'] = calibrationRun
   made['writingRun'] = writingRun
 

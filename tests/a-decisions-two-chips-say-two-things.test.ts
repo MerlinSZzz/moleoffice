@@ -7,7 +7,7 @@
  * page in Chinese, the kind chip and the family chip at the top both read 决定, where English has "decision"
  * and "Decisions". The kind chip says what this record is; the family chip says which list it is read in,
  * and that list holds proposals as well as decisions (KIND_FAMILIES in src/shared/work.ts). So the family
- * is 提议与决定 in Chinese, in the form the other family words take (报告与笔记, 模块与流程).
+ * is 提议与决定 in Chinese, in the form the other family words take (报告与笔记, 模块与流水线).
  *
  * MADE-UP RECORDS: one decision, filed as the test office's person.
  *
@@ -19,7 +19,7 @@
 
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { liveApp, type LiveApp, waitForThePage } from './helpers.ts'
+import { liveApp, type LiveApp, waitForThePage, governsTheWholeProject } from './helpers.ts'
 import { testShots, TEST_SHOTS } from './where-shots-go.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { recordPath } from '../src/web/components/router.tsx'
@@ -56,7 +56,8 @@ beforeAll(async () => {
   const filed = await fetch(`${app.api}/api/records`, {
     method: 'POST',
     headers: AS_THE_PERSON,
-    body: JSON.stringify({ kind: 'decision', title: 'Fire the second kiln on Saturdays', data: { replaces: [] } }),
+    body: JSON.stringify({ kind: 'decision', title: 'Fire the second kiln on Saturdays', data: {
+      ...governsTheWholeProject(), replaces: [] } }),
   })
   expect(filed.status, await filed.clone().text()).toBe(201)
   decisionId = ((await filed.json()) as { record: { id: string } }).record.id

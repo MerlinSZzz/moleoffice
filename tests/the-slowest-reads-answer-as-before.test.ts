@@ -140,6 +140,15 @@ const ASKED: Asked[] = [
  * fields taken out of the code again (the two `shippedFlags:` lines in src/server/api/participants.ts and the
  * `Object.assign(value, theLookForTheReader(...))` line), the answer hashed to ed2aae7b, the hash this list held before.
  * The supervisor of wave 13y's round 173 ran that control.
+ *
+ * EACH PERSON'S ROW CARRIES `startingMode` since wave 13y round 175: the mode the page opens in for a person whose
+ * browser has stored none. The office writes `inspect` on the person it makes at a new office's first migrate, and a
+ * person from before has null. It is checked on its own, as `chatLayout` is, and taken out before the bytes are
+ * compared, so the hash is of the answer as it was.
+ *
+ * EACH AGENT'S ROW CARRIES `harness` since agents of any harness came in: the harness the agent's record names, as
+ * stored. It is checked on its own, as `chatLayout` and `startingMode` are, and taken out before the bytes are
+ * compared, so the hash stays the one of the answer before.
  */
 const BEFORE: Record<string, string> = {
   'GET /api/messages/comments': 'dd57c28cfb49aab82ecf06dd9c0e73b7014053198d8b5c68deaaabe596830c54',
@@ -197,7 +206,7 @@ function theOfficesPairsInTheHandlesOrder(body: string, officeId: string): { wro
 
 let t: TestDb
 let app: FastifyInstance
-const answers = new Map<string, { status: number; hash: string; namesTheOfficeByItsId: boolean; theOfficesPairs: string | null; chatLayouts: unknown[] | null }>()
+const answers = new Map<string, { status: number; hash: string; namesTheOfficeByItsId: boolean; theOfficesPairs: string | null; chatLayouts: unknown[] | null; startingModes: [unknown, unknown][] | null; harnesses: unknown[] | null }>()
 
 /**
  * EVERY PAGE OF THE ROSTER, JOINED IN THE ORDER THE DOOR GIVES THEM.
@@ -255,15 +264,21 @@ beforeAll(async () => {
     const inOrder = PAIRS_IN_KEY_ORDER.has(one.name) ? theOfficesPairsInTheHandlesOrder(reply.body, theOfficesOwnId(t)) : { wrong: null, body: reply.body }
     let body = inOrder.body
     let chatLayouts: unknown[] | null = null
+    let startingModes: [unknown, unknown][] | null = null
+    let harnesses: unknown[] | null = null
     if (one.name === 'GET /api/participants') {
-      const held = JSON.parse(body) as { people: Record<string, unknown>[] }
+      const held = JSON.parse(body) as { people: Record<string, unknown>[]; agents: Record<string, unknown>[] }
       if (JSON.stringify(held) !== body) throw new Error('The participants answer did not serialize as received')
       chatLayouts = held.people.map(person => person['chatLayout'])
       for (const person of held.people) delete person['chatLayout']
+      startingModes = held.people.map(person => [person['id'], person['startingMode']])
+      for (const person of held.people) delete person['startingMode']
+      harnesses = held.agents.map(agent => agent['harness'])
+      for (const agent of held.agents) delete agent['harness']
       body = JSON.stringify(held)
     }
     for (const [value, word] of random) body = body.split(value).join(word)
-    answers.set(one.name, { status: reply.statusCode, hash: createHash('sha256').update(body).digest('hex'), namesTheOfficeByItsId, theOfficesPairs: inOrder.wrong, chatLayouts })
+    answers.set(one.name, { status: reply.statusCode, hash: createHash('sha256').update(body).digest('hex'), namesTheOfficeByItsId, theOfficesPairs: inOrder.wrong, chatLayouts, startingModes, harnesses })
   }
 }, 600_000)
 
@@ -284,6 +299,15 @@ describe('the slowest reads, on an office of the live shape', () => {
       if (one.name === 'GET /api/participants') {
         expect(answer?.chatLayouts?.length).toBeGreaterThan(0)
         expect(answer?.chatLayouts?.every(value => value === null)).toBe(true)
+        // The owner was made by the office's first migrate; every other person here was written into the table.
+        expect(answer?.startingModes?.find(([id]) => id === THE_PERSON)?.[1]).toBe('inspect')
+        expect(answer?.startingModes?.filter(([id]) => id !== THE_PERSON).every(([, value]) => value === null)).toBe(true)
+        // A row with no `harness` reads undefined here, which is neither null nor a word.
+        expect(answer?.harnesses?.length).toBeGreaterThan(0)
+        expect(answer?.harnesses?.every(value => value === null || (typeof value === 'string' && value !== ''))).toBe(true)
+        // The made-up office writes its agents into the registry with no agent record, and the office's own row has
+        // none, so no record names a harness for any agent here.
+        expect(answer?.harnesses?.every(value => value === null)).toBe(true)
       }
       expect(answer?.hash).toBe(BEFORE[one.name])
     })

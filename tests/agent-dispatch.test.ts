@@ -82,6 +82,34 @@ async function file(kind: string, title: string, data: Record<string, unknown> =
 }
 
 /**
+ * THE AGENT EACH RUN HERE WORKED AS. A comment addressed to a run that answers as no agent is refused before it is
+ * stored, and nothing is made up for it. So every run these helpers file names, in `ranAs`, a registered agent of this
+ * project. Its handle is read from the run's title by `handleFromTitle`. A run of the same title in a later case works
+ * as the same agent, because the office is shared between the cases of this file.
+ */
+const agentsByHandle = new Map<string, string>()
+
+async function theAgentItRanAs(title: string): Promise<{ workspaceId: string; agentId: string }[]> {
+  const handle = handleFromTitle(title)
+  const agentId = agentsByHandle.get(handle) ?? (await file('agent', `The agent of "${title}"`, { handle, runtime: 'claude-code', state: 'active' }))
+  agentsByHandle.set(handle, agentId)
+  return [{ workspaceId: WORKSPACE, agentId }]
+}
+
+/** File a run that names the agent it worked as. Only the person with their key may file a session for an agent. */
+async function fileARun(title: string, data: Record<string, unknown>): Promise<string> {
+  const ranAs = await theAgentItRanAs(title)
+  const res = await app.inject({
+    method: 'POST',
+    url: '/api/records',
+    headers: { ...HUMAN, ...thePersonsKeyHeader() },
+    payload: { kind: 'session', title, data: { ...data, ranAs } },
+  })
+  expect(res.statusCode, res.body).toBe(201)
+  return (res.json() as { record: { id: string } }).record.id
+}
+
+/**
  * A run Mole Office could really pick up again: a session record carrying what discovery stamps on one.
  *
  * `stampOf` in lib/sessions.ts needs `tool`, `externalId` and `logPath`, and it is the one reader of
@@ -94,7 +122,7 @@ async function resumableSession(title: string, externalId: string, runtime = 'cl
   // the file. A stamp pointing at a path nothing wrote is a run that cannot be picked up, which is
   // what `stampedButGone` below is for. This one writes a real file so the sent case is real.
   const logPath = fakeTranscript(externalId)
-  return file('session', title, {
+  return fileARun(title, {
     state: 'idle',
     runtime,
     extra: {
@@ -119,9 +147,11 @@ async function resumableSession(title: string, externalId: string, runtime = 'cl
  * This is the case the whole idea turns on. Before 18 August 2026 the recipient list said this run
  * could not be picked up and dispatch sent to it anyway, so the refusal a person read before
  * pressing Send was advice rather than a rule.
+ *
+ * It names the agent it worked as, so what refuses it is dispatch's own reading and not the door that stores a comment.
  */
 async function stampedButGone(title: string, externalId: string): Promise<string> {
-  return file('session', title, {
+  return fileARun(title, {
     state: 'idle',
     runtime: 'claude-code',
     extra: {
@@ -141,9 +171,12 @@ async function stampedButGone(title: string, externalId: string): Promise<string
   })
 }
 
-/** A session record nothing has ever stamped: Mole Office has no id for its conversation. */
+/**
+ * A session record nothing has ever stamped: Mole Office has no id for its conversation. It names the agent it worked
+ * as, so what refuses it is dispatch's own reading and not the door that stores a comment.
+ */
 async function unresumableSession(title: string): Promise<string> {
-  return file('session', title, { state: 'idle', runtime: 'claude-code' })
+  return fileARun(title, { state: 'idle', runtime: 'claude-code' })
 }
 
 async function startReview(title = 'Round six, read again'): Promise<string> {
@@ -582,8 +615,8 @@ describe('the request is what the worker was actually given', () => {
     expect(request.recipient.why).toBe('It filed this report on 15 August.')
     expect(request.resume.externalId).toBe('eeee5555-0000-0000-0000-00000000eeee')
     expect(request.resume.runtime).toBe('claude-code')
-    // THE HANDLE IS THE ONE THIS TITLE MINTS, read from the function that mints it rather than
-    // copied here: a second session of one title is handled with a suffix, and the office is shared.
+    // THE HANDLE IS THE ONE OF THE AGENT THE RUN WORKED AS. `resumableSession` gave that agent the handle
+    // `handleFromTitle` reads from this title, and the title carries the case's number so no earlier case holds it.
     expect(request.actorId, 'the run writes as the registered holder of its key').toBe(handleFromTitle(title))
     expect(request.contextNote).toContain('picked up again')
     expect(request.contextNote).toContain(title)

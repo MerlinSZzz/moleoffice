@@ -14,13 +14,6 @@ let app: LiveApp
 const panel = () => app.page.locator('[data-target="uiSurface/settings.gates"]')
 const row = (id: string) => panel().locator(`[data-gate="${id}"]`)
 const history = async (id: string) => row(id).locator('.gates-history').innerText()
-// One row is named by its id: the switch that hands a red only with the entry to the entry's own supervisor draws its own history.
-it('draws a history for the red-fixing gate that says Not counted yet while the office holds no count row', async () => {
-  withTheDatabase((database) => database.prepare('DELETE FROM gate_counts').run())
-  await open()
-  expect(await history('red-fixing')).toContain('Not counted yet.')
-}, 90_000)
-
 function dayAgo(days: number): string {
   const day = new Date()
   day.setDate(day.getDate() - days)

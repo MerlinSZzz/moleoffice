@@ -20,6 +20,11 @@ export interface TheUpdateOffer {
   holds: string
   /** One line for each thing a migration would write, in the migrations' own words. */
   wouldWrite: string[]
+  /**
+   * How the start check measured that: on a copy when a migration was pending, or on the database itself, inside a
+   * transaction it rolled back, when none was. The check says it where it chooses the path; the page says what it did by it.
+   */
+  measuredOn: 'a copy' | 'this file'
   /** The folder the backup is written to. */
   backups: string
 }

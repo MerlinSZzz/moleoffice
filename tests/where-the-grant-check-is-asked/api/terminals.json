@@ -11,7 +11,8 @@
     "terminals.set-keeping",
     "terminals.open",
     "terminals.close",
-    "terminals.keep-line"
+    "terminals.keep-line",
+    "terminals.name"
   ],
-  "why": "The list and agent-terminal streams check the secretary's own key first. Manual streams and other terminal mutations retain their grant guards. Typing keeps its exact-line words or grant check."
+  "why": "The list and agent-terminal streams check the secretary's own key first, and a stream of a terminal the secretary prepared while it runs. Manual streams and other terminal mutations retain their grant guards. Typing keeps its exact-line words or grant check, and a prepared terminal takes the person's words for its folder and line, or the grant. Naming a terminal keeps the grant guard."
 }

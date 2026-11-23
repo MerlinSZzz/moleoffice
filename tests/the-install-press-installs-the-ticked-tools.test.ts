@@ -89,11 +89,19 @@ beforeAll(async () => {
   registry = await aStandInRegistry()
 
   await startAHolder(place)
-  server = await startAServer(place, undefined, {
-    PATH: `${standIns}:${system}`,
-    MOLE_OFFICE_HARNESS_REGISTRY: registry.at,
-    ANTHROPIC_API_KEY: A_KEY,
-  })
+  // THE SERVER STARTS WITH NO SANDBOX_DIR, because the office refuses every install press inside a sandbox and case 2
+  // presses Install. It takes its environment once, at its start, so the variable is put back as soon as it has started.
+  const sandbox = process.env['SANDBOX_DIR']
+  delete process.env['SANDBOX_DIR']
+  try {
+    server = await startAServer(place, undefined, {
+      PATH: `${standIns}:${system}`,
+      MOLE_OFFICE_HARNESS_REGISTRY: registry.at,
+      ANTHROPIC_API_KEY: A_KEY,
+    })
+  } finally {
+    if (sandbox !== undefined) process.env['SANDBOX_DIR'] = sandbox
+  }
   const registered = await ask(server.api, '/api/agents/started', {
     method: 'POST',
     body: { handle: AS_AN_AGENT['x-mole-office-actor-id'], name: 'Some agent', role: 'worker' },

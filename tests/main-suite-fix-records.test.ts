@@ -505,3 +505,109 @@ it('refuses a malformed later-sequence mint revision and accepts the normal seq2
     note:'fixture SQLite only; the original mint proof is intact and only its revision sequence changes',
     heldId,mint,keyLastUsedAt:heldAfter['last_used_at'],refusal:{status:refused.status,error:refused.body.error},acceptedStatus:accepted.status},null,2))
 })
+
+/**
+ * A RECEIPT WITH TESTS MISSING READS INCOMPLETE IN THE GUARD. Case 5, and the guard's half of case 7, of
+ * tests/a-receipt-with-tests-missing-reads-incomplete-everywhere.test.ts. The guard on a repair's verification takes only
+ * the outcome wholeSuiteReceiptOutcome gives for its pinned original receipt, and refuses each other word with the refusal
+ * it gives a receipt of another commit. The verifier's half is at the end of
+ * tests/the-stable-upgrade-verifies-original-evidence.test.ts. Both halves pin each receipt to the same function and the
+ * same word, so the guard and the verifier agree on every receipt both can be given.
+ * The guard cannot be given case 2's failed build that carries suite evidence, with whole coverage or not: the store
+ * refuses a whole_suite_receipt whose build exit is other than 0 beside any suite field. It can be given case 8's
+ * receipt with no suite exit: the check that admits a repair reads the problem's own receipt, not this one.
+ */
+const outcomeModule='../src/shared/whole-suite-receipt.ts'
+/**
+ * AN ENTRY AN EARLIER CASE LEFT LANDING IS LANDED FIRST, so that cases 5 and 7 hold in any order of the cases. sealedRun
+ * seals the same commit in every case, so each repair here is the same work as every entry still in the queue. The queue
+ * refuses a submission of the same work while an entry of it is neither final nor withdrawable, and the case that admits
+ * a checked takeout leaves its last repair landing. Each such entry is moved to merged, as this file lands an entry, and
+ * no other entry is changed. The states come from the queue's own specs.
+ */
+async function landWhatAnEarlierCaseLeftLanding() {
+  const {MERGE_STATE_SPECS}=await import('../src/shared/merge-queue.ts')
+  for(const {id} of t.client.sqlite.prepare("SELECT id FROM records WHERE kind = 'merge_entry' AND deleted_at IS NULL").all() as {id:string}[]) {
+    const data=t.api.getRecord(id)!.data,spec=MERGE_STATE_SPECS[data['state'] as keyof typeof MERGE_STATE_SPECS]
+    if(spec.final||spec.mayBeWithdrawn) continue
+    const commit=(data['changeset'] as {commit:string}).commit
+    rawData(id,{...data,state:'merged',toolWanted:null,occupies:undefined,integrated:{entry:id,mainBefore:base,mainAfter:commit,rebasedTip:commit,at:'2026-10-15 09:30:00'}})
+  }
+}
+async function aLandedRepairToVerify() {
+  await freshController()
+  const p=await problem(),id=p.body.record.id as string,run=await sealedRun()
+  let current=await read(id);expect((await patch(id,{repair:{run}},current.body.version)).status).toBe(200)
+  await landWhatAnEarlierCaseLeftLanding()
+  const queued=await submit(run,{fixRound:{problem:id,kind:'repair'}});expect(queued.status,JSON.stringify(queued.body)).toBe(201)
+  const entry=queued.body.entry.id as string,repairCommit=queued.body.entry.changeset.commit as string
+  current=await read(id);expect((await patch(id,{repair:{entry}},current.body.version)).status).toBe(200)
+  rawData(entry,{...t.api.getRecord(entry)!.data,state:'merged',toolWanted:null,integrated:{entry,mainBefore:base,mainAfter:repairCommit,rebasedTip:repairCommit,at:'2026-10-15 09:30:00'}})
+  current=await read(id);expect((await patch(id,{verification:{repairCommit,targetCommit:repairCommit,state:'planned'}},current.body.version)).status).toBe(200)
+  current=await read(id);expect((await patch(id,{verification:{state:'attempted',attempt:'synthetic-outcome-attempt'}},current.body.version)).status).toBe(200)
+  return {id,repairCommit}
+}
+/** The original verification receipt of the repair: the fixture's red receipt, changed into the case's receipt. */
+function aVerificationReceipt(repairCommit: string, change: (red: Record<string, unknown>) => Record<string, unknown>) {
+  const red=receipt('2026-10-15 10:30:00',repairCommit,git('rev-parse',`${repairCommit}^{tree}`))
+  const data=change({...red.data})
+  const made=t.api.createRecord({kind:'whole_suite_receipt',title:'Synthetic original verification receipt',workspaceId:'default',actor:person,origin:'fixture',data})
+  return {data,pin:{recordId:made.id,seq:1,contentHash:t.api.versionOf(made)}}
+}
+/** The guard's refusal, read from the guard: a pinned receipt of another commit, given the outcome it reads. */
+async function theGuardsRefusal(id: string) {
+  const other=receipt('2026-10-15 10:30:00'),current=await read(id),before=corpus()
+  const refused=await patch(id,{verification:{state:'complete',receipt:{recordId:other.id,seq:1,contentHash:t.api.versionOf(other)},outcome:'red'}},current.body.version)
+  expect(refused.status,JSON.stringify(refused.body)).toBe(409);expect(corpus()).toBe(before)
+  expect(refused.body.error).toMatch(/\S/)
+  return refused.body.error as string
+}
+async function theGuardTakesOnly(id: string, pin: unknown, outcome: string, refusal: string, name: string) {
+  const {mainSuiteFixSchema}=await import('../src/shared/main-suite-fix.ts')
+  for(const word of mainSuiteFixSchema.shape.verification.unwrap().shape.outcome.unwrap().options.filter(word=>word!==outcome)) {
+    const current=await read(id),before=corpus(),refused=await patch(id,{verification:{state:'complete',receipt:pin,outcome:word}},current.body.version)
+    expect(refused.status,`${name}, ${word}: ${JSON.stringify(refused.body)}`).toBe(409);expect(refused.body.error,`${name}, ${word}`).toBe(refusal);expect(corpus()).toBe(before)
+  }
+  const current=await read(id),taken=await patch(id,{verification:{state:'complete',receipt:pin,outcome}},current.body.version)
+  expect(taken.status,`${name}, ${outcome}: ${JSON.stringify(taken.body)}`).toBe(200)
+  expect((await read(id)).body.record.data.mainSuiteFix.verification.outcome,name).toBe(outcome)
+}
+const synthetic=(n: number)=>['log','report'].map(name=>({name,path:`${root}/alone/${n}/${name==='log'?'run.log':'report.json'}`,sha256Base64:'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA='}))
+// The receipts of cases 1 to 4 and 8 that the guard can be given, each made from the fixture's complete red receipt.
+const GUARD_RECEIPTS: [string, (red: Record<string, unknown>) => Record<string, unknown>, string][] = [
+  ["1, the problem's case: build 0, suite 1, its one test file never seen",red=>({...red,failedFiles:[],failedTests:[],coverage:{expectedCount:1,observedCount:0,missing:['work/a.txt'],unexpected:[]}}),'incomplete'],
+  ['2, a failed build as the producer writes it, with only its log',red=>{
+    const failed:Record<string,unknown>={...red,buildExitCode:17,artifacts:(red['artifacts'] as {name:string}[]).filter(artifact=>artifact.name==='log')}
+    for(const key of ['suiteExitCode','failedFiles','failedTests','coverage']) delete failed[key]
+    return failed
+  },'build-failed'],
+  ['3, version 1 with no failures',red=>({...red,suiteExitCode:0,failedFiles:[],failedTests:[]}),'green'],
+  ['3, version 2 with every run alone green',red=>({...red,version:2,errorsOutsideTests:0,aloneRuns:[{file:'work/a.txt',outcome:'green',exitCode:0,artifacts:synthetic(1)}]}),'green'],
+  ['3, version 1 with a failed file',red=>red,'red'],
+  ['3, version 2 with a run alone not green',red=>({...red,version:2,errorsOutsideTests:0,aloneRuns:[{file:'work/a.txt',outcome:'red',exitCode:1,artifacts:synthetic(1)}]}),'red'],
+  ['4, a suite that exited 0 with whole coverage and its reads missing',red=>({...red,suiteExitCode:0,failedFiles:[],failedTests:[],artifacts:(red['artifacts'] as {name:string}[]).filter(artifact=>artifact.name!=='reads')}),'incomplete'],
+  ['8, complete with no failures and no suite exit',red=>{
+    const unread:Record<string,unknown>={...red,failedFiles:[],failedTests:[]}
+    delete unread['suiteExitCode']
+    return unread
+  },'incomplete'],
+]
+it("5. takes incomplete for an original receipt whose suite exited 1 with its one test file never seen, and refuses red with the guard's refusal",async()=>{
+  const {id,repairCommit}=await aLandedRepairToVerify(),refusal=await theGuardsRefusal(id)
+  const {pin}=aVerificationReceipt(repairCommit,GUARD_RECEIPTS[0]![1])
+  let current=await read(id);const before=corpus(),refused=await patch(id,{verification:{state:'complete',receipt:pin,outcome:'red'}},current.body.version)
+  expect(refused.status,JSON.stringify(refused.body)).toBe(409);expect(refused.body.error).toBe(refusal);expect(corpus()).toBe(before)
+  current=await read(id);expect((await patch(id,{verification:{state:'complete',receipt:pin,outcome:'incomplete'}},current.body.version)).status).toBe(200)
+  expect((await read(id)).body.record.data.mainSuiteFix.verification).toMatchObject({state:'complete',receipt:pin,outcome:'incomplete'})
+})
+it('7. takes, for each receipt of cases 1 to 4 and 8 it can be given, only the outcome wholeSuiteReceiptOutcome reads',async()=>{
+  const {wholeSuiteReceiptOutcome}=await import(outcomeModule) as {wholeSuiteReceiptOutcome:(data:unknown)=>string}
+  let refusal: string|undefined
+  for(const [name,change,outcome] of GUARD_RECEIPTS) {
+    const {id,repairCommit}=await aLandedRepairToVerify()
+    refusal??=await theGuardsRefusal(id)
+    const {data,pin}=aVerificationReceipt(repairCommit,change)
+    expect(wholeSuiteReceiptOutcome(data),name).toBe(outcome)
+    await theGuardTakesOnly(id,pin,outcome,refusal,name)
+  }
+})

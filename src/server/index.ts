@@ -68,6 +68,7 @@ import { withTheWayForThisJob } from '../config/the-office-tool-environment.mjs'
 import { createServer, type Server } from 'node:http'
 import { drain } from './lib/drain.ts'
 import { join, resolve } from 'node:path'
+import { getHeapStatistics } from 'node:v8'
 import {
   THE_WORKER_LOG_ROOT,
   whyThisCheckoutMayNotOpenTheDatabase,
@@ -78,8 +79,6 @@ import {
   THE_STARTER_WATCH_THREAD_ENTRY,
   THE_THREAD_BUNDLES,
   isTheProgramRun,
-  aPageOnThisMachine,
-  originsAPageMayBeOn,
   portFrom,
   readSetting,
   settingValue,
@@ -108,6 +107,7 @@ import {
 } from '../config/the-service-lock.mjs'
 import { writeHowTheServerEnded } from '../config/how-the-server-ended.mjs'
 import { readTheProcessAt } from '../config/session-process.mjs'
+import { THE_TEST_RUN_FLAG, theTestRunToEndWith } from '../config/the-test-mark.mjs'
 import { thisSystem } from '../config/systems/the-system.mjs'
 import { FRESHNESS_HEADER } from '../config/freshness-header.mjs'
 import { CALL_ID_HEADER } from '../config/call-header.mjs'
@@ -116,7 +116,6 @@ import {
   A_PAGE_MAY_SEND_ITS_COOKIE,
   HEADERS_A_PAGE_MAY_READ,
   METHODS_A_PAGE_MAY_USE,
-  mayAPageOnThisOriginRead,
 } from '../config/what-a-page-may-read.mjs'
 import type { World } from '@shared/runtime.ts'
 import { loadPanelEnv } from './lib/env.ts'
@@ -144,6 +143,9 @@ import { isLoopback } from './lib/access.ts'
 import { discoveryRoutes, noSuchEndpoint, trackApiRoutes, type ApiRoute } from './api/kinds.ts'
 import { route } from './lib/route.ts'
 import { watchTheLoop } from './lib/loop-watch.ts'
+import { named } from './lib/named-timers.ts'
+// Opens no database: it imports better-sqlite3's types only.
+import { closeTheDatabase } from './db/a-closed-database.ts'
 import { STARTER_SHUTDOWN_GRACE_MS } from './lib/starter-watch.mjs'
 import { refuseADataFolderInAWorktree } from './lib/git-checkout.ts'
 // The word a reader sees for a kind of world, for the line this server logs about itself.
@@ -229,8 +231,13 @@ export interface BuiltServer {
    * and say how many. A stop calls it as it stops taking reads: such a request waits for something
    * to happen and is not a read being worked out, so a drain would wait its whole grace for it.
    * Before the drain these were ended after 1 s. The page and the waiter connect again.
+   *
+   * `finished` SETTLES WHEN WHAT THEY DO AS THEY CLOSE HAS BEEN DONE (package SD): each one's connection has closed,
+   * which ran its close (a page that closed looks at who is online), and its reply has been sent or given up (the
+   * waiting door reads what it hands the agent after the agent has left). A stop waits for it before it closes the
+   * database, so that work reads and writes an open one.
    */
-  endTheWaits: () => number
+  endTheWaits: () => { ended: number; finished: Promise<void> }
 }
 
 /**
@@ -356,6 +363,8 @@ const endedRunResourceTimers = new WeakMap<FastifyInstance, () => void>()
 const loadReadingTimers = new WeakMap<FastifyInstance, () => void>()
 /** What stops each canonical server's minute reading of storage upload receipts (lib/storage/receipts.ts). */
 const storageReceiptTimers = new WeakMap<FastifyInstance, () => void>()
+/** What stops each server's 5-minute read of this machine's tailnet name (lib/a-host-that-is-not-this-office.ts). */
+const tailnetNameReadTimers = new WeakMap<FastifyInstance, () => void>()
 
 /**
  * Build the whole served surface: every route group, the health route, the error handler and the
@@ -421,8 +430,39 @@ export async function buildApp(appSettings: AppSettings): Promise<BuiltServer> {
    * after it, and a route registered above this line would exist and be undiscoverable.
    */
   const listApiRoutes = trackApiRoutes(app)
-  // A LINE FOR EVERY REQUEST OVER 2 s, with its time inside SQLite and its five slowest statements. First of the request
-  // hooks, so every later hook and the handler run inside the request's own count. See lib/slow-requests.ts.
+  // A REQUEST WHOSE HOST IS NOT THIS OFFICE'S IS REFUSED, AND TOUCHES NOTHING. The first request hook, so for a refused
+  // request no other request hook and no handler runs, and the redirect to the address for browsers below never sends
+  // it on. See lib/a-host-that-is-not-this-office.ts.
+  {
+    const { refuseAHostThatIsNotThisOffice } = await import('./lib/a-host-that-is-not-this-office.ts')
+    refuseAHostThatIsNotThisOffice(app)
+  }
+  // A WRITE A WEBSITE COULD SEND IS REFUSED BEFORE ANY DOOR: a request that changes something and carries neither a
+  // header of the office's own nor JSON. Right after the Host check, so a refused request reaches no other request hook
+  // and no handler. A request made in the office's own process passes, because no listener carried it and so no browser
+  // could have sent it; `refuseAnUnclassifiedDoor` below refuses one that came on a socket no listener stamped. See
+  // lib/a-write-a-website-could-send.ts.
+  {
+    const { refuseAWriteWithoutTheOfficesMark } = await import('./lib/a-write-a-website-could-send.ts')
+    refuseAWriteWithoutTheOfficesMark(app)
+  }
+  // A REQUEST WHOSE ORIGIN IS NOT THIS OFFICE'S IS REFUSED, AND TOUCHES NOTHING. Right after the Host check and the
+  // office's mark, from the Host check's list of names, so for a refused request no other request hook runs, the CORS
+  // answer included, and no handler does. It decides every request's Origin once, and the CORS answer below reads that.
+  // A write a website sent with no mark is refused by the mark first, with that rule's words. See
+  // lib/an-origin-that-is-not-this-office.ts.
+  const { refuseAnOriginThatIsNotThisOffice, theStandingOfTheOrigin } = await import('./lib/an-origin-that-is-not-this-office.ts')
+  refuseAnOriginThatIsNotThisOffice(app, appSettings.production)
+  // A FILE TICKET IS HONOURED OR REFUSED BEFORE EVERY OTHER KEY RULE. A browser's own load of a file carries the cookie
+  // half and a ticket, and the refusal of one half below would refuse it first. A request whose address names no ticket
+  // is not read. The book lives with this app, so a restart ends every ticket. See lib/file-tickets.ts.
+  const { aFileTicketBook, honourOrRefuseAFileTicket } = await import('./lib/file-tickets.ts')
+  const fileTickets = aFileTicketBook()
+  honourOrRefuseAFileTicket(app, fileTickets)
+  // A LINE FOR EVERY REQUEST OVER 2 s, with its time inside SQLite and its five slowest statements. The first request
+  // hook after the Host check, the office's mark, the Origin check and the file ticket, so every later hook and the
+  // handler run inside the request's own count. A request any of the four refuses is not counted. See
+  // lib/slow-requests.ts.
   {
     const { sqlite } = await import('./db/client.ts')
     const { measureTheStatementsOf, sayTheSlowRequests } = await import('./lib/slow-requests.ts')
@@ -445,8 +485,11 @@ export async function buildApp(appSettings: AppSettings): Promise<BuiltServer> {
   // and closed before the line's timer ran. See lib/loop-watch.ts.
   const REMEMBERS_CLOSED_FOR_MS = 120_000
   const theRecentlyClosed: { request: FastifyRequest; closedAt: number }[] = []
+  // EACH OPEN REQUEST'S REPLY, so a stop can tell when the reply of a wait it ended has been sent (`endTheWaits`).
+  const theirReplies = new WeakMap<FastifyRequest, FastifyReply>()
   app.addHook('onRequest', async (request, reply) => {
     theOpenRequests.add(request)
+    theirReplies.set(request, reply)
     arrivedAt.set(request, performance.now())
     reply.raw.once('close', () => {
       theOpenRequests.delete(request)
@@ -485,10 +528,24 @@ export async function buildApp(appSettings: AppSettings): Promise<BuiltServer> {
   // page load: /api, loopback and an address that is not this machine's stay where they arrived.
   const { sendPageLoadsToTheAddressForBrowsers } = await import('./lib/address-for-browsers.ts')
   sendPageLoadsToTheAddressForBrowsers(app)
-  const endTheWaits = (): number => {
+  const endTheWaits = (): { ended: number; finished: Promise<void> } => {
     const waits = [...theOpenRequests].filter(thisRequestWasAChosenWait)
     for (const one of waits) one.raw.socket.destroy()
-    return waits.length
+    // LOOKED AT EVERY 10 MS AND NOT AT ONCE. A request reads closed a moment before its close runs, and a look made in a
+    // later turn of the event loop comes after that close and after what the reply did in the same turn.
+    const theyHaveFinished = (): boolean => waits.every((one) => one.raw.closed && theirReplies.get(one)?.sent === true)
+    const finished = new Promise<void>((done) => {
+      if (waits.length === 0) return done()
+      const look = setInterval(
+        named('the look at the waits a stop ended', (line) => app.log.warn(line), () => {
+          if (!theyHaveFinished()) return
+          clearInterval(look)
+          done()
+        }),
+        10,
+      )
+    })
+    return { ended: waits.length, finished }
   }
 
   const { howOldThisServersCodeIs, sayWhichWorldAnswered, theWorldThisProcessIsIn } = await import('./lib/world.ts')
@@ -578,8 +635,10 @@ export async function buildApp(appSettings: AppSettings): Promise<BuiltServer> {
   // A SECRETARY'S OWN BROADCAST SETTINGS: on or off, the reminder's lead and its words, read back with the times.
   const { broadcastSettingsRoutes } = await import('./api/broadcast-settings.ts')
   const { thePersonsLookRoutes } = await import('./api/the-persons-look.ts')
+  const { figureRoutes } = await import('./api/figures.ts')
   // THE TOOLSET CATALOGUE'S DOORS: the list, one manual page, and a use written on the calling run.
   const { toolsetRoutes } = await import('./api/toolset.ts')
+  const { knowledgeRoutes } = await import('./api/knowledge.ts')
   const { forkRoutes } = await import('./api/forks.ts')
   const { waitingRoutes } = await import('./api/waiting.ts')
   const { restrictionRoutes } = await import('./api/restrictions.ts')
@@ -597,12 +656,14 @@ export async function buildApp(appSettings: AppSettings): Promise<BuiltServer> {
   const { workDomainRoutes } = await import('./api/workdomain.ts')
   const { workingRoutes } = await import('./api/working.ts')
   const { fileRoutes } = await import('./api/files.ts')
+  const { fileTicketRoutes } = await import('./api/file-tickets.ts')
   // A ZIP BROUGHT BACK FROM OUTSIDE, written to a file beside the pictures and pointed at by a later
   // record. Criterion F16, point 5. The rules are in lib/returnedfiles.ts; this is the route group.
   const { returnedFilesRoutes } = await import('./api/returnedfiles.ts')
   // A FILE A REPORT CARRIES AS A FILE, stored beside the database and served back by the preview
   // door above. Criterion R3. The rules are in lib/reportfiles.ts; this is the route group.
   const { reportFilesRoutes } = await import('./api/reportfiles.ts')
+  const { reportPdfRoutes } = await import('./api/report-pdf.ts')
   const { storageRoutes } = await import('./api/storage.ts')
   // PERMANENT RESIDENTS AND THE PERSONAL SPACE EACH HAS, a folder beside the database reached only through these
   // doors. The rules are in lib/residents.ts; this is the route group.
@@ -637,6 +698,7 @@ export async function buildApp(appSettings: AppSettings): Promise<BuiltServer> {
   const { dataFolderRoutes } = await import('./api/data-folder.ts')
   const { sandboxMemoryCapRoutes } = await import('./api/sandbox-memory-cap.ts')
   const { terminalAgentRoutes } = await import('./api/terminal-agents.ts')
+  const { newAgentRoutes } = await import('./api/new-agent.ts')
   const { deadLetterRoutes } = await import('./api/dead-letters.ts')
   const { eventRoutes } = await import('./api/events.ts')
   const { zoomRoutes } = await import('./api/zoom.ts')
@@ -668,6 +730,7 @@ export async function buildApp(appSettings: AppSettings): Promise<BuiltServer> {
   const { sidebarRoutes } = await import('./api/sidebar.ts')
   const { homeLayoutRoutes } = await import('./api/home-layout.ts')
   const { sidebarPinsRoutes } = await import('./api/sidebar-pins.ts')
+  const { reportCountRoutes } = await import('./api/report-count.ts')
   const { wordSettingsRoutes } = await import('./api/word-settings.ts')
   const { addedRolesRoutes } = await import('./api/added-roles.ts')
   const { goalSpanRoutes } = await import('./api/goal-spans.ts')
@@ -699,6 +762,8 @@ export async function buildApp(appSettings: AppSettings): Promise<BuiltServer> {
   const { entryRoutes } = await import('./api/entry.ts')
   const { sandboxLoginRoutes } = await import('./api/sandbox-logins.ts')
   const { secretaryDutiesRoutes } = await import('./api/secretary-duties.ts')
+  const { departmentRoutes } = await import('./api/departments.ts')
+  const { keyItemRoutes } = await import('./api/key-items.ts')
   const { backlogRoutes } = await import('./api/backlog.ts')
   const { doneRoutes } = await import('./api/done.ts')
   const { providerRouterRoutes } = await import('./api/provider-router.ts')
@@ -711,72 +776,81 @@ export async function buildApp(appSettings: AppSettings): Promise<BuiltServer> {
   const { backupRoutes } = await import('./api/backups.ts')
   const { projectGraphRoutes } = await import('./api/project-graph.ts')
   const { projectBoardRoutes } = await import('./api/project-board.ts')
+  const { pipelinesStandingStillRoutes } = await import('./api/pipelines-standing-still.ts')
   const { checkVisitorCredentials } = await import('./lib/visitorgate.ts')
   const { checkWhereTheCallerIsFrom } = await import('./lib/visits.ts')
 
+  /**
+   * THE ONE ERROR HANDLER, SET BEFORE THE FIRST ROUTE. Fastify gives each route the error handler that is set when
+   * the route is registered, not the one set later. The CORS registration below adds a route of its own, the
+   * preflight that answers OPTIONS on every path. Set after it, that route kept Fastify's default handler, so the
+   * Origin check's refusal of a preflight was answered "Forbidden" and not in this office's words.
+   */
+  installErrorHandling(app)
+
+  /**
+   * ONLY THIS OFFICE'S OWN ORIGINS, DECIDED ONCE FOR EACH REQUEST BY THE ORIGIN CHECK ABOVE.
+   *
+   * It was `origin: true`, which reflects whatever origin asks, then the origins this installation
+   * declared, and from 4 September 2026 until SEC-2 also a page on any port of this machine. Now the
+   * Origin check in lib/an-origin-that-is-not-this-office.ts takes a page of this office, from the
+   * names the Host check takes, and the dev server's page while the office is not built for
+   * production. A world that is not the office also takes the office's own page, exactly as the
+   * office's list of its pages names it, and answers that page with no leave to send a cookie. The
+   * check refuses every other request a listener carried before this answer is written. So this
+   * answer reads its decision, and does not decide again: a delegator, because the decision is about
+   * the request and not only its origin text.
+   *
+   * NO ORIGIN, AND THE PLUGIN FILES' NULL, GET NOTHING HERE. A request with no `Origin` is curl, a
+   * tool, an agent or a server, and CORS is a rule browsers apply to pages. The plugin page's own
+   * files answer an Origin of null themselves, to any origin and with no leave to send a cookie
+   * (src/server/api/plugins.ts). A request no listener carried whose Origin is not this office's gets
+   * nothing either, and a door that asks refuses it.
+   */
   await app.register(cors, {
-    /**
-     * ONLY THE ORIGINS THIS INSTALLATION DECLARES, AND IT USED TO BE ALL OF THEM.
-     *
-     * It was `origin: true`, which reflects whatever origin asks, and the comment defending it said
-     * the server only listens on loopback so the only pages that can reach it are already on this
-     * machine. That is no longer true: `MOLE_OFFICE_ADDRESS_FOR_OTHER_MACHINES` opens a door on an
-     * address other machines reach, and reflecting every origin there would let any page anybody
-     * opened, anywhere, read this research diary through a browser that can reach that address.
-     *
-     * `originsAPageMayBeOn` in src/config/settings.mjs is the list and says how it is built. It is
-     * READ per request rather than captured when the app is built, so it is this process's settings
-     * and not a copy taken earlier.
-     *
-     * A REQUEST WITH NO `Origin` HEADER IS ALLOWED, and that is not a hole: it is curl, a tool, an
-     * agent and every server-to-server caller. CORS is a rule browsers apply to pages. A caller that
-     * is not a page is not restrained by it either way, so refusing here would inconvenience the
-     * honest callers and stop nobody.
-     */
-    /**
-     * AND ANY PAGE SERVED BY SOMETHING ON THIS MACHINE, since 4 September 2026.
-     *
-     * Criterion C7 lets a person enter another world, and the page then sends its requests to that
-     * world's port — a different origin, which the visited world has no way of having on a list. The
-     * whole argument, including why this widens nothing that matters, is on `aPageOnThisMachine` in
-     * src/config/settings.mjs: anything on this machine can already reach this API with curl, and
-     * the door another machine comes through still admits exactly the two declared addresses.
-     */
-    origin: (origin, decide) => {
-      // THE SAME QUESTION THE EVENT STREAM ASKS. A hijacked reply gets no hook and writes its own
-      // headers, so the decision lives in one function both call — problem `PjlpSf-hizZA`, where
-      // this callback allowed a page anywhere on this machine and the stream allowed only the
-      // declared origins, and a visiting page lost its live channel with nothing saying why.
-      decide(null, mayAPageOnThisOriginRead(origin, originsAPageMayBeOn(settings())))
+    delegator: (req, answer) => {
+      const standing = theStandingOfTheOrigin(req)
+      if (standing.is !== "this office's" && standing.is !== "the office's page, on a visited world") {
+        answer(null, { origin: false })
+        return
+      }
+      answer(null, {
+        origin: standing.origin,
+        methods: [...METHODS_A_PAGE_MAY_USE],
+        /**
+         * A PAGE ON ANOTHER ORIGIN MAY SEND THE PAIRING COOKIE. Criterion P83, point 2.
+         *
+         * The rule and the reason for it are `A_PAGE_MAY_SEND_ITS_COOKIE` in
+         * src/config/what-a-page-may-read.mjs. The event stream reads the same rule, because its reply
+         * gets no hook and writes its own headers. When the rule is true this answer writes
+         * `access-control-allow-credentials: true`, and it names the one origin the request carried
+         * rather than `*`, which is the pair the browser demands.
+         *
+         * A VISITED WORLD'S ANSWER TO THE OFFICE'S PAGE GIVES NO SUCH LEAVE (SEC-2's design, item
+         * 2). The page sends neither half of its key there, and a browser that sent a cookie anyway
+         * would not let the page read the answer.
+         */
+        credentials: standing.is === "this office's" && A_PAGE_MAY_SEND_ITS_COOKIE,
+        /**
+         * THE HEADERS A PAGE ON ANOTHER ORIGIN HAS TO BE ABLE TO READ. The reply names these headers, so a
+         * page on another origin can read them.
+         *
+         * A browser hides every response header from a page's own JavaScript except a handful it deems
+         * safe, unless the reply names the others here. Nothing did, so a page on another origin read no
+         * world header at all — and `theWorldThatAnswered` never learns a first world from replies that
+         * do not carry one, so the check criterion G3 exists for was not drawing a false banner: it was
+         * silently never running. That is the worse of the two, because an absent check looks exactly
+         * like a passing one.
+         *
+         * THE NAMES ARE IMPORTED, NEVER TYPED HERE, and the list itself is one module:
+         * `src/config/what-a-page-may-read.mjs`. Two places send these headers — this registration, and
+         * the event stream, which hijacks its reply and so gets no hook at all — and a list in each
+         * would be one fact worked out twice. `tests/a-page-on-another-origin.test.ts` reads the browser
+         * app's own source and fails when it starts reading a header the list omits.
+         */
+        exposedHeaders: [...HEADERS_A_PAGE_MAY_READ],
+      })
     },
-    methods: [...METHODS_A_PAGE_MAY_USE],
-    /**
-     * A PAGE ON ANOTHER ORIGIN MAY SEND THE PAIRING COOKIE. Criterion P83, point 2.
-     *
-     * The rule and the reason for it are `A_PAGE_MAY_SEND_ITS_COOKIE` in
-     * src/config/what-a-page-may-read.mjs. The event stream reads the same rule, because its reply
-     * gets no hook and writes its own headers. When the rule is true this option writes
-     * `access-control-allow-credentials: true`, and the origin callback above answers with the one
-     * origin it read rather than `*`, which is the pair the browser demands.
-     */
-    credentials: A_PAGE_MAY_SEND_ITS_COOKIE,
-    /**
-     * THE HEADERS A PAGE ON ANOTHER ORIGIN HAS TO BE ABLE TO READ. Problem `a36N9Ivqf46H`.
-     *
-     * A browser hides every response header from a page's own JavaScript except a handful it deems
-     * safe, unless the reply names the others here. Nothing did, so a page on another origin read no
-     * world header at all — and `theWorldThatAnswered` never learns a first world from replies that
-     * do not carry one, so the check criterion G3 exists for was not drawing a false banner: it was
-     * silently never running. That is the worse of the two, because an absent check looks exactly
-     * like a passing one.
-     *
-     * THE NAMES ARE IMPORTED, NEVER TYPED HERE, and the list itself is one module:
-     * `src/config/what-a-page-may-read.mjs`. Two places send these headers — this registration, and
-     * the event stream, which hijacks its reply and so gets no hook at all — and a list in each
-     * would be one fact worked out twice. `tests/a-page-on-another-origin.test.ts` reads the browser
-     * app's own source and fails when it starts reading a header the list omits.
-     */
-    exposedHeaders: [...HEADERS_A_PAGE_MAY_READ],
   })
 
   /**
@@ -834,8 +908,6 @@ export async function buildApp(appSettings: AppSettings): Promise<BuiltServer> {
       done(failure, undefined)
     }
   })
-
-  installErrorHandling(app)
 
   /**
    * MAKE THE TWO KEYS IF THIS IS THE FIRST RUN, BESIDE THE DATABASE. Criterion P83, point 1.
@@ -1242,6 +1314,7 @@ export async function buildApp(appSettings: AppSettings): Promise<BuiltServer> {
     bookingRoutes: () => app.register(bookingRoutes, { prefix: '/api' }),
     draftRoutes: () => app.register(draftRoutes, { prefix: '/api' }),
     toolsetRoutes: () => app.register(toolsetRoutes, { prefix: '/api' }),
+    knowledgeRoutes: () => app.register(knowledgeRoutes, { prefix: '/api' }),
     // The same forks, whole, for the person who is going to settle one. Beside the queue that lists
     // them because both are the same reading — src/server/lib/forks.ts — and neither takes a project.
     forkRoutes: () => app.register(forkRoutes, { prefix: '/api' }),
@@ -1306,12 +1379,16 @@ export async function buildApp(appSettings: AppSettings): Promise<BuiltServer> {
     // Inline preview. After the record routes because a file is previewable only while a live record
     // points at it, which is a fact those routes own; it adds no way to write anything.
     fileRoutes: () => app.register(fileRoutes, { prefix: '/api' }),
+    // The address a browser's own load opens one file with, beside the door it opens. It writes into the app's book of
+    // tickets, which the request hook above reads.
+    fileTicketRoutes: () => app.register(fileTicketRoutes, { prefix: '/api', book: fileTickets }),
     // A returned file is stored beside the pictures and served by the same preview door above, so its
     // group is registered here. It writes no record and it never opens the archive it stores.
     returnedFilesRoutes: () => app.register(returnedFilesRoutes, { prefix: '/api' }),
     // A report's own file is stored the same way and served by the same preview door, so its group is
     // registered beside the outside return. It writes no record.
     reportFilesRoutes: () => app.register(reportFilesRoutes, { prefix: '/api' }),
+    reportPdfRoutes: () => app.register(reportPdfRoutes, { prefix: '/api' }),
     storageRoutes: () => app.register(storageRoutes, { prefix: '/api' }),
     // A resident's personal space is the third folder of files beside the database with doors of its own. It is
     // served by its own doors and never by the preview door, because only its readers may read it.
@@ -1389,6 +1466,8 @@ export async function buildApp(appSettings: AppSettings): Promise<BuiltServer> {
     sandboxMemoryCapRoutes: () => app.register(sandboxMemoryCapRoutes, { prefix: '/api' }),
     // An agent opened in one of those terminals, by the person's press. Wave 13u, round 3.
     terminalAgentRoutes: () => app.register(terminalAgentRoutes, { prefix: '/api' }),
+    // The new agent dialog's Create: one press makes an agent and opens it in a terminal, the office's own or one outside.
+    newAgentRoutes: () => app.register(newAgentRoutes, { prefix: '/api' }),
     // THE DEAD LETTERS: the wild messages, the one line per sweep to the secretary the person named (or to
     // nobody when nobody is named, problem 0WUuvB0IhRfb), and the claim. Criterion M111. After the worker's routes, because the worker is what presses the sweep once a pass.
     deadLetterRoutes: () => app.register(deadLetterRoutes, { prefix: '/api' }),
@@ -1434,7 +1513,7 @@ export async function buildApp(appSettings: AppSettings): Promise<BuiltServer> {
     folderReadingRoutes: () => app.register(folderReadingRoutes, { prefix: '/api' }),
     // WHICH WORLDS THIS INSTALLATION HAS. Served by every world: the main world answers from its own
     // table, and any other world answers from the mirror and says so.
-    officeRoutes: () => app.register(officeRoutes, { prefix: '/api' }),
+    officeRoutes: () => app.register(officeRoutes, { prefix: '/api', production: appSettings.production }),
     stableUpgradeNoticeRoutes: () => app.register(stableUpgradeNoticeRoutes, { prefix: '/api', webDir: appSettings.webDir }),
     // AND THE CREDENTIAL A VISITING AGENT HOLDS, at the same office and under the same prefix: an
     // agent on another machine, before that machine runs a world, is a trusted visitor and holds one
@@ -1462,6 +1541,8 @@ export async function buildApp(appSettings: AppSettings): Promise<BuiltServer> {
     homeLayoutRoutes: () => app.register(homeLayoutRoutes, { prefix: '/api' }),
     // EACH PERSON'S PAGES IN FRONT OF THE SIDEBAR: one row each, written only by that person.
     sidebarPinsRoutes: () => app.register(sidebarPinsRoutes, { prefix: '/api' }),
+    // EACH PERSON'S ANSWER ABOUT THE UNREAD REPORT COUNT: one row each, written only by that person.
+    reportCountRoutes: () => app.register(reportCountRoutes, { prefix: '/api' }),
     wordSettingsRoutes: () => app.register(wordSettingsRoutes, { prefix: '/api' }),
     addedRolesRoutes: () => app.register(addedRolesRoutes, { prefix: '/api' }),
     // THE GOAL SPANS: HOW FAR OUT SHORT, MEDIUM AND LONG REACH. Criterion P1. On the same installation
@@ -1524,6 +1605,10 @@ export async function buildApp(appSettings: AppSettings): Promise<BuiltServer> {
     entryRoutes: () => app.register(entryRoutes, { prefix: '/api' }),
     // WHAT EACH SECRETARY DOES IN THIS PROJECT, wave 13s round 92: the duties records' own doors, never in records.ts.
     secretaryDutiesRoutes: () => app.register(secretaryDutiesRoutes, { prefix: '/api' }),
+    // THE DEPARTMENTS OF THIS PROJECT, wave 13s round 281: the department records' own doors, never in records.ts.
+    departmentRoutes: () => app.register(departmentRoutes, { prefix: '/api' }),
+    // THE KEY ITEMS OF A PROJECT, wave 13s round 281: the key item records' own doors, never in records.ts.
+    keyItemRoutes: () => app.register(keyItemRoutes, { prefix: '/api' }),
     // ONE LINE'S BACKLOG, wave 13s round 142: the backlog items of one line, in the line's order.
     backlogRoutes: () => app.register(backlogRoutes, { prefix: '/api' }),
     // A RECORD MARKED DONE IN ONE CALL, wave 13s round 142: a task, a backlog item or an obligation.
@@ -1552,6 +1637,10 @@ export async function buildApp(appSettings: AppSettings): Promise<BuiltServer> {
     broadcastSettingsRoutes: () => app.register(broadcastSettingsRoutes, { prefix: '/api' }),
     // ONE PERSON'S LOOK AND OWN THEMES, read and set by that person or by a secretary holding the person's grant.
     thePersonsLookRoutes: () => app.register(thePersonsLookRoutes, { prefix: '/api' }),
+    // THE FOUR FIGURES THE HOME PAGE LACKS (wave 13s round 281): four reads, and no write door.
+    figureRoutes: () => app.register(figureRoutes, { prefix: '/api' }),
+    // THE PIPELINES THAT STAND STILL, for home's Late or stuck (wave 13s round 281): one read, and no write door.
+    pipelinesStandingStillRoutes: () => app.register(pipelinesStandingStillRoutes, { prefix: '/api' }),
   } satisfies Record<(typeof ROUTE_GROUPS)[number], () => typeof app>
   for (const name of ROUTE_GROUPS) await routeRegistrations[name]()
 
@@ -1666,6 +1755,8 @@ export async function buildApp(appSettings: AppSettings): Promise<BuiltServer> {
     loadReadingTimers.delete(app)
     storageReceiptTimers.get(app)?.()
     storageReceiptTimers.delete(app)
+    tailnetNameReadTimers.get(app)?.()
+    tailnetNameReadTimers.delete(app)
   })
   return { app, listApiRoutes, endTheWaits }
 }
@@ -2019,6 +2110,12 @@ export async function writeThisServerIntoTheLedger(
       sleepClockEvery ?? theIntervalOfTheSleepClock(settingValue(THE_SLEEP_CLOCK_SETTING)),
     )
     /**
+     * AND THE PACKAGE REMINDERS. An unref'd minute timer, for the same reasons. It reminds each maker of the inside
+     * packages that wait on it, together, at the interval it set. See src/server/lib/package-reminders.ts.
+     */
+    const { startThePackageReminderClock } = await import('./lib/package-reminders.ts')
+    startThePackageReminderClock((line) => app.log.info(line))
+    /**
      * AND THE DEAD-LETTER SWEEP, ON THE SERVER'S OWN TIMER. Another unref'd
      * timer, for the same reasons. It sweeps when five minutes have passed since the last sweep, whatever the
      * worker's mode, because a worker in merges-only mode never presses the sweep. See src/server/lib/deadletters.ts.
@@ -2361,6 +2458,13 @@ async function start(): Promise<void> {
    */
   const starter = starterPid()
   /**
+   * THE TEST RUN THIS SERVER ENDS WITH, given by a start that carried the test suite's mark (src/config/the-test-mark.mjs),
+   * or null. It is read here for the same reason as the starter: a flag without a process number is refused before
+   * anything opens. It is watched below, beside the starter, and is recorded nowhere: the lock's starter stays the one
+   * --stop-with-pid names.
+   */
+  const testRun = theTestRunToEndWith(process.argv)
+  /**
    * STOP WHEN THE PROCESS THAT STARTED THIS SERVER IS GONE.
    *
    * Eight browser tests start a server detached so one signal can take it and its children. Detaching
@@ -2375,41 +2479,68 @@ async function start(): Promise<void> {
    * A stuck close still holds a port for a server nobody awaits. The main thread ends the process
    * after the shutdown grace, running the exit handler; the independent thread sends SIGKILL later
    * if the main thread cannot run at all.
+   *
+   * The test run, when the flag names one, is watched the same way, by a thread of its own that runs the same file, with
+   * the same grace and the same forced end. Whichever of the two is found gone first says why the server shuts down.
    */
-  let starterGone = false
-  let onStarterGone: (() => void) | null = null
+  let starterGone: string | null = null
+  let onStarterGone: ((why: string) => void) | null = null
+  const watched: { pid: number; who: string; gone: string; unreadable: (why: string | undefined) => string; failed: string }[] = []
   if (starter !== null) {
+    watched.push({
+      pid: starter,
+      who: 'The starter',
+      gone: `the process that started this server (pid ${starter}) is gone`,
+      unreadable: (why) => `--stop-with-pid=${starter}: Mole Office cannot tell whether that process is still running (${why}), so this server will not stop itself.`,
+      failed: 'The starter watch failed',
+    })
+  }
+  if (testRun !== null) {
+    watched.push({
+      pid: testRun,
+      who: 'The test run that started this server',
+      gone: `the test run that started this server (pid ${testRun}) is gone`,
+      unreadable: (why) => `${THE_TEST_RUN_FLAG}=${testRun}: Mole Office cannot tell whether the test run that started this server is still running (${why}), so this server will not end with it.`,
+      failed: 'The watch on the test run failed',
+    })
+  }
+  if (watched.length > 0) {
     // Start before opening the database or listeners, so a later main-thread stall cannot prevent
     // the watch itself from starting. Preloads belong to the server, not to its watchdog thread.
     const { Worker } = await import('node:worker_threads')
     const entry = THE_INSTALL.from === 'bundle' ? THE_THREAD_BUNDLES[THE_STARTER_WATCH_THREAD_ENTRY] : THE_STARTER_WATCH_THREAD_ENTRY
-    const watch = new Worker(join(REPO_ROOT, entry), {
-      workerData: { starterWatchPid: starter },
-      execArgv: [],
-    })
-    watch.on('message', (answer: { state: 'gone' | 'unreadable'; why?: string }) => {
-      if (answer.state === 'unreadable') {
-        // Could not look is not gone. The worker stands down after this one warning rather than
-        // treating an unreadable process as dead or repeating a permanent failure every second.
-        console.error(`--stop-with-pid=${starter}: Mole Office cannot tell whether that process is still running (${answer.why}), so this server will not stop itself.`)
-        return
-      }
-      starterGone = true
-      const lastResort = setTimeout(() => {
-        console.error('The starter is gone and shutdown has not finished; ending without closing the database.')
-        process.exit(0)
-      }, STARTER_SHUTDOWN_GRACE_MS)
-      lastResort.unref()
-      onStarterGone?.()
-    })
-    watch.on('error', (error) => console.error(`The starter watch failed: ${error instanceof Error ? error.message : String(error)}`))
-    watch.unref()
+    for (const { pid, who, gone, unreadable, failed } of watched) {
+      const watch = new Worker(join(REPO_ROOT, entry), {
+        workerData: { starterWatchPid: pid },
+        execArgv: [],
+      })
+      watch.on('message', (answer: { state: 'gone' | 'unreadable'; why?: string }) => {
+        if (answer.state === 'unreadable') {
+          // Could not look is not gone. The worker stands down after this one warning rather than
+          // treating an unreadable process as dead or repeating a permanent failure every second.
+          console.error(unreadable(answer.why))
+          return
+        }
+        if (starterGone !== null) return
+        starterGone = gone
+        const lastResort = setTimeout(() => {
+          console.error(`${who} is gone and shutdown has not finished; ending without closing the database.`)
+          process.exit(0)
+        }, STARTER_SHUTDOWN_GRACE_MS)
+        lastResort.unref()
+        onStarterGone?.(gone)
+      })
+      watch.on('error', (error) => console.error(`${failed}: ${error instanceof Error ? error.message : String(error)}`))
+      watch.unref()
+    }
   }
 
   // The port, its default and the refusal all come from src/config/settings.mjs, which is the same
   // declaration vite.config.ts reads. Until 3 September 2026 this line carried its own `?? '8787'`
   // and Vite carried another; moving one moved half of `npm run dev`.
   const port = portFrom(process.env, 'MOLE_OFFICE_PORT')
+  // The heap setting, read before anything listens, so a value outside its range stops the server here. The start line says it.
+  const theHeapSetting = settingValue('MOLE_OFFICE_SERVER_HEAP_MB')
 
   /**
    * Where the browser app is in development, for the two messages that name it.
@@ -2568,6 +2699,21 @@ async function start(): Promise<void> {
   steps.ended(THE_START_STEPS.theTestCheck)
 
   /**
+   * THE USER'S OWN PATH IS READ HERE, ONCE AT EACH START, and from here on this server's PATH is the office's own with
+   * the user's entries after it, so every terminal and worker started later gets them (src/config/the-users-own-path.mjs).
+   * It is read after the test check, because a server a test started runs no login shell, and before anything starts a
+   * terminal or a worker or looks up an agent tool. The login shell is given the environment a terminal gets, which
+   * holds none of this server's keys. The line says whether it was read, and names no entry.
+   */
+  {
+    const { giveTheOfficeTheUsersPath, theLineThatSaysTheUsersPath } = await import('../config/the-users-own-path.mjs')
+    const { theEnvironmentATerminalGets } = await import('./lib/terminals.ts')
+    const aTestStartedThis = (await import('./lib/runtime.ts')).aTestRunnerIsBehindThisProcess()
+    console.log(theLineThatSaysTheUsersPath(await giveTheOfficeTheUsersPath({ shellEnvironment: theEnvironmentATerminalGets(), aTestStartedThis })))
+  }
+  steps.ended(THE_START_STEPS.theUsersPath)
+
+  /**
    * Make sure the database is up to date before serving anything — WITHOUT MIGRATING IT UNASKED.
    *
    * TWO DEFECTS MEET AT THIS LINE AND IT HAS TO MISS BOTH.
@@ -2645,7 +2791,7 @@ async function start(): Promise<void> {
       const { whichWorldAnswered } = await import('./lib/world.ts')
       await waitForThePress({
         sqlite,
-        offer: { file: resolve(sqlite.name), holds: decision.update.holds, wouldWrite: decision.update.wouldWrite, backups: settings().backupsDirectory },
+        offer: { file: resolve(sqlite.name), holds: decision.update.holds, wouldWrite: decision.update.wouldWrite, measuredOn: decision.update.measuredOn, backups: settings().backupsDirectory },
         migrationsFolder: MIGRATIONS_FOLDER,
         port,
         host,
@@ -2662,6 +2808,8 @@ async function start(): Promise<void> {
   // database it has just said it will not serve.
   if (!decision.serve) throw new Error(decision.refusal)
   console.log(decision.report)
+  const { establishKnowledgeWorkspace } = await import('./knowledge/workspace.ts')
+  establishKnowledgeWorkspace()
 
   // WHO OWNS THIS OFFICE, read once from its database before anything answers a request, so that
   // `THE_PERSON` in @shared/person.ts is the owner's id for every request this process serves.
@@ -2743,6 +2891,11 @@ async function start(): Promise<void> {
   const { copyTheDefaultRegulationsOnce } = await import('./lib/default-regulations.ts')
   console.log(copyTheDefaultRegulationsOnce().line)
 
+  // THE FIRST START OF THE CODE THAT KEEPS AN AGENT'S OWNER HAND-OVERS WRITES WHEN IT BEGAN, once, before it serves, so
+  // the page can say from when the list holds them. lib/agent-owner-changes.ts says why.
+  const { keepTheDayTheHandOversBeganOnce } = await import('./lib/agent-owner-changes.ts')
+  console.log(keepTheDayTheHandOversBeganOnce().line)
+
   // AN APPIMAGE'S OFFICE WRITES ITS SKILL'S COPY AND ITS HOOK LAUNCHER AGAIN AT EVERY START, because its skill link
   // points at that copy, its three hook lines run that launcher, and the AppImage's folder both name can be another one
   // at the next start (src/config/install-the-entry.mjs says why). Outside an AppImage it writes nothing and says
@@ -2784,6 +2937,12 @@ async function start(): Promise<void> {
     console.log(fileTheCardWordsOnce(theCommitTheCardWordsComeFrom()).line)
   }
   steps.ended(THE_START_STEPS.theCardWords)
+
+  // THE FLOW COPY COMES AFTER buildApp, BECAUSE FILING A FLOW READS THE ROLE CARDS IT HAS READ.
+  {
+    const { copyTheDefaultFlowsOnce } = await import('./lib/default-flows.ts')
+    console.log(copyTheDefaultFlowsOnce().line)
+  }
 
   // A MOVED OFFICE ENDS THE ROWS ITS FORMER PLACE LEFT, so its first reply can say it moved. The lib file says what it reads.
   {
@@ -2984,13 +3143,39 @@ async function start(): Promise<void> {
     )
   }
 
+  // THE LISTENERS THE OFFICE IS BOUND ON, read off their sockets, for the list of its pages a world reads from the
+  // mirror (SEC-2's design, item 6). Here and not in buildApp, so an app a test builds says none, and the mirror is
+  // written at once so a world does not wait for the next change. A mirror that cannot be written is a line in the log
+  // and does not stop the office: its rows are right, and a world reads the list of the last mirror written.
+  {
+    const { theOfficeListensOn } = await import('./lib/a-host-that-is-not-this-office.ts')
+    const { writeTheMirror } = await import('./lib/office.ts')
+    const listeners = [
+      { listener: 'the loopback listener' as const, server: app.server },
+      { listener: 'the second listener' as const, server: otherMachines },
+      { listener: 'the door for other machines' as const, server: theAddressDoor },
+    ]
+    theOfficeListensOn(
+      listeners.flatMap(({ listener, server }) => {
+        const bound = server?.address() ?? null
+        return bound === null || typeof bound === 'string' ? [] : [{ listener, address: bound.address, port: bound.port }]
+      }),
+    )
+    try {
+      writeTheMirror()
+    } catch (err) {
+      app.log.warn(`The mirror could not be written with the list of the office's pages: ${err instanceof Error ? err.message : String(err)}`)
+    }
+  }
+
   const count = liveRecordCount(db)
   // The path ABSOLUTE, not as configured. `./data/panelx.db` is a different file depending on where
   // the process was started, and this line is the one place an operator can find out which one this
   // is — so it must not be the answer that needs a second question. The version leads it, so a
   // tester's log says which build they ran (decision sKPFWjOuQVEe).
   app.log.info(
-    `Mole Office ${theVersion() ?? '(version not recorded in this bundle)'} API on http://${host}:${port} — database ${resolve(sqlite.name)}`,
+    `Mole Office ${theVersion() ?? '(version not recorded in this bundle)'} API on http://${host}:${port} — database ${resolve(sqlite.name)}` +
+      ` — heap limit ${String(Math.round(getHeapStatistics().heap_size_limit / (1024 * 1024)))} MB (MOLE_OFFICE_SERVER_HEAP_MB ${theHeapSetting ?? 'not set'})`,
   )
   // Said on every start because it is the answer to "what can I call?", and the person or agent
   // reading this line is the one asking.
@@ -3051,6 +3236,15 @@ async function start(): Promise<void> {
     loadReadingTimers.set(app, startTheLoadReadings((line) => app.log.warn(line)))
   }
 
+  // THIS MACHINE'S OWN TAILNET NAME, read now and every 5 minutes, for the Host check. Here and not in buildApp, so an
+  // app a test builds starts no read and runs no tailscale. A read holds no request. After each read the list of the
+  // office's pages is worked out again, and the mirror is written only when the list changed.
+  {
+    const { keepReadingThisMachinesTailnetName } = await import('./lib/a-host-that-is-not-this-office.ts')
+    const { writeTheMirrorWhenThePagesChanged } = await import('./lib/office.ts')
+    tailnetNameReadTimers.set(app, keepReadingThisMachinesTailnetName((line) => app.log.info(line), writeTheMirrorWhenThePagesChanged))
+  }
+
   // AND THE WORKER THAT TAKES THE MESSAGE QUEUE. After the ledger, so it is registered under a
   // server that is already on the list, and never under a test runner.
   let theWorker = await startTheMessageWorker(app)
@@ -3099,8 +3293,39 @@ async function start(): Promise<void> {
      * queue now waits there for the next server.
      */
     const drained = Promise.all([app.server, otherMachines, theAddressDoor].map((one) => (one === null ? null : drain(one))))
+    const endedAt = performance.now()
     const waits = endTheWaits()
-    process.stdout.write(`shutdown: this server takes no new reads, ended the ${String(waits)} held open on purpose, and answers the rest for at most ${String(SHUTDOWN_CONNECTION_GRACE_MS / 1000)}s.\n`)
+    process.stdout.write(`shutdown: this server takes no new reads, ended the ${String(waits.ended)} held open on purpose, and answers the rest for at most ${String(SHUTDOWN_CONNECTION_GRACE_MS / 1000)}s.\n`)
+    /**
+     * WHAT THE ENDED WAITS DO AS THEY CLOSE IS DONE BEFORE THE DATABASE CLOSES, OR FOR AT MOST TEN SECONDS (package SD).
+     * A page's event stream that closes looks at who is online, and on Windows with a person's page open that look waits
+     * for a reading of every process first, seconds later (lib/a-look-on-one-reading-of-every-process.ts). The waiting
+     * door reads what it hands the agent after the agent has left. Until package SD the database could close before
+     * either had run, and they met a closed handle. Counted from when the waits were ended, so it runs beside the steps
+     * below and is waited for once the reads are answered. Past the limit the stop goes on, and the closed database
+     * skips what they write after it (db/a-closed-database.ts).
+     */
+    const ENDED_WAITS_FINISH_WITHIN_MS = 10_000
+    let theirLimit: ReturnType<typeof setTimeout> | undefined
+    type TheirWork = { done: 'yes'; took: number } | { done: 'not in time' } | { done: 'failed'; why: string }
+    const theirWork = Promise.race([
+      waits.finished
+        .then(async (): Promise<TheirWork> => {
+          const { theLooksAskedForHaveRun } = await import('./lib/a-look-on-one-reading-of-every-process.ts')
+          await theLooksAskedForHaveRun()
+          return { done: 'yes', took: Math.round(performance.now() - endedAt) }
+        })
+        // SAID AND COUNTED, NOT THROWN: the stop goes on to end the holder and let the lock go, and exits 1 for it.
+        .catch((failed: unknown): TheirWork => ({ done: 'failed', why: failed instanceof Error ? failed.message : String(failed) })),
+      new Promise<TheirWork>((done) => {
+        theirLimit = setTimeout(
+          named('the limit on what the ended waits do as they close', (line) => app.log.warn(line), () => done({ done: 'not in time' })),
+          ENDED_WAITS_FINISH_WITHIN_MS,
+        )
+      }),
+    ])
+    /** What failed in the stop without ending it. Any one makes the exit code 1. */
+    const theFailures: string[] = []
     let step = 'starting'
     const waitingOn = (next: string): void => {
       step = next
@@ -3196,6 +3421,17 @@ async function start(): Promise<void> {
       process.stdout.write(unanswered === 0
         ? `shutdown: every read this server had taken was answered, ${String(took)} ms after it stopped taking reads.\n`
         : `shutdown: ${String(unanswered)} connection(s) were still open ${String(SHUTDOWN_CONNECTION_GRACE_MS / 1000)}s after this server stopped taking reads, and were ended unanswered.\n`)
+      waitingOn('waiting for what the ended waits do as they close')
+      const theirs = await theirWork
+      clearTimeout(theirLimit)
+      if (theirs.done === 'yes') {
+        process.stdout.write(`shutdown: what the ${String(waits.ended)} ended waits did as they closed was done, ${String(theirs.took)} ms after they were ended.\n`)
+      } else if (theirs.done === 'not in time') {
+        app.log.warn(`shutdown: what the ended waits do as they close was not done ${String(ENDED_WAITS_FINISH_WITHIN_MS / 1000)}s after they were ended. The database closes all the same, and a write they ask after it is skipped.`)
+      } else {
+        theFailures.push(`waiting for what the ended waits do as they close failed: ${theirs.why}`)
+        app.log.error(`shutdown: ${theFailures.at(-1)!}`)
+      }
       waitingOn('closing the app')
       await app.close()
       // A SEARCH THREAD STILL LOADING IS STOPPED ONLY ONCE IT HAS LOADED, and the app's close does not wait for that
@@ -3204,8 +3440,20 @@ async function start(): Promise<void> {
       const { theSearchThreadsHaveStopped } = await import('./lib/search-thread.ts')
       await theSearchThreadsHaveStopped()
       waitingOn('closing the database')
-      sqlite.close()
+      closeTheDatabase(sqlite, (line) => app.log.warn(`shutdown: ${line}`))
       clearTimeout(deadline)
+      /**
+       * WHAT FAILS AFTER THE CLOSE DOES NOT END THE STOP (package SD). A timer or an event that throws from here on, with
+       * no caller to take it, would end the process at once: the holder below would not be ended, and the log would not
+       * say the stop finished. Each is said here at error level and counted, the stop goes on to the holder and the lock,
+       * and the exit code is 1. The process is leaving, so nothing is left in an unknown state for long.
+       */
+      const failedAfterTheClose = (failed: unknown): void => {
+        theFailures.push(`after the database closed: ${failed instanceof Error ? failed.message : String(failed)}`)
+        app.log.error({ err: failed }, `shutdown: ${theFailures.at(-1)!}. The stop goes on.`)
+      }
+      process.on('uncaughtException', failedAfterTheClose)
+      process.on('unhandledRejection', failedAfterTheClose)
       /**
        * AND THE TERMINAL HOLDER, WHEN THE OWNER SHUT THE OFFICE DOWN, as the stop command ends it and with the stop
        * command's own function, which says what it did on this server's output. The window hands its Shut down to
@@ -3221,22 +3469,29 @@ async function start(): Promise<void> {
       let theHolderWasLeft: { code: number; warning: string } | null = null
       if (how.andTheHolder === true) {
         waitingOn('ending the terminal holder')
-        const { endTheTerminalHolder, theShutDownLeftTheHolderWords } = await import('../config/the-service-command.mjs')
-        const said: string[] = []
-        const code = await endTheTerminalHolder({ databasePath: settings().databasePath }, (line) => {
-          said.push(line)
-          process.stdout.write(`${line}\n`)
-        })
-        if (code !== 0) theHolderWasLeft = { code, warning: theShutDownLeftTheHolderWords(said.join(' ')) }
+        try {
+          const { endTheTerminalHolder, theShutDownLeftTheHolderWords } = await import('../config/the-service-command.mjs')
+          const said: string[] = []
+          const code = await endTheTerminalHolder({ databasePath: settings().databasePath }, (line) => {
+            said.push(line)
+            process.stdout.write(`${line}\n`)
+          })
+          if (code !== 0) theHolderWasLeft = { code, warning: theShutDownLeftTheHolderWords(said.join(' ')) }
+        } catch (failed) {
+          // THE LOCK STILL GOES, and the window's stop then reads the holder again (src/desktop/what-the-shut-down-left.mjs).
+          failedAfterTheClose(failed)
+        }
       }
       // THE LOCK LAST, once the database is closed, so a server started the moment it is gone never
       // finds this one still writing.
       waitingOn('letting the service lock go')
       app.log.info(`shutdown: ${letTheLockGo()}`)
+      if (theFailures.length > 0) app.log.error(`shutdown: ended with ${String(theFailures.length)} failure(s): ${theFailures.join(' | ')}`)
       if (theHolderWasLeft !== null) {
         app.log.warn(theHolderWasLeft.warning)
         process.exit(theHolderWasLeft.code)
       }
+      if (theFailures.length > 0) process.exit(1)
       app.log.info('shutdown: finished')
       process.exit(0)
     } catch (error) {
@@ -3310,8 +3565,8 @@ async function start(): Promise<void> {
 
   // A starter that died during startup is remembered until shutdown is ready. The independent
   // watch also enforces the deadline if this thread cannot run the shutdown callback.
-  onStarterGone = () => { void shutdown(`the process that started this server (pid ${starter}) is gone`) }
-  if (starterGone) onStarterGone()
+  onStarterGone = (why) => { void shutdown(why) }
+  if (starterGone !== null) onStarterGone(starterGone)
 }
 
 /**

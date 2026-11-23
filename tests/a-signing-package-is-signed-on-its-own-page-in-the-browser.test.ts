@@ -8,12 +8,15 @@
  * - send [] instead of the struck ids (case 2);
  * - hide could-not items in SigningPackagesPage.tsx (case 3).
  * Pictures are opt-in, SIGNING_PACKAGE_SHOTS=1, and use only invented tasks and agents.
+ * Case 5 reads "Every item is struck" from its key. Before, the page drew a sentence that also told the person to
+ * refuse the package; the Refuse press says that already, so the page draws the state alone, as decided.
  */
 import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { ASigningPackage } from '../src/server/lib/signing-packages.ts'
+import { sayInEnglish } from '../src/shared/i18n.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { liveApp, waitForThePage, type LiveApp } from './helpers.ts'
 
@@ -129,13 +132,13 @@ describe('the package and its page', () => {
     expect(await app.page.locator(`[data-signing-package="${pack.id}"]`).innerText()).toContain('You refused')
   }, 60_000)
 
-  it('5: with every item struck Sign is not offered and the page says to refuse', async () => {
+  it('5: with every item struck Sign is not offered and the page draws "Every item is struck"', async () => {
     const pack = await bring('Strike every invented bench change')
     await open(pack.id)
     const panel = app.page.locator(`[data-signing-package="${pack.id}"]`)
     for (const one of pack.items) await panel.locator(`[data-package-item="${one.id}"]`).getByRole('button', { name: 'Strike', exact: true }).click()
     expect(await panel.getByRole('button', { name: 'Sign', exact: true }).count()).toBe(0)
-    expect(await panel.innerText()).toContain('Every item is struck. Refuse the package instead.')
+    expect(await panel.innerText()).toContain(sayInEnglish('signingPackagesPage.allStruck'))
     expect((await read(pack.id)).state).toBe('waiting')
   }, 60_000)
 

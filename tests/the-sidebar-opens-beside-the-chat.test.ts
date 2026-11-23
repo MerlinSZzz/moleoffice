@@ -203,6 +203,10 @@ async function dragTheSeamUntil(page: Page, width: number): Promise<void> {
 
 beforeAll(async () => {
   app = await liveApp({ name: 'the-sidebar-beside-the-chat', viewport: { width: 1440, height: 900 }, workspace: 'default' })
+  // THE PERSON LAST HAD THE CHAT BESIDE THE PAGE, so the sidebar's Chat row opens it there again once it is put away.
+  // The chat opens the way the person last had it, and the corner window when nothing is kept.
+  const beside = await fetch(`${app.api}/api/participants/person/${THE_PERSON}`, { method: 'PATCH', headers: PERSON, body: JSON.stringify({ chatOpensAs: 'split' }) })
+  expect(beside.status, await beside.clone().text()).toBe(200)
   const filed = await fetch(`${app.api}/api/records`, { method: 'POST', headers: PERSON, body: JSON.stringify({ kind: 'agent', title: AGENT.name, data: { handle: AGENT.handle, runtime: 'claude-code', state: 'active' } }) })
   expect(filed.status, await filed.clone().text()).toBe(201)
   const agents = ((await (await fetch(`${app.api}/api/participants`, { headers: PERSON })).json()) as { agents: { id: string; handle: string }[] }).agents

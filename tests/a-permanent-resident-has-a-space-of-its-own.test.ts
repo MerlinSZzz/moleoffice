@@ -37,7 +37,7 @@ import { dirname, join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { THE_PERSON } from '../src/shared/person.ts'
-import { apiApp, freshDb, thePersonsKeyHeader, FOR_THE_PERSON, type TestDb } from './helpers.ts'
+import { A_SLEEP_TIME, apiApp, freshDb, thePersonsKeyHeader, FOR_THE_PERSON, type TestDb } from './helpers.ts'
 
 let t: TestDb
 let app: FastifyInstance
@@ -107,7 +107,7 @@ function spaceOf(agentId: string): string {
 }
 
 async function propose(secretary: string, agent: string, because = 'It has done steady work here for weeks.'): Promise<Reply> {
-  return inject('POST', '/api/residents/proposals', as(secretary), { agentId: agent, because })
+  return inject('POST', '/api/residents/proposals', as(secretary), { agentId: agent, because, sleepTime: A_SLEEP_TIME })
 }
 
 /** Propose and confirm, and answer the resident's id. */
@@ -164,10 +164,10 @@ describe('proposing a resident', () => {
 
   it('2: a worker, and a secretary named without its key, are refused, and nothing is filed', async () => {
     const before = count("SELECT count(*) AS n FROM records WHERE kind = 'proposal'")
-    const byAWorker = await inject('POST', '/api/residents/proposals', as('reader-one'), { agentId: 'res-two', because: 'x' })
+    const byAWorker = await inject('POST', '/api/residents/proposals', as('reader-one'), { agentId: 'res-two', because: 'x', sleepTime: A_SLEEP_TIME })
     expect(byAWorker.status, byAWorker.text).toBe(403)
     expect(String(byAWorker.json['error'])).toContain('secretary card')
-    const noKey = await inject('POST', '/api/residents/proposals', asAgent('sec-made-up'), { agentId: 'res-two', because: 'x' })
+    const noKey = await inject('POST', '/api/residents/proposals', asAgent('sec-made-up'), { agentId: 'res-two', because: 'x', sleepTime: A_SLEEP_TIME })
     expect(noKey.status, noKey.text).toBe(403)
     expect(count("SELECT count(*) AS n FROM records WHERE kind = 'proposal'")).toBe(before)
   })

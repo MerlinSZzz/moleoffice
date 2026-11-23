@@ -8,6 +8,7 @@ import { join } from 'node:path'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { liveApp, waitForThePage, type LiveApp } from './helpers.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
+import { createI18n, type WordKey } from '../src/shared/i18n.ts'
 import { aMadeUpCheckSession, inspectorFixture } from './inspector-tool-fixture.ts'
 
 let fixture: Awaited<ReturnType<typeof inspectorFixture>>
@@ -96,6 +97,11 @@ describe('two checks of one run do not share a worktree, on the page', () => {
       const firstCheck = await checkSession('Fixture first check')
       const secondCheck = await checkSession('Fixture second check')
       const pathFor = (check: string) => join(fixture.home, '.cache/mole-office/worktrees', `a-check-of-${run}-${check}`)
+      /** The worktree row the check panel draws in developer mode: its label, and the path in its code element. */
+      const theWorktreeRow = async () => ({
+        label: (await app.page.locator('.chk-read-tree dt').textContent()) ?? '',
+        path: (await app.page.locator('.chk-read-tree dd code').textContent()) ?? '',
+      })
       const held = new Promise<void>((resolve) => { releaseFirst = resolve })
       let sayFirst!: (path: string) => void
       const firstSeen = new Promise<string>((resolve) => { sayFirst = resolve })
@@ -119,7 +125,7 @@ describe('two checks of one run do not share a worktree, on the page', () => {
       // in developer mode.
       await app.page.goto(`${app.site}/?mode=inspect#/r/${run}`)
       await waitForThePage(app.page)
-      expect(await app.page.locator('.chk-read-tree').textContent()).toBe(`Worktree: ${firstPath}`)
+      expect(await theWorktreeRow()).toEqual({ label: createI18n('en').t('chk.row.worktree' as WordKey), path: firstPath })
 
       const second = await fixture.inspect([...flags, '--check', secondCheck], served)
       expect(second.code, second.err).toBe(0)
@@ -133,7 +139,7 @@ describe('two checks of one run do not share a worktree, on the page', () => {
           await app.page.emulateMedia({ colorScheme })
           await app.page.reload()
           await waitForThePage(app.page)
-          expect(await app.page.locator('.chk-read-tree').textContent()).toBe(`Worktree: ${pathFor(secondCheck)}`)
+          expect(await theWorktreeRow()).toEqual({ label: createI18n('en').t('chk.row.worktree' as WordKey), path: pathFor(secondCheck) })
           expect(await app.page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0)
         }
       }

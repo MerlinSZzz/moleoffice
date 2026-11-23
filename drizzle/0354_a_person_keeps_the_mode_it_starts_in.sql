@@ -1,0 +1,11 @@
+-- THE MODE A PERSON STARTS IN, for one person.
+--
+-- `starting_mode` holds the mode the office opens in for a person who has not chosen one with the
+-- mode switch. `inspect` is Developer mode: the office writes it for the owner of a new office, who
+-- starts in Developer mode, as decided. NULL is every other person, read as Normal mode. Among them is
+-- every person made before this migration, who has been using the office in Normal mode and keeps it.
+--
+-- IT IS A COLUMN ON `people` AND NOT A TABLE OF ITS OWN, for the reason `chat_opens_as` beside it
+-- gives: it is one fact about one person. There is no CHECK constraint, for the reason the other word
+-- columns of this table have none.
+ALTER TABLE `people` ADD `starting_mode` text;

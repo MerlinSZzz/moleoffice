@@ -5,8 +5,8 @@ import { basename, join } from 'node:path'
 import { sayInEnglish } from './i18n.ts'
 import type { PackageMaterial, PackageParent } from './delegation.ts'
 import {
-  bytes, readRoundChapters, REQUIREMENTS_FILE, roundChaptersGivenText,
-  type DelegationPoint, type DelegationStanding, type RoundChapters, type RoundDelegations, type Section,
+  bytes, readRoundChapters, REQUIREMENTS_FILE, roundChaptersGivenText, THE_CHAPTERS_DOOR, THE_REGULATIONS_DOOR,
+  type DelegationPoint, type DelegationStanding, type RoundChapters, type RoundDelegations, type SavedSource, type Section,
 } from './round-chapters/manifest.ts'
 
 /**
@@ -27,8 +27,6 @@ export const THE_FALLBACK_RULE = 'The fallback rule'
 export const NEXT_FILE = 'briefs/NEXT.md'
 /** The start of the one level-2 heading of NEXT.md whose section lists the line's open items. */
 export const THE_OPEN_ITEMS_HEADING = '1.'
-/** The words the pack's part that lists the rules a round is given begins with. */
-export const THE_RULES_PART = 'The list below is what this round is given.'
 
 function fail(why: string): never { throw new Error(THE_PACK_REFUSAL(why)) }
 
@@ -41,9 +39,29 @@ export function theRoundStartPackHead(line: string): string {
   return `THE ROUND-START PACK OF LINE ${line}. This round is given what its line needs at its start: the open items as NEXT.md's section 1 lists them, the line's own section of TERRITORIES.md and its fallback rule, the rule chapters at outline, and NEXT.md, with LINE-common.md as the saved selection gives it.`
 }
 
-/** The sentence that says the full files are still there. A file the sandbox does not have is not named. */
-export function oneReadAway(paths: string[]): string {
-  return `The full files stay one read away, and nothing is refused for reading them: ${and(paths)}.`
+/**
+ * Where each part of the pack came from, said after its head. `chaptersAt` is when the start read the chapters and the
+ * person's regulations from the office, and null when CODE.md was read from the file `code`.
+ */
+export interface WhereThePackCameFrom { chaptersAt: string | null; code: string; heading: string; territories: string; next: string; common: string }
+
+/** The sentence after the pack's head that names where each part came from. */
+export function whereEachPartCameFrom(from: WhereThePackCameFrom): string {
+  const rules = from.chaptersAt === null
+    ? `the rule chapters from the file ${from.code}, and no regulation of the person was read`
+    : `the rule chapters from GET ${THE_CHAPTERS_DOOR} and the person's regulations from GET ${THE_REGULATIONS_DOOR}, both read at ${from.chaptersAt}`
+  return `Where each part came from: ${rules}; any delegations its declaration names from GET /api/delegation/inside; ` +
+    `the line's own section from the heading "${from.heading}" of ${from.territories}, with the fallback rule of the same file; ` +
+    `the open items and NEXT.md from ${from.next}; and LINE-common.md from ${from.common}.`
+}
+
+/**
+ * The sentence that says the full files are still there. A file the sandbox does not have is not named. When the start
+ * read the chapters from the office, the sentence names the door that gives them in full.
+ */
+export function oneReadAway(paths: string[], chaptersFromTheOffice = false): string {
+  return `The full files stay one read away, and nothing is refused for reading them: ${and(paths)}.` +
+    (chaptersFromTheOffice ? ` The full chapters stay one read away too, at GET ${THE_REGULATIONS_DOOR}.` : '')
 }
 
 /** One part that could not be given, as it is written in the pack. */
@@ -217,12 +235,25 @@ function theOpenItems(nextFile: string, text: string | null, code: string): { gi
 }
 
 /**
+ * THE LINE'S PART OF A WHOLE TERRITORIES.md: its own section, which is the heading that names the sandbox and everything
+ * under it, and the one paragraph that begins with the fallback rule, in the file's order. The paragraph is not added
+ * again when the own section holds it, and it is left out when the file holds none or more than one.
+ */
+function theLinesOwnTerritory(territories: SavedSource, own: Section[], rule: string | null): Section[] {
+  if (rule === null || own.some(s => s.text.includes(rule))) return own
+  const paragraph: Section = { path: [], title: `the paragraph that begins with "${THE_FALLBACK_RULE}"`, text: rule + '\n', bytes: bytes(rule + '\n') }
+  return territories.text.indexOf(rule) < territories.text.indexOf(own[0]!.text) ? [paragraph, ...own] : [...own, paragraph]
+}
+
+/**
  * THE ROUND-START PACK. A round whose sandbox one heading of TERRITORIES.md names is given its line's open items, the
  * line's own section of TERRITORIES.md and the fallback rule, the rule chapters at outline, and NEXT.md, with
- * LINE-common.md as the saved selection gives it. The full files are named one read away. The delegations the
- * declaration names come right after that, before everything else. The manifest's sources stay as they are, so this
- * round's check is given the saved selection as before. With no heading naming the sandbox, the line is not known, and
- * the manifest is returned unchanged; a manifest with delegations is then refused, as nothing else would carry them.
+ * LINE-common.md as the saved selection gives it. Its head names where each part came from, and the full files are named
+ * one read away. The delegations the declaration names come right after that, before everything else. When the saved
+ * selection holds TERRITORIES.md whole, as a fallback does, the round is still given only its line's part of it. The
+ * manifest's sources stay as they are, so this round's check is given the saved selection as before. With no heading
+ * naming the sandbox, the line is not known, and the manifest is returned unchanged; a manifest with delegations is then
+ * refused, as nothing else would carry them.
  */
 export function withTheRoundStartPack(manifest: RoundChapters, sandboxDir: string): RoundChapters {
   const [code, common, territories] = manifest.sources as [RoundChapters['sources'][number], RoundChapters['sources'][number], RoundChapters['sources'][number]]
@@ -246,23 +277,21 @@ export function withTheRoundStartPack(manifest: RoundChapters, sandboxDir: strin
   const own = territories.sections.filter(s => s === heading || (s.path.length > heading.path.length && heading.path.every((p, i) => s.path[i] === p)))
   const rules = territories.text.split(/\n[ \t]*\n/).filter(paragraph => paragraph.startsWith(THE_FALLBACK_RULE))
   if (rules.length !== 1) missing.push(theFallbackRuleMissing(territories.path, rules.length))
-  const rule: Section[] = rules.length === 1 ? [{ path: [], title: `the paragraph that begins with "${THE_FALLBACK_RULE}"`, text: rules[0]! + '\n', bytes: bytes(rules[0]! + '\n') }] : []
-  const given = [...own, ...rule]
-  const part = given.map(s => s.text).join('')
+  // A selection that is not whole is already the line's own section and its fallback rule, as the delivery chose them.
+  const territory = territories.fullFile ? theLinesOwnTerritory(territories, own, rules.length === 1 ? rules[0]! : null) : null
 
+  const fromTheOffice = manifest.regulations !== undefined
   const requirements = join(sandboxDir, REQUIREMENTS_FILE)
-  const away = [...(existsSync(requirements) ? [requirements] : []), territories.path, code.path, common.path, ...(next === null ? [] : [nextFile])]
-  const asGiven = { ...manifest, notice: null, sources: [code, common, { ...territories, sections: given, text: part, bytes: bytes(part) }] }
+  const away = [...(existsSync(requirements) ? [requirements] : []), territories.path, ...(fromTheOffice ? [] : [code.path]), common.path, ...(next === null ? [] : [nextFile])]
+  const from = { chaptersAt: manifest.regulations?.at ?? null, code: code.path, heading: heading.title, territories: territories.path, next: nextFile, common: common.path }
   const text = [
-    theRoundStartPackHead(line),
-    oneReadAway(away),
+    `${theRoundStartPackHead(line)} ${whereEachPartCameFrom(from)}`,
+    oneReadAway(away, fromTheOffice),
     ...(manifest.delegations ? [theDelegationPart(manifest.delegations)] : []),
     ...missing.map(theMissingLine),
     ...('given' in items ? items.given : []),
     ...(next !== null && next === manifest.brief.text ? [nextIsTheBrief()] : []),
-    `${THE_RULES_PART} This round's check is given the saved selection instead, which holds ${territories.bytes} bytes of TERRITORIES.md.` +
-      (manifest.notice ? ` The saved selection says: ${manifest.notice}` : ''),
-    roundChaptersGivenText(asGiven),
+    roundChaptersGivenText(manifest, territory),
     ...(next === null || next === manifest.brief.text ? [] : [`${nextWhole(nextFile)}\n\n${next}`]),
   ].join('\n\n')
   return readRoundChapters({ ...manifest, pack: { line, missing, text, bytes: bytes(text) } })

@@ -89,48 +89,13 @@ import { MAP_COLUMNS } from '../db/stated-for.ts'
 import { toStated } from '../db/stated-for.ts'
 import { statedInRepository } from '../db/stated-in-repository.ts'
 import { RECORD_KINDS_THAT_OWN_CODE } from '@shared/record-kinds-that-own-code.ts'
+import type { StatedRelationship, MapRow } from '../db/types/implementation.ts'
 
 export { RECORD_KINDS_THAT_OWN_CODE } from '@shared/record-kinds-that-own-code.ts'
 
 // ============================================================================ rows as read
 
-/** One row of `implementation_map`, as every reader gets it. */
-export interface StatedRelationship {
-  id: string
-  workspaceId: string
-  recordId: string
-  repositoryId: string
-  pattern: string
-  relation: Relation
-  provenance: Provenance
-  note: string | null
-  revisionId: string | null
-  statedAt: string
-  statedBy: string
-  acceptedAt: string | null
-  acceptedBy: string | null
-  /** Set when somebody removed it. A soft delete, the way `records` does it. */
-  deletedAt: string | null
-  /** Computed from the three above it. NEVER a column — see @shared/implementation.ts. */
-  authority: Authority
-}
-
-export interface MapRow {
-  id: string
-  workspace_id: string
-  record_id: string
-  repository_id: string
-  pattern: string
-  relation: string
-  provenance: string
-  note: string | null
-  revision_id: string | null
-  stated_at: string
-  stated_by: string
-  accepted_at: string | null
-  accepted_by: string | null
-  deleted_at: string | null
-}
+export type { StatedRelationship, MapRow } from '../db/types/implementation.ts'
 
 export { MAP_COLUMNS } from '../db/stated-for.ts'
 

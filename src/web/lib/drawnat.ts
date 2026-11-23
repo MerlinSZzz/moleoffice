@@ -31,12 +31,13 @@
  * was drawn at a reading length, because that surface has none. That is the fifth invariant —
  * *nobody looked* is not *nothing is there* — in the one field whose purpose is to keep them apart.
  *
- * NOTHING READS `data-card-rung` YET AND THAT IS SAID HERE RATHER THAN LEFT TO BE FOUND. A card
- * position has nowhere to be stored: `View.detail` is required and is the reading ladder, and
- * `Seen` is refused for a target that names a record. So splitting the attribute makes the silence
- * honest; it does not yet make the card position recorded, and `design/problem-03/ACCEPTANCE.md`
- * §C2.4 asks for both. The half that is missing is written down in the step's report rather than
- * implied by a reader with no caller.
+ * NO SCRIPT IN THE APP READS THE VALUE OF `data-card-rung` YET AND THAT IS SAID HERE RATHER THAN
+ * LEFT TO BE FOUND. The comment circle reads only whether an element carries it, and an element on
+ * the lanes drawing that carries it is a lanes card. A card position has nowhere to be stored:
+ * `View.detail` is required and is the reading ladder, and `Seen` is refused for a target that
+ * names a record. So splitting the attribute makes the silence honest; it does not yet make the
+ * card position recorded, and `design/problem-03/ACCEPTANCE.md` §C2.4 asks for both. The half that
+ * is missing is written down in the step's report rather than implied by a reader with no caller.
  */
 
 import { isRung, type Rung } from '@shared/detail.ts'

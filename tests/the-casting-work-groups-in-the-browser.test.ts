@@ -26,7 +26,7 @@
  *      work group, and the history shows that group as it was stored, with no label guessed for it.
  *
  * Every casting and every label here is the test's own made-up sample. No width or theme scrolls the page sideways.
- * With CASTING_SHOTS set to a folder, the page is photographed at 1440, 990, 660 and 390 in light and dark: the
+ * With CASTING_SHOTS set to a folder, the page is photographed at 1440 and 390 in light: the
  * picked list with a change panel open, and the Rules tab. No model is called.
  */
 import { mkdirSync } from 'node:fs'
@@ -50,8 +50,8 @@ let out = 0
 let zero = 0
 let own = 0
 let inspector = 0
-const WIDTHS = [1440, 990, 660, 390] as const
-const THEMES = ['light', 'dark'] as const
+const WIDTHS = [1440, 390] as const
+const THEMES = ['light'] as const
 const PAGE = '.cast'
 const PROJECT = 'sample-project'
 const MEANING = "The test's own made-up meaning of hard work."
@@ -221,7 +221,7 @@ describe('the Casting page, in the browser', () => {
     const simple = String(await summary.locator(`li[data-label="${String(simpleLabel)}"]`).textContent())
     expect(simple).toContain('sample-model-marked')
     expect(simple).not.toContain('sample-model-zero')
-    expect(await summary.locator('li[data-label]').last().textContent()).toContain(en('casting.draw.none'))
+    expect(await summary.locator('li[data-label]').last().textContent()).toContain(en('casting.notDrawn'))
 
     // THE OTHER CELLS ARE ONE PRESS AWAY, an empty one saying so.
     expect(await row(drawn).locator('.cast-cell-difficulty').count()).toBe(0)

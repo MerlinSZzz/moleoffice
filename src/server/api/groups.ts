@@ -27,7 +27,7 @@ import { participantKey, theBodyThatWritesAMessage, theProjectsOfAConversation }
 import { PAGE_SHAPE, PAGE_SHAPE_REFUSAL, aGroupRowForThePage } from '@shared/short-lists.ts'
 import { actorFrom } from '../lib/http.ts'
 import { parse } from '../lib/parse.ts'
-import { route } from '../lib/route.ts'
+import { itChangesSomething, route } from '../lib/route.ts'
 import { PanelError } from '../lib/panel-error.ts'
 import { workspaceOf } from '../lib/workspaces.ts'
 import { EVERY_PROJECT } from '@shared/which-projects.ts'
@@ -221,7 +221,7 @@ export async function groupRoutes(app: FastifyInstance): Promise<void> {
     }
   }
 
-  app.get('/groups/:id', route('group.read', 'remote', READ_NOTE), async (req) => {
+  app.get('/groups/:id', itChangesSomething(route('group.read', 'remote', READ_NOTE)), async (req) => {
     const workspaceId = workspaceOf(req)
     const me = whoIsAsking(req)
     const asked = parse(whichGroup, req.params, 'The group asked about')

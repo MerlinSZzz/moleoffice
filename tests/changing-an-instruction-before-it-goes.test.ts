@@ -54,7 +54,7 @@ import { join } from 'node:path'
 import { fileURLToPath, URL } from 'node:url'
 import { chromium, errors, type Browser, type Locator, type Page } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { commandThatStopsWithItsOwner, apiServerArguments, anApiServerOfItsOwn, waitForItsOwnVite, openRecordPagesAt, waitForThePage } from './helpers.ts'
+import { commandThatStopsWithItsOwner, apiServerArguments, anApiServerOfItsOwn, waitForItsOwnVite, openRecordPagesAt, storeNormalModeWhereNothingIsStored, waitForThePage } from './helpers.ts'
 import { theTimeLeftIn, type TheTimeLeft } from './how-long-a-test-may-take.ts'
 import { shortenToWords } from '../src/shared/shortening.ts'
 import { THE_TEST_OFFICES_OWNER } from './a-page-of-a-test-office.ts'
@@ -192,6 +192,7 @@ beforeAll(async () => {
 
   browser = await chromium.launch()
   page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
+  await storeNormalModeWhereNothingIsStored(page.context())
   await openRecordPagesAt(page, 'full')
 }, 240_000)
 

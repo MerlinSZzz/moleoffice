@@ -46,6 +46,7 @@ import {
   changeAChecklist,
   changeAnItem,
   listChecklists,
+  listChecklistsOfProjects,
   makeAChecklist,
   readOneChecklist,
   switchTheReminder,
@@ -84,7 +85,9 @@ const LIST_NOTE =
   '?owner=agent:<id or handle> or ?owner=person:<id> is one owner\'s. Those with an item waiting on the owner come ' +
   'first, then the newest change. Each carries its items, its counts and its version. An empty list says so in ' +
   'words. Writes nothing. ?projects=all reads every project instead, and ?projects=<project id> that one project; ' +
-  'each checklist carries its workspaceId.'
+  'each checklist carries its workspaceId. ?items=open hands only the items not yet done or replaced, and the counts ' +
+  'still count every item. Each finished item is then in finishedItems, with only its id and who added it, and the ' +
+  'records, people, flows and presses are only those the open items name. Read one checklist by its id for all of it.'
 
 const READ_NOTE =
   'ONE CHECKLIST, whoever owns it: its owner, its items with every field, its counts, its version, and `flows`: for each item ' +
@@ -144,7 +147,7 @@ const choicesQuery = z
     offset: z.coerce.number({ error: 'offset must be a whole number of choices to skip' }).int().min(0).optional(),
   })
   .strict()
-const whoseQuery = z.object({ owner: z.string().trim().min(1).optional() }).strict()
+const whoseQuery = z.object({ owner: z.string().trim().min(1).optional(), items: z.literal('open').optional() }).strict()
 
 /**
  * WHAT THE OFFICE WRITES AND A CALLER MAY NOT, refused by name with the reason. A strict shape would
@@ -210,16 +213,16 @@ export async function checklistRoutes(app: FastifyInstance): Promise<void> {
     // ACROSS PROJECTS WHEN `?projects=` IS ASKED, the way the counters door reads them. Without it, the
     // header's project, answered exactly as before.
     const { [PROJECTS_QUERY]: projectsWord, ...rest } = (req.query ?? {}) as Record<string, unknown>
-    const { owner } = parse(whoseQuery, rest, 'Whose checklists to read')
+    const { owner, items } = parse(whoseQuery, rest, 'Whose checklists to read')
     const actor = actorFrom(req)
     const whose = whoseChecklistsAreAsked(owner)
+    const openItemsOnly = items === 'open'
     if (projectsWord === undefined) {
       const workspaceId = workspaceOf(req)
-      return { ...listChecklists({ workspaceId, actor, whose }), workspaceId }
+      return { ...listChecklists({ workspaceId, actor, whose, openItemsOnly }), workspaceId }
     }
     const projects = theProjectsAQueryAsks(req.query, theMessageReader(actor)) ?? []
-    const checklists = projects
-      .flatMap((project) => listChecklists({ workspaceId: project.id, actor, whose }).checklists)
+    const checklists = listChecklistsOfProjects({ workspaceIds: projects.map((project) => project.id), actor, whose, openItemsOnly })
       .sort((a, b) => Number(b.counts.waitingOnTheOwner > 0) - Number(a.counts.waitingOnTheOwner > 0) || b.updatedAt.localeCompare(a.updatedAt))
     const where = projects.length === 1 ? `the project "${projects[0]!.id}"` : `the ${String(projects.length)} projects read`
     return {

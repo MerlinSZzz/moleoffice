@@ -46,8 +46,8 @@ import { storedFileChanged, storedFileMoved, storedTreeRemoved } from './storage
  *   successor      the person, or a secretary under the person's raise, once the resident is retired, and once.
  *   sleep, wake    the resident with its own key, or the person. A retired resident is not put to sleep.
  *   postpone       the resident with its own key only. It is written on the resident and sent to nobody.
- *   sleep time     the resident with its own key, or the person, for a resident that holds the secretary card and is
- *                  not retired (each secretary sets its own).
+ *   sleep time     the resident with its own key, or the person, for a resident that is not retired (each resident
+ *                  sets its own).
  *   named          the resident with its own key, or the person: the picture and the name are chosen.
  *
  * A request that names an agent in its headers and carries no key proves nothing here, as everywhere.
@@ -75,11 +75,14 @@ import { storedFileChanged, storedFileMoved, storedTreeRemoved } from './storage
 import { createHash } from 'node:crypto'
 import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
+import { and, asc, eq, isNull, sql } from 'drizzle-orm'
 import { anOfficeId } from './ids.ts'
+import { NOTHING_FITS_FIELD } from '@shared/what-a-record-names.ts'
 
 import { settings, settingValue } from '../../config/settings.mjs'
 import { THE_MAIL_TOOL_HANDLE } from '../../config/the-mail-tool.mjs'
-import { sqlite } from '../db/client.ts'
+import { db, sqlite } from '../db/client.ts'
+import { records } from '../db/schema.ts'
 import { theStampsOf } from './registry-aliases/stamps.ts'
 import { localStamp, nowStamp, parseLocalStamp, readATypedTime } from '@shared/time.ts'
 import type { ParticipantRef } from '@shared/participants.ts'
@@ -99,12 +102,14 @@ import {
   createRecordWithReport,
   getRecord,
   proposalResolution,
+  toRecord,
   writeDownAnActUnderTheRaise,
   type Actor,
 } from './records.ts'
 import { thePersonIsProved } from '@shared/the-person-proved.ts'
 import { PanelError } from './panel-error.ts'
 import { theWorldThisDatabaseIs } from './world.ts'
+import { isThisOfficesHome } from './visits.ts'
 import { SESSION_ORIGINS_FILE, bringTheOriginsUpToDate, theSessionsOfTheAgent, writeTheFirstOrigin } from './session-origins.ts'
 import type { PanelRecord } from '@shared/types.ts'
 import {
@@ -362,9 +367,10 @@ function theCriterionInWords(reading: TheCriterionReading): string[] {
 }
 
 /** The facts as sentences, for the proposal's `evidence`. */
-function theFactsInWords(facts: MeasuredFacts, area: string | null): string[] {
+function theFactsInWords(facts: MeasuredFacts, area: string | null, sleepTime: ASleepTime): string[] {
   return [
     ...theCriterionInWords(measuredAgainstTheCriterion(facts, area)),
+    `Its sleep begins at ${sleepTime.startsAt} each day and lasts ${String(sleepTime.minutes)} minutes, on the office's clock.`,
     facts.daysSinceCitizen === null
       ? 'Nobody recorded when it became a citizen.'
       : `It has been a citizen for ${String(facts.daysSinceCitizen)} day${facts.daysSinceCitizen === 1 ? '' : 's'}, since ${String(facts.citizenSince)}.`,
@@ -396,7 +402,9 @@ export function whyThisAgentMayNotBeProposed(agent: RegisteredAgent): string | n
   if (here === null) {
     return `This office cannot say which world it is, so it cannot tell whether ${agent.handle} is one of its citizens. ${nothing}`
   }
-  if (agent.homeWorld !== here) {
+  // THIS OFFICE'S HOME IS ITS OWN IDENTITY OR A DEAD HOME OF ITS INSTALLATION, so a citizen registered before a move of
+  // the data folder is still a citizen here. A home nobody recorded is refused in the same words.
+  if (isThisOfficesHome(agent.homeWorld) !== true) {
     return (
       `${agent.handle} is not a citizen of this office's world: its home world is ${agent.homeWorld ?? 'not recorded'}. ` +
       `Only a citizen of this world may be a resident here, and never an agent of a scratch or test world. ${nothing}`
@@ -416,6 +424,8 @@ interface WhatAProposalHolds {
   facts: MeasuredFacts
   /** The long-term area of responsibility the proposal named, or null because it named none. */
   area: string | null
+  /** The sleep time the proposal named, or null because it was filed before a proposal had to name one. */
+  sleepTime: ASleepTime | null
 }
 
 function whatAProposalHolds(record: Pick<PanelRecord, 'data'>): WhatAProposalHolds | null {
@@ -427,7 +437,19 @@ function whatAProposalHolds(record: Pick<PanelRecord, 'data'>): WhatAProposalHol
   const facts = (held as Record<string, unknown>)['facts']
   if (typeof agentId !== 'string' || typeof facts !== 'object' || facts === null) return null
   const area = (held as Record<string, unknown>)['area']
-  return { agentId, facts: facts as MeasuredFacts, area: typeof area === 'string' && area.trim() !== '' ? area : null }
+  const kept = (held as Record<string, unknown>)['sleepTime']
+  const sleepTime =
+    typeof kept === 'object' && kept !== null && !Array.isArray(kept) &&
+    typeof (kept as Record<string, unknown>)['startsAt'] === 'string' &&
+    typeof (kept as Record<string, unknown>)['minutes'] === 'number'
+      ? { startsAt: (kept as { startsAt: string }).startsAt, minutes: (kept as { minutes: number }).minutes }
+      : null
+  return {
+    agentId,
+    facts: facts as MeasuredFacts,
+    area: typeof area === 'string' && area.trim() !== '' ? area : null,
+    sleepTime,
+  }
 }
 
 /** A residency proposal, as the doors answer about it. */
@@ -442,8 +464,16 @@ export interface AResidencyProposal {
   proposedBy: string | null
   because: string | null
   facts: MeasuredFacts
+  /**
+   * WHETHER THE STORED FACTS' HOME WORLD IS THIS OFFICE'S HOME, from `isThisOfficesHome`. It is read when the reply is
+   * made, not when the facts were measured: a move of the data folder after the proposal does not make it false. Null
+   * when nobody recorded the home world, or when this office cannot say which world it is.
+   */
+  homeWorldIsThisOffice: boolean | null
   /** The long-term area of responsibility the proposal named, or null because it named none. */
   area: string | null
+  /** The sleep time the proposal named, or null because it was filed before a proposal had to name one. */
+  sleepTime: ASleepTime | null
   /** The facts against the decided criterion, from `measuredAgainstTheCriterion`, the one place it is worked out. */
   criterion: TheCriterionReading
   /** Open, or settled by the decision named. */
@@ -491,23 +521,31 @@ function asAResidencyProposal(record: PanelRecord): AResidencyProposal | null {
     proposedBy: theProposerOf(record.id),
     because: typeof because === 'string' ? because : null,
     facts: held.facts,
+    // A STORED PROPOSAL MAY LACK THE KEY, so an absent home world is read as one nobody recorded.
+    homeWorldIsThisOffice: isThisOfficesHome(held.facts.homeWorld ?? null),
     area: held.area,
+    sleepTime: held.sleepTime,
     criterion: measuredAgainstTheCriterion(held.facts, held.area),
     settled: settledBy === null ? null : { decisionId: settledBy.id, title: settledBy.title },
   }
 }
 
-/** Every live residency proposal in every project, oldest first. */
+/**
+ * Every live residency proposal in every project, oldest first. The records themselves are read in one statement and
+ * mapped as `getRecord` maps each, so no proposal is read a second time by its id (decision 7LNTYnmK_O1W).
+ */
 export function everyResidencyProposal(): AResidencyProposal[] {
-  const ids = sqlite
-    .prepare(
-      "SELECT id FROM records WHERE kind = 'proposal' AND deleted_at IS NULL AND " +
-        `json_extract(data, '$.extra.${RESIDENCY_EXTRA_KEY}.agentId') IS NOT NULL ORDER BY created_at, rowid`,
-    )
-    .all() as { id: string }[]
-  return ids
-    .map((one) => getRecord(one.id))
-    .filter((one): one is PanelRecord => one !== null)
+  return db
+    .select()
+    .from(records)
+    .where(and(
+      eq(records.kind, 'proposal'),
+      isNull(records.deletedAt),
+      sql`json_extract(${records.data}, ${`$.extra.${RESIDENCY_EXTRA_KEY}.agentId`}) IS NOT NULL`,
+    ))
+    .orderBy(asc(records.createdAt), sql`rowid`)
+    .all()
+    .map(toRecord)
     .map(asAResidencyProposal)
     .filter((one): one is AResidencyProposal => one !== null)
 }
@@ -523,7 +561,11 @@ function theOptionFor(agent: RegisteredAgent): string {
 }
 
 /** A secretary proposes an agent. Files a `proposal` record with the measured facts. */
-export function proposeAResident(input: { agentId: string; because: string; area?: string }, actor: Actor, workspaceId: string): AResidencyProposal {
+export function proposeAResident(
+  input: { agentId: string; because: string; area?: string; sleepTime?: { startsAt: string; minutes: number } },
+  actor: Actor,
+  workspaceId: string,
+): AResidencyProposal {
   if (!theKeyProvesASecretary(actor)) {
     throw new PanelError(
       'Only an agent holding the secretary card, not retired, proposes a permanent resident, and it proves who it is with ' +
@@ -535,6 +577,14 @@ export function proposeAResident(input: { agentId: string; because: string; area
   if (because === '') {
     throw new PanelError('Say why, in "because": the reason this agent should be a permanent resident, in your own words. Nothing was written.', 400)
   }
+  if (input.sleepTime === undefined) {
+    throw new PanelError(
+      'Every permanent resident has a sleep time, so this proposal must name one in "sleepTime": {startsAt, minutes}, ' +
+        'where startsAt is the time of day its sleep begins and minutes is how long it lasts. Nothing was written.',
+      400,
+    )
+  }
+  const sleepTime = readTheSleepTime(input.sleepTime)
   const named = theAgentAnArrivingReferenceNames(input.agentId, 'writing')
   if (named === null) throw new PanelError(`No agent in this installation answers to "${input.agentId}". Nothing was written.`, 404)
   const agent = readParticipant({ kind: 'agent', id: named.agent.id }) as RegisteredAgent
@@ -561,9 +611,9 @@ export function proposeAResident(input: { agentId: string; because: string; area
       options: [option],
       recommendation: option,
       because,
-      evidence: theFactsInWords(facts, area),
+      evidence: theFactsInWords(facts, area, sleepTime),
       who_settles_it: 'the owner',
-      extra: { [RESIDENCY_EXTRA_KEY]: { agentId: agent.id, facts, ...(area === null ? {} : { area }) } },
+      extra: { [RESIDENCY_EXTRA_KEY]: { agentId: agent.id, facts, ...(area === null ? {} : { area }), sleepTime } },
     },
   })
   const made = asAResidencyProposal(record)
@@ -632,6 +682,19 @@ export function confirmAResident(proposalId: string, actor: Actor): Confirmed {
     }
   }
   const { record, proposal } = theOpenProposal(proposalId)
+  if (proposal.sleepTime === null) {
+    throw new PanelError(
+      'This proposal was filed before a proposal had to name a sleep time, and every permanent resident must have one, ' +
+        'so it cannot be confirmed. Nothing was written. Decline it, and a secretary may propose the agent again with a ' +
+        'sleep time.',
+      409,
+      undefined,
+      undefined,
+      undefined,
+      { code: 'residentProposalHasNoSleepTime', values: {} },
+    )
+  }
+  const sleepTime = proposal.sleepTime
   const agent = readParticipant({ kind: 'agent', id: proposal.agentId }) as RegisteredAgent | null
   if (agent === null) throw new PanelError(`The agent this proposal names, ${proposal.agentId}, is no longer registered. Nothing was written.`, 409)
   const why = whyThisAgentMayNotBeProposed(agent)
@@ -689,9 +752,12 @@ export function confirmAResident(proposalId: string, actor: Actor): Confirmed {
           option_index: 0,
           replaces: [],
           why_it_replaces_none: 'A residency is a new standing for one agent, and no earlier decision made this one a resident.',
+          // WHAT IT GOVERNS: an agent, and an agent is not a page, so no page fits it (lib/what-a-record-names.ts).
+          [NOTHING_FITS_FIELD]: [{ missing: 'agent', what: `whether ${agent.name} is a permanent resident` }],
         },
         links: [{ type: RESOLVES_PROPOSAL, toId: record.id }],
         mustSayWhatItReplaces: true,
+        mustSayWhatItGoverns: true,
         door: `POST /api/residents/proposals/${record.id}/confirm`,
       }))
       sqlite
@@ -700,6 +766,7 @@ export function confirmAResident(proposalId: string, actor: Actor): Confirmed {
             'resident_confirmed_by_id = ?, resident_naming_asked_at = ? WHERE id = ? AND resident_since IS NULL',
         )
         .run(since, record.id, created.record.id, by.kind, by.id, since, agent.id)
+      writeTheSleepTime(agent.id, sleepTime, 'agent')
       return created.record
     })()
     const residency = residencyOf(agent.id)
@@ -712,6 +779,7 @@ export function confirmAResident(proposalId: string, actor: Actor): Confirmed {
       reminder: { person: 'waiting', agent: told },
       said:
         `${agent.name} is a permanent resident from ${since}, and its personal space is made. ` +
+        `Its sleep begins at ${sleepTime.startsAt} each day and lasts ${String(sleepTime.minutes)} minutes, on the office's clock. ` +
         (firstOrigin === null
           ? `No session of ${agent.handle} was on record, so ${SESSION_ORIGINS_FILE} is empty until one starts. `
           : `The first line of ${SESSION_ORIGINS_FILE} was read from its most recent session, ${firstOrigin}. `) +
@@ -780,9 +848,12 @@ export function declineAResident(proposalId: string, because: string | undefined
       ...(said === '' ? {} : { because: said }),
       replaces: [],
       why_it_replaces_none: 'Declining a residency proposal changes no earlier decision.',
+      // WHAT IT GOVERNS: an agent, and an agent is not a page, so no page fits it (lib/what-a-record-names.ts).
+      [NOTHING_FITS_FIELD]: [{ missing: 'agent', what: `whether ${proposal.name ?? proposal.agentId} is a permanent resident` }],
     },
     links: [{ type: RESOLVES_PROPOSAL, toId: record.id }],
     mustSayWhatItReplaces: true,
+    mustSayWhatItGoverns: true,
     door: `POST /api/residents/proposals/${record.id}/decline`,
   })).record
 }
@@ -1475,8 +1546,8 @@ export function postponeASleep(residency: Residency, because: string, actor: Act
   if (residency.retired) {
     throw new PanelError(`${residency.handle} is retired, and a retired resident does not sleep. Nothing was written.`, 409)
   }
-  // A SLEEP THE OFFICE BEGAN AT THE SLEEP TIME may be postponed while it goes on: a secretary at work when its time
-  // opened says so, and the sleep ends now. Each secretary sets its own sleep time, and a
+  // A SLEEP THE OFFICE BEGAN AT THE SLEEP TIME may be postponed while it goes on: a resident at work when its time
+  // opened says so, and the sleep ends now. Each resident sets its own sleep time, and a
   // postponed sleep is shown on the agent and sent to nobody. A sleep begun by a press was asked for, and is ended by
   // waking, as before.
   const row = sqlite.transaction(() => {
@@ -1532,22 +1603,14 @@ export const HAVING_A_SLEEP_TIME = 'have a sleep time'
 
 /**
  * THE RESIDENT'S OWN SLEEP TIME IS SET: the time of day its sleep begins and how many minutes it lasts, on the office's
- * clock. The person's decision: each secretary sets its own, at the hour its department is least affected, so only a
- * resident that holds the secretary card has one. The resident itself or the person sets it, and either may change it.
- * Setting it begins no sleep: the clock in src/server/lib/sleep-windows.ts begins the next one when its time opens.
- * The door has read the time as HH:MM and checked the minutes before this is asked.
+ * clock. Any permanent resident that is not retired has one; the resident itself or the person sets it, and either may
+ * change it. Setting it begins no sleep: the clock in src/server/lib/sleep-windows.ts begins the next one when its time
+ * opens. The door has read the time as HH:MM and checked the minutes before this is asked.
  */
 export function setASleepTime(residency: Residency, time: ASleepTime, actor: Actor): ASleepAct {
   const caller = theResidentOrThePerson(residency, actor, 'set its sleep time')
   if (residency.retired) {
     throw new PanelError(`${residency.handle} is retired, and a retired resident does not sleep. Nothing was written.`, 409)
-  }
-  if (!holdsTheSecretaryCard({ kind: 'agent', id: residency.agentId })) {
-    throw new PanelError(
-      `${residency.handle} does not hold the secretary card. A sleep time is a secretary's own, set at the hour its work is ` +
-        'least affected, so only a resident that holds the secretary card has one. Nothing was written.',
-      409,
-    )
   }
   writeTheSleepTime(residency.agentId, time, theWriterOf(caller).kind)
   const sleep = theSleepOf(residency.agentId)
@@ -1622,11 +1685,17 @@ export interface OneResidentReading {
     /** Who filed the proposal, as the change log names its writer, or null when no row says. */
     proposedBy: string | null
     factsAtProposal: MeasuredFacts | null
+    /**
+     * WHETHER THE HOME WORLD IN `factsAtProposal` IS THIS OFFICE'S HOME, from `isThisOfficesHome`. It is read when the
+     * reply is made, not when the facts were measured. Null when there are no facts, when nobody recorded the home
+     * world, or when this office cannot say which world it is.
+     */
+    homeWorldIsThisOffice: boolean | null
     heartbeat: TheHeartbeat
     sleep: TheSleepReading
     /** How many compactions its runs reported, read now. 0 means none was reported, not that none happened. */
     compactionsReported: number
-    /** Whether it holds the secretary card now, and is not retired: only then may it have a sleep time. */
+    /** Whether it holds the secretary card now, and is not retired. The card has nothing to do with its sleep time. */
     holdsTheSecretaryCard: boolean
   }
   space:
@@ -1660,6 +1729,7 @@ export function oneResident(residency: Residency, actor: Actor): OneResidentRead
     decisionId: residency.decisionId,
     confirmedBy: residency.confirmedBy,
     factsAtProposal: held?.facts ?? null,
+    homeWorldIsThisOffice: held === null ? null : isThisOfficesHome(held.facts.homeWorld ?? null),
     retired: residency.retired,
     retiredAt: residency.retiredAt,
     successor: residency.successor,

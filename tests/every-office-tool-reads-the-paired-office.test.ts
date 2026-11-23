@@ -37,8 +37,6 @@
  *     loads only when it integrates an entry, run in the stable checkout with the test files they read from it;
  *   - MOLE_OFFICE_WORKER_CHECKOUT (B): the development checkout gives no pairing; a third checkout refuses the
  *     office's own tools, and the worker's start line says so; an agent's run is unchanged;
- *   - the merge tool's own starts (C): the launcher calls, modal-tests, run-named-tests and the checks;
- *   - the cleanup watcher (G): the merge tool's own watchMergeCleanup starts it with the pairing, and the probe's spawn records the start and starts nothing;
  *   - the service command (D, rows 14 and 15): from the development checkout, and as a restart inside the paired
  *     office, it starts serve-dev in the stable checkout, paired with the development checkout;
  *   - the start-at-login unit (E, row 16), proved in this fixture only;
@@ -78,6 +76,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import { freshDb } from './helpers.ts'
+import { THE_TEST_MARK, THE_TEST_RUN_FLAG } from '../src/config/the-test-mark.mjs'
 
 const SOURCE = fileURLToPath(new URL('..', import.meta.url))
 /**
@@ -458,10 +457,11 @@ function theStartOf(line: Line, ran: Ran): Spawned {
   expect(serveDev.length, `the service command started ${JSON.stringify(line.spawned.map((one) => [one.command, ...one.args]))}, and it said: ${ran.said}`).toBe(1)
   const start = serveDev[0] as Spawned
   // The script is named relative to the stable checkout it starts in, as every other start names it, so the stop
-  // after it finds serve-dev as the second word even when the checkout's path has a space.
+  // after it finds serve-dev as the second word even when the checkout's path has a space. The start carries the suite's
+  // mark, so serve-dev is told to end with the test run the mark names (src/config/the-test-mark.mjs).
   expect({ command: start.command, args: start.args, cwd: start.cwd }).toEqual({
     command: process.execPath,
-    args: ['tools/serve-dev.mjs', '--built', '--prepared'],
+    args: ['tools/serve-dev.mjs', '--built', '--prepared', `${THE_TEST_RUN_FLAG}=${String(process.env[THE_TEST_MARK])}`],
     cwd: stable,
   })
   expect({
@@ -648,46 +648,13 @@ it('B: a worker checkout that is the development checkout gets no pairing, and a
   }
 })
 
-it('C: the merge tool\'s launcher calls, modal-tests, run-named-tests and its checks read the office', async () => {
-  const fromTheMergeTool = await theProbe('merge-tool', anEnvironment(office['envFor merge-tool stable'], 'envFor for the merge tool'), false)
-  expect(fromTheMergeTool, String(fromTheMergeTool['probeFailed'])).not.toHaveProperty('probeFailed')
-  const checks = anEnvironment(fromTheMergeTool['the checks'], 'the checks')
-  const launcherCalls = anEnvironment(fromTheMergeTool['the launcher calls'], 'the launcher calls')
-  const stableTools = anEnvironment(fromTheMergeTool['the stable tools'], 'modal-tests and run-named-tests')
-  for (const [what, env] of [['the checks', checks], ['the launcher calls', launcherCalls], ['the stable tools', stableTools]] as const) {
-    expect(env[THE_PAIRING], what).toBe(dev)
-  }
-  expect(launcherCalls['MOLE_AGENT_KEY']).toBe(THE_OFFICE_KEY)
-  const [changeset, launcher, modal, named] = await Promise.all([
-    aTool(stable, 'tools/checks/git-changeset.mjs', [], checks),
-    aTool(stable, 'tools/sandbox.mjs', ['--help'], launcherCalls),
-    aTool(stable, 'tools/modal-tests.mjs', [], stableTools),
-    aTool(stable, 'tools/run-named-tests.mjs', ['--no-such-option'], stableTools),
-  ])
-  expectTheOffice(changeset, 'tools/checks/git-changeset.mjs')
-  expectTheOffice(launcher, 'tools/sandbox.mjs')
-  expectTheOffice(modal, 'tools/modal-tests.mjs')
-  expectTheOffice(named, 'tools/run-named-tests.mjs')
-}, 120_000)
-
-it('G: the cleanup watcher the merge tool starts is handed the pairing', async () => {
-  const fromTheMergeTool = await theProbe('merge-tool', anEnvironment(office['envFor merge-tool stable'], 'envFor for the merge tool'), false)
-  expect(fromTheMergeTool, String(fromTheMergeTool['probeFailed'])).not.toHaveProperty('probeFailed')
-  const watcher = fromTheMergeTool['the cleanup watcher']
-  const said = JSON.stringify(watcher) ?? String(watcher)
-  expect(watcher, said).not.toBeNull()
-  expect(watcher, said).not.toHaveProperty('failed')
-  const start = watcher as { command: string, args: string[], detached: boolean, pairing: string | null }
-  expect(start.command).toBe(process.execPath)
-  expect(start.args).toEqual([join(stable, 'tools', 'merge-tool', 'cleanup.mjs'), '--watch'])
-  expect(start.detached).toBe(true)
-  expect(start.pairing).toBe(dev)
-}, 120_000)
-
+// GETCONF IS LET THROUGH in cases D and E. A start that carries the test suite's mark reads when the test run began,
+// before it starts anything. On Linux that asks `getconf CLK_TCK` for the clock tick, which starts nothing of the
+// office's. A child let through is not recorded, so the one start the case reads is still serve-dev's.
 it('D, rows 14 and 15: the service command starts serve-dev in the stable checkout paired with the development checkout, from it and as a restart inside the office', async () => {
   const [fromDevelopment, asARestart] = await Promise.all([
-    aTool(dev, THE_SERVICE_COMMAND, ['start'], base()),
-    aTool(stable, THE_SERVICE_COMMAND, ['restart'], officeEnv),
+    aTool(dev, THE_SERVICE_COMMAND, ['start'], base(), { passes: ['getconf'] }),
+    aTool(stable, THE_SERVICE_COMMAND, ['restart'], officeEnv, { passes: ['getconf'] }),
   ])
   const firstStart = theStartOf(theLineOf(fromDevelopment, dev, THE_SERVICE_COMMAND), fromDevelopment)
   const secondStart = theStartOf(theLineOf(asARestart, stable, THE_SERVICE_COMMAND), asARestart)
@@ -709,8 +676,8 @@ it('E, row 16: the start-at-login unit runs the development checkout\'s service 
     }),
   )
   expect(Object.keys(environment).sort()).toEqual(['MOLE_OFFICE_DB', 'MOLE_OFFICE_PORT', 'PATH'])
-  // A user unit with no WorkingDirectory runs in the home folder.
-  const started = await aTool(home, String(words[1]), ['start'], { ...base(), ...environment })
+  // A user unit with no WorkingDirectory runs in the home folder. getconf is let through for the reason above case D.
+  const started = await aTool(home, String(words[1]), ['start'], { ...base(), ...environment }, { passes: ['getconf'] })
   const start = theStartOf(theLineOf(started, dev, THE_SERVICE_COMMAND), started)
   expectTheOffice(await theHop(start), 'tools/serve-dev.mjs')
 }, 120_000)

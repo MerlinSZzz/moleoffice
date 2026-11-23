@@ -22,8 +22,9 @@
  *   1. a page load by the number is sent to the chosen name, with its path and query, on the port it arrived on;
  *   2. an API call by the number is answered where it arrived, even when it asks for HTML;
  *   3. a page load at loopback is answered where it arrived, even when the probe names that loopback address;
- *   4. a forged Host header never becomes a target: a Host that is not this machine's is answered where it arrived,
- *      and a Host that is this machine's but names another port is sent to the chosen name on the real port;
+ *   4. a forged Host header never becomes a target: a Host that is not this office's, and a Host that is this
+ *      machine's number with another port, are refused with a coded refusal and sent nowhere
+ *      (tests/a-request-that-names-another-host-is-refused.test.ts holds that rule);
  *   5. nothing is sent when nobody has chosen an address and .env names none;
  *   6. only the person chooses it, a written address must be a name or a number on its own, and every change is
  *      written down;
@@ -215,20 +216,24 @@ describe('a page load at another of this machine\'s addresses is sent to the one
     }
   })
 
-  it('4: a forged Host header never becomes a redirect target', async () => {
+  it('4: a forged Host header is refused, and never becomes a redirect target', async () => {
     theMachineHas([THE_NUMBER])
     expect((await choose(THE_NAME)).status).toBe(200)
     for (const host of ['evil.example', `evil.example:${String(theDoorsPort())}`, '203.0.113.9:80', `${THE_NUMBER}.evil.example`]) {
       const answer = await ask({ path: '/', host, accept: A_PAGE_LOAD })
+      expect(answer.status, `a page load naming Host ${host}`).toBe(421)
+      expect(JSON.parse(answer.body).code, `a page load naming Host ${host}`).toBe('hostIsNotThisOffice')
       expect(answer.location, `a page load naming Host ${host}`).toBeUndefined()
     }
-    // A Host that IS this machine's number, but names another port and carries a path of its own: the answer is the
-    // chosen name on the port the connection arrived on, and nothing of the header is in it.
+    // A Host that IS this machine's number, but names another port and carries a path of its own, is refused the same
+    // way: it is not this office's address, so it is sent nowhere and nothing of the header becomes a target.
     const forged = await ask({ path: '/settings', host: `${THE_NUMBER}:9999`, accept: A_PAGE_LOAD })
-    expect(forged.status).toBe(307)
-    expect(forged.location).toBe(`http://${THE_NAME}:${String(theDoorsPort())}/settings`)
-    // An absolute URL in the request line is not a path, and is answered where it arrived.
-    const absolute = await new Promise<string | undefined>((done, fail) => {
+    expect(forged.status).toBe(421)
+    expect(JSON.parse(forged.body).code).toBe('hostIsNotThisOffice')
+    expect(forged.location).toBeUndefined()
+    // An absolute URL in the request line is not a path. Its Host is this machine's number with no port, which names
+    // port 80 and not the door's, so it is refused as well and sent nowhere.
+    const absolute = await new Promise<{ status: number; location: string | undefined }>((done, fail) => {
       const req = request(
         {
           host: THE_DOORS_ADDRESS,
@@ -238,13 +243,14 @@ describe('a page load at another of this machine\'s addresses is sent to the one
         },
         (res) => {
           res.resume()
-          res.once('end', () => done(typeof res.headers.location === 'string' ? res.headers.location : undefined))
+          res.once('end', () => done({ status: res.statusCode ?? 0, location: typeof res.headers.location === 'string' ? res.headers.location : undefined }))
         },
       )
       req.once('error', fail)
       req.end()
     })
-    expect(absolute === undefined || absolute.startsWith(`http://${THE_NAME}:`), `an absolute request line was sent to ${String(absolute)}`).toBe(true)
+    expect(absolute.status, `an absolute request line was answered ${String(absolute.status)}`).toBe(421)
+    expect(absolute.location, `an absolute request line was sent to ${String(absolute.location)}`).toBeUndefined()
   })
 
   it('5: nothing is sent when nobody has chosen an address and .env names none', async () => {
@@ -253,7 +259,9 @@ describe('a page load at another of this machine\'s addresses is sent to the one
     expect(reading.statusCode).toBe(200)
     // A test's environment names no address for other machines (tests/helpers.ts starts from a clean one).
     expect(JSON.parse(reading.body)).toMatchObject({ inForce: null, chosen: null, fromTheEnvironment: null })
-    const answer = await ask({ path: '/', host: THE_NUMBER, accept: A_PAGE_LOAD })
+    // The door's own port, so the Host check takes this machine's number and the page load reaches the redirect step.
+    const answer = await ask({ path: '/', host: `${THE_NUMBER}:${String(theDoorsPort())}`, accept: A_PAGE_LOAD })
+    expect(answer.status, 'the page load was refused, so it never reached the redirect step').not.toBe(421)
     expect(answer.location).toBeUndefined()
   })
 })

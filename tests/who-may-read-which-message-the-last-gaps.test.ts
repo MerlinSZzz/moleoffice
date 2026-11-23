@@ -268,6 +268,7 @@ describe('2. POST /api/records with links', () => {
 })
 
 describe('3. GET /api/source?module=', () => {
+  // THE CASE'S REINDEX READS THE WHOLE REPOSITORY: about five seconds alone and longer under a whole suite's load, so the case has its own minute.
   it('answers a hidden message as an id that names nothing, and does not quote its title', async () => {
     const built = await post('/api/source/reindex', {}, OWNER)
     expect(built.status, built.body).toBeLessThan(300)
@@ -281,7 +282,7 @@ describe('3. GET /api/source?module=', () => {
     // owner was told so.
     const owners = await get(`/api/source?module=${m1}`, OWNER)
     expect(owners.status, owners.body).toBe(404)
-  })
+  }, 60_000)
 })
 
 describe('4. the lists of records already called this', () => {

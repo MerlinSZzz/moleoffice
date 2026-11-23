@@ -11,6 +11,7 @@
  * `asPerson` was moved byte for byte out of src/server/lib/participants.ts, with no change of behaviour.
  * `citizenshipOf` was moved byte for byte out of src/server/lib/participants.ts, with no change of behaviour.
  * `runtimeOfTheAgentRecord` was moved byte for byte out of src/server/lib/participants.ts, with no change of behaviour.
+ * `harnessOfTheAgentRecord` is new here: the same record's runtime word as stored, any harness's.
  * `theStoredShortcuts` was moved byte for byte out of src/server/lib/participants.ts, with no change of behaviour.
  * `whoSetIt` was moved byte for byte out of src/server/lib/participants.ts, with no change of behaviour.
  * `theStoredMessageLabels` was moved out of src/server/lib/participants.ts; it now answers an unreadable stored
@@ -21,8 +22,8 @@
  * That file imports it back where it still uses it and re-exports it, so its export surface is unchanged.
  */
 
-import { type ParticipantRef, isLanguage, isChatButtonStays, isChatOpensAs, isChatLayout, isChatTextSize, isCircleShows, isMessageLinkLayout, isMessageProjectMark, isSendKeySetting, isMessageLinkLevel, isPresenceChoice, readShortcutSettings, type ShortcutSettings, isParticipantKind } from '@shared/participants.ts'
-import type { RegisteredAgent, RegisteredPerson, WhoAnAgentIs } from '../lib/participants.ts'
+import { type ParticipantRef, declaredRuntimeOrNull, isLanguage, isChatButtonStays, isChatOpensAs, isChatLayout, isChatTextSize, isCircleShows, isMessageLinkLayout, isMessageProjectMark, isSendKeySetting, isMessageLinkLevel, isPresenceChoice, readShortcutSettings, type ShortcutSettings, isParticipantKind } from '@shared/participants.ts'
+import type { RegisteredAgent, RegisteredPerson, WhoAnAgentIs } from './types/participants.ts'
 import { pixelScaleSchema } from '@shared/pixel-scale.ts'
 import { pixelAppearanceSchema } from '@shared/pixel-office.ts'
 import { readElevation, readElevations } from '@shared/read-elevations.ts'
@@ -32,7 +33,7 @@ import { sqlite } from './client.ts'
 import { circlePicture } from '@shared/messages.ts'
 import { isMessagePictureChoice } from '@shared/messagepictures.ts'
 import { isMediaLoadChoice } from '@shared/mediaload.ts'
-import { theRuntimeOnTheNewestRecord } from './list-participants.ts'
+import { theHarnessOnTheNewestRecord, theRuntimeOnTheNewestRecord } from './list-participants.ts'
 import { theRuntimeForAgentStatement } from './the-model-on-the-agent-record.ts'
 import { readMessageLabels, type TheStoredMessageLabels } from '@shared/message-label.ts'
 import { readShippedFlags, type StoredShippedFlags } from '@shared/intent-mark.ts'
@@ -49,10 +50,11 @@ export function readParticipant(who: ParticipantRef): RegisteredPerson | Registe
   const row = statements.agents.get(who.id) as Record<string, unknown> | undefined
   return row === undefined ? null : asAgent(row)
 }
-/** One registry row as a participant. `runtimes` is every agent's runtime read at once, for a caller building them all. */
+/** One registry row as a participant. `runtimes` is every agent's stored runtime word read at once, for a caller building them all. */
 export function asAgent(row: Record<string, unknown>, runtimes?: ReadonlyMap<string, string | null>): RegisteredAgent {
   const who = whoTheRowSays(row)
   const pixelAppearance = row['pixel_appearance'] == null ? null : pixelAppearanceSchema.parse(JSON.parse(String(row['pixel_appearance'])))
+  const harness = runtimes === undefined ? harnessOfTheAgentRecord(who.id) : (runtimes.get(who.id) ?? null)
   return {
     pixelAppearance,
     pixelScale: row['pixel_scale'] == null ? null : pixelScaleSchema.parse(JSON.parse(String(row['pixel_scale']))),
@@ -66,7 +68,9 @@ export function asAgent(row: Record<string, unknown>, runtimes?: ReadonlyMap<str
     // THE RUNTIME IS NOT ON THIS ROW. The record's `data.runtime` is the one
     // store. `runtimeOfTheAgentRecord` is the one reader of it. The `runtime` column is
     // left in place and dead — see the comment on it in db/schema.ts.
-    runtime: runtimes === undefined ? runtimeOfTheAgentRecord(who.id) : (runtimes.get(who.id) ?? null),
+    // `runtime` is the word only when this product has an adapter for it; `harness` is the word as stored, any harness's.
+    runtime: declaredRuntimeOrNull(harness),
+    harness,
     startedBy: who.startedBy,
     ownerId: typeof row['owner_id'] === 'string' ? row['owner_id'] : null,
     ownerKind: typeof row['owner_kind'] === 'string' ? row['owner_kind'] : null,
@@ -195,6 +199,9 @@ export function asPerson(row: Record<string, unknown>): RegisteredPerson {
     chatButtonStays: isChatButtonStays(row['chat_button_stays']) ? row['chat_button_stays'] : null,
     chatOpensAs: isChatOpensAs(row['chat_opens_as']) ? row['chat_opens_as'] : null,
     chatLayout: isChatLayout(row['chat_layout']) ? row['chat_layout'] : null,
+    // AND FOR THE MODE THEY START IN: `inspect` is the one word the office writes, and anything else
+    // is a person made before the column, read as Normal mode.
+    startingMode: row['starting_mode'] === 'inspect' ? 'inspect' : null,
     // AND FOR THE PERSON'S OWN MESSAGE LABELS: only the door writes the column, and only what
     // `readMessageLabels` accepted, so a value that does not read is one this build did not write.
     chatLabels: theStoredMessageLabels(row['chat_labels']),
@@ -247,12 +254,20 @@ export function citizenshipOf(row: Record<string, unknown>): {
  * `theProjectOfTheAgentRecord` use: a registry row is the installation's and an `agent` record
  * belongs to one project, so one agent may have a record in more than one.
  *
- * A WORD THIS BUILD HAS NO ADAPTER FOR IS NOT AN ANSWER. `declaredRuntimeOrNull` is the one place
- * that decides, exactly as the migration and the write gate already read it; null is a real answer
- * and means no record here names a runtime, which is not the same as a default.
+ * A WORD THIS BUILD HAS NO ADAPTER FOR IS NOT AN ANSWER HERE. `declaredRuntimeOrNull` is the one place
+ * that decides; null is a real answer and means no record here names a runtime the office can start,
+ * which is not the same as a default. Any harness's word is taken on the record, and
+ * `harnessOfTheAgentRecord` gives that word as stored.
  */
 export function runtimeOfTheAgentRecord(agentId: string): string | null {
   return theRuntimeOnTheNewestRecord(theRuntimeForAgentStatement().get(agentId) as { runtime?: unknown } | undefined)
+}
+/**
+ * WHICH HARNESS SERVES THIS AGENT, as its newest live record names it, or null because none does. The same record
+ * `runtimeOfTheAgentRecord` reads; this keeps a word this build has no adapter for, so a page can show what was stored.
+ */
+export function harnessOfTheAgentRecord(agentId: string): string | null {
+  return theHarnessOnTheNewestRecord(theRuntimeForAgentStatement().get(agentId) as { runtime?: unknown } | undefined)
 }
 /** The stored shortcuts column read back, or null because nobody chose or it does not read. */
 export function theStoredShortcuts(held: unknown): ShortcutSettings | null {

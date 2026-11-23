@@ -106,13 +106,6 @@ const NEEDS_YOU: Readonly<Record<string, (reply: WaitingReply) => WaitingItem[]>
   },
 }
 
-/** The page's one line under its title. The Developer page has none: it is not in this round. */
-const LINES: Readonly<Partial<Record<CategoryKey, WordKey>>> = {
-  agents: 'categoryPages.line.agents',
-  office: 'categoryPages.line.office',
-  project: 'categoryPages.line.project',
-}
-
 /**
  * The cards of one group. `caption` is the group's name as the sidebar draws it. `waiting` is the
  * one waiting reading App.tsx fetched for the rail; absent, no count of what needs the person is drawn.
@@ -127,12 +120,11 @@ export function CategoryPage({
   waiting?: AsyncState<WaitingReply>
 }) {
   useLanguage()
-  const sidebar = useSidebarArrangement()
+  useSidebarArrangement()
   const group = railGroups().find((one) => one.key === category)
   if (group === undefined) throw new Error(`No sidebar group called "${category}".`)
   const rows = groupRows(group)
   const redrawn = category !== 'developer'
-  const line = sidebar.changed ? 'sidebarSetting.categoryLine' : LINES[category]
   // Only the rows whose page counts what needs the person take part; a group with none draws no Needs you.
   const counting = rows.filter((row) => NEEDS_YOU[row.key] !== undefined)
   const cards = (
@@ -150,7 +142,6 @@ export function CategoryPage({
         {CATEGORY_CSS}
       </style>
       <h1 className="px-category-title">{caption}</h1>
-      {line === undefined ? null : <p className="px-category-line">{t(line, { group: caption })}</p>}
       {counting.length === 0 || waiting === undefined ? null : <NeedsYou group={caption} rows={counting} waiting={waiting} />}
       {category === 'project' && rows.length > 0 ? (
         <SideBySide className="px-category-sides">
@@ -273,7 +264,6 @@ function CategoryCard({ row, redrawn, waiting }: { row: Destination; redrawn: bo
   return (
     <a className="px-category-card" href={`#${row.to}`} data-card={row.key}>
       <span className="px-category-card-title">{row.label}</span>
-      <span className="px-category-card-what">{row.what}</span>
       <span className="px-category-card-foot">
         {reader === undefined ? null : <Glance reader={reader} redrawn={redrawn} />}
         {counts ? <NeedsCount row={row} waiting={waiting} /> : null}
@@ -384,11 +374,9 @@ export function WhereThisPageIs({
 
 const CATEGORY_CSS = `
 .px-category-title { margin: 0; font-size: var(--fs-5); line-height: 1.2; }
-.px-category-line { margin: 4px 0 0; max-width: 72ch; font-size: var(--fs-2); color: var(--text-2); line-height: var(--lh-body); }
 .px-category-title + .px-category-cards,
-.px-category-line + .px-category-cards,
-.px-category-line + .px-category-sides,
-.px-category-line + .px-category-needs,
+.px-category-title + .px-category-sides,
+.px-category-title + .px-category-needs,
 .px-category-needs + .px-category-cards { margin-top: var(--pad-lg); }
 
 /* The modules panel beside the cards (round 22). The cards keep the wider first column; the panel's
@@ -456,7 +444,6 @@ const CATEGORY_CSS = `
 .px-category-card:hover { background: var(--hover); }
 .px-category-card:focus-visible { outline: var(--focus-w) solid var(--focus); outline-offset: var(--focus-offset); }
 .px-category-card-title { font-size: var(--fs-3); font-weight: 700; overflow-wrap: anywhere; }
-.px-category-card-what { flex: 1 1 auto; font-size: var(--fs-1); color: var(--text-3); line-height: var(--lh-body); }
 .px-category-card-foot { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px var(--pad); }
 .px-category-card-foot:empty { display: none; }
 .px-category-glance { font-size: var(--fs-1); font-weight: 700; color: var(--text-2); }

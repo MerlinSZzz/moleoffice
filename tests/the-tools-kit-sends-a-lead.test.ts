@@ -85,7 +85,7 @@ async function aServerThatKeepsWhatItIsSent(): Promise<{ api: string; kept: stri
 
 /** Run the script in a process group of its own, with only the environment given, and wait for it. */
 async function sendMessage(args: string[]): Promise<{ code: number | null; printed: string }> {
-  const env = { PATH: process.env.PATH ?? '', HOME: process.env.HOME ?? '' }
+  const env = { PATH: process.env.PATH ?? '', HOME: process.env.HOME ?? '', MOLE_AGENT_KEY: 'made-up-key-for-the-stand-in' }
   const child = spawn('python3', [SEND_MESSAGE, ...args], { detached: true, env, stdio: ['ignore', 'pipe', 'pipe'] })
   let printed = ''
   child.stdout.on('data', (chunk: Buffer) => (printed += chunk.toString('utf8')))

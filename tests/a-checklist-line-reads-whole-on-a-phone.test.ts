@@ -26,7 +26,7 @@
  *      made for you" block reads whole.
  *   7. The wire carries the kind: the done lines carry notice "markedDoneOnAChecklist" and the
  *      person's own messages carry notice null (the field is there, and null).
- *   8. The office conversation's own sentence is the new one about upgrades and checklists.
+ *   8. The office conversation says it is read only, as a short state word.
  *   9. At 390 the longest done line reads whole in four or five lines: a 57-character agent name,
  *      and an item whose words the line cuts at 40 characters, the most a line ever carries. More
  *      than five lines means something made the line longer than its cut allows.
@@ -57,10 +57,12 @@
 import { join } from 'node:path'
 import Database from 'better-sqlite3'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { createI18n } from '../src/shared/i18n.ts'
 import { FOR_THE_PERSON, liveApp, theOfficesOwnIdIn, theResizeIsDrawn, waitForThePage, type LiveApp } from './helpers.ts'
 import { THE_TEST_OFFICES_OWNER } from './a-page-of-a-test-office.ts'
 import { openTheChat as openTheChatFromTheShell } from './open-the-chat.ts'
 
+const { t } = createI18n('en')
 /** Every value here is made up and nobody's. */
 const THE_LONG_ITEM = 'Sweep the kiln room floor before the inspector comes on Friday'
 const THE_LONG_NAME = 'Antidisestablishmentarianism Floccinaucinihilipilification'
@@ -652,12 +654,10 @@ describe('a checklist line reads whole on a phone, with no clamp', () => {
     }
   }, 60_000)
 
-  it('8. the office conversation says what Mole Office tells the person here', async () => {
+  it('8. the office conversation says it is read only', async () => {
     await openTheOfficeConversation()
     const said = await app.page.locator('.px-chat-office-notices').textContent()
-    expect(said).toBe(
-      'Mole Office tells you here about upgrades and about changes to your checklists. Replies are unavailable.',
-    )
+    expect(said).toBe(t('chat.officeNotices.readOnly'))
   }, 120_000)
 
   it('9. at 390 the longest done line reads whole in four or five lines', async () => {

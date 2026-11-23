@@ -22,6 +22,7 @@ import { currentProcessRecord, observeBootstrapTopology, startGatedBootstrapGrou
 import { observeUpgradeTopology, upgradeServiceGroups } from '../tools/stable/stable-upgrade-processes.mjs'
 import { upgradeStable, validateUpgradeConfig } from '../tools/stable/stable-upgrade-transaction.mjs'
 import { aMadeUpNoticeContract, aMadeUpWordCounter } from './made-up-upgrade-words.ts'
+import { aMadeUpElectronPackage } from './stable-upgrade-fixture.ts'
 import { receiptFromArtifacts } from '../tools/periodic-main-suite.mjs'
 import { fakeReleasePolicyFixture } from './stable-release-policy-fixture.ts'
 import { copyBootstrapSettings } from './stable-bootstrap-clone-fixture.ts'
@@ -135,7 +136,7 @@ function makeController(folder: string) {
   const controller = join(folder, 'reviewed-controller'); mkdirSync(join(controller, 'tools/stable'), { recursive: true })
   // Unchanged tools. The tracked fixture controller reviews the same fixture launcher blob as development.
   for (const name of ['stable/stable-bootstrap-transaction.mjs', 'stable/stable-bootstrap-execution.mjs', 'stable/stable-bootstrap-launcher.mjs']) copyFileSync(join(root, 'tools', name), join(controller, 'tools', name))
-  for (const name of ['database-holders.mjs', 'stable/stable-bootstrap-support.mjs', 'stable/stable-bootstrap-storage.mjs', 'stable/stable-bootstrap-processes.mjs', 'stable/stable-bootstrap-notices.mjs', 'stable/stable-bootstrap-words.mjs', 'stable/stable-upgrade-evidence.mjs', 'read-only-git-config.mjs', 'independent-storage.mjs', 'files-that-restart-the-server.mjs']) symlinkSync(join(root, 'tools', name), join(controller, 'tools', name))
+  for (const name of ['database-holders.mjs', 'stable/stable-bootstrap-support.mjs', 'stable/stable-bootstrap-storage.mjs', 'stable/stable-bootstrap-processes.mjs', 'stable/stable-bootstrap-notices.mjs', 'stable/stable-bootstrap-words.mjs', 'stable/electrons-binary.mjs', 'stable/stable-upgrade-evidence.mjs', 'read-only-git-config.mjs', 'independent-storage.mjs', 'files-that-restart-the-server.mjs']) symlinkSync(join(root, 'tools', name), join(controller, 'tools', name))
   symlinkSync(join(root, 'src'), join(controller, 'src')); write(join(controller, 'tools/serve-dev.mjs'), supervisor)
   git(controller, 'init', '-b', 'main'); git(controller, 'config', 'user.name', 'Synthetic controller'); git(controller, 'config', 'user.email', 'fixture@example.invalid'); git(controller, 'add', '.'); git(controller, 'commit', '-m', 'Synthetic reviewed launcher')
   return controller
@@ -150,7 +151,9 @@ function seedSource(dev: string, owner: number) {
   // Kept source folders are not artifacts and do not point outside this fixture.
   write(join(dev, 'loader/package.json'), '{"name":"tsx","version":"0.0.0","type":"module","exports":"./loader.mjs"}'); write(join(dev, 'loader/loader.mjs'), "process.env.TMPDIR=process.env.HOME; // Keep the fixture's cache beside its own home.\n")
   run(dev, 'tar', ['-czf', 'loader.tgz', 'loader'])
-  write(join(dev, 'package.json'), JSON.stringify({ name: 'synthetic-second-handoff', version: '1.0.0', type: 'module', scripts: { typecheck: 'node typecheck.mjs', build: 'node build.mjs', 'db:migrate': 'node migrate.mjs' }, dependencies: { 'chain-dependency': 'file:dependency.tgz', tsx: 'file:loader.tgz' } }))
+  // The upgrade runs electron's install.js after npm ci, so the made-up office carries the made-up electron package.
+  const electron = aMadeUpElectronPackage(dev)
+  write(join(dev, 'package.json'), JSON.stringify({ name: 'synthetic-second-handoff', version: '1.0.0', type: 'module', scripts: { typecheck: 'node typecheck.mjs', build: 'node build.mjs', 'db:migrate': 'node migrate.mjs' }, dependencies: { 'chain-dependency': 'file:dependency.tgz', tsx: 'file:loader.tgz', ...electron } }))
   write(join(dev, 'typecheck.mjs'), "import{mkdirSync,writeFileSync}from'node:fs';mkdirSync('dist',{recursive:true});writeFileSync('dist/checked','fixture');")
   write(join(dev, 'build.mjs'), "import{mkdirSync,writeFileSync,readFileSync}from'node:fs';mkdirSync('dist/web',{recursive:true});writeFileSync('dist/web/index.html',readFileSync('version.txt'));")
   write(join(dev, 'tools/build-the-page.mjs'), "import{execFileSync}from'node:child_process';import{writeFileSync}from'node:fs';export async function buildThePage(){await import('../build.mjs');writeFileSync('dist/web/build-stamp.json',JSON.stringify({builtAt:'2026-10-19 00:00:00',builtAtMs:1,commit:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim()}));return{ok:true}}")
@@ -289,8 +292,12 @@ async function aSecondHandoff(owner = process.pid, holder = false) {
   git(f.dev, 'add', 'version.txt', 'migrate.mjs', migration); git(f.dev, 'commit', '-m', 'Synthetic migration for second handoff'); git(f.dev, 'push', 'origin', 'main')
   const target = git(f.dev, 'rev-parse', 'HEAD'), evidence = receipt(f.folder, f.dev, target, f.add, 'fixture-second-receipt')
   const config: any = { developmentRepository: f.dev, stableCheckout: f.stable, database: running.database.path, targetCommit: target, previousBaselineTag: f.first, candidateTag: f.second, evidence, serviceGroups, serviceHome: running.fixtureVariables.HOME, serviceSettings: f.config.serviceSettings, recoveryRoot: f.upgradeRecovery, servicePort: Number(running.fixtureVariables.MOLE_OFFICE_PORT), releaseCheckPort: f.config.releaseCheckPort, notice: 'Synthetic second handoff outside use.', noticeApproval: { id: 'fixture-policy', seq: 1, contentHash: 'c'.repeat(16) }, noticeSendIds: { before: 'fixture-second-before', after: 'fixture-second-after' }, health: f.config.health }
-  const policy = fakeReleasePolicyFixture({ config, baseline: f.config.targetCommit, tree: git(f.dev, 'rev-parse', 'HEAD^{tree}') })
-  const stamp = new Date(Math.floor(Date.now()/1000)*1000).toISOString()
+  // One reading of the clock for the policy and the establishment it is filed against. The bootstrap note is filed at
+  // that second, and an establishment read later could fall in the next second, which the policy refuses as filed
+  // before its establishment.
+  const t = Date.now()
+  const policy = fakeReleasePolicyFixture({ config, baseline: f.config.targetCommit, tree: git(f.dev, 'rev-parse', 'HEAD^{tree}'), now: () => t })
+  const stamp = new Date(Math.floor(t / 1000) * 1000).toISOString()
   const source = policy.revise('fixture-bootstrap', 1, r => { r.content.data.extra.stableReleaseBaseline.establishedAt = stamp })
   policy.reviseAuthorization({ mode: 'outside-use', reason: 'Synthetic immediate fixture release outside use.', baselineSource: { kind: 'bootstrap', note: source } }); f.setPolicy(policy)
   // The actual upgrade must refuse shared storage even after a successful first handoff.

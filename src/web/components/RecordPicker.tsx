@@ -100,11 +100,11 @@ export function RecordPicker({
       <style href="mole-office-record-picker" precedence="default">{RECORD_PICKER_CSS}</style>
       <input type="search" className="px-input rpk-box" aria-label={label} placeholder={t('recordPicker.placeholder')} value={words} onChange={(event) => setWords(event.target.value)} />
       {found.status === 'idle' ? null : found.status === 'looking' ? (
-        <p className="rpk-says">{t('recordPicker.looking')}</p>
+        <p className="rpk-state">{t('recordPicker.looking')}</p>
       ) : found.status === 'error' ? (
         <ErrorNote message={found.message} fault={found.fault} />
       ) : found.records.length === 0 ? (
-        <p className="rpk-says">{t('recordPicker.none', { q: words.trim() })}</p>
+        <p className="rpk-state">{t('absence.none')}</p>
       ) : (
         <ul className="rpk-found" aria-label={t('recordPicker.found')}>
           {found.records.map((record) => {
@@ -200,7 +200,7 @@ export function RecordByName({ id }: { id: string }) {
 export const RECORD_PICKER_CSS = `
 .rpk { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .rpk-box { width: 100%; max-width: 32rem; }
-.rpk-says { margin: 0; color: var(--text-2); font-size: var(--fs-1); }
+.rpk-state { margin: 0; color: var(--text-2); font-size: var(--fs-1); }
 .rpk-found { list-style: none; margin: 0; padding: 0; border: var(--border-w) solid var(--border); border-radius: var(--radius-sm); background: var(--panel); max-width: 40rem; }
 .rpk-found > li + li { border-top: var(--border-w) solid var(--border); }
 .rpk-one {

@@ -36,7 +36,7 @@ import type { FastifyInstance } from 'fastify'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { THE_PERSON } from '../src/shared/person.ts'
-import { apiApp, freshDb, type TestDb } from './helpers.ts'
+import { apiApp, freshDb, type TestDb, governsTheWholeProject } from './helpers.ts'
 
 const CHECKOUT = fileURLToPath(new URL('..', import.meta.url)).replace(/\/$/, '')
 const WORKSPACE = 'default'
@@ -93,7 +93,7 @@ beforeAll(async () => {
   await ask('POST', '/api/agents/started', asAgent('cast-starter'), { handle: 'cast-builder', name: 'Cast builder', role: 'worker', runtime: 'claude-code', workArea: ['src'] })
   const session = await ask('POST', '/api/records', asAgent('cast-starter'), { kind: 'session', title: 'The starter of the Casting tool test', data: { state: 'running' } })
   starterSession = (session['record'] as { id: string }).id
-  const filed = await ask('POST', '/api/records', PERSON, { kind: 'decision', title: 'The test decides the worker model', data: { replaces: [] } })
+  const filed = await ask('POST', '/api/records', PERSON, { kind: 'decision', title: 'The test decides the worker model', data: { ...governsTheWholeProject(), replaces: [] } })
   decision = (filed['record'] as { id: string }).id
 }, 120_000)
 

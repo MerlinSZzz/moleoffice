@@ -40,6 +40,19 @@ import { USAGE_NUMBERS } from '../usage-receipts.ts'
 import { REVIEW_LEVELS } from '../workspaces.ts'
 import { METHOD_WORKS } from '../design-reminders.ts'
 
+// THE THREE FIELDS OF A SEAL THAT COUNTS ONLY ITS RUN'S OWN COMMITS (wave 13n; src/server/lib/a-runs-own-commits.ts).
+// A run's `filingHead` and `endHead` are below. A seal's `carriedCommits` is on the sealed_tip kind.
+export const FILING_HEAD = 'filingHead'
+export const END_HEAD = 'endHead'
+export const CARRIED_COMMITS = 'carriedCommits'
+
+/**
+ * THE FIELDS OF A RUN ONLY THE OFFICE WRITES, which it may write as the run is filed: `filingHead` always, and `endHead`
+ * too when the run is filed already finished. The create and change doors refuse both. A program that compares a run's
+ * first revision with the data it sent leaves these out (tools/main-suite-fix-round-author.mjs).
+ */
+export const THE_HEADS_ONLY_THE_OFFICE_WRITES = [FILING_HEAD, END_HEAD] as const
+
 export const sessionKind: KindSpec = {
     kind: 'session',
     purpose: 'One agent working session: what it is doing, whether it is still alive, and how it ended.',
@@ -236,6 +249,7 @@ export const sessionKind: KindSpec = {
           'same start time for it; otherwise it says the start time is unknown and when the office first recorded the run.',
         example: '2026-10-25 01:30:00',
       },
+      { key: 'filedTime', type: 'ClockStamp', required: false, description: 'Instant beside the stamp the record door filed the run at, from the one reading of the clock that made it. The record door writes it when the run is filed, in place of any value sent with the filing. Missing on a run filed before the office kept it.', example: { stamp: '2026-10-25 01:30:00', instant: '2026-10-25T01:30:00.000+00:00', offset: '+00:00', timeZone: 'Europe/London' } },
       { key: 'startedTime', type: 'ClockStamp', required: false, description: 'Instant beside startedAt. Missing on older runs and when no instant was recorded.', example: { stamp: '2026-10-25 01:30:00', instant: '2026-10-25T01:30:00.000+01:00', offset: '+01:00', timeZone: 'Europe/London' } },
       {
         key: 'waitedForASeatSeconds',
@@ -689,10 +703,9 @@ export const sessionKind: KindSpec = {
         type: 'NeedsNoCheck',
         required: false,
         description:
-          "THE OFFICE FILED THIS RUN FOR A SECRETARY'S design/-ONLY MERGE ENTRY, so the run is closed although nobody " +
-          'checked or confirmed it. The office asks no check of such an entry; exactly one of decision and rule names its authority. ' +
-          "Written by the office in the same first write that files the run (`submitASecretarysDesignEntry`). ABSENT MEANS " +
-          "THE OFFICE DID NOT FILE THIS RUN FOR A SECRETARY'S ENTRY, or filed it before this field existed.",
+          'THE OFFICE CLOSED THIS RUN WITHOUT A CHECK, so nothing waits on it. Exactly one of decision and rule names its authority. ' +
+          "Written only by the office when it files a run for a secretary's design/-only entry, at a seal while its checks " +
+          'are switched off, or at its start while its checks are switched off. ABSENT MEANS the office has not marked this run.',
         example: {
           decision: 'Madeup100007',
           at: '2026-09-25 00:59:00',
@@ -752,6 +765,30 @@ export const sessionKind: KindSpec = {
         example: { Wk1e2r3t4y5u: { state: 'wanted', askedAt: '2026-10-12 19:00:00', askedBy: { who: { kind: 'agent', id: 'Sv1e2r3t4y5u' }, session: 'Rs1e2r3t4y5u' }, handle: 'a-worker', brief: { path: '/srv/mole-office-fixtures/.cache/mole-office/sandboxes/w13j/briefs/a-worker.md', sha256: '9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08', bytes: 2048 }, sandbox: { folder: '/srv/mole-office-fixtures/.cache/mole-office/sandboxes/w13j', instance: 'w13j', container: 'cX2d9QwErT5y' } } },
       },
       {
+        key: FILING_HEAD,
+        type: 'Record<string, string>',
+        required: false,
+        description:
+          "THE COMMIT THIS RUN'S WORKING DIRECTORY WAS AT WHEN THE RUN WAS FILED (wave 13n): the commit, when the " +
+          'office read it and the directory it read, or that it was not read and why. A seal counts as the run\'s own only ' +
+          'the commits made after it. Written only by the office, as the run is filed. An ordinary write may not set, change ' +
+          'or drop it. ABSENT MEANS A RUN FILED BEFORE THE OFFICE READ IT, or one that names no working directory: its seal ' +
+          'counts its commits as before.',
+        example: { commit: '9f86d081884c7d659a2feaa0c55ad015a3bf4f1b', at: '2026-11-22 10:00:00', directory: '/srv/mole-office-fixtures/worktrees/a-worker' },
+      },
+      {
+        key: END_HEAD,
+        type: 'Record<string, string>',
+        required: false,
+        description:
+          "THE COMMIT THIS RUN'S WORKING DIRECTORY WAS AT WHEN THE RUN ENDED (wave 13n): read at the run's own " +
+          'finish, at a write that ends its round, or by the account of a round that ended with no request, with when and ' +
+          'where; or that it was not read and why, such as another run filed in the same directory first. Written only by ' +
+          'the office. An ordinary write may not set, change or drop it. ABSENT MEANS NOT ENDED YET, or a run filed before ' +
+          'the office read it.',
+        example: { notRead: 'Another run was filed in /srv/mole-office-fixtures/worktrees/a-worker before this run\'s end was read.', at: '2026-11-22 11:00:00', directory: '/srv/mole-office-fixtures/worktrees/a-worker' },
+      },
+      {
         key: 'castingRoll',
         type: 'Record<string, unknown>',
         required: false,
@@ -789,6 +826,13 @@ export const sessionKind: KindSpec = {
         example: { images: ['design/the-page-now.png'], worktree: '/srv/mole-office-fixtures/.cache/mole-office/sandboxes/w13j/worktrees/a-worker', says: "The launcher gave codex exec 1 image of the worker's worktree as -i: design/the-page-now.png." },
       },
       {
+        key: 'workerPlace',
+        type: 'Record<string, unknown>',
+        required: false,
+        description: "Where this worker's run works outside a sandbox, copied from its ask only by the office when the run is filed. An ordinary create or write may not set, change or drop it.",
+        example: { kind: 'folder', folder: '/srv/fixture/work', repository: null },
+      },
+      {
         key: 'workerPackage',
         type: 'WorkerPackage',
         required: false,
@@ -824,7 +868,7 @@ export const sessionKind: KindSpec = {
           'ABSENT MEANS NO SUCH CAUSE WAS READ: the run is still going, it ended for another reason, or nobody ' +
           'read why it ended. A run filed before this was a field (wave 13s round 49) holds it at `extra.stopCause`, and ' +
           'the office still reads that copy.',
-        example: { kind: 'session-limit', said: "You've hit your session limit · resets 7:10pm (Europe/London)", at: '2026-09-11T16:55:08.628Z', resetsAt: '7:10pm (Europe/London)' },
+        example: { kind: 'session-limit', said: "You've hit your session limit · resets 7:10pm (Europe/London)", at: '2026-09-11T17:55:08.628+01:00', resetsAt: '7:10pm (Europe/London)' },
       },
       {
         key: 'waitingOnALimit',
@@ -1773,7 +1817,7 @@ export const SESSION_SHAPES: Record<string, ShapeSpec> = {
     fields: [
       { key: 'state', type: "'wanted' | 'starting' | 'started' | 'failed'", required: true, description: 'Where the ask is.', example: 'wanted' },
       { key: 'askedAt', type: 'date', required: true, description: 'When it was asked. Local wall clock.', example: '2026-10-12 14:00:00' },
-      { key: 'askedBy', type: 'NextRoundAskedBy', required: true, description: 'Who asked, and as which of the five who may.', example: { who: { kind: 'agent', id: 'ooNSJY6rVzuI' }, as: 'its starter', session: 'aj8pUya9LRu7' } },
+      { key: 'askedBy', type: 'NextRoundAskedBy', required: true, description: 'Who asked, and as which of the six who may.', example: { who: { kind: 'agent', id: 'ooNSJY6rVzuI' }, as: 'its starter', session: 'aj8pUya9LRu7' } },
       { key: 'brief', type: 'NextRoundBrief', required: true, description: 'The brief, as a pointer and a hash.', example: { path: '/srv/mole-office-fixtures/.cache/mole-office/sandboxes/w13j/briefs/loop-3.md', sha256: '9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08', bytes: 2048 } },
       { key: 'sandbox', type: 'NextRoundSandbox', required: true, description: 'The sandbox the last run was started in, as the office vouches for it.', example: { folder: '/srv/mole-office-fixtures/.cache/mole-office/sandboxes/w13j', instance: 'w13j', container: 'cX2d9QwErT5y' } },
       { key: 'repair', type: 'NextRoundRepair', required: false, description: 'The merge entry this repair waits to land and the instant its launch reservation expires. The office writes entry and dueAt; ordinary rounds have none.', example: { entry: 'synthetic-entry', dueAt: '2026-10-12T19:05:00Z' } },
@@ -1807,7 +1851,7 @@ export const SESSION_SHAPES: Record<string, ShapeSpec> = {
     description: 'WHO ASKED FOR A NEXT ROUND, proved by its own key, or the person.',
     fields: [
       { key: 'who', type: 'ParticipantRef', required: true, description: 'The agent by its registry id, or the person, named as a participant is named everywhere.', example: { kind: 'agent', id: 'ooNSJY6rVzuI' } },
-      { key: 'as', type: "'the run’s agent' | 'its starter' | 'a secretary' | 'the person' | 'the office'", required: true, description: 'Which of the five who may ask. The office asks only in its own process, for a fix round of a red merge entry, a resolve brief, or the next round of a run it saw sealed.', example: 'its starter' },
+      { key: 'as', type: "'the run’s agent' | 'its starter' | 'its leader' | 'a secretary' | 'the person' | 'the office'", required: true, description: 'Which of the six who may ask. The office asks only in its own process, for a fix round of a red merge entry, a resolve brief, or the next round of a run it saw sealed.', example: 'its starter' },
       { key: 'session', type: 'string', required: false, description: "The asker's run, when its key named one. Absent when it named none.", example: 'aj8pUya9LRu7' },
     ],
   },
@@ -1937,6 +1981,7 @@ export const SESSION_SHAPES: Record<string, ShapeSpec> = {
       { key: 'askedAt', type: 'date', required: true, description: 'When it was asked. Local wall clock.', example: '2026-10-12 19:00:00' },
       { key: 'askedBy', type: 'WorkerRunAskedBy', required: true, description: 'The supervisor, proved by its own key, and the run it asked from.', example: { who: { kind: 'agent', id: 'Sv1e2r3t4y5u' }, session: 'Rs1e2r3t4y5u' } },
       { key: 'handle', type: 'string', required: true, description: "The worker's handle when it was asked for.", example: 'a-worker' },
+      { key: 'package', type: 'WorkerPackage', required: false, description: 'The package this ask named, with its points, its difficulty and why, in the shape TheWorkerPackage in shared/worker-runs.ts. The office copies it onto the worker\'s own run as `workerPackage` when the run is filed. Absent on an ask made before the package account, and on an ask that names none; the account draws both as naming none.', example: { task: 't8Kq2mW1pLzR', points: ['p1', 'p2'], difficulty: 'hard', why: 'These two points need the builder that wrote them.', askedAt: '2026-10-12 19:00:00' } },
       { key: 'brief', type: 'NextRoundBrief', required: true, description: 'The brief, as a pointer and a hash.', example: { path: '/srv/mole-office-fixtures/.cache/mole-office/sandboxes/w13j/briefs/a-worker.md', sha256: '9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08', bytes: 2048 } },
       { key: 'sandbox', type: 'NextRoundSandbox', required: true, description: "The sandbox the supervisor's run was started in, as the office vouches for it. The worker starts in it too.", example: { folder: '/srv/mole-office-fixtures/.cache/mole-office/sandboxes/w13j', instance: 'w13j', container: 'cX2d9QwErT5y' } },
       { key: 'replaced', type: 'WorkerRunReplaced', required: false, description: 'The ask this one replaced, when one was still waiting.', example: { askedAt: '2026-10-12 18:50:00' } },
@@ -1944,6 +1989,8 @@ export const SESSION_SHAPES: Record<string, ShapeSpec> = {
       { key: 'castingRoll', type: 'Record<string, unknown>', required: false, description: "How the default router chose the Casting row for the worker card at the ask, in the shape readCastingRoll in shared/casting-roll.ts reads (round 46). The start reads it and does not roll again. When the ask chose the program and the model, it is the roll an earlier ask on this entry made, kept unused for an ask that names neither (round 47), and absent when there was none. Absent on an ask made before round 46.", example: { choice: 'rolled', group: 'every row', selected: { rowId: 4, program: 'codex', model: 'gpt-6.1-sol', effort: 'low', probability: 0.5, share: 1, number: 0.3 }, candidates: [{ rowId: 4, program: 'codex', model: 'gpt-6.1-sol', effort: 'low', probability: 0.5, share: 1 }], skipped: [], keptFrom: null, unreadableStops: [], week: 'The sandboxes Claude week was not read.', notes: [], says: 'The every row Casting roll 0.3 chose row 4 (codex gpt-6.1-sol).' } },
       { key: 'row', type: 'WorkerRunRow', required: false, description: "The Casting row of the worker card the ask chose, by its choice or by its roll, as the ask read it. The start reads that row again, and a changed, held or removed row fails the start; no other row is taken or rolled. Absent on an ask made before the ask kept its row.", example: { id: 4, revision: null, program: 'codex', model: 'gpt-6.1-sol', effort: 'low' } },
       { key: 'cut', type: 'WorkerRunCut', required: false, description: "The commit the worker's worktree is to be cut from, as the ask chose it. Absent on an ask made before the ask chose one.", example: { commit: '3f2a9c1e0000000000000000000000000000beef', named: null } },
+      { key: 'paths', type: 'string[]', required: false, description: 'The paths the ask named that the worker needs, which the start gives the launcher as `--with-path` each, so they are checked out in its worktree even when the sandbox\'s template leaves them out of a worker\'s. Absent when it named none.', example: ['design', 'docs/big'] },
+      { key: 'images', type: 'string[]', required: false, description: "The files of the worker's worktree the ask named as images, which the start gives the launcher as `--image` each, so codex exec is given each as -i. Only a codex worker is given any. Absent when it named none.", example: ['design/the-page-now.png'] },
       { key: 'starting', type: 'WorkerRunStarting', required: false, description: "From `starting` on: the launcher run, and the program and the model it was given, from the ask's choice or the Casting row its roll chose.", example: { at: '2026-10-12 19:05:00', wrapper: 'Wq1e2r3t4y5u', runtime: 'claude-code', model: 'claude-opus-5-5', casting: 3, castingSays: 'The Casting row for worker in default.', effort: 'high', effortFrom: 'Casting', effortSays: "The launcher asks the office for a builder run of sw-hand on claude-code with model claude-opus-5-5, and the office answers: The caller names model claude-opus-5-5. The run gets effort high from the Casting row for worker. If the office cannot answer the launcher, the launcher uses the owner's rule and says so. Any effort the launcher passes is written on the run it starts." } },
       { key: 'started', type: 'NextRoundStarted', required: false, description: "With `started`: the worker's run and the key the office minted for it, by id.", example: { at: '2026-10-12 19:05:10', run: 'Rn1e2r3t4y5u', runKeyId: 'Kh1e2r3t4y5u' } },
       { key: 'launcher', type: 'NextRoundLauncher', required: false, description: 'How the launcher ended, once it has.', example: { at: '2026-10-12 19:05:12', ok: true, says: 'The launcher exited with code 0.' } },
@@ -2078,7 +2125,7 @@ export const SESSION_SHAPES: Record<string, ShapeSpec> = {
     fields: [
       { key: 'kind', type: "'session-limit' | 'quota' | 'login'", required: true, description: "Which cause: a session limit, a quota, or a login. OpenCode Go's usage limit is a quota.", example: 'session-limit' },
       { key: 'said', type: 'string', required: true, description: "The cause's own words, as the transcript or the provider's error gave them.", example: "You've hit your session limit · resets 7:10pm (Europe/London)" },
-      { key: 'at', type: 'string | null', required: false, description: 'When the cause was said, as the transcript line or the launcher stamped it. Absent or null when the line carried no time.', example: '2026-09-11T16:55:08.628Z' },
+      { key: 'at', type: 'string | null', required: false, description: "When the cause was said: an instant in local wall-clock with its offset, in the shape clockStamp in src/shared/time.ts writes. Read from the transcript line's own time, or stamped when the cause was read from a launcher's or a check's output. Absent or null when the line carried no time, or words that name no moment.", example: '2026-09-11T17:55:08.628+01:00' },
       { key: 'resetsAt', type: 'string | null', required: false, description: "When the limit resets: the time the cause's words named, or the instant the launcher worked out for a Go stop. Absent or null when nothing named one.", example: '7:10pm (Europe/London)' },
       { key: 'resetFrom', type: 'string', required: false, description: 'Where the reset came from, in words: named by the error, or assumed and why. The launcher writes it for an OpenCode Go stop. A cause read from a transcript has none.', example: 'named by the error: "retry-after: 7200"' },
     ],

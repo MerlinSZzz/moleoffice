@@ -11,9 +11,9 @@
  *
  *   · developer mode (?mode=inspect) draws the base line (`chk.baseFound`) with the assembly's own
  *     sentence about it, and Chinese reads that line once;
- *   · developer mode draws `chk.noBaseNamed` where no base was said, and `chk.noWorkingDirectory`,
- *     which names the branch and the fork point, where the run recorded a checkout with no working
- *     directory;
+ *   · developer mode draws `chk.noBaseNamed` where no base was said, and the state
+ *     `chk.noWorkingDirectoryWord` where the run recorded a checkout with no working directory (as
+ *     decided in November 2026, the sentence that named the branch and the fork point is gone);
  *   · normal mode (?mode=normal) draws none of them, and still draws the part "What the check would
  *     read" with its file line, and the part "Who the office asked", so no heading is left over an
  *     empty part.
@@ -41,8 +41,8 @@
  *     normal-mode base cases go red: "is not drawn in normal mode, and the part it was in still
  *     says what the check would read" and "says nobody named a base in developer mode only".
  *   - In `WhoWasAsked`, drop `|| !inspect` from the checkout condition. The no-working-directory
- *     case "says no branch could be read for the fork point in developer mode only" goes red in
- *     English, on the sentence drawn in normal mode.
+ *     case "draws that no working directory was recorded in developer mode only" goes red in
+ *     English, on the state drawn in normal mode.
  *   - Normal mode drawing `said.says` again in `WhatTreeItRead` turns every English "normal mode
  *     describes <reading> without paths or commits" case red, and the one Chinese reading case.
  *     The stored sentence carries made-up paths and commits.
@@ -65,7 +65,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import type { WhatWasRead } from '../src/shared/releasing.ts'
-import type { Page } from 'playwright'
+import type { Locator, Page } from 'playwright'
 import { liveApp, type LiveApp, waitForThePage } from './helpers.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { createI18n, type WordKey } from '../src/shared/i18n.ts'
@@ -75,6 +75,7 @@ let page: Page
 let withABase = ''
 let withNoBase = ''
 let withNoDirectory = ''
+let withADirectory = ''
 /** Each made-up run's title, which its page draws, so an open can tell the run it asked for has been drawn. */
 const titles = new Map<string, string>()
 
@@ -88,6 +89,11 @@ const MADE_UP_FILE = 'private-worker-file.ts'
 const MADE_UP_STAGE = '/made-up/sealed-files'
 const MADE_UP_SEAL = 'made-up-seal-id'
 const FULL_READING = `Made up for this test: read ${MADE_UP_TREE} at ${MADE_UP_TIP}, from ${MADE_UP_OTHER_COMMIT}, with ${MADE_UP_FILE} staged at ${MADE_UP_STAGE} for ${MADE_UP_SEAL}.`
+/** The paths of the run with a working directory: its office run's log, its work folder, and the worktree a check would read. */
+const MADE_UP_OFFICE_RUN = 'made-up-office-run'
+const MADE_UP_LOG = '/made-up/office-runs/made-up-office-run.log'
+const MADE_UP_WORK_FOLDER = '/made-up/worktrees/the-lamp'
+const MADE_UP_CHECK_TREE = '/made-up/check-trees/the-lamp'
 const readings: {
   name: string
   source: 'released' | 'refused' | 'assembly' | 'confirmed'
@@ -157,12 +163,28 @@ async function answerWithAMadeUpAssembly(): Promise<void> {
       const real = await route.fetch()
       const body = (await real.json()) as { record: { data: Record<string, unknown> } }
       body.record.data['whatTheCheckWouldRead'] = wouldRead(base)
-      // A CHECKOUT WITH NO WORKING DIRECTORY, so the panel's sentence about the branch the fork point
-      // is read from has nothing to name.
+      // A CHECKOUT WITH NO WORKING DIRECTORY, so the panel draws that none was recorded.
       if (checkout) body.record.data['theCheck'] = { askedAt: '2026-09-30T10:00:00.000Z', askedOf: 'made-up-inspector', checkout: {} }
       await route.fulfill({ response: real, json: body })
     })
   }
+  // A CHECK ASKED WITH A WORKING DIRECTORY AND AN OFFICE RUN, so developer mode draws their paths, and an assembly
+  // that names the worktree a check would read. The assembly's own sentence holds none of the paths.
+  await app.context.route(`**/api/records/${withADirectory}`, async (route) => {
+    const real = await route.fetch()
+    const body = (await real.json()) as { record: { data: Record<string, unknown> } }
+    body.record.data['whatTheCheckWouldRead'] = {
+      ...wouldRead(true),
+      read: { worktree: MADE_UP_CHECK_TREE, tip: MADE_UP_TIP, ofItsOwn: true, says: 'Made up for this test: the check would read the work.' },
+    }
+    body.record.data['theCheck'] = {
+      askedAt: '2026-09-30T10:00:00.000Z',
+      askedOf: 'made-up-inspector',
+      checkout: { directory: MADE_UP_WORK_FOLDER, cutFrom: MADE_UP_REF },
+      execution: { session: MADE_UP_OFFICE_RUN, log: MADE_UP_LOG, model: 'made-up-model', minutes: 3 },
+    }
+    await route.fulfill({ response: real, json: body })
+  })
 }
 
 /**
@@ -190,6 +212,17 @@ async function open(run: string, lang: 'en' | 'zh', mode: 'normal' | 'inspect'):
   await page.locator('.chk').waitFor({ timeout: 30_000 })
 }
 
+/** Each code row in this place: its label, the text of its code element, and the state word after it. */
+async function theCodeRows(place: Locator): Promise<{ label: string; value: string; state: string | null }[]> {
+  return place.evaluate((holder) =>
+    [...holder.querySelectorAll('dl.code-rows dt')].map((term) => ({
+      label: term.textContent ?? '',
+      value: term.nextElementSibling?.querySelector('code')?.textContent ?? '',
+      state: term.nextElementSibling?.querySelector('.code-rows-state')?.textContent ?? null,
+    })),
+  )
+}
+
 /** The headings and the whole text of the check panel. */
 async function thePanel(): Promise<{ parts: string[]; text: string }> {
   return page.evaluate(() => ({
@@ -206,7 +239,7 @@ beforeAll(async () => {
     { handle: 'lamp-worker', name: 'lamp-worker', runtime: 'claude-code', role: 'worker', chapters: ['5:full'], workArea: ['work'] },
     asAgent(THE_TEST_OFFICES_SECRETARY.handle),
   )
-  for (const title of ['A made-up run with a base', 'A made-up run with no base', 'A made-up run with no working directory']) {
+  for (const title of ['A made-up run with a base', 'A made-up run with no base', 'A made-up run with no working directory', 'A made-up run with a working directory']) {
     const made = (await post(
       '/api/records',
       { kind: 'session', title, data: { state: 'running', servingAgent: 'lamp-worker', doing: 'mending the lamp' } },
@@ -215,7 +248,8 @@ beforeAll(async () => {
     titles.set(made.id, title)
     if (title.endsWith('with a base')) withABase = made.id
     else if (title.endsWith('with no base')) withNoBase = made.id
-    else withNoDirectory = made.id
+    else if (title.endsWith('with no working directory')) withNoDirectory = made.id
+    else withADirectory = made.id
   }
   await answerWithAMadeUpAssembly()
   for (const reading of readings) {
@@ -254,7 +288,7 @@ for (const lang of ['en', 'zh'] as const) {
   const filesLine = words.t('chk.filesInsideRead', { n: 1 })
   const baseLine = words.t('chk.baseFound', { ref: MADE_UP_REF, how: words.t('chk.base.forkPoint') })
   const noBase = words.t('chk.noBaseNamed')
-  const noDirectory = words.t('chk.noWorkingDirectory')
+  const noDirectory = words.t('chk.noWorkingDirectoryWord')
 
   describe(`the check panel's base, in ${lang}`, () => {
     it('is drawn in developer mode, with the assembly\'s own sentence', async () => {
@@ -284,7 +318,7 @@ for (const lang of ['en', 'zh'] as const) {
         expect(seen.text).not.toContain(noBase)
       })
 
-      it('says no branch could be read for the fork point in developer mode only', async () => {
+      it('draws that no working directory was recorded in developer mode only', async () => {
         await open(withNoDirectory, lang, 'inspect')
         expect((await thePanel()).text).toContain(noDirectory)
         await open(withNoDirectory, lang, 'normal')
@@ -342,22 +376,30 @@ for (const lang of ['en', 'zh'] as const) {
           await open(reading.run!, lang, 'inspect')
           const seen = await thePanel()
           expect(seen.text).toContain(FULL_READING)
-          expect(seen.text).toContain(words.t(('tip' in reading.facts && reading.facts.tip == null) ? 'chk.worktreeNoTip' : 'chk.worktreeAtTip', { worktree: MADE_UP_TREE, tip: MADE_UP_TIP }))
+          // THE WORKTREE AND THE TIP ARE ROWS OF THEIR OWN, and the sentence that held them is gone.
+          const noTip = 'tip' in reading.facts && reading.facts.tip == null
+          const part = page.locator('.chk-part').filter({ has: page.locator('h3', { hasText: words.t(reading.source === 'confirmed' ? 'chk.whichWorkWasAccepted' : 'chk.whichTreeItRead') }) })
+          expect(await theCodeRows(part)).toEqual([
+            { label: words.t('chk.row.worktree' as WordKey), value: MADE_UP_TREE, state: noTip ? words.t('chk.row.tipNotRecorded' as WordKey) : null },
+            ...(noTip ? [] : [{ label: words.t('chk.row.tip' as WordKey), value: MADE_UP_TIP, state: null }]),
+          ])
+          expect(seen.text).not.toContain(words.t(noTip ? 'chk.worktreeNoTip' : 'chk.worktreeAtTip', { worktree: MADE_UP_TREE, tip: MADE_UP_TIP }))
         })
       }
     }
   })
 }
 
-it('the normal reading fits at four widths, in both themes, in English', async () => {
+it('the normal reading fits at 1440 and 390, in the light theme, in English', async () => {
   const shots = process.env['CHECK_READING_SHOTS']
   if (shots) mkdirSync(shots, { recursive: true })
   for (const lang of ['en'] as const) {
     for (const reading of readings.filter((one) => one.scope === 2 || ['sealed code with no tip recorded', 'the sealed record revisions', 'the sealed record revisions of a seal made before links were pinned', 'the sealed record revisions whose record does not say', 'sealed work with no kind or tip recorded', 'sealed code in the worker’s worktree', 'an older sealed release in the worker’s worktree'].includes(one.name))) {
       await open(reading.run!, lang, 'normal')
-      for (const theme of ['light', 'dark'] as const) {
+      {
+        const theme = 'light' as const
         await page.emulateMedia({ colorScheme: theme })
-        for (const width of [1440, 990, 660, 390]) {
+        for (const width of [1440, 390]) {
           await page.setViewportSize({ width, height: 1000 })
           expect(await page.locator('.chk').evaluate((panel) => panel.scrollWidth > panel.clientWidth), `${lang}/${theme}/${width}`).toBe(false)
           if (shots) await page.locator('.chk').screenshot({ path: join(shots, `${reading.words[0]}-${lang}-${theme}-${width}.png`) })
@@ -365,4 +407,37 @@ it('the normal reading fits at four widths, in both themes, in English', async (
       }
     }
   }
+})
+
+/**
+ * IN DEVELOPER MODE THE PATHS OF WHO WAS ASKED AND OF WHAT THE CHECK WOULD READ ARE ROWS OF THEIR OWN. The office
+ * run's log, the work's folder and the worktree a check would read each sat in a sentence: "Its log is …", "The work is
+ * in …, cut from …" and "Worktree: …". Those sentences go, and each path, with the office run and where the work was
+ * cut from, is a labelled row in the office's code style.
+ */
+describe('developer mode draws the paths of who was asked and of what the check would read as rows', () => {
+  const words = createI18n('en')
+
+  it('draws the office run, its log, the work folder, where it was cut from and the worktree as rows, and no sentence holds a path', async () => {
+    await open(withADirectory, 'en', 'inspect')
+    const rows = await theCodeRows(page.locator('.chk'))
+    for (const row of [
+      { label: words.t('chk.row.officeRun' as WordKey), value: MADE_UP_OFFICE_RUN, state: null },
+      { label: words.t('chk.row.log' as WordKey), value: MADE_UP_LOG, state: null },
+      { label: words.t('chk.row.workFolder' as WordKey), value: MADE_UP_WORK_FOLDER, state: null },
+      { label: words.t('chk.row.cutFrom' as WordKey), value: MADE_UP_REF, state: null },
+      { label: words.t('chk.row.worktree' as WordKey), value: MADE_UP_CHECK_TREE, state: null },
+    ]) expect(rows, `no row ${row.label}`).toContainEqual(row)
+    for (const said of await page.locator('.chk p').allTextContents()) {
+      for (const path of [MADE_UP_LOG, MADE_UP_WORK_FOLDER, MADE_UP_CHECK_TREE]) expect(said, 'a sentence holds a path').not.toContain(path)
+    }
+  })
+
+  it('draws none of these rows in normal mode', async () => {
+    await open(withADirectory, 'en', 'normal')
+    const rows = await theCodeRows(page.locator('.chk'))
+    for (const path of [MADE_UP_OFFICE_RUN, MADE_UP_LOG, MADE_UP_WORK_FOLDER, MADE_UP_CHECK_TREE]) {
+      expect(rows.map((row) => row.value), `normal mode draws ${path}`).not.toContain(path)
+    }
+  })
 })

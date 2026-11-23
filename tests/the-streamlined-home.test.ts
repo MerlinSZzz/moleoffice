@@ -3,12 +3,12 @@
 /**
  * THE STREAMLINED HOME, in a real browser. A decision took choice A of report XydBS8GM4BAD.
  *
- * Home keeps Needs you cut to five with a press to the rest, the newest five reports, today, Late or stuck and the
- * agents. What else it drew is one press away, each press on Home in the words of the page it opens, or is gone from
+ * Home keeps Needs you cut to NEEDS_SHOWN rows with a press to the rest, today, Late or stuck and the agents. Reports
+ * left Home: they are read on their own pages. What else it drew is one press away, each press on Home in the words of the page it opens, or is gone from
  * Home because another page draws it. This file proves four things:
  *
- *   1. AT MOST FIVE ROWS of Needs you and five reports, on an office with seven of each, and the line that says how
- *      many of how many with the press to the rest.
+ *   1. AT MOST NEEDS_SHOWN ROWS of Needs you and no report, on an office with seven questions and seven reports, and
+ *      the line that says how many of how many with the press to the rest.
  *   2. EACH MOVED SECTION IS ONE PRESS AWAY: the press is on Home without opening anything, it says what the page it
  *      opens is called, and that page draws the section. What has been said and the questions are Developer mode's,
  *      as they were.
@@ -21,7 +21,8 @@
  * `GET /api/planning/today`, on Home and on the plan page alike, and its work is a task filed here.
  *
  * MUTATIONS, each run after a control run and then restored (round 21 of wave 13w):
- *   1. NEEDS_SHOWN = 6 in src/web/components/home/HomeSections.tsx: case 1 is red, six rows.
+ *   1. NEEDS_SHOWN = 6 in src/web/components/home/HomeSections.tsx: case 1 was red, six rows. Case 1 now reads the
+ *      number from its export.
  *   2. The press to Claims taken out of Agents at work: case 2 is red, no press.
  *   3. `loadDay` asks for the week again: case 3 is red in both modes on the request to /api/planning/week/current.
  *   4. A `.hm-week-bar` drawn again in Agents at work: case 3 is red in both modes on the week's hours.
@@ -29,6 +30,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createI18n } from '../src/shared/i18n.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
+import { NEEDS_SHOWN } from '../src/web/components/home/HomeSections.tsx'
 import { liveApp, waitForThePage, type LiveApp } from './helpers.ts'
 
 const OWNER = { 'content-type': 'application/json', 'x-mole-office-workspace': 'default', 'x-mole-office-actor-type': 'human', 'x-mole-office-actor-id': THE_PERSON }
@@ -85,21 +87,22 @@ async function openHome(mode: 'normal' | 'inspect', quiet = false): Promise<stri
   await waitForThePage(app.page, 60_000)
   await app.page.locator('[data-home-section="agents"]').waitFor({ timeout: 30_000 })
   await app.page.locator('[data-home-section="needs"] .hm-needs-item').first().waitFor({ timeout: 30_000 })
-  await app.page.locator('.hm-main-column .att-rep').first().waitFor({ timeout: 30_000 })
+  await app.page.locator('[data-home-section="keyItems"]').waitFor({ timeout: 30_000 })
   if (quiet) await app.page.waitForTimeout(3_000)
   app.page.off('request', watch)
   return asked
 }
 
 describe('the streamlined Home', () => {
-  it('draws at most five rows of Needs you and five reports, and says how many of how many', async () => {
+  it('draws at most NEEDS_SHOWN rows of Needs you and no report, and says how many of how many', async () => {
     await openHome('normal')
     const needs = app.page.locator('[data-home-section="needs"]')
     const total = Number(await needs.locator('.hm-needs-count').innerText())
-    expect(total, 'the office holds more than five things waiting, so the cut is tried').toBeGreaterThan(5)
-    expect(await needs.locator('.hm-needs-item').count(), 'five rows of Needs you').toBe(5)
-    expect(await needs.locator('[data-home-needs-more] .hm-section-count').innerText()).toBe(t('home.lateShown', { n: 5, total }))
-    expect(await app.page.locator('.hm-main-column .att-rep').count(), 'five reports').toBe(5)
+    expect(NEEDS_SHOWN, 'Home draws one or two decisions').toBeLessThanOrEqual(2)
+    expect(total, 'the office holds more things waiting than Home draws, so the cut is tried').toBeGreaterThan(NEEDS_SHOWN)
+    expect(await needs.locator('.hm-needs-item').count(), 'the rows of Needs you Home draws').toBe(NEEDS_SHOWN)
+    expect(await needs.locator('[data-home-needs-more] .hm-section-count').innerText()).toBe(t('home.lateShown', { n: NEEDS_SHOWN, total }))
+    expect(await app.page.locator('.att-rep').count(), 'no report is drawn on Home').toBe(0)
   }, 120_000)
 
   // EACH PRESS: where it is on Home, the mode it is drawn in, the page's own name, and what that page must draw.

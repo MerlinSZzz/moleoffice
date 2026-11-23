@@ -55,7 +55,7 @@
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { Page } from 'playwright'
-import { liveApp, type LiveApp, waitForThePage } from './helpers.ts'
+import { liveApp, type LiveApp, waitForThePage, governsTheWholeProject } from './helpers.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { THE_SHELL_WIDTH } from '../src/web/lib/the-shell-width.ts'
 import { join } from 'node:path'
@@ -115,7 +115,7 @@ beforeAll(async () => {
     body: JSON.stringify({
       kind: 'decision',
       title: 'The lantern archive keeps its scans for a year',
-      data: { replaces: [] },
+      data: { ...governsTheWholeProject(), replaces: [] },
     }),
   })
   const body = (await res.json()) as { record?: { id: string }; error?: string }

@@ -57,7 +57,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { FastifyInstance } from 'fastify'
 import { THE_TEST_OFFICES_OWNER } from './a-page-of-a-test-office.ts'
-import { apiApp, freshDb, type TestDb } from './helpers.ts'
+import { apiApp, freshDb, type TestDb, governsTheWholeProject } from './helpers.ts'
 import { THE_OWNER, type ForkSettler } from '../src/shared/kinds.ts'
 import type { ForksReply } from '../src/server/api/forks.ts'
 import type { NeedsYouReply } from '../src/server/api/needs-you.ts'
@@ -219,7 +219,7 @@ async function ownersDecision(title: string): Promise<string> {
     'decision',
     title,
     {
-      replaces: [],
+      ...governsTheWholeProject(), replaces: [],
       because: 'They said so on the call.',
       authority: 'the owner said so',
       authority_reference: 'the call on 20 August',
@@ -232,7 +232,7 @@ async function ownersDecision(title: string): Promise<string> {
 /** A decision an AGENT wrote, carrying an authority, which is what lets an agent close a fork. */
 async function agentsDecision(title: string): Promise<string> {
   return fileRecord('decision', title, {
-    replaces: [],
+    ...governsTheWholeProject(), replaces: [],
     because: 'The bench run timed out at 200ms.',
     authority: 'a measurement',
     decided_by: 'claude-code',

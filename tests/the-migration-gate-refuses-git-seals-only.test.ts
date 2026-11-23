@@ -17,8 +17,8 @@
  *      was, running and with no seal.
  *   2. The same branch seals at once with a files submission sent with `remindBeforeTheSeal: false`. A records
  *      submission sent the same way is refused at once, in the words of 1.
- *   3. A run filed already finished with a records submission over the same branch is refused in the words of 1, and
- *      neither the run nor a seal is filed.
+ *   3. A run filed already finished with a records submission over the same branch is filed and sealed as records:
+ *      commit B was there when the run was filed, so it is not the run's own commit.
  *   4. The gate is unchanged for the seals that do seal the branch: a write naming no submission, one naming git and
  *      one naming mixed are each refused over the prefix, with the item's own sentence and what to do, and the run is
  *      left as it was; a clean branch's git seal still seals.
@@ -190,15 +190,16 @@ function expectTheRunIsAsItWas(id: string, beforeTheWrite: { data: Record<string
 }
 
 /**
- * A RECORDS FINISH OVER COMMIT B IS REFUSED BY THE COMMITS PAST ITS CUT, NOT BY THIS GATE: the words name commit B and the
- * mixed write that would seal it, and not the migration item. Returns the run the words name.
+ * A RECORDS FINISH OVER COMMIT B IS REFUSED BY THE COMMITS PAST ITS CUT, NOT BY THIS GATE: the words name commit B, the
+ * run's own commit, by its full hash, and the mixed write that would seal it, and not the migration item. Returns the run
+ * the words name.
  */
 function expectTheCommitsPastTheCutRefuse(refused: { statusCode: number; body: string }, tree: { dir: string; b: string }, note: string): string {
   expect(refused.statusCode, refused.body.slice(0, 800)).toBe(409)
   const error = (JSON.parse(refused.body) as { error: string }).error
   const run = /^Run (\S+) declared a records submission/.exec(error)?.[1]
   if (run === undefined) throw new Error(`the refusal names no run: ${error}`)
-  expect(error).toContain(`The commit: ${git(tree.dir, 'log', '-1', '--format=%h', tree.b)} "Synthetic commit B".`)
+  expect(error).toContain(`so a records seal would leave it out: ${tree.b} "Synthetic commit B".`)
   expect(error).toContain(`PATCH /api/records/${run} ${JSON.stringify({ dataPatch: { state: 'finished', submission: { kind: 'mixed', records: [note] } } })}`)
   expect(error).not.toContain('names a migration by the bare prefix')
   return run
@@ -280,7 +281,7 @@ describe('the migration gate at a records or files seal', () => {
     expectTheRunIsAsItWas(records.id, beforeTheWrite)
   })
 
-  it('3: a run filed already finished with a records submission over the prefix is refused by the commits past its cut, and nothing is filed', async () => {
+  it('3: a run filed already finished with a records submission over the prefix is sealed as records, since commit B was there when it was filed', async () => {
     const tree = aTreeWithABarePrefix()
     const note = aNote()
     const filed = await app.inject({
@@ -304,10 +305,10 @@ describe('the migration gate at a records or files seal', () => {
         },
       },
     })
-    const named = expectTheCommitsPastTheCutRefuse(filed, tree, note)
-    expect(t.api.getRecord(named), 'the refused filing filed its run').toBeFalsy()
-    expect((t.client.sqlite.prepare("SELECT count(*) AS n FROM records WHERE kind = 'session' AND title = ?").get('Synthetic tree filed finished as records') as { n: number }).n).toBe(0)
-    expect((t.client.sqlite.prepare("SELECT count(*) AS n FROM records WHERE kind = 'sealed_tip' AND json_extract(data, '$.seal.run') = ?").get(named) as { n: number }).n).toBe(0)
+    expect(filed.statusCode, filed.body.slice(0, 800)).toBe(201)
+    const named = (filed.json() as { record: { id: string } }).record.id
+    expect(t.api.getRecord(named)?.data['state']).toBe('finished')
+    expect((t.client.sqlite.prepare("SELECT count(*) AS n FROM records WHERE kind = 'sealed_tip' AND json_extract(data, '$.seal.run') = ? AND json_extract(data, '$.seal.kind') = 'records'").get(named) as { n: number }).n).toBe(1)
   })
 })
 

@@ -15,10 +15,10 @@
  *   · Beside "last slept", the presses that put it to sleep, wake it and postpone its sleep, for those who may press
  *     them (SleepPresses.tsx), and beside its compactions the office flow of its newest run. Item 1 of a decision says:
  *     "together with its compactions and its office flow".
- *   · Beside "last slept" too, a secretary's own sleep time and who set it, and for the person and the secretary itself
+ *   · Beside "last slept" too, a resident's own sleep time and who set it, and for the person and the resident itself
  *     the editor that sets it.
  *
- * A SECRETARY SLEEPS AT ITS OWN TIME, which each secretary sets for itself. The
+ * A PERMANENT RESIDENT SLEEPS AT ITS OWN TIME, which each resident sets for itself. The
  * office begins and ends that sleep (src/server/lib/sleep-windows.ts), and while it goes on the Sleep place says until
  * when. Every other sleep is an act the resident or the person presses now, through the doors in
  * src/server/api/residents.ts.
@@ -35,7 +35,7 @@ import { thePersonIsLooking, type OneResidentReading, type TheHeartbeat } from '
 import { FlowRunSteps } from './FlowRunSteps.tsx'
 import { ResidentFact, useNameOf } from './ResidentProposals.tsx'
 import { SleepPresses, whoMayPress, type WhoMayPress } from './SleepPresses.tsx'
-import { Absence, Btn, ErrorNote, Field, Panel, TextInput, useAsync } from './ui.tsx'
+import { Absence, Btn, ErrorNote, Field, Panel, ServerNote, TextInput, useAsync } from './ui.tsx'
 import { useProjectAsync } from '../lib/project-async.ts'
 
 /** The heartbeat in a few words, for a label on the profile and on the resident's section. */
@@ -49,15 +49,14 @@ export function heartbeatWords(heartbeat: TheHeartbeat): string {
 
 /** The heartbeat as one fact: the few words, and in developer mode the server's whole sentence under them. */
 export function HeartbeatFact({ heartbeat }: { heartbeat: TheHeartbeat }) {
-  const inspect = useInspect()
   return (
     <ResidentFact
       label={t('resident.heartbeat.label')}
       value={
-        <span data-heartbeat={heartbeat.state}>
-          {heartbeatWords(heartbeat)}
-          {inspect ? <span className="resident-sleep-says">{content(heartbeat.says)}</span> : null}
-        </span>
+        <>
+          <span data-heartbeat={heartbeat.state}>{heartbeatWords(heartbeat)}</span>
+          <ServerNote text={content(heartbeat.says)} />
+        </>
       }
     />
   )
@@ -102,12 +101,12 @@ export function OfficeFlowOfARun({ runId }: { runId: string | null }) {
   const inspect = useInspect()
   const [read, readAgain] = useProjectAsync(() => (runId === null ? Promise.resolve(null) : api.flowRunOf(runId)), [runId])
   const [participants] = useProjectAsync(readParticipantsOnce, [])
-  if (runId === null) return <OfficeFlowAbsent words={t('resident.flow.noRun')} />
+  if (runId === null) return <OfficeFlowAbsent words={t('resident.flow.noRunWord')} />
   if (read.status === 'loading') return null
   if (read.status === 'error') {
     return <ErrorNote message={inspect ? read.message : t('resident.flow.readFailed')} fault={inspect ? read.fault : undefined} retry={readAgain} />
   }
-  if (read.value === null || read.value.flowRun === null) return <OfficeFlowAbsent words={t('resident.flow.none')} />
+  if (read.value === null || read.value.flowRun === null) return <OfficeFlowAbsent words={t('resident.flow.noneWord')} />
   return (
     <FlowRunSteps
       record={read.value.flowRun}
@@ -155,7 +154,7 @@ export function TheResidentSleep({
       : sleep.asleep.wakesAt === null
         ? t('resident.sleep.asleepSince', { when: drawnStamp(sleep.asleep.since) })
         : t('resident.sleep.asleepUntil', { when: drawnStamp(sleep.asleep.since), until: drawnStamp(sleep.asleep.wakesAt) })
-  const mayEditTheSleepTime = may.sleepAndWake && !resident.retired && resident.holdsTheSecretaryCard
+  const mayEditTheSleepTime = may.sleepAndWake && !resident.retired
   return (
     <>
       <style href="mole-office-resident-sleep" precedence="default">
@@ -194,7 +193,6 @@ export function TheResidentSleep({
             ))}
           </ul>
         )}
-        <p className="resident-sleep-quiet">{t('resident.sleep.postponedSentToNobody')}</p>
       </Panel>
       {flow}
       <TheNaming reading={reading} thePerson={thePerson} onChanged={onChanged} />
@@ -203,14 +201,13 @@ export function TheResidentSleep({
 }
 
 /**
- * A SECRETARY'S SLEEP TIME IN WORDS: when it begins, how long it lasts, the clock it is on and when the next begins, then
- * who set it and when. A resident without the secretary card has none, and the words say so rather than "none set".
+ * A RESIDENT'S SLEEP TIME IN WORDS: when it begins, how long it lasts, the clock it is on and when the next begins, then
+ * who set it and when. A resident with none says so rather than "none set".
  */
 function SleepTimeWords({ reading, thePerson }: { reading: OneResidentReading; thePerson: boolean }) {
   const resident = reading.resident
   const time = resident.sleep.sleepTime
-  if (!resident.holdsTheSecretaryCard) return <span data-sleep-time="not-a-secretary">{t('resident.sleep.time.notASecretary')}</span>
-  if (time === null) return <span data-sleep-time="none">{t('resident.sleep.time.none')}</span>
+  if (time === null) return <span data-sleep-time="none">{t('resident.sleep.time.noneSet')}</span>
   const when = drawnStamp(time.setAt)
   return (
     <span data-sleep-time="set">
@@ -225,7 +222,7 @@ function SleepTimeWords({ reading, thePerson }: { reading: OneResidentReading; t
 }
 
 /**
- * THE EDITOR OF A SECRETARY'S SLEEP TIME, for the person and the secretary itself, as the door allows. The time of day
+ * THE EDITOR OF A RESIDENT'S SLEEP TIME, for the person and the resident itself, as the door allows. The time of day
  * is sent as it was written: the door reads "3.00" as 03:00, refuses what it cannot read, and its words are drawn here.
  * The minutes are sent only as a whole number, and until then the press says what is missing.
  */
@@ -312,7 +309,7 @@ function TheNaming({ reading, thePerson, onChanged }: { reading: OneResidentRead
       ) : (
         <>
           <p className="resident-sleep-said" data-naming="waiting">
-            {t('resident.naming.waiting', { when: drawnStamp(naming.askedAt), name: content(reading.resident.name) })}
+            {t('resident.naming.notChosen', { when: drawnStamp(naming.askedAt) })}
           </p>
           {fault === null ? null : <ErrorNote message={fault.message} fault={fault.fault} />}
           {thePerson ? (
@@ -330,7 +327,6 @@ function TheNaming({ reading, thePerson, onChanged }: { reading: OneResidentRead
 
 const RESIDENT_SLEEP_CSS = `
 .resident-sleep-facts { margin: 0; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-.resident-sleep-says { display: block; color: var(--text-3); font-size: var(--fs-1); overflow-wrap: anywhere; }
 .resident-sleep-head {
   margin: var(--pad) 0 4px; color: var(--text-3); font: 600 var(--fs-1)/var(--lh-tight) var(--font-ui);
   letter-spacing: .06em; text-transform: uppercase;

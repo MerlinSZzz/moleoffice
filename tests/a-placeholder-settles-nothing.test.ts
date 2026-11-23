@@ -32,7 +32,7 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { FastifyInstance } from 'fastify'
-import { apiApp, freshDb, type TestDb } from './helpers.ts'
+import { apiApp, freshDb, type TestDb, governsTheWholeProject } from './helpers.ts'
 import { THE_TEST_OFFICES_OWNER } from './a-page-of-a-test-office.ts'
 
 const WORKSPACE = 'default'
@@ -121,7 +121,7 @@ describe('a placeholder waiting on a fork cannot be resolved', () => {
     })
     expect((await post('/api/links', { fromId: fork, toId: placeholder, type: 'blocks' })).status).toBe(201)
     const decision = await record('decision', 'We build on the two-stage detector', {
-      replaces: [],
+      ...governsTheWholeProject(), replaces: [],
       because: 'It is the one the trials ran on and the numbers hold.',
     })
     expect((await post('/api/links', { fromId: decision, toId: fork, type: 'derived_from' })).status).toBe(201)

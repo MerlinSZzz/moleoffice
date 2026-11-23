@@ -17,10 +17,9 @@
  * of its rows are alarms). The waiting list names the agent each row came from (`WaitingItem.fromAgent`),
  * and is read whole, so an agent it names is waiting on you in each project whose roster holds it.
  *
- * WHICH RUN SERVES EACH AGENT is not on the roster. It is read (`useServingRuns` below) only for a project
- * whose attention holds an alarm on a run, in reads of at most `DOING_ASKED_AT_ONCE` agents, and asked again
- * only when that project's roster is read again or its alarms on runs change. A project with no such alarm,
- * or with nobody on its roster, asks nothing, and nobody in it is stuck.
+ * WHICH RUN SERVES EACH AGENT comes with the roster: each row names it as `doingFrom`, so Home asks no read
+ * of its own for it. An agent is stuck when an alarm names that run, so in a project with no alarm on a run
+ * nobody is stuck.
  *
  * A COUNT WHOSE READING DID NOT ANSWER IS SAID IN WORDS AND NEVER DRAWN AS ZERO. The bar names each reading
  * that failed, and a bar still being read says so. The heading counts only the bars that were counted, and
@@ -30,11 +29,7 @@
  * agent record of its own, and the registry maps both to one participant (one live registry row per handle,
  * src/server/lib/participants.ts). Each bar counts its own roster, and the heading counts the participants.
  */
-import { useEffect, useRef, useState } from 'react'
 import { content, count, t, type WordKey } from '@shared/i18n.ts'
-import { DOING_ASKED_AT_ONCE } from '@shared/working.ts'
-import type { HomeDoing } from '../../../server/lib/working.ts'
-import { api, errorMessage, faultOf } from '../../api.ts'
 import type { AsyncState } from '../ui.tsx'
 
 /** The three parts of a bar, in the order they are drawn. */
@@ -42,26 +37,21 @@ const BAR_PARTS = ['working', 'waiting', 'stuck'] as const
 type BarPart = (typeof BAR_PARTS)[number]
 const PART_WORDS: Readonly<Record<BarPart, WordKey>> = { working: 'home.bars.working', waiting: 'home.bars.waiting', stuck: 'home.bars.stuck' }
 
-/** The four readings a bar is counted from. */
-export type BarReading = 'roster' | 'waiting' | 'attention' | 'doing'
+/** The three readings a bar is counted from. */
+export type BarReading = 'roster' | 'waiting' | 'attention'
 const UNREAD_WORDS: Readonly<Record<BarReading, WordKey>> = {
   roster: 'home.bars.unread.roster',
   waiting: 'home.bars.unread.waiting',
   attention: 'home.bars.unread.attention',
-  doing: 'home.bars.unread.doing',
 }
 
 /** What the bars read of each reading: only the fields the counts use. */
-interface BarRosterRow { agentId: string; participant: { id: string } | null; presence: { presence: string } }
-interface BarServingRow { agentId: string; doingFrom: string | null }
-type ServingRuns = AsyncState<{ rows: readonly BarServingRow[] }>
+interface BarRosterRow { agentId: string; participant: { id: string } | null; presence: { presence: string }; doingFrom: string | null }
 
 export interface BarReadings {
   roster: AsyncState<{ rows: readonly BarRosterRow[] }>
   waiting: AsyncState<{ items: readonly { fromAgent: { answer: string; agentId?: string } }[] }>
   attention: AsyncState<{ alarms: { sessionIds: readonly string[] } }>
-  /** Which run serves each agent. Read only when the attention holds an alarm on a run. */
-  doing: ServingRuns
 }
 
 /**
@@ -80,23 +70,18 @@ function alarmRunsOf(attention: { alarms: { sessionIds: readonly string[] } }): 
   return new Set(attention.alarms.sessionIds)
 }
 
-/** One project's bar, counted from its four readings. */
-export function theBarOf({ roster, waiting, attention, doing }: BarReadings): HomeBar {
+/** One project's bar, counted from its three readings. */
+export function theBarOf({ roster, waiting, attention }: BarReadings): HomeBar {
   const alarmRuns = attention.status === 'ready' ? alarmRunsOf(attention.value) : null
-  // A roster with nobody on it has nobody to ask about.
-  const asksDoing = alarmRuns !== null && alarmRuns.size > 0 && roster.status === 'ready' && roster.value.rows.length > 0
   const failed: BarReading[] = []
   if (roster.status === 'error') failed.push('roster')
   if (waiting.status === 'error') failed.push('waiting')
   if (attention.status === 'error') failed.push('attention')
-  if (asksDoing && doing.status === 'error') failed.push('doing')
   if (failed.length > 0) return { read: false, failed }
   if (roster.status !== 'ready' || waiting.status !== 'ready' || alarmRuns === null) return STILL_READING
-  if (asksDoing && doing.status !== 'ready') return STILL_READING
 
   const named = new Set<string>()
   for (const item of waiting.value.items) if (item.fromAgent.answer === 'an-agent' && item.fromAgent.agentId !== undefined) named.add(item.fromAgent.agentId)
-  const servedBy = new Map(doing.status === 'ready' ? doing.value.rows.map((row) => [row.agentId, row.doingFrom] as const) : [])
   let working = 0
   let waitingOnYou = 0
   let stuck = 0
@@ -108,16 +93,11 @@ export function theBarOf({ roster, waiting, attention, doing }: BarReadings): Ho
       atWork.push(who)
       continue
     }
-    if (asksDoing) {
-      // AN AGENT THE LAST READ OF SERVING RUNS DID NOT ANSWER FOR joined the roster after it; the read that follows
-      // the roster's answers for it, and until then the bar is still being read rather than counted without it.
-      if (!servedBy.has(row.agentId)) return STILL_READING
-      const run = servedBy.get(row.agentId) ?? null
-      if (run !== null && alarmRuns.has(run)) {
-        stuck += 1
-        atWork.push(who)
-        continue
-      }
+    // THE RUN SERVING THE AGENT IS THE ROSTER ROW'S OWN, so it is read with the agent and cannot lag behind it.
+    if (row.doingFrom !== null && alarmRuns.has(row.doingFrom)) {
+      stuck += 1
+      atWork.push(who)
+      continue
     }
     if (row.presence.presence === 'online' || row.presence.presence === 'stale') {
       working += 1
@@ -130,66 +110,6 @@ export function theBarOf({ roster, waiting, attention, doing }: BarReadings): Ho
 /** How many rows of the waiting list cannot say which agent they came from. They may be from an agent counted here. */
 export function cannotTellIn(waiting: BarReadings['waiting']): number {
   return waiting.status === 'ready' ? waiting.value.items.filter((item) => item.fromAgent.answer === 'cannot-tell').length : 0
-}
-
-/** One project's readings, as Home holds them. */
-export interface ProjectBarReadings {
-  id: string
-  roster: AsyncState<{ rows: readonly BarRosterRow[] }>
-  attention: BarReadings['attention']
-}
-
-/**
- * WHICH RUN SERVES EACH AGENT, for the projects whose attention holds an alarm on a run. A project is asked
- * again when its roster answers again (a run that opened or ended moves the roster, and the run serving an agent
- * with it) or when its alarms on runs change, and at no other time. While it is asked again the last answer stays.
- */
-export function useServingRuns(projects: readonly ProjectBarReadings[]): ReadonlyMap<string, ServingRuns> {
-  const [answers, setAnswers] = useState<ReadonlyMap<string, ServingRuns>>(new Map())
-  // WHICH READING OF ITS PROJECT WAS LAST ASKED, kept beside the answers so an effect that runs twice before the page
-  // draws again cannot ask twice, and an answer overtaken by a later question is dropped.
-  const askedAt = useRef(new Map<string, string>())
-  // Each roster answer gets a number of its own, so a roster read again is a new question even in the same second.
-  const rosterNumbers = useRef({ next: 0, of: new WeakMap<object, number>() })
-  const numberOf = (roster: object): number => {
-    const held = rosterNumbers.current
-    const known = held.of.get(roster)
-    if (known !== undefined) return known
-    held.next += 1
-    held.of.set(roster, held.next)
-    return held.next
-  }
-  const due = projects.flatMap((project) => {
-    if (project.roster.status !== 'ready' || project.attention.status !== 'ready') return []
-    const runs = alarmRunsOf(project.attention.value)
-    if (runs.size === 0 || project.roster.value.rows.length === 0) return []
-    const at = `${String(numberOf(project.roster.value))}:${[...runs].sort().join(',')}`
-    return [{ id: project.id, at, agentIds: project.roster.value.rows.map((row) => row.agentId) }]
-  })
-  const wanted = useRef(due)
-  wanted.current = due
-  const signature = due.map((one) => `${one.id}@${one.at}`).join('|')
-  useEffect(() => {
-    for (const { id, at, agentIds } of wanted.current) {
-      if (askedAt.current.get(id) === at) continue
-      askedAt.current.set(id, at)
-      const settle = (answer: ServingRuns) => {
-        if (askedAt.current.get(id) !== at) return
-        setAnswers((was) => new Map(was).set(id, answer))
-      }
-      const reads: Promise<HomeDoing>[] = []
-      for (let from = 0; from < agentIds.length; from += DOING_ASKED_AT_ONCE) {
-        reads.push(api.homeDoing({ workspaceId: id, agentIds: agentIds.slice(from, from + DOING_ASKED_AT_ONCE) }))
-      }
-      Promise.all(reads).then(
-        (replies) => settle({ status: 'ready', value: { rows: replies.flatMap((reply) => reply.rows) } }),
-        (err: unknown) => settle({ status: 'error', message: errorMessage(err), fault: faultOf(err) }),
-      )
-    }
-    // The signature names each project's roster answer and alarm runs, so the effect runs when either moves.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [signature])
-  return answers
 }
 
 /** One project's line in the bars. `agents` is how many active agents its roster holds, when it was read. */

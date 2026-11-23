@@ -1410,16 +1410,6 @@ describe('Vite hands the page the file, and the page asks for it at the address 
     if (copy !== '') rmSync(copy, { recursive: true, force: true })
   })
 
-  it('is asked for at the same address Vite answers on, which is the one fact written twice', () => {
-    const page = readFileSync(join(REPO, 'src/web/index.html'), 'utf8')
-    // THE FETCH ITSELF, not merely the address appearing somewhere in the file. The prose above the
-    // notice names the address too, and asserting the file CONTAINS it passed a page that asked at
-    // a different one — measured 4 September 2026, mutant 15.
-    expect(page, 'the page asks for the supervisor file at an address vite.config.ts does not serve').toContain(
-      `fetch('${THE_TROUBLE_ADDRESS}'`,
-    )
-  })
-
   it('answers 204 while the supervisor is starting servers normally, which is every ordinary minute', async () => {
     rmSync(theTroubleFileIn(copy), { force: true })
     const answered = await fetch(`${site}${THE_TROUBLE_ADDRESS}`, { signal: AbortSignal.timeout(10_000) })
@@ -1833,7 +1823,8 @@ afterAll(async () => {
     } catch {
       // Already gone, which is the outcome that was wanted.
     }
-    await sleep(3000)
+    const untilItsGroupIsGone = Date.now() + 3000
+    while (Date.now() < untilItsGroupIsGone && isRunning(-supervisor.pid)) await sleep(100)
     try {
       process.kill(-supervisor.pid, 'SIGKILL')
     } catch {

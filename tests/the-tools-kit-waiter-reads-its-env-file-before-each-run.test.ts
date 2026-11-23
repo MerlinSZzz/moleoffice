@@ -4,9 +4,8 @@
  * THE WAITER IN tools/kit/ READS ITS ENV FILE AGAIN BEFORE EACH RUN OF THE HOLD TOOL, AND TRIES A
  * REFUSED HOLD ONCE MORE WHEN THE ENV FILE HAS CHANGED.
  *
- * This is tests/the-kits-waiter-reads-its-env-file-before-each-run.test.ts, proved again on
- * `tools/kit/waiter.sh`, the copy with no personal default. That file goes on
- * testing `design/agents/kit/waiter.sh`, which live agents still run by its path.
+ * This is proved on `tools/kit/waiter.sh`, the copy with no personal default.
+ * `design/agents/kit/waiter.sh`, which live agents still run by its path, forwards to it.
  *
  * Problem `-2DXAjdifik3`, 26 September 2026. The owner granted an agent a new key, which revoked its
  * old one. The agent collected the new key and wrote it into its env file, but the kit's waiter.sh

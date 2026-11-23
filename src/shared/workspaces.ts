@@ -40,6 +40,8 @@
  * `fixture` as the name of one project would be a guess reported as a measurement.
  */
 
+import { KNOWLEDGE_WORKSPACE } from './knowledge/constants.ts'
+
 /**
  * The workspace a request means when it does not say, and the workspace a fresh database has.
  *
@@ -100,7 +102,7 @@ export const WRITTEN_IN_BY_THE_MOVE = 'the move into the message centre: the pro
 
 /** Whether this project belongs on a list of projects a person or an agent reads. The message centre does not. */
 export function isAProjectOnAList(id: string): boolean {
-  return id !== MESSAGE_CENTRE
+  return id !== MESSAGE_CENTRE && id !== KNOWLEDGE_WORKSPACE
 }
 
 /**

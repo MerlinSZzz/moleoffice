@@ -1,12 +1,15 @@
 // Copyright © 2026 Zhengyang Shen
 // Licensed under the MIT License. See LICENSE.
 import type { LightMyRequestResponse } from 'fastify'
+import { spawn } from 'node:child_process'
+import { randomUUID } from 'node:crypto'
+import { once } from 'node:events'
 import { chmodSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { expect, it, vi } from 'vitest'
-import { buildTheFirstOfficeInAHook, apiApp, freshDb, theOfficesKeyHeader, thePersonsKeyHeader } from './helpers.ts'
+import { A_SLEEP_TIME, buildTheFirstOfficeInAHook, apiApp, freshDb, theOfficesKeyHeader, thePersonsKeyHeader, governsTheWholeProject } from './helpers.ts'
 import { MESSAGE_QUOTE_POSITIONS_INVALID, PRIVATE_LOGIN_REFUSAL_CODES, REFUSAL_CODES, type CodedRefusal, type RefusalCode, type TerminalRefusalCode } from '../src/shared/refusal-codes.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 import type { Actor } from '../src/server/lib/records.ts'
@@ -291,13 +294,34 @@ it('keeps the English, status and stored data while sending every declared refus
     expect(first.json()).toMatchObject({ code: 'decisionReplacesUnsaid', values: {} })
     expect(first.json().error).toContain('data.replaces')
     seen.add('decisionReplacesUnsaid')
-    const earlier = await app.inject({ method: 'POST', url: '/api/records', headers: { ...headers, 'content-type': 'application/json' }, payload: { kind: 'decision', title: 'Test: the shed is painted blue', data: { because: 'Test reason.', replaces: [] }, links: [{ type: 'about', toId: subjectId }] } })
+    const shed = { because: 'Test reason.', ...governsTheWholeProject(), replaces: [] }
+    const earlier = await app.inject({ method: 'POST', url: '/api/records', headers: { ...headers, 'content-type': 'application/json' }, payload: { kind: 'decision', title: 'Test: the shed is painted blue', data: shed, links: [{ type: 'about', toId: subjectId }] } })
     expect(earlier.statusCode, earlier.body).toBe(201)
     const second = await unsaid('Test: the shed is painted green')
     expect(second.statusCode, second.body).toBe(400)
     expect(second.json()).toMatchObject({ code: 'decisionReplacesUnsaidWithCandidates', values: {} })
     expect(second.json().error).toContain(earlier.json().record.id as string)
     seen.add('decisionReplacesUnsaidWithCandidates')
+    // WHAT A DECISION NAMES (src/server/lib/what-a-record-names.ts): each of the five refusals through the record door,
+    // with its code, its values and its English, and nothing written.
+    const named = (title: string, data: Record<string, unknown>) => {
+      const payload = { kind: 'decision', title, data: { because: 'Test reason.', replaces: [], ...data } }
+      return app.inject({ method: 'POST', url: '/api/records', headers: { ...headers, 'content-type': 'application/json' }, payload })
+    }
+    for (const [data, code, values] of [
+      [{}, 'decisionNamesNothingItGoverns', {}],
+      [{ governs: [] }, 'decisionGovernsIsEmpty', {}],
+      [{ governs: [{ path: 'src/test-shed.ts' }] }, 'decisionGovernsNamesAPath', { path: 'src/test-shed.ts' }],
+      [{ governs: [{ wholeProject: true }, { record: subjectId }] }, 'decisionGovernsTheWholeProjectBesideOthers', {}],
+      [{ nothingFits: [{ missing: 'module', what: 'the test shed', nearest: 'NoSuchPage12' }] }, 'decisionNearestIsNotALivePage', { nearest: 'NoSuchPage12' }],
+    ] as const) {
+      const reply = await named(`Test: the shed is refused for ${code}`, data)
+      expect(reply.statusCode, reply.body).toBe(400)
+      expect(reply.json()).toMatchObject({ code, values })
+      expect(reply.json().error).toBe(sayInEnglish(`server.${code}`, values))
+      expect(db.client.sqlite.prepare('SELECT id FROM records WHERE title = ?').all(`Test: the shed is refused for ${code}`)).toEqual([])
+      seen.add(code)
+    }
 
     // WHAT A WRITE TO A FLOW'S STEPS LACKS, wave 13p round 33: each of the six refusals through
     // the record door, with its code for the page and the English sentence kept on the reply. Round 33b: the short
@@ -376,7 +400,7 @@ it('keeps the English, status and stored data while sending every declared refus
     // migration 0268), through the door itself: the code for the Casting page, and the English sentence kept on the
     // reply, with the word language set to Chinese.
     const filed = async (kind: string, title: string): Promise<string> => {
-      const made = await app.inject({ method: 'POST', url: '/api/records', headers, payload: { kind, title, data: kind === 'decision' ? { replaces: [] } : {} } })
+      const made = await app.inject({ method: 'POST', url: '/api/records', headers, payload: { kind, title, data: kind === 'decision' ? { ...governsTheWholeProject(), replaces: [] } : {} } })
       expect(made.statusCode, made.body).toBe(201)
       return made.json().record.id as string
     }
@@ -841,7 +865,7 @@ it('keeps the English, status and stored data while sending every declared refus
         seen.add(code)
       }
       const propose = async (handle: string): Promise<string> => {
-        const reply = await app.inject({ method: 'POST', url: '/api/residents/proposals', headers: as('test-res-sec', key('test-res-sec')), payload: { agentId: handle, because: 'Test: steady work.' } })
+        const reply = await app.inject({ method: 'POST', url: '/api/residents/proposals', headers: as('test-res-sec', key('test-res-sec')), payload: { agentId: handle, because: 'Test: steady work.', sleepTime: A_SLEEP_TIME } })
         expect(reply.statusCode, reply.body).toBe(201)
         return reply.json().proposal.id as string
       }
@@ -859,6 +883,9 @@ it('keeps the English, status and stored data while sending every declared refus
       rmSync(spaces, { force: true })
       expect((await confirm(proposal)).statusCode).toBe(200)
       await expectCoded('residentProposalSettled', 409, 'already settled', await confirm(proposal))
+      const withoutATime = await propose('test-res-c')
+      db.client.sqlite.prepare("UPDATE records SET data = json_remove(data, '$.extra.residency.sleepTime') WHERE id = ?").run(withoutATime)
+      await expectCoded('residentProposalHasNoSleepTime', 409, 'filed before a proposal had to name a sleep time', await confirm(withoutATime))
       const forB = await propose('test-res-b')
       expect((await app.inject({ method: 'POST', url: '/api/participants/agent/test-res-b/retire', headers: asThePerson, payload: { because: 'Test: done.' } })).statusCode).toBe(200)
       await expectCoded('residentNoLongerEligible', 409, 'can no longer be confirmed', await confirm(forB))
@@ -1053,6 +1080,49 @@ it('keeps the English, status and stored data while sending every declared refus
         await expectTerminalCoded('terminalAgentNoRuntime', 409, 'names no runtime', await open('test-term-plain'))
         // PAST EVERY CHECK, THE HOLDER IS ASKED, and none runs here: the round-2 refusal, with its code, and nothing opens.
         await expectTerminalCoded('terminalHolderNotRunning', 503, 'So no terminal can be opened', await open('test-term-claude'))
+
+        // THE FOUR LIVE-RUN REFUSALS carry values while keeping the server's English sentence.
+        const liveHere = await register('test-term-live-here', 'claude-code', null)
+        const liveHeld = await register('test-term-live-held', 'claude-code', null)
+        const liveSandbox = await register('test-term-live-sandbox', 'claude-code', null)
+        const liveElsewhere = await register('test-term-live-elsewhere', 'claude-code', null)
+        const project = await app.inject({ method: 'POST', url: '/api/workspaces', headers: asThePerson, payload: { id: 'test-terminal-project', title: 'Test terminal project' } })
+        expect(project.statusCode, project.body).toBe(201)
+        const liveConversation = randomUUID()
+        const processForRun = spawn(process.execPath, ['-e', 'setInterval(() => {}, 100000)', '--', '--resume', liveConversation], { detached: true, stdio: 'ignore' })
+        await once(processForRun, 'spawn')
+        const pid = processForRun.pid!
+        const file = (agentId: string, title: string, data: Record<string, unknown>, workspaceId = 'default') => db.api.createRecord({
+          kind: 'session', title, workspaceId, actor: { type: 'human', id: THE_PERSON },
+          data: { state: 'running', servingAgentId: agentId, ...data },
+        })
+        try {
+          const here = file(liveHere, 'Test live run', { providerSession: liveConversation })
+          file(liveHeld, 'Test held run', { extra: { inATerminal: { terminal: 'test-terminal', holder: { pid: 1, startedAt: null } } } })
+          file(liveSandbox, 'Test sandbox run', { sandbox: { folder: '/test/sandbox' } })
+          const elsewhere = file(liveElsewhere, 'Test other project run', { providerSession: liveConversation }, 'test-terminal-project')
+          for (const [agent, code, values, english] of [
+            ['test-term-live-here', 'terminalAgentRunsHere', { run: 'Test live run', pid }, here.id],
+            ['test-term-live-held', 'terminalAgentInTheOfficesTerminal', { run: 'Test held run', terminal: 'test-terminal' }, 'test-terminal'],
+            ['test-term-live-sandbox', 'terminalAgentRunsInASandbox', { run: 'Test sandbox run' }, 'sandbox'],
+            ['test-term-live-elsewhere', 'terminalAgentRunsInAnotherProject', { project: 'Test terminal project' }, 'Test terminal project'],
+          ] as const) {
+            const reply = await open(agent)
+            expect(reply.statusCode, reply.body).toBe(409)
+            expect(reply.json()).toMatchObject({ code, values })
+            expect(reply.json().error).toContain(english)
+            expect(reply.json().error).toContain('Nothing was opened.')
+            if (code === 'terminalAgentRunsInAnotherProject') {
+              expect(reply.body).not.toContain(elsewhere.id)
+              expect(reply.body).not.toContain(elsewhere.title)
+            }
+            seen.add(code)
+          }
+        } finally {
+          const exited = once(processForRun, 'exit')
+          process.kill(-pid, 'SIGTERM')
+          await exited
+        }
 
         // THE WAY BACK'S PRESS (wave 13u, round 10: POST /api/terminals/agents/:agent/way-back). Each refusal is met with
         // a run filed in the shape the session hook files one, and each comes before anything is filed or opened.
@@ -1503,6 +1573,18 @@ it('keeps the English, status and stored data while sending every declared refus
       expect(refused.json().error).toBe('Send the pages in front to keep, and nothing else. Nothing was changed.')
       expect(kept()).toEqual(before)
       seen.add('sidebarPinsRefused')
+    }
+
+    // The unread report count refuses an incomplete choice through its real door, before any person's row or change is written.
+    {
+      const kept = () => db.client.sqlite.prepare("SELECT (SELECT COUNT(*) FROM runtime_settings WHERE name LIKE 'reports.count%') AS rows, (SELECT COUNT(*) FROM changes WHERE record_id LIKE 'setting:reports.count%') AS changes").get()
+      const before = kept()
+      const refused = await app.inject({ method: 'PUT', url: '/api/report-count', headers, payload: {} })
+      expect(refused.statusCode, refused.body).toBe(400)
+      expect(refused.json()).toMatchObject({ code: 'reportCountRefused', values: { reason: 'Send whether the count is shown, as true or false, and nothing else.' } })
+      expect(refused.json().error).toBe('Send whether the count is shown, as true or false, and nothing else. Nothing was changed.')
+      expect(kept()).toEqual(before)
+      seen.add('reportCountRefused')
     }
 
     // The chapter preview refuses an incomplete request without changing its records or either ledger.

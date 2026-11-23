@@ -19,8 +19,9 @@ import { content, t } from '@shared/i18n.ts'
 import type { OfficeMergeQueueOwnerReply } from '../api.ts'
 import { api, errorMessage, faultOf, type Fault } from '../api.ts'
 import { useLanguage } from '../lib/language.ts'
-import { ErrorNote, Loading, Panel, Select, useAsync } from './ui.tsx'
+import { ErrorNote, Loading, Panel, useAsync } from './ui.tsx'
 import { SettingChangedLine } from './SettingChangedLine.tsx'
+import { AgentPicker } from './agent/AgentPicker.tsx'
 
 export function MergeQueueOwnerPanel() {
   useLanguage()
@@ -80,16 +81,10 @@ function MergeQueueOwner({ first }: { first: OfficeMergeQueueOwnerReply }) {
       })
   }
 
-  const options = [
-    { value: '', label: t(settingsControlWord('settings.mergequeueowner', 'mergeQueueOwner.pickNobody')) },
-    // EACH BY ITS NAME ALONE, or by its handle where its row holds no name, as the dead-letter picker does. The handle
-    // is added beside a name only where two of them carry the same name.
-    ...reading.mayBeNamed.map((one) => {
-      const name = one.name.trim() === '' ? one.handle : one.name
-      const shared = reading.mayBeNamed.filter((other) => other.name === one.name).length > 1
-      return { value: one.id, label: shared && name !== one.handle ? `${name} (${one.handle})` : name }
-    }),
-  ]
+  const fixed = [{ value: '', name: t(settingsControlWord('settings.mergequeueowner', 'mergeQueueOwner.pickNobody')) }]
+  // THE SECRETARIES THE DOOR OFFERS, each by its name, or by its handle where its row holds no name. Every row draws
+  // its handle beside its name, so two secretaries of one name can still be told apart.
+  const candidates = reading.mayBeNamed.map((one) => ({ kind: 'agent' as const, id: one.id, name: one.name.trim() === '' ? one.handle : one.name }))
 
   return (
     <div className="mqo">
@@ -99,10 +94,13 @@ function MergeQueueOwner({ first }: { first: OfficeMergeQueueOwnerReply }) {
       </p>
       {reading.mayBeNamed.length === 0 ? <p className="mqo-none">{t('mergeQueueOwner.nobodyQualifies')}</p> : null}
       <div className="mqo-pick">
-        <label className="mqo-field">
-          <span>{t(settingsControlWord('settings.mergequeueowner', 'mergeQueueOwner.pick'))}</span>
-          <Select value={chosen} onChange={setChosen} options={options} aria-label={t(settingsControlWord('settings.mergequeueowner', 'mergeQueueOwner.pick'))} />
-        </label>
+        <AgentPicker
+          label={t(settingsControlWord('settings.mergequeueowner', 'mergeQueueOwner.pick'))}
+          candidates={candidates}
+          chosen={chosen}
+          onChoose={setChosen}
+          fixed={fixed}
+        />
         <button className="mqo-button" type="button" disabled={busy || chosen === (reading.named?.id ?? '')} onClick={save}>
           {t(settingsControlWord('settings.mergequeueowner', 'mergeQueueOwner.save'))}
         </button>
@@ -120,8 +118,6 @@ const MERGE_QUEUE_OWNER_CSS = `
 .mqo-state { margin: 0; max-width: var(--measure-in-box); overflow-wrap: anywhere; font: 600 var(--fs-1)/var(--lh-body) var(--font-ui); color: var(--text); }
 .mqo-none { margin: 0; max-width: var(--measure-in-box); overflow-wrap: anywhere; font: var(--fs-1)/var(--lh-body) var(--font-ui); color: var(--text-2); }
 .mqo-pick { display: flex; flex-wrap: wrap; align-items: end; gap: var(--pad); min-width: 0; }
-.mqo-field { display: flex; flex-direction: column; gap: 4px; min-width: 0; max-width: 100%; color: var(--text-2); font: 600 var(--fs-1)/var(--lh-tight) var(--font-ui); }
-.mqo-field .px-select { max-width: 100%; }
 .mqo-button { min-height: var(--row-h); max-width: 100%; padding: 2px var(--pad); border: var(--border-w) solid var(--border-strong); border-radius: var(--radius-sm); background: var(--panel); color: var(--text); box-shadow: var(--button-shadow); font: var(--button-weight) var(--fs-1)/var(--lh-tight) var(--font-ui); cursor: pointer; overflow-wrap: anywhere; }
 .mqo-button:hover:not(:disabled) { background: var(--hover); }
 .mqo-button:focus-visible { outline: var(--focus-w) solid var(--focus); outline-offset: var(--focus-offset); }

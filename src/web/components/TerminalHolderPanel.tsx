@@ -108,8 +108,6 @@ export function TerminalHolderPanel() {
         {TERMINAL_PARTS_CSS + TERMINAL_HOLDER_CSS}
       </style>
       <div className="th">
-        <p className="th-lead">{t('terminalHolder.what')}</p>
-
         {step.kind === 'restarted' ? <TheRestart answer={step.answer} /> : null}
         {step.kind === 'refused' ? (
           <p className="th-refuse" role="alert" data-testid="terminal-holder-refused">
@@ -139,7 +137,7 @@ export function TerminalHolderPanel() {
                 </details>
               </div>
             ) : now.value.holder.state === 'unusable' && now.value.holder.anotherCopy !== undefined ? (
-              <p className="th-state" data-testid="terminal-holder-another-copy">{t('terminalHolder.anotherCopy', { copy: now.value.holder.anotherCopy.copy })}</p>
+              <p className="th-state" data-testid="terminal-holder-another-copy">{t('terminalHolder.heldByCopy', { copy: now.value.holder.anotherCopy.copy })}</p>
             ) : (
               <HolderSays holder={now.value.holder} onChanged={readAgain} />
             )}
@@ -152,14 +150,13 @@ export function TerminalHolderPanel() {
               <Btn size="sm" onClick={look} pending={step.kind === 'reading'}>
                 {step.kind === 'reading' ? t('terminalHolder.reading') : t(settingsControlWord('settings.terminalholder', 'terminalHolder.restart'))}
               </Btn>
-              <p className="th-state">{t('terminalHolder.restartSays')}</p>
             </div>
           ) : null
         ) : (
           <section className="th-ask" aria-label={t('terminalHolder.willEnd', { n: listing.terminals.length })} data-testid="terminal-holder-confirm">
             {listing.terminals.length === 0 ? (
               <p className="th-key" ref={listHeading} tabIndex={-1}>
-                {t('terminalHolder.noneToEnd')}
+                {t('terminalHolder.endsNone')}
               </p>
             ) : (
               <>
@@ -171,7 +168,7 @@ export function TerminalHolderPanel() {
                     <li key={one.id} className="th-row">
                       <p className="th-row-title">{terminalTitle(one, agentLabel)}</p>
                       <p className="th-row-state" data-state={one.state}>
-                        {one.state === 'running' ? t('terminalHolder.row.running') : t('terminalHolder.row.ended')}
+                        {one.state === 'running' ? t('terminalHolder.rowState.running') : t('terminalHolder.rowState.ended')}
                       </p>
                       <dl className="th-row-facts">
                         <div>
@@ -186,7 +183,6 @@ export function TerminalHolderPanel() {
                     </li>
                   ))}
                 </ul>
-                {listing.terminals.some((one) => one.agent !== null) ? <p className="th-state">{t('terminalHolder.agents')}</p> : null}
               </>
             )}
             <div className="th-presses">
@@ -199,7 +195,7 @@ export function TerminalHolderPanel() {
             </div>
             {step.kind === 'restarting' ? (
               <p className="th-state" role="status">
-                {t('terminalHolder.restarting')}
+                {t('settingsState.restarting')}
               </p>
             ) : null}
           </section>
@@ -223,11 +219,11 @@ function TheConfirmingPress({ shown, restarting, onPress }: { shown: WhatWasShow
 function TheRestart({ answer }: { answer: TheHolderRestarted }) {
   return (
     <section className="th-done" role="status" data-testid="terminal-holder-restarted">
-      <p className="th-key">{answer.ended === 0 ? t('terminalHolder.doneNone') : t('terminalHolder.done', { n: answer.ended })}</p>
+      <p className="th-key">{answer.ended === 0 ? t('terminalHolder.restartedNone') : t('terminalHolder.restartedEnded', { n: answer.ended })}</p>
       <dl className="tm-holder-why">
         <div>
           <dt>{t('terminalHolder.oldLastWord')}</dt>
-          <dd className="tm-mono">{answer.itsLastWord ?? t('terminalHolder.noOldLastWord')}</dd>
+          <dd className="tm-mono">{answer.itsLastWord ?? t('absence.none')}</dd>
         </div>
       </dl>
       {/* THE PROCESS NUMBERS ARE FOR DEVELOPERS, behind their fold, as on the terminal pages. */}
@@ -253,7 +249,7 @@ function TheRestart({ answer }: { answer: TheHolderRestarted }) {
 /** The panel's own rules. Every value is a token, so a preset swap re-skins it with everything else. */
 const TERMINAL_HOLDER_CSS = `
 .th { display: flex; flex-direction: column; gap: var(--pad); min-width: 0; font: var(--fs-2)/var(--lh-body) var(--font-ui); color: var(--text); }
-.th-lead, .th-state { margin: 0; max-width: var(--measure-in-box); color: var(--text-2); overflow-wrap: anywhere; }
+.th-state { margin: 0; max-width: var(--measure-in-box); color: var(--text-2); overflow-wrap: anywhere; }
 .th-key { margin: 0; max-width: var(--measure-in-box); font-weight: 600; line-height: var(--lh-tight); color: var(--text); overflow-wrap: anywhere; }
 .th-key:focus-visible { outline: var(--focus-w) solid var(--focus); outline-offset: var(--focus-offset); }
 .th-now, .th-done { display: flex; flex-direction: column; gap: calc(var(--pad) / 2); min-width: 0; }

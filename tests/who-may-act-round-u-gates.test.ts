@@ -636,6 +636,16 @@ describe(`${REMINDER}: whom the reminder names`, () => {
 const waiting = (): string[] => (t.client.sqlite.prepare("SELECT id FROM readiness_checklists WHERE state = 'waiting' ORDER BY id").all() as { id: string }[]).map((row) => row.id)
 
 describe(`${HOLD} at ${INSTALL}`, () => {
+  // NO SANDBOX_DIR WHILE THESE CASES PRESS INSTALL, because the office refuses every install press inside a sandbox,
+  // before the gate. A refusal there would also pass the case below that expects any 409 but a wait. It is put back after.
+  const sandbox = process.env.SANDBOX_DIR
+  beforeAll(() => {
+    delete process.env.SANDBOX_DIR
+  })
+  afterAll(() => {
+    if (sandbox !== undefined) process.env.SANDBOX_DIR = sandbox
+  })
+
   // A control case: nothing in it switches the gate.
   it('at block, the person\'s press waits for the secretaries\' signatures, and nothing is opened', async () => {
     const asked = opened.asked.length

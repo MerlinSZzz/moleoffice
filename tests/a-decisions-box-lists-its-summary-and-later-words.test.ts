@@ -35,7 +35,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { Page } from 'playwright'
 import { join } from 'node:path'
-import { liveApp, type LiveApp, waitForThePage } from './helpers.ts'
+import { liveApp, type LiveApp, waitForThePage, governsTheWholeProject } from './helpers.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { createI18n } from '../src/shared/i18n.ts'
 import { testShots, TEST_SHOTS } from './where-shots-go.ts'
@@ -84,13 +84,13 @@ beforeAll(async () => {
   withoutSummary = await filed({
     kind: 'decision',
     title: 'The made-up archive keeps its scans for a year',
-    data: { replaces: [], words_since: [{ at: '2026-10-01 09:00', words: LATER_WORDS }] },
+    data: { ...governsTheWholeProject(), replaces: [], words_since: [{ at: '2026-10-01 09:00', words: LATER_WORDS }] },
   })
   withSummary = await filed({
     kind: 'decision',
     title: 'The made-up archive is read on Mondays',
     summary: 'A made-up decision for this test, with a summary.',
-    data: { replaces: [] },
+    data: { ...governsTheWholeProject(), replaces: [] },
   })
 }, 180_000)
 

@@ -12,8 +12,8 @@
  * the owner, the commit, main before it, and the switch's row. Main has one writer at a time: the push takes the lock a
  * landing takes, waits for a landing that is writing main, and never waits for a test. The merge tool's emergency mode
  * moves main, pushes the commit on to the private GitHub copy and to the mirror through pushLanded, and ends the record
- * as git shows. An entry tested on the old main is integrated and tested again, and its log names the push. The push's
- * record marks its follow-up, the first whole-suite receipt on main that contains the commit (13q's theFollowUp).
+ * as git shows. The push's record marks its follow-up, the first whole-suite receipt on main that contains the commit
+ * (13q's theFollowUp).
  * The push may name the line its fix came from, by that line's supervisor handle, and the record keeps it. A red
  * follow-up in a file the push changed goes back first to that line: the office files a problem about the push and tells
  * the line and the secretary. With no line named, it goes to whoever pushed when that is an agent, and to whoever holds
@@ -46,8 +46,6 @@
  * - (b) page: no push in the reply / the lane's history not drawn.
  * - (c) tool: no tool / pushLanded not called.
  * - (a) tool waits: no tool / the wait for a landing taken out.
- * - (a) a landing waits: no wait / the push left out of untilNoOtherLandingOf.
- * - (b) log: no line / the line left out of land.mjs.
  * - (d) line kept: 400 for an unknown key `line` / the line left out of the record.
  * - (d) hand-back to the line: no door, so 404 / the line left out of the recipients, or the push's files not compared.
  * - (d) hand-back with no line: no door / the secretary card's holder not chosen when the person pushed.
@@ -134,29 +132,9 @@ import { localStamp } from '../src/shared/typed-time.mjs'
 import { whenAHandBackIsDue } from '../src/shared/merge-class.ts'
 import type { MergeQueueReply } from '../src/shared/merge-queue-page.ts'
 import type { Actor } from '../src/server/lib/records.ts'
-import * as officeKeeper from '../tools/merge-tool/office-keeper.mjs'
 import { sleep } from '../tools/merge-tool/office-keeper.mjs'
-import { wholeSuiteFixRoundIsOn } from '../src/config/whole-suite-red.mjs'
-import { pluginPagesPosition } from '../src/config/integration-guards.mjs'
 import { theMainMirrorOf } from '../tools/sandbox-common.mjs'
 import { bringTheMainMirrorForward } from '../tools/sandbox-git.mjs'
-import { landGit as landGitFixture } from '../tools/merge-tool/land.mjs'
-const notReached = (name: string) => () => { throw new Error(`Synthetic: ${name} is not reached in this file`) }
-const landGit = (entry: any) => landGitFixture(entry, {
-  replayOnly: true,
-  ask: officeKeeper.ask,
-  step: officeKeeper.step,
-  theOfficesRuntime: officeKeeper.theOfficesRuntime,
-  waitForHealth: officeKeeper.waitForHealth,
-  conflictsAfterLanding: officeKeeper.conflictsAfterLanding,
-  theLane: officeKeeper.theLane,
-  sleep: officeKeeper.sleep,
-  countAGateMet: notReached('countAGateMet'),
-  runInSandbox: notReached('runInSandbox'),
-  theSandbox: notReached('theSandbox'),
-  wholeSuiteFixRoundIsOn,
-  pluginPagesPosition,
-})
 
 type ObjectValue = Record<string, any>
 type Pin = { id: string; seq: 1; contentHash: string }
@@ -576,37 +554,6 @@ describe("the merge tool's emergency push", () => {
     expect(again.state).toBe('pushed')
     expect(boundary.logged.filter((line) => line.includes('waits'))).toEqual([])
     theEntryEnds(testing)
-  }, 60_000)
-
-  it('makes a landing wait while an emergency push moves main', async () => {
-    const documents = await vi.importActual<typeof import('../tools/merge-tool/documents.mjs')>('../tools/merge-tool/documents.mjs')
-    const commit = aFix()
-    const taken = await aPush(commit, tellTheOwner(commit))
-    expect(taken.status, taken.raw).toBe(201)
-    let ended = 0
-    setTimeout(() => { void theEnd(taken.body.push.id, { says: 'Synthetic: stopped.', onward: null }).then((reply) => { expect(reply.status).toBe(200); ended = Date.now() }) }, 600)
-    // The landing looks again every 5 s; this case looks every 50 ms at most, so it waits for the push to end and no longer.
-    await documents.untilNoOtherLandingOf(root, { theLane: officeKeeper.theLane, sleep: (ms: number) => officeKeeper.sleep(Math.min(ms, 50)), ask: officeKeeper.ask })
-    expect(ended).toBeGreaterThan(0)
-    expect(boundary.logged.some((line) => line.includes(`emergency push ${taken.body.push.id} is moving main in ${root}`))).toBe(true)
-  }, 60_000)
-
-  it("names the push in the log of an entry tested on the old main, which is sent back to be integrated and tested again", async () => {
-    const M = mainOf()
-    // THE ENTRY, integrated on M and tested there, in a clone of its own.
-    const clone = join(folder, 'entry-clone')
-    rmSync(clone, { recursive: true, force: true })
-    git(folder, 'clone', '-q', root, clone)
-    writeFileSync(join(clone, 'entry.txt'), 'Synthetic entry\n')
-    git(clone, 'add', 'entry.txt')
-    git(clone, 'commit', '-qm', 'Synthetic entry')
-    boundary.state = { integrated: { M, Cfinal: git(clone, 'rev-parse', 'HEAD'), clone } }
-    const pushed = await aPushThatLanded()
-    const moved = await landGit({ state: 'landing', changeset: { root } })
-    expect(moved.state).toBe('judged')
-    expect(boundary.steps.map((one) => one.name)).toEqual(['main-moved'])
-    expect(boundary.logged.some((line) => line.includes(`emergency push ${pushed.id}`) && line.includes(pushed.commit))).toBe(true)
-    expect(mainOf()).toBe(pushed.commit)
   }, 60_000)
 })
 

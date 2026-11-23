@@ -10,14 +10,17 @@
  * Case one: at the end of the page, no control inside the page's main element meets the corner chat
  * button. While the page scrolls its rows may pass under the button, but at the end the page leaves
  * the room the button needs. Since design D the controls under the corner button are measured only at
- * 1440, with a window 1000 tall, in the light and the dark look. At 990, 660 and 390 the case checks
- * that no corner button is drawn, at 390 with windows 844 and 1000 tall. A page that cannot scroll at
- * 390 is named rather than counted as a pass.
+ * 1440, with a window 1000 tall, in the light look. At 390 the case checks that no corner button is
+ * drawn, with windows 844 and 1000 tall. A page that cannot scroll at 390 is named rather than counted
+ * as a pass.
  *
  * Case two: the room between the bottom of the terminal list's refusal and the top of the Agent tools
  * heading is at least the page's own --pad, less half a pixel. When the list is read its last row
  * ends with that room, so a refusal must end with the same room rather than sitting against the next
- * heading. That is measured at 1440, 990, 660 and 390 wide, in the light and the dark look.
+ * heading. That is measured at 1440 and 390 wide, in the light look.
+ *
+ * The dark look and the widths 990 and 660 are not measured: where a box sits does not depend on the
+ * colours, and 1440 and 390 are the wide page and the phone.
  *
  * WHAT IS REAL. A throwaway office and its own database come from tests/helpers.ts. A made-up agent
  * is registered in that office as a worker, and the browser acts as that agent and holds no person's
@@ -30,6 +33,7 @@
  * case two then measures no room at every size and goes red.
  */
 import { afterAll, beforeAll, expect, it } from 'vitest'
+import { DEVICE_HALF_COOKIE, KEY_COOKIE } from '../src/config/key-header.mjs'
 import type { Page } from 'playwright'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { THE_SHELL_WIDTH } from '../src/web/lib/the-shell-width.ts'
@@ -81,7 +85,7 @@ beforeAll(async () => {
   expect(waitingFromThePerson.status, await waitingFromThePerson.clone().text()).toBe(409)
   await live.page.addInitScript((who) => localStorage.setItem('mole-office.actor', JSON.stringify(who)), { type: 'agent', id: AGENT.handle })
   const held = await live.context.cookies()
-  expect(held.some((one) => one.name === 'mole-office-key'), 'the browser was given the person key').toBe(false)
+  expect(held.some((one) => one.name === KEY_COOKIE || one.name === DEVICE_HALF_COOKIE), 'the browser was given the person key or a half of a device key').toBe(false)
 }, 240_000)
 
 afterAll(async () => {
@@ -139,15 +143,14 @@ interface AtTheEnd {
   under: string[]
 }
 
-it('leaves no control under the corner button at the end of the page, at every width and look', async () => {
+it('leaves no control under the corner button at the end of the page, at 1440 and 390 wide in the light look', async () => {
   const measured: AtTheEnd[] = []
-  for (const look of LIGHT_AND_DARK) {
+  {
+    const look: Look = 'light'
     for (const size of [
       { width: 390, height: 844 },
       { width: 390, height: 1000 },
       { width: 1440, height: 1000 },
-      { width: 990, height: 1000 },
-      { width: 660, height: 1000 },
     ]) {
       await live.page.setViewportSize(size)
       await openThePage(live.page, look)
@@ -185,10 +188,11 @@ interface TheRoom {
   pad: number | null
 }
 
-it('leaves the page own room under the terminal list refusal, at every width and look', async () => {
+it('leaves the page own room under the terminal list refusal, at 1440 and 390 wide in the light look', async () => {
   const measured: TheRoom[] = []
-  for (const look of LIGHT_AND_DARK) {
-    for (const width of [1440, 990, 660, 390]) {
+  {
+    const look: Look = 'light'
+    for (const width of [1440, 390]) {
       await live.page.setViewportSize({ width, height: 1000 })
       await openThePage(live.page, look)
       const room = await live.page.evaluate((): { found: boolean; gap: number | null; pad: number | null } => {

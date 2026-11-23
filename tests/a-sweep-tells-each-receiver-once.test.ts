@@ -20,6 +20,10 @@ import { setFixtureOwner } from './agent-owner-fixture.ts'
  * The shared owner in the second group holds a secretary card, but the route follows ownership rather than the card.
  * Every receiver gets at most one message per sweep, whatever their role.
  *
+ * SINCE WAVE 14C ONE SWEEP ROUTES AT MOST `AT_MOST_ROUTED_IN_ONE_SWEEP` LETTERS, and one receiver's letters go whole in
+ * one sweep. The 500 are more than that cap and the oldest, so the first sweep routes them alone and writes no line.
+ * The 40 go in the second sweep, which clears the backlog and writes the one line, with the totals of both.
+ *
  * A REACHABLE AGENT IS A RUNNING SESSION RECORD SERVING IT PLUS A LIVE CHILD PROCESS REGISTERED AS ITS RESOURCE, as in
  * tests/the-message-centre-handles-the-dead-letters-itself.test.ts. The children are stopped by their process group in
  * afterAll. The three-run proof of each case is in the commit that made the change this file holds.
@@ -246,11 +250,15 @@ afterAll(async () => {
 
 describe('one sweep over 500 old letters for retired agents', () => {
   let swept: Swept
+  /** The second sweep, which routes the 40 the route cap left after the first. */
+  let next: Swept
   let rowsBefore = 0
   let secretaryRowsBefore = 0
   let summaryId = ''
 
   it('gives the receiver exactly ONE new message, and no delivery row for any letter', async () => {
+    const { AT_MOST_ROUTED_IN_ONE_SWEEP } = await import('../src/server/lib/deadletters.ts')
+    expect(RETIRED.length * LETTERS_EACH, "this file's first sweep routes one part larger than the route cap, alone").toBeGreaterThan(AT_MOST_ROUTED_IN_ONE_SWEEP)
     rowsBefore = rowsFor('w-starter')
     secretaryRowsBefore = rowsFor('sec-quill')
     swept = await sweep()
@@ -267,15 +275,23 @@ describe('one sweep over 500 old letters for retired agents', () => {
       expect(dataOf(id)['sentBy']).toEqual(agentRef('x-sender'))
       expect((dataOf(id)['to'] as { id: string }[]).map((one) => one.id)).toContain(recipientsOf(id)[0])
     }
-    expect(swept.routed).toBe(500 + STARTED_BY_A_SECRETARY.length * LETTERS_FOR_EACH_OF_THOSE)
+    // THE 500 ARE ONE PART LARGER THAN THE ROUTE CAP, so they go alone, and the 40 wait for the next sweep.
+    expect(swept.routed).toBe(500)
+    expect(swept.summaries).toHaveLength(1)
+    expect(swept.lineId, 'the route cap left letters for the next sweep, so no line yet').toBeNull()
   }, 300_000)
 
-  it('a secretary up the chain, with no dead-letter secretary named, also gets exactly ONE message', () => {
+  it('a secretary up the chain, with no dead-letter secretary named, also gets exactly ONE message, in the next sweep', async () => {
+    expect(rowsFor('sec-quill'), 'the secretary was told before its part was routed').toBe(secretaryRowsBefore)
+    next = await sweep()
     expect(rowsFor('sec-quill'), 'the secretary got more than one new delivery row').toBe(secretaryRowsBefore + 1)
-    const toTheSecretary = swept.summaries.filter((one) => one.to.id === idOf('sec-quill'))
+    expect(rowsFor('w-starter'), 'the receiver of the 500 was told again').toBe(rowsBefore + 1)
+    const toTheSecretary = next.summaries.filter((one) => one.to.id === idOf('sec-quill'))
     expect(toTheSecretary).toHaveLength(1)
     expect(toTheSecretary[0]!.letters).toBe(40)
-    expect(swept.summaries).toHaveLength(2)
+    expect(next.summaries).toHaveLength(1)
+    expect(next.routed).toBe(STARTED_BY_A_SECRETARY.length * LETTERS_FOR_EACH_OF_THOSE)
+    expect(next.lineId, 'the second sweep clears the backlog and writes the line').not.toBeNull()
     for (const id of toTheChainsSecretary) {
       expect(recipientsOf(id)).toHaveLength(1)
       const handle = STARTED_BY_A_SECRETARY.find((one) => routedFor(id, one).length > 0)!
@@ -323,7 +339,7 @@ describe('one sweep over 500 old letters for retired agents', () => {
     expect(secretaryReply.statusCode).toBe(200)
   })
 
-  it('the sweep\'s one line says each receiver was sent one message', async () => {
+  it('the line written when the backlog is cleared says each receiver was sent one message', async () => {
     const { sayInEnglish } = await import('../src/shared/i18n.ts')
     const line = (
       t.client.sqlite
@@ -331,7 +347,12 @@ describe('one sweep over 500 old letters for retired agents', () => {
         .get() as { data: string }
     ).data
     const said = String((JSON.parse(line) as Record<string, unknown>)['saidInFull'])
-    const list = swept.summaries.map((one) => `${one.to.id === idOf('w-starter') ? 'w-starter' : 'sec-quill'} (${String(one.letters)})`).join(', ')
+    expect(
+      t.client.sqlite.prepare("SELECT COUNT(*) AS n FROM records WHERE kind = 'message' AND json_extract(data, '$.deadLetterSweep.said') IS NOT NULL").get(),
+      'the two sweeps wrote one line between them',
+    ).toEqual({ n: 1 })
+    // THE LINE CARRIES THE TOTALS OF BOTH SWEEPS, each receiver as the sweeps met it.
+    const list = [...swept.summaries, ...next.summaries].map((one) => `${one.to.id === idOf('w-starter') ? 'w-starter' : 'sec-quill'} (${String(one.letters)})`).join(', ')
     expect(said).toContain(sayInEnglish('deadLetterSweep.summarisedAnySender', { n: 540, list }))
     expect(said).toContain('w-starter (500)')
     expect(said).toContain('sec-quill (40)')

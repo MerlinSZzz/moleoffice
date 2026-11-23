@@ -154,9 +154,14 @@ export function aTypeReaderWith(shapes: ReadonlySet<string>): (expr: string) => 
 }
 
 function parseTypeUncached(expr: string, again: (expr: string) => TypeNode, isAShape: (name: string) => boolean): TypeNode {
-  // The one hand-written type, because a union inside an array is the only place the grammar
+  // The one hand-written type, because a union of forms inside an array is the only place the grammar
   // would need brackets and one table cell is not worth a grammar.
   if (expr === '(string | number)[]') return { kind: 'cells' }
+
+  // A list of quoted values, e.g. `('a' | 'b')[]`: each item one of them. It is the only other place brackets are read,
+  // and only around a quoted union, so a union of forms inside an array is still refused below.
+  const listOf = /^\((.+)\)\[\]$/.exec(expr)
+  if (listOf && listOf[1] !== undefined && listOf[1].trim().startsWith("'")) return { kind: 'array', of: again(listOf[1]) }
 
   // A quoted value, alone or in a union. `'text'` on its own is how a discriminator key is
   // declared, and it is a union of one rather than a special case.

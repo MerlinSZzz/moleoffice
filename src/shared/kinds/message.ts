@@ -418,7 +418,9 @@ export const messageKind: KindSpec = {
         description:
           'WHAT THE PERSON WANTS BACK, the mark they put on a message to an agent: ' +
           '"just-ask" is answer only and change nothing; "proposal-first" is come back with a proposal and build ' +
-          'nothing until the person says yes; "none" asks neither. ONLY THE PERSON SETS IT, on a message they write, ' +
+          'nothing until the person says yes; "align" is agree first, restate what was agreed and act only after the ' +
+          'person\u2019s yes to that; "give-options" is come back with two or three options, each with its cost and ' +
+          'one recommended, and build nothing until the person chooses one; "none" asks none of these. ONLY THE PERSON SETS IT, on a message they write, ' +
           'when they write it: an agent that sends it is refused, and a later write may not set, change or take it ' +
           'off. LEAVING IT OUT means nobody set a mark, which is every agent\u2019s message and every message written ' +
           'before this field existed. Every read an agent makes of a marked message carries the mark and the ' +
@@ -553,6 +555,17 @@ export const messageKind: KindSpec = {
           original: { title: 'The setting 15 print cracked', body: 'The setting 15 print cracked again.' },
         },
       },
+      {
+        key: 'writtenTime',
+        type: 'ClockStamp',
+        required: false,
+        description:
+          'THE MOMENT THE MESSAGE WAS WRITTEN: the instant beside its stamp, from the one reading of the clock that ' +
+          'made the stamp. MOLE OFFICE WRITES IT AND A VALUE YOU SEND IS REPLACED. On the night the clocks go back the ' +
+          'stamp alone cannot say which pass of the hour from 01:00 it means, and this can. Absent on a message ' +
+          'written before the office kept it, which is read from its stamp.',
+        example: { stamp: '2026-10-25 01:30:00', instant: '2026-10-25T01:30:00.000+00:00', offset: '+00:00', timeZone: 'Europe/London' },
+      },
       ...commonFields('message'),
     ],
     rules: [
@@ -654,7 +667,7 @@ export const MESSAGE_SHAPES: Record<string, ShapeSpec> = {
         key: 'intent',
         type: unionOf(INTENT_MARKS),
         required: false,
-        description: 'THE FLAG THIS RUN CARRIES, when it is one of the office\u2019s two marks. A part\u2019s mark asks something; "none" is not a flag.',
+        description: 'THE FLAG THIS RUN CARRIES, when it is one of the office\u2019s four marks. A part\u2019s mark asks something; "none" is not a flag.',
         example: 'just-ask',
       },
       {

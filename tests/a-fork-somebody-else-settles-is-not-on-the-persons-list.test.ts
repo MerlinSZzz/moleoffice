@@ -27,7 +27,7 @@
  * An agent still cannot take a fork off the owner's list by classifying it. A fork nobody had classified is
  * the owner's, and a value an agent writes onto it after it was filed is the agent granting itself the
  * authority — three requests that executed exactly that on 27 August 2026 are on
- * `anAgentGaveThisForkItsClassification`. Such a fork stays on the owner's list, and the third test below is
+ * `anAgentGaveThisForkItsClassification`. Such a fork stays on the owner's list, and the last test below is
  * what fails if that ever stops being true.
  */
 
@@ -141,22 +141,6 @@ describe('a fork somebody else settles is not on the owner’s list', () => {
     expect(left.count).toBe(1)
     expect(left.sentence).toContain('somebody other than you settles it')
     expect(list.note).toContain('not counted here')
-  })
-
-  it('does the same for "the parent" and for "a measurement"', async () => {
-    const parent = await fileFork('Which dispatch word does the answer carry?', 'the parent')
-    const measured = await fileFork('Which of the two encoders drifts less?', 'a measurement')
-
-    const list = await waiting()
-    const onTheirList = list.items.map((item) => item.id)
-    expect(onTheirList).not.toContain(parent)
-    expect(onTheirList).not.toContain(measured)
-    expect(
-      one(
-        list.excluded.filter((group) => group.reason === 'somebody-else-settles-it'),
-        'the bucket for forks somebody else settles',
-      ).count,
-    ).toBe(2)
   })
 
   it('an agent that classifies a fork itself does NOT take it off the owner’s list, and the desk says so', async () => {

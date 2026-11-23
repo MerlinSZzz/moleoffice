@@ -18,9 +18,8 @@
  *   · a run is not filed carrying either settlement on theCheck either (round 6 guarded only the patch door);
  *   · a write under the field's own door mark passes, which is how the doors write.
  * That the doors themselves still write is shown by their own files, run in the same sweep: the check door's release
- * and refusal (tests/merge-state-machine.test.ts, tests/a-whole-check-reaches-its-verdict.test.ts), the office's
- * rework mark and a new check (tests/a-second-check-is-not-refused-by-the-first.test.ts), the check asked again
- * (tests/a-check-again-nobody-starts-is-said.test.ts), and the confirm door
+ * and refusal (tests/a-whole-check-reaches-its-verdict.test.ts), the office's
+ * rework mark and a new check (tests/a-second-check-is-not-refused-by-the-first.test.ts), and the confirm door
  * (tests/a-release-names-its-seal-as-it-was-before-0154.test.ts).
  *
  * MUTATIONS (wave 13k round 7), one per field, each after a control run: leave the field out of both guards. That

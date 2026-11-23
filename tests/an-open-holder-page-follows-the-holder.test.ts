@@ -62,10 +62,12 @@ let standIn: { stop: () => Promise<void> } | null = null
 
 beforeAll(async () => {
   place = aPlace('follows')
-  server = await startAServer(place, undefined, { MOLE_OFFICE_TERMINAL_HOLDER: 'on' })
-  const personsKey = thePersonsKeyHeader(join(dirname(place.database), 'keys.json'))
   // THE PAGE IS SERVED BY A LIVE APP OF ITS OWN, and every request it sends to that app's API goes to the scratch office.
+  // It starts first, so the scratch office can be told its web port: the scratch office refuses a page on a loopback
+  // port that is not its own unless it is told that port is its dev page's.
   app = await liveApp({ name: 'holder-follows', viewport: { width: 1440, height: 900 }, database: join(place.dir, 'page.db') })
+  server = await startAServer(place, undefined, { MOLE_OFFICE_TERMINAL_HOLDER: 'on', MOLE_OFFICE_WEB_PORT: String(app.webPort) })
+  const personsKey = thePersonsKeyHeader(join(dirname(place.database), 'keys.json'))
   context = await app.browser.newContext({ viewport: { width: 1440, height: 900 } })
   const thePagesApiPort = String(app.apiPort)
   const theScratchPort = String(server.port)

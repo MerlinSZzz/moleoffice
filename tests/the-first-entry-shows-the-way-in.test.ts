@@ -3,7 +3,7 @@
 /**
  * THE FIRST ENTRY: A NEW OFFICE GREYS EVERYTHING BUT ONE PLACE, SHOWS THE CHAT, THEN THE CHECKLIST, AND ENDS ON THE REPORT.
  * Item 74 of wave 13y, part b (round 138): a decision, with the shape settled in
- * JC2_JG3WNjp- points 1, 2 and 5. Part c's browser half is here too: a press
+ * its points 1, 2 and 5. Part c's browser half is here too: a press
  * on the link inside the item's words opens the report, and the item's facts stay closed.
  *
  * Every office here is started fresh, owned by nobody named, and the person names it in the welcome guide, as a new
@@ -18,34 +18,58 @@
  *      lit, when the reader asks for less motion); the sidebar's Chat row is grey now;
  *   5. the checklist opens through the gap, its one item holds the report's title as a link, and a press on that link
  *      opens the report and leaves the item's facts closed; the layer is gone, and the office says the first entry
- *      ended, by the person. The item is standing, which is never counted, so the list draws no "0 of 0 done" line,
- *      and the press says 0 (round 139, decision nYVpu3pQE5dM);
+ *      ended, by the person. The item is standing, which is never counted, so the list's card draws no progress
+ *      number, and the press says 0 (round 139, as decided);
  *   6. after a reload, and at another address, the layer is not drawn again;
  *   7. a browser where the checklist is switched off (the switch may be left from an older office at the same
- *      address) is not trapped: step two switches it on, says so, and lights it, and the first entry ends from it as
- *      in step two above (decision s17K3PIf0zV5). It stays on afterwards.
+ *      address) is not trapped: step two switches it on and lights it, and the first entry ends from it as
+ *      in step two above (as decided). It stays on afterwards.
  *   8. on a phone, at 390, the open checklist is as wide as the window, so the ring around it and the press takes in
  *      the header. A press on the Menu button there still lands on the grey, and no menu opens (round 139, the
  *      refusal of round 138's check).
- *   9. the checklists page draws no bar for the getting-started list either, in its row or on the list's own page,
- *      and the list's own page still says how many are still to do: "0 still to do" (round 139).
+ *   9. the checklists page draws no progress number for the getting-started list either: the list's own address
+ *      marks its card, which draws its one standing item and no "0 / 0".
  *  10. at 1440 and 390, in light and in dark, the pulse is plain over the grey: held at its middle and at its start,
  *      the grey around the gap changes by at least the bounds below, and toward the office's press colour
  *      (round 139: it blinks and glows so that it draws a press).
  *
  * PICTURES AND A FILM. With FIRST_ENTRY_SHOTS naming a folder, the last cases photograph both steps and the report at
  * 1440, 990, 660 and 390 in light and dark, and film a first start from the welcome guide to the report at 1440.
- * With GETTING_STARTED_PICTURES naming a folder, a case photographs the two pictures the report carries, from a made-up
- * office with one made-up agent asking at the Embassy. Without them, those cases are skipped.
+ * With GETTING_STARTED_PICTURES naming a folder, a case photographs the two pictures of the way in the report carries,
+ * from a made-up office with one made-up agent asking at the Embassy. A second case photographs the whole box a
+ * right-click opens, which the report's part "Try right-click?" carries. Without them, those cases are skipped.
  *
  * MUTATIONS, each after a green control run, then restored: listed in round 138's report, and for cases 5, 8, 9 and
  * 10 in round 139's.
+ *
+ * Test change (wave 13y round 175): the checklists page and window draw design E, as decided. Each checklist is a
+ * card, and its progress is a number. Case 5 reads the list's card in the window. Case 9 reads the card the list's
+ * address marks: it draws no progress number and draws the standing item. Before, case 5 read the list's group in the
+ * window; case 9 read the list's row in the table of checklists and the opened list, and asked that the opened list
+ * said "0 still to do". The table and that counts line went.
+ *
+ * Test change (wave 13y round 175, the right-click part): the owner asked that the first report ask the person to try
+ * right-click, and show what the box can do. A new picture case, under the same GETTING_STARTED_PICTURES switch, takes
+ * one picture of the whole box. One made-up agent files a made-up report, so the box opens with that agent chosen.
+ * The case selects a made-up sentence in it, right-clicks it and types one made-up line. Then the pointer leaves the
+ * box, and the box is photographed once at 1440 in the light look, with no press under the pointer and the keyboard
+ * in the box you write in. Before, the switch took only the two pictures of the way in. The case takes a picture and
+ * proves nothing about main's code: the report test's case 8 holds the part, and fails on main's code.
+ *
+ * Test change (wave 13y round 175, the translation round): a Chinese reader gets the report in Chinese, so its
+ * pictures are in Chinese too. Each picture case now takes each of its pictures twice, from the same made-up office:
+ * in English into en/ in the GETTING_STARTED_PICTURES folder, then in Chinese into zh/, with the page opened in
+ * Chinese. Before each picture the case waits until the page says it is drawn in that language. For the box, the
+ * made-up agent files one made-up report in each language, and the selected sentence and the typed line are in the
+ * picture's language. No kept draft goes from the English box into the Chinese one. Before, each picture was taken
+ * once, in English, into the folder itself. The cases take pictures and prove nothing: the report test's case 10
+ * holds the Chinese report, and fails on main's code.
  */
 import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { Page } from 'playwright'
-import { sayInEnglish, type WordKey } from '../src/shared/i18n.ts'
+import { createI18n, sayInEnglish, type Language, type WordKey } from '../src/shared/i18n.ts'
 import { liveApp, waitForThePage, type LiveApp } from './helpers.ts'
 
 const OWNER_SETTINGS = ['MOLE_OFFICE_OWNER_ID', 'MOLE_OFFICE_OWNER_NAME'] as const
@@ -93,6 +117,16 @@ async function openFresh(page: Page, url: string): Promise<void> {
   await page.goto('about:blank')
   await page.goto(url, { timeout: 60_000 })
   await waitForThePage(page, 60_000)
+}
+
+/** The report's pictures are taken in these languages, each into its own folder under GETTING_STARTED_PICTURES. */
+const THE_REPORTS_LANGUAGES = ['en', 'zh'] as const satisfies readonly Language[]
+type ThePicturesLanguage = (typeof THE_REPORTS_LANGUAGES)[number]
+
+/** Opens a page in one language, and waits until the page says it is drawn in that language. */
+async function openIn(page: Page, url: string, language: Language): Promise<void> {
+  await openFresh(page, url)
+  await page.waitForFunction((lang) => document.documentElement.lang === lang, language, { timeout: 30_000 })
 }
 
 /** The person names the office in the welcome guide and lands on Home. */
@@ -287,14 +321,15 @@ describe('a new office’s first entry', () => {
     expect(await app.page.locator('.px-chat-circle').count()).toBe(0)
     expect(inside(await aBox(app.page, '.shell-chat'), await theGap(app.page))).toBe(true)
     expect(await whatAPressLandsOn(app.page, '.shell-chat')).toEqual({ inLayer: false, inTarget: true })
-    // The chat opens through the gap, and the gap grows to hold the open split.
+    // The chat opens through the gap in the corner window, as it does for a person with nothing remembered, and the
+    // gap grows to hold the open window.
     await app.page.locator('.shell-chat').click()
-    await app.page.locator('.px-chat[data-where="split"]').waitFor({ timeout: 10_000 })
-    await expect.poll(async () => inside(await aBox(app.page, '.px-chat[data-where="split"]'), await theGap(app.page)), { timeout: 5_000 }).toBe(true)
-    // The close drawn beside the page is in the gap too, and pressing it closes the chat.
-    expect(inside(await aBox(app.page, '.px-chat-seam-away'), await theGap(app.page))).toBe(true)
-    await app.page.locator('.px-chat-seam-away').click()
-    await app.page.locator('.px-chat[data-where="split"]').waitFor({ state: 'detached', timeout: 10_000 })
+    await app.page.locator('.px-chat[data-where="corner"]').waitFor({ timeout: 10_000 })
+    await expect.poll(async () => inside(await aBox(app.page, '.px-chat[data-where="corner"]'), await theGap(app.page)), { timeout: 5_000 }).toBe(true)
+    // The window's close is in the gap too, and pressing it closes the chat.
+    expect(inside(await aBox(app.page, '.px-chat[data-where="corner"] .px-chat-close'), await theGap(app.page))).toBe(true)
+    await app.page.locator('.px-chat[data-where="corner"] .px-chat-close').click()
+    await app.page.locator('.px-chat[data-where="corner"]').waitFor({ state: 'detached', timeout: 10_000 })
   })
 
   it('3: the keyboard stays in the gap and the words', async () => {
@@ -341,11 +376,11 @@ describe('a new office’s first entry', () => {
     const link = panel.locator('.ckp-words a', { hasText: title })
     await link.waitFor({ timeout: 30_000 })
     expect(await link.getAttribute('href')).toBe(`#/report/${report}`)
-    // ITS ONE ITEM IS STANDING, which is never counted, so the list draws no "0 of 0 done" line, and the press says 0.
+    // ITS ONE ITEM IS STANDING, which is never counted, so the list's card draws no progress number, and the press says 0.
     // Soft, so that a failure here still lets the case end the first entry, and the cases after it start as they should.
-    const group = panel.locator('.ckw-group', { has: app.page.locator('.ckw-group-title', { hasText: say('gettingStarted.checklist.title') }) })
-    expect.soft(await group.count()).toBe(1)
-    expect.soft(await group.locator('.ckp-progress').count()).toBe(0)
+    const card = panel.locator('.cks-card', { has: app.page.locator('.cks-title', { hasText: say('gettingStarted.checklist.title') }) })
+    expect.soft(await card.count()).toBe(1)
+    expect.soft(await card.locator('.cks-progress').count()).toBe(0)
     expect.soft(await app.page.locator('.ckw-count').textContent()).toBe('0')
     // THE PANEL IS STILL OPENING AT THE READ, and a second later the press lands on the link, so this waits for the press to land on the link.
     await expect.poll(async () => await whatAPressLandsOn(app.page, '.ckp-words a'), { timeout: 5_000 }).toEqual({ inLayer: false, inTarget: true })
@@ -368,22 +403,19 @@ describe('a new office’s first entry', () => {
     }
   })
 
-  it('9: on the checklists page, the list with only its standing item draws no "0 of 0 done" line, and still says what is to do', async () => {
+  it('9: on the checklists page, the card of the list with only its standing item draws no "0 / 0", and draws the item', async () => {
     const checklist = String((await theFirstEntry(app)).checklist)
     const name = say('gettingStarted.checklist.title')
     await openFresh(app.page, `${app.site}/?lang=en#/checklists/${checklist}`)
-    const row = app.page.locator('.ckb-row', { has: app.page.locator('.ckb-row-title', { hasText: name }) })
-    await row.waitFor({ timeout: 30_000 })
-    expect(await row.locator('.ckp-progress').count()).toBe(0)
-    const one = app.page.locator('.ck1')
-    await one.locator('.ck1-title', { hasText: name }).waitFor({ timeout: 30_000 })
-    expect(await one.locator('.ckp-progress').count()).toBe(0)
-    expect(await one.locator('.ck1-counts').textContent()).toBe(say('checklists.countsNoneWaiting', { open: 0 }))
+    const card = app.page.locator('.cks-card[data-marked="yes"]')
+    await card.locator('.cks-title', { hasText: name }).waitFor({ timeout: 30_000 })
+    expect(await card.locator('.cks-progress').count()).toBe(0)
+    expect(await card.locator('.cks-items:not(.ckp-folded) > .ckp-item').count(), 'its one standing item').toBe(1)
   })
 })
 
 describe('a browser where the checklist is switched off', () => {
-  it('7: is not trapped: step two switches the checklist on, says so, and the first entry ends from it', async () => {
+  it('7: is not trapped: step two switches the checklist on, and the first entry ends from it', async () => {
     const app = await aFreshOffice('first-entry-no-checklist')
     try {
       await openFresh(app.page, `${app.site}/?lang=en#/welcome`)
@@ -401,7 +433,7 @@ describe('a browser where the checklist is switched off', () => {
       await app.page.locator('.fe-layer[data-step="checklist"]').waitFor({ timeout: 10_000 })
       await app.page.locator('.ckw-press').waitFor({ timeout: 10_000 })
       expect(await app.page.evaluate(() => localStorage.getItem('mole-office.checklists.window'))).toBe('on')
-      expect(await app.page.locator('.fe-words-note').textContent()).toBe(say('firstEntry.checklist.switchedOn'))
+      expect(await app.page.locator('.fe-layer .fe-words p').count(), 'step two draws its own words only').toBe(1)
       expect(await app.page.locator('.fe-words-text').textContent()).toBe(say('firstEntry.checklist.text'))
       await expect.poll(async () => inside(await aBox(app.page, '.ckw-press'), await theGap(app.page)), { timeout: 5_000 }).toBe(true)
       expect(await app.page.locator('.fe-ring').getAttribute('data-pulse')).toBe('yes')
@@ -556,9 +588,8 @@ describe('pictures and a film of the first entry', () => {
     await video.delete()
   }, 300_000)
 
-  it.skipIf(!process.env['GETTING_STARTED_PICTURES'])('photographs the two pictures the report carries, from a made-up office', async () => {
+  it.skipIf(!process.env['GETTING_STARTED_PICTURES'])('photographs the two pictures the report carries, in English and in Chinese, from a made-up office', async () => {
     const shots = process.env['GETTING_STARTED_PICTURES'] as string
-    mkdirSync(shots, { recursive: true })
     const app = await liveApp({ name: 'getting-started-pictures', viewport: { width: 1440, height: 900 } })
     try {
       const asked = await fetch(`${app.api}/api/agents/register-myself`, {
@@ -571,22 +602,143 @@ describe('pictures and a film of the first entry', () => {
         localStorage.setItem('mole-office.preset.theme', 'light')
         localStorage.setItem('mole-office.workspace', 'default')
       })
-      await openFresh(app.page, `${app.site}/?lang=en#/embassy`)
-      await app.page.locator('.door-ask[data-door-ask="a-made-up-helper"]').waitFor({ timeout: 30_000 })
-      await app.page.waitForTimeout(400)
-      // The Embassy is listed on All pages, and the sidebar marks the All pages entry on its page (wave 13y
-      // round 165). The entry is scrolled into the window first, and the clip is kept inside it.
-      await app.page.locator('a.shell-link.shell-all-pages').scrollIntoViewIfNeeded()
-      const embassy = await aBox(app.page, 'a.shell-link.shell-all-pages')
-      const sidebar = await aBox(app.page, '.shell-side')
-      const height = 320
-      await app.page.screenshot({
-        path: `${shots}/the-embassy-in-the-list.png`,
-        clip: { x: sidebar.left, y: Math.min(Math.max(0, embassy.top - height / 2), 900 - height), width: sidebar.right - sidebar.left, height },
-      })
-      await app.page.locator('.door-asks').first().screenshot({ path: `${shots}/an-agent-asking-at-the-embassy.png` })
+      // EACH PICTURE IS TAKEN IN ENGLISH AND THEN IN CHINESE, from the same made-up office, into its language's folder.
+      for (const language of THE_REPORTS_LANGUAGES) {
+        const folder = join(shots, language)
+        mkdirSync(folder, { recursive: true })
+        await openIn(app.page, `${app.site}/?lang=${language}#/embassy`, language)
+        await app.page.locator('.door-ask[data-door-ask="a-made-up-helper"]').waitFor({ timeout: 30_000 })
+        await app.page.waitForTimeout(400)
+        // The Embassy is listed on All pages, and the sidebar marks the All pages entry on its page (wave 13y
+        // round 165). The entry is scrolled into the window first, and the clip is kept inside it.
+        await app.page.locator('a.shell-link.shell-all-pages').scrollIntoViewIfNeeded()
+        const embassy = await aBox(app.page, 'a.shell-link.shell-all-pages')
+        const sidebar = await aBox(app.page, '.shell-side')
+        const height = 320
+        await app.page.screenshot({
+          path: join(folder, 'the-embassy-in-the-list.png'),
+          clip: { x: sidebar.left, y: Math.min(Math.max(0, embassy.top - height / 2), 900 - height), width: sidebar.right - sidebar.left, height },
+        })
+        await app.page.locator('.door-asks').first().screenshot({ path: join(folder, 'an-agent-asking-at-the-embassy.png') })
+      }
     } finally {
       await app.stop()
     }
-  }, 240_000)
+  }, 360_000)
+
+  it.skipIf(!process.env['GETTING_STARTED_PICTURES'])('photographs the whole box a right-click opens, in English and in Chinese, from a made-up office', async () => {
+    const shots = process.env['GETTING_STARTED_PICTURES'] as string
+    const HELPER = 'a-made-up-helper'
+    // THE MADE-UP REPORT, ITS SENTENCE AND THE LINE TYPED ARE IN THE PICTURE'S LANGUAGE, so the Chinese box quotes
+    // Chinese words and holds a Chinese line.
+    const MADE_UP: Record<ThePicturesLanguage, { title: string; heading: string; selected: string; text: (selected: string) => string; typed: string; for: string }> = {
+      en: {
+        title: 'A made-up report about a made-up kiln',
+        heading: 'What the made-up log says',
+        selected: 'the made-up kiln held its heat through the night',
+        text: (selected) => `The made-up log says ${selected}.`,
+        typed: 'A made-up question: did the made-up kiln keep that heat until morning?',
+        for: 'A made-up reader',
+      },
+      zh: {
+        title: '一份关于虚构的窑的虚构报告',
+        heading: '虚构的日志写了什么',
+        selected: '虚构的窑整夜保住了热度',
+        text: (selected) => `虚构的日志写着：${selected}。`,
+        typed: '一个虚构的问题：虚构的窑到早上还保持着那份热度吗？',
+        for: '一位虚构的读者',
+      },
+    }
+    const app = await liveApp({ name: 'getting-started-right-click', viewport: { width: 1440, height: 900 }, opensAt: 'full' })
+    try {
+      const person = await asThePerson(app)
+      const write = async (headers: Record<string, string>, body: object): Promise<string> => {
+        const reply = await fetch(`${app.api}/api/records`, { method: 'POST', headers, body: JSON.stringify(body) })
+        const text = await reply.text()
+        expect(reply.status, text).toBe(201)
+        return (JSON.parse(text) as { record: { id: string } }).record.id
+      }
+      // ONE MADE-UP AGENT FILES THE MADE-UP REPORTS, so the box opens with that agent chosen, as the box chooses the
+      // agent that filed what is right-clicked (tests/a-right-click-on-a-report-chooses-who-filed-it.test.ts).
+      await write(person, { kind: 'agent', title: 'A made-up helper', data: { handle: HELPER, runtime: 'claude-code', state: 'active' } })
+      const reports: Partial<Record<ThePicturesLanguage, string>> = {}
+      for (const language of THE_REPORTS_LANGUAGES) {
+        const made = MADE_UP[language]
+        reports[language] = await write(
+          { ...person, 'x-mole-office-actor-type': 'agent', 'x-mole-office-actor-id': HELPER },
+          {
+            kind: 'report',
+            title: made.title,
+            data: { for: made.for, date: '2026-11-22', blocks: [{ id: 'b-1', type: 'text', heading: made.heading, text: made.text(made.selected) }] },
+          },
+        )
+      }
+      const registry = (await (await fetch(`${app.api}/api/participants`, { headers: person })).json()) as { agents: { handle: string; name: string }[] }
+      const helper = registry.agents.find((one) => one.handle === HELPER)?.name ?? ''
+      expect(helper, 'the registry names the made-up agent').not.toBe('')
+
+      await app.page.addInitScript(() => {
+        localStorage.setItem('mole-office.preset.theme', 'light')
+        localStorage.setItem('mole-office.workspace', 'default')
+        // NO DRAFT IS CARRIED FROM ONE PICTURE TO THE NEXT. The box keeps what was typed in it under this key
+        // (src/web/lib/drafts.ts), and a kept draft would draw its note in the Chinese box after the English one.
+        localStorage.removeItem('mole-office.talk.drafts')
+      })
+      for (const language of THE_REPORTS_LANGUAGES) {
+        const made = MADE_UP[language]
+        const folder = join(shots, language)
+        mkdirSync(folder, { recursive: true })
+        await openIn(app.page, `${app.site}/?lang=${language}#/r/${reports[language] ?? ''}`, language)
+        const run = '[data-text-field="data.blocks[#b-1].text"]'
+        await app.page.locator(run).waitFor({ timeout: 30_000 })
+        await app.page.locator(run).evaluate((el) => el.scrollIntoView({ block: 'center' }))
+        // THE MADE-UP SENTENCE IS SELECTED AS A PERSON SELECTS IT, and the right-click lands on the middle of it.
+        const at = await app.page.evaluate(
+          ([where, words]) => {
+            const el = document.querySelector<HTMLElement>(where)
+            if (el === null) throw new Error('the made-up paragraph is not drawn')
+            const walk = document.createTreeWalker(el, NodeFilter.SHOW_TEXT)
+            for (let node = walk.nextNode() as Text | null; node !== null; node = walk.nextNode() as Text | null) {
+              const from = node.data.indexOf(words)
+              if (from === -1) continue
+              const range = document.createRange()
+              range.setStart(node, from)
+              range.setEnd(node, from + words.length)
+              const chosen = window.getSelection()
+              chosen?.removeAllRanges()
+              chosen?.addRange(range)
+              const box = range.getBoundingClientRect()
+              return { x: Math.round(box.left + box.width / 2), y: Math.round(box.top + box.height / 2) }
+            }
+            throw new Error('no one run of the made-up paragraph holds the made-up sentence')
+          },
+          [run, made.selected] as const,
+        )
+        await app.page.mouse.click(at.x, at.y, { button: 'right' })
+        const talk = app.page.locator('.px-talk')
+        await talk.waitFor({ timeout: 20_000 })
+        await app.page.locator('.px-talk .px-talk-do:not([aria-busy="true"])').waitFor({ timeout: 20_000 })
+        // ONE MADE-UP LINE IS TYPED, so Send and Start review are drawn ready to press.
+        await talk.locator('textarea').fill(made.typed)
+        await expect
+          .poll(async () => (await talk.locator('.px-talk-to-btn').innerText()).replace(/\s+/g, ' ').trim(), { timeout: 20_000 })
+          .toBe(`${helper} ▾`)
+        const send = talk.locator('.px-talk-do > button').first()
+        const startReview = talk.getByRole('button', { name: createI18n(language).t('talk.startReview'), exact: true })
+        expect(await send.getAttribute('aria-disabled'), 'Send is ready to press').toBeNull()
+        expect(await startReview.getAttribute('aria-disabled'), 'Start review is ready to press').toBeNull()
+        // THE POINTER LEAVES THE BOX, so no press in the picture is drawn under it. The box you write in keeps the
+        // keyboard, and its ring shows where to type.
+        const box = await talk.boundingBox()
+        if (box === null) throw new Error('the box a right-click opens has no place on the page')
+        await app.page.mouse.move(box.x > 40 ? box.x - 20 : box.x + box.width + 20, box.y + 10)
+        expect(await talk.evaluate((el) => el.matches(':hover')), 'the pointer is off the box').toBe(false)
+        expect(await talk.locator('textarea').evaluate((el) => el === document.activeElement), 'the box you write in has the keyboard').toBe(true)
+        await app.page.waitForTimeout(400)
+        await talk.screenshot({ path: join(folder, 'right-click-box.png') })
+      }
+    } finally {
+      await app.stop()
+    }
+  }, 360_000)
 })

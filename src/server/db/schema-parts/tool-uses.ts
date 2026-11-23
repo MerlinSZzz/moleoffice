@@ -8,6 +8,22 @@ import { workspaces } from './workspaces.ts'
 const existingArchive = { existingArchive: true } as const
 
 
+/**
+ * ONE USE OF A TOOL, ONE ROW. Added by migration 0231, wave 13s round 33.
+ *
+ * Until this table a use was a line in `data.toolUses` on the calling run's record. Every use rewrote
+ * the record, so every use wrote a revision holding the whole list again: 268,483,514 bytes of
+ * revisions for one made-up run of 2,000 uses. Now the use door (`writeAUse` in
+ * src/server/lib/toolset.ts) writes one use row here, with optional file results in test_file_runs:
+ * no record write, no revision and no change row. The rows are append-only, so they are the history of the uses.
+ *
+ * NOT A RECORD, so an earlier decision still holds: a use never gets a record of its own.
+ *
+ * `seq` is the order of the use on its run, 1, 2, 3 …, and (run_id, seq) is unique, so two uses
+ * cannot claim one place. A row the migration moved out of `data.toolUses` keeps its place in the
+ * list as its `seq`, carries `moved_at`, and names no writer: the list did not record who wrote each
+ * line, and the old change rows and revisions that do are kept as they are.
+ */
 export const toolUses = aPartTable(sqliteTable(
   'tool_uses',
   {
@@ -37,6 +53,11 @@ export const toolUses = aPartTable(sqliteTable(
      * `matches`, `none` or `does not match` (src/config/use-line-proof.mjs). NULL on a row written before the door checked.
      */
     proof: text('proof'),
+    /**
+     * The same moment as `at`, as an instant with its offset, from the same reading of the clock, migration 0358. NULL on
+     * a row written before the migration and on a row moved out of a run's list, which are read from `at` as before.
+     */
+    atInstant: text('at_instant'),
   },
   (t) => [uniqueIndex('tool_uses_run_seq_idx').on(t.runId, t.seq)],
 ), existingArchive)

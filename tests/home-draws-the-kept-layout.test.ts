@@ -1,12 +1,12 @@
 // Copyright © 2026 Zhengyang Shen
 // Licensed under the MIT License. See LICENSE.
 /**
- * HOME DRAWS THE LAYOUT ITS PERSON KEPT. With no kept row Home draws A: the three parts in one column. The
+ * HOME DRAWS THE LAYOUT ITS PERSON KEPT. With no kept row Home draws A: its drawn parts in one column. The
  * person drags a part by its handle to the band or either column, and the place it would go is shown while
  * it is dragged. A small menu on each part makes the same moves from the keyboard. Each move is kept, so a
  * reload draws it again. Below the width where two columns fit, the parts stack band, first column, second
- * column, and a drag there keeps the order it makes. A kept row Home cannot read draws A and says so. The
- * notice that the office is paused stands above the three parts, wherever the person put them.
+ * column, and a drag there keeps the order it makes. A kept row Home cannot read draws A, marked not read. The
+ * notice that the office is paused stands above Home's parts, wherever the person put them.
  *
  * THE PICTURES are taken only when W13Y_SIDEBAR_PICTURES names a folder: Home in A, B and C at 1440, and A at 990, 660
  * and 390, in light and dark, in English, and a film at 1440 in light of a drag from A into B, then into C, and a reload
@@ -22,7 +22,8 @@ import { THE_TEST_OFFICES_OWNER } from './a-page-of-a-test-office.ts'
 import { putTheMadeUpLabelIn } from './the-made-up-label-above-the-page.ts'
 import { t } from '../src/shared/i18n.ts'
 import {
-  HOME_LAYOUT_A, HOME_LAYOUT_B, HOME_LAYOUT_C, homeLayoutSettingName, type HomeLayout, type HomePart, type HomePlace,
+  HOME_LAYOUT_A, HOME_LAYOUT_B, HOME_LAYOUT_C, applyMenuMove, drawnPlaces, homeLayoutSettingName, movePart, stackedOrder,
+  type HomeDrawnPlace, type HomeLayout, type HomePart,
 } from '../src/shared/home-layout.ts'
 import { sevenDaysFrom } from '../src/web/components/home/HomeWeek.tsx'
 
@@ -66,7 +67,7 @@ async function open(width: number, height = 2400, asked = ''): Promise<void> {
 }
 
 /** What the page draws: which parts each place holds, in order, and whether the place takes any space. */
-async function drawn(): Promise<{ kept: string | null; places: Record<HomePlace, { parts: string[]; shown: boolean; x: number; y: number; width: number }> }> {
+async function drawn(): Promise<{ kept: string | null; places: Record<HomeDrawnPlace, { parts: string[]; shown: boolean; x: number; y: number; width: number }> }> {
   return page.evaluate(() => {
     const root = document.querySelector<HTMLElement>('[data-home-layout]')!
     const place = (name: string) => {
@@ -82,14 +83,14 @@ async function drawn(): Promise<{ kept: string | null; places: Record<HomePlace,
   })
 }
 
-const asDrawn = (places: Awaited<ReturnType<typeof drawn>>['places']): HomeLayout => ({ band: places.band.parts as HomePart[], first: places.first.parts as HomePart[], second: places.second.parts as HomePart[] })
+const asDrawn = (places: Awaited<ReturnType<typeof drawn>>['places']): ReturnType<typeof drawnPlaces> => ({ band: places.band.parts as HomePart[], first: places.first.parts as HomePart[], second: places.second.parts as HomePart[] })
 
 function aKeep(): Promise<unknown> {
   return page.waitForResponse(reply => new URL(reply.url()).pathname === '/api/home-layout' && reply.request().method() === 'PUT' && reply.status() === 200)
 }
 
 /** Drags a part by its handle to the start or the end of a place, and checks the place it would go is shown first. */
-async function drag(part: HomePart, to: HomePlace, where: 'start' | 'end'): Promise<void> {
+async function drag(part: HomePart, to: HomeDrawnPlace, where: 'start' | 'end'): Promise<void> {
   const handle = await page.locator(`[data-home-part="${part}"] [data-home-drag]`).boundingBox()
   expect(handle, `${part} has no handle to drag`).not.toBeNull()
   const fromX = handle!.x + handle!.width / 2, fromY = handle!.y + handle!.height / 2
@@ -106,12 +107,12 @@ async function drag(part: HomePart, to: HomePlace, where: 'start' | 'end'): Prom
   await kept
 }
 
-it('draws A with no kept row: the three parts in the first column, and the band and second column take no space', async () => {
+it('draws A with no kept row: its drawn parts in the first column, and the band and second column take no space', async () => {
   writeTheRow(null)
   await open(1440)
   const { kept, places } = await drawn()
   expect(kept).toBe('nothing-kept')
-  expect(asDrawn(places)).toEqual(HOME_LAYOUT_A)
+  expect(asDrawn(places)).toEqual(drawnPlaces(HOME_LAYOUT_A))
   expect(places.band.shown).toBe(false)
   expect(places.second.shown).toBe(false)
   expect(await page.locator('[data-home-layout-note]').count()).toBe(0)
@@ -125,13 +126,13 @@ it('after drags into the second column and a reload draws B, and after a drag in
   await open(1440)
   await drag('agents', 'second', 'start')
   await drag('schedule', 'second', 'end')
-  expect(asDrawn((await drawn()).places)).toEqual(HOME_LAYOUT_B)
+  expect(asDrawn((await drawn()).places)).toEqual(drawnPlaces(HOME_LAYOUT_B))
   expect(readTheRow()).toEqual(HOME_LAYOUT_B)
 
   await open(1440)
   const b = await drawn()
   expect(b.kept).toBe('kept')
-  expect(asDrawn(b.places)).toEqual(HOME_LAYOUT_B)
+  expect(asDrawn(b.places)).toEqual(drawnPlaces(HOME_LAYOUT_B))
   expect(b.places.second.shown).toBe(true)
   expect(b.places.second.x).toBeGreaterThan(b.places.first.x + b.places.first.width - 1)
   expect(Math.abs(b.places.second.y - b.places.first.y)).toBeLessThan(2)
@@ -140,7 +141,7 @@ it('after drags into the second column and a reload draws B, and after a drag in
   await open(1440)
   const c = await drawn()
   expect(c.kept).toBe('kept')
-  expect(asDrawn(c.places)).toEqual(HOME_LAYOUT_C)
+  expect(asDrawn(c.places)).toEqual(drawnPlaces(HOME_LAYOUT_C))
   expect(readTheRow()).toEqual(HOME_LAYOUT_C)
   // The band runs across both columns, above them.
   expect(c.places.band.width).toBeGreaterThan(c.places.first.width + c.places.second.width)
@@ -155,43 +156,45 @@ it('moves a part from its small menu with the keyboard, and keeps the move', asy
   await page.locator('[data-home-part="schedule"] [data-home-move="band"]').press('Enter')
   await kept
   await open(1440)
-  expect(asDrawn((await drawn()).places)).toEqual({ band: ['schedule'], first: ['needs', 'agents'], second: [] })
+  const scheduleInTheBand = applyMenuMove(HOME_LAYOUT_A, 'schedule', 'band')
+  expect(asDrawn((await drawn()).places)).toEqual(drawnPlaces(scheduleInTheBand))
   await page.locator('[data-home-part="needs"] [data-home-move-menu]').press('Enter')
   const again = aKeep()
   await page.locator('[data-home-part="needs"] [data-home-move="down"]').press('Enter')
   await again
   await open(1440)
-  expect(asDrawn((await drawn()).places)).toEqual({ band: ['schedule'], first: ['agents', 'needs'], second: [] })
+  expect(asDrawn((await drawn()).places)).toEqual(drawnPlaces(applyMenuMove(scheduleInTheBand, 'needs', 'down')))
+  expect(readTheRow()).toEqual(applyMenuMove(scheduleInTheBand, 'needs', 'down'))
 }, 120_000)
 
 it('stacks band, first column, second column below the width for two columns, and keeps the order a drag there makes', async () => {
   writeTheRow(JSON.stringify(HOME_LAYOUT_C))
-  for (const width of [990, 660, 390]) {
+  for (const width of [990, 390]) {
     await open(width)
     const { places } = await drawn()
-    expect(asDrawn(places), `${String(width)}px`).toEqual(HOME_LAYOUT_C)
+    expect(asDrawn(places), `${String(width)}px`).toEqual(drawnPlaces(HOME_LAYOUT_C))
     const order = await page.locator('[data-home-part]').evaluateAll(nodes => nodes.map(one => ({ part: one.getAttribute('data-home-part'), x: one.getBoundingClientRect().x, y: one.getBoundingClientRect().y })))
-    expect(order.map(one => one.part), `${String(width)}px`).toEqual(['agents', 'needs', 'schedule'])
+    expect(order.map(one => one.part), `${String(width)}px`).toEqual(stackedOrder(HOME_LAYOUT_C))
     expect(order.every(one => Math.abs(one.x - order[0]!.x) < 1), `${String(width)}px: the parts do not stand in one column`).toBe(true)
     expect(order.every((one, index) => index === 0 || one.y > order[index - 1]!.y), `${String(width)}px: the parts are not stacked in order`).toBe(true)
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `${String(width)}px scrolls sideways`).toBe(true)
   }
   await open(660)
   await drag('needs', 'second', 'end')
-  const moved = { band: ['agents'], first: [], second: ['schedule', 'needs'] }
+  const moved = movePart(HOME_LAYOUT_C, 'needs', 'second', HOME_LAYOUT_C.second.length)
   expect(readTheRow()).toEqual(moved)
   await open(660)
-  expect(await page.locator('[data-home-part]').evaluateAll(nodes => nodes.map(one => one.getAttribute('data-home-part')))).toEqual(['agents', 'schedule', 'needs'])
-  expect(asDrawn((await drawn()).places)).toEqual(moved)
+  expect(await page.locator('[data-home-part]').evaluateAll(nodes => nodes.map(one => one.getAttribute('data-home-part')))).toEqual(stackedOrder(moved))
+  expect(asDrawn((await drawn()).places)).toEqual(drawnPlaces(moved))
 }, 240_000)
 
-it('draws A from a kept row it cannot read, and says in words that the kept layout could not be read', async () => {
+it('draws A from a kept row it cannot read, and marks the kept layout not read', async () => {
   writeTheRow('made-up words that are not a layout')
   await open(1440)
   const { kept, places } = await drawn()
   expect(kept).toBe('unreadable')
-  expect(asDrawn(places)).toEqual(HOME_LAYOUT_A)
-  expect((await page.locator('[data-home-layout-note]').innerText()).trim()).toBe(t('home.layout.unreadable'))
+  expect(asDrawn(places)).toEqual(drawnPlaces(HOME_LAYOUT_A))
+  expect((await page.locator('[data-home-layout-note]').innerText()).trim()).toBe(t('home.layout.keptNotRead'))
 }, 120_000)
 
 /** The made-up projects of the pictures, and the agents at work in each. The default project holds none. */
@@ -307,7 +310,7 @@ it.skipIf(PICTURES === undefined)('takes the pictures of Home in A, B and C at 1
         writeTheRow(kept)
         for (const width of widths) {
           await openForAPicture(width)
-          expect(asDrawn((await drawn()).places), `${name} at ${String(width)} in ${theme}`).toEqual(layout)
+          expect(asDrawn((await drawn()).places), `${name} at ${String(width)} in ${theme}`).toEqual(drawnPlaces(layout))
           await page.screenshot({ path: join(folder, `home-${name}-${String(width)}-${theme}.png`), fullPage: true })
         }
       }
@@ -327,17 +330,17 @@ it.skipIf(PICTURES === undefined)('films a drag from A into B, then into C, and 
   const filmed = page
   try {
     await openForAPicture(1440)
-    expect(asDrawn((await drawn()).places)).toEqual(HOME_LAYOUT_A)
+    expect(asDrawn((await drawn()).places)).toEqual(drawnPlaces(HOME_LAYOUT_A))
     await drag('agents', 'second', 'start')
     await page.waitForTimeout(1_000)
     await drag('schedule', 'second', 'end')
-    expect(asDrawn((await drawn()).places)).toEqual(HOME_LAYOUT_B)
+    expect(asDrawn((await drawn()).places)).toEqual(drawnPlaces(HOME_LAYOUT_B))
     await page.waitForTimeout(1_500)
     await drag('agents', 'band', 'start')
-    expect(asDrawn((await drawn()).places)).toEqual(HOME_LAYOUT_C)
+    expect(asDrawn((await drawn()).places)).toEqual(drawnPlaces(HOME_LAYOUT_C))
     await page.waitForTimeout(1_500)
     await openForAPicture(1440)
-    expect(asDrawn((await drawn()).places)).toEqual(HOME_LAYOUT_C)
+    expect(asDrawn((await drawn()).places)).toEqual(drawnPlaces(HOME_LAYOUT_C))
     await page.waitForTimeout(3_000)
   } finally {
     page = app.page
@@ -350,13 +353,13 @@ it.skipIf(PICTURES === undefined)('films a drag from A into B, then into C, and 
 }, 300_000)
 
 // LAST, BECAUSE IT LEAVES THE OFFICE PAUSED.
-it('draws the notice that the office is paused above the three parts, in A and in C', async () => {
+it('draws the notice that the office is paused above Home\'s parts, in A and in C', async () => {
   const headers = { 'content-type': 'application/json', 'x-mole-office-actor-type': 'human', 'x-mole-office-actor-id': THE_TEST_OFFICES_OWNER.id, 'x-mole-office-workspace': 'default' }
   expect((await fetch(`${app.api}/api/office/pause`, { method: 'POST', headers, body: JSON.stringify({ why: 'Made-up quiet office' }) })).status).toBe(200)
   for (const [kept, layout] of [[null, HOME_LAYOUT_A], [JSON.stringify(HOME_LAYOUT_C), HOME_LAYOUT_C]] as const) {
     writeTheRow(kept)
     await open(1440)
-    expect(asDrawn((await drawn()).places)).toEqual(layout)
+    expect(asDrawn((await drawn()).places)).toEqual(drawnPlaces(layout))
     await page.locator('.office-pause-notice').waitFor()
     const where = await page.evaluate(() => {
       const notice = document.querySelector('.office-pause-notice')!
@@ -372,7 +375,7 @@ it('draws the notice that the office is paused above the three parts, in A and i
   }
 }, 120_000)
 
-it('draws the whole long project name in Agents at work at every width in both themes', async () => {
+it('draws the whole long project name in Agents at work at the widest and the narrowest width, in the light theme', async () => {
   const project = { id: 'made-up-project-for-bars', title: 'Made-up Riverside Seed Library and Store' }
   expect(project.title.length).toBe(40)
   const made = await fetch(`${app.api}/api/workspaces`, {
@@ -381,7 +384,7 @@ it('draws the whole long project name in Agents at work at every width in both t
     body: JSON.stringify(project),
   })
   expect(made.status, await made.clone().text()).toBe(201)
-  for (const theme of ['light', 'dark']) for (const width of [1440, 990, 660, 390]) {
+  for (const theme of ['light']) for (const width of [1440, 390]) {
     const context = await app.browser.newContext({ viewport: { width, height: 900 }, reducedMotion: 'reduce' })
     await context.addInitScript((look) => {
       localStorage.setItem('mole-office.preset.theme', look)

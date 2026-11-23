@@ -44,6 +44,17 @@ import { ROUND_LAUNCHER_RUNTIME, type TheEffortTheLauncherIsAnswered } from './n
 import type { ParticipantRef } from './participants.ts'
 
 export const WORKER_RUNS = 'workerRuns'
+export const FOR_THE_PERSON = 'For the person: a worker is safest in a sandbox. A copy, such as a worktree or a copied folder, is next. Working straight in your own checkout carries some risk. Outside a sandbox, a worker can read everything your account can read, the office\'s key too.'
+export const HOST_DEFAULT_PERMISSIONS = 'The runtime runs with its own default permissions and may not be able to write or commit unless your settings for it allow it.'
+export const WORKER_PLACE = 'workerPlace'
+export const ONLY_THE_OFFICE_WRITES_THE_WORKER_PLACE = "Only the office writes where a worker's run works, when it is filed for an ask. Nothing was written."
+
+export type TheWorkerPlace =
+  | { kind: 'worktree'; folder: string; repository: { name: string; root: string } }
+  | { kind: 'folder'; folder: string; repository: { name: string; root: string } | null }
+export type TheWorkerPlaceAsked =
+  | { kind: 'worktree'; repository: string; folder: string }
+  | { kind: 'folder'; folder: string }
 
 /** The refusal of `workerRuns` in any write but the office's own, on a create and on a patch. */
 export const ONLY_THE_OFFICE_WRITES_THE_WORKER_RUNS =
@@ -208,7 +219,8 @@ export interface TheWorkerRun {
   /** The brief, as a pointer and a hash: an absolute path inside the sandbox folder, its sha256 and its size. */
   brief: { path: string; sha256: string; bytes: number }
   /** The sandbox the supervisor's run was started in, as the office vouches for it. The worker starts in it too. */
-  sandbox: { folder: string; instance: string; container: string }
+  sandbox?: { folder: string; instance: string; container: string }
+  place?: TheWorkerPlace
   /** The ask this one replaced, when one was still waiting. */
   replaced?: { askedAt: string }
   /**
@@ -281,9 +293,17 @@ export function readTheWorkerRun(value: unknown): TheWorkerRun | null {
   const askedBy = value['askedBy']
   const brief = value['brief']
   const sandbox = value['sandbox']
+  const place = value['place']
   if (!isObject(askedBy) || !isObject(askedBy['who']) || !isText(askedBy['who']['id']) || !isText(askedBy['session'])) return null
   if (!isObject(brief) || !isText(brief['path']) || !isText(brief['sha256']) || typeof brief['bytes'] !== 'number') return null
-  if (!isObject(sandbox) || !isText(sandbox['folder']) || !isText(sandbox['instance']) || !isText(sandbox['container'])) return null
+  if ((sandbox === undefined) === (place === undefined)) return null
+  if (sandbox !== undefined && (!isObject(sandbox) || !isText(sandbox['folder']) || !isText(sandbox['instance']) || !isText(sandbox['container']))) return null
+  if (place !== undefined) {
+    if (!isObject(place) || !isText(place['folder']) || (place['kind'] !== 'worktree' && place['kind'] !== 'folder')) return null
+    const repository = place['repository']
+    if (repository === null) { if (place['kind'] !== 'folder') return null }
+    else if (!isObject(repository) || !isText(repository['name']) || !isText(repository['root'])) return null
+  }
   return value as unknown as TheWorkerRun
 }
 

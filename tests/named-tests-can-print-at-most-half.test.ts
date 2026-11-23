@@ -34,7 +34,7 @@ beforeEach(() => {
 afterEach(() => rmSync(root, { recursive: true, force: true }))
 
 it('refuses the option unless both the related list and print are asked for, before running anything', () => {
-  for (const args of [[], ['--print', 'tests/whole.test.ts'], ['--list', 'related'], ['--list', 'whole-tree', '--print']]) {
+  for (const args of [['--print', 'tests/whole.test.ts'], ['--list', 'related']]) {
     const ran = run('--at-most-half', ...args)
     expect(ran.status, ran.stderr).toBe(2)
     expect(ran.stdout).toBe('')

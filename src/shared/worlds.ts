@@ -43,7 +43,7 @@ import { readStoredWord } from './i18n.ts'
 import type { ParticipantKind, ParticipantRef } from './participants.ts'
 // THE VISITING AGENT'S CREDENTIAL. The Embassy answers about worlds, citizens, visits AND visiting
 // agents in one read, for the reason its route says: four clocks drawn on one page disagree.
-import type { VisitorCredential } from './visitors.ts'
+import { credentialNeedsOwnerAction, isAPersonsDeviceCredential, type VisitorCredential } from './visitors.ts'
 // WHO CHOSE THE CARD ON A ROW. Criterion P75; ./roles.ts is the only place that shape lives.
 import type { WhoChoseTheCard } from './roles.ts'
 // WHETHER PICKING THIS AGENT'S NEWEST RUN UP IS EXPENSIVE. Criterion T6; the warning and its two
@@ -365,6 +365,15 @@ export interface Mirror {
    * one, which is the question the mirror exists for.
    */
   visits: Visit[]
+  /**
+   * THE EXACT ORIGINS OF THE OFFICE'S OWN PAGES, as `theOriginsOfThisOfficesPages` in
+   * src/server/lib/a-host-that-is-not-this-office.ts makes them from the names the Host check takes. A world takes a
+   * page's origin only when it is exactly on this list (SEC-2's design, item 6).
+   *
+   * NULL IS NO LIST: the office did not yet know its listeners when it wrote this, or an older office wrote it without
+   * the field. A world then takes no page's origin from it.
+   */
+  pageOrigins: string[] | null
 }
 
 /**
@@ -666,6 +675,44 @@ export interface EmbassyRow {
    */
   /** `byHandle` is the handle on the retirer's row (wave rule 5), or null or absent where no agent row answers. */
   retired: { at: string | null; because: string | null; by: ParticipantRef | null; byHandle?: string | null } | null
+  /**
+   * HOW MANY BROWSERS THE PERSON HAS, AND HOW MANY WAIT FOR THEIR PRESS. Design C of early idea B9.
+   *
+   * The person's browsers are drawn on their own card, and a page of the Embassy draws no row for any of them.
+   * The person's one row carries these two counts instead, with the way to their card. It is on that row only,
+   * and only when they have a browser paired or waiting; absent everywhere else. `hisBrowsersIn` below
+   * is the one place the two counts are worked out, and the card reads the same split.
+   */
+  hisBrowsers?: { paired: number; waiting: number }
+}
+
+/**
+ * THE PERSON'S BROWSERS, SPLIT AS THEIR CARD DRAWS THEM. Design C of early idea B9.
+ *
+ * A browser asks through the same credential door as a visiting agent, so the list of credentials
+ * holds both. This keeps the person's devices only and splits them by standing: waiting for their
+ * press, paired, and ended. The Embassy door counts the first two for the person's row and the card draws all
+ * three, so the two cannot disagree about which browser is which.
+ */
+export function hisBrowsersIn(credentials: readonly VisitorCredential[]): {
+  waiting: VisitorCredential[]
+  paired: VisitorCredential[]
+  ended: VisitorCredential[]
+} {
+  const his = credentials.filter((one) => isAPersonsDeviceCredential(one))
+  return {
+    waiting: his.filter((one) => one.standing === 'pending'),
+    paired: his.filter((one) => one.standing === 'trusted'),
+    ended: his.filter((one) => one.standing === 'ended'),
+  }
+}
+
+/**
+ * WHETHER THE EMBASSY'S ASKING PANEL DRAWS THIS ASK. Design C of early idea B9: an agent's ask stays
+ * there, and a browser's ask is drawn on the person's card instead.
+ */
+export function anAskTheEmbassyDraws(credential: Pick<VisitorCredential, 'standing' | 'role'>): boolean {
+  return credentialNeedsOwnerAction(credential) && !isAPersonsDeviceCredential(credential)
 }
 
 /**
@@ -790,24 +837,37 @@ export interface EmbassyView {
  * WHETHER THE EMBASSY PAGE DRAWS THIS ROW IN ITS DEFAULT VIEW. The one rule, read by the server that
  * makes the page and by a test that compares a page with the whole answer. `retired` is a fact, not
  * a row, so the server can ask it before it builds the row.
+ *
+ * DESIGN C OF EARLY IDEA B9 adds two facts. A person's browser is never drawn here: it is on their
+ * card. The person's own row is drawn while it carries the count of their browsers, because that count is the
+ * way to their card. A reader that leaves either out asks the rule as it was.
  */
 export function theEmbassyPageDrawsThisRow(row: {
   standing: EmbassyRow['standing']
   retired: boolean
   contact: boolean
   credential: string | null
+  device?: boolean
+  hisBrowsers?: boolean
 }): boolean {
-  return row.standing !== 'asks to come in' && !row.retired && (row.contact || row.credential !== null)
+  if (row.device === true) return false
+  return (
+    row.standing !== 'asks to come in' &&
+    !row.retired &&
+    (row.contact || row.credential !== null || row.hisBrowsers === true)
+  )
 }
 
 /** The same rule over a built row, for a reader that already has one. */
 export function aRowTheEmbassyPageDraws(
-  row: Pick<EmbassyRow, 'standing' | 'retired' | 'contact' | 'credential'>,
+  row: Pick<EmbassyRow, 'standing' | 'retired' | 'contact' | 'credential' | 'device' | 'hisBrowsers'>,
 ): boolean {
   return theEmbassyPageDrawsThisRow({
     standing: row.standing,
     retired: row.retired !== null,
     contact: row.contact,
     credential: row.credential,
+    device: row.device,
+    hisBrowsers: row.hisBrowsers !== undefined,
   })
 }

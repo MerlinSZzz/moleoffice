@@ -24,7 +24,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { createServer, type Server } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { fileURLToPath, URL } from 'node:url'
 
 import type { FastifyInstance } from 'fastify'
@@ -33,7 +33,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { AGENT_RUNTIMES } from '../src/shared/participants.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { HOW_TO_WAKE, WAKING_ACTS, whatTheWaiterDoes } from '../src/shared/waking.ts'
-import { apiApp, freshDb, type TestDb } from './helpers.ts'
+import { apiApp, freshDb, aTestAgentsKeyEnvironment, type TestDb } from './helpers.ts'
 
 const transcripts = mkdtempSync(join(tmpdir(), 'mole-office-waking-'))
 let transcriptNumber = 0
@@ -249,6 +249,7 @@ describe('the waiter, running as a session starts it', () => {
   let api: string
   let resources: typeof import('../src/server/lib/resources.ts')
   let agentId = ''
+  let keyEnv: NodeJS.ProcessEnv = {}
   let session = ''
   /** Everything the stand-in OpenCode session was sent. */
   const sentIn: { path: string; body: string }[] = []
@@ -281,13 +282,7 @@ describe('the waiter, running as a session starts it', () => {
     })
     await new Promise<void>((go) => standIn.listen(0, '127.0.0.1', go))
     standInAt = `http://127.0.0.1:${String((standIn.address() as AddressInfo).port)}`
-    t.api.createRecord({
-      workspaceId: 'default',
-      kind: 'agent',
-      title: 'Woken',
-      data: { handle: 'woken', runtime: 'opencode', state: 'active' },
-      actor: { type: 'human', id: THE_PERSON },
-    })
+    keyEnv = await aTestAgentsKeyEnvironment(app, 'woken', dirname(t.file), 'default', 'opencode')
     session = t.api.createRecord({
       workspaceId: 'default',
       kind: 'session',
@@ -296,10 +291,10 @@ describe('the waiter, running as a session starts it', () => {
       actor: { type: 'human', id: THE_PERSON },
     }).id
     /**
-     * A LIVE PROCESS FOR THE SESSION, BECAUSE A SESSION THAT IS ANSWERING HAS ONE. Criterion M106:
-     * the handle door no longer reads a hold's session from the waiter's beat alone, so a fixture
-     * that expects "a live session" has to describe one. This is the test's own process, registered
-     * while it runs, exactly as a session registers a process it started.
+     * A LIVE PROCESS FOR THE SESSION, BECAUSE A SESSION THAT IS ANSWERING HAS ONE. A beating hold
+     * now answers on its own, so this row is not what makes the session "a live session"; it keeps
+     * the fixture describing a session that really runs. This is the test's own process,
+     * registered while it runs, exactly as a session registers a process it started.
      */
     resources.registerResource({
       workspaceId: 'default',
@@ -334,7 +329,7 @@ describe('the waiter, running as a session starts it', () => {
     const child = spawn(
       process.execPath,
       [fileURLToPath(new URL('../tools/hold-the-handle.mjs', import.meta.url)), ...args],
-      { env: { ...process.env, MOLE_OFFICE_HANDLE_BEAT_SECONDS: '1', MOLE_OFFICE_HANDLE_LAPSES_AFTER_SECONDS: '30' } },
+      { env: { ...keyEnv, MOLE_OFFICE_HANDLE_BEAT_SECONDS: '1', MOLE_OFFICE_HANDLE_LAPSES_AFTER_SECONDS: '30' } },
     )
     started.push(child)
     let printed = ''
@@ -391,11 +386,11 @@ describe('the waiter, running as a session starts it', () => {
     const stands = (
       await app.inject({ method: 'GET', url: '/api/handles/woken', headers: AS_THE_OWNER })
     ).json() as { answering: { how: string; session: string | null } }
-    // THE OFFICE CANNOT READ THIS SESSION'S TRANSCRIPT: there is no OpenCode adapter, so under
-    // criterion M126 a live process alone is not answering and the hold reads `nobody`. The waiter's
-    // own output above is what proves it is still holding, which is what this case is about.
-    expect(stands.answering.how).toBe('nobody')
-    expect(stands.answering.session).toBeNull()
+    // THE OFFICE CANNOT READ INSIDE AN OPENCODE SESSION, so the beating hold is the whole answer:
+    // the session it names is a live session. The waiter's own output above is what proves it is
+    // still holding, which is what this case is about.
+    expect(stands.answering.how).toBe('a live session')
+    expect(stands.answering.session).toBe(session)
     waiter.child.kill('SIGTERM')
     await waiter.ended
   }, 60_000)
@@ -432,11 +427,11 @@ describe('the waiter, running as a session starts it', () => {
     const stands = (
       await app.inject({ method: 'GET', url: '/api/handles/woken', headers: AS_THE_OWNER })
     ).json() as { answering: { how: string; session: string | null } }
-    // THE OFFICE CANNOT READ THIS SESSION'S TRANSCRIPT: there is no OpenCode adapter, so under
-    // criterion M126 a live process alone is not answering and the hold reads `nobody`. The waiter's
-    // own output above is what proves it is still holding, which is what this case is about.
-    expect(stands.answering.how).toBe('nobody')
-    expect(stands.answering.session).toBeNull()
+    // THE HOLD STILL BEATS, a few seconds old, and nothing read of the session turns it to not
+    // answering: no transcript is on its record and no process of its own is recorded. So the
+    // session it names is a live session, on its hold.
+    expect(stands.answering.how).toBe('a live session')
+    expect(stands.answering.session).toBe(session)
   }, 60_000)
 })
 

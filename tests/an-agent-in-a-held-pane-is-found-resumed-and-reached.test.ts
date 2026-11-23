@@ -43,7 +43,7 @@ import {
   type Place,
   type ScratchServer,
 } from './terminal-holder-stand.ts'
-import { thePersonsKeyHeader } from './helpers.ts'
+import { A_SLEEP_TIME, thePersonsKeyHeader } from './helpers.ts'
 
 const CHECKOUT = fileURLToPath(new URL('..', import.meta.url))
 const HOOK = join(CHECKOUT, 'tools', 'session-hook.mjs')
@@ -85,6 +85,8 @@ const PATHS = ${JSON.stringify(paths)}
   const transcript = PATHS.transcripts + '/' + conversation + '.jsonl'
   const env = { ...process.env, HOME: PATHS.home, MOLE_OFFICE_DB: DB, MOLE_OFFICE_PORT: new URL(process.env.MOLE_OFFICE_API).port, MOLE_HOOK_DETAILS_FOLDER: PATHS.details }
   for (const name of ['TMUX_PANE', 'CLAUDE_PID', 'SANDBOX_DIR', 'MOLE_OFFICE_TOOL_CONFIGURATION']) delete env[name]
+  delete env.MOLE_AGENT_KEY
+  env.MOLE_AGENT_KEY_FILE = ${JSON.stringify(join(place.dir, 'agent.key'))}
   const hook = (mode, more) => {
     const ran = spawnSync(process.execPath, ['--no-experimental-strip-types', HOOK, mode], {
       env,
@@ -169,6 +171,7 @@ beforeAll(async () => {
 
   const agent = await register(AGENT, 'worker')
   agentId = agent.id
+  writeFileSync(join(place.dir, 'agent.key'), agent.key, { mode: 0o600 })
   folder = join(place.dir, 'w')
   mkdirSync(folder)
   const set = await ask(server.api, `/api/participants/agent/${AGENT}/start-folder`, { method: 'POST', body: { startFolder: folder, because: 'the pilot opens it in a pane' } })
@@ -179,7 +182,7 @@ beforeAll(async () => {
   const proposed = await ask(server.api, '/api/residents/proposals', {
     method: 'POST',
     headers: { ...AS_THE_PERSON, 'x-mole-office-actor-type': 'agent', 'x-mole-office-actor-id': SECRETARY, 'x-mole-office-key': secretary.key },
-    body: { agentId, because: 'A made-up reason.' },
+    body: { agentId, because: 'A made-up reason.', sleepTime: A_SLEEP_TIME },
   })
   expect(proposed.status, JSON.stringify(proposed.body)).toBe(201)
   const confirmed = await ask(server.api, `/api/residents/proposals/${String((proposed.body['proposal'] as { id: string }).id)}/confirm`, { method: 'POST', headers: asThePerson(), body: {} })

@@ -101,6 +101,8 @@ const THE_LONGEST_CALL_MS = 30_000
 export const THE_PAUSE_MS = 5_000
 /** How long it waits instead after a round fails with the same error as the round before. */
 export const THE_PAUSE_AFTER_THE_SAME_ERROR_MS = 60_000
+/** How often the runner the office starts looks for the office's process. */
+const THE_WATCH_MS = 1_000
 
 /**
  * WHAT THE RUNNER SAYS: every sentence it prints and every why it answers about a job, each once. A sentence the runner
@@ -798,7 +800,7 @@ function theGroupHasAMember(groupId) {
  * @param {number} groupId @param {number} ms
  * @returns {Promise<boolean>}
  */
-async function untilTheGroupHasGone(groupId, ms = THE_GROUP_WAIT_MS) {
+async function untilTheGroupHasGone(groupId, ms) {
   const until = Date.now() + ms
   for (;;) {
     if (!theGroupHasAMember(groupId)) return true
@@ -901,13 +903,14 @@ async function itsRecovery(declaration, jobId, jobFolder, limitMs = THE_RECOVERY
  * @param {{ program: string, folder: string }} onDisk
  * @param {string} jobFolder
  * @param {number} graceMs
+ * @param {number} groupWaitMs
  * @param {Holding} holding
  * @param {(groupId: number) => void} started
  * @param {AbortSignal} [stop]
  * @param {number} [recoveryMs]
  * @returns {Promise<Record<string, unknown>>}
  */
-function runOneJob(job, declaration, onDisk, jobFolder, graceMs, holding, started, stop, recoveryMs = THE_RECOVERY_LIMIT_MS) {
+function runOneJob(job, declaration, onDisk, jobFolder, graceMs, groupWaitMs, holding, started, stop, recoveryMs = THE_RECOVERY_LIMIT_MS) {
   const output = join(jobFolder, 'out')
   mkdirSync(output, { recursive: true, mode: 0o700 })
   const logFile = join(jobFolder, 'log')
@@ -1002,7 +1005,7 @@ function runOneJob(job, declaration, onDisk, jobFolder, graceMs, holding, starte
       // still be there for a moment. The scope path has awaited the stop already. WHEN A MEMBER IS STILL THERE the
       // recovery is not run, and the answer says why: the step must not read what a process of the job still uses.
       const byItsGroupOnly = scope === undefined || holding.heldBy === HOST_JOB_HOLDINGS[1]
-      const theGroupHasGone = !byItsGroupOnly || child.pid === undefined ? true : await untilTheGroupHasGone(child.pid)
+      const theGroupHasGone = !byItsGroupOnly || child.pid === undefined ? true : await untilTheGroupHasGone(child.pid, groupWaitMs)
       // A JOB LOST WHILE IT RAN, OR ENDED AT ITS TIME LIMIT, IS CLEANED UP AFTER ITS SCOPE HAS STOPPED, never before:
       // the recovery step reads what the job left and removes only what its own journal proves. A time-limit kill is
       // as much a stopped job as a stop asked for, and a hand-over killed at its two-hour limit leaves the same
@@ -1013,7 +1016,7 @@ function runOneJob(job, declaration, onDisk, jobFolder, graceMs, holding, starte
           ? await itsRecovery(declaration, job.id, jobFolder, recoveryMs)
           : declaration?.recovery === undefined
             ? ''
-            : THE_RUNNERS_WORDS.itsRecoveryDidNotRunWhileTheGroupRan(THE_GROUP_WAIT_MS / 1_000)
+            : THE_RUNNERS_WORDS.itsRecoveryDidNotRunWhileTheGroupRan(groupWaitMs / 1_000)
       const outputs = declaration.outputs.map((/** @type {{ name: string, maxBytes: number }} */ one) => readAnOutput(output, one))
       const declared = new Set(declaration.outputs.map((/** @type {{ name: string }} */ one) => one.name))
       const undeclaredFiles = readdirSync(output).filter((name) => !declared.has(name)).length
@@ -1048,10 +1051,11 @@ function runOneJob(job, declaration, onDisk, jobFolder, graceMs, holding, starte
  * @param {number} groupId
  * @param {string | undefined} groupStartedAt
  * @param {number} graceMs
+ * @param {number} groupWaitMs
  * @param {import('../src/config/process-reader.mjs').ProcessReader} reads
  * @returns {Promise<{ said: string, gone: boolean }>}
  */
-async function theLostGroup(groupId, groupStartedAt, graceMs, reads) {
+async function theLostGroup(groupId, groupStartedAt, graceMs, groupWaitMs, reads) {
   if (groupStartedAt === undefined) return { said: THE_RUNNERS_WORDS.itsStartWasNotWrittenDown, gone: false }
   const now = theProcessAt(groupId, reads)
   if (!now.here) {
@@ -1068,9 +1072,9 @@ async function theLostGroup(groupId, groupStartedAt, graceMs, reads) {
   toTheGroup(groupId, 'SIGKILL')
   // KILL WAS JUST SENT, and a member may still be there for a moment. A group with a member left is not shown to
   // have stopped, so the recovery step is not run against what a process of the job may still be using.
-  const gone = await untilTheGroupHasGone(groupId)
+  const gone = await untilTheGroupHasGone(groupId, groupWaitMs)
   return {
-    said: gone ? THE_RUNNERS_WORDS.itsGroupWasEnded(graceMs) : THE_RUNNERS_WORDS.itsGroupStillHadAMember(THE_GROUP_WAIT_MS / 1_000),
+    said: gone ? THE_RUNNERS_WORDS.itsGroupWasEnded(graceMs) : THE_RUNNERS_WORDS.itsGroupStillHadAMember(groupWaitMs / 1_000),
     gone,
   }
 }
@@ -1116,10 +1120,10 @@ async function giveTheAnswer(office, heldFile, held) {
 }
 
 /**
- * ONE RUN OF THE RUNNER, to this machine's office only and holding the lock. `graceMs` is THE_GRACE_MS unless a test
- * shortens it, `reads` is this system's process reader and `runtimeFolders` THE_RUNTIME_FOLDERS unless a test hands in
- * its own.
- * @param {{ api: string, key: string, folder: string, toolsFile: string, graceMs?: number, recoveryMs?: number, stop?: AbortSignal, reads?: import('../src/config/process-reader.mjs').ProcessReader, runtimeFolders?: string }} at
+ * ONE RUN OF THE RUNNER, to this machine's office only and holding the lock. `graceMs` and `groupWaitMs` are
+ * THE_GRACE_MS and THE_GROUP_WAIT_MS unless a test shortens them, `reads` is this system's process reader and
+ * `runtimeFolders` THE_RUNTIME_FOLDERS unless a test hands in its own.
+ * @param {{ api: string, key: string, folder: string, toolsFile: string, graceMs?: number, groupWaitMs?: number, recoveryMs?: number, stop?: AbortSignal, reads?: import('../src/config/process-reader.mjs').ProcessReader, runtimeFolders?: string }} at
  * @returns {Promise<number>} The exit code.
  */
 export async function runOnce(at) {
@@ -1144,7 +1148,7 @@ export async function runOnce(at) {
 /**
  * `stop` and `quiet` are the office's runner's: it ends a running tool when it is asked to stop, and says nothing when
  * nothing is asked, since it asks every few seconds.
- * @param {{ api: string, key: string, folder: string, toolsFile: string, reads: import('../src/config/process-reader.mjs').ProcessReader, graceMs?: number, recoveryMs?: number, stop?: AbortSignal, quiet?: boolean, runtimeFolders?: string }} at
+ * @param {{ api: string, key: string, folder: string, toolsFile: string, reads: import('../src/config/process-reader.mjs').ProcessReader, graceMs?: number, groupWaitMs?: number, recoveryMs?: number, stop?: AbortSignal, quiet?: boolean, runtimeFolders?: string }} at
  * @returns {Promise<number>}
  */
 async function theRunHoldingTheLock(at) {
@@ -1154,6 +1158,7 @@ async function theRunHoldingTheLock(at) {
     const held = JSON.parse(readFileSync(heldFile, 'utf8'))
     if (held.answer === undefined) {
       const graceMs = at.graceMs ?? THE_GRACE_MS
+      const groupWaitMs = at.groupWaitMs ?? THE_GROUP_WAIT_MS
       /** @type {string} */
       let why
       /** Whether the job's processes were shown to have stopped before the recovery step is read. */
@@ -1175,13 +1180,13 @@ async function theRunHoldingTheLock(at) {
         } else {
           held.heldBy = HOST_JOB_HOLDINGS[1]
           held.howItWasHeld = THE_RUNNERS_WORDS.itsScopeWasNotStopped(unit, whatItDid('systemctl', did))
-          const byItsGroup = await theLostGroup(held.groupId, held.groupStartedAt, graceMs, at.reads)
+          const byItsGroup = await theLostGroup(held.groupId, held.groupStartedAt, graceMs, groupWaitMs, at.reads)
           what = THE_RUNNERS_WORDS.theLostScopeWasNotStopped(whatItDid('systemctl', did), byItsGroup.said)
           itsGroupStopped = byItsGroup.gone
         }
         why = THE_RUNNERS_WORDS.lostWhileTheToolRanInItsScope(unit, what)
       } else {
-        const byItsGroup = await theLostGroup(held.groupId, held.groupStartedAt, graceMs, at.reads)
+        const byItsGroup = await theLostGroup(held.groupId, held.groupStartedAt, graceMs, groupWaitMs, at.reads)
         why = THE_RUNNERS_WORDS.lostWhileTheToolRan(held.groupId, byItsGroup.said)
         itsGroupStopped = byItsGroup.gone
       }
@@ -1239,7 +1244,7 @@ async function theRunHoldingTheLock(at) {
   else if (at.stop?.aborted === true) held.answer = { state: 'could not start', why: THE_RUNNERS_WORDS.askedToStopAsItTook }
   else if (holding !== null) {
     mkdirSync(jobFolder, { mode: 0o700 })
-    held.answer = await runOneJob(job, declaration, starts, jobFolder, at.graceMs ?? THE_GRACE_MS, holding, (groupId) => {
+    held.answer = await runOneJob(job, declaration, starts, jobFolder, at.graceMs ?? THE_GRACE_MS, at.groupWaitMs ?? THE_GROUP_WAIT_MS, holding, (groupId) => {
       held.groupId = groupId
       // WHEN THE TOOL'S OWN PROCESS BEGAN is written with its group, so a runner after one that stopped can tell the
       // group from one given the same number later (theLostGroup). WHICH WAY HOLDS IT is written with them, so that
@@ -1257,9 +1262,10 @@ async function theRunHoldingTheLock(at) {
 
 /**
  * THE RUNNER THE OFFICE STARTS, for as long as the office runs, to this machine's office only and holding the lock the
- * whole time, so a run by hand or by a timer beside it refuses. `graceMs` and `pauseMs` are THE_GRACE_MS and
- * THE_PAUSE_MS unless a test shortens them, and `reads` is this system's process reader unless a test hands in its own.
- * @param {{ api: string, key: string, folder: string, toolsFile: string, officePid: number, graceMs?: number, pauseMs?: number, reads?: import('../src/config/process-reader.mjs').ProcessReader }} at
+ * whole time, so a run by hand or by a timer beside it refuses. `graceMs`, `groupWaitMs`, `pauseMs` and `watchMs` are
+ * THE_GRACE_MS, THE_GROUP_WAIT_MS, THE_PAUSE_MS and THE_WATCH_MS unless a test shortens them, and `reads` is this
+ * system's process reader unless a test hands in its own.
+ * @param {{ api: string, key: string, folder: string, toolsFile: string, officePid: number, graceMs?: number, groupWaitMs?: number, pauseMs?: number, watchMs?: number, reads?: import('../src/config/process-reader.mjs').ProcessReader }} at
  * @returns {Promise<number>} The exit code: 0 when it stopped as asked or with the office, 2 when it refused to start.
  */
 export async function runWithTheOffice(at) {
@@ -1293,6 +1299,7 @@ export async function runWithTheOffice(at) {
     return 2
   }
   const pauseMs = at.pauseMs ?? THE_PAUSE_MS
+  const watchMs = at.watchMs ?? THE_WATCH_MS
   const stopping = new AbortController()
   const stop = (/** @type {string} */ why) => {
     if (stopping.signal.aborted) return
@@ -1301,9 +1308,9 @@ export async function runWithTheOffice(at) {
   }
   const onTerm = () => stop(THE_RUNNERS_WORDS.askedToStop)
   process.on('SIGTERM', onTerm)
-  // THE OFFICE'S PROCESS IS LOOKED FOR EVERY SECOND, by its pid, when it began and its command line (whetherItStillRuns),
-  // so a runner whose office was ended outright stops too, and a process given the office's pid later does not keep it.
-  // A start that cannot be read later is not gone, and is said once.
+  // THE OFFICE'S PROCESS IS LOOKED FOR EVERY SECOND, or every `watchMs` a test gives, by its pid, when it began and its
+  // command line (whetherItStillRuns), so a runner whose office was ended outright stops too, and a process given the
+  // office's pid later does not keep it. A start that cannot be read later is not gone, and is said once.
   let saidItCannotTell = false
   const watch = setInterval(() => {
     const office = whetherItStillRuns(at.officePid, theOfficesStart, (line) => line === theOfficesCommandLine, reads)
@@ -1312,7 +1319,7 @@ export async function runWithTheOffice(at) {
       saidItCannotTell = true
       process.stderr.write(`${THE_RUNNERS_WORDS.theOfficesStartCannotBeReadNow(at.officePid)}\n`)
     }
-  }, 1_000)
+  }, watchMs)
   try {
     process.stdout.write(`${THE_RUNNERS_WORDS.itAsksEvery(pauseMs, at.officePid)}\n`)
     /** @type {string | null} */

@@ -236,18 +236,33 @@ describe('a durable agent written today gets its registry row at the door', () =
     expect(row('SELECT origin FROM assets WHERE id = ?', drawing)?.['origin']).toBe('default')
   })
 
-  it('refuses a runtime word nobody declared, and the refusal names every one it does declare', () => {
-    // WHAT THIS IS ABOUT. `AGENT_RUNTIMES` was declared, its comment said a new write was checked
-    // against it, and nothing in the repository imported it: `runtime: "a-runtime-nobody-declared"`
-    // was accepted and the registry row carried that string. Problem `3zYuz90LvTS5`. The worker in
-    // part 2d picks its adapter from this field, so a word nobody declared picks none.
+  it('takes a runtime word with no adapter, keeps it as written, and gives no adapter runtime for it', () => {
+    // WHAT THIS IS ABOUT. An agent of any harness registers: the agent kind takes any harness's word. The list of
+    // runtimes says only which harnesses the office can start a run in. So the record keeps the word, the
+    // registry's `runtime` says no adapter serves it, and `harness` gives the word as stored.
+    const made = t.api.createRecord({
+      workspaceId: 'panelx',
+      kind: 'agent',
+      title: 'Builder X',
+      data: { handle: 'builder-x', runtime: 'a-runtime-nobody-declared', state: 'active' },
+      actor: HUMAN,
+    })
+
+    expect(row("SELECT json_extract(data, '$.runtime') AS runtime FROM records WHERE id = ?", made.id)).toEqual({
+      runtime: 'a-runtime-nobody-declared',
+    })
+    expect(registry.agentForRecord(made.id)?.runtime).toBeNull()
+    expect(registry.agentForRecord(made.id)?.harness).toBe('a-runtime-nobody-declared')
+  })
+
+  it('refuses a blank runtime word, and writes nothing on either side of the door', () => {
     let said = ''
     try {
       t.api.createRecord({
         workspaceId: 'panelx',
         kind: 'agent',
         title: 'Builder X',
-        data: { handle: 'builder-x', runtime: 'a-runtime-nobody-declared', state: 'active' },
+        data: { handle: 'builder-x', runtime: '   ', state: 'active' },
         actor: HUMAN,
       })
     } catch (err) {
@@ -255,8 +270,6 @@ describe('a durable agent written today gets its registry row at the door', () =
     }
 
     expect(said, 'the write was allowed, and this test is about it being refused').not.toBe('')
-    for (const word of AGENT_RUNTIMES) expect(said).toContain(word)
-    // AND NOTHING WAS WRITTEN, on either side of the door.
     // NO ROW AT ALL, live or retired: `agentByHandle` sees only a live one since criterion I3.
     expect(row('SELECT count(*) AS n FROM agents WHERE handle = ?', 'builder-x')).toEqual({ n: 0 })
     expect(row("SELECT count(*) AS n FROM records WHERE kind = 'agent'")).toEqual({ n: 0 })

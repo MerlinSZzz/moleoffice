@@ -27,7 +27,7 @@ import { t } from '@shared/i18n.ts'
 import type { AWaitingNote } from '@shared/the-persons-own-words.ts'
 import { api, errorMessage, faultOf, getActor } from '../api.ts'
 import { recordPath, RouteLink } from '../components/router.tsx'
-import { Absence, Btn, ErrorNote, Explain, Loading, NumberInItsWord, Panel, Stamp, useAsync } from '../components/ui.tsx'
+import { Absence, Btn, ErrorNote, Hint, Loading, NumberInItsWord, Panel, Stamp, useAsync } from '../components/ui.tsx'
 import { useLanguage } from '../lib/language.ts'
 
 /** The most notes one reading asks for: the door refuses more. */
@@ -49,12 +49,7 @@ export function YourWordsPage({ onChanged }: { onChanged?: () => void }) {
       <header className="yw-head">
         {/* THE NAME, TYPED: the same words as the rail row that opens this page. */}
         <h1 className="yw-title" data-title-is="its-label">{t('nav.yourWords')}</h1>
-        {/* WHERE THE WORDS CAME FROM STAYS IN SIGHT, AND WHAT EACH PRESS STORES IS ONE PRESS DOWN. */}
-        <Explain declares={{ surface: null }} meaning={t('w13q.yourWords.what')} opens={t('w13q.yourWords.whatThePressesStore')}>
-          <p className="yw-intro">{t('w13q.yourWords.confirmDoes')}</p>
-          <p className="yw-intro">{t('w13q.yourWords.notWhatISaidDoes')}</p>
-          <p className="yw-intro">{t('w13q.yourWords.whereNotRecorded')}</p>
-        </Explain>
+        <Hint>{t('w13q.yourWords.what')}</Hint>
       </header>
       {state.status === 'loading' ? <Loading label={t('w13q.yourWords.loading')} rows={2} /> : null}
       {state.status === 'error' ? <ErrorNote message={state.message} fault={state.fault ?? null} retry={reload} /> : null}
@@ -92,7 +87,7 @@ export function TheWaitingWords({
   const [failedAll, setFailedAll] = useState<Failed | null>(null)
 
   if (total === 0 && notes.length === 0) {
-    return <Absence looked tier="told-apart" title={t('nav.yourWords')} word={t('w13q.yourWords.none')} />
+    return <Absence looked tier="told-apart" title={t('nav.yourWords')} />
   }
 
   const settle = (id: string, outcome: Outcome) => {
@@ -134,14 +129,10 @@ export function TheWaitingWords({
         <p className="yw-count" data-part="waiting-count">
           <NumberInItsWord word={(n) => t('w13q.yourWords.count', { n })} n={left} />
         </p>
-        {thePerson ? (
-          confirmable.length === 0 ? null : (
-            <Btn variant="primary" pending={busyAll} onClick={confirmAll}>
-              {t('w13q.yourWords.confirmAll', { n: confirmable.length })}
-            </Btn>
-          )
-        ) : (
-          <span className="yw-note">{t('w13q.yourWords.onlyThePerson')}</span>
+        {!thePerson || confirmable.length === 0 ? null : (
+          <Btn variant="primary" pending={busyAll} onClick={confirmAll}>
+            {t('w13q.yourWords.confirmAll', { n: confirmable.length })}
+          </Btn>
         )}
       </div>
       {failedAll === null ? null : <ErrorNote label={t('w13q.yourWords.notConfirmed')} message={failedAll.message} fault={failedAll.fault} />}
@@ -235,7 +226,7 @@ function OneNote({
                 {t('w13q.yourWords.confirmed')} <RouteLink to={recordPath(outcome.note.id)}>{outcome.note.title}</RouteLink>
               </>
             ) : (
-              t('w13q.yourWords.markedNotWhatISaid')
+              t('yourWordsPage.markedNotWhatISaid')
             )}
           </p>
         ) : thePerson ? (
@@ -258,9 +249,8 @@ function OneNote({
 
 export const YOUR_WORDS_CSS = `
 .yw { min-width: 0; }
-.yw-head { display: grid; gap: var(--pad); min-width: 0; margin: 0 0 var(--gut); }
+.yw-head { display: flex; align-items: baseline; gap: var(--pad); min-width: 0; margin: 0 0 var(--gut); }
 .yw-title { margin: 0; color: var(--text); font: 600 var(--fs-4)/var(--lh-tight) var(--font-ui); overflow-wrap: anywhere; }
-.yw-intro { margin: 0; max-width: 70ch; color: var(--text-2); font: var(--fs-2)/var(--lh-read) var(--font-ui); }
 .yw-body { display: grid; gap: var(--gut); min-width: 0; }
 .yw-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--pad) var(--gut); min-width: 0; }
 .yw-count { margin: 0; color: var(--text); font: var(--fs-3)/var(--lh-tight) var(--font-ui); }

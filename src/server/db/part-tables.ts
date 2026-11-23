@@ -9,7 +9,7 @@
  * and how to put it back, or it leaves the table out, with why. lib/export.ts and
  * scripts/restore-check.ts read those answers through `everyPartTable()` in every-part-table.ts, so a line that
  * adds a table changes neither file. The tables declared in schema.ts itself are not read here; their
- * lists at the foot of schema.ts, and in the two files, stay as they are. A moved table can say
+ * lists in table-name-lists.ts and authored-table-of.ts, and in the two files, stay as they are. A moved table can say
  * `existingArchive: true` when that exact table is already in the authored registry; its existing
  * pages, order, scope and fixed restore proof remain in charge, so it is not a generic part region.
  * Existing measured tables likewise keep their exclusion through `existingMeasured: true`.
@@ -140,7 +140,7 @@ export interface PartTable {
   readonly says: WhatAnArchiveAndARestoreDo
   /**
    * The SQL column that says which project a row is in, or null when the table belongs to no
-   * project. Read off a `workspaceId` column, by the rule `WORKSPACE_COLUMN` in schema.ts uses.
+   * project. Read off a `workspaceId` column, by the rule `WORKSPACE_COLUMN` in authored-table-of.ts uses.
    */
   readonly workspaceColumn: string | null
 }

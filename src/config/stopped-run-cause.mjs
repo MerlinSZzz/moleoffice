@@ -133,6 +133,32 @@ export function localStampOf(when) {
 }
 
 /**
+ * THE INSTANT A TIME NAMES, written as local wall-clock with its offset, or null when the words name no moment. The same
+ * shape as clockStamp's `instant` in src/shared/time.ts, and the same rule for what an instant is: seconds, then Z or an
+ * explicit offset, and a real calendar time. For the session hook, which runs under a Node that cannot read TypeScript.
+ * A transcript line's time is in UTC words, and a stored time is local wall-clock.
+ * @param {unknown} words
+ * @returns {string | null}
+ */
+export function theLocalInstantOf(words) {
+  if (typeof words !== 'string') return null
+  const m = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(\.\d{3})?(Z|([+-])(\d{2}):(\d{2}))$/.exec(words)
+  if (m === null) return null
+  const hours = Number(m[5] ?? 0)
+  const minutes = Number(m[6] ?? 0)
+  const stated = (m[4] === '-' ? -1 : 1) * (hours * 60 + minutes)
+  const ms = Date.parse(words)
+  if (hours > 23 || minutes > 59 || !Number.isFinite(ms)) return null
+  // Date.parse moves a day that does not exist into the next month, so the stated fields are checked as well.
+  if (new Date(ms + stated * 60_000).toISOString().slice(0, 19) !== m[1]) return null
+  const at = new Date(ms)
+  const east = -at.getTimezoneOffset()
+  const pad = (n) => String(n).padStart(2, '0')
+  const offset = `${east < 0 ? '-' : '+'}${pad(Math.floor(Math.abs(east) / 60))}:${pad(Math.abs(east) % 60)}`
+  return `${localStampOf(at).replace(' ', 'T')}.${String(at.getMilliseconds()).padStart(3, '0')}${offset}`
+}
+
+/**
  * THE LAST LINES OF A TRANSCRIPT, READ FROM THE END AND NEVER WHOLE.
  *
  * It seeks to within `maxBytes` of the file's end and reads forward. When it started in the middle
@@ -382,6 +408,9 @@ export function theStopCauseInAClaudeResult(result) {
  *
  * A transcript with no file, no error line among its last lines, or an error line that names no
  * cause answers null. That is the absence the caller writes down, never a cause invented here.
+ *
+ * The cause's `at` is the line's own time written by `theLocalInstantOf`, or null when it carries
+ * none that names a moment.
  */
 export function theStopCauseInTheTranscript(logPath) {
   const lines = theLastLinesOf(logPath)
@@ -396,7 +425,7 @@ export function theStopCauseInTheTranscript(logPath) {
     if (!itIsAnErrorLine(record)) continue
     const cause = theCauseIn(record)
     if (cause === null) continue
-    return { ...cause, at: typeof record.timestamp === 'string' ? record.timestamp : null }
+    return { ...cause, at: theLocalInstantOf(record.timestamp) }
   }
   return null
 }
@@ -430,7 +459,7 @@ export function theStopCauseAtTheEndOfTheTranscript(logPath) {
     if (!itIsAnErrorLine(record)) return null
     const cause = theCauseIn(record)
     if (cause === null) return null
-    return { ...cause, at: typeof record.timestamp === 'string' ? record.timestamp : null }
+    return { ...cause, at: theLocalInstantOf(record.timestamp) }
   }
   return null
 }

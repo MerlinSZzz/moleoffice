@@ -71,7 +71,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { THE_PERSON } from '../src/shared/person.ts'
 import type { TheOfficeOwner } from '../src/shared/owner.ts'
 import { links, records } from '../src/server/db/schema.ts'
-import { apiApp, freshDb, type TestDb } from './helpers.ts'
+import { apiApp, freshDb, type TestDb, governsTheWholeProject } from './helpers.ts'
 import { THE_TEST_OFFICES_OWNER } from './every-test-process-is-given-the-test-offices-owner.ts'
 
 let t: TestDb
@@ -205,7 +205,8 @@ describe('and the browser really gets through the door', () => {
       body: JSON.stringify({
         kind: 'decision',
         title: 'The owner is still the owner in their own browser',
-        data: { replaces: [], because: 'the name the browser sends and the name the server holds are one fact' },
+        data: {
+          ...governsTheWholeProject(), replaces: [], because: 'the name the browser sends and the name the server holds are one fact' },
       }),
     })
     const body = (await res.json()) as { error?: string }
@@ -223,7 +224,7 @@ describe('and the browser really gets through the door', () => {
       body: JSON.stringify({
         kind: 'decision',
         title: 'A decision in a name Mole Office cannot place',
-        data: { replaces: [], because: 'this must not be written' },
+        data: { ...governsTheWholeProject(), replaces: [], because: 'this must not be written' },
       }),
     })
     const body = (await res.json()) as { error?: string }

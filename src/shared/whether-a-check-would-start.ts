@@ -44,6 +44,13 @@ export function checksAreOnForOtherProjects(projects: readonly string[], project
   return `the message worker runs in merges-only mode, and checks in that mode are on for ${named} only, not for ${project}.`
 }
 
+/** The office deliberately switched checks off for this project in merges-only mode. */
+export function whetherAnOfficesChecksAreSwitchedOff(mode: AMessageWorkerMode, theSwitch: () => TheChecksSwitch, project: string): boolean {
+  if (mode !== 'merges-only') return false
+  const checks = theSwitch()
+  return !checks.nobodyChose && (!checks.on || (checks.projects !== null && !checks.projects.includes(project)))
+}
+
 /**
  * Whether an office in `mode`, with the checks switch as `theSwitch` reads it, would start a check queued in `project`.
  * The switch is read only in merges-only mode, the one mode it decides anything in.

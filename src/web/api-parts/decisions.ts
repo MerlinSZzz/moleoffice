@@ -8,7 +8,7 @@ import type { WhichDecisionsGovern } from '../../server/lib/governs.ts'
 
 export const decisionsDoors = {
   /**
-   * WHICH DECISIONS GOVERN A PATH OR A MODULE, FLOW OR PIPELINE, newest first, with the replaced ones
+   * WHICH DECISIONS GOVERN A PATH OR A PAGE, newest first, with the replaced ones
    * marked. A read of the project on screen.
    */
   decisionsGoverning: (asked: { path: string } | { record: string }) =>

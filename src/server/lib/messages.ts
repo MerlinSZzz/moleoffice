@@ -42,7 +42,7 @@ import { holdNoticeDeliveries } from '../../holder/notice-batches.ts'
 
 import { projectsOfAgents } from '../db/projects-of-agents.ts'
 import { isAHandOverSentence, isAMessageReadSentence } from '@shared/handles.ts'
-import { and, desc, eq, gt, gte, inArray, isNotNull, isNull, ne, or, sql, type SQL } from 'drizzle-orm'
+import { and, desc, eq, gt, gte, inArray, isNotNull, isNull, ne, or, sql, type SQL, type SQLWrapper } from 'drizzle-orm'
 import { union } from 'drizzle-orm/sqlite-core'
 import { anOfficeId } from './ids.ts'
 import { PAIR_SEPARATOR, pairFrom, pairKey } from './message-pairs.ts'
@@ -52,7 +52,7 @@ import { isOneOfTheIds, theFiledAliasesReadOnce, type TheFiledAliases } from './
 import { theRegistryIdsOf } from './registry-aliases/stamps.ts'
 import { piecesOf, readInPieces } from '../db/in-pieces.ts'
 import { ONE_KIND_WRITTEN_OUT, STORED_FIELDS, agentRecords, theKindOfARowFoundById, theProjectOfARowFoundById, conversationReads, groupMembers, handleHolds, messageDelivery, records } from '../db/schema.ts'
-import { localStamp, nowStamp, parseStoredStamp } from '@shared/time.ts'
+import { anInstantNamesItsStamp, localStamp, momentOfAStampAndItsInstant, nowStamp, parseStoredStamp } from '@shared/time.ts'
 import { theSummaryFactsOf, theSweepFactsOf } from '@shared/dead-letter-lines.ts'
 import {
   declaredRuntimeOrNull,
@@ -140,7 +140,7 @@ import {
   type Mentionable,
 } from '@shared/groups.ts'
 import type { ContactToPlace } from './contacts.ts'
-import { asAgentIdentity, type AgentIdentity, type TheIdentityOf } from './agent-references.ts'
+import { asAgentIdentity, everyAgentsIdentityWithReferencesReadOnce, type AgentIdentity, type TheIdentityOf } from './agent-references.ts'
 import { theRegistryRowsNamedBy } from '../db/registry-aliases/index.ts'
 // READ INSIDE A FUNCTION BODY AND NEVER WHILE THIS MODULE IS BEING EVALUATED. lib/groups.ts imports
 // lib/records.ts, which imports this file, so the three are a cycle — the same safe shape the
@@ -211,6 +211,7 @@ import { itIsNotSentYet } from './message-pool-at-or-after.ts'
 import { nobodyHasBeenHandedIt } from './message-pool-at-or-after.ts'
 import { TALK_COLUMNS, talkEntriesOf } from './message-pool-at-or-after.ts'
 import { theStoredKindsReadAs } from '../db/their-own-messages.ts'
+import type { TheirOwnMessages, AMessageReader } from '../db/types/messages.ts'
 
 /**
  * WHAT THE CONTACTS AND CONVERSATION LIBRARY NEEDS TO KNOW ABOUT ONE REGISTERED PARTICIPANT.
@@ -710,8 +711,9 @@ export type AMessageToSort = Pick<MessageOnTheWire, 'id' | 'sentBy' | 'from' | '
 
 /**
  * THE FIELDS OF ONE ROW THAT THE SORT INTO CONVERSATIONS READS, made here and nowhere else (invariant 9). `asMessage`
- * places them in the whole entry, and the queue's read builds nothing more (`everyMessageOfTheProjectsForTheQueue`), so
- * the two cannot come to read one row two ways. `routed` is `routedOf(data)`, which `asMessage` also hands over whole.
+ * places them in the whole entry, the queue's read builds nothing more (`everyMessageOfTheProjectsForTheQueue`), and
+ * the contact read places all of them but the body in its narrow entry (`contactEntriesOf`). So no two of them can come
+ * to read one row two ways. `routed` is `routedOf(data)`, which `asMessage` also hands over whole.
  */
 function theFieldsTheSortReads(
   row: Pick<MessageRow, 'id' | 'workspaceId'>,
@@ -743,9 +745,34 @@ function theFieldsTheSortReads(
   return fields
 }
 
+/**
+ * THE PROJECT A MESSAGE IS MARKED ABOUT, or null because it is marked about none. The whole entry (`asMessage`) and the
+ * contact read's narrow entry (`contactEntriesOf`) both read it here, so the two cannot read one row two ways.
+ */
+function aboutProjectOf(data: Record<string, unknown>): string | null {
+  return typeof data['aboutProject'] === 'string' && data['aboutProject'] !== '' ? data['aboutProject'] : null
+}
+
 export { theRecipientsOf } from './message-pool-at-or-after.ts'
 
 export { itIsNotSentYet } from './message-pool-at-or-after.ts'
+
+/**
+ * THE MOMENT A MESSAGE WAS WRITTEN, as milliseconds, or null when nobody can tell, with the stored words it was read
+ * from. The one reading that both the message's `wordsMayChangeUntil` and the record door's edit window
+ * (`whatAChangeToAMessageMustCarry` in ./records/patching.ts) ask, so the two cannot disagree.
+ *
+ * The stamp is read with the moment the record door kept beside it (`data.writtenTime`), by the rule of
+ * `momentOfAStampAndItsInstant` in src/shared/time.ts. On the night the clocks go back the stamp alone reads the second
+ * pass of the hour from 01:00 as the first, so a message written at 01:10 winter time could be changed until an hour
+ * before it was written. A moment that names its stamp and cannot be read is null, as a stamp that cannot be read is. A
+ * message written before the door kept its moment, or whose stamp was changed alone, is read from its stamp, as before,
+ * and its stamp is the words it was read from.
+ */
+export function theMomentAMessageWasWritten(createdAt: string, data: unknown): { ms: number | null; readFrom: unknown } {
+  const instant = data !== null && typeof data === 'object' ? ((data as Record<string, unknown>)['writtenTime'] as { instant?: unknown } | null | undefined)?.instant : undefined
+  return { ms: momentOfAStampAndItsInstant(createdAt, instant, parseStoredStamp), readFrom: anInstantNamesItsStamp(createdAt, instant) ? instant : createdAt }
+}
 
 /**
  * UNTIL WHEN A MESSAGE'S WRITER MAY CHANGE ITS WORDS: the time it was written and the edit window, the two facts the
@@ -753,11 +780,17 @@ export { itIsNotSentYet } from './message-pool-at-or-after.ts'
  * comment nobody has been handed has no window, and `asMessage` sends null for it. Null here when nobody may: Mole Office's lines are
  * changed by nobody, a writer nobody could name has nobody to ask, and a stored time Mole Office did not write cannot
  * be added to. AN ISO TIME WITH ITS ZONE, not the stored stamp form, so a browser on another computer in another zone
- * reads the same moment.
+ * reads the same moment. When it was written is read by `theMomentAMessageWasWritten`.
  */
-function theWordsMayChangeUntil(createdAt: string, sentBy: ParticipantRef | null, editWindowSeconds: number, officeTest: (who: ParticipantRef) => boolean): string | null {
+function theWordsMayChangeUntil(
+  createdAt: string,
+  data: unknown,
+  sentBy: ParticipantRef | null,
+  editWindowSeconds: number,
+  officeTest: (who: ParticipantRef) => boolean,
+): string | null {
   if (sentBy === null || officeTest(sentBy)) return null
-  const written = parseStoredStamp(createdAt)
+  const written = theMomentAMessageWasWritten(createdAt, data).ms
   if (written === null) return null
   return new Date(written + editWindowSeconds * 1000).toISOString()
 }
@@ -827,7 +860,7 @@ function asMessage(
     writtenFrom: writtenFromOf(data),
     // WHERE IT WAS WRITTEN, AND THE PROJECT IT IS ABOUT, through the one shared reader.
     writtenIn: writtenInOf(data),
-    aboutProject: typeof data['aboutProject'] === 'string' && data['aboutProject'] !== '' ? data['aboutProject'] : null,
+    aboutProject: aboutProjectOf(data),
     // SENT AS AN EMERGENCY, and the one viewer it was narrowed to. Criterion M62.
     urgent: isUrgent(data),
     onlyOn: onlyOnOf(data),
@@ -849,7 +882,7 @@ function asMessage(
     sendId: typeof data['sendId'] === 'string' && data['sendId'] !== '' ? data['sendId'] : null,
     // WHETHER ITS WORDS WERE CHANGED, AND UNTIL WHEN THEY STILL MAY BE, at point 2.
     edited: editedOf(data),
-    wordsMayChangeUntil: notSentYet ? null : theWordsMayChangeUntil(row.createdAt, sentBy, said.editWindowSeconds, officeTest),
+    wordsMayChangeUntil: notSentYet ? null : theWordsMayChangeUntil(row.createdAt, data, sentBy, said.editWindowSeconds, officeTest),
     // THE PICTURES IT CARRIES, criterion M64, or an empty list because it carries none. Read through
     // the one shared reader, for the reason `writtenFrom` above is: the server and the browser
     // cannot come to disagree about what a stored row holds.
@@ -2365,17 +2398,7 @@ export { theirTalksPool } from './their-talks-pool.ts'
 
 export { theMessagesOf } from '../db/their-own-messages.ts'
 
-/**
- * THE MESSAGES ONE PARTICIPANT SENT OR WAS HANDED, READ ONCE (round 76 of wave 13y): the rowids `theMessagesOf` names
- * for them, as a JSON list, read once by whoever reads every project and handed to each project's read to narrow by
- * (`onlyTheirs`). Read inside each statement, the list was read again for each project and each read. On a made-up office
- * that cost the made-up agent with the most messages (22,951 of them) about 8.5 ms a time, and one start=latest of the
- * talk about 290 ms. Since round 78 the talk door reads it once for its whole answer (`theReaderOfTheTalk` in
- * src/server/lib/pixel-office.ts); until then its messages and its withdrawals each read it.
- */
-export interface TheirOwnMessages {
-  readonly rowids: string
-}
+export type { TheirOwnMessages, AMessageReader } from '../db/types/messages.ts'
 
 export { theirOwnMessages } from '../db/their-own-messages.ts'
 
@@ -3895,7 +3918,8 @@ function theMessagesChosenFor(
   which: WhichProjects,
   groupLinesFrom: ParticipantRef | null,
 ): PoolEntry[] {
-  return theMessagesChosenAndTheirRows(me, everyone, which, groupLinesFrom).entries
+  const read = theRowsChosenFor(me, everyone, which, groupLinesFrom)
+  return entriesOf(read.rows, which, read.deliveries)
 }
 
 /**
@@ -3907,17 +3931,6 @@ interface MessagesJustRead {
   deliveries: Map<string, DeliveryOnTheWire[]>
 }
 
-/** `theMessagesChosenFor`, with the rows and delivery rows its entries were built from. */
-function theMessagesChosenAndTheirRows(
-  me: ParticipantRef,
-  everyone: readonly KnownParticipant[],
-  which: WhichProjects,
-  groupLinesFrom: ParticipantRef | null,
-): { entries: PoolEntry[]; read: MessagesJustRead } {
-  const read = theRowsChosenFor(me, everyone, which, groupLinesFrom)
-  return { entries: entriesOf(read.rows, which, read.deliveries), read }
-}
-
 /** The rows of the messages `theMessagesChosenFor` keeps, oldest first, and their delivery rows by message id. */
 function theRowsChosenFor(
   me: ParticipantRef,
@@ -3927,16 +3940,34 @@ function theRowsChosenFor(
 ): MessagesJustRead {
   // EVERY MESSAGE CHOSEN IS ALREADY LIVE, because each read in `theIdsChosenFor` asks for live messages
   // only. So the rows are read by their ids alone, which SQLite looks up one by one.
-  const rows = db
+  //
+  // THE STATEMENT IS DRIZZLE'S OWN, TAKEN WITH `toSQL()`, and run straight through better-sqlite3. Its text and its
+  // values come from the same query drizzle would run, so the two cannot drift apart. Each row is built here, because
+  // drizzle's mapping of every value of every row is work the list does not need. Every value is the one drizzle gives:
+  // the text columns as stored, and `data` through the column's own decoder, which throws on text that is not JSON as
+  // drizzle's read throws, and NULL stays null as drizzle leaves it.
+  const { sql: statement, params } = db
     .select(MESSAGE_COLUMNS)
     .from(records)
     .where(inArray(records.id, theIdsChosenFor(me, everyone, which, groupLinesFrom)))
     .orderBy(records.createdAt, sql`rowid`)
-    .all() as MessageRow[]
+    .toSQL()
+  const stored = sqlite.prepare(statement).all(...params) as { id: string; workspace_id: string; kind: string; title: string; data: string | null; created_at: string }[]
+  const rows: MessageRow[] = stored.map((row) => ({
+    id: row.id,
+    workspaceId: row.workspace_id,
+    kind: row.kind,
+    title: row.title,
+    data: row.data === null ? null : records.data.mapFromDriverValue(row.data),
+    createdAt: row.created_at,
+  }))
   return { rows, deliveries: deliveriesOfMany(rows.map((row) => row.id)) }
 }
 
-/** Rows of messages built as entries, each with its delivery rows, by `asEntry`. */
+/**
+ * Rows of messages built as whole entries, each with its delivery rows, by `asEntry`. `whatTheProjectSays` is asked
+ * about these rows alone, and every answer it gives one message comes from that message's own fields.
+ */
 function entriesOf(
   rows: readonly MessageRow[],
   which: WhichProjects,
@@ -3946,6 +3977,62 @@ function entriesOf(
 ): PoolEntry[] {
   const said = whatTheProjectSays(which, rows, shared)
   return rows.map((row) => asEntry(row, deliveries.get(row.id) ?? [], said, officeTest))
+}
+
+/**
+ * A MESSAGE AS THE CONTACT READ READS IT: the fields its rows, its counts and the reader's rule ask of a pool entry, and
+ * nothing else. The fields are named here and nowhere else.
+ *
+ *   - `id` and `entry`: the reader's rule (`onlyTheMessagesThisReaderMayRead`). `id` also keys the pair a notice
+ *     names (`thePartiesOfEveryPair`), and finds the row each last line is built whole from.
+ *   - `sentBy` and `from`: who wrote it, read by `theWritersOfOnePool`, and whether Mole Office wrote it
+ *     (`isASystemLine`, criterion M33).
+ *   - `to`, `toGroup` and `aboutMessage`: which conversation it is in (`everyoneElseThisMessageIsBetween`,
+ *     `thePartiesOfEveryPair`, criterion M128), and which group's count it is in (`messagesInAGroup`).
+ *   - `deliveries`: whether it is unread (`isUnseenBy`, criteria M19 and M32).
+ *   - `writtenIn` and `aboutProject`: a conversation's projects (`theProjectsOfAConversation`).
+ *
+ * A routed entry also carries the writer's own list beside these fields, as the whole entry does, because
+ * `thePartiesOfEveryPair` reads it. It is kept under a symbol, so it is not in the JSON a door serves.
+ */
+export type AMessageTheContactsRead = Pick<
+  PoolEntry,
+  'id' | 'entry' | 'sentBy' | 'from' | 'to' | 'toGroup' | 'aboutMessage' | 'deliveries' | 'writtenIn' | 'aboutProject'
+>
+
+/**
+ * THE ROWS THE CONTACT READ HAS JUST READ, BUILT AS IT READS THEM: one `AMessageTheContactsRead` for each row, in the
+ * rows' order, with its delivery rows.
+ *
+ * EACH FIELD IS MADE BY WHAT MAKES IT IN THE WHOLE ENTRY: `theFieldsTheSortReads`, `writtenInOf` and `aboutProjectOf`,
+ * with the delivery rows as they are. So this entry and the whole entry `asEntry` builds from the same row cannot come
+ * to disagree about a field.
+ *
+ * ONLY MESSAGES. Each select in `theIdsChosenFor` names the kind, so every row the contact read chooses is a message. A
+ * row of another kind says that a read changed under this one, so it is thrown and the read answers nothing.
+ */
+function contactEntriesOf(read: MessagesJustRead): AMessageTheContactsRead[] {
+  return read.rows.map((row) => {
+    if (row.kind !== 'message') throw new Error(`The contact read reads messages only, and record ${row.id} is not a message.`)
+    const data = (row.data ?? {}) as Record<string, unknown>
+    const deliveries = read.deliveries.get(row.id) ?? []
+    const sorted = theFieldsTheSortReads(row, data, deliveries, routedOf(data))
+    const entry: AMessageTheContactsRead = {
+      id: sorted.id,
+      entry: 'message',
+      sentBy: sorted.sentBy,
+      from: sorted.from,
+      to: sorted.to,
+      toGroup: sorted.toGroup,
+      aboutMessage: sorted.aboutMessage,
+      deliveries,
+      writtenIn: writtenInOf(data),
+      aboutProject: aboutProjectOf(data),
+    }
+    const addressed = (sorted as EntryWithTheWriterAddressed)[THE_WRITER_ADDRESSED]
+    if (addressed !== undefined) (entry as EntryWithTheWriterAddressed)[THE_WRITER_ADDRESSED] = addressed
+    return entry
+  })
 }
 
 /**
@@ -3972,10 +4059,22 @@ function theIdsChosenFor(
   everyone: readonly KnownParticipant[],
   which: WhichProjects,
   groupLinesFrom: ParticipantRef | null,
+  // ONLY THE MESSAGES AN AGENT SENT, and the notices about them, for the list between agents (wave 13y round 175).
+  // That list keeps no other row, and every read of one agent took every routed message in the office, each sent by
+  // the person, with every notice about them: about 2,200 rows dropped in each of 100 reads on a made-up office of
+  // the live shape. A notice about a message no agent sent is left out only when this reader neither sent it nor was
+  // handed it, and then it is in no pair of this reader's: its message is not among the rows, so the notice is drawn
+  // only between the ones it reached, and paired only as its sender with each of them.
+  onlyFromAnAgent = false,
 ) {
   // THE KIND IS WRITTEN OUT AND NOT PASSED AS A VALUE, because SQLite uses an index that holds only
   // messages only for a query that names the kind in the same words.
   const live = and(messagesInTheViewOf(which), ONE_KIND_WRITTEN_OUT.message, isNull(records.deletedAt))
+  // Read from valid JSON only, as `STORED_FIELDS` reads a field, since a row found through its delivery row was found
+  // through no index on its data.
+  const fromAnAgent = onlyFromAnAgent
+    ? sql`(CASE WHEN json_valid(${records.data}) THEN json_extract(${records.data}, '$.sentBy.kind') END) = 'agent'`
+    : undefined
   // A PERSON'S STORED SENDER IS READ BY ID ONLY; an agent's by id, by handle, and by its own record in the reading
   // project when the list carries one (wave 13y round 90), the three ways `theAgentAStoredSenderNames` reads it.
   const names = theIdsAMessageMayStoreFor(me, everyone)
@@ -3993,7 +4092,7 @@ function theIdsChosenFor(
   const routed = and(eq(STORED_FIELDS.messageRoutedType(records.data), 'array'), sql`json_array_length(${records.data}, '$.routed') > 0`)
   /** The live messages that concern this reader: one of the first four things the header names. */
   const concerning = () => {
-    const one = (condition: SQL | undefined) => db.select({ id: records.id }).from(records).where(and(live, condition))
+    const one = (condition: SQL | undefined) => db.select({ id: records.id }).from(records).where(and(live, condition, fromAnAgent))
     // THE MESSAGES HANDED TO THIS READER ARE READ FROM THEIR DELIVERY ROWS, so SQLite starts from the
     // index on the recipient and looks each message up by its id. A cross join is how SQLite is told
     // to start from the table named first; with an inner join it read every message instead.
@@ -4003,7 +4102,7 @@ function theIdsChosenFor(
       .select({ id: records.id })
       .from(messageDelivery)
       .crossJoin(records)
-      .where(and(eq(messageDelivery.recipientKind, me.kind), inArray(messageDelivery.recipientId, names), eq(records.id, messageDelivery.messageId), live))
+      .where(and(eq(messageDelivery.recipientKind, me.kind), inArray(messageDelivery.recipientId, names), eq(records.id, messageDelivery.messageId), live, fromAnAgent))
     return union(handed, one(typedFrom), one(routed), ...storedAsMe.map(one))
   }
   // A NOTICE ABOUT ONE OF THEM. SQLite reads every message that holds an `aboutMessage`, through its
@@ -4073,14 +4172,17 @@ export function conversationWithUnregistered(
  * EXACTLY ONE OF `who` AND `unregistered` IS SET. A contact is either somebody in a registry or a
  * writer nobody registered, and the two are different shapes so no reader can treat the second as
  * the first. Criterion M25.
+ *
+ * `Last` is the shape of the last line. Every row handed out has a whole entry there. Only inside the
+ * contact read (`theContactsOfOneReader`) is it the narrow entry, until that read builds it whole.
  */
-export interface ContactLine {
+export interface ContactLine<Last extends AMessageTheContactsRead = PoolEntry> {
   /** The registered participant this row is, or null when nobody registered the writer. */
   who: ParticipantRef | null
   /** The writer nobody registered, or null when this row is a registered participant. */
   unregistered: UnregisteredWriter | null
   /** The newest message either way, or null when nothing has been said. */
-  last: PoolEntry | null
+  last: Last | null
   /**
    * How many messages from them this reader has not marked seen. A line Mole Office wrote is not one
    * of them, criterion M33: it shows without counting.
@@ -4118,7 +4220,7 @@ export interface ContactLine {
 }
 
 /** The one key that names a contact row, whether a registry holds it or not. */
-export function contactKey(line: ContactLine): string {
+export function contactKey(line: Pick<ContactLine, 'who' | 'unregistered'>): string {
   return line.who !== null ? participantKey(line.who) : unregisteredKey(line.unregistered ?? { typed: null, said: null })
 }
 
@@ -4242,12 +4344,12 @@ export function theNarrowingsByWho(
  * Everybody, with the own record of each agent these messages store as their sender or as a recipient: a delivery row
  * may hold an agent's own record as well (wave 13y round 91).
  */
-function withTheRecordsTheseMessagesStore(everyone: KnownParticipant[], messages: readonly PoolEntry[], workspaceId: string): KnownParticipant[] {
+function withTheRecordsTheseMessagesStore(everyone: KnownParticipant[], messages: readonly AMessageTheContactsRead[], workspaceId: string): KnownParticipant[] {
   return withTheRecordsOfTheseIds(everyone, theAgentIdsTheseMessagesStore(messages), workspaceId)
 }
 
 /** Every agent id these messages store, as their sender or as a recipient. */
-function theAgentIdsTheseMessagesStore(messages: readonly PoolEntry[]): Set<string> {
+function theAgentIdsTheseMessagesStore(messages: readonly AMessageTheContactsRead[]): Set<string> {
   const ids = new Set<string>()
   for (const one of messages) {
     if (one.sentBy !== null && one.sentBy.kind === 'agent') ids.add(one.sentBy.id)
@@ -4327,7 +4429,7 @@ function theContactToPlace(line: ContactLine, readAgent: (id: string) => Registe
  */
 function whoThisRowIsFoldedUnder(
   who: ParticipantRef,
-  last: PoolEntry | null,
+  last: AMessageTheContactsRead | null,
   agents: ReadonlyMap<string, RegisteredAgent>,
 ): ParticipantRef | null {
   if (who.kind !== 'agent') return null
@@ -4365,7 +4467,7 @@ function whoThisRowIsFoldedUnder(
  */
 function theWritersOfOnePool(everyone: readonly KnownParticipant[]): {
   senderOf: (one: Pick<MessageOnTheWire, 'sentBy' | 'from'>) => ParticipantRef | null
-  unregisteredWriterOf: (one: MessageOnTheWire) => UnregisteredWriter | null
+  unregisteredWriterOf: (one: Pick<MessageOnTheWire, 'sentBy' | 'from'>) => UnregisteredWriter | null
   recipientsOf: (one: Pick<MessageOnTheWire, 'to'>) => readonly ParticipantRef[]
   participantOf: (who: ParticipantRef) => ParticipantRef
 } {
@@ -4405,29 +4507,31 @@ function theWritersOfOnePool(everyone: readonly KnownParticipant[]): {
   }
 }
 
-export function contactsFor(
+export function contactsFor<Entry extends AMessageTheContactsRead = PoolEntry>(
   me: ParticipantRef,
   everyone: readonly KnownParticipant[],
   which: WhichProjects,
-  // THE POOL, READ ONCE BY A CALLER THAT ALSO WANTS IT FOR SOMETHING ELSE. Same shape as
-  // `conversationBetween`'s `pool` above: a caller that already read the pool for this same width
-  // hands it in, and one that has not gets it read here, exactly as before. `GET
-  // /api/messages/contacts` is such a caller.
-  // IT NEED NOT BE THE WHOLE POOL. That door hands in only the reader's part of it,
-  // `theMessagesOfOneReader`, and the answer is the same: any list holding every message of that
+  // THE POOL, READ ONCE BY A CALLER THAT ALSO WANTS IT FOR SOMETHING ELSE. A caller that already
+  // read the pool for this same width hands it in, and one that has not gets it read here, whole,
+  // exactly as before. The contact read (`theContactsOfOneReader`) is such a caller.
+  // IT NEED NOT BE THE WHOLE POOL. That read hands in only the reader's part of it, the messages
+  // `theMessagesOfOneReader` reads, and the answer is the same: any list holding every message of that
   // part, in the pool's order, gives the same answer.
-  pool: readonly PoolEntry[] = poolOf(which),
+  // NOR NEED ITS ENTRIES BE WHOLE. Every field read here is one of `AMessageTheContactsRead`, and each
+  // row's `last` is the very entry handed in, so the rows are the same whichever shape the pool has.
+  pool: readonly (Entry | PoolEntry)[] = poolOf(which),
   // EVERY AGENT'S REGISTRY ROW, READ ONCE. The folding below reads a row per agent contact, and a
   // caller that also places the rows (`asContactsToPlace`) hands in the one it read for that.
   agents: ReadonlyMap<string, RegisteredAgent> = everyAgentById(),
-): ContactLine[] {
+): ContactLine<Entry | PoolEntry>[] {
+  type One = Entry | PoolEntry
   // A RETIRED AGENT IS A CONTACT AGAIN, IN ITS OWN GROUP. Criterion M114 said it was not drawn;
   // criterion M121 replaces that: every group can be folded away, and the retired agents' group is folded by
   // default. So it stays a contact, `asAContactToPlace` puts it in the `retired` group,
   // and the panel folds that group away until somebody opens it. Its conversation is still readable
   // by address, whichever group draws it.
 
-  const out: { line: ContactLine; at: number }[] = []
+  const out: { line: ContactLine<One>; at: number }[] = []
   // CRITERION M128: the pair each message was between, built once for the whole list, so a notice
   // naming a message makes this contact's row its newest line without a second read of the pool.
   const aboutParties = thePartiesOfEveryPair(pool)
@@ -4439,7 +4543,7 @@ export function contactsFor(
   // contact whether it is between the two: the pool times the contacts was 4 to 7 seconds a call on
   // a copy of the person's office on 25 September 2026 (problem zo_hyUBLSAVJ). `at` is where the last of
   // them sits in the pool.
-  const withEach = new Map<string, { between: PoolEntry[]; at: number }>()
+  const withEach = new Map<string, { between: One[]; at: number }>()
   for (const [i, one] of pool.entries()) {
     const sides = new Set<string>()
     const recipients = one.toGroup !== null ? [] : writers.recipientsOf(one)
@@ -4465,8 +4569,8 @@ export function contactsFor(
     // Other readers and offices with no original announcement have no such contact.
     if (officeTest(who) && !ownerHasUpgradeConversation) continue
     const held = withEach.get(participantKey(who))
-    const between: readonly PoolEntry[] = held?.between ?? []
-    const last: PoolEntry | null = between[between.length - 1] ?? null
+    const between: readonly One[] = held?.between ?? []
+    const last: One | null = between[between.length - 1] ?? null
     // WHERE THE LAST MESSAGE SITS IN THE POOL, not the stamp on it. Stamps here are whole seconds,
     // so two messages written in the same second tie, and a tie would put the conversations in an
     // order that changes for no reason a reader could see. The pool is read oldest first, so a
@@ -4515,7 +4619,7 @@ export function contactsFor(
    *
    * A MESSAGE THIS READER SENT IS NOT ONE OF THESE. Its writer is the reader, who is registered.
    */
-  const byWriter = new Map<string, { line: ContactLine; at: number }>()
+  const byWriter = new Map<string, { line: ContactLine<One>; at: number }>()
   for (const [i, one] of pool.entries()) {
     if (one.toGroup !== null) continue
     if (!one.to.some((to) => sameParticipant(to, me))) continue
@@ -4545,12 +4649,24 @@ export function contactsFor(
 }
 
 /**
- * ONE READER'S CONTACT ROWS, IN EVERY PROJECT, READ THE ONE WAY BOTH DOORS THAT DRAW THEM READ THEM.
+ * ONE READER'S CONTACT ROWS, IN EVERY PROJECT, READ THE ONE WAY EVERY DOOR THAT DRAWS THEM READS THEM.
  *
- * `GET /api/messages/contacts` and the Embassy's contact column both ask this, so the two cannot
- * read the contacts two ways. Only the reader's part of the pool is read (`theMessagesOfOneReader`),
- * which gives the same rows as the whole pool, and every agent's registry row is read once. The pool
- * and the registry rows are handed back too, for a caller that needs them for something else.
+ * `GET /api/messages/contacts`, `GET /api/messages/contact-list`, `GET /api/messages/circle` and the Embassy's contact
+ * column all ask this, so they cannot read the contacts two ways. Only the reader's part of the pool is read, the rows
+ * `theMessagesOfOneReader` builds from, which gives the same rows as the whole pool, and every agent's registry row is
+ * read once. The pool and the registry rows are handed back too, for a caller that needs them for something else.
+ *
+ * THE POOL IS BUILT NARROW, AND ONLY EACH ROW'S LAST LINE IS BUILT WHOLE. The rows, their counts and the reader's rule
+ * read ten fields of each message (`AMessageTheContactsRead`), and a door hands out only each row's last line, whole.
+ * A whole entry has about forty fields, and it needs `whatTheProjectSays` first. In a profile of this read over a
+ * made-up office of 35,701 messages, with 2,639 contact rows, one read took about 978 ms. Of that, `whatTheProjectSays`
+ * took 50 ms, `asEntry` and `asMessage` 48 ms, and garbage collection 212 ms. Those are times from a profile, not a
+ * measure.
+ * So every message is built with the ten fields, and the last lines alone are built whole, by `asEntry`, from the rows
+ * this read already holds (`withTheLastLinesWhole`). No message row and no delivery row is read twice.
+ *
+ * The pool handed back is the narrow one. Its one other reader is the group counts of the circle (`unreadInAGroup`),
+ * which read only its fields.
  *
  * The Embassy read the whole pool here until 27 September 2026. In a CPU profile on a copy of the person's
  * office, the contact column took about 174 ms of each Embassy call that way and about 138 ms this way.
@@ -4570,19 +4686,47 @@ export function theContactsOfOneReader(
   aliases: TheFiledAliases = theFiledAliasesReadOnce(sqlite),
 ): {
   contacts: ContactLine[]
-  pool: PoolEntry[]
+  pool: AMessageTheContactsRead[]
   agents: Map<string, RegisteredAgent>
   /** Everybody either registry holds, with their names: the chat's filter box finds a row by its name (criterion M124). */
   everyone: KnownParticipant[]
 } {
   const registered = everybodyRegistered(aliases)
   const mine = workspaceId === null ? registered : withTheOwnRecordsOf(registered, [me], workspaceId)
-  // `theMessagesOfOneReader`, with the rows it read, so the reader's rule below does not read them again.
-  const { entries: whole, read } = theMessagesChosenAndTheirRows(me, mine, EVERY_PROJECT, null)
-  const pool = reader === null ? whole : onlyTheMessagesThisReaderMayRead(reader, whole, new Map(), read)
+  // THE ROWS `theMessagesOfOneReader` READS, AND THEIR DELIVERY ROWS, read once: the reader's rule below and the last
+  // lines are both given them and read neither again.
+  const read = theRowsChosenFor(me, mine, EVERY_PROJECT, null)
+  const narrow = contactEntriesOf(read)
+  // THE READER'S RULE IS ASKED OF THE SAME IDS, WITH THE SAME ROWS, as when the pool was whole. It reads only each
+  // entry's id and kind and the rows it is given, so it keeps the same messages whichever shape the pool has.
+  const pool = reader === null ? narrow : onlyTheMessagesThisReaderMayRead(reader, narrow, new Map(), read)
   const everyone = workspaceId === null ? registered : withTheRecordsTheseMessagesStore(mine, pool, workspaceId)
   const agents = everyAgentById()
-  return { contacts: contactsFor(me, everyone, EVERY_PROJECT, pool, agents), pool, agents, everyone }
+  const rows = contactsFor<AMessageTheContactsRead>(me, everyone, EVERY_PROJECT, pool, agents)
+  return { contacts: withTheLastLinesWhole(rows, read), pool, agents, everyone }
+}
+
+/**
+ * THE CONTACT ROWS WITH EACH LAST LINE BUILT WHOLE, by `asEntry` through `entriesOf`, and nothing else changed.
+ *
+ * Only the rows of the last lines are built, and they are taken from `read`, the rows the narrow entries were built
+ * from, with their delivery rows, so no row is read again. `whatTheProjectSays` is asked about those rows alone. Every
+ * answer it gives a message comes from that message's own fields: the run its `fromRun` names, its sender's registry row
+ * and flags, and what holds for the whole project. So each last line is the entry a whole pool would have held. Each
+ * row keeps its keys in their order, so the answer a door serves is the same text.
+ */
+function withTheLastLinesWhole(rows: readonly ContactLine<AMessageTheContactsRead>[], read: MessagesJustRead): ContactLine[] {
+  const lastIds = new Set<string>()
+  for (const line of rows) if (line.last !== null) lastIds.add(line.last.id)
+  const whole = new Map(entriesOf(read.rows.filter((row) => lastIds.has(row.id)), EVERY_PROJECT, read.deliveries).map((one) => [one.id, one]))
+  return rows.map((line) => {
+    if (line.last === null) return { ...line, last: null }
+    const last = whole.get(line.last.id)
+    // EVERY LAST LINE IS ONE OF `read`'S ROWS, because the narrow entries were built from them. One missing says that
+    // assumption broke, and no row is handed out without its last line.
+    if (last === undefined) throw new Error(`The contact read built no whole entry for its last line ${line.last.id}.`)
+    return { ...line, last }
+  })
 }
 
 /**
@@ -4591,7 +4735,7 @@ export function theContactsOfOneReader(
  * A registered contact sorts by its id, which is what it sorted by before; an unregistered writer
  * sorts by the line it typed. One function, so the order cannot depend on which branch a row took.
  */
-function nameOfContact(line: ContactLine): string {
+function nameOfContact(line: Pick<ContactLine, 'who' | 'unregistered'>): string {
   return line.who !== null ? line.who.id : unregisteredName(line.unregistered ?? { typed: null, said: null })
 }
 
@@ -4621,7 +4765,7 @@ function nameOfContact(line: ContactLine): string {
  * Left out, Mole Office's registry row is read again for each message an agent sent.
  */
 export function unreadAmong(
-  messages: readonly PoolEntry[],
+  messages: readonly AMessageTheContactsRead[],
   me: ParticipantRef,
   officeTest: (who: ParticipantRef) => boolean = isMoleOffice,
 ): number {
@@ -4637,12 +4781,12 @@ export function unreadAmong(
  * two functions, both reading the same delivery rows: neither can drift from the other, because
  * `isUnseenBy` is the one rule underneath both.
  */
-export function anythingUnreadAmong(messages: readonly PoolEntry[], me: ParticipantRef): boolean {
+export function anythingUnreadAmong(messages: readonly AMessageTheContactsRead[], me: ParticipantRef): boolean {
   return messages.some((one) => isUnseenBy(one, me))
 }
 
 /** The one rule: there is a delivery row addressed to this reader and it does not say seen. */
-function isUnseenBy(one: PoolEntry, me: ParticipantRef): boolean {
+function isUnseenBy(one: AMessageTheContactsRead, me: ParticipantRef): boolean {
   const mine = one.deliveries.find((d) => sameParticipant(d.to, me))
   return mine !== undefined && mine.mark !== 'seen'
 }
@@ -4654,7 +4798,7 @@ function isUnseenBy(one: PoolEntry, me: ParticipantRef): boolean {
  * asked here as well rather than sent down as a flag: the sender is already on every entry, and a
  * second field saying what the sender already says is the defect CLAUDE.md names at the top.
  */
-function isASystemLine(one: PoolEntry, officeTest: (who: ParticipantRef) => boolean = isMoleOffice): boolean {
+function isASystemLine(one: AMessageTheContactsRead, officeTest: (who: ParticipantRef) => boolean = isMoleOffice): boolean {
   return one.sentBy !== null && officeTest(one.sentBy)
 }
 
@@ -4724,9 +4868,10 @@ export interface BetweenAgents {
  * list of conversations between agents asks the same of each side before it calls two sides one agent, so the list
  * offers no row the door refuses as one agent named twice. It may throw what the resolver throws: a 409 for a string
  * that is one agent's id and another live agent's handle, or a handle several retired agents bore and no live agent bears.
+ * `identityOf` is one reading of every agent, for a caller that asks about many sides; left out, each side is read alone.
  */
-export function theAgentTheDoorToOnePairReads(one: ParticipantRef): ParticipantRef {
-  const found = theAgentAnArrivingReferenceNames(one.id, 'reading')
+export function theAgentTheDoorToOnePairReads(one: ParticipantRef, identityOf?: TheIdentityOf): ParticipantRef {
+  const found = theAgentAnArrivingReferenceNames(one.id, 'reading', undefined, identityOf)
   return found === null ? one : { kind: 'agent', id: found.agent.id }
 }
 
@@ -4789,12 +4934,17 @@ function betweenAgentsContext(which: WhichProjects, reader: ParticipantRef | nul
     const changes = sqlite.prepare("SELECT agent_id, from_kind, from_id, to_kind, to_id, applied_at FROM agent_starter_changes WHERE agent_id IN (SELECT value FROM json_each(?)) AND state = 'applied' ORDER BY applied_at, rowid").all(JSON.stringify(agentIds)) as (StarterHistoryRow & { agent_id: string })[]
     for (const change of changes) said.starterHistory.get(change.agent_id)?.push(change)
   }
+  // EVERY AGENT READ ONCE FOR THE DOOR'S KEYS (wave 13y round 175). Asked one side at a time, each agent was three
+  // statements, and the read of one busy agent reaches nearly every agent it ever wrote to: about 7,900 of the 9,151
+  // statements of the first page on a made-up office of 2,640 agents. The reading answers what those statements
+  // answered, with the same refusals, and the aliases it validates are the ones `theFiledAliasesReadOnce` reads above.
+  const identityOf = everyAgentsIdentityWithReferencesReadOnce(sqlite)
   const asTheDoorReads = new Map<string, string>()
   const theDoorsKey = (one: ParticipantRef): string => {
     let read = asTheDoorReads.get(one.id)
     if (read === undefined) {
       try {
-        read = participantKey(theAgentTheDoorToOnePairReads(one))
+        read = participantKey(theAgentTheDoorToOnePairReads(one, identityOf))
       } catch (err) {
         if (!(err instanceof PanelError && err.status === 409)) throw err
         read = participantKey(one)
@@ -4896,22 +5046,49 @@ export function aBetweenAgentsReader(reader: ParticipantRef | null, workspaceId:
   // THE MESSAGES EACH AGENT IS A SIDE OF, as the reads so far found them. Only these can be left out of that agent's
   // read, so the list a read leaves out is made from them and not from every message found so far.
   const ofSide = new Map<string, Set<string>>()
-  const agentsNamedBy = (agentRows: APlacedRow[]): ParticipantRef[] => {
+  // MOLE OFFICE'S OWN AGENT IS LEFT UNREAD BY THE SCAN (wave 13y round 175). It writes to nearly every agent, so its read
+  // was the whole office's history: about 50,000 rows on a made-up office of the live shape. Each pair a message of the
+  // scan is in has a side other than Mole Office that the scan names: a line Mole Office wrote is between it and each
+  // agent it reached, or between two agents it reached, and any other message is between its sender and each agent it
+  // reached. So each such pair is read from that side, and a pair read from either side is the same row. Mole Office's
+  // lines stay in the scan, since only a read settles a sender. The agents of a message a notice names are read, Mole
+  // Office too, when that message is between two agents, because the notice is in that message's pair, whose other side
+  // the scan may not name.
+  // A NOTICE NAMES AGENTS ONLY WHEN ITS MESSAGE IS BETWEEN TWO AGENTS (wave 13y round 175). Through the message it
+  // names, a notice is in one pair at most: the pair `thePartiesOfEveryPair` gives that message. For a message between
+  // an agent and the person, that pair holds the person, and this list does not show it. A message to a group or to
+  // several addressees gets no pair, so the notice joins none. Reading the agents of such a message added no row and
+  // changed no value. It read each such agent's whole history and the run each of its messages names, and a busy agent
+  // has thousands.
+  const agentsNamedBy = (agentRows: APlacedRow[], leaveTheOfficeUnread = false): ParticipantRef[] => {
     const entries = entriesOf(agentRows, which, undefined, context.said, context.officeTest)
     const heldIds = new Set(agentRows.map((row) => row.id))
-    const named = [...new Set(entries.map((one) => one.aboutMessage).filter((id): id is string => typeof id === 'string' && !heldIds.has(id)))]
-    const originals = rowsByIds(named, which).filter((row) => refFrom(((row.data ?? {}) as Record<string, unknown>)['sentBy'])?.kind === 'agent')
+    const aboutIds = new Set(entries.map((one) => one.aboutMessage).filter((id): id is string => typeof id === 'string'))
+    const named = [...aboutIds].filter((id) => !heldIds.has(id))
+    const originals = entriesOf(
+      rowsByIds(named, which).filter((row) => refFrom(((row.data ?? {}) as Record<string, unknown>)['sentBy'])?.kind === 'agent'),
+      which, undefined, context.said, context.officeTest,
+    )
+    const betweenTwoAgents = new Set(
+      [...thePartiesOfEveryPair([...entries.filter((one) => aboutIds.has(one.id)), ...originals])]
+        .filter(([, sides]) => sides.every((side) => side.kind === 'agent'))
+        .map(([id]) => id),
+    )
     const agents = new Map<string, ParticipantRef>()
-    for (const one of [...entries, ...entriesOf(originals, which, undefined, context.said, context.officeTest)]) {
+    const ofANamedMessage = new Set<string>()
+    for (const one of [...entries, ...originals.filter((original) => betweenTwoAgents.has(original.id))]) {
       const sender = context.writers.senderOf(one)
       for (const who of [sender, ...context.writers.recipientsOf(one)]) {
         if (who === null || who.kind !== 'agent') continue
         const normalized = context.writers.participantOf(who)
         const key = participantKey(normalized)
+        if (betweenTwoAgents.has(one.id)) ofANamedMessage.add(key)
         if (!alreadyRead.has(key)) agents.set(key, normalized)
       }
     }
-    return [...agents.values()]
+    return [...agents.entries()]
+      .filter(([key, who]) => !leaveTheOfficeUnread || !context.officeTest(who) || ofANamedMessage.has(key))
+      .map(([, who]) => who)
   }
   return {
     /** For a sparse project, find its candidate agents without settling every agent in the office. */
@@ -4957,7 +5134,7 @@ export function aBetweenAgentsReader(reader: ParticipantRef | null, workspaceId:
       const scanned = ids.map((one) => byId.get(one.id)!).filter((one) => one !== undefined)
       const agentRows = scanned.filter((row) => refFrom(((row.data ?? {}) as Record<string, unknown>)['sentBy'])?.kind === 'agent')
       const last = scanned.at(-1)
-      return { agents: agentsNamedBy(agentRows), edge: last === undefined ? null : { at: last.createdAt, rowid: last.rowid }, exhausted: scanned.length < limit }
+      return { agents: agentsNamedBy(agentRows, true), edge: last === undefined ? null : { at: last.createdAt, rowid: last.rowid }, exhausted: scanned.length < limit }
     },
     /** Every row involving this agent, decided by the same rules as the whole list. */
     involving(who: ParticipantRef): APlacedBetweenAgentsRow[] {
@@ -4976,7 +5153,7 @@ export function aBetweenAgentsReader(reader: ParticipantRef | null, workspaceId:
       const rows = (db.select({ ...MESSAGE_COLUMNS, rowid: sql<number>`rowid` })
         .from(records)
         .where(and(
-          inArray(records.id, theIdsChosenFor(who, context.everyone, which, null)),
+          inArray(records.id, theIdsChosenFor(who, context.everyone, which, null, true)),
           leftOut.length === 0 ? undefined : sql`${records.id} NOT IN (SELECT value FROM json_each(${JSON.stringify(leftOut)}))`,
         ))
         .orderBy(records.createdAt, sql`rowid`)
@@ -5229,31 +5406,6 @@ export function thePartiesOfMany(
 
 // ============================================================================ who may read which message
 
-/**
- * WHO IS READING, AS THE MESSAGE DOORS JUDGE IT, option A.
- *
- *   - The OWNER reads every message. The owner is the one person `THE_PERSON` names, and a request
- *     that named nobody is the owner (`actorFrom`).
- *   - A SECRETARY reads every message, to coordinate. Who is a secretary is `theSecretaries()`: the
- *     agents holding the secretary card, read from the role declaration. No handle is written here.
- *   - THE MESSAGE WORKER reads every message. It is a piece of the office, not an agent: it reads a
- *     message's words to hand them to the run it starts for the agent the message is addressed to.
- *     THE AGENT WORKER (`tools/agent-worker.mjs`) reads every one too, for the same reason: it runs
- *     the runs the person's conversations with agents ask for, and reads those conversations to do it.
- *   - EVERY OTHER READER reads only the messages it is a party to (`thePartiesOf`): it sent them, they
- *     were addressed or routed to it, or it was a member of the group they went to when they were
- *     sent. That is every agent that is not a secretary, and every person but the owner, as the live
- *     push already treats them (`reaches` in lib/events.ts).
- *   - THE OFFICE ITSELF is one of those other readers. It writes as `{ type: 'system', id: <its id> }`
- *     and sends as its own participant, so that actor is read as that participant: a party to the
- *     messages it sent or was handed, and to no other (wave 13s, round 77).
- *
- * `who` is null when neither registry holds the caller. Such a reader is a party to nothing.
- */
-export type AMessageReader =
-  | { readsEveryMessage: true; because: 'the owner' | 'a secretary' | 'the message worker' | 'the agent worker'; who: ParticipantRef | null }
-  | { readsEveryMessage: false; who: ParticipantRef | null }
-
 /** Who is reading, from the caller as `actorFrom` read it. */
 export function theMessageReader(
   actor: { type: string; id: string; keyHolder?: string | undefined },
@@ -5306,6 +5458,50 @@ export function theMessagesThisReaderMayRead(
   return out
 }
 
+/**
+ * THE LIVE MESSAGES OF ONE PROJECT THAT THIS READER IS A PARTY TO, found from the reader's own messages. It is for a
+ * count of how many of a project's messages a reader limited to its own messages may read.
+ *
+ * It starts from the reader's narrowing (`theMessagesAReaderCouldBeAPartyTo`), and not from every message of the
+ * project. It keeps those messages that are filed in the project or in its view and are not deleted. Then it works out
+ * their parties as `theMessagesThisReaderMayRead` does. A reader is a party to few of a project's messages, so the ids
+ * of the others are not handed back only to be left out.
+ *
+ * EACH PIECE IS ASKED BY THE RULE FOR A ROW FOUND BY ID: filed in the project, or in its view as `messagesInTheViewOf`
+ * asks it for rows found by id. For a message whose data is JSON, these are the same rows as `filedInOrInTheViewOf`.
+ * That rule builds the list of rowids of every record of the project and every message in its view, and it built that
+ * list once for each piece. On a copy of the made-up office at the live change-log size, a supervisor's narrowing of
+ * 2,989 ids in 6 pieces took 755 ms that way and 9 ms by id (wave 14c round 9).
+ *
+ * It gives the number `theMessagesThisReaderMayRead` gives for every live message of the project's view, as long as
+ * the narrowing keeps every message the reader could be a party to, as its own comment promises. A long list given to
+ * `theMessagesThisReaderMayRead` already rests on that promise.
+ */
+export function theLiveMessagesOfAProjectAReaderIsAPartyTo(me: ParticipantRef, workspaceId: string): Set<string> {
+  const ofTheProject: string[] = []
+  for (const piece of piecesOf(theNarrowingFor(me))) {
+    for (const row of db
+      .select({ id: records.id })
+      .from(records)
+      .where(
+        and(
+          inArray(records.id, piece),
+          or(theProjectOfARowFoundById(workspaceId), messagesInTheViewOf(justThisProject(workspaceId), true)),
+          theKindOfARowFoundById('message'),
+          isNull(records.deletedAt),
+        ),
+      )
+      .all()) {
+      ofTheProject.push(row.id)
+    }
+  }
+  const out = new Set<string>()
+  for (const [id, parties] of thePartiesOfMany(ofTheProject)) {
+    if (parties.some((party) => sameParticipant(party, me))) out.add(id)
+  }
+  return out
+}
+
 /** A list this short has its parties worked out at once, without narrowing it first. */
 export const A_SHORT_LIST = 50
 
@@ -5343,6 +5539,79 @@ function theNarrowingFor(me: ParticipantRef): Set<string> {
 }
 
 /**
+ * JAVASCRIPT'S trim() REMOVES NO CODE POINT FROM U+0021 UP TO U+0080. Every code point it removes is below the first of
+ * these two bounds or at or above the second. So an id with white space at its start begins outside them. A test
+ * checks this against trim() itself, for every code point.
+ */
+export const TRIM_KEEPS_EVERY_CODE_POINT_FROM = 0x21
+export const TRIM_KEEPS_EVERY_CODE_POINT_BELOW = 0x80
+
+/**
+ * THE STORED IDS OF ONE PLACE THAT COULD BE ONE OF THESE NAMES WITH WHITE SPACE AROUND IT, read in one statement. The
+ * statement is a UNION of three SELECTs, and each one seeks the place's index by a range:
+ *
+ *   1. the ids below the first bound;
+ *   2. the ids at or above the second bound. An id with white space at its start begins with a character trim()
+ *      removes, so it is in one of these two ranges;
+ *   3. for each name, the ids greater than the name and below the name followed by U+10FFFF, the highest code point.
+ *      An id with white space only at its end begins with the name it trims to, so it is in that name's range.
+ *
+ * SQLite stores this text as UTF-8 and compares it byte by byte, which is the order of the code points. So the ranges
+ * hold every such id. They hold other ids too, and trim() decides which ones are kept. The names come as one JSON list,
+ * so the statement has the same words for any number of names. UNION, not UNION ALL, so an id stored on many rows comes
+ * back once. For the group membership, the place is the member index joined from the reader's kinds, so each range is
+ * sought within one kind at a time.
+ *
+ * Read whole, the delivery's ids took 3.3 ms and the sender's 2.3 ms of each narrowing for an agent. Read this way, for
+ * a reader with 4 names, they took 0.043 ms and 0.072 ms. Both were measured on a made-up office of the 13 November
+ * 2026 scale (wave 13y round 175).
+ */
+function theStoredIdsThatCouldBePadded(place: { from: SQL; stored: SQLWrapper; where: SQL }, names: readonly string[]): { id: unknown }[] {
+  const part = (from: SQL, range: SQL): SQL => sql`SELECT ${place.stored} AS id FROM ${from} WHERE ${and(place.where, range)}`
+  return db.all<{ id: unknown }>(
+    sql.join(
+      [
+        part(place.from, sql`${place.stored} < char(${TRIM_KEEPS_EVERY_CODE_POINT_FROM})`),
+        part(place.from, sql`${place.stored} >= char(${TRIM_KEEPS_EVERY_CODE_POINT_BELOW})`),
+        // THE NAMES COME FIRST, by CROSS JOIN, so SQLite seeks the place's index once for each name. For the group
+        // membership the reader's kinds come next, so it seeks the member index once for each name and kind.
+        part(
+          sql`json_each(${JSON.stringify(names)}) AS reader_name CROSS JOIN ${place.from}`,
+          sql`${place.stored} > reader_name.value AND ${place.stored} < (reader_name.value || char(${0x10ffff}))`,
+        ),
+      ],
+      sql` UNION `,
+    ),
+  )
+}
+
+/**
+ * EVERY KIND STORED IN THE GROUP MEMBERSHIPS, read in one statement that walks group_members_member_idx. The walk
+ * starts from the lowest kind and takes each next kind above the last one, so it seeks the index once for each kind and
+ * reads no other entry. The kinds are read from the table and not written here, because no door bounds them: an older
+ * row could hold any kind, and thePartiesOfMany reads every kind but `person` as an agent's.
+ *
+ * A KIND STORED AS SOMETHING OTHER THAN TEXT STOPS THE NARROWING WITH AN ERROR. The column is TEXT and no door writes
+ * anything else, so only a row written by SQL could hold one. The kinds go to SQLite as a JSON list, which carries only
+ * text, so such a kind could not be asked for, and its memberships would be left out with nothing said.
+ *
+ * With each kind given, the member index is sought by the kind and the member id. Measured raw on a made-up office of
+ * the 13 November 2026 scale, this walk took 0.003 ms, the read of the groups 0.004 ms and the read of the membership
+ * ids that could be padded 0.004 ms. Asked by every kind but `person` at once, the read of the groups scanned the
+ * memberships by group_members_group_idx, in 2.2 to 2.5 ms, and the whole read of the member ids took 1.07 ms more
+ * (wave 13y round 175).
+ */
+function theStoredMemberKinds(): string[] {
+  const stored = db.all<{ kind: unknown }>(
+    sql`WITH RECURSIVE stored_kind(kind) AS (SELECT min(${groupMembers.memberKind}) FROM ${groupMembers} INDEXED BY group_members_member_idx UNION ALL SELECT (SELECT min(${groupMembers.memberKind}) FROM ${groupMembers} INDEXED BY group_members_member_idx WHERE ${groupMembers.memberKind} > stored_kind.kind) FROM stored_kind WHERE stored_kind.kind IS NOT NULL) SELECT kind FROM stored_kind WHERE kind IS NOT NULL`,
+  )
+  return stored.map(({ kind }) => {
+    if (typeof kind !== 'string') throw new Error('A group membership\'s kind is stored as something other than text, so a long message list cannot be narrowed by the kinds of membership.')
+    return kind
+  })
+}
+
+/**
  * THE IDS OF EVERY MESSAGE THIS READER COULD BE A PARTY TO, and of some it is not.
  *
  * `thePartiesOfMany` makes a reader a party to a message in four ways, and each is kept here:
@@ -5355,10 +5624,14 @@ function theNarrowingFor(me: ParticipantRef): Set<string> {
  *   4. It was a member of the group the message went to: every message to a group the reader has
  *      ever been a member of is kept.
  *
+ * A DELETED MESSAGE IS KEPT TOO, because `thePartiesOfMany` keeps the parties of a deleted message. If this left
+ * deleted messages out, a long list and a short one could get different answers.
+ *
  * A stored name means an agent only when it is that agent's id, the handle of that one agent, one of
  * that agent's own records of kind `agent`, or an old registry id that agent alone answers to
  * (`theRegistryIdsOf`), so a message naming the reader any other way does not make it
- * a party. The parties of the messages kept are then worked out exactly, by `thePartiesOfMany`. Working
+ * a party. An agent's stored id is trimmed first, as the parties rule trims it, so an id stored with white space
+ * around it is kept too. The parties of the messages kept are then worked out exactly, by `thePartiesOfMany`. Working
  * them out for every message in a long list was most of what the brief did for an agent: about 300 ms
  * for the 12,500 messages of an office of the live shape (round 34 of wave 13n).
  *
@@ -5376,25 +5649,52 @@ function theMessagesAReaderCouldBeAPartyTo(me: ParticipantRef): Set<string> {
     names.push(...theAgentRecordsOf(me.id))
     for (const id of theRegistryIdsOf(sqlite, me.id)) if (!names.includes(id)) names.push(id)
   }
-  const message = and(ONE_KIND_WRITTEN_OUT.message, isNull(records.deletedAt))
+  const message = ONE_KIND_WRITTEN_OUT.message
+  // AN AGENT'S ID STORED WITH WHITE SPACE AROUND IT NAMES THE AGENT ITS trim() NAMES, because thePartiesOfMany trims it
+  // before it looks the agent up. The look-ups below compare exactly. So the stored ids that could be padded are read
+  // first, and each one whose trim() is one of the reader's names is looked up too. For the sender, the delivery and the
+  // group membership, they are read in one statement of seeks on the index each look-up uses
+  // (theStoredIdsThatCouldBePadded). The member index begins with the member's kind, so the membership's ids are sought
+  // for each of the reader's kinds, and the stored kinds are read first (theStoredMemberKinds). It is JavaScript's
+  // trim(), as the parties rule's; SQLite's trim() strips only spaces. A person's stored id is not trimmed there, so a
+  // person's look-ups stay exact.
+  const namesAsStored = (stored: () => readonly { id: unknown }[]): string[] =>
+    me.kind === 'agent'
+      ? [...names, ...stored().flatMap(({ id }) => (typeof id === 'string' && id !== id.trim() && names.includes(id.trim()) ? [id] : []))]
+      : names
   const out = new Set<string>()
   const keep = (rows: { id: string }[]): void => {
     for (const row of rows) out.add(row.id)
   }
+  const recipients = namesAsStored(() =>
+    theStoredIdsThatCouldBePadded({ from: sql`${messageDelivery} INDEXED BY message_delivery_recipient_idx`, stored: messageDelivery.recipientId, where: eq(messageDelivery.recipientKind, me.kind) }, names),
+  )
   keep(
     db
       .select({ id: messageDelivery.messageId })
       .from(messageDelivery)
-      .where(and(eq(messageDelivery.recipientKind, me.kind), inArray(messageDelivery.recipientId, names)))
+      .where(and(eq(messageDelivery.recipientKind, me.kind), inArray(messageDelivery.recipientId, recipients)))
       .all(),
   )
-  keep(db.all<{ id: string }>(sql`SELECT ${records.id} AS id FROM ${records} INDEXED BY records_message_sent_by_idx WHERE ${and(message, inArray(STORED_FIELDS.messageSentById(records.data), names))}`))
+  const senders = namesAsStored(() =>
+    theStoredIdsThatCouldBePadded({ from: sql`${records} INDEXED BY records_message_sent_by_idx`, stored: STORED_FIELDS.messageSentById(records.data), where: message }, names),
+  )
+  keep(db.all<{ id: string }>(sql`SELECT ${records.id} AS id FROM ${records} INDEXED BY records_message_sent_by_idx WHERE ${and(message, inArray(STORED_FIELDS.messageSentById(records.data), senders))}`))
   keep(db.select({ id: records.id }).from(records).where(and(message, eq(STORED_FIELDS.messageRoutedType(records.data), 'array'))).all())
+  // A MEMBERSHIP'S KIND IS READ AS thePartiesOfMany READS IT: `person` is the person's, and any other kind is an agent's.
+  // Matched to the reader's own kind, an agent's membership of another kind was left out of a long list only. So a
+  // person's kinds are `person` alone, and an agent's are every stored kind but `person`. Each kind is given to the
+  // member index with each name, so each look-up is a seek. Asked by every kind but `person` at once, SQLite could not
+  // seek that index, which begins with the kind.
+  const kinds = me.kind === 'person' ? ['person'] : theStoredMemberKinds().filter((kind) => kind !== 'person')
+  const ofTheReadersKinds = sql`${groupMembers.memberKind} = reader_kind.value`
+  const members = namesAsStored(() =>
+    theStoredIdsThatCouldBePadded({ from: sql`json_each(${JSON.stringify(kinds)}) AS reader_kind CROSS JOIN ${groupMembers} INDEXED BY group_members_member_idx`, stored: groupMembers.memberId, where: ofTheReadersKinds }, names),
+  )
   const groups = db
-    .selectDistinct({ id: groupMembers.groupId })
-    .from(groupMembers)
-    .where(and(eq(groupMembers.memberKind, me.kind), inArray(groupMembers.memberId, names)))
-    .all()
+    .all<{ id: string }>(
+      sql`SELECT DISTINCT ${groupMembers.groupId} AS id FROM json_each(${JSON.stringify(kinds)}) AS reader_kind CROSS JOIN json_each(${JSON.stringify(members)}) AS reader_name CROSS JOIN ${groupMembers} INDEXED BY group_members_member_idx WHERE ${ofTheReadersKinds} AND ${groupMembers.memberId} = reader_name.value`,
+    )
     .map((row) => row.id)
   // IN PIECES (src/server/db/in-pieces.ts): every group the reader was ever in. The ids go into a set.
   for (const piece of piecesOf(groups)) {
@@ -6153,12 +6453,16 @@ function asConversationRead(row: typeof conversationReads.$inferSelect): Convers
  * the whole of it. Narrowing to one project cut a group's own conversation in half whenever a member
  * wrote from somewhere else. Problem `m1ea9ihnnu9e`.
  */
-export function messagesInAGroup(groupId: string, which: WhichProjects, pool?: readonly PoolEntry[]): PoolEntry[] {
-  // The same entries `messagePool` hands out, so a caller holding the pool filters it instead of
-  // reading the table again. A caller without one is answered from this group's messages alone, by
-  // the same select with the group's id added, and not from every message of every project: that read
-  // was one statement naming all 34,400 messages of the office on 11 October 2026, which SQLite refused
-  // (round 48h of wave 13k).
+export function messagesInAGroup<Entry extends AMessageTheContactsRead = PoolEntry>(
+  groupId: string,
+  which: WhichProjects,
+  pool?: readonly Entry[],
+): (Entry | PoolEntry)[] {
+  // A caller holding the pool gets its own entries back, filtered, instead of the table read again: the whole
+  // entries `messagePool` hands out, or the contact read's narrow ones (`AMessageTheContactsRead`). A caller
+  // without one is answered from this group's messages alone, by the same select with the group's id added, and
+  // not from every message of every project: that read was one statement naming all 34,400 messages of the
+  // office on 11 October 2026, which SQLite refused (round 48h of wave 13k).
   if (pool !== undefined) return pool.filter((one) => one.toGroup === groupId)
   return messagesSentToGroups([groupId], which)
 }
@@ -6263,7 +6567,7 @@ function afterEachPoint(piece: readonly string[], after: ReadonlyMap<string, str
 }
 
 /** How many messages in one group this reader has not marked seen. A system line is not one. */
-export function unreadInAGroup(groupId: string, me: ParticipantRef, which: WhichProjects, pool?: readonly PoolEntry[]): number {
+export function unreadInAGroup(groupId: string, me: ParticipantRef, which: WhichProjects, pool?: readonly AMessageTheContactsRead[]): number {
   return unreadAmong(messagesInAGroup(groupId, which, pool), me)
 }
 

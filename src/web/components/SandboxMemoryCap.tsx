@@ -6,10 +6,9 @@
  * own password dialog. The doors are src/server/api/sandbox-memory-cap.ts, and src/config/sandbox-memory-cap.mjs says
  * what runs and why.
  *
- * IN PLAIN WORDS, SO THEY CAN WEIGH IT BEFORE THEY PRESS (the coordinator's message tdDKf2kBx3Xy): what it does in one
- * sentence, that a system window asks for their password and cancelling changes nothing, where it stands now, and the
- * exact command that runs as administrator. THE COMMAND IS DRAWN IN NORMAL MODE, not only in Developer mode as other
- * panels draw theirs, because it runs as root and the person should see it before they give their password.
+ * WHERE IT STANDS IS A SHORT STATE WORD, and a press's outcome is one too, as decided. THE EXACT COMMAND THAT RUNS AS
+ * ADMINISTRATOR IS DRAWN IN NORMAL MODE, under a short label, not only in Developer mode as other panels draw theirs,
+ * because it runs as root and the person should see it before they give their password.
  *
  * EVERY WORD IS FROM THE WORD LISTS. The command and the reason a program gave are drawn as they are, marked English.
  * An agent the person's grant does not carry here is refused by the door, and the panel draws that refusal by its code.
@@ -43,27 +42,26 @@ function gb(bytes: number): number {
   return Math.round((bytes / 1024 ** 3) * 10) / 10
 }
 
-/** The one sentence for where it stands. */
+/** The short word for where it stands. */
 function theStateWords(reading: SandboxCapReading): string {
-  const cap = gb(reading.capBytes)
-  if (reading.held === 'on') return t('sandboxCap.state.on', { cap })
-  if (reading.held === 'off') return t('sandboxCap.state.off')
-  if (reading.held === 'other' && reading.bytes !== null) return t('sandboxCap.state.other', { cap, gb: gb(reading.bytes) })
-  return t('sandboxCap.state.unreadable')
+  if (reading.held === 'on') return t('sandboxCap.state.onAt', { cap: gb(reading.capBytes) })
+  if (reading.held === 'off') return t('shortcuts.off')
+  if (reading.held === 'other' && reading.bytes !== null) return t('sandboxCap.state.setTo', { gb: gb(reading.bytes) })
+  return t('settingsState.notRead')
 }
 
 const OUTCOME_WORDS: Readonly<Record<Exclude<SandboxCapOutcome, 'done'>, WordKey>> = {
-  already: 'sandboxCap.done.already',
-  cancelled: 'sandboxCap.done.cancelled',
-  'not authorized': 'sandboxCap.done.notAuthorized',
-  'no dialog': 'sandboxCap.done.noDialog',
-  failed: 'sandboxCap.done.failed',
-  'not readable': 'sandboxCap.done.notReadable',
+  already: 'settingsState.unchanged',
+  cancelled: 'settingsState.cancelled',
+  'not authorized': 'settingsState.notPermitted',
+  'no dialog': 'sandboxCap.state.noAnswer',
+  failed: 'settingsState.failed',
+  'not readable': 'settingsState.notRead',
 }
 
-/** What their press did, in their language. */
-function whatThePressDid(done: SandboxCapDone, on: boolean, reading: SandboxCapReading): string {
-  if (done.outcome === 'done') return on ? t('sandboxCap.done.on', { cap: gb(reading.capBytes) }) : t('sandboxCap.done.off')
+/** What their press did, as a short word in their language. */
+function whatThePressDid(done: SandboxCapDone, on: boolean): string {
+  if (done.outcome === 'done') return t(on ? 'settingsState.turnedOn' : 'settingsState.turnedOff')
   return t(OUTCOME_WORDS[done.outcome])
 }
 
@@ -78,17 +76,15 @@ export interface SandboxMemoryCapViewProps {
 /** THE PANEL ONCE THE READING IS IN: drawn from its props alone, so a test can draw every state. */
 export function SandboxMemoryCapView({ reading, busy, done, onPress }: SandboxMemoryCapViewProps): React.ReactElement {
   const mayPress = reading.held !== 'unreadable'
-  const busyWhy = busy ? t('sandboxCap.busy') : undefined
+  const busyWhy = busy ? t('sandboxCap.state.waiting') : undefined
   return (
     <>
-      <p className="smc-what">{t('sandboxCap.what', { cap: gb(reading.capBytes), total: Math.round(reading.machineBytes / 1024 ** 3) })}</p>
       <p className="smc-said">{theStateWords(reading)}</p>
       {mayPress ? (
         <>
-          <p className="smc-what">{t('sandboxCap.dialog')}</p>
-          <p className="smc-what">{t('sandboxCap.commandOn')}</p>
+          <p className="smc-label">{t('sandboxCap.commandOnLabel')}</p>
           <code className="smc-code" lang="en">{reading.onCommand}</code>
-          <p className="smc-what">{t('sandboxCap.commandOff')}</p>
+          <p className="smc-label">{t('sandboxCap.commandOffLabel')}</p>
           <code className="smc-code" lang="en">{reading.offCommand}</code>
           <div className="smc-presses">
             <Btn onClick={() => onPress(true)} disabled={busy} reason={busyWhy}>
@@ -100,8 +96,8 @@ export function SandboxMemoryCapView({ reading, busy, done, onPress }: SandboxMe
           </div>
         </>
       ) : null}
-      {busy ? <p className="smc-said" role="status">{t('sandboxCap.busy')}</p> : null}
-      {done === null ? null : <p className="smc-said" role="status">{whatThePressDid(done.answer, done.on, reading)}</p>}
+      {busy ? <p className="smc-said" role="status">{t('sandboxCap.state.waiting')}</p> : null}
+      {done === null ? null : <p className="smc-said" role="status">{whatThePressDid(done.answer, done.on)}</p>}
       {done !== null && done.answer.outcome !== 'done' && done.answer.reason !== null ? (
         <code className="smc-code" lang="en">{done.answer.reason}</code>
       ) : null}
@@ -148,13 +144,13 @@ export function SandboxMemoryCap(): React.ReactElement {
 
 const SANDBOX_MEMORY_CAP_CSS = `
 .smc { display: flex; flex-direction: column; align-items: flex-start; gap: 0.5rem; min-width: 0; }
-.smc-what, .smc-said {
+.smc-label, .smc-said {
   margin: 0;
   max-width: var(--measure-in-box);
   font: var(--fs-1)/var(--lh-read) var(--font-ui);
   overflow-wrap: anywhere;
 }
-.smc-what { color: var(--text-2); }
+.smc-label { color: var(--text-2); }
 .smc-said { color: var(--text); }
 .smc-code {
   display: block; max-width: 100%;

@@ -1,6 +1,6 @@
 // Copyright © 2026 Zhengyang Shen
 // Licensed under the MIT License. See LICENSE.
-import { stableUpgradeFixture as fixture, stableUpgradeFixtureOwnedByAStandIn as fixtureOwnedByAStandIn, THE_TARGETS_MIGRATION, root, fixtureTimeZone, databaseModule, baselineTag, candidateTag, out, groups, children, folders, standIns, run, git, write, port, remember, track, snapshot, baselineIsBack } from './stable-upgrade-fixture.ts'
+import { stableUpgradeFixture as fixture, stableUpgradeFixtureOwnedByAStandIn as fixtureOwnedByAStandIn, THE_TARGETS_MIGRATION, root, fixtureTimeZone, databaseModule, baselineTag, out, groups, children, folders, standIns, run, git, write, port, remember, track, snapshot, baselineIsBack } from './stable-upgrade-fixture.ts'
 import { afterEach, describe, expect, it } from 'vitest'
 import { spawn, spawnSync, type ChildProcess } from 'node:child_process'
 import { chmodSync, closeSync, cpSync, existsSync, fstatSync, linkSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, statSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs'
@@ -501,7 +501,7 @@ describe('the stable upgrade transaction, with real Git, SQLite, npm and HTTP fi
     expect(readFileSync(join(f.dev, '.env'), 'utf8')).toBe(localSettings)
     expect(snapshot(f).records).toEqual([{ id: 'authored', value: 'baseline' }, { id: 'migration', value: 'candidate' }])
     const steps = events.filter((e) => e.phase === 'before').map((e) => e.step)
-    for (const [first, second] of [['install', 'candidate-typecheck'], ['candidate-typecheck', 'web-build'], ['web-build', 'plugin-build-example'], ['plugin-build-example', 'candidate-migrate'], ['candidate-migrate', 'candidate-checkpoint'], ['candidate-checkpoint', 'candidate-check'], ['candidate-stop', 'delete-candidate-database'], ['delete-candidate-database', 'preserve-artifacts'], ['preserve-artifacts', 'notice-before'], ['notice-before', 'private-backup'], ['private-backup', 'stable-checkout'], ['candidate-tag', 'migrate'], ['stable-check-stop', 'ordinary-start']]) expect(steps.indexOf(first)).toBeLessThan(steps.indexOf(second))
+    for (const [first, second] of [['install', 'electron-binary'], ['electron-binary', 'candidate-typecheck'], ['candidate-typecheck', 'web-build'], ['web-build', 'plugin-build-example'], ['plugin-build-example', 'candidate-migrate'], ['candidate-migrate', 'candidate-checkpoint'], ['candidate-checkpoint', 'candidate-check'], ['candidate-stop', 'delete-candidate-database'], ['delete-candidate-database', 'preserve-artifacts'], ['preserve-artifacts', 'notice-before'], ['notice-before', 'private-backup'], ['private-backup', 'stable-checkout'], ['candidate-tag', 'migrate'], ['stable-check-stop', 'ordinary-start']]) expect(steps.indexOf(first)).toBeLessThan(steps.indexOf(second))
     const privateBackup = new Database(result.paths.privateDatabase, { readonly: true })
     try {
       expect(privateBackup.prepare("SELECT name FROM sqlite_master WHERE name='migrated'").get()).toBeUndefined()
@@ -612,7 +612,7 @@ describe('the stable upgrade transaction, with real Git, SQLite, npm and HTTP fi
     const f = await fixture()
     const posted: string[] = []
     let closed = false, deliveryFault = 0
-    const noticePath = join(f.recovery, `${candidateTag}.notices.jsonl`)
+    const noticePath = join(f.recovery, `${f.config.candidateTag}.notices.jsonl`)
     const officeRequest = async (request: any, destination: any) => {
       if (request.method === 'POST') {
         const local = readFileSync(noticePath, 'utf8')
@@ -684,7 +684,7 @@ describe('the stable upgrade transaction, with real Git, SQLite, npm and HTTP fi
         officeRequest: Object.assign(async (request: any, destination: any) => {
           if (destination && request.path.startsWith('/api/office/upgrades?')) {
             expect(closed).toBe(true)
-            const ready = readFileSync(join(f.recovery, `${candidateTag}.notices.jsonl`), 'utf8').trim().split('\n').map(line => JSON.parse(line)).find(row => row.step === 'after-ready')
+            const ready = readFileSync(join(f.recovery, `${f.config.candidateTag}.notices.jsonl`), 'utf8').trim().split('\n').map(line => JSON.parse(line)).find(row => row.step === 'after-ready')
             after.push(JSON.parse(ready.payload))
           }
           return f.options.officeRequest(request, destination)
@@ -701,10 +701,22 @@ describe('the stable upgrade transaction, with real Git, SQLite, npm and HTTP fi
   }, 120_000)
 
   it('recovers failures before and after every mutation step, including accepted writes after publication', async () => {
-    const steps = ['policy-lock', 'policy-before', 'policy-stop', 'prepare-directories', 'notice', 'candidate-database', 'clone', 'candidate-checkout', 'install', 'candidate-typecheck', 'web-build', 'plugin-build-example', 'candidate-migrate', 'candidate-checkpoint', 'candidate-check', 'candidate-check-health', 'candidate-stop', 'delete-candidate-database', 'preserve-artifacts', 'notice-before', 'old-stop', 'private-backup', 'stable-fetch', 'stable-checkout', 'candidate-tag', 'install-artifacts', 'migrate', 'stable-checkpoint', 'stable-check', 'stable-check-health', 'stable-check-stop', 'ordinary-start', 'ordinary-start-health', 'final-journal', 'close-lock-descriptor', 'release-lock']
+    const steps = ['policy-lock', 'policy-before', 'policy-stop', 'prepare-directories', 'notice', 'candidate-database', 'clone', 'candidate-checkout', 'install', 'electron-binary', 'candidate-typecheck', 'web-build', 'plugin-build-example', 'candidate-migrate', 'candidate-checkpoint', 'candidate-check', 'candidate-check-health', 'candidate-stop', 'delete-candidate-database', 'preserve-artifacts', 'notice-before', 'old-stop', 'private-backup', 'stable-fetch', 'stable-checkout', 'candidate-tag', 'install-artifacts', 'migrate', 'stable-checkpoint', 'stable-check', 'stable-check-health', 'stable-check-stop', 'ordinary-start', 'ordinary-start-health', 'final-journal', 'close-lock-descriptor', 'release-lock']
     // The answer says how the gate-count spool is handed over exactly when the database file's world changed (wave 13q item 1h).
     const worlds = { changed: 0, kept: 0 }
-    for (const point of steps) for (const phase of ['before', 'after']) {
+    // A step's 'before' is reached already as the 'after' of the step that runs just before it, so most steps run at
+    // 'after' alone. These ten keep 'before':
+    //   policy-lock: no step runs before it.
+    //   policy-before: a health read and the set-aside rows run between it and the step before.
+    //   candidate-migrate: the untranslated-words and notice-contract commands run between.
+    //   old-stop: downtime = true runs between.
+    //   private-backup: the database guard runs between.
+    //   migrate: databaseTouched = true runs between.
+    //   ordinary-start: ordinaryStarted = true runs between.
+    //   final-journal, close-lock-descriptor and release-lock: what runs before them was not checked.
+    // A later change that adds code that changes the state before a step whose 'before' was dropped adds that step here.
+    const keepsBefore = new Set(['policy-lock', 'policy-before', 'candidate-migrate', 'old-stop', 'private-backup', 'migrate', 'ordinary-start', 'final-journal', 'close-lock-descriptor', 'release-lock'])
+    for (const point of steps) for (const phase of keepsBefore.has(point) ? ['before', 'after'] : ['after']) {
       const f = await fixture()
       const worldBefore = databaseIdentity(f.config.database).id
       let fired = false
@@ -842,7 +854,7 @@ describe('the stable upgrade transaction, with real Git, SQLite, npm and HTTP fi
     }
     for (const damage of ['missing', 'replaced', 'symlink']) {
       const broken = await fixture()
-      const journalPath = join(broken.recovery, candidateTag + '.journal.jsonl')
+      const journalPath = join(broken.recovery, broken.config.candidateTag + '.journal.jsonl')
       const refused = remember(await upgradeStable(broken.config, { ...broken.options, onStep: track, closeFinalDescriptor: (fd: number) => {
         closeSync(fd)
         renameSync(journalPath, journalPath + '.original')

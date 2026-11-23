@@ -53,7 +53,7 @@ import type { AddressInfo } from 'node:net'
 import type { FastifyInstance } from 'fastify'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { THE_TEST_OFFICES_OWNER } from './a-page-of-a-test-office.ts'
-import { apiApp, freshDb, one, type TestDb } from './helpers.ts'
+import { apiApp, freshDb, one, type TestDb, governsTheWholeProject } from './helpers.ts'
 
 const HUMAN = {
   'content-type': 'application/json',
@@ -202,7 +202,7 @@ describe('a decision is written at the machine Mole Office runs on', () => {
     const answer = await ask(anotherMachine, 'POST', '/api/records', {
       kind: 'decision',
       title: 'The gripper stays on position control',
-      data: { replaces: [], because: 'force control needs a sensor that is not on the arm' },
+      data: { ...governsTheWholeProject(), replaces: [], because: 'force control needs a sensor that is not on the arm' },
     })
     expect(answer.status, `a decision was written from another machine: ${answer.error}`).toBe(403)
     expectRefusedAsAClaimNoKeyProved(answer)
@@ -215,7 +215,7 @@ describe('a decision is written at the machine Mole Office runs on', () => {
     const answer = await ask(thisMachine, 'POST', '/api/records', {
       kind: 'decision',
       title: 'The gripper stays on position control',
-      data: { replaces: [], because: 'force control needs a sensor that is not on the arm' },
+      data: { ...governsTheWholeProject(), replaces: [], because: 'force control needs a sensor that is not on the arm' },
     })
     expect(answer.status, answer.error).toBe(201)
     expect(decisionTitles()).toContain('The gripper stays on position control')
@@ -229,7 +229,7 @@ describe('a decision is written at the machine Mole Office runs on', () => {
     const answer = await ask(anotherMachine, 'POST', '/api/records', {
       kind: 'decision',
       title: 'Two listeners, one corpus',
-      data: { replaces: [], because: 'the same database is the whole point' },
+      data: { ...governsTheWholeProject(), replaces: [], because: 'the same database is the whole point' },
     }, {
       ...HUMAN,
       'x-forwarded-for': '127.0.0.1',
@@ -247,7 +247,7 @@ describe('a decision is written at the machine Mole Office runs on', () => {
     const answer = await ask(anotherMachine, 'POST', '/api/records', {
       kind: 'decision',
       title: 'Arrival by header',
-      data: { replaces: [], because: 'a caller cannot say which door it came through' },
+      data: { ...governsTheWholeProject(), replaces: [], because: 'a caller cannot say which door it came through' },
     }, { ...HUMAN, 'x-mole-office-arrival': 'this machine' })
     expect(answer.status, answer.error).toBe(400)
     expect(answer.error).toContain('x-mole-office-arrival is not a header Mole Office reads')
@@ -258,7 +258,7 @@ describe('a decision is written at the machine Mole Office runs on', () => {
     const answer = await ask(anotherMachine, 'POST', '/api/records', {
       kind: 'decision',
       title: 'The refusal is read by a person',
-      data: { replaces: [], because: 'a refusal nobody can act on is a failed refusal' },
+      data: { ...governsTheWholeProject(), replaces: [], because: 'a refusal nobody can act on is a failed refusal' },
     })
     expect(answer.status, answer.error).toBe(403)
     expectRefusedAsAClaimNoKeyProved(answer)
@@ -500,7 +500,7 @@ describe('a door nobody classified', () => {
     const answer = await ask(anUnclassifiedDoor, 'POST', '/api/records', {
       kind: 'decision',
       title: 'A third listener nobody classified',
-      data: { replaces: [], because: 'an unstamped door is a broken assumption, not a permission question' },
+      data: { ...governsTheWholeProject(), replaces: [], because: 'an unstamped door is a broken assumption, not a permission question' },
     })
     expect(answer.status, `an unclassified door wrote a decision: ${answer.error}`).toBe(500)
     expect(answer.error).toContain('could not tell which door this request came through')

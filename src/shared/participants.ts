@@ -52,20 +52,20 @@ export function isParticipantKind(value: unknown): value is ParticipantKind {
 }
 
 /**
- * The runtimes a durable agent may be served by, as criterion M2 names them.
+ * The runtimes this product has an adapter for: the harnesses Mole Office knows by name.
  *
- * THIS LIST IS WHAT A NEW WRITE IS CHECKED AGAINST. The `agent` record kind declares its `runtime`
- * field from it, so `POST /api/records` refuses a word that is not one of these and the refusal
- * names every one of them. That sentence used to be written here and was true nowhere: nothing in
- * the repository imported this list, and `runtime: "a-runtime-nobody-declared"` was accepted into
- * the registry. Problem `3zYuz90LvTS5`.
+ * THIS LIST NO LONGER DECIDES WHICH WORD AN AGENT MAY CARRY. The `agent` record kind and the hold
+ * take any harness's word, so an agent of a harness nobody wrote an adapter for can register, hold
+ * its heartbeat and be written to. This list decides only what the office knows a harness by: its
+ * name, and whether it can start a run of it. For a word outside it, every reader says the office
+ * cannot start that harness by itself and that its messages wait for its own waiter
+ * (`aHarnessWithNoAdapter` below). Whether the office can read inside a session of a harness on the
+ * list is a second fact, kept beside it (`THE_OFFICE_READS_ITS_SESSIONS` below).
  *
- * A RECORD WRITTEN BEFORE THE CHECK KEEPS ITS OWN WORD, AND THE REGISTRY SAYS NOTHING ABOUT IT.
- * Agent records written earlier carry other words — `codex-cli` is the one in this corpus. The
- * record keeps what it says, because rewriting a stored value to make a list look tidy is the one
- * thing a migration here may not do. The registry column is left empty instead, and empty there
- * means nobody has said which of these words serves this agent. That is a real answer; `codex-cli`
- * in a column that means "one of these words" would be a false one.
+ * THE REGISTRY'S `runtime` STAYS ONE OF THESE WORDS OR NONE. A stored word outside the list is
+ * read as no known runtime there, and the stored word itself travels beside it as `harness`, so a
+ * page can show what the agent said it runs in. `codex-cli`, a word records carried before the
+ * list was checked, is read the same way as any other word outside it.
  *
  * `kimi` IS THE FOURTH, ADDED ON 5 SEPTEMBER 2026: Kimi CLI is in the adapter list, and the other two
  * command-line tools surveyed with it are not. It is Moonshot
@@ -79,6 +79,37 @@ export type AgentRuntime = (typeof AGENT_RUNTIMES)[number]
 
 export function isAgentRuntime(value: unknown): value is AgentRuntime {
   return typeof value === 'string' && (AGENT_RUNTIMES as readonly string[]).includes(value)
+}
+
+/**
+ * WHICH RUNTIMES' SESSIONS THE OFFICE CAN READ INSIDE: their own process and their transcript.
+ *
+ * Today that is claude-code and codex. For any other runtime, and for any word outside the list,
+ * the office reads nothing inside the session, so a live hold is the only sign that the agent is
+ * there. Every runtime on the list says yes or no here, so a runtime added to the list cannot be
+ * left out of this question.
+ */
+const THE_OFFICE_READS_ITS_SESSIONS: Record<AgentRuntime, boolean> = {
+  'claude-code': true,
+  codex: true,
+  dsh: false,
+  opencode: false,
+  kimi: false,
+}
+
+/**
+ * THE STORED WORD OF A HARNESS WHOSE SESSIONS THE OFFICE CANNOT READ INSIDE, or null for one it can read
+ * or no word at all.
+ *
+ * A word outside the list is such a harness too. Every reader that says what the office can see inside
+ * a session asks this, so a reader for a harness with no adapter and a reader for opencode or kimi say
+ * the same thing.
+ */
+export function aHarnessTheOfficeCannotReadInside(said: unknown): string | null {
+  if (typeof said !== 'string') return null
+  const word = said.trim()
+  if (word === '') return null
+  return isAgentRuntime(word) && THE_OFFICE_READS_ITS_SESSIONS[word] ? null : word
 }
 
 /**
@@ -99,11 +130,11 @@ export function theRuntimeWordsSaid(): string {
 /**
  * WHICH RUNTIME IS THIS OFFICE'S OWN ON THIS MACHINE. Criterion P88.
  *
- * P88's decision: every Codex, and every agent from another machine, is a visitor. A
- * visitor comes in through the Embassy on a credential; the registration door refuses or re-routes a
- * registration from a runtime that is not the office's own Claude Code on this machine. So this is
- * the one word a registration made on this machine may declare, and it is written here rather than
- * spelled into the refusal and the gate separately.
+ * P88's decision: every Codex, and every agent from another machine, is a visitor. A visitor
+ * comes in through the Embassy on a credential. The registration door does not read the runtime
+ * word to decide that: it takes any harness's word as given. This word is read where a row of the
+ * office's own Claude Code is told apart from an older row admitted before P88
+ * (`admittedBeforeP88` below).
  */
 export const THE_OFFICES_OWN_RUNTIME: AgentRuntime = 'claude-code'
 
@@ -276,6 +307,50 @@ export function declaredRuntimeOrNull(said: unknown): AgentRuntime | null {
   const word = said.trim()
   return isAgentRuntime(word) ? word : null
 }
+
+/**
+ * THE LONGEST A RUNTIME WORD MAY BE. One number for the two places that take a harness's word: the
+ * agent kind's check and the hold door.
+ */
+export const RUNTIME_WORD_MAX = 40
+
+/**
+ * WHY A RUNTIME WORD CANNOT BE STORED, or null because it can. Any harness's word is taken. The word is stored as
+ * written, so its length is counted as written.
+ */
+export function whyThatIsNoRuntimeWord(said: unknown): string | null {
+  if (typeof said !== 'string' || said.trim() === '') return 'A runtime word is the name of a harness, and it cannot be empty.'
+  if (said.length > RUNTIME_WORD_MAX) return `A runtime word is at most ${String(RUNTIME_WORD_MAX)} characters long.`
+  return null
+}
+
+/**
+ * THE STORED WORD OF A HARNESS THIS PRODUCT HAS NO ADAPTER FOR, or null for a known word or none.
+ *
+ * Every reader that branches on an agent's runtime asks this first. A word outside the list means
+ * the office cannot start that harness by itself, and nothing worse: the agent is not hidden, its
+ * hold is not refused and its messages are not refused. They wait for its own waiter.
+ */
+export function aHarnessWithNoAdapter(said: unknown): string | null {
+  if (typeof said !== 'string') return null
+  const word = said.trim()
+  return word === '' || isAgentRuntime(word) ? null : word
+}
+
+/** THE ONE SENTENCE FOR SUCH A HARNESS, on the hold's answer and wherever else it is said. */
+export function whatTheOfficeDoesForAHarnessWithNoAdapter(harness: string): string {
+  return readStoredWord('devWords.runtime.noAdapter', { runtime: harness })
+}
+
+/**
+ * THE RUNTIME WORDS MOLE OFFICE FILES FOR ITS OWN PROCESSES. The API server, the message worker, the
+ * terminal holder and the dev supervisor file `mole-office`; the browser app files `vite`; the review
+ * worker, tools/agent-worker.mjs, files `mole-office-agent-worker`. No agent stands behind a session
+ * filed with one of them, so nothing can be addressed to it. A run the message worker starts, a check
+ * or a merge among them, carries `startedByMoleOffice` instead, so its word needs no place here. Any
+ * other word is a harness's, and a session filed with it is a run an agent stands behind.
+ */
+export const THE_OFFICES_OWN_PROCESS_WORDS: readonly string[] = ['mole-office', 'vite', 'mole-office-agent-worker']
 
 /** The shortest a handle may be. */
 export const HANDLE_MIN = 2
@@ -571,10 +646,11 @@ export function chatButtonStaysBeforeAnybodyChooses(kind: ParticipantKind | unde
 }
 
 /**
- * HOW THE CHAT OPENS from the circle, the sidebar's Chat row, the phone's bar and the chat key.
+ * HOW THE CHAT OPENS from the circle, the sidebar's Chat row, the phone's bar and the chat key: the way the person last
+ * had it, which the chat keeps on their row whenever it is put beside the page or in its window.
  *
- * `split` is what they have always done: the chat opens beside the page. `window` opens it in its
- * window over the bottom-right corner, the one the seam sends it to.
+ * `split` opens the chat beside the page. `window` opens it in its window over the bottom-right corner, the one the
+ * seam sends it to.
  */
 export const CHAT_OPENS_AS = ['split', 'window'] as const
 
@@ -586,8 +662,8 @@ export function isChatOpensAs(value: unknown): value is ChatOpensAs {
   return typeof value === 'string' && (CHAT_OPENS_AS as readonly string[]).includes(value)
 }
 
-/** WHAT NOBODY HAVING CHOSEN IS READ AS: `split`, which is how the chat opens today. */
-export const CHAT_OPENS_AS_BEFORE_ANYBODY_CHOOSES: ChatOpensAs = 'split'
+/** WHAT NOBODY HAVING CHOSEN IS READ AS: `window`, so the chat opens in the corner window the first time. */
+export const CHAT_OPENS_AS_BEFORE_ANYBODY_CHOOSES: ChatOpensAs = 'window'
 
 /** A person's chosen chat layout; null leaves the layout to the available width. */
 export const CHAT_LAYOUTS = ['one', 'two'] as const
@@ -800,15 +876,14 @@ export function isSendKeySetting(value: unknown): value is SendKeySetting {
 export const SEND_KEY_BEFORE_ANYBODY_CHOOSES: SendKeySetting = 'shift-or-alt-enter'
 
 /**
- * THE KEYBOARD SHORTCUTS A PERSON CAN TURN ON OR OFF. Each of the eight questions of the proposal in report
- * hbu756wTdJnz is answered as its recommendation says, at item 5 of a decision.
+ * THE KEYBOARD SHORTCUTS A PERSON CAN TURN ON OR OFF.
  *
  * ONE ID FOR EACH ROW OF THE SETTINGS GROUP. Which keys each id answers to, and its words, are in
  * `src/web/lib/shortcuts.ts`, whose table is typed over this list, so a row cannot be added there and
  * missed here. The door refuses an id this list does not hold.
  *
- * NOT BUILT, AND SO NOT HERE: `r` for the review pane and `a` for pointing at a part. The proposal's
- * first batch (question 8) leaves them out.
+ * NOT BUILT, AND SO NOT HERE: a key for the review pane and a key for pointing at a part. The first
+ * batch of shortcuts left them out.
  */
 export const SHORTCUT_IDS = ['chat', 'keys', 'home', 'decisions', 'settings', 'project', 'waiting', 'search', 'quickSearch', 'theme'] as const
 
@@ -822,16 +897,20 @@ export function isShortcutId(value: unknown): value is ShortcutId {
 
 /**
  * WHAT A PERSON HAS CHOSEN ABOUT THE SHORTCUTS, stored as JSON in the `shortcuts` column of their
- * `people` row (migration 0191).
+ * `people` row (migration 0191). Nothing stored names a key, so the keys can move and the choice
+ * is kept as it was.
  *
- * `singleKeys` is the one switch for every single-letter key and every "g" key. `false` stops all of
- * them at once, whatever `off` says. The keys held with Ctrl (⌘ on a Mac) are not single keys and
- * follow only their own row.
+ * `singleKeys` is the one switch for every Alt key (Option on a Mac), the keys that work only
+ * outside a text box. Before the keys moved to Alt, it stopped the single keys and the "g" keys,
+ * which were the keys outside a text box then; its name and its stored value are kept. `false`
+ * stops every Alt key at once, whatever `off` says. The keys held with Ctrl (⌘ on a Mac) do not
+ * answer to it and follow only their own row.
  *
- * `off` names each shortcut they turned off, in the order of `SHORTCUT_IDS`, each once.
+ * `off` names each shortcut they turned off, in the order of `SHORTCUT_IDS`, each once. It keeps
+ * its meaning: a shortcut in it stays off.
  *
  * A NULL COLUMN MEANS NOBODY HAS CHOSEN, and it is read as `SHORTCUTS_BEFORE_ANYBODY_CHOOSES`: every
- * shortcut on. That is the proposal's question 3, answered "on by default".
+ * shortcut on.
  */
 export interface ShortcutSettings {
   singleKeys: boolean

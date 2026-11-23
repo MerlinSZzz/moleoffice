@@ -17,6 +17,33 @@ import { KEY_HEADER } from '../src/config/key-header.mjs'
 
 export { A_VISITORS_TOKEN, THE_AGENT_KEY, aSecretFromTheEnvironment, theAgentKey } from '../src/config/agent-key-reader.mjs'
 
+/** The shared refusal tells a caller how to obtain a key before any kit tool sends. */
+export const A_KIT_TOOL_HOLDS_NO_KEY = "This tool holds no key, so it sent nothing. Set MOLE_AGENT_KEY_FILE to the full path of the file holding your agent key (register-myself.mjs --key-file writes one), or run this tool in your run's own terminal, which holds your run's key."
+
+/**
+ * Explain why the run key was unavailable without printing the configuration's path.
+ * @param {string} why
+ * @param {Record<string, string | undefined>} env
+ * @returns {string}
+ */
+export function theNoKeyLine(why, env) {
+  const path = env.MOLE_OFFICE_TOOL_CONFIGURATION
+  const reason = path ? why.replaceAll(path, 'named by MOLE_OFFICE_TOOL_CONFIGURATION') : why
+  return `${A_KIT_TOOL_HOLDS_NO_KEY} The run's key was not used: ${reason}.`
+}
+
+/**
+ * Print a shell assignment after registration so the next tool can find the key file.
+ * @param {string} path
+ * @param {string} [system]
+ * @returns {string}
+ */
+export function theLineThatSetsTheKeyFile(path, system = process.platform) {
+  return system === 'win32'
+    ? `$env:MOLE_AGENT_KEY_FILE = '${path.replaceAll("'", "''")}'`
+    : `export MOLE_AGENT_KEY_FILE='${path.replaceAll("'", "'\\''")}'`
+}
+
 /** @typedef {import('../src/config/agent-key-reader.mjs').ASecret} ASecret */
 
 /**

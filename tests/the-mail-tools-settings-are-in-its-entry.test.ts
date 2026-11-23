@@ -15,15 +15,15 @@
  * ---------------------------------------------------------------------------------------
  *
  *   1. With a real tool on this computer, the entry draws the list the tool keeps, refuses a list with a line that is
- *      not an address whole and says so, and saves a right list into the tool's own folder.
+ *      not an address whole with "Not saved", and saves a right list into the tool's own folder.
  *   2. A tool that answers only another origin's page is not read by this one: the browser keeps its answer, the entry
  *      says the tool did not answer, and nothing is saved; in developer mode it names this page's origin.
  *   3. The account it sends from, the accounts that cannot send and why, and what became of each test letter are drawn
  *      in the words of the lists, and developer mode alone draws what the servers said.
  *   4. With several accounts and none picked, the entry asks for one, and its press sends the one the person chose.
- *   5. A test letter that was not sent says why, and an empty list says so.
- *   6. The press that turns it off is drawn for an installed tool alone, says what it did, and the tool then reads as
- *      turned off.
+ *   5. A test letter that was not sent names what kept it, and an empty list reads "Not sent: the list is empty."
+ *   6. The press that turns it off is drawn for an installed tool alone, reads "Turned off" after it, and the tool then
+ *      reads as off.
  *   7. In Chinese, the entry's words are the Chinese list's.
  *   8. Where the tool answers is taken only as http on 127.0.0.1 with a secret, and only this computer is its own.
  *  10. At 1440 and 390, in English and Chinese, the entry fits in the theme the person stored, and no dark picture is
@@ -72,6 +72,7 @@ import { liveApp, type LiveApp } from './helpers.ts'
 import { testShots } from './where-shots-go.ts'
 import { en } from '../src/shared/words/en.ts'
 import { zh } from '../src/shared/words/zh.ts'
+import { createI18n, t } from '../src/shared/i18n.ts'
 import { makeTheFolder, makeTheTool, saveTheAddresses, serveTheDoors, theOfficesOrigins } from '../tools/mail-the-summonses.mjs'
 import { onTheToolsComputer, whereTheToolIs } from '../src/web/lib/the-mail-tool.ts'
 
@@ -212,11 +213,11 @@ describe("the mail tool's settings are in its entry", () => {
       await draw(RUNNING(tool.page), null, null)
       await theList().waitFor()
       expect(await theList().inputValue()).toBe(A)
-      // ITS ACCOUNTS READER IS NOT THERE, so it reads no account of this computer, and says so.
-      await expect.poll(() => theEntry().innerText()).toContain(en['settingsPanel.mailtool.from.unreadable'])
+      // ITS ACCOUNTS READER IS NOT THERE, so it reads no account of this computer, and the account reads "not read".
+      await expect.poll(() => theEntry().innerText()).toContain(t('settingsState.notRead'))
       await theList().fill(`${B}\nnot an address`)
       await press(en['settingsPanel.mailtool.addresses.save'])
-      await expect.poll(() => theEntry().innerText()).toContain(said(en, 'settingsPanel.mailtool.addresses.notAnAddress', { which: 'not an address' }))
+      await expect.poll(() => theEntry().innerText()).toContain(t('settingsPanel.mailtool.addresses.notSaved.notAnAddress', { which: 'not an address' }))
       expect(tool.list()).toEqual({ addresses: [A] })
       await theList().fill(`${B}\n${A}`)
       await press(en['settingsPanel.mailtool.addresses.save'])
@@ -237,9 +238,9 @@ describe("the mail tool's settings are in its entry", () => {
       expect(await theEntry().innerText()).not.toContain(A)
       expect(tool.list()).toEqual({ addresses: [A] })
       // IN DEVELOPER MODE, THE PAGE'S OWN ORIGIN IS NAMED, so a page the tool refused can tell whether it is the office's.
-      expect(await theEntry().innerText()).not.toContain('This page is')
+      expect(await theEntry().innerText()).not.toContain(t('settingsPanel.mailtool.tool.pageOrigin', { origin: pageAt }))
       await draw(RUNNING(tool.page), null, null, 'en', 'inspect')
-      await expect.poll(() => theEntry().innerText()).toContain(`This page is ${pageAt}.`)
+      await expect.poll(() => theEntry().innerText()).toContain(t('settingsPanel.mailtool.tool.pageOrigin', { origin: pageAt }))
     } finally {
       await tool.doors.close()
     }
@@ -280,7 +281,7 @@ describe("the mail tool's settings are in its entry", () => {
     expect(errors).toEqual([])
   }, 60_000)
 
-  it('5: says why a test letter was not sent, and says so of an empty list', async () => {
+  it('5: names what kept a test letter from being sent, and that the list was empty', async () => {
     const state = aToolsState()
     await draw(RUNNING(A_STAND_IN), null, { state, afterTest: { ...state, lastTest: { at: '2026-09-28 21:06:00', outcome: 'not sent', reason: 'login refused', letters: [] } } })
     await theList().waitFor()
@@ -289,18 +290,18 @@ describe("the mail tool's settings are in its entry", () => {
     await draw(RUNNING(A_STAND_IN), null, { state, afterTest: { ...state, addresses: [], lastTest: { at: '2026-09-28 21:07:00', outcome: 'empty list', reason: null, letters: [] } } })
     await theList().waitFor()
     await press(en['settingsPanel.mailtool.test.send'])
-    await expect.poll(() => theEntry().innerText()).toContain(en['settingsPanel.mailtool.test.emptyList'])
+    await expect.poll(() => theEntry().innerText()).toContain(t('settingsPanel.mailtool.test.notSentEmpty'))
     expect(errors).toEqual([])
   }, 60_000)
 
-  it('6: draws the press that turns it off for an installed tool alone, says what it did, and then reads it as turned off', async () => {
+  it('6: draws the press that turns it off for an installed tool alone, reads "Turned off" after it, and then reads the tool as off', async () => {
     await draw(NOT_INSTALLED, null, { state: aToolsState() })
     expect(await app.page.getByRole('button', { name: en['settingsPanel.mailtool.disable'], exact: true }).count()).toBe(0)
     await draw(RUNNING(A_STAND_IN), TURNED_OFF, { state: aToolsState() })
     await theList().waitFor()
     await press(en['settingsPanel.mailtool.disable'])
-    await expect.poll(() => theEntry().innerText()).toContain(en['settingsPanel.mailtool.done.turnedOff'])
-    await expect.poll(() => theEntry().innerText()).toContain(en['settingsPanel.mailtool.state.off'])
+    await expect.poll(() => theEntry().innerText()).toContain(t('settingsPanel.mailtool.done.nowOff'))
+    await expect.poll(() => theEntry().innerText()).toContain(t('settingsPanel.mailtool.state.isOff'))
     expect(await asked()).toContain('disable')
     // TURNED OFF, IT HAS NO SETTINGS TO READ: the tool is not asked again.
     expect(await theList().count()).toBe(0)
@@ -337,7 +338,7 @@ describe("the mail tool's settings are in its entry", () => {
         }
       }
       await press(words['settingsPanel.mailtool.key.takeBack'])
-      await expect.poll(() => theEntry().innerText()).toContain(words['settingsPanel.mailtool.key.takenBack'])
+      await expect.poll(() => theEntry().innerText()).toContain(createI18n(language).t('settingsPanel.mailtool.key.takenBackState'))
       expect(await asked()).toContain('take-back-key')
       expect(await app.page.locator('.imt-key').count()).toBe(0)
       expect(await app.page.getByRole('button', { name: words['settingsPanel.mailtool.key.takeBack'], exact: true }).count()).toBe(0)

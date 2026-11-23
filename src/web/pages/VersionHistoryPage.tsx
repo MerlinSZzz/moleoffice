@@ -26,7 +26,7 @@ export function versionHistoryBoundaryKey(workspace: string, generation: number)
 function outcomeWord(row: StableUpgradeHistoryRow): string {
   switch (row.outcome) {
     case 'handed-off':
-      return t('w13q.upgrades.handedOffSentence')
+      return t('versionHistoryPage.handedOff')
     case 'completed':
       return t('w13q.upgrades.completedSentence')
     case 'refused':
@@ -47,11 +47,11 @@ function noticeStateWord(state: NonNullable<StableUpgradeHistoryRow['notices']['
     case 'unchanged':
       return t('w13q.upgrades.noticeUnchanged')
     case 'changed':
-      return t('w13q.upgrades.noticeChanged')
+      return t('versionHistoryPage.noticeChanged')
     case 'deleted':
-      return t('w13q.upgrades.noticeDeleted')
+      return t('versionHistoryPage.noticeDeleted')
     case 'missing':
-      return t('w13q.upgrades.noticeMissing')
+      return t('versionHistoryPage.noticeMissing')
   }
   return t('w13q.upgrades.noticeUnavailable')
 }
@@ -89,7 +89,7 @@ type EmergencyFacts = Extract<StableUpgradeHistoryRow, { kind: 'emergency' }>['e
  */
 function EmergencyDebts({ facts }: { facts: EmergencyFacts }) {
   const { followUp, report } = facts
-  if (followUp.state === 'not-owed' && report.state === 'not-owed') return <p className="vh-emergency-line">{t('w13q.upgrades.emergencyOwesNothing')}</p>
+  if (followUp.state === 'not-owed' && report.state === 'not-owed') return <p className="vh-emergency-line">{t('versionHistoryPage.owesNothing')}</p>
   const receiptLine = followUp.state === 'not-owed' ? null
     : followUp.state === 'missing' ? t('w13q.upgrades.followUpMissing')
     : followUp.state === 'unknown' ? t('w13q.upgrades.followUpUnknown')
@@ -154,7 +154,7 @@ function UpgradeEntry({ row }: { row: StableUpgradeHistoryRow }) {
           to: row.toCommit.slice(0, 9),
         })}
       </p>
-      {noticeChanged ? <p className="vh-notice-changed">{t('w13q.upgrades.noticeChangedShort')}</p> : null}
+      {noticeChanged ? <p className="vh-notice-changed">{t('versionHistoryPage.editedLater')}</p> : null}
       <RouteLink to={messagePath(row.before.id)} className="vh-announcement-link">
         {t('w13q.upgrades.openAnnouncement')}
       </RouteLink>
@@ -195,7 +195,6 @@ function UpgradeEntry({ row }: { row: StableUpgradeHistoryRow }) {
 }
 
 const VERSION_HISTORY_CSS = `
-  .vh-intro { margin: 0 0 var(--pad-lg); color: var(--text-2); }
   .vh-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--gut); min-width: 0; }
   .vh-entry { min-width: 0; border: var(--border-w) solid var(--border); border-radius: var(--radius); background: var(--panel); padding: var(--pad-lg); }
   .vh-entry-heading { min-width: 0; display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--pad) var(--pad-lg); }
@@ -273,7 +272,7 @@ export function VersionHistoryContent({
       ) : null}
       {state.status === 'ready' ? (
         state.value.entries.length === 0 ? (
-          <p className="vh-empty">{t('w13q.upgrades.empty')}</p>
+          <p className="vh-empty">{t('absence.none')}</p>
         ) : (
           <>
             <section className="vh-list" aria-label={t('nav.versionHistory')}>
@@ -339,7 +338,6 @@ function VersionHistoryReader() {
   return (
     <div className="page version-history-page">
       <h1>{t('nav.versionHistory')}</h1>
-      <p className="vh-intro">{t('nav.what.versionHistory')}</p>
       <VersionHistoryContent
         state={state}
         onOlder={loadOlder}

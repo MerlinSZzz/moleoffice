@@ -21,6 +21,7 @@
 import { readFileSync } from 'node:fs'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import { THE_PERSON } from '../src/shared/person.ts'
+import { englishWords } from '../src/shared/words/joined.ts'
 import { theRoleCardsFile } from '../src/server/lib/roles.ts'
 import { THE_TEST_OFFICES_SECRETARY } from './a-page-of-a-test-office.ts'
 import { liveApp, waitForThePage, type LiveApp } from './helpers.ts'
@@ -37,6 +38,7 @@ const PANEL = '[data-target="uiSurface/settings.mergequeueowner"]'
 const ENTRY = '[data-settings-panel="settings.mergequeueowner"]'
 
 let app: LiveApp
+const en = englishWords()
 const shots = testShots('the-settings-page-names-the-merge-queue-owner')
 
 /** The card that may act for the person, read from the declaration and never typed. */
@@ -107,7 +109,10 @@ it('says nobody is named, says what the setting allows, and offers the secretari
   expect((await app.page.locator(`${PANEL} .mqo-state`).innerText()).trim()).toBe(
     'No owner named. Only you may move an entry to the front.',
   )
-  const offered = (await app.page.locator(`${PANEL} select option`).allInnerTexts()).map((one) => one.trim())
+  // THE PICKER'S ROWS, once its search box is pressed and the registries it names them from are read.
+  await app.page.locator(PANEL).getByLabel(en['mergeQueueOwner.pick'], { exact: true }).click()
+  await app.page.locator(`${PANEL} .agp .agp-row:not(.agp-fixed)`).first().waitFor({ timeout: 15_000 })
+  const offered = (await app.page.locator(`${PANEL} .agp .agp-row .agp-name`).allInnerTexts()).map((one) => one.trim())
   expect(offered[0]).toBe('None')
   expect(offered.slice(1).sort()).toEqual([THE_TEST_OFFICES_SECRETARY.name, 'Quill'].sort())
 }, 120_000)
@@ -120,7 +125,8 @@ it('names one secretary with one press, and draws back what was stored', async (
   await openThePanel()
   const ids = (await call('GET', '/api/office/merge-queue-owner')) as { mayBeNamed: { id: string; handle: string }[] }
   const chosen = ids.mayBeNamed.find((one) => one.handle === THE_TEST_OFFICES_SECRETARY.handle)!.id
-  await app.page.locator(`${PANEL} select`).selectOption(chosen)
+  await app.page.locator(PANEL).getByLabel(en['mergeQueueOwner.pick'], { exact: true }).fill(THE_TEST_OFFICES_SECRETARY.handle)
+  await app.page.locator(`${PANEL} .agp button.agp-row[data-value="${chosen}"]`).click()
   await app.page.locator(`${PANEL} .mqo-button`).click()
   await app.page.waitForFunction(
     ({ selector, expected }) => document.querySelector(selector)?.textContent?.trim() === expected,

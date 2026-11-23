@@ -347,6 +347,11 @@ export interface CastingReading {
   rules: readonly CastingLabelRule[]
   /** The office's time zone, in which an Out until with no offset is read. */
   officeTimeZone: string
+  /**
+   * EVERY AGENT OF A HARNESS THE OFFICE HAS NO ADAPTER FOR, by handle, with the harness's word. No row can name that
+   * harness as its program, because the office cannot start it; the page says its model is chosen there.
+   */
+  harnesses: { handle: string; harness: string }[]
 }
 
 /** What `GET /api/casting/for/:role` answers. */
@@ -500,6 +505,21 @@ export function theRowTheToolsTake<T extends { project: string | null; marked: b
   if (project !== null && inScope(project).length > 0) return { row: marked(project), scope: 'the project' }
   if (inScope(null).length > 0) return { row: marked(null), scope: 'every project' }
   return null
+}
+
+/**
+ * THE ROWS IN FORCE FOR ONE PROJECT: every row of the scope whose marked row the tools take, by the rule above, and
+ * that marked row. None when the table marks no row. `rows` are every row of ONE role. The server's roll
+ * (src/server/lib/the-rows-in-force.ts) and the new agent dialog read their rows here, so both read one scope.
+ */
+export function theRowsOfTheScopeInForce<T extends { project: string | null; marked: boolean }>(
+  rows: readonly T[],
+  project: string | null,
+): { rows: T[]; marked: T } | null {
+  const taken = theRowTheToolsTake(rows, project)
+  if (taken === null) return null
+  const scope = taken.scope === 'the project' ? project : null
+  return { rows: rows.filter((row) => row.project === scope), marked: taken.row }
 }
 
 /** A row with every cell empty. */

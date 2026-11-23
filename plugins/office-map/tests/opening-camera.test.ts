@@ -136,11 +136,13 @@ it.each([.04, .07524752475247524, .24, 1])('draws the full northern sign inside 
   const next = { ...layout, ownership: true, bounds: { x: 0, y: 0, width: 8272, height: 8080 }, houses: [house] } as unknown as Layout
   const before = structuredClone(next)
   update(next)
-  const inner = map as unknown as { zoom: number; homeLabels(ctx: CanvasRenderingContext2D, camera: { left: number; top: number; width: number; height: number }): Generator<void> }
+  type Homes = { house: Layout['houses'][number]; box: { x: number; y: number; width: number; height: number } }[]
+  const inner = map as unknown as { zoom: number; homeSignBoxes(camera: { left: number; top: number; width: number; height: number }): Homes; homeLabels(ctx: CanvasRenderingContext2D, homes: Homes): Generator<void> }
   inner.zoom = zoom
   const boxes: number[][] = [], text: number[][] = []
   const ctx = { fillRect: (...rect: number[]) => boxes.push(rect), fillText: (_value: string, ...rect: number[]) => text.push(rect), getImageData() {} }
-  for (const _ of inner.homeLabels(ctx as unknown as CanvasRenderingContext2D, { left: 0, top: 0, width: 8272, height: 8080 })) { /* actual renderer generator */ }
+  Object.assign(ctx, { measureText: (_value: string) => ({ width: 0 }) })
+  for (const _ of inner.homeLabels(ctx as unknown as CanvasRenderingContext2D, inner.homeSignBoxes({ left: 0, top: 0, width: 8272, height: 8080 }))) { /* actual renderer generator */ }
   expect(boxes).toHaveLength(2); expect(text).toHaveLength(1)
   const top = boxes[0]![1]!, height = boxes[0]![3]!, baseline = text[0]![1]!
   expect(top).toBeGreaterThanOrEqual(next.bounds.y)

@@ -122,7 +122,7 @@ describe('the goal drawing on the Goals page, at 990', () => {
     expect(seen.card!.left, 'the goal card runs past the left edge of the pane').toBeGreaterThanOrEqual(0)
   })
 
-  it('keeps each folded group heading clear of the left edge fade, and says why it is folded', async () => {
+  it('keeps each folded group heading clear of the left edge fade, and says it is folded', async () => {
     const seen = await app.page.evaluate(() => {
       const fade = document.querySelector('.pg-canvas-wrap > .px-reach-edge[data-side="left"]')
       const fadeRight = fade?.getBoundingClientRect().right ?? null
@@ -138,7 +138,7 @@ describe('the goal drawing on the Goals page, at 990', () => {
     for (const head of seen.heads) {
       expect(head.caret, 'a folded group heading starts under the edge fade').toBeGreaterThanOrEqual(seen.fadeRight!)
       expect(head.why, 'the fold sentence starts under the edge fade').toBeGreaterThanOrEqual(seen.fadeRight!)
-      expect(head.whyText).toBe(en['planNotes.graph.foldedOneNotOnThePlan'])
+      expect(head.whyText).toBe(en['g8.graph.folded'])
     }
   })
 })

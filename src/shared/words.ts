@@ -287,6 +287,12 @@ const trimmed = (value: unknown): string | null => {
  * match it exactly. The test fails if they ever stop matching.
  */
 export const KIND_WORDS: Readonly<Record<RecordKind, string>> = wordTable('kind', {
+  knowledge_entry: 'knowledge entry',
+  knowledge_category: 'knowledge category',
+  knowledge_bookmark: 'knowledge bookmark',
+  knowledge_change: 'knowledge change',
+  knowledge_query: 'knowledge query',
+  knowledge_rating: 'knowledge rating',
   whole_suite_receipt: 'whole suite receipt',
   sealed_tip: 'submitted tip',
   // TWO WORDS, THE STORED ONES WITHOUT THE UNDERSCORE: one entry in the merge queue. Sandbox v1, P6.
@@ -397,6 +403,7 @@ export const KIND_WORDS: Readonly<Record<RecordKind, string>> = wordTable('kind'
   flow_run: 'flow run',
   // TWO WORDS, THE STORED ONES WITHOUT THE UNDERSCORE: one ask for a registered host tool.
   host_job: 'host job',
+  pack: 'pack',
   // ONE WORD, AND THE STORED ONE. A counter counts things, which is what the English word already
   // says, and there is no underscore to spell out. Criterion CT1 states it.
   counter: 'counter',
@@ -428,6 +435,12 @@ export const KIND_WORDS: Readonly<Record<RecordKind, string>> = wordTable('kind'
   // TWO WORDS, THE STORED ONES WITHOUT THE UNDERSCORE: one reminder of a missing reviewed design, or one miss (part 6 of
   // the design-first build).
   design_reminder: 'design reminder',
+  // ONE WORD: one department of a project (step 1 of departments and posts). A department with no sub-department is
+  // called a team, a word worked out when it is read and never a kind.
+  department: 'department',
+  // TWO WORDS, THE STORED ONES WITHOUT THE UNDERSCORE: one key item of a project, with its progress and an estimate of the
+  // time left (point HD-2c of home as a data dashboard).
+  key_item: 'key item',
 })
 
 /** What to call a record of this kind. */
@@ -671,6 +684,10 @@ export const STATE_WORDS: Readonly<Record<string, string>> = wordTable('state', 
   // same there. Both new words are already what a person says, so each is printed as it is stored.
   draft: 'draft',
   'in use': 'in use',
+
+  // A DEPARTMENT'S STATES (DEPARTMENT_STATES in ./departments.ts). `running` and `merged` are above. `resting` is already
+  // what a person says: the department is kept and takes no work for now.
+  resting: 'resting',
 })
 
 /**

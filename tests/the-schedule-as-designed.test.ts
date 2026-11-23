@@ -29,6 +29,7 @@ import { liveApp, waitForThePage, type LiveApp } from './helpers.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { periodKey } from '../src/shared/planning.ts'
 import { en } from '../src/shared/words/en.ts'
+import { sayInEnglish } from '../src/shared/i18n.ts'
 
 let app: LiveApp
 let page: Page
@@ -188,7 +189,7 @@ describe('the Schedule as the owner adopted it, on a real page', () => {
     expect(hatch, 'the bar has no hatched part although one piece of work has no hours').not.toBeNull()
     expect(hatch!.width).toBeGreaterThan(0)
     expect(hatch!.image).toContain('gradient')
-    expect(await section('plan.hours')).toContain('1 more has no hours yet, so the real number can only go up')
+    expect(await section('plan.hours')).toContain(sayInEnglish('schedule.unstatedCount', { n: 1 }))
   })
 
   it('5. says "not set" on a week nobody gave a capacity, and never 0h, with no bar', async () => {

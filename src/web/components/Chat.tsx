@@ -56,9 +56,9 @@ import type React from 'react'
 import { flushSync } from 'react-dom'
 import { useLoadingLight } from '../lib/waiting-light.ts'
 import { putThePageAt, thePlaceOnThePage, whenThePageScrolls } from '../lib/page-scroll.ts'
-import { THE_SPLIT_FROM, TWO_COLUMNS_FROM, keepTheWidth, openTheChatAsChosen, putTheChat, sayHowTheChatOpens, sayTheCount, sayTheSplitIsDrawn, swapTheSides, theSplit, watchTheSplit, widthInside } from '../lib/chat-split.ts'
+import { THE_SPLIT_FROM, TWO_COLUMNS_FROM, keepTheWidth, openTheChatAsChosen, putTheChat, sayHowTheChatOpens, sayTheCount, sayTheSplitIsDrawn, swapTheSides, theSplit, theWayItWasOpenHere, watchTheSplit, widthInside } from '../lib/chat-split.ts'
 import { THE_NARROW_FROM } from '../lib/the-shell-width.ts'
-import { AShapePress, BackToThePageShape, BesideThePageShape, BetweenShape, ContactsShape, GroupsShape, ItsOwnWindowShape, PutItAwayShape, SendShape, AddGroupShape, FlagShape, SwapSidesShape } from './chat/Shapes.tsx'
+import { AShapePress, BackToThePageShape, BesideThePageShape, BetweenShape, ContactsShape, GroupsShape, ItsOwnWindowShape, PutItAwayShape, QuoteShape, SendShape, AddGroupShape, FlagShape, SwapSidesShape } from './chat/Shapes.tsx'
 import {
   CANNOT_REACH_WORDS,
   CHAT_DRAFTS_KEY,
@@ -107,6 +107,8 @@ import {
   STATE_PRESETS,
   isMoleOffice,
   MOLE_OFFICE_NAME,
+  type ChatLayout,
+  type ChatOpensAs,
   type ChatTextSize,
   type CircleShows,
   type MessageLinkLayout,
@@ -120,10 +122,10 @@ import { WhetherYouAreHere } from './WhetherYouAreHere.tsx'
 // THE CONTACTS LIST, LIFTED OUT OF THIS FILE — the same chooser the right-click panel draws. Criterion W4.
 import { ContactsInGroups, Dot, facesInAGroup, isASystemLine, ReadOutOnly, theNameBesideItsDate } from './ContactChooser.tsx'
 import { HowLinksAreDrawn, TheLineWithItsLinksInWords, theWordsOfALink } from './ChatLinks.tsx'
+import { theDotsOf } from './agent/the-dots-of.ts'
 import { GROUP_WORDS, THE_CHECKLIST_LINES, theTimelineOfAGroup, whereEachGroupSits, type GroupMemberOnTheWire, type SystemLine, type SystemLineKind } from '@shared/groups.ts'
 import { theWordsOfAnOfficeLine } from '@shared/dead-letter-lines.ts'
 import { whereAMessageHoldsAKey } from '@shared/message-keys.ts'
-import { A_PERSONS_TURN_DRAFT_GOES_WITHIN_MINUTES } from '@shared/turn-drafts.ts'
 import { theDraftAsTheStoreKeepsIt } from '../lib/the-kept-chat-draft.ts'
 import { KeyQuestion, useAKeyQuestion, type HowTheDraftChanged } from './AKeyQuestion.tsx'
 import { theFoldsOf, whenItStands } from '@shared/folded-lines.ts'
@@ -186,10 +188,9 @@ import { readStored, theBrowsersStore, writeStored } from '../lib/store.ts'
 // src/shared/time.ts. A contact's row reads the time of the last message against this.
 import { calendarDaysBetweenDayKeys, drawnStamp, nowStamp } from '@shared/time.ts'
 import { REMIND_ME_LATER_CHOICES, type RemindMeLaterChoice } from '@shared/remind-me-later.ts'
-import { whereRequestsGo } from '../lib/visiting.ts'
+import { theCrossOriginOfALoad, whereRequestsGo } from '../lib/visiting.ts'
 import { navigate, pathFor, recordPath, RouteLink, whoPath } from './router.tsx'
-import { SleepLine, theLineAfterAPress, type TheSleepLine } from './SleepLine.tsx'
-import { SleepPresses } from './SleepPresses.tsx'
+import { SleepLine } from './SleepLine.tsx'
 import { settingsPath } from '@shared/addresses.ts'
 import { recordNamedByTarget, TARGET_ATTRIBUTE, targetAttributes, targetFromAttributeValue, wordsNamedBy, type Context } from '@shared/targets.ts'
 // A MESSAGE'S PARTS, from the one derivation the server resolves against. Problem DowO7yEioWp0.
@@ -200,10 +201,10 @@ import { pressChoosesTheSubject, showWhatCanBeTalkedAbout, stopShowing, usePoint
 // THE QUOTE ABOVE A MESSAGE SENT BY POINTING.
 import { Quotes } from './chat/Quotes.tsx'
 import { QuoteBox, type DraftQuote, type QuoteCaret } from './chat/QuoteBox.tsx'
-import { MarkedWordsPaint, type AMarkedPartToDraw } from './chat/MarkedWords.tsx'
+import { MarkedWordsGround, MarkedWordsPaint, type AMarkedPartToDraw, type WordsHeldForAFlag } from './chat/MarkedWords.tsx'
 // A SENT MESSAGE'S MARKED PARTS, PAINTED ON ITS MARKDOWN, and the count of those that cannot be.
 import { MarkedPartsFoot, MarksOnMarkdownStyle, MESSAGE_BODY_FIELD, NO_PLACE, THE_MARKDOWN_OF_A_MESSAGE, drawsPressesInside, markTheDrawing, saysWhereItIs, theMessageInPlaces, thePartsToDraw, type HowToMark } from './chat/marks-on-markdown.tsx'
-import { markedPartsAfterATypedChange, markedPartsOverTheChosenWords, unmarkedOverTheChosenWords, type ADroppedPart } from '../lib/marking-the-words.ts'
+import { markedPartsAfterATypedChange, markedPartsOverTheChosenWords, theChosenRun, unmarkedOverTheChosenWords } from '../lib/marking-the-words.ts'
 import { knownTitleOf, useRecordTitles } from '../lib/titles.ts'
 import { goToTheLead, useWhatALeadsPageShows, whereALeadGoes } from './Leading.tsx'
 import { Avatar } from './Avatar.tsx'
@@ -230,11 +231,12 @@ import { aSendKeyPress, useSendKey } from '../lib/send-key.ts'
 // AND CHOOSING ONE TO SEND. Criterion M65: the composer takes a file, chosen or dropped, says the
 // size and the three types before it refuses anybody, and hands `send` the block to carry.
 import { AttachPress, PictureToSendRow, usePictureToSend, type PictureChosen } from './PictureToSend.tsx'
-import { Menu, Overlay, useCloseOnOutsidePress, useNarrow } from './ui.tsx'
-import { anIntentThatAsks, theFlagFor, theFlagForLabel, theFlagsOf, readTheMarkedParts, type AFlagOfThePersons, type AMarkedPart, type AnIntentThatAsks, type IntentMark, type TheFlagsOfAPerson } from '@shared/intent-mark.ts'
+import { Menu, useCloseOnOutsidePress, useNarrow } from './ui.tsx'
+import { anIntentThatAsks, THE_SHIPPED_COLOURS, theFlagFor, theFlagsOf, readTheMarkedParts, type AFlagOfThePersons, type AMarkedPart, type AnIntentThatAsks, type IntentMark, type TheFlagsOfAPerson } from '@shared/intent-mark.ts'
 import type { MessageLabel } from '@shared/message-label.ts'
 import { LabelColourStyle } from './chat/LabelColours.tsx'
-import { StartANewAgent, StartANewAgentFromHere, letThePressGoFor, useMadeOnThisPage } from './StartANewAgent.tsx'
+import { StartANewAgent, letThePressGoFor, useMadeOnThisPage } from './StartANewAgent.tsx'
+import { NewAgentDialog } from './NewAgentDialog.tsx'
 import type { WorkspaceReading } from '@shared/workspaces.ts'
 // THE ONE FUNCTION IN THE BROWSER THAT NAMES A PROJECT. Two spellings of one project's name is the
 // defect the switcher had; this is the same function the switcher and the record pages call.
@@ -1071,41 +1073,74 @@ function theMarksName(mark: IntentMark, flags: TheFlagsOfAPerson): string {
   if (flag !== null) return flag.name
   if (mark === 'just-ask') return t('message.intent.name.justAsk')
   if (mark === 'proposal-first') return t('message.intent.name.proposalFirst')
+  if (mark === 'align') return t('message.intent.name.align')
+  if (mark === 'give-options') return t('message.intent.name.giveOptions')
   return t('chat.intent.name.none')
 }
 
 /**
  * THE BUTTON LEFT OF SEND THAT SAYS WHAT THE AGENT MAY DO WITH THE NEXT MESSAGE. Its menu opens upward with the name
- * and, under it, the description the person wrote for that flag when there is one, and a tick on the one in force, and
- * a chosen flag is drawn loud so it is never missed. "No mark" stays quiet.
+ * and, under it, the flag's short description when it has one: the person's own, or the office's for a shipped flag. A
+ * tick is on the one in force, and a chosen flag is drawn loud so it is never missed. "No mark" stays quiet.
  *
  * IT IS A FLAG IN A BORDER OF ITS OWN, just left of Send, and it shows the chosen flag's short word beside the flag. The
  * long name is still the button's name for a screen reader.
  *
- * THE MENU LISTS THE TWO SHIPPED FLAGS, THE PERSON'S OWN, AND 'NO MARK' LAST, in the order `theFlagsOf` gives them. A
+ * THE MENU LISTS THE FOUR SHIPPED FLAGS, THE PERSON'S OWN, AND 'NO MARK' LAST, in the order `theFlagsOf` gives them. A
  * chosen flag is drawn in its colour on a soft ground of the same colour, whichever kind it is, by one drawing rule.
  * The message carries an own flag as its word and colour only; the description and instruction stay on the person's row.
  */
 function IntentSelector({
   chosen,
   flags,
+  held = null,
   onChoose,
   onOpen,
+  onShut,
 }: {
   chosen: AFlagOfThePersons
   flags: TheFlagsOfAPerson
-  onChoose: (flag: AFlagOfThePersons) => void
+  /** The words the menu was opened on, which the box draws grey while it is open, or null. */
+  held?: WordsHeldForAFlag | null
+  /** Answers where the box's cursor goes after the choice, or null to leave it where it was. */
+  onChoose: (flag: AFlagOfThePersons) => number | null
   /** Taken before the press moves the focus, so the selection in the box is still there to be read. */
   onOpen?: () => void
+  /** The menu shut with no flag chosen. */
+  onShut?: () => void
 }) {
   const [open, setOpen] = useState(false)
   const button = useRef<HTMLButtonElement | null>(null)
   const name = chosen.name
   const word = chosen.shortWord
   const chosenAt = flags.all.findIndex((one) => one.id === chosen.id)
-  const afterChoosing = (): void => {
+  /**
+   * AFTER A CHOICE THE FOCUS GOES BACK TO THE WRITING BOX, so the person goes on writing: at the place the choice names,
+   * or where the cursor was. A box holding a quote is not a plain box, and there the press keeps the focus.
+   */
+  const theBox = (): HTMLTextAreaElement | null => button.current?.closest('.px-chat-write')?.querySelector<HTMLTextAreaElement>('textarea.px-chat-box') ?? null
+  const afterChoosing = (at: number | null): void => {
     setOpen(false)
-    button.current?.focus()
+    const box = theBox()
+    if (box === null) {
+      button.current?.focus()
+      return
+    }
+    box.focus()
+    if (at !== null) box.setSelectionRange(at, at)
+  }
+  /**
+   * SHUT WITH NO CHOICE BY ESCAPE OR BY THE PRESS, THE WORDS ARE GIVEN BACK: the focus goes back to the box with the
+   * same words selected, as they were before the press. With no words held, the press keeps the focus as before.
+   */
+  const giveTheWordsBack = (): void => {
+    const box = held === null ? null : theBox()
+    if (held === null || box === null) {
+      button.current?.focus()
+      return
+    }
+    box.focus()
+    box.setSelectionRange(held.from, held.to)
   }
   return (
     <>
@@ -1121,10 +1156,16 @@ function IntentSelector({
         aria-haspopup="menu"
         aria-expanded={open ? 'true' : 'false'}
         onPointerDown={() => {
-          onOpen?.()
+          if (!open) onOpen?.()
         }}
         onClick={() => {
-          setOpen(!open)
+          if (!open) {
+            setOpen(true)
+            return
+          }
+          setOpen(false)
+          onShut?.()
+          giveTheWordsBack()
         }}
       >
         <FlagShape />
@@ -1143,10 +1184,9 @@ function IntentSelector({
           focusIndex={chosenAt < 0 ? flags.all.length - 1 : chosenAt}
           onClose={() => {
             setOpen(false)
+            onShut?.()
           }}
-          onEscape={() => {
-            button.current?.focus()
-          }}
+          onEscape={giveTheWordsBack}
           choices={flags.all.map((flag) => ({
             key: flag.id,
             chosen: flag.id === chosen.id,
@@ -1162,8 +1202,7 @@ function IntentSelector({
               </span>
             ),
             onChoose: () => {
-              onChoose(flag)
-              afterChoosing()
+              afterChoosing(onChoose(flag))
             },
           }))}
         />
@@ -1175,7 +1214,7 @@ function IntentSelector({
 /** THE MARK ON A SENT MESSAGE, in its footer where Urgent is drawn. A message marked none, or with no mark, draws nothing. */
 function IntentOnIt({ intent, whatTheMarkAsks, flags }: { intent: IntentMark | undefined; whatTheMarkAsks?: string; flags: TheFlagsOfAPerson }) {
   if (!anIntentThatAsks(intent)) return null
-  const colour = theFlagFor(intent, flags)?.colour ?? 'blue'
+  const colour = theFlagFor(intent, flags)?.colour ?? THE_SHIPPED_COLOURS[intent]
   return (
     <span className="px-chat-intent-mark px-label-ink" data-intent={intent} data-colour={colour} title={whatTheMarkAsks ?? undefined}>
       {theMarksName(intent, flags)}
@@ -1245,7 +1284,6 @@ function MarkBrokenPress({ reply, marked, flagName }: { reply: string; marked: {
         type="button"
         className="px-chat-mark-broken"
         disabled={state.at === 'filing'}
-        title={t('chat.intent.markBrokenTitle', { mark: flagName })}
         onClick={() => {
           setState({ at: 'filing' })
           api.markBroken(reply, marked.id).then(
@@ -1834,7 +1872,7 @@ function AGroupRow({
               <TieredPress key={participantKey(member.who)} tier="undo" size="sm"
                 available={group.members.some(current => participantKey(current.who) === participantKey(member.who))}
                 windowMs={CHAT_UNDO_MS} press={t('chat.group.takeOut', { name: theNameBesideItsDate(one.name, one.retiredAt) })}
-                pending={t('chat.removing')} done={t('chat.groupRemoved')} undo={undoSeconds}
+                pending={t('chat.removing')} done={t('chat.group.memberRemoved')} undo={undoSeconds}
                 undoing={t('chat.undoing')}
                 onPress={async () => {
                   keepForUndo(group.id)
@@ -1959,9 +1997,6 @@ function thePairKey(between: readonly [{ id: string }, { id: string }]): string 
 }
 
 /** The events the chat panel draws, so a tab is handed these and no others for it. */
-/** How many dots one read of `GET /api/presence?of=` asks for. The door answers at most 500. */
-const DOTS_IN_ONE_READ = 200
-
 const CHAT_DRAWS: readonly EventName[] = ['message.new', 'delivery.changed', 'presence.changed', 'list.changed', 'answering.changed']
 
 /**
@@ -2058,6 +2093,7 @@ function GrowingBox({
   onSelectWords,
   markedParts = [],
   flags = null,
+  held = null,
   select = null,
 }: {
   value: string
@@ -2071,6 +2107,8 @@ function GrowingBox({
   markedParts?: readonly AMarkedPart[]
   /** The person's flags, for the colours and names the paint draws. */
   flags?: TheFlagsOfAPerson | null
+  /** The words held for a flag while its menu is open, drawn on a grey ground, or null. */
+  held?: WordsHeldForAFlag | null
   /** The piece Change it asks the box to select, once, or null. */
   select?: APieceToSelect | null
 }): React.JSX.Element {
@@ -2212,7 +2250,10 @@ function GrowingBox({
   }
 
   return (
-    <div className="px-chat-box-holder">
+    <div className="px-chat-box-holder" data-ground={flags !== null && (markedParts.length > 0 || held !== null) ? 'yes' : undefined}>
+      {/* THE GROUNDS ARE DRAWN UNDER THE BOX, which is clear while they are there: each marked run on its flag's soft
+          ground, and the words held for a flag on grey while the flag's menu is open. */}
+      {flags === null ? null : <MarkedWordsGround body={value} parts={markedParts} held={held} flags={flags} />}
       {/* MARKED WORDS ARE PAINTED OVER THE BOX, because a plain textarea cannot colour a run inside itself. The layer
           takes no pointer, and every character it does not mark is transparent, so the box beneath is what is read and
           typed in. */}
@@ -2300,11 +2341,12 @@ const SEND_TIMEOUT_MS = 20_000
 type PendingSendState = 'sending' | 'sent' | 'failed' | 'not-known' | 'not-in-the-conversation'
 
 /**
- * A NEW ID FOR ONE PRESS OF SEND, stored on the message as `sendId`. Problem KzLydNEm4HYX. Random
- * bytes rather than `crypto.randomUUID`, which a page on the office's plain HTTP address does not
- * have.
+ * A NEW ID: for one press of send, stored on the message as `sendId`, for one quote kept in a
+ * draft, and for one marked part of a draft, as the id maker the flag menu gives the marking of
+ * chosen words. Random bytes rather than `crypto.randomUUID`, which a page on the office's plain HTTP
+ * address does not have. A quote's id was made with it once, and on that address no quote was kept.
  */
-function aSendId(): string {
+function aNewId(): string {
   return Array.from(crypto.getRandomValues(new Uint8Array(12)), (b) => b.toString(16).padStart(2, '0')).join('')
 }
 
@@ -2415,6 +2457,13 @@ interface WhatTheChatHeld {
  * reading and the project on screen, so it survives a reload and is forgotten when the writer changes.
  */
 const CHAT_KEPT = 'chat.held'
+
+/** The non-contact conversation selected in this tab, shared by the page and corner drawings. */
+let selectedConversation:
+  | { kind: 'group'; id: string }
+  | { kind: 'unregistered'; writer: UnregisteredWriter }
+  | { kind: 'between'; reading: { pair: string; asSide: string | null } }
+  | null = null
 
 /**
  * WHERE THE READER WAS IN EACH CONVERSATION, so coming back to one lands on the message they were reading, at the
@@ -2667,10 +2716,13 @@ function TheChat({ where }: { where: ChatWhere }) {
   }, [])
   // THE PAGE IS ALWAYS OPEN. It has no circle and no seam, so nothing on it can close it.
   const open = onAPage || split.where !== 'closed'
-  // OPENING NEVER MOVES AN OPEN CHAT. From shut it opens beside the page. A chat the person put in its
-  // own window shows what it is asked to open there, and stays in its window.
+  // OPENING NEVER MOVES AN OPEN CHAT. From shut it opens the way the person last had it. A chat the person
+  // put in its own window shows what it is asked to open there, and stays in its window. Where it is now is
+  // read from the store, since a listener set up once holds this from its first drawing.
   const setOpen = (next: boolean): void => {
-    if (!onAPage) putTheChat(!next ? 'closed' : split.where === 'window' ? 'window' : 'split')
+    if (onAPage) return
+    if (!next) putTheChat('closed')
+    else if (theSplit().where === 'closed') openTheChatAsChosen()
   }
   /**
    * THE PAGE'S ROOM, SAID FROM WHAT IS DRAWN. Only a split on a window wide enough to hold both
@@ -2735,14 +2787,14 @@ function TheChat({ where }: { where: ChatWhere }) {
     return held.ok && held.value === 'yes'
   })
   /**
-   * WHETHER THE ONE CHOOSER FOR SUMMONING AN AGENT IS OPEN. Criterion M115.
+   * WHETHER THE NEW AGENT DIALOG IS OPEN.
    *
-   * The panel's own header carries one New agent button and this is its open flag. The chooser it
-   * opens is `StartANewAgentFromHere`, the same component the right-click menu draws, so the two
-   * cannot become two ways of starting an agent.
+   * This is the dialog's open flag. The New agent press in the chat's contacts opens it. Create sends
+   * the values it shows to POST /api/agents/new, which makes the agent and opens it in the chosen
+   * terminal.
    */
   const [summoning, setSummoning] = useState(false)
-  const [talkingTo, setTalkingToNow] = useState<{ kind: ParticipantKind; id: string } | null>(rememberedContact)
+  const [talkingTo, setTalkingToNow] = useState<{ kind: ParticipantKind; id: string } | null>(() => selectedConversation === null ? rememberedContact() : null)
   const pressedContact = useRef<HTMLElement | null>(null)
   const contactSequence = useRef(0)
   const preparedContact = useRef<string | null>(null)
@@ -2757,6 +2809,10 @@ function TheChat({ where }: { where: ChatWhere }) {
   })
   const [who, setWhoNow] = useState<ParticipantsForThePageReply | null>(kept?.lists.who ?? null)
   const layoutSaveInFlight = useRef(false)
+  /** The columns the person last pressed for, drawn while their save is on its way; null once the row says the same. */
+  const [layoutChosen, setLayoutChosen] = useState<ChatLayout | null>(null)
+  /** The same choice for the save, which reads it after each answer. Each press sets it before it is read. */
+  const layoutWanted = useRef<ChatLayout>('two')
   const [presence, setPresenceNow] = useState<PresenceOnTheWire[]>(kept?.lists.presence ?? [])
   const [contacts, setContactsNow] = useState<ContactListHeld | null>(kept?.lists.contacts ?? null)
   /**
@@ -2851,7 +2907,7 @@ function TheChat({ where }: { where: ChatWhere }) {
    * message whose writer answers to no registry row. That section is gone, and
    * each such writer now has a conversation of its own under the line it typed. Criterion M25.
    */
-  const [withUnregistered, setWithUnregisteredNow] = useState<UnregisteredWriter | null>(null)
+  const [withUnregistered, setWithUnregisteredNow] = useState<UnregisteredWriter | null>(() => selectedConversation?.kind === 'unregistered' ? selectedConversation.writer : null)
   const [fromUnregistered, setFromUnregisteredNow] = useState<UnregisteredReply | null>(null)
   /**
    * WHICH CONVERSATION BETWEEN TWO AGENTS IS OPEN, AND WHOSE VIEW IT IS BEING READ FROM.
@@ -2862,14 +2918,17 @@ function TheChat({ where }: { where: ChatWhere }) {
    * third party to these conversations and taking one of their viewpoints is the special case
    * rather than the ordinary one. The two side presses stay beside it.
    */
-  const [reading, setReadingNow] = useState<{ pair: string; asSide: string | null } | null>(null)
+  const [reading, setReadingNow] = useState<{ pair: string; asSide: string | null } | null>(() => selectedConversation?.kind === 'between' ? selectedConversation.reading : null)
   const [asSide, setAsSide] = useState<AsSideReply | null>(null)
   const asSideNow = useRef(asSide)
   asSideNow.current = asSide
   // THE READING WHOSE READ WAS REFUSED, and the reason the panel says in its place (wave 13y round 95, item 26).
   const [pairRefused, setPairRefused] = useState<{ reading: { pair: string; asSide: string | null }; reason: string } | null>(null)
   /** The group the reader has open, or null because they are not in one. */
-  const [inTheGroup, setInTheGroupNow] = useState<string | null>(null)
+  const [inTheGroup, setInTheGroupNow] = useState<string | null>(() => selectedConversation?.kind === 'group' ? selectedConversation.id : null)
+  // THE GROUP OPEN NOW, for a read of a group that answers after the reader picked another (`readTheGroup`).
+  const theGroupOpenNow = useRef(inTheGroup)
+  theGroupOpenNow.current = inTheGroup
   /**
    * ONE MESSAGE THE PANEL WAS ASKED TO OPEN A GROUP AT, or null because the group was asked for on
    * its own. Criterion GM2: the line saying which group a forwarded reply came from opens that
@@ -2886,6 +2945,7 @@ function TheChat({ where }: { where: ChatWhere }) {
   }
   function setTalkingTo(who: { kind: ParticipantKind; id: string } | null): void {
     if (who !== null) {
+      selectedConversation = null
       stopWaitingForAContact()
       setInTheGroupNow(null)
       setWithUnregisteredNow(null)
@@ -2895,6 +2955,8 @@ function TheChat({ where }: { where: ChatWhere }) {
     setTalkingToNow(who)
   }
   function setWithUnregistered(writer: UnregisteredWriter | null): void {
+    if (writer !== null) selectedConversation = { kind: 'unregistered', writer }
+    else if (selectedConversation?.kind === 'unregistered') selectedConversation = null
     if (writer !== null) {
       stopWaitingForAContact()
       setTalkingToNow(null)
@@ -2905,6 +2967,8 @@ function TheChat({ where }: { where: ChatWhere }) {
     setWithUnregisteredNow(writer)
   }
   function setReading(choice: { pair: string; asSide: string | null } | null): void {
+    if (choice !== null) selectedConversation = { kind: 'between', reading: choice }
+    else if (selectedConversation?.kind === 'between') selectedConversation = null
     if (choice !== null) {
       stopWaitingForAContact()
       setTalkingToNow(null)
@@ -2915,13 +2979,19 @@ function TheChat({ where }: { where: ChatWhere }) {
     setReadingNow(choice)
   }
   function setInTheGroup(group: string | null): void {
+    if (group !== null) selectedConversation = { kind: 'group', id: group }
+    else if (selectedConversation?.kind === 'group') selectedConversation = null
     if (group !== null) {
       stopWaitingForAContact()
       setTalkingToNow(null)
       setWithUnregisteredNow(null)
       setReadingNow(null)
       setOpenAtMessage(null)
+      // THE GROUP OPEN BEFORE IS LET GO AT THE PICK. Until wave 13y round 175 its reply stayed drawn under the group just
+      // picked, its name, its members and its messages, until the new group's read answered.
+      if (held.current.theGroup !== null && held.current.theGroup.group.id !== group) setTheGroup(null)
     }
+    theGroupOpenNow.current = group
     setInTheGroupNow(group)
   }
   const [groups, setGroupsNow] = useState<ShortGroupsReply | null>(kept?.lists.groups ?? null)
@@ -2994,7 +3064,7 @@ function TheChat({ where }: { where: ChatWhere }) {
   const thePinnedGroups = everyPinnedGroup.filter((one) => inTheChosenProject(one, shownProject))
   const theGroupsTheyAreInThatStayOpen = everyGroupTheyAreInThatStaysOpen.filter((one) => inTheChosenProject(one, shownProject))
   const theFoldedGroups = everyFoldedGroup.filter((one) => inTheChosenProject(one, shownProject))
-  const [theGroup, setTheGroupNow] = useState<OneGroupReply | null>(null)
+  const [theGroup, setTheGroupNow] = useState<OneGroupReply | null>(() => kept?.lists.theGroup != null && kept.lists.theGroup.group.id === inTheGroup ? kept.lists.theGroup : null)
   /**
    * WHAT THE PANEL HOLDS, for the event handler, which applies an event to it rather than reading the
    * lists again (src/web/lib/chatdeltas.ts). Each list's setter below moves this at the same moment as
@@ -3074,19 +3144,6 @@ function TheChat({ where }: { where: ChatWhere }) {
       }, 0)
     }
     dotsToRead.current.set(key, who)
-  }
-  /**
-   * The dots of these participants, in the project on screen, or none where the read answered for another one. The door
-   * says which project it answered for (`workspaceId`). A read started before the page moved to another project answers
-   * for the old one, and drawing it would show dots worked out somewhere else.
-   */
-  const theDotsOf = async (whos: readonly { kind: ParticipantKind; id: string }[]): Promise<PresenceOnTheWire[]> => {
-    const project = currentWorkspace()
-    const answers = await Promise.all(
-      Array.from({ length: Math.ceil(whos.length / DOTS_IN_ONE_READ) }, (_, i) => api.presenceOf(whos.slice(i * DOTS_IN_ONE_READ, (i + 1) * DOTS_IN_ONE_READ))),
-    )
-    if (project !== currentWorkspace() || answers.some((one) => one.workspaceId !== project)) return []
-    return answers.flatMap((one) => one.presence)
   }
   /**
    * The presence read again: the dots drawn, read in the project on screen, and nothing else kept. With no dot drawn,
@@ -3282,6 +3339,8 @@ function TheChat({ where }: { where: ChatWhere }) {
   const partsFault = useSyncExternalStore(watchTheDrafts, () => draftsNow().partsFault, () => draftsNow().partsFault)
   /** Where the plain box's selection was when the person last made one, so choosing a flag knows what to mark. */
   const wordsSelectedInTheBox = useRef<{ from: number; to: number }>({ from: 0, to: 0 })
+  /** The words the flag's menu was opened on, drawn grey while it is open, because the press takes the box's focus. */
+  const [wordsHeldForAFlag, setWordsHeldForAFlag] = useState<WordsHeldForAFlag | null>(null)
   const quoteCaret = useRef<QuoteCaret>({ at: 0, quotesBefore: 0 })
   const selectedQuote = useRef<ReturnType<typeof pointedAt> | null>(null)
   const [pickingQuote, setPickingQuote] = useState(false)
@@ -3298,7 +3357,7 @@ function TheChat({ where }: { where: ChatWhere }) {
   useLayoutEffect(() => {
     quoteCaret.current = { at: draftOf(draftHereKey).length, quotesBefore: quotesInDraft(draftHereKey).length }
     wordsSelectedInTheBox.current = { from: 0, to: 0 }
-    setDroppedMarks([])
+    setWordsHeldForAFlag(null)
     setMarksTakenOff(null)
   }, [draftHereKey])
 
@@ -3310,7 +3369,7 @@ function TheChat({ where }: { where: ChatWhere }) {
     // A caret between two quotes at the same text position distinguishes their order.
     let index = current.findIndex((quote, n) => quote.at > at || (quote.at === at && n >= before))
     if (index < 0) index = current.length
-    const quote: DraftQuote = { id: crypto.randomUUID(), context: pointed.context, about: pointed.about, at }
+    const quote: DraftQuote = { id: aNewId(), context: pointed.context, about: pointed.about, at }
     writeDraftQuotes(draftHereKey, [...current.slice(0, index), quote, ...current.slice(index)])
     quoteCaret.current = { at, quotesBefore: index + 1 }
   }
@@ -3393,8 +3452,6 @@ function TheChat({ where }: { where: ChatWhere }) {
    * and choosing a mark takes the label off, so the flag shows one choice. It too goes back to none at every send.
    */
   const [label, setLabel] = useState<MessageLabel | null>(null)
-  /** The parts a typed change took out of the draft, said under the box until the next change or send. */
-  const [droppedMarks, setDroppedMarks] = useState<readonly ADroppedPart[]>([])
   /** A whole-message flag that took the marks off the words, said under the box until the next change or send. */
   const [marksTakenOff, setMarksTakenOff] = useState<string | null>(null)
   const [pieceToSelect, setPieceToSelect] = useState<APieceToSelect | null>(null)
@@ -3437,21 +3494,15 @@ function TheChat({ where }: { where: ChatWhere }) {
    * The words a person types close the question, so Send anyway never sends other words than it was asked about.
    *
    * TYPING MOVES THE MARKS WITH THE WORDS. A part wholly before or after the change keeps its flag and moves by the
-   * change's length; a part the change touches is dropped, and every dropped part is said under the box with its words
-   * and its flag. The one reader of that arithmetic is `markedPartsAfterATypedChange`.
+   * change's length; a part the change touches is dropped with its words, and nothing is said of it: the words losing
+   * their colour show it. The one reader of that arithmetic is `markedPartsAfterATypedChange`.
    */
   const typeInTheBox = (next: string): void => {
     keyQuestion.close()
     const before = typedNow()
     if (next !== before) {
       const held = partsInDraft(draftHereKey)
-      if (held.length > 0) {
-        const moved = markedPartsAfterATypedChange(before, next, held)
-        writeDraftParts(draftHereKey, moved.kept)
-        setDroppedMarks(moved.dropped)
-      } else if (droppedMarks.length > 0) {
-        setDroppedMarks([])
-      }
+      if (held.length > 0) writeDraftParts(draftHereKey, markedPartsAfterATypedChange(before, next, held).kept)
       if (marksTakenOff !== null) setMarksTakenOff(null)
     }
     setTyped(next)
@@ -3752,9 +3803,13 @@ function TheChat({ where }: { where: ChatWhere }) {
    * widths rather than copied: the page is as wide as the window less the sidebar and the chat, so
    * the chat's new width is its old one plus what the page is over the reading width. That holds
    * whatever the window is and however wide the folded sidebar is.
+   *
+   * A DOUBLE-CLICK ON A SHAPE IS TWO PRESSES OF THE SHAPE, as a press on one never starts the drag.
+   * Two fast presses are a double-click to the browser, and from a shape it reached the seam, so
+   * folding the lists fast moved the widths of the page and the chat.
    */
-  const giveThePageItsReadingWidth = (): void => {
-    if (!drawingTheSplit || !theSplitIsWide) return
+  const giveThePageItsReadingWidth = (e: React.MouseEvent<HTMLDivElement>): void => {
+    if (!drawingTheSplit || !theSplitIsWide || (e.target as Element).closest('button') !== null) return
     const page = document.querySelector<HTMLElement>('#main')
     if (page === null) return
     const style = getComputedStyle(page)
@@ -4350,11 +4405,16 @@ function TheChat({ where }: { where: ChatWhere }) {
     void readTheUnregistered()
   }, [unregisteredOpen, readTheUnregistered])
 
+  // AN ANSWER FOR A GROUP THE READER HAS SINCE LEFT IS NOT DRAWN, nor its failure, as for a pair (`readTheOpenPairAgain`).
+  // It came after another group was picked, and drew the group left over the one picked.
   const readTheGroup = useCallback(async (id: string) => {
     try {
-      setTheGroup(await api.oneGroup(id))
+      const read = await api.oneGroup(id)
+      if (theGroupOpenNow.current !== id) return
+      setTheGroup(read)
       setFault(null)
     } catch (err: unknown) {
+      if (theGroupOpenNow.current !== id) return
       setFault(errorMessage(err))
     }
   }, [])
@@ -4823,19 +4883,26 @@ function TheChat({ where }: { where: ChatWhere }) {
       return
     }
     // AN ANSWER FOR A READING THE PERSON HAS SINCE LEFT IS NOT DRAWN (wave 13y round 129, item 67). It came after the
-    // conversation opened next, and drew its messages, or its refusal, over that one. The lists are still read again,
-    // since the read recorded that the reader has seen it.
+    // conversation opened next, and drew its messages, or its refusal, over that one. The between-agents list is still
+    // read again, since the read recorded that the reader has seen it.
     let left = false
     void api
       .conversationBetween(reading.pair, reading.asSide)
-      .then(async (said) => {
+      .then((said) => {
         if (!left) setAsSide(said)
-        // AND THE LISTS ARE READ AGAIN, SO BOTH COUNTS FALL. Criterion M71. The owner reported that
+        // AND THE BETWEEN-AGENTS LIST IS READ AGAIN, SO THE ROW'S COUNT FALLS. Criterion M71. The owner reported that
         // opening a conversation did not make the bubble counts above fall. The read above is what
         // records that the reader has read this
         // conversation, and it always did; nothing asked for the list again afterwards, so the
-        // number on the tab and the bold on the row were both answers from before the read.
-        await readEverything()
+        // count on the row was an answer from before the read.
+        //
+        // THAT LIST AND NO OTHER, as `readTheOpenPairAgain` reads it and as the server's own event about this read
+        // names it (`recordThatSomebodyRead` in src/server/lib/messages.ts). The read moves nothing else the chat draws:
+        // the tab of this list draws no number, and the circle counts contacts and groups. Until wave 13y round 175
+        // every list was read here afresh, the registry of every participant and the whole contact list among them.
+        // That was the difference found between this open and a contact's, which has read only its conversation and
+        // the agent's presence since round 9 of wave 13x.
+        readAfterTheBurst(new Set<ChatList>(['betweenAgents']))
       })
       .catch((err: unknown) => {
         // A SIDE NOBODY ANSWERS TO IS SAID BY THE DOOR'S SHORT REASON, which quotes no id (wave 13y round 94). The panel
@@ -4846,7 +4913,7 @@ function TheChat({ where }: { where: ChatWhere }) {
     return () => {
       left = true
     }
-  }, [reading, readEverything])
+  }, [reading, readAfterTheBurst])
 
   const pairOlderOut = useRef(false)
   const readOlderPair = (): void => {
@@ -5238,12 +5305,17 @@ function TheChat({ where }: { where: ChatWhere }) {
   // below then puts that place back on screen. See `CHAT_PLACES`.
   conversationOnScreenNow.current = conversationOnScreen
   useEffect(() => {
-    drawnBefore.current = null
-    olderAdded.current = 0
     goToTheNewest()
     const place = !open || conversationOnScreen === null ? undefined : thePlacesRead()[conversationOnScreen]
     placeToComeBackTo.current = place === undefined || conversationOnScreen === null ? null : { conversation: conversationOnScreen, place, row: null }
   }, [open, conversationOnScreen, where, goToTheNewest])
+  // WHAT WAS DRAWN IS FORGOTTEN ONLY WHEN THE PANEL OPENS OR ANOTHER CONVERSATION OPENS. A new frame draws the same
+  // messages, so it keeps what was drawn. When a new frame forgot it, the first message to arrive after the chat was
+  // put beside the page was taken for the first drawing, and a reader who had scrolled up got no mark.
+  useEffect(() => {
+    drawnBefore.current = null
+    olderAdded.current = 0
+  }, [open, conversationOnScreen])
 
   /**
    * WHAT IS DRAWN IN THE LIST RIGHT NOW: how many messages, and which is last.
@@ -5476,12 +5548,6 @@ function TheChat({ where }: { where: ChatWhere }) {
   // THE PERSON'S WHOLE LIST OF FLAGS, from their two stored values, read through the one builder the Settings panel
   // reads them through too. A reply reading somebody else's message does not draw their flag for them.
   const myFlags = theFlagsOf(myself?.shippedFlags ?? null, myself?.chatLabels ?? [])
-  /** The person's word for a dropped part's flag, from the list the menu draws. */
-  const theNameOfAPart = (part: AMarkedPart): string => {
-    if (part.intent !== undefined) return theFlagFor(part.intent, myFlags)?.name ?? ''
-    if (part.label !== undefined) return theFlagForLabel(part.label, myFlags)?.name ?? part.label.text
-    return ''
-  }
   /** One flag in the shape a marked part stores: an asking mark, or the label's own word and colour. */
   const theFlagOfTheMenu = (flag: AFlagOfThePersons): { intent?: AnIntentThatAsks; label?: MessageLabel } => (
     flag.kind === 'shipped'
@@ -5505,25 +5571,43 @@ function TheChat({ where }: { where: ChatWhere }) {
         wordsColour: label.colour,
       })
   const roomForTwoColumns = onAPage ? !narrow : wideForTwoColumns
-  const twoColumns = roomForTwoColumns && myself?.chatLayout !== 'one'
+  const twoColumns = roomForTwoColumns && (layoutChosen ?? myself?.chatLayout) !== 'one'
+  /**
+   * THE COLUMNS CHANGE IN THE FRAME OF THE PRESS. The choice is kept on the person's row, and it is saved behind the
+   * drawing: the save and a read of every participant, page after page, take as long as the office takes to answer,
+   * and the columns used to wait for both. A press while a save is on its way changes the drawing at once as well, and
+   * the last choice is the one saved. A save that fails draws what the row last said, and says why.
+   */
   const changeTheLayout = async (): Promise<void> => {
-    if (me?.kind !== 'person' || layoutSaveInFlight.current) return
+    if (me?.kind !== 'person') return
+    const person = me
+    layoutWanted.current = twoColumns ? 'one' : 'two'
+    setLayoutChosen(layoutWanted.current)
+    if (layoutSaveInFlight.current) return
     layoutSaveInFlight.current = true
     try {
-      await api.changeParticipant(me.kind, me.id, { chatLayout: twoColumns ? 'one' : 'two' })
-      readTheParticipantsOnce.written()
-      setWho(await readTheParticipantsOnce.again())
+      for (;;) {
+        const saving = layoutWanted.current
+        await api.changeParticipant(person.kind, person.id, { chatLayout: saving })
+        readTheParticipantsOnce.written()
+        const read = await readTheParticipantsOnce.again()
+        if (layoutWanted.current !== saving) continue
+        setWho(read)
+        setLayoutChosen(null)
+        break
+      }
     } catch (error: unknown) {
+      setLayoutChosen(null)
       setFault(errorMessage(error))
     } finally {
       layoutSaveInFlight.current = false
     }
   }
   const layoutPress = me?.kind !== 'person' || !roomForTwoColumns ? null : (
-    <AShapePress className="px-chat-layout-toggle" words={twoColumns ? t('chat.layout.single') : t('chat.layout.sideBySide')} onPress={() => { void changeTheLayout() }}>
+    <AShapePress className="px-chat-layout-toggle" words={t('chat.layout.sideBySide')} pressed={twoColumns} onPress={() => { void changeTheLayout() }}>
       <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
         <rect x="2" y="3" width="16" height="14" rx="1" />
-        {twoColumns ? null : <path d="M8 3v14" />}
+        <path d="M8 3v14" />
       </svg>
     </AShapePress>
   )
@@ -5532,13 +5616,20 @@ function TheChat({ where }: { where: ChatWhere }) {
     <IntentSelector
       chosen={chosenFlag}
       flags={myFlags}
+      held={wordsHeldForAFlag}
       onOpen={() => {
         const active = document.activeElement
         if (active instanceof HTMLTextAreaElement && active.closest('.px-chat-write') !== null) {
-          wordsSelectedInTheBox.current = { from: active.selectionStart, to: active.selectionEnd }
+          const selected = { from: active.selectionStart, to: active.selectionEnd }
+          wordsSelectedInTheBox.current = selected
+          setWordsHeldForAFlag(selected.to > selected.from && active.value.slice(selected.from, selected.to).trim() !== '' ? selected : null)
         }
       }}
+      onShut={() => {
+        setWordsHeldForAFlag(null)
+      }}
       onChoose={(flag) => {
+        setWordsHeldForAFlag(null)
         // WORDS SELECTED IN THE BOX ARE MARKED, and a flag chosen with nothing selected marks the whole message as
         // before. A message carries parts or one whole flag, never both, so marking words takes the whole flag off.
         const held = wordsSelectedInTheBox.current
@@ -5548,18 +5639,17 @@ function TheChat({ where }: { where: ChatWhere }) {
           if (flag.kind === 'none') {
             writeDraftParts(draftHereKey, unmarkedOverTheChosenWords(words, held.from, held.to, partsInDraft(draftHereKey)))
           } else {
-            const next = markedPartsOverTheChosenWords(words, held.from, held.to, partsInDraft(draftHereKey), theFlagOfTheMenu(flag), () => crypto.randomUUID())
+            const next = markedPartsOverTheChosenWords(words, held.from, held.to, partsInDraft(draftHereKey), theFlagOfTheMenu(flag), aNewId)
             if (next !== null) writeDraftParts(draftHereKey, next)
           }
           setIntent('none')
           setLabel(null)
-          setDroppedMarks([])
           setMarksTakenOff(null)
-          return
+          // THE CURSOR STANDS AT THE END OF THE WORDS JUST MARKED.
+          return theChosenRun(words, held.from, held.to)?.to ?? null
         }
         if (partsInDraft(draftHereKey).length > 0 && flag.kind !== 'none') {
           writeDraftParts(draftHereKey, [])
-          setDroppedMarks([])
           setMarksTakenOff(flag.name)
         } else {
           setMarksTakenOff(null)
@@ -5574,20 +5664,18 @@ function TheChat({ where }: { where: ChatWhere }) {
           setIntent('none')
           setLabel(null)
         }
+        // THE CHOICE IS FOR THE WHOLE MESSAGE, and the cursor stays where the person left it.
+        return null
       }}
     />
   ) : null
   /**
-   * WHAT HAPPENED TO A MARK WHILE THE PERSON WROTE: a part the typing touched, a whole flag that took the parts' place,
-   * or a browser that could not keep the marks with the draft. Said under the box, where the person is looking.
+   * WHAT HAPPENED TO THE MARKS WHILE THE PERSON WROTE: a whole flag that took the parts' place, or a browser that could
+   * not keep the marks with the draft. Said under the box, where the person is looking. A part the typing took out is
+   * not said: its words lose their colour.
    */
-  const theMarkNotes = droppedMarks.length === 0 && marksTakenOff === null && partsFault === null ? null : (
+  const theMarkNotes = marksTakenOff === null && partsFault === null ? null : (
     <div className="px-chat-mark-notes">
-      {droppedMarks.map((one, at) => (
-        <p key={`${String(one.part.from)}:${String(at)}`} className="px-chat-dropped-mark">
-          {t(one.why === 'moved' ? 'chat.partDroppedMoved' : 'chat.partDroppedGone', { quote: one.part.quote, name: theNameOfAPart(one.part) })}
-        </p>
-      ))}
       {marksTakenOff === null ? null : <p className="px-chat-marks-taken-off">{t('chat.marksTakenOff', { name: marksTakenOff })}</p>}
       {partsFault === null ? null : <p className="px-chat-marks-not-kept">{partsFault}</p>}
     </div>
@@ -5747,8 +5835,12 @@ function TheChat({ where }: { where: ChatWhere }) {
       // count and contact, not every comment in the review. Read those rows fresh, and only them.
       if (talkingTo === null || talk === null) return
       const members = [...detail.members.filter((one) => one.found), ...detail.saved]
+      // ONLY THE SHOWN COMMENTS THE OPEN REVIEW HOLDS ARE COMPARED AND SENT. A comment it does not hold, such as one left
+      // by an abandoned review, stays not sent; comparing it made every Send here say the review had changed.
+      const held = unsentHere.filter((one) => [...detail.members, ...detail.saved].some((member) => member.id === one.id))
       const theReviewChanged =
-        unsentHere.some((one) => !members.some((member) => member.id === one.id && member.found && member.state === 'queued' && member.body === one.body)) ||
+        held.length === 0 ||
+        held.some((one) => !members.some((member) => member.id === one.id && member.found && member.state === 'queued' && member.body === one.body)) ||
         (finishFirst && (detail.review.state !== 'collecting' || detail.members.length !== askingToFinish)) ||
         detail.review.state === 'abandoned' || detail.review.state === 'sent'
       // WHEN THE REVIEW ALREADY SAYS SO, the narrowed read is not asked: the conversation is read whole once, to redraw it.
@@ -5772,7 +5864,7 @@ function TheChat({ where }: { where: ChatWhere }) {
         setTalk(next.reply)
         talkReadStartedAt.current = Date.now()
         talkBeat.current?.settled()
-        setFault(t('chat.commentsChangedAtSend'))
+        setFault(t('review.b.changedNothingSent'))
         return
       }
       if (detail.review.state === 'collecting' && !finishFirst) {
@@ -5784,7 +5876,7 @@ function TheChat({ where }: { where: ChatWhere }) {
       await api.sendReview(
         reviewId,
         [],
-        unsentHere.map((one) => one.id),
+        held.map((one) => one.id),
       )
       setAskingToFinish(null)
       reviewChanged()
@@ -5987,7 +6079,7 @@ function TheChat({ where }: { where: ChatWhere }) {
     // as its own row and is not taken for this one.
     const retrying: PendingSend = {
       ...found,
-      sendId: aSendId(),
+      sendId: aNewId(),
       timedOutAt: null,
       state: 'sending',
       reason: null,
@@ -6035,7 +6127,7 @@ function TheChat({ where }: { where: ChatWhere }) {
     pendingSendCounter.current += 1
     const entry: PendingSend = {
       id: `pending-${String(Date.now())}-${String(pendingSendCounter.current)}`,
-      sendId: aSendId(),
+      sendId: aNewId(),
       timedOutAt: null,
       to,
       body: words,
@@ -6055,7 +6147,6 @@ function TheChat({ where }: { where: ChatWhere }) {
     setPendingSends((was) => [...was, entry])
     takeTheSentDraftOut(draftAtPress, typedAtPress, quotesAtPress)
     writeDraftParts(draftAtPress, [])
-    setDroppedMarks([])
     setMarksTakenOff(null)
     picture.sent(these)
     setIntent('none')
@@ -6141,7 +6232,6 @@ function TheChat({ where }: { where: ChatWhere }) {
       await api.sendToGroup(group, words, pictures, marked, quotesAtPress.map((one) => one.context), labelled, positionsForSend(quotesAtPress, typedAtPress, words), markedParts)
       takeTheSentDraftOut(draftAtPress, typedAtPress, quotesAtPress)
       writeDraftParts(draftAtPress, [])
-      setDroppedMarks([])
       setMarksTakenOff(null)
       picture.sent(these)
       setIntent('none')
@@ -6285,9 +6375,55 @@ function TheChat({ where }: { where: ChatWhere }) {
   const circleOnScreen = !onAPage && (buttonStays ? !theCornerIsCovered : where === 'corner' && split.where === 'closed' && theSplitIsWide && unread > 0)
   /** HOW THE CHAT OPENS from the circle, the sidebar's row, the phone's bar and the chat key, as the person chose. */
   const opensAs = myself?.chatOpensAs ?? CHAT_OPENS_AS_BEFORE_ANYBODY_CHOOSES
+  /**
+   * THE CHAT OPENS THE WAY THE PERSON LAST HAD IT. Put beside the page or in its window by any press, the way is kept on
+   * the person's own row, so the next opening in any browser of theirs is the same. Opening it the way it already opens
+   * keeps nothing, so a person who has only had it in its window still has nothing chosen. Where the window stands is
+   * kept in this browser, with its size.
+   */
+  const whereItWas = useRef(split.where)
+  const keepTheWay = useRef<(way: ChatOpensAs) => void>(() => undefined)
+  keepTheWay.current = (way) => {
+    if (me?.kind !== 'person' || way === opensAs) return
+    const person = me
+    void (async () => {
+      try {
+        await api.changeParticipant(person.kind, person.id, { chatOpensAs: way })
+        readTheParticipantsOnce.written()
+        setWho(await readTheParticipantsOnce.again())
+      } catch (error: unknown) {
+        setFault(errorMessage(error))
+      }
+    })()
+  }
   useEffect(() => {
+    const was = whereItWas.current
+    whereItWas.current = split.where
+    if (onAPage || split.where === 'closed' || split.where === was) return
+    keepTheWay.current(split.where)
+  }, [split.where, onAPage])
+  /**
+   * THE ROW IS SAID ONCE IT HAS BEEN READ IN THIS PAGE. A row kept from before a reload may hold a way the person has
+   * since changed.
+   *
+   * THE FIRST READ MEETS THE WAY THE CHAT WAS OPEN IN THIS PAGE. A reload opens the chat the way this browser left it,
+   * and the row may keep another way or none. Then that way is kept on the row, so a later reload with the chat shut,
+   * which has only the row to ask, opens it the same way. The row is said when it comes back holding that way.
+   */
+  const theRowIsRead = myself !== undefined && whoReadHere
+  const theWayHereIsKept = useRef(false)
+  useEffect(() => {
+    if (!theRowIsRead) return
+    if (!theWayHereIsKept.current) {
+      theWayHereIsKept.current = true
+      const here = theWayItWasOpenHere()
+      if (here !== null && here !== opensAs) {
+        keepTheWay.current(here)
+        return
+      }
+    }
     sayHowTheChatOpens(opensAs)
-  }, [opensAs])
+  }, [theRowIsRead, opensAs])
   /**
    * THE CHAT IS THE ONE PLACE THE COUNT IS WORKED OUT, and the sidebar's Chat row and the phone's
    * bar draw it from here. When the circle carries it, they say nothing; when it does not, they
@@ -6461,11 +6597,6 @@ function TheChat({ where }: { where: ChatWhere }) {
       ? { ...theirPresence, ...theirStatus.presence.value, word: presenceWord(theirStatus.presence.value) }
       : undefined
     : theirPresence
-  /** A resident's sleep as its press's door answered, held until the dot's next reading brings the office's own line. */
-  const [sleptHere, setSleptHere] = useState<{ agentId: string; line: TheSleepLine } | null>(null)
-  useEffect(() => {
-    setSleptHere(null)
-  }, [theirPresence])
   /**
    * WHO SET THIS AGENT'S LINE, BY NAME, or null because there is nothing to say.
    *
@@ -6848,9 +6979,7 @@ function TheChat({ where }: { where: ChatWhere }) {
                     say nothing is there when nobody has looked yet. */}
                 {shownProject === null || !theListIsEmptyUnderTheChoice ? null : (
                   <p className="px-chat-empty" data-px-none-in-project={shownProject}>
-                    {t('chat.projects.noneInThisList', {
-                      name: projectName(shownProject, projects.find((one) => one.id === shownProject)?.title),
-                    })}
+                    {t('absence.none')}
                   </p>
                 )}
                 {list !== 'contacts' ? null : contacts === null ? (
@@ -6901,9 +7030,12 @@ function TheChat({ where }: { where: ChatWhere }) {
                             api.conversationWith(them.kind, them.id, project, whatToAskFor(before)),
                             them.kind === 'agent' && !isMoleOffice(them) ? api.presenceOfOne(them.kind, them.id, project) : Promise.resolve(null),
                           ])
-                          if (sequence !== contactSequence.current || openTalk.current.project !== project || openTalk.current.key !== prior || !openNow.current) return
                           const held = heldConversation(key)
                           const newest = aMessageJoinedTheHeldOnes(held, value) ? await api.conversationWith(them.kind, them.id, project, whatToAskFor(null)) : null
+                          // THE ONE CHECK THAT THE ANSWER IS STILL WANTED, made after every read: still the latest press, for
+                          // the same project and the same open conversation, with the chat open. It is made once, because a
+                          // second copy before the read above ran on the same state and hid a change to either. A newer
+                          // page read above for a press the person has left is dropped here.
                           if (sequence !== contactSequence.current || openTalk.current.project !== project || openTalk.current.key !== prior || !openNow.current) return
                           const next = newest === null ? afterANewerRead(held, value) : afterANewerRead(null, newest)
                           holdConversation(key, next)
@@ -6962,7 +7094,6 @@ function TheChat({ where }: { where: ChatWhere }) {
                             type="button"
                             className="px-chat-edit"
                             disabled
-                            title={t('chat.contact.secretaryGroupEditTitle')}
                           >
                             {t('chat.contact.edit')}
                           </button>
@@ -7235,7 +7366,8 @@ function TheChat({ where }: { where: ChatWhere }) {
                 </span>
                 <div className="px-chat-them-words">
                   <span className="px-chat-them-top">
-                    <span className="px-chat-name">{theGroup?.group.name ?? ''}</span>
+                    {/* WHILE THE PICKED GROUP'S READ IS OUT, its row in the groups list names it. */}
+                    <span className="px-chat-name">{theGroup?.group.name ?? groups?.groups.find((one) => one.id === inTheGroup)?.name ?? ''}</span>
                   </span>
                   <span className="px-chat-them-state">
                     {GROUP_WORDS.memberCount(theGroup?.group.members.length ?? 0)}
@@ -7364,6 +7496,7 @@ function TheChat({ where }: { where: ChatWhere }) {
                       select={pieceToSelect}
                       markedParts={offersAMark ? keptParts : []}
                       flags={offersAMark ? myFlags : null}
+                      held={offersAMark ? wordsHeldForAFlag : null}
                       onSelectWords={(from, to) => { wordsSelectedInTheBox.current = { from, to } }}
                       onSend={() => {
                         void sendToTheGroup()
@@ -7399,7 +7532,7 @@ function TheChat({ where }: { where: ChatWhere }) {
                 <div className="px-chat-leave">
                   <TieredPress key={theGroup.group.id} tier="undo" available={theGroup.yours}
                     windowMs={CHAT_UNDO_MS} press={GROUP_WORDS.leave} pending={t('chat.leaving')}
-                    done={t('chat.groupLeft')} undo={undoSeconds} undoing={t('chat.undoing')}
+                    done={t('chat.group.youLeft')} undo={undoSeconds} undoing={t('chat.undoing')}
                     onPress={async () => {
                       const id = theGroup.group.id
                       const who = me
@@ -7622,7 +7755,7 @@ function TheChat({ where }: { where: ChatWhere }) {
                 <button type="button" className="px-chat-back" aria-label={CHAT_WORDS.back} onClick={() => setTalkingTo(null)}>{'‹'}</button>
                 <span className="px-chat-name">{MOLE_OFFICE_NAME}</span>
               </div>
-              <p className="px-chat-office-notices">{t('w13q.upgrades.chatReadOnly')}</p>
+              <p className="px-chat-office-notices">{t('chat.officeNotices.readOnly')}</p>
               <ol {...theMessageList} data-office-notices="yes">
                 {(talk?.messages ?? []).map((one) => isASystemLine(one)
                   ? <SystemLine key={one.id} said={one} />
@@ -7675,10 +7808,15 @@ function TheChat({ where }: { where: ChatWhere }) {
                     {talkingTo.kind === 'agent' && !isMoleOffice(talkingTo) ? (
                       <span className="px-chat-presence-word">{theirStatus === undefined ? t('chat.status.reading') : theirStatus?.presence.available ? presenceWord(theirStatus.presence.value) : t('chat.status.couldNotBeRead')}</span>
                     ) : null}
+                    {/* A PERMANENT RESIDENT'S ASLEEP WORD, from the reading the dot draws, and nothing while it is awake.
+                        It sits in the name row beside the presence word, because whether it is asleep is part of its
+                        presence. The row wraps, so in a narrow chat the word moves to the next line whole. Its sleep
+                        presses and the rest of its sleep are on its profile. */}
+                    <SleepLine reading={theirPresence} />
                     {/* THE NEWER OF TWO AGENTS THAT SHARE A NAME, marked beside the name and not in it
                         (problem hqbovBMnTu-z). The server says which one is newer. */}
                     {them?.newerOfASharedName === true ? (
-                      <span className="px-chat-newer" title={t('chat.newerOfASharedName.title')}>{t('chat.newerOfASharedName')}</span>
+                      <span className="px-chat-newer">{t('chat.newerOfASharedName')}</span>
                     ) : null}
                     {/* WHICH MIND IS ANSWERING AS THIS AGENT NOW. Criterion H3: the session the person has
                         open answers as itself and carries everything said in that terminal; a run is
@@ -7693,7 +7831,7 @@ function TheChat({ where }: { where: ChatWhere }) {
                         conversation's reply). A run that serves the agent and holds nothing draws nothing here, except
                         in inspect, which names the mind as before. */}
                     {!inspect && talk?.replying === true ? (
-                      <span className="px-chat-answering" title={t('chat.replying.title', { minutes: A_PERSONS_TURN_DRAFT_GOES_WITHIN_MINUTES })}>{t('chat.replying')}</span>
+                      <span className="px-chat-answering">{t('chat.replying')}</span>
                     ) : talk?.answering == null || talk.answering.how === 'nobody' || (talk.answering.how === 'a run' && !inspect) ? null : (
                       <span className="px-chat-answering" title={talk.answering.says}>
                         {CHAT_WORDS.answeringNow[talk.answering.how]}
@@ -7703,23 +7841,6 @@ function TheChat({ where }: { where: ChatWhere }) {
                   {/* A SECRETARY'S ONE-LINE DUTY, directly under the name (wave 13y round 86, item 12). Nothing for anybody else yet.
                       Two lines of a longer duty, and a press for the rest (wave 13y round 113, item 45). */}
                   <TheDutyLine who={talkingTo} folds />
-                  {/* A PERMANENT RESIDENT'S SLEEP, from the header dot's own reading. On its own
-                      line under the name: beside it, the narrow chat cut both the name and the line short. */}
-                  <SleepLine reading={sleptHere !== null && talkingTo !== null && sleptHere.agentId === talkingTo.id ? { residentSleep: sleptHere.line } : theirPresence} />
-                  {/* ITS SLEEP AND WAKE PRESSES, beside its sleep line, for the person, from
-                      round 47. The door also lets the resident itself press them, and only the
-                      resident postpones a sleep; a chat is never the resident's conversation with itself, so here they
-                      are the person's alone. */}
-                  {talkingTo?.kind === 'agent' && theirPresence?.residentSleep !== undefined && me?.kind === 'person' ? (
-                    <SleepPresses
-                      agentId={talkingTo.id}
-                      asleep={(sleptHere !== null && sleptHere.agentId === talkingTo.id ? sleptHere.line : theirPresence.residentSleep).asleepSince !== null}
-                      may={{ sleepAndWake: true, postpone: false }}
-                      onDone={(sleep) => {
-                        setSleptHere({ agentId: talkingTo.id, line: theLineAfterAPress(sleep) })
-                      }}
-                    />
-                  ) : null}
                   {/* THEIR LINE, AND THE PERSON'S HAND ON IT. Decision lUh6uis7oB6z keeps
                       the person's power to set it, and makes the line a mark like reporting or
                       working, not offline or online. The agent may
@@ -7767,7 +7888,7 @@ function TheChat({ where }: { where: ChatWhere }) {
                         ))}
                         <TieredPress tier="undo" available={theirPersonalWords !== null} windowMs={CHAT_UNDO_MS}
                           press={CHAT_WORDS.clearTheirLine} pending={t('chat.clearing')}
-                          done={t('chat.lineCleared')} undo={undoSeconds} undoing={t('chat.undoing')}
+                          done={t('chat.line.cleared')} undo={undoSeconds} undoing={t('chat.undoing')}
                           onPress={async () => {
                             const who = talkingTo
                             const words = theirPersonalWords ?? ''
@@ -7840,7 +7961,7 @@ function TheChat({ where }: { where: ChatWhere }) {
                     {talk?.couldNotTell === true
                       ? t('notesFixes.chat.couldNotTell', { who: theirNameInASentence })
                       : madeOnThisPage
-                      ? t('newAgentKeys.madeHere', { who: theirName })
+                      ? t('chat.notAnsweringYet', { who: theirName })
                       : CANNOT_REACH_WORDS.cannotReach(theirNameInASentence)}
                   </span>
                   {/* THE PRESS ONLY WHERE IT WOULD CARRY SOMETHING. After the press carried what was
@@ -8121,6 +8242,7 @@ function TheChat({ where }: { where: ChatWhere }) {
                     select={pieceToSelect}
                     markedParts={offersAMark ? keptParts : []}
                     flags={offersAMark ? myFlags : null}
+                    held={offersAMark ? wordsHeldForAFlag : null}
                     onSelectWords={(from, to) => { wordsSelectedInTheBox.current = { from, to } }}
                     onCaret={(at) => { quoteCaret.current = { at, quotesBefore: 0 } }}
                     onSend={() => { void send() }}
@@ -8167,7 +8289,7 @@ function TheChat({ where }: { where: ChatWhere }) {
                       else { showWhatCanBeTalkedAbout(); setPickingQuote(true) }
                     }}
                   >
-                    <span className="px-chat-quote-mark" aria-hidden="true">&quot;</span>
+                    <QuoteShape />
                     <span className="sr-only">{t('chat.quote.press')}</span>
                   </button>
                   <div className="px-chat-sender">
@@ -8239,6 +8361,7 @@ function TheChat({ where }: { where: ChatWhere }) {
             <img
               className="px-chat-circle-mark"
               src={whereRequestsGo(circlePictureUrl(circleFace))}
+              crossOrigin={theCrossOriginOfALoad()}
               alt=""
               aria-hidden="true"
               width={48}
@@ -8323,7 +8446,6 @@ function TheChat({ where }: { where: ChatWhere }) {
             <div
               className="px-chat-seam"
               data-chat-side={split.side}
-              title={theSplitIsWide ? t('chat.split.seam') : undefined}
               onPointerDown={startSeamDragging}
               onPointerMove={keepSeamDragging}
               onPointerUp={stopSeamDragging}
@@ -8342,7 +8464,7 @@ function TheChat({ where }: { where: ChatWhere }) {
                   <AShapePress className="px-chat-seam-away" words={t('chat.split.away')} onPress={() => putTheChat('closed')}>
                     <PutItAwayShape />
                   </AShapePress>
-                  <span className="px-chat-seam-grip" role="separator" aria-label={t('chat.split.seam')} title={t('chat.split.seam')} />
+                  <span className="px-chat-seam-grip" role="separator" aria-label={t('chat.split.seamName')} />
                 </>
               ) : (
                 <AShapePress className="px-chat-seam-back" words={t('chat.split.back')} onPress={leaveTheCoveringChat}>
@@ -8381,7 +8503,6 @@ function TheChat({ where }: { where: ChatWhere }) {
           {onAPage || drawingTheSplit ? null : (
           <div
             className="px-chat-chrome"
-            title={mayMove ? t('chat.move.hold') : undefined}
             data-moves={mayMove ? 'yes' : 'no'}
             onPointerDown={pressTheTopRow}
           >
@@ -8429,39 +8550,14 @@ function TheChat({ where }: { where: ChatWhere }) {
               conversation they are drawn with the cannot-reach notice instead, so every view keeps
               them at the top and nothing under the composer moves. */}
           {inAConversation ? null : noticeBanners}
-          {/* AND THE CHOOSER THE NEW AGENT BUTTON OPENS. Criterion M115. It is the same
-              `StartANewAgentFromHere` the right-click menu draws, so there is one list of the
-              agents nothing is answering as, one press per agent, and one door behind them
-              (`api.startANewAgentFor`). The label is drawn even when the list is empty, because a
-              press that opened nothing would be a press that said nothing. The styles live in this
-              file's one stylesheet, which is already in the document while the panel is. */}
+          {/* AND THE DIALOG THE NEW AGENT PRESS OPENS: the new agent dialog. Cancel closes it. Create sends
+              the values it shows to POST /api/agents/new, which makes the agent and opens it in the chosen terminal. */}
           {!summoning ? null : (
-            <Overlay>
-              <div className="px-chat-new-agent-behind" aria-hidden="true" />
-              <div
-                className="px-chat-new-agent-ask"
-                role="dialog"
-                aria-modal="true"
-                aria-label={CANNOT_REACH_WORDS.newAgent}
-              >
-                <StartANewAgentFromHere
-                  showLabelWhenEmpty
-                  onDone={() => {
-                    setSummoning(false)
-                    void readEverything()
-                  }}
-                />
-                <button
-                  type="button"
-                  className="px-chat-new-agent-close"
-                  onClick={() => {
-                    setSummoning(false)
-                  }}
-                >
-                  {t('chat.notNow')}
-                </button>
-              </div>
-            </Overlay>
+            <NewAgentDialog
+              onClose={() => {
+                setSummoning(false)
+              }}
+            />
           )}
           {/* THE THREE EDGES A PERSON DRAGS. The owner named each one: the left edge sets the
               width, the top edge the height, and the top-left corner both at once. They are drawn only where there is a box to resize. */}
@@ -8724,7 +8820,9 @@ const CSS = `
 /* THE CHAT BESIDE THE PAGE. Design D: both are as tall as the window, the chat is fixed to the
    window's edge, and the page gives it the room rather than being covered. The width comes from
    the person's drag through the style on the element; the seam is the chat's own first child and
-   the edge it meets the page at. */
+   the edge it meets the page at. Its dark edge is drawn only on the side that faces the page, so
+   none stands at the window's edge or against the sidebar's own line, and each side clears the
+   other's. */
 .px-chat[data-where='split'] {
   position: fixed;
   top: 0;
@@ -8740,11 +8838,12 @@ const CSS = `
   display: flex;
   flex-direction: row;
 }
-.px-chat[data-where='split'][data-chat-side='right'] { right: 0; left: auto; }
+.px-chat[data-where='split'][data-chat-side='right'] { right: 0; left: auto; border-right: none; }
 .px-chat[data-where='split'][data-chat-side='left'] {
   left: var(--sidebar-w, 248px);
   right: auto;
   flex-direction: row-reverse;
+  border-left: none;
 }
 .px-chat-split-view {
   flex: 1 1 auto;
@@ -8809,6 +8908,7 @@ const CSS = `
 .px-chat-chrome .px-chat-layout-toggle { width: 1.5rem; height: 1.5rem; }
 .px-chat-layout-toggle:hover { background: var(--hover); color: var(--text); }
 .px-chat-layout-toggle:focus-visible { outline: var(--focus-w) solid var(--focus); outline-offset: 2px; }
+.px-chat-layout-toggle[aria-pressed='true'] { background: var(--hover); color: var(--accent); box-shadow: inset 0 0 0 var(--border-w) var(--accent); }
 .px-chat-page-lists, .px-chat-page-talk, .px-chat-columns-lists, .px-chat-columns-talk {
   display: flex;
   flex-direction: column;
@@ -9676,10 +9776,11 @@ const CSS = `
   border-radius: 0.15rem;
 }
 .px-chat-marked-words { white-space: pre-wrap; overflow-wrap: anywhere; }
-.px-chat-marked-count { color: var(--muted); font-size: 0.72rem; }
+.px-chat-marked-count { color: var(--text-3); font-size: 0.72rem; }
 /* THE LAYER OVER THE PLAIN BOX. It has the box's own border, padding, font and wrapping, and takes no pointer. The box
-   beneath keeps the caret, the selection and the typing; the layer only colours the marked runs. */
-.px-chat-mark-paint {
+   beneath keeps the caret, the selection and the typing; the layer only colours the marked runs. It is named with both
+   classes so that its clear ground, border and ink win over the .px-chat-box rule further down. */
+.px-chat-box.px-chat-mark-paint {
   position: absolute;
   inset: 0;
   z-index: 1;
@@ -9690,11 +9791,27 @@ const CSS = `
   pointer-events: none;
   overflow: hidden;
 }
-/* THE NOTES UNDER THE BOX about a mark a change took out, or a whole flag that took the parts' place. */
+/* THE LAYER UNDER THE PLAIN BOX, with the box's own ground, border, padding, font and wrapping. While it is there the
+   box above it is clear, so its grounds show through under the box's own words, caret and selection. A marked run lies
+   on its flag's soft ground. The words held for a flag while the flag's menu is open lie on grey, because the press
+   took the focus and the browser no longer draws the selection: the grey is the box's ink mixed into the box's ground,
+   so it is grey in both themes and the box's ink stays readable on it. */
+.px-chat-box.px-chat-mark-ground {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  flex: none;
+  color: transparent;
+  pointer-events: none;
+  overflow: hidden;
+}
+.px-chat-box-holder[data-ground='yes'] > textarea.px-chat-box { position: relative; z-index: 0; background: transparent; }
+.px-chat-marked-ground { background: var(--label-soft); border-radius: 0.15rem; }
+.px-chat-held { background: color-mix(in srgb, var(--text) 18%, var(--bg, var(--panel))); border-radius: 0.15rem; }
+/* THE NOTES UNDER THE BOX about a whole flag that took the parts' place, or marks the browser could not keep. */
 .px-chat-mark-notes { display: flex; flex-direction: column; gap: 0.2rem; }
-.px-chat-dropped-mark,
 .px-chat-marks-taken-off,
-.px-chat-marks-not-kept { margin: 0; color: var(--muted); font-size: 0.75rem; }
+.px-chat-marks-not-kept { margin: 0; color: var(--text-3); font-size: 0.75rem; }
 
 /* A MESSAGE BODY, DRAWN BY THE RENDERER THE REPORTS USE.
 
@@ -9914,26 +10031,31 @@ const CSS = `
   padding: 0 0.1rem;
 }
 .px-chat-quote-chip-out:hover { color: var(--text); }
-.px-chat-quote-press[aria-pressed='true'] { background: var(--panel-2); color: var(--accent); }
+.px-chat-quote-press[aria-pressed='true'] { border-color: var(--accent); background: var(--panel-2); color: var(--accent); }
 /* THE SHAPES THAT ATTACH A FILE AND TAKE THE SELECTED WORDS, at the left of the row of presses. They
-   are as big as the other writing-box presses so a pointer finds them. The attach press is quiet until
-   the pointer is on it. */
+   are as big as the other writing-box presses so a pointer finds them. The two have one frame, set here
+   for both: an edge of their own, as the flag and Send have, so each reads as a press, and a ground that
+   stays clear until the pointer is on it. The attach press's shape is quiet until the pointer is on it.
+   The quote press is dark only while pressed. */
 .px-chat-attach-add,
 .px-chat-quote-press {
   flex: none;
   display: grid;
   place-items: center;
+  box-sizing: border-box;
   width: 2rem;
   height: 2rem;
   padding: 0;
-  border: none;
-  border-radius: var(--radius-sm);
+  border: var(--border-w) solid var(--border-strong);
+  border-radius: var(--radius);
   background: none;
   color: var(--text-2);
   cursor: pointer;
 }
-.px-chat-attach-add:hover { background: var(--hover); color: var(--text); }
-.px-chat-quote-mark { font: 1.5rem/1 var(--font-ui); }
+.px-chat-attach-add:hover,
+.px-chat-quote-press:not([aria-pressed='true']):hover { background: var(--hover); }
+.px-chat-attach-add:hover { color: var(--text); }
+.px-chat-quote-press { color: var(--text); }
 .px-chat-attach-add:focus-visible,
 .px-chat-quote-press:focus-visible { outline: var(--focus-w) solid var(--focus); outline-offset: 2px; }
 
@@ -10413,6 +10535,8 @@ const CSS = `
     border-right: none;
     border-bottom: var(--border-w) solid var(--border-strong);
   }
+  /* THE LEFT SIDE'S LINE OUTRANKS THE BAR'S RULE ABOVE, so a chat left stored on the left clears it here. */
+  .px-chat-seam[data-chat-side='left'] { border-left: none; }
   .px-chat-seam button { width: 2.5rem; height: 2.5rem; }
   .px-chat-seam-grip { display: none; }
 }

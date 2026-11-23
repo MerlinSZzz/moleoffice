@@ -2,10 +2,10 @@
 // Licensed under the MIT License. See LICENSE.
 /**
  * THE OFFICE'S OWN WRITES OF A RUN'S FIELDS: the later-look mark, how the round ended, the next round, one worker run,
- * the Casting roll and the cut asked. Each is the only write of its field. Each asks the human-only guard and keeps
- * its own change row and revision. They were moved whole out of src/server/lib/records.ts in wave 13s round 108, with
- * no change of behaviour, so that a change to them no longer meets another line's change in that file. The line that
- * owns them is 13n.
+ * the Casting roll and the cut asked, and since wave 13n the end commit. Each is the only write of its field.
+ * Each asks the human-only guard and keeps its own change row and revision. They were moved whole out of
+ * src/server/lib/records.ts in wave 13s round 108, with no change of behaviour, so that a change to them no longer
+ * meets another line's change in that file. The line that owns them is 13n.
  *
  * NO CALLER CHANGED. records.ts hands on everything here with `export *`, and every caller still imports these names
  * from records.ts. A test deleted on 13 November 2026 held that. No line changed in the move. `patchRecord` in records.ts still calls `writeTheEndedRunLookMark`. The refusals of these fields to an
@@ -24,7 +24,7 @@ import { ENDED_RUN_LOOK_FIELD } from '@shared/ended-run-resources.ts'
 import { HOW_THE_ROUND_ENDED } from '@shared/how-the-round-ended.ts'
 import { NEXT_ROUND } from '@shared/next-round.ts'
 import { moleOffice } from '@shared/participants.ts'
-import { CUT_ASKED, IMAGES_GIVEN, WORKER_PACKAGE, WORKER_RUNS, type TheCutAsked, type TheImagesGiven, type TheWorkerPackage } from '@shared/worker-runs.ts'
+import { CUT_ASKED, IMAGES_GIVEN, WORKER_PACKAGE, WORKER_PLACE, WORKER_RUNS, type TheCutAsked, type TheImagesGiven, type TheWorkerPackage, type TheWorkerPlace } from '@shared/worker-runs.ts'
 import { db, sqlite } from '../../db/client.ts'
 import { theWorkerRunKeyToWrite } from '../registry-aliases/worker-runs.ts'
 import { records } from '../../db/schema.ts'
@@ -33,6 +33,8 @@ import { logChange } from '../log-change.ts'
 import { now } from '@shared/now.ts'
 import { sameJson } from '@shared/same-json.ts'
 import { getRecord } from './reading.ts'
+import { END_HEAD } from '@shared/kinds.ts'
+import { type AHeadRead } from '../a-runs-own-commits.ts'
 
 /**
  * yFiC5HsshiTi: only the office calls this later-look path. Like every record write, it asks the
@@ -159,6 +161,23 @@ export function writeTheCutAsked(id: string, value: TheCutAsked, actor: Actor): 
   })()
 }
 
+/** The office records the place once when the worker's run is filed. */
+export function writeTheWorkerPlace(id: string, value: TheWorkerPlace, actor: Actor): void {
+  const held = getRecord(id)
+  if (held === null) throw new Error(`Run ${id} could not be read while writing its worker place.`)
+  assertMayWrite(held.kind, 'change', actor, id)
+  if (held.kind !== 'session') throw new Error(`Record ${id} is not a session, so it holds no worker place.`)
+  const before = held.data[WORKER_PLACE]
+  if (sameJson(before, value)) return
+  if (before !== undefined) throw new Error(`Run ${id} already holds a different worker place, and it is written once.`)
+  const data = { ...held.data, [WORKER_PLACE]: value }
+  sqlite.transaction(() => {
+    db.update(records).set({ data, updatedAt: now() }).where(eq(records.id, id)).run()
+    logChange(id, 'update', actor, `data.${WORKER_PLACE}`, undefined, value)
+    saveRevision(id, 'update', actor)
+  })()
+}
+
 /**
  * THE OFFICE'S ONE WRITE OF THE PACKAGE A WORKER'S RUN WAS STARTED FOR, which every ordinary write is refused
  * (ONLY_THE_OFFICE_WRITES_THE_WORKER_PACKAGE). Written once, as the cut asked is: the same value again changes nothing,
@@ -197,6 +216,26 @@ export function writeTheImagesGiven(id: string, value: TheImagesGiven, actor: Ac
   sqlite.transaction(() => {
     db.update(records).set({ data, updatedAt: now() }).where(eq(records.id, id)).run()
     logChange(id, 'update', actor, `data.${IMAGES_GIVEN}`, undefined, value)
+    saveRevision(id, 'update', actor)
+  })()
+}
+
+/**
+ * THE OFFICE'S ONE WRITE OF THE COMMIT A RUN'S WORKING DIRECTORY WAS AT WHEN IT ENDED, for an end no request read: the
+ * account of a round that ended with no seal (../how-a-round-ended.ts). Every ordinary write is refused the field
+ * (`refuseTheHeadsInAChange` in ../a-runs-own-commits.ts). A run that already holds an end commit keeps it: the record
+ * door or the seal read it first.
+ */
+export function writeTheEndHead(id: string, value: AHeadRead, actor: Actor): void {
+  const held = getRecord(id)
+  if (held === null) throw new Error(`Run ${id} could not be read while writing the commit it ended at.`)
+  assertMayWrite(held.kind, 'change', actor, id)
+  if (held.kind !== 'session') throw new Error(`Record ${id} is not a session, so it holds no end commit.`)
+  if (held.data[END_HEAD] !== undefined) return
+  const data = { ...held.data, [END_HEAD]: value }
+  sqlite.transaction(() => {
+    db.update(records).set({ data, updatedAt: now() }).where(eq(records.id, id)).run()
+    logChange(id, 'update', actor, `data.${END_HEAD}`, undefined, value)
     saveRevision(id, 'update', actor)
   })()
 }

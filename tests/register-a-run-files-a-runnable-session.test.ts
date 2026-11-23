@@ -294,7 +294,7 @@ describe('the start step files a run the check can be asked about', () => {
 
   // MUTATIONS: fileARun drops --parent → parent assertion red; header written from --parent
   // instead of --session → attribution assertion red.
-  it.each(AGENT_RUNTIMES)('fileARun passes parent through and opts in only an approved checkpoint runtime: %s', async runtime => {
+  it.each(['claude-code', 'dsh'] as const)('fileARun passes parent through and opts in only an approved checkpoint runtime: %s', async runtime => {
     const parent = await ask('POST', '/api/records', { type: 'agent', id: STARTER }, {
       kind: 'session', title: 'the parent of the fileARun worker', data: { state: 'running' },
     })

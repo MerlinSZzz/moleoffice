@@ -55,6 +55,8 @@
 
 import type { ChildProcess } from 'node:child_process'
 import { spawn } from 'node:child_process'
+import { writeFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
 import type { AddressInfo } from 'node:net'
 import { fileURLToPath } from 'node:url'
 
@@ -69,6 +71,7 @@ let app: FastifyInstance
 let api = ''
 let agentRegistryId = ''
 let agentRecordId = ''
+let keyFile = ''
 let session = ''
 let noteId = ''
 const started: ChildProcess[] = []
@@ -104,7 +107,7 @@ function startTheWaiter(handle: string, forSession: string): { child: ChildProce
       '--workspace',
       'default',
     ],
-    { env: { ...process.env, MOLE_OFFICE_HANDLE_BEAT_SECONDS: '1' } },
+    { env: { ...process.env, MOLE_AGENT_KEY: '', MOLE_OFFICE_TOOL_CONFIGURATION: '', MOLE_AGENT_KEY_FILE: keyFile, MOLE_OFFICE_HANDLE_BEAT_SECONDS: '1' } },
   )
   started.push(child)
   let printed = ''
@@ -156,6 +159,8 @@ beforeAll(async () => {
     data: { handle: 'answering-session', runtime: 'claude-code', state: 'active' },
   })
   agentRecordId = ((agent.body['record'] as { id: string }).id)
+  keyFile = join(dirname(t.file), 'agent.key')
+  writeFileSync(keyFile, (agent.body['whatToGiveIt'] as { key: string }).key, { mode: 0o600 })
   const listed = (await get('/api/participants')) as { agents?: { id: string; handle: string }[] }
   agentRegistryId = one((listed.agents ?? []).filter((a) => a.handle === 'answering-session'), 'the registry row').id
 

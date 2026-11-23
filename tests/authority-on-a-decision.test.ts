@@ -39,7 +39,7 @@ import {
   validateData,
 } from '../src/shared/kinds.ts'
 import { THE_TEST_OFFICES_OWNER } from './a-page-of-a-test-office.ts'
-import { freshDb, type TestDb } from './helpers.ts'
+import { freshDb, type TestDb, governsTheWholeProject } from './helpers.ts'
 
 const decision = KIND_SPECS.decision
 const keys = decision.fields.map((f) => f.key)
@@ -127,7 +127,9 @@ describe('`recorded_by` is filled from the request', () => {
       payload: {
         kind: 'decision',
         title: 'Never change the GPU driver on the workstation',
-        data: { replaces: [], decided_by: THE_OWNER, authority: 'a product invariant', because: 'the 5070 Ti is marginally stable' },
+        data: {
+          ...governsTheWholeProject(),
+          replaces: [], decided_by: THE_OWNER, authority: 'a product invariant', because: 'the 5070 Ti is marginally stable' },
       },
     })
     expect(made.statusCode).toBe(201)
@@ -144,7 +146,7 @@ describe('`recorded_by` is filled from the request', () => {
       method: 'POST',
       url: '/api/records',
       headers: HUMAN_HEADERS,
-      payload: { kind: 'decision', title: 'Stop the round-ten campaign block', data: { replaces: [] } },
+      payload: { kind: 'decision', title: 'Stop the round-ten campaign block', data: { ...governsTheWholeProject(), replaces: [] } },
     })
     expect(made.statusCode).toBe(201)
     const id = (made.json() as { record: { id: string } }).record.id
@@ -158,7 +160,8 @@ describe('`recorded_by` is refused from a caller, on both doors', () => {
       method: 'POST',
       url: '/api/records',
       headers: HUMAN_HEADERS,
-      payload: { kind: 'decision', title: 'Position control for the handover', data: { replaces: [], authority: 'a measurement' } },
+      payload: { kind: 'decision', title: 'Position control for the handover', data: {
+        ...governsTheWholeProject(), replaces: [], authority: 'a measurement' } },
     })
     return (made.json() as { record: { id: string } }).record.id
   }
@@ -172,7 +175,8 @@ describe('`recorded_by` is refused from a caller, on both doors', () => {
       payload: {
         kind: 'decision',
         title: 'Signed in somebody else’s name',
-        data: { replaces: [], recorded_by: `human ${THE_TEST_OFFICES_OWNER.id}`, authority: 'a measurement' },
+        data: {
+          ...governsTheWholeProject(), replaces: [], recorded_by: `human ${THE_TEST_OFFICES_OWNER.id}`, authority: 'a measurement' },
       },
     })
     expect(reply.statusCode).toBe(403)
@@ -206,7 +210,8 @@ describe('`recorded_by` is refused from a caller, on both doors', () => {
       headers: HUMAN_HEADERS,
       // THE WHOLE DATA KEEPS `replaces`, because a whole replace that dropped a saved field is refused (problem ZSWftCSVUP2r
       // added the field to every decision the door writes).
-      payload: { data: { authority: 'reversible engineering judgement', replaces: [] } },
+      // It keeps what the decision governs too, for the same reason.
+      payload: { data: { ...governsTheWholeProject(), authority: 'reversible engineering judgement', replaces: [] } },
     })
     expect(reply.statusCode).toBe(200)
     expect(dataOf(id)['recorded_by']).toBe(`human ${THE_TEST_OFFICES_OWNER.id}`)

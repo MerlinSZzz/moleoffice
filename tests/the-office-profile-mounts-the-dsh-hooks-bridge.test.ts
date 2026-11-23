@@ -27,7 +27,7 @@
  *   write the manifest without its version → the plugin manifest case is red.
  */
 import { spawnSync } from 'node:child_process'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -173,6 +173,21 @@ describe('the installer writes the office profile', () => {
     expect(ran.status, ran.stderr).toBe(0)
     expect(ran.stdout).toContain('dsh plugin --profile office add @deepseek-ai/dsh-hooks-claude-code')
   })
+
+  // A SANDBOX'S DSH HOME, READ FROM THE HOST. dsh links each package of the shared farm into its own installation, which
+  // for a sandbox is inside the container, so from the host the link leads nowhere. Whether the bridge is there is not
+  // known from here, so the installer says that and prints no command that would add a second copy.
+  it('says the bridge is a link that leads nowhere from here, and prints no command, when the farm holds such a link', () => {
+    const home = scratchHome(false)
+    const gone = join(home, 'an-installation-this-process-cannot-see', 'dsh-hooks-claude-code')
+    mkdirSync(join(home, 'profiles', 'node_modules', '@deepseek-ai'), { recursive: true })
+    symlinkSync(gone, join(home, 'profiles', 'node_modules', '@deepseek-ai', 'dsh-hooks-claude-code'))
+    const ran = install(home)
+    expect(ran.status, ran.stderr).toBe(0)
+    expect(ran.stdout).toContain(`is a link to ${gone}, and nothing is at ${gone} from here.`)
+    expect(ran.stdout).toContain('So whether the bridge is installed is unknown from here.')
+    expect(ran.stdout).not.toContain('dsh plugin --profile office add')
+  })
 })
 
 describe('hooks.json is the shape the bridge reads', () => {
@@ -181,7 +196,7 @@ describe('hooks.json is the shape the bridge reads', () => {
     expect(Object.keys(config.hooks).sort()).toEqual(['PostToolUse', 'PreToolUse', 'SessionStart', 'Stop'])
     expect(config.hooks['PreToolUse']?.[0]?.matcher).toBe('')
     expect(config.hooks['PreToolUse']?.[0]?.hooks[0]?.command).toBe(
-      'node ${CLAUDE_PLUGIN_ROOT}/tools/guard/main-world-guard.mjs',
+      'node ${CLAUDE_PLUGIN_ROOT}/for-agents/main-world-guard.mjs',
     )
     expect(config.hooks['SessionStart']?.[0]?.hooks[0]?.command).toBe(
       'node ${CLAUDE_PLUGIN_ROOT}/tools/dsh-hooks/session-start.mjs',

@@ -54,6 +54,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { freshDb, type TestDb } from './helpers.ts'
 import type { PlanBlocksReply } from '../src/web/api.ts'
 import type { PlanWritingState } from '../src/web/pages/plans/PlanWriting.tsx'
+import { t } from '../src/shared/i18n.ts'
 
 type WebApi = typeof import('../src/web/api.ts')
 type WritingModule = typeof import('../src/web/pages/plans/PlanWriting.tsx')
@@ -268,18 +269,8 @@ describe('the shape of a plan, shown in the empty box', () => {
     expect(read.items[2]!.depth).toBe(read.items[1]!.depth + 1)
   })
 
-  /**
-   * AND THE ONE SENTENCE OF HELP THAT TAUGHT SOMETHING UNTRUE NOW SAYS WHAT INDENTING DOES.
-   *
-   * It read "Indent with spaces instead." and stopped, on the only help this surface has. Every
-   * tester who followed it wrote a plan of nothing but prose.
-   */
-  it('says that indenting a line which is not an item leaves it as writing', async () => {
-    const said = words(h(writing.PlanWriting, { state: await openAgain() }))
-    expect(said).toContain('Indent with spaces')
-    expect(said).toMatch(/Indent with spaces[^.]*item sits under the item above it/)
-    expect(said).toContain('leaves it as writing')
-  })
+  // CRITERION CHANGE, as decided: the help under the box is one sentence on the keys now, and it no
+  // longer teaches indenting, so the case that read the indenting sentence is gone.
 })
 
 // ============================================================ work that lost its line
@@ -356,11 +347,11 @@ describe('a line that was filed as work and then split in two', () => {
     await rewriteIt(id, text)
     const said = words(h(writing.PlanWriting, { state: await openAgain(id) }))
 
-    expect(said).toContain('The work itself still exists')
+    // CRITERION CHANGE, as decided: the notice counts the lost line and offers the press. It no
+    // longer explains what filing again would cost or that it stays after a reload.
+    expect(said).toContain(t('planWriting.lostCount', { n: 1 }))
     expect(said).toContain(text)
     expect(said).toContain('Point that line at it')
-    expect(said).toContain('makes a second, separate piece of work')
-    expect(said).toContain('still here after a reload')
     // The rewritten line is offered as somewhere to point it, and the record id is not on screen.
     expect(said).toContain(`${text} tomorrow`)
     expect(said).not.toContain(recordId)

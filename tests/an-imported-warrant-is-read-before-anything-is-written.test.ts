@@ -32,7 +32,7 @@ import { mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync
 import { tmpdir } from 'node:os'
 import { join, relative } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { apiApp, freshDb, type TestDb } from './helpers.ts'
+import { apiApp, freshDb, type TestDb, governsTheWholeProject } from './helpers.ts'
 import { AUTHORED_TABLES } from '../src/server/db/schema.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 import type { BuiltServer } from '../src/server/index.ts'
@@ -151,7 +151,7 @@ beforeEach(async () => {
   const decision = await filed(AS_THE_PERSON, {
     kind: 'decision',
     title: 'The answer, written down',
-    data: { replaces: [], decided_by: 'the owner', authority: 'the owner said so', because: 'The owner answered in the terminal.' },
+    data: { ...governsTheWholeProject(), replaces: [], decided_by: 'the owner', authority: 'the owner said so', because: 'The owner answered in the terminal.' },
   })
   const link = await ask('POST', '/api/links', asAgent(THE_TEST_OFFICES_SECRETARY.handle), {
     fromId: decision,

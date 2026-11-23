@@ -9,7 +9,7 @@
 
 import { sqlite } from './client.ts'
 import { SECRETARY_DUTIES_KIND } from '@shared/secretary-duties-record.ts'
-import type { TheDuties, AnotherSecretarysArea, TheDutiesPart } from '../lib/grant/secretary-duties.ts'
+import type { TheDuties, AnotherSecretarysArea, TheDutiesPart } from './types/secretary-duties.ts'
 
 /**
  * EVERY LIVE secretary_duties RECORD IN THE PROJECT, IN ONE STATEMENT: the reader's own whole, and every other's area

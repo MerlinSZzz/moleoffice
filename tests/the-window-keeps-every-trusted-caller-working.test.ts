@@ -43,7 +43,7 @@ import type { AddressInfo } from 'node:net'
 import type { FastifyInstance } from 'fastify'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { THE_TEST_OFFICES_OWNER } from './a-page-of-a-test-office.ts'
-import { apiApp, freshDb, type TestDb } from './helpers.ts'
+import { apiApp, freshDb, type TestDb, governsTheWholeProject } from './helpers.ts'
 import { settings } from '../src/config/settings.mjs'
 
 /** The person's headers and no key: exactly the claim the window is about. */
@@ -173,7 +173,7 @@ describe('a header claim with no key, on each door', () => {
     const answer = await ask(anotherMachine, 'POST', '/api/records', {
       kind: 'decision',
       title: 'The gripper stays on position control',
-      data: { replaces: [], because: 'a header is not a key' },
+      data: { ...governsTheWholeProject(), replaces: [], because: 'a header is not a key' },
     }, NOT_TRUSTED)
     expect(answer.status, `an untrusted claim wrote a decision: ${answer.error}`).toBe(403)
     expect(decisionTitles()).toEqual(before)
@@ -183,7 +183,7 @@ describe('a header claim with no key, on each door', () => {
     const answer = await ask(anotherMachine, 'POST', '/api/records', {
       kind: 'decision',
       title: 'The gripper stays on position control',
-      data: { replaces: [], because: 'their own machine is on the trusted list' },
+      data: { ...governsTheWholeProject(), replaces: [], because: 'their own machine is on the trusted list' },
     }, TRUSTED)
     expect(answer.status, `a trusted machine was refused: ${answer.error}`).toBe(201)
     expect(decisionTitles()).toContain('The gripper stays on position control')
@@ -193,7 +193,7 @@ describe('a header claim with no key, on each door', () => {
     const answer = await ask(thisMachine, 'POST', '/api/records', {
       kind: 'decision',
       title: 'The second listener is not the only door',
-      data: { replaces: [], because: 'loopback is covered for one version' },
+      data: { ...governsTheWholeProject(), replaces: [], because: 'loopback is covered for one version' },
     }, null)
     expect(answer.status, answer.error).toBe(201)
   })
@@ -204,7 +204,7 @@ describe('a header claim with no key, on each door', () => {
     const answer = await askWithThePersonsKey(anotherMachine, '/api/records', {
       kind: 'decision',
       title: 'The person holds the key and the key is enough',
-      data: { replaces: [], because: 'the office made this key at first run' },
+      data: { ...governsTheWholeProject(), replaces: [], because: 'the office made this key at first run' },
     })
     expect(answer.status, `the person's key was refused: ${answer.error}`).toBe(201)
     expect(decisionTitles()).toContain('The person holds the key and the key is enough')

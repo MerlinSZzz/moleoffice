@@ -64,7 +64,11 @@ import { theRungsOfTheRoutingWalk } from './superiors.ts'
 import { theNameOf } from '@shared/participant-name.ts'
 import { anAgentItsOwnKeyProves } from './who-may-act.ts'
 
-const THE_OWNER: ParticipantRef = { kind: 'person', id: THE_PERSON }
+/**
+ * THE OWNER, READ EACH TIME IT IS ASKED FOR. A new office is told its owner by the migrate, and the start loads this file
+ * before that. A copy made when this file loads would name nobody in a new office.
+ */
+const theOwner = (): ParticipantRef => ({ kind: 'person', id: THE_PERSON })
 
 /** The lead a line to the person carries: the agent's page, where the person's two presses are. Chapter 10 rule 4. */
 function aLeadToTheAgentsPage(agentId: string): { target: { kind: 'page'; route: string } } {
@@ -156,7 +160,7 @@ export function theApproverOf(agentId: string): ParticipantRef {
   if (walk.ending.how === 'nobody reachable' && last !== undefined && last.row.retired !== true) {
     return { kind: 'agent', id: last.row.id }
   }
-  return THE_OWNER
+  return theOwner()
 }
 
 /**
@@ -164,7 +168,7 @@ export function theApproverOf(agentId: string): ParticipantRef {
  * starters, by its own key.
  */
 function theProposer(agent: RegisteredAgent, actor: Actor): ParticipantRef {
-  if (thePersonIsProved(actor)) return THE_OWNER
+  if (thePersonIsProved(actor)) return theOwner()
   const keyed = anAgentItsOwnKeyProves(actor)
   if (keyed === agent.id) return { kind: 'agent', id: keyed }
   if (keyed !== null) {
@@ -312,7 +316,7 @@ function answerARename(renameId: string, answer: RenameAnswer, said: string, act
     const not = whyTheCallerMayNotAnswer(row, actor, atTheDoor)
     if (not !== null) throw new PanelError(`${not} Nothing was written.`, 403)
     const because = aReason(said, answer === 'approved' ? 'An approval' : 'A refusal')
-    const by: ParticipantRef = thePersonIsProved(actor) ? THE_OWNER : { kind: 'agent', id: anAgentItsOwnKeyProves(actor)! }
+    const by: ParticipantRef = thePersonIsProved(actor) ? theOwner() : { kind: 'agent', id: anAgentItsOwnKeyProves(actor)! }
     // THE GRANT IS KEPT ONLY WHERE THE RAISE WAS WHAT LET THE SECRETARY ANSWER. `aRaiseCarriesIt` marks the actor only
     // then, as every ledger row names a grant only then.
     const underTheGrant = by.kind === 'agent' && actor.elevationUsed === true && actor.elevation !== undefined ? actor.elevation.id : null

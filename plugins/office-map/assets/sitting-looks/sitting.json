@@ -1,0 +1,1659 @@
+{
+  "atlases": {
+    "sitting-looks/tuft-sit": {
+      "size": [
+        177,
+        86
+      ],
+      "bytes": 24093,
+      "decodedBytes": 60888,
+      "sha256": "5fcf02f9a09cb10f2f41d9e2d9df7a10e67177a4245dfcf8883e71cfcaa147f9"
+    },
+    "sitting-looks/fringe-sit": {
+      "size": [
+        179,
+        85
+      ],
+      "bytes": 26352,
+      "decodedBytes": 60860,
+      "sha256": "af0f8cd2ceebf810a455e5ab8be5bc77e17b7c92202a4622550d22cee889a2af"
+    },
+    "sitting-looks/bun-sit": {
+      "size": [
+        198,
+        87
+      ],
+      "bytes": 24563,
+      "decodedBytes": 68904,
+      "sha256": "3c4df3ce4a3b72e0fd49b47eca3e1840c4a8b90743d658c75a9e5e3a0c3eabf8"
+    },
+    "sitting-looks/fan-sit": {
+      "size": [
+        183,
+        86
+      ],
+      "bytes": 24224,
+      "decodedBytes": 62952,
+      "sha256": "e04b1b19d6f895f7e3752e193aafab7a6f4e78efdd969cb03bd1f79ac8b1cbee"
+    },
+    "sitting-looks/crest-sit": {
+      "size": [
+        179,
+        88
+      ],
+      "bytes": 22265,
+      "decodedBytes": 63008,
+      "sha256": "53d325ca453c59e766d3db81f670e8515ad5093c9e33a6caf7d163a739b986df"
+    },
+    "sitting-looks/helmet-sit": {
+      "size": [
+        193,
+        87
+      ],
+      "bytes": 27100,
+      "decodedBytes": 67164,
+      "sha256": "4bcac7ccd12a931148d106d449840c13e374e667906674c82745ae7013ec16de"
+    },
+    "sitting-looks/waves-sit": {
+      "size": [
+        178,
+        85
+      ],
+      "bytes": 26239,
+      "decodedBytes": 60520,
+      "sha256": "561374b5f5b8ea8771676a3160e76bd46019a6e759e7a3ede24fceac2200b3cf"
+    },
+    "sitting-looks/part-sit": {
+      "size": [
+        186,
+        85
+      ],
+      "bytes": 26153,
+      "decodedBytes": 63240,
+      "sha256": "09683d2bce5b83e06ddabc060e36aace7431b8a8f8b6792179b2031c35398498"
+    },
+    "sitting-looks/beret-sit": {
+      "size": [
+        175,
+        85
+      ],
+      "bytes": 24283,
+      "decodedBytes": 59500,
+      "sha256": "7645e0d9a09d2f4a2210e4626d8777426b61cbef304b3aec67f3427f327e06a6"
+    },
+    "sitting-looks/knit-sit": {
+      "size": [
+        170,
+        88
+      ],
+      "bytes": 28005,
+      "decodedBytes": 59840,
+      "sha256": "b49e78a2dbb6ce475a0ffd85a5c2171b8129c5b4da6fed971ab6107d524e647c"
+    },
+    "sitting-looks/raincoat-sit": {
+      "size": [
+        186,
+        85
+      ],
+      "bytes": 23598,
+      "decodedBytes": 63240,
+      "sha256": "e9588517aa7a3893e577ff3bbe7cf24719e4d8359677484586c35a83882e54f0"
+    },
+    "sitting-looks/apron-sit": {
+      "size": [
+        201,
+        86
+      ],
+      "bytes": 26616,
+      "decodedBytes": 69144,
+      "sha256": "126d2264061589a37828835a0ab41ce695fa864abbc02ccce00f1fd251064116"
+    },
+    "sitting-looks/bowtie-sit": {
+      "size": [
+        176,
+        87
+      ],
+      "bytes": 25058,
+      "decodedBytes": 61248,
+      "sha256": "032fe7400681d9e4b7d2137cbebf0306093a0ba88cdd57199de8f6e705318cca"
+    },
+    "sitting-looks/backpack-sit": {
+      "size": [
+        223,
+        87
+      ],
+      "bytes": 30550,
+      "decodedBytes": 77604,
+      "sha256": "6eb80b4665f7b94853b204c113d459b9f80632138ba695f8bbc7b57ed7190e17"
+    },
+    "sitting-looks/roll-sit": {
+      "size": [
+        177,
+        88
+      ],
+      "bytes": 23455,
+      "decodedBytes": 62304,
+      "sha256": "9b0b73dd5dbb63fb42fdc72bc4dc1d24496728168ff4f33465dc3d98dcc1bb42"
+    },
+    "sitting-looks/flower-sit": {
+      "size": [
+        188,
+        88
+      ],
+      "bytes": 27931,
+      "decodedBytes": 66176,
+      "sha256": "dad3027eda8b91956beca48436e0fbb347cebbab0f8738f1fd5bdcadaa7b0e52"
+    },
+    "sitting-looks/gardener-sit": {
+      "size": [
+        198,
+        88
+      ],
+      "bytes": 31727,
+      "decodedBytes": 69696,
+      "sha256": "2df669e7329f96b281c90558dfd4591e3b2d3fdb2a133b30d60242f91bcd4e8e"
+    },
+    "sitting-looks/mapmaker-sit": {
+      "size": [
+        190,
+        88
+      ],
+      "bytes": 28022,
+      "decodedBytes": 66880,
+      "sha256": "b8b403c5ca27a4a5b20f656d17c0a85f7d37fa7f955e6059d7950a1198f265a2"
+    },
+    "sitting-looks/runner-sit": {
+      "size": [
+        185,
+        86
+      ],
+      "bytes": 25586,
+      "decodedBytes": 63640,
+      "sha256": "7b72d7e10321fa5c558ce1f7c66afa2bbfb1dc9f16e2c5e3071fff6b644eb619"
+    }
+  },
+  "sprites": {
+    "sit-tuft-down": {
+      "source": "cut-the-sitting-frames.mjs, sit-tuft-down.png",
+      "sha256": "94d329800a4f56edb4130870ca094912bf66026e93fb575307fb625e4258a2b8",
+      "pixelHash": "8d8db6c3161d7ea5b6d0289983ac515b4870dfde5ed750eb1ace1bef7024c095",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        35,
+        30,
+        94,
+        112
+      ],
+      "anchor": [
+        64,
+        111
+      ],
+      "rect": [
+        2,
+        2,
+        59,
+        82
+      ],
+      "atlas": "sitting-looks/tuft-sit"
+    },
+    "sit-tuft": {
+      "source": "cut-the-sitting-frames.mjs, sit-tuft.png",
+      "sha256": "69cd7c1b5a4952440368c118f6808963b6d1892f27321361e3a8f01c4520ef11",
+      "pixelHash": "c522e37e4bab12f9894857678212743189e545923962115325b755e375293e7f",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        39,
+        32,
+        90,
+        112
+      ],
+      "anchor": [
+        64,
+        111
+      ],
+      "rect": [
+        63,
+        2,
+        51,
+        80
+      ],
+      "atlas": "sitting-looks/tuft-sit"
+    },
+    "sit-tuft-up": {
+      "source": "cut-the-sitting-frames.mjs, sit-tuft-up.png",
+      "sha256": "78943f8583d88714ecc355612482de96b631f647bfed4621b81b0bfac169b45d",
+      "pixelHash": "84bf104966e648629238c724ec35e651a7ba4fe8478af07e1c3b12295ba256dc",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        35,
+        30,
+        94,
+        112
+      ],
+      "anchor": [
+        64,
+        111
+      ],
+      "rect": [
+        116,
+        2,
+        59,
+        82
+      ],
+      "atlas": "sitting-looks/tuft-sit"
+    },
+    "sit-fringe-down": {
+      "source": "cut-the-sitting-frames.mjs, sit-fringe-down.png",
+      "sha256": "95bf3a7d9582221a2a8a1282a76eae7f12ae950fdd30ffb61e12fe5e935eb8e4",
+      "pixelHash": "4a01f8b32c563aec181b6be958e0c8c1b73f2fb2a88d8aed4e1aa5d933e6df0f",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        34,
+        31,
+        93,
+        112
+      ],
+      "anchor": [
+        64,
+        111
+      ],
+      "rect": [
+        2,
+        2,
+        59,
+        81
+      ],
+      "atlas": "sitting-looks/fringe-sit"
+    },
+    "sit-fringe": {
+      "source": "cut-the-sitting-frames.mjs, sit-fringe.png",
+      "sha256": "0496eba29ae96a911f8489f596ce3c64bd9e51a77247f19ba8d97e784cf859dc",
+      "pixelHash": "85d1e47bc527f0be3fb792cf108db7b7cc34da4fc4cc06f091d8805667c301e6",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        38,
+        32,
+        90,
+        112
+      ],
+      "anchor": [
+        64,
+        111
+      ],
+      "rect": [
+        63,
+        2,
+        52,
+        80
+      ],
+      "atlas": "sitting-looks/fringe-sit"
+    },
+    "sit-fringe-up": {
+      "source": "cut-the-sitting-frames.mjs, sit-fringe-up.png",
+      "sha256": "1db9e05fffd99421e38bfb4170ecfed1b12aa520ba4a4a0fc7633cd654dfe403",
+      "pixelHash": "15069a119ca6c965aaa865203f10c2bac107958c07ef5b5a2318a52a7ed768cf",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        34,
+        31,
+        94,
+        112
+      ],
+      "anchor": [
+        64,
+        111
+      ],
+      "rect": [
+        117,
+        2,
+        60,
+        81
+      ],
+      "atlas": "sitting-looks/fringe-sit"
+    },
+    "sit-bun-down": {
+      "source": "cut-the-sitting-frames.mjs, sit-bun-down.png",
+      "sha256": "5161246b606b876e1019aca696378776f081a6b25e601844f4aa4a3c6f5c27e6",
+      "pixelHash": "c8cc2b29722b2d4fc85a07a45495dc87cdc5021760ec0a1cde5959932d9ae7c8",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        30,
+        29,
+        94,
+        112
+      ],
+      "anchor": [
+        64,
+        111
+      ],
+      "rect": [
+        2,
+        2,
+        64,
+        83
+      ],
+      "atlas": "sitting-looks/bun-sit"
+    },
+    "sit-bun": {
+      "source": "cut-the-sitting-frames.mjs, sit-bun.png",
+      "sha256": "c06b6a9bac0ac799de85e168398e6b125c2af660e3d046e49bf35d9f821e4609",
+      "pixelHash": "d9d93a443c4b5713a0cb3b78d97bb4bc4aa0c27c0da22a18d2952ea1d00c75e0",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        33,
+        31,
+        95,
+        112
+      ],
+      "anchor": [
+        64,
+        111
+      ],
+      "rect": [
+        68,
+        2,
+        62,
+        81
+      ],
+      "atlas": "sitting-looks/bun-sit"
+    },
+    "sit-bun-up": {
+      "source": "cut-the-sitting-frames.mjs, sit-bun-up.png",
+      "sha256": "ba0fcbc5632e5390582ffc6aea0ebb830882907cddaf8a45e3ad411ed2cd3a79",
+      "pixelHash": "78df47489c209b1bb5f7e1143f8135c41d22c7a37afd11a0723a94280205a95f",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        32,
+        29,
+        96,
+        112
+      ],
+      "anchor": [
+        64,
+        111
+      ],
+      "rect": [
+        132,
+        2,
+        64,
+        83
+      ],
+      "atlas": "sitting-looks/bun-sit"
+    },
+    "sit-fan-down": {
+      "source": "cut-the-sitting-frames.mjs, sit-fan-down.png",
+      "sha256": "a0f8ee52e6cf4eb248b532ef8551e46e5588dbadbfbf9cd24229c34cc60000fb",
+      "pixelHash": "48d64fb5085e7c7ad0cc3ca6813779ab2954b7798bf3d4b1dc51e57dc9a51b31",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        32,
+        30,
+        93,
+        112
+      ],
+      "anchor": [
+        64,
+        111
+      ],
+      "rect": [
+        2,
+        2,
+        61,
+        82
+      ],
+      "atlas": "sitting-looks/fan-sit"
+    },
+    "sit-fan": {
+      "source": "cut-the-sitting-frames.mjs, sit-fan.png",
+      "sha256": "a1aca8105c6022b1ee86671a21262fcc60a81a8add0efdaf36e64cfe5e885ff2",
+      "pixelHash": "e703f2e37c3bd1f00d225f2d4e809b325e403c29fa3620495d40fe41508c1df3",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        35,
+        32,
+        90,
+        112
+      ],
+      "anchor": [
+        64,
+        111
+      ],
+      "rect": [
+        65,
+        2,
+        55,
+        80
+      ],
+      "atlas": "sitting-looks/fan-sit"
+    },
+    "sit-fan-up": {
+      "source": "cut-the-sitting-frames.mjs, sit-fan-up.png",
+      "sha256": "42ba4303ae5ab981814e4c4f2a3c140ba6c140719e13912d2cec928a3a56c373",
+      "pixelHash": "57bdd3eae0009e4fb22939253eaa4ef6a189817b2c935492a84e97c1d05e269a",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        33,
+        31,
+        92,
+        112
+      ],
+      "anchor": [
+        64,
+        111
+      ],
+      "rect": [
+        122,
+        2,
+        59,
+        81
+      ],
+      "atlas": "sitting-looks/fan-sit"
+    },
+    "sit-crest-down": {
+      "source": "cut-the-sitting-frames.mjs, sit-crest-down.png",
+      "sha256": "8b52e69af34f05d56a1c5f11f72e01ee18496a6f4c5b812d87ef7eb1a499b760",
+      "pixelHash": "241e2694dd9a8f58eed7bb3c19a0c4fcdde32e12adb3a47d8f7b2865ba810142",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        32,
+        29,
+        92,
+        112
+      ],
+      "anchor": [
+        64,
+        111
+      ],
+      "rect": [
+        2,
+        2,
+        60,
+        83
+      ],
+      "atlas": "sitting-looks/crest-sit"
+    },
+    "sit-crest": {
+      "source": "cut-the-sitting-frames.mjs, sit-crest.png",
+      "sha256": "60c83c5cc5c44a55bf7a62fd7a76c0df9007bac6646f51da535f50e7cf716bb4",
+      "pixelHash": "dee6dcd273b4590c3fd701251c5055ada3168a1faa80a52f0d3bf01de29cf984",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        36,
+        29,
+        87,
+        112
+      ],
+      "anchor": [
+        64,
+        111
+      ],
+      "rect": [
+        64,
+        2,
+        51,
+        83
+      ],
+      "atlas": "sitting-looks/crest-sit"
+    },
+    "sit-crest-up": {
+      "source": "cut-the-sitting-frames.mjs, sit-crest-up.png",
+      "sha256": "960029c47289d36826a7e3353e548f4699b615a4a2e3b951430d6e0fa640454b",
+      "pixelHash": "fa2fb2e00ecba54dbbd6ca5a194b4a436910703d9ba5cd3286479a6829206619",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        32,
+        28,
+        92,
+        112
+      ],
+      "anchor": [
+        64,
+        111
+      ],
+      "rect": [
+        117,
+        2,
+        60,
+        84
+      ],
+      "atlas": "sitting-looks/crest-sit"
+    },
+    "sit-helmet-down": {
+      "source": "cut-the-sitting-frames.mjs, sit-helmet-down.png",
+      "sha256": "f288ab62250266165ce18bc719eeacc07886706ac00f0ea513053bafd833fc2b",
+      "pixelHash": "46e06b8b5fcdd5a2026c4f5dd1b5525d53a144c3e8a3c78ae4542812c8df987c",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        32,
+        29,
+        93,
+        112
+      ],
+      "anchor": [
+        64,
+        111
+      ],
+      "rect": [
+        2,
+        2,
+        61,
+        83
+      ],
+      "atlas": "sitting-looks/helmet-sit"
+    },
+    "sit-helmet": {
+      "source": "cut-the-sitting-frames.mjs, sit-helmet.png",
+      "sha256": "ac80f6b546d94061b1e1f74a568a30021b38c31c799a398cc0f99f0928ee8345",
+      "pixelHash": "65f1552c10b35bec31f2227ce74445db334cda53fddbf37afef21d536344f625",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        36,
+        31,
+        95,
+        112
+      ],
+      "anchor": [
+        64,
+        111
+      ],
+      "rect": [
+        65,
+        2,
+        59,
+        81
+      ],
+      "atlas": "sitting-looks/helmet-sit"
+    },
+    "sit-helmet-up": {
+      "source": "cut-the-sitting-frames.mjs, sit-helmet-up.png",
+      "sha256": "9118497504d9a787d905ea00d598c1464e51a000d2c13587e9c3c8a3f006fd5b",
+      "pixelHash": "1d3bb37ba004dbcdaf648db7d07ee7e07ab7ee14fe2dc4cff4d37633ef5df36b",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        32,
+        29,
+        97,
+        112
+      ],
+      "anchor": [
+        64,
+        111
+      ],
+      "rect": [
+        126,
+        2,
+        65,
+        83
+      ],
+      "atlas": "sitting-looks/helmet-sit"
+    },
+    "sit-waves-down": {
+      "source": "cut-the-sitting-frames.mjs, sit-waves-down.png",
+      "sha256": "739113ac2470cbf77963a9e261533d204d5e3245d86e5363719010c01d483e9c",
+      "pixelHash": "a02238236fd439da5936e14d689fdd99687b9e1f61dcadbf31454743ea2c5380",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        32,
+        31,
+        91,
+        112
+      ],
+      "anchor": [
+        64,
+        111
+      ],
+      "rect": [
+        2,
+        2,
+        59,
+        81
+      ],
+      "atlas": "sitting-looks/waves-sit"
+    },
+    "sit-waves": {
+      "source": "cut-the-sitting-frames.mjs, sit-waves.png",
+      "sha256": "7f31b760bfaf8ba797fa1ee102c46f1f95f591a1877169ba915693221ce714b4",
+      "pixelHash": "741e3b8c6407f0450c589958f5e18f5b6d5a1f20d8149cab5591075c13c75b77",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        35,
+        33,
+        88,
+        112
+      ],
+      "anchor": [
+        64,
+        111
+      ],
+      "rect": [
+        63,
+        2,
+        53,
+        79
+      ],
+      "atlas": "sitting-looks/waves-sit"
+    },
+    "sit-waves-up": {
+      "source": "cut-the-sitting-frames.mjs, sit-waves-up.png",
+      "sha256": "9708ba209fffe958a0aa2c7dae9f243712bb9b3f5ef193def50f52708f99e9cd",
+      "pixelHash": "edee932f1c420080943c1b7dd20f298b6bbfd5a51a1475b923eeb53449604abb",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        33,
+        32,
+        91,
+        112
+      ],
+      "anchor": [
+        64,
+        111
+      ],
+      "rect": [
+        118,
+        2,
+        58,
+        80
+      ],
+      "atlas": "sitting-looks/waves-sit"
+    },
+    "sit-part-down": {
+      "source": "cut-the-sitting-frames.mjs, sit-part-down.png",
+      "sha256": "3ea046058090bbe98921c5abd1ed4dea076ae130599e804c3c7a24954cd9f297",
+      "pixelHash": "5b3a2279a7c50a1c64538f2fad02e90b2f83ad245d92f89db91a63ed1212d0b1",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        31,
+        31,
+        93,
+        112
+      ],
+      "anchor": [
+        64,
+        111
+      ],
+      "rect": [
+        2,
+        2,
+        62,
+        81
+      ],
+      "atlas": "sitting-looks/part-sit"
+    },
+    "sit-part": {
+      "source": "cut-the-sitting-frames.mjs, sit-part.png",
+      "sha256": "f9df2a98733d88852c50a520efd7f5fb811a60786b89a4ee6fb926f4f8f17fea",
+      "pixelHash": "71255f617bdedac85eadb9cdd0522ac9691e6ead38f67af7b66cde50c2a6bb27",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        34,
+        34,
+        89,
+        112
+      ],
+      "anchor": [
+        64,
+        111
+      ],
+      "rect": [
+        66,
+        2,
+        55,
+        78
+      ],
+      "atlas": "sitting-looks/part-sit"
+    },
+    "sit-part-up": {
+      "source": "cut-the-sitting-frames.mjs, sit-part-up.png",
+      "sha256": "192f899fb8f57c7418221c955d690e004e0f6d32eda0f3b5f64024fa3c220acc",
+      "pixelHash": "3c9c7bb99e6616880ca3ac32fea5cc4e0e99432ae8bcd9cb3ada89fa7b1c4c62",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        31,
+        31,
+        92,
+        112
+      ],
+      "anchor": [
+        64,
+        111
+      ],
+      "rect": [
+        123,
+        2,
+        61,
+        81
+      ],
+      "atlas": "sitting-looks/part-sit"
+    },
+    "sit-beret-down": {
+      "source": "cut-the-sitting-frames.mjs, sit-beret-down.png",
+      "sha256": "f8e4db3d537d4e1fbd2d9047ded1650a45687e97d498f223fbda1ba5dac0e7e0",
+      "pixelHash": "80fe754badcba696403ddf6b42161d0759eef55e0a97fb27d65ffe616304dc07",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        34,
+        31,
+        94,
+        112
+      ],
+      "anchor": [
+        64,
+        111
+      ],
+      "rect": [
+        2,
+        2,
+        60,
+        81
+      ],
+      "atlas": "sitting-looks/beret-sit"
+    },
+    "sit-beret": {
+      "source": "cut-the-sitting-frames.mjs, sit-beret.png",
+      "sha256": "485277bb78617b6f3eb5a4204367eef3dc509289e7953532bbaa3d40f4b484b3",
+      "pixelHash": "0f367e9252471b548e26b198078271b9773ab68d35113e0cf702ef0a208d66f3",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        38,
+        34,
+        89,
+        112
+      ],
+      "anchor": [
+        64,
+        111
+      ],
+      "rect": [
+        64,
+        2,
+        51,
+        78
+      ],
+      "atlas": "sitting-looks/beret-sit"
+    },
+    "sit-beret-up": {
+      "source": "cut-the-sitting-frames.mjs, sit-beret-up.png",
+      "sha256": "1f1868907ce7c6b0cc9ac162331cd7f96fd5cde59efc1dcdc6f238049da38f92",
+      "pixelHash": "d7cce33970b2a91bbbc800efa59f3611ab26eb249840a82e16714141aab5b216",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        36,
+        31,
+        92,
+        112
+      ],
+      "anchor": [
+        64,
+        111
+      ],
+      "rect": [
+        117,
+        2,
+        56,
+        81
+      ],
+      "atlas": "sitting-looks/beret-sit"
+    },
+    "sit-knit-down": {
+      "source": "cut-the-sitting-frames.mjs, sit-knit-down.png",
+      "sha256": "2895fffb6a9d35e61ef02b43850071046ecd563877ddc4d52bfec9261ede3f07",
+      "pixelHash": "2299a2439bb297fecdfdcd74ca14ab5245483981b1c6ed1e69e297dd850303a5",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        36,
+        28,
+        92,
+        112
+      ],
+      "anchor": [
+        64,
+        111
+      ],
+      "rect": [
+        2,
+        2,
+        56,
+        84
+      ],
+      "atlas": "sitting-looks/knit-sit"
+    },
+    "sit-knit": {
+      "source": "cut-the-sitting-frames.mjs, sit-knit.png",
+      "sha256": "11e41cff2795cc8295e277e6e41df3f1592d6973891a7ba37162da18ad796198",
+      "pixelHash": "8cd3a8ebe9e2b8065d4c6fc3308a732550f4b6e1bdc15e08d6535032cb668362",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        39,
+        31,
+        88,
+        112
+      ],
+      "anchor": [
+        64,
+        111
+      ],
+      "rect": [
+        60,
+        2,
+        49,
+        81
+      ],
+      "atlas": "sitting-looks/knit-sit"
+    },
+    "sit-knit-up": {
+      "source": "cut-the-sitting-frames.mjs, sit-knit-up.png",
+      "sha256": "d801e655b468972dbb48ef2d8cbd179662390a4266f2cbfd2594ef8cb91489ab",
+      "pixelHash": "83f9db2e6a7e783ec4dcc30665c8a7e1495137d1d13cb7f55be237e40cfc61f6",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        35,
+        30,
+        92,
+        112
+      ],
+      "anchor": [
+        64,
+        111
+      ],
+      "rect": [
+        111,
+        2,
+        57,
+        82
+      ],
+      "atlas": "sitting-looks/knit-sit"
+    },
+    "sit-raincoat-down": {
+      "source": "cut-the-sitting-frames.mjs, sit-raincoat-down.png",
+      "sha256": "396f7d2aebe9d8936b1468992ff0da2e411935dc97d14078e71e1b06f55e74bd",
+      "pixelHash": "b0227ec83fa3841ba7318e45655b23e3a4b8661976315d23b7d9ea37086c7de7",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        33,
+        31,
+        95,
+        112
+      ],
+      "anchor": [
+        64,
+        111
+      ],
+      "rect": [
+        2,
+        2,
+        62,
+        81
+      ],
+      "atlas": "sitting-looks/raincoat-sit"
+    },
+    "sit-raincoat": {
+      "source": "cut-the-sitting-frames.mjs, sit-raincoat.png",
+      "sha256": "f7f6775f741660c56a646050df7c525e0d3b670a49bb486d7bdd53f27050dd68",
+      "pixelHash": "17ee10679f5941c8615eaf82c75cdecece892bb2658dce3b47ac4dfcd2fc04b4",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        37,
+        32,
+        92,
+        112
+      ],
+      "anchor": [
+        64,
+        111
+      ],
+      "rect": [
+        66,
+        2,
+        55,
+        80
+      ],
+      "atlas": "sitting-looks/raincoat-sit"
+    },
+    "sit-raincoat-up": {
+      "source": "cut-the-sitting-frames.mjs, sit-raincoat-up.png",
+      "sha256": "3c860569e0b0d21071c5f40549c8f58342e3b53ab23bdfd2076cd88c8457aa65",
+      "pixelHash": "8a3974d388f515b2cfceb8a5de68ffca261a7f67c7b300b7680fadc021cc27bf",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        34,
+        31,
+        95,
+        112
+      ],
+      "anchor": [
+        64,
+        111
+      ],
+      "rect": [
+        123,
+        2,
+        61,
+        81
+      ],
+      "atlas": "sitting-looks/raincoat-sit"
+    },
+    "sit-apron-down": {
+      "source": "cut-the-sitting-frames.mjs, sit-apron-down.png",
+      "sha256": "6d80d4f76013bc9d7a14e46177a477455352e78b1f0f1b74ca3b271e8db4ad38",
+      "pixelHash": "0f0aa85e32de1af2638c8572a21924148db46bdec864becb975923c99673b6f2",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        30,
+        30,
+        97,
+        112
+      ],
+      "anchor": [
+        64,
+        111
+      ],
+      "rect": [
+        2,
+        2,
+        67,
+        82
+      ],
+      "atlas": "sitting-looks/apron-sit"
+    },
+    "sit-apron": {
+      "source": "cut-the-sitting-frames.mjs, sit-apron.png",
+      "sha256": "163b3f0c4784ff6881f0a6638635d608e4ed676c01c3447432bee8fe02b4b3e4",
+      "pixelHash": "be0e56ed10fe86ea7b70809398a3097b3017f901dceb0a647744f5a7a17df683",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        33,
+        31,
+        95,
+        112
+      ],
+      "anchor": [
+        64,
+        111
+      ],
+      "rect": [
+        71,
+        2,
+        62,
+        81
+      ],
+      "atlas": "sitting-looks/apron-sit"
+    },
+    "sit-apron-up": {
+      "source": "cut-the-sitting-frames.mjs, sit-apron-up.png",
+      "sha256": "31f2f0c0de1e922e3dad514816341609863cc9567374662d3238ccf6519f03c4",
+      "pixelHash": "ce90484b7a2e1463518027be9a35d523f77800d6e3a962e52f40865304a5ce0e",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        32,
+        30,
+        96,
+        112
+      ],
+      "anchor": [
+        64,
+        111
+      ],
+      "rect": [
+        135,
+        2,
+        64,
+        82
+      ],
+      "atlas": "sitting-looks/apron-sit"
+    },
+    "sit-bowtie-down": {
+      "source": "cut-the-sitting-frames.mjs, sit-bowtie-down.png",
+      "sha256": "1fa5ca0b0543a85b72fe7de8bc80b1705f1d31be5367ba4403b5dc404485b916",
+      "pixelHash": "0f524b8cc93e568dca50956ce0de7969bb6f10c36eef00b9b71a5016cb13a677",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        35,
+        29,
+        93,
+        112
+      ],
+      "anchor": [
+        64,
+        111
+      ],
+      "rect": [
+        2,
+        2,
+        58,
+        83
+      ],
+      "atlas": "sitting-looks/bowtie-sit"
+    },
+    "sit-bowtie": {
+      "source": "cut-the-sitting-frames.mjs, sit-bowtie.png",
+      "sha256": "71e1041f618f184856faeffd60188b35bfeaff2d386301874931555fdd8603a4",
+      "pixelHash": "b7324422bb1f5a6a35b0a9ab73dbdaae842d231923e33be72c36e3feb42ac61f",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        38,
+        30,
+        90,
+        112
+      ],
+      "anchor": [
+        64,
+        111
+      ],
+      "rect": [
+        62,
+        2,
+        52,
+        82
+      ],
+      "atlas": "sitting-looks/bowtie-sit"
+    },
+    "sit-bowtie-up": {
+      "source": "cut-the-sitting-frames.mjs, sit-bowtie-up.png",
+      "sha256": "254b16edd422163ef886e3c794b68de5277e29fdd42bd9747d30bc3914138eba",
+      "pixelHash": "988310d370415ed8241bd77a97ff4fd2e773ea3e02e5d36cdb6c699638c9c6bc",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        35,
+        29,
+        93,
+        112
+      ],
+      "anchor": [
+        64,
+        111
+      ],
+      "rect": [
+        116,
+        2,
+        58,
+        83
+      ],
+      "atlas": "sitting-looks/bowtie-sit"
+    },
+    "sit-backpack-down": {
+      "source": "cut-the-sitting-frames.mjs, sit-backpack-down.png",
+      "sha256": "ce4a87cdac6e21d5bd8b50318e189828b2cd62c8714bf0b37228206ae5963880",
+      "pixelHash": "8a957ebbc4383d101d3ac37df1e6a465959bfbde26921c8ef98025a92dc65ee3",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        28,
+        29,
+        100,
+        112
+      ],
+      "anchor": [
+        64,
+        111
+      ],
+      "rect": [
+        2,
+        2,
+        72,
+        83
+      ],
+      "atlas": "sitting-looks/backpack-sit"
+    },
+    "sit-backpack": {
+      "source": "cut-the-sitting-frames.mjs, sit-backpack.png",
+      "sha256": "ea6fd5006fe5cb0bfcb766e548ca6645d9dce1044e11fa80ba760204ce0e9d26",
+      "pixelHash": "02d107817dab1ef008502f724ca5fb9376338a87d4daa45179191625da555802",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        28,
+        29,
+        100,
+        112
+      ],
+      "anchor": [
+        64,
+        111
+      ],
+      "rect": [
+        76,
+        2,
+        72,
+        83
+      ],
+      "atlas": "sitting-looks/backpack-sit"
+    },
+    "sit-backpack-up": {
+      "source": "cut-the-sitting-frames.mjs, sit-backpack-up.png",
+      "sha256": "89a4fadbe2234fc0d9d3631f997390e31fd15f5287a73f0899752d9753ee4291",
+      "pixelHash": "320211e363de5a93e9c2e996d16ba69ae5ce9c11c1fa8b5415159d7cf8f33624",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        28,
+        30,
+        99,
+        112
+      ],
+      "anchor": [
+        64,
+        111
+      ],
+      "rect": [
+        150,
+        2,
+        71,
+        82
+      ],
+      "atlas": "sitting-looks/backpack-sit"
+    },
+    "sit-roll-down": {
+      "source": "cut-the-sitting-frames.mjs, sit-roll-down.png",
+      "sha256": "01cd1a39e29dc9fe3ebad0f6f70471d840e09dff8d39337aa4bf26a964e79c84",
+      "pixelHash": "2a1d2915f815dc65084353c1c79111a563b2c63a43acc10eb1bac7bfe79cc430",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        35,
+        29,
+        94,
+        112
+      ],
+      "anchor": [
+        64,
+        111
+      ],
+      "rect": [
+        2,
+        2,
+        59,
+        83
+      ],
+      "atlas": "sitting-looks/roll-sit"
+    },
+    "sit-roll": {
+      "source": "cut-the-sitting-frames.mjs, sit-roll.png",
+      "sha256": "1ae0cb2c1a32777c9b5367750f710c41baa3997e527af9f681d4f4313dcdd70e",
+      "pixelHash": "944f5eb2ddc6f4698feeee25113cb91746f622a10c3d11ce7f0ce55c88fa641f",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        38,
+        30,
+        90,
+        112
+      ],
+      "anchor": [
+        64,
+        111
+      ],
+      "rect": [
+        63,
+        2,
+        52,
+        82
+      ],
+      "atlas": "sitting-looks/roll-sit"
+    },
+    "sit-roll-up": {
+      "source": "cut-the-sitting-frames.mjs, sit-roll-up.png",
+      "sha256": "765fc5415d6e5dd3cd507957d966cce8b4c724d4924ac183da9d9d6d67d4c0c0",
+      "pixelHash": "81f813aac86282d46deb49ba01af8481315c5ed3cb23502cbb00e2fad91c7823",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        35,
+        28,
+        93,
+        112
+      ],
+      "anchor": [
+        64,
+        111
+      ],
+      "rect": [
+        117,
+        2,
+        58,
+        84
+      ],
+      "atlas": "sitting-looks/roll-sit"
+    },
+    "sit-flower-down": {
+      "source": "cut-the-sitting-frames.mjs, sit-flower-down.png",
+      "sha256": "3802d4b4444deb29498a5b7cda4e7008745ecaad2e821a1a2325eab53964e88e",
+      "pixelHash": "a708e579cc92fd9d926316f7ebf50deaa3a69a63b670845d4c730dc9819e087d",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        34,
+        30,
+        95,
+        112
+      ],
+      "anchor": [
+        64,
+        111
+      ],
+      "rect": [
+        2,
+        2,
+        61,
+        82
+      ],
+      "atlas": "sitting-looks/flower-sit"
+    },
+    "sit-flower": {
+      "source": "cut-the-sitting-frames.mjs, sit-flower.png",
+      "sha256": "106533717df9a0e67e8354070e32851ca370819c748093e43f59a475e20616a6",
+      "pixelHash": "2604af1e804f057190fc057396897b7096d0108bda7c840bbadcf8dc8a8f0641",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        36,
+        29,
+        93,
+        112
+      ],
+      "anchor": [
+        64,
+        111
+      ],
+      "rect": [
+        65,
+        2,
+        57,
+        83
+      ],
+      "atlas": "sitting-looks/flower-sit"
+    },
+    "sit-flower-up": {
+      "source": "cut-the-sitting-frames.mjs, sit-flower-up.png",
+      "sha256": "8db1c3f2135f0eeb03e6eae5322b8a03c3cb4dcf39e0f47d1c33544722dca4ce",
+      "pixelHash": "5257219c7b69dde730508c99fc7a7d010357a007a8063d599c388d055d9e5d3a",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        33,
+        28,
+        95,
+        112
+      ],
+      "anchor": [
+        64,
+        111
+      ],
+      "rect": [
+        124,
+        2,
+        62,
+        84
+      ],
+      "atlas": "sitting-looks/flower-sit"
+    },
+    "sit-gardener-down": {
+      "source": "cut-the-sitting-frames.mjs, sit-gardener-down.png",
+      "sha256": "a601d5e78ac9e404af1c1147001cbad5a4b73e80caf874ba07bf9f9d0be8f27a",
+      "pixelHash": "ea298cdab3a2ffd729b96842459fee323c3d5ab0c80d492a6e8c86e93c2de804",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        33,
+        28,
+        96,
+        112
+      ],
+      "anchor": [
+        64,
+        111
+      ],
+      "rect": [
+        2,
+        2,
+        63,
+        84
+      ],
+      "atlas": "sitting-looks/gardener-sit"
+    },
+    "sit-gardener": {
+      "source": "cut-the-sitting-frames.mjs, sit-gardener.png",
+      "sha256": "fe73b0218ffaee777e0fe98042d247de00524e5eeefee6b0138a95396a246219",
+      "pixelHash": "ca3086514a20a9ddbcec44477217e21095656d8a1243bb37835d9181b4de38e1",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        34,
+        31,
+        95,
+        112
+      ],
+      "anchor": [
+        64,
+        111
+      ],
+      "rect": [
+        67,
+        2,
+        61,
+        81
+      ],
+      "atlas": "sitting-looks/gardener-sit"
+    },
+    "sit-gardener-up": {
+      "source": "cut-the-sitting-frames.mjs, sit-gardener-up.png",
+      "sha256": "5f4751d66885bc83b01393b9509f6a76e627c04e9a0aae6e39386c0b092127c4",
+      "pixelHash": "c5742110df53188c2963fab1df5244d9fd65d290a2f24426150368a129b99121",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        31,
+        28,
+        97,
+        112
+      ],
+      "anchor": [
+        64,
+        111
+      ],
+      "rect": [
+        130,
+        2,
+        66,
+        84
+      ],
+      "atlas": "sitting-looks/gardener-sit"
+    },
+    "sit-mapmaker-down": {
+      "source": "cut-the-sitting-frames.mjs, sit-mapmaker-down.png",
+      "sha256": "876441a0b04bee8418ef8ebdf2c7841d8f4816643a0cbdea36ecba5a029700b7",
+      "pixelHash": "fa700e4a34fcfe3590ab58efb0516782a483c96a3bfac9a1588e75c55886bcb6",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        33,
+        29,
+        96,
+        112
+      ],
+      "anchor": [
+        64,
+        111
+      ],
+      "rect": [
+        2,
+        2,
+        63,
+        83
+      ],
+      "atlas": "sitting-looks/mapmaker-sit"
+    },
+    "sit-mapmaker": {
+      "source": "cut-the-sitting-frames.mjs, sit-mapmaker.png",
+      "sha256": "96fe919fcca7221a226caa3b3a01ad68d1f1fb7323c3de2f9cd6fdcaec792f60",
+      "pixelHash": "4c43aa45e7a70326826f0fe49c2adfdf6d5ccaca1ad182f806b04f72279ed595",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        36,
+        30,
+        93,
+        112
+      ],
+      "anchor": [
+        64,
+        111
+      ],
+      "rect": [
+        67,
+        2,
+        57,
+        82
+      ],
+      "atlas": "sitting-looks/mapmaker-sit"
+    },
+    "sit-mapmaker-up": {
+      "source": "cut-the-sitting-frames.mjs, sit-mapmaker-up.png",
+      "sha256": "588539504c23020b8df32c91238cec434bc15ffcb85f8fe8e5609998a1f770d2",
+      "pixelHash": "86265598c4a49e6953b0ed2fc22f976031dc1978463793a1bc3013f6e0eda30f",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        33,
+        28,
+        95,
+        112
+      ],
+      "anchor": [
+        64,
+        111
+      ],
+      "rect": [
+        126,
+        2,
+        62,
+        84
+      ],
+      "atlas": "sitting-looks/mapmaker-sit"
+    },
+    "sit-runner-down": {
+      "source": "cut-the-sitting-frames.mjs, sit-runner-down.png",
+      "sha256": "fa9d49aa37583205ac8f72e820c8cb11a82527c9654f9d4d7742e65a636a7643",
+      "pixelHash": "b2c1b21fa27242359331bcb22e53c3e84654effdaff226f04fd9052113a2d785",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        35,
+        31,
+        94,
+        112
+      ],
+      "anchor": [
+        64,
+        111
+      ],
+      "rect": [
+        2,
+        2,
+        59,
+        81
+      ],
+      "atlas": "sitting-looks/runner-sit"
+    },
+    "sit-runner": {
+      "source": "cut-the-sitting-frames.mjs, sit-runner.png",
+      "sha256": "8d4a4700c387d296e86dd7c4e493c1049f1232b1252a831b967055b75704a890",
+      "pixelHash": "98529218778520fa92643f0aff4f5f093cbeb72b9e50f9aceb05128654796a94",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        38,
+        31,
+        93,
+        112
+      ],
+      "anchor": [
+        64,
+        111
+      ],
+      "rect": [
+        63,
+        2,
+        55,
+        81
+      ],
+      "atlas": "sitting-looks/runner-sit"
+    },
+    "sit-runner-up": {
+      "source": "cut-the-sitting-frames.mjs, sit-runner-up.png",
+      "sha256": "349278525334e48f233bb70fe4ab50f09c7ea9da258568a68e790f142e1c9a2d",
+      "pixelHash": "31f3b6b23b266b845b0a1b41f0c3b06fa84ee238b7022266ff6979989b359b79",
+      "size": [
+        128,
+        128
+      ],
+      "trim": [
+        35,
+        30,
+        98,
+        112
+      ],
+      "anchor": [
+        64,
+        111
+      ],
+      "rect": [
+        120,
+        2,
+        63,
+        82
+      ],
+      "atlas": "sitting-looks/runner-sit"
+    }
+  }
+}

@@ -65,7 +65,7 @@ export interface WhatThisBrowserIsWaitingOn {
   standing: VisitorStanding
 }
 
-/** What `GET /api/office/pairing` answers, and what the pairing press answers with. */
+/** What `GET /api/office/pairing` answers. The pairing press answers the same, with the header half beside it. */
 export interface WhatThePairingSays {
   /**
    * True when this request carried the person's key: this browser is already paired. A key the
@@ -85,20 +85,55 @@ export interface WhatThePairingSays {
    */
   mayAsk: boolean
   /**
+   * True when this browser may MOVE: it is not paired, and it sent the old cookie, which held a whole key, with a key
+   * this office still holds as the person's. The move door then gives it two halves once and ends the old cookie in the
+   * same answer. False for every other browser, in a test world, and once it has moved.
+   */
+  mayMove: boolean
+  /**
    * The credential this browser already asked under, or null because it asked under none. It is read
-   * from the cookie, so a reload keeps it; `standing` says whether it is still waiting, was
+   * from the two halves, so a reload keeps it; `standing` says whether it is still waiting, was
    * confirmed, or was ended.
    */
   waiting: WhatThisBrowserIsWaitingOn | null
 }
 
 /**
+ * What `POST /api/office/pairing` answers: the pairing, and the header half of this browser's new key.
+ *
+ * ONE HALF IS HERE, NEVER THE WHOLE KEY. The cookie half is set as an HttpOnly cookie, and the page keeps this half
+ * and sends it as a header. Neither is enough alone. The answer is sent with no-store, so no cache keeps it.
+ */
+export interface WhatThePressSays extends WhatThePairingSays {
+  /** The header half of this browser's device key, answered once and never again. */
+  deviceHalf: string
+}
+
+/**
+ * What the move door moved: the person's own key, or a confirmed device credential of the person's from before the two
+ * halves. A visitor's credential that is not the person's is never moved.
+ */
+export type WhatTheMoveMoved = 'the-person-key' | 'a-device-credential'
+
+/**
+ * What `POST /api/office/pairing/move` answers: what moved, and the header half of this browser's new key.
+ *
+ * ONE HALF IS HERE, NEVER THE WHOLE KEY, as in the press's answer. The cookie half is set as the HttpOnly cookie, the old
+ * cookie is ended in the same answer, and the answer is sent with no-store.
+ */
+export interface WhatTheMoveSays {
+  moved: WhatTheMoveMoved
+  /** The header half of this browser's device key, answered once and never again. */
+  deviceHalf: string
+}
+
+/**
  * What `POST /api/office/pairing/ask` answers, and it is deliberately not a credential.
  *
- * THE TOKEN IS NEVER HERE. The browser asked for a person's-device credential; the credential's
- * token is installed as the same HttpOnly cookie the loopback press sets, and the reply names only
- * the credential's id, the device's name and that the office is waiting for their confirmation. There
- * is no field a token could arrive in.
+ * ONE HALF IS HERE, NEVER THE WHOLE KEY. The browser asked for a person's-device credential. The cookie half of the
+ * credential's key is set as the same HttpOnly cookie the loopback press sets, and the reply names the credential's
+ * id, the device's name, the header half and that the office is waiting for their confirmation. There is no field
+ * the whole key could arrive in.
  */
 export interface WhatAskingToPairSays {
   /** The credential's id, which is what the Embassy's confirm press names. It is not a secret. */
@@ -107,4 +142,17 @@ export interface WhatAskingToPairSays {
   device: string
   /** True and always true: nothing works until the person confirms it at the Embassy. */
   waitingForConfirmation: boolean
+  /** The header half of this browser's device key, answered once and never again. */
+  deviceHalf: string
+}
+
+/**
+ * WHAT THE PRESS TO PAIR SAYS WHEN THE PROGRAM THAT SENT IT IS NOT ONE OF THE PERSON'S, for the program the reading
+ * named. The press's door says it (src/server/api/office.ts), followed by the sentence that says who pairs, and a test
+ * reads it here rather than keeping a copy that a change to these words would leave wrong.
+ */
+export function thePairingRefusalFor(sentBy: string): string {
+  return `Pairing gives the browser that asks a key that is the person, and this request came from ${sentBy}. Nothing that ` +
+    'comes from a sandbox is the person, and a program Mole Office cannot find is not taken for one of theirs. Nothing ' +
+    'was paired and no cookie was set.'
 }

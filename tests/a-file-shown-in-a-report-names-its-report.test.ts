@@ -8,10 +8,11 @@
  * ---------------------------------------------------------------------------------------
  *
  * A report draws two kinds of file block. A file that is neither a picture nor a video is drawn
- * as a thing to fetch, and its Open and Save links name the report the block belongs to. An HTML,
- * PDF, Word or text file is drawn in a frame of its own on one press, and until this test its Save
- * link and its frame's address named no report: the same file block answered to two different
- * addresses depending on the type of the file it holds.
+ * as a thing to fetch, and its Open and Save links name the report the block belongs to. An HTML
+ * file is drawn in a frame of its own on one press, and until this test its Save link and its
+ * frame's address named no report: the same file block answered to two different addresses
+ * depending on the type of the file it holds. A PDF is drawn by the office's own page now, and the
+ * PDF tests read the address it asks for.
  *
  * This test puts a made-up report with one made-up HTML file in a made-up office, opens the
  * report, presses the block's Show press, and reads the two addresses the drawing gives:

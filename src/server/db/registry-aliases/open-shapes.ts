@@ -8,7 +8,7 @@
  * fixed shape into most of them. An adapter below is that shape, written in the declared type language of kinds.ts and
  * read by its one grammar (`aTypeReaderWith`). Each adapter's keys are bound to the writer's TypeScript type, so tsc
  * refuses an adapter that misses a key of the writer's type or adds one it does not have. The field types are not
- * bound, and the cases in tests/registry-alias-open-bags.test.ts and tests/registry-alias-merge-entry-bags.test.ts read
+ * bound, and the cases in tests/registry-alias-open-bags.test.ts read
  * stored values through them.
  *
  * Where the writer has a strict reader of its own, that reader decides instead, and an identity is never looked for
@@ -18,7 +18,7 @@
  * an agent in it are listed in STORED_COLUMNS, each with the adapter its writer's type is written in.
  */
 import type { RoundChapters, RoundDelegations, DelegationGiven, DelegationStanding } from '@shared/round-chapters/manifest.ts'
-import type { ZodType, output } from 'zod'
+import type { ZodType } from 'zod'
 import { SHAPE_SPECS, aTypeReaderWith, unionOf, type DeclaredType, type ShapeSpec } from '@shared/kinds.ts'
 import type { AgentTag } from '@shared/agent-tags.ts'
 import { CASTING_CELLS, type CastingCell, type CastingCellSource, type CastingHold, type CastingImage, type CastingLabelImage, type CastingNative, type CastingSetting, type CastingStoredCell } from '@shared/casting.ts'
@@ -43,12 +43,6 @@ import { SUMMONS_URGENCIES, type ASummonsRead } from '@shared/summons.ts'
 import { ACTOR_TYPES, THREAD_MODES, type HowACallerProvedItself, type ProvedHolder } from '@shared/types.ts'
 import { THE_CHOICES_FOR_A_DOOR } from '@shared/what-the-grant-carries.ts'
 import type { BusCause, WholeSuiteRed } from '@shared/whole-suite-red.ts'
-import type { ARunRequest } from '../../lib/agents.ts'
-import type { TheDuties } from '../../lib/grant/secretary-duties.ts'
-import type { MergeEntryReading, SuiteWorkers } from '../../lib/merge-queue.ts'
-import type { CheckerReport, Deletes, Integration, Press, Reinspected, Reinspection, Stalls, Tested, Verdict } from '../../lib/merge-state-machine.ts'
-import type { KNOWN_ACTS, KnownActName } from '../../lib/one-press.ts'
-import type { FilesAreaFolder, ReadsReleasesFromTheCheck } from '../../lib/participants.ts'
 
 /** A field of an adapter: its key, and its type in the declared type language. */
 export interface AdapterField {
@@ -100,17 +94,95 @@ const OWNER_ENDINGS: Variants<TheOwnerEnding, 'how'> = {
 const WAS = "'retired' | 'nothing answering'"
 const POSITION = unionOf(mergeClassDecision.shape.position.options)
 const ORIGINAL = "'original'"
-type TheTestedWith = NonNullable<Tested['testedWith']>
-type ALoadTimeout = NonNullable<Tested['loadTimeouts']>[number]
-type ARunMessage = ARunRequest['messages'][number]
-type ARunQuote = Extract<ARunMessage, { quotes: unknown }>['quotes'][number]
 // The grammar reads a union as quoted values only when every part is quoted, so `null` comes first and each side is read alone.
 const CONTEXT_STATE = "null | 'there' | 'changed' | 'gone' | 'unknown'"
 const A_MAP_REGION = forestMapStateSchema.shape.regions.element.shape
 /** The zones a map region may be in, as the map's own schema lists them. */
 export const FOREST_ZONES: readonly string[] = A_MAP_REGION.zone.options
-/** What an act asked for one press, or in a signing package, keeps as its inputs. */
-type InputsOf<A extends KnownActName> = output<(typeof KNOWN_ACTS)[A]['inputs']>
+
+/**
+ * THE ADAPTERS WHOSE WRITER'S TYPE IS DECLARED IN src/server/lib. This file imports nothing from src/server/lib, so the
+ * keys of each adapter here are bound to its writer's type in src/server/lib/registry-aliases/open-shapes.ts, which
+ * re-exports this file. tsc refuses there an adapter that misses a key of its writer's type or adds one, as shape<T>
+ * refuses one below, and names it. ADAPTER_SHAPES names each of these in its place.
+ */
+export const CHECKED_IN_LIB = {
+  SupervisorAnswered: { agent: 'ParticipantRef', area: 'string' },
+  FilesAreaFolder: { written: 'string', resolved: 'string' },
+  MergeSeal: { id: 'string', hash: 'string' },
+  SuiteWorkers: { count: 'number', by: 'ParticipantRef' },
+  MergeWithdrawn: { because: 'string', by: 'ParticipantRef', at: 'string' },
+  MergeSuperseded: { by: 'string', because: 'string', at: 'string' },
+  MergeTool: { session: 'string', log: 'string', startedAt: 'string', endedAt: 'string', reason: 'string' },
+  MergeToolWanted: { since: 'string' },
+  MergeVerdict: { run: 'string', by: 'ParticipantRef', at: 'string', time: 'ClockStamp', how: 'string', message: 'string | null' },
+  MergeChecked: { at: 'string', tool: 'string', decided: 'CheckerDecided[]', needsJudgment: 'PathThatNeedsJudgment[]' },
+  CheckerDecided: { path: 'string', check: 'string', ok: 'boolean', detail: 'string' },
+  MergeIntegration: {
+    result: 'string', mainAt: 'string', clone: 'string', files: 'Record<string, string>', at: 'string', reads: 'ReadsOnMain', lines: 'LinesOfAFile[]',
+    keptByLine: 'KeptByLine', ownerContent: 'OwnerContentReminders', placeholderCommits: 'PlaceholderCommits',
+  },
+  ReadsOnMain: { tree: 'string', files: 'number', folders: 'number', record: 'string' },
+  KeptByLine: { files: 'KeptByLineFile[]', says: 'string' },
+  KeptByLineFile: { path: 'string', ranges: 'string' },
+  Reinspection: { run: 'string', only: 'string[]', needsJudgment: 'PathThatNeedsJudgment[]', askedAt: 'string', says: 'string' },
+  Reinspected: { run: 'string', only: 'string[]', needsJudgment: 'string[]', releasedAt: 'string' },
+  MergeTested: {
+    relatedOnly: 'RelatedOnly', wholeSuiteBecause: 'WholeSuiteBecause[]', green: 'boolean', redTests: 'string[]', log: 'string', tip: 'string', ran: 'number',
+    passed: 'number', says: 'string', officeHealth: 'OfficeHealth', at: 'string', time: 'ClockStamp', testedWith: 'TestedWith', borrowedFrom: 'BorrowedFrom',
+    loadTimeouts: 'LoadTimeout[]', plugin: 'APluginOnlyChange', wholeSuiteRed: 'WholeSuiteRed', busCause: 'BusCause', houseRules: 'HouseRulesDecision',
+    mergeClass: 'MergeClassDecision', build: 'BuildPassed', repair: 'RepairFact',
+  },
+  RelatedOnly: { files: 'number', related: 'number', every: 'number', leftOutSlow: 'LeftOutSlow[]', says: 'string' },
+  LeftOutSlow: { file: 'string', seconds: 'number' },
+  WholeSuiteBecause: { case: 'number', paths: 'string[]', says: 'string' },
+  OfficeHealth: {
+    samples: 'number', answered: 'number', unanswered: 'number', medianMs: 'number | null', maxMs: 'number | null', over10s: 'number', everySeconds: 'number',
+    load1Median: 'number', load1Max: 'number', availableMemoryMiBMedian: 'number', availableMemoryMiBLowest: 'number', cpus: 'number', memoryMiB: 'number',
+  },
+  TestedWith: {
+    entry: 'string', tree: 'string', forTheOther: 'ForTheOther', collision: 'string[]', bus: 'BusRider[]', passedForACheck: 'string[]', passedAlone: 'string[]',
+  },
+  ForTheOther: { tree: 'string', green: 'boolean', build: 'BuildPassed', redTests: 'string[]', says: 'string' },
+  BusRider: { entry: 'string', forTheOther: 'ForTheOther' },
+  BorrowedFrom: { entry: 'string', tree: 'string' },
+  LoadTimeout: { file: 'string', mainAt: 'string', here: 'LoadTimeoutHere', modal: 'ModalLoadTimeout' },
+  LoadTimeoutHere: { entryLog: 'string', mainLog: 'string' },
+  ModalLoadTimeout: { entry: 'ModalRun', main: 'ModalRun' },
+  ModalRun: { commit: 'string', log: 'string', report: 'string' },
+  BuildPassed: { passed: 'boolean' },
+  MergeStalls: { runs: 'number', says: 'string', secretary: 'string | null', asked: 'StallsAsked' },
+  StallsAsked: { by: 'ParticipantRef', at: 'string', because: 'string', mainAt: 'string' },
+  MergeDeletes: { paths: 'string[]', asked: 'string | null', confirmed: 'PressedBy' },
+  PressToLand: { paths: 'string[]', asked: 'string | null', pressed: 'PressedBy', leftOut: 'PressLeftOut' },
+  PressedBy: { by: 'ParticipantRef', at: 'string', because: 'string' },
+  PressLeftOut: { mainAt: 'string', paths: 'string[]' },
+  RunRequest: {
+    workspaceId: 'string', workspaceTitle: 'string | null', actorId: 'string', agentId: 'string | null', thread: 'RunRequestThread', recipient: 'RunRequestRecipient',
+    resume: 'RunRequestResume | null', messages: 'RunRequestMessage[]', contextNote: 'string', assembledAt: 'string', agentKeyId: 'string',
+  },
+  RunRequestThread: { id: 'string', title: 'string', mode: unionOf(THREAD_MODES) },
+  RunRequestRecipient: {
+    kind: "'session' | 'new' | 'agent'", sessionRecordId: 'string | null', sessionTitle: 'string | null', said: 'string | null', why: 'string | null',
+  },
+  RunRequestResume: { runtime: 'string', externalId: 'string' },
+  RunRequestMessage: {
+    id: 'string', intent: unionOf(MESSAGE_INTENTS), body: 'string', context: 'Context | null', contextSaid: 'string | null', contextState: CONTEXT_STATE,
+    quotes: 'RunRequestQuote[]', writtenAt: 'string', writtenBy: 'string',
+  },
+  RunRequestQuote: { number: 'number', commentId: 'string', context: 'Context | null', contextSaid: 'string | null', contextState: CONTEXT_STATE },
+  SettingInputs: { panel: 'string', setting: 'string', value: 'number' },
+  AskAtTheDoorInputs: { request: 'string', answer: "'grant' | 'refuse'" },
+  RuleMarkInputs: { chapter: 'string', rule: 'string', only: 'boolean' },
+  GrantListInputs: { changes: 'GrantListChange[]' },
+  GrantListChange: { door: 'string', answer: unionOf(THE_CHOICES_FOR_A_DOOR) },
+  ReadsReleasesFromTheCheck: { on: 'boolean', by: 'ParticipantRef', at: 'string', because: 'string' },
+} as const
+
+/** An adapter of CHECKED_IN_LIB, made from its keys as shape<T> makes one. */
+function checkedInLib(name: keyof typeof CHECKED_IN_LIB, open = false): AdapterShape {
+  return { name, fields: Object.entries(CHECKED_IN_LIB[name] as Readonly<Record<string, string>>).map(([key, type]) => ({ key, type })), open }
+}
 
 export const ADAPTER_SHAPES: readonly AdapterShape[] = [
   // A message's routed entries, carries, ask to resolve, edit mark, reminder and summons.
@@ -176,13 +248,13 @@ export const ADAPTER_SHAPES: readonly AdapterShape[] = [
   }),
   shape<CounterPause>('CounterPause', { at: 'string', by: 'ParticipantRef', because: 'string' }),
   // A secretary's supervisors, an agent's files area, the notice of a seal, and the end of an emergency push.
-  shape<NonNullable<TheDuties['supervisors']>[number]>('SupervisorAnswered', { agent: 'ParticipantRef', area: 'string' }),
-  shape<FilesAreaFolder>('FilesAreaFolder', { written: 'string', resolved: 'string' }),
+  checkedInLib('SupervisorAnswered'),
+  checkedInLib('FilesAreaFolder'),
   shape<{ to: unknown; because: string }>('TheStarterNotice', { to: 'ParticipantRef', because: 'string' }),
   shape<EmergencyPushEnd & { at: string; mainAfter: string }>('EmergencyPushEnded', { at: 'string', mainAfter: 'string', says: 'string', onward: 'EmergencyPushOnward | null' }),
   shape<NonNullable<EmergencyPushEnd['onward']>>('EmergencyPushOnward', { ok: 'boolean', says: 'string' }),
   // A merge entry's seal, changeset, submitter, workers, withdrawal, move, successor and tool run.
-  shape<MergeEntryReading['seal']>('MergeSeal', { id: 'string', hash: 'string' }),
+  checkedInLib('MergeSeal'),
   ...union<Changeset, 'adapter'>('MergeChangeset', 'adapter', {
     git: { root: 'string', repository: 'string', branch: 'string | null', commit: 'string', base: 'string' },
     files: { root: 'string', stagedAt: 'string', onConflict: unionOf(ON_CONFLICT), operations: 'MergeFileOperation[]' },
@@ -190,55 +262,42 @@ export const ADAPTER_SHAPES: readonly AdapterShape[] = [
   shape<FileOperation>('MergeFileOperation', {
     op: unionOf(FILE_OPERATIONS), path: 'string', from: 'string', before: 'string', after: 'string', mode: unionOf(FILE_MODES), source: 'string', record: 'string',
   }),
-  shape<SuiteWorkers>('SuiteWorkers', { count: 'number', by: 'ParticipantRef' }),
-  shape<NonNullable<MergeEntryReading['withdrawn']>>('MergeWithdrawn', { because: 'string', by: 'ParticipantRef', at: 'string' }),
+  checkedInLib('SuiteWorkers'),
+  checkedInLib('MergeWithdrawn'),
   shape<MovedFirst>('MovedFirst', { by: 'ParticipantRef', at: 'string', because: 'string', turn: 'number', underARaise: 'string' }),
   shape<ReturnsFirst>('ReturnsFirst', { run: 'string', at: 'string', turn: 'number' }),
-  shape<NonNullable<MergeEntryReading['superseded']>>('MergeSuperseded', { by: 'string', because: 'string', at: 'string' }),
-  shape<NonNullable<MergeEntryReading['tool']>>('MergeTool', { session: 'string', log: 'string', startedAt: 'string', endedAt: 'string', reason: 'string' }),
-  shape<NonNullable<MergeEntryReading['toolWanted']>>('MergeToolWanted', { since: 'string' }),
+  checkedInLib('MergeSuperseded'),
+  checkedInLib('MergeTool'),
+  checkedInLib('MergeToolWanted'),
   // Its verdict, the checker's report, the integration and the reinspection. The report is kept without what it checked.
-  shape<Verdict>('MergeVerdict', { run: 'string', by: 'ParticipantRef', at: 'string', time: 'ClockStamp', how: 'string', message: 'string | null' }),
-  shape<Omit<CheckerReport, 'checked'> & { at: string }>('MergeChecked', { at: 'string', tool: 'string', decided: 'CheckerDecided[]', needsJudgment: 'PathThatNeedsJudgment[]' }),
-  shape<CheckerReport['decided'][number]>('CheckerDecided', { path: 'string', check: 'string', ok: 'boolean', detail: 'string' }),
-  shape<Integration>('MergeIntegration', {
-    result: 'string', mainAt: 'string', clone: 'string', files: 'Record<string, string>', at: 'string', reads: 'ReadsOnMain', lines: 'LinesOfAFile[]',
-    keptByLine: 'KeptByLine', ownerContent: 'OwnerContentReminders', placeholderCommits: 'PlaceholderCommits',
-  }),
-  shape<NonNullable<Integration['reads']>>('ReadsOnMain', { tree: 'string', files: 'number', folders: 'number', record: 'string' }),
+  checkedInLib('MergeVerdict'),
+  checkedInLib('MergeChecked'),
+  checkedInLib('CheckerDecided'),
+  checkedInLib('MergeIntegration'),
+  checkedInLib('ReadsOnMain'),
   shape<LinesOfAFile>('LinesOfAFile', { path: 'string', held: 'boolean', ranges: 'string', why: 'string' }),
-  shape<NonNullable<Integration['keptByLine']>>('KeptByLine', { files: 'KeptByLineFile[]', says: 'string' }),
-  shape<NonNullable<Integration['keptByLine']>['files'][number]>('KeptByLineFile', { path: 'string', ranges: 'string' }),
+  checkedInLib('KeptByLine'),
+  checkedInLib('KeptByLineFile'),
   shape<OwnerContentReminders>('OwnerContentReminders', { reminded: 'number', byPattern: 'Record<string, number>', says: 'string', log: 'string' }),
   shape<PlaceholderCommits>('PlaceholderCommits', { position: "'remind'", domain: 'string', commits: 'PlaceholderCommit[]', log: 'string' }),
   shape<PlaceholderCommits['commits'][number]>('PlaceholderCommit', { commit: 'string', author: 'string | null', committer: 'string | null' }),
-  shape<Reinspection>('Reinspection', { run: 'string', only: 'string[]', needsJudgment: 'PathThatNeedsJudgment[]', askedAt: 'string', says: 'string' }),
-  shape<Reinspected>('Reinspected', { run: 'string', only: 'string[]', needsJudgment: 'string[]', releasedAt: 'string' }),
+  checkedInLib('Reinspection'),
+  checkedInLib('Reinspected'),
   // What its suite found.
-  shape<Tested>('MergeTested', {
-    relatedOnly: 'RelatedOnly', wholeSuiteBecause: 'WholeSuiteBecause[]', green: 'boolean', redTests: 'string[]', log: 'string', tip: 'string', ran: 'number',
-    passed: 'number', says: 'string', officeHealth: 'OfficeHealth', at: 'string', time: 'ClockStamp', testedWith: 'TestedWith', borrowedFrom: 'BorrowedFrom',
-    loadTimeouts: 'LoadTimeout[]', plugin: 'APluginOnlyChange', wholeSuiteRed: 'WholeSuiteRed', busCause: 'BusCause', houseRules: 'HouseRulesDecision',
-    mergeClass: 'MergeClassDecision', build: 'BuildPassed', repair: 'RepairFact',
-  }),
-  shape<NonNullable<Tested['relatedOnly']>>('RelatedOnly', { files: 'number', related: 'number', every: 'number', leftOutSlow: 'LeftOutSlow[]', says: 'string' }),
-  shape<NonNullable<Tested['relatedOnly']>['leftOutSlow'][number]>('LeftOutSlow', { file: 'string', seconds: 'number' }),
-  shape<NonNullable<Tested['wholeSuiteBecause']>[number]>('WholeSuiteBecause', { case: 'number', paths: 'string[]', says: 'string' }),
-  shape<NonNullable<Tested['officeHealth']>>('OfficeHealth', {
-    samples: 'number', answered: 'number', unanswered: 'number', medianMs: 'number | null', maxMs: 'number | null', over10s: 'number', everySeconds: 'number',
-    load1Median: 'number', load1Max: 'number', availableMemoryMiBMedian: 'number', availableMemoryMiBLowest: 'number', cpus: 'number', memoryMiB: 'number',
-  }),
-  shape<TheTestedWith>('TestedWith', {
-    entry: 'string', tree: 'string', forTheOther: 'ForTheOther', collision: 'string[]', bus: 'BusRider[]', passedForACheck: 'string[]', passedAlone: 'string[]',
-  }),
-  shape<NonNullable<TheTestedWith['forTheOther']>>('ForTheOther', { tree: 'string', green: 'boolean', build: 'BuildPassed', redTests: 'string[]', says: 'string' }),
-  shape<NonNullable<TheTestedWith['bus']>[number]>('BusRider', { entry: 'string', forTheOther: 'ForTheOther' }),
-  shape<NonNullable<Tested['borrowedFrom']>>('BorrowedFrom', { entry: 'string', tree: 'string' }),
-  shape<ALoadTimeout>('LoadTimeout', { file: 'string', mainAt: 'string', here: 'LoadTimeoutHere', modal: 'ModalLoadTimeout' }),
-  shape<ALoadTimeout['here']>('LoadTimeoutHere', { entryLog: 'string', mainLog: 'string' }),
-  shape<ALoadTimeout['modal']>('ModalLoadTimeout', { entry: 'ModalRun', main: 'ModalRun' }),
-  shape<ALoadTimeout['modal']['entry']>('ModalRun', { commit: 'string', log: 'string', report: 'string' }),
-  shape<NonNullable<Tested['build']>>('BuildPassed', { passed: 'boolean' }),
+  checkedInLib('MergeTested'),
+  checkedInLib('RelatedOnly'),
+  checkedInLib('LeftOutSlow'),
+  checkedInLib('WholeSuiteBecause'),
+  checkedInLib('OfficeHealth'),
+  checkedInLib('TestedWith'),
+  checkedInLib('ForTheOther'),
+  checkedInLib('BusRider'),
+  checkedInLib('BorrowedFrom'),
+  checkedInLib('LoadTimeout'),
+  checkedInLib('LoadTimeoutHere'),
+  checkedInLib('ModalLoadTimeout'),
+  checkedInLib('ModalRun'),
+  checkedInLib('BuildPassed'),
   shape<WholeSuiteRed>('WholeSuiteRed', { outcome: "'admitted-for-fix-round'", build: 'WholeSuiteRedBuild', affected: 'WholeSuiteRedAffected', suite: 'WholeSuiteRedSuite' }),
   shape<WholeSuiteRed['build']>('WholeSuiteRedBuild', { source: ORIGINAL, tip: 'string', tree: 'string', log: 'string', exit: 'number' }),
   shape<WholeSuiteRed['affected']>('WholeSuiteRedAffected', {
@@ -275,8 +334,8 @@ export const ADAPTER_SHAPES: readonly AdapterShape[] = [
   shape<RepairFact>('RepairFact', { problem: 'string', files: 'RepairedFile[]' }),
   shape<RepairFact['files'][number]>('RepairedFile', { file: 'string', passed: 'boolean' }),
   // Its stalls, its waits, the red on main it found, and the presses it needs.
-  shape<Stalls>('MergeStalls', { runs: 'number', says: 'string', secretary: 'string | null', asked: 'StallsAsked' }),
-  shape<NonNullable<Stalls['asked']>>('StallsAsked', { by: 'ParticipantRef', at: 'string', because: 'string', mainAt: 'string' }),
+  checkedInLib('MergeStalls'),
+  checkedInLib('StallsAsked'),
   // The state machine writes the wait for room, the files red on main, the documents and what it told inline, so their keys are written here by hand.
   shape<{ since: string; at: string; says: string; message: unknown; toldAt: unknown; toldTime: unknown }>('WaitingForRoom', {
     since: 'string', at: 'string', says: 'string', message: 'string | null', toldAt: 'string | null', toldTime: 'ClockStamp',
@@ -293,10 +352,10 @@ export const ADAPTER_SHAPES: readonly AdapterShape[] = [
   shape<NonNullable<WaitsForAFixRound['opened']>>('FixRoundOpened', { at: 'string', for: "'line' | 'sheriff' | 'starter'", agent: 'string', run: 'string' }),
   shape<NonNullable<WaitsForAFixRound['reserved']>>('FixRoundReserved', { at: 'string', for: "'line' | 'sheriff'", agent: 'string', holder: 'string' }),
   shape<{ file: string; mainAt: string; log: string; problem: string; at: string }>('RedOnMain', { file: 'string', mainAt: 'string', log: 'string', problem: 'string', at: 'string' }),
-  shape<Deletes>('MergeDeletes', { paths: 'string[]', asked: 'string | null', confirmed: 'PressedBy' }),
-  shape<Press>('PressToLand', { paths: 'string[]', asked: 'string | null', pressed: 'PressedBy', leftOut: 'PressLeftOut' }),
-  shape<NonNullable<Deletes['confirmed']> | NonNullable<Press['pressed']>>('PressedBy', { by: 'ParticipantRef', at: 'string', because: 'string' }),
-  shape<NonNullable<Press['leftOut']>>('PressLeftOut', { mainAt: 'string', paths: 'string[]' }),
+  checkedInLib('MergeDeletes'),
+  checkedInLib('PressToLand'),
+  checkedInLib('PressedBy'),
+  checkedInLib('PressLeftOut'),
   shape<{ tree: string; files: string[] }>('MergeDocuments', { tree: 'string', files: 'string[]' }),
   shape<{ submitter: string[]; secretary: unknown; says: string }>('MergeTold', { submitter: 'string[]', secretary: 'string | null', says: 'string' }),
   // Its bounce, the conflict it waits to have resolved, and the resolution.
@@ -341,20 +400,12 @@ export const ADAPTER_SHAPES: readonly AdapterShape[] = [
     houseRules: 'HouseRulesDecision', mergeClass: 'MergeClassDecision', build: 'BuildPassed', repair: 'RepairFact',
   }),
   // The stores that are not records. A run's request, as the dispatch wrote it.
-  shape<ARunRequest>('RunRequest', {
-    workspaceId: 'string', workspaceTitle: 'string | null', actorId: 'string', agentId: 'string | null', thread: 'RunRequestThread', recipient: 'RunRequestRecipient',
-    resume: 'RunRequestResume | null', messages: 'RunRequestMessage[]', contextNote: 'string', assembledAt: 'string', agentKeyId: 'string',
-  }),
-  shape<ARunRequest['thread']>('RunRequestThread', { id: 'string', title: 'string', mode: unionOf(THREAD_MODES) }),
-  shape<ARunRequest['recipient']>('RunRequestRecipient', {
-    kind: "'session' | 'new' | 'agent'", sessionRecordId: 'string | null', sessionTitle: 'string | null', said: 'string | null', why: 'string | null',
-  }),
-  shape<NonNullable<ARunRequest['resume']>>('RunRequestResume', { runtime: 'string', externalId: 'string' }),
-  shape<ARunMessage>('RunRequestMessage', {
-    id: 'string', intent: unionOf(MESSAGE_INTENTS), body: 'string', context: 'Context | null', contextSaid: 'string | null', contextState: CONTEXT_STATE,
-    quotes: 'RunRequestQuote[]', writtenAt: 'string', writtenBy: 'string',
-  }),
-  shape<ARunQuote>('RunRequestQuote', { number: 'number', commentId: 'string', context: 'Context | null', contextSaid: 'string | null', contextState: CONTEXT_STATE }),
+  checkedInLib('RunRequest'),
+  checkedInLib('RunRequestThread'),
+  checkedInLib('RunRequestRecipient'),
+  checkedInLib('RunRequestResume'),
+  checkedInLib('RunRequestMessage'),
+  checkedInLib('RunRequestQuote'),
   // The office map's layout.
   shape<ForestMapState>('ForestMapState', {
     version: 'number', seed: 'string', grouping: unionOf(forestMapStateSchema.shape.grouping.options), regions: 'ForestRegion[]',
@@ -374,11 +425,11 @@ export const ADAPTER_SHAPES: readonly AdapterShape[] = [
   shape<NonNullable<FolderReadingPiece['rejectionUndo']>>('FolderPieceUndoOffer', { token: 'string', atMs: 'number', fingerprint: 'string' }),
   shape<NonNullable<FolderReadingPiece['lastRejectionUndo']>>('FolderPieceUndone', { at: 'string', by: 'string' }),
   // The inputs of each act that may be asked for one press or in a signing package.
-  shape<InputsOf<'change-a-setting'>>('SettingInputs', { panel: 'string', setting: 'string', value: 'number' }),
-  shape<InputsOf<'answer-an-ask-at-the-door'>>('AskAtTheDoorInputs', { request: 'string', answer: "'grant' | 'refuse'" }),
-  shape<InputsOf<'mark-a-rule-only-for-this-office'>>('RuleMarkInputs', { chapter: 'string', rule: 'string', only: 'boolean' }),
-  shape<InputsOf<'change-what-the-grant-carries'>>('GrantListInputs', { changes: 'GrantListChange[]' }),
-  shape<InputsOf<'change-what-the-grant-carries'>['changes'][number]>('GrantListChange', { door: 'string', answer: unionOf(THE_CHOICES_FOR_A_DOOR) }),
+  checkedInLib('SettingInputs'),
+  checkedInLib('AskAtTheDoorInputs'),
+  checkedInLib('RuleMarkInputs'),
+  checkedInLib('GrantListInputs'),
+  checkedInLib('GrantListChange'),
   // A casting image, as a casting history row keeps it before and after a change: the cells side by side, then the mark and the native state.
   // An image written before migration 0349 holds the cell work_group, and no labels or Out until.
   shape<Record<CastingCell, CastingStoredCell> & Omit<CastingImage, 'cells' | 'workGroup'> & { work_group?: CastingStoredCell }>('CastingImage', {
@@ -403,7 +454,7 @@ export const ADAPTER_SHAPES: readonly AdapterShape[] = [
   shape<CastingHold['refusal']>('CastingHoldRefusal', { kind: "'model' | 'option'", code: 'string', said: 'string' }),
   // Who a key proved, beside the name the request's headers gave, as a change row and a revision keep it.
   shape<ProvedHolder>('ProvedHolder', { id: 'string', how: unionOf(Object.keys(HOW_A_KEY_PROVED)), claimed: 'string' }),
-  shape<ReadsReleasesFromTheCheck>('ReadsReleasesFromTheCheck', { on: 'boolean', by: 'ParticipantRef', at: 'string', because: 'string' }),
+  checkedInLib('ReadsReleasesFromTheCheck'),
   // A person's own tag, as the tags door keeps it: its agents are registry ids.
   shape<AgentTag>('AgentTag', { name: 'string', colour: 'string', agents: 'string[]' }),
 ]
@@ -564,12 +615,17 @@ export const OPEN_BAGS: Readonly<Record<string, OpenBag>> = {
   'tool_category.extra': AUTHORED,
   'tool.extra': AUTHORED,
   'secretary_duties.extra': AUTHORED,
+  'department.extra': AUTHORED,
   'watch.extra': AUTHORED,
   'backlog_item.extra': AUTHORED,
   'host_job.arguments': notYet('The host job door writes the named values asked with, each of the shape its tool declares'),
   'host_job.askedBy': notYet('The host job door writes the caller in one of two shapes: the run that asked, proved by its run key, and its agent; or the person or secretary as {kind, id}'),
   'host_job.outputs': notYet("The host job runner's finish writes each declared output as it found it"),
   'host_job.extra': { reads: 'nothing', because: 'Only the host job doors write a host job, and none of them writes this field.' },
+  'pack.counts': { reads: 'nothing', because: 'The counts hold numbers describing the pack.' },
+  'pack.previous': { reads: 'nothing', because: 'The link holds a pack file name and a fingerprint.' },
+  'pack.base': { reads: 'nothing', because: 'The link holds a pack file name and a fingerprint.' },
+  'pack.extra': { reads: 'nothing', because: 'Only the pack filing function writes a pack record, and it writes no extra field.' },
   'handbook.extra': AUTHORED,
   'design.extra': AUTHORED,
 }
@@ -598,13 +654,16 @@ export const DATA_OF_A_KIND: Readonly<Record<string, DataOfAKind>> = {
   'FolderReadingPiece.data': { kindIn: 'kind', marks: { editedBeforeAccepting: 'boolean' }, writer: FOLDER_READINGS },
 }
 
-/** The adapter of each act's inputs. tsc refuses a list that misses an act the office knows. */
-const INPUTS_OF_AN_ACT: Readonly<Record<KnownActName, string>> = {
+/**
+ * The adapter of each act's inputs. src/server/lib/registry-aliases/open-shapes.ts binds its keys to the acts the office
+ * knows, so tsc refuses there a list that misses an act or names one the office does not know.
+ */
+export const INPUTS_OF_AN_ACT = {
   'change-a-setting': 'SettingInputs',
   'answer-an-ask-at-the-door': 'AskAtTheDoorInputs',
   'mark-a-rule-only-for-this-office': 'RuleMarkInputs',
   'change-what-the-grant-carries': 'GrantListInputs',
-}
+} as const satisfies Readonly<Record<string, string>>
 
 /**
  * HOW ONE STORED COLUMN THAT IS NOT A RECORD'S DATA IS READ. `type` reads it by one adapter type. `by-act` reads it by the
@@ -612,7 +671,7 @@ const INPUTS_OF_AN_ACT: Readonly<Record<KnownActName, string>> = {
  */
 export type StoredColumn =
   | { reads: 'type'; type: string; writer: string }
-  | { reads: 'by-act'; types: Readonly<Record<KnownActName, string>>; writer: string }
+  | { reads: 'by-act'; types: typeof INPUTS_OF_AN_ACT; writer: string }
   /** Read by one type, and the re-mint gives each old registry id the reader finds in it its new id (remint-plain.ts). */
   | { reads: 'type'; type: string; writer: string; remint: 'rewrites-each-registry-id' }
 

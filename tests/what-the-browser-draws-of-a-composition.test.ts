@@ -85,14 +85,13 @@ if (NARROW === null || !NARROW.endsWith('rem')) {
 const NARROW_REM = Number(NARROW.slice(0, -'rem'.length))
 
 /**
- * THE FOUR VIEWPORT WIDTHS THE MEASURE IS READ AT.
+ * THE TWO VIEWPORT WIDTHS THE MEASURE IS READ AT.
  *
- * They are the four `ACCEPTANCE.md` criterion C26 names, and they are the four
- * `node tools/review.mjs` photographs every screen at: one per band of the layout. 1440 and 990
- * draw the compositions beside each other, 660 and 390 draw them one under another, so the loop
+ * They are the widest and the narrowest of the four `ACCEPTANCE.md` criterion C26 names. 1440
+ * draws the compositions beside each other and 390 draws them one under another, so the loop
  * below covers both arrangements rather than only the wide one.
  */
-const WIDTHS = [1440, 990, 660, 390]
+const WIDTHS = [1440, 390]
 
 /** A paragraph long enough that its lines wrap at every width this file opens. */
 const PROSE =

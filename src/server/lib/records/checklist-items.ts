@@ -386,6 +386,7 @@ export function patchChecklistItem(
    * with who and when (`whatThisWroteOver`).
    */
   ifVersion?: string,
+  revisionNote?: string,
 ): ChecklistPatchResult {
   const appending = appendToPart !== undefined
   const before = db.select().from(records).where(eq(records.id, recordId)).get()
@@ -651,7 +652,7 @@ export function patchChecklistItem(
     }
 
     db.update(records).set({ data: nextData, updatedAt: now() }).where(eq(records.id, recordId)).run()
-    saveRevision(recordId, 'update', actor)
+    saveRevision(recordId, 'update', actor, revisionNote)
   })()
   const after = getRecord(recordId)
   if (!after) throw new PanelError('The update did not take effect', 500)

@@ -1,5 +1,6 @@
 // Copyright © 2026 Zhengyang Shen
 // Licensed under the MIT License. See LICENSE.
+import { inspectorAnswersRun } from './inspector-answers-lines.ts'
 import { RULES_THE_CODE_NAMES } from '@shared/chapter-check.ts'
 import { checkSavedChapterClaims, ROUND_CHAPTERS, roundChaptersText, savedRoundChapters } from '@shared/round-chapters/manifest.ts'
 import { REMINDED_BEFORE_THE_SEAL } from '@shared/before-the-seal.ts'
@@ -143,7 +144,7 @@ import { everyAgentAReferenceCouldName } from '../db/agent-references.ts'
 import { theRoleCards, theRoleCardsAreRead } from './roles.ts'
 import { aRoleNeedsARegisteredWorkArea, theCardOffTheTree, THE_WORKER, THE_SUPERVISOR } from '@shared/roles.ts'
 import { theReviewLevel } from '../db/the-review-level.ts'
-import { whetherThisOfficeWouldStartACheck } from './checks-in-merges-only.ts'
+import { whetherThisOfficeWouldStartThisRunCheck } from './checks-in-merges-only.ts'
 import { A_CHECK_NOTHING_STARTS, A_CHECK_NOTHING_STARTS_IS_TOLD_AFTER_MS, aCheckNothingStartsSays, aCheckThatWillStartSays, type ACheckNothingStarts } from '@shared/whether-a-check-would-start.ts'
 import { readTheHonourOfARun, storeTheHonourReading } from './honour.ts'
 import { gateMet } from './gate-counts.ts'
@@ -171,9 +172,11 @@ import { theRecordedProcessOf } from '../../config/own-rows.mjs'
 import { whetherTheRecordedProcessRuns } from '../../config/session-process.mjs'
 import { SETTLEMENTS_ON_THE_CHECK, asTheDoorOf } from './check-field-doors.ts'
 import { listRepositories } from '../db/list-repositories.ts'
+import { theRepositoryNamed } from './the-repository-named.ts'
 import { theRunHasEnded } from '@shared/run-has-ended.ts'
 import { theRunThatStartedItHasEnded } from './worker.ts'
 import { theAgentARunServes } from './the-agent-a-run-serves.ts'
+import { theAgentTheKeyProves } from './the-agent-the-key-proves.ts'
 import { isOneOf, theFiledAliasesReadOnce } from './registry-aliases/runs.ts'
 import { isOneOfTheStamps, theStampsOfAnAgent, theStampsReadOnce, type TheStampsOf } from './registry-aliases/stamps.ts'
 import { THE_OFFICE_WRITES_AS } from './the-offices-secretary-run.ts'
@@ -205,6 +208,14 @@ export function theNameAPersonReads(who: ParticipantRef): string {
   if (who.kind !== 'agent') return who.id
   const agent = theOneAgentAStringNames(sqlite, who.id)
   if (agent === null) return sayInEnglish('record.writer.unregisteredAgent')
+  return theOfficeNameOf(agent)
+}
+
+/**
+ * THE OFFICE NAME OF AN AGENT WHOSE ROW THE CALLER HOLDS: its name, or its handle when the name is blank. The one rule,
+ * so a sentence that already holds the row names the agent as `theNameAPersonReads` does, with no second read.
+ */
+export function theOfficeNameOf(agent: { name: string; handle: string }): string {
   return agent.name.trim() === '' ? agent.handle : agent.name
 }
 
@@ -933,13 +944,16 @@ export function whereARunStands(
   }
 }
 
-/** Finished runs, newest first, leaving out the archives closed unchecked. */
-export function runsThatSaidTheyAreFinished(workspaceId: string): { record: PanelRecord; stands: WhereARunStands }[] {
+/**
+ * Finished runs, newest first, leaving out the archives closed unchecked. Given `ids`, it reads only those of the
+ * project's session records, and an empty list reads none.
+ */
+export function runsThatSaidTheyAreFinished(workspaceId: string, ids?: readonly string[]): { record: PanelRecord; stands: WhereARunStands }[] {
   // THE REGISTRY IS READ ONCE FOR THE WHOLE LIST. Read once per run, GET /api/checks took 6.9 seconds
   // for 6,000 runs on an office of the live shape, and the server answered nothing else meanwhile
   // (problem P-P3huQftq9w).
   const agents = theRegistryReadOnce()
-  return listRecords({ workspaceId, kind: 'session' })
+  return listRecords({ workspaceId, kind: 'session', ...(ids === undefined ? {} : { ids }) })
     .map((record) => ({ record, stands: whereARunStands(record, agents) }))
     .filter((one) => one.stands.saidFinished && one.stands.closedUnchecked === null)
 }
@@ -1420,6 +1434,7 @@ export interface WhatTheInspectorReads {
   decisionsComplete: boolean
   /** The inside packages whose latest hand-back this run wrote and that no check has answered since, and the ones whose points could not be read. */
   packages: ThePackagesARunHandedBack
+  readingOnly: boolean
   /** The work area the worker registered, or null because nobody recorded one. */
   workArea: string[] | null
   /**
@@ -1900,6 +1915,7 @@ export function whatTheInspectorReads(runId: string, workspaceId: string, read: 
     stampsOf,
   )
 
+  const readingOnly = inspectorAnswersRun(run.id, workspaceId)
   return {
     run,
     stands: whereARunStands(run),
@@ -1912,7 +1928,8 @@ export function whatTheInspectorReads(runId: string, workspaceId: string, read: 
     reportsReadFrom,
     reportOfMergeEntry,
     ...theDecisionsOfTheRun(run, workspaceId, agent, submission?.seal.sealedAt ?? nowStamp()),
-    packages: thePackagesThisRunHandedBack(run.id, workspaceId),
+    packages: thePackagesThisRunHandedBack(run.id, workspaceId, readingOnly),
+    readingOnly,
     wrote: pinned ? pinned.map((one) => ({ id: one.id, kind: one.kind, title: one.title, when: submission!.seal.sealedAt })) : agent === null ? [] : everythingThisAgentWrote(agent, workspaceId, stampsOf(agent)),
     submission,
     submissionStatus: submission ? 'sealed' : isLegacyUnsealed(runId) ? 'legacy-unsealed' : 'unsealed',
@@ -2178,7 +2195,6 @@ function aScopedCheckSays(only: readonly string[], carried: readonly string[]): 
 /**
  * THE PATHS A CHECKER TOOL HANDED ON, with why and what changed. Sandbox v1 decision R4. A path whose
  * diff is already written out in the changes section points there rather than being written twice.
- * Exported for tests/the-office-moves-a-checked-resolution.test.ts, which reads what it asks of a resolved file.
  */
 export function theNeedsJudgmentSection(list: readonly PathHandedOn[], changes: ChangesInTheWorkArea, aFilesSeal = false): string {
   const writtenAbove = new Set(changes.inside.map((one) => one.path))
@@ -2608,8 +2624,10 @@ export function assembleTheInspectorsPrompt(input: {
       (reads.decisions ?? []).some((decision) => everyStringIn([decision.authority_reference, decision.because, decision.replaces]).some((value) => theIdAsAWholeWord(one.id).test(value))))
   parts.push(
     '## Reading a record this prompt does not carry\n\n' +
-      'You are given no office address and no key, on purpose. A check runs the tree\'s own tests, and those tests ' +
-      'must not reach the live office by accident (acceptance finding 44, 23 September 2026). So ask the office ' +
+      (reads.readingOnly
+        ? 'You are given no office address and no key, on purpose. So ask the office '
+        : 'You are given no office address and no key, on purpose. A check runs the tree\'s own tests, and those tests ' +
+          'must not reach the live office by accident (acceptance finding 44, 23 September 2026). So ask the office ') +
       'nothing: a request from here carries no key, and the office refuses it. ' +
       'Your verdict goes back through the tool that started you.\n\n' +
       (written.length === 0
@@ -2629,8 +2647,10 @@ export function assembleTheInspectorsPrompt(input: {
 
   parts.push(
     '## What to answer, and what not to do\n\n' +
-      'You may make temporary edits only in your own throwaway check checkout to verify tests and source mutations. ' +
-      'Restore every change before giving a verdict. If no own throwaway checkout was supplied, make no file changes. ' +
+      (reads.readingOnly
+        ? 'Read the change without modifying any file or running tests, mutations or a build. '
+        : 'You may make temporary edits only in your own throwaway check checkout to verify tests and source mutations. ' +
+          'Restore every change before giving a verdict. If no own throwaway checkout was supplied, make no file changes. ') +
       'Do not fix the submitted work, commit, push, start another agent, file or change a record, or post anything to Mole Office. ' +
       "Do not edit the run's own worktree, the main checkout, office data, carried record files or other instance files. " +
       "These are role instructions. Sandboxed checks use a private check view: carried inputs and other checks' evidence are read-only or absent. Explicit --on-the-host checks use the harness's host restrictions. " +
@@ -2645,14 +2665,17 @@ export function assembleTheInspectorsPrompt(input: {
       // THE CHECK'S OWN VERIFICATION, 18 October 2026. The id stays in this comment, and not
       // in the prompt string: the prompt ships in the bundle, which carries no decision of the owner's
       // (scripts/no-owner-content.mjs).
-      "DO ONLY THE CHECK'S OWN VERIFICATION. Do not run the build, the typecheck, the whole suite or lists of test files. " +
-      'The merge queue runs them all.\n\n' +
-      'READ AND TEST THE CHANGE YOURSELF. Read the diff path by path against the recorded decisions and the rules. ' +
-      'Check every claim in the report against the code. For each test this run added or changed, break the code it guards once or twice. ' +
-      'Run only that test file, see it turn red, and restore the code. In a scoped check, do this only for the paths in its scope.\n\n' +
-      'THE TREE HAS NOT BEEN BUILT. A test that needs dist/ needs `npm run build` first; run that command yourself in your sandbox. ' +
-      'tests/source-api.test.ts is the known test that needs it.\n\n' +
-      'A RELEASE THAT RESTS ON THE REPORT ALONE IS NOT A CHECK. Say in the verdict what you read and which mutations you ran, with what each showed.\n\n' +
+      (reads.readingOnly
+        ? 'READ THE CHANGE YOURSELF. Read the diff path by path against every package point and the rules. ' +
+          'Judge every point and look for the four kinds of fault by reading. Say in the verdict what you read and that you ran nothing.\n\n'
+        : "DO ONLY THE CHECK'S OWN VERIFICATION. Do not run the build, the typecheck, the whole suite or lists of test files. " +
+          'The merge queue runs them all.\n\n' +
+          'READ AND TEST THE CHANGE YOURSELF. Read the diff path by path against the recorded decisions and the rules. ' +
+          'Check every claim in the report against the code. For each test this run added or changed, break the code it guards once or twice. ' +
+          'Run only that test file, see it turn red, and restore the code. In a scoped check, do this only for the paths in its scope.\n\n' +
+          'THE TREE HAS NOT BEEN BUILT. A test that needs dist/ needs `npm run build` first; run that command yourself in your sandbox. ' +
+          'tests/source-api.test.ts is the known test that needs it.\n\n' +
+          'A RELEASE THAT RESTS ON THE REPORT ALONE IS NOT A CHECK. Say in the verdict what you read and which mutations you ran, with what each showed.\n\n') +
       // THE FOUR KINDS AND THE FAULTS OF FORM, in the check's own instructions.
       // A sentence in a needs-judgment list did not outweigh the regulations; this paragraph is part of the rules the prompt hands the model.
       `A REFUSAL IS ONLY FOR ONE OF FOUR KINDS OF FAULT: ${THE_FOUR_KINDS.map((kind, at) => `(${String(at + 1)}) ${kind} — ${WHAT_A_KIND_IS[kind as keyof typeof WHAT_A_KIND_IS]}`).join('; ')}. ` +
@@ -3855,6 +3878,18 @@ export function theSupervisorOfAWorkerRun(run: PanelRecord): { kind: 'agent'; id
   return starter !== null && 'role' in starter && starter.role === THE_SUPERVISOR ? { kind: 'agent', id: starter.id } : null
 }
 
+
+/**
+ * The one reading of who is left out under the owner's decision of 12 November 2026. The seal notice, held-check notice
+ * and child-finished line ask it. Only that supervisor is left out; a notice to anybody else is sent as before: an owner
+ * recorded later, a supervisor that took a moved package, a secretary or the person.
+ */
+export function whyAWorkersSupervisorIsNotTold(run: PanelRecord, to: ParticipantRef): string | null {
+  const supervisor = theSupervisorOfAWorkerRun(run)
+  if (supervisor === null || to.kind !== 'agent' || to.id !== supervisor.id) return null
+  return "This run's agent is a worker that a line's supervisor started, and that supervisor is not told when the run is sealed or its check is held: the worker's own last message says the run ends, and a worker's run is not checked by itself."
+}
+
 /**
  * THE OFFICE STARTS THE CHECK ITSELF. Criterion C28: nobody keeps a checking agent open in a tmux window;
  * Mole Office starts one itself. And one rule stands over all of it: a user is never
@@ -3950,27 +3985,8 @@ export function theOfficeStartsTheCheck(input: {
   // what that means is decided here.
   const standingRefusal = aRefusalStandsOn(run)
   if (standingRefusal) {
-    // THE WHOLE REFUSAL IS RESENT WITH ONE KEY ADDED. `dataPatch` merges objects at every depth, so
-    // this keeps what the refusal said and adds `reworked`. The verdict door is the one writer that
-    // replaces a refusal, and it sends a patch that deletes what the new refusal leaves out.
-    const held = (isObject(run.data) ? run.data[REFUSED] : undefined) as Record<string, unknown>
-    asTheDoorOf('refused', () => patchRecord(
-      input.runId,
-      {
-        dataPatch: {
-          [REFUSED]: {
-            ...held,
-            reworked: {
-              at: nowStamp(),
-              because:
-                'The worker said its work was finished again after the refusal, so the office asked for a fresh ' +
-                'check. The refusal stays on the record: it is what the rework answered.',
-            },
-          },
-        },
-      },
-      THE_OFFICE,
-    ))
+    markARefusalAnswered(run, 'The worker said its work was finished again after the refusal, so the office asked for a fresh ' +
+      'check. The refusal stays on the record: it is what the rework answered.')
   }
 
   // ALREADY ASKED, AND NOT A REWORK. The field this writes is also what says it has been written.
@@ -4036,7 +4052,7 @@ export function theOfficeStartsTheCheck(input: {
   // WHETHER ANYTHING IN THIS OFFICE WOULD START THE CHECK, read at the ask (wave 13n round DP). When nothing would, the notice
   // and the run say so in the same sentence, in the past tense, with the time and who can start it, and the run keeps the
   // mark the minute pass reads an hour on.
-  const willItStart = whetherThisOfficeWouldStartACheck(input.workspaceId)
+  const willItStart = whetherThisOfficeWouldStartThisRunCheck(input.workspaceId, input.runId)
   const message = writeAMessage({
     workspaceId: input.workspaceId,
     to: [{ kind: 'agent', id: inspector.id }],
@@ -4097,6 +4113,15 @@ export function theOfficeStartsTheCheck(input: {
 export function aRefusalStandsOn(run: Pick<PanelRecord, 'id' | 'data'>): boolean {
   const refused = whereARunStands(run).refused
   return refused !== null && (refused.reworked ?? null) === null
+}
+
+/** Mark a standing refusal answered, retaining the refusal and its history. */
+export function markARefusalAnswered(run: Pick<PanelRecord, 'id' | 'data'>, because: string): void {
+  if (!aRefusalStandsOn(run)) return
+  const held = run.data[REFUSED] as Record<string, unknown>
+  asTheDoorOf('refused', () => patchRecord(run.id, {
+    dataPatch: { [REFUSED]: { ...held, reworked: { at: nowStamp(), because } } },
+  }, THE_OFFICE))
 }
 
 /**
@@ -4515,8 +4540,11 @@ export function askForTheCheckAgain(runId: string, workspaceId: string, actor: A
   const run = getRecord(runId)
   if (!run || run.workspaceId !== workspaceId) throw new PanelError('No such run in this project.', 404)
   const starter = theAgentOfARun(run)?.startedBy
+  // An agent's headers name its handle and startedBy holds a registry id, so the agent's own key is
+  // what proves it is the starter, as at the held-check release.
+  const theStarterAsks = starter?.kind === 'agent' && (theAgentTheKeyProves(actor) === starter.id || starter.id === actor.id)
   let counted = false
-  if (actor.type !== 'human' && (starter?.kind !== 'agent' || starter.id !== actor.id)) {
+  if (actor.type !== 'human' && !theStarterAsks) {
     const gate = gateMet('who-asks-for-a-check-again')
     counted = true
     if (gate === 'block') throw new PanelError('Only this run’s starter can ask for its check again.', 403)
@@ -5347,7 +5375,7 @@ export function howARunWouldSettle(input: { runId: string; workspaceId: string; 
  *     ancestor, the same patches, the same changed lines), read from the run's fork base to the named commit.
  * Then one field is written, `theCheck.landedByHand`, and nothing else of the run changes. It adds no standing.
  */
-export function recordAHandLanding(input: { runId: string; workspaceId: string; commit: string; because: string; actor: Actor }): {
+export function recordAHandLanding(input: { runId: string; workspaceId: string; commit: string; because: string; repository?: string; actor: Actor }): {
   landedByHand: LandedByHand
   stands: WhereARunStands
   says: string
@@ -5393,19 +5421,40 @@ export function recordAHandLanding(input: { runId: string; workspaceId: string; 
   // WHICH MAIN TO READ: the lane every git entry of the run names; for a run never submitted as a git entry, the
   // project's one registered repository, the rule coverage and the work domains use too. Two of the three runs
   // landed by hand on 26 September (TpN6TqIUMN-_ and 6qcS_13nhfSZ) were never submitted, which is why they were.
+  // The body's repository is read only for a run without a git entry when several checkouts are registered, and is refused elsewhere.
   const lanes = [...new Set(entries.filter((entry) => entry.changeset.adapter === 'git').map((entry) => entry.changeset.root))]
   if (lanes.length > 1) {
     throw new PanelError(`Run ${input.runId}'s merge entries name ${String(lanes.length)} lanes (${lanes.join(', ')}), so the office cannot tell which main to read. Nothing was written.`, 409)
   }
-  const registered = lanes.length === 0 ? listRepositories(run.workspaceId).flatMap((one) => (one.root === null ? [] : [one.root])) : []
-  if (lanes.length === 0 && registered.length !== 1) {
-    throw new PanelError(
-      `Run ${input.runId} was never submitted as a git entry to the merge queue, and this project has ${String(registered.length)} registered repositories with a checkout ` +
-        `${registered.length === 0 ? '' : `(${registered.join(', ')}) `}rather than one, so the office cannot tell which main to read. Nothing was written.`,
-      409,
-    )
+  let lane: string
+  if (lanes.length === 1) {
+    lane = lanes[0]!
+    if (input.repository !== undefined) {
+      throw new PanelError(`Run ${input.runId}'s merge entries name the lane ${lane}, so the office reads main there and takes no repository from the body. Send no repository. Nothing was written.`, 409)
+    }
+  } else {
+    const registered = listRepositories(run.workspaceId).filter((one) => one.root !== null)
+    if (registered.length === 0 || (registered.length > 1 && input.repository === undefined)) {
+      throw new PanelError(
+        `Run ${input.runId} was never submitted as a git entry to the merge queue, and this project has ${String(registered.length)} registered repositories with a checkout ` +
+          `${registered.length === 0 ? '' : `(${registered.map((one) => `${one.name} (${one.id}) at ${one.root}`).join(', ')}) `}rather than one, so the office cannot tell which main to read. ` +
+          `${registered.length === 0 ? '' : 'Name the one that holds this run\'s main as "repository" in the body, by its id or its name. '}Nothing was written.`,
+        409,
+      )
+    }
+    if (registered.length === 1) {
+      lane = registered[0]!.root!
+      if (input.repository !== undefined) {
+        throw new PanelError(`Run ${input.runId} was never submitted as a git entry to the merge queue, and this project has one registered repository with a checkout (${lane}), so the office reads main there and takes no repository from the body. Send no repository. Nothing was written.`, 409)
+      }
+    } else {
+      const repository = theRepositoryNamed(input.repository!, run.workspaceId)
+      if (repository.root === null) {
+        throw new PanelError(`Repository ${repository.name} (${repository.id}) has no checkout on this machine, so there is no main to read in it. Nothing was written.`, 409)
+      }
+      lane = repository.root
+    }
   }
-  const lane = lanes[0] ?? registered[0]!
   const sealed = readRunSeal(run.id)?.seal.git ?? null
   if (sealed === null) throw new PanelError(`Run ${input.runId} has no seal of git work, so there are no commits to find on main. Nothing was written.`, 409)
 

@@ -49,6 +49,9 @@
  *     session ends (THE_SESSION_HOOK); the waiter's kit, its scripts and its README, is copied as it is.
  *     hold-the-handle.mjs is built alone into one file that imports no chunk, because the office serves that
  *     file as it is to an agent on another machine (theWaiterAsOneFile in src/server/api/handles.ts).
+ *     main-world-guard.mjs and opencode-plugin.mjs, the main-world guard every runtime on the host calls and the
+ *     OpenCode plugin that calls it, are built into one file each that shares nothing (THE_GUARDS_BUILT_FILES in
+ *     src/config/settings.mjs), because the guard runs only when its own file is the program.
  *     .claude/skills/mole-office/ is the skill those agents read, copied as it is.
  *   - holder.mjs, the terminal holder, built alone into one file that imports no chunk, and node_modules/node-pty
  *     beside it, the one module it loads from outside because it loads a native file: its package.json,
@@ -84,6 +87,7 @@ import {
   THE_AGENTS_TOOLS,
   THE_BUNDLES,
   THE_FOR_AGENTS_FOLDER,
+  THE_GUARDS_BUILT_FILES,
   THE_INSTALL,
   THE_SESSION_HOOK,
   THE_THREAD_BUNDLES,
@@ -195,6 +199,21 @@ const alone = await build({ ...theOptions, metafile: true, entryPoints: [join(RE
 sources.push(...Object.keys(alone.metafile.inputs))
 say(`Bundled ${waiter} alone into ${join(out, waiter)}.`)
 
+// THE MAIN-WORLD GUARD AND ITS OPENCODE PLUGIN, each built into one file that imports no chunk, with nothing shared.
+// The guard runs only when the program's address is the guard's own module's, and the plugin imports the guard; in
+// the split build above the guard's code would move into a chunk, and the guard's file would then exit 0 on every
+// call without reading it. Not because a file is served alone, as the waiter's is: the two only need their own code
+// in their own file. Code built into either finds the bundle's stamp one folder up, as the tools above do.
+const guards = await build({
+  ...theOptions,
+  metafile: true,
+  entryPoints: Object.fromEntries(THE_GUARDS_BUILT_FILES.map((file) => [join(THE_FOR_AGENTS_FOLDER, file.slice(0, -'.mjs'.length)), join(REPO_ROOT, THE_FOR_AGENTS_FOLDER, file)])),
+  outdir: out,
+  outExtension: { '.js': '.mjs' },
+})
+sources.push(...Object.keys(guards.metafile.inputs))
+for (const file of THE_GUARDS_BUILT_FILES) say(`Bundled ${join(THE_FOR_AGENTS_FOLDER, file)} alone into ${join(out, THE_FOR_AGENTS_FOLDER, file)}.`)
+
 // THE NATIVE MODULE, outside the bundles: its JavaScript, and the one prebuilt native file for the
 // target's system and processor, which is the one its lib/binding.js loads there.
 const sqlite = join(REPO_ROOT, 'node_modules', 'better-sqlite3')
@@ -223,6 +242,8 @@ for (const [from, to] of /** @type {[string, string][]} */ ([
     join(out, file),
   ])),
   [join(REPO_ROOT, 'src', 'config', 'roles.json'), join(out, 'src', 'config', 'roles.json')],
+  // The script the terminal holder runs to show an agent's tmux pane (THE_PANE_VIEW in src/server/lib/agent-pane.ts).
+  [join(REPO_ROOT, 'src', 'config', 'tmux-pane-view.mjs'), join(out, 'src', 'config', 'tmux-pane-view.mjs')],
   // The stop pipe's helper, beside the bundles that read it (THE_STOP_HELPER in src/config/systems/windows-groups.mjs).
   [join(REPO_ROOT, 'src', 'config', 'systems', THE_STOP_HELPER), join(out, THE_STOP_HELPER)],
   // Mole Office's own licence and notice, at the install's root.

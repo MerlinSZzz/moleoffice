@@ -295,6 +295,7 @@ describe('one service per database, started by one command and stopped by anothe
   it('stops the service, which lets the lock and the port go', async () => {
     const stopped = await theCommand(world, 'stop')
     expect(stopped.code, stopped.out).toBe(0)
+    expect(stopped.out).toContain(`Asked process group ${String(server)} to stop, with SIGTERM.`)
     expect(stopped.out).toContain(`Mole Office stopped: process ${String(server)} has ended, and the service lock is gone.`)
     expect(isRunning(server)).toBe(false)
     expect(existsSync(world.lockPath)).toBe(false)

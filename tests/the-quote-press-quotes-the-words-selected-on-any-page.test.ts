@@ -7,10 +7,16 @@
  * worked. The press kept a selection only when its words lay inside one stored text. Home draws Mole Office's own
  * words, which no record stores, so the press dropped them and said nothing. The person also asked for a shorter tip,
  * with no sentence about what the press does with nothing selected, and for the press to be drawn as design D draws it.
+ * Design D's square marks read as "ss", and the plain mark drawn after them was not what he first agreed either: he
+ * asked for the pair of big quotation marks the press first drew, and for a press that looks pressable. That pair is
+ * two small square brackets, and the review of its pictures read them as a pause sign. So the press draws a curly
+ * opening quotation mark, as two closed shapes.
  *
  * WHAT THIS FILE PROVES, in a real browser, against a real office, with the chat beside the page at 1440:
  *   1. THE TIP is the word list's own tip, in English and in Chinese, and the English tip is one short sentence. The
- *      press has a plain quotation mark and a clear background while it is not pressed.
+ *      press draws a curly opening quotation mark: a picture of two closed shapes, and no character. While
+ *      it is not pressed its background is clear and it has an edge, under the pointer it has a ground, and on
+ *      keyboard focus it has an outline.
  *   2. WORDS SELECTED ON HOME are quoted: the chip in the writing box holds exactly those words.
  *   3. WORDS SELECTED ON A PLAN, ON A RECORD AND ON THE CHAT'S OWN PAGE are quoted in the same way.
  *   4. SEVERAL QUOTES GO IN ONE MESSAGE: words from Home and then words from a report are both stored on the message
@@ -21,6 +27,8 @@
  *   MUTATION B: the second quote replaces the first instead of following it. Red on 4.
  *   MUTATION C: the Chinese tip taken out of the word list. Red on 1.
  *   MUTATION D: the press is given a resting background again. Red on 1.
+ *   MUTATION E: the press draws the plain quotation mark again, or design D's two open lines. Red on 1.
+ *   MUTATION F: the press loses its edge, or its ground under the pointer. Red on 1.
  *
  * Everything here is made up: the agent, the report, the note and the message. The servers come from `liveApp` in
  * tests/helpers.ts, on a database in its own temporary folder.
@@ -175,7 +183,7 @@ async function quote(page: Page, chips: string[]): Promise<void> {
 }
 
 describe('the quote press itself', () => {
-  it('1. says a short tip and shows a plain quotation mark on a clear ground at rest', async () => {
+  it('1. says a short tip and draws a curly opening quotation mark as two closed shapes, clear with an edge at rest, a ground under the pointer and an outline on focus', async () => {
     const tip = EN[THE_TIP]
     expect(typeof tip, 'the English tip is not a string').toBe('string')
     // ONE SHORT SENTENCE: five words or fewer, and nothing after its first full stop.
@@ -191,15 +199,39 @@ describe('the quote press itself', () => {
         expect(await press.getAttribute('title'), `the tip in ${lang}`).toBe(lang === 'en' ? EN[THE_TIP] : ZH[THE_TIP])
         if (lang === 'zh') continue
         // Compare the background with a clear element, rather than a colour from a particular theme.
-        const drawn = await press.evaluate((one) => {
+        const clear = await page.evaluate(() => {
           const probe = document.createElement('div')
           probe.style.cssText = 'position:absolute;visibility:hidden;background:transparent'
           document.body.append(probe)
           const ground = getComputedStyle(probe).backgroundColor
           probe.remove()
-          return { clear: getComputedStyle(one).backgroundColor === ground, mark: one.querySelector('[aria-hidden="true"]')?.textContent }
+          return ground
         })
-        expect(drawn).toEqual({ clear: true, mark: '"' })
+        const drawn = await press.evaluate((one, ground) => {
+          const style = getComputedStyle(one)
+          // THE CURLY OPENING QUOTATION MARK is two closed shapes in one picture. The plain mark was a character, and
+          // design D's square marks were two open lines.
+          const marks = [...one.querySelectorAll('svg[aria-hidden="true"] path')].map((path) => path.getAttribute('d') ?? '')
+          return {
+            clear: style.backgroundColor === ground,
+            edge: style.borderTopStyle !== 'none' && parseFloat(style.borderTopWidth) >= 1,
+            marks: marks.length,
+            closed: marks.every((d) => /z\s*$/i.test(d)),
+            character: one.querySelector('span[aria-hidden="true"]')?.textContent ?? null,
+          }
+        }, clear)
+        expect(drawn).toEqual({ clear: true, edge: true, marks: 2, closed: true, character: null })
+        await press.hover()
+        await expect.poll(() => press.evaluate((one) => getComputedStyle(one).backgroundColor), { message: 'the press has no ground under the pointer' }).not.toBe(clear)
+        await page.mouse.move(-1, -1)
+        // KEYBOARD FOCUS: Tab from the attach press, which stands just before it in the row.
+        await page.locator('.px-chat-write .px-chat-attach-add').focus()
+        await page.keyboard.press('Tab')
+        const focused = await press.evaluate((one) => ({
+          here: document.activeElement === one,
+          outline: one.matches(':focus-visible') && getComputedStyle(one).outlineStyle !== 'none',
+        }))
+        expect(focused, 'the press has no outline on keyboard focus').toEqual({ here: true, outline: true })
       } finally {
         await context.close()
       }

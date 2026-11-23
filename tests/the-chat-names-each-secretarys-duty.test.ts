@@ -6,9 +6,9 @@
  * For a secretary the line is the area of its duties record, in whichever project holds it, as
  * GET /api/secretaries/duties?scope=office answers it. A secretary nobody recorded duties for gets no line: where there is
  * nothing to show, nothing is shown (wave 13y round 111). Nobody else has a line yet: the owner has not
- * chosen what an agent that is not a secretary, or a person, would show. When the read fails, an agent's line says it
- * could not be read and why, because drawing nothing would say the agent has no line. Mole Office itself sits in the
- * agent registry and is not an agent, so nothing is drawn under it even then.
+ * chosen what an agent that is not a secretary, or a person, would show. When the read fails, an agent's line is the
+ * short state word for a duty not read, because drawing nothing would say the agent has no line. Mole Office itself
+ * sits in the agent registry and is not an agent, so nothing is drawn under it even then.
  *
  * A SUPERVISOR A SECRETARY'S DUTIES NAME gets the area those duties give it, in the same three places (wave 13y round 91,
  * item 12b). A supervisor no duties name gets nothing.
@@ -44,14 +44,14 @@
 import { mkdirSync } from 'node:fs'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { Page } from 'playwright'
-import { liveApp, waitForThePage, type LiveApp } from './helpers.ts'
+import { liveApp, waitForThePage, type LiveApp, governsTheWholeProject } from './helpers.ts'
 import { putTheMadeUpLabelIn } from './the-made-up-label-above-the-page.ts'
 import { participantKey } from '../src/shared/messages.ts'
 import { THE_OWNER } from '../src/shared/kinds.ts'
 import { MOLE_OFFICE_HANDLE } from '../src/shared/participants.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { THE_SECRETARY, THE_SUPERVISOR } from '../src/shared/roles.ts'
-import { enWave13y } from '../src/shared/words/en-wave-13y.ts'
+import { createI18n } from '../src/shared/i18n.ts'
 import { OPEN_AT } from '../src/web/lib/open-chat.ts'
 import { whoPath } from '../src/web/components/router.tsx'
 
@@ -69,12 +69,8 @@ const AREA = 'Keeps the night ledger and answers the late bell.'
 const SUPERVISOR_AREA = 'The lamps of the night ledger.'
 const SHOTS = process.env.W13Y_DUTY_SHOTS
 const LABEL = 'Made-up data — a test office with two secretaries, a supervisor, a worker and four messages, not real office data'
-/**
- * The words for a line that could not be read, in English, from the list the page reads. NOT TYPED AS THE LIST, so the
- * file runs the same before the words were in it, and fails there on what is drawn.
- */
-const WORDS = enWave13y as Record<string, unknown>
-const UNREAD = String(WORDS['chat.duty.unread'] ?? '')
+/** The word for a line that could not be read, in English, read by its key. */
+const NOT_READ = createI18n('en').t('chat.duty.notRead')
 /** What the failed read answers, made up here. */
 const THE_FAILURE = 'A made-up failure of the duties read.'
 
@@ -100,7 +96,7 @@ describe("a secretary's one-line duty, under its name", () => {
       body: JSON.stringify({
         kind: 'decision',
         title: 'Made-up decision the duties rest on',
-        data: { option_taken: 'The keeper keeps the night ledger.', because: 'A made-up reason.', decided_by: THE_OWNER, replaces: [] },
+        data: { option_taken: 'The keeper keeps the night ledger.', because: 'A made-up reason.', decided_by: THE_OWNER, ...governsTheWholeProject(), replaces: [] },
       }),
     })
     expect(decision.status, await decision.clone().text()).toBe(201)
@@ -289,19 +285,18 @@ describe("a secretary's one-line duty, under its name", () => {
     }
   }, 120_000)
 
-  it('says under an agent that its line could not be read, and why, when the read fails, and nothing under Mole Office itself', async () => {
+  it('says under an agent that its line was not read when the read fails, and nothing under Mole Office itself', async () => {
     const { context, page } = await aWindow('light', 1440, true)
     try {
       await theContacts(page)
-      const unread = UNREAD.slice(0, UNREAD.indexOf('{why}'))
-      expect(unread, 'the words for a line that could not be read').not.toBe('')
+      expect(NOT_READ, 'the word for a line that could not be read').not.toBe('')
       for (const who of Object.keys(AGENTS) as Who[]) {
         await expect
           .poll(async () => (await linesIn(theRowOf(page, who))).map((one) => one.says), { timeout: 15_000, message: `the row of ${who}` })
           .toEqual(['unread'])
-        // THE WORDS SAY IT COULD NOT BE READ, AND WHY: the failure the door answered.
+        // THE WORDS ARE THE STATE WORD ALONE, as decided: the line no longer says why the read failed.
         const [line] = await linesIn(theRowOf(page, who))
-        expect(line?.words, `the words under ${who}`).toMatch(new RegExp(`^${unread}.*${THE_FAILURE.replace(/\./g, '\\.')}`))
+        expect(line?.words, `the words under ${who}`).toBe(NOT_READ)
       }
       // THE OFFICE IS NOT AN AGENT, so the failed read, which has settled by now, draws nothing under it.
       await theOfficesProfile(page)

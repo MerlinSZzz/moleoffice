@@ -124,7 +124,6 @@ import {
   Absence,
   Btn,
   ErrorNote,
-  Hint,
   OriginMark,
   StoredState,
   Tag,
@@ -2802,11 +2801,6 @@ export function ItemType({ item, acts }: { item: PlanItem; acts: ItemActs }) {
             ? t('g8.planitems.whatSortOfThingIsOnceYouTrackIt', { value1: wordsOf(item) })
             : t('g8.planitems.whatSortOfThingIs', { value1: work.name })
         }
-        title={
-          work === null
-            ? t('g8.planitems.whatSortOfThingTrackWillMakeNothingKeeps')
-            : t('g8.planitems.whatSortOfThingThisIsChangingItRewrites')
-        }
         onChange={(event) => void change(event.currentTarget.value as RecordKind)}
       >
         {/* THE KIND THE RECORD ALREADY IS, WHEREVER IT IS NOT ONE OF THE FOUR. A plan can point a
@@ -3708,40 +3702,6 @@ export function projectForTracking(
 }
 
 /**
- * WHAT EACH TYPE MEANS, in the kind's own words, drawn where somebody asks for them.
- *
- * ---------------------------------------------------------------------------------------
- * THE EXPLANATIONS STOPPED FILLING THE PAGE ON 17 AUGUST 2026
- * ---------------------------------------------------------------------------------------
- *
- * The explanatory prose for every type (such as 'Something to do that is small
- * enough…') no longer fills the page permanently: short labels stay visible, and the definitions go
- * behind the help mark that already exists. They were four paragraphs under four buttons on every filing form, and
- * a person who has filed one line has read them.
- *
- * THE SENTENCES ARE STILL THE KIND'S OWN `purpose` from shared/kinds.ts, which is the one
- * declaration the server checks writes against, so nothing here is a second description of a kind.
- */
-export function WhatTheTypesMean() {
-  const mode = useMode()
-  return (
-    <dl className="pi-kinds-mean">
-      {KINDS_A_PLAN_LINE_CAN_BE_FILED_AS.map((one) => (
-        <Fragment key={one}>
-          <dt>{kindWord(one, mode).text}</dt>
-          <dd>
-            {KIND_SPECS[one].purpose}{' '}
-            {STATE_A_FILED_LINE_STARTS_IN[one] === undefined
-              ? t('g8.planitems.aHasNoStateSoItGetsNone', { value1: kindWord(one, mode).text })
-              : t('g8.planitems.startsAs', { value1: STATE_A_FILED_LINE_STARTS_IN[one] })}
-          </dd>
-        </Fragment>
-      ))}
-    </dl>
-  )
-}
-
-/**
  * TRACK ONE LINE, OR EVERY LINE PICKED: make the record and bind the line to it.
  *
  * ---------------------------------------------------------------------------------------
@@ -3824,10 +3784,7 @@ export function MakeItWork({
       <div className="pi-form-say">
         {items.length === 1
           ? t('g8.planitems.trackedAsAIn', { value1: kindWord(plan[0]?.kind ?? A_LINE_IS_A_TASK_UNLESS_YOU_SAY, mode).text, value2: goingTo.join('", "') })
-          : t('g8.planitems.itemsEachTrackedAsTheTypeInItsOwn', { value1: items.length, value2: goingTo.length === 1 ? `"${goingTo[0] ?? ''}"` : t('g8.planitems.projects', { value1: goingTo.length }) })}{' '}
-        <Hint label={t('g8.planitems.whatEachTypeMeans')}>
-          <WhatTheTypesMean />
-        </Hint>
+          : t('g8.planitems.itemsEachTrackedAsTheTypeInItsOwn', { value1: items.length, value2: goingTo.length === 1 ? `"${goingTo[0] ?? ''}"` : t('g8.planitems.projects', { value1: goingTo.length }) })}
       </div>
       {couldNotRead.length === 0 ? null : (
         <ul className="pi-form-said">
@@ -4398,12 +4355,6 @@ export function GiveItTime({
           {inspect ? will.reading : periodsInWords(will.reading)}
         </p>
       )}
-      {will.why === null ? null : (
-        <details className="pi-why">
-          <summary>{t('g8.planitems.whyMoleOfficeReadNoDate')}</summary>
-          <p className="pi-form-say">{will.why}</p>
-        </details>
-      )}
       <PressReport results={said} />
     </div>
   )
@@ -4504,7 +4455,7 @@ export const PLAN_ITEM_CSS = `
 .pi-words:placeholder-shown, .pi-hours:placeholder-shown { background: var(--panel-2); }
 .pi-words:hover, .pi-hours:hover { background: var(--panel-2); }
 .pi-words:focus, .pi-hours:focus { outline: none; border-bottom-color: var(--accent); background: var(--panel-2); }
-.pi-words::placeholder, .pi-hours::placeholder { color: var(--text-3); font-style: italic; }
+.pi-words::placeholder, .pi-hours::placeholder { color: var(--placeholder); font-style: italic; }
 
 /* THE WHOLE CELL IS THE FIELD, so a press anywhere in the cell lands in the box.
    Measured at 1440 on 16 August 2026: the cell was 122 by 26.5 pixels and the box 110 by 21, so
@@ -4598,14 +4549,6 @@ export const PLAN_ITEM_CSS = `
 /* The tick as the characters somebody typed, where this surface may not change them. */
 .pi-tick-read { flex: none; color: var(--text-2); font-size: var(--fs-2); line-height: var(--lh-tight); }
 .pi-tick-read[data-done='1'] { color: var(--text); }
-
-/* WHAT EACH TYPE MEANS, BEHIND THE HELP MARK. It used to be four paragraphs permanently under four
-   buttons on the filing form; now the labels stay visible and the definitions go behind the help
-   affordance that already exists. */
-.pi-kinds-mean { margin: 0; font-size: var(--fs-1); line-height: var(--lh-body); }
-.pi-kinds-mean dt { font-weight: 600; color: var(--text); }
-.pi-kinds-mean dd { margin: 0 0 6px; color: var(--text-2); overflow-wrap: anywhere; }
-.pi-kinds-mean dd:last-child { margin-bottom: 0; }
 
 /* WHAT SORT OF THING A ROW IS. A menu before it is tracked, and the record's own word after — the
    two are drawn differently because only one of them is a control. */
@@ -4776,11 +4719,6 @@ export const PLAN_ITEM_CSS = `
    interaction. They were the whole interaction, and that is the defect this pass corrects. */
 .pi-shortcuts { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px; min-width: 0; }
 
-/* THE LONG REASON, BEHIND A PRESS. The short reading is always on screen; this is the reader's own
-   sentence naming which word stopped it, and it is three lines, which is what turned this control
-   into a large explanatory box. */
-.pi-why { font-size: var(--fs-1); color: var(--text-2); min-width: 0; }
-.pi-why > summary { cursor: pointer; }
 .pi-period-pick {
   display: inline-flex;
   align-items: baseline;

@@ -314,6 +314,8 @@ describe('the human settles a fork in one request', () => {
     // AGENT'S words; the server moving them into a human-only record would be the false provenance
     // the human-only rule exists to prevent, done by the server instead of by the agent.
     const decision = bodyOf(res)['decision'] as { id: string; data: Record<string, unknown> }
+    const { MISSING_KIND_NOT_SAID } = await import('../src/shared/what-a-record-names.ts')
+    const { WHY_A_PROMOTED_DECISION_NAMES_NO_PAGE } = await import('../src/server/lib/records/what-a-decision-files.ts')
     expect(decision.data).toEqual({
       because: 'A regression after two changes at once cannot be attributed to either.',
       // WRITTEN BY PANELX, NOT COPIED FROM THE PROPOSAL. `recorded_by` says who wrote the decision
@@ -334,6 +336,9 @@ describe('the human settles a fork in one request', () => {
       // decision shares a subject with the fork (problem ZSWftCSVUP2r). Written by the route, not copied.
       replaces: [],
       why_it_replaces_none: 'Nobody named one, and no earlier decision in this project is linked to the same records as the fork it settles.',
+      // AND WHAT IT GOVERNS, answered by the office the same way: the fork is linked to no page and the press did not
+      // say, so one nothingFits entry says so. Written by the route, not copied.
+      nothingFits: [{ missing: MISSING_KIND_NOT_SAID, what: WHY_A_PROMOTED_DECISION_NAMES_NO_PAGE }],
     })
     expect(Object.keys(decision.data)).not.toContain('question')
     expect(Object.keys(decision.data)).not.toContain('options')

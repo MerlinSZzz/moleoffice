@@ -5,7 +5,7 @@
  * owner's decisions. In a real browser, on this test's own office:
  *
  * 1. THE LIST SAYS WHAT IS TRUE OF EACH FLOW, AND WHAT IS TRUE OF THE RUNS THAT NAMED NONE. A flow with no runs says
- *    "never run"; the heading line says how many runs named no flow; "Most runs" puts the busiest flow first.
+ *    "No run recorded"; the heading line says how many runs named no flow; "Most runs" puts the busiest flow first.
  *    MUTATION: in src/web/pages/FlowsPage.tsx the heading line drew `page.matched` for the runs that named no flow.
  *    This case went red.
  * 2. ONE FLOW DRAWS ITS RUNS OVER ITS STAGES. Each stage's tally counts the runs that recorded stage numbers; a run
@@ -43,7 +43,7 @@ import Database from 'better-sqlite3'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import type { Page } from 'playwright'
 import { THE_PERSON } from '../src/shared/person.ts'
-import { liveApp, waitForThePage, type LiveApp } from './helpers.ts'
+import { deleteTheCopiedDefaultFlows, liveApp, waitForThePage, type LiveApp } from './helpers.ts'
 import { createI18n } from '../src/shared/i18n.ts'
 
 let app: LiveApp
@@ -91,13 +91,15 @@ let namingNoFlow = 0
 
 beforeAll(async () => {
   app = await liveApp({ name: 'the-flows-page', viewport: { width: 1440, height: 1000 }, workspace: 'default' })
+  await deleteTheCopiedDefaultFlows(app.api)
   source = (await send('/api/records', { kind: 'report', title: 'Test: how a pot is thrown', data: { for: 'The owner', date: '2026-10-11', blocks: [{ id: 'b-1', type: 'text', text: 'Made up.' }] } }))['record'].id as string
   busy = await aFlow('Test: throwing a pot', 3, source)
   quiet = await aFlow('Test: a flow nobody ran', 2, source)
   // ONLY THE OFFICE FILES A FLOW RUN, so the runs are written into the table, the way tests/flows-page-reads.test.ts does.
   const db = new Database(join(app.dir, 'panelx.db'))
   try {
-    const like = db.prepare("SELECT * FROM records WHERE kind = 'flow' LIMIT 1").get() as Record<string, unknown>
+    // A LIVE FLOW'S ROW IS THE PATTERN, because the copied default flows this test deleted are rows too, and a run copied from one of them would be deleted with it.
+    const like = db.prepare("SELECT * FROM records WHERE kind = 'flow' AND deleted_at IS NULL LIMIT 1").get() as Record<string, unknown>
     const at = (minutesAgo: number) => new Date(Date.now() - minutesAgo * 60_000).toISOString().replace('T', ' ').slice(0, 19)
     const runs: [string | null, Record<string, unknown>[], number][] = [
       // The newest run recorded no stage numbers.
@@ -142,14 +144,14 @@ it('1. lists each flow with what is true of it, and says how many runs named no 
   // By name, the order a page of flows takes when none is asked.
   expect(await rows.locator('.flw-row-title').allTextContents()).toEqual(['Test: a flow nobody ran', 'Test: throwing a pot'])
   const nobody = rows.filter({ hasText: 'Test: a flow nobody ran' })
-  expect(await nobody.textContent()).toContain(en.t('flows.neverRun'))
+  expect(await nobody.textContent()).toContain(en.t('flows.noRunRecorded'))
   expect(await nobody.textContent()).toContain(en.t('flows.stages', { n: 2 }))
   expect(await nobody.textContent()).toContain(en.t('flows.runs30d', { n: 0 }))
   const thrown = rows.filter({ hasText: 'Test: throwing a pot' })
   expect(await thrown.textContent()).toContain(en.t('flows.runs30d', { n: 3 }))
   expect(await thrown.textContent()).toContain('A test order for Test: throwing a pot.')
   expect(await thrown.textContent()).toContain('the test potter')
-  expect(await thrown.textContent()).not.toContain(en.t('flows.neverRun'))
+  expect(await thrown.textContent()).not.toContain(en.t('flows.noRunRecorded'))
   await page.getByRole('button', { name: en.t('flows.sort.runs') }).click()
   await page.waitForFunction(() => document.querySelector('.flw-row-title')?.textContent === 'Test: throwing a pot', null, { timeout: 15_000 })
   expect(await page.getByRole('button', { name: en.t('flows.sort.runs') }).getAttribute('aria-pressed')).toBe('true')
@@ -169,7 +171,9 @@ it('2. draws one flow’s runs over its stages, with a tally per stage and one l
   await open(page, `/flows/${busy}`, '.flw-stage')
   expect(await page.locator('h1').textContent()).toBe('Test: throwing a pot')
   expect(await page.locator('.flw-facts').textContent()).toContain('tools/test-pottery.mjs')
-  expect(await page.locator('.flw-note').first().textContent()).toBe(en.t('flows.tally.from', { n: 2 }))
+  // CRITERION CHANGE, as decided: the line over the tallies is a count, not a sentence, and a stage
+  // with no recorded run draws a short state word.
+  expect(await page.locator('.flw-note').first().textContent()).toBe(en.t('flows.tally.counted', { n: 2 }))
   const tallies = await page.locator('.flw-stage .flw-tally').allTextContents()
   // EACH MARK OF A TALLY IS ITS GLYPH AND THE WORD OF ITS COUNT, done, failed and open in that order.
   const tally = (done: number, failed: number, open: number) =>
@@ -177,15 +181,15 @@ it('2. draws one flow’s runs over its stages, with a tally per stage and one l
   expect(tallies).toEqual([tally(2, 0, 0), tally(1, 1, 0), tally(0, 0, 1)])
   const grid = page.locator('.flw-grid tbody tr')
   expect(await grid.count()).toBe(3)
-  expect(await grid.nth(0).locator('.flw-grid-none').textContent()).toBe(en.t('flows.runs.noStageNumbers'))
+  expect(await grid.nth(0).locator('.flw-grid-none').textContent()).toBe(en.t('word.notRecorded'))
   expect(await grid.nth(1).locator('.flw-mark [aria-hidden="true"]').allTextContents()).toEqual(['✓', '✓', '○'])
   expect(await grid.nth(2).locator('.flw-mark [aria-hidden="true"]').allTextContents()).toEqual(['✓', '✕', '·'])
   expect(await grid.nth(2).locator('.flw-mark .px-sr').allTextContents()).toContain(en.t('flows.runs.notReached'))
-  // A flow nobody ran says so under its latest runs, and draws no tally. The line is read in the runs section, found by
+  // A flow nobody ran draws No run recorded under its latest runs, and no tally. The line is read in the runs section, found by
   // its heading, because the Handbooks section above it draws a line of its own in the same style.
   await open(page, `/flows/${quiet}`, '.flw-stage')
   const theRuns = page.locator('section', { has: page.locator('h2', { hasText: en.t('flows.runsHeading') }) })
-  expect(await theRuns.locator('.flw-says').textContent()).toBe(en.t('flows.runs.none'))
+  expect(await theRuns.locator('.flw-says').textContent()).toBe(en.t('flows.noRunRecorded'))
   expect(await page.locator('.flw-tally').count()).toBe(0)
 }, 120_000)
 
@@ -226,17 +230,17 @@ it('4. stands the stages in a row, in two columns or in one, and draws the runs 
   await expect.poll(columns, { timeout: 10_000 }).toBe(1)
   expect(await page.locator('.flw-grid').isVisible()).toBe(false)
   expect(await page.locator('.flw-runlist').isVisible()).toBe(true)
-  expect(await page.locator('.flw-runlist-none').textContent()).toBe(en.t('flows.runs.noStageNumbers'))
+  expect(await page.locator('.flw-runlist-none').textContent()).toBe(en.t('word.notRecorded'))
 }, 120_000)
 
-it('5. fits a flow of 30 stages and one of 60 at every width, with no sideways scroll and every box readable', async () => {
+it('5. fits a flow of 30 stages and one of 60 at the widest and the narrowest width, with no sideways scroll and every box readable', async () => {
   const page = app.page
   const long: [number, string][] = []
   for (const n of [30, 60]) long.push([n, await aFlow(`Test: a pot of ${n} stages`, n, source)])
   // Runs at every stage, so the grid of latest runs is as wide as the flow is long.
   const db = new Database(join(app.dir, 'panelx.db'))
   try {
-    const like = db.prepare("SELECT * FROM records WHERE kind = 'flow' LIMIT 1").get() as Record<string, unknown>
+    const like = db.prepare("SELECT * FROM records WHERE kind = 'flow' AND deleted_at IS NULL LIMIT 1").get() as Record<string, unknown>
     for (const [n, flow] of long) {
       const data = { run: `test-session-long-${n}`, flow, stepsTaken: Array.from({ length: n }, (_, k) => step(k + 1, k === n - 1 ? 'failed' : 'done')) }
       const row = { ...like, id: `test-run-long-${n}`, kind: 'flow_run', title: 'Flow run', data: JSON.stringify(data) }

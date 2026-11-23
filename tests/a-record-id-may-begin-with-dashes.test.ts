@@ -6,7 +6,7 @@
  * A-Za-z0-9_-, so one in 4,096 begins with `--`. tools/the-merger.mjs refused such a --session, and
  * tools/isolated-mole-office.mjs (--run, --handback) and tools/cluster-register.mjs (--pipeline) had the same
  * rule. Each now refuses a value only when there is none, or when it is one of its own flags, which is what a
- * forgotten value looks like. The merge tool's case is in tests/the-merger.test.ts.
+ * forgotten value looks like.
  *
  * MUTATION PROOF, 23 September 2026, each alone: the old refusal of any value beginning with `--` put back in
  * isolated-mole-office's `wants`, and the first case goes red; put back in cluster-register's `valueAfter`,

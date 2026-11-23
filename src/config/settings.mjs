@@ -77,6 +77,7 @@ import { SETTING_WORDS, STABLE_OFFICE_WORDS } from './word-sources.mjs'
 
 import { createHash } from 'node:crypto'
 import { existsSync, lstatSync, readFileSync, realpathSync, statSync } from 'node:fs'
+import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { basename, delimiter, dirname, isAbsolute, join, resolve } from 'node:path'
 import { fileURLToPath, URL } from 'node:url'
@@ -87,6 +88,7 @@ import { storedRuntimeValue } from './runtime-setting-store.mjs'
 import { OWN_RELEASE_SKIP_RUNS, OWN_RELEASE_SKIP_TAGS, RECEIPT_PRODUCER_PENDING } from '../shared/work-switches.mjs'
 import { PROVIDER_ROUTER_SETTINGS, theProviderRouterValueRefused } from './provider-router-settings.mjs'
 import { STABLE_RELEASE_FLOOR_SETTINGS, theStableReleaseFloorRefused } from './stable-release-floor.mjs'
+import { theStableCheckoutFolder } from './sandbox-folder.mjs'
 
 // ---------------------------------------------------------------------------- the build stamp
 // Written by src/config/build-stamp.mjs (the built page's stamp, and a bundle's). Read here, once.
@@ -260,8 +262,9 @@ export function theDefaultLockFolders(platform, temporary) {
 
 /**
  * THE FOLDER OF AN INSTALL THAT HOLDS WHAT AN AGENT RUNS: the registration tool, the waiter's tool, the waiter's
- * kit, and the session hook Claude Code runs for it. A checkout keeps their source in it, and a bundle keeps the
- * two tools and the hook in it built into one file each (scripts/bundle.mjs), one folder below the bundle's stamp.
+ * kit, the session hook Claude Code runs for it, and the main-world guard with its OpenCode plugin. A checkout keeps
+ * their source in it, and a bundle keeps the two tools, the hook and the guard's two files in it built into one file
+ * each (scripts/bundle.mjs), one folder below the bundle's stamp.
  */
 export const THE_FOR_AGENTS_FOLDER = 'for-agents'
 
@@ -278,6 +281,18 @@ export const THE_AGENTS_TOOLS = Object.freeze(['register-myself.mjs', 'hold-the-
  * agent's tools: Claude Code runs it, and GET /api/onboarding does not list it.
  */
 export const THE_SESSION_HOOK = 'session-hook.mjs'
+
+/**
+ * THE MAIN-WORLD GUARD'S TWO BUILT FILES in that folder: first the hook every runtime calls before a tool runs, then
+ * the OpenCode plugin that calls the same hook. src/config/main-world-guard.mjs works out their paths from this list.
+ * The policy and the reading of a call are compiled into the hook, so they are not in it.
+ *
+ * A BUNDLE BUILDS THESE TWO WITH NOTHING SHARED (scripts/bundle.mjs). The hook runs only when its own address is the
+ * program's, and the plugin imports the hook; a build that shares code moves the hook into a chunk at another
+ * address, and the hook would then let every call through without reading it. They are not in THE_AGENTS_TOOLS:
+ * an agent does not run them, and GET /api/onboarding does not list them.
+ */
+export const THE_GUARDS_BUILT_FILES = Object.freeze(/** @type {const} */ (['main-world-guard.mjs', 'opencode-plugin.mjs']))
 
 /**
  * Where this code's build stamp is looked for. The bundle's own files have it beside them. An agent's tool,
@@ -516,6 +531,70 @@ export function theInstallsNode(here = {}) {
   if (from === 'checkout') return { program: named ? 'node' : execPath, environment: {} }
   if (platform === 'linux') return { program: execPath, environment: { [RUN_AS_NODE]: '1' } }
   return { program: named ? join(here.root ?? REPO_ROOT, ...theShippedNodeIn(platform)) : execPath, environment: {} }
+}
+
+/**
+ * The window's program in the folder the Windows installer installs into. It is THE_WINDOWS_EXECUTABLE in
+ * scripts/the-windows-build.mjs, which names it as electron-builder does. That file is a build script, and it
+ * imports this one, so the name is written again here. tests/the-pdf-door-refuses-and-the-install-finds-its-program.test.ts
+ * builds its Windows case from that one, so the two cannot drift apart with nothing failing.
+ */
+const THE_WINDOWS_WINDOW_PROGRAM = 'mole-office.exe'
+
+/**
+ * ELECTRON'S OWN BINARY IN THIS CHECKOUT, read where the electron package keeps it: the file path.txt in the
+ * package's folder names the binary inside its dist folder.
+ *
+ * It is read here, and not by requiring the electron package, because requiring the package downloads the binary
+ * when it is missing, and prints as it does. A start of the window must not fetch anything from the network. A
+ * missing package, path.txt or binary throws one sentence instead.
+ *
+ * @returns {string}
+ */
+function theCheckoutsElectron() {
+  let folder
+  try {
+    folder = dirname(createRequire(import.meta.url).resolve('electron/package.json'))
+  } catch {
+    throw new Error("Electron is not installed in this checkout's node_modules, so the window program cannot be started.")
+  }
+  const pathFile = join(folder, 'path.txt')
+  if (!existsSync(pathFile)) throw new Error(`Electron's binary was never fetched into this checkout, because ${pathFile} is missing.`)
+  const binary = join(folder, 'dist', readFileSync(pathFile, 'utf8').trim())
+  if (!existsSync(binary)) throw new Error(`Electron's binary is missing from this checkout: ${binary} is not there.`)
+  return binary
+}
+
+/**
+ * THE WINDOW PROGRAM OF THIS INSTALL, AND THE ARGUMENTS THAT GO BEFORE A CALLER'S OWN: what another office program
+ * runs to start the window. The PDF door starts it to print a report's page (src/server/api/report-pdf.ts).
+ *
+ *   - From a checkout, Electron's own binary from this checkout's node_modules (`theCheckoutsElectron`), with the
+ *     window's entry in the checkout.
+ *   - From a bundle on the Mac, the app's program, Contents/MacOS/Mole Office. The office is in
+ *     Contents/Resources/office, two folders below Contents.
+ *   - From a bundle on Windows, the app's program in the installed folder. The office is in resources/office, two
+ *     folders below it.
+ *   - From a bundle on Linux, the program this process runs on. ELECTRON_RUN_AS_NODE was taken out of this process's
+ *     environment above, so that program opens as the app.
+ *   - Any other system has no window program here, and asking throws.
+ *
+ * The bundles' places were read from main on 23 November 2026: the Mac's in src/server/lib/darwin-probe.ts, and
+ * Windows' in src/config/systems/the-installer-of-a-folder.mjs and scripts/the-windows-build.mjs.
+ *
+ * @param {{ from?: 'checkout' | 'bundle', platform?: string, execPath?: string, root?: string }} [here]
+ *   this process's own unless a caller names another
+ * @returns {{ program: string, args: string[] }}
+ */
+export function theInstallsWindowProgram(here = {}) {
+  const from = here.from ?? THE_INSTALL.from
+  const platform = here.platform ?? process.platform
+  const root = here.root ?? REPO_ROOT
+  if (from === 'checkout') return { program: theCheckoutsElectron(), args: [join(root, THE_WINDOW_ENTRY)] }
+  if (platform === 'darwin') return { program: resolve(root, '../..', 'MacOS', 'Mole Office'), args: [] }
+  if (platform === 'win32') return { program: resolve(root, '../..', THE_WINDOWS_WINDOW_PROGRAM), args: [] }
+  if (platform === 'linux') return { program: here.execPath ?? process.execPath, args: [] }
+  throw new Error(`This install has no window program on ${platform}, so it cannot start one.`)
 }
 
 /**
@@ -971,6 +1050,9 @@ export function whyThisCheckoutMayNotOpenTheDatabase(databasePath) {
  * @property {boolean} inTemplate Whether `.env.example` names it. A setting nobody can find in that
  *   file is one nobody will ever turn, so the default is yes; the exceptions carry their reason.
  * @property {string | null} notInTemplateBecause Null exactly when `inTemplate` is true.
+ * @property {boolean} served Whether the settings door serves its value. A private value is declared
+ *   not served here, and the door leaves it out as it leaves out a key.
+ * @property {string | null} notServedBecause Null exactly when `served` is true.
  * @property {string | null} emptyMeans What being set to an empty string means. Null means it is
  *   refused, which is the rule for all but two: an empty LIST is a real instruction — watch
  *   nothing, serve nothing — and refusing it would leave no way to say so.
@@ -981,7 +1063,7 @@ export function whyThisCheckoutMayNotOpenTheDatabase(databasePath) {
  * @param {SettingKind} kind
  * @param {string} what
  * @param {string | null} fallback
- * @param {{ absentMeans?: string, notInTemplateBecause?: string, emptyMeans?: string }} [extra]
+ * @param {{ absentMeans?: string, notInTemplateBecause?: string, notServedBecause?: string, emptyMeans?: string }} [extra]
  * @returns {Setting}
  */
 function setting(name, kind, what, fallback, extra = {}) {
@@ -993,6 +1075,8 @@ function setting(name, kind, what, fallback, extra = {}) {
     absentMeans: extra.absentMeans ?? null,
     inTemplate: extra.notInTemplateBecause === undefined,
     notInTemplateBecause: extra.notInTemplateBecause ?? null,
+    served: extra.notServedBecause === undefined,
+    notServedBecause: extra.notServedBecause ?? null,
     emptyMeans: extra.emptyMeans ?? null,
   }
 }
@@ -1030,6 +1114,12 @@ export const MERGE_WORKERS_BOUNDS = Object.freeze({ fewest: 1, most: 32 })
  */
 export const BUS_ENTRIES_BOUNDS = Object.freeze({ fewest: 1, most: 64 })
 export const BUS_ENTRIES_FALLBACK = 8
+
+/**
+ * THE FEWEST AND THE MOST MEGABYTES MOLE_OFFICE_SERVER_HEAP_MB MAY GIVE THE SERVER'S V8 HEAP, in one place: `readSetting`
+ * refuses a whole number outside them, the setting's words say them, and the tests name them from here.
+ */
+export const SERVER_HEAP_MB_BOUNDS = Object.freeze({ fewest: 2048, most: 32768 })
 
 /**
  * HOW MANY CHECKS MAY START IN ONE LANE IN AN HOUR (MOLE_OFFICE_CHECKS_AN_HOUR): at most six.
@@ -1372,6 +1462,16 @@ export const SETTINGS = [
   setting('MOLE_OFFICE_INSPECTION_API_SECONDS', 'word', SETTING_WORDS.MOLE_OFFICE_INSPECTION_API_SECONDS, '60'),
   // Tj0gSo-y1I6h: only a request that never reached the office may be asked again.
   setting('MOLE_OFFICE_INSPECTION_OFFICE_BACK_SECONDS', 'word', SETTING_WORDS.MOLE_OFFICE_INSPECTION_OFFICE_BACK_SECONDS, '120'),
+  setting(
+    'MOLE_OFFICE_LINES_THE_INSPECTOR_ANSWERS',
+    'list',
+    SETTING_WORDS.MOLE_OFFICE_LINES_THE_INSPECTOR_ANSWERS,
+    null,
+    {
+      absentMeans: "no line's hand-backs are read this way; every check runs as before.",
+      emptyMeans: "no line's hand-backs are read this way; every check runs as before.",
+    },
+  ),
   // WHOSE RUNS tools/settle-owed-runs.mjs NEVER SETTLES, beside the person's own, as FLO-45 of a decision
   // says. The tool named two of the owner's agents in its code until 2 October 2026; an office
   // that wants the same names them here.
@@ -1432,6 +1532,7 @@ export const SETTINGS = [
     {
       absentMeans: 'the merge tool pushes a landed commit to no private copy and says so. The mirror of main is still pushed.',
       notInTemplateBecause: 'it is set in the environment of the host run that lands and never in a .env file, so the template has no line for it',
+      notServedBecause: 'its value is a private address',
     },
   ),
   // THE MERGE SUITE'S WORKERS: the default is THE_SUITE_WORKERS.queue in src/config/the-suite-workers.mjs, which holds
@@ -1628,6 +1729,7 @@ export const SETTINGS = [
         'Each gate says which named patterns it did not check, and each test that needs the real values is taken out and says why.',
       emptyMeans: 'the same as not set: no named pattern is checked, and each gate says so. It is how a shell says so over a .env that sets it.',
       notInTemplateBecause: 'the file holds one person\'s content and lives outside every checkout. Whoever holds the file names it in their own .env or environment',
+      notServedBecause: 'its value is the place of a private file on this computer',
     },
   ),
   setting(
@@ -1731,6 +1833,15 @@ export const SETTINGS = [
     'word',
     SETTING_WORDS.MOLE_OFFICE_WINDOW_DEBUGGING,
     'off',
+  ),
+  // THE SERVER'S HEAP, in whole megabytes. tools/serve-dev.mjs gives the server it starts --max-old-space-size from it,
+  // and a stable upgrade records it with the other service settings. NODE_OPTIONS is still dropped. The range is above.
+  setting(
+    'MOLE_OFFICE_SERVER_HEAP_MB',
+    'word',
+    shippedSettingDescription('MOLE_OFFICE_SERVER_HEAP_MB'),
+    null,
+    { absentMeans: "the server runs with Node's own default heap limit" },
   ),
   setting(FEW_FEATURE_REDS_GATE.setting, 'word', SETTING_WORDS[FEW_FEATURE_REDS_GATE.setting], gateDefaultHere(FEW_FEATURE_REDS_GATE)),
   setting(WIDE_RED_GATE.setting, 'word', SETTING_WORDS[WIDE_RED_GATE.setting], gateDefaultHere(WIDE_RED_GATE)),
@@ -2599,6 +2710,19 @@ export const SETTINGS = [
     SETTING_WORDS.MOLE_OFFICE_DEAD_LETTER_AFTER_COUNT,
     '20',
   ),
+  // EACH RESULT OF A SEARCH OR A LIST BY KIND AT A LEVEL, by the person's decision of 20 November 2026. The three
+  // values are that decision's suggestions and have no source. The rule that reads them is src/shared/results-at-a-level.ts.
+  setting('MOLE_OFFICE_RESULT_LEVEL_OF_EACH_KIND', 'word', SETTING_WORDS.MOLE_OFFICE_RESULT_LEVEL_OF_EACH_KIND, 'decision=full,message=full,task=3,report=3,module=3,knowledge_entry=3,others=3',
+    { notInTemplateBecause: 'Chosen on the Office controls page; the shipped value is a suggestion with no source.' }),
+  setting('MOLE_OFFICE_RESULT_WHOLE_UNDER_CHARACTERS', 'word', SETTING_WORDS.MOLE_OFFICE_RESULT_WHOLE_UNDER_CHARACTERS, '300',
+    { notInTemplateBecause: 'Chosen on the Office controls page; the shipped value is a suggestion with no source.' }),
+  setting('MOLE_OFFICE_KNOWLEDGE_RATING_ASK', 'flag', SETTING_WORDS.MOLE_OFFICE_KNOWLEDGE_RATING_ASK, '1', { notInTemplateBecause: 'Chosen on the Office controls page.' }),
+  setting('MOLE_OFFICE_KNOWLEDGE_LOW_RATING_NOTICE', 'flag', SETTING_WORDS.MOLE_OFFICE_KNOWLEDGE_LOW_RATING_NOTICE, '1', { notInTemplateBecause: 'Chosen on the Office controls page.' }),
+  setting('MOLE_OFFICE_KNOWLEDGE_FEWEST_RATINGS', 'word', SETTING_WORDS.MOLE_OFFICE_KNOWLEDGE_FEWEST_RATINGS, '1', { notInTemplateBecause: 'Chosen on the Office controls page.' }),
+  setting('MOLE_OFFICE_KNOWLEDGE_QUERY_LIMIT', 'word', SETTING_WORDS.MOLE_OFFICE_KNOWLEDGE_QUERY_LIMIT, '100',
+    { notInTemplateBecause: 'Chosen on the Office controls page.' }),
+  setting('MOLE_OFFICE_RESULTS_CAP_CHARACTERS', 'word', SETTING_WORDS.MOLE_OFFICE_RESULTS_CAP_CHARACTERS, '6000',
+    { notInTemplateBecause: 'Chosen on the Office controls page; the shipped value is a suggestion with no source.' }),
   setting('MOLE_OFFICE_STRAY_GRACE', 'word', SETTING_WORDS.MOLE_OFFICE_STRAY_GRACE, '120'),
   setting(
     'MOLE_OFFICE_STALE_CODE_GRACE',
@@ -2880,10 +3004,15 @@ export function settingNamed(name) {
  * with it; the caller falls through to the declared defaults.
  */
 /**
+ * A CALLER THAT NEEDS ONE NAME FROM ANOTHER CHECKOUT'S FILE NAMES IT IN `keep`, and every other line is passed over
+ * before its value is read, so the map holds nothing else from that file and nothing else can be printed from it
+ * (theDatabaseTheStableCheckoutNames, below).
+ *
  * @param {string} [file]
+ * @param {readonly string[]} [keep] the only names to keep; every name when it is not given
  * @returns {Record<string, string>}
  */
-export function envFileValues(file = ENV_FILE) {
+export function envFileValues(file = ENV_FILE, keep = undefined) {
   /** @type {Record<string, string>} */
   const out = {}
   /** @type {string} */
@@ -2901,6 +3030,7 @@ export function envFileValues(file = ENV_FILE) {
     if (at === -1) continue
     const key = trimmed.slice(0, at).trim()
     if (key === '') continue
+    if (keep !== undefined && !keep.includes(key)) continue
     out[key] = trimmed
       .slice(at + 1)
       .trim()
@@ -3096,6 +3226,12 @@ export function readSetting(name, env) {
   if (name === 'MOLE_OFFICE_WINDOW_DEBUGGING' && raw !== undefined && !WINDOW_DEBUGGING_MODES.includes(raw)) {
     throw aValueRefused(name, raw,
       `MOLE_OFFICE_WINDOW_DEBUGGING is "${raw}", and it must be on or off. Nothing was guessed from it.`,
+    )
+  }
+  if (name === 'MOLE_OFFICE_SERVER_HEAP_MB' && raw !== undefined &&
+    (!/^[1-9]\d*$/.test(raw) || Number(raw) < SERVER_HEAP_MB_BOUNDS.fewest || Number(raw) > SERVER_HEAP_MB_BOUNDS.most)) {
+    throw aValueRefused(name, raw,
+      `${name} is "${raw}", and it must be a whole number of megabytes from ${String(SERVER_HEAP_MB_BOUNDS.fewest)} to ${String(SERVER_HEAP_MB_BOUNDS.most)}. Nothing was started.`,
     )
   }
   if (['MOLE_OFFICE_FEW_RED_FILES', 'MOLE_OFFICE_HAND_BACK_HOURS', 'MOLE_OFFICE_TEST_SHUTDOWN_LIMIT_MS', 'MOLE_OFFICE_TEST_FOLDER_LIMIT_MS', 'MOLE_OFFICE_TEST_GPU_COMMAND_LIMIT_MS'].includes(name) && raw !== undefined && (!/^\d+$/.test(raw) || !Number.isSafeInteger(Number(raw)) || Number(raw) < 1)) {
@@ -3554,6 +3690,27 @@ export function canonicalDatabasePath(file = ENV_FILE) {
 }
 
 /**
+ * THE DATABASE THE STABLE CHECKOUT'S SETTINGS NAME, which is the live office's: the value of MOLE_OFFICE_DB in the
+ * .env of theStableCheckoutFolder(home), or the declared default when the file does not name one. The value is resolved
+ * against the stable checkout, as tools/the-offices-data-folder.mjs resolved it before this function was taken out of
+ * that file. Null when that checkout has no .env.
+ *
+ * Only MOLE_OFFICE_DB is read from that file. It is another checkout's, and the live office's, so no other value is
+ * held or can be printed. Two readers ask it: the sandbox launcher's data-folder check
+ * (tools/the-offices-data-folder.mjs) and the service command's refusal of a test-marked start on the live office
+ * (src/config/the-service-command.mjs).
+ *
+ * @param {string} home
+ * @returns {string | null}
+ */
+export function theDatabaseTheStableCheckoutNames(home) {
+  const stable = theStableCheckoutFolder(home)
+  const file = join(stable, '.env')
+  if (!existsSync(file)) return null
+  return resolve(stable, String(readSetting('MOLE_OFFICE_DB', envFileValues(file, ['MOLE_OFFICE_DB'])).value))
+}
+
+/**
  * WHERE THE API OF THE CANONICAL STACK ANSWERS: the address a server started from this checkout with
  * nothing set in a shell would take.
  *
@@ -3854,10 +4011,10 @@ export function addressesForOtherMachines(env) {
  * WHY THE API'S OWN ADDRESS IS IN THE LIST. In a build, the API process serves the browser app
  * itself, so the page is on the API's origin. Leaving it out would refuse the production arrangement.
  *
- * WHAT IT IS FOR. The API lets a page on one of these read its replies and refuses every other
- * origin. It used to reflect whatever origin asked, which was defensible while every listener was on
- * 127.0.0.1 and is not once `MOLE_OFFICE_ADDRESS_FOR_OTHER_MACHINES` opens a door on an address
- * another machine can reach.
+ * WHAT IT IS FOR. The private sandbox login doors take only these as a page's origin
+ * (src/server/api/sandbox-logins.ts). Which origins the API answers at all is decided by the Origin
+ * check in src/server/lib/an-origin-that-is-not-this-office.ts, from the names the Host check takes,
+ * since SEC-2. Before that the API answered a page on one of these, and on any port of loopback.
  *
  * IT IS HERE RATHER THAN BESIDE THE CORS REGISTRATION because every value in it is already declared
  * in this file, and because `src/server/index.ts` opens the database when it is imported — so a
@@ -3867,8 +4024,6 @@ export function addressesForOtherMachines(env) {
  * @returns {string[]}
  */
 export function originsAPageMayBeOn(resolved) {
-  /** @param {number} port @returns {string[]} */
-  const bothSpellings = (port) => [`http://127.0.0.1:${String(port)}`, `http://localhost:${String(port)}`]
   const declared = [...bothSpellings(resolved.webPort), ...bothSpellings(resolved.apiPort)]
   if (resolved.otherMachines !== null) {
     declared.push(resolved.otherMachines.webAddress, resolved.otherMachines.apiAddress)
@@ -3877,44 +4032,28 @@ export function originsAPageMayBeOn(resolved) {
 }
 
 /**
- * IS THIS ORIGIN A PAGE SERVED BY SOMETHING ON THIS COMPUTER?
+ * THE ORIGINS THE DEV SERVER SERVES THE BROWSER APP ON: the web port in both spellings, and the address for other
+ * machines' web port when one is declared, because Vite opens a door there too. Read only when this process is not
+ * production: by the Origin check (src/server/lib/an-origin-that-is-not-this-office.ts), which takes these as this
+ * office's own, and by a press that gives a browser a key (src/server/lib/a-press-another-site-sent.ts).
  *
- * ---------------------------------------------------------------------------------------
- * WHY THIS EXISTS, AND WHY IT IS NOT A HOLE
- * ---------------------------------------------------------------------------------------
- *
- * Criterion C7 of design/messages/ACCEPTANCE.md section 8 lets a person enter another world: the
- * page keeps its own address and sends its requests to the world it is visiting. That world is a
- * different port, so it is a different origin, and it cannot know which port the visiting page was
- * served on — `originsAPageMayBeOn` above is a list of the ports THIS installation declares, and a
- * scratch world's own web port is on nobody's list. Without this the Enter button answers "Failed to
- * fetch" and nothing says why, which is what it did the first time it was photographed.
- *
- * A LOOPBACK ORIGIN IS A PAGE SERVED BY SOMETHING ON THIS MACHINE, and anything running on this
- * machine can already reach this API directly, with `curl`, without a browser and without an origin
- * at all. So the same-origin rule buys nothing here: what it protects against is a page on the
- * INTERNET reading a local server's replies, and such a page cannot be on a loopback origin. The
- * door another machine comes through is untouched — `MOLE_OFFICE_ADDRESS_FOR_OTHER_MACHINES` still
- * admits exactly the two addresses it declares and nothing else.
- *
- * ONLY `http`, ONLY THE TWO SPELLINGS OF LOOPBACK, AND A PORT. `http://127.0.0.1.example.com` is a
- * name somebody else controls; `https://localhost` is a page this product never serves. Both are
- * refused, which is why this parses rather than looking for a substring.
- *
- * @param {string} origin the `Origin` header of a request, exactly as the browser sent it
- * @returns {boolean}
+ * @param {Settings} resolved
+ * @returns {string[]}
  */
-export function aPageOnThisMachine(origin) {
-  let parsed
-  try {
-    parsed = new URL(origin)
-  } catch {
-    // Not a URL at all. A browser does not send one of these, and refusing it is the answer.
-    return false
-  }
-  if (parsed.protocol !== 'http:') return false
-  if (parsed.hostname !== '127.0.0.1' && parsed.hostname !== 'localhost') return false
-  return parsed.port !== '' && /^\d+$/.test(parsed.port)
+export function theDevServersOrigins(resolved) {
+  const origins = bothSpellings(resolved.webPort)
+  if (resolved.otherMachines !== null) origins.push(resolved.otherMachines.webAddress)
+  return [...new Set(origins)]
+}
+
+/**
+ * One port on this computer, in the two spellings a browser calls two origins.
+ *
+ * @param {number} port
+ * @returns {string[]}
+ */
+function bothSpellings(port) {
+  return [`http://127.0.0.1:${String(port)}`, `http://localhost:${String(port)}`]
 }
 
 /**
@@ -4137,6 +4276,7 @@ export function theServingInstall() {
 export function settingWordValues(name) {
   if (name === 'MOLE_OFFICE_BUS_MOST_ENTRIES') return { fewest: BUS_ENTRIES_BOUNDS.fewest, most: BUS_ENTRIES_BOUNDS.most, shipped: BUS_ENTRIES_FALLBACK }
   if (name === 'MOLE_OFFICE_MERGE_WORKERS') return { fewest: MERGE_WORKERS_BOUNDS.fewest, most: MERGE_WORKERS_BOUNDS.most }
+  if (name === 'MOLE_OFFICE_SERVER_HEAP_MB') return { fewest: SERVER_HEAP_MB_BOUNDS.fewest, most: SERVER_HEAP_MB_BOUNDS.most }
   const gate = gateForSetting(name)
   if (gate?.positions.kind === 'number') return { fewest: gate.positions.fewest, most: gate.positions.most }
   if (name === 'MOLE_OFFICE_MODAL_MONTHLY_CAP_USD') return { shipped: MODAL_MONTHLY_CAP_USD }

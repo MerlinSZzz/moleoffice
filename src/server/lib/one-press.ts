@@ -131,6 +131,9 @@ type ARequestablePanel = keyof typeof THE_SETTINGS_A_REQUEST_MAY_CHANGE
 export const SETTINGS_A_REQUEST_MAY_NOT_CHANGE = {
   'settings.keys': 'a-key-a-login-or-a-summons',
   'settings.providerkeys': 'a-key-a-login-or-a-summons',
+  // WAVE 13U ROUND 242'S PANEL: each coding tool's line came out of the keys panel, and its one press, the person's
+  // ask to a secretary to set up a tool and its key, is the person's alone.
+  'settings.codingtools': 'a-key-a-login-or-a-summons',
   'settings.restart': 'who-may-do-what',
   'settings.notifications': 'a-key-a-login-or-a-summons',
   'settings.inject': 'who-may-do-what',
@@ -204,6 +207,9 @@ export const SETTINGS_A_REQUEST_MAY_NOT_CHANGE = {
   // request for one press was built for it.
   'settings.plugins': 'not-offered-yet',
   'settings.storage': 'not-offered-yet',
+  // THE UNREAD REPORT COUNT PANEL: each person's own answer about the unread report count, kept on their row and
+  // changed at its own door, and no request for one press was built for it.
+  'settings.reportcount': 'not-offered-yet',
 } as const satisfies Record<Exclude<SettingsPanel, ARequestablePanel>, WhyNotByARequest>
 
 function isRequestable(panel: SettingsPanel): panel is ARequestablePanel {

@@ -8,7 +8,7 @@
  * That file imports it back where it still uses it and re-exports it, so its export surface is unchanged.
  */
 
-import { declaredRuntimeOrNull } from '@shared/participants.ts'
+import { aHarnessWithNoAdapter, declaredRuntimeOrNull } from '@shared/participants.ts'
 import { sqlite } from './client.ts'
 
 /**
@@ -24,6 +24,8 @@ import { sqlite } from './client.ts'
  * written onto that record (`setAnAgentsRunModel`), so what is written is what is read next. `modelIsFor` is the
  * runtime on the record that holds the model, which is what a run's runtime is compared with. `holding` names every
  * live record of the agent that names a model or an effort, so a clear can clear them all and no older one comes back.
+ * `harness` is the newest record's word when it names a harness the office has no adapter for, and null otherwise:
+ * such a harness chooses its model itself.
  *
  * ALL OF IT COMES FROM THE ONE STATEMENT `runtimeOfTheAgentRecord` READS, so the queue's one pass prepares no new
  * statement to ask an agent's model. Round 36
@@ -40,6 +42,7 @@ export function theModelOnTheAgentRecord(agentId: string): {
   variant: string | null
   modelIsFor: string | null
   holding: string[]
+  harness: string | null
 } | null {
   const rows = theRuntimeForAgentStatement().all(agentId) as { id: string; runtime: unknown; model: unknown; variant: unknown }[]
   const newest = rows[0]
@@ -59,6 +62,7 @@ export function theModelOnTheAgentRecord(agentId: string): {
     variant: holder === undefined ? null : read(holder.variant, 'variant'),
     modelIsFor: holder === undefined ? null : declaredRuntimeOrNull(holder.runtime),
     holding: named.map((row) => row.id),
+    harness: aHarnessWithNoAdapter(newest.runtime),
   }
 }
 export function theRuntimeForAgentStatement(): { get: (agentId: string) => unknown; all: (agentId: string) => unknown[] } {

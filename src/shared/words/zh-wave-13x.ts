@@ -4,7 +4,6 @@ import type { enWave13x } from './en-wave-13x.ts'
 
 export const zhWave13x = {
   "flowRunSteps.doneByHandWhy": "这一步是有人在办公室里亲手做的，不是程序做的。",
-  "review.b.changedAtSend": "没有发送任何内容。这次评审在本页显示后已在别处更改。下面重新显示的是当前内容。",
   "review.leave.anyway": "仍然离开",
   "review.leave.unread.title": "Mole Office 无法读取本页评审中是否有未发送的评论",
   "talk.addToReview": "加入评审",

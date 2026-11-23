@@ -53,12 +53,13 @@ import {
   type ScreeningOnTheWire,
   type StatedReturn,
 } from '../api.ts'
-import { Absence, Btn, ErrorNote, Field, Loading, Panel, Tag, TextArea, TextInput, useAsync, type AsyncState } from './ui.tsx'
+import { Absence, Btn, ErrorNote, Field, Loading, Panel, ServerNote, Tag, TextArea, TextInput, useAsync, type AsyncState } from './ui.tsx'
 import { useProjectAsync } from '../lib/project-async.ts'
 import { readParticipantsOnce, readWorkspacesOnce } from '../lib/oneread.ts'
 import { theParticipantAStoredIdNames, writerNamed, type ParticipantsNamed } from '../lib/participant-lookup.ts'
 import { asBase64 } from './PictureToSend.tsx'
 import { putOnTheClipboard } from '../lib/clipboard.ts'
+import { CodeRows } from '../lib/code-rows.tsx'
 import { exportFileName } from '@shared/zip-export/manifest.ts'
 import { handTheZipToTheBrowserAsAFile, theFileCountsSaid } from './zip-export/download.ts'
 import { PackageAlignmentPlan } from './PackageAlignmentPlan.tsx'
@@ -190,13 +191,13 @@ export function TaskPackagePanel({ record }: { record: PanelRecord }) {
           <div className="tpp-acceptance">
             <p className="tpp-key">{t('tpp.acceptanceCriteria')}</p>
             <p className="tpp-acceptance-text">{content(pkg.acceptance)}</p>
-            <p className="tpp-source">
-              {t('tpp.copiedFrom', {
-                file: content(pkg.acceptanceSource.file),
-                criterion: content(pkg.acceptanceSource.criterion),
-                commit: content(pkg.acceptanceSource.commit),
-              })}
-            </p>
+            <CodeRows
+              rows={[
+                { label: 'tpp.row.copiedFrom', value: pkg.acceptanceSource.file },
+                { label: 'tpp.row.criterion', value: pkg.acceptanceSource.criterion },
+                { label: 'tpp.row.commit', value: pkg.acceptanceSource.commit },
+              ]}
+            />
           </div>
         </>
       )}
@@ -236,7 +237,7 @@ export function PackageHandbackPoints({ data, enabled }: { data: PanelRecord['da
             <li key={point.pointId} data-point-id={point.pointId}>
               <strong>{content(material?.says ?? point.pointId)}</strong>
               <p>{t(`delegation.inspection.outcome.${point.outcome}`)}: {content(point.words)}</p>
-              {opinion === undefined ? <p>{t('delegation.inspection.notLookedAt')}</p> : (
+              {opinion === undefined ? <p>{t('absence.notLooked')}</p> : (
                 <p>{t(`delegation.inspection.judged.${opinion.judged}`)} · {opinion.rulesKept === undefined ? null : <>{t(opinion.rulesKept ? 'delegation.inspection.rulesKept' : 'delegation.inspection.rulesNotKept')} · </>}{content(opinion.why)}</p>
               )}
             </li>
@@ -290,17 +291,16 @@ export function TaskPackageComputed({
   const row = reply.tasks.find((one) => one.recordId === recordId) ?? null
   if (row === null) {
     const unreadable = reply.couldNotRead.find((one) => one.recordId === recordId) ?? null
-    return (
-      <p className="tpp-unreadable">
-        {unreadable === null ? (
-          t('tpp.noRowForTask')
-        ) : (
-          // `because` IS THE SERVER'S OWN SENTENCE (`couldNotRead[].because`, `GET /api/delegation`),
-          // drawn as it wrote it, and marked so this round's browser test can tell it apart from a
-          // word this piece forgot to move.
-          <span className="tpp-server">{content(unreadable.because)}</span>
-        )}
-      </p>
+    return unreadable === null ? (
+      <p className="tpp-unreadable">{t('tpp.notListed')}</p>
+    ) : (
+      <>
+        <p className="tpp-unreadable">{t('planning.notReadable')}</p>
+        {/* `because` IS THE SERVER'S OWN SENTENCE (`couldNotRead[].because`, `GET /api/delegation`),
+            drawn as it wrote it, and marked so this round's browser test can tell it apart from a
+            word this piece forgot to move. */}
+        <ServerNote text={unreadable.because} />
+      </>
     )
   }
   // WHAT ONLY OUTSIDE WORK HAS: the exports and returns, and the presses that write an act of outside work. A package
@@ -321,7 +321,7 @@ export function TaskPackageComputed({
         )}
       </p>
       {/* `responsibleWhy` IS ALSO THE SERVER'S OWN SENTENCE, for the same reason as `because` above. */}
-      <p className="tpp-why tpp-server">{content(row.responsibleWhy)}</p>
+      <ServerNote text={row.responsibleWhy} />
       {outside ? (
         <dl className="tpp-facts">
           <dt>{t('tpp.exported')}</dt>
@@ -331,7 +331,10 @@ export function TaskPackageComputed({
         </dl>
       ) : null}
       {row.statedCodeCount === 0 ? (
-        <p className="tpp-nocode">{t('tpp.noCode')}</p>
+        <p className="tpp-code">
+          <span className="tpp-key">{t('tpp.codeStated')}</span>
+          {t('absence.none')}
+        </p>
       ) : (
         <p className="tpp-code">
           <span className="tpp-key">{t('tpp.codeStated')}</span>
@@ -383,7 +386,7 @@ export function ReturnsList({ returns }: { returns: StatedReturn[] }) {
               ))}
             </ul>
           )}
-          {entry.file === undefined ? null : <p className="tpp-return-paths">{entry.file}</p>}
+          {entry.file === undefined ? null : <p className="tpp-return-paths"><code className="wrap-anywhere">{content(entry.file)}</code></p>}
         </div>
       ))}
     </div>
@@ -459,6 +462,8 @@ export function TaskOutsideExport({ recordId, workspaceId }: { recordId: string;
   const [withFiles, setWithFiles] = useState(false)
   /** What a zip press came to, in the same place the text press draws its own answer. */
   const [zipSaid, setZipSaid] = useState<string | null>(null)
+  /** The name of the zip the browser took, drawn on its own row; null when the last press handed none. */
+  const [zipFile, setZipFile] = useState<string | null>(null)
   /**
    * THE SCREEN'S ANSWER A ZIP PRESS RECORDED. Drawn above the counts, the way the text press draws
    * it above the text, so the person choosing the zip sees the same findings before pasting. Null
@@ -474,16 +479,18 @@ export function TaskOutsideExport({ recordId, workspaceId }: { recordId: string;
       setMade(null)
       setCopied(null)
       setZipSaid(null)
+      setZipFile(null)
       setZipScreening(null)
       try {
         const answer = await api.exportOutside(recordId, withFiles)
         if (answer.kind === 'zip') {
           const fileName = exportFileName(answer.title, answer.n)
-          const handover = handTheZipToTheBrowserAsAFile(answer.bytes, fileName)
-          // THE COUNTS ARE TRUE WHEN THE ZIP WAS MADE, but the handed-over sentence is true only
-          // when the browser took the file. A browser that will not take one hears its refusal
-          // alone, never the claim beside it.
-          setZipSaid(handover.handed ? `${handover.said} ${theFileCountsSaid(answer)}` : handover.said)
+          const download = handTheZipToTheBrowserAsAFile(answer.bytes, fileName)
+          // THE COUNTS ARE TRUE WHEN THE ZIP WAS MADE, but the row naming the file is true only
+          // when the browser took it. A browser that will not take one hears its refusal alone,
+          // never the claim beside it.
+          setZipSaid(download.handed ? theFileCountsSaid(answer) : download.said)
+          setZipFile(download.handed ? fileName : null)
           setZipScreening(answer.screening)
           setWithFiles(false)
           return
@@ -544,6 +551,7 @@ export function TaskOutsideExport({ recordId, workspaceId }: { recordId: string;
         </Btn>
         {failed === null ? null : <ErrorNote label={t('tpp.notMade')} message={failed.message} fault={failed.fault} />}
         {zipSaid === null ? null : <p className="tpp-done">{zipSaid}</p>}
+        {zipFile === null ? null : <CodeRows rows={[{ label: 'frameFiles.row.handed', value: zipFile }]} />}
         {zipScreening === null ? null : <TheScreensAnswer screening={zipScreening} />}
         {made === null ? null : (
           <div className="tpp-outside">
@@ -580,7 +588,8 @@ export function TaskOutsideExport({ recordId, workspaceId }: { recordId: string;
 function TheScreensAnswer({ screening }: { screening: ScreeningOnTheWire }) {
   return (
     <>
-      <p className="tpp-screen tpp-server">{screening.summary}</p>
+      <p className="tpp-screen">{t('tpp.screenFindings', { n: screening.findings.length })}</p>
+      <ServerNote text={screening.summary} />
       {screening.findings.map((finding) => (
         <p className="tpp-screen-finding" key={findingKey(finding)}>
           <span className="tpp-key">{screenCheckWord(finding.check).text}</span>
@@ -693,7 +702,7 @@ export function ReturnForm({ recordId, onReturned }: { recordId: string; onRetur
           </Btn>
         </div>
         {failed === null ? null : <ErrorNote label={t('tpp.notPutBack')} message={failed.message} fault={failed.fault} />}
-        {done === null ? null : <p className="tpp-done tpp-server">{done}</p>}
+        {done === null ? null : <><p className="tpp-done">{t('tpp.wasPutBack')}</p><ServerNote text={done} /></>}
       </div>
     </details>
   )
@@ -755,7 +764,7 @@ export function ConfirmPackagePress({
           </Btn>
         )}
         {failed === null ? null : <ErrorNote label={t('tpp.notConfirmed')} message={failed.message} fault={failed.fault} />}
-        {done === null ? null : <p className="tpp-done tpp-server">{done}</p>}
+        {done === null ? null : <><p className="tpp-done">{t('tpp.wasConfirmed')}</p><ServerNote text={done} /></>}
       </div>
     </details>
   )
@@ -768,12 +777,10 @@ const TPP_CSS = `
 .tpp-packager { display: inline-block; max-width: 100%; vertical-align: top; overflow-wrap: anywhere; }
 .tpp-key { display: block; color: var(--text-3); font-size: var(--fs-1); }
 .tpp-severity { display: block; color: var(--text-3); font-size: var(--fs-1); }
-.tpp-state, .tpp-outside, .tpp-why, .tpp-responsible, .tpp-code { margin: 0 0 var(--gut); overflow-wrap: anywhere; }
+.tpp-state, .tpp-outside, .tpp-responsible, .tpp-code { margin: 0 0 var(--gut); overflow-wrap: anywhere; }
 .tpp-acceptance { margin: 0 0 var(--gut); }
 .tpp-acceptance-text { margin: 2px 0 0; overflow-wrap: anywhere; }
-.tpp-source { margin: 2px 0 0; color: var(--text-2); font-size: var(--fs-1); overflow-wrap: anywhere; }
 .tpp-unreadable { margin: 0; color: var(--text-2); }
-.tpp-nocode { margin: 0; color: var(--text-2); }
 .tpp-returns { margin: 0 0 var(--gut); }
 .tpp-return { margin: 0 0 var(--pad-lg); }
 .tpp-return-who { margin: 0; color: var(--text); overflow-wrap: anywhere; }

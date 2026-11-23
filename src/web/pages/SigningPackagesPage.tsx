@@ -25,7 +25,6 @@ export function SigningPackagesPage({ id }: { id?: string }) {
     <style href="mole-office-signing-packages" precedence="default">{SIGNING_PACKAGES_CSS}</style>
     <header className="sp-head">
       <h1 className="sp-title" data-title-is="its-label">{t('nav.signingPackages')}</h1>
-      <p className="sp-intro">{t('signingPackages.intro')}</p>
     </header>
     {id === undefined ? <PackageLists /> : <OnePackage key={id} id={id} />}
   </div>
@@ -116,8 +115,7 @@ function ThePackage({ package: initial }: { package: ASigningPackage }) {
       </ol>
       {fault === null ? null : <ErrorNote message={fault.message} fault={fault.fault} />}
       {waiting ? <div className="sp-actions">
-        <p className="sp-only">{t('signingPackages.onlyYou')}</p>
-        {struck.size === pack.items.length ? <p className="sp-only">{t('signingPackages.allStruck')}</p> : null}
+        {struck.size === pack.items.length ? <p className="sp-only">{t('signingPackagesPage.allStruck')}</p> : null}
         <div className="sp-presses">
           {struck.size === pack.items.length ? null : <Btn variant="primary" pending={busy === 'sign'} disabled={busy !== null} reason={t('signingPackages.answering')} onClick={() => press('sign')}>{t('signingPackages.sign')}</Btn>}
           <Btn pending={busy === 'refuse'} disabled={busy !== null} reason={t('signingPackages.answering')} onClick={() => press('refuse')}>{t('signingPackages.refuse')}</Btn>
@@ -131,8 +129,7 @@ const SIGNING_PACKAGES_CSS = `
 .sp, .sp-head, .sp-one, .sp-actions { display: grid; gap: var(--pad); min-width: 0; }
 .sp { gap: var(--gut); }
 .sp-title { margin: 0; color: var(--text); font: 600 var(--fs-4)/var(--lh-tight) var(--font-ui); overflow-wrap: anywhere; }
-.sp-intro, .sp-only, .sp-answer { margin: 0; color: var(--text-2); font: var(--fs-2)/var(--lh-read) var(--font-ui); overflow-wrap: anywhere; }
-.sp-intro { max-width: 70ch; }
+.sp-only, .sp-answer { margin: 0; color: var(--text-2); font: var(--fs-2)/var(--lh-read) var(--font-ui); overflow-wrap: anywhere; }
 .sp-rows, .sp-items { display: grid; gap: var(--pad); margin: 0; padding: 0; list-style: none; min-width: 0; }
 .sp-row { display: grid; gap: 4px; padding: var(--pad); border: var(--border-w) solid var(--border); border-radius: var(--radius-sm); color: var(--text); text-decoration: none; overflow-wrap: anywhere; }
 .sp-row:hover { border-color: var(--border-strong); }

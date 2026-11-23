@@ -117,6 +117,7 @@ export const PARTICIPANT_FIELDS_THE_PAGES_READ = [
   'chatButtonStays', // src/web/components/Chat.tsx TheChat
   'chatOpensAs', // src/web/components/Chat.tsx TheChat
   'chatLayout', // src/web/components/Chat.tsx TheChat
+  'startingMode', // src/web/lib/starting-mode.ts takeTheStartingMode
   'role', // src/web/components/ContactChooser.tsx ContactRow
   'shortcuts', // src/web/lib/shortcuts.ts readShortcuts
   'chatLabels', // src/web/components/Chat.tsx TheChat

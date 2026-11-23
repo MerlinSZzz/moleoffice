@@ -93,6 +93,16 @@ export function OpenTheChatShape() {
   )
 }
 
+/** A curly opening quotation mark, two marks each with a round head and a tail curving up to the right: take the words selected on the page into the next message. */
+export function QuoteShape() {
+  return (
+    <ShapePicture>
+      <path d="M10.5 6.5C8.4 7.2 7.6 9.4 8.63 12.12A2.75 2.75 0 1 1 4.5 14.5C4.5 10.6 6.9 7.3 10.5 6.5z" />
+      <path d="M19.5 6.5C17.4 7.2 16.6 9.4 17.63 12.12A2.75 2.75 0 1 1 13.5 14.5C13.5 10.6 15.9 7.3 19.5 6.5z" />
+    </ShapePicture>
+  )
+}
+
 
 /** Two people: the contacts tab. */
 export function ContactsShape() {
@@ -180,13 +190,15 @@ export interface AShapePressProps {
   onPress?: () => void
   /** A press whose work is done on the way down, before focus moves the page's selection away. */
   onPointerDown?: () => void
+  /** A press that stays down while what it turns on is on; left out, the press is not a switch. */
+  pressed?: boolean
   children: ReactNode
 }
 
 /** One shape as a press, with its word where a pointer and a screen reader find it and nowhere on the picture. */
-export function AShapePress({ className, words, onPress, onPointerDown, children }: AShapePressProps) {
+export function AShapePress({ className, words, onPress, onPointerDown, pressed, children }: AShapePressProps) {
   return (
-    <button type="button" className={className} title={words} aria-label={words} onClick={onPress} onPointerDown={onPointerDown}>
+    <button type="button" className={className} title={words} aria-label={words} aria-pressed={pressed} onClick={onPress} onPointerDown={onPointerDown}>
       {children}
       <span className="sr-only">{words}</span>
     </button>

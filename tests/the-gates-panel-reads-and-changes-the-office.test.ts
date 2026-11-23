@@ -658,7 +658,11 @@ it('draws the spool block only while another world owns the spool, waits for a r
     await spoolBlock().waitFor()
     expect(await spoolBlock().locator('h3').innerText()).toBe(t('gates.spool.title'))
     const words = await spoolBlock().innerText()
-    for (const said of [t('gates.spool.owned', { folder: A_MADE_UP_SPOOL.folder, theirs: A_MADE_UP_SPOOL.itsWorld, ours: A_MADE_UP_SPOOL.thisWorld }), t('gates.spool.what'), t('gates.spool.who')]) expect(words).toContain(said)
+    for (const said of [t('gates.spool.what'), t('gates.spool.who')]) expect(words).toContain(said)
+    // The folder and the two worlds are rows in the code style, and no sentence holds the folder.
+    expect(await spoolBlock().locator('dt').allTextContents()).toEqual([t('gates.spool.row.folder'), t('gates.spool.row.belongsTo'), t('gates.spool.row.thisOffice')])
+    expect(await spoolBlock().locator('dd > code').allTextContents()).toEqual([A_MADE_UP_SPOOL.folder, A_MADE_UP_SPOOL.itsWorld, A_MADE_UP_SPOOL.thisWorld])
+    for (const said of await spoolBlock().locator('p').allTextContents()) expect(said).not.toContain(A_MADE_UP_SPOOL.folder)
     await spoolBlock().getByRole('button', { name: t('pagesFromSettings.edit'), exact: true }).click()
     const give = spoolBlock().getByRole('button', { name: t('gates.spool.give'), exact: true })
     expect(await give.isDisabled()).toBe(true)

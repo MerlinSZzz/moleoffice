@@ -123,7 +123,7 @@ import { theFiledAliasesReadOnce, type TheFiledAliases } from './registry-aliase
 // WHICH COMMENTS A REVIEW HAS NOT SENT YET, and what a person reads when one is held. Read inside
 // theQueue and never while this module is being evaluated: lib/reviews.ts reaches back into this
 // one through lib/records.ts, and that cycle is safe exactly as long as nothing is called at import.
-import { inspectionForMessage, isInspectionForMessage, isInspectionForMessageWithRuns, recordCheckToolEnded, whyAnAskNeedsNoCheck, whyAReplacedAskNeedsNoCheck, theRegistryReadOnce } from './inspection.ts'
+import { inspectionForMessage, isInspectionForMessage, isInspectionForMessageWithRuns, recordCheckToolEnded, whyAnAskNeedsNoCheck, whyAReplacedAskNeedsNoCheck, theRegistryReadOnce, whyAWorkersSupervisorIsNotTold } from './inspection.ts'
 import { theChecksStartedInTheLastHour, thePaceOfACheckOf } from './checks-an-hour.ts'
 import { type TheHoldOnNewChecks } from './checks-in-merges-only.ts'
 import { theHoldOnNewChecks } from './the-hold-on-new-checks.ts'
@@ -135,6 +135,7 @@ import { resolvingEntriesWhoseHourIsOver, theMergeToolRunEnded } from './merge-s
 import { MERGE_ENTRY_KIND, MERGE_TOOL_RUNTIME, type ChangesetAdapter, type MergeState, type ResolutionBounce } from '@shared/merge-queue.ts'
 import type { ThePaceOfACheck } from '@shared/checks-an-hour.ts'
 import { THE_WORKER } from '@shared/the-worker-actor.ts'
+import { inspectorAnswersRun } from './inspector-answers-lines.ts'
 import { theAgentARunServes } from './the-agent-a-run-serves.ts'
 import { said } from './the-agent-a-run-serves.ts'
 import { theIdentityByItsOwnRead } from './the-agent-a-run-serves.ts'
@@ -175,6 +176,7 @@ export interface Waiting {
    */
   inspection?: {
     run: string
+    readingOnly?: boolean
     checkout: string | null
     only?: string[]
     needsJudgment?: { path: string; why: string }[]
@@ -213,7 +215,9 @@ export interface Waiting {
   handle: string
   /**
    * The runtime the run goes to: the agent's registry row, then the Settings page's choice for a run
-   * answering a message, then MOLE_OFFICE_CHORE_RUNTIME. Null because none of them names one.
+   * answering a message, then MOLE_OFFICE_CHORE_RUNTIME. Null because none of them names one. A
+   * harness the office has no adapter for keeps its own word here (`theModelARunGets`), so the
+   * worker says it cannot start it instead of starting another runtime in its place.
    */
   runtime: string | null
   /**
@@ -1567,11 +1571,13 @@ export function theAnsweringReading(
       })
     }
     /**
-     * A FRESH BEAT IS NOT ENOUGH. The waiter that beats this hold can outlive the session it
-     * speaks for (problem `DyEIJyDCG01X`), so the session named on the row is asked whether it is
-     * still there — its own process row, or its own transcript inside the hold's window. When
-     * neither can be read this is `nobody` with the reading's own sentence naming what could not be
-     * read; the handle door never answers a live session on the heartbeat alone. Criterion M106.
+     * A HOLD THAT BEATS ANSWERS, UNLESS WHAT IS READ OF ITS SESSION SAYS THE SESSION STOPPED. The
+     * waiter that beats this hold can outlive the session it speaks for, so `theSessionBehindTheHold`
+     * puts the session to four signs: a stop cause at the end of its transcript, an unread hand-over,
+     * a recorded process that has ended beside a quiet transcript, and an office terminal whose run has
+     * ended. When one holds, this is `nobody` with that reading's sentence. A hold past its lapse and
+     * inside its grace has no heartbeat to stand on, and answers only when a process or a transcript of
+     * the session says so.
      */
     const ofTheSession = how.machineOfTheSession
     const behind = (how.behindTheHold ?? theSessionBehindTheHold)(hold, workspaceId, new Date(at), ofTheSession === undefined ? how.machine : () => ofTheSession(hold.session))
@@ -2603,6 +2609,7 @@ function* readingTheQueue(
         ? null
         : {
             ...asked,
+            readingOnly: inspectorAnswersRun(asked.run, workspaceId),
             ...(checkModel === null || !theOfficeChoseIt(checkModel) || checkModel.model === null ? {} : { model: checkModel.model }),
             ...(waits === null ? {} : { waits }),
             pace: thePaceOfACheckOf(asked.run, workspaceId, environment(), (startedThisHour ??= theChecksStartedInTheLastHour()), theNewestEntryOf(asked.run)),
@@ -3039,6 +3046,12 @@ export function tellTheParentAChildFinished(childId: string, by: Actor): { writt
   // with a seal tells its starter in the seal's notice, written earlier in the same write (`sealFinishedRun`). When
   // that notice went to the agent this line would go to, it already says the run finished, so this line is
   // not written.
+  // The owner's decision of 12 November 2026 also leaves out this replacement line when the sealed child's parent is
+  // its supervisor: the absent seal notice must not cause a child-finished notice in its place.
+  if (typeof data['sealedTip'] === 'string' && data['sealedTip'].trim() !== '') {
+    const because = whyAWorkersSupervisorIsNotTold(child, { kind: 'agent', id: answering.agent.id })
+    if (because !== null) return { written: false, because }
+  }
   const sealSaidIt = sqlite
     .prepare(
       `SELECT 1 FROM records r WHERE r.kind = 'message' AND r.deleted_at IS NULL AND ${theWordsOfAStoredField(STORED_FIELDS.messageAboutRun, 'r.data')} = ? ` +

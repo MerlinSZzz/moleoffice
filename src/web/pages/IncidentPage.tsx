@@ -317,7 +317,7 @@ export function TheSceneView({ said }: { said: TheScene }) {
               tier="told-apart"
               looked
               word={t('unrowedPages.incident.notSaid')}
-              title={t('unrowedPages.incident.stateNotSaid')}
+              title={SCENE_WORDS.state}
             />
           ) : (
             <span className="inc-state">{stateWord(scene.state).text}</span>
@@ -343,7 +343,7 @@ export function TheSceneView({ said }: { said: TheScene }) {
           who reads nothing else on this page still reads the reason the page exists. */}
       <Panel titleIs="label" declares={{ surface: 'incident.loss' }} title={SCENE_WORDS.theLoss}>
         {scene.loss === undefined ? (
-          <Absence tier="told-apart" looked word={t('unrowedPages.incident.notSaid')} title={t('unrowedPages.incident.noLoss')} />
+          <Absence tier="told-apart" looked word={t('unrowedPages.incident.notSaid')} title={SCENE_WORDS.theLoss} />
         ) : (
           <p className="inc-loss wrap-anywhere">{scene.loss}</p>
         )}
@@ -372,7 +372,7 @@ export function TheSceneView({ said }: { said: TheScene }) {
 
       <Panel titleIs="label" declares={{ surface: 'incident.timeline' }} title={SCENE_WORDS.timeline}>
         {scene.timeline.length === 0 ? (
-          <Absence tier="told-apart" looked title={t('unrowedPages.incident.noTimeline')} />
+          <Absence tier="told-apart" looked title={SCENE_WORDS.timeline} />
         ) : (
           <ol className="inc-timeline">
             {scene.timeline.map((moment) => (
@@ -383,9 +383,9 @@ export function TheSceneView({ said }: { said: TheScene }) {
       </Panel>
 
       <Panel declares={{ surface: 'incident.expected' }} title={SCENE_WORDS.expected}>
-        <p className="inc-exp wrap-anywhere">{scene.expected ?? <Absence tier="ordinary" title={t('unrowedPages.incident.noExpected')} />}</p>
+        <p className="inc-exp wrap-anywhere">{scene.expected ?? <Absence tier="told-apart" looked word={t('unrowedPages.incident.notSaid')} />}</p>
         <p className="inc-exp-label">{SCENE_WORDS.actual}</p>
-        <p className="inc-act wrap-anywhere">{scene.actual ?? <Absence tier="ordinary" title={t('unrowedPages.incident.noActual')} />}</p>
+        <p className="inc-act wrap-anywhere">{scene.actual ?? <Absence tier="told-apart" looked word={t('unrowedPages.incident.notSaid')} />}</p>
       </Panel>
 
       {/* THE CAUSES, each linked to the problem it is where one exists — the field I1 gives the
@@ -401,7 +401,7 @@ export function TheSceneView({ said }: { said: TheScene }) {
             tier="told-apart"
             looked
             word={t('unrowedPages.incident.notWeighed')}
-            title={t('unrowedPages.incident.noResponsibility')}
+            title={SCENE_WORDS.responsibility}
           />
         ) : (
           <TheResponsibility said={scene.responsibility} />
@@ -412,7 +412,7 @@ export function TheSceneView({ said }: { said: TheScene }) {
         {scene.correctiveActions.length === 0 ? (
           // ORDINARY EMPTINESS IS THE SHORT MARK, with the reason on hover and read out to a screen
           // reader (plan 7FEOshq3mBGG, block b-6, check 4).
-          <Absence tier="ordinary" title={t('unrowedPages.incident.noCorrective')} />
+          <Absence word={t('absence.none')} />
         ) : (
           <ul className="inc-actions">
             {scene.correctiveActions.map((action) => (
@@ -501,7 +501,7 @@ function Causes({ title, causes, said }: { title: string; causes: IncidentCause[
     <div className="inc-causes-group">
       <p className="inc-causes-title">{title}</p>
       {causes.length === 0 ? (
-        <Absence tier="ordinary" title={t('unrowedPages.incident.noCauses')} />
+        <Absence tier="told-apart" looked word={t('unrowedPages.incident.notSaid')} />
       ) : (
         <ul className="inc-causes">
           {causes.map((cause) => {
@@ -510,7 +510,7 @@ function Causes({ title, causes, said }: { title: string; causes: IncidentCause[
               <li key={cause.id} className="inc-cause wrap-anywhere">
                 <span className="inc-cause-text">{cause.text}</span>
                 {typeof cause.problemId === 'string' && problem != null ? (
-                  <RouteLink to={recordPath(cause.problemId)} className="inc-cause-link" title={t('unrowedPages.incident.theProblem')}>
+                  <RouteLink to={recordPath(cause.problemId)} className="inc-cause-link">
                     {problem.title}
                   </RouteLink>
                 ) : null}
@@ -546,11 +546,11 @@ function Moment({ moment, said }: { moment: IncidentMoment; said: TheScene }) {
             : t('unrowedPages.incident.evidenceUnread')}
         </RouteLink>
       ) : other === null ? (
-        <span className="inc-evidence-gone" title={t('unrowedPages.incident.evidenceGoneWhy')}>
+        <span className="inc-evidence-gone">
           {SCENE_WORDS.evidenceGone}
         </span>
       ) : (
-        <RouteLink to={recordPath(moment.evidence)} className="inc-evidence" title={t('unrowedPages.incident.evidenceOpen')}>
+        <RouteLink to={recordPath(moment.evidence)} className="inc-evidence">
           {t('unrowedPages.incident.evidence', { title: content(other.title) })}
         </RouteLink>
       )}
@@ -592,7 +592,6 @@ function Action({
       ) : (
         <span className="inc-action-state" title={t('unrowedPages.incident.readFrom', { what: state.readFrom })}>
           <span className="inc-action-state-word">{SCENE_WORDS[state.word]}</span>
-          <span className="inc-action-readfrom">{state.readFrom}</span>
         </span>
       )}
     </li>
@@ -680,7 +679,6 @@ const INCIDENT_CSS = `
   font-size: var(--fs-1); font-weight: 600; color: var(--text);
   border: 1px solid var(--accent); border-radius: var(--radius-sm); padding: 1px 6px;
 }
-.inc-action-readfrom { color: var(--text-3); font-size: var(--fs-1); }
 
 .inc-verify-how { margin: 0 0 var(--pad); color: var(--text); font-size: var(--fs-2); }
 .inc-verify-flag { margin: 0; color: var(--text-2); font-size: var(--fs-1); }

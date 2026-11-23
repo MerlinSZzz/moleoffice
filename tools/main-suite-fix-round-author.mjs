@@ -9,6 +9,7 @@ import { A_KEY_SHOWN_AS, withoutKeys } from './office-request.mjs'
 import { readReceiptEvidenceObject } from './stable/stable-upgrade-evidence.mjs'
 import { SHIPPED_CHAPTER_NUMBERS } from '../src/shared/chapter-check.ts'
 import { clockStamp } from '../src/shared/time.ts'
+import { THE_HEADS_ONLY_THE_OFFICE_WRITES } from '../src/shared/kinds/session.ts'
 
 const fail = words => { throw new Error(withoutKeys(`Fix round author refused: ${words}`)) }
 const id = value => typeof value === 'string' && /^[A-Za-z0-9_-]+$/.test(value)
@@ -78,8 +79,12 @@ async function recordAction({ io, journal, state, name, kind, title, data, hand 
   const request = { method: 'POST', path: '/api/records', body: { kind, title, data, ...hand } }
   const action = state.actions[name]
   if (action?.request && !isDeepStrictEqual(action.request, request)) fail('The retained original filing request correlation differs.')
+  // Revision 1 of a run also holds the HEADs the office read as it filed the run, which no request may send, and the
+  // moment the office filed the run at, filedTime, which the record door writes in place of any value sent.
+  const theOfficeWrote = [...THE_HEADS_ONLY_THE_OFFICE_WRITES, 'filedTime']
+  const sent = filed => filed !== null && typeof filed === 'object' && !Array.isArray(filed) ? Object.fromEntries(Object.entries(filed).filter(([field]) => !theOfficeWrote.includes(field))) : filed
   const matches = original => original.op === 'create' && original.content?.kind === kind && original.content.title === title
-    && isDeepStrictEqual(original.content.data, data) && original.who?.actorType === 'agent'
+    && isDeepStrictEqual(sent(original.content.data), data) && original.who?.actorType === 'agent'
     && [controller.agent, state.configuration.identity.agent].includes(original.who.actorId)
     && original.who.sessionId === controller.run && original.provedBy === 'an-agent-key'
   if (action?.id) {

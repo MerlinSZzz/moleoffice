@@ -12,12 +12,17 @@
  * 1. Many runs of one starter passing 8 hours in one night give that starter two lines. The first names the first run, at
  *    once. Nothing more is written for 8 hours. The second names the rest, and none of them twice.
  * 2. A second starter gets its own first line at once, while the first starter is still inside its 8 hours.
+ * 3. A run its starter has closed is not named, though it still says running: closing a run leaves its work state as it
+ *    was. A run of the same starter, filed at the same moment and left open, is named.
  *
  * WHERE THE RULE LIVES: `sendTheLongSandboxRunRemindersThatAreDue` in src/server/lib/reminders.ts. Every key, agent and
  * run here is made up, in this file's own empty office.
  *
  * Both cases were red before the change. The old code wrote one line for each run as soon as it was due, so the first
  * starter got four lines, and the tick at 9 hours named the first starter's second run beside the second starter's run.
+ *
+ * Case 3 was red before its change: the step read every sandbox run that said running, closed or not, so the tick at 19
+ * hours named the closed run beside the open one.
  *
  * MUTATIONS, each proved red after a control run and restored:
  *   1. the wait of 8 hours taken out (every due run told at once): cases 1 and 2 red.
@@ -45,7 +50,7 @@ let app: FastifyInstance
 let reminders: typeof import('../src/server/lib/reminders.ts')
 let resources: typeof import('../src/server/lib/resources.ts')
 const directories: string[] = []
-const starters: Record<'a' | 'b', string> = { a: '', b: '' }
+const starters: Record<'a' | 'b' | 'c', string> = { a: '', b: '', c: '' }
 const runs: Record<string, string> = {}
 const reminded: Record<string, string[]> = {}
 
@@ -114,7 +119,7 @@ beforeAll(async () => {
   resources.useOsProbe(Object.assign(Object.create(resources.LINUX_PROBE), {
     containers: () => ({ available: true, containers: [{ id: 'made-up', name: 'test-row', image: 'made-up', status: 'Up' }] }),
   }))
-  for (const side of ['a', 'b'] as const) {
+  for (const side of ['a', 'b', 'c'] as const) {
     const starter = `a-long-run-starter-${side}`
     const made = await app.inject({ method: 'POST', url: '/api/agents/started', headers: AS_THE_PERSON, payload: { handle: starter, name: starter, role: 'secretary', runtime: 'claude-code' } })
     expect(made.statusCode, made.body.slice(0, 300)).toBe(201)
@@ -124,6 +129,7 @@ beforeAll(async () => {
   const agents = (await app.inject({ method: 'GET', url: '/api/participants', headers: AS_THE_PERSON })).json() as { agents: { id: string; handle: string }[] }
   starters.a = agents.agents.find((one) => one.handle === 'a-long-run-starter-a')!.id
   starters.b = agents.agents.find((one) => one.handle === 'a-long-run-starter-b')!.id
+  starters.c = agents.agents.find((one) => one.handle === 'a-long-run-starter-c')!.id
   vi.useFakeTimers({ toFake: ['Date'] })
   // FOUR RUNS OF THE FIRST STARTER, filed an hour apart and then later, and one of the second's.
   runs.a1 = await aRunFiledAt(0, 'a-long-round-a')
@@ -131,6 +137,18 @@ beforeAll(async () => {
   runs.b1 = await aRunFiledAt(1 * HOUR + MINUTE, 'a-long-round-b')
   runs.a3 = await aRunFiledAt(2 * HOUR, 'a-long-round-a')
   runs.a4 = await aRunFiledAt(9 * HOUR, 'a-long-round-a')
+  // TWO RUNS OF A THIRD STARTER, filed together after the first starter's last run. Its starter closes the first, and
+  // closing leaves the work state as it was, so both still say running.
+  runs.c1 = await aRunFiledAt(10 * HOUR, 'a-long-round-c')
+  runs.c2 = await aRunFiledAt(10 * HOUR, 'a-long-round-c')
+  vi.setSystemTime(T0 + 10 * HOUR + 30 * MINUTE)
+  const closed = await app.inject({
+    method: 'POST',
+    url: `/api/attachments/${runs.c1}/close`,
+    headers: asAgent('a-long-run-starter-c'),
+    payload: { how: 'starter-said', because: 'The made-up round was finished and its starter closed it.' },
+  })
+  expect(closed.statusCode, closed.body.slice(0, 300)).toBe(200)
   // THE NIGHT, tick by tick: each run passes 8 hours, and the first starter's 8 hours end at 16 hours 2 minutes.
   tickAt('8h', 8 * HOUR + 2 * MINUTE)
   tickAt('9h', 9 * HOUR + 2 * MINUTE)
@@ -138,6 +156,8 @@ beforeAll(async () => {
   tickAt('16h', 16 * HOUR + MINUTE)
   tickAt('16h+', 16 * HOUR + 3 * MINUTE)
   tickAt('17h', 17 * HOUR + 2 * MINUTE)
+  // THE THIRD STARTER'S TWO RUNS PASS 8 HOURS at 18 hours, while the first starter is still inside its 8 hours.
+  tickAt('19h', 19 * HOUR + 2 * MINUTE)
 }, 120_000)
 
 afterAll(async () => {
@@ -169,5 +189,13 @@ describe("a starter's long sandbox runs", () => {
   it('2. a second starter gets its own first line at once, while the first is still inside its 8 hours', () => {
     expect(reminded['9h']).toEqual([runs.b1])
     expect(theLongRunLinesTo(starters.b).map((one) => one.runs)).toEqual([[runs.b1]])
+  })
+
+  it('3. a run its starter closed is not named, though it still says running; its open twin is', () => {
+    const closed = t.api.getRecord(runs.c1!)!.data
+    expect(closed['closedHow']).toBe('starter-said')
+    expect(closed['state']).toBe('running')
+    expect(reminded['19h']).toEqual([runs.c2])
+    expect(theLongRunLinesTo(starters.c).map((one) => one.runs)).toEqual([[runs.c2]])
   })
 })

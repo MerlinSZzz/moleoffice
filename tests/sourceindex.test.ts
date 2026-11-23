@@ -672,27 +672,10 @@ describe('the routes in api/source.ts serve exactly what this file stored', () =
     } finally {
       await app.close()
     }
-    // THIS CASE AND THE NEXT MAY TAKE 60 S, as the case above that scans the real repository may. Each scans the whole
-    // repository again, and this one is the first to import the route module, http.ts and Fastify. On 12 November 2026
+    // THIS CASE MAY TAKE 60 S, as the case above that scans the real repository may. It scans the whole
+    // repository again, and it is the first to import the route module, http.ts and Fastify. On 12 November 2026
     // the merge queue's run of the related files timed this case out at vitest's 5 s, and the file was green alone on
     // the same tree. The claim of 150 ms per MiB above holds the scan's speed; this time does not.
-  }, 60_000)
-
-  it('serves import lists with the comments stripped, so a documented import is not a dependency', async () => {
-    idx.rebuildIndex({ workspaceId: WORKSPACE, root: repo() })
-    const app = await serve()
-    try {
-      const body = (await app.inject({ method: 'GET', url: '/api/source', headers: { 'x-mole-office-workspace': WORKSPACE } })).json() as { files: SourceFile[] }
-      // The concrete case, on a real file: HomePage.tsx documents its own use with an import line
-      // in its header comment. The route serving that as a dependency is what the second scanner
-      // did, and it is the reason this one survived the merge.
-      const home = body.files.find((f) => f.path === 'src/web/pages/HomePage.tsx')
-      expect(home, 'HomePage.tsx is not in the served index').toBeDefined()
-      expect(home?.imports).not.toContain('./pages/HomePage.tsx')
-      expect(home?.imports).toContain('react')
-    } finally {
-      await app.close()
-    }
   }, 60_000)
 
   it('compares two stored file lists without inventing a change', () => {

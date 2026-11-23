@@ -27,8 +27,8 @@
  *      nothing is read, and cases 1 to 5 go red;
  *   2. in historical-reader.ts, delete the `w.tell?.(` line in readAStamp: case 1 and case 3 go red;
  *   3. in historical-reader.ts, delete the `w.tell?.(` line in readField's actor pair: no case goes red. No value here is
- *      at an actor pair: the run's opener is a stamp, and the actor pairs the register keeps, ShortForm.by,
- *      ReportParts.by and ProvedHolder.id, are not in this fixture;
+ *      at an actor pair: the run's opener, ShortForm.by and ReportParts.by are stamps, and the actor pair the register
+ *      keeps, ProvedHolder.id, is not in this fixture;
  *   4. in historical-reader.ts, delete the `tell?.(` line in aLedgerStampReader: case 1 and case 2 go red;
  *   5. in historical-reader.ts, delete the `tell?.(` line in aPlainIdReader: cases 1, 3, 4 and 5 go red;
  *   6. in historical-reader.ts, delete `, tell` from readChangeIdentities' call of readRecordIdentities: case 1 and

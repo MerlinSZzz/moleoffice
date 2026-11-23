@@ -28,8 +28,8 @@ person's decision; the words under a rule may be rewritten by any agent.
 - **Processes and ports** — Stop a process only by the group id you recorded. Read this before you start anything that outlives your command.
 - **Worktrees and the owner's home** — Nothing an agent makes goes into the owner's home directory. Read this before you make a worktree or a scratch file.
 - **Records and warrants** — How a write into Mole Office is addressed, shaped and attributed. Read this before you file or change a record.
-- **Tests and gates** — A test is proved by mutation, after a control run. Read this before you add a test or change a criterion.
-- **Screens** — Name a thing by what it is to the reader. Read this before you change a page.
+- **Tests and gates** — Workers run no tests. As soon as a worker hands in a package, the supervisor runs that package's tests, the ten gates, the type check and the build, and seals it when they pass. There is no joined check before the pass. Measuring, mutation proofs and pictures are not proof. Read this before you add a test or change a criterion.
+- **Screens** — Pictures are not proof and are not taken. A worker takes no pictures. The rules for the CSS backtick, naming a thing by what it is to the reader, a list that locates and the weight of a state still hold. Read this before you change a page.
 - **The chat and messages** — Who may write to a person, and how to lead somebody to a page. Read this before you send a message.
 - **Identity and governance** — Which acts are the person's, and what an agent may never claim to be. Read this before any governance write.
 - **Toolchain and context** — The exit code and the log file. Read this before you run a command whose output you will report.

@@ -12,8 +12,8 @@
  *     reasoning, wall time and the runtime's own cost join tokens in, cached and tokens out.
  *   · The cost the runtime reported and the cost estimated from the person's table are drawn
  *     SIDE BY SIDE, each named for what it is. Neither replaces the other.
- *   · With no table set the page says so, in the one sentence declared in
- *     `src/shared/price-table.ts`, and the measured cost is still drawn.
+ *   · With no table set the page draws a short state word for it, and the measured cost is
+ *     still drawn. The sentence declared in `src/shared/price-table.ts` stays in the answer.
  *   · Nothing scrolls sideways at 390: the wide totals fold into a wrapping grid rather than a
  *     fixed-width table, so the estimate is not taken off the edge of the screen.
  *
@@ -26,7 +26,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { freshDb, liveApp, waitForThePage, type LiveApp, type TestDb } from './helpers.ts'
 import { historicalSession } from './synthetic-submission-fixtures.ts'
-import { theNoPriceTableSentence } from '../src/shared/price-table.ts'
+import { sayInEnglish } from '../src/shared/i18n.ts'
 
 let live: LiveApp
 let database: TestDb
@@ -80,7 +80,7 @@ describe('the usage page draws the four fields and both costs, and folds', () =>
     }
     expect(words).toContain('Without a receipt:')
     // NO TABLE IS SET IN THIS WORLD, SO THE PAGE SAYS SO AND THE MEASURED COST IS STILL DRAWN.
-    expect(words).toContain(theNoPriceTableSentence())
+    expect(words).toContain(sayInEnglish('usageReceipt.noPriceTable'))
     expect(words).toContain('1.25 USD')
 
     for (const width of [1440, 390]) {

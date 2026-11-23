@@ -1,0 +1,9 @@
+#!/bin/sh
+# Copyright © 2026 Zhengyang Shen
+# Licensed under the MIT License. See LICENSE.
+# THE CODEX A COMMAND IN A SANDBOX FINDS FIRST. tools/sandbox-start.mjs puts this folder first on the PATH of every
+# command it starts, so every Codex started inside a sandbox starts here, however many shells lie between. This runs
+# tools/codex-in-a-sandbox.mjs, which keeps only the names a Codex keeps and becomes the next codex on PATH.
+# It is the only file in its folder, so it takes no other program's place on PATH.
+case "$0" in */*) here=${0%/*};; *) here=.;; esac
+exec node "$here/../codex-in-a-sandbox.mjs" "$@"

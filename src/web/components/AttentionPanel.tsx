@@ -1,7 +1,7 @@
 // Copyright © 2026 Zhengyang Shen
 // Licensed under the MIT License. See LICENSE.
 import { Counted } from './home/Counted.tsx'
-import { t, content, clausesJoined, endOfSentence } from '@shared/i18n.ts'
+import { t, content, type WordKey } from '@shared/i18n.ts'
 /**
  * Draw the attention reply without recomputing its rank. Closed rows show the record and
  * its urgency; the fold holds the reason and the recorded consequence. Developer mode adds
@@ -34,10 +34,10 @@ import { t, content, clausesJoined, endOfSentence } from '@shared/i18n.ts'
 // with the "by reason" groups.)
 import { useEffect, useState, type ReactNode } from 'react'
 import {
-  PAUSE_STANDING_SENTENCES,
   mayMarkReportRead,
   reportNoteOnAPage,
   type AttentionRow,
+  type PauseStanding,
   type PausedRow,
   type ReportRow,
 } from '@shared/attention.ts'
@@ -68,8 +68,6 @@ import {
   Btn,
   DataHealth,
   ErrorNote,
-  Explain,
-  Hint,
   NoStateMark,
   OriginMark,
   Panel,
@@ -147,21 +145,6 @@ export function codedReasonWords(reason: CodedReason, kind: string): string {
 // ============================================================================ the questions
 
 /**
- * What the paused group says about itself: the exact split, in the product's own words.
- *
- * Every standing that has any records in it is named with its count and the sentence from
- * `PAUSE_STANDING_SENTENCES`, so "6 paused" never stands on its own. The three that matter most
- * are the three answers `pauseElapsed` can give, and they are three different things to do:
- * renew the decision, wait, or go and write down what would end it.
- */
-function pauseSplitSentence(holdingByStanding: AttentionQuestions['paused']['holdingByStanding']): string {
-  const parts: string[] = []
-  for (const { standing, count } of holdingByStanding) parts.push(t('home.pauseCount', { n: count, standing: PAUSE_STANDING_SENTENCES[standing] }))
-  // CLAUSES OF ONE SENTENCE, joined in the page's language: "; " or "；" (clausesJoined).
-  return clausesJoined(parts)
-}
-
-/**
  * The paused records that are ALSO on the attention list, named, under the health strip.
  *
  * ---------------------------------------------------------------------------------------
@@ -182,35 +165,18 @@ function pauseSplitSentence(holdingByStanding: AttentionQuestions['paused']['hol
  */
 function PausedAndListed({ rows, total }: { rows: readonly PausedOnTheList[]; total: number }) {
   if (rows.length === 0) return null
-  const many = rows.length !== 1
   return (
-    <div className="att-questions-note">
-      {/* THE CORRECTION ITSELF STAYS OUT IN THE OPEN, and only the correction. A count that has had
-          something taken out of it has to say so where the count is read, and that is one clause.
-          WHICH records were taken out, and why a pause stops being a question at all, are the
-          explanation — behind the press, named and counted, exactly like every other fold here. */}
-      <Explain declares={{ surface: 'home.needs.pauses' }}
-        meaning={
-          <Counted as="span" firstStrong text={t('home.pausedElsewhere', { n: rows.length, total })} />
-        }
-        opens={t('home.pausesOpens')}
-        holds={{ count: rows.length, what: t('home.pausesOpenable', { n: rows.length }) }}
-      >
-        <p className="att-questions-which">
-          {rows.map((row, index) => (
-            <span key={row.key}>
-              {index === 0 ? null : t('sentence.listGap')}
-              <a className="px-nav" href={`#${recordPath(row.recordId, row.recordKind)}`}>
-                {content(row.title)}
-              </a>
-            </span>
-          ))}
-        </p>
-        <p className="att-questions-why">
-          {t('home.pauseNoLongerHolds')}
-        </p>
-      </Explain>
-    </div>
+    <p className="att-questions-listed">
+      <Counted as="span" firstStrong text={t('home.pausesListed', { n: rows.length, total })} />{' '}
+      {rows.map((row, index) => (
+        <span key={row.key}>
+          {index === 0 ? null : t('sentence.listGap')}
+          <a className="px-nav" href={`#${recordPath(row.recordId, row.recordKind)}`}>
+            {content(row.title)}
+          </a>
+        </span>
+      ))}
+    </p>
   )
 }
 
@@ -264,15 +230,16 @@ export function QuestionsPanel({ questions, headed = true }: {
     {
       label: t('home.pausesLabel'),
       count: paused.holding,
-      note:
-        t('home.pauseMeaning') + t('home.pauseSplit', { total: paused.total, n: paused.holding, which: pauseSplitSentence(paused.holdingByStanding) }),
+      note: t('home.pausesHolding', { n: paused.holding, total: paused.total }),
       detail: <PartRows part="paused" drawAll={(rows) => <HoldingRows rows={rows} />} />,
     },
     {
       label: t('home.unclassifiedLabel'),
       count: unclassified.count,
       note:
-        t('home.unclassifiedMeaning', { words: unclassified.words.map(({ word, count }) => `${count} × “${content(word)}”`).join(', ') }),
+        unclassified.words.length === 0
+          ? t('absence.none')
+          : unclassified.words.map(({ word, count }) => `${count} × “${content(word)}”`).join(', '),
       href: '#/records',
       linkText: t('home.recordsArchive', { n: unclassified.count }),
       detail: (
@@ -285,8 +252,7 @@ export function QuestionsPanel({ questions, headed = true }: {
     {
       label: t('home.noStateLabel'),
       count: noState.count,
-      note:
-        t('home.noStateMeaning', { written: noState.written, noField: noState.noField, unknown: noState.unknownKind }),
+      note: t('home.noStateSplit', { written: noState.written, noField: noState.noField, unknown: noState.unknownKind }),
       href: '#/records',
       linkText: t('home.recordsArchive', { n: noState.count }),
       detail: (
@@ -299,7 +265,6 @@ export function QuestionsPanel({ questions, headed = true }: {
                 sev={<NoStateMark expected={row.expected} />}
                 leading={<Tag kind={row.recordKind} />}
                 title={content(row.title)}
-                meta={row.note}
                 href={`#${recordPath(row.recordId, row.recordKind)}`}
                 target={{ kind: 'record', recordId: row.recordId, workspaceId: currentWorkspace() }}
               />
@@ -391,10 +356,9 @@ export function UnclassifiedRows({ rows }: { rows: readonly AttentionPartRow['un
   return rows.map((row) => (
     <Row
       key={row.key}
-      sev={<UnclassifiedMark state={row.state} note={row.note} />}
+      sev={<UnclassifiedMark state={row.state} />}
       leading={<Tag kind={row.recordKind} />}
       title={content(row.title)}
-      meta={row.note}
       href={`#${recordPath(row.recordId, row.recordKind)}`}
       target={{ kind: 'record', recordId: row.recordId, workspaceId: currentWorkspace() }}
     />
@@ -418,17 +382,18 @@ export function PausedRows({ rows, titleOf }: { rows: readonly PausedRow[]; titl
       title={content(row.title)}
       meta={
         <span className="att-meta">
-          <span className="att-meta-one">{row.note}</span>
+          {row.pause === null ? null : <span className="att-meta-one">{content(row.pause.why)}</span>}
+          {row.pause?.until?.date === undefined ? null : (
+            <span className="att-meta-one">{t('home.pauseUntil', { date: row.pause.until.date })}</span>
+          )}
+          {row.pause?.until?.condition === undefined ? null : (
+            <span className="att-meta-one">{content(row.pause.until.condition)}</span>
+          )}
           <ResumeRecord recordId={row.pause?.until?.recordId} titleOf={titleOf} />
           {/* Nothing here says "and it is on the list too". A row that is on the attention
               list is not in this group at all — it is named under the strip by
               `PausedAndListed`, with the count both ways round. */}
-          {/* The three answers `pauseElapsed` gives, said in the product's own words on the
-              row itself. Without this an open-ended pause and one whose date is still ahead
-              look identical, and one of them is a decision nobody can ever act on. */}
-          <span className="att-meta-one att-standing">
-            {t('home.pauseReading', { standing: PAUSE_STANDING_SENTENCES[row.standing] })}
-          </span>
+          <StandingWord standing={row.standing} />
         </span>
       }
       href={`#${recordPath(row.recordId, row.recordKind)}`}
@@ -438,21 +403,37 @@ export function PausedRows({ rows, titleOf }: { rows: readonly PausedRow[]; titl
 }
 
 /**
- * The record a pause is waiting on, by name, beside the server's sentence.
- *
- * Nothing is drawn when there is no such record. When there is one and this page did not fetch
- * its title, that is said — an id with no name is still better than a name Mole Office invented.
+ * The standing of a pause as a word, where the pause mark does not already say it. The mark says
+ * "due to resume", "open-ended" and "no reason" itself, so those standings draw nothing here.
+ */
+export const PAUSE_STANDING_WORDS: Readonly<Record<PauseStanding, WordKey | null>> = {
+  'resume-date-passed': null,
+  'waiting-for-date': 'home.pauseStanding.dateAhead',
+  'date-unreadable': 'home.pauseStanding.dateUnreadable',
+  'condition-in-words': 'home.pauseStanding.notChecked',
+  'waits-on-a-record': 'home.pauseStanding.notChecked',
+  'open-ended': null,
+  'no-pause-recorded': null,
+}
+
+function StandingWord({ standing }: { standing: PauseStanding }) {
+  const word = PAUSE_STANDING_WORDS[standing]
+  return word === null ? null : <span className="att-meta-one att-standing">{t(word)}</span>
+}
+
+/**
+ * The record a pause is waiting on, by name. Nothing is drawn when there is no such record, and
+ * its id when this page did not fetch its title.
  */
 function ResumeRecord({ recordId, titleOf }: { recordId: string | undefined; titleOf: TitleOf | undefined }) {
   if (recordId === undefined) return null
   const title = titleOf?.(recordId) ?? null
   return (
     <span className="att-meta-one">
-      {t('home.thatRecord')}{' '}
+      {t('home.waitsOn')}{' '}
       <a className="px-nav" href={`#${recordPath(recordId)}`}>
         {title === null ? recordId : content(title)}
       </a>
-      {title === null ? t('home.recordTitleMissing') : '.'}
     </span>
   )
 }
@@ -504,7 +485,7 @@ export function ReportsForYou({ reply, onMarkedRead }: { reply: Pick<AttentionHo
  const waitingShown = reply.reports
  const waitingHidden = waiting - waitingShown.length
  return <><style href="mole-office-attention" precedence="default">{ATTENTION_CSS}</style>
-  <Panel titleIs="label" declares={{ surface: 'home.reports' }} title={t('home.reports')} rank={waiting === 0 ? 1 : 0} tone="ask" actions={<span className="att-count"><Hint label={t('home.reportAbout')}><p>{t('home.reportMeaning')}</p></Hint> {waiting + read === 0 ? null : <>{t('home.toRead', { n: waiting })}{read === 0 ? null : ` · ${t('home.alreadyRead', { n: read })}`}</>}</span>}>
+  <Panel titleIs="label" declares={{ surface: 'home.reports' }} title={t('home.reports')} rank={waiting === 0 ? 1 : 0} tone="ask" actions={waiting + read === 0 ? undefined : <span className="att-count">{t('home.toRead', { n: waiting })}{read === 0 ? null : ` · ${t('home.alreadyRead', { n: read })}`}</span>}>
    {waiting + read === 0 ? <Absence title={t('home.noReports')} /> : null}
    {/* ON HOME THE PRESS "I HAVE READ THIS" SAYS NOBODY HAS MARKED THE REPORT, so the row draws no mark for it. */}
    {waitingShown.length === 0 ? null : <ul className="att-rep-list">{waitingShown.map(row => <ReportLine key={row.key} row={row} onMarkedRead={onMarkedRead} marksNobodySaid={false} />)}</ul>}
@@ -597,14 +578,13 @@ export function ReportLine({ row, onMarkedRead, marksNobodySaid = true }: { row:
                   </a>
                 </span>
               ))}
-              {/* THE SENTENCE ENDS IN THE PAGE'S LANGUAGE ("." or "。"), from the one sentence end (endOfSentence). */}
-              {endOfSentence()}
             </>
-          )}{' '}
-          {/* THE ROW'S SENTENCE IN THE PAGE'S LANGUAGE (wave 13k round 34): `row.note` is the API's English. */}
-          {reportNoteOnAPage(row, t, formatDue)}{' '}
-          {/* AN EMPTY REPORT IS SAID ONCE, by the row's sentence before this (round 124, item 61). */}
-          {row.blocks === 0 ? null : t('home.reportBlocks', { n: row.blocks })}
+          )}
+          {/* THE ROW'S WHOLE SENTENCE, in the page's language, worded only in src/shared/attention.ts. */}
+          {' · '}
+          {reportNoteOnAPage(row, t, formatDue)}
+          {/* AN EMPTY REPORT IS SAID ONCE, by the sentence before this. The count is drawn only when there are blocks. */}
+          {row.blocks === 0 ? null : <>{' · '}{t('home.blocksCount', { n: row.blocks })}</>}
         </p>
       ) : null}
     </li>
@@ -757,20 +737,15 @@ export const ATTENTION_CSS = `
   color: var(--text-2);
   font: 600 var(--fs-3)/var(--lh-tight) var(--font-ui);
 }
-/* The correction to the strip's own sentence: which paused records are NOT counted in it, and
-   why. The CORRECTION is outside the fold on purpose — a count that has had something taken out of
-   it has to say so where the count is read, not one press behind it. What is behind the press is
-   which records and why, which is explanation and reads like it. */
-.att-questions-note { min-width: 0; }
-.att-questions-note b { color: var(--text); font-variant-numeric: tabular-nums; }
-.att-questions-which, .att-questions-why {
+/* Which paused records are on the attention list and not counted in the strip: a count and the titles. */
+.att-questions-listed {
   margin: 0;
   max-width: var(--measure-in-box);
   color: var(--text-2);
   font: var(--fs-2)/1.72 var(--font-ui);
   overflow-wrap: break-word;
 }
-.att-questions-why { color: var(--text-3); font-size: var(--fs-1); }
+.att-questions-listed b { color: var(--text); font-variant-numeric: tabular-nums; }
 /* The rows behind a count. Full-bleed inside the opened group, and separated from the group's own
    sentence above them rather than running straight on from it. */
 .att-q-rows { margin-top: 4px; display: flex; flex-direction: column; min-width: 0; }

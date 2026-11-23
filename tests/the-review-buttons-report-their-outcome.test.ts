@@ -33,6 +33,7 @@
  */
 import type { Locator, Page, Route } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { HEADERS_A_PAGE_MAY_READ } from '../src/config/what-a-page-may-read.mjs'
 import { WORLD_HEADER } from '../src/config/world-header.mjs'
 import { t } from '../src/shared/i18n.ts'
 import { artefactNamed, onlyAPersonMayWriteIt } from '../src/shared/intent.ts'
@@ -53,7 +54,12 @@ let app: LiveApp
 let person: Record<string, string> = UNPROVED
 let kiln = ''
 let worldAnswered = ''
-let exposedHeaders = ''
+/**
+ * The reply headers a page is allowed to read: the office's own list, joined as the office joins it for a page it
+ * takes. A reply to a request with no Origin carries no CORS headers, so the test process's own health read has none
+ * to copy.
+ */
+const exposedHeaders = HEADERS_A_PAGE_MAY_READ.join(', ')
 /** A number that gives each note and each comment words of its own, so its row is found by them. */
 let made = 0
 
@@ -151,7 +157,6 @@ beforeAll(async () => {
   app = await liveApp({ name: 'review-button-outcomes', viewport: { width: 1440, height: 1000 }, workspace: 'default' })
   const health = await fetch(`${app.api}/api/health`)
   worldAnswered = health.headers.get(WORLD_HEADER) ?? ''
-  exposedHeaders = health.headers.get('access-control-expose-headers') ?? ''
   if (worldAnswered === '') throw new Error('the test office did not say which world answered GET /api/health')
   person = { ...UNPROVED, ...thePersonsKeyHeader(`${app.dir}/keys.json`) }
   kiln = (await ask<{ record: { id: string } }>('POST', '/api/records', { kind: 'agent', title: KILN.name, data: { handle: KILN.handle, runtime: 'claude-code', state: 'active' } })).record.id

@@ -29,6 +29,7 @@ import { readFileSync } from 'node:fs'
 import type { Page } from 'playwright'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { type LiveApp, liveApp, waitForThePage } from './helpers.ts'
+import { t } from '../src/shared/i18n.ts'
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
@@ -368,11 +369,11 @@ describe('a plan is always writable', () => {
     const id = await newPlan('The keys')
     await openPlan(id)
     const onScreen = await page.locator('.pw').innerText()
-    expect(onScreen).not.toContain('Alt and the up or down arrow')
+    // CRITERION CHANGE, as decided: what the keys do is one sentence now, and it is all behind the mark.
+    expect(onScreen).not.toContain(t('planWriting.keysHint'))
 
     const said = await behindTheMark('What the keys do')
-    expect(said).toContain('Alt and the up or down arrow')
-    expect(said).toContain('indented under it')
+    expect(said).toContain(t('planWriting.keysHint'))
   }, 120_000)
 })
 
@@ -718,7 +719,7 @@ describe('a line keeps its work when a line is inserted above it', () => {
     expect(await page.locator('.pw-lost').count()).toBe(0)
   }, 180_000)
 
-  it('says so when a line that was filed as work is deleted, and keeps the work', async () => {
+  it('counts a deleted line that was filed as work, and keeps the work', async () => {
     // A title of its own, because the test above already filed one called "- baseline" and this one
     // looks its record up by name. Titles may repeat in the product since 17 August 2026; what
     // could not tell two records apart is this test.
@@ -745,7 +746,9 @@ describe('a line keeps its work when a line is inserted above it', () => {
 
     await page.waitForSelector('.pw-lost')
     const lost = await page.locator('.pw-lost').innerText()
-    expect(lost).toContain('The work itself still exists')
+    // CRITERION CHANGE, as decided: the panel counts the lost line rather than explaining that the
+    // work still exists; the record read below is what proves it does.
+    expect(lost).toContain(t('planWriting.lostCount', { n: 1 }))
     expect(lost).toContain('- reprint the mount')
 
     const record = await fetch(`http://127.0.0.1:${apiPort}/api/records/${recordId}`)
@@ -1553,10 +1556,10 @@ describe('the plan’s name is saved by the same thing that saves the words', ()
    * AND IT SAYS SOMETHING WHEN WHAT IS IN IT HAS STOPPED BEING A NAME.
    *
    * The last catch for the person who is already typing their plan into it. It is a note and not a
-   * refusal: Mole Office does not know that a long name is wrong, so it says what it noticed and says
-   * where the writing box is.
+   * refusal: Mole Office does not know that a long name is wrong, so it says what it noticed.
+   * CRITERION CHANGE, as decided: it no longer goes on to say where the writing box is.
    */
-  it('says so when the name has become a document, and points at the writing box', async () => {
+  it('counts the characters when the name has become a document', async () => {
     const id = await newPlan('About to become a document')
     await openPlan(id)
     await page.locator('.op-title').click()
@@ -1565,7 +1568,6 @@ describe('the plan’s name is saved by the same thing that saves the words', ()
     await page.waitForSelector('.op-title-note', { timeout: 10_000 })
     const note = await page.locator('.op-title-note').innerText()
     expect(note).toContain('characters long')
-    expect(note).toContain('writing box')
   }, 120_000)
 })
 
@@ -1660,9 +1662,8 @@ describe('every press of Save is answered, and the answer does not outlive its p
     const id = await newPlan('Keys')
     await openPlan(id)
     const keys = await behindTheMark('What the keys do')
-    expect(keys).toContain('Tab')
-    expect(keys).toContain('Indent with spaces')
-    expect(keys).toContain('Ctrl+S')
+    // CRITERION CHANGE, as decided: the keys are one sentence, which names Tab with the others.
+    expect(keys).toContain(t('planWriting.keysHint'))
 
     // And it is true: the focus leaves the box.
     await page.locator('.pw-box').click()
@@ -1784,10 +1785,7 @@ describe('getting the writing out of a save that will not go through', () => {
     await waitForStored()
     const onOpening = await page.locator('.pw-say-when').innerText()
     expect(onOpening).toContain('Read from the server')
-    // The caveat survives, one press away, in full.
-    expect(await behindTheMark('Why this says when it was')).toContain(
-      'has not asked the server about this plan since that moment',
-    )
+    // CRITERION CHANGE, as decided: the caveat behind a mark beside this line is gone.
 
     // Somebody else writes to the same plan. This page has no way to know, and does not pretend to.
     const res = await fetch(`http://127.0.0.1:${apiPort}/api/plans/${id}/body`, {

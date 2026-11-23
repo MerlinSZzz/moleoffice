@@ -71,6 +71,7 @@ import { ReadinessPage } from '../pages/ReadinessPage.tsx'
 import { SigningPackagesPage } from '../pages/SigningPackagesPage.tsx'
 import { HonourBoardPage } from '../pages/HonourBoardPage.tsx'
 import { ProjectBoardPage } from '../pages/ProjectBoardPage.tsx'
+import { DepartmentsPage } from '../pages/DepartmentsPage.tsx'
 import { GatesPage } from '../pages/GatesPage.tsx'
 import { OfficeControlsPage } from '../pages/OfficeControlsPage.tsx'
 import { SidebarArrangementPage } from '../pages/SidebarArrangementPage.tsx'
@@ -99,6 +100,8 @@ import { NotebookPage } from '../pages/NotebookPage.tsx'
 import { EmbassyPage } from '../pages/EmbassyPage.tsx'
 import { CredentialPage } from '../pages/CredentialPage.tsx'
 import { PluginPage } from '../pages/PluginPage.tsx'
+import { SetUpAToolPage } from '../pages/SetUpAToolPage.tsx'
+import { FilePage } from '../pages/FilePage.tsx'
 import { RolesPage } from '../pages/RolesPage.tsx'
 import { CastingPage } from '../pages/CastingPage.tsx'
 import { RoleCensusPage } from '../pages/RoleCensusPage.tsx'
@@ -108,6 +111,7 @@ import { ToolsetPage } from '../pages/ToolsetPage.tsx'
 import { RoleCardNewPage } from '../pages/RoleCardNewPage.tsx'
 import { UsagePage } from '../pages/UsagePage.tsx'
 import { VersionHistoryPage } from '../pages/VersionHistoryPage.tsx'
+import { KnowledgePage } from '../pages/KnowledgePage.tsx'
 import { FolderReadingPage } from '../pages/FolderReadingPage.tsx'
 
 /**
@@ -250,6 +254,7 @@ export const PAGE_LIST: readonly AnyPageRow[] = [
   page('yourWords', (_route, shell) => <YourWordsPage onChanged={shell.readWordsAgain} />),
   // MY NOTES: every quick note of every project, searched and counted by the office, under the week it was started in.
   page('myNotes', () => <MyNotesPage />),
+  page('knowledge', (route) => <KnowledgePage route={route} />),
   // WHO HOLDS THE MACHINE'S SHARED RESOURCES, and who is booked next. Designed in wave 13s round 28, built in round 30.
   page('resources', () => <ResourcesPage />),
   // EVERYBODY'S CHECKLISTS, in one project or every project; with an id, one checklist opened.
@@ -264,6 +269,8 @@ export const PAGE_LIST: readonly AnyPageRow[] = [
   // THE HONOUR BOARD: the project's exemplary runs, the noted ones folded, and the weekly table.
   page('honourBoard', () => <HonourBoardPage />),
   page('board', () => <ProjectBoardPage />),
+  // THE DEPARTMENTS: the tree with each department's level word; with an id, one department and its history.
+  page('departments', (route) => <DepartmentsPage {...(route.id === undefined ? {} : { id: route.id })} />),
   // THREE PAGES THAT WERE PANELS ON SETTINGS until wave 13y round 125: Gates, Office controls, and the sidebar's
   // arrangement, which has no row and is reached from Settings' Looks. Gates and the arrangement open as a reading,
   // and `/edit` is their editing face.
@@ -293,6 +300,12 @@ export const PAGE_LIST: readonly AnyPageRow[] = [
   page('visitor', (route) => <CredentialPage id={route.id} />),
   // ONE PAGE OF A SWITCHED-ON PLUGIN, in a frame that holds no key. Wave 13x round 15, plugins step 3.
   page('plugin', (route) => <PluginPage id={route.id} slug={route.slug} />),
+  // ONE AGENT TOOL'S KEY PAGE, wave 13u round 242. Keyed by its address, so a key typed on one way's page is gone when
+  // the person moves to another's.
+  page('setUpATool', (route) => <SetUpAToolPage key={`${route.tool}/${route.way}`} tool={route.tool} way={route.way} />),
+  // ONE FILE A RECORD NAMES, DRAWN AS ITS WORDS, reached from a report's file block. Keyed by the file, so moving
+  // from one file to another starts the page again.
+  page('file', (route) => <FilePage key={`${route.record}/${route.path}`} record={route.record} path={route.path} />),
   // WHAT EACH OF THEM MAY DO, criterion P44. The criterion puts its way in under the Embassy,
   // so the row sits under the Embassy in the foot of the rail and the page opens from there.
   page('roles', () => <RolesPage />),
@@ -318,7 +331,9 @@ export const PAGE_LIST: readonly AnyPageRow[] = [
   // ONE PARTICIPANT'S OWN PAGE, criterion M51. Keyed on both halves of the address so moving from
   // one profile to another starts the page again rather than drawing the previous participant's
   // facts under the new one's name.
-  page('who', (route) => <ProfilePage key={whoPath(route.kind, route.id)} kind={route.kind} id={route.id} />),
+  page('who', (route) => (
+    <ProfilePage key={whoPath(route.kind, route.id)} kind={route.kind} id={route.id} browser={route.browser ?? null} />
+  )),
   // ONE SECRETARY'S NOTEBOOK, criteria N1 to N4. Reached from that agent's own page, because the
   // owner asked for it to sit under one secretary agent's name. Keyed on the address for the reason
   // the citizen page above is: moving from one notebook to another starts the page again rather

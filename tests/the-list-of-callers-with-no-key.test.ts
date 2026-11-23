@@ -15,8 +15,8 @@
  *   · a caller that really sent actor headers and no key is drawn on the page, by name, with where
  *     it came from, its count, and when it was first and last seen — read back through the door
  *     (`GET /api/office/header-only-calls`) so a row tested here is a row the office kept;
- *   · an empty list is an ANSWER and is drawn in words, not as an empty box: "nothing has called
- *     with a claim and no key since this office began keeping this list" (the fifth invariant);
+ *   · an empty list is an ANSWER and is drawn as the word "none", not as an empty box (the fifth
+ *     invariant);
  *   · the panel's title is the name the surface registry gives it, so the table of where each panel
  *     is kept and the page stay one list.
  *
@@ -62,7 +62,7 @@ const THE_CALLER = 'caller-with-no-key'
 const THE_CALLERS = [
   THE_CALLER,
   `${THE_TEST_OFFICES_SECRETARY.handle}-script-with-no-key`,
-  'jamies-own-script',
+  'wrens-own-script',
   'a-second-device',
   'the-brief-tool',
   'a-hand-written-curl',
@@ -70,7 +70,7 @@ const THE_CALLERS = [
   'a-codex-on-this-machine',
   'the-message-worker-script',
   'a-notebook-run',
-  'merlins-browser',
+  'wrens-browser',
   'a-forgotten-tool',
   'the-world-tool',
   'a-one-off-repair',
@@ -182,17 +182,14 @@ describe('the list draws the callers that sent a claim and no key', () => {
   }, 120_000)
 })
 
-describe('an empty list is an answer, said in words', () => {
-  it('says nothing has called, rather than drawing an empty box', () => {
+describe('an empty list is an answer, drawn as a word', () => {
+  it('draws the word none, rather than an empty box', () => {
     const html = renderToStaticMarkup(
       h(HeaderOnlyCallers, { said: { callers: [], says: 'These are claims, not proofs.' } }),
     )
     expect(html, 'an empty list is an empty box').not.toContain('<ul')
-    // THE SENTENCE IS NOW THE `title` OF THE ONE `Absence` MARK, so it rides on the mark rather than
-    // opening a paragraph. The words a reader gets are the same, and this is where they are pinned.
-    expect(html, 'the sentence that says nothing has called is not drawn').toContain(
-      'Nothing has called with a claim and no key since this office began keeping this list.',
-    )
+    // THE ONE `Absence` MARK draws the word where the list would be, as decided.
+    expect(html, 'the word none is not drawn').toContain(`<span class="px-absent">${HEADER_ONLY_WORDS.none}</span>`)
   })
 })
 

@@ -40,6 +40,7 @@ import { basename } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { recordPath } from '../src/web/components/router.tsx'
+import { previewUrl } from '../src/web/components/SummaryBlocks.tsx'
 import { THE_TEST_OFFICES_OWNER } from './a-page-of-a-test-office.ts'
 import { png } from './checker-fixtures.ts'
 import { type LiveApp, liveApp, waitForThePage } from './helpers.ts'
@@ -48,6 +49,8 @@ import { type LiveApp, liveApp, waitForThePage } from './helpers.ts'
 const PROJECT = 'robotics'
 /** The address the server listens on for other machines, in this test's stack. */
 const OTHER_MACHINE = '127.0.0.2'
+/** The file door's own path, read from the product's builder of a file's plain address. */
+const THE_FILE_DOOR = new URL(previewUrl(''), `http://${OTHER_MACHINE}`).pathname
 
 /** Two made-up files, one with an English name and one with a Chinese one, and a made-up picture. */
 const ENGLISH = { name: 'Grip test results.txt', bytes: Buffer.from('Test file: made-up grip test results.\n') }
@@ -66,6 +69,7 @@ let app: LiveApp
 let english: Stored
 let chinese: Stored
 let picture: Stored
+let recordId = ''
 
 beforeAll(async () => {
   app = await liveApp({
@@ -118,7 +122,7 @@ beforeAll(async () => {
     },
   })
   expect(filed.status, await filed.clone().text()).toBe(201)
-  const recordId = ((await filed.json()) as { record: { id: string } }).record.id
+  recordId = ((await filed.json()) as { record: { id: string } }).record.id
 
   // THE MACHINE THE OFFICE SEES. A browser on this computer reaching the door for other machines arrives with
   // 127.0.0.1 as its peer, so that is the address trusted, as the pairing test does.
@@ -162,29 +166,47 @@ afterAll(async () => {
   await app?.stop()
 }, 60_000)
 
-/** Press one save link and wait for the browser's own download: the name the browser gives it, and its bytes. */
-async function saved(link: ReturnType<LiveApp['page']['locator']>): Promise<{ name: string; bytes: Buffer }> {
-  await link.waitFor({ timeout: 30_000 })
-  const href = (await link.getAttribute('href')) ?? ''
-  const [download] = await Promise.all([
-    app.page.waitForEvent('download', { timeout: 20_000 }).catch(() => {
-      throw new Error(`pressing the save link (${href}) started no download`)
-    }),
-    link.click(),
-  ])
-  expect(await download.failure(), `the download from ${href} failed`).toBeNull()
-  return { name: download.suggestedFilename(), bytes: readFileSync(await download.path()) }
+/** An address as a message may name it, by its origin and its path, so that a ticket in it is never printed. */
+function whereItGoes(address: string): string {
+  const at = new URL(address)
+  return `${at.origin}${at.pathname}`
 }
 
 /**
- * The name the door gives this browser for one save link: the header's `filename*`, decoded as a browser decodes it. The
- * ask goes through the browser's own context, so it carries the pairing cookie that the press carries.
+ * A LINK'S OWN ADDRESS ON THIS PAIRED PAGE IS THE RECORD'S PAGE, and it holds no file address, so a link copied out of
+ * the page opens the record and not the file.
  */
-async function theNameTheDoorGives(link: ReturnType<LiveApp['page']['locator']>): Promise<string> {
+async function itsOwnAddressIsTheRecordsPage(link: ReturnType<LiveApp['page']['locator']>): Promise<void> {
+  const href = await link.getAttribute('href', { timeout: 30_000 })
+  expect(href, 'the save link\'s own address').toBe(`#${recordPath(recordId)}`)
+  expect(href, 'the save link\'s own address holds a file address').not.toContain(THE_FILE_DOOR)
+}
+
+/**
+ * Press one save link and wait for the browser's own download: the address the press handed the browser, the name the
+ * browser gives the download, and its bytes.
+ */
+async function saved(link: ReturnType<LiveApp['page']['locator']>): Promise<{ address: string; name: string; bytes: Buffer }> {
   await link.waitFor({ timeout: 30_000 })
-  const href = new URL((await link.getAttribute('href')) ?? '', app.page.url()).toString()
-  const answered = await app.page.context().request.get(href)
-  expect(answered.status(), `${href}: ${(await answered.text()).slice(0, 300)}`).toBe(200)
+  const [download] = await Promise.all([
+    app.page.waitForEvent('download', { timeout: 20_000 }).catch(() => {
+      throw new Error('pressing the save link started no download')
+    }),
+    link.click(),
+  ])
+  const address = download.url()
+  expect(await download.failure(), `the download from ${whereItGoes(address)} failed`).toBeNull()
+  return { address, name: download.suggestedFilename(), bytes: readFileSync(await download.path()) }
+}
+
+/**
+ * The name the door gives this browser at the address a press handed it: the header's `filename*`, decoded as a browser
+ * decodes it. The ask goes through the browser's own context, so it carries the cookie half that the ticket in the
+ * address was made under, as the press's own load does.
+ */
+async function theNameTheDoorGives(address: string): Promise<string> {
+  const answered = await app.page.context().request.get(address)
+  expect(answered.status(), `${whereItGoes(address)}: ${(await answered.text()).slice(0, 300)}`).toBe(200)
   const disposition = answered.headers()['content-disposition'] ?? ''
   const encoded = /filename\*=UTF-8''([^;\s]+)/.exec(disposition)?.[1]
   expect(encoded, `the door sent no UTF-8 name: "${disposition}"`).toBeDefined()
@@ -211,10 +233,11 @@ async function aFileIsSavedUnderItsShownName(
   expect(shown).toBe(sent.name)
 
   const link = block.locator('a.sb-file-save')
-  expect(await theNameTheDoorGives(link), 'the door names the file by its stored id, not by the name the report shows').toBe(
+  await itsOwnAddressIsTheRecordsPage(link)
+  const got = await saved(link)
+  expect(await theNameTheDoorGives(got.address), 'the door names the file by its stored id, not by the name the report shows').toBe(
     shown,
   )
-  const got = await saved(link)
   expect(got.bytes.equals(sent.bytes)).toBe(true)
   if (byTheBrowser) expect(got.name, 'the saved file is named by its stored id, not by the name the report shows').toBe(shown)
 }
@@ -231,8 +254,9 @@ describe('a file saved from a report on another machine', () => {
   it('keeps the stored name for a picture, which the report shows with no name', async () => {
     await app.page.waitForSelector('.sb-image img', { timeout: 30_000 })
     const link = app.page.locator('a.sb-picture-save').first()
-    expect(await theNameTheDoorGives(link)).toBe(basename(picture.path))
+    await itsOwnAddressIsTheRecordsPage(link)
     const got = await saved(link)
+    expect(await theNameTheDoorGives(got.address)).toBe(basename(picture.path))
     expect(got.bytes.equals(A_PICTURE)).toBe(true)
     expect(got.name).toBe(basename(picture.path))
   }, 120_000)

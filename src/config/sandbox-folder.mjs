@@ -12,8 +12,9 @@
  * handed on, with nothing failing. All three use this now. The folder is always the resolved one (realpath), as
  * tools/sandbox-start.mjs writes it on the run.
  */
+import { existsSync, realpathSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { join } from 'node:path'
+import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import { theLocalAppDataFolder, thePathsOf } from './the-paths-of-a-system.mjs'
 
 /**
@@ -71,6 +72,40 @@ export const WORKTREES_FOLDER = theWorktreesFolder(homedir())
  */
 export function theStableCheckoutFolder(home) {
   return join(home, '.cache', 'mole-office', 'stable')
+}
+
+/**
+ * HOW A HOST PATH MEETS A FOLDER NO SANDBOX MAY MOUNT: 'is', 'is inside', 'holds', or null when it does not. Both are
+ * compared as written and as they are on disk (the realpath of the nearest folder that exists, with the rest after it),
+ * so a link to one cannot stand in for the other. The stable checkout is asked here, and so is the office's data folder
+ * (tools/the-offices-data-folder.mjs). It lives here, beside theStableCheckoutFolder, because the service command
+ * (src/config/the-service-command.mjs) asks it too and src/ imports nothing from tools/; tools/sandbox-common.mjs
+ * hands it on to the tools.
+ * @param {string} path an absolute host path
+ * @param {string} folder an absolute host folder
+ * @returns {'is' | 'is inside' | 'holds' | null}
+ */
+export function howAPathMeets(path, folder) {
+  /** @param {string} given */
+  const onDisk = (given) => {
+    let held = given
+    /** @type {string[]} */
+    const rest = []
+    while (!existsSync(held) && dirname(held) !== held) { rest.unshift(basename(held)); held = dirname(held) }
+    return join(realpathSync(held), ...rest)
+  }
+  /**
+   * @param {string} inner
+   * @param {string} outer
+   */
+  const inside = (inner, outer) => { const r = relative(outer, inner); return r !== '' && !r.startsWith('..') && !isAbsolute(r) }
+  for (const one of new Set([resolve(path), onDisk(resolve(path))])) {
+    for (const other of new Set([folder, onDisk(folder)])) {
+      const how = one === other ? 'is' : inside(one, other) ? 'is inside' : inside(other, one) ? 'holds' : null
+      if (how !== null) return how
+    }
+  }
+  return null
 }
 
 /**

@@ -137,6 +137,10 @@ import { db, sqlite } from '../db/client.ts'
 import { revisionsReaderOf, wholeRevisionData, type ReadARevision } from '../db/revision-stored-once.ts'
 import { records, revisions } from '../db/schema.ts'
 import { patchRecord, nothingWrittenSentence, recordInWorkspace, versionOf, type Actor } from './records.ts'
+// WHICH REGISTRY ROW WROTE A FORM, and the name the office gives that row. A form stores the row's id,
+// and the reading names it by the one function that names a stored reference.
+import { participantForActor } from './participant-for-actor.ts'
+import { theOfficeNameOfAStoredReference } from './agent-owner-changes.ts'
 import { resolveSessionRef } from './resolve-session-ref.ts'
 import { PanelError } from './panel-error.ts'
 // THE ONE PLACE A PART OF A RECORD IS NAMED, and the tree it is named out of. Both read the same
@@ -248,14 +252,29 @@ export interface ShortFormReading {
   /** Who wrote them. Null when nobody has. */
   writtenBy: ShortFormAuthor | null
   /**
-   * WHICH agent or person wrote them, by actor id. Null when nobody has written this length, and
+   * WHICH agent or person wrote them, as stored. Null when nobody has written this length, and
    * null on every form stored before 2 September 2026, which carries no name.
+   *
+   * A FORM STORES ITS WRITER'S REGISTRY ID, and a form stored before that stores the actor id the
+   * request sent, which may be a handle. This hands back what is stored either way. `byName` below
+   * is the name a screen draws.
    *
    * NOT THE SAME FACT AS `writtenBy` ABOVE. That says whether a person or an agent wrote it, which
    * is what decides the override. This says which one. A screen drawing one in place of the other
    * would answer a question nobody asked.
    */
   by: string | null
+  /**
+   * THE NAME THE OFFICE GIVES THE WRITER `by` NAMES, worked out when the form is read.
+   *
+   * NULL WHEN NO REGISTERED PERSON OR AGENT HAS THAT ID. That is a form stored before the writer was
+   * stored by id, a writer nobody registered, and a length nobody wrote. A screen then draws `by` as
+   * it is, so a form stored before the change reads as it did.
+   *
+   * NULL ON THE TWO COLUMNS AS WELL. Their writer comes from the revision ledger, which stores the
+   * actor id the request sent, not a registry id.
+   */
+  byName: string | null
   /**
    * WHEN they were written, as local wall-clock time. Null on the same two counts as `by`.
    *
@@ -645,6 +664,17 @@ function saysOf(
 }
 
 /**
+ * THE NAME OF THE WRITER A STORED FORM NAMES, or null when no registered person or agent has the id
+ * it stores. `writtenBy` says which of the two registries to look in. A form stored before its
+ * writer was stored by id holds the actor id the request sent. Where that is a handle, no registry id
+ * answers to it, so it reads as null and a screen draws what is stored.
+ */
+function theNameOfAFormsWriter(writtenBy: ShortFormAuthor, by: string | undefined): string | null {
+  if (by === undefined) return null
+  return theOfficeNameOfAStoredReference({ kind: writtenBy === 'human' ? 'person' : 'agent', id: by })
+}
+
+/**
  * WHERE EVERY LENGTH STANDS ON ONE RECORD.
  *
  * All seven come back whether or not anybody has written them, because a length that is missing from
@@ -742,6 +772,7 @@ export function readShortForms(recordId: string, workspaceId: string): ShortForm
         wordCount: null,
         writtenBy: null,
         by: null,
+        byName: null,
         at: null,
         session: null,
         override: false,
@@ -772,6 +803,7 @@ export function readShortForms(recordId: string, workspaceId: string): ShortForm
         return null
       })(),
       by: wrote === null ? null : wrote.actorId,
+      byName: null,
       at: wrote === null ? null : wrote.at,
       session: wrote?.sessionId ?? null,
       override: wrote !== null && wrote.actorType === 'human',
@@ -801,6 +833,7 @@ export function readShortForms(recordId: string, workspaceId: string): ShortForm
         writtenBy: null,
         // NOBODY WROTE THIS LENGTH, so there is nobody to name, no moment to give and no run.
         by: null,
+        byName: null,
         at: null,
         session: null,
         override: false,
@@ -827,6 +860,7 @@ export function readShortForms(recordId: string, workspaceId: string): ShortForm
       // WHAT THE FORM CARRIES, AND NOTHING FILLED IN. A form stored before 2 September 2026 carries
       // neither, and the record's own `updatedAt` is not an answer to when these words were written.
       by: form.by ?? null,
+      byName: theNameOfAFormsWriter(form.writtenBy, form.by),
       at: form.at ?? null,
       session: form.session ?? null,
       override: form.writtenBy === 'human',
@@ -865,6 +899,7 @@ export function readShortForms(recordId: string, workspaceId: string): ShortForm
         wordCount: null,
         writtenBy: null,
         by: null,
+        byName: null,
         at: null,
         session: null,
         override: false,
@@ -889,6 +924,7 @@ export function readShortForms(recordId: string, workspaceId: string): ShortForm
       wordCount: null,
       writtenBy: parts.writtenBy,
       by: parts.by ?? null,
+      byName: theNameOfAFormsWriter(parts.writtenBy, parts.by),
       at: parts.at ?? null,
       session: parts.session ?? null,
       override: parts.writtenBy === 'human',
@@ -913,6 +949,7 @@ export function readShortForms(recordId: string, workspaceId: string): ShortForm
     wordCount: null,
     writtenBy: null,
     by: null,
+    byName: null,
     at: null,
     session: null,
     override: false,
@@ -1029,7 +1066,7 @@ export interface ShortFormForRow {
   state: ShortFormState
   /** True when a person wrote it by hand. A screen has to mark it. */
   override: boolean
-  /** Which agent or person wrote it, by actor id, or null where nobody recorded one. */
+  /** Which agent or person wrote it, as `ShortFormReading.by` holds it, or null where nobody recorded one. */
   by: string | null
   /** When it was written, local wall clock, or null where nobody recorded one. */
   at: string | null
@@ -1125,7 +1162,16 @@ export type ShortFormWrite = Partial<Record<ShortFormLevel, string | null>> & {
 export interface ShortFormWriting {
   writtenBy: ShortFormAuthor
   /**
-   * The actor id, or null when the request stated no actor at all.
+   * The writer's registry id, or null when the request stated no actor at all.
+   *
+   * THE ID OF THE ROW `participantForActor` FINDS, not the string the request sent. An agent may
+   * send its handle, and a handle can be changed or freed and then name another agent. The resolver's
+   * first step is the agent's key, so an agent a key proved is stored as itself. A form the person
+   * writes stores the person's id.
+   *
+   * THE ACTOR ID WHERE NO ROW IS FOUND. The office's own writer is neither an agent nor a person, and
+   * an agent that needs no registration has no registry row. What the request sent is then the only
+   * name there is.
    *
    * NULL RATHER THAN THE DEFAULT IDENTITY. `actorFrom` defaults a header-less request to
    * the owner and marks it as not stated, and `design/DECISIONS-PENDING.md` §36 settles that
@@ -1166,7 +1212,7 @@ export interface ShortFormWriting {
 export function shortFormWriting(actor: Actor, workspaceId: string | null): ShortFormWriting {
   return {
     writtenBy: shortFormAuthor(actor),
-    by: actor.stated === false ? null : actor.id,
+    by: actor.stated === false ? null : (participantForActor(actor)?.id ?? actor.id),
     at: nowStamp(),
     session: sessionRecordBehind(actor, workspaceId),
   }
@@ -1938,7 +1984,8 @@ export function settleShortForms(
         `A summary written by part names the revision of this record it was written from, and a record being ` +
           `filed for the first time has no revisions yet — so \`${SHORT_FORMS_FIELD}.${PARTS_KEY}\` cannot be ` +
           `checked against anything and nothing was stored. File the record, then write its short forms with ` +
-          `POST /api/records/<id>/short-forms, which names the revision they were made from.`,
+          `POST /api/records/<id>/short-forms, which names the revision they were made from, or send the top-level ` +
+          `shortForms key in the same POST /api/records.`,
       )
     }
     const stamp = plainObject(arrivingParts['madeFrom'])
@@ -1974,7 +2021,8 @@ export function settleShortForms(
         `A short form names the revision of this record it was written from, and a record being filed for the ` +
           `first time has no revisions yet — so the ${SHORT_FORM_SPECS[level].noun} in \`${SHORT_FORMS_FIELD}.` +
           `${level}\` cannot be checked against anything and nothing was stored. File the record, then write its ` +
-          `short forms with POST /api/records/<id>/short-forms, which names the revision they were made from.`,
+          `short forms with POST /api/records/<id>/short-forms, which names the revision they were made from, or send ` +
+          `the top-level shortForms key in the same POST /api/records.`,
       )
     }
     const madeFrom = plainObject(form['madeFrom'])

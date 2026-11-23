@@ -1,15 +1,14 @@
 // Copyright © 2026 Zhengyang Shen
 // Licensed under the MIT License. See LICENSE.
 /**
- * THE PICTURES OF THE KEYBOARD SHORTCUTS, item 5 of a decision.
+ * THE PICTURES OF THE KEYBOARD SHORTCUTS.
  *
  * The case runs only when `SHORTCUT_KEYS_SHOTS` names a directory; the ordinary runs leave it unset
  * and take no picture. It writes nothing into this checkout: every file goes under that directory.
  *
- * Eighteen pictures, which is what chapter 6 asks for twice over: the "?" list open, and the
- * Keyboard shortcuts group in Settings, each at 1440, 990, 660 and 390 in both looks, and each at
- * 1440 in Chinese. One more of the line the page shows after "g", and one of a tooltip that names
- * its key.
+ * The pictures: the list of keys open, which Ctrl+/ opens, the Settings page, and the Keyboard
+ * shortcuts group alone, each at 1440, 990, 660 and 390 in both looks, and each at 1440 in Chinese.
+ * One more of the list as a Mac draws it, where the Alt keys are Option keys and Ctrl is ⌘.
  */
 
 import { mkdirSync } from 'node:fs'
@@ -45,9 +44,9 @@ afterAll(async () => {
   await app.stop()
 })
 
-async function openTheList(): Promise<void> {
+async function openTheList(keys = 'Control+/'): Promise<void> {
   await app.page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur())
-  await app.page.keyboard.press('?')
+  await app.page.keyboard.press(keys)
   await app.page.waitForSelector('.sck-list', { timeout: 10_000 })
 }
 
@@ -90,12 +89,16 @@ describe('the pictures of the keyboard shortcuts', () => {
     await app.page.screenshot({ path: `${dir}/settings-1440-zh-light.png`, fullPage: true })
     await app.page.locator('#set-panel-shortcuts').screenshot({ path: `${dir}/group-1440-zh-light.png` })
 
-    // THE LINE AFTER "g", which stays on screen for about a second and a half.
-    await app.page.goto(`${app.site}/#/governance`)
+    // THE LIST AS A MAC DRAWS IT. The page asks the browser whether it is on a Mac, so the browser
+    // is told it is, from here to the end of the case.
+    await app.page.addInitScript(() => {
+      Object.defineProperty(Navigator.prototype, 'platform', { get: () => 'MacIntel' })
+    })
+    await app.page.goto(`${app.site}/#/`)
     await waitForThePage(app.page, 30_000)
-    await app.page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur())
-    await app.page.keyboard.press('g')
-    await app.page.waitForSelector('[data-shortcut-line="after-g"]', { timeout: 5_000 })
-    await app.page.screenshot({ path: `${dir}/after-g-1440-light.png` })
+    await app.page.waitForTimeout(500)
+    await openTheList('Meta+/')
+    expect(await app.page.locator('.sck-row[data-action="home"] kbd').allTextContents()).toEqual(['Option', 'O'])
+    await app.page.screenshot({ path: `${dir}/list-1440-mac-light.png` })
   }, 600_000)
 })

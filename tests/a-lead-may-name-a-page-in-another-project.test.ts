@@ -220,7 +220,7 @@ describe('one press takes the reader to the page AND to the project', () => {
  * THE OFFER, LOOKED AT ON A CHINESE PAGE — chapter 6: four widths and both themes (check FwwgzHBjpErx).
  *
  * Since problem 30fVQwjGa3Qb, a lead's page is named by what it shows, in the page language, so on a Chinese page the
- * offer says 流程 Handover v2 的图 where it said "页面 /pipeline/…". The offer is photographed at 1440, 990, 660 and 390 in light and
+ * offer says 流水线 Handover v2 的图 where it said "页面 /pipeline/…". The offer is photographed at 1440, 990, 660 and 390 in light and
  * dark, after the words are checked to hold the Chinese name. The case is gated: a run that is not asked for pictures
  * takes none. The pictures go to the folder LEAD_OFFER_SHOTS names, never into the worktree.
  */
@@ -245,7 +245,7 @@ describe('the lead offer is looked at on a Chinese page', () => {
       // address. It is what the page shows now, the brief's own example.
       await expect
         .poll(() => app.page.$eval('.px-lead-offer .px-lead-words', (el) => el.textContent ?? ''), { timeout: 20_000 })
-        .toContain('流程 Handover v2 的图')
+        .toContain('流水线 Handover v2 的图')
       for (const width of [1440, 990, 660, 390]) {
         for (const theme of ['light', 'dark'] as const) {
           await app.page.setViewportSize({ width, height: 1000 })

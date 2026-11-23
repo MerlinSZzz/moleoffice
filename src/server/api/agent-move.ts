@@ -11,6 +11,10 @@
  * AND THREE DOORS THAT CHANGE WHO ANSWERS FOR AN AGENT, its starter (wave 13u, round 186): who answers for it now with
  * each change, the preview of a change, and the person's press. The preview and the press answer one shape, worked out
  * in lib/agent-starter.ts.
+ *
+ * AND THE OWNER DOOR, which hands an agent to another owner, AND THE READ OF EVERY HAND-OVER IT KEPT (wave 13s round
+ * 281). The door keeps each hand-over through lib/agent-owner-changes.ts, in the same write as the new owner, and the
+ * read gives them back from there.
  */
 
 import type { FastifyInstance } from 'fastify'
@@ -20,6 +24,8 @@ import { sqlite } from '../db/client.ts'
 import { readParticipant } from '../db/read-participant.ts'
 import { theOneAgentAStringNames } from '../lib/agent-references.ts'
 import { theRecordedOwner } from '../lib/agent-owner.ts'
+import { theOwnerHandOversOf, writeAnOwnerHandOver } from '../lib/agent-owner-changes.ts'
+import { theAgentAnArrivingReferenceNames } from '../lib/the-agent-an-arriving-reference-names.ts'
 import { anAgentItsOwnKeyProves } from '../lib/who-may-act.ts'
 import { thePersonIsProved } from '@shared/the-person-proved.ts'
 import { aRaiseCarriesIt } from '../lib/records.ts'
@@ -82,6 +88,15 @@ const STARTER_MOVE_NOTE =
   'to withdraw a waiting change. The agent and both starters ' +
   'are told, each that is an agent. Only the person presses it; a secretary\'s raise does not carry it.'
 
+const OWNER_CHANGES_NOTE =
+  "EVERY HAND-OVER OF ONE AGENT'S OWNER that POST /api/agents/:id/owner made, newest first: the owner before and after, " +
+  'who made it, the grant it was made under, the reason and when. An owner before is held, absent where the row held ' +
+  'none, or broken where it cannot be read, as the read of one agent says its owner. A name is null where the id names ' +
+  'nobody registered. `since` is the moment this office began to keep them, null until it was written; a hand-over ' +
+  'before it is not listed. The agent is named by its id or its handle. The reply is {agent, since, handOvers}.'
+
+const agentParams = z.strictObject({ id: z.string().min(1) })
+
 export async function agentMoveRoutes(app: FastifyInstance): Promise<void> {
   app.post('/agents/:id/owner', route('agent.owner-move', 'remote', 'Change the agent responsible for this agent. The starter remains recorded.'), async (req) => {
     const { id } = req.params as { id: string }
@@ -127,7 +142,13 @@ export async function agentMoveRoutes(app: FastifyInstance): Promise<void> {
       .filter((one) => acting.kind !== 'agent' || acting.id !== one.id)
       .map((one) => ({ kind: 'agent' as const, id: one.id }))
     sqlite.transaction(() => {
-      sqlite.prepare("UPDATE agents SET owner_id = ?, owner_kind = 'agent' WHERE id = ?").run(next.id, target.id)
+      writeAnOwnerHandOver({
+        agent: target.id,
+        to: { kind: 'agent', id: next.id },
+        by: acting,
+        underTheGrant: acting.kind === 'agent' && actor.elevationUsed === true && actor.elevation !== undefined ? actor.elevation.id : null,
+        because: body.because,
+      })
       writeASystemLineToAgents(
         recipients,
         workspaceOf(req),
@@ -136,6 +157,13 @@ export async function agentMoveRoutes(app: FastifyInstance): Promise<void> {
       )
     })()
     return { agent: target.id, owner: { kind: 'agent', id: next.id } }
+  })
+
+  app.get('/participants/agent/:id/owner-changes', route('agent-owner-change.list', 'remote', OWNER_CHANGES_NOTE), async (req) => {
+    const { id } = parse(agentParams, req.params, 'The agent asked for')
+    const named = theAgentAnArrivingReferenceNames(id, 'reading')
+    if (named === null) throw new PanelError(`No agent in this installation answers to "${id}".`, 404)
+    return theOwnerHandOversOf(named.agent.id)
   })
 
   app.get('/agents/:id/project-move', route('agent.project-move-preview', 'remote', PREVIEW_NOTE), async (req) => {

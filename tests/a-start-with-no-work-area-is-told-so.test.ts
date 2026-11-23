@@ -36,7 +36,7 @@ import { NO_WORK_AREA_FIRST, NO_WORK_AREA_HOW, NO_WORK_AREA_REMINDER, theReminde
 import { SESSION_STATES } from '../src/shared/types.ts'
 import { theWordsNamingTheFolder } from '../src/config/sandbox-folder.mjs'
 import { aMadeUpSandboxRepo } from './a-made-up-sandbox-repo.ts'
-import { apiApp, freshDb, type TestDb } from './helpers.ts'
+import { apiApp, freshDb, type TestDb, governsTheWholeProject } from './helpers.ts'
 
 const CHECKOUT = fileURLToPath(new URL('..', import.meta.url)).replace(/\/$/, '')
 const A_MADE_UP_MODEL = 'claude-made-up-no-area-0'
@@ -172,7 +172,7 @@ beforeAll(async () => {
   await started('plan-boss-area', asOne('plan-quill'), 'supervisor', ['src/'])
 
   // THE PERSON CASTS THE WORKER CARD, so the worker door's roll has a row to take.
-  const decided = await call('POST', '/api/records', AS_THE_PERSON, { kind: 'decision', title: 'The test casts the worker card', data: { replaces: [] } })
+  const decided = await call('POST', '/api/records', AS_THE_PERSON, { kind: 'decision', title: 'The test casts the worker card', data: { ...governsTheWholeProject(), replaces: [] } })
   expect(decided.status, JSON.stringify(decided.body)).toBe(201)
   const decision = String(decided.body['record'].id)
   const cast = await call('POST', '/api/casting/worker', AS_THE_PERSON, {

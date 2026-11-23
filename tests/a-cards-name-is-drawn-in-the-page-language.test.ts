@@ -27,8 +27,8 @@
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { Page } from 'playwright'
-import { join } from 'node:path'
-import { liveApp, thePersonsKeyHeader, type LiveApp, waitForThePage } from './helpers.ts'
+import { liveApp, type LiveApp, waitForThePage } from './helpers.ts'
+import { pairTheContext } from './a-paired-context.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 
 const THEIR: Record<string, string> = {
@@ -79,9 +79,8 @@ async function factBeside(label: string): Promise<string | null> {
 beforeAll(async () => {
   app = await liveApp({ name: 'card-names-in-the-page-language', viewport: { width: 1440, height: 1000 }, workspace: 'default' })
   page = app.page
-  // THE PERSON'S KEY, so the page reads as the person and the contact group they see is drawn.
-  const key = thePersonsKeyHeader(join(app.dir, 'keys.json'))['x-mole-office-key'] as string
-  await app.context.addCookies([{ name: 'mole-office-key', value: key, domain: '127.0.0.1', path: '/' }])
+  // THE PERSON'S BROWSER, PAIRED with two halves, so the page reads as the person and the contact group they see is drawn.
+  await pairTheContext(app.context, app.api)
   for (const agent of [SECRETARY, WORKER]) {
     const started = await fetch(`${app.api}/api/agents/started`, { method: 'POST', headers: THEIR, body: JSON.stringify(agent) })
     expect(started.status, await started.text()).toBe(201)

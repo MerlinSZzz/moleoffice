@@ -84,9 +84,9 @@ const KEPT_FOR_BETA = 'MADE_UP_SETTING_KEPT_FOR_BETA'
 const VIEWPORT = { width: 1440, height: 900 }
 
 /** The doors the tools category's sections ask on the way in. Each reads no project. */
+// The provider key panel is developer-only, so case 1 opens Settings in normal mode and never asks that door.
 const TOOLS_OFFICE_DOORS = [
   '/api/office/mail-tool',
-  '/api/settings/provider-keys',
   '/api/office/sandbox-memory-cap',
   '/api/office/gpu-watcher',
   '/api/plugins',
@@ -162,8 +162,14 @@ interface Frame {
   fold: boolean | null
   /** The words of the section under test; null when it is not drawn. */
   section: string | null
+  /** How far the window is scrolled. */
   scrollY: number
+  /** How far #main is scrolled. */
   mainTop: number
+  /** The height of the whole document. */
+  pageHeight: number
+  /** The height of the content of #main; 0 when there is no #main. */
+  mainHeight: number
 }
 
 interface Watched {
@@ -282,6 +288,8 @@ async function startTheFrames(page: Page, section: string | null): Promise<void>
           section: part instanceof HTMLElement ? part.innerText : null,
           scrollY: window.scrollY,
           mainTop: main?.scrollTop ?? 0,
+          pageHeight: document.documentElement.scrollHeight,
+          mainHeight: main?.scrollHeight ?? 0,
         })
         if (!held.__stopFrames) requestAnimationFrame(take)
       }
@@ -416,8 +424,11 @@ describe('a switch of project reads again only what belongs to a project', () =>
       if (loading > 0) faults.push(`${String(loading)} of ${String(after.length)} frames after the switch drew loading in the page`)
       const closed = after.filter((frame) => frame.fold !== true).length
       if (closed > 0) faults.push(`${String(closed)} frames after the switch did not show the office map fold open`)
-      const moved = after.filter((frame) => frame.scrollY !== was.scrollY || frame.mainTop !== was.mainTop).length
-      if (moved > 0) faults.push(`${String(moved)} frames after the switch were not at the place the page was scrolled to`)
+      const moved = after.filter((frame) => frame.scrollY !== was.scrollY || frame.mainTop !== was.mainTop)
+      if (moved.length > 0) {
+        const first = moved[0] as Frame
+        faults.push(`${String(moved.length)} frames after the switch were not at the place the page was scrolled to; the first was frame ${String(after.indexOf(first) + 1)} of ${String(after.length)} after the switch, at scrollY ${String(first.scrollY)} and #main scrollTop ${String(first.mainTop)} against ${String(was.scrollY)} and ${String(was.mainTop)}, with the page ${String(first.pageHeight)} and #main ${String(first.mainHeight)} pixels high against ${String(was.pageHeight)} and ${String(was.mainHeight)}`)
+      }
       theOfficeDoorsAskedAgain(watched.asked, TOOLS_OFFICE_DOORS, faults)
       expect(watched.errors, 'the page threw').toEqual([])
       expect(faults).toEqual([])
@@ -586,6 +597,7 @@ describe('a switch of project reads again only what belongs to a project', () =>
       if (films !== null) await putTheMadeUpLabelIn(page, 'Made-up office: two made-up projects, for a test', page.locator(ceiling), 'Settings, a kept answer')
       // BETA'S FIRST ANSWER IS MADE RECOGNISABLE. The two made-up projects have the same role cards, so
       // the answer Beta's first read keeps carries a made-up setting name, which the ceiling draws.
+      let recognised = 0
       const recognisable = async (route: Route): Promise<void> => {
         if (route.request().method() !== 'GET' || route.request().headers()['x-mole-office-workspace'] !== BETA.id) return route.continue()
         const response = await route.fetch()
@@ -593,6 +605,7 @@ describe('a switch of project reads again only what belongs to a project', () =>
         delete headers['content-length']
         const body = (await response.json()) as { visitorCardCeiling: { setting: string } }
         body.visitorCardCeiling.setting = KEPT_FOR_BETA
+        recognised += 1
         await route.fulfill({ status: response.status(), headers, body: JSON.stringify(body) })
       }
       await page.route(roleCards, recognisable)
@@ -623,8 +636,13 @@ describe('a switch of project reads again only what belongs to a project', () =>
       if (before.some((frame) => frame.section === null || frame.section.includes(KEPT_FOR_BETA))) throw new Error(`a frame before the switch did not show ${ALPHA.id}'s visitor ceiling`)
       const held = frames.slice(firstAfter, atRelease)
       if (held.length < 20) throw new Error(`only ${String(held.length)} frames were taken while ${BETA.id}'s role cards were held`)
-      const notKept = held.filter((frame) => frame.section === null || !frame.section.includes(KEPT_FOR_BETA)).length
-      if (notKept > 0) faults.push(`${String(notKept)} of ${String(held.length)} frames while ${BETA.id}'s role cards were held did not show ${BETA.id}'s kept answer`)
+      const notKept = held.filter((frame) => frame.section === null || !frame.section.includes(KEPT_FOR_BETA))
+      if (notKept.length > 0) {
+        const first = notKept[0] as Frame
+        const showed = first.section === null ? 'no section' : `"${first.section.replace(/\s+/g, ' ').trim().slice(0, 160)}"`
+        const reads = watched.asked.filter((one) => one.path === '/api/roles').map((one) => `${String(one.project)}${one.afterTheSwitch ? ' after the switch' : ''}`).join(', ')
+        faults.push(`${String(notKept.length)} of ${String(held.length)} frames while ${BETA.id}'s role cards were held did not show ${BETA.id}'s kept answer; the first showed ${showed}; the role cards were asked for ${reads}; ${String(recognised)} of ${BETA.id}'s answers were made recognisable`)
+      }
       const unmarked = held.filter((frame) => !frame.mark).length
       if (unmarked > 0) faults.push(`${String(unmarked)} of ${String(held.length)} frames while ${BETA.id}'s role cards were held carried no re-read mark`)
       const loading = frames.slice(firstAfter).filter((frame) => frame.loading).length

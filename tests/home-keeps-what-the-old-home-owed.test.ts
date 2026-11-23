@@ -6,10 +6,8 @@
  * Wave 13k's round 16 was refused (check l3MN04jpFPhK) because six parts the old Home drew were
  * mounted on no page and no report said where they went. Each is proved here, on Home itself:
  *
- *   1. REPORTS WAITING FOR THE OWNER, capped at five (REPORTS_SHOWN). The
- *      drawing (report Nr5dZygiWTy0 block b-3) puts reports among what waits for the owner, so the band sits
- *      directly under Needs you in the main column, before Today. Seven filed: five rows, and the line
- *      that says how many are shown of how many.
+ *   1. REPORTS LEAVE HOME, by the person's later decision: seven are filed for him, and home draws no report
+ *      list and no report row. They are on their own page.
  *   2. WHAT HAS BEEN SAID: message counts, in developer mode only, on question 7.
  *   3. THE DEVELOPER-MODE QUESTIONS PANEL (paused, not classified, no state): developer mode, as before.
  *      Since a decision both are one press from Home in developer mode, each on its
@@ -26,8 +24,7 @@
  *      that sets them; with nothing on today, it draws nothing under today's date; with nothing late or stuck in
  *      any project, that part is not drawn.
  *
- * MUTATIONS (each red here): the reports band not drawn; the cap removed; the developer presses drawn
- * in normal mode; the minute re-read removed; Today's retry removed.
+ * MUTATIONS (each red here): the reports band drawn again; the developer presses drawn in normal mode; the minute re-read removed; Today's retry removed.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { liveApp, waitForThePage, type LiveApp } from './helpers.ts'
@@ -63,23 +60,13 @@ async function open(mode: 'normal' | 'inspect'): Promise<void> {
 }
 
 describe('what the old Home owed, on the new Home', () => {
-  it('draws the reports waiting for the person under Needs you, five of seven, before Today', async () => {
+  it('draws no report list, though seven reports wait for the person', async () => {
     await open('normal')
-    const main = app.page.locator('.hm-main-column')
-    const reports = main.locator('.att-rep-list').first().locator('.att-rep')
-    await reports.first().waitFor({ timeout: 20_000 })
-    expect(await reports.count(), 'five, the person’s cap').toBe(5)
-    expect(await main.locator('.att-rep-more').getAttribute('aria-label')).toBe(t('home.reportsShown', { n: 5, total: 7 }))
-    const order = await main.evaluate((column) => {
-      const needs = column.querySelector('[data-home-section="needs"]')
-      const band = column.querySelector('.att-rep-list')
-      const today = column.querySelector('[data-home-section="today"]')
-      const at = (node: Element | null) => (node === null ? -1 : [...column.querySelectorAll('*')].indexOf(node))
-      return [at(needs), at(band), at(today)]
-    })
-    const [needs = -1, band = -1, day = -1] = order
-    expect(needs, 'Needs you first').toBeGreaterThanOrEqual(0)
-    expect(needs < band && band < day, `Needs you, then the reports, then Today: ${order.join(', ')}`).toBe(true)
+    await app.page.locator('[data-home-section="needs"]').waitFor({ timeout: 20_000 })
+    await app.page.locator('[data-home-section="today"]').waitFor({ timeout: 30_000 })
+    await app.page.waitForTimeout(1500)
+    expect(await app.page.locator('.att-rep-list').count(), 'a report list is drawn on home').toBe(0)
+    expect(await app.page.locator('.att-rep').count(), 'a report row is drawn on home').toBe(0)
   }, 120_000)
 
   it('has a press to what has been said and to the questions in developer mode only, and no sessions', async () => {

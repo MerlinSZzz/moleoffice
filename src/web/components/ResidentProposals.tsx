@@ -25,7 +25,6 @@ import { api, errorMessage, faultOf, getActor, type Fault, type ParticipantOnThe
 import { useInspect } from '../lib/mode.ts'
 import { useLanguage } from '../lib/language.ts'
 import { readParticipantsOnce } from '../lib/oneread.ts'
-import { theWorldThatAnsweredLast } from '../lib/world.ts'
 import {
   theResidentInASentence,
   thePersonIsLooking,
@@ -153,9 +152,14 @@ export function ResidentProposalRow({
       <p className="resident-proposal-who">{t('resident.proposal.proposes', { name: proposer })}</p>
       <h3 className="resident-proposal-title">{t('resident.proposal.title', { name })}</h3>
       <h4 className="resident-proposal-head">{t('resident.facts.heading')}</h4>
-      <ResidentFactsList facts={proposal.facts} />
+      <ResidentFactsList facts={proposal.facts} homeWorldIsThisOffice={proposal.homeWorldIsThisOffice} />
       <h4 className="resident-proposal-head">{t('resident.criterion.heading')}</h4>
       <ResidentCriterionList criterion={proposal.criterion} />
+      <p className="resident-proposal-sleep-time" data-proposed-sleep-time={proposal.sleepTime === null ? 'none' : 'set'}>
+        {proposal.sleepTime === null
+          ? t('resident.proposal.sleepTimeNone')
+          : t('resident.proposal.sleepTime', { startsAt: proposal.sleepTime.startsAt, minutes: proposal.sleepTime.minutes })}
+      </p>
       <h4 className="resident-proposal-head">{t('resident.proposal.reason', { name: proposer })}</h4>
       <p className="resident-proposal-reason">{proposal.because === null ? <Absence /> : content(proposal.because)}</p>
       {answer !== null ? (
@@ -315,8 +319,12 @@ export function ResidentCriterionList({ criterion }: { criterion: TheCriterionRe
 /**
  * THE FACTS THE OFFICE MEASURED, one label and one value each. A value nobody recorded says "unknown",
  * never zero. Drawn on a proposal and, as they were when it was proposed, on a resident's own section.
+ *
+ * `homeWorldIsThisOffice` is the reply's answer to whether the stored home world is this office's home, which
+ * the server works out once, a dead home of this installation included. The list draws that answer and does not
+ * compare the home world with the world this page reads.
  */
-export function ResidentFactsList({ facts }: { facts: MeasuredFacts }) {
+export function ResidentFactsList({ facts, homeWorldIsThisOffice }: { facts: MeasuredFacts; homeWorldIsThisOffice: boolean | null }) {
   useLanguage()
   const inspect = useInspect()
   const unknown = t('resident.unknown')
@@ -328,16 +336,16 @@ export function ResidentFactsList({ facts }: { facts: MeasuredFacts }) {
         : t('resident.facts.citizenSinceValue', { date: drawnStamp(facts.citizenSince), n: facts.daysSinceCitizen })
   // A COUNT OF DAYS, NOT A SHARE: an agent registered today has 0 whole days as a citizen and may have a run on 1.
   const runs = String(facts.daysWithARun)
-  // THE HOME WORLD IS A DATABASE IDENTITY. It is called this office when it is the one this page reads.
-  const here = theWorldThatAnsweredLast()?.database ?? null
+  // THE HOME WORLD IS A DATABASE IDENTITY. It is called this office when the reply says it is this office's home, and
+  // another world when the reply says it is not. When the reply cannot say, the identity itself is drawn.
   const world =
     facts.homeWorld === null
       ? unknown
-      : facts.homeWorld === here
+      : homeWorldIsThisOffice === true
         ? t('resident.facts.thisOffice')
-        : inspect || here === null
-          ? content(facts.homeWorld)
-          : t('resident.facts.anotherWorld')
+        : homeWorldIsThisOffice === false && !inspect
+          ? t('resident.facts.anotherWorld')
+          : content(facts.homeWorld)
   return (
     <dl className="resident-facts">
       <ResidentFact label={t('resident.facts.citizenSince')} value={since} />
@@ -424,7 +432,7 @@ const RESIDENT_PROPOSALS_CSS = `
   margin: 6px 0 0; color: var(--text-3); font: 600 var(--fs-1)/var(--lh-tight) var(--font-ui);
   letter-spacing: .06em; text-transform: uppercase;
 }
-.resident-proposal-reason, .resident-proposal-does, .resident-proposal-done {
+.resident-proposal-reason, .resident-proposal-sleep-time, .resident-proposal-does, .resident-proposal-done {
   margin: 0; max-width: var(--measure-in-box); color: var(--text); font: var(--fs-2)/var(--lh-read) var(--font-ui); overflow-wrap: anywhere;
 }
 .resident-proposal-press, .resident-proposal-decline { display: flex; flex-direction: column; gap: 6px; min-width: 0; }

@@ -18,8 +18,7 @@
  *
  * A button with `role="switch"` and `aria-checked`, drawn as a track and a knob in the product's own
  * tokens: the accent when on, the panel and the strong border when off. Beside it the word On or
- * Off, so the state is never carried by colour alone. Under it the server's sentence saying the
- * state and whether anybody chose it, and one sentence saying what injecting is.
+ * Off, so the state is never carried by colour alone, and the word "default" while nobody has chosen.
  *
  * THE STATE DRAWN IS THE STORED ONE. After a press the panel reads the door's answer, so the switch
  * moves only once the office has stored the change. A refused press leaves the switch where it was
@@ -33,7 +32,7 @@ import { t } from '@shared/i18n.ts'
 import type { MayInject } from '@shared/profile.ts'
 import { api, errorMessage } from '../api.ts'
 import { useLanguage } from '../lib/language.ts'
-import { ErrorNote, Loading, Panel, useAsync } from './ui.tsx'
+import { ErrorNote, Hint, Loading, Panel, useAsync } from './ui.tsx'
 import { SettingChangedLine } from './SettingChangedLine.tsx'
 
 export function InjectSwitchPanel() {
@@ -42,7 +41,12 @@ export function InjectSwitchPanel() {
   if (state.status === 'loading') return <Loading what={t('settingsPanel.inject.loading')} />
   if (state.status === 'error') return <ErrorNote message={state.message} fault={state.fault} />
   return (
-    <Panel titleIs="label" declares={{ surface: 'settings.inject' }} title={t('settingsPanel.title.inject')}>
+    <Panel
+      titleIs="label"
+      declares={{ surface: 'settings.inject' }}
+      title={t('settingsPanel.title.inject')}
+      actions={<Hint>{t('settingsPanel.inject.goesFirst')}</Hint>}
+    >
       <style href="mole-office-inject-switch" precedence="default">
         {INJECT_SWITCH_CSS}
       </style>
@@ -92,13 +96,8 @@ function InjectSwitch({ first }: { first: MayInject }) {
         <span className="injs-word" aria-hidden="true">
           {t(settingsControlWord('settings.inject', reading.may ? 'settingsPanel.inject.on' : 'settingsPanel.inject.off'))}
         </span>
+        {reading.nobodyChose ? <span className="injs-default">{t('switch.byDefault')}</span> : null}
       </div>
-      {/* THE SERVER'S STATE SENTENCE IS ONE OF THREE FROM INJECT_WORDS, picked by the two fields beside it, so the
-          page draws the same one in its own language. */}
-      <p className="injs-state">
-        {t(reading.nobodyChose ? 'settingsPanel.inject.nobodyChose' : reading.may ? 'settingsPanel.inject.switchedOn' : 'settingsPanel.inject.switchedOff')}
-      </p>
-      <p className="injs-what">{t('settingsPanel.inject.whatItIs')}</p>
       {fault === null ? null : <p className="injs-refuse">{fault}</p>}
       <SettingChangedLine setting="agents-may-inject" refreshKey={changeNumber} />
     </div>
@@ -124,8 +123,7 @@ const INJECT_SWITCH_CSS = `
 }
 .injs-switch[aria-checked='true'] .injs-knob { left: 22px; background: var(--panel); }
 .injs-word { font: 600 var(--fs-1)/var(--lh-tight) var(--font-ui); color: var(--text); }
-.injs-state { margin: 0; max-width: var(--measure-in-box); font: var(--fs-1)/var(--lh-tight) var(--font-ui); color: var(--text-2); }
-.injs-what { margin: 0; max-width: var(--measure-in-box); font: var(--fs-1)/var(--lh-body) var(--font-ui); color: var(--text-3); }
+.injs-default { font: var(--fs-1)/var(--lh-tight) var(--font-ui); color: var(--text-3); }
 .injs-refuse {
   margin: 0; max-width: var(--measure-in-box); padding: 2px var(--pad);
   color: var(--st-failed); background: var(--st-failed-bg);

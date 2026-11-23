@@ -40,7 +40,6 @@ tests/graph-card.test.ts
 tests/graph-lines.test.ts
 tests/how-long-a-test-may-take.ts
 tests/kinds-api.test.ts
-tests/merge-carry-rule.test.ts
 tests/module-condition.test.ts
 tests/no-new-agent-is-started-without-the-persons-press.test.ts
 tests/no-test-file-name-carries-a-pronoun-or-a-name.test.ts

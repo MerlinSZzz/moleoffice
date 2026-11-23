@@ -201,7 +201,7 @@ describe('dsh', () => {
     }
     const entry = config.hooks['PreToolUse']?.[0]
     expect(entry?.matcher).toBe('')
-    expect(entry?.hooks[0]?.command).toBe('node ${CLAUDE_PLUGIN_ROOT}/tools/guard/main-world-guard.mjs')
+    expect(entry?.hooks[0]?.command).toBe('node ${CLAUDE_PLUGIN_ROOT}/for-agents/main-world-guard.mjs')
   })
 
   it('says it is not mounted when a hooks file has no such entry', () => {

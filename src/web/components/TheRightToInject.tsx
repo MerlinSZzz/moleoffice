@@ -1,7 +1,6 @@
 // Copyright © 2026 Zhengyang Shen
 // Licensed under the MIT License. See LICENSE.
 import { t } from '@shared/i18n.ts'
-import { gapBetween } from '@shared/spacing.ts'
 import { useLanguage } from '../lib/language.ts'
 import { ParticipantName } from '../pages/NotebookPage.tsx'
 /**
@@ -50,11 +49,8 @@ export function TheRightToInject({ said }: { said: ProfileReply }) {
       <p className="inject-state" data-may={may.may ? 'yes' : 'no'}>
         {may.may ? t('g6b.inject.yes') : t('g6b.inject.no')}
       </p>
-      <p className="inject-what">{t(may.may ? 'g6b.inject.switchedOn' : 'g6b.inject.switchedOff')}</p>
-      {/* WHERE THE SWITCH IS, and one press that goes there. It is the only way to change this. */}
-      <p className="inject-what inject-where">
-        {/* THE GAP BEFORE THE LINK IS THE OFFICE'S ONE RULE: a space in English, none after 。 (wave 13q's round 32). */}
-        {t('g6b.inject.whereItIsSet')}{gapBetween(t('g6b.inject.whereItIsSet'), t('g6b.inject.settings'))}
+      {/* WHERE THE SWITCH IS: one press that goes there. It is the only way to change this. */}
+      <p className="inject-where">
         <RouteLink to={pathFor('settings')} className="inject-to-settings">
           {t('g6b.inject.settings')}
         </RouteLink>
@@ -74,7 +70,7 @@ export function WhoHasInjectedToThem({ said }: { said: ProfileReply }) {
         {INJECT_CSS}
       </style>
       {rows.length === 0 ? (
-        <p className="inject-what"><Absence title={t('g6b.inject.nobodyHas')} /></p>
+        <p className="inject-none"><Absence title={t('g6b.inject.nobodyHas')} /></p>
       ) : (
         <ul className="inject-rows">
           {rows.map((row) => (
@@ -94,7 +90,7 @@ export function WhoHasInjectedToThem({ said }: { said: ProfileReply }) {
 const INJECT_CSS = `
 .inject-state { margin: 0 0 .25rem; font-weight: 600; }
 .inject-state[data-may='no'] { color: var(--st-broken); }
-.inject-what { margin: 0 0 .5rem; font-size: var(--fs-1); color: var(--text-2); }
+.inject-where, .inject-none { margin: 0 0 .5rem; font-size: var(--fs-1); color: var(--text-2); }
 .inject-to-settings { color: var(--accent); font-weight: 600; text-decoration: underline; text-underline-offset: .16em; }
 .inject-rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .35rem; }
 .inject-rows li { display: flex; gap: .5rem; align-items: baseline; flex-wrap: wrap; }

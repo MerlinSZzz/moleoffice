@@ -1995,8 +1995,8 @@ describe('the component sheet carries the whole disclosure vocabulary', () => {
   })
 
   it('shows a row title in Chinese, uncut, in the same list as the English ones', () => {
-    expect(sheet).toContain('把借来的 PageReader Mini 还给灯笼档案组')
-    expect(sheet).toContain('重印目录第 4 页（字号 13，页边距 2.0 cm）')
+    expect(sheet).toContain('把借来的扫描仪还给档案组')
+    expect(sheet).toContain('打印目录页 — 打印机卡纸')
   })
 
   it('shows a health group with nothing in it, which is the state a real strip will spend most of', () => {
@@ -2095,6 +2095,27 @@ describe('absence, at three weights', () => {
     // And each still says it in words, so nothing is carried by shape alone.
     expect(unlooked).toContain('not looked at')
     expect(none).toContain('none')
+  })
+
+  it('draws a told-apart absence with no sentence as its glyph, its edge and its word alone', async () => {
+    // THE PAGES TAKE THESE SENTENCES OFF, because an absence is a short state word. With no
+    // sentence there is nothing to explain on focus, so the mark is not a tab stop and has no
+    // name beyond its word. Without that, it would read out "none: undefined".
+    const { t } = await import('../src/shared/i18n.ts')
+    const none = render(h(ui.Absence, { tier: 'told-apart', looked: true }))
+    const unlooked = render(h(ui.Absence, { tier: 'told-apart', looked: false }))
+    // The same edge as with a sentence, so the two still read apart by shape.
+    expect(none).toContain('data-edge="none"')
+    expect(unlooked).toContain('data-edge="dashed"')
+    expect(none).toContain(`>${t('absence.none')}<`)
+    expect(unlooked).toContain(`>${t('absence.notLooked')}<`)
+    for (const html of [none, unlooked]) {
+      expect(html).toContain('px-glyph')
+      expect(html).not.toContain('undefined')
+      expect(html).not.toContain('tabindex')
+      expect(html).not.toContain('role="note"')
+      expect(html).not.toContain('aria-label')
+    }
   })
 
   it('refuses to draw a told-apart absence without saying which of the two it is', () => {

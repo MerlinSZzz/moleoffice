@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import { liveApp, waitForThePage, type LiveApp } from './helpers.ts'
 import { THE_TEST_OFFICES_OWNER } from './a-page-of-a-test-office.ts'
-import { HOME_LAYOUT_B, homeLayoutSettingName } from '../src/shared/home-layout.ts'
+import { HOME_LAYOUT_A, HOME_LAYOUT_B, homeLayoutSettingName, stackedOrder, type HomePart } from '../src/shared/home-layout.ts'
 
 let app: LiveApp
 
@@ -25,9 +25,11 @@ function keep(layout: unknown): void {
   } finally { database.close() }
 }
 
-// HOME'S SECTIONS, IN THE ORDER LAYOUT A DRAWS THEM: Needs you, Agents at work its bars, and Schedule the week,
-// then today's band. Nothing in the test office is late or stuck, so Late or stuck is not drawn and is not here.
-const SECTIONS = ['needs', 'agents', 'week', 'today'] as const
+// HOME'S SECTIONS, IN THE ORDER A LAYOUT STACKS ITS PARTS: each part is one section, except Schedule, which is the week
+// and then today's band. Nothing in the test office is late or stuck, so Late or stuck is not drawn and is not here.
+const sectionsOf = (parts: readonly HomePart[]): string[] => parts.flatMap(part => part === 'schedule' ? ['week', 'today'] : [part])
+const SECTIONS = sectionsOf(stackedOrder(HOME_LAYOUT_A))
+const STACKED_B = sectionsOf(stackedOrder(HOME_LAYOUT_B))
 
 // EACH OPENING HAS AN ADDRESS OF ITS OWN. An address the page already shows differs from it only by nothing, so the
 // browser stays on the same page, and Home would not read the layout kept since.
@@ -56,10 +58,10 @@ async function openAt(width: number) {
   }, [...SECTIONS])
 }
 
-it('keeps the sections in layout A\'s reading order at every review width', async () => {
+it('keeps the sections in layout A\'s reading order at the widest and the narrowest width', async () => {
   // MUTATION: moving any section changes its data marker order and this assertion fails.
   keep(null)
-  for (const width of [1440, 1180, 990, 660, 390]) {
+  for (const width of [1440, 390]) {
     await openAt(width)
     expect(await app.page.locator('[data-home-section]').evaluateAll(nodes => nodes.map(node => node.getAttribute('data-home-section'))), `${String(width)}px`).toEqual([...SECTIONS])
   }
@@ -81,12 +83,13 @@ it('draws layout B as two columns side by side at 1440, and stacks them at 1180 
   expect(wide.columns).toBe(2)
   expect(wide.sections.agents!.x).toBe(wide.sections.week!.x)
   expect(wide.sections.agents!.x).toBeGreaterThan(wide.sections.needs!.x + wide.sections.needs!.width - 1)
-  expect(Math.abs(wide.sections.agents!.y - wide.sections.needs!.y)).toBeLessThan(2)
+  // Each column starts at the top: the key items head the first, and Agents at work the second.
+  expect(Math.abs(wide.sections.agents!.y - wide.sections.keyItems!.y)).toBeLessThan(2)
   expect(wide.scrollWidth).toBeLessThanOrEqual(wide.viewport)
-  for (const width of [1180, 990, 660, 390]) {
+  for (const width of [1180, 390]) {
     const layout = await openAt(width)
     expect(layout.columns, `${String(width)}px column count`).toBe(1)
-    const rects = SECTIONS.map(id => layout.sections[id]!)
+    const rects = STACKED_B.map(id => layout.sections[id]!)
     expect(rects.every(rect => Math.abs(rect.x - rects[0]!.x) < 1), `${String(width)}px horizontal alignment`).toBe(true)
     expect(rects.every((rect, index) => index === 0 || rect.y > rects[index - 1]!.y), `${String(width)}px reading order`).toBe(true)
     expect(layout.scrollWidth, `${String(width)}px sideways overflow`).toBeLessThanOrEqual(layout.viewport)

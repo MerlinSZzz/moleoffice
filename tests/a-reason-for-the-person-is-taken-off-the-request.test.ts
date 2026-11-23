@@ -35,6 +35,7 @@ import {
   FOR_THE_PERSON_IN_THE_QUERY,
   thePersonsKeyHeader,
   type TestDb,
+  governsTheWholeProject,
 } from './helpers.ts'
 
 let t: TestDb
@@ -101,7 +102,7 @@ async function aDecisionThePersonWrote(): Promise<string> {
   const made = await ask('POST', '/api/records', { ...AS_THE_PERSON, ...thePersonsKeyHeader() }, {
     kind: 'decision',
     title: 'A decision filed by mistake',
-    data: { replaces: [], decided_by: 'the owner', authority: 'the owner said so', because: 'It was filed by mistake.' },
+    data: { ...governsTheWholeProject(), replaces: [], decided_by: 'the owner', authority: 'the owner said so', because: 'It was filed by mistake.' },
   })
   expect(made.status, made.said).toBe(201)
   return String((made.body['record'] as { id: string }).id)

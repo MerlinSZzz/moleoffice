@@ -22,6 +22,7 @@ import { readNextRoundAtTheSeal } from '@shared/next-round-at-the-seal.ts'
 import { NEXT_ROUND, readTheNextRound, type TheNextRound } from '@shared/next-round.ts'
 import { content, t } from '@shared/i18n.ts'
 import type { PanelRecord } from '@shared/types.ts'
+import { CodeRows } from '../lib/code-rows.tsx'
 import { readParticipantsOnce } from '../lib/oneread.ts'
 import type { Declares } from './declares.ts'
 import { storedActorName } from './Governance.tsx'
@@ -154,9 +155,9 @@ function TheNextRoundAtTheSeal({ stored, round, now }: { stored: unknown; round:
         </p>
       ) : note.outcome === 'asked' ? (
         <>
-          <p className="ats-line" data-next-at-the-seal="asked">
-            {t('nextAtTheSeal.asked', { at: shortTime(note.at, now), path: content(note.brief.path) })}
-          </p>
+          <div className="ats-line" data-next-at-the-seal="asked">
+            <CodeRows rows={[{ label: 'nextAtTheSeal.row.askedAt', value: shortTime(note.at, now) }, { label: 'nextAtTheSeal.row.brief', value: note.brief.path }]} />
+          </div>
           <TheAskNow round={readTheNextRound(round)} sha256={note.brief.sha256} now={now} />
         </>
       ) : (

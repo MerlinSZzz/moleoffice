@@ -76,7 +76,7 @@ import { gateNumber } from '../../config/settings.mjs'
 import { theEndOfResolving, theTimeLeftToResolve } from '@shared/merge-queue.ts'
 import { BUS_ENTRIES_BOUNDS, REPO_ROOT, gatePosition, settingValue } from '../../config/settings.mjs'
 import { gateMet, gateMetOnceTheWriteIsTakenBack } from './gate-counts.ts'
-import { THE_LANDING_TOOL_STOPPED, eachHasAPlace, theOfficeStoppedAskingForTheLandingTool, theQueueIsHeld, theQueueIsHeldFor } from './merge-queue.ts'
+import { THE_LANDING_TOOL_STOPPED, eachHasAPlace, theOfficeNameOrAsStored, theOfficeStoppedAskingForTheLandingTool, theQueueIsHeld, theQueueIsHeldFor } from './merge-queue.ts'
 import { theOrderWritten } from '@shared/the-order-written.ts'
 
 import {
@@ -146,7 +146,7 @@ import { whatTheReportOfARunLacks } from './before-the-seal.ts'
 import type { WhatTheReportLacks } from './before-the-seal-rules.ts'
 import { addressText, theAddressThisProcessAnswersOn } from './bound-address.ts'
 import { insideTheFilesArea, theFoldersThatMoved } from '../../config/files-area.mjs'
-import { theAgentOfARun, theCheckAskedFor, theNameAPersonReads, theOfficeStartsTheCheck, whoHoldsTheSecretaryCard, writeAMessage, type TheCheckTheOfficeAskedFor } from './inspection.ts'
+import { theAgentOfARun, theCheckAskedFor, theNameAPersonReads, theOfficeNameOf, theOfficeStartsTheCheck, whoHoldsTheSecretaryCard, writeAMessage, type TheCheckTheOfficeAskedFor } from './inspection.ts'
 import { THE_OFFICE } from './the-office.ts'
 import type { AnotherNoticeKind } from './notices.ts'
 import { asTheMergeQueue } from './merge-entry-door.ts'
@@ -1264,13 +1264,17 @@ function theRefusalsOwnLine(entry: MergeEntryReading, refusedRun?: string): stri
   const run = getRecord(refusedRun ?? entry.run)
   const refused = run === null ? null : howARunStands(run.data).refused
   if (refused === null) return ''
-  return `${aRefusalHappened(theNameAPersonReads(refused.by), theHandleOf(entry), refused.group ?? null)}\n\n`
+  return `${aRefusalHappened(theNameAPersonReads(refused.by), theNameOf(entry), refused.group ?? null)}\n\n`
 }
 
-/** The handle a line about this entry names: the agent of the run that submitted it, or the submitter. */
-function theHandleOf(entry: MergeEntryReading): string {
+/**
+ * THE NAME A LINE ABOUT THIS ENTRY GIVES ITS SUBMITTER, which a person reads: the office name of the agent of the run that
+ * submitted it. Where no run or no agent row answers, the submitter is shown as the entry stores it.
+ */
+function theNameOf(entry: MergeEntryReading): string {
   const run = getRecord(entry.run)
-  return (run === null ? null : theAgentOfARun(run)?.handle) ?? entry.submittedBy.id
+  const agent = run === null ? null : theAgentOfARun(run)
+  return agent === null ? entry.submittedBy.id : theOfficeNameOf(agent)
 }
 
 /**
@@ -1316,7 +1320,7 @@ function theSecretarysLine(reading: MergeEntryReading): { line: string; notice: 
   const record = getRecord(reading.id)
   const held = record === null ? null : machineFieldsOf(record)
   const where = basename(reading.lane)
-  const handle = theHandleOf(reading)
+  const named = theNameOf(reading)
   const files = record === null ? 0 : howManyFiles(record)
   const n = `${String(files)} ${files === 1 ? 'file' : 'files'}`
   if (reading.state === 'merged') {
@@ -1324,7 +1328,7 @@ function theSecretarysLine(reading: MergeEntryReading): { line: string; notice: 
     // A FILES ENTRY RAN NO TESTS AND NOTHING OF IT WAS CHECKED AGAIN, so its line says where it landed and
     // stops there. It said "tests: <the merger's log>" until the sandbox v1 fix (INTEGRATION.md section 7,
     // issue 7): the log the tool names beside a files changeset's `tested` step is its own, not a suite's.
-    if (reading.changeset.adapter === 'files') return { line: `merged ${where}: ${handle} #${reading.id} ${n} → ${reading.lane}`, notice: 'anEntryLanded' }
+    if (reading.changeset.adapter === 'files') return { line: `merged ${where}: ${named} #${reading.id} ${n} → ${reading.lane}`, notice: 'anEntryLanded' }
     const tests = receipt?.tests
     // NO LOG IN THE LINE (SPEC.md 5.7): a green run whose counts the tool did not report is said to be green. A plugin-only
     // change was tested by the plugin's own check and not by the office's tests, and its line says that (plan VlQueUhVQQmi).
@@ -1340,7 +1344,7 @@ function theSecretarysLine(reading: MergeEntryReading): { line: string; notice: 
             : `tests ${String(tests.passed)}/${String(tests.ran)}`
     const reinspected = `reinspected ${String(receipt?.reinspected.length ?? 0)}`
     const target = `main ${(receipt?.mainAfter ?? '').slice(0, 7)}`
-    return { line: `merged ${where}: ${handle} #${reading.id} ${n} → ${target} (${[testsSay, reinspected].filter((one) => one !== '').join(', ')})`, notice: 'anEntryLanded' }
+    return { line: `merged ${where}: ${named} #${reading.id} ${n} → ${target} (${[testsSay, reinspected].filter((one) => one !== '').join(', ')})`, notice: 'anEntryLanded' }
   }
   if (reading.state === 'bounced') {
     const bounce = record?.data['bounced'] as Bounce | undefined
@@ -1363,20 +1367,20 @@ function theSecretarysLine(reading: MergeEntryReading): { line: string; notice: 
               reason === 'refused' && (bounce?.files.length ?? 0) === 0
               ? 'by the check'
               : `in ${String(bounce?.files.length ?? 0)} ${bounce?.files.length === 1 ? 'file' : 'files'}`
-    return { line: `bounced ${where}: ${handle} #${reading.id} ${reason} ${about} → back to ${handle}`, notice: 'anEntryBouncedForTheSecretary' }
+    return { line: `bounced ${where}: ${named} #${reading.id} ${reason} ${about} → back to ${named}`, notice: 'anEntryBouncedForTheSecretary' }
   }
   // Read the completed stop from its stored words. Today's limit cannot undo it.
   if (reading.state === 'landing' && held !== null && held.stalls !== null && theOfficeStoppedAskingForTheLandingTool(held.stalls)) {
     const then = reading.changeset.adapter === 'git' ? `, then ${theRequestToLandAgain(reading.id)}` : ''
-    return { line: `landing stalled ${where}: ${handle} #${reading.id} ${n} after ${String(held.stalls.runs)} merge tool runs → a person must look${then}`, notice: 'aLandingStalled' }
+    return { line: `landing stalled ${where}: ${named} #${reading.id} ${n} after ${String(held.stalls.runs)} merge tool runs → a person must look${then}`, notice: 'aLandingStalled' }
   }
   if (reading.state === 'withdrawn') {
     const by = reading.withdrawn?.by
-    // An agent is named by its handle, read from its row; an id no single row answers is shown as it is.
-    const byName = by === undefined ? 'nobody named' : by.kind === 'agent' ? (theOneAgentAStringNames(sqlite, by.id)?.handle ?? by.id) : by.id
-    return { line: `withdrawn ${where}: ${handle} #${reading.id} by ${byName}: ${reading.withdrawn?.because ?? ''}`, notice: 'anEntryWasWithdrawn' }
+    // An agent is named by its office name, read from its row; an id no single row answers is shown as it is.
+    const byName = by === undefined ? 'nobody named' : theOfficeNameOrAsStored(by)
+    return { line: `withdrawn ${where}: ${named} #${reading.id} by ${byName}: ${reading.withdrawn?.because ?? ''}`, notice: 'anEntryWasWithdrawn' }
   }
-  return { line: `${stateWord(reading.state).text.toLowerCase()} ${where}: ${handle} #${reading.id} ${n}`, notice: 'anEntryEndedInAnotherState' }
+  return { line: `${stateWord(reading.state).text.toLowerCase()} ${where}: ${named} #${reading.id} ${n}`, notice: 'anEntryEndedInAnotherState' }
 }
 
 /**
@@ -1597,7 +1601,7 @@ function bounce(entry: MergeEntryReading, reason: BounceReason, facts: BounceFac
     const told =
       inTheNotice === null || secretary === null
         ? theSecretaryHearsOneLine(reading, entry.workspaceId)
-        : { message: inTheNotice, says: `${secretary.handle} was told in the bounce notice, message ${inTheNotice}, so no second line was written.` }
+        : { message: inTheNotice, says: `${theOfficeNameOf(secretary)} was told in the bounce notice, message ${inTheNotice}, so no second line was written.` }
     return write(entry.id, { told: { submitter, secretary: told.message, says: `${whom.says} ${told.says}` } }, actor)
   })()
   return readMergeEntry(moved)
@@ -1835,16 +1839,16 @@ function writeTheResolveBrief(entry: MergeEntryReading, resolving: Resolving, un
       noBrief:
         told.length === 0
           ? `Nobody is told of this entry's end, so no agent is asked to ${red ? 'fix its red tests' : 'resolve it'}, and no brief was written.`
-          : `No agent told of this entry's end (${told.map((one) => one.id).join(', ')}) may hand a ${red ? 'fix' : 'resolution'} over: each is retired or holds a worker's card. No brief was written.`,
+          : `No agent told of this entry's end (${told.map(theOfficeNameOrAsStored).join(', ')}) may hand a ${red ? 'fix' : 'resolution'} over: each is retired or holds a worker's card. No brief was written.`,
     }
   }
   const last = theLastSandboxRunOrWhyNot(agent, entry.workspaceId)
   if ('cannot' in last) return { agent: agent.id, noBrief: `${last.cannot} No brief was written.` }
   const run = last.run
-  if (run === null) return { agent: agent.id, noBrief: `${agent.handle} has no run in this project that was started in a sandbox, so there is no sandbox folder to write the brief into. No brief was written.` }
+  if (run === null) return { agent: agent.id, noBrief: `${theOfficeNameOf(agent)} has no run in this project that was started in a sandbox, so there is no sandbox folder to write the brief into. No brief was written.` }
   const sandbox = theSandboxTheOfficeVouchesFor(run)
   if (sandbox === null) {
-    return { agent: agent.id, noBrief: `Run ${run.id}, the last of ${agent.handle} started in a sandbox, names a sandbox the office cannot vouch for: its folder is not one a container row of the ledger names. No brief was written.` }
+    return { agent: agent.id, noBrief: `Run ${run.id}, the last of ${theOfficeNameOf(agent)} started in a sandbox, names a sandbox the office cannot vouch for: its folder is not one a container row of the ledger names. No brief was written.` }
   }
   const changeset = entry.changeset as GitChangeset
   const written = writeABriefIntoASandbox(sandbox.folder, `resolve-${entry.id}`, (name) => theResolveBrief(entry, changeset, resolving, agent, join(sandbox.folder, 'worktrees', name), until))
@@ -1866,6 +1870,9 @@ function sendTheAskingMessage(entry: MergeEntryReading, resolving: Resolving, as
   if (to.length === 0) return { noMessage: "Nobody is told of this entry's end and nobody holds the secretary card, so no message was sent." }
   const named = asked.agent === undefined ? null : readParticipant({ kind: 'agent', id: asked.agent })
   const handle = named !== null && 'handle' in named ? named.handle : (asked.agent ?? null)
+  // A PERSON READS THE AGENT BY ITS OFFICE NAME; the commands and the handle beside the name in the body keep the handle.
+  const name = named !== null && 'handle' in named ? theOfficeNameOf(named) : handle
+  const nameAndHandle = name === handle ? handle : `${name} (${handle})`
   const askedToResolve: AskedToResolveMessage = { entry: entry.id, files: [...resolving.files], ...(resolving.red === undefined ? {} : { red: [...resolving.red.tests] }), brief: asked.brief ?? null, agent: asked.agent ?? null, until: new Date(untilMs).toISOString() }
   const replays = resolving.replays === undefined ? '' : `The fix of its red tests that passed the merge tool's check, commit ${resolving.replays.commit}, is held at ${resolving.replays.ref}, and the clean copy replays it with the entry's own commits.\n`
   const round = asked.round
@@ -1873,8 +1880,8 @@ function sendTheAskingMessage(entry: MergeEntryReading, resolving: Resolving, as
     asked.brief === undefined || handle === null
       ? `Nobody can be started on a brief, so whoever ${resolving.red === undefined ? 'resolves it' : 'fixes them'} has to be told by a person or the secretary.`
       : round?.status === 202
-        ? `${handle} had no run going, so the office asked for its next round itself, on this brief. The door answered: ${round.said}`
-        : `${round === undefined ? '' : `${handle} had no run going, and the next-round door refused the office's own ask (${round.status}): ${round.said} `}To start ${handle} on it, a secretary asks POST /api/agents/${handle}/next-round {"brief": "${asked.brief}"}.`
+        ? `${name} had no run going, so the office asked for its next round itself, on this brief. The door answered: ${round.said}`
+        : `${round === undefined ? '' : `${name} had no run going, and the next-round door refused the office's own ask (${round.status}): ${round.said} `}To start ${name} on it, a secretary asks POST /api/agents/${handle}/next-round {"brief": "${asked.brief}"}.`
   if (resolving.red !== undefined) {
     const message = writeAMessage({
       workspaceId: entry.workspaceId,
@@ -1889,7 +1896,7 @@ function sendTheAskingMessage(entry: MergeEntryReading, resolving: Resolving, as
         `Merge entry ${entry.id} — ${entry.title} — was red only with its own change, and the queue handed it to its own supervisor instead of bouncing it. ${resolving.says}\n\n` +
         `The red tests: ${resolving.red.tests.join(', ')}.\n` +
         replays +
-        (handle === null ? 'No agent is asked by name.\n' : `The agent asked to fix them: ${handle}.\n`) +
+        (handle === null ? 'No agent is asked by name.\n' : `The agent asked to fix them: ${nameAndHandle}.\n`) +
         (asked.brief === undefined ? `${asked.noBrief ?? ''}\n` : `The fix brief: ${asked.brief}\n`) +
         `The ${resolving.minutes} minutes end at ${until} (${resolving.timeZone}). When they end with no fix handed over, or with the last fix refused by the merge tool's check, the entry bounces as "not fixed in the hour".\n\n` +
         startIt,
@@ -1910,7 +1917,7 @@ function sendTheAskingMessage(entry: MergeEntryReading, resolving: Resolving, as
       `The files to resolve: ${resolving.files.join(', ')}.\n` +
       replays +
       (resolving.resolvedBefore === undefined ? '' : `${resolving.resolvedBefore.files.join(', ')} ${resolving.resolvedBefore.files.length === 1 ? 'was' : 'were'} resolved before, in commit ${resolving.resolvedBefore.commit}, which ${resolvedRefOf(entry.id)} still holds as a help; ${resolving.resolvedBefore.files.length === 1 ? 'it is' : 'they are'} resolved and judged again.\n`) +
-      (handle === null ? 'No agent is asked by name.\n' : `The agent asked to resolve it: ${handle}.\n`) +
+      (handle === null ? 'No agent is asked by name.\n' : `The agent asked to resolve it: ${nameAndHandle}.\n`) +
       (asked.brief === undefined ? `${asked.noBrief ?? ''}\n` : `The resolve brief: ${asked.brief}\n`) +
       `The ${resolving.minutes} minutes end at ${until} (${resolving.timeZone}). When they end with no resolution handed over, the entry bounces as "the hour ran out".\n\n` +
       startIt,
@@ -2910,9 +2917,14 @@ export function askAStalledLandingAgain(input: {
     throw new PanelError(`The office could not read where main stands in ${root}: ${String(error)}. Nothing was written.`, 409)
   }
   const at = nowStamp()
-  // AN AGENT IS NAMED BY ITS HANDLE, which is what a person reads it as; its registry id when it has none.
+  // AN AGENT IS NAMED BY ITS OFFICE NAME, which is what a person reads it as; its registry id when it has no row.
+  // Worked out outside the sentence: the machine-word gate reads a stored kind in a template as a word shown unread.
   const registered = readParticipant(me)
-  const who = `the ${participantWord(me.kind)} ${registered !== null && 'handle' in registered ? registered.handle : me.id}`
+  const name =
+    registered !== null && 'handle' in registered
+      ? (me.kind === 'agent' ? theOfficeNameOf(registered) : registered.handle)
+      : me.id
+  const who = `the ${participantWord(me.kind)} ${name}`
   const because = /[.!?]$/u.test(input.because) ? input.because : `${input.because}.`
   const asked = { by: me, at, because: input.because, mainAt: now }
   if (input.integrateAgain === true) {
@@ -3636,8 +3648,8 @@ function tellTheSubmitterOfTheCheckAgain(input: {
   if (submitter.kind === 'agent') {
     const agent = theOneAgentAStringNames(sqlite, submitter.id)
     if (agent === null) return `The submitter ${submitter.id} was not told: no single registered agent answers to that name.`
-    if (agent.retired) return `The submitter ${agent.handle} was not told: it is retired.`
-    return `The submitter ${agent.handle} was told, in message ${tell({ kind: 'agent', id: agent.id }, forAnAgent(agent))}.`
+    if (agent.retired) return `The submitter ${theOfficeNameOf(agent)} was not told: it is retired.`
+    return `The submitter ${theOfficeNameOf(agent)} was told, in message ${tell({ kind: 'agent', id: agent.id }, forAnAgent(agent))}.`
   }
   // THE SECRETARY FIRST, so the person's notice says what was actually sent.
   const secretary = whoHoldsTheSecretaryCard()
@@ -3645,7 +3657,7 @@ function tellTheSubmitterOfTheCheckAgain(input: {
   const theSecretarySays =
     secretary === null || toTheSecretary === null
       ? 'Nobody holds the secretary card, so nobody was sent this notice with the commands.'
-      : `${secretary.handle}, who holds the secretary card, was sent this notice with the commands, in message ${toTheSecretary}.`
+      : `${theOfficeNameOf(secretary)}, who holds the secretary card, was sent this notice with the commands, in message ${toTheSecretary}.`
   const toThePerson = tell(submitter, `${what}\n\n${whatTheOfficeDid}\n\n${whoStartsIt} ${theSecretarySays}`)
   return `The person, who submitted the entry, was told, in message ${toThePerson}. ${theSecretarySays}`
 }
@@ -3721,7 +3733,7 @@ function theEntryWaitsForRoom(entry: MergeEntryReading, record: PanelRecord, say
       toldSays = `Nobody holds the secretary card, so the line "${line}" reached nobody.`
     } else {
       message = writeAMessage({ workspaceId: entry.workspaceId, to: [{ kind: 'agent', id: holder.id }], title: line, body: line, aboutRun: entry.run, actor: THE_OFFICE, onlyThem: true, notice: 'anEntryWaitsForRoom' })
-      toldSays = `${holder.handle} was told in one line, message ${message}.`
+      toldSays = `${theOfficeNameOf(holder)} was told in one line, message ${message}.`
     }
   }
   const written = write(entry.id, { waitingForRoom: { since, at, says, message, toldAt: told, ...(toldClock === null ? {} : { toldTime: toldClock }) } }, actor)
@@ -3826,15 +3838,15 @@ function askTheDoorAsTheOffice(agent: string, brief: string, workspaceId: string
  * ONE ASK FOR A FIX ROUND (13u round 90). The brief goes into the agent's last sandbox first, and then the door is asked.
  * Each reason the door was not asked is said with no `status`; `nobody` says why there is no agent to ask.
  */
-function askForAFixRound(entry: MergeEntryReading, which: FixRoundAsk['for'], agent: { id: string; handle: string } | null, nobody: string, brief: string, dueAt: string): FixRoundAsk {
+function askForAFixRound(entry: MergeEntryReading, which: FixRoundAsk['for'], agent: { id: string; handle: string; name: string } | null, nobody: string, brief: string, dueAt: string): FixRoundAsk {
   const at = nowStamp()
   if (agent === null) return { for: which, at, said: nobody }
   const last = theLastSandboxRunOrWhyNot(agent, entry.workspaceId)
   if ('cannot' in last) return { for: which, agent: agent.id, at, said: `${last.cannot} The door was not asked.` }
   const run = last.run
-  if (run === null) return { for: which, agent: agent.id, at, said: `${agent.handle} has no run in this project that was started in a sandbox, so there is no sandbox to write the fix brief into. The door was not asked.` }
+  if (run === null) return { for: which, agent: agent.id, at, said: `${theOfficeNameOf(agent)} has no run in this project that was started in a sandbox, so there is no sandbox to write the fix brief into. The door was not asked.` }
   const sandbox = theSandboxTheOfficeVouchesFor(run)
-  if (sandbox === null) return { for: which, agent: agent.id, at, said: `Run ${run.id}, the last of ${agent.handle} started in a sandbox, names a sandbox the office cannot vouch for. The door was not asked.` }
+  if (sandbox === null) return { for: which, agent: agent.id, at, said: `Run ${run.id}, the last of ${theOfficeNameOf(agent)} started in a sandbox, names a sandbox the office cannot vouch for. The door was not asked.` }
   const written = writeABriefIntoASandbox(sandbox.folder, `fix-round-${entry.id}`, () => brief)
   if ('refused' in written) return { for: which, agent: agent.id, at, said: `${written.refused} The door was not asked.` }
   const answered = askTheDoorAsTheOffice(agent.id, written.path, entry.workspaceId, { entry: entry.id, dueAt })
@@ -3866,7 +3878,7 @@ function askTheSheriff(entry: MergeEntryReading, three: Pick<WideRedDecision, 'f
 /** Each ask for a fix round and what it was answered, one sentence or two each, for the step's words and a bounce. */
 function whatEachAskWasAnswered(asks: readonly FixRoundAsk[]): string {
   return asks.map(ask => {
-    const who = `${ask.for === 'line' ? "the line's supervisor" : 'the build sheriff'}${ask.agent === undefined ? '' : `, agent ${ask.agent},`}`
+    const who = `${ask.for === 'line' ? "the line's supervisor" : 'the build sheriff'}${ask.agent === undefined ? '' : `, agent ${theOfficeNameOrAsStored({ kind: 'agent', id: ask.agent })},`}`
     const answer = ask.status === undefined ? `${who} was not asked at the door: ${ask.said}` : `${who} was asked at ${ask.at}, and the door answered ${ask.status}: ${ask.said}`
     const after = ask.ended !== undefined ? ` The ask ended with no run at ${ask.ended.at}: ${ask.ended.says}` : ask.started !== undefined ? ` Its round started run ${ask.started.run} at ${ask.started.at}.` : ''
     return `For a fix round, ${answer}${after}`
@@ -3920,7 +3932,7 @@ function lookAtTheFixRound(entry: MergeEntryReading, held: MachineFields, actor:
       write(entry.id, { tested: { mergeClass: null } }, actor)
       return write(entry.id, { tested: { mergeClass: two }, waitsForAFixRound: { asks, reserved } }, actor)
     })()
-    return { entry: readMergeEntry(written), decided: `A repair is reserved for agent ${reserved.agent} until ${waits.until} (${waits.timeZone}). It starts in a new worktree after the entry lands on main. No repair run has started. The entry may land handed back.` }
+    return { entry: readMergeEntry(written), decided: `A repair is reserved for agent ${theOfficeNameOrAsStored({ kind: 'agent', id: reserved.agent })} until ${waits.until} (${waits.timeZone}). It starts in a new worktree after the entry lands on main. No repair run has started. The entry may land handed back.` }
   }
   if (reading.open || (reading.reason === NO_RUN_GOING && going !== undefined)) {
     const starter = reading.open ? reading.starter! : theAgentAndStarterOfAnEntry(entry).starter!.id
@@ -3934,7 +3946,7 @@ function lookAtTheFixRound(entry: MergeEntryReading, held: MachineFields, actor:
       return write(entry.id, { tested: { mergeClass: two }, waitsForAFixRound: { asks, opened } }, actor)
     })()
     const whose = opened.for === 'starter' ? 'its starter' : opened.for === 'line' ? "the line's supervisor" : 'the build sheriff'
-    return { entry: readMergeEntry(written), decided: `The fix round opened: run ${opened.run} of ${whose}, agent ${opened.agent}, is going. The entry may land, handed back: ${two.featureFiles.join(', ')}.` }
+    return { entry: readMergeEntry(written), decided: `The fix round opened: run ${opened.run} of ${whose}, agent ${theOfficeNameOrAsStored({ kind: 'agent', id: opened.agent })}, is going. The entry may land, handed back: ${two.featureFiles.join(', ')}.` }
   }
   if (reading.reason === NO_RUN_GOING && !asks.some(ask => ask.for === 'sheriff') && asks.every(ask => ask.status !== 202 || ask.ended !== undefined)) {
     asks = [...asks, askTheSheriff(entry, three, tested, waits)]
@@ -4028,7 +4040,11 @@ export { theHandBackDeadline }
 function theHandBackSymptom(facts: HandBackFacts, basis: 'landing' | 'this hand-back'): string {
   const { line, commits, deadline, timeZone, hours } = facts
   const fixRound = line.run === null ? undefined : line.fixRound
-  return `Merge entry ${facts.entry} landed with feature test files red: ${facts.files.join(', ')}. Landed commits: ${commits.join(', ')}. Its line is agent ${line.agent ?? 'not recorded'}, starter ${line.starter}, ${line.run === null ? 'repair reserved, with no run started yet' : `running run ${line.run}`}.${fixRound === undefined ? '' : ` That run is the fix round the office asked for itself, of ${fixRound.as === 'line' ? "the line's supervisor" : 'the build sheriff'}, agent ${fixRound.agent}.`} Land a repair by ${deadline} (${timeZone}), ${hours} hours after ${basis}. Name this problem with fixRound kind repair; every named file must pass alone.`
+  // A person reads each agent by its office name; an id no single row answers is shown as stored.
+  const agent = line.agent === null ? 'not recorded' : theOfficeNameOrAsStored({ kind: 'agent', id: line.agent })
+  const starter = theOfficeNameOrAsStored({ kind: 'agent', id: line.starter })
+  const round = fixRound === undefined ? '' : ` That run is the fix round the office asked for itself, of ${fixRound.as === 'line' ? "the line's supervisor" : 'the build sheriff'}, agent ${theOfficeNameOrAsStored({ kind: 'agent', id: fixRound.agent })}.`
+  return `Merge entry ${facts.entry} landed with feature test files red: ${facts.files.join(', ')}. Landed commits: ${commits.join(', ')}. Its line is agent ${agent}, starter ${starter}, ${line.run === null ? 'repair reserved, with no run started yet' : `running run ${line.run}`}.${round} Land a repair by ${deadline} (${timeZone}), ${hours} hours after ${basis}. Name this problem with fixRound kind repair; every named file must pass alone.`
 }
 
 /** Both landing and scheduled tracing use this exact problem shape and notice. */
@@ -4054,7 +4070,7 @@ export function fileAHandBackProblem(entry: MergeEntryReading, input: {
   const secretary = whoHoldsTheSecretaryCard()
   if (secretary !== null && !to.some(one => one.id === secretary.id)) to.push({ kind: 'agent', id: secretary.id })
   if (to.length > 0) writeAMessage({ workspaceId: entry.workspaceId, to, title: problem.title, body: `Problem ${problem.id}. ${symptom}`, aboutRun: entry.run, actor: THE_OFFICE, onlyThem: true, notice: 'handedBack' })
-  return { problem: problem.id, says: `Filed Handed back problem ${problem.id} for ${facts.files.join(', ')}; repair is due ${deadline} (${clock.timeZone}). Told ${to.map(one => one.id).join(', ') || 'nobody'}.` }
+  return { problem: problem.id, says: `Filed Handed back problem ${problem.id} for ${facts.files.join(', ')}; repair is due ${deadline} (${clock.timeZone}). Told ${to.map(theOfficeNameOrAsStored).join(', ') || 'nobody'}.` }
 }
 
 /** One hand-back holds all feature files; plain H reminders keep their existing per-file path. */
@@ -4084,8 +4100,10 @@ function fileWideRedProblem(entry: MergeEntryReading, decision: WideRedDecision,
   const secretary = whoHoldsTheSecretaryCard()
   for (const recipient of [sheriff, secretary]) if (recipient !== null) writeAMessage({ workspaceId: entry.workspaceId, to: [{ kind: 'agent', id: recipient.id }], title: line, body: line, aboutRun: entry.run, actor: THE_OFFICE, onlyThem: true, notice: 'landedWithAWideRed' })
   return [sayInEnglish('wideRed.filed', { problem: problem.id, files: files.join(', ') }),
-    sheriff === null ? sayInEnglish('wideRed.noSheriff') : sayInEnglish('wideRed.toldSheriff', { handle: sheriff.handle }),
-    secretary === null ? sayInEnglish('wideRed.noSecretary') : sayInEnglish('wideRed.toldSecretary', { handle: secretary.handle })].join(' ')
+    // The value under the key {handle} is the office name, which a person reads.
+    sheriff === null ? sayInEnglish('wideRed.noSheriff') : sayInEnglish('wideRed.toldSheriff', { handle: theOfficeNameOf(sheriff) }),
+    // The value under the key {handle} is the office name, which a person reads.
+    secretary === null ? sayInEnglish('wideRed.noSecretary') : sayInEnglish('wideRed.toldSecretary', { handle: theOfficeNameOf(secretary) })].join(' ')
 }
 
 /** Only the landed repair closes its hand-back, in the landing's transaction. */
@@ -4190,8 +4208,8 @@ function filePerFileProblems<T extends { file: string; log?: string; failureLine
     const toSecretary = holder === null ? null : writeAMessage({ workspaceId: entry.workspaceId, to: [{ kind: 'agent', id: holder.id }], title: line, body: line, aboutRun: entry.run, actor: THE_OFFICE, onlyThem: true, notice: family.notice })
     said =
       `Filed ${fresh.map((one) => one.problem).join(', ')}. ` +
-      (sheriff === null ? (named === '' ? 'MOLE_OFFICE_BUILD_SHERIFF names nobody, so no sheriff was told. ' : `MOLE_OFFICE_BUILD_SHERIFF names ${named}, which is no one agent, so no sheriff was told. `) : `The build sheriff ${sheriff.handle} was told in message ${String(toSheriff)}. `) +
-      (holder === null ? 'Nobody holds the secretary card, so no secretary was told.' : `${holder.handle} was told in message ${String(toSecretary)}.`)
+      (sheriff === null ? (named === '' ? 'MOLE_OFFICE_BUILD_SHERIFF names nobody, so no sheriff was told. ' : `MOLE_OFFICE_BUILD_SHERIFF names ${named}, which is no one agent, so no sheriff was told. `) : `The build sheriff ${theOfficeNameOf(sheriff)} was told in message ${String(toSheriff)}. `) +
+      (holder === null ? 'Nobody holds the secretary card, so no secretary was told.' : `${theOfficeNameOf(holder)} was told in message ${String(toSecretary)}.`)
   }
   return { held, said }
 }
@@ -4203,7 +4221,7 @@ function fileRedOnMainProblems(entry: MergeEntryReading, facts: FactsOf<'red-on-
       : `${one.file} is red on main ${facts.mainAt.slice(0, HOW_MUCH_OF_A_COMMIT_A_SYMPTOM_NAMES)} after merge entry ${entry.id} landed with it red. It is a plain house rule. MOLE_OFFICE_GATE_HOUSE_RULES was at ${houseRules.position} when the office admitted it; it is at ${String(gatePosition('house-rule-reds'))} on completion. Its log is ${one.log ?? 'not recorded'}.`,
     extra: (one, buildSheriff) => ({ redOnMainFamily: true, buildSheriff, mainAt: facts.mainAt, mergeEntry: entry.id, ...(one.log === undefined ? {} : { log: one.log }) }),
     matcher: openRedOnMainProblem,
-    line: (fresh, sheriff) => `${houseRules === undefined ? "Red on main, and no merge entry's" : 'Red on main after a house-rule landing'}: ${fresh.map((one) => `${one.file} (problem ${one.problem})`).join(', ')}${sheriff === null ? '' : `, for the build sheriff ${sheriff.handle}`}.`,
+    line: (fresh, sheriff) => `${houseRules === undefined ? "Red on main, and no merge entry's" : 'Red on main after a house-rule landing'}: ${fresh.map((one) => `${one.file} (problem ${one.problem})`).join(', ')}${sheriff === null ? '' : `, for the build sheriff ${theOfficeNameOf(sheriff)}`}.`,
     notice: 'redOnMain',
   })
   // THE ENTRY KEEPS WHICH FILE WAS FILED WHERE; the failure lines stay in the problem alone.
@@ -4230,7 +4248,8 @@ function fileChangedAnswerProblems(entry: MergeEntryReading, files: NonNullable<
       commit: one.commit.slice(0, HOW_MUCH_OF_A_COMMIT_A_SYMPTOM_NAMES), log: one.log ?? sayInEnglish('flakyTests.noLog') }),
     extra: (one, buildSheriff) => ({ changedItsAnswerFamily: true, buildSheriff, mergeEntry: entry.id, commit: one.commit, how: one.how, ...(one.log === undefined ? {} : { log: one.log }) }),
     matcher: openChangedAnswerProblem,
-    line: (fresh, sheriff) => sayInEnglish('flakyTests.noticeLine', { files: fresh.map(one => `${one.file} (problem ${one.problem})`).join(', '), sheriff: sheriff === null ? '' : sayInEnglish('flakyTests.forSheriff', { handle: sheriff.handle }) }),
+    // The value under the key {handle} is the office name, which a person reads.
+    line: (fresh, sheriff) => sayInEnglish('flakyTests.noticeLine', { files: fresh.map(one => `${one.file} (problem ${one.problem})`).join(', '), sheriff: sheriff === null ? '' : sayInEnglish('flakyTests.forSheriff', { handle: theOfficeNameOf(sheriff) }) }),
     notice: 'aTestChangedItsAnswer',
   }).said
 }

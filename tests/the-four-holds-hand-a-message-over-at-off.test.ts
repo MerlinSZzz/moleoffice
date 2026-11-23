@@ -45,7 +45,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { GATES, MESSAGE_HOLDS, type MessageHold } from '../src/config/gates.mjs'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { onePass, type WorkerSettings } from '../src/worker/index.ts'
-import { apiApp, freshDb, one, theAnswerToAWriteInATestOffice, thePersonsKeyHeader, type TestDb } from './helpers.ts'
+import { A_SLEEP_TIME, apiApp, freshDb, one, theAnswerToAWriteInATestOffice, thePersonsKeyHeader, type TestDb } from './helpers.ts'
 import { aCheckoutForATestRun } from './a-checkout-for-a-test-run.ts'
 
 const FAKE = fileURLToPath(new URL('./fake-runtime.mjs', import.meta.url))
@@ -150,7 +150,7 @@ async function theDelivery(message: string, agent: string): Promise<{ mark: stri
 
 /** The person makes the agent a permanent resident and puts it to sleep; it is woken after each case. */
 async function putToSleep(handle: string): Promise<void> {
-  const proposed = await call('POST', '/api/residents/proposals', as(SECRETARY), { agentId: handle, because: 'It has done made-up steady work here.' })
+  const proposed = await call('POST', '/api/residents/proposals', as(SECRETARY), { agentId: handle, because: 'It has done made-up steady work here.', sleepTime: A_SLEEP_TIME })
   expect(proposed.status, proposed.raw).toBe(201)
   const confirmed = await call('POST', `/api/residents/proposals/${String(proposed.body.proposal?.id)}/confirm`, PERSON)
   expect(confirmed.status, confirmed.raw).toBe(200)

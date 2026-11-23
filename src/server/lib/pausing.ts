@@ -33,8 +33,13 @@
  *    ended the moment its process goes; left running, it would write `crashed` over `paused`, and
  *    it could start a new run for a queued message after the list was read.
  * 2. Each run the office started is stopped by its process group, through the same release a
- *    person's stop uses, and waited for. Only a run whose process is gone is written `paused`: a run
- *    that survives the signal is reported as still running, never as paused.
+ *    person's stop uses, and waited for. On Windows that group is the Job Object the run's starter
+ *    made, and the release ends every process in it at once, because a run's program has no stop
+ *    pipe to ask. Then the release looks again, as the listing reads the run, for a few seconds at
+ *    most. Only a run whose program is read gone is written `paused`. A run read alive after its
+ *    stop is reported as still running, never as paused. A run whose reading cannot tell is not
+ *    paused either, and its answer says it could not tell. Such a run is in the list as well, with
+ *    its state as not known, and it goes to the same release.
  * 3. Each paused run's conversation id is read from its record. It was written when the run started
  *    (piece H5), so a run killed mid-turn still has it. A run without one is said to have none,
  *    because it can then not be resumed by its id.
@@ -46,10 +51,10 @@ import { theOwnPartOf } from '../../config/own-rows.mjs'
 import { saysStillGoing } from '../../config/still-going.mjs'
 import type { ParticipantRef } from '@shared/participants.ts'
 import { readMessage, sayWhereADeliveryStands } from './messages.ts'
-import { theLastToolRunStillRuns } from './merge-queue.ts'
+import { theLastToolRunsReading } from './merge-queue.ts'
 import { patchRecord, type Actor } from './records.ts'
 import { PanelError } from './panel-error.ts'
-import { askAProcessGroupToStop, listResources, releaseResource } from './resources.ts'
+import { askAProcessGroupToStop, listResources, releaseResource, type ReleaseResult } from './resources.ts'
 import { everyRunRow } from './worker.ts'
 import { theAgentARunServes } from './the-agent-a-run-serves.ts'
 import { THE_WORKER } from '@shared/the-worker-actor.ts'
@@ -80,10 +85,13 @@ function theMessage(messageId: string, workspaceId: string): { id: string; title
  *
  * Every project, because the office is shut down for all of them at once.
  *
- * A RUN THE OFFICE STARTED counts while its own process is still going, read by the same question the
- * worker's other readers ask (`theLastToolRunStillRuns`). A record that says `running` for a process
- * that has already gone is not at work: a crash or a restart cut it off, and the next start carries
- * it on as criterion M24 says.
+ * A RUN THE OFFICE STARTED counts while its own process is read running, and while its reading cannot
+ * tell whether it runs. Such a run may still be running, so it is listed among the runs a pause would
+ * pause, and its state is given as not known. The pause sends it to the release like any other, and
+ * pauses it only once its program is read gone. The reading is the one the release takes of the same
+ * row (`theLastToolRunsReading`), so the list and the release cannot say two things of one run. A record
+ * that says `running` for a process read gone is not at work: a crash or a restart cut it off, and the
+ * next start carries it on as criterion M24 says.
  *
  * A SESSION THE OFFICE DID NOT START — a terminal a person is working in, an agent's own session —
  * counts while a process registered under it is still alive. The office cannot pause it, because it
@@ -106,7 +114,8 @@ export function theLiveRuns(): TheLiveRuns {
       // The office's own processes (the server's row, the worker's row) and its tools (the check, the
       // merge tool) answer no message for an agent, and a shutdown does not pause them.
       if (messageId === null || agent === null) continue
-      if (theLastToolRunStillRuns(row.workspaceId, { session: row.id }) === null) continue
+      const reading = theLastToolRunsReading(row.workspaceId, { session: row.id })
+      if (reading.state === 'not running') continue
       pausable.push({
         session: row.id,
         workspaceId: row.workspaceId,
@@ -115,10 +124,13 @@ export function theLiveRuns(): TheLiveRuns {
         since,
         conversation,
         pausable: true,
+        state: reading.state,
         says:
-          conversation === null
-            ? 'A shutdown pauses it. No conversation id was recorded for it, so it cannot be resumed by its id.'
-            : `A shutdown pauses it and keeps its conversation, ${conversation}.`,
+          reading.state === 'not known'
+            ? `Whether it still runs cannot be told. A shutdown calls it paused only if it is read gone after the stop. ${reading.reason}`
+            : conversation === null
+              ? 'A shutdown pauses it. No conversation id was recorded for it, so it cannot be resumed by its id.'
+              : `A shutdown pauses it and keeps its conversation, ${conversation}.`,
       })
       continue
     }
@@ -138,6 +150,7 @@ export function theLiveRuns(): TheLiveRuns {
       since,
       conversation,
       pausable: false,
+      state: 'running',
       says:
         `Mole Office did not start "${row.title}", so it cannot pause it. It keeps running after the shutdown.`,
     })
@@ -157,25 +170,45 @@ export function asParticipant(actor: Actor): ParticipantRef | null {
  *
  * The caller has stopped the message worker first (see THE ORDER above). Each run's process group is
  * stopped through `releaseResource`, the release a person's stop uses, with `force` because the run's
- * session IS the process and it is still going. Only when the process is gone is the record written
+ * session IS the process and it is still going. Only when the process is read gone is the record written
  * `paused`, with who asked, when and why, and the message it was answering says so on its delivery row.
+ * A run still running, or one whose reading cannot tell, keeps its record as it was.
+ *
+ * A run is said to have ended before the pause only when its reading says it is not running. A run whose
+ * reading cannot tell, whether it was listed so or turned so after the list, goes to the release, which
+ * reads the row again and says what it could tell. When the release refuses such a run, the run is not
+ * paused, its answer gives the refusal, and the pause goes on with the others. A refusal of a run read
+ * running still ends the pause, as before.
  */
 export async function pauseTheRunsAtWork(who: Actor, because: string, operation: 'shutdown' | 'pause' = 'shutdown'): Promise<{ paused: APausedRun[]; notPausable: ALiveRun[] }> {
   const live = theLiveRuns()
   const pausedBy = asParticipant(who)
   const out: APausedRun[] = []
   for (const run of live.pausable) {
-    const row = theLastToolRunStillRuns(run.workspaceId, { session: run.session })
-    if (row === null) {
+    const reading = theLastToolRunsReading(run.workspaceId, { session: run.session })
+    if (reading.state === 'not running') {
       // It ended between the list and the pause. Nothing was signalled, and it is not called paused.
       out.push({ ...run, paused: false, outcome: 'It had already ended before it could be paused, so nothing was done to it.' })
       continue
     }
-    const released = await releaseResource(
-      row.row.id,
-      { actor: who, force: true, note: `stopped by a ${operation} of Mole Office, which pauses the runs at work: ${because}` },
-      run.workspaceId,
-    )
+    let released: ReleaseResult
+    try {
+      released = await releaseResource(
+        reading.row.id,
+        { actor: who, force: true, note: `stopped by a ${operation} of Mole Office, which pauses the runs at work: ${because}` },
+        run.workspaceId,
+      )
+    } catch (error) {
+      // A RELEASE THAT REFUSES A RUN WHOSE STATE CANNOT BE TOLD does not end the pause of the others. A row with no
+      // start time whose pid still runs reads so, and the release refuses to signal it. The refusal's words are kept.
+      if (reading.state !== 'not known' || !(error instanceof PanelError)) throw error
+      out.push({ ...run, paused: false, outcome: `Whether it has stopped cannot be told, so it is not paused. Its release refused: ${error.message}` })
+      continue
+    }
+    if (released.stillAlive === 'unknown') {
+      out.push({ ...run, paused: false, outcome: `Whether it has stopped cannot be told, so it is not paused. ${released.outcome}` })
+      continue
+    }
     if (released.stillAlive) {
       out.push({ ...run, paused: false, outcome: `It was asked to stop and is still running, so it is not paused. ${released.outcome}` })
       continue

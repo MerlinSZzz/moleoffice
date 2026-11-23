@@ -199,7 +199,7 @@ export function contactPlace(layout: Layout, walker: IdleWalker, seat: { foot: P
 /** Candidate places 32 px apart, nearest walk first. With more than one walker each
  * later one's place is the one before it moved right by the meeting spacing, and every
  * walk must be within reach and reachable. Each walker's flood treats the others at home. */
-export function idlePlaceCandidates(layout: Layout, walkers: readonly IdleWalker[], blockers: readonly Rect[]): Point[] {
+export function idlePlaceCandidates(layout: Layout, walkers: readonly IdleWalker[], blockers: readonly Rect[], spacing = PAPER_MEETING_SPACING): Point[] {
   const kept = walkers.map(w => [...blockers, ...atHome(walkers, w)]), from = walkers.map((w, n) => setsOut(layout, w, kept[n]!))
   if (!from.every((p): p is Point => !!p)) return []
   const at = from.map(p => field(layout, p))
@@ -211,7 +211,7 @@ export function idlePlaceCandidates(layout: Layout, walkers: readonly IdleWalker
     const p = { x: first.x + (i - SPAN) * IDLE_ROUTE_STEP, y: first.y + (j - SPAN) * IDLE_ROUTE_STEP }
     let worst = 0
     for (let n = 0; n < walkers.length && worst <= IDLE_REACH; n++) {
-      const q = { x: p.x + n * PAPER_MEETING_SPACING, y: p.y }, cost = at[n]!.walk(q)
+      const q = { x: p.x + n * spacing, y: p.y }, cost = at[n]!.walk(q)
       worst = cost >= IDLE_LEAST_WALK && reachable(n, q) ? Math.max(worst, cost) : Infinity
     }
     if (worst <= IDLE_REACH) found.push({ p, cost: worst })
@@ -283,14 +283,14 @@ export type PaperArcClear = (places: readonly Point[], bodies: readonly Rect[], 
  * are drawn. Null means none of them has a place. When paperClear is given, a pair prefers a place
  * whose paper arc is clear and falls back to the nearest place only when no candidate in reach is
  * clear; three, or a single walker, have no paper and are chosen as before. */
-export function chooseIdleOuting(layout: Layout, selected: readonly IdleWalker[], blockers: readonly Rect[], visible: (point: Point) => boolean, offset: number, paperClear?: PaperArcClear): IdleOuting | null {
+export function chooseIdleOuting(layout: Layout, selected: readonly IdleWalker[], blockers: readonly Rect[], visible: (point: Point) => boolean, offset: number, paperClear?: PaperArcClear, spacing = PAPER_MEETING_SPACING): IdleOuting | null {
   if (selected.length < 1 || selected.length > IDLE_WALKING_CAP) return null
   // A blocker further than the reach plus the body's extent cannot touch a body at any candidate.
   const extent = Math.max(...selected.flatMap(w => [Math.abs(w.body.x), Math.abs(w.body.x + w.body.width), Math.abs(w.body.y), Math.abs(w.body.y + w.body.height)])) + IDLE_ROUTE_STEP
   // A walker whose desk has no way round does not set out; the others may go without it.
   const from = selected.map(w => setsOut(layout, w, [...blockers, ...atHome(selected, w)]))
   const feet = selected.flatMap((w, n) => [w.foot, from[n] ?? w.foot]), left = Math.min(...feet.map(p => p.x)), top = Math.min(...feet.map(p => p.y))
-  const box = { x: left - IDLE_REACH - extent, y: top - IDLE_REACH - extent, width: Math.max(...feet.map(p => p.x)) - left + 2 * (IDLE_REACH + extent) + Math.max(1, selected.length - 1) * PAPER_MEETING_SPACING, height: Math.max(...feet.map(p => p.y)) - top + 2 * (IDLE_REACH + extent) }
+  const box = { x: left - IDLE_REACH - extent, y: top - IDLE_REACH - extent, width: Math.max(...feet.map(p => p.x)) - left + 2 * (IDLE_REACH + extent) + Math.max(1, selected.length - 1) * spacing, height: Math.max(...feet.map(p => p.y)) - top + 2 * (IDLE_REACH + extent) }
   const near = blockers.filter(blocker => touches(blocker, box))
   const [a, b, c] = selected
   const goes = (w: IdleWalker) => !!from[selected.indexOf(w)]
@@ -300,16 +300,16 @@ export function chooseIdleOuting(layout: Layout, selected: readonly IdleWalker[]
   const facilities = rooms.flatMap(room => roomFacilities(layout, room))
   const tries = orders.map(group => {
     const staying = [...near, ...selected.filter(w => !group.includes(w)).map(w => translateBody(w.body, w.foot))]
-    const bodies = group.map(w => w.body), starts = group.map(w => w.foot), candidates = idlePlaceCandidates(layout, group, staying)
+    const bodies = group.map(w => w.body), starts = group.map(w => w.foot), candidates = idlePlaceCandidates(layout, group, staying, spacing)
     const reaches = (places: readonly Point[]) => group.length < 2 || laterReach(layout, group, staying, places)
     const prefer = paperClear && group.length === 2 ? (places: readonly Point[]) => paperClear(places, bodies, staying) && reaches(places) : undefined
-    const row = (p: Point) => group.map((_, n) => ({ x: p.x + n * PAPER_MEETING_SPACING, y: p.y }))
+    const row = (p: Point) => group.map((_, n) => ({ x: p.x + n * spacing, y: p.y }))
     const atFacility = candidates.filter(p => facilities.some(f => meetsAt(f, row(p))))
     // A place clear and in reach, with a clear paper arc first when the pair has paper; a room where no
     // candidate has a clear arc still plays, and the page records the blockers that made the paper absent.
     const choose = (from: readonly Point[]): Point[] | null => {
       for (const accept of prefer ? [prefer, reaches] : [reaches]) {
-        const places = chooseIdlePlaces(from, staying, visible, bodies, offset, PAPER_MEETING_SPACING, starts, accept)
+        const places = chooseIdlePlaces(from, staying, visible, bodies, offset, spacing, starts, accept)
         if (places.length === group.length) return places
       }
       return null

@@ -234,9 +234,19 @@ const DRIVES: readonly Drive[] = [
   // THE PERSON'S TYPING KEPT WITH NO PRESS, wave 13u round 4: the switch and the note are read from the holder on this machine.
   { route: 'GET /api/terminals/:id/keeping', method: 'GET', url: '/api/terminals/no-such-terminal/keeping' },
   { route: 'PUT /api/terminals/:id/keeping', method: 'PUT', url: '/api/terminals/no-such-terminal/keeping' },
+  // ONE READING OF SEVERAL TERMINALS, AND A TERMINAL'S NAME, GROUP AND TAGS: both are read from or kept in the holder on this machine.
+  { route: 'GET /api/terminals/stream', method: 'GET', url: '/api/terminals/stream?terminals=no-such-terminal' },
+  { route: 'POST /api/terminals/:id/name', method: 'POST', url: '/api/terminals/no-such-terminal/name' },
   // THE INSTALL PRESS, wave 13u round 3: the list runs programs on this machine, and the press installs programs on it.
   { route: 'GET /api/harnesses', method: 'GET', url: '/api/harnesses' },
   { route: 'POST /api/harnesses/install', method: 'POST', url: '/api/harnesses/install' },
+  // SETTING UP AN AGENT TOOL, wave 13u round 242: each runs one tool on this machine, and the key door gives it a key.
+  { route: 'GET /api/harnesses/:id/signed-in', method: 'GET', url: '/api/harnesses/no-such-tool/signed-in' },
+  { route: 'POST /api/harnesses/:id/key', method: 'POST', url: '/api/harnesses/no-such-tool/key' },
+  { route: 'POST /api/harnesses/:id/sign-in', method: 'POST', url: '/api/harnesses/no-such-tool/sign-in' },
+  { route: 'POST /api/harnesses/:id/sign-in/code', method: 'POST', url: '/api/harnesses/no-such-tool/sign-in/code' },
+  // THE SET UP PRESS, wave 13u round 242: it is the person's own press for this machine's tools, kept to this machine as they are.
+  { route: 'POST /api/harnesses/:id/set-up', method: 'POST', url: '/api/harnesses/no-such-tool/set-up' },
   // A READINESS CHECKLIST, wave 13u round 13: raising one or signing it can run a gated operation on this machine.
   { route: 'POST /api/readiness', method: 'POST', url: '/api/readiness' },
   { route: 'POST /api/readiness/:id/sign', method: 'POST', url: '/api/readiness/no-such-checklist/sign' },
@@ -256,6 +266,8 @@ const DRIVES: readonly Drive[] = [
   { route: 'GET /api/office/storage-destinations', method: 'GET', url: '/api/office/storage-destinations' },
   { route: 'POST /api/office/storage-destinations', method: 'POST', url: '/api/office/storage-destinations' },
   { route: 'POST /api/terminals/agents', method: 'POST', url: '/api/terminals/agents' },
+  // THE NEW AGENT DIALOG'S CREATE: it starts the new agent's program in a terminal on this machine.
+  { route: 'POST /api/agents/new', method: 'POST', url: '/api/agents/new' },
   // THE WAY BACK, wave 13u round 10: the read looks at this machine's processes, and the press starts a program here.
   { route: 'GET /api/terminals/agents/:agent/way-back', method: 'GET', url: '/api/terminals/agents/no-such-agent/way-back' },
   { route: 'POST /api/terminals/agents/:agent/way-back', method: 'POST', url: '/api/terminals/agents/no-such-agent/way-back' },
@@ -313,6 +325,13 @@ const DRIVES: readonly Drive[] = [
   // the owner's home directory on this computer, so a caller from another computer is refused
   // before any handler runs.
   { route: 'POST /api/office/install-the-entry', method: 'POST', url: '/api/office/install-the-entry' },
+  // AND THE STATE OF THE KEY THAT PRESS GIVES THIS COMPUTER'S ENTRY AGENT. It reads two files beside the office's key
+  // file on this computer, so a caller from another computer is refused before any handler runs.
+  {
+    route: 'GET /api/office/install-the-entry/this-computers-key',
+    method: 'GET',
+    url: '/api/office/install-the-entry/this-computers-key',
+  },
   // THE SAME ENTRY, FOR CODEX AND OPENCODE. The piece that split the skill, F15 point 5. The plan reads this
   // computer's own directories and the write is the person's press, for the same reason as the entry above.
   {
@@ -330,6 +349,7 @@ const DRIVES: readonly Drive[] = [
   { route: 'GET /api/office/sandbox-logins', method: 'GET', url: '/api/office/sandbox-logins' },
   { route: 'POST /api/office/sandbox-logins/set', method: 'POST', url: '/api/office/sandbox-logins/set' },
   { route: 'POST /api/office/sandbox-logins/clear', method: 'POST', url: '/api/office/sandbox-logins/clear' },
+  { route: 'POST /api/office/sandbox-logins/test', method: 'POST', url: '/api/office/sandbox-logins/test' },
   // THE PROVIDER ROUTER'S KEY SLOTS, item 12 of the key layer. The slots file is in the owner's home on this computer, so a
   // caller from another computer is refused before any handler runs.
   { route: 'GET /api/provider-router/key-slots', method: 'GET', url: '/api/provider-router/key-slots' },
@@ -395,6 +415,13 @@ const DRIVES: readonly Drive[] = [
   { route: 'GET /api/worker/worker-runs', method: 'GET', url: '/api/worker/worker-runs' },
   { route: 'POST /api/worker/worker-runs/:run/starting', method: 'POST', url: '/api/worker/worker-runs/no-such-run/starting' },
   { route: 'POST /api/worker/worker-runs/:run/ended', method: 'POST', url: '/api/worker/worker-runs/no-such-run/ended' },
+  // The conversation sync's three presses read or write this computer's home folder.
+  { route: 'POST /api/conversations/sync', method: 'POST', url: '/api/conversations/sync' },
+  { route: 'POST /api/conversations/sync/run', method: 'POST', url: '/api/conversations/sync/run' },
+  { route: 'POST /api/conversations/:run/restore', method: 'POST', url: '/api/conversations/no-such-run/restore' },
+  // The conversation export reads this computer's home folder, its agents' personal spaces and memory folders.
+  { route: 'GET /api/conversations/:run/export', method: 'GET', url: '/api/conversations/no-such-run/export' },
+  { route: 'POST /api/conversations/:run/export', method: 'POST', url: '/api/conversations/no-such-run/export' },
 ]
 
 let t: TestDb

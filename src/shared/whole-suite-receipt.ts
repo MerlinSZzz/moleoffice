@@ -1,6 +1,7 @@
 // Copyright © 2026 Zhengyang Shen
 // Licensed under the MIT License. See LICENSE.
 import type { FieldSpec, ShapeSpec, ValidationError } from './kinds.ts'
+import type { MainSuiteFix } from './main-suite-fix.ts'
 import { STAMP_GRAMMAR } from './time.ts'
 import { SHORT_FORMS_FIELD } from './zoom.ts'
 
@@ -31,6 +32,7 @@ export interface WholeSuiteReceipt {
   failedFiles?: string[]
   failedTests?: { file: string; name: string }[]
   workerCrashes?: { file: string; unfinishedTests: number }[]
+  skippedCases?: { count: number; cases?: { file: string; name: string }[]; notListed?: number }
   coverage?: { expectedCount: number; observedCount: number; missing: string[]; unexpected: string[] }
   artifacts: { name: 'log' | 'report' | 'manifest' | 'reads'; path: string; sha256Base64: string }[]
   errorsOutsideTests?: number
@@ -60,6 +62,7 @@ export const WHOLE_SUITE_RECEIPT_FIELDS: FieldSpec[] = [
   field('failedFiles', 'string[]', false, 'Unique safe repository-relative paths of failing files. Absent when not observed; empty means observed with none failing.', []),
   field('failedTests', 'WholeSuiteFailedTest[]', false, 'Unique failing file and test-name pairs. Absent when not observed; empty means observed with none failing.', []),
   field('workerCrashes', 'WholeSuiteWorkerCrash[]', false, 'Files with pending assertions explaining the exact test-count gap and Vitest\'s unhandled Worker exited unexpectedly error. Each count says how many tests never finished; these are not failed assertions. Absent when none were observed or the older office did not declare this field.', [{ file: 'tests/example.test.ts', unfinishedTests: 1 }]),
+  field('skippedCases', 'WholeSuiteSkippedCases', false, 'How many test cases the suite skipped, the first 200 by file and name, and how many more were only counted. Absent on a failed build and on receipts filed before the field.', { count: 0 }),
   field('coverage', 'WholeSuiteCoverage', false, 'Counts and exact differences of the manifest and report test-file sets. Full sets remain in the hashed artifacts.', { expectedCount: 1, observedCount: 1, missing: [], unexpected: [] }),
   field('artifacts', 'WholeSuiteArtifact[]', true, 'Artifacts actually kept, with unique kinds, absolute paths and base64 SHA-256 digests. Missing artifacts are not fabricated.', [{ name: 'log', path: '/srv/example/receipts/log.txt', sha256Base64: MADE_UP_DIGEST }]),
   field('errorsOutsideTests', 'number', false, 'Version 2 only: the errors the whole run\'s summary counted outside the tests, a nonnegative safe integer. Absent when the summary could not be read.', 0),
@@ -73,6 +76,18 @@ export const WHOLE_SUITE_RECEIPT_SHAPES: Record<string, ShapeSpec> = {
   },
   WholeSuiteFailedTest: {
     name: 'WholeSuiteFailedTest', description: 'One failing test: the repository-relative file and its nonblank test name.',
+    fields: [field('file', 'string', true, 'The safe repository-relative file path.', 'tests/example.test.ts'), field('name', 'string', true, 'The full nonblank test name reported by the suite.', 'example suite > example test')],
+  },
+  WholeSuiteSkippedCases: {
+    name: 'WholeSuiteSkippedCases', description: 'The test cases a whole suite skipped, with at most the first 200 named by file and name.',
+    fields: [
+      field('count', 'number', true, 'The number of skipped test cases, a nonnegative safe integer.', 0),
+      field('cases', 'WholeSuiteSkippedCase[]', false, 'At most the first 200 skipped cases, in file and then name order. Absent when none were skipped.', []),
+      field('notListed', 'number', false, 'The positive number of skipped cases beyond the first 200 that were only counted. Absent when at most 200 were skipped.', 50),
+    ],
+  },
+  WholeSuiteSkippedCase: {
+    name: 'WholeSuiteSkippedCase', description: 'One skipped test: the repository-relative file and its nonblank test name.',
     fields: [field('file', 'string', true, 'The safe repository-relative file path.', 'tests/example.test.ts'), field('name', 'string', true, 'The full nonblank test name reported by the suite.', 'example suite > example test')],
   },
   WholeSuiteCoverage: {
@@ -111,6 +126,7 @@ export const WHOLE_SUITE_RECEIPT_RULES = [
   'Coverage difference lists are disjoint and fit their respective counts. Subtracting each difference list from its count gives the same common-file count. Full observed membership is verified against the hashed report.',
   'Paths, failure pairs and artifact kinds are unique. Paths are safe and digests are canonical base64 SHA-256 values.',
   'workerCrashes names unique failed files with a positive safe integer unfinished-test count, only after a successful build and a nonzero suite exit. It does not replace failedTests, change errorsOutsideTests or authorize green.',
+  'skippedCases is only after a successful build with a suite exit. Its count is the number of cases listed plus notListed, at most 200 cases are listed, and it does not make a receipt red, incomplete or green.',
   'Green is derived: build and suite exit 0, present empty failure lists, positive equal coverage counts with empty missing and unexpected lists, and log, report, manifest and reads artifacts. No green field is stored.',
   'Version 2 is a red whole run with each failed file run alone afterwards. aloneRuns names every entry of failedFiles once, in the same order, and failedFiles is not empty. A version 1 receipt carries neither aloneRuns nor errorsOutsideTests.',
   'A run alone that is green exited 0 and keeps its log and report; red keeps its exit code and report; no result keeps its exit code and says why; not run says why, with no exit code and no artifacts.',
@@ -236,6 +252,41 @@ export function wholeSuiteReceiptCrossChecks(data: unknown): ValidationError[] {
     if (data.buildExitCode !== 0) fail('data.buildExitCode', 'workerCrashes requires a successful build')
     if (typeof data.suiteExitCode !== 'number' || data.suiteExitCode === 0) fail('data.suiteExitCode', 'workerCrashes requires a nonzero suite exit')
   }
+  if (data.skippedCases !== undefined) {
+    const skipped = data.skippedCases
+    if (object(skipped, WHOLE_SUITE_RECEIPT_SHAPES.WholeSuiteSkippedCases!.fields, 'data.skippedCases', true)) {
+      const count = skipped.count
+      const countIsValid = typeof count === 'number' && Number.isSafeInteger(count) && count >= 0
+      if (!countIsValid) fail('data.skippedCases.count', 'must be a nonnegative safe integer')
+      let casesAreValid = true
+      if (skipped.cases === undefined) {
+        if (countIsValid && count !== 0) fail('data.skippedCases.cases', 'must be present when the count is not zero')
+      } else if (!Array.isArray(skipped.cases)) {
+        fail('data.skippedCases.cases', 'must be an array of skipped cases')
+        casesAreValid = false
+      } else {
+        skipped.cases.forEach((one, index) => {
+          const path = `data.skippedCases.cases[${index}]`
+          if (!object(one, WHOLE_SUITE_RECEIPT_SHAPES.WholeSuiteSkippedCase!.fields, path, true)) { casesAreValid = false; return }
+          if (!safePath(one.file, false)) { fail(`${path}.file`, 'must be a safe repository-relative path'); casesAreValid = false }
+          if (typeof one.name !== 'string' || one.name.trim() === '') { fail(`${path}.name`, 'must be a nonblank test name'); casesAreValid = false }
+        })
+        if (skipped.cases.length > 200) { fail('data.skippedCases.cases', 'must list at most 200 skipped cases'); casesAreValid = false }
+        if (countIsValid && count === 0) { fail('data.skippedCases.cases', 'must be absent when the count is zero'); casesAreValid = false }
+      }
+      const notListed = skipped.notListed
+      if (notListed !== undefined) {
+        if (typeof notListed !== 'number' || !Number.isSafeInteger(notListed) || notListed < 1) { fail('data.skippedCases.notListed', 'must be a positive safe integer'); casesAreValid = false }
+        if (!Array.isArray(skipped.cases) || skipped.cases.length !== 200) fail('data.skippedCases.notListed', 'is allowed only when 200 cases are listed')
+      }
+      if (countIsValid && casesAreValid && Array.isArray(skipped.cases)) {
+        const notListedCount = typeof notListed === 'number' && Number.isSafeInteger(notListed) && notListed > 0 ? notListed : 0
+        if (count !== skipped.cases.length + notListedCount) fail('data.skippedCases', 'count must equal the number of cases listed plus notListed')
+      }
+    }
+    if (data.buildExitCode !== 0) fail('data.buildExitCode', 'skippedCases requires a successful build')
+    if (typeof data.suiteExitCode !== 'number') fail('data.suiteExitCode', 'skippedCases requires a suite exit')
+  }
   if (data.artifacts !== undefined) {
     if (!Array.isArray(data.artifacts)) fail('data.artifacts', 'must be an array of artifacts')
     else {
@@ -339,4 +390,19 @@ export function wholeSuiteReceiptIsGreen(data: unknown): boolean {
   if (receipt.version === 1) return receipt.suiteExitCode === 0 && receipt.failedFiles!.length === 0 && receipt.failedTests!.length === 0
   return receipt.suiteExitCode === 1 && receipt.errorsOutsideTests === 0 &&
     receipt.aloneRuns !== undefined && receipt.aloneRuns.length > 0 && receipt.aloneRuns.every((run) => run.outcome === 'green')
+}
+
+/**
+ * A receipt's outcome, in the words a repair's verification stores. This is the one place an outcome is worked out from
+ * a receipt; the guard on a repair's verification and the stable upgrade's verifier both call it. Incomplete comes from
+ * wholeSuiteReceiptIsComplete, so that complete has one meaning. The last step reads a complete receipt that is not green
+ * and has no suite exit other than 0 as incomplete, because red says a failure was seen, and nobody saw one.
+ */
+export function wholeSuiteReceiptOutcome(data: unknown): NonNullable<NonNullable<MainSuiteFix['verification']>['outcome']> {
+  if (isObject(data) && typeof data.buildExitCode === 'number' && data.buildExitCode !== 0) return 'build-failed'
+  if (!wholeSuiteReceiptIsComplete(data)) return 'incomplete'
+  if (wholeSuiteReceiptIsGreen(data)) return 'green'
+  const { suiteExitCode } = parseWholeSuiteReceipt(data)
+  if (typeof suiteExitCode === 'number' && suiteExitCode !== 0) return 'red'
+  return 'incomplete'
 }

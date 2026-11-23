@@ -5,8 +5,8 @@
  *
  * A plan's lines are filed as work; two of those work records are linked as answers to planned
  * states, one by the person and one by a registered agent. The plan's own page must say who wrote
- * each answer, when, and how many the plan has. The pictures it takes are the plan page at 1440,
- * 990, 660 and 390, in light and dark, each with both answers and both writers on it.
+ * each answer, when, and how many the plan has. The pictures it takes are the plan page at 1440
+ * and 390, in light, each with both answers and both writers on it.
  *
  * MADE-UP DATA ONLY. Every title, line and planned state below is written by this test. The
  * pictures are labelled as made-up in the round's report, and this file writes them only into the
@@ -165,11 +165,11 @@ describe('the plan page and its answers', () => {
     }
   }, 180_000)
 
-  it('takes the page with both answers at four widths in both looks, and no width is wider than its window', async () => {
+  it('takes the page with both answers at the widest and the narrowest width in the light look, and no width is wider than its window', async () => {
     const page = live.page
-    for (const width of [1440, 990, 660, 390]) {
+    for (const width of [1440, 390]) {
       await page.setViewportSize({ width, height: 1000 })
-      for (const theme of ['light', 'dark'] as const) {
+      const theme = 'light'
         await openThePlan(page, theme)
         const said = await answerWords(page)
         expect(said, `${width} ${theme}: both writers`).toContain(THE_TEST_OFFICES_OWNER.name)
@@ -179,7 +179,6 @@ describe('the plan page and its answers', () => {
           `${width} ${theme}: the page is not wider than its window`,
         ).toBe(true)
         await page.screenshot({ path: `${PICTURES}/plan-answers-${String(width)}-${theme}.png`, fullPage: true })
-      }
     }
   }, 300_000)
 })

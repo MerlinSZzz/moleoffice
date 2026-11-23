@@ -5,11 +5,9 @@ import Database from 'better-sqlite3'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { liveApp, type LiveApp } from './helpers.ts'
-import { testShots } from './where-shots-go.ts'
 
 let app: LiveApp
 let person: string
-const shots = testShots('a-routed-message-keeps-its-addressee-visible')
 let secretary: { id: string; handle: string }
 let target: { id: string; handle: string }
 let sender: { id: string; handle: string }
@@ -80,22 +78,4 @@ describe('a routed message keeps its addressee visible', () => {
       await drawn(id)
     }, 120_000)
   }
-
-  it.skipIf(!process.env['TEST_SHOTS'])('photographs both routed messages in both themes at four widths', async () => {
-    for (const kind of ['human', 'agent'] as const) {
-      const id = await send(kind, kind === 'human' ? person : sender.handle, `A photographed message from a ${kind}`)
-      await received(id)
-      await drawn(id)
-      for (const width of [1440, 990, 660, 390]) {
-        for (const theme of ['light', 'dark'] as const) {
-          await app.page.setViewportSize({ width, height: 1000 })
-          await app.page.emulateMedia({ colorScheme: theme })
-          await app.page.waitForTimeout(150)
-          const dimensions = await app.page.evaluate(() => ({ width: document.documentElement.clientWidth, scroll: document.documentElement.scrollWidth }))
-          expect(dimensions.scroll).toBeLessThanOrEqual(dimensions.width)
-          await app.page.screenshot({ path: `${shots}/${kind}-${String(width)}-${theme}.png`, fullPage: false })
-        }
-      }
-    }
-  }, 300_000)
 })

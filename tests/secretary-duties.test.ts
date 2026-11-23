@@ -202,7 +202,7 @@ import { THE_OWNER } from '../src/shared/kinds.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { THE_SECRETARY, THE_WORKER } from '../src/shared/roles.ts'
 import { THE_DOORS_THE_LIST_NAMES } from '../src/shared/what-the-grant-carries-words.ts'
-import { apiApp, freshDb, FOR_THE_PERSON, thePersonsKeyHeader, type TestDb } from './helpers.ts'
+import { apiApp, freshDb, FOR_THE_PERSON, thePersonsKeyHeader, type TestDb, governsTheWholeProject } from './helpers.ts'
 import { SECRETARY_DUTIES_KIND } from '../src/shared/secretary-duties-record.ts'
 
 type TheGuard = typeof import('../src/server/lib/grant/secretary-duties.ts')
@@ -274,7 +274,7 @@ async function aDecision(title: string, optionTaken: string, replaces: string[] 
   const filed = await call('POST', '/api/records', PERSON, {
     kind: 'decision',
     title,
-    data: { option_taken: optionTaken, because: 'A made-up reason.', decided_by: THE_OWNER, replaces },
+    data: { option_taken: optionTaken, because: 'A made-up reason.', decided_by: THE_OWNER, ...governsTheWholeProject(), replaces },
   })
   expect(filed.status, filed.raw).toBe(201)
   return String(filed.body.record.id)
@@ -1022,7 +1022,7 @@ describe("one secretary's duties", () => {
     const theirDecision = await call('POST', '/api/records', there, {
       kind: 'decision',
       title: 'A made-up decision in the other project',
-      data: { option_taken: one.words, because: 'A made-up reason.', decided_by: THE_OWNER, replaces: [] },
+      data: { option_taken: one.words, because: 'A made-up reason.', decided_by: THE_OWNER, ...governsTheWholeProject(), replaces: [] },
     })
     expect(theirDecision.status, theirDecision.raw).toBe(201)
     const filed = await call('POST', '/api/records', there, {
@@ -1378,7 +1378,7 @@ describe("one secretary's duties", () => {
         const filed = await call('POST', '/api/records', PERSON, {
           kind: 'decision',
           title: 'A made-up decision a deputy made',
-          data: { option_taken: `The made-up duties rest here, ${change}.`, because: 'A made-up reason.', decided_by: 'made-up-deputy', replaces: [] },
+          data: { option_taken: `The made-up duties rest here, ${change}.`, because: 'A made-up reason.', decided_by: 'made-up-deputy', ...governsTheWholeProject(), replaces: [] },
         })
         expect(filed.status, filed.raw).toBe(201)
         decision = String(filed.body.record.id)
@@ -1428,7 +1428,7 @@ describe("one secretary's duties", () => {
     const decision = String((one.data['restsOn'] as string[])[0])
     // THE PERSON SAYS WHAT THE DECISION GOVERNS, so the answer to which decisions govern a file lists it too.
     const place = 'made-up/replaced-twice.ts'
-    const governs = await call('PATCH', `/api/records/${decision}`, PERSON, { dataPatch: { governs: [{ path: place }] } })
+    const governs = await call('PATCH', `/api/records/${decision}`, PERSON, { dataPatch: { governsFiles: [place] } })
     expect(governs.status, governs.raw).toBe(200)
     // THE FIRST FILED replaces nothing when it is filed. The second filed names the decision in `replaces`, so its link is
     // the first stored. The person then links the first filed as replacing the decision too, through the links door.

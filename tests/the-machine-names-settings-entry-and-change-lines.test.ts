@@ -6,6 +6,7 @@ import { existsSync, mkdirSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
+import { sayInEnglish } from '../src/shared/i18n.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 import type { OfficeSettingChangeName, OfficeSettingChangesReply } from '../src/web/api.ts'
 import { liveApp, waitForThePage, type LiveApp } from './helpers.ts'
@@ -96,15 +97,19 @@ describe('the machine names entry in Settings', () => {
     const changed = app.page.locator(`${PANEL} .scl-line`)
     await changed.waitFor({ timeout: 30_000 })
     expect((await changed.innerText()).trim()).toBe(NO_CHANGE)
-    expect(await app.page.locator(`${PANEL} .mn-history`).innerText()).toContain('A new name applies to new messages only.')
+    // THE PANEL DRAWS NO SENTENCE ABOUT WHAT A NAME IS FOR OR WHEN IT APPLIES. Its title names the setting,
+    // and the list and the form are the panel. Both sentences are read from their keys.
+    const drawnWords = await app.page.locator(PANEL).innerText()
+    expect(drawnWords, 'the panel still says what a name is for').not.toContain(sayInEnglish('settingsPanel.machineNames.purpose'))
+    expect(drawnWords, 'the panel still says when a new name applies').not.toContain(sayInEnglish('settingsPanel.machineNames.history'))
 
     await addName(` ${ADDRESS} `, '  loquat  ')
     await app.page.waitForSelector(`${PANEL} [data-machine-address="${ADDRESS}"]`, { timeout: 15_000 })
     const panelOrder = await app.page.locator(`${PANEL} .mn`).evaluate((panel) =>
       Array.from(panel.children, (child) => (child as HTMLElement).className),
     )
-    expect(panelOrder.indexOf('mn-purpose')).toBeGreaterThan(panelOrder.indexOf('mn-list'))
-    expect(panelOrder.indexOf('mn-history')).toBeGreaterThan(panelOrder.indexOf('mn-purpose'))
+    expect(panelOrder.indexOf('mn-list'), 'the panel drew no list of names').toBeGreaterThan(-1)
+    expect(panelOrder.indexOf('mn-add'), 'the form to add a name does not follow the list').toBe(panelOrder.indexOf('mn-list') + 1)
     expect((await app.page.locator(`${PANEL} .mn-saved`).innerText()).trim()).toBe(
       `${ADDRESS} is named loquat. A message from it reads “from loquat”.`,
     )

@@ -1,16 +1,15 @@
 // Copyright © 2026 Zhengyang Shen
 // Licensed under the MIT License. See LICENSE.
 /**
- * A PDF IS SERVED UNDER A SANDBOX POLICY ONLY WHEN THE PAGE ASKS TO SHOW IT IN A FRAME.
+ * A PDF IS SERVED UNDER A SANDBOX POLICY ONLY WHEN THE PAGE ASKS TO SHOW IT.
  *
  * ---------------------------------------------------------------------------------------
  * WHAT IS PROVED
  * ---------------------------------------------------------------------------------------
  *
- * A PDF reply has no policy today. The work asks for a PDF attached to a report to be read inside
- * the office, in a frame on the report page. Chromium will not draw a PDF in a frame that carries a
- * `sandbox` attribute at all, so the frame has none and the reply is what must hold the document.
- * Measured: a reply policy of `default-src 'none'; sandbox` still draws every page.
+ * The office's page asks for a PDF attached to a report with open=1&shown=1, reads its bytes and
+ * draws its pages itself. The same address opened on its own is drawn by the browser's own reader,
+ * and there the reply is what holds the document: a policy of `default-src 'none'; sandbox`.
  *
  *   1. A PDF asked for by the report's own press, open=1&shown=1, arrives as application/pdf under
  *      `default-src 'none'; sandbox` and still says nosniff. The policy has `sandbox` and has

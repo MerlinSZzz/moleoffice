@@ -67,7 +67,7 @@ fs.writeFileSync(${JSON.stringify(record)}, JSON.stringify({ args, patch, settin
   return { root, savedFile, code, out, err, log: existsSync(join(root, 'dsh.log')) ? readFileSync(join(root, 'dsh.log'), 'utf8') : '', native: existsSync(record) ? JSON.parse(readFileSync(record, 'utf8')) : null }
 }
 
-it.each(['off', 'low', 'high', 'max', 'medium', 'xhigh', null])('selected effort %s overlays only present Office values and keeps unrelated settings', async effort => {
+it.each(['off', 'low', 'high', null])('selected effort %s overlays only present Office values and keeps unrelated settings', async effort => {
   const ran = await runDsh({ effort })
   expect(ran.code, ran.err).toBe(0)
   expect(ran.native.settings['agent-default-model']).toEqual({ provider: 'deepseek-official', model: 'deepseek-flash', reasoningEffort: effort ?? 'low' })

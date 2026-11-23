@@ -136,15 +136,15 @@ silicon. Find out which system this is, then check:
     older office on port 8787 on a real computer, or shut one down in another account. If a step
     does not go as written, stop, tell the person, and send it as feedback (part 8).
 - **Find the installer.** It is usually in the same folder as this file. This guide is for version
-  0.1.0-beta.9. Linux has two, and each name ends with the processor it was built for. For a
+  0.1.0-beta.10. Linux has two, and each name ends with the processor it was built for. For a
   64-bit Intel or AMD processor, where `uname -m` answers `x86_64`, they are
-  `mole-office-0.1.0-beta.9-amd64.deb` and `mole-office-0.1.0-beta.9-x86_64.AppImage`. Windows
-  has one: `mole-office-0.1.0-beta.9-x64-setup.exe`. The Mac has one:
-  `mole-office-0.1.0-beta.9-arm64.dmg`. If you cannot find it, ask the person where they saved it.
+  `mole-office-0.1.0-beta.10-amd64.deb` and `mole-office-0.1.0-beta.10-x86_64.AppImage`. Windows
+  has one: `mole-office-0.1.0-beta.10-x64-setup.exe`. The Mac has one:
+  `mole-office-0.1.0-beta.10-arm64.dmg`. If you cannot find it, ask the person where they saved it.
   - **The office map** is a choice, and part 2 says what it is. On Linux it is a file of its own,
-    `mole-office-map-0.1.0-beta.9-amd64.deb`, which adds the map to the .deb. The AppImage has no
+    `mole-office-map-0.1.0-beta.10-amd64.deb`, which adds the map to the .deb. The AppImage has no
     map, and none can be added to it. On the Mac it is a second dmg,
-    `mole-office-0.1.0-beta.9-arm64-with-the-map.dmg`, which is the same app with the map in it.
+    `mole-office-0.1.0-beta.10-arm64-with-the-map.dmg`, which is the same app with the map in it.
     On Windows it is a part of the one installer.
 
 **Check the download.** The file `SHA256SUMS` sits beside the installers. It holds one line for each
@@ -451,8 +451,9 @@ Choose your handle now (see part 4) so you can send it from the first request.
 office answers at that moment. A conversation that started before the office answered begins with
 a line saying `Mole Office did not answer`, and nothing files its record later. The office then
 cannot see its heartbeat (part 4). So tell the person: whenever the office was not running, for
-example after the computer was switched on, open **Mole Office** first, and start Claude Code only
-once its window shows the office's pages rather than **Starting Mole Office.** If your
+example after the computer was switched on, open **Mole Office** first, and start your harness,
+whether Claude Code or another, only once its window shows the office's pages rather than
+**Starting Mole Office.** If your
 conversation begins with `Mole Office did not answer`, run the check above. Once it answers, ask
 the person to end the conversation and start it again, as *Attach your heartbeat* in part 4,
 step 2, says.
@@ -562,12 +563,21 @@ part 2 says how to add the map later.
 
 You connect once. After that every conversation uses the same handle and key.
 
+**What any harness does.** Mole Office takes an agent of any harness, the tool you run in: Claude
+Code, Codex, WorkBuddy or another. In every harness, an agent does four things. It registers once,
+with `register-myself.mjs`. It has a session record for each conversation. It holds its heartbeat
+with `hold-the-handle.mjs` while the conversation runs. It reads the messages the heartbeat hands
+it, and answers them. Mole Office can also start runs itself, but only in the harnesses it has an
+adapter for. `hold-the-handle.mjs --help` names them. For any other harness, the office starts no
+run, and a message to you waits for your own heartbeat. Most of this part is the same in every
+harness. Where a step is Claude Code's own, it says so.
+
 **Choose a handle and a name.** A handle is your short address: lowercase letters, digits and
 dashes, 2 to 40 characters, starting and ending with a letter or a digit. `mole-office` is taken by
 the office itself. Do not choose `claude-code`: session hooks installed by earlier versions write
 under that name, and the office lets it write without registering. Choose something the person
-will recognise, for example `claude-laptop`, and tell the person what you chose. Your name is what
-the person reads, for example "Claude Code on this laptop".
+will recognise, for example `claude-laptop` or `workbuddy-laptop`, and tell the person what you
+chose. Your name is what the person reads, for example "Claude Code on this laptop".
 
 **Find the office's agent tools and its skill.** Ask:
 
@@ -607,8 +617,12 @@ exists. On Linux without curl, you made this folder in part 1 for the helper. Us
 **Register.** Run the tool with the Node from `/api/onboarding`:
 
 ```
-"<node>" "<for-agents folder>/register-myself.mjs" --api http://127.0.0.1:8787 --handle <your handle> --name "<your name>" --dir "<the folder you started in>" --start-folder "<the folder you started in>" --key-file "<notes folder>/key"
+"<node>" "<for-agents folder>/register-myself.mjs" --api http://127.0.0.1:8787 --handle <your handle> --name "<your name>" --dir "<the folder you started in>" --start-folder "<the folder you started in>" --runtime <your harness> --key-file "<notes folder>/key"
 ```
+
+`--runtime` is your harness's own name, in lowercase: `claude-code` for Claude Code, `codex` for
+Codex, `workbuddy` for WorkBuddy. Any harness's name is taken, and the office keeps that name on
+your record.
 
 `--start-folder` lets the office's session hook tell, in a later conversation started in that
 folder, that it is you (part 6). It must be a full path, and it may not be `/`, a whole drive such
@@ -765,8 +779,12 @@ conversation and tells the office every 20 seconds that you are there. A message
 to that conversation: the tool prints the message and ends, and its end is what wakes you. Without
 a heartbeat, the office cannot reach you, and a message to you waits in the chat.
 
-The office counts a heartbeat only for a conversation that the session hook filed and has stamped.
-The hook stamps a conversation's record at the end of each turn. It cannot do that for this
+How you start it depends on your harness. In Claude Code, follow the steps under *In Claude Code*,
+just below. In any harness that does not run the office's session hook, follow *In a harness with
+no session hook*, after them.
+
+**In Claude Code.** The office counts a Claude Code heartbeat only for a conversation that the
+session hook filed and has stamped. The hook stamps a conversation's record at the end of each turn. It cannot do that for this
 conversation, which started before the office answered and before the hook's lines were in place.
 So the heartbeat goes in a new conversation, in this order:
 
@@ -848,10 +866,12 @@ So the heartbeat goes in a new conversation, in this order:
 
    Among its first lines, one begins `Holding the handle "<your handle>" for this session`, and one
    says whether the office recorded this conversation's process. `This session's own process is on
-   record <id>` is what you want. A line beginning `Mole Office did not` or `No claude process was
-   found` means the office cannot tie your heartbeat to this conversation. Then stop the tool, read
-   that line to the person, and send it as feedback (part 8). If the tool ends at once instead, its
-   last lines say why. Read them to the person.
+   record <id>` is what you want. In Claude Code, a line beginning `Mole Office did not` or `No
+   claude process was found` means the office cannot tie your heartbeat to this conversation. Then
+   stop the tool, read that line to the person, and send it as feedback (part 8). In any other
+   harness, that line does not appear, and the line the tool prints instead is not a fault: see *In
+   a harness with no session hook*. If the tool ends at once instead, its last lines say why. Read
+   them to the person.
 6. **Check that the office sees it:**
 
    ```
@@ -868,8 +888,33 @@ If a step does not go as it says here, stop, tell the person, and send it as fee
 
 If you left `--start-folder` out because you were started in the home folder, or in a network
 folder on Windows, the hook does not file a conversation as yours, and part 6 has you file its
-record yourself. The office cannot see a heartbeat on a record you filed. So skip steps 4 to 6, and
-tell the person that the chat will say it cannot reach you.
+record yourself. In Claude Code, the office cannot see a heartbeat on a record you filed. So skip
+steps 4 to 6, and tell the person that the chat will say it cannot reach you.
+
+**In a harness with no session hook.** Codex, WorkBuddy and other harnesses do not run the office's
+session hook. So nothing files a record for a new conversation, and nothing stamps one. The
+heartbeat still works, because the office reads it from the heartbeat itself:
+
+1. **Its record.** In the conversation you registered in, the record the registration filed is
+   yours: its id is on the line that starts `session:`. In a later conversation, file a record
+   yourself, as part 6 says under *Each new conversation*, and write the headers file again with
+   its id.
+2. **Start it** as a background command, if your harness has one, with your harness's own name.
+   If your harness cannot run a command in the background, run it when you have nothing else to
+   do: it ends when a message comes, and prints it.
+
+   ```
+   MOLE_AGENT_KEY_FILE="<notes folder>/key" "<node>" "<for-agents folder>/hold-the-handle.mjs" --api http://127.0.0.1:8787 --agent <your handle> --session <your session record> --runtime <your harness>
+   ```
+
+   When the office has no adapter for your harness, the tool says so among its first lines. One
+   line says that Mole Office cannot start that harness by itself, so your messages wait for your
+   own waiter. Another says that the tool cannot read that harness's process, and that it holds the
+   heartbeat and waits for messages. Neither line is a fault. Do not stop the tool for them.
+3. **Check that the office sees it**, as in step 6 above. `answering.how` is `a live session`, and
+   `answering.says` says that Mole Office cannot see inside your harness. The heartbeat is then the
+   office's only sign that you are there. While it beats, the chat shows you as answering. Once it
+   has stopped for longer than the office waits, the chat shows that it cannot reach you.
 
 **What the person sees when it works.** In **Chat** (中文: **聊天**), when the person opens their
 conversation with you, your name has a green dot and the word **Answering** (中文: **正在回复**), and after it **Handle holding** (中文:
@@ -998,10 +1043,12 @@ you do not know your handle or your notes folder, run `ls ~/.mole-office-agent` 
 only. Never open, print or search the files inside them. If there is no such folder, ask the
 person. Each conversation has a session record of its own, and there are two ways it gets one.
 
-**Choose its project before starting it.** For a new project with no registered folder, start each
-later conversation with its project id in `MOLE_OFFICE_WORKSPACE`, using the command for the
-person's terminal in part 4, step 2. A plain `claude` does not remember the project chosen in the
-previous conversation. The environment setting applies to that process and its children; it does
+**Choose its project before starting it.** This is for a conversation the session hook files. In
+a harness with no session hook, you file the record yourself, and its project is the one your
+headers name. For a new project with no registered folder, start each later conversation with its
+project id in `MOLE_OFFICE_WORKSPACE`, using the command for the person's terminal in part 4,
+step 2. In Claude Code, a plain `claude` does not remember the project chosen in the previous
+conversation. The environment setting applies to that process and its children; it does
 not change a file. Before suggesting or making a persistent change to a file outside the start
 folder, such as a shell profile, ask the person first (rule 8).
 
@@ -1045,6 +1092,8 @@ Otherwise, file it yourself:
    work handed in. It may then refuse the plain finishing write above, and when the record ends, it
    sends the person messages about it.
 4. Write the headers file again, with the new record's id in the `x-mole-office-session` line.
+5. In a harness with no session hook, start your heartbeat on that record, as part 4 says under
+   *In a harness with no session hook*, step 2, with `--runtime <your harness>`.
 
 **So that every conversation knows about Mole Office**, ask the person whether you may make the
 skill available everywhere. For Claude Code there is a press that does this. It is shown in

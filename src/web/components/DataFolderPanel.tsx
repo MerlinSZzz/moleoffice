@@ -5,7 +5,8 @@
  *
  * Where the office keeps its data, who chose that folder, what the last move did, and the presses that move the folder
  * and later remove the old copy. The doors are src/server/api/data-folder.ts, and src/shared/data-folder.ts is the shape
- * of every answer. The words are the data folder block of src/shared/words/en-wave-13t.ts.
+ * of every answer. The words are the data folder block of src/shared/words/en-wave-13t.ts, and the labels of the rows
+ * with the sentences that hold no path are the data folder block of src/shared/words/en-wave-13y.ts.
  *
  * WHILE THE OFFICE IS STOPPED the panel asks the office again every two seconds, one read at a time, and says in words
  * that it is waiting and how many reads have not been answered. It stops when a read answers a move that is no longer
@@ -17,13 +18,14 @@
  * other office with another identity ends the wait, because this page reads only the office it was opened against, so
  * the panel offers to load the page again.
  *
- * EVERY WORD IS FROM THE WORD LISTS. A path, the database's file name and the server's own English sentence are the
- * exceptions: those are drawn as they came, and the server's sentence is marked as English. A press refusal is drawn
- * with the door's code, so the page gives it its own language.
+ * EVERY WORD IS FROM THE WORD LISTS. A path and the database's file name are the exceptions: those are drawn as they
+ * came, each in a code element, the office's code style. A check's refusal and a press refusal are drawn from the
+ * door's code and values, so the page gives them its own language. A check refused for an error of the walk carries
+ * the system's own English words, and only that one is marked as English.
  */
 
 import { settingsControlWord } from '@shared/settings-declaration.ts'
-import { t, type WordKey } from '@shared/i18n.ts'
+import { content, t, type WordKey } from '@shared/i18n.ts'
 import type {
   DataFolderConfirmed,
   DataFolderMoveStarted,
@@ -33,6 +35,7 @@ import type {
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 
 import { ApiError, faultOf, moleOfficeRequest } from '../api.ts'
+import { CodeRows } from '../lib/code-rows.tsx'
 import { useLanguage } from '../lib/language.ts'
 import { useInspect } from '../lib/mode.ts'
 import {
@@ -87,36 +90,41 @@ function pressWord(key: string): WordKey {
 
 /** The words for who chose the data folder. */
 function theChosenByWord(chosenBy: DataFolderReading['chosenBy']): WordKey | null {
-  if (chosenBy === 'the default') return 'dataFolder.chosenBy.default'
-  if (chosenBy === 'the .env line') return 'dataFolder.chosenBy.envLine'
-  if (chosenBy === 'the process environment') return 'dataFolder.chosenBy.processEnvironment'
+  if (chosenBy === 'the default') return 'dataFolder.state.chosenBy.default'
+  if (chosenBy === 'the .env line') return 'dataFolder.state.chosenBy.envLine'
+  if (chosenBy === 'the process environment') return 'dataFolder.state.chosenBy.processEnvironment'
   return null
 }
 
-/** The mark as words: the last move's step, a switch whose mover ended, or why a move did not finish, and its two paths. */
-function theMarkWords(mark: Extract<TheMarkInTheReading, { state: 'read' }>, folder: string): React.ReactNode {
+/**
+ * The mark as words: the last move's step, a switch whose mover ended, or why a move did not finish. The move's two
+ * folders are a From row and a To row under the words.
+ */
+function theMarkWords(mark: Extract<TheMarkInTheReading, { state: 'read' }>): React.ReactNode {
   const state = mark.mark.state
-  if (state === 'switched' && !mark.moverAlive) {
-    return <p className="dfp-said">{t('dataFolder.mark.switchedAndEnded', { from: mark.mark.from, to: mark.mark.to, folder })}</p>
-  }
+  const said = (words: string): React.ReactNode => (
+    <>
+      <p className="dfp-said">{words}</p>
+      <CodeRows rows={[{ label: 'dataFolder.row.from', value: mark.mark.from }, { label: 'dataFolder.row.to', value: mark.mark.to }]} />
+    </>
+  )
+  if (state === 'switched' && !mark.moverAlive) return said(t('dataFolder.lastMove.switchedAndEnded'))
   if (THE_MOVING_STATES.includes(state as TheMovingState)) {
     const step = t(THE_STEP_WORDS[state as TheMovingState])
     if (mark.moverAlive) {
       return (
         <>
-          <p className="dfp-said">{t('dataFolder.mark.moving', { from: mark.mark.from, to: mark.mark.to })}</p>
+          {said(t('dataFolder.lastMove.moving'))}
           <p className="dfp-said">{step}</p>
         </>
       )
     }
-    return <p className="dfp-said">{t('dataFolder.mark.didNotFinish', { from: mark.mark.from, to: mark.mark.to, step })}</p>
+    return said(t('dataFolder.lastMove.didNotFinish', { step }))
   }
-  if (state === 'started') return <p className="dfp-said">{t('dataFolder.mark.started', { from: mark.mark.from, to: mark.mark.to })}</p>
-  if (state === 'confirmed') return <p className="dfp-said">{t('dataFolder.mark.confirmed', { from: mark.mark.from, to: mark.mark.to })}</p>
-  if (state === 'stopped-before-the-switch') {
-    return <p className="dfp-said">{t('dataFolder.mark.stoppedBeforeTheSwitch', { from: mark.mark.from, to: mark.mark.to })}</p>
-  }
-  if (state === 'switched-back') return <p className="dfp-said">{t('dataFolder.mark.switchedBack', { from: mark.mark.from, to: mark.mark.to })}</p>
+  if (state === 'started') return said(t('dataFolder.lastMove.started'))
+  if (state === 'confirmed') return said(t('dataFolder.lastMove.confirmed'))
+  if (state === 'stopped-before-the-switch') return said(t('dataFolder.lastMove.stoppedBeforeTheSwitch'))
+  if (state === 'switched-back') return said(t('dataFolder.lastMove.switchedBack'))
   return <p className="dfp-said">{t('dataFolder.mark.unknownState', { state: state as string })}</p>
 }
 
@@ -125,6 +133,9 @@ function TheRefusal({ refused }: { refused: ApiError | Error | null }): React.Re
   if (refused === null) return null
   return <ErrorNote message={refused.message} fault={refused instanceof ApiError ? refused.fault : null} label={t('dataFolder.notChanged')} />
 }
+
+/** What the reading answers about a folder the person checked: a refusal's code and values, both null when it passes. */
+type TheCheckAnswer = NonNullable<DataFolderReading['wouldRefuse']>
 
 /** The panel Normal mode draws, and Developer mode draws more of. */
 export function DataFolderPanel(): React.ReactElement {
@@ -137,7 +148,7 @@ export function DataFolderPanel(): React.ReactElement {
   const [failedReads, setFailedReads] = useState(0)
   const [started, setStarted] = useState<DataFolderMoveStarted | null>(null)
   const [to, setTo] = useState('')
-  const [checked, setChecked] = useState<{ to: string; why: string | null } | null>(null)
+  const [checked, setChecked] = useState<{ asked: string; code: TheCheckAnswer['code']; values: TheCheckAnswer['values'] } | null>(null)
   const [warning, setWarning] = useState(false)
   const [busy, setBusy] = useState(false)
   const [refused, setRefused] = useState<ApiError | Error | null>(null)
@@ -225,7 +236,7 @@ export function DataFolderPanel(): React.ReactElement {
     readTheDataFolder(to).then(
       (answer) => {
         setBusy(false)
-        setChecked(answer.wouldRefuse ?? { to, why: null })
+        setChecked({ asked: to, code: answer.wouldRefuse?.code ?? null, values: answer.wouldRefuse?.values ?? null })
       },
       (err: unknown) => {
         setBusy(false)
@@ -237,7 +248,6 @@ export function DataFolderPanel(): React.ReactElement {
   const pressMove = (): void => {
     setRefused(null)
     setConfirmed(null)
-    setChecked(null)
     setWarning(true)
   }
 
@@ -247,6 +257,7 @@ export function DataFolderPanel(): React.ReactElement {
       (answer) => {
         setBusy(false)
         setWarning(false)
+        setChecked(null)
         setStarted(answer)
         setLater(null)
         setOtherIdentity(false)
@@ -285,99 +296,105 @@ export function DataFolderPanel(): React.ReactElement {
     )
   }
 
-  /** The field and its presses, drawn only for the person when a move may start from here. */
-  const theMoveField = (): React.ReactElement => (
-    <>
-      <div className="dfp-field">
-        <label className="dfp-label" htmlFor="dfp-to">
-          {t('dataFolder.to')}
-        </label>
-        <input
-          className="dfp-input"
-          id="dfp-to"
-          type="text"
-          value={to}
-          aria-describedby="dfp-to-hint"
-          onChange={(event) => {
-            setTo(event.target.value)
-            setChecked(null)
-          }}
-        />
-        <p className="dfp-hint" id="dfp-to-hint">
-          {t('dataFolder.toHint')}
-        </p>
-      </div>
-      <div className="dfp-presses">
-        {/* A PRESS IN FLIGHT IS WHY BOTH ARE OFF while it is, whatever the field holds; an empty field is why otherwise. */}
-        <Btn onClick={pressCheck} disabled={busy || to.trim() === ''} reason={busy ? t('dataFolder.busy') : t('dataFolder.toHint')}>
-          {t(pressWord('dataFolder.check'))}
-        </Btn>
-        <Btn onClick={pressMove} disabled={busy || to.trim() === ''} reason={busy ? t('dataFolder.busy') : t('dataFolder.toHint')}>
-          {t(pressWord('dataFolder.move'))}
-        </Btn>
-      </div>
-      {checked === null ? null : checked.why === null ? (
-        <p className="dfp-said">{t('dataFolder.check.fine', { to: checked.to })}</p>
-      ) : (
-        <>
-          <p className="dfp-said">{t('dataFolder.check.refused', { to: checked.to })}</p>
-          {/* THE SERVER'S OWN SENTENCE IS THE ONLY REASON THE PERSON HAS, so it is drawn in both modes, as English. */}
-          <p className="dfp-why" lang="en">
-            {checked.why}
-          </p>
-        </>
-      )}
-      {warning ? (
-        <>
-          <p className="dfp-said">{t('dataFolder.move.warn')}</p>
+  /**
+   * The field and its presses, drawn only for the person when a move may start from here. ONE PRESS AT A TIME, in the
+   * order a move takes: the check, until a check says a move to the folder would go ahead; then the move; then the
+   * warning's press with the cancel, which goes back to the move. A change to the folder goes back to the check.
+   */
+  const theMoveField = (): React.ReactElement => {
+    // A CHECK ANSWERS ONLY FOR THE FOLDER IT ASKED ABOUT. An answer that arrives after the field has changed is not about
+    // the folder in the field, so it neither speaks of "this folder" nor brings the move.
+    const theCheck = checked !== null && checked.asked === to ? checked : null
+    const theCheckIsDone = theCheck !== null && theCheck.code === null
+    return (
+      <>
+        <div className="dfp-field">
+          <label className="dfp-label" htmlFor="dfp-to">
+            {t('dataFolder.to')}
+          </label>
+          <input
+            className="dfp-input"
+            id="dfp-to"
+            type="text"
+            value={to}
+            onChange={(event) => {
+              setTo(event.target.value)
+              setChecked(null)
+              setWarning(false)
+            }}
+          />
+        </div>
+        {theCheckIsDone ? null : (
           <div className="dfp-presses">
-            <Btn variant="primary" onClick={pressSure} disabled={busy} reason={t('dataFolder.busy')}>
-              {t(pressWord('dataFolder.move.sure'))}
-            </Btn>
-            <Btn onClick={pressCancel} disabled={busy} reason={t('dataFolder.busy')}>
-              {t(pressWord('dataFolder.move.cancel'))}
+            {/* A PRESS IN FLIGHT IS WHY THE CHECK IS OFF while it is, whatever the field holds; an empty field is why otherwise. */}
+            <Btn onClick={pressCheck} disabled={busy || to.trim() === ''} reason={busy ? t('dataFolder.busy') : t('dataFolder.toHint')}>
+              {t(pressWord('dataFolder.check'))}
             </Btn>
           </div>
-        </>
-      ) : null}
-    </>
-  )
+        )}
+        {theCheck === null ? null : theCheck.code === null ? (
+          <p className="dfp-said">{t('dataFolder.check.thisFolderIsFine')}</p>
+        ) : (
+          <>
+            <p className="dfp-said">{t('dataFolder.check.thisFolderIsRefused')}</p>
+            {/* THE CHECK'S REFUSAL IS THE ONLY REASON THE PERSON HAS, so it is drawn in both modes, in the page's language
+                from its code and values. dataFolderMoveRefused is an error of the walk in the system's own English
+                words, so only that one is marked as English. */}
+            <p className="dfp-why" lang={theCheck.code === 'dataFolderMoveRefused' ? 'en' : undefined}>
+              {t(`server.${theCheck.code}`, theCheck.values ?? undefined)}
+            </p>
+          </>
+        )}
+        {/* NO PRESS IS IN FLIGHT WHILE THE MOVE IS DRAWN: a check in flight has no answer yet, and a move in flight is
+            under the warning. */}
+        {theCheckIsDone && !warning ? (
+          <div className="dfp-presses">
+            <Btn onClick={pressMove}>{t(pressWord('dataFolder.move'))}</Btn>
+          </div>
+        ) : null}
+        {warning ? (
+          <>
+            <p className="dfp-said">{t('dataFolder.move.warn')}</p>
+            <div className="dfp-presses">
+              <Btn variant="primary" onClick={pressSure} disabled={busy} reason={t('dataFolder.busy')}>
+                {t(pressWord('dataFolder.move.sure'))}
+              </Btn>
+              <Btn onClick={pressCancel} disabled={busy} reason={t('dataFolder.busy')}>
+                {t(pressWord('dataFolder.move.cancel'))}
+              </Btn>
+            </div>
+          </>
+        ) : null}
+      </>
+    )
+  }
 
   /** What may be pressed, in the order the checks decide it. */
   const thePresses = (): React.ReactNode => {
     if (reading === null) return null
-    if (!reading.fromABundle) return <p className="dfp-what">{t('dataFolder.notABundle')}</p>
+    if (!reading.fromABundle) return <p className="dfp-what">{t('dataFolder.state.notABundle')}</p>
     // THE PROCESS ENVIRONMENT DECIDES THE FOLDER, so a .env line would not, and the words above say so.
     if (reading.chosenBy === 'the process environment') return null
-    // THE PANEL TAKES NO REASON, so a caller who may press only under the grant reads that a secretary presses through
-    // the door with its reason. The presses themselves are drawn only for the person.
-    const theGrantPressesThese = !reading.theCallerIsThePerson && (reading.mayMove || reading.mayConfirm)
-    const theNoPressWords = (): React.ReactElement => (
-      <p className="dfp-what">{t(theGrantPressesThese ? 'dataFolder.throughTheDoor' : 'dataFolder.onlyThePerson')}</p>
-    )
+    // The presses are drawn only for the person.
     const anEndedSwitch =
       reading.mark.state === 'read' && reading.mark.mark.state === 'switched' && !reading.mark.moverAlive
     if (reading.mark.state === 'read' && (reading.mark.mark.state === 'started' || anEndedSwitch)) {
       return (
         <>
-          <p className="dfp-said">{t('dataFolder.confirm.what', { from: reading.mark.mark.from })}</p>
           {reading.theCallerIsThePerson && reading.mayConfirm ? (
             <div className="dfp-presses">
               <Btn variant="primary" onClick={pressConfirm} disabled={busy} reason={t('dataFolder.busy')}>
                 {t(pressWord('dataFolder.confirm'))}
               </Btn>
             </div>
-          ) : (
-            theNoPressWords()
-          )}
-          <p className="dfp-what">{t('dataFolder.confirmFirst')}</p>
+          ) : null}
         </>
       )
     }
     // A SWITCHED MARK WHOSE MOVER LIVES, OR A MOVE STILL RUNNING, has nothing to press: the mover may yet switch back, or
     // the office is starting again.
     if (reading.mark.state === 'read' && (reading.mark.mark.state === 'switched' || theReadingKeepsThePanelWaiting(reading))) return null
-    if (!(reading.theCallerIsThePerson && reading.mayMove)) return theNoPressWords()
+    if (!(reading.theCallerIsThePerson && reading.mayMove)) return null
     return theMoveField()
   }
 
@@ -393,14 +410,14 @@ export function DataFolderPanel(): React.ReactElement {
         ) : null}
         {otherIdentity ? (
           <>
-            <p className="dfp-said">{t('dataFolder.waiting.otherIdentity')}</p>
+            <p className="dfp-said">{t('dataFolder.state.otherIdentity')}</p>
             <div className="dfp-presses">
               <Btn onClick={() => window.location.reload()}>{t('dataFolder.loadAgain')}</Btn>
             </div>
           </>
         ) : waiting ? (
           <>
-            <p className="dfp-said">{t('dataFolder.waiting')}</p>
+            <p className="dfp-said">{t('dataFolder.state.stopped')}</p>
             {failedReads > 0 ? <p className="dfp-said">{t('dataFolder.waiting.asked', { n: failedReads })}</p> : null}
             {developer && started !== null ? (
               <p className="dfp-dev" lang="en">
@@ -414,11 +431,11 @@ export function DataFolderPanel(): React.ReactElement {
                 from a bundle says only that, and Developer mode still draws the reading around it. */}
             {reading.fromABundle || developer ? (
               <>
-                <p className="dfp-said">{t('dataFolder.where', { folder: reading.folder })}</p>
+                <CodeRows rows={[{ label: 'dataFolder.row.folder', value: reading.folder }]} />
                 {developer ? (
                   <>
-                    <p className="dfp-dev" lang="en">
-                      {reading.database}
+                    <p className="dfp-dev">
+                      <code className="wrap-anywhere">{content(reading.database)}</code>
                     </p>
                     <p className="dfp-dev" lang="en">
                       {reading.chosenBySays}
@@ -426,10 +443,10 @@ export function DataFolderPanel(): React.ReactElement {
                   </>
                 ) : null}
                 {theChosenByWord(reading.chosenBy) === null ? null : <p className="dfp-what">{t(theChosenByWord(reading.chosenBy) as WordKey)}</p>}
-                {reading.mark.state === 'absent' ? <p className="dfp-said">{t('dataFolder.mark.absent')}</p> : null}
+                {reading.mark.state === 'absent' ? <p className="dfp-said">{t('dataFolder.state.lastMoveNone')}</p> : null}
                 {reading.mark.state === 'unreadable' ? (
                   <>
-                    <p className="dfp-said">{t('dataFolder.mark.unreadable')}</p>
+                    <p className="dfp-said">{t('dataFolder.state.lastMoveNotRead')}</p>
                     {developer ? (
                       <p className="dfp-dev" lang="en">
                         {reading.mark.why}
@@ -439,13 +456,15 @@ export function DataFolderPanel(): React.ReactElement {
                 ) : null}
                 {reading.mark.state === 'read' ? (
                   <>
-                    {theMarkWords(reading.mark, reading.folder)}
+                    {theMarkWords(reading.mark)}
                     {reading.mark.mark.earlier.length === 0 ? null : (
                       <>
                         <p className="dfp-said">{t('dataFolder.earlier')}</p>
                         <ul className="dfp-paths">
                           {reading.mark.mark.earlier.map((folder) => (
-                            <li key={folder}>{folder}</li>
+                            <li key={folder}>
+                              <code className="wrap-anywhere">{content(folder)}</code>
+                            </li>
                           ))}
                         </ul>
                       </>
@@ -468,7 +487,9 @@ export function DataFolderPanel(): React.ReactElement {
                     <p className="dfp-said">{t('dataFolder.confirmed.kept')}</p>
                     <ul className="dfp-paths">
                       {confirmed.kept.map((name) => (
-                        <li key={name}>{name}</li>
+                        <li key={name}>
+                          <code className="wrap-anywhere">{content(name)}</code>
+                        </li>
                       ))}
                     </ul>
                   </>
@@ -485,14 +506,14 @@ export function DataFolderPanel(): React.ReactElement {
 
 const DATA_FOLDER_CSS = `
 .dfp { display: flex; flex-direction: column; align-items: stretch; gap: 0.5rem; min-width: 0; }
-.dfp-said, .dfp-what, .dfp-dev, .dfp-why, .dfp-hint, .dfp-label {
+.dfp-said, .dfp-what, .dfp-dev, .dfp-why, .dfp-label {
   margin: 0;
   max-width: var(--measure-in-box);
   font: var(--fs-1)/var(--lh-read) var(--font-ui);
   overflow-wrap: anywhere;
 }
 .dfp-said { color: var(--text); }
-.dfp-what, .dfp-hint, .dfp-label { color: var(--text-2); }
+.dfp-what, .dfp-label { color: var(--text-2); }
 .dfp-dev, .dfp-why { color: var(--text-2); font-family: var(--font-mono); }
 .dfp-paths { margin: 0; padding-left: 1.25rem; max-width: var(--measure-in-box); }
 .dfp-paths li { font: var(--fs-1)/var(--lh-read) var(--font-ui); overflow-wrap: anywhere; }

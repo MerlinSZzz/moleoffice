@@ -68,17 +68,19 @@ it('names the agent when its reading fails', async () => {
   expect(carryReads).toEqual(['empty-agent'])
 }, 120_000)
 
-it('keeps the chat usable while the carry reading is still out', async () => {
+it('keeps the chat usable while the new agent dialog\'s reading is still out', async () => {
   let release = () => {}
   const held = new Promise<void>((resolve) => { release = resolve })
   let completed = () => {}
   const finished = new Promise<void>((resolve) => { completed = resolve })
   let started = false
-  await app.page.route('**/api/messages/carryable-agent-ids', async (route) => {
+  // THE CHAT'S NEW AGENT PRESS OPENS THE NEW AGENT DIALOG, and the dialog's agent tool list is the
+  // Casting reading. That reading is held here, so the dialog is open while its list is still out.
+  await app.page.route('**/api/casting', async (route) => {
     started = true
     try {
       await held
-      await route.fulfill({ json: { agentIds: ['carrying-agent'] } })
+      await route.fulfill({ json: { roles: [], programs: [], labels: [], rules: [], officeTimeZone: 'UTC' } })
     } finally { completed() }
   })
   try {
@@ -87,12 +89,14 @@ it('keeps the chat usable while the carry reading is still out', async () => {
     await waitForThePage(app.page, 60_000)
     await openTheChat(app.page)
     await app.page.locator('.px-chat-new-agent').waitFor()
-    const request = app.page.waitForRequest('**/api/messages/carryable-agent-ids')
+    const request = app.page.waitForRequest('**/api/casting')
     await app.page.locator('.px-chat-new-agent').click()
     await request
-    await app.page.locator('.px-chat-new-agent-ask').waitFor()
+    await app.page.locator('.px-new-agent-dialog').waitFor()
+    await app.page.locator('.px-new-agent-dialog-state', { hasText: t('newAgentDialog.reading') }).first().waitFor()
     expect(await app.page.locator('.px-chat').isVisible()).toBe(true)
-    await app.page.locator('.px-chat-new-agent-close').click()
+    await app.page.locator('.px-new-agent-dialog-cancel').click()
+    expect(await app.page.locator('.px-new-agent-dialog').count()).toBe(0)
     expect(await app.page.locator('.px-chat').isVisible()).toBe(true)
   } finally {
     release()

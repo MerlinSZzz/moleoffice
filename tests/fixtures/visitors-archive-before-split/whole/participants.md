@@ -37,6 +37,7 @@ chatOpensAs: null
 chatLabels: null
 shippedFlags: null
 chatLayout: null
+startingMode: "inspect"
 themes: null
 agentTags: null
 officeOwner: "named-by-the-installer"
@@ -182,6 +183,7 @@ pluginSwitches: null
 checksInMergesOnly: null
 staleForkBases: null
 otherProjectsMessagesSince: null
+ownerChangesSince: null
 ```
 
 ## Whether the reading-measure words carry their new names

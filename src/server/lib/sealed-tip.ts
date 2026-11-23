@@ -25,7 +25,7 @@ import { createRecord, createLink, getRecord, type Actor } from './records.ts'
 import { PanelError } from './panel-error.ts'
 import type { PanelRecord } from '@shared/types.ts'
 import { theReviewLevel } from '../db/the-review-level.ts'
-import { resolveCheckEligibilityFacts, theCheckAgainsEntry, theMergeEntryACheckAgainIsFor, theSealsReadingOfARunsAgent } from './inspection.ts'
+import { resolveCheckEligibilityFacts, theCheckAgainsEntry, theMergeEntryACheckAgainIsFor, theSealsReadingOfARunsAgent, whyAWorkersSupervisorIsNotTold } from './inspection.ts'
 import { THE_OFFICE } from './the-office.ts'
 import { theOneAgentAStringNames } from './agent-references.ts'
 import { theRowNamesAnotherMachine } from './machines.ts'
@@ -33,7 +33,9 @@ import { writeASystemLineToOne } from './groups.ts'
 import { whoIsToldOfASealOnceAPackageMoves } from './delegation.ts'
 import { theSealEmptiesTheAreaSetForItsRun, type RegisteredAgent } from './participants.ts'
 import { readParticipant } from '../db/read-participant.ts'
-import { sayTheCommitsWereNotChecked, theCommitsPastTheCutAtTheWrite, theGitOfASealAtTheWrite } from './a-finish-reads-git-apart.ts'
+import { sayTheCommitsWereNotChecked, theCommitsPastTheCutAtTheWrite, theGitOfASealAtTheWrite, theRunsOwnCommitsAtTheWrite } from './a-finish-reads-git-apart.ts'
+import { CARRIED_COMMITS, END_HEAD } from '@shared/kinds.ts'
+import { theEndHeadAtTheSeal, theOwnCommitsAskOf, theOwnCommitsJudged, theRunsOwnCommitsRead, type AHeadRead, type TheRunsOwnCommits } from './a-runs-own-commits.ts'
 import type { ASealGitAsk, TheCommitsPastTheCut } from './the-seal-read-apart-thread.ts'
 import { SYSTEM_LINES } from '@shared/groups.ts'
 import { theRecordedBaseOfRun } from '@shared/next-round.ts'
@@ -455,11 +457,18 @@ export function captureGit(directory: string, base: string | null, area: string[
 export function theGitOfASeal(directory: string, prior: GitSubmission | null, named: string | null, area: string[], capture: typeof captureGit = captureGit): GitSubmission {
   if (prior === null) return capture(directory, named, area)
   const again = capture(directory, named, area)
-  const rebased = again.forkBase !== prior.forkBase && again.forkBase !== again.commit &&
-    theCommitIsUnder(directory, prior.forkBase, again.forkBase)
-  if (rebased) return again
+  if (aRebasedRunReadsTheNewBase(directory, prior.forkBase, again.forkBase, again.commit)) return again
   return { ...capture(directory, prior.forkBase, area, true),
     forkBaseSays: `An earlier seal of this run read the fork base ${prior.forkBase}. The run was not rebased onto a newer base, so this seal keeps it.` }
+}
+
+/**
+ * WHETHER A RUN SEALED AGAIN READS ITS NEW FORK BASE: the new one is not the first, nor the tip itself, and the first is
+ * under it. Otherwise the run keeps its first seal's fork base. `theGitOfASeal` and the reading of a run's own commits
+ * (./a-runs-own-commits.ts) both ask it, so the two read one fork base.
+ */
+export function aRebasedRunReadsTheNewBase(directory: string, prior: string, again: string, tip: string): boolean {
+  return again !== prior && again !== tip && theCommitIsUnder(directory, prior, again)
 }
 
 /**
@@ -541,14 +550,30 @@ function aReaderOf(repository: string): { read: ARead; unreadable: (error: unkno
 }
 
 /**
+ * HOW A PATCH LOG REACHES `git patch-id --stable` WITHOUT BEING HELD WHOLE: it is given the `git log` arguments
+ * `thePatchIdsOf` built and the range they read, and answers what patch-id printed.
+ */
+export type APatchLogReader = (log: string[], range: string) => string
+
+/**
  * THE PATCH-ID OF EACH COMMIT IN A RANGE. The same flags are used on both ranges, so the same change gives the same id
  * on both sides. `context` adds -U0 for the third proof.
+ *
+ * Left out, `throughAFile` makes it two reads through `read`: the log is read whole and then handed to patch-id, so a
+ * log larger than one git read may hold fails. Given, the log goes to patch-id the way it says, and `read` is not used.
  */
-export function thePatchIdsOf(read: ARead, range: string, context: PatchKind = 'default'): Map<string, string> {
-  const patches = read(['log', '-p', ...(context === 'none' ? ['-U0'] : []), '--no-color', '--no-ext-diff', '--no-renames', '--format=commit %H', range])
+export function thePatchIdsOf(read: ARead, range: string, context: PatchKind = 'default', throughAFile?: APatchLogReader): Map<string, string> {
+  const log = ['log', '-p', ...(context === 'none' ? ['-U0'] : []), '--no-color', '--no-ext-diff', '--no-renames', '--format=commit %H', range]
   const byCommit = new Map<string, string>()
-  if (patches.trim() === '') return byCommit
-  for (const row of read(['patch-id', '--stable'], patches).split('\n').filter(Boolean)) {
+  let thePatchIds: string
+  if (throughAFile === undefined) {
+    const patches = read(log)
+    if (patches.trim() === '') return byCommit
+    thePatchIds = read(['patch-id', '--stable'], patches)
+  } else {
+    thePatchIds = throughAFile(log, range)
+  }
+  for (const row of thePatchIds.split('\n').filter(Boolean)) {
     const [patch, commit] = row.split(' ')
     if (patch !== undefined && commit !== undefined) byCommit.set(commit, patch)
   }
@@ -1181,6 +1206,28 @@ function whatARunWithNoSubmissionMustDeclare(runId: string): string {
 }
 
 /**
+ * WHAT A RUN WITH NO WORK AREA IS TOLD: the area is missing, the exact write that gives its agent a work area for this
+ * run, and the records submission that finishes a run which made no commits, with the reports linked to the run. The
+ * work-area write is for the owner, the run's starter or a holder of the secretary card, and its `forRun` names the run
+ * whose seal empties the area again.
+ */
+function whatARunWithNoWorkAreaCanDo(runId: string, agent: string): string {
+  const reports = theReportsLinkedTo(runId)
+  const records = reports.length > 0 ? JSON.stringify({ kind: 'records', records: reports }) : aSubmissionOfRecords('records')
+  return (
+    'The run cannot finish: no registered work area can be sealed. Nothing was written. ' +
+    "The owner, the run's starter or a holder of the secretary card can give the agent a work area for this run with " +
+    `POST /api/participants/agent/${agent}/work-area and the body {"workArea":["<repository-relative path>"],` +
+    `"because":"<why>","forRun":"${runId}"}. ` +
+    'A run that made no commits finishes with a records submission instead: ' +
+    `PATCH /api/records/${runId} ${theFinishingWrite(records)}. ` +
+    (reports.length > 0
+      ? `The report${reports.length === 1 ? '' : 's'} linked to this run: ${reports.join(', ')}.`
+      : 'No report is linked to this run yet: file one about the run, link it to the run, and name it there.')
+  )
+}
+
+/**
  * WHY A RUN ON ANOTHER COMPUTER IS NOT SEALED HERE, in the words the finishing write is refused with. It names the
  * computer, why its code cannot be read here, and the two ways on.
  */
@@ -1257,6 +1304,59 @@ export function theCommitsPastTheCut(directory: string, cut: string): TheCommits
   return { commits }
 }
 
+/** The commits a refusal names: each by its full hash and the first line of its message. */
+function theCommitsSaid(commits: { commit: string; subject: string }[]): string {
+  return commits.map((one) => `${one.commit} "${one.subject}"`).join(', ')
+}
+
+/**
+ * A GIT OR MIXED SEAL REFUSES COMMITS THE RUN DID NOT MAKE: commits between the fork base and HEAD that were not there
+ * when the run was filed, that no run it continues made, and whose change is on main or in no seal that judged it. The
+ * refusal names each commit and the write that finishes the run. Nothing is written.
+ */
+function aSealOverCommitsNotTheRunsOwn(runId: string, read: Extract<TheRunsOwnCommits, { own: unknown }>, submitted: { kind?: string; records?: string[] } | undefined): PanelError {
+  const n = read.foreign.length
+  const records = Array.isArray(submitted?.records) && submitted.records.length > 0 ? submitted.records : null
+  const next = read.own.length === 0
+    ? 'This run made no commits of its own since it was filed. To finish it with the records it wrote, send: ' +
+      `PATCH /api/records/${runId} ${theFinishingWrite(records === null ? aSubmissionOfRecords('records') : JSON.stringify({ kind: 'records', records }))}`
+    : `Take ${n === 1 ? 'it' : 'them'} off the run's branch, then send the finishing write again: ` +
+      `PATCH /api/records/${runId} ${theFinishingWrite(JSON.stringify({ kind: submitted?.kind ?? 'git', ...(records === null ? {} : { records }) }))}`
+  return new PanelError(
+    `The seal of run ${runId} would hold ${n === 1 ? 'a commit' : `${String(n)} commits`} the run did not make: ${theCommitsSaid(read.foreign)}. ` +
+      `${n === 1 ? 'It is' : 'They are'} between the fork base ${read.forkBase} and HEAD ${read.head}, ${n === 1 ? 'was' : 'were'} not there ` +
+      `when the run was filed, and no run it continues made ${n === 1 ? 'it' : 'them'}. Nothing was written. ${next}`,
+    409, undefined, undefined, undefined, { code: 'sealHoldsCommitsNotTheRunsOwn', values: {} },
+  )
+}
+
+/**
+ * A RECORDS SEAL REFUSES A RUN THAT MADE COMMITS OF ITS OWN that no seal holds yet: a records seal holds no git, so the
+ * check and the merge queue would never see them. The refusal names each and the mixed write. Nothing is written.
+ */
+function aRecordsSealThatLeavesOutTheRunsOwnCommits(runId: string, judged: { commit: string; subject: string }[], records: unknown): PanelError {
+  const n = judged.length
+  const submission = Array.isArray(records) && records.length > 0 ? JSON.stringify({ kind: 'mixed', records }) : aSubmissionOfRecords('mixed')
+  return new PanelError(
+    `Run ${runId} declared a records submission, but it made ${n === 1 ? 'a commit' : `${String(n)} commits`} of its own since it was filed ` +
+      `that no seal holds, so a records seal would leave ${n === 1 ? 'it' : 'them'} out: ${theCommitsSaid(judged)}. Nothing was written. ` +
+      `To seal ${n === 1 ? 'it' : 'them'} with the records, declare the submission mixed: PATCH /api/records/${runId} ${theFinishingWrite(submission)}`,
+    409, undefined, undefined, undefined, { code: 'sealLeavesOutTheRunsOwnCommits', values: {} },
+  )
+}
+
+/**
+ * A GIT OR MIXED SEAL REFUSES A WORKING DIRECTORY GIT CANNOT READ. Nothing is written. A working directory git reads in
+ * another repository than the run was filed in is sealed as a run with no filing commit is (choice 6).
+ */
+function aWorkingDirectoryUnread(runId: string, why: string): PanelError {
+  return new PanelError(
+    `Run ${runId} cannot be sealed, because ${why}. Nothing was written. Seal it from the working directory it was filed in, ` +
+      `or finish it with the records it wrote: PATCH /api/records/${runId} ${theFinishingWrite(aSubmissionOfRecords('records'))}`,
+    409, undefined, undefined, undefined, { code: 'sealWorkingDirectoryUnread', values: {} },
+  )
+}
+
 /**
  * WHY A SUBMISSION OF A KIND THERE IS NOT IS REFUSED, in the words the seal is refused with. It is here once, and
  * tests/a-finish-reads-its-git-apart.test.ts reads it from here.
@@ -1271,7 +1371,7 @@ export function whyASubmissionKindIsRefused(kind: unknown): string {
  * AND THE RUN'S STARTER IS SENT ONE MESSAGE saying what the seal holds, in the same write, or the seal says
  * why nobody was told. See `whoIsToldOfASeal`.
  */
-export function sealFinishedRun(runId: string, data: Record<string, unknown>, actor: Actor, submittedTip: unknown): { sealedTip: string; tip?: string } {
+export function sealFinishedRun(runId: string, data: Record<string, unknown>, actor: Actor, submittedTip: unknown): { sealedTip: string; tip?: string; endHead?: AHeadRead } {
   const run = getRecord(runId)
   if (!run) throw new PanelError(`No run ${runId}.`, 404)
   const submitted = data['submission'] as { kind?: string; records?: string[]; stagedAt?: unknown; root?: unknown; sources?: unknown; standard?: unknown } | undefined
@@ -1307,18 +1407,36 @@ export function sealFinishedRun(runId: string, data: Record<string, unknown>, ac
   // missing is the submission, not the area, so the refusal names it and the write that finishes the run (problems
   // o8rBHt9RtUUJ and JF9q5cqiOPCS). A run that declared git and has no area is still told the area is missing.
   if (submitted?.kind === undefined && (!area || !area.length)) throw new PanelError(whatARunWithNoSubmissionMustDeclare(runId), 409)
-  if (!area || (kind !== 'records' && !area.length)) throw new PanelError('The run cannot finish: no registered work area can be sealed.', 409)
+  if (!area || (kind !== 'records' && !area.length)) throw new PanelError(whatARunWithNoWorkAreaCanDo(runId, agent.id), 409)
   const prior = readRunSeal(runId)?.seal.git
   // A RUN THAT NAMED NO cutFrom AND HAS NO EARLIER SEAL NAMES NO BASE HERE; the seal reads the
   // repository's trunk. `null` is that absence, and it is not the string `main`.
   const named = theBaseARunNames(data)
-  if (kind === 'records') refuseARecordsSealOverCommitsPastTheCut(runId, data, named, submitted?.records)
   // A FILES RUN NEVER REACHES GIT, which is what lets a recovery of never-versioned bytes finish:
   // captureGit refuses any file outside a commit, and outside any commit is exactly where they are.
   // INSIDE A FINISHING WRITE THE GIT WAS READ ON THE SEAL-READ THREAD, with the same function and arguments
   // (./a-finish-reads-git-apart.ts); anywhere else it is read here, as it always was.
   const git: ASealGitAsk | null = kind === 'records' || kind === 'files' ? null : { directory: String(data['workingDirectory'] ?? ''), prior: prior ?? null, named, area }
+  // A RUN WHOSE FILING COMMIT THE OFFICE READ IS SEALED WITH ITS OWN COMMITS ALONE (./a-runs-own-commits.ts). Any other
+  // run, a run whose working directory is now in another repository, and a records run whose working directory git
+  // cannot read, is read as before. The seal's git is asked with the own commits, so a finishing write reads both in one
+  // read apart.
+  const counted = kind === 'files' || theRowNamesAnotherMachine({ data }) ? null : theOwnCommitsAskOf(runId, data, named)
+  const ownRead = counted === null ? null : theRunsOwnCommitsAtTheWrite(counted, git) ?? theRunsOwnCommitsRead(counted)
+  const owned = ownRead !== null && 'own' in ownRead ? ownRead : null
+  if (kind === 'records') {
+    // A CUT GIT CANNOT FIND IS READ AS BEFORE: the commits past it are not checked, and the answer says why.
+    if (owned === null || !owned.cutFound) refuseARecordsSealOverCommitsPastTheCut(runId, data, named, submitted?.records)
+    else if (theOwnCommitsJudged(owned).length > 0) throw aRecordsSealThatLeavesOutTheRunsOwnCommits(runId, theOwnCommitsJudged(owned), submitted?.records)
+  } else if (ownRead !== null && 'unread' in ownRead) throw aWorkingDirectoryUnread(runId, ownRead.unread)
+  else if (owned !== null && owned.foreign.length > 0) throw aSealOverCommitsNotTheRunsOwn(runId, owned, submitted)
   const code = git === null ? null : theGitOfASealAtTheWrite(git) ?? theGitOfASeal(git.directory, git.prior, git.named, git.area)
+  // THE OWN COMMITS WERE READ OFF THE FORK BASE AND HEAD THE SEAL READ, by the same functions. Where they were not, the
+  // assumption is broken and nothing is sealed.
+  if (code !== null && ownRead !== null && 'noBase' in ownRead) throw new Error(`The seal of run ${runId} read a fork base where reading the run's own commits could not: ${ownRead.noBase}`)
+  if (code !== null && owned !== null && (code.forkBase !== owned.forkBase || code.commit !== owned.head)) {
+    throw new Error(`The working directory of run ${runId} changed while its own commits were read: they were read at fork base ${owned.forkBase} and HEAD ${owned.head}, and the seal read ${code.forkBase} and ${code.commit}. Nothing was written. Send the finishing write again.`)
+  }
   const filesPart = kind === 'files' ? captureFiles(submitted?.stagedAt, submitted?.root, submitted?.sources, theSandboxFolderOf(data)) : null
   if (code && submittedTip !== undefined && submittedTip !== code.commit) throw new PanelError(`The submitted tip ${String(submittedTip)} differs from HEAD ${code.commit}.`, 409)
   const recordPart = kind === 'git' || kind === 'files' ? null : captureRecords(runId, run.workspaceId, submitted?.records ?? [], kind === 'mixed' ? 'mixed' : 'records')
@@ -1326,9 +1444,14 @@ export function sealFinishedRun(runId: string, data: Record<string, unknown>, ac
   const attempt = typeof data['attemptId'] === 'string' && data['attemptId'].trim() ? data['attemptId'] : randomUUID()
   // `files` IS ADDED ONLY TO A FILES SEAL, and `standard` only to a seal that declares one, so every other seal's
   // content — and therefore its hash — is exactly what it was before either existed.
-  const content = { version: 1 as const, run: runId, execution, attempt, area: [...area], sealedAt: nowStamp(), kind: kind as SealedTip['kind'], git: code, records: recordPart, ...(filesPart === null ? {} : { files: filesPart }), ...(standard === undefined ? {} : { standard }) }
+  // `carriedCommits` IS ADDED ONLY TO A SEAL OF A RUN WHOSE OWN COMMITS WERE READ AND THAT CARRIES A COMMIT, so every other
+  // seal's content is exactly what it was before it existed.
+  const content = { version: 1 as const, run: runId, execution, attempt, area: [...area], sealedAt: nowStamp(), kind: kind as SealedTip['kind'], git: code, records: recordPart, ...(filesPart === null ? {} : { files: filesPart }), ...(standard === undefined ? {} : { standard }), ...(owned === null || owned.carried.length === 0 ? {} : { [CARRIED_COMMITS]: owned.carried }) }
   const seal: SealedTip = { ...content, hash: sealHash(JSON.stringify(content)) }
-  const told = whoIsToldOfASealOnceAPackageMoves(runId, agent, whoIsToldOfTheRun(agent))
+  // The owner's decision of 12 November 2026 leaves only the worker's supervisor out of this notice.
+  const recipient = whoIsToldOfASealOnceAPackageMoves(runId, agent, whoIsToldOfTheRun(agent))
+  const because = 'to' in recipient ? whyAWorkersSupervisorIsNotTold(run, recipient.to) : null
+  const told: TheStarterNotice = because === null ? recipient : { because }
   let id: string
   writingSeal = true
   try {
@@ -1365,14 +1488,24 @@ export function sealFinishedRun(runId: string, data: Record<string, unknown>, ac
   // refusal and rebuttal is the area the seal stored, which the check reads once the agent's own area
   // has been emptied above, and the live-process check in tools/live-processes.mjs, which refuses a
   // removal while a process is still in the tree.
-  return { sealedTip: id, ...(code ? { tip: code.commit } : {}) }
+  // THE RUN'S END COMMIT, READ AT ITS OWN FINISH, on a run that has none.
+  const endHead = counted === null || ownRead === null || data[END_HEAD] !== undefined ? null : theEndHeadAtTheSeal(runId, counted.directory, ownRead)
+  return { sealedTip: id, ...(code ? { tip: code.commit } : {}), ...(endHead === null ? {} : { endHead }) }
 }
 
 export function readRunSeal(runId: string): { id: string; seal: SealedTip } | null {
-  const run = getRecord(runId)
-  const id = run?.data['sealedTip']
+  return readTheSealNamed(runId, getRecord(runId)?.data['sealedTip'])
+}
+
+/**
+ * THE SEAL `id` NAMES, READ AS A SEAL OF RUN `runId`, or null when it names none. `readRunSeal` reads the seal the stored
+ * run names. A run's own commits are read against the seal the data they are asked of names (./a-runs-own-commits.ts),
+ * and what a seal found is asked of the run as it was before that seal, so the seal is not counted as its own earlier one.
+ */
+export function readTheSealNamed(runId: string, id: unknown): { id: string; seal: SealedTip } | null {
   if (id === undefined) return null
   if (typeof id !== 'string') throw new PanelError(`Run ${runId} names an unreadable seal.`, 409)
+  const run = getRecord(runId)
   const record = getRecord(id)
   const seal = record?.data['seal'] as SealedTip | undefined
   if (record?.kind !== 'sealed_tip' || !seal || seal.run !== runId || record.deletedAt || record.workspaceId !== run?.workspaceId) throw new PanelError(`Seal ${id} does not identify this run.`, 409)

@@ -13,20 +13,20 @@
  * WHAT IS CLAIMED
  * ---------------------------------------------------------------------------------------
  *
- *   1. On another device the entry says where the tool runs and draws the settings the office passed on with the
- *      presses of the office's computer: the account it sends from and the accounts to choose from, the list of
- *      addresses in its box, and the presses that pick, save and send a test letter.
+ *   1. On another device the entry draws the settings the office passed on with the presses of the office's
+ *      computer: the account it sends from and the accounts to choose from, the list of addresses in its box, and the
+ *      presses that pick, save and send a test letter.
  *      It asks the office's read alone: not the office's door for the tool's install, which is kept on its computer,
  *      and not the tool itself.
  *   2. An empty list is an empty box, and the last test letter is drawn as the tool says it.
- *   3. When the office has no answer of the tool's, the entry says why in words, as a status and not as a failure, and
- *      developer mode alone draws what the office said.
+ *   3. When the office has no answer of the tool's, the entry names what kept it in a short word, such as "Tool: no
+ *      answer", as a status and not as a failure, and developer mode alone draws what the office said.
  *   4. When the office's own read fails, the entry says the office did not pass the settings on, and its press asks
  *      again.
  *   5. It fits each width the page is drawn at, in both themes, with the tool's answer, without one, and after a change
  *      the tool did not confirm; and at 1440 and 390 in Chinese as well, with the tool's answer and without one.
  *   6. Each press asks the office, never the tool, with what the person typed or chose, and draws what the tool did. A
- *      change the tool did not confirm says so and why in words, as a status, and developer mode alone draws what the
+ *      change the tool did not confirm is named with what kept it, as a status, and developer mode alone draws what the
  *      office said; a press the office itself refused says so under the same heading.
  *
  * THE PAGE IS SERVED FROM 127.0.0.2, a loopback address that is not one of this computer's own names for the tool
@@ -94,10 +94,10 @@ function aToolsState(change: Record<string, unknown> = {}) {
 
 /** The word each reason is said in. */
 const SAID_AS = {
-  'no address': 'settingsPanel.mailtool.throughTheOffice.noAddress',
-  'no answer': 'settingsPanel.mailtool.throughTheOffice.noAnswer',
-  refused: 'settingsPanel.mailtool.throughTheOffice.refused',
-  'not the tool': 'settingsPanel.mailtool.throughTheOffice.notTheTool',
+  'no address': 'settingsPanel.mailtool.throughTheOffice.state.noAddress',
+  'no answer': 'settingsPanel.mailtool.throughTheOffice.state.noAnswer',
+  refused: 'settingsPanel.mailtool.throughTheOffice.state.refused',
+  'not the tool': 'settingsPanel.mailtool.throughTheOffice.state.notTheTool',
 } as const satisfies Record<WhyTheToolWasNotRead, WordKey>
 
 /** A word of the English list, with its values put in. */
@@ -189,7 +189,7 @@ const press = (name: string) => app.page.getByRole('button', { name, exact: true
 const asked = () => app.page.evaluate(() => (window as any).mfad.stand.asked as string[])
 
 describe("on another device, the mail tool's settings are read through the office", () => {
-  it('1: says where the tool runs, draws the settings the office passed on with their presses, and asks the office alone', async () => {
+  it('1: draws the settings the office passed on with their presses, and asks the office alone', async () => {
     // THE PAGE IS ON ANOTHER DEVICE, as the entry tells it.
     expect(await app.page.evaluate(() => window.location.hostname)).toBe(ANOTHER_DEVICE)
     expect(onTheToolsComputer(ANOTHER_DEVICE)).toBe(false)
@@ -197,7 +197,6 @@ describe("on another device, the mail tool's settings are read through the offic
     await draw({ answered: true, state: aToolsState() })
     await expect.poll(() => theBox().inputValue()).toBe([A, B].join('\n'))
     const drawn = await theEntry().innerText()
-    expect(drawn).toContain(said('settingsPanel.mailtool.throughTheOffice.lead'))
     expect(drawn).toContain(said('settingsPanel.mailtool.from.one', { address: SENDER, provider: 'Google' }))
     // THE ACCOUNTS TO CHOOSE FROM, AND EACH PRESS, as on the office's computer: each is passed on through the office.
     expect(await app.page.getByLabel(said('settingsPanel.mailtool.from.choice', { address: OTHER, provider: 'Google' })).count()).toBe(1)
@@ -219,7 +218,7 @@ describe("on another device, the mail tool's settings are read through the offic
     expect(errors).toEqual([])
   }, 60_000)
 
-  it("3: says in words why the office has no answer of the tool's, as a status, and what the office said in developer mode alone", async () => {
+  it("3: names in a short word what kept the office from the tool's answer, as a status, and what the office said in developer mode alone", async () => {
     const says = 'What the office said, in its own English.'
     for (const [because, key] of Object.entries(SAID_AS) as [WhyTheToolWasNotRead, WordKey][]) {
       await draw({ answered: false, because, status: because === 'refused' ? 403 : null, says })

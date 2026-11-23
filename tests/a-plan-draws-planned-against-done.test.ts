@@ -19,8 +19,8 @@
  * WHAT IT DOES NOT PROVE, SAID PLAINLY. A line records only when it was last written and by whom:
  * nothing stores when it first appeared, and a line removed from the plan leaves no row. So the
  * drawing can mark a line as written after the plan was made, and it cannot say whether it was added
- * or edited, or draw a line that is gone. Those are asserted here as the drawing's own words rather
- * than left as absences a reader would take for zeros.
+ * or edited, or draw a line that is gone. The drawing says this as one label and one state, and
+ * both are read here by their keys.
  *
  * Proved by mutation with a control run of this file first: changing `hoursOn` in
  * src/server/lib/plans.ts so it counts unstated hours as zero turns the "not stated" case red.
@@ -32,6 +32,7 @@ import { createElement as h } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { freshDb, type TestDb } from './helpers.ts'
+import { sayInEnglish } from '../src/shared/i18n.ts'
 import type { PlanBlocksReply, PlanReviewsReply, PlanSinceReadReply } from '../src/web/api.ts'
 
 type WebApi = typeof import('../src/web/api.ts')
@@ -188,16 +189,17 @@ describe('planned against done', () => {
     expect(said).not.toContain('0h')
   })
 
-  it('marks a line written after the plan was made, and says what it cannot know', async () => {
+  it('marks a line written after the plan was made, and draws its history as not recorded', async () => {
     const reply = await webApi.api.planBlocks(planId)
-    const said = words(body(h(planProgress.PlanProgress, { lines: reply.lines, planCreatedAt: reply.plan.createdAt })))
+    const markup = body(h(planProgress.PlanProgress, { lines: reply.lines, planCreatedAt: reply.plan.createdAt }))
+    const said = words(markup)
 
     expect(said).toContain('added later')
     expect(said).toContain('written since this plan was made')
-    // THE ABSENCE IS SAID, NOT DRAWN AS A ZERO. A line's first appearance and its reason are not
-    // stored, and a removed line leaves no row; the drawing says so in its own words.
-    expect(said).toContain('is not recorded')
-    expect(said).toContain('leaves no row')
+    // THE ABSENCE IS A LABEL AND A STATE, NOT A SENTENCE. A line's first appearance and its reason
+    // are not stored, and the drawing says so in a row like the tally's.
+    expect(markup).toContain(`<dt>${sayInEnglish('g8.progress.lineHistory')}</dt><dd>${sayInEnglish('word.notRecorded')}</dd>`)
+    expect(said).not.toContain(sayInEnglish('g8.progress.whenEachLineFirstAppearedAndWhyItWas'))
   })
 
   it('is on the plan’s own page, under the table', async () => {

@@ -141,6 +141,7 @@ import {
 // Which world answered, criterion G3. The format and the database identity are declared once each,
 // in src/config, and read by this hook, by the server that writes the header and by the browser.
 import {
+  bootstrapEnvironment,
   readSetting,
   REPO_ROOT,
   settings,
@@ -160,18 +161,30 @@ import { whatAnswersForThisOffice, theAnswerInWords, whatAWorldHeaderShows } fro
 import { THIS_SIDE_EN } from '../src/config/the-self-check-words.mjs'
 import { WORLD_HEADER, worldInWords } from '../src/config/world-header.mjs'
 import { KEY_HEADER } from '../src/config/key-header.mjs'
+// THE OFFICE'S OWN KEY, FOR THE HOOK'S ONE LAST-RESORT PATH ALONE: a session that holds no key, names no agent, and runs
+// on a computer with no entry key file (`theOfficeKeyHeader` below). Nothing else in this file reads it.
 import { theOfficeKey } from '../src/config/office-key.mjs'
+// THIS COMPUTER'S ENTRY AGENT AND ITS KEY, which the entry press writes beside the office's key file: where they are,
+// how they are read, and the start lines about them, in one module the press and the doors import too.
+import {
+  aNamedAgentWithoutAKeyLine,
+  aPrivateFileRead,
+  theEntrysFilesRead,
+  theEntrysKeyFileWasNotUsedLine,
+  theOfficeRefusedTheEntrysKeyLine,
+} from '../src/config/the-entrys-agent.mjs'
 import { theLineOfTheHookRunByHand } from '../src/config/the-hook-run-by-hand.mjs'
 import { A_COMPACTION_REPORTED_BY_CLAUDE_CODE } from '../src/config/a-reported-compaction.mjs'
-// THE RUN'S KEY FOR ITS OWN HOOKS, in the office tool configuration the launcher names: the same reading
-// tools/use-line.mjs and tools/dsh-hooks/office.mjs use, so the hook and those tools cannot disagree about it.
-import { OFFICE_TOOL_CONFIGURATION, theRunsKeyFromItsOfficeToolFile } from '../src/config/run-permissions.mjs'
+// WHICH KEY A RUN'S TOOL SENDS: the agent's own key from the environment, or else the run's key from the office tool
+// configuration the launcher names. One function holds that order for the hook and for the kit's tools, so the two
+// cannot choose differently.
+import { OFFICE_TOOL_CONFIGURATION, theKeyARunsToolSends } from '../src/config/run-permissions.mjs'
 // THE NOTE OF WHICH RECORD THIS CONVERSATION IS FILED AS, and the states in which a run is over, declared once in
 // src/config because tools/register-myself.mjs writes the note too (problem Tv32CoCfV-cP).
 import { carriesTheTestMark } from '../src/config/the-test-mark.mjs'
-import { THE_SESSION_NOTES_FOLDER, RUN_IS_OVER_STATES, theRecordTheNoteNames, theSessionNote, writeTheSessionNote } from '../src/config/the-session-note.mjs'
+import { THE_KEY_FILE_ENTRY_SAYS, THE_SESSION_NOTES_FOLDER, RUN_IS_OVER_STATES, theRecordTheNoteNames, theSessionNote, theWaitersKeyFileAndOffice, writeTheSessionNote } from '../src/config/the-session-note.mjs'
 import { readAFullList } from './a-full-list-read.mjs'
-import { anAgentsToolHeaders, theAgentKey } from './agent-key.mjs'
+import { A_KIT_TOOL_HOLDS_NO_KEY, THE_AGENT_KEY, anAgentsToolHeaders, theNoKeyLine } from './agent-key.mjs'
 // THE STOP CAUSE, READ FROM THE TRANSCRIPT. Criterion M94 and the office's decision say a Claude Code session's end
 // writes why it stopped onto its run record. The reading is shared with the office's own sweep
 // — src/server/lib/reminders.ts — so the two cannot drift.
@@ -372,6 +385,36 @@ const THE_SESSION_HOOK_ID = 'mole-office/the-session-hook'
 let ACTOR = AGENT ?? THE_SESSION_HOOK_ID
 /** Whether the reason a named office tool configuration gave no key has been said, so it is said once. */
 let theRunsKeyWasNotReadSaid = false
+/** Whether this hook sent the office's key, its last resort, so its start lines say so (`theKeyLines`). */
+let theLastResortWasTaken = false
+/** Whether a request named this session's agent with no key of it, so its start lines say so once (`theKeyLines`). */
+let theNamedAgentSentItsNameAlone = false
+/** Whether the office answered 401 to a request that carried this computer's entry key. Every request after it carries no key. */
+let theEntrysKeyWasRefused = false
+/**
+ * THIS COMPUTER'S ENTRY FILES, read once and only for a session that holds no key and names no agent
+ * (`theEntrysFilesOnce`), or null because no request has asked yet.
+ * @type {ReturnType<typeof theEntrysFilesRead> | null}
+ */
+let theEntrysFiles = null
+/**
+ * THE KEY IN THE FILE THIS SESSION'S NOTE NAMES, read once, or null because there is none to send, or undefined because
+ * no request has asked yet (`theKeyTheNotedFileHolds`).
+ * @type {string | null | undefined}
+ */
+let theNotedKeyFilesKey = undefined
+/**
+ * WHAT THE HOOK SAYS, ONCE, WHEN IT TOOK ITS LAST RESORT: one line among its start lines on stdout, at a start only.
+ * Nothing goes on stderr for it, because Claude Code shows the hook's stderr to the person at every start, every turn's
+ * end and every session's end, and the person's own session is one that holds neither key.
+ *
+ * THESE ARE NEW WORDS. KK-1's sentence for a tool that holds no key (`A_KIT_TOOL_HOLDS_NO_KEY` in
+ * for-agents/agent-key.mjs) says that the tool sent nothing, and tells the person to run the tool in the run's own
+ * terminal. Neither is true of a hook that Claude Code runs. No key and no key file's path is ever printed.
+ */
+const THE_HOOK_USED_THE_OFFICES_KEY =
+  "This session holds no key of its own and names no agent, and this computer has no entry key file, so the hook sent its requests with the office's key, as its last resort. " +
+  "To give the session a key of its own, start it with MOLE_AGENT_KEY_FILE set to the full path of the file holding the agent's key; register-myself.mjs --key-file writes one."
 
 /** THE RUN THE ENVIRONMENT NAMES AS THIS SESSION'S, from MOLE_OFFICE_SESSION, or null because it is not set. */
 const THE_RUN_THE_ENVIRONMENT_NAMES = (() => {
@@ -636,8 +679,10 @@ function withProcessFacts(stamp) {
  * tools/register-myself.mjs points this conversation's note at the record the registration gave it, and names in the
  * note ("supersedes") the record the note named before when that was this hook's own: live, of this conversation, and
  * held by no agent. The tool cannot end that run, because an agent may not end a run it did not start or file (problem
- * FZQflYp1vHuY). This hook can: it is one of the office's own processes, and sends the office's key when the session
- * holds no key of its own (`theHookIdentity` below). So the first `stop` or `end` after the registration closes it as
+ * FZQflYp1vHuY). This hook can when the key it sends lets it (`theHookIdentity` below): the office's key, its last
+ * resort, does, and so does the key of the agent that filed the record. A session that names an agent and holds no key
+ * of it sends the name alone, which may end no run, so the close is refused and the record stays open in the list,
+ * where a person sees it. Otherwise the first `stop` or `end` after the registration closes it as
  * superseded by the record the note names, after asking again that it is still live, still names this conversation and
  * is still held by no agent.
  *
@@ -694,11 +739,19 @@ async function closeTheRecordItSupersedes(id) {
     const done = closed.status !== null && closed.status >= 200 && closed.status < 300
     if (!done && ![400, 403, 409].includes(closed.status)) return
   }
-  writeTheSessionNote(sessionId, id, note.at ?? `${stamp} ${clock}`, null, { workspace: note.workspace, childOf: note.childOf })
+  writeTheSessionNote(sessionId, id, note.at ?? `${stamp} ${clock}`, null, {
+    workspace: note.workspace,
+    childOf: note.childOf,
+    ...theWaitersKeyFileAndOffice(note),
+  })
 }
 
-/** THE OFFICE'S OWN KEY ON THE ONE HEADER IT TRAVELS ON. Criterion P83, point 5. Read per request.
- * @returns {Record<string, string>} */
+/**
+ * THE OFFICE'S OWN KEY ON THE ONE HEADER IT TRAVELS ON: THE HOOK'S ONE LAST-RESORT PATH. Criterion P83, point 5. Read per
+ * request, and only for a session that holds no key and names no agent, on a computer where this computer's entry key
+ * file does not exist (`theHookIdentity` below). Any other session never reads the office's key file.
+ * @returns {Record<string, string>}
+ */
 function theOfficeKeyHeader() {
   const held = theOfficeKey()
   return held.key === null ? {} : { [KEY_HEADER]: held.key }
@@ -707,58 +760,124 @@ function theOfficeKeyHeader() {
 /**
  * THE KEY THIS SESSION HOLDS, or null because it holds none.
  *
- * A run launched in a sandbox carries no key in its own environment: the launcher gives the run's office tool the key
- * and names that configuration in MOLE_OFFICE_TOOL_CONFIGURATION, for the run's own hooks to read. So the key in the
- * environment wins where there is one, and otherwise the key is read from that file, only when the file names this
- * session's agent and run. A file that is named and gives no key has its reason said once, and never the key itself.
+ * `theKeyARunsToolSends` in src/config/run-permissions.mjs chooses it, the function the kit's tools ask, so the hook
+ * and those tools cannot choose differently: the agent's own key from MOLE_AGENT_KEY_FILE or MOLE_AGENT_KEY, and
+ * otherwise the run's key from the office tool configuration MOLE_OFFICE_TOOL_CONFIGURATION names, read only when that
+ * configuration names this session's agent and run. A run launched in a sandbox carries no key in its own environment;
+ * its launcher gives the key to the run's office tool, which is why the second exists. The reason never holds a key.
+ *
+ * The environment's key counts as held before the agent is known too. It is sent only under its agent's name
+ * (`theHookIdentity`), but a session started with a key of its own never takes the last resort.
+ *
+ * A NAMED CONFIGURATION THAT GAVE NO KEY has its reason said once on stderr, as before, for a session whose agent is
+ * known. The reason is KK-1's `theNoKeyLine` without its opening sentence, which is about a kit tool: so the
+ * configuration's path is not printed, and the key never is.
  * @returns {string | null}
  */
 function theKeyThisSessionHolds() {
-  if (AGENT === null) return null
-  const fromTheEnvironment = theAgentKey()
-  if (fromTheEnvironment !== null) return fromTheEnvironment
-  const reading = theRunsKeyFromItsOfficeToolFile(process.env, {
-    agent: AGENT,
-    session: THE_RUN_THE_ENVIRONMENT_NAMES ?? undefined,
-  })
-  if (reading.key !== null) return reading.key
+  const held = theKeyARunsToolSends(
+    process.env,
+    { agent: AGENT ?? undefined, session: THE_RUN_THE_ENVIRONMENT_NAMES ?? undefined },
+    { agent: 'MOLE_OFFICE_AGENT', session: 'MOLE_OFFICE_SESSION' },
+  )
+  if (held.key !== null) return held.key
   const named = process.env[OFFICE_TOOL_CONFIGURATION]
-  if (typeof named === 'string' && named !== '' && !theRunsKeyWasNotReadSaid) {
+  if (AGENT !== null && typeof named === 'string' && named !== '' && !theRunsKeyWasNotReadSaid) {
     theRunsKeyWasNotReadSaid = true
-    process.stderr.write(`session-hook: this run's key was not read from its office tool configuration, because ${reading.why}.\n`)
+    process.stderr.write(`session-hook: ${theNoKeyLine(held.why, process.env).replace(`${A_KIT_TOOL_HOLDS_NO_KEY} `, () => '')}\n`)
   }
   return null
 }
 
 /**
- * WHO THIS HOOK ASKS AS, AND WHICH KEY IT SENDS. Read per request, because AGENT can be set late.
+ * THE AGENT'S KEY FROM THE FILE THIS SESSION'S NOTE NAMES, or null. A session started by hand names its agent and holds
+ * no key of it, and its waiter, given the key in a file, wrote that file's full path into the note
+ * (src/config/the-session-note.mjs). Read once, and only at a compaction, a stop and an end, where a name alone may not
+ * stamp, change or end the run. No other start reads it. A file that is not there, or that the reader refuses, gives
+ * one line on stderr that names neither the path nor the key, and null, so the hook sends the name alone as before.
+ * The reader's own sentences are not passed on, because they name the path. A file holding another agent's key is sent
+ * as it is: the office refuses a key under a name that is not its holder's.
  *
- * The agent's own key goes when this session holds one: from MOLE_AGENT_KEY or its file, or, for a run launched without
- * a key in its environment, from the office tool configuration MOLE_OFFICE_TOOL_CONFIGURATION names, read by
- * `theKeyThisSessionHolds` above. It goes under that agent's name, through anAgentsToolHeaders in
- * for-agents/agent-key.mjs.
- *
- * Otherwise the hook sends the office's own key under ACTOR, as it did before agents held keys. That
- * covers a caller with no agent key, and the requests made before AGENT is known (the start-folder
- * read), when the agent key could only go under a name that may not be its holder's.
- *
- * THIS FALLBACK GOES WHEN EVERY AGENT HOLDS ITS OWN KEY: only the office's
- * own processes send the office's key.
- * @returns {Record<string, string>}
+ * ONLY TO THE OFFICE THE WAITER HELD. The waiter wrote the address it asked beside the path. The file is not read
+ * unless that address is this hook's own `API`, compared as written: one office written two ways is not the same
+ * office here, and a note that names a key file and no office does not say which office the key is for. Otherwise one
+ * line on stderr that names no address, path or key, and null, so the hook sends the name alone as before.
+ * @returns {string | null}
  */
-function theHookIdentity() {
-  const asked = anAgentsToolHeaders({ self: AGENT, withoutAKey: ACTOR, key: theKeyThisSessionHolds() })
-  return KEY_HEADER in asked ? asked : { ...asked, ...theOfficeKeyHeader() }
+function theKeyTheNotedFileHolds() {
+  if (theNotedKeyFilesKey !== undefined) return theNotedKeyFilesKey
+  theNotedKeyFilesKey = null
+  const now = (mode === 'start' && input.source === 'compact') || mode === 'stop' || mode === 'end'
+  if (!now || typeof input.session_id !== 'string') return null
+  const note = theSessionNote(input.session_id)
+  if (note === null || note.agentKeyFile === null) return null
+  if (note.agentKeyOffice !== API) {
+    process.stderr.write(`${THE_KEY_FILE_ENTRY_SAYS.anotherOffice}\n`)
+    return null
+  }
+  const read = aPrivateFileRead(note.agentKeyFile, THE_AGENT_KEY)
+  if (read.is === 'held') theNotedKeyFilesKey = read.value
+  else process.stderr.write(`${read.is === 'absent' ? THE_KEY_FILE_ENTRY_SAYS.absent : THE_KEY_FILE_ENTRY_SAYS.refused}\n`)
+  return theNotedKeyFilesKey
+}
+
+/** This computer's entry files, read the first time a request asks, and kept for the rest of this run. */
+function theEntrysFilesOnce() {
+  if (theEntrysFiles === null) theEntrysFiles = theEntrysFilesRead(bootstrapEnvironment())
+  return theEntrysFiles
 }
 
 /**
- * WHETHER THE HOOK FILES THIS SESSION WITH THE OFFICE'S KEY UNDER THE AGENT'S NAME, read the way `theHookIdentity` above
- * chooses its key: the session's agent is known, it has no key of its own here, and the office's key is there to send.
- * Only then does the filing say `heldByItsFiler`, so that agent's own key holds the run later. The office takes the
- * field from its own key alone (src/server/lib/held-by-its-filer.ts).
+ * WHO THIS HOOK ASKS AS, AND WHICH KEY IT SENDS. Read per request, because AGENT can be set late.
+ *
+ * 1. The key this session holds goes when it holds one (`theKeyThisSessionHolds`), under that agent's name, through
+ *    anAgentsToolHeaders in for-agents/agent-key.mjs. A key held before the agent is known goes nowhere: those requests
+ *    (the start-folder read) go under ACTOR with no key, because a key could only go under a name that may not be its
+ *    holder's.
+ * 2. A session that names an agent and holds no key of it sends, at a compaction, a stop and an end, the key in the
+ *    file its note names, under that agent's name, when the note says its waiter held the office this hook asks
+ *    (`theKeyTheNotedFileHolds`). Otherwise it sends the name alone, on every computer, and its start lines say once
+ *    that the office refuses its writes while the key window is closed.
+ * 3. A session that holds no key and names no agent sends this computer's entry key, under the entry agent's registry
+ *    id, when the two entry files are sound. AGENT stays null: the session is the entry agent's by its key alone. After
+ *    the office refused that key with 401, no key goes.
+ * 4. THE LAST RESORT. Only when the entry key file does not exist at all, the office's own key goes under ACTOR, as the
+ *    hook did before agents held keys, and its start lines say so. That is a computer wired before the entry press gave
+ *    keys, or wired by the terminal tool alone. An entry key file that is there and fails a check never brings the
+ *    office's key back.
+ * @returns {Record<string, string>}
  */
-function theOfficesKeyFilesItForTheAgent() {
-  return AGENT !== null && theKeyThisSessionHolds() === null && KEY_HEADER in theOfficeKeyHeader()
+function theHookIdentity() {
+  const key = theKeyThisSessionHolds()
+  if (key !== null) return anAgentsToolHeaders({ self: AGENT, withoutAKey: ACTOR, key: AGENT === null ? null : key })
+  if (AGENT !== null) {
+    const noted = theKeyTheNotedFileHolds()
+    if (noted !== null) return anAgentsToolHeaders({ self: AGENT, withoutAKey: ACTOR, key: noted })
+    theNamedAgentSentItsNameAlone = true
+    return anAgentsToolHeaders({ self: AGENT, withoutAKey: ACTOR, key: null })
+  }
+  const asked = anAgentsToolHeaders({ self: null, withoutAKey: ACTOR, key: null })
+  const entry = theEntrysFilesOnce()
+  if (entry.is === 'held') return theEntrysKeyWasRefused ? asked : anAgentsToolHeaders({ self: entry.agent, withoutAKey: ACTOR, key: entry.key })
+  if (entry.is === 'refused') return asked
+  const office = theOfficeKeyHeader()
+  if (KEY_HEADER in office) theLastResortWasTaken = true
+  return { ...asked, ...office }
+}
+
+/**
+ * THE START LINES ABOUT THE KEY THE HOOK SENT, or none. Only at a start: a stop or an end prints nothing for them. Each
+ * output of a start that sent a request carries each line once. No line holds a key or what a key file holds.
+ * @returns {string[]}
+ */
+function theKeyLines() {
+  if (mode !== 'start') return []
+  const lines = []
+  if (theLastResortWasTaken) lines.push(THE_HOOK_USED_THE_OFFICES_KEY)
+  if (theEntrysFiles?.is === 'refused') lines.push(theEntrysKeyFileWasNotUsedLine(theEntrysFiles.why))
+  if (theEntrysKeyWasRefused && theEntrysFiles?.is === 'held') lines.push(theOfficeRefusedTheEntrysKeyLine(theEntrysFiles.keyFile))
+  if (theNamedAgentSentItsNameAlone && AGENT !== null) lines.push(aNamedAgentWithoutAKeyLine(AGENT))
+  return lines
 }
 
 /**
@@ -830,11 +949,35 @@ async function askTheOfficeTransport(input, options) {
   try {
     const reply = await fetch(input, options)
     repliesReceived++
-    return reply
+    const keyless = theHeadersWithoutARefusedEntryKey(reply.status, options?.headers)
+    if (keyless === null) return reply
+    // THE ENTRY KEY REFUSED: the office never gave it, or not to this office. This request is asked once more with
+    // no key, and so is every request after it, and the start lines name the file (`theKeyLines`).
+    const again = await fetch(input, { ...options, headers: keyless })
+    repliesReceived++
+    return again
   } catch (error) {
     failedRequests.set(endpointName(path), `${method} ${path}: ${error instanceof Error ? error.message : String(error)}`)
     throw error
   }
+}
+/**
+ * THE HEADERS TO ASK AGAIN WITH, AFTER THE OFFICE ANSWERED 401 TO THIS COMPUTER'S ENTRY KEY, or null because the reply
+ * is to be kept: it was not a 401, or the request did not carry the entry key. The entry identity's headers are
+ * replaced by this hook's identity without a key, which every later request carries too. The office's key never comes
+ * back here.
+ * @param {number} status
+ * @param {HeadersInit | undefined} sent
+ * @returns {Record<string, string> | null}
+ */
+function theHeadersWithoutARefusedEntryKey(status, sent) {
+  if (status !== 401 || theEntrysFiles?.is !== 'held' || theEntrysKeyWasRefused) return null
+  if (sent === undefined || sent instanceof Headers || Array.isArray(sent)) return null
+  if (sent[KEY_HEADER] !== theEntrysFiles.key) return null
+  theEntrysKeyWasRefused = true
+  const entry = anAgentsToolHeaders({ self: theEntrysFiles.agent, withoutAKey: ACTOR, key: theEntrysFiles.key })
+  const kept = Object.fromEntries(Object.entries(sent).filter(([name]) => !(name in entry)))
+  return { ...kept, ...theHookIdentity() }
 }
 /** The identity of a read, without the directory or conversation its query searches for.
  * @param {string} path */
@@ -1075,7 +1218,7 @@ if (mode === 'start' && input.source === 'compact') await afterACompaction()
  */
 const worldCheck = await checkTheWorldBeforeWriting()
 if (!worldCheck.fileAnything) {
-  console.log(worldCheck.line)
+  console.log([worldCheck.line, ...theKeyLines()].join('\n'))
   process.exit(0)
 }
 
@@ -1711,6 +1854,7 @@ async function followTheNotedRecordIfItMoved(id) {
     supersedesWorkspace: note.supersedesWorkspace ?? askedIn,
     supersededBecause: note.supersededBecause,
     childOf: note.childOf,
+    ...theWaitersKeyFileAndOffice(note),
   })
 }
 
@@ -1857,18 +2001,7 @@ async function recordAlreadyFiled() {
  */
 const stampAtStart = withProcessFacts(discoveryStamp())
 
-/**
- * THE OFFICE'S OWN WORDS FOR A DATA KEY ITS SESSION KIND DOES NOT DECLARE, naming `heldByItsFiler`: the opening every
- * one of the three sentences of `checkUnknownKeys` in src/shared/kinds.ts shares. An office older than this hook says
- * them when the filing carries the field.
- */
-const AN_OFFICE_WITHOUT_HELD_BY_ITS_FILER = 'unknown key "heldByItsFiler" — '
-
-/** Set when the office refused `heldByItsFiler` in those words and the session was filed again without it. */
-let filedWithoutHeldByItsFiler = false
-
 async function fileRecord() {
-  let held = theOfficesKeyFilesItForTheAgent()
   const body = (title) =>
     JSON.stringify({
       kind: 'session',
@@ -1878,9 +2011,6 @@ async function fileRecord() {
         runtime: 'claude-code',
         doing: 'Nobody has described this run yet. The agent should replace this title and this line as soon as it knows what it is doing.',
         workspace: WORKSPACE,
-        // HELD BY THE AGENT IT IS FILED UNDER. Not `servingAgent`: that makes a session work
-        // handed in, which the office seals when it ends and tells the person about.
-        ...(held ? { heldByItsFiler: true } : {}),
         // WHICH CONVERSATION THIS RUN IS, WHERE IT IS RUNNING, AND WHERE A PERSON COULD WATCH.
         // Each key is left out when this run does not know it — an absent key is an honest answer
         // and a made-up one is not.
@@ -1894,14 +2024,7 @@ async function fileRecord() {
       },
     })
   const plain = `${stamp} ${clock} — ${PLACEHOLDER}`
-  let first = await ask('/api/records', { method: 'POST', withStatus: true, body: body(plain) })
-  // AN OFFICE OLDER THAN THIS HOOK refuses the field, and the session would go unfiled. So it is filed once more
-  // without it, as before the field, on that one refusal only. Every other refusal stays a refusal.
-  if (held && first.status === 400 && String(first.body?.error ?? '').includes(AN_OFFICE_WITHOUT_HELD_BY_ITS_FILER)) {
-    held = false
-    filedWithoutHeldByItsFiler = true
-    first = await ask('/api/records', { method: 'POST', withStatus: true, body: body(plain) })
-  }
+  const first = await ask('/api/records', { method: 'POST', withStatus: true, body: body(plain) })
   if (first.body?.record?.id !== undefined || first.body === null) return first.body
   return await ask('/api/records', { method: 'POST', body: body(`${plain} (${sessionId.slice(0, 8)})`) })
 }
@@ -1962,12 +2085,16 @@ if (id !== null && thisStart?.how !== 'note' && thisStart?.how !== 'environment'
   // WITH THE PROJECT THE RECORD IS IN, so stop, end and the next start find it there (`THE_NOTED_PROJECT`), and, after a
   // takeover, the record it supersedes when that one names this conversation. A child's note names the run it is the
   // child of, so that every later start, stop and end reads the child's own record (`THE_CHILD_NOTE`).
+  //
+  // THE KEY FILE THE NOTE NAMES IS CARRIED, WITH THE OFFICE ITS WAITER HELD, whichever record the note names now: both
+  // are the waiter's, given for this conversation, and not the record's.
   const superseded = thisStart?.how === 'held' && thisStart.replaced?.namesThisConversation === true ? thisStart.replaced : null
   writeTheSessionNote(sessionId, id, `${stamp} ${clock}`, superseded?.id ?? null, {
     workspace: WORKSPACE,
     supersedesWorkspace: superseded?.workspace ?? null,
     supersededBecause: superseded === null ? null : 'held',
     childOf: thisStart?.how === 'child' ? thisStart.parent.id : null,
+    ...theWaitersKeyFileAndOffice(theSessionNote(sessionId)),
   })
 }
 // A NOTE WHOSE RECORD WAS FOUND IN ANOTHER PROJECT is written again with that project, and with the rest of what it said.
@@ -1979,6 +2106,7 @@ if (id !== null && thisStart?.how === 'note' && thisStart.askedIn !== undefined)
     supersedesWorkspace: before?.supersedesWorkspace ?? thisStart.askedIn,
     supersededBecause: before?.supersededBecause ?? null,
     childOf: before?.childOf ?? null,
+    ...theWaitersKeyFileAndOffice(before),
   })
 }
 
@@ -2006,16 +2134,18 @@ const stamped =
 // the last of the seven reads arrived after 3.9 to 8.1 s, and a compaction at 07:16 on 5 October was told
 // that none of them answered. The office keeps the last answer it gave this session, and when it is busy it
 // answers with that at once and says how old it is (src/server/api/where-you-stand.ts).
-// It is sent LAST: when nothing is kept yet it is the slow one, and the three small reads, sent before
-// it, are answered before it holds the thread. The handles read is between them because it can only
-// name the session ids the running-session answer gave. Criterion I2: Claude Code's mechanism for
+// It is sent LAST, and only once the four small reads have answered or given up: when nothing is kept
+// yet it is the slow one, so the four are answered before it holds the office's one thread, and the
+// order is fixed by this code rather than by which request reaches the office first. The handles
+// read waits for the running-session answer because it can only name the session ids that answer
+// gave. Criterion I2: Claude Code's mechanism for
 // getting the state of a project into a run is this hook, because it is the one tool here that reads
 // its rules from a source file in the checkout rather than from a file written per run.
 // One 3-second handleNote read remains below; allow 500 ms for printing and exit.
-// The one read gets the elapsed budget, bounded to 3–7 seconds. ask's overall deadline
+// The one read gets the elapsed budget when it is sent, bounded to 3–7 seconds. ask's overall deadline
 // also bounds earlier slow filing, so even a read that never answers cannot overrun.
 const runningSessions = ask('/api/sessions?only=running')
-const [orphans, sessions, handles, resources, standing] = await Promise.all([
+const [orphans, sessions, handles, resources] = await Promise.all([
   ask('/api/resources/orphans'),
   // ONLY THE RUNNING ROWS (wave 13n's round 35, BuHUg7uEz6WP): howManyRunsAreReallyAlive keeps only rows in state
   // "running", and ?only=running answers exactly those (isRunning in src/server/api/sessions.ts). The whole list, every run
@@ -2027,15 +2157,15 @@ const [orphans, sessions, handles, resources, standing] = await Promise.all([
   // about the machine: a registered process it has just looked for, and a handle a session is
   // still beating. See `howManyRunsAreReallyAlive` below. The handles read names only the running
   // record ids, so it is one small answer instead of every hold in the installation. It alone waits
-  // for the sessions read; the other three start alongside it.
+  // for the sessions read; the other two start alongside it.
   runningSessions.then((reply) => theHoldsOn((reply?.sessions ?? [])
     .filter((row) => row?.state === 'running' && typeof row.recordId === 'string')
     .map((row) => row.recordId))),
   ask('/api/resources'),
-  ask('/api/where-you-stand', { withStatus: true, timeLimitMs: Math.round(Math.max(hookMs(3000), Math.min(hookMs(7000),
-  HOOK_BUDGET_MS - (performance.now() - hookStartedAt) - AFTER_READS_MARGIN_MS,
-))) }),
 ])
+const standing = await ask('/api/where-you-stand', { withStatus: true, timeLimitMs: Math.round(Math.max(hookMs(3000), Math.min(hookMs(7000),
+  HOOK_BUDGET_MS - (performance.now() - hookStartedAt) - AFTER_READS_MARGIN_MS,
+))) })
 
 /**
  * THE THREE PARTS OF WHERE THIS SESSION STANDS, or why there are none.
@@ -2672,10 +2802,7 @@ function hereLines() {
     startDirectory === null
       ? 'Read GET /api/onboarding next: it names the doors and the project in one small reply.'
       : `Read GET /api/onboarding?directory=${encodeURIComponent(startDirectory)} next: it names the doors and the project in one small reply.`
-  const notHeld = filedWithoutHeldByItsFiler
-    ? "This office does not take heldByItsFiler yet, so the session is filed as before, and the agent's own key does not hold it."
-    : null
-  return [who, fromItsHold, fromItsFolder, where, whereItWasFiled(), notHeld, next].filter((one) => one !== null)
+  return [who, fromItsHold, fromItsFolder, where, whereItWasFiled(), ...theKeyLines(), next].filter((one) => one !== null)
 }
 
 /**
@@ -2801,6 +2928,7 @@ async function afterACompaction() {
       `MOLE OFFICE — after a compaction. Mole Office did not answer GET /api/after-a-compaction on ${API} (${String(read.error)}), ` +
         'so this session was given back neither its role, nor its rules, nor its handover, and nothing was recorded. ' +
         `GET /api/after-a-compaction, GET /api/brief and${AGENT === null ? '' : ` GET /api/agents/${AGENT}/handover and`} ${THE_RULES} answer them.`,
+      ...theKeyLines(),
       ...(skill === null ? [] : ['', skill]),
     ])
     process.exit(0)
@@ -2817,6 +2945,7 @@ async function afterACompaction() {
       'MOLE OFFICE — after a compaction. The office that answered GET /api/after-a-compaction is not shown to be the one ' +
         `${THIS_SIDE_EN} declares, so nothing it said is printed here as this office's, and nothing was recorded.`,
       world.line,
+      ...theKeyLines(),
     ].join('\n'))
     process.exit(0)
   }
@@ -2972,6 +3101,7 @@ async function afterACompaction() {
     '',
     who,
     where,
+    ...theKeyLines(),
     '',
     waitingLine(stood?.waiting ?? null, missed),
     ...(launched === null

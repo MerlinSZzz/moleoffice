@@ -38,6 +38,12 @@
  *      says nothing was stopped and exits STALE.
  *  12. When a restart reads a held lock and the lock goes stale between that reading and its stop, the stop keeps
  *      the holder, stops nothing and exits STALE, and the restart starts nothing.
+ *  13. On Linux, when the holder's socket path is longer than a Unix socket's path may be, the stop asks nothing and
+ *      exits 0, as when no holder runs: the holder's own start refuses such a path, so none can listen on it. Exactly
+ *      one line names the path, and it gives the path's length in bytes and the limit. No line says that the holder's
+ *      terminals keep running. Before 22 November 2026 the ask tried the path anyway, and the stop named a path it had
+ *      not asked. On a Mac a path too long moves to a shorter place or is refused before any ask, and on Windows the
+ *      address is a named pipe that no folder makes longer, so the case runs on Linux only.
  *
  * WHAT IT DOES NOT SHOW. Nothing ran on Windows. What the Job Object answers there, and whether the installer then
  * ends the holder by its path, is the walk in briefs/NEXT.md for the infrastructure agent.
@@ -71,11 +77,12 @@ import {
   main,
   NO_HOLDER_RUNS,
   NOTHING_WAS_STOPPED,
+  THE_HOLDER_WAS_NOT_STOPPED,
   theHolderWasStoppedWords,
   theLockIsStale,
   theNoServiceLockToStopWords,
 } from '../src/config/the-service-command.mjs'
-import { theTerminalHolderSocket } from '../src/config/the-terminal-holder.mjs'
+import { theLongestSocketPathBytes, theTerminalHolderSocket } from '../src/config/the-terminal-holder.mjs'
 import { theProcessReading } from '../src/config/the-service-lock.mjs'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { freshDb, type TestDb } from './helpers.ts'
@@ -412,6 +419,31 @@ describe("a stop with no service lock ends a terminal holder it can prove is thi
     expect(code, said.join('\n')).toBe(EXIT.NOT_RUNNING)
     expect(isRunning(holder.pid), 'the restart ended the holder').toBe(true)
     expect(isRunning(serverPid), 'the restart signalled the process that held the lock').toBe(true)
+  }, 30_000)
+
+  it.skipIf(process.platform !== 'linux')("13: asks nothing, says the socket path's length and exits 0 as when no holder runs, when that path is too long", async () => {
+    // A FOLDER DEEP ENOUGH that the holder's socket in it is longer than a Unix socket's path may be. It is made, so
+    // nothing but the length can stop the ask.
+    const deep = join(folder, 'd'.repeat(theLongestSocketPathBytes()))
+    mkdirSync(join(deep, 'mole-office', 'terminals'), { recursive: true })
+    vi.stubEnv('XDG_CONFIG_HOME', deep)
+    try {
+      const socket = theTerminalHolderSocket(t.file)
+      const length = Buffer.byteLength(socket)
+      expect(length, socket).toBeGreaterThan(theLongestSocketPathBytes())
+      const { code, said } = await theStop()
+      // ONE LINE NAMES THE PATH, so no other line says what an ask of that path answered. The numbers are looked for
+      // outside the path, whose name is made of hexadecimal digits.
+      const naming = said.filter((line) => line.includes(socket))
+      expect(naming, said.join('\n')).toHaveLength(1)
+      const besideThePath = naming.join('\n').split(socket).join(' ')
+      expect(besideThePath, said.join('\n')).toContain(String(length))
+      expect(besideThePath, said.join('\n')).toContain(String(theLongestSocketPathBytes()))
+      expect(said.some((line) => line.includes(THE_HOLDER_WAS_NOT_STOPPED)), said.join('\n')).toBe(false)
+      expect(code, said.join('\n')).toBe(EXIT.OK)
+    } finally {
+      vi.stubEnv('XDG_CONFIG_HOME', folder)
+    }
   }, 30_000)
 })
 

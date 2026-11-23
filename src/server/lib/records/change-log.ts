@@ -12,11 +12,11 @@
  * `changesWhere` and `whoFiled` from here, and every reference this file makes to records.ts is gone, so nothing of
  * this file is read while records.ts is still being evaluated.
  */
-import { and, asc, desc, eq, exists, inArray, like, or, sql, type SQL } from 'drizzle-orm'
+import { and, asc, desc, eq, exists, inArray, like, or, sql, type SQL, type SQLWrapper } from 'drizzle-orm'
 import { readOrigin, type RecordOrigin } from '@shared/types.ts'
 import { MESSAGE_CENTRE } from '@shared/workspaces.ts'
 import { db } from '../../db/client.ts'
-import { changes, records } from '../../db/schema.ts'
+import { changes, records, theKindOfARowFoundById } from '../../db/schema.ts'
 import { theMessagesHiddenFrom, type AMessageReader } from '../messages.ts'
 import { countChanges } from '../../db/count-changes.ts'
 import { ACROSS_WORKSPACES } from '@shared/across-workspaces.ts'
@@ -49,8 +49,8 @@ export interface ChangeFilter {
    */
   session?: readonly string[]
   /**
-   * MESSAGES THE READER MAY NOT READ (`everyMessageHiddenFrom`). No row naming one
-   * is listed or counted: not a row about the message, and not a row that names it as a value.
+   * MESSAGES THE READER MAY NOT READ (`everyMessageHiddenFrom`, or `theHiddenMessagesTheRowsName` over these rows or
+   * more). No row naming one is listed or counted: not a row about the message, and not a row that names it as a value.
    */
   hidden?: readonly string[]
   /**
@@ -140,6 +140,35 @@ export function listChanges(opts: ChangeFilter & { limit?: number }) {
     .orderBy(desc(changes.at), desc(changes.appendOrder))
     .limit(opts.limit ?? 200)
     .all()
+}
+
+/**
+ * THE MESSAGES THE ROWS OF THIS FILTER NAME THAT THIS READER MAY NOT READ: the hidden list for this filter, and for any
+ * filter that selects some of the same rows.
+ *
+ * A row names a message in the three ways `aChangeNamingNoneOf` leaves out: as the record it is about, as a value it
+ * logged, or as a string inside a honour reading's value. One statement finds the messages named those ways by the
+ * rows of the whole filter, not of one page, so a count over the filter leaves out every hidden row. A deleted message
+ * is a message here, as it is to `everyMessageHiddenFrom`. Only these messages are then asked about. Asking about every
+ * message in the office read the id of each one, and worked out the parties of each one the reader could be a party
+ * to, for a page that names a few.
+ */
+export function theHiddenMessagesTheRowsName(opts: Omit<ChangeFilter, 'hidden'>, reader: AMessageReader): string[] {
+  if (reader.readsEveryMessage) return []
+  const where = changesWhere(opts) ?? sql`1`
+  // A MESSAGE'S ID, asked of the records table by its key for each row.
+  const aMessage = (id: SQLWrapper): SQL => sql`EXISTS (SELECT 1 FROM ${records} WHERE ${records.id} = ${id} AND ${theKindOfARowFoundById('message')})`
+  // THE STRINGS INSIDE A HONOUR READING'S VALUE, opened only on the honour rows, as `aChangeNamingNoneOf` opens them.
+  const quotedIn = (value: typeof changes.oldValue | typeof changes.newValue): SQL =>
+    sql`SELECT one.atom FROM ${changes}, json_tree(CASE WHEN json_valid(${value}) THEN ${value} ELSE '[]' END) AS one WHERE ${where} AND coalesce(${changes.field}, '') LIKE ${`data.${THE_HONOUR_KEY}%`} AND one.type = 'text' AND ${aMessage(sql`one.atom`)}`
+  const named = db.all<{ id: string }>(
+    sql`SELECT ${changes.recordId} AS id FROM ${changes} WHERE ${where} AND ${aMessage(changes.recordId)}
+        UNION SELECT ${changes.oldValue} FROM ${changes} WHERE ${where} AND ${aMessage(changes.oldValue)}
+        UNION SELECT ${changes.newValue} FROM ${changes} WHERE ${where} AND ${aMessage(changes.newValue)}
+        UNION ${quotedIn(changes.oldValue)}
+        UNION ${quotedIn(changes.newValue)}`,
+  )
+  return [...theMessagesHiddenFrom(reader, named.map((row) => row.id))]
 }
 
 /** One change row as `whoWroteWhereNewestFirst` gives it: the session column, the record id and the time. */

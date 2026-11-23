@@ -3,8 +3,8 @@
 /**
  * A SOURCE FILE IN A REPORT IS DRAWN AS A FILE, AND ITS TEXT NEVER LANDS IN THE PAGE'S TEXT. This
  * follows a decision that a source file is not pasted into a report; in the current drawing a .md or
- * .json file is a shown kind, so its words are drawn in a frame of its own. The page's own text
- * never holds the file's words.
+ * .json file is a shown kind, so its words are drawn in the page on the reader's press. Until that
+ * press the page's own text never holds the file's words.
  *
  * ---------------------------------------------------------------------------------------
  * WHAT IS BEING PROVED
@@ -16,13 +16,13 @@
  * is drawn. A HEAD request is allowed: it reads the type and no bytes.
  *
  * IN THE CURRENT DRAWING BOTH FILES ARE SHOWN KINDS. Once the page has read the type, the block draws a
- * Show press and a Save link, and no Open link; the frame the Show press creates draws the file's
- * own words. Under the person's choice "never" no type is read, so the block keeps the older
- * drawing with its Open press, and that case asks for the older drawing.
+ * Show press, a Save link, and an Open link to the office's page for the file; the Show press draws
+ * the file's own words in the report, with no frame. Under the person's choice "never" no type is
+ * read, so the block keeps the older drawing with its Open press, and that case asks for the older
+ * drawing.
  *
  * THE SAVE PRESS IS THE PLAIN READ. The browser asks the address "Save the file" carries and is
- * answered 200 with the file's exact bytes. The Show press asks for the generated page, whose
- * address carries open=1 together with shown=1.
+ * answered 200 with the file's exact bytes. The Show press asks the file door for the file's words.
  *
  * PICTURES ARE NOT CHANGED BY THAT DECISION. With the media choice 'with-page' the image block is
  * drawn with its picture, and a .png file block keeps its small picture beside its name.
@@ -45,7 +45,7 @@ import { afterAll, beforeAll, expect, it } from 'vitest'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { sizeSaid } from '../src/shared/fileblocks.ts'
 import { t } from '../src/shared/i18n.ts'
-import { recordPath } from '../src/web/components/router.tsx'
+import { recordPath, shownFilePath } from '../src/web/components/router.tsx'
 import { type LiveApp, liveApp, waitForThePage } from './helpers.ts'
 import { putTheMadeUpLabelIn } from './the-made-up-label-above-the-page.ts'
 
@@ -237,18 +237,20 @@ async function expectBothSourceFilesDrawAsAttachedFiles(): Promise<void> {
 }
 
 /**
- * What both source files must draw once their type is read: the name, the size, the Show press and
- * the Save link, and no Open press. The same half matters: no GET for their bytes has been asked.
+ * What both source files must draw once their type is read: the name, the size, the Show press, the
+ * Save link, and the Open press to the office's page for the file. The same half matters: no GET for
+ * their bytes has been asked.
  */
 async function expectBothSourceFilesDrawAsShownFiles(): Promise<void> {
-  for (const [name, size] of [['runbook.md', MD_BYTES.length], ['settings.json', JSON_BYTES.length]] as const) {
+  for (const [name, size, path] of [['runbook.md', MD_BYTES.length, MD_PATH], ['settings.json', JSON_BYTES.length, JSON_PATH]] as const) {
     const figure = figureFor(name)
     await figure.waitFor({ timeout: 30_000 })
     expect(await figure.locator('.sb-file-name').innerText(), name).toBe(name)
     expect(await figure.locator('.sb-file-size').innerText(), name).toBe(sizeSaid(size))
     expect(await figure.locator('button.sb-file-show').innerText(), name).toBe(t('sb.file.show'))
     expect(await figure.locator('.sb-file-save').innerText(), name).toBe(t('sb.file.save'))
-    expect(await figure.locator('.sb-file-open').count(), `${name} drew an open press`).toBe(0)
+    expect(await figure.locator('.sb-file-open').innerText(), name).toBe(t('sb.file.open'))
+    expect(await figure.locator('.sb-file-open').getAttribute('href'), name).toBe(`#${shownFilePath(recordId, path)}`)
     expect(await figure.locator('.sb-file-code').count(), `${name} drew a code box`).toBe(0)
   }
   // AND NEITHER FILE'S TEXT IS IN THE PAGE.
@@ -277,18 +279,17 @@ it('with the page, draws both source files as shown files, quotes neither, and b
     expect(Buffer.from(await answer.body()), name).toEqual(bytes)
   }
 
-  // THE SHOW PRESS ASKS FOR THE GENERATED PAGE: its address names open=1 and shown=1, and the
-  // frame draws the file's own words.
+  // THE SHOW PRESS DRAWS THE FILE'S OWN WORDS IN THE REPORT, with no frame. The Markdown file is
+  // drawn as Markdown, so its '#' line is a heading.
   for (const [name, inTheFile] of [['runbook.md', IN_THE_MARKDOWN], ['settings.json', IN_THE_JSON]] as const) {
     const figure = figureFor(name)
     await figure.locator('button.sb-file-show').click()
-    const frame = figure.locator('iframe.sb-file-frame')
-    await frame.waitFor({ timeout: 30_000 })
-    const address = new URL((await frame.getAttribute('src')) ?? '', app.site)
-    expect(address.searchParams.get('open'), name).toBe('1')
-    expect(address.searchParams.get('shown'), name).toBe('1')
-    await expect.poll(async () => (await frame.contentFrame().locator('body').textContent()) ?? '', { timeout: 30_000 }).toContain(inTheFile)
+    const reader = figure.locator('.sb-file-words')
+    await reader.waitFor({ timeout: 30_000 })
+    await expect.poll(async () => reader.innerText(), { timeout: 30_000 }).toContain(inTheFile)
+    expect(await figure.locator('iframe').count(), name).toBe(0)
   }
+  expect(await figureFor('runbook.md').locator('.sb-file-words h3').innerText()).toBe('Runbook')
 }, 240_000)
 
 it('with the page, leaves the pictures as they were: the image block loads and the .png file keeps its small picture', async () => {

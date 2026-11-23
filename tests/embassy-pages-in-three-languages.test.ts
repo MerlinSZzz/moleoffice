@@ -49,7 +49,7 @@ const request: VisitorRequestRow = {
   id: `${secret}request`, credential: visitor.id, at: stamp, method: 'POST', route: '/api/wire-only-door', operation: `${secret}operation`,
   wrote: true, refusedBecause: `${secret}refusal`, mismatch: [{ said: `${secret}rawField`, issued: `/${secret}issued`, sent: `/${secret}sent` }],
 }
-const pairing: WhatThePairingSays = { paired: false, offered: false, mayAsk: true, waiting: null }
+const pairing: WhatThePairingSays = { paired: false, offered: false, mayAsk: true, mayMove: false, waiting: null }
 const pages = ['embassy', 'credential', 'pairing'] as const
 let app: LiveApp
 let page: Page

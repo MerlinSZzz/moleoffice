@@ -51,7 +51,7 @@ import { t, content } from '@shared/i18n.ts'
 
 import type { Direction, HowFar, WhatHasBeenSaid } from '../../../server/lib/communication.ts'
 import { readSaidOnce, useSharedRead } from '../../lib/homereads.ts'
-import { Explain, Panel } from '../ui.tsx'
+import { Panel } from '../ui.tsx'
 
 /** The word a person reads for how far a direction gets. The server's key is not shown. */
 export const HOW_FAR_WORD: Readonly<Record<HowFar, string>> = {
@@ -98,15 +98,13 @@ export function WhatHasBeenSaidBand({ reloadKey }: { reloadKey: number }) {
 export function SaidBand({ reading }: { reading: WhatHasBeenSaid }) {
  const inspect = useInspect()
  return <Panel titleIs="label" declares={{ surface: 'home.said' }} title={t('home.said')} rank={2}>
-  <Explain declares={{ surface: null }} meaning={<span>{t('home.saidDirections')}</span>} opens={t('home.saidOpens')}>
-   <ul className="hsaid-dirs">{reading.directions.map(direction => <li key={direction.key} className="hsaid-dir" data-how-far={direction.howFar}>
+  <ul className="hsaid-dirs">{reading.directions.map(direction => <li key={direction.key} className="hsaid-dir" data-how-far={direction.howFar}>
     <span className="hsaid-dir-word">{t(direction.key === 'human-to-agent' ? 'home.saidHumanAgent' : direction.key === 'agent-to-human' ? 'home.saidAgentHuman' : 'home.saidAgentAgent')}</span>
     <span className="hsaid-howfar">{HOW_FAR_WORD[direction.howFar]}</span>
     <span className="hsaid-counts">{countsLine(direction) ?? <Absence title={t('home.saidEmpty')} />}</span>
-    {inspect ? <ul className="hsaid-mechs">{direction.mechanisms.map(one => <li key={one.what}><b>{one.what}</b> — {one.says}</li>)}</ul> : null}
+    {inspect ? <ul className="hsaid-mechs">{direction.mechanisms.map(one => <li key={one.what}><b>{one.what}</b> — {HOW_FAR_WORD[one.howFar]}<ServerNote text={one.says} /></li>)}</ul> : null}
    </li>)}</ul>
-   <ServerNote text={reading.note} />
-  </Explain>
+  <ServerNote text={reading.note} />
  </Panel>
 }
 

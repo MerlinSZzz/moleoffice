@@ -34,7 +34,9 @@ export interface ScreenTestHooks {
   /** Every mole in the last painted frame, where it was painted, and whether it was painted walking; `body` is the
    * box the motion worker checks for it at that point, null while its bounds are unknown, and `plate` the plate
    * drawn for it in that frame, or null when none is drawn. */
-  paintedActors?: { key: string; point: { x: number; y: number }; walking: boolean; body: import('./viewport.ts').Rect | null; plate: import('./viewport.ts').Rect | null }[]
+  paintedActors?: { key: string; point: { x: number; y: number }; walking: boolean; facing?: 1 | -1; body: import('./viewport.ts').Rect | null; plate: import('./viewport.ts').Rect | null; sprite?: string }[]
+  /** The sign boxes drawn in the last frame, in screen pixels relative to the viewport. */
+  signBoxes?: ({ kind: 'house' | 'area' | 'sleeping-house' } & import('./viewport.ts').Rect)[]
   /** The contact walks in their last frame, as the page handed them to the map. */
   contactActors?: import('./walks.ts').MovingContact[]
   /** False turns idle outings off for a screen test; they are on as the map ships. */

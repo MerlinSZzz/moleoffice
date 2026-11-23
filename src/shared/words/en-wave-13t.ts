@@ -1,8 +1,9 @@
 // Copyright © 2026 Zhengyang Shen
 // Licensed under the MIT License. See LICENSE.
-// The English list's place for wave 13t's new words, in English only. Their Chinese is written in
-// the translation round before a version, and until then a Chinese page shows the English. joined.ts reads this file.
+// The English list's place for wave 13t's new words. Their Chinese is in zh-wave-13t.ts, written with them; a
+// word with no Chinese there yet shows in English on a Chinese page. joined.ts reads this file.
 import type { DataFolderRefusalCode, MailToolRefusalCode, MergeQueueOwnerRefusalCode, SenderReadingRefusalCode, StartAtLoginBackupRefusalCode } from '../refusal-codes.ts'
+import { THE_DATA_FOLDER_MOVE_WORDS } from '../../config/the-data-folder-move-words.mjs'
 import { SURFACES } from '../surfaces.ts'
 export const enWave13t = {
   "record.section.movedFirst": "Moved first",
@@ -33,12 +34,17 @@ export const enWave13t = {
   // ---- the menu the Settings page names, by system: src/web/components/ShutDown.tsx (round W32) ----
   'shutDown.windowOnly.trayMenuBar': 'The Shut down item in the menu bar always shuts Mole Office down.',
   'shutDown.windowOnly.trayNotificationArea': 'The Shut down item in the notification area always shuts Mole Office down.',
+  // ---- the state word beside a run in the shut-down list whose state the server could not tell: src/web/components/ShutDown.tsx ----
+  'shutDown.stateNotKnown': 'not known',
   // ---- start at sign-in on Windows: src/web/components/StartAtLogin.tsx (the decision of 31 October 2026) ----
   'startAtLogin.windows.where': 'On Windows, turn this on or off with "Open at login" in the menu of the Mole Office icon, in the notification area at the right of the taskbar.',
-  'startAtLogin.windows.signOut': 'Signing out of Windows stops the office. When this is on, the office starts again when you next sign in, not when the computer is switched on.',
+  // ---- start at login when the office runs from an AppImage: src/web/components/StartAtLogin.tsx ----
+  'startAtLogin.appImage.where': 'Start at login is not available when Mole Office runs from an AppImage. The .deb install of Mole Office has it.',
+  'startAtLogin.appImage.unitLeft': 'A start-at-login unit that Mole Office wrote earlier is still on this computer. The press below removes the unit and keeps a copy of it.',
   // The press's refusals when its old unit cannot be backed up, or the new unit cannot be written (round W26), when
   // the file beside a first unit is left or a file stands where a folder of the unit goes (round W28), and when the
-  // file beside a unit that was kept is left, alone or with the copy (round W29).
+  // file beside a unit that was kept is left, alone or with the copy (round W29), and when the office runs from an
+  // AppImage. The last three are the press Off's in an AppImage, each saying what was done before the step that failed.
   ...{
     'server.startAtLoginNotBackedUp': 'The unit the office wrote before could not be copied to {path}, so it was not written again. Nothing was changed.',
     'server.startAtLoginNotWritten': 'The unit could not be written to {path}, so it was left as it was. Nothing was changed.',
@@ -47,6 +53,10 @@ export const enWave13t = {
     'server.startAtLoginCopyAndFileLeft': 'The unit could not be written, so it was left as it was. The copy of it this press made could not be removed, and is still at {path}. The file this press wrote beside it could not be removed either, and is still at {beside}.',
     'server.startAtLoginFileLeft': 'The unit could not be written, so there is still no unit. The file this press wrote beside it could not be removed, and is still at {path}.',
     'server.startAtLoginUnderAFile': '{path} is a file, not a folder, so the unit cannot be read or written. Nothing was changed. Move that file aside, and try again.',
+    'server.startAtLoginInAnAppImage': 'Start at login is not available when Mole Office runs from an AppImage. The .deb install of Mole Office has it. Nothing was changed.',
+    'server.startAtLoginOffNotCopied': 'The unit was disabled, and then it could not be copied to {path}, so its file was not removed.',
+    'server.startAtLoginOffNotRemoved': 'The unit was disabled and copied to {path}, and then its file could not be removed.',
+    'server.startAtLoginOffNotReloaded': 'The unit was disabled, copied to {path} and removed, and then systemd would not read its units again.',
   } satisfies Record<`server.${StartAtLoginBackupRefusalCode}`, string>,
   // ---- the data folder panel: src/web/components/DataFolderPanel.tsx (criteria DF18 and DF22) ----
   // {folder}, {from}, {to}, {step} and {state} are paths, a step and a state, drawn as they come and never translated.
@@ -54,12 +64,6 @@ export const enWave13t = {
   'dataFolder.loading': 'where the office keeps its data',
   'dataFolder.unread': 'Where the office keeps its data could not be read.',
   'dataFolder.where': 'The office keeps its data in {folder}.',
-  'dataFolder.chosenBy.default': 'This is the office\'s own folder, the one it uses when nothing names another.',
-  'dataFolder.chosenBy.envLine': 'The office\'s settings file names this folder.',
-  'dataFolder.chosenBy.processEnvironment': 'The way this office was started names this folder, so it is not moved from here.',
-  'dataFolder.notABundle': 'This office runs from its source code, not from an install, so its data folder is not moved from here.',
-  'dataFolder.mark.absent': 'No move of the data folder is recorded.',
-  'dataFolder.mark.unreadable': 'The note the last move left cannot be read, so the office cannot tell whether a move is running. Until the note is removed, no move starts, and the office does not start again after it stops.',
   'dataFolder.mark.moving': 'The data folder is being moved from {from} to {to}.',
   'dataFolder.mark.didNotFinish': 'A move from {from} to {to} ended before it finished. Its last step was this: {step}',
   'dataFolder.mark.started': 'The data folder was moved from {from} to {to}. The old folder is kept until you confirm that the office works from the new one.',
@@ -83,22 +87,17 @@ export const enWave13t = {
   'dataFolder.move.warn': 'The office stops while the files are copied and checked, and then starts again from the new folder. No agent can work while it is stopped. The old folder is kept until you confirm.',
   'dataFolder.move.sure': 'Stop the office and move',
   'dataFolder.move.cancel': 'Cancel',
-  'dataFolder.waiting': 'The office is stopped while the data folder is moved. This panel asks it again every two seconds until it answers.',
   'dataFolder.waiting.asked': { one: 'Asked {n} time with no answer so far.', other: 'Asked {n} times with no answer so far.' },
-  'dataFolder.waiting.otherIdentity': 'An office answers again, but under another identity than the office this page was opened against. A move gives the office a new identity, because its identity is made from the place of its database. This page reads only the office it was opened against, so load the page again to read the office as it is now.',
   'dataFolder.loadAgain': 'Load the page again',
-  'dataFolder.confirm.what': 'Removing the old copy removes from {from} only the files that are the same as their copies. Anything changed or added there is kept.',
   'dataFolder.confirm': 'Remove the old copy',
-  'dataFolder.confirmFirst': 'A new move can start once the old copy is removed.',
   'dataFolder.confirmed.removed': { one: 'Removed {n} file from the old folder.', other: 'Removed {n} files from the old folder.' },
   'dataFolder.confirmed.kept': 'Kept, because they changed, were added, or could not be read or removed:',
-  'dataFolder.onlyThePerson': 'Only you press this, or a secretary where your grant allows it.',
-  'dataFolder.throughTheDoor': 'A secretary holding the person\'s grant presses these through the door, with its reason, because this panel takes no reason.',
   'dataFolder.notChanged': 'Nothing was changed.',
   'dataFolder.busy': 'Waiting for the office to answer the last press.',
-  // ---- the data folder door's refusals: src/server/api/data-folder.ts (criteria DF18 to DF21) ----
-  // {runs} is the handles of the agent runs at work; {why} is the mover's own check's sentence; {log} is the end of the
-  // mover's log; {group} is its process group.
+  // ---- the data folder door's refusals: src/server/api/data-folder.ts (criteria DF4 and DF18 to DF21) ----
+  // {runs} is the handles of the agent runs at work; {log} is the end of the mover's log; {group} is its process group.
+  // The move's check, its walk and its confirm refuse with the codes after these, and their English is written once
+  // in src/config/the-data-folder-move-words.mjs. dataFolderMoveRefused is the walk's other errors, in their own words.
   ...{
     'server.dataFolderOnlyThePerson': 'Only the person may move the office\'s data folder or confirm a move, or a secretary holding the person\'s grant where this office\'s list of what the grant carries says so. Nothing was started or changed.',
     'server.dataFolderTestWorld': 'This Mole Office is a test world. A data folder move here would stop the office the world runs from, and the confirm would remove files in a folder that is deleted with the world. Nothing was started and nothing was changed. Press it on the office itself.',
@@ -106,12 +105,47 @@ export const enWave13t = {
     'server.dataFolderNotABundle': 'This office runs from a checkout, and a checkout\'s data folder is not moved from Settings. Nothing was started and nothing was changed.',
     'server.dataFolderRunsAtWork': 'The move stops the office for as long as the copy takes, and these agent runs are at work: {runs}. Nothing was started and nothing was changed. Wait until they have finished.',
     'server.dataFolderMoveStarting': 'A data folder move is already starting in this server, so this press started nothing and nothing was changed. Wait for the move to be seen at work, or for this server to say it was not.',
-    'server.dataFolderMoveRefused': '{why}',
+    'server.dataFolderMoveRefused': THE_DATA_FOLDER_MOVE_WORDS.dataFolderMoveRefused,
     'server.dataFolderMoverEnded': 'The data folder mover ended before this door saw it at work, so no move was seen to start. Its log ends: {log}',
     'server.dataFolderMoverNotSeen': 'The data folder mover started as process group {group} and wrote no mark this door could see at work. Its log is {log}. The mover is registered in the process ledger, and this door did not stop it.',
-    'server.dataFolderNothingToConfirm': '{why}',
     'server.dataFolderNotUnderTheGrant': '{why}',
     'server.dataFolderMarkUnreadable': 'The data folder move\'s mark at {mark} cannot be read, because {why}, so the earlier data folders are not known. A stored file outside the data folder in use cannot be placed. Nothing was read or changed.',
+    'server.dataFolderPlaceNotAFullPathFromSlash': THE_DATA_FOLDER_MOVE_WORDS.dataFolderPlaceNotAFullPathFromSlash,
+    'server.dataFolderPlaceNotAFullPathOnWindows': THE_DATA_FOLDER_MOVE_WORDS.dataFolderPlaceNotAFullPathOnWindows,
+    'server.dataFolderPlaceNotEmpty': THE_DATA_FOLDER_MOVE_WORDS.dataFolderPlaceNotEmpty,
+    'server.dataFolderPlaceIsTheDataFolder': THE_DATA_FOLDER_MOVE_WORDS.dataFolderPlaceIsTheDataFolder,
+    'server.dataFolderPlaceInsideTheDataFolder': THE_DATA_FOLDER_MOVE_WORDS.dataFolderPlaceInsideTheDataFolder,
+    'server.dataFolderPlaceHoldsTheDataFolder': THE_DATA_FOLDER_MOVE_WORDS.dataFolderPlaceHoldsTheDataFolder,
+    'server.dataFolderPlaceInTheInstallFolder': THE_DATA_FOLDER_MOVE_WORDS.dataFolderPlaceInTheInstallFolder,
+    'server.dataFolderPlaceHasNoFolder': THE_DATA_FOLDER_MOVE_WORDS.dataFolderPlaceHasNoFolder,
+    'server.dataFolderPlaceHasTooLittleRoom': THE_DATA_FOLDER_MOVE_WORDS.dataFolderPlaceHasTooLittleRoom,
+    'server.dataFolderProcessEnvironmentDecides': THE_DATA_FOLDER_MOVE_WORDS.dataFolderProcessEnvironmentDecides,
+    'server.dataFolderMoveStillRunning': THE_DATA_FOLDER_MOVE_WORDS.dataFolderMoveStillRunning,
+    'server.dataFolderMoveNotConfirmed': THE_DATA_FOLDER_MOVE_WORDS.dataFolderMoveNotConfirmed,
+    'server.dataFolderMoveRunningUnknown': THE_DATA_FOLDER_MOVE_WORDS.dataFolderMoveRunningUnknown,
+    'server.dataFolderPlaceInTheTemporaryFolder': THE_DATA_FOLDER_MOVE_WORDS.dataFolderPlaceInTheTemporaryFolder,
+    'server.dataFolderPlaceIsANetworkPath': THE_DATA_FOLDER_MOVE_WORDS.dataFolderPlaceIsANetworkPath,
+    'server.dataFolderPlaceOnANetworkDrive': THE_DATA_FOLDER_MOVE_WORDS.dataFolderPlaceOnANetworkDrive,
+    'server.dataFolderDriveNotRead': THE_DATA_FOLDER_MOVE_WORDS.dataFolderDriveNotRead,
+    'server.dataFolderDriveTypeUnknown': THE_DATA_FOLDER_MOVE_WORDS.dataFolderDriveTypeUnknown,
+    'server.dataFolderDriveNotAsked': THE_DATA_FOLDER_MOVE_WORDS.dataFolderDriveNotAsked,
+    'server.dataFolderLoginUnitNotOurs': THE_DATA_FOLDER_MOVE_WORDS.dataFolderLoginUnitNotOurs,
+    'server.dataFolderLoginUnitNotOursRuns': THE_DATA_FOLDER_MOVE_WORDS.dataFolderLoginUnitNotOursRuns,
+    'server.dataFolderLoginUnitInAnAppImage': THE_DATA_FOLDER_MOVE_WORDS.dataFolderLoginUnitInAnAppImage,
+    'server.dataFolderLoginUnitStartsAtLogin': THE_DATA_FOLDER_MOVE_WORDS.dataFolderLoginUnitStartsAtLogin,
+    'server.dataFolderLoginUnitStartsAtLoginRuns': THE_DATA_FOLDER_MOVE_WORDS.dataFolderLoginUnitStartsAtLoginRuns,
+    'server.dataFolderLoginUnitMayStartAtLogin': THE_DATA_FOLDER_MOVE_WORDS.dataFolderLoginUnitMayStartAtLogin,
+    'server.dataFolderLoginUnitMayStartAtLoginRuns': THE_DATA_FOLDER_MOVE_WORDS.dataFolderLoginUnitMayStartAtLoginRuns,
+    'server.dataFolderLoginUnitRuns': THE_DATA_FOLDER_MOVE_WORDS.dataFolderLoginUnitRuns,
+    'server.dataFolderLoginUnitOff': THE_DATA_FOLDER_MOVE_WORDS.dataFolderLoginUnitOff,
+    'server.dataFolderWalkMetASymbolicLink': THE_DATA_FOLDER_MOVE_WORDS.dataFolderWalkMetASymbolicLink,
+    'server.dataFolderWalkMetASpecialFile': THE_DATA_FOLDER_MOVE_WORDS.dataFolderWalkMetASpecialFile,
+    'server.dataFolderWalkMetMoreNames': THE_DATA_FOLDER_MOVE_WORDS.dataFolderWalkMetMoreNames,
+    'server.dataFolderConfirmNeedsAStartedMove': THE_DATA_FOLDER_MOVE_WORDS.dataFolderConfirmNeedsAStartedMove,
+    'server.dataFolderConfirmCannotReadTheOldFolder': THE_DATA_FOLDER_MOVE_WORDS.dataFolderConfirmCannotReadTheOldFolder,
+    'server.dataFolderConfirmNeedsTheNewDatabase': THE_DATA_FOLDER_MOVE_WORDS.dataFolderConfirmNeedsTheNewDatabase,
+    'server.dataFolderConfirmWaitsForTheMover': THE_DATA_FOLDER_MOVE_WORDS.dataFolderConfirmWaitsForTheMover,
+    'server.dataFolderNoMoveToConfirm': THE_DATA_FOLDER_MOVE_WORDS.dataFolderNoMoveToConfirm,
   } satisfies Record<`server.${DataFolderRefusalCode}`, string>,
   // The mail tool's press and its turn-off, when a file stands where a folder of its service goes (round W28).
   ...{
@@ -125,4 +159,67 @@ export const enWave13t = {
   } satisfies Record<`server.${SenderReadingRefusalCode}`, string>,
   'start.waitingForWindows': "Waiting for the operating system. It has not yet said which program on this computer sent this window's first requests, so the window asks again by itself.",
   'start.windowsDidNotSay': "Mole Office did not open, and nothing was done. The window asked {times} times, and each time the operating system did not say within {seconds} seconds which program on this computer sent the window's requests. To try again, choose Reload in the View menu at the top of this window.",
+  // ---- an agent of a harness this product has no adapter for: its hold, its waiter, its chat line, its model, its pages ----
+  // {runtime} is the harness's own word and {handle} an agent's handle; neither is translated.
+  'devWords.runtime.noAdapter': "Mole Office cannot start {runtime} by itself, so this agent's messages wait for its own waiter.",
+  'devWords.runtime.noAdapterNoRun': '{handle} runs in {runtime}, which Mole Office cannot start by itself, so no run was started for it. Its messages wait for its own waiter.',
+  'devWords.said.answeringLiveSessionUnread': "Answering from a {runtime} session on {machine}. Mole Office cannot see inside {runtime}, so the hold's heartbeat is the sign it is there. A message waits for that session's own waiter, and Mole Office starts no run.",
+  'g6b.profile.runtimeNoAdapter': '{runtime}, not started by Mole Office',
+  'g6b.model.chosenInTheHarness': 'model chosen in {runtime}',
+  'casting.harnesses': 'Agents of a harness with no adapter',
+  'devWords.said.modelChosenInTheHarness': '{runtime} chooses its model itself. Mole Office has no adapter for it, so it starts no run of it and gives it no model.',
+  'devWords.waking.notMeasured': 'Nobody has measured how a message reaches a running {runtime} session, so whether one wakes it is not known. When a message arrives, this waiter prints it here and exits, and the message is left for this session to read.',
+  'devWords.waiter.harnessNotRead': "This waiter cannot read a {runtime} session's process, so it recorded none. It holds the heartbeat for this session and waits for its messages.",
+  // ---- what the answer of a hold that beats rests on, and the signs that turn it: src/server/lib/answering.ts ----
+  // {runtime} is a harness's own word, {session} and {terminal} are ids, {state} is a stored state word, {because} is a
+  // record's own words, and {read}, {ended} and {transcript} are the office's readings; none is translated.
+  'heldSession.rests.onTheHoldInsideUnread': "It reads as answering on its hold's heartbeat alone, because Mole Office cannot read inside {runtime}.",
+  'heldSession.rests.onTheHoldAlone': "It reads as answering on its hold's heartbeat alone. What else was read: {read}.",
+  'heldSession.rests.onTheHoldAndWhatWasRead': "It reads as answering on its hold's heartbeat and on what was read: {read}.",
+  'heldSession.grey.itsProcessEnded': 'The session filed as record {session} is holding its handle, but {ended}, and {transcript}, so it is not answering.',
+  'heldSession.grey.itsTerminalEnded': 'The session filed as record {session} is holding its handle, but its run in the office terminal {terminal} has ended, so it is not answering. Its record says: {because}',
+  'heldSession.grey.itsTerminalEndedUnsaid': 'The session filed as record {session} is holding its handle, but its run in the office terminal {terminal} has ended, so it is not answering. Its record says it is {state}, and not why.',
+  // ---- a web page in the window: src/web/components/WebPage.tsx, and src/desktop/the-web-page.mjs (package OT-B) ----
+  // {address} is a web address, {name} a downloaded file's name and {path} where it was saved; none is translated.
+  get 'nav.webPage'(): string { return SURFACES['rail.webpage'] },
+  'webPage.form.title': 'Open a web page',
+  'webPage.form.address': 'Address',
+  'webPage.form.place': 'Where',
+  'webPage.place.body': 'Instead of the page',
+  'webPage.place.left': 'In a column on the left',
+  'webPage.place.right': 'In a column on the right',
+  'webPage.form.opens': 'Opens {address}',
+  'webPage.form.open': 'Open',
+  'webPage.form.openInATab': 'Open in a new tab',
+  'webPage.form.cancel': 'Cancel',
+  'webPage.form.noAddress': 'Type an address first.',
+  'webPage.form.desktopOnly': 'A web page inside Mole Office is a feature of the desktop app. Here it opens in a new tab.',
+  'webPage.form.noBridge': 'This window gave the page no way to draw a web page, so none opens.',
+  'webPage.form.notOpened': 'The window did not open it, and nothing was opened.',
+  'webPage.form.tabBlocked': 'The browser opened no new tab.',
+  // Why an address is not opened, as src/desktop/the-web-page.mjs names it.
+  'webPage.refused.not-an-address': 'This is not a web address.',
+  'webPage.refused.scheme': 'Only an http or https address opens here.',
+  'webPage.refused.loopback': 'An address on this computer does not open here.',
+  'webPage.refused.the-office': 'The office\'s own address does not open here.',
+  'webPage.region': 'Web page',
+  'webPage.bar.address': 'Address of the web page',
+  'webPage.bar.back': 'Back',
+  'webPage.bar.forward': 'Forward',
+  'webPage.bar.reload': 'Reload',
+  'webPage.bar.close': 'Close',
+  'webPage.bar.outside': 'Open in the browser',
+  'webPage.bar.noEarlier': 'There is no earlier page.',
+  'webPage.bar.noLater': 'There is no later page.',
+  'webPage.bar.loading': 'loading',
+  'webPage.bar.hidden': 'hidden',
+  'webPage.said.refused': 'Not opened: {address}. {why}',
+  'webPage.said.failed': '{address} did not load: {why}',
+  'webPage.said.saved': 'Saved as {path}.',
+  'webPage.said.notSaved': '{name} was not saved.',
+  'webPage.said.interrupted': '{name} stopped before it was saved.',
+  'webPage.download.asks': 'Save {name}?',
+  'webPage.download.from': 'From {address}',
+  'webPage.download.save': 'Save',
+  'webPage.download.dontSave': 'Do not save',
 } as const

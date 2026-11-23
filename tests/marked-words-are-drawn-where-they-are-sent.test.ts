@@ -11,12 +11,12 @@
  * WHAT THIS FILE PROVES, in a real browser, against a real office:
  *   (a) one message carries two parts with two different flags, each part `from`, `to`, `quote` and its flag.
  *   (b) the marked words are drawn in their flag's words colour while the person writes, and again in the bubble.
- *   (c) the bubble's foot says how many marked parts the message has.
+ *   (c) the bubble's foot says how many marked parts the message has, in the page's quiet text colour.
  *   (d) a part is kept with the draft: opening another conversation and coming back keeps the words and their marks.
  *   (e) choosing No mark over a marked run takes the mark off those words and leaves the other part.
  *   (f) a refusal from the office is said, and the words and their marks stay in the box.
  *   (g) with nothing selected, the flag still marks the whole message: `intent`, with no parts.
- *   (h) typing before a part moves it; typing inside it drops it and says its words and its flag under the box.
+ *   (h) typing before a part moves it; typing inside it drops it, and no line under the box speaks of it.
  *
  * The words are read from the word lists, never copied. Everything here is made up: the agent, its one line and the
  * person's flags. The servers come from `liveApp` in tests/helpers.ts, on a database in its own temporary folder.
@@ -171,6 +171,21 @@ describe('marked words', () => {
         { words: 'And these too.', wordsColour: 'red', flagColour: 'amber' },
       ])
       expect(await page.locator('.px-chat-one[data-mine="yes"] .px-chat-marked-count').last().textContent()).toBe('2 marked parts')
+      // THE COUNT IS QUIETER THAN THE WORDS AROUND IT. Its colour is read from the page and compared with a probe
+      // wearing var(--text-3), never with a colour copied into this file.
+      const colour = await page.evaluate(() => {
+        const probe = document.createElement('span')
+        probe.style.color = 'var(--text-3)'
+        probe.style.position = 'absolute'
+        probe.style.visibility = 'hidden'
+        document.body.append(probe)
+        const quiet = getComputedStyle(probe).color
+        probe.remove()
+        const count = document.querySelector('.px-chat-one[data-mine="yes"] .px-chat-marked-count')
+        return { quiet, count: count === null ? null : getComputedStyle(count).color }
+      })
+      expect(colour.count, 'the count is not drawn').not.toBe(null)
+      expect(colour.count, 'the count is not drawn in the page\'s quiet text colour').toBe(colour.quiet)
     } finally {
       await context.close()
     }
@@ -230,7 +245,7 @@ describe('marked words', () => {
     }
   }, 180_000)
 
-  it('(h) typing before a part moves it, and typing inside it drops it and says so', async () => {
+  it('(h) typing before a part moves it, and typing inside it drops it and says nothing', async () => {
     const { context, page } = await aWindow()
     const body = 'Keep this. Change that.'
     try {
@@ -246,7 +261,7 @@ describe('marked words', () => {
       await page.locator('.px-chat-write textarea').pressSequentially('New ')
       expect(await page.locator('.px-chat-write textarea').inputValue()).toBe('New ' + body)
       expect(await theMarksInTheBox(page)).toEqual([{ words: 'Keep this.', wordsColour: 'green', flagColour: 'purple' }])
-      // TYPING INSIDE THE PART: it is dropped, and the line under the box names its words and its flag.
+      // TYPING INSIDE THE PART: it is dropped, and no line on the page quotes its words to say so.
       const inside = ('New ' + body).indexOf('this') + 1
       await page.locator('.px-chat-write textarea').evaluate((el, at) => {
         ;(el as HTMLTextAreaElement).focus()
@@ -254,8 +269,8 @@ describe('marked words', () => {
       }, inside)
       await page.locator('.px-chat-write textarea').press('X')
       expect(await theMarksInTheBox(page)).toEqual([])
-      expect(await page.locator('.px-chat-dropped-mark').textContent()).toContain('"Keep this."')
-      expect(await page.locator('.px-chat-dropped-mark').textContent()).toContain(JUST_ASK)
+      const quoting = await page.evaluate(() => document.body.innerText.split('\n').filter((line) => line.includes('"Keep this."')))
+      expect(quoting, 'a line under the box still speaks of the dropped flag').toEqual([])
     } finally {
       await context.close()
     }

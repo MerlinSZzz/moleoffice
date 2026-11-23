@@ -73,10 +73,11 @@ import type { RepositoriesReply, RepositoryOut } from '../../server/api/implemen
 import { content, t } from '@shared/i18n.ts'
 import { faultOf, api, errorMessage } from '../api.ts'
 import { useLanguage } from '../lib/language.ts'
+import { useInspect } from '../lib/mode.ts'
 import { projectName } from '../lib/projects.ts'
 import { currentWorkspace } from '../lib/workspace.ts'
 import { TieredPress } from './TieredPress.tsx'
-import { Absence, Btn, ErrorNote, Explain, Field, Loading, Panel, ServerNote, TextArea, TextInput } from './ui.tsx'
+import { Absence, Btn, ErrorNote, Field, Loading, Panel, ServerNote, TextArea, TextInput } from './ui.tsx'
 import { useProjectAsync } from '../lib/project-async.ts'
 
 /**
@@ -144,7 +145,6 @@ export function OneRepository({
             variant="ghost"
             pending={scanning === repository.id}
             onClick={() => onScan(repository.id)}
-            title={t('settingsPanel.repos.scanSays')}
           >
             {t(settingsControlWord('settings.repositories', 'settingsPanel.repos.scanNow'))}
           </Btn>
@@ -201,8 +201,7 @@ export function OneRepository({
           one layer down. Re-pointing opens its form; forgetting asks its question. Neither runs from the
           first press. */}
       <div className="repos-acts">
-        <Btn size="sm" variant="ghost" onClick={() => setDoing(doing === 'repoint' ? null : 'repoint')}
-          title={t('settingsPanel.repos.repointSays')}>
+        <Btn size="sm" variant="ghost" onClick={() => setDoing(doing === 'repoint' ? null : 'repoint')}>
           {t(settingsControlWord('settings.repositories', 'settingsPanel.repos.repoint'))}
         </Btn>
         <TieredPress tier="confirm" size="sm" press={t(settingsControlWord('settings.repositories', 'settingsPanel.repos.forget'))} pending={t('settingsPanel.repos.forgetting')}
@@ -219,13 +218,6 @@ export function OneRepository({
           <Field label={t(settingsControlWord('settings.repositories', 'settingsPanel.repos.folder'))}>
             <TextInput value={root} onChange={setRoot} placeholder={t('settingsPanel.repos.somewhere')} />
           </Field>
-          {/* WHAT IT COSTS, BEFORE THE PRESS. Behind a fold rather than beside the button: the
-              press already says what it does, and a paragraph over every control is the shape the
-              UX contract calls a failed fix. The fold's own line is the consequence in four words
-              and opening it is the whole of it. */}
-          <Explain declares={{ surface: null }} meaning={t('settingsPanel.repos.whatDrops')} opens={t('settingsPanel.repos.consequence')}>
-            <p>{t('settingsPanel.repos.dropsSays')}</p>
-          </Explain>
           <div className="repos-acts">
             <Btn size="sm" variant="primary" pending={busy} onClick={() => void run()}>
               {t(settingsControlWord('settings.repositories', 'settingsPanel.repos.pointThere'))}
@@ -420,6 +412,7 @@ export function RepositoriesRead({
   onRegistered: () => void
 }) {
   const held = reply.repositories
+  const inspect = useInspect()
   return (
     <>
       {held.length === 0 ? null : (
@@ -433,7 +426,16 @@ export function RepositoriesRead({
           exactly one thing to do here, and putting that one thing behind a press is the shape of
           the fault this panel closes: the act existed and nothing on a screen led to it. */}
       {held.length === 0 || adding ? <RegisterForm onRegistered={onRegistered} /> : null}
-      <ServerNote text={reply.note} />
+      {/* THE LINE UNDER REGISTER IS THE PANEL'S OWN WORDS, IN THE PAGE'S LANGUAGE. The read's own note says the
+          same for an agent, in English; a Chinese page drew it as it was. It is drawn in Developer mode only,
+          where that note was drawn. */}
+      {inspect ? (
+        <p className="repos-note">
+          {held.length === 0
+            ? t('settingsPanel.repos.noneRegistered')
+            : t('settingsPanel.repos.registeredCount', { n: held.length })}
+        </p>
+      ) : null}
     </>
   )
 }

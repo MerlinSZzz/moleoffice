@@ -17,6 +17,9 @@
  *   4. The first line of the unit no longer names Terminal management alone. A unit the press wrote under the older first
  *      line is still the press's own: it reads as out of date and one press writes it again. A unit of that name with
  *      any other first line is still not the press's own.
+ *   5. In an AppImage with no unit, the panel says the .deb install has it, with no press. In an AppImage with a unit a
+ *      press wrote, current or out of date, it also says the unit is still there and draws the press Off, and never the
+ *      press On.
  *
  * Nothing here touches a real unit, systemd or home: the cases read and write a unit in a scratch home, with a stand-in
  * systemctl and loginctl that start nothing.
@@ -140,7 +143,7 @@ describe('the start-at-login press is on Settings, where Normal mode finds it', 
     expect(inThePanel).not.toContain('sal-heading')
     expect(timesIn(inThePanel, `>${heading}<`)).toBe(1)
     expect(inThePanel).toContain(asDrawn(i18n.t('startAtLogin.turnOn')))
-    expect(inThePanel).toContain(asDrawn(i18n.t('startAtLogin.loginNotBoot')))
+    expect(inThePanel).toContain(`<p class="sal-said">${asDrawn(i18n.t('shortcuts.off'))}</p>`)
 
     const onItsOwn = drawn(h(card.StartAtLogin), reading)
     expect(onItsOwn).toContain('<section class="sal" aria-labelledby="sal-heading">')
@@ -152,7 +155,6 @@ describe('the start-at-login press is on Settings, where Normal mode finds it', 
     const home = join(scratch, 'home-elsewhere')
     const windows = drawn(h(card.StartAtLoginPanel), readStartAtLogin({ home, office, platform: 'win32', user: 'sam' }) as StartAtLoginReading)
     expect(windows).toContain(asDrawn(i18n.t('startAtLogin.windows.where')))
-    expect(windows).toContain(asDrawn(i18n.t('startAtLogin.windows.signOut')))
     expect(windows).not.toContain(asDrawn(i18n.t('startAtLogin.turnOn')))
     const mac = drawn(h(card.StartAtLoginPanel), readStartAtLogin({ home, office, platform: 'darwin', user: 'sam' }) as StartAtLoginReading)
     expect(mac).toContain(asDrawn(i18n.t('startAtLogin.mac.where')))
@@ -194,5 +196,36 @@ describe('the start-at-login press is on Settings, where Normal mode finds it', 
     expect(readStartAtLogin({ home: theirs, office, platform: 'linux', user: 'sam', systemctl: theirSystemd.systemctl, loginctl: noLoginctl })).toMatchObject({ unit: 'not ours' })
     expect(turnStartAtLoginOn({ home: theirs, office, platform: 'linux', systemctl: theirSystemd.systemctl })).toMatchObject({ ok: false, code: 'startAtLoginNotOurs' })
     expect(readFileSync(theirPath, 'utf8')).toBe(theirText)
+  })
+
+  it('5. in an AppImage the panel says the .deb install has it; with a unit a press wrote it also draws the press Off, and never On', () => {
+    const appImage = join(scratch, 'a-mount-of-the-appimage')
+    const home = join(scratch, 'home-appimage')
+    const read = () => readStartAtLogin({ home, office, platform: 'linux', user: 'sam', appImage }) as StartAtLoginReading
+    const noUnit = read()
+    expect(noUnit).toMatchObject({ fromAnAppImage: true, unit: 'none' })
+    const bare = drawn(h(card.StartAtLoginPanel), noUnit)
+    expect(bare).toContain(asDrawn(i18n.t('startAtLogin.appImage.where')))
+    expect(bare).not.toContain(asDrawn(i18n.t('startAtLogin.appImage.unitLeft')))
+    expect(bare).not.toContain(asDrawn(i18n.t('startAtLogin.turnOn')))
+    expect(bare).not.toContain(asDrawn(i18n.t('startAtLogin.turnOff')))
+
+    // A UNIT A PRESS WROTE, once for another mount of the AppImage and once for the office as it is now.
+    const unitPath = theStartAtLoginUnitPath(home)
+    mkdirSync(dirname(unitPath), { recursive: true })
+    for (const [text, unit] of [
+      [theStartAtLoginUnit({ ...office, command: join(scratch, 'an-older-mount', 'mole-office') }), 'out of date'],
+      [theStartAtLoginUnit(office), 'current'],
+    ] as const) {
+      writeFileSync(unitPath, text)
+      const reading = read()
+      expect(reading).toMatchObject({ fromAnAppImage: true, unit, startsAtLogin: null })
+      const left = drawn(h(card.StartAtLoginPanel), reading)
+      expect(left).toContain(asDrawn(i18n.t('startAtLogin.appImage.where')))
+      expect(left).toContain(asDrawn(i18n.t('startAtLogin.appImage.unitLeft')))
+      expect(left).toContain(asDrawn(i18n.t('startAtLogin.turnOff')))
+      expect(left).not.toContain(asDrawn(i18n.t('startAtLogin.turnOn')))
+      expect(left).not.toContain(asDrawn(i18n.t('startAtLogin.rewrite')))
+    }
   })
 })

@@ -131,9 +131,9 @@ import {
   Absence,
   Btn,
   ErrorNote,
-  Explain,
   NoStateMark,
   ScanRow,
+  ServerNote,
   StateChip,
   StateDrawingGlyph,
   StateGlyph,
@@ -1779,8 +1779,6 @@ export interface SessionGroupSpec {
   key: SessionGroupKey
   /** The heading, as a phrase that reads after a count: "7 crashed". */
   label: string
-  /** What the group MEANS, said once at its head instead of once under every row. */
-  what: string
   /**
    * A PERSON wrote down that this work is done. Exactly one group answers true.
    *
@@ -1799,62 +1797,52 @@ export const SESSION_GROUPS: readonly SessionGroupSpec[] = [
   {
     key: 'crashed',
     get label() { return t('g6a.sessions.crashed') },
-    get what() { return t('g6a.sessions.eachOneDiedOrStoppedWithoutFinishingNobody') },
     humanConfirmedFinished: false,
   },
   {
     key: 'orphaned',
     get label() { return t('g6a.sessions.endedWithoutSayingSoAndLeftSomethingRunning') },
-    get what() { return t('g6a.sessions.theSessionIsGoneAndSomethingItStarted') },
     humanConfirmedFinished: false,
   },
   {
     // Criterion W6: stopped on purpose by a shutdown of Mole Office. It does not resume by itself.
     key: 'paused',
     get label() { return t('w13t.sessions.paused') },
-    get what() { return t('w13t.sessions.pausedWhat') },
     humanConfirmedFinished: false,
   },
   {
     key: 'idle',
     get label() { return t('g6a.sessions.idle') },
-    get what() { return t('g6a.sessions.aliveAndEachHasSaidNothingSinceThe') },
     humanConfirmedFinished: false,
   },
   {
     key: 'running',
     get label() { return t('g6a.sessions.running') },
-    get what() { return t('g6a.sessions.workingRightNowNothingInThisGroupNeeds') },
     humanConfirmedFinished: false,
   },
   {
     key: 'unknown-judged',
     get label() { return t('g6a.sessions.recordedAsUnknown') },
-    get what() { return t('g6a.sessions.somebodyLookedAtEachOfTheseAndCould') },
     humanConfirmedFinished: false,
   },
   {
     key: 'no-state',
     get label() { return t('g6a.sessions.withNoStateEverWritten') },
-    get what() { return t('g6a.sessions.nobodyHasSaidWhatHappenedToTheseIt') },
     humanConfirmedFinished: false,
   },
   {
     key: 'unclassified',
     get label() { return t('g6a.sessions.carryingAStateWordNobodyHasClassified') },
-    get what() { return t('g6a.sessions.eachRecordHoldsAWordThisProductHas') },
     humanConfirmedFinished: false,
   },
   {
     key: 'unknown-unread',
     get label() { return t('g6a.sessions.moleOfficeCannotPlace') },
-    get what() { return t('g6a.sessions.theSessionsApiReportsTheseAsUnknownAnd') },
     humanConfirmedFinished: false,
   },
   {
     key: 'finished-unwritten',
     get label() { return t('g6a.sessions.reportedFinishedWithNobodyHavingWrittenItDown') },
-    get what() { return t('g6a.sessions.aToolCalledEachOfTheseFinishedAnd') },
     humanConfirmedFinished: false,
   },
   {
@@ -1867,7 +1855,6 @@ export const SESSION_GROUPS: readonly SessionGroupSpec[] = [
     // noun is what the count already supplies. Round 131 took out "by a person": the group takes
     // every record whose state word is finished, and an agent may write that word.
     get label() { return t('g6a.sessions.writtenDownAsFinishedByAPerson') },
-    get what() { return t('g6a.sessions.theWordFinishedIsOnEachRecordWritten') },
     humanConfirmedFinished: true,
   },
 ]
@@ -2156,14 +2143,6 @@ export function groupNotes(
 /** How many shared sentences the head prints before the rest are folded, with their count. */
 export const GROUP_NOTES_SHOWN = 3
 
-/**
- * How many rows in this group are missing something, so the absence can be counted rather than
- * repeated. Two or more, and it is said once at the head; exactly one, and that row says it.
- */
-export function missingCount(lines: readonly SessionLine[], read: (line: SessionLine) => string | null): number {
-  return lines.filter((line) => read(line) === null).length
-}
-
 // ============================================================================ how long a group runs
 /**
  * ---------------------------------------------------------------------------------------
@@ -2356,7 +2335,7 @@ export function CompositionStrip({ groups }: { groups: readonly SessionGroup[] }
 // ============================================================================ one session, drawn
 
 /**
- * THE NINE THINGS A ROW CAN OPEN ONTO, named once here and once on the page.
+ * THE NINE THINGS A ROW CAN OPEN ONTO, named here.
  *
  * WHY THE ROW ITSELF NO LONGER LISTS THEM. It used to: the summary read "why Mole Office says orphaned ·
  * what it was doing · how it was placed · what it was for · where it ran · the resume command · the
@@ -2365,10 +2344,8 @@ export function CompositionStrip({ groups }: { groups: readonly SessionGroup[] }
  * one string was costing about twenty-five pixels on each of ninety-one rows. Measured: the page
  * went from 7,181px to 5,072px when it came out.
  *
- * The names are not gone. They are said ONCE, at the head of the page, in the same order this
- * function builds them — see `ROW_HOLDS` and `SessionExplanations` — and each row carries the exact
- * NUMBER of them it has. That is a fold naming what is behind it and counting it, said in the one
- * place where saying it costs nothing instead of the ninety-one places where it costs the page.
+ * The names were said once, at the head of the page, until November 2026, when the explanations
+ * were taken off the page, as decided. Each row carries the exact NUMBER of them it has.
  */
 function insideRow(
   line: SessionLine,
@@ -2395,36 +2372,16 @@ function insideRow(
   return bits
 }
 
-/** Everything a session row can hold, in the order `insideRow` builds it. Printed at the head. */
-function rowHolds(): readonly string[] { return [
-  t('g6a.sessions.whyMoleOfficeSaysTheStateWordIt'),
-  t('g6a.sessions.whatItWasDoingOrWasDoingWhen'),
-  t('g6a.sessions.howItWasPlacedUnderThePipelineOr'),
-  t('g6a.sessions.whatItWasFor'),
-  t('g6a.sessions.howItEndedInTheWordsTheExit'),
-  t('g6a.sessions.whereItRan'),
-  t('g6a.sessions.whichAgentTheRecordNamesWhenThatIs'),
-  t('g6a.sessions.theResumeCommandWholeAndNeverAbbreviated'),
-  t('g6a.sessions.theLogPath'),
-  t('g6a.sessions.anythingItLeftRunningWithWhatStoppingThat'),
-] }
-
-/** English snapshot retained for readers of this published list; the page reads it afresh. */
-export const ROW_HOLDS = rowHolds()
-
 export interface SessionLineRowProps {
   line: SessionLine
   now: number
-  /** True when the group has already counted the rows that carry no resume command. */
-  groupSaidNoResume?: boolean
-  groupSaidNoLog?: boolean
   /** Where this run belongs, and how Mole Office worked it out. Drawn inside the fold. */
   placement?: Placement
   /**
    * Placement sentences the group above has already said, by shape — see `sharedPlacementNotes`.
    *
-   * A row whose sentence is in here keeps silent about it, exactly as it does for a resume command
-   * the group has already counted. A row whose sentence is its own still prints it.
+   * A row whose sentence is in here keeps silent about it. A row whose sentence is its own still
+   * prints it.
    */
   groupSaidPlacement?: ReadonlySet<string>
   /** Everything this session left running, for the fold. */
@@ -2451,8 +2408,6 @@ export interface SessionLineRowProps {
 export function SessionLineRow({
   line,
   now,
-  groupSaidNoResume = false,
-  groupSaidNoLog = false,
   placement,
   groupSaidPlacement,
   orphans = [],
@@ -2500,8 +2455,7 @@ export function SessionLineRow({
           // (wave 13y round 146). The opened row's Last activity says the gap in words.
           line.lastOutputAt === null ? <Absence title={t('g6a.sessions.noClock')} /> : relativeToNow(line.lastOutputAt, now)
         }
-        // The same words on every row, with this row's own exact count beside them. What the count
-        // counts is named in full at the head of the page — see ROW_HOLDS.
+        // The same words on every row, with this row's own exact count beside them.
         opens={t('g6a.sessions.facts')}
         {...(inside.length === 0 ? {} : { holds: { count: inside.length, what: t(inside.length === 1 ? 'g6a.sessions.oneFact' : 'g6a.sessions.factCount') } })}
         {...(line.recordId === null ? {} : { href: `#${recordPath(line.recordId)}`, linkText: t('g6a.sessions.openRecord') })}
@@ -2632,14 +2586,12 @@ export function SessionLineRow({
             </dl> : null}
 
             {/* Never truncated and never reformatted: a resume command that is nearly right starts
-                something in the wrong directory and looks like it worked. Left out entirely, rather
-                than printed as a missing-line, when the group above has already said that not one
-                of its rows carries one. */}
+                something in the wrong directory and looks like it worked. */}
             {!inspect ? null : hasResume ? (
               <div className="sx-cmds">
                 <CommandLine label={t('g6a.sessions.resume')} command={line.resumeCommand ?? ''} what={t('g6a.sessions.resumeCommand')} />
               </div>
-            ) : groupSaidNoResume ? null : (
+            ) : (
               // TWO WORDS AND THE SENTENCE ON THE MARK, in place of the sentence itself. Nobody
               // wrote a resume command down, a reader does nothing about that, and the sentence
               // was on this page ten times.
@@ -2657,7 +2609,7 @@ export function SessionLineRow({
               <div className="sx-cmds">
                 <CommandLine label={t('g6a.sessions.log')} command={line.logPath ?? ''} what={t('g6a.sessions.logPath')} />
               </div>
-            ) : groupSaidNoLog ? null : (
+            ) : (
               <p className="sx-cmd-missing">
                 <Absence
                   tier="told-apart"
@@ -2713,8 +2665,8 @@ function PlacementNote({ placement, groupSaid }: { placement: Placement; groupSa
 
               WHY THE ONE ABOVE WON IS SAID ONCE, AT THE HEAD. This line used to carry "and is
               filed under the one above because that is the strongest evidence" on every row that
-              reaches more than one — fourteen copies of one clause on this corpus. The rule is in
-              `SessionExplanations`; what varies, and therefore what stays here, is the number. */}
+              reaches more than one — fourteen copies of one clause on this corpus. The rule was in
+              `SessionExplanations` until November 2026; what varies, and therefore what stays here, is the number. */}
           <p className="sx-place-also">{t('g6a.sessions.alsoProjects', {n: placement.also.length})}</p>
           <ul className="sx-place-list">
             {placement.also.map((claim) => (
@@ -2842,8 +2794,8 @@ function WrittenMark({ line }: { line: SessionLine }) {
 /**
  * WHAT THE OFFICE SAW OF A HAND-FILED RUNNING RUN'S PROCESS, beside the word "running" (decided for wave 13y
  * round 30). A run whose process the office can see says so. A run whose process it cannot see says it is
- * running by its own word. Where something runs under the recorded number and is not shown to be the run's own, the
- * reader's sentence is written after the mark; on the other two it is the mark's title.
+ * running by its own word. Where something runs under the recorded number and is not shown to be the run's own, it
+ * says that. On all three the reader's sentence is the mark's title.
  *
  * Exported because the run's own page draws the same mark beside its state. That page does not load SESSIONS_CSS, so
  * the mark brings its own stylesheet.
@@ -2857,23 +2809,17 @@ export function ItsProcessMark({ its }: { its: ItsProcess }) {
       </style>
       {its.seen === 'running' ? <Tag tone="quiet" title={title}>{t('sessions.itsProcess.running')}</Tag> : null}
       {its.seen === 'none' ? <Tag tone="warn" title={title}>{t('sessions.itsProcess.none')}</Tag> : null}
-      {its.seen === 'not-its-own' ? (
-        <>
-          <Tag tone="warn" title={title}>{t('sessions.itsProcess.notItsOwn')}</Tag>
-          <span className="sx-its-process-says">{its.says}</span>
-        </>
-      ) : null}
+      {its.seen === 'not-its-own' ? <Tag tone="warn" title={title}>{t('sessions.itsProcess.notItsOwn')}</Tag> : null}
     </span>
   )
 }
 
 /* THE MARK WRAPS INSIDE WHATEVER HOLDS IT. A tag does not wrap anywhere else, and the third mark's tag is about 330
    pixels wide: at 390 it made the Agent runs page 465 pixels wide, and at 660 it was drawn over the age column
-   (wave 13y round 30). So here its words may wrap, and the sentence goes under the tag when it does not fit beside it. */
+   (wave 13y round 30). So here its words may wrap. */
 const ITS_PROCESS_CSS = `
 .sx-its-process { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 6px; }
 .sx-its-process .px-tag { white-space: normal; }
-.sx-its-process-says { color: var(--st-inferred); }
 `
 
 /**
@@ -2948,10 +2894,9 @@ export interface SessionGroupBlockProps {
  * the page and wrong now that there are eight groups inside each of fifteen projects: the same
  * paragraph about what `crashed` means would be on screen fifteen times.
  *
- * None of it is gone. It is all in `SessionExplanations`, once, at the head of the page, measured
- * over every run rather than over the handful in one project — which is also the only place the
- * measurement is worth making, because "thirty-seven rows say this sentence" is a fact about the
- * page and not about a group of two.
+ * It was all in `SessionExplanations`, once, at the head of the page, until November 2026, when the
+ * explanations were taken off the page, as decided. Each row now says its own missing resume
+ * command and log path.
  */
 export function SessionGroupBlock({
   group,
@@ -2966,8 +2911,6 @@ export function SessionGroupBlock({
   const inspect = useInspect()
   const { spec, lines } = group
   const count = lines.length
-  const noResume = missingCount(lines, (line) => line.resumeCommand)
-  const noLog = missingCount(lines, (line) => line.logPath)
   const { shown, folded } = foldPastLimit(lines)
 
   const draw = (line: SessionLine) => (
@@ -2975,8 +2918,6 @@ export function SessionGroupBlock({
       key={line.id}
       line={line}
       now={now}
-      groupSaidNoResume={noResume > 1}
-      groupSaidNoLog={noLog > 1}
       orphans={orphans}
       {...(saidPlacement === undefined ? {} : { groupSaidPlacement: saidPlacement })}
       {...(placements?.get(line.id) === undefined ? {} : { placement: placements.get(line.id)! })}
@@ -3155,7 +3096,7 @@ export function ProjectBlock({ entry, now, placements, orphans = [], onRelease, 
         <div className="sx-band-body">
           {/* THE ARITHMETIC, AND NOT THE RULE BEHIND IT. This paragraph used to end with "and are
               drawn as their own groups below for that reason", which is the rule the head of the
-              page already states in bold — "A run that has merely gone quiet is not a run somebody
+              page stated in bold until November 2026 — "A run that has merely gone quiet is not a run somebody
               said was done" — and it was printed once per project group, seven times on this
               corpus. What varies is the two numbers, so the two numbers are what is left.
 
@@ -3168,7 +3109,7 @@ export function ProjectBlock({ entry, now, placements, orphans = [], onRelease, 
                 tier="told-apart"
                 looked={false}
                 word={t('g6a.sessions.notConfirmed', {n: band.count})}
-                title={t('g6a.sessions.notConfirmedReason', {n: band.count})}
+                title={t('g6a.sessions.notConfirmed', {n: band.count})}
               />
             </p>
           ) : (
@@ -3206,15 +3147,6 @@ export function ProjectBlock({ entry, now, placements, orphans = [], onRelease, 
       <details className="sx-proj" data-quiet="1">
         <summary className="sx-proj-sum">{head}</summary>
         <div className="sx-proj-body">
-          {/* WHY THIS GROUP WAS FOLDED, in one quiet sentence (wave 13y round 142; it was a dash). A pipeline whose runs
-              have all ended is the ordinary case — four to seven groups on this corpus are in it —
-              and there is nothing for a reader to do about it. The summary line above already
-              prints the band composition ("1 run — 1 ended, or nobody ever said"), so this is the
-              second time the same fact is said; it is kept because a reader who has opened the
-              group is no longer looking at the summary, and it is kept quiet for the same reason. */}
-          <p className="sx-band-what">
-            <Absence say title={t('g6a.sessions.noneAliveReason')} />
-          </p>
           {inspect ? sharedPlace : null}
           {bands}
         </div>
@@ -3227,132 +3159,6 @@ export function ProjectBlock({ entry, now, placements, orphans = [], onRelease, 
       <h3 className="sx-proj-head">{head}</h3>
       {inspect ? sharedPlace : null}
       {bands}
-    </section>
-  )
-}
-
-// ============================================================================ said once, at the head
-
-/**
- * EVERY EXPLANATION THIS PAGE OWES, IN ONE FOLD, MEASURED OVER EVERY RUN.
- *
- * ---------------------------------------------------------------------------------------
- * WHAT THIS REPLACES
- * ---------------------------------------------------------------------------------------
- *
- * Each state group used to print its own meaning, the sentences the server shares between its rows,
- * and the counts of rows carrying no resume command and no log path. With one level of grouping
- * that was four to eight lines, eight times. With two levels it would be the same paragraphs once
- * per state group per project — the defect this page was rebuilt to remove, coming back through a
- * new door.
- *
- * So they are said ONCE, here, and the measurement is made over EVERY run rather than over the two
- * or three inside one project. That is also the only scale at which the measurement means anything:
- * "thirty-seven runs say this sentence with a different number in each" is a fact worth reading, and
- * "both of these say it" is not.
- *
- * NOTHING IS SHORTER THAN IT WAS. Every sentence the server sends is still on the page, in full, and
- * every row still carries its own inside its own fold. What changed is how many times each is
- * printed.
- */
-export function SessionExplanations({ lines }: { lines: readonly SessionLine[] }) {
-  const groups = SESSION_GROUPS.map((spec) => ({
-    spec,
-    lines: lines.filter((line) => sessionGroupKey(line) === spec.key),
-  })).filter((entry) => entry.lines.length > 0)
-
-  return (
-    <Explain declares={{ surface: 'sessions.grouping' }}
-      meaning={
-        /* The grouping is derived from typed links and the change log, and no reader can infer
-           that from a heading, so it stays open. The sentence that followed it — "inside that, the
-           state word says what it demands of you" — is the band headings themselves: `need you`
-           sits first, above `alive right now`, above `ended, or nobody ever said`. */
-        <span>{t('g6a.sessions.aRunIsFiledUnderThePipelineOr')}</span>
-      }
-      opens={t('g6a.sessions.howARunIsPlacedAndWhatEach')}
-      holds={{ count: groups.length, what: t('g6a.sessions.stateGroupsOnThisPage') }}
-    >
-      <p className="sx-group-what">
-        {t('g6a.sessions.moleOfficePlacesARunUsingTwoThings')}</p>
-      <p className="sx-group-what">
-        {t('g6a.sessions.aWorkingFolderCanContainSeveralModulesSo')}</p>
-      {/* WHY ONE OF SEVERAL WINS, SAID ONCE. A run that reaches more than one pipeline or module
-          names the others inside its own fold. The clause explaining the choice was on every one
-          of those rows; it belongs here, where it is said once for all of them. */}
-      <p className="sx-group-what">
-        {t('g6a.sessions.aRunThatReachesMoreThanOnePipeline')}</p>
-      {/* WHAT THE NUMBER ON EVERY ROW COUNTS. Each row's fold says "what was recorded" and a
-          count; these are the things it is counting, in the order the row lays them out. Said here
-          rather than on each row because ninety-one copies of this list is the page. */}
-      <p className="sx-group-what">{t('g6a.sessions.everyRowOpensOntoWhatMoleOfficeRecorded', { value1: (rowHolds().length) })}</p>
-      <ul className="sx-place-list">
-        {rowHolds().map((held) => (
-          <li key={held}>{held}</li>
-        ))}
-      </ul>
-      {groups.map((entry) => (
-        <SessionGroupNotes key={entry.spec.key} spec={entry.spec} lines={entry.lines} />
-      ))}
-    </Explain>
-  )
-}
-
-/** One state group's meaning and everything the server said about its rows, with exact counts. */
-function SessionGroupNotes({ spec, lines }: { spec: SessionGroupSpec; lines: readonly SessionLine[] }) {
-  const count = lines.length
-  const reasons = groupNotes(lines, (line) => line.stateReason)
-  const noResume = missingCount(lines, (line) => line.resumeCommand)
-  const noLog = missingCount(lines, (line) => line.logPath)
-
-  /** "All 7 say" when one sentence covers the group, "5 of them say" when it does not. */
-  const said = (note: SharedNote): string => {
-    const who = note.count === count ? t('g6a.sessions.allSay', { value1: (count) }) : t('g6a.sessions.ofThemSay', { value1: (note.count) })
-    return note.varies
-      ? t('g6a.sessions.thisWithADifferentNumberInEach', { value1: (who) })
-      : t('g6a.sessions.theSameThingAboutHowMoleOfficeKnows', { value1: (who) })
-  }
-  const headNotes = reasons.shared.slice(0, GROUP_NOTES_SHOWN)
-  const restNotes = reasons.shared.slice(GROUP_NOTES_SHOWN)
-  const restRows = restNotes.reduce((sum, note) => sum + note.count, 0)
-
-  return (
-    <section className="sx-note-group">
-      <h4 data-title-is="its-label" className="sx-group-head">{t('g6a.sessions.inTheBand', { value1: (count), value2: (spec.label), value3: (BAND_WORDS[BAND_OF[spec.key]].label) })}</h4>
-      <p className="sx-group-what">{spec.what}</p>
-      {headNotes.map((note) => (
-        <p className="sx-group-said" key={note.sentence}>
-          {said(note)}
-          <span className="sx-group-quote">{note.sentence}</span>
-        </p>
-      ))}
-      {restNotes.length === 0 ? null : (
-        <details className="sx-searched">
-          <summary>{t('g6a.sessions.otherSentenceTheServerGaveCoveringOfThese', { n: restNotes.length, value1: (restNotes.length), value3: (restRows), value4: (count) })}</summary>
-          <ul className="sx-searched-list">
-            {restNotes.map((note) => (
-              <li key={note.sentence} className="wrap-anywhere">
-                {said(note)}
-                {note.sentence}
-              </li>
-            ))}
-          </ul>
-        </details>
-      )}
-      {noResume > 1 ? (
-        <p className="sx-group-said">
-          {noResume === count
-            ? t('g6a.sessions.notOneOfTheseCarriesAResumeCommand', { value1: (count) })
-            : t('g6a.sessions.ofThemCarryNoResumeCommandSoThose', { value1: (noResume) })}
-        </p>
-      ) : null}
-      {noLog > 1 ? (
-        <p className="sx-group-said">
-          {noLog === count
-            ? t('g6a.sessions.notOneOfTheseCarriesALogPath', { value1: (count) })
-            : t('g6a.sessions.ofThemCarryNoLogPathSoThere', { value1: (noLog) })}
-        </p>
-      ) : null}
     </section>
   )
 }
@@ -3622,34 +3428,10 @@ export function MachineSurface({ unclaimed }: { unclaimed: UnclaimedRead | null 
         <StateGlyph state="broken" />
         {t('g6a.sessions.unclaimedCount', {n: resources.length, holders: holders.length})}
       </h3>
-      {/* THE SAME PARAGRAPH, ON DEMAND. It is written once for the whole surface and it is worth
-          reading once; standing open it is a hundred and ten pixels of the same words every time
-          this page is opened, above rows that already carry the pid and the command to run.
-
-          THE SENTENCE IS WRITTEN ONCE, ON THE FOLD, AND THE BODY CONTINUES IT.
-
-          It was written twice. First as two subjects for one fact — the summary said "Nobody wrote
-          these down" and the body opened "Nothing wrote these down" — and then, once those were
-          made one node, as that node rendered in both places. A <details> keeps its summary on
-          screen while it is open, so the second arrangement put the sentence directly above a
-          verbatim copy of itself: pressing the control showed the reader the line they had just
-          pressed. What the fold is FOR is what the fact costs, so that is what is inside it, and
-          "either" reaches back to the sentence on the control, which is two lines above it and
-          cannot be scrolled away from it. One copy in the file, one on the screen, nothing to
-          drift. */}
-      <Explain declares={{ surface: 'sessions.unwritten' }}
-        meaning={
-          <span>{t('g6a.sessions.unclaimedAttribution')}</span>
-        }
-        opens={t('g6a.sessions.whyAnUnclaimedProcessIsWorseThanAn')}
-      >
-        <p className="sx-unclaimed-lede">{t('g6a.sessions.holderExplanation')}</p>
-        {/* THE SERVER'S OWN SENTENCE, VERBATIM AND NOT REBUILT. It went from the foot of the
-            surface into this fold because it restates the heading above and then lists the ports —
-            eight wrapped lines saying what the heading says in one. It is kept whole because it is
-            the only place the sweep speaks for itself about what it left out and why. */}
-        {unclaimed.summary === null ? null : <p className="sx-unclaimed-summary">{unclaimed.summary}</p>}
-      </Explain>
+      {/* THE SERVER'S OWN SENTENCE, VERBATIM AND NOT REBUILT, for a developer. The fold that held it, with a paragraph
+          on what an unclaimed process costs, was taken off the page in November 2026, as decided. It is kept whole
+          because it is the only place the sweep speaks for itself about what it left out and why. */}
+      <ServerNote text={unclaimed.summary} />
       <ul className="sx-unclaimed-list">
         {shown.map((group) => (
           <HolderRow key={group.key} group={group} />
@@ -3688,8 +3470,8 @@ export function MachineSurface({ unclaimed }: { unclaimed: UnclaimedRead | null 
  * this whole feature exists to break.
  *
  * NO LINK. The router reads the address bar, so an in-page `#machine` anchor would be read as a
- * page that does not exist. The line says where to look instead, in words. It took a link while the
- * home page's preview drew it; the preview was removed in wave 13y round 32.
+ * page that does not exist. It took a link while the home page's preview drew it; the preview was
+ * removed in wave 13y round 32.
  */
 export function MachineLine({
   unclaimed,
@@ -3700,7 +3482,6 @@ export function MachineLine({
 }) {
   const inspect = useInspect()
   if (!inspect) return null
-  const route = <span className="sx-machine-bit">{t('g6a.sessions.theWholeOfItIsUnderThisMachine')}</span>
   const orphanBit =
     orphans.length === 0 ? null : (
       <span className="sx-machine-bit">{t('g6a.sessions.orphanCount', {n: orphans.length})}</span>
@@ -3713,7 +3494,6 @@ export function MachineLine({
         <span>
           {t('g6a.sessions.thisReplyDoesNotSayWhatIsRunning2')}</span>
         {orphanBit}
-        {route}
       </p>
     )
   }
@@ -3729,7 +3509,6 @@ export function MachineLine({
           : t('g6a.sessions.unclaimedCount', {n: unclaimed.resources.length, holders: holders.length})}
       </span>
       {orphanBit}
-      {route}
     </p>
   )
 }
@@ -3841,7 +3620,7 @@ export function ReadAt({ read }: { read: MachineRead }) {
         // machine; what is missing is a newer one, and saying "could not load" over the top of a
         // good reading would throw away information to report a failure.
         <p className="sx-read-failed" role="status">
-          {t('g6a.sessions.unreadNewer', {failedAt: readingStamp(read.failed.at), message: read.failed.message, at: readingStamp(read.at)})}
+          {t('g6a.sessions.readFailed', {failedAt: readingStamp(read.failed.at), message: read.failed.message})}
         </p>
       )}
     </div>
@@ -3918,12 +3697,6 @@ export function LookForRuns({ onFound }: { onFound: () => void }) {
 
   return (
     <div className="sx-look">
-      {/* THE BUTTON'S OWN CAPTION CARRIES MOST OF THIS, and it always did: "Look for runs on this
-          computer". What was here was three sentences of instructions in front of it, one of which
-          — "nothing knows where its conversation is" — has no subject a reader can hold. What is
-          left is the one fact the caption cannot carry and somebody might want before pressing:
-          this reads files here and sends nothing anywhere. Finding 23, 19 August 2026. */}
-      <p className="sx-look-say">{t('g6a.sessions.lookPrivacy')}</p>
       <span className="sx-look-act">
         <Btn
           size="sm"
@@ -3964,7 +3737,7 @@ function WhatTheSweepDid({ reply, inspect }: { reply: DiscoverReply; inspect: bo
           folder is in; one no single project holds is filed nowhere, and the counts above would add up to less than
           the total with nothing saying why. Developer mode lists each one below, from the server's own sentence. */}
       {notFiled(r) === 0 ? null : (
-        <p className="sx-look-say">{t('g6a.sessions.notFiledHere', { n: notFiled(r) })}</p>
+        <p className="sx-look-say">{t('g6a.sessions.notFiledCount', { n: notFiled(r) })}</p>
       )}
       {r.unreadable.length === 0 ? (
         // "Nothing could not be read" is a different answer from "nothing was found", and this is
@@ -3987,7 +3760,7 @@ function WhatTheSweepDid({ reply, inspect }: { reply: DiscoverReply; inspect: bo
       )}
       {/* THE SERVER'S OWN WORDS, WHOLE, FOR A READER WHO ASKED FOR THE MACHINERY. It names stored
           fields and a request field by their spellings, which is why it is not in Normal mode. */}
-      {!inspect ? null : <p className="sx-look-note">{reply.note}</p>}
+      <ServerNote text={reply.note} />
     </div>
   )
 }
@@ -4360,13 +4133,6 @@ export const SESSIONS_CSS = `
   width: var(--px-glyph); height: var(--px-glyph); flex: none; fill: none;
   color: var(--st-broken); align-self: center;
 }
-.sx-unclaimed-lede, .sx-unclaimed-summary {
-  margin: 0 0 var(--pad);
-  font: var(--fs-1)/var(--lh-body) var(--font-ui);
-  color: var(--text-2);
-  max-width: var(--measure-in-box);
-}
-.sx-unclaimed-summary { margin: var(--pad) 0 0; color: var(--text-3); }
 .sx-unclaimed-clear {
   margin: 0;
   font: var(--fs-1)/var(--lh-body) var(--font-ui);
@@ -4457,7 +4223,7 @@ export const SESSIONS_CSS = `
    THE GENERAL CAUSE IS NOT THIS FILE'S. Any prose in this app set at the smallest step has the
    same problem the moment it contains a code element; it is reported to whoever owns styles.css.
    This rule fixes the page. Every prose class on this surface that can hold one is named. */
-.sx-group-what code, .sx-empty code, .sx-band-what code, .px-empty code {
+.sx-empty code, .sx-band-what code, .px-empty code {
   font-size: 1em;
 }
 
@@ -4502,10 +4268,6 @@ export const SESSIONS_CSS = `
 .sx-look-unread {
   margin: 0; padding-left: var(--pad-lg);
   font: var(--fs-1)/var(--lh-body) var(--font-ui); color: var(--text-2);
-}
-.sx-look-note {
-  margin: 0; max-width: var(--measure-in-box);
-  font: var(--fs-1)/var(--lh-body) var(--font-ui); color: var(--text-3);
 }
 
 .sx-read {
@@ -4628,13 +4390,6 @@ export const SESSIONS_CSS = `
   color: var(--text);
 }
 .sx-group-count { font-variant-numeric: tabular-nums; }
-.sx-group-what, .sx-group-said {
-  margin: 0 0 4px;
-  font: var(--fs-1)/var(--lh-body) var(--font-ui);
-  color: var(--text-2);
-  max-width: var(--measure-in-box);
-}
-.sx-group-said { color: var(--text-3); }
 /* The server's sentence, quoted rather than restated, so it is visibly not this page's words. */
 .sx-group-quote { font-style: italic; }
 /* WHY THESE RUNS ARE FILED HERE, ONCE FOR THE WHOLE PROJECT GROUP, above its bands. Same ink and
@@ -4705,7 +4460,6 @@ details[open] > .sx-proj-sum::before, details[open] > .sx-band-sum::before { con
 }
 /* The action band carries the alarm hue on a rail, so the eye finds it without reading. */
 .sx-band[data-band="action"] > .sx-band-head { color: var(--text); }
-.sx-note-group + .sx-note-group { margin-top: var(--gut); }
 .sx-note-band { font-weight: 400; color: var(--text-3); }
 
 /* ---- what a group is made of, as a proportion -----------------------------------------
@@ -4933,9 +4687,4 @@ details[open] > .sx-proj-sum::before, details[open] > .sx-band-sum::before { con
   max-width: var(--measure-in-box);
 }
 .sx-arithmetic b { color: var(--text); font-variant-numeric: tabular-nums; }
-/* THE NOTE ABOUT ROWS WITH NO MARK SITS BELOW THE MACHINE PANEL, NOT ON ITS EDGE. It is drawn
-   after the page's .stack, so the stack's own gap does not reach it: with no space of its own its
-   first line was drawn under the panel's bottom border and hard shadow. Padding rather than a
-   margin, so no margin collapse and no shadow reaches the words. */
-.sx-origin-note-foot[data-has-note] { padding-top: var(--gut); }
 `

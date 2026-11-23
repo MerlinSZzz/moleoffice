@@ -87,6 +87,10 @@
  * `node tools/session-hook.mjs <mode>` with a hook payload on stdin, as tests/the-hook-writes-down-which-conversation-
  * this-is.test.ts runs it, against a listening server on a throwaway database. The notes it writes in `.logs` are
  * removed after each case.
+ *
+ * THE AGENT THE RUNS ANSWER AS HOLDS A KEY OF ITS OWN, from the door that registers it, and every run of the hook is
+ * given it. A session that names an agent and holds no key of it sends the name alone, and the office lets no name
+ * alone change a run, so the writes these cases read on the run and on its child would not be made without the key.
  */
 
 import { spawn, type ChildProcess } from 'node:child_process'
@@ -117,6 +121,8 @@ let url: string
 let scratch: string
 const notesWritten: string[] = []
 const otherConversations: ChildProcess[] = []
+/** The key the office gave HANDLE when it was registered. Every run of the hook is given it. */
+let agentsKey = ''
 
 beforeEach(async () => {
   t = await freshDb()
@@ -128,6 +134,8 @@ beforeEach(async () => {
   mkdirSync(join(scratch, 'home'))
   const registered = await server.app.inject({ method: 'POST', url: '/api/agents/started', headers: AS_THE_PERSON, payload: { handle: HANDLE, name: 'A nesting agent' } })
   expect(registered.statusCode, registered.body).toBe(201)
+  agentsKey = String((registered.json() as { whatToGiveIt?: { key?: string } }).whatToGiveIt?.key ?? '')
+  expect(agentsKey, 'the registration gave the agent no key').not.toBe('')
 }, 60_000)
 
 afterEach(async () => {
@@ -211,8 +219,9 @@ function theNoteOf(sessionId: string): Record<string, unknown> | null {
  * `behindClaude` runs it under a wrapper called `claude`, so the hook finds a session process above itself. The wrapper
  * prints its own pid and waits for a line on its stdin before it starts the hook, so `beforeItRuns` can write that pid
  * on the run first: that is how a run names this session's own process. `flags` go on the wrapper's command line, where
- * the hook reads the start flags of this session's process; the hook itself ignores them. CLAUDE_PID, TMUX_PANE, any
- * key and the office tool's configuration are never inherited from the shell that runs this file.
+ * the hook reads the start flags of this session's process; the hook itself ignores them. The agent's own key goes as
+ * MOLE_AGENT_KEY. CLAUDE_PID, TMUX_PANE, any other key, any key file and the office tool's configuration are never
+ * inherited from the shell that runs this file.
  */
 async function theHook(
   mode: 'start' | 'stop' | 'end',
@@ -228,9 +237,10 @@ async function theHook(
     MOLE_OFFICE_DB: t.file,
     MOLE_HOOK_DETAILS_FOLDER: join(scratch, 'hook-details'),
     MOLE_OFFICE_AGENT: HANDLE,
+    MOLE_AGENT_KEY: agentsKey,
     MOLE_OFFICE_SESSION: run,
   }
-  for (const name of ['TMUX_PANE', 'CLAUDE_PID', 'MOLE_AGENT_KEY', 'SANDBOX_DIR', 'MOLE_OFFICE_TOOL_CONFIGURATION']) delete env[name]
+  for (const name of ['TMUX_PANE', 'CLAUDE_PID', 'MOLE_AGENT_KEY_FILE', 'SANDBOX_DIR', 'MOLE_OFFICE_TOOL_CONFIGURATION']) delete env[name]
   Object.assign(env, more.env ?? {})
   const wrapper = join(scratch, 'claude')
   if (more.behindClaude === true) {

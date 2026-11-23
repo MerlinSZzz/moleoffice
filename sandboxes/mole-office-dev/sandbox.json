@@ -49,8 +49,8 @@
       "for": "Taking one of the machine's seats before a whole suite or a browser test file. Inside a sandbox a pid is not the host's, so name the holder by the process row: node tools/slot.mjs acquire <pool> --wait --resource $SANDBOX_PROCESS_ROW, then release the seat when the tests end. tools/sandbox-start.mjs --slot <pool> does this for a command it starts."
     },
     {
-      "path": "design/agents/kit/send-message.py",
-      "for": "Sending one message as this agent from anything that can run python3, not only Node: python3 design/agents/kit/send-message.py <workspace> <to> \"<title>\" <body file>. It reads MOLE_OFFICE_AGENT, MOLE_OFFICE_SESSION and MOLE_OFFICE_API from the environment, already set there for anything tools/sandbox-start.mjs starts. The image's python3 is what makes this usable here at all (acceptance finding 3)."
+      "path": "tools/kit/send-message.py",
+      "for": "Sending one message as this agent from anything that can run python3, not only Node: python3 tools/kit/send-message.py <workspace> <to> \"<title>\" <body file>. It reads MOLE_OFFICE_AGENT, MOLE_OFFICE_SESSION and MOLE_OFFICE_API from the environment, already set there for anything tools/sandbox-start.mjs starts. The image's python3 is what makes this usable here at all (acceptance finding 3)."
     }
   ],
   "contacts": {
@@ -59,7 +59,7 @@
       "how": "The clone in the sandbox has no .env of its own, so a process there cannot find the office unless it is told. The launcher passes the host's own value of this setting to each agent it starts. It is not set for the whole container, so a test run inside never picks up the live address by accident."
     },
     "secretary": {
-      "card": "design/permissions/roles.json, elevation.onlyThisCardCanHoldIt",
+      "card": "src/config/roles.json, elevation.onlyThisCardCanHoldIt",
       "how": "Write to whoever holds that card, through the office's messages. Nobody is named here, because who holds the card changes."
     }
   },

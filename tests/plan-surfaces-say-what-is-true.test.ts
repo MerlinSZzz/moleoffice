@@ -285,18 +285,9 @@ describe('1 — words nobody scheduled, on a week that has hours', () => {
     expect(read).not.toContain('Nothing has been scheduled from these words')
   })
 
-  it('says once, about the words themselves, that the plan holds nothing from them', () => {
+  it('marks the words once as not on the plan and in no total', () => {
     const read = text(keptList([intent()]))
-    expect(read).toContain('Nothing on the plan came from these words')
-    expect(read).toContain('in no total')
-  })
-
-  it('says how both facts can be true, which is the half that stops it reading as a denial', () => {
-    // Without this clause a reader meets "nothing came from these words" beside "12h planned this
-    // week" and has to guess which of the two is wrong. Neither is.
-    expect(text(keptList([intent()]))).toContain(
-      'The work they name may still have hours, given some other way.',
-    )
+    expect(read.split(sayInEnglish('schedule.keptNotOnPlan')).length - 1).toBe(1)
   })
 
   it('shows the kept period as given when the words name another period', () => {

@@ -313,7 +313,7 @@ export function mappingFacts(steps: readonly FlowStep[]): MappingFacts {
   }
   if (stepsWithNone > 0) {
     rest.push(
-      t('g7b.PipelineFlow.no_module_recorded_as_carrying_which_is', { v1: plural(stepsWithNone, t('g7b.PipelineFlow.step_has'), t('g7b.PipelineFlow.steps_have')), v2: stepsWithNone === 1 ? t('g7b.PipelineFlow.it') : t('g7b.PipelineFlow.them') }),
+      t('pipelineFlow.fact.noModule', { v1: plural(stepsWithNone, t('g7b.PipelineFlow.step_has'), t('g7b.PipelineFlow.steps_have')), v2: stepsWithNone === 1 ? t('g7b.PipelineFlow.it') : t('g7b.PipelineFlow.them') }),
     )
   }
 
@@ -448,7 +448,7 @@ export function dependencyFacts(steps: readonly FlowStep[], holds: readonly Hold
   const gaps: string[] = []
   if (noneRecorded > 0) {
     gaps.push(
-      t('g7b.PipelineFlow.no_dependency_recorded_either_way_which_is', { v1: plural(noneRecorded, t('g7b.PipelineFlow.block_has'), t('g7b.PipelineFlow.blocks_have')) }),
+      t('pipelineFlow.fact.noDependency', { v1: plural(noneRecorded, t('g7b.PipelineFlow.block_has'), t('g7b.PipelineFlow.blocks_have')) }),
     )
   }
   if (broken > 0) {
@@ -880,7 +880,7 @@ export function PipelineFlow({ reading, attention, now = Date.now() }: PipelineF
           <p className="pf-fact">{deps.sentence}</p>
 
           <div className="pf-grid">
-            <LaneHeader lanes={mapping.lanes} gutterLanes={layout.lanes} />
+            <LaneHeader lanes={mapping.lanes} />
             <ol className="pf-steps">
               {drawn.map(({ step, index, hold }) => (
                 <StepRow
@@ -948,16 +948,13 @@ export function PipelineFlow({ reading, attention, now = Date.now() }: PipelineF
  * at the height available; the whole of it is in the roster below and in every step's "carried by"
  * line, so nothing lives only here.
  */
-function LaneHeader({ lanes, gutterLanes }: { lanes: readonly ModuleLane[]; gutterLanes: number }) {
+function LaneHeader({ lanes }: { lanes: readonly ModuleLane[] }) {
   return (
     <div className="pf-row pf-colhead">
       <div className="pf-gutter" aria-hidden="true" />
       <div className="pf-body">
         <div className="pf-text">
           <span className="pf-colhead-word">{t('g7b.PipelineFlow.steps_in_the_order_written')}</span>
-          <span className="pf-colhead-note">{t('g7b.PipelineFlow.the_order_is_the_order_the_work')}{' '}
-            {gutterLanes === 1 ? t('g7b.PipelineFlow.in_one_track_here') : t('g7b.PipelineFlow.tracks_wide_here', { v1: gutterLanes })}{endOfSentence()}
-          </span>
         </div>
         {lanes.length === 0 ? null : (
           <div className="pf-lanes">
@@ -987,9 +984,7 @@ function LaneFooter({ lanes, total }: { lanes: readonly ModuleLane[]; total: num
     <div className="pf-row pf-colfoot">
       <div className="pf-gutter" aria-hidden="true" />
       <div className="pf-body">
-        <div className="pf-text">
-          <span className="pf-colfoot-note">{t('g7b.PipelineFlow.the_counts_on_the_right_are_steps')}</span>
-        </div>
+        <div className="pf-text" aria-hidden="true" />
         <div className="pf-lanes">
           {lanes.map((lane) => (
             <span
@@ -1157,7 +1152,7 @@ function Waits({ hold, state, steps }: { hold: Hold; state: ItemState; steps: re
   if (hold.kind === 'none-recorded') {
     return (
       <>
-        <p className="pf-none">{t('g7b.PipelineFlow.no_dependency_is_recorded_either_way_nothing')}</p>
+        <p className="pf-none">{t('pipelineFlow.noDependencies')}</p>
         <BlockedBySomethingElse hold={hold} state={state} />
       </>
     )
@@ -1445,7 +1440,7 @@ function Roster({ mapping, steps }: { mapping: MappingFacts; steps: readonly Flo
       {unowned.length === 0 ? null : (
         <p className="pf-roster-none">
           <b>{t('g7b.PipelineFlow.no_module')}{listJoined(unowned.map((entry) => stepNumber(entry.index)))}</b> — {unowned.length}{t('g7b.PipelineFlow.of_497')}{' '}
-          {steps.length}{t('g7b.PipelineFlow.steps_nobody_owns_these_yet_that_is')}</p>
+          {steps.length} {t('g7b.PipelineFlow.steps')}</p>
       )}
     </div>
   )
@@ -1471,7 +1466,7 @@ function Legend({ orderArrows }: { orderArrows: boolean }) {
             <span className="pf-line" data-kind="through" data-tone="standing" style={{ left: at }} />
             <span className="pf-node" style={{ left: at }} />
           </span>
-          <span>{t('g7b.PipelineFlow.a_dot_is_a_step_a_line')}</span>
+          <span>{t('g7b.PipelineFlow.step')} · {t('g7b.PipelineFlow.dependency')}</span>
         </li>
         {orderArrows ? (
           <li>
@@ -1479,7 +1474,7 @@ function Legend({ orderArrows }: { orderArrows: boolean }) {
               <span className="pf-line" data-kind="through" data-tone="standing" data-order="1" style={{ left: at }} />
               <span className="pf-node" style={{ left: at }} />
             </span>
-            <span>{t('g7b.PipelineFlow.a_lighter_line_is_the_order_the')}</span>
+            <span>{t('pipelineFlow.legend.stepOrder')}</span>
           </li>
         ) : null}
         <li>
@@ -1488,7 +1483,7 @@ function Legend({ orderArrows }: { orderArrows: boolean }) {
             <span className="pf-gate" data-gate="hard" data-tone="standing" data-side="above" style={{ left: at }} />
             <span className="pf-node" style={{ left: at }} />
           </span>
-          <span>{t('g7b.PipelineFlow.a_solid_bar_across_a_line_is')}<b>{t('g7b.PipelineFlow.hard_gate')}</b>{t('g7b.PipelineFlow.the_step_below_cannot_proceed_at_all')}</span>
+          <span>{t('g7b.PipelineFlow.hard_gate')}</span>
         </li>
         <li>
           <span className="pf-legend-art" aria-hidden="true">
@@ -1496,17 +1491,16 @@ function Legend({ orderArrows }: { orderArrows: boolean }) {
             <span className="pf-gate" data-gate="partial" data-tone="standing" data-side="above" style={{ left: at }} />
             <span className="pf-node" style={{ left: at }} />
           </span>
-          <span>{t('g7b.PipelineFlow.a_bar_with_a_gap_in_it')}<b>{t('g7b.PipelineFlow.partial_gate')}</b>{t('g7b.PipelineFlow.the_step_below_may_go_as_far')}</span>
+          <span>{t('g7b.PipelineFlow.partial_gate')}</span>
         </li>
         <li>
           <span className="pf-legend-art" aria-hidden="true">
             <span className="pf-line" data-kind="through" data-tone="cleared" style={{ left: at }} />
             <span className="pf-node" style={{ left: at }} />
           </span>
-          <span>{t('g7b.PipelineFlow.a_faint_line_is_a_dependency_that')}</span>
+          <span>{t('pipelineFlow.legend.cleared')}</span>
         </li>
       </ul>
-      <p className="pf-legend-note">{t('g7b.PipelineFlow.the_wall_under_a_held_step_shows')}</p>
     </div>
   )
 }
@@ -1874,12 +1868,6 @@ export const PIPELINE_FLOW_CSS = `
   text-transform: uppercase;
   color: var(--text-3);
 }
-.pf-colhead-note, .pf-colfoot-note {
-  font-size: var(--fs-1);
-  line-height: var(--lh-body);
-  color: var(--text-3);
-  max-width: var(--measure-in-box);
-}
 .pf-lane-head {
   display: flex;
   flex-direction: column;
@@ -1946,7 +1934,7 @@ export const PIPELINE_FLOW_CSS = `
 .pf-roster-item { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--pad); min-width: 0; }
 .pf-roster-name { font-size: var(--fs-2); font-weight: 600; color: var(--text); }
 .pf-roster-steps { font-size: var(--fs-1); color: var(--text-3); }
-.pf-roster-none, .pf-legend-note {
+.pf-roster-none {
   margin-top: var(--pad);
   padding-top: var(--pad);
   border-top: var(--border-w) solid var(--border-strong);

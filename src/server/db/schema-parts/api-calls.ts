@@ -4,6 +4,8 @@ import { sql } from 'drizzle-orm'
 import { index, integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core'
 import { aPartTable } from '../part-tables.ts'
 
+// ------------------------------------------------------------------- what Mole Office measured of itself
+
 /**
  * ONE ROW PER REQUEST MOLE OFFICE ANSWERED.
  *
@@ -107,7 +109,7 @@ export const apiCalls = aPartTable(sqliteTable(
     clientOrigin: text('client_origin'),
   },
   (t) => [
-    // SIX, AND EACH IS PAID FOR IN BYTES PER ROW, which is what this table's whole design is about.
+    // SEVEN, AND EACH IS PAID FOR IN BYTES PER ROW, which is what this table's whole design is about.
     // The first three are by time, by trace and by operation. The fourth is there because two usage doors,
     // `GET /api/usage/operations` and `GET /api/usage/patterns`, count one project's rows grouped by
     // operation, and without it they were slow under load. It holds every column those queries read,
@@ -118,7 +120,11 @@ export const apiCalls = aPartTable(sqliteTable(
     // remote calls, so `clientsFromOtherMachines` in the same file reads it instead of every row.
     // Migration 0227 has the measurements. The sixth is by run and then time, so reads using
     // `session_id` can search for a run's timeline, latest calls and start steps. Migration 0322 has
-    // the measurements.
+    // the measurements. The seventh is by actor type, actor id, address and time, so `machinesSeenFrom`
+    // in src/server/lib/participants.ts searches one participant's calls instead of reading every row.
+    // It holds only calls with an address, so it is paid for on each of those, and SQLite uses it only
+    // for a query whose WHERE implies `client_addr IS NOT NULL`: that term itself, or a comparison of
+    // `client_addr` with a value. No other read of this table does either. Migration 0355 says why.
     index('api_calls_at_idx').on(t.atMs),
     index('api_calls_trace_idx').on(t.traceId, t.atMs),
     index('api_calls_operation_idx').on(t.operation, t.atMs),
@@ -136,5 +142,6 @@ export const apiCalls = aPartTable(sqliteTable(
     ).where(sql`operation IS NOT NULL`),
     index('api_calls_from_other_machines_idx').on(t.clientAddr, t.atMs).where(sql`client_origin = 'remote'`),
     index('api_calls_session_at_idx').on(t.sessionId, t.atMs),
+    index('api_calls_actor_address_idx').on(t.actorType, t.actorId, t.clientAddr, t.atMs).where(sql`client_addr IS NOT NULL`),
   ],
 ), { existingMeasured: true })

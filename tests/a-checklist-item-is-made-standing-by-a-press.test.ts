@@ -8,7 +8,7 @@
  *
  * WHERE THE PRESS IS. Only on the reader's own checklists, as the door reads "yours": somebody else's checklists are
  * shown to be read. Only on an open item: the door refuses `standing` on an item that is done, in progress or waiting
- * on the owner, because a standing item stays open or replaced only (loop-5, the secretary's answer SzZNUTuPaUXs). A replaced
+ * on the owner, because a standing item stays open or replaced only (loop-5, the secretary's answer). A replaced
  * standing item is finished, so it has no press either.
  *
  * In a real browser, on this test's own office. The browser is the person: `liveApp`'s key window covers a caller on
@@ -17,13 +17,18 @@
  *
  * What is proved:
  *   1. On the reader's own checklist an opened open item has "Make it standing". Pressed, the door stores the item as
- *      standing, the item says it is a standing item, the counts leave it out, and the press then reads "Make it
- *      ordinary".
+ *      standing, the item says it is a standing item, the card's progress number leaves it out, and the press then
+ *      reads "Make it ordinary".
  *   2. "Make it ordinary", pressed, takes `standing` away: the item is open and ordinary, and counted again.
  *   3. An item that is done, in progress, waiting on the owner or replaced has neither press.
  *   4. Somebody else's checklist, opened on the page, has neither press.
  *   5. A press the door refuses shows why under the item, and nothing is written. Refused because the checklist changed
  *      after the page read it, the words are the code's, and the page reads the checklist again (round loop-8).
+ *
+ * Test change (wave 13y round 175): the page draws design E, as decided, so a checklist is a card and the address
+ * `#/checklists/<id>` marks its card. The cases read the marked card, and cases 1 and 2 read its progress number, as
+ * "1 / 4". Before, they read the one opened checklist and its counts line, as "3 still to do, 1 of them waiting on the
+ * owner"; that line went with the opened checklist. The progress number leaves a standing item out as the counts did.
  */
 
 import type { Locator, Page } from 'playwright'
@@ -67,8 +72,8 @@ async function openThePage(page: Page, id: string): Promise<Locator> {
   await page.goto('about:blank')
   await page.goto(`${app.site}/?lang=en#/checklists/${id}`, { timeout: 60_000 })
   await waitForThePage(page, 60_000)
-  const one = page.locator('.ck1')
-  await one.locator('.ck1-counts').waitFor({ timeout: 30_000 })
+  const one = page.locator('.cks-card[data-marked="yes"]')
+  await one.locator('.ckp-item').first().waitFor({ timeout: 30_000 })
   return one
 }
 
@@ -110,16 +115,16 @@ afterAll(async () => {
 })
 
 describe('a press makes a checklist item standing, and a press makes it ordinary again', () => {
-  it('1. on the reader\'s own checklist, "Make it standing" makes an open item standing, and the counts leave it out', async () => {
+  it('1. on the reader\'s own checklist, "Make it standing" makes an open item standing, and the progress number leaves it out', async () => {
     const page = app.page
     const one = await openThePage(page, bench)
-    expect(await one.locator('.ck1-counts').innerText()).toBe(t('checklists.counts', { open: 3, waiting: 1 }))
+    expect(await one.locator('.cks-progress').innerText()).toBe(t('checklists.progressNumber', { done: 1, total: 4 }))
     const camera = await openedItem(one, CAMERA)
     expect(await camera.getByRole('button', UNMAKE).count(), 'an ordinary item is not offered "Make it ordinary"').toBe(0)
     await camera.getByRole('button', MAKE).click()
     await expect.poll(async () => (await theItem(bench, CAMERA))['standing'], { timeout: 10_000 }).toBe(true)
     expect((await theItem(bench, CAMERA))['state'], 'it stays open').toBe('open')
-    await expect.poll(() => one.locator('.ck1-counts').innerText(), { timeout: 10_000 }).toBe(t('checklists.counts', { open: 2, waiting: 1 }))
+    await expect.poll(() => one.locator('.cks-progress').innerText(), { timeout: 10_000 }).toBe(t('checklists.progressNumber', { done: 1, total: 3 }))
     const after = await openedItem(one, CAMERA)
     await expect.poll(() => after.innerText(), { timeout: 10_000 }).toContain(t('w13j.checklistStanding.fact'))
     expect(await after.getByRole('button', UNMAKE).count()).toBe(1)
@@ -133,7 +138,7 @@ describe('a press makes a checklist item standing, and a press makes it ordinary
     await camera.getByRole('button', UNMAKE).click()
     await expect.poll(async () => Object.hasOwn(await theItem(bench, CAMERA), 'standing'), { timeout: 10_000 }).toBe(false)
     expect((await theItem(bench, CAMERA))['state']).toBe('open')
-    await expect.poll(() => one.locator('.ck1-counts').innerText(), { timeout: 10_000 }).toBe(t('checklists.counts', { open: 3, waiting: 1 }))
+    await expect.poll(() => one.locator('.cks-progress').innerText(), { timeout: 10_000 }).toBe(t('checklists.progressNumber', { done: 1, total: 4 }))
     const after = await openedItem(one, CAMERA)
     expect(await after.getByRole('button', MAKE).count()).toBe(1)
   }, 120_000)
@@ -174,7 +179,7 @@ describe('a press makes a checklist item standing, and a press makes it ordinary
     expect(((await reply.json()) as Record<string, unknown>)['code']).toBe('checklistChangedSinceRead')
     // READ AGAIN, THE ITEM IS IN PROGRESS AND HAS NO PRESS, so the words do not ask for another press.
     await expect
-      .poll(() => camera.locator('.ck1-refusal').innerText(), { timeout: 10_000 })
+      .poll(() => camera.locator('.ckl-refusal').innerText(), { timeout: 10_000 })
       .toBe(t('w13j.checklistPress.readAgain', { refusal: t('server.checklistChangedSinceRead') }))
     expect(await camera.getByRole('button', MAKE).count()).toBe(0)
     expect((await theList(bench))['version'], 'nothing was written').toBe(before)

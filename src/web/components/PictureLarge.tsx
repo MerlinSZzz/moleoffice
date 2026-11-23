@@ -68,8 +68,21 @@ export function opensAtFullSize(
   return natural.width > fitted + 1 && fitted < drawnWidth * WORTH_FITTING
 }
 
-/** The picture, pressable, with its quiet mark, and the large view it opens. */
-export function OpensLarge({ src, alt, children }: { src: string; alt: string; children: ReactNode }) {
+/**
+ * The picture, pressable, with its quiet mark, and the large view it opens. `crossOrigin` is how the large view loads
+ * the picture, the same as the small one it opens (`theCrossOriginOfALoad` in src/web/lib/visiting.ts).
+ */
+export function OpensLarge({
+  src,
+  alt,
+  crossOrigin,
+  children,
+}: {
+  src: string
+  alt: string
+  crossOrigin?: 'anonymous'
+  children: ReactNode
+}) {
   const [open, setOpen] = useState<'no' | 'fitted' | 'full'>('no')
   const opener = useRef<HTMLButtonElement>(null)
   // HOW WIDE THE PICTURE IS DRAWN decides whether its mark carries words, measured again as it changes.
@@ -119,6 +132,7 @@ export function OpensLarge({ src, alt, children }: { src: string; alt: string; c
         <PictureLarge
           src={src}
           alt={alt}
+          crossOrigin={crossOrigin}
           startsFull={open === 'full'}
           onClose={() => {
             setOpen('no')
@@ -134,7 +148,19 @@ export function OpensLarge({ src, alt, children }: { src: string; alt: string; c
  * The picture over the page. Escape, the close button and a press outside the picture close it.
  * "Full size" and a press on the picture switch between fitted to the window and the picture's own pixels.
  */
-function PictureLarge({ src, alt, startsFull, onClose }: { src: string; alt: string; startsFull: boolean; onClose: () => void }) {
+function PictureLarge({
+  src,
+  alt,
+  crossOrigin,
+  startsFull,
+  onClose,
+}: {
+  src: string
+  alt: string
+  crossOrigin: 'anonymous' | undefined
+  startsFull: boolean
+  onClose: () => void
+}) {
   const close = useRef<HTMLButtonElement>(null)
   const view = useRef<HTMLDivElement>(null)
   const picture = useRef<HTMLImageElement>(null)
@@ -208,6 +234,7 @@ function PictureLarge({ src, alt, startsFull, onClose }: { src: string; alt: str
           <img
             ref={picture}
             src={src}
+            crossOrigin={crossOrigin}
             alt={alt}
             data-press={full ? 'fit' : bigger ? 'full' : 'none'}
             onLoad={measure}

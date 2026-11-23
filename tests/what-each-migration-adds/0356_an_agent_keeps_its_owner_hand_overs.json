@@ -1,0 +1,7 @@
+{
+  "why": "Keep one row for each hand-over of an agent's owner made at the owner door, with the owner before and after, who made it, the grant it was made under, the reason and when. The installation row keeps the moment this office began to keep them, written once by the first start of the code that writes the rows.",
+  "tables": ["agent_owner_changes"],
+  "columnsAddedAfterTheRebuild": {
+    "installation": ["owner_changes_since"]
+  }
+}

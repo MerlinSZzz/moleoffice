@@ -219,7 +219,7 @@ describe('the counters page draws what a counter is', () => {
   // THE DUE LINE IS READ WHOLE, IN BOTH LANGUAGES (wave 13q's round 33e). This case read only "Next due" and the
   // time, on the fixture counter, which is paused; since round 33d a paused counter's due line says it will not fire
   // and names no time, and the merge queue found the case red (entry qJxQVlwcdLSG). The three lines a person reads
-  // are now each held as drawn: a time ahead, a time that has come, and a paused counter.
+  // are now each held as drawn: a time ahead, a time that has come, and a paused counter, which draws no due line.
   it('draws when a timer is next due', () => {
     const ahead = new Date()
     ahead.setHours(12, 0, 0, 0)
@@ -251,15 +251,14 @@ describe('the counters page draws what a counter is', () => {
     }
   })
 
-  it('says a paused counter will not fire until it is resumed, and names no time', () => {
+  // A PAUSED COUNTER DRAWS NO DUE LINE. Before, the line was a sentence saying it would not fire until it was resumed;
+  // that sentence said what would happen, and the pause line below already says it is paused, so it is gone, as decided.
+  it('draws no due line for a paused counter, and names no time', () => {
     for (const language of ['zh', 'en'] as const) {
       setWordLanguage(language)
       const markup = draw(oneCounter())
-      expect(markup, language).toContain(
-        language === 'zh'
-          ? '<p class="cnt-nextdue">已暂停，恢复之前不会触发。</p>'
-          : `<p class="cnt-nextdue">${en.t('g7a.counters.dueWhilePaused')}</p>`,
-      )
+      expect(markup, language).not.toContain('cnt-nextdue')
+      expect(markup, language).toContain('cnt-paused')
       expect(markup, language).not.toContain('dateTime="2026-09-24 20:30:00"')
     }
   })
@@ -284,9 +283,11 @@ describe('the counters page draws what a counter is', () => {
     expect(markup).not.toContain('this counter fires at most once every 30 minutes')
   })
 
-  it('says the office does not know when a quiet trigger’s spell began, and never guesses', () => {
+  // Before, this was a sentence that also said the trigger therefore does not hold; the holds mark says that, so the
+  // line is its state alone now, as decided.
+  it('draws "Quiet since: not recorded" when nobody recorded when a quiet trigger’s spell began, and never guesses', () => {
     const markup = draw(oneCounter())
-    expect(markup).toContain(en.t('g7a.counters.unknownQuiet'))
+    expect(markup).toContain(en.t('countersPage.quietSinceNotRecorded'))
     expect(markup).not.toContain('long ago')
   })
 

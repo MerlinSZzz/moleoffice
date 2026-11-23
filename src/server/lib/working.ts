@@ -48,7 +48,7 @@
  * picture; a screenshot of invented agents is fabricated evidence.
  */
 
-import { and, eq, inArray, isNull, sql } from 'drizzle-orm'
+import { and, count, eq, inArray, isNull, sql } from 'drizzle-orm'
 
 import { theMoleOfficeTest } from '@shared/participants.ts'
 import { nowStamp, parseAnyStamp } from '@shared/time.ts'
@@ -57,7 +57,7 @@ import { overlapMarkOf, rankOf, type OverlapClass } from '@shared/workdomain.ts'
 import { db, sqlite } from '../db/client.ts'
 import { readInPieces } from '../db/in-pieces.ts'
 import { records, theProjectOfARowFoundById } from '../db/schema.ts'
-import { agentsIn } from './inbox.ts'
+import { AGENT_KIND, isAnActiveAgent } from './inbox.ts'
 import { unregisteredAgentsSeen, type UnregisteredAgent } from './participants.ts'
 import { agentsForRecords } from '../db/agents-for-records.ts'
 import { avatarsOnOffer, pictureShownFor, theAssetRowsFor } from './avatars.ts'
@@ -420,30 +420,44 @@ function lastProgressOf(
  * here: only the whole roster draws anything from them, and it reads them itself.
  */
 interface TheActiveAgents {
-  everyAgent: ReturnType<typeof agentsIn>
-  active: ReturnType<typeof agentsIn>
+  /** How many live agent records the project holds, active or not. */
+  agents: number
+  active: PanelRecord[]
   retired: number
   readOnce: WhatARosterReadOnce
 }
 
 /**
- * WHETHER AN AGENT RECORD IS ACTIVE: one that may still be given work. Every reading in this file asks this, so the
- * roster, Home's roster and Home's doing lines cannot disagree about who is at work.
+ * THE LIVE AGENT RECORDS OF ONE PROJECT THAT ARE ACTIVE: the ones that may still be given work, read in one statement.
+ * Every reading in this file asks this, so the roster, Home's roster and the doing lines cannot disagree about who is
+ * at work. Who is active is `isAnActiveAgent`'s, which the list of the runs that could serve an active agent asks too,
+ * and the records of agents that are not active are not read at all (decision OQR0WDVq0FkP).
  */
-function isActiveAgent(record: PanelRecord): boolean {
-  // ABSENT IS NOT ASSUMED ACTIVE. The kind requires `state`, so an agent without one is a record
-  // that was written round the validator, and drawing it as active would be a guess about
-  // whether the owner may still give it work.
-  return record.data['state'] === 'active'
+function activeAgentsIn(workspaceId: string): PanelRecord[] {
+  return db
+    .select()
+    .from(records)
+    .where(and(eq(records.workspaceId, workspaceId), isAnActiveAgent(records)))
+    .all() as unknown as PanelRecord[]
+}
+
+/** How many live agent records one project holds, active or not, counted in one statement and not read. */
+function agentsCountedIn(workspaceId: string): number {
+  const row = db
+    .select({ n: count() })
+    .from(records)
+    .where(and(eq(records.workspaceId, workspaceId), eq(records.kind, AGENT_KIND), isNull(records.deletedAt)))
+    .get()
+  return row?.n ?? 0
 }
 
 function readTheActiveAgents(
   workspaceId: string,
-  openRuns: readonly AttachmentView[] = listAttachments({ workspaceId, openOnly: true, namingAnAgentOnly: true }),
+  openRuns: readonly AttachmentView[] = listAttachments({ workspaceId, openOnly: true, servingAnActiveAgentOnly: true }),
 ): TheActiveAgents {
-  const everyAgent = agentsIn(workspaceId)
-  const active = everyAgent.filter(isActiveAgent)
-  const retired = everyAgent.length - active.length
+  const agents = agentsCountedIn(workspaceId)
+  const active = activeAgentsIn(workspaceId)
+  const retired = agents - active.length
 
   // EVERY ACTIVE AGENT'S OPEN RUNS, AND THE NEWEST REQUEST OF EACH, READ ONCE FOR THE WHOLE ROSTER.
   // `presenceOf` read both again for every agent, and that was 7.4 of the 7.5 seconds a call took on
@@ -468,13 +482,13 @@ function readTheActiveAgents(
     recordOf: (agentId) => recordsById.get(agentId),
     registeredOf: (agentId) => registeredById.get(agentId) ?? null,
   }
-  return { everyAgent, active, retired, readOnce }
+  return { agents, active, retired, readOnce }
 }
 
 /**
  * THE RUN SERVING AN AGENT NOW: the newest of its open runs, or null when none is open. `runs` are newest first, as
- * `listAttachments` answers them. The whole roster and Home's doing lines both ask this, so the run whose sentence
- * Home draws is the run the roster names.
+ * `listAttachments` answers them. The whole roster, Home's roster and the doing lines all ask this, so the run Home
+ * counts an agent stuck by is the run the roster names.
  */
 function servingRunOf(agentId: string, runs: readonly AttachmentView[]): AttachmentView | null {
   return runs.find((one) => one.agentId === agentId && one.open) ?? null
@@ -538,11 +552,11 @@ function theRecordsOfRuns(workspaceId: string, runIds: readonly string[]): Map<s
  */
 export function whoIsWorking(workspaceId: string, now: Date = new Date()): WhoIsWorking {
   const storeExists = transitionStoreExists()
-  // EVERY RUN OF THE PROJECT AND THE SQL OPEN RULE'S ANSWER, IN ONE READ. The open runs go to
-  // `readTheActiveAgents` as its own open-only read gave them; every run stays here, because an
-  // agent's last progress is read over all of its runs and Home's roster draws no run that ended.
-  const everyRun = listAttachmentsAndOpenIds({ workspaceId, namingAnAgentOnly: true })
-  const { everyAgent, active, retired, readOnce } = readTheActiveAgents(
+  // EVERY RUN THAT COULD SERVE AN ACTIVE AGENT, AND THE SQL OPEN RULE'S ANSWER, IN ONE READ. The open
+  // runs go to `readTheActiveAgents` as its own open-only read gave them; every such run stays here,
+  // because an agent's last progress is read over all of its runs and Home's roster draws no run that ended.
+  const everyRun = listAttachmentsAndOpenIds({ workspaceId, servingAnActiveAgentOnly: true })
+  const { agents, active, retired, readOnce } = readTheActiveAgents(
     workspaceId,
     everyRun.runs.filter((run) => everyRun.openIds.has(run.id)),
   )
@@ -640,7 +654,7 @@ export function whoIsWorking(workspaceId: string, now: Date = new Date()): WhoIs
   }
 
   const absences: Absence[] = []
-  if (everyAgent.length === 0) {
+  if (agents === 0) {
     absences.push({
       code: 'registeredAgent',
       what: 'a durable agent',
@@ -655,7 +669,7 @@ export function whoIsWorking(workspaceId: string, now: Date = new Date()): WhoIs
       answer: 'nothing-recorded',
       count: 0,
       says:
-        `${everyAgent.length === 1 ? '1 agent recorded, and it is retired.' : `${String(everyAgent.length)} agents recorded, all retired.`} ` +
+        `${agents === 1 ? '1 agent recorded, and it is retired.' : `${String(agents)} agents recorded, all retired.`} ` +
         'A retired agent keeps its inbox and can be made active again.',
     })
   }
@@ -691,7 +705,7 @@ export function whoIsWorking(workspaceId: string, now: Date = new Date()): WhoIs
     computedAt: nowStamp(),
     rows,
     counts: {
-      agents: everyAgent.length,
+      agents,
       active: active.length,
       retired,
       withWorkState,
@@ -701,7 +715,7 @@ export function whoIsWorking(workspaceId: string, now: Date = new Date()): WhoIs
     },
     unregistered: unregisteredAgentsSeen(),
     absences,
-    note: noteFor(everyAgent.length, active.length, domains.length, storeExists),
+    note: noteFor(agents, active.length, domains.length, storeExists),
     machinery: {
       resolverVersion: RESOLVER_VERSION,
       transitionStore: {
@@ -726,21 +740,28 @@ export function whoIsWorking(workspaceId: string, now: Date = new Date()): WhoIs
  * runs, 200,000 request rows; tests/an-office-of-the-live-shape.ts), the four whole rosters came to
  * 975 KB, 681 KB of it for the 280 agents of one project: every row carried its presence inputs, its
  * open runs, its work state, its domains and its picture. This answers the same rows with the fields
- * Home draws and nothing else, and it skips the per-agent work Home never draws: the last progress, the
- * domains, the overlaps, the picture and the run's own sentence. Since the column is folded by who
- * started each agent (src/web/components/home/AgentGroups.tsx), a row carries the starter, which says
- * which group it sits in. It carries neither the run's sentence nor the work state:
- *   - the run's sentence is drawn only in a group the person opens, and is read for that group's agents
- *     alone, by `theDoingLinesHomeDraws` below (round 31b of wave 13k);
+ * Home reads and nothing else, and it skips the per-agent work Home never draws: the last progress, the
+ * domains, the overlaps, the picture and the run's own sentence. Home draws one bar per project
+ * (`theBarOf` in HomeAgentBars.tsx), which counts the agents working, waiting on the person and
+ * stuck. So a row carries:
+ *   - the presence word, which says whether an agent is working;
+ *   - `doingFrom`, the run serving the agent. The bar counts an agent stuck when an alarm names that
+ *     run. The roster has already read every active agent's open runs, so the run is named from them,
+ *     and Home asks no second read of the same runs (decision OQR0WDVq0FkP);
+ *   - the participant, which the waiting list's rows are matched to.
+ * It carries neither the run's sentence nor the work state:
+ *   - the run's sentence is not drawn on Home; `theDoingLinesHomeDraws` below reads it for any reader
+ *     of the API that asks;
  *   - whether an agent waits for the person is read from the waiting list Home's Needs you box reads
- *     (`WaitingItem.fromAgent` in lib/waiting.ts), so the mark and the box are one reading. Round 31
+ *     (`WaitingItem.fromAgent` in lib/waiting.ts), so the bar and the box are one reading. Round 31
  *     marked it from the work state, and its pictures showed groups needing the person beside a box
  *     that said nothing did.
  *
  * IT IS THE SAME ROSTER, NOT A SECOND ONE. The active agents and their presence come from
- * `readTheActiveAgents` and `presenceOf`, which `whoIsWorking` reads too, so a row here and the same
- * agent's row there cannot disagree. Each field keeps the path it has on the whole row
- * (`participant.name`, `participant.startedBy`, `presence.presence`), so a screen drawing one can draw
+ * `readTheActiveAgents` and `presenceOf`, which `whoIsWorking` reads too, and the run serving each
+ * agent comes from `servingRunOf`, which it asks too, so a row here and the same agent's row there
+ * cannot disagree. Each field keeps the path it has on the whole row (`participant.name`,
+ * `participant.startedBy`, `presence.presence`, `doingFrom`), so a screen drawing one can draw
  * the other. The counts say how many agents there are, so an empty `rows` cannot be read as nobody.
  */
 export interface HomeRosterRow {
@@ -749,6 +770,8 @@ export interface HomeRosterRow {
   participant: { id: string; name: string; startedBy: { kind: string; id: string } | null } | null
   /** The presence reading's word, from `presenceOf`, the same reading the whole roster carries. */
   presence: { presence: PresenceReading['presence'] }
+  /** The run serving the agent, from `servingRunOf` as the whole roster's `doingFrom`, or null when none is open. */
+  doingFrom: string | null
 }
 
 export interface HomeRoster {
@@ -762,9 +785,10 @@ export interface HomeRoster {
 
 export const HOME_ROSTER_NOTE =
   'WHO IS ACTIVE IN THIS PROJECT, AS HOME DRAWS IT: one row per active durable agent with its registry name and ' +
-  'starter and its presence word, and nothing else. It is the same roster as GET /api/working without ' +
-  '`shape=home`, read from the same rows; ask that for the work state, the domains, the overlaps and the last ' +
-  'progress. Add `doing=<id>,<id>` to read what the runs serving those agents say they are doing, and nothing else.'
+  'starter, its presence word and `doingFrom`, the run serving it, and nothing else. It is the same roster as ' +
+  'GET /api/working without `shape=home`, read from the same rows; ask that for the work state, the domains, the ' +
+  'overlaps and the last progress. Add `doing=<id>,<id>` to read what the runs serving those agents say they are ' +
+  'doing, and nothing else.'
 
 export function theRosterHomeDraws(workspaceId: string, now: Date = new Date()): HomeRoster {
   const read = readTheActiveAgents(workspaceId)
@@ -774,28 +798,29 @@ export function theRosterHomeDraws(workspaceId: string, now: Date = new Date()):
       agentId: record.id,
       participant: registered === null ? null : { id: registered.id, name: registered.name, startedBy: registered.startedBy },
       presence: { presence: presenceOf(record.id, workspaceId, now, read.readOnce).presence },
+      doingFrom: servingRunOf(record.id, read.readOnce.openRunsOf(record.id))?.id ?? null,
     }
   })
   return {
     workspaceId,
     computedAt: nowStamp(),
     rows,
-    counts: { agents: read.everyAgent.length, active: read.active.length, retired: read.retired },
+    counts: { agents: read.agents, active: read.active.length, retired: read.retired },
     note: HOME_ROSTER_NOTE,
   }
 }
 
 /**
- * WHAT THE RUNS SERVING SOME AGENTS SAY THEY ARE DOING, FOR ONE GROUP HOME HAS OPENED.
+ * WHAT THE RUNS SERVING SOME AGENTS SAY THEY ARE DOING, FOR THE AGENTS ASKED.
  *
  * ---------------------------------------------------------------------------------------
  * WHY THIS EXISTS
  * ---------------------------------------------------------------------------------------
  *
- * Home drew each agent's doing line, the sentence the run serving it wrote about itself, until round 31
- * folded the column and dropped the line with the whole roster. The release check
- * refused that. A folded group draws no agent, so it needs no line; a group the person opens draws its
- * agents, and asks this for theirs and for nobody else's. A folded Home asks for none.
+ * A reader of the API that has a roster in Home's shape may ask what the runs serving some of its agents
+ * say they are doing, the sentence each run wrote about itself, without asking for the whole roster.
+ * Home asks none of it. Its bars need only the run serving each agent, and Home's roster rows name that
+ * run as `doingFrom` (`theRosterHomeDraws` above).
  *
  * IT IS THE ROSTER'S OWN READING, NARROWED. The line is `doingOf` on the run `servingRunOf` names, the
  * same two `whoIsWorking` uses, so the line here and the line on the page about who is working cannot
@@ -824,15 +849,15 @@ export interface HomeDoing {
 }
 
 export const HOME_DOING_NOTE =
-  'WHAT THE RUNS SERVING THE ASKED AGENTS SAY THEY ARE DOING, for one group Home has opened: one row per asked ' +
+  'WHAT THE RUNS SERVING THE ASKED AGENTS SAY THEY ARE DOING: one row per asked ' +
   'active agent, with the sentence the run serving it wrote about itself, or null when no run serves it or its run ' +
   'never wrote one. An asked id that is not an active agent of this project is named in `notActiveHere`. It is the ' +
   'same line GET /api/working carries as `doing`, read the same way.'
 
 export function theDoingLinesHomeDraws(workspaceId: string, asked: readonly string[]): HomeDoing {
-  const active = new Set(agentsIn(workspaceId).filter(isActiveAgent).map((record) => record.id))
+  const active = new Set(activeAgentsIn(workspaceId).map((record) => record.id))
   const here = asked.filter((id) => active.has(id))
-  const runs = listAttachments({ workspaceId, openOnly: true, namingAnAgentOnly: true })
+  const runs = listAttachments({ workspaceId, openOnly: true, servingAnActiveAgentOnly: true })
   const serving = new Map(here.map((agentId) => [agentId, servingRunOf(agentId, runs)] as const))
   const runRecords = theRecordsOfRuns(
     workspaceId,

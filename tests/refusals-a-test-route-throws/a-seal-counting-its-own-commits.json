@@ -1,0 +1,41 @@
+{
+  "why": "A seal that counts only its own run's commits. The record door reaches these only with a run filed in a git repository, a finish read on the seal-read thread, and for the carried commits a seal already written. tests/a-seal-takes-only-its-own-runs-commits.test.ts meets each through the door.",
+  "refusals": [
+    {
+      "code": "onlyTheOfficeWritesTheFilingHead",
+      "status": 403,
+      "english": "Test: only the office writes the commit a run was filed at.",
+      "values": {}
+    },
+    {
+      "code": "onlyTheOfficeWritesTheEndHead",
+      "status": 403,
+      "english": "Test: only the office writes the commit a run ended at.",
+      "values": {}
+    },
+    {
+      "code": "onlyTheOfficeWritesTheCarriedCommits",
+      "status": 403,
+      "english": "Test: only the office writes the commits a seal carried.",
+      "values": {}
+    },
+    {
+      "code": "sealHoldsCommitsNotTheRunsOwn",
+      "status": 409,
+      "english": "Test: the branch holds a commit that is not the run's own.",
+      "values": {}
+    },
+    {
+      "code": "sealLeavesOutTheRunsOwnCommits",
+      "status": 409,
+      "english": "Test: a records seal would leave out the run's own commits.",
+      "values": {}
+    },
+    {
+      "code": "sealWorkingDirectoryUnread",
+      "status": 409,
+      "english": "Test: the run's working directory could not be read as the repository it was filed in.",
+      "values": {}
+    }
+  ]
+}

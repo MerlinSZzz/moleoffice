@@ -3,9 +3,11 @@
 /**
  * WHERE THE CHAT IS: SHUT, BESIDE THE PAGE, OR IN A WINDOW OF ITS OWN. Design D of the chat.
  *
- * Opening the chat splits the window at one seam into the page and the chat, both as tall as the window. The seam swaps
- * the two sides, sends the chat to a window of its own (the panel over the corner the chat always had), and puts it
- * away. Below 1024 pixels the same open chat covers the whole screen instead, and its seam is a bar at the top.
+ * The chat opens the way the person last had it: beside the page, or in its window over the corner, which it opens in
+ * the first time. Beside the page it splits the window at one seam into the page and the chat, both as tall as the
+ * window. The seam swaps the two sides, sends the chat to a window of its own (the panel over the corner the chat always
+ * had), and puts it away. Below 1024 pixels the chat beside the page covers the whole screen instead, and its seam is a
+ * bar at the top.
  *
  * ONE STORE, BECAUSE FOUR PLACES READ IT. The chat draws itself from it; the sidebar's Chat row and the phone's bar
  * open the chat through it and draw the count it carries; and the sidebar folds while the split is drawn. Each of
@@ -110,8 +112,12 @@ function change(next: Partial<ChatSplit>): void {
   for (const watcher of watchers) watcher()
 }
 
-/** Open the chat beside the page, shut it, or send it to its own window. */
+/**
+ * Open the chat beside the page, shut it, or send it to its own window. Put beside the page or in its window, that is
+ * the way it opens next, in this page at once; the chat keeps it on the person's row for every page after.
+ */
 export function putTheChat(where: ChatIsWhere): void {
+  if (where !== 'closed') openedHere = where
   if (where !== now.where) change({ where })
 }
 
@@ -121,20 +127,37 @@ export function openTheChat(): void {
 }
 
 /**
- * HOW THE PERSON CHOSE THE CHAT OPENS: beside the page or in its window. It is the person's own setting, stored on
- * their row and not in this browser; the chat says it here once it has read the row, and until then the chat opens as
- * it always has, beside the page.
+ * HOW THE CHAT OPENS: beside the page or in its window, the way the person last had it.
+ *
+ * FIRST, THE WAY IT WAS LAST OPEN IN THIS PAGE. A page loaded with the chat open, as this browser left it, has it open
+ * that way from the start, and each press that opens it sets the way again. So the first press after a reload opens the
+ * chat the way it was open, even before the person's row is read.
+ *
+ * THEN THE WAY KEPT ON THE PERSON'S ROW, which is theirs in every browser. The chat says it here once it has read the
+ * row. A person with nothing kept has the chat open in its window.
  */
-let opensAs: ChatOpensAs = CHAT_OPENS_AS_BEFORE_ANYBODY_CHOOSES
+let openedHere: ChatOpensAs | null = now.where === 'closed' ? null : now.where
+let keptOnTheRow: ChatOpensAs = CHAT_OPENS_AS_BEFORE_ANYBODY_CHOOSES
 
-/** The chat says how the person chose the chat opens. */
-export function sayHowTheChatOpens(as: ChatOpensAs): void {
-  opensAs = as
+/** The way the chat was last open in this page, or null when it has not been open here since the row last changed. */
+export function theWayItWasOpenHere(): ChatOpensAs | null {
+  return openedHere
 }
 
-/** Open the chat as the person chose. What the circle, the sidebar's Chat row, the phone's bar and the chat key press. */
+/**
+ * The chat says how the chat opens for the person, from their row. A new way on the row comes after the way this page
+ * had: the chat keeps this page's way on the row before it says the row, and a change made in the settings or in
+ * another browser is newer.
+ */
+export function sayHowTheChatOpens(as: ChatOpensAs): void {
+  if (as === keptOnTheRow) return
+  keptOnTheRow = as
+  openedHere = null
+}
+
+/** Open the chat the way the person last had it. What the circle, the sidebar's Chat row, the phone's bar and the chat key press. */
 export function openTheChatAsChosen(): void {
-  putTheChat(opensAs)
+  putTheChat(openedHere ?? keptOnTheRow)
 }
 
 /** Put the chat on the other side of the page. */

@@ -15,7 +15,8 @@
  * accessibility tree. That tree holds the number the browser draws for a list item as text, and it
  * holds a number drawn from the page's own styles as text too, so one reading covers both ways of
  * drawing it.
- *  1. The chat draws 3, and 2 then 5, at 1440, 990, 660 and 390, in the light look and the dark.
+ *  1. The chat draws 3, and 2 then 5, at 1440 in the light look. What is read is text, not layout or colour, so
+ *     one width and one look are enough.
  *  2. A message's own page draws them the same way, since it draws the body with the chat's reader.
  *  3. The messages page draws "3. yes" and "2. A 5. B", and the stored bodies are what was sent.
  * Each look is stored before the page is opened for it, since the app draws the look that is stored
@@ -29,15 +30,14 @@
  * THE MUTATIONS:
  *  A. draw the chat's lists without the typed numbers, and cases 1 and 2 go red with "1. yes" and
  *     "1. A", "2. B".
- *  B. with TYPED_NUMBERS_SHOTS set, in src/web/components/PresetBar.tsx, draw a stored dark look as
- *     the light one: cases 1 and 2 go red on a dark picture that is its light one.
+ *  B. is no longer run: it was caught only by a dark picture, and the cases now draw the light look only.
  *
  * THE PICTURES are taken only when TYPED_NUMBERS_SHOTS names a folder outside the checkout: the chat
- * and a message's own page at the four widths, in both looks. It is made-up data, and every picture
+ * and a message's own page at 1440 in the light look. It is made-up data, and every picture
  * carries the label that says so. In the chat the label goes above the conversation's head, as in the
  * other chat pictures, and the line that names the machine a message was written on is blurred. A
  * message's own page is photographed with the chat closed, since at 390 the chat is drawn over the
- * page. The dark picture of each place is taken straight after its light one, and a dark picture whose
+ * page. A dark picture of a place, when one is taken, must follow its light one, and a dark picture whose
  * bytes are its light one's fails the case: the page never took the dark look, so it is no picture of
  * the dark look.
  *
@@ -69,8 +69,8 @@ const TWO_THEN_FIVE = ['2. A', '5. B'].join('\n')
 /** What a reader is given for each drawn item of each body, in the order the items are drawn. */
 const AS_TYPED = [['3. yes'], ['2. A', '5. B']]
 
-const WIDTHS = [1440, 990, 660, 390] as const
-const LOOKS = ['light', 'dark'] as const
+const WIDTHS = [1440] as const
+const LOOKS = ['light'] as const
 
 let app: LiveApp
 const sent = new Map<string, string>()
@@ -180,7 +180,7 @@ afterAll(async () => {
 }, 120_000)
 
 describe('a typed number is drawn as typed', () => {
-  it('the chat draws 3, and 2 then 5, at four widths in both looks', async () => {
+  it('the chat draws 3, and 2 then 5, at 1440 in the light look', async () => {
     const shots = theShotsFolder()
     try {
       for (const width of WIDTHS) {
@@ -213,7 +213,7 @@ describe('a typed number is drawn as typed', () => {
         await app.page.waitForSelector('.mp-body ol.sb-list', { timeout: 30_000 })
         expect(await whatEachItemReads(app.page, '.mp-body ol.sb-list'), `the page of ${JSON.stringify(body)}`).toEqual([items])
       }
-      // THE PAGE HOLDING 2 THEN 5, at the four widths in both looks.
+      // THE PAGE HOLDING 2 THEN 5, at 1440 in the light look.
       for (const width of WIDTHS) {
         for (const look of LOOKS) {
           await app.page.setViewportSize({ width, height: 1000 })

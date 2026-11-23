@@ -61,7 +61,7 @@ import { pipelineScope } from '../src/shared/presentation.ts'
 import { pipelinePath } from '../src/web/components/router.tsx'
 import { freshDb, liveApp, type LiveApp, type TestDb } from './helpers.ts'
 import { DRAWING, SAID, prepareThePage, storeTheAreas, theAreasWereStored, theDrawingIsDrawn, writerFor, type Attempt, type Writer } from './a-made-up-office-drawn-in-lanes.ts'
-import { DEVELOPER, FOR_DEVELOPERS, theDeveloperLines, theWordForDevelopersThatWrote, type ADeveloperLine } from './a-pipeline-page-in-the-developer-view.ts'
+import { DEVELOPER, FOR_DEVELOPERS, theDeveloperLines, theUnroutedLinks, theWordForDevelopersThatWrote, type ADeveloperLine } from './a-pipeline-page-in-the-developer-view.ts'
 import { waitForTheProjects } from './switch-the-project.ts'
 
 const PROJECT = { id: 'test-developer-view', title: 'Example office for the developer view (made up)' }
@@ -249,15 +249,10 @@ for (const each of PAGES) {
       if (wrote !== line.key) misnamed.push(`${line.key} names "${line.words}", which ${wrote ?? 'no word for developers'} writes`)
     }
     expect(misnamed, `${each.name}: every line names the key whose words it says`).toEqual([])
-    const place = await app.page.evaluate(
-      ({ developer, said, about }) => {
-        const section = document.querySelector(developer)
-        const before = document.querySelector(said) ?? document.querySelector(about)
-        return { drawn: section !== null, rightAfter: section !== null && before !== null && before.nextElementSibling === section }
-      },
-      { developer: DEVELOPER, said: SAID, about: '[data-pipeline-part="context"]' },
-    )
-    expect(place, `${each.name}: one developer section, right after the said section or, with none, right after the About part`).toEqual({ drawn: true, rightAfter: true })
+    expect(await app.page.locator(DEVELOPER).count(), 'no developer section is drawn').toBe(0)
+    expect(await app.page.locator(`${DRAWING}[data-to-developers]`).count()).toBe(1)
+    expect(lines.some((line) => line.key === 'lanes.noRoute')).toBe(false)
+    expect(await theUnroutedLinks(page)).toEqual(JSON.parse((await page.locator(DRAWING).getAttribute('data-not-drawn'))!))
     expect(await app.page.locator(DRAWING).count(), `${each.name}: the developer view still draws the drawing`).toBe(1)
   }, 120_000)
 }
@@ -276,6 +271,7 @@ for (const each of PAGES) {
       .toBe(false)
     await page.evaluate(() => new Promise<void>((done) => requestAnimationFrame(() => requestAnimationFrame(() => done()))))
     expect(await page.locator(DEVELOPER).count(), `${each.name}: the normal view draws no developer section`).toBe(0)
+    expect(await theDeveloperLines(page)).toEqual(seen)
     const text = (await page.locator('.pp').innerText()).replace(/\s+/g, ' ')
     expect(seen!.filter((line) => text.includes(line.words)).map((line) => line.key), `${each.name}: the normal view says no line of the developer section`).toEqual([])
     const said = await page.locator(`${SAID} p`).evaluateAll((all) => all.map((p) => (p.textContent ?? '').replace(/\s+/g, ' ').trim()))
@@ -287,3 +283,19 @@ for (const each of PAGES) {
     expect(forDevelopers, `${each.name}: the said section of the normal view holds no sentence for developers`).toEqual([])
   }, 120_000)
 }
+
+it('keeps developer lines on both empty drawing states in both views', async () => {
+  const empty = await write.call('POST', '/api/records', { kind: 'pipeline', title: 'Empty pipeline (made up)', data: { blockIds: [] } }) as { record: { id: string } }
+  const emptyMaster = await write.call('POST', '/api/records', { kind: 'pipeline', title: 'Empty master (made up)', data: { blockIds: [] } }) as { record: { id: string } }
+  for (const one of [empty, emptyMaster]) await write.call('POST', '/api/links', { fromId: one.record.id, toId: id.memo, type: 'relates_to' })
+  await write.call('PUT', `/api/projects/${PROJECT.id}/master-pipeline`, { pipeline: emptyMaster.record.id })
+  for (const [record, selector] of [[empty, '.gx-projection'], [emptyMaster, '.pp-no-boxes']] as const) {
+    for (const mode of ['', '&mode=inspect']) {
+      await app.page.goto(`${app.site}/?lang=en${mode}#${pipelinePath(record.record.id)}`)
+      const element = app.page.locator(`${selector}[data-to-developers]`)
+      await element.waitFor({ timeout: 60_000 })
+      await expect.poll(async () => (await theDeveloperLines(app.page)).some((line) => line.key === 'lanesInput.ownLinkNotDrawn')).toBe(true)
+      expect(await app.page.locator(DEVELOPER).count()).toBe(0)
+    }
+  }
+}, 240_000)

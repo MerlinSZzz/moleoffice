@@ -5,6 +5,7 @@
  * Mutation: make CommentRecipient return null; the row assertion must fail.
  */
 import { afterAll, beforeAll, expect, it } from 'vitest'
+import { DEVICE_HALF_HEADER } from '../src/config/key-header.mjs'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { liveApp, waitForThePage, type LiveApp, theAnswerToAWriteInATestOffice } from './helpers.ts'
 import { setTheReviewTraysList } from './the-review-trays-list.ts'
@@ -150,7 +151,11 @@ it('names recipients on the comment-only column when those comments belong to no
 }, 60_000)
 
 it('keeps the default writer on a comment-only row after the review sends it', async () => {
-  const send = await app.context.request.post(`${app.api}/api/reviews/${reviewId}/send`, { data: {}, headers: PERSON })
+  // AS THE PAIRED BROWSER: its cookies carry the cookie half, and the header half is read from the page's storage.
+  const { DEVICE_HALF_KEY } = await import('../src/web/lib/the-device-half.ts')
+  const headerHalf = await app.page.evaluate((key) => window.localStorage.getItem(key), DEVICE_HALF_KEY)
+  if (headerHalf === null) throw new Error('the page keeps no header half, so this browser is not paired')
+  const send = await app.context.request.post(`${app.api}/api/reviews/${reviewId}/send`, { data: {}, headers: { ...PERSON, [DEVICE_HALF_HEADER]: headerHalf } })
   expect(send.ok(), await send.text()).toBe(true)
   const sent = await send.json() as { review: { review: { state: string } } }
   expect(sent.review.review.state).toBe('sent')

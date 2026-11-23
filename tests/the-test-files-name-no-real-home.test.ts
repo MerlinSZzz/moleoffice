@@ -13,11 +13,13 @@
  * WHAT IS NOT READ: comments, which the clean version's word table handles (step 4), and regular
  * expressions. WHAT IS ALLOWED, each string whole with its reason, is in ALLOWED: a test that is about a
  * home path keeps one. The clean version takes out an entry whose file it leaves out, and so may leave ALLOWED
- * empty; the case that counts an allowed string is then taken out and says why.
+ * empty. No case checks that each entry still finds its string: that case was cut on 17 November 2026. So an
+ * entry whose string is gone stays in ALLOWED with nothing failing, and lets that exact string through if it is
+ * written again.
  *
  * MUTATIONS, each after a control run: a home path written back into one moved file's fixture; the
- * fixture root written out in a moved file instead of read; an allowance whose string is gone; a file
- * that names a home path, listed only in a wave's list in tests/moved/. Each turns a case red.
+ * fixture root written out in a moved file instead of read; a file that names a home path, listed only in a
+ * wave's list in tests/moved/. Each turns a case red.
  */
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'

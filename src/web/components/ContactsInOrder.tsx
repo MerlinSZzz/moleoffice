@@ -29,8 +29,9 @@
  *
  * The name and the dot are the chat's own (`theNameOfAContact`, `theNameBesideItsDate` and `Dot` from
  * ContactChooser.tsx), and the rows wear the right-click panel's classes, so the three lists look alike.
- * The filter narrows by the name a row draws. A writer nobody registered cannot receive, so pressing that
- * row opens the chat where the conversation already lives, as the chat's own contacts do.
+ * The filter narrows by the name a row draws and an agent's handle (`theTypedWordsFindARow`). A writer nobody
+ * registered cannot receive, so pressing that row opens the chat where the conversation already lives, as the
+ * chat's own contacts do.
  *
  * Used by the review column (src/web/components/agent/ReviewBar.tsx). The right-hand column may draw it
  * too: it takes nothing from the review except what `WhatThePickIsAbout` names.
@@ -48,7 +49,7 @@ import { api } from '../api.ts'
 import { useLanguage } from '../lib/language.ts'
 import { readContactsOnce, readParticipantsOnce, readPresenceForAMinute } from '../lib/oneread.ts'
 import { openTheChatAtUnregistered } from '../lib/open-chat.ts'
-import { Dot, theNameBesideItsDate, theNameOfAContact } from './ContactChooser.tsx'
+import { Dot, theNameBesideItsDate, theNameOfAContact, theTypedWordsFindARow } from './ContactChooser.tsx'
 import { Absence, ErrorNote } from './ui.tsx'
 import { useProjectAsync } from '../lib/project-async.ts'
 import { AGENT_CSS } from './agent/agent-css.ts'
@@ -247,9 +248,7 @@ export function ContactsInOrder({
   const readingOf = (who: { kind: string; id: string }): PresenceOnTheWire | undefined =>
     presence?.find((one) => one.who.kind === who.kind && one.who.id === who.id)
   const rows = book.value.rows
-  const needle = filter.trim().toLocaleLowerCase()
-  const shown =
-    needle === '' ? rows : rows.filter((row) => theNameOfAContact(row.line, everybody).toLocaleLowerCase().includes(needle))
+  const shown = rows.filter((row) => theTypedWordsFindARow(row.line, everybody, filter))
   return (
     <div className="px-talk-chooser" data-part="contacts-in-order">
       {/* THE PANEL'S RULES, BY THE SAME NAME THE PANEL AND THE REVIEW COLUMN EMIT THEM UNDER, so a page drawing

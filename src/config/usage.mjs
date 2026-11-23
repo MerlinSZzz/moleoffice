@@ -782,30 +782,65 @@ function summed(counts) {
  * @returns {UsageReceipt}
  */
 export function claudeTranscriptUsage(texts, sinceMs) {
-  /** @type {Map<string, Envelope>} */
-  const answers = new Map()
-  let unnamed = 0
-  for (const text of texts) {
-    for (const line of String(text).split('\n')) {
-      if (line.trim() === '') continue
-      let event
-      try { event = object(JSON.parse(line)) } catch { continue }
-      if (event['type'] !== 'assistant') continue
-      const at = typeof event['timestamp'] === 'string' ? Date.parse(event['timestamp']) : NaN
-      if (!Number.isFinite(at) || at < sinceMs) continue
-      const message = object(event['message'])
-      if (Object.keys(object(message['usage'])).length === 0) continue
-      const id = typeof message['id'] === 'string' && message['id'] !== '' ? message['id'] : `unnamed ${unnamed += 1}`
-      answers.set(id, message)
-    }
+  const answers = claudeAnswersSince(sinceMs)
+  for (const text of texts) claudeAnswersFoldedIn(answers, text)
+  return theReceiptOfClaudeAnswers(answers)
+}
+
+/**
+ * WHAT THE RECEIPT OF A CLAUDE CODE TRANSCRIPT READS OF ONE ANSWER: its four counts and its model, never its content.
+ * @typedef {{ inputTokens: number | undefined, cachedInputTokens: number | undefined, cacheCreationInputTokens: number | undefined, outputTokens: number | undefined, model: string | undefined }} AClaudeAnswer
+ */
+/**
+ * A CLAUDE CODE TRANSCRIPT'S ANSWERS SO FAR, as the lines folded in leave them: each answer by its id, in the order the
+ * ids were first seen, and how many answers with no id were given a name.
+ * @typedef {{ sinceMs: number, byId: Map<string, AClaudeAnswer>, unnamed: number }} ClaudeAnswers
+ */
+
+/** No answers yet, of the lines stamped at or after `sinceMs`. @param {number} sinceMs @returns {ClaudeAnswers} */
+export function claudeAnswersSince(sinceMs) {
+  return { sinceMs, byId: new Map(), unnamed: 0 }
+}
+
+/**
+ * THE LINES OF `text` FOLDED INTO `answers`, worked out here once. claudeTranscriptUsage folds in whole transcripts, and
+ * the step reminder (claudeCodeTokensSoFarReadOn in ./tokens-so-far.mjs) folds in only the lines added to a conversation
+ * file since it last read it, into the answers it kept. So an answer keeps only what the receipt reads: it is kept
+ * between passes, and its content would be kept with it. Changes `answers` and returns it.
+ * @param {ClaudeAnswers} answers
+ * @param {string} text
+ * @returns {ClaudeAnswers}
+ */
+export function claudeAnswersFoldedIn(answers, text) {
+  for (const line of String(text).split('\n')) {
+    if (line.trim() === '') continue
+    let event
+    try { event = object(JSON.parse(line)) } catch { continue }
+    if (event['type'] !== 'assistant') continue
+    const at = typeof event['timestamp'] === 'string' ? Date.parse(event['timestamp']) : NaN
+    if (!Number.isFinite(at) || at < answers.sinceMs) continue
+    const message = object(event['message'])
+    const usage = object(message['usage'])
+    if (Object.keys(usage).length === 0) continue
+    const id = typeof message['id'] === 'string' && message['id'] !== '' ? message['id'] : `unnamed ${answers.unnamed += 1}`
+    answers.byId.set(id, {
+      inputTokens: number(usage['input_tokens']), cachedInputTokens: number(usage['cache_read_input_tokens']),
+      cacheCreationInputTokens: number(usage['cache_creation_input_tokens']), outputTokens: number(usage['output_tokens']),
+      model: typeof message['model'] === 'string' ? message['model'] : undefined,
+    })
   }
-  const usages = [...answers.values()].map((message) => object(message['usage']))
+  return answers
+}
+
+/** The receipt of the answers folded in so far. @param {ClaudeAnswers} answers @returns {UsageReceipt} */
+export function theReceiptOfClaudeAnswers(answers) {
+  const kept = [...answers.byId.values()]
   const receipt = finish({
     runtime: 'claude-code', source: 'the conversation transcript, message.usage once for each answer',
-    inputTokens: summed(usages.map((u) => number(u['input_tokens']))), cachedInputTokens: summed(usages.map((u) => number(u['cache_read_input_tokens']))),
-    cacheCreationInputTokens: summed(usages.map((u) => number(u['cache_creation_input_tokens']))), outputTokens: summed(usages.map((u) => number(u['output_tokens']))),
-    ...(answers.size === 0 ? {} : { inputIncludesCached: false }),
-    model: modelIn([...answers.values()].filter((message) => message['model'] !== '<synthetic>')),
+    inputTokens: summed(kept.map((a) => a.inputTokens)), cachedInputTokens: summed(kept.map((a) => a.cachedInputTokens)),
+    cacheCreationInputTokens: summed(kept.map((a) => a.cacheCreationInputTokens)), outputTokens: summed(kept.map((a) => a.outputTokens)),
+    ...(kept.length === 0 ? {} : { inputIncludesCached: false }),
+    model: modelIn(kept.filter((a) => a.model !== '<synthetic>')),
   })
   return { ...receipt, says: `${receipt.says === undefined ? '' : `${receipt.says} `}The transcript carries no cost.` }
 }

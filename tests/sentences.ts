@@ -237,13 +237,10 @@ export function sentencesIn(file: string, text: string): SentenceSite[] {
  * list holds is refused below as a word that is not a sentence.
  */
 const SENTENCES_FROM_THE_WORD_LISTS: Readonly<Record<string, readonly string[]>> = {
-  'pages/RegulationsPage.tsx': ['chapterEdit.readingCount', 'chapterEdit.unsupported'],
   'components/ChapterEditor.tsx': [
     'chapterEdit.chineseDropped',
     'chapterEdit.none',
     'chapterEdit.readingShipped',
-    'chapterEdit.languages',
-    'chapterEdit.chineseNeeded',
     'chapterEdit.fixProblems',
     'chapterEdit.valid',
     'chapterEdit.size',
@@ -258,9 +255,8 @@ const SENTENCES_FROM_THE_WORD_LISTS: Readonly<Record<string, readonly string[]>>
     'chapterEdit.noHistory',
     'chapterEdit.busy',
   ],
-  'components/agent/ReviewBar.tsx': ['review.pane.projectIsElsewhere', 'review.pane.projectNotRecorded', 'review.leave.changedAtSend'],
+  'components/agent/ReviewBar.tsx': ['review.pane.projectIsElsewhere', 'review.pane.projectNotRecorded', 'review.b.changedNothingSent'],
   'components/ReportQuestions.tsx': [
-    'rq.choice.many',
     'rq.button.warning',
     'rq.button.sentAlready',
     'rq.submit.allSent',
@@ -274,43 +270,8 @@ const SENTENCES_FROM_THE_WORD_LISTS: Readonly<Record<string, readonly string[]>>
   ],
   // Round 45's. Their other words end in a placeholder or a colon, or open with the count, so this
   // scanner does not read them as sentences and they are not named here.
-  'components/Chat.tsx': ['chatEnglish.remindMeLater.comesBack', 'chat.commentsChangedAtSend'],
+  'components/Chat.tsx': ['chatEnglish.remindMeLater.comesBack', 'review.b.changedNothingSent'],
   'components/OnePress.tsx': ['onePress.onlyThePerson', 'onePress.refused'],
-  // Wave 13x round 7: the address for browsers, drawn inside the remote access panel. Its other words,
-  // the title, the field, the two buttons and "Browsers are sent to", are not sentences to this scanner.
-  'components/AddressForBrowsers.tsx': [
-    'settingsPanel.addressForBrowsers.purpose',
-    'settingsPanel.addressForBrowsers.onlyPages',
-    'settingsPanel.addressForBrowsers.none',
-    'settingsPanel.addressForBrowsers.chosenHere',
-    'settingsPanel.addressForBrowsers.fromTheEnvironment',
-    'settingsPanel.addressForBrowsers.nobodyChose',
-    'settingsPanel.addressForBrowsers.onlyThePerson',
-  ],
-  // Wave 13x round 14: the plugin switches. Their other words, the title, On and Off, the version, what a plugin reads
-  // and the names of the views, are not sentences to this scanner. Nor, since wave 13y round 121, is the line for a
-  // plugin never switched on: "Off, the default."
-  'components/PluginSwitches.tsx': [
-    'settingsPanel.plugins.whatTheyAre',
-    'settingsPanel.plugins.noFolder',
-    'settingsPanel.plugins.none',
-    'settingsPanel.plugins.switchedOn',
-    'settingsPanel.plugins.switchedOff',
-    'settingsPanel.plugins.refused',
-  ],
-  // Wave 13x round 15: a plugin's page and its sidebar rows. Their other words, the title, "No plugin page here", the
-  // frame's name, the button, and the sentence that ends in what the office said, are not sentences to this scanner.
-  'pages/PluginPage.tsx': [
-    'pluginPage.why.noFolder',
-    'pluginPage.why.unknown',
-    'pluginPage.why.refused',
-    'pluginPage.why.off',
-    'pluginPage.why.nobodyChose',
-    'pluginPage.why.noSuchPage',
-    'pluginPage.toSettings',
-    'pluginPage.notAnswering',
-    'pluginPage.moved',
-  ],
   'components/Sidebar.tsx': ['pluginPage.sidebarFailed'],
   // Wave 13x round 22 (problem 6yMD5gal_oXz): the comment box while a review collects what the comment is about. Its
   // other new words, the two presses, their titles and the two labels of an error note, are not sentences to this
@@ -318,7 +279,7 @@ const SENTENCES_FROM_THE_WORD_LISTS: Readonly<Record<string, readonly string[]>>
   'components/agent/TalkBox.tsx': ['talk.stillReadingTheReviews', 'talk.state.addedToTheReview', 'talk.state.noReviewHoldsIt'],
   // Wave 13p round M8UvviWBU-IS, item 2 (problem gYWdWJQcxyuZ): an entry a bus passed over because it is tested alone.
   // The page's earlier words were written before COMMON.md asked for each new sentence to be named, and are not named here.
-  'pages/MergeQueuePage.tsx': ['mergeQueuePage.why.passedAlone', 'mergeQueuePage.why.behindTestedAlone', 'mergeQueuePage.bus.passedAlone'],
+  'pages/MergeQueuePage.tsx': ['mergeQueuePage.row.passedAlone', 'mergeQueuePage.row.behindTestedAlone', 'mergeQueuePage.bus.passedAlone'],
   // Wave 13r: the notice on a setting whose saved value this release refuses. The reason beside it is the server's
   // own sentence, drawn through `content`, so this scanner cannot read it and it is not named here. Round 16: the lines
   // on a read-only setting that a tool reads, or that Vite reads. Round 18: the lines on the 14 read-only settings

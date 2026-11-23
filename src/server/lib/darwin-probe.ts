@@ -40,6 +40,10 @@
  * src/config/process-reader.mjs runs `ps` and `lsof` and reads their lines; the service lock, the
  * worker and the session hook read processes through the same reader. lib/resources.ts hands it in.
  * A test hands in a reader over its own commands, which is what lets it drive every method here.
+ *
+ * THE SEARCH PATH THE GIT CHECK READS comes from `theSearchPathIn` of this system
+ * (src/config/systems/the-system.mjs), the one reader of a search path in src/. On the Mac that is
+ * `PATH` alone.
  */
 
 import { realpathSync, statSync } from 'node:fs'
@@ -56,6 +60,7 @@ import {
   whyItDidNotAnswer,
   type WhatACommandDid,
 } from '../../config/process-reader.mjs'
+import { thisSystem } from '../../config/systems/the-system.mjs'
 import { PanelError } from './panel-error.ts'
 // Type-only, and so erased: this file takes nothing from lib/resources.ts at run time, because
 // lib/resources.ts imports this file to build the probe.
@@ -106,7 +111,7 @@ export interface TheMacsGit {
 
 /** This Mac's own environment and files. */
 export const THIS_MACS_GIT: TheMacsGit = {
-  environment: () => ({ PATH: process.env['PATH'], DEVELOPER_DIR: process.env['DEVELOPER_DIR'] }),
+  environment: () => ({ PATH: thisSystem().theSearchPathIn(process.env), DEVELOPER_DIR: process.env['DEVELOPER_DIR'] }),
   isFile: (path) => {
     try {
       return statSync(path).isFile()

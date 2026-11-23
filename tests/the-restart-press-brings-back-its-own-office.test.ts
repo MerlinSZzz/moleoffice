@@ -5,13 +5,19 @@
 import { spawn } from 'node:child_process'
 import { cpSync, mkdirSync, symlinkSync } from 'node:fs'
 import { dirname, join } from 'node:path'
-import { afterAll, expect, it } from 'vitest'
+import { afterAll, beforeAll, expect, it } from 'vitest'
 import { REPO, aPlace, aFreePort, aServerEnvironment, askThePlacesOffice, groups, stopEverything, until, sleep } from './terminal-holder-stand.ts'
 import { readTheServiceLock } from '../src/config/the-service-lock.mjs'
 import { serviceLockPathFrom } from '../src/config/settings.mjs'
 import { theFilesBuiltFrom } from '../src/config/import-graph.mjs'
 import { THE_TEST_OFFICES_OWNER } from './a-page-of-a-test-office.ts'
-import { commandThatStopsWithItsOwner } from './helpers.ts'
+import { commandThatStopsWithItsOwner, theCheckoutsPageBuiltAtThisCommit } from './helpers.ts'
+
+beforeAll(async () => {
+  // This test copies dist/web/index.html into each place it makes, so the page must be built at this commit first.
+  await theCheckoutsPageBuiltAtThisCommit()
+}, 300_000)
+
 const headers = {'content-type':'application/json','x-mole-office-actor-type':'human','x-mole-office-actor-id':THE_TEST_OFFICES_OWNER.id,'x-mole-office-workspace':'default'}
 afterAll(stopEverything,60_000)
 async function read(api:string, path:string, body?:unknown) {
@@ -23,16 +29,20 @@ for (const mode of ['checkout','installed'] as const) it(`${mode}: the press ans
   // The import graph does not follow a file the supervisor spawns, so the stand-in is named here.
   const entries = ['tools/build-the-page.mjs', 'tools/office-diagnostic-report.mjs', 'tools/files-that-restart-the-server.mjs', 'tools/serve-dev.mjs', 'tools/serve-dev-stand-in.mjs', 'src/config/the-service-command.mjs', 'src/server/index.ts', 'src/worker/index.ts']
   const files = new Set(entries.flatMap(entry => theFilesBuiltFrom(entry, REPO).files))
+  // THE CHECKOUT IS A FOLDER OF ITS OWN, beside the made-up home and not around it. A start that carries the test
+  // suite's mark refuses a checkout that is, is inside, or holds the stable checkout of its HOME, and the made-up HOME
+  // is inside the place.
+  const checkout = join(place.dir, 'checkout')
   for (const part of [...files, 'src/config/roles.json', 'for-agents', 'drizzle', 'package.json', 'tsconfig.json', 'dist/web/index.html']) {
-    mkdirSync(dirname(join(place.dir, part)), { recursive: true })
-    cpSync(join(REPO, part), join(place.dir, part), { recursive: true, preserveTimestamps: true })
+    mkdirSync(dirname(join(checkout, part)), { recursive: true })
+    cpSync(join(REPO, part), join(checkout, part), { recursive: true, preserveTimestamps: true })
   }
-  symlinkSync(join(REPO,'node_modules'),join(place.dir,'node_modules'))
+  symlinkSync(join(REPO,'node_modules'),join(checkout,'node_modules'))
   const env={...await aServerEnvironment(place,port),MOLE_OFFICE_MESSAGE_WORKER:'off',MOLE_OFFICE_CHECK_FOR_MISSED_CHANGES:'0',MOLE_OFFICE_TERMINAL_HOLDER:'off',MOLE_OFFICE_WORKSPACE:'default'}
   let output=''
   // Its own group, which the watchdog ends if this worker dies before afterAll runs.
   const watched=commandThatStopsWithItsOwner(process.execPath,mode==='checkout'?['tools/serve-dev.mjs']:['src/config/the-service-command.mjs','start'])
-  const child=spawn(watched.command,watched.args,{cwd:place.dir,env,detached:true,stdio:['ignore','pipe','pipe']})
+  const child=spawn(watched.command,watched.args,{cwd:checkout,env,detached:true,stdio:['ignore','pipe','pipe']})
   if(child.pid===undefined)throw new Error('No test starter process was made.')
   groups.add(child.pid); child.stdout.on('data',(b)=>output+=String(b));child.stderr.on('data',(b)=>output+=String(b))
   const lockPath=serviceLockPathFrom({MOLE_OFFICE_DB:place.database})

@@ -2,7 +2,7 @@
 // Licensed under the MIT License. See LICENSE.
 import { screenTestHooks } from './screen-test-hooks.ts'
 import { screenAgents } from './screen-selection.ts'
-import { words } from './words.ts'
+import { roleMarks, words } from './words.ts'
 import { SceneryIndex } from './compact-scenery.ts'
 import type { FacilityPlace, Layout, Point } from './geometry.ts'
 import { cameraFor, overlapsCamera, type Camera, type Rect } from './viewport.ts'
@@ -18,10 +18,10 @@ import { boundsOf, isTree, stableHash, type Piece } from './village.ts'
 import { DEFAULT_MOLE_SCALE, paperArcBlockers, paperArcClear, PAPER_ARC_SHIFT, type MovingContact } from './walks.ts'
 import { translateBody, visualBodyBounds } from './visual-body.ts'
 import wallAlpha from './wall-alpha-data.json'
-import { badges, moleGroup, moleSprite, playPose, paperExchange } from './mole-state.ts'
+import { badges, moleGroup, moleSprite, playPose, paperExchange, sittingSprite } from './mole-state.ts'
 import { overviewPlan } from './overview.ts'
 import { Nameplates, shortName } from './nameplates.ts'
-import { houseSign, ownershipAreaLabelsOrSkips, type AreaLabelHeader } from './ownership-area-labels.ts'
+import { houseSign, ownershipAreaLabelsOrSkips, SIGN_GAP, type AreaLabelHeader } from './ownership-area-labels.ts'
 import { actorRect, layoutIndexes, seatRect, SlicedBuild, type LayoutIndexes } from './layout-index.ts'
 import { atDesk, standsOn } from './desk-things.ts'
 import { SceneryTiles, SCENERY_TILE_BYTES } from './scenery-tiles.ts'
@@ -46,6 +46,7 @@ export const moleMiddle = { awake: 44, asleep: 18 } as const
 /** A desk piece stands at its desk's corner and a desk thing's base lies inside the desk's area, so
  * the desk is looked for within this distance of the piece's picture; the exact test decides. */
 const DESK_REACH = 32
+const FIT_SIGN_MARGIN = 48
 const PLATE_GLIDE_MS = 300
 const covers = (outer: Rect, inner: Rect): boolean =>
   outer.x <= inner.x && outer.y <= inner.y && outer.x + outer.width >= inner.x + inner.width && outer.y + outer.height >= inner.y + inner.height
@@ -132,7 +133,7 @@ export class OfficeMap {
   private dynamics = new OwnedBuild<boolean>()
   private zoomTimer: ReturnType<typeof setTimeout> | null = null
   private scrollTimer: ReturnType<typeof setTimeout> | null = null
-  private shown: { left: number; top: number; width: number; height: number; scrollLeft: number; scrollTop: number; viewWidth: number; viewHeight: number } | null = null
+  private shown: { left: number; top: number; camera: Camera; scrollLeft: number; scrollTop: number } | null = null
   private holdingView = false
   private pendingZoom: number | null = null
   private zooms: number[] = []
@@ -197,6 +198,17 @@ export class OfficeMap {
     return { scenery: {}, portraits: {}, atlases: assets.atlases, dimensions: assets.dimensions }
   })
   private sleepPack: ArtPack | null = null
+  private sittingCast = new SelectedPack(async id => {
+    const assets = await import('./sitting-look-assets.ts'), looks = JSON.parse(id) as string[]
+    const atlases = Object.fromEntries(looks.map(look => { const key = `sitting-looks/${look}-sit`; return [key, assets.atlases[key]!] }))
+    return { scenery: {}, portraits: {}, atlases, sprites: assets.sprites, dimensions: assets.dimensions }
+  })
+  private sittingPack: ArtPack | null = null
+  private sittingRequest = ''
+  private sittingState: 'loading' | 'ready' | 'failed' = 'loading'
+  private sittingVersion = 0
+  private paintedSprites = new Map<string, string>()
+  private paintedFacings = new Map<string, 1 | -1>()
   private sleepGeneration = 0
   private sleepDemand = false
   private sleepAttempted = false
@@ -232,6 +244,7 @@ export class OfficeMap {
   /** The visible left edge of the map the house signs were last placed for, and the area names they stop short of. */
   private signsLeft = -Infinity
   private signHeaders: AreaLabelHeader[] = []
+  private areaNameCache: { layout: Layout; zoom: number; language: 'en' | 'zh'; result: ReturnType<typeof ownershipAreaLabelsOrSkips> } | null = null
   private namesChanged: (leftOut: boolean) => void
   private layoutDrawn: () => void
   private follow: string | null = null
@@ -491,7 +504,7 @@ export class OfficeMap {
   whereaboutsOf(key: string): Whereabouts { return whereaboutsAt(this.whereaboutsByKey, this.occupants, key) }
   /** Movement waits for the participating recoloured poses; stale asynchronous
    * completions cannot restart it after the scene or motion is disabled. */
-  readyIdleLooks(ids: readonly string[], changed: () => void): boolean {
+  readyIdleLooks(ids: readonly string[], changed: () => void, walkingOnly = false): boolean {
     const recipes: number[] = []
     for (const id of ids) {
       const occupant = this.occupants.get(id); if (!occupant) return false
@@ -499,12 +512,12 @@ export class OfficeMap {
     }
     if (!recipes.length) { if (this.idleLookRequest || this.idleLookReady) this.clearIdleLooks(); return true }
     if (!this.pack || !this.lookFrames.ready || this.frameLookEpoch !== this.lookEpoch || this.canvas.dataset['lookReady'] !== 'true') return false
-    const key = JSON.stringify([this.lookEpoch, [...new Set(recipes)].sort((a, b) => a - b)])
+    const key = JSON.stringify([this.lookEpoch, [...new Set(recipes)].sort((a, b) => a - b), walkingOnly])
     if (this.idleLookReady === key) return true
     if (this.idleLookRequest !== key) {
       this.idleLookRequest = key; this.idleLookReady = ''
       const version = this.idleLookVersion = (this.idleLookVersion ?? 0) + 1, pack = this.pack
-      void this.lookFrames.prepareMotion(pack, recipes).then(ready => {
+      void this.lookFrames.prepareMotion(pack, recipes, walkingOnly).then(ready => {
         if (this.closed || this.idleLookVersion !== version || this.idleLookRequest !== key || this.pack !== pack) return
         if (ready) this.idleLookReady = key
         changed()
@@ -515,6 +528,49 @@ export class OfficeMap {
   clearIdleLooks(): void {
     this.idleLookVersion = (this.idleLookVersion ?? 0) + 1; this.idleLookRequest = ''; this.idleLookReady = ''
     this.lookFrames.clearMotion()
+    this.clearSittingLooks()
+  }
+  private clearSittingLooks(): void {
+    this.sittingVersion++; this.sittingRequest = ''; this.sittingState = 'loading'; this.sittingPack = null
+    this.sittingCast.release(); this.lookFrames.clearSitting()
+  }
+  /** Prepare only the two looks about to sit; a failed load leaves the ordinary outing available. */
+  readyIdleSitting(ids: readonly string[], changed: () => void): 'loading' | 'ready' | 'failed' {
+    const pack = this.pack, occupants = ids.map(id => this.occupants.get(id))
+    if (!pack || occupants.some(one => !one)) return 'loading'
+    const looks = [...new Set(occupants.map(one => one!.standing.look))].sort()
+    const recipes = [...new Set(occupants.flatMap(one => standingClothes(one!.standing) ? [one!.standing.recipe!] : []))].sort((a, b) => a - b)
+    const key = JSON.stringify([this.lookEpoch, looks, recipes])
+    if (this.sittingRequest === key) return this.sittingState
+    this.clearSittingLooks(); this.sittingRequest = key
+    const version = this.sittingVersion
+    void (async () => {
+      const extra = await this.sittingCast.select(JSON.stringify(looks))
+      if (!extra || this.closed || version !== this.sittingVersion || this.pack !== pack) return false
+      const sleepBytes = this.sleepPack ? this.sleepPack.bytes - pack.bytes : 0
+      if (pack.bytes + sleepBytes + extra.bytes > ATLAS_BYTES) return false
+      const steps = packTouchSteps(extra)
+      while (!steps.next().done) {
+        await new Promise<void>(resolve => setTimeout(resolve, 0))
+        if (this.closed || version !== this.sittingVersion || this.pack !== pack) return false
+      }
+      const combined: ArtPack = { ...pack, images: new Map([...pack.images, ...extra.images]), bytes: pack.bytes + extra.bytes,
+        sources: { ...pack.sources, sprites: { ...pack.sources.sprites, ...extra.sources.sprites } } }
+      if (recipes.length && !await this.lookFrames.prepareSitting(combined, recipes)) return false
+      if (this.closed || version !== this.sittingVersion || this.pack !== pack) return false
+      if (pack.bytes + (this.sleepPack ? this.sleepPack.bytes - pack.bytes : 0) + extra.bytes > ATLAS_BYTES) return false
+      this.sittingPack = combined
+      return true
+    })().then(ready => {
+      if (this.closed || version !== this.sittingVersion || this.pack !== pack) return
+      this.sittingState = ready ? 'ready' : 'failed'
+      if (!ready) { this.sittingCast.release(); this.lookFrames.clearSitting() }
+      changed()
+    }).catch(() => {
+      if (version !== this.sittingVersion || this.closed) return
+      this.sittingState = 'failed'; this.sittingCast.release(); this.lookFrames.clearSitting(); changed()
+    })
+    return 'loading'
   }
   /** Full conservative extents of drawn solid artwork, including its trim,
    * scale and cropped tiles. Unknown artwork prevents a route. */
@@ -645,8 +701,8 @@ export class OfficeMap {
   scale(factor: number): void { this.cancelFollow(); this.queueZoom((this.pendingZoom ?? this.zoom) * factor) }
   fit(): void {
     if (!this.layout) return
-    const gutter = this.layout.ownership ? 48 : 0
-    this.cancelFollow(); this.clearZooms(); this.setZoom(Math.min((this.view.clientWidth - gutter) / this.layout.bounds.width, (this.view.clientHeight - gutter) / this.layout.bounds.height))
+    const gutter = this.layout.ownership ? FIT_SIGN_MARGIN : 0
+    this.cancelFollow(); this.clearZooms(); this.setZoom(Math.min(Math.max(1, this.view.clientWidth - gutter) / this.layout.bounds.width, Math.max(1, this.view.clientHeight - gutter) / this.layout.bounds.height))
     this.view.scrollLeft = 0; this.view.scrollTop = 0; this.paint()
   }
   animate(points: MovingContact[]): void {
@@ -683,7 +739,7 @@ export class OfficeMap {
   dispose(): void {
     if (this.closed) return
     this.clearSleepingLooks(); this.clearMotionFurniture(); this.actions.dispose(); this.contacts.release()
-    const hooks = screenTestHooks(); if (hooks) { delete hooks.actions; delete hooks.drawnAt; delete hooks.layout; delete hooks.paintedActors }
+    const hooks = screenTestHooks(); if (hooks) { delete hooks.actions; delete hooks.drawnAt; delete hooks.layout; delete hooks.paintedActors; delete hooks.signBoxes }
     this.lookFrames.release()
     this.lookPack = null
     this.lookEpoch++; this.frameLookEpoch = -1; this.lookState = 'unloaded'
@@ -723,6 +779,12 @@ export class OfficeMap {
     return { left: bounds.x + (this.view.scrollLeft - this.padding.x) / this.zoom, top: bounds.y + (this.view.scrollTop - this.padding.y) / this.zoom,
       width: this.view.clientWidth / this.zoom, height: this.view.clientHeight / this.zoom }
   }
+  private clippedView(): { left: number; top: number; right: number; bottom: number } {
+    const actual = this.actualCamera(), bounds = this.layout!.bounds
+    return { left: Math.max(bounds.x, actual.left), top: Math.max(bounds.y, actual.top),
+      right: Math.min(bounds.x + bounds.width, actual.left + actual.width),
+      bottom: Math.min(bounds.y + bounds.height, actual.top + actual.height) }
+  }
   private center(point: Point): void {
     const bounds = this.layout!.bounds
     this.view.scrollLeft = (point.x - bounds.x) * this.zoom + this.padding.x - this.view.clientWidth / 2
@@ -734,8 +796,9 @@ export class OfficeMap {
   private holdView(force = false): void {
     const shown = this.shown; if (!shown) return
     const left = this.view.scrollLeft, top = this.view.scrollTop
-    if (!force && !this.holdingView && left >= shown.left && top >= shown.top &&
-      left + shown.viewWidth <= shown.left + shown.width && top + shown.viewHeight <= shown.top + shown.height) {
+    const clipped = this.clippedView(), camera = shown.camera
+    if (!force && !this.holdingView && clipped.left >= camera.left && clipped.top >= camera.top &&
+      clipped.right <= camera.left + camera.width && clipped.bottom <= camera.top + camera.height) {
       shown.scrollLeft = left; shown.scrollTop = top; return
     }
     if (!this.holdingView) { this.dynamics.cancel(); this.drawingDynamic = false }
@@ -750,7 +813,7 @@ export class OfficeMap {
   }
   private queueZoom(value: number): void {
     if (!this.layout || this.closed) return
-    const minimum = Math.min(.04, this.view.clientWidth / this.layout.bounds.width, this.view.clientHeight / this.layout.bounds.height)
+    const minimum = this.minimumZoom()
     const next = Math.max(minimum, Math.min(2, value))
     if (next === (this.pendingZoom ?? this.zoom)) return
     this.pendingZoom = next; this.zooms.push(next)
@@ -769,12 +832,16 @@ export class OfficeMap {
   }
   private setZoom(value: number): void {
     if (!this.layout) return
-    const center = this.actualCamera(), minimum = Math.min(.04, this.view.clientWidth / this.layout.bounds.width, this.view.clientHeight / this.layout.bounds.height)
+    const center = this.actualCamera(), minimum = this.minimumZoom()
     const next = Math.max(minimum, Math.min(2, value))
     if (next === this.zoom) { if (!this.repainting) this.canvas.dataset['paintReady'] = 'true'; return }
     this.holdView(true)
     this.zoom = next; if (next < .25) { this.selectionSignature = ''; this.factsChanged([]) }; this.sizePlane()
     this.signature = ''; this.center({ x: center.left + center.width / 2, y: center.top + center.height / 2 }); this.viewportChanged()
+  }
+  private minimumZoom(): number {
+    const layout = this.layout!, gutter = layout.ownership ? FIT_SIGN_MARGIN : 0
+    return Math.min(.04, Math.max(1, this.view.clientWidth - gutter) / layout.bounds.width, Math.max(1, this.view.clientHeight - gutter) / layout.bounds.height)
   }
   private paint(): void {
     if (this.closed || this.preparingPreview || !this.layout || !this.model) return
@@ -782,10 +849,9 @@ export class OfficeMap {
     this.sizePlane()
     // Keep the complete composed surface while its overscan still contains the viewport.
     // Scrolling moves the existing canvas; unchanged terrain, sprites and labels do no work.
-    const actual = this.actualCamera(), bounds = this.layout.bounds, cached = this.camera
-    if (this.signature && this.dpr === window.devicePixelRatio && cached && Math.max(bounds.x, actual.left) >= cached.left && Math.max(bounds.y, actual.top) >= cached.top &&
-      Math.min(bounds.x + bounds.width, actual.left + actual.width) <= cached.left + cached.width &&
-      Math.min(bounds.y + bounds.height, actual.top + actual.height) <= cached.top + cached.height) return
+    const clipped = this.clippedView(), cached = this.camera
+    if (this.signature && this.dpr === window.devicePixelRatio && cached && clipped.left >= cached.left && clipped.top >= cached.top &&
+      clipped.right <= cached.left + cached.width && clipped.bottom <= cached.top + cached.height) return
     const camera = this.bufferCamera()
     const signature = JSON.stringify([camera, this.zoom, window.devicePixelRatio])
     if (signature === this.signature) return
@@ -794,10 +860,9 @@ export class OfficeMap {
     if (!this.layout.preview) this.dynamic([{ x: camera.left, y: camera.top, width: camera.width, height: camera.height }], true)
     this.canvas.dataset['paintReady'] = 'false'
     this.painting.start(this.paintSteps(camera), () => {
-      const actual = this.actualCamera(), bounds = this.layout!.bounds
-      if (Math.max(bounds.x, actual.left) < camera.left || Math.max(bounds.y, actual.top) < camera.top ||
-        Math.min(bounds.x + bounds.width, actual.left + actual.width) > camera.left + camera.width ||
-        Math.min(bounds.y + bounds.height, actual.top + actual.height) > camera.top + camera.height) {
+      const clipped = this.clippedView()
+      if (clipped.left < camera.left || clipped.top < camera.top ||
+        clipped.right > camera.left + camera.width || clipped.bottom > camera.top + camera.height) {
         this.signature = ''; this.repainting = false; this.paint(); return
       }
       this.present()
@@ -823,7 +888,7 @@ export class OfficeMap {
     // One DOM turn presents only a complete frame. All raster copies stay sliced.
     this.plane.append(next); previous.remove()
     this.canvas = next; this.frame = previous
-    this.shown = { left, top, width, height, scrollLeft: this.view.scrollLeft, scrollTop: this.view.scrollTop, viewWidth: this.view.clientWidth, viewHeight: this.view.clientHeight }
+    this.shown = { left, top, camera, scrollLeft: this.view.scrollLeft, scrollTop: this.view.scrollTop }
     this.holdingView = false; this.targets.style.visibility = ''
     const bindingReady = this.bindingTransition && !this.pending && this.layout === this.bindingLayout
     if (bindingReady) this.bindingTransition = false
@@ -858,8 +923,9 @@ export class OfficeMap {
       const generation = this.sleepGeneration
       void this.sleepCast.select('woodland').then(async extra => {
         if (!extra || generation !== this.sleepGeneration || this.closed || this.pack !== pack) return
-        if (pack.bytes + extra.bytes > ATLAS_BYTES) { this.sleepCast.release(); return }
+        if (pack.bytes + extra.bytes + (this.sittingPack ? this.sittingPack.bytes - pack.bytes : 0) > ATLAS_BYTES) { this.sleepCast.release(); return }
         if (!await this.touchSleepPack(extra, generation) || this.pack !== pack) return
+        if (pack.bytes + extra.bytes + (this.sittingPack ? this.sittingPack.bytes - pack.bytes : 0) > ATLAS_BYTES) { this.sleepCast.release(); return }
         this.sleepPack = { ...pack, images: new Map([...pack.images, ...extra.images]), bytes: pack.bytes + extra.bytes }
         this.prepareSleepingLooks()
       }).catch(() => { if (generation === this.sleepGeneration) this.sleepCast.release() })
@@ -1013,7 +1079,7 @@ export class OfficeMap {
       const source = this.model!.rooms.find(source => source.id === room.id)!
       ctx.fillStyle = dark ? '#25372b' : '#fffdf5'; ctx.fillRect(house.x + 8, house.y - 32, Math.min(house.width - 16, 280), 28)
       ctx.fillStyle = dark ? '#e4edda' : '#293c32'; ctx.font = '14px system-ui'
-      ctx.fillText(roomWords(source, this.options.language), house.x + 14, house.y - 12, Math.min(house.width - 28, 268))
+      ctx.fillText(this.fitText(ctx, roomWords(source, this.options.language), Math.min(house.width - 28, 268)), house.x + 14, house.y - 12)
       materialize(ctx); yield
     }
     materialize(ctx); yield
@@ -1090,7 +1156,11 @@ export class OfficeMap {
    *  form is left out by itself, the page says some names are left out, and every other area still
    *  gets its name. */
   private areaNames(ctx: CanvasRenderingContext2D): ReturnType<typeof ownershipAreaLabelsOrSkips>['headers'] {
-    const { headers, skipped } = ownershipAreaLabelsOrSkips(this.layout!, this.zoom, this.options.language, text => { ctx.font = `${12 / this.zoom}px system-ui`; return ctx.measureText(text).width }, true)
+    const cached = this.areaNameCache
+    const result = cached && cached.layout === this.layout && cached.zoom === this.zoom && cached.language === this.options.language ? cached.result :
+      ownershipAreaLabelsOrSkips(this.layout!, this.zoom, this.options.language, text => { ctx.font = `${12 / this.zoom}px system-ui`; return ctx.measureText(text).width }, true)
+    this.areaNameCache = { layout: this.layout!, zoom: this.zoom, language: this.options.language, result }
+    const { headers, skipped } = result
     const leftOut = skipped.length > 0
     if (leftOut !== this.namesLeftOut) { this.namesLeftOut = leftOut; this.namesChanged(leftOut) }
     return headers
@@ -1168,6 +1238,7 @@ export class OfficeMap {
     // The area names are placed once for the whole pass: the house signs stop short of them.
     const headers = this.layout.ownership && !(this.villagePlan && this.villagePlan.level !== 'homes') ? this.areaNames(ctx) : []
     this.signHeaders = headers
+    const homes = !(this.villagePlan && this.villagePlan.level !== 'homes') && (this.villagePlan?.level === 'homes' || this.layout.ownership && this.zoom >= .18) ? this.homeSignBoxes(camera) : []
     for (const region of visibleRegions) {
       ctx.save()
       try {
@@ -1195,7 +1266,7 @@ export class OfficeMap {
           if (entry && ++painted % 4 === 0) materialize(ctx)
           yield
         }
-        if (this.villagePlan?.level === 'homes' || this.layout.ownership && this.zoom >= .18) yield* this.homeLabels(ctx, camera)
+        if (homes.length) yield* this.homeLabels(ctx, homes)
         if (this.layout.ownership) {
           for (const header of headers) {
             if (!overlapsCamera(header.area, camera)) { yield; continue }
@@ -1203,7 +1274,7 @@ export class OfficeMap {
             ctx.font = `${header.fontSize / this.zoom}px system-ui`
             ctx.fillStyle = this.options.theme === 'dark' ? '#25372b' : '#fffdf5'; ctx.fillRect(x, y, width, height)
             ctx.fillStyle = this.options.theme === 'dark' ? '#e4edda' : '#293c32'
-            for (const text of header.lines) ctx.fillText(text, x + 6 / this.zoom, y + (header.fontSize + 3) / this.zoom, width - 12 / this.zoom)
+            for (const text of header.lines) ctx.fillText(this.fitText(ctx, text, width - 12 / this.zoom), x + 6 / this.zoom, y + (header.fontSize + 3) / this.zoom)
             materialize(ctx); yield
           }
         }
@@ -1233,9 +1304,15 @@ export class OfficeMap {
     // Every mole painted in this frame: where, whether walking, the box the motion worker checks for it
     // there, and the plate drawn for it, or null when none is drawn.
     const hooks = screenTestHooks()
+    if (hooks) {
+      const view = this.actualCamera()
+      const screenBox = (box: Rect) => ({ x: (box.x - view.left) * this.zoom, y: (box.y - view.top) * this.zoom, width: box.width * this.zoom, height: box.height * this.zoom })
+      hooks.signBoxes = [...homes.map(({ box }) => ({ kind: 'house' as const, ...screenBox(box) })),
+        ...headers.filter(header => overlapsCamera(header.area, camera)).map(header => ({ kind: header.stage === 'sleeping-house' ? 'sleeping-house' as const : 'area' as const, ...screenBox(header) }))]
+    }
     if (hooks) hooks.paintedActors = actors.map(actor => {
       const body = this.motionBounds(actor.key), plate = this.plates.get(actor.key)
-      return { key: actor.key, point: { x: actor.point.x, y: actor.point.y }, walking: !!actor.walk, body: body ? translateBody(body, actor.point) : null, plate: plate && this.plateShown(actor.key) ? { ...plate } : null }
+      return { key: actor.key, point: { x: actor.point.x, y: actor.point.y }, walking: !!actor.walk, facing: this.paintedFacings.get(actor.key), body: body ? translateBody(body, actor.point) : null, plate: plate && this.plateShown(actor.key) ? { ...plate } : null, sprite: this.paintedSprites.get(actor.key) }
     })
     this.canvas.dataset['moving'] = String(this.moving.length)
     // Only a full-camera draw that began with this prepared pack can remove
@@ -1267,6 +1344,7 @@ export class OfficeMap {
     const recoloured = !!standingClothes(standing)
     if (!distant && desk && !walk && this.options.wave !== key && !this.options.still && this.actions.draw(ctx,key)) return
     let sprite = distant || recoloured ? `stand-${look}` : walk?.phase === 'play' ? playPose(standing, Math.floor(walk.elapsed / 1200) + (walk.facing < 0 ? 1 : 0)).sprite : moleSprite(look, occupant.work, this.options.still, walk?.phase === 'wait' ? undefined : walk, this.options.wave === key, currentFacts(occupant) && (occupant.facts ? true : this.options.workAvailable), at.where)
+    if (walk?.phase === 'sit') sprite = sittingSprite(look, walk.elapsed)
     if (at.where === 'sleep') { this.startSleepingLooks(); const art = this.sleepPack ?? this.pack, frame = art?.sources.sprites?.[`sleep-${look}`]; sprite = moleSprite(look, occupant.work, this.options.still, undefined, false, true, 'sleep', !!frame && !!art?.images.has(frame.atlas)) }
     // An idle mole at a facility place takes the place's pose there, as a still picture, and stands under reduced motion.
     const place = desk && !walk && this.options.wave !== key && !distant ? this.atFacility.get(key) : undefined
@@ -1275,14 +1353,15 @@ export class OfficeMap {
     else if (!recoloured && !walk && !this.options.still && desk && this.layout?.ownership && sprite === `stand-${look}`) sprite = `${facilityPose(this.layout.seats[key])}-${look}`
     const scale = this.drawnScale(key)
     const facing: 1 | -1 = walk && !this.options.still ? walk.facing : 1
-    const pose = at.where === 'sleep' ? 'sleep' : walk?.phase === 'play' ? 'play' : walk?.phase === 'walk' ? 'walk' : 'stand'
+    const pose = at.where === 'sleep' ? 'sleep' : walk?.phase === 'sit' ? 'sit' : walk?.phase === 'play' ? 'play' : walk?.phase === 'walk' ? 'walk' : 'stand'
     let drawn: boolean | undefined
     if (recoloured && pose === 'stand' && facing === -1) {
       ctx.save(); ctx.translate(point.x * 2, 0); ctx.scale(-1, 1)
       drawn = this.lookFrames?.draw(ctx, standing.recipe!, point, scale, pose, walk?.elapsed ?? 0, facing)
       ctx.restore()
     } else if (recoloured && pose === 'stand') drawn = this.lookFrames?.draw(ctx, standing.recipe!, point, scale)
-    else drawn = recoloured ? this.lookFrames?.draw(ctx, standing.recipe!, point, scale, pose, walk?.elapsed ?? 0, facing) : drawAnchoredSprite(ctx, at.where === 'sleep' ? this.sleepPack ?? this.pack : this.pack, sprite, point, scale, facing)
+    else drawn = recoloured ? this.lookFrames?.draw(ctx, standing.recipe!, point, scale, pose, walk?.elapsed ?? 0, facing) : drawAnchoredSprite(ctx, at.where === 'sleep' ? this.sleepPack ?? this.pack : pose === 'sit' ? this.sittingPack : this.pack, sprite, point, scale, facing)
+    if (drawn) { this.paintedSprites?.set(key, sprite); this.paintedFacings?.set(key, facing) }
     if (at.where === 'sleep' && drawn && this.sleepPrepared) this.sleepFrameHasReady = true
     // One small paper bundle travels between the two partners as they gesture.
     if (walk?.phase === 'play' && walk.facing === 1 && walk.paper) {
@@ -1293,18 +1372,49 @@ export class OfficeMap {
       ctx.fillStyle = '#8b8174'; ctx.beginPath(); ctx.moveTo(point.x, point.y - 24); ctx.lineTo(point.x + 12, point.y - 12); ctx.lineTo(point.x, point.y); ctx.lineTo(point.x - 12, point.y - 12); ctx.closePath(); ctx.fill()
     }
   }
+  /** Measure the same bubble for painting and for clearing it after a visibility change. */
+  private bubble(ctx: CanvasRenderingContext2D, key: string, rect: Rect, occupant: Occupant) {
+    const matching = projectMatch(occupant, this.options.project)
+    const group = moleGroup(occupant.work, currentFacts(occupant) && (occupant.facts ? true : this.options.workAvailable)), badge = badges[group]
+    const asleep = whereaboutsAt(this.whereaboutsByKey, this.occupants, key).where === 'sleep'
+    const text = asleep ? words[this.options.language][this.options.asleepMadeUp === true ? 'madeUpSleep' : 'asleepPlate'] : matching === 'unknown' ? words[this.options.language].projectUnloaded : matching === 'absent' ? words[this.options.language].agentAbsent : occupant.facts && !currentFacts(occupant) ? (occupant.facts.people.status === 'unloaded' || occupant.facts.work.status === 'unloaded' ? words[this.options.language].factsUnloaded : words[this.options.language].priorFacts) : badge.symbol
+    const solid = group === 'attention' || group === 'waiting', height = solid ? 19 : 17
+    ctx.font = `bold ${solid ? 13 : 12}px system-ui`
+    const label = this.fitText(ctx, text, 90), width = Math.max(height + 2, ctx.measureText(label).width + 10)
+    // The first middle is the actor's drawn point. A bound actor at its desk is already at
+    // the foot used by its action; the extra foot only constrains visibility when it is away.
+    const middle = this.moleMiddles.get(key)?.[0], scale = this.drawnScale(key)
+    const cx = middle ? middle.x : rect.x + rect.width / 2
+    const head = middle ? middle.y - moleMiddle[asleep ? 'asleep' : 'awake'] * scale - 3 : rect.y - 92
+    return { x: cx - width / 2, y: head - height - 4, width, height, cx, label, solid, badge }
+  }
   private nameplate(ctx: CanvasRenderingContext2D, key: string, rect: Rect): void {
     const occupant = this.occupants.get(key); if (!occupant) return
     const matching = projectMatch(occupant, this.options.project), searched = !!this.options.search && `${occupant.agent.name} ${occupant.agent.handle}`.toLocaleLowerCase().includes(this.options.search.toLocaleLowerCase()), selected = key === this.options.selected
+    const dark = this.options.theme === 'dark'
     // Filters change the nameplate only. Bodies and homes retain their size, colour and place.
     ctx.globalAlpha = matching === 'other' ? .45 : 1
-    ctx.fillStyle = selected || searched ? '#f1d891' : this.options.theme === 'dark' ? '#25372b' : '#f5f0dc'; ctx.fillRect(rect.x, rect.y, rect.width, rect.height)
-    ctx.fillStyle = this.options.theme === 'dark' && !selected && !searched ? '#e3eadc' : '#293c32'
-    ctx.font = '11px system-ui'; ctx.fillText(shortName(occupant.agent.name || occupant.agent.handle), rect.x + 5, rect.y + 11, rect.width - 10)
-    const badge = badges[moleGroup(occupant.work, currentFacts(occupant) && (occupant.facts ? true : this.options.workAvailable))]
-    const asleep = whereaboutsAt(this.whereaboutsByKey, this.occupants, key).where === 'sleep'
-    ctx.font = '10px system-ui'; ctx.fillText(asleep ? words[this.options.language][this.options.asleepMadeUp === true ? 'madeUpSleep' : 'asleepPlate'] : matching === 'unknown' ? words[this.options.language].projectUnloaded : matching === 'absent' ? words[this.options.language].agentAbsent : occupant.facts && !currentFacts(occupant) ? (occupant.facts.people.status === 'unloaded' || occupant.facts.work.status === 'unloaded' ? words[this.options.language].factsUnloaded : words[this.options.language].priorFacts) : `${badge.symbol} ${badge[this.options.language]}`, rect.x + 5, rect.y + 24, rect.width - 10)
-    ctx.fillStyle = badge.colour; ctx.fillRect(rect.x, rect.y, 2, rect.height)
+    ctx.font = '11px system-ui'
+    const name = this.fitText(ctx, shortName(occupant.agent.name || occupant.agent.handle), Math.max(0, rect.width - 24))
+    const width = Math.min(rect.width, ctx.measureText(name).width + 24), x = rect.x + (rect.width - width) / 2, y = rect.y + 2
+    ctx.fillStyle = selected || searched ? '#f1d891' : dark ? '#25372b' : '#f5f0dc'
+    ctx.strokeStyle = dark ? '#506447' : '#cbbf98'; ctx.lineWidth = 1
+    ctx.beginPath(); ctx.roundRect(x, y, width, 16, 8); ctx.fill(); ctx.stroke()
+    ctx.fillStyle = dark ? '#3c5242' : '#e3dcc0'
+    ctx.beginPath(); ctx.roundRect(x + 3, y + 2, 15, 12, 4); ctx.fill()
+    ctx.font = '9px system-ui'; ctx.fillStyle = selected || searched ? '#293c32' : dark ? '#bccbbb' : '#566456'; ctx.textAlign = 'center'
+    ctx.fillText(roleMarks[occupant.agent.role ?? '']?.[this.options.language] ?? '?', x + 10.5, y + 12)
+    ctx.textAlign = 'left'; ctx.font = '11px system-ui'; ctx.fillStyle = dark && !selected && !searched ? '#e3eadc' : '#293c32'
+    ctx.fillText(name, x + 21, y + 12)
+
+    const bubble = this.bubble(ctx, key, rect, occupant), { cx } = bubble
+    ctx.fillStyle = bubble.solid ? bubble.badge.colour : dark ? '#25372b' : '#fffdf5'
+    ctx.strokeStyle = bubble.solid ? dark ? '#16211a' : '#fffdf5' : dark ? '#506447' : '#cbbf98'; ctx.lineWidth = 1.5
+    ctx.beginPath(); ctx.roundRect(bubble.x, bubble.y, bubble.width, bubble.height, 6)
+    ctx.moveTo(cx - 3, bubble.y + bubble.height); ctx.lineTo(cx, bubble.y + bubble.height + 4); ctx.lineTo(cx + 3, bubble.y + bubble.height); ctx.fill(); ctx.stroke()
+    ctx.beginPath(); ctx.moveTo(cx - 3.5, bubble.y + bubble.height - .5); ctx.lineTo(cx, bubble.y + bubble.height + 3.5); ctx.lineTo(cx + 3.5, bubble.y + bubble.height - .5); ctx.closePath(); ctx.fill()
+    ctx.fillStyle = bubble.solid ? '#ffffff' : bubble.badge.colour; ctx.textAlign = 'center'
+    ctx.fillText(bubble.label, cx, bubble.y + bubble.height - 5); ctx.textAlign = 'left'
     ctx.globalAlpha = 1
   }
   private pattern(ctx: CanvasRenderingContext2D, id: string): CanvasPattern | null {
@@ -1395,14 +1505,21 @@ export class OfficeMap {
       }
       ctx.fillStyle = dark ? '#e4edda' : '#293c32'
       const suffix = block.signs.length > 1 ? ` +${block.signs.length-1}` : ''
-      const label = this.labelWords(ctx,sign.label,width-8/this.zoom-ctx.measureText(suffix).width)
-      if(label) ctx.fillText(label+suffix,x+4/this.zoom,y+26/this.zoom)
+      // Population blocks retain their existing whole-word omission rule.
+      const remaining = sign.label.trim().split(/\s+/)
+      const available = width - 8 / this.zoom - ctx.measureText(suffix).width
+      while (remaining.length && ctx.measureText(remaining.join(' ')).width > available) remaining.pop()
+      const label = remaining.join(' ')
+      if (label) ctx.fillText(label + suffix, x + 4 / this.zoom, y + 26 / this.zoom)
     }
   }
-  private labelWords(ctx: CanvasRenderingContext2D, text: string, width: number): string {
-    const words = text.trim().split(/\s+/)
-    while (words.length && ctx.measureText(words.join(' ')).width > width) words.pop()
-    return words.join(' ')
+  /** Fit with the current font, preserving an optional ending such as a count. */
+  private fitText(ctx: CanvasRenderingContext2D, text: string, width: number, ending = ''): string {
+    if (ctx.measureText(text + ending).width <= width) return text + ending
+    if (ctx.measureText('…' + ending).width > width) return ''
+    const chars = Array.from(text)
+    while (chars.length && ctx.measureText(chars.join('') + '…' + ending).width > width) chars.pop()
+    return chars.join('') + '…' + ending
   }
   private *woodlandGround(ctx:CanvasRenderingContext2D,area:Rect):Generator<void> {
     this.texture(ctx,'grass-0',this.options.theme==='dark'?'#507f3f':'#70a745',area.x,area.y,area.width,area.height)
@@ -1416,41 +1533,76 @@ export class OfficeMap {
       }
     }
   }
-  private *homeLabels(ctx: CanvasRenderingContext2D, camera: Camera): Generator<void> {
-    const dark = this.options.theme === 'dark'
+  private homeSignBoxes(camera: Camera): { house: Layout['houses'][number]; box: Rect }[] {
+    const result: { house: Layout['houses'][number]; box: Rect }[] = []
     for (const house of this.layout!.houses) {
-      if (!overlapsCamera(house, camera)) continue
+      if (!overlapsCamera(house, camera) || !this.layout!.ownership && !this.layout!.villages![house.village!]!.signs.some(s => s.id === house.group)) continue
+      // The area's Direct count already names this exact house's occupants.
+      if (this.layout!.ownership && house.type === 'direct' && this.signHeaders.some(header =>
+        header.includesDirect && header.area.owner != null && header.area.owner === house.owner &&
+        header.area.signs.some(sign => sign.id === house.group) && overlapsCamera(header.area, camera) && overlapsCamera(header, camera))) continue
+      const box = this.signBox(house, result.map(other => other.box))
+      if (this.signShown(box)) result.push({ house, box })
+    }
+    return result
+  }
+  private *homeLabels(ctx: CanvasRenderingContext2D, homes: { house: Layout['houses'][number]; box: Rect }[]): Generator<void> {
+    const dark = this.options.theme === 'dark'
+    for (const { house, box } of homes) {
       const sign = this.layout!.ownership ? { label: (this.options.language === 'zh' ? house.zh : house.label) ?? house.group, token: stableHash(house.group) } : this.layout!.villages![house.village!]!.signs.find(s => s.id === house.group)
       if (!sign) continue
-      const box = this.signBox(house), { x, y, width, height } = box
-      if (!this.signShown(box)) continue
+      const { x, y, width, height } = box
       ctx.fillStyle = dark ? '#25372b' : '#fffdf5'; ctx.fillRect(x, y, width, height)
       ctx.fillStyle = `hsl(${sign.token % 360} 45% 48%)`; ctx.fillRect(x, y, 5 / this.zoom, height)
       ctx.fillStyle = dark ? '#e4edda' : '#293c32'; ctx.font = `${11 / this.zoom}px system-ui`
-      ctx.fillText(this.layout!.ownership ? (house.type === 'sleeping-house' ? sign.label : `${sign.label} · ${house.occupants.length}`) : shortName(sign.label), this.signNameLeft(box), y + 14 / this.zoom, width - 12 / this.zoom)
+      const text = this.layout!.ownership ? sign.label : shortName(sign.label)
+      const ending = this.layout!.ownership && house.type !== 'sleeping-house' ? ` · ${house.occupants.length}` : ''
+      ctx.fillText(this.fitText(ctx, text, width - 12 / this.zoom, ending), this.signNameLeft(box), y + 14 / this.zoom)
       materialize(ctx); yield
     }
   }
   /** A house's sign, moved right with the visible left edge of the map when that edge is inside the
    *  house, so the whole sign stays in view. It stays above its own house and short of any area name. */
-  private signBox(house: Rect): Rect {
+  private signBox(house: Rect, otherHomes: Rect[] = []): Rect {
     const sign = houseSign(this.layout!, house, this.zoom)
-    const stop = Math.min(house.x + house.width - sign.width, ...this.signHeaders.filter(h => h.x + h.width > house.x && h.y < sign.y + sign.height && sign.y < h.y + h.height).map(h => h.x - sign.width))
-    return { ...sign, x: Math.max(house.x, Math.min(stop, this.signsLeft)) }
+    const gap = SIGN_GAP / this.zoom
+    let spans = [{ left: house.x, right: house.x + house.width }]
+    for (const obstacle of [...this.signHeaders, ...otherHomes]) {
+      if (obstacle.y >= sign.y + sign.height + gap || obstacle.y + obstacle.height + gap <= sign.y) continue
+      const left = obstacle.x - gap, right = obstacle.x + obstacle.width + gap
+      spans = spans.flatMap(span => right <= span.left || left >= span.right ? [span] : [
+        ...(left > span.left ? [{ left: span.left, right: left }] : []),
+        ...(right < span.right ? [{ left: right, right: span.right }] : []),
+      ])
+    }
+    const candidates = spans.map(span => {
+      const width = Math.min(sign.width, span.right - span.left)
+      const x = Math.max(span.left, Math.min(span.right - width, this.signsLeft))
+      return { ...sign, x, width }
+    }).filter(box => box.width > 12 / this.zoom && this.signNameLeft(box) >= this.signsLeft)
+    candidates.sort((a, b) => Number(b.width === sign.width) - Number(a.width === sign.width) || b.width - a.width || Math.abs(a.x - this.signsLeft) - Math.abs(b.x - this.signsLeft))
+    return candidates[0] ?? { ...sign, width: 0 }
   }
   private signNameLeft(box: Rect): number { return box.x + 8 / this.zoom }
   /** A sign is drawn only while its name starts inside the visible map. When less of the house is
    *  in view than the sign is wide, the name would start outside the view and leave a blank plate. */
-  private signShown(box: Rect): boolean { return this.signNameLeft(box) >= this.signsLeft }
+  private signShown(box: Rect): boolean { return box.width > 12 / this.zoom && this.signNameLeft(box) >= this.signsLeft }
   /** After a scroll the drawn surface still holds, only the signs that move, appear or go are drawn
    *  again, over where they stood and where they now stand. */
   private followSigns(): void {
     if (this.closed || !this.layout || !this.camera || this.layout.preview || !(this.villagePlan?.level === 'homes' || this.layout.ownership && this.zoom >= .18)) return
     const left = this.actualCamera().left
     if (left === this.signsLeft) return
-    const before = this.layout.houses.map(house => this.signBox(house)), shown = before.map(box => this.signShown(box))
+    const before = this.homeSignBoxes(this.camera)
     this.signsLeft = left
-    const moved = this.layout.houses.flatMap((house, i) => { const after = this.signBox(house); return after.x === before[i]!.x && this.signShown(after) === shown[i] ? [] : [before[i]!, after] })
+    const after = this.homeSignBoxes(this.camera)
+    const oldBoxes = new Map(before.map(({ house, box }) => [house, box]))
+    const newBoxes = new Map(after.map(({ house, box }) => [house, box]))
+    const moved = this.layout.houses.flatMap(house => {
+      const old = oldBoxes.get(house), next = newBoxes.get(house)
+      if (old && next && old.x === next.x && old.y === next.y && old.width === next.width && old.height === next.height) return []
+      return [...(old ? [old] : []), ...(next ? [next] : [])]
+    })
     if (moved.length) this.dynamic(moved)
   }
   /** A plate is drawn only while the middle of its mole is in the visible map, so no part of a plate shows without its mole. */
@@ -1461,9 +1613,19 @@ export class OfficeMap {
   /** After a scroll or a resize the drawn surface still holds, only the plates whose moles came into view or left it are drawn again. */
   private followPlates(): void {
     if (this.closed || !this.layout || !this.camera) return
-    const view = this.actualCamera(), changed = [...this.plates].filter(([key]) => this.plateShown(key) !== this.plateShown(key, view)).map(([, rect]) => rect)
+    const view = this.actualCamera(), changed = [...this.plates].filter(([key]) => this.plateShown(key) !== this.plateShown(key, view))
     this.platesView = view
-    if (changed.length) this.dynamic(changed)
+    if (!changed.length) return
+    const ctx = this.frame?.getContext('2d', { willReadFrequently: true })
+    ctx?.save()
+    const regions = changed.flatMap(([key, rect]) => {
+      const occupant = this.occupants.get(key)
+      if (!ctx || !occupant) return [rect]
+      const bubble = this.bubble(ctx, key, rect, occupant)
+      return [rect, { x: bubble.x - 2, y: bubble.y - 2, width: bubble.width + 4, height: bubble.height + 8 }]
+    })
+    ctx?.restore()
+    if (regions.length) this.dynamic(regions)
   }
   private blockArea(block: Rect): Rect {
     const bounds = this.layout!.bounds, x = Math.max(block.x, bounds.x), y = Math.max(block.y, bounds.y)

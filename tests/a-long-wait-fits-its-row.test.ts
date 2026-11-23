@@ -12,7 +12,7 @@
  *     the edge of the table's box at 660.
  *
  * Here each chip is measured against its row, or its cell, and against the box that scrolls it, and on Agent runs the
- * title must keep at least a third of the row. Opened at 1440, 990, 660 and 390, light, in a test office of its own.
+ * title must keep at least a third of the row. Opened at 1440, 660 and 390, light, in a test office of its own.
  *
  *   node tools/run-named-tests.mjs tests/a-long-wait-fits-its-row.test.ts
  *
@@ -133,7 +133,7 @@ afterAll(async () => {
 }, 120_000)
 
 describe('a run waiting days on a usage limit', () => {
-  for (const width of [1440, 990, 660, 390]) {
+  for (const width of [1440, 660, 390]) {
     it(`fits its row on Agent runs at ${width}px, and leaves its title a third of the row`, async () => {
       await open('/sessions', width)
       await app.page.locator('.sx-line', { hasText: TITLE }).first().waitFor({ timeout: 30_000 })

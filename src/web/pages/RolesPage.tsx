@@ -4,7 +4,7 @@ import { useEffect } from 'react'
 import { useChannel } from '../lib/channel.ts'
 import { useInspect } from '../lib/mode.ts'
 import { NotebookNumbers, ParticipantName } from './NotebookPage.tsx'
-import { content, t, wordLanguage, type WordKey } from '@shared/i18n.ts'
+import { content, t, wordLanguage } from '@shared/i18n.ts'
 import { cardWord } from '@shared/card-words.ts'
 import { useLanguage } from '../lib/language.ts'
 // A CARD'S HOW IT WORKS, drawn the one way every card page draws it.
@@ -41,14 +41,14 @@ import type { HandbookRead } from '@shared/handbooks.ts'
  *     `design/permissions/roles.json`. Marked as a default (P49), because that file is the only
  *     thing that decides what an agent may do;
  *   · a card somebody wrote here (P51). Drawn exactly like a default one, and carrying the one line
- *     saying nothing enforces it. That line is the server's own sentence, measured rather than
- *     assumed: `isARole` reads the declaration and has never read a record;
+ *     saying nothing enforces it, measured rather than assumed: `isARole` reads the declaration and
+ *     has never read a record;
  *   · the add block (P50): a mole in black with a large plus in the middle, every other field
  *     empty, and pressing it opens the card's own page to fill in.
  */
 
 import { api } from '../api.ts'
-import { Absence, ErrorNote, Explain, Loading } from '../components/ui.tsx'
+import { Absence, ErrorNote, Explain, Hint, Loading, ServerNote } from '../components/ui.tsx'
 import { useAsync } from '../components/ui.tsx'
 import { useProjectAsync } from '../lib/project-async.ts'
 import { BackLink } from '../components/BackLink.tsx'
@@ -56,7 +56,7 @@ import { InReach } from '../components/InReach.tsx'
 import { RouteLink, navigate, recordPath, pathFor, roleCensusPath, notebookPath } from '../components/router.tsx'
 import { declaredAttributes } from '../components/declares.ts'
 import { MoleSilhouette } from '../components/MoleSilhouette.tsx'
-import { whereRequestsGo } from '../lib/visiting.ts'
+import { theCrossOriginOfALoad, whereRequestsGo } from '../lib/visiting.ts'
 import { smallPortrait, theFirstPortraitOf, type PortraitOnOffer } from '@shared/portraits.ts'
 import { OpensLarge } from '../components/PictureLarge.tsx'
 import { THE_PERSON } from '@shared/person.ts'
@@ -108,8 +108,7 @@ export const ROLES_WORDS = {
    *
    * SO THE WORDS NAMED THE MECHANISM AND NOT THE STATE, which chapter 6's fourth rule forbids: a
    * copy is how a card's page comes to exist, and what a reader wants to know is that there is no
-   * page. The word now says that, and the mark's own detail says what makes one and that nothing
-   * about the card's authority depends on it.
+   * page. The word now says that.
    */
   get noPage() { return t('g6b.roles.noPage') },
   /** The detail on the empty mark when no card is declared. */
@@ -128,7 +127,6 @@ export const ROLES_WORDS = {
    * at the tier this product uses for an emptiness somebody looked for.
    */
   get noPowersWord() { return t('g6b.roles.noPowersWord') },
-  get noPowersSays() { return t('g6b.roles.noPowersSays') },
   /**
    * THE WAY INTO THE STATISTICS, FOLDED SHUT. Criterion P72.
    *
@@ -285,7 +283,7 @@ export function TheCards({
 
       {said.leftOut && said.leftOut.length > 0 ? <section className="rol-group" data-left-out-roles="" role="status">
         <h2>{t('addedRoles.leftOutTitle')}</h2>
-        {said.leftOut.map(row => <article key={row.name}><h3>{cardWord(row.name)}</h3><p>{t('addedRoles.leftOut')}</p><ul>{row.problems.map(problem => <li key={problem}>{problem}</li>)}</ul><RouteLink to={`/roles/added/${encodeURIComponent(row.name)}/history`}>{t('addedRoles.restore')}</RouteLink></article>)}
+        {said.leftOut.map(row => <article key={row.name}><h3>{cardWord(row.name)}</h3><ul>{row.problems.map(problem => <li key={problem}>{problem}</li>)}</ul><RouteLink to={`/roles/added/${encodeURIComponent(row.name)}/history`}>{t('addedRoles.restore')}</RouteLink></article>)}
       </section> : null}
 
       {said.removedAddedRoles && said.removedAddedRoles.length > 0 ? <section className="rol-group" data-removed-roles=""><h2>{t('addedRoles.removedTitle')}</h2><ul>{said.removedAddedRoles.map(name => <li key={name}>{cardWord(name)} · <RouteLink to={`/roles/added/${encodeURIComponent(name)}/history`}>{t('addedRoles.history')}</RouteLink></li>)}</ul></section> : null}
@@ -298,13 +296,10 @@ export function TheCards({
           Mole Office's defaults, and a new one is added on that same page. Originally the add block was in this
           group because it made a project card of this third kind. A decision now makes the press
           an added office setting, so its own section above names what it creates.
-          THE DOOR THAT WROTE THESE CARDS IS SWITCHED OFF, the owner's decision. The cards stay,
-          and the sentence under the heading says where a role is added now: the add block above. The page keeps its own
-          words for it — "Add an office role above" — because the reader is on this page; the door names the page to go
-          to for a caller who is not on it (see 8NsXCjJEaqQR item 3). */}
+          THE DOOR THAT WROTE THESE CARDS IS SWITCHED OFF, the owner's decision. The cards stay, and a role is
+          added now in the add block above. */}
       <section className="rol-group" {...declaredAttributes({ surface: 'roles.madehere' })}>
         <h2 data-title-is="its-label" className="rol-group-name">{ROLES_WORDS.madeHere}</h2>
-        <p className="rol-moved" data-role-cards-moved="">{t('addedRoles.addAnOfficeRoleAbove')}</p>
         <ul className="rol-blocks">
           {said.madeHere.map((one) => (
             <Block
@@ -321,22 +316,18 @@ export function TheCards({
               chosenPortrait={one.portrait}
               mark={ROLES_WORDS.written}
               /* WHAT A CARD WRITTEN HERE IS WORTH, ON THE CARD. It is not a footnote under the list: a
-                 reader meets one card at a time, and the note is about THIS card rather than about the
-                 page. Criterion P51 asks for this line. The page draws its own words key in the page's
-                 language (see 8NsXCjJEaqQR item 3). It says "above" because its reader is on the
-                 page; the server's `nothingEnforcesACardMadeHere` names the Role cards page instead,
-                 because a caller of the door is not on it. */
-              enforces={t('addedRoles.nothingEnforcesAnOldCard')}
+                 reader meets one card at a time, and the state is about THIS card rather than about the
+                 page. Criterion P51 asks for this line. */
+              enforces={t('addedRoles.notEnforced')}
               key={one.record}
             />
           ))}
         </ul>
       </section>
 
-      {/* THE COPY GRANTS NOTHING, said where the copies are listed. A card sitting in the place a
-          reader trusts to say what the rules are would otherwise be taken for the rules. It is the
-          server's own sentence, not a second statement of it. */}
-      <FirstSentenceInSight className="rol-says" text={said.theCopyGrantsNothing} opens="w13q.roles.copyOpens" />
+      {/* THE COPY GRANTS NOTHING, the server's own sentence, drawn for a developer only, as decided in
+          November 2026. */}
+      <ServerNote text={said.theCopyGrantsNothing} />
     </>
   )
 }
@@ -392,7 +383,7 @@ function Block({
   standing?: string
   /** Which of the two kinds of card this is: a Mole Office default, or one written here. */
   mark: string
-  /** The sentence saying nothing enforces this card. Undefined on a declared one, which is enforced. */
+  /** The state saying nothing enforces this card. Undefined on a declared one, which is enforced. */
   enforces?: string
   /** The elevation rule, on the one card that can hold one. Criteria P59 and P64: no press here. */
   elevation?: { rule: ElevationRule }
@@ -422,8 +413,8 @@ function Block({
         ) : (
           // THE PAGE DRAWS A SMALL COPY AND A PRESS OPENS THE WHOLE PICTURE. Five whole portraits made this
           // page's first load 14.0 MB; the copy is made on the server and the chosen address is unchanged.
-          <OpensLarge src={whereRequestsGo(picture)} alt={t('g6b.cardPicture', { name: cardWord(card.name) })}>
-            <img className="rol-portrait" src={whereRequestsGo(smallPortrait(picture))} alt={t('g6b.cardPicture', { name: cardWord(card.name) })} />
+          <OpensLarge src={whereRequestsGo(picture)} crossOrigin={theCrossOriginOfALoad()} alt={t('g6b.cardPicture', { name: cardWord(card.name) })}>
+            <img className="rol-portrait" src={whereRequestsGo(smallPortrait(picture))} crossOrigin={theCrossOriginOfALoad()} alt={t('g6b.cardPicture', { name: cardWord(card.name) })} />
           </OpensLarge>
         )}
       </div>
@@ -545,11 +536,11 @@ function Block({
           </p>
         </Explain>
 
-        {/* THE WAY IN, OR THE STATE THAT SAYS WHY THERE IS NONE. Criterion P66. A press that goes
-            nowhere is worse than saying there is no page, and the mark carries what makes one. */}
+        {/* THE WAY IN, OR THE STATE THAT THERE IS NONE. Criterion P66. A press that goes nowhere is
+            worse than saying there is no page. */}
         {record === null ? (
           <p className="rol-absent">
-            <Absence title={t('g6b.roles.noPageSays')} />
+            <Absence title={ROLES_WORDS.noPage} />
           </p>
         ) : (
           <p className="rol-open">
@@ -576,8 +567,8 @@ function Block({
  * on the role profile reached from the Embassy.
  *
  * So what was here — the choice of end, the box for it, the press and the press that ended it — is
- * on `TheirCard`, on the agent's own profile. What stays is the declaration's own sentence about
- * what the standing is, which is a description, and the way to the page where the person does it.
+ * on `TheirCard`, on the agent's own profile. What stays is the first sentence of the declaration's
+ * own description behind the hint, and the way to the page where the person does it.
  *
  * THE STATE IS NOT HERE EITHER. Who is acting for the person right now is on that agent's profile and on
  * this card's own page; a card in a list of cards is not where somebody looks for it, and drawing it
@@ -586,13 +577,11 @@ function Block({
 function TheElevation({ said }: { said: { rule: ElevationRule } }) {
   return (
     <div className="rol-elev">
-      <span className="rol-key">{ROLES_WORDS.actingFor}</span>
-      <FirstSentenceInSight
-        className="rol-elev-says"
-        text={said.rule.whatItIs[wordLanguage() === 'zh' ? 'zh' : 'en'] ?? ''}
-        opens="w13q.roles.actingForOpens"
-      />
-      {/* THE PRESS STAYS IN SIGHT, outside the fold. */}
+      <div className="rol-elev-head">
+        <span className="rol-key">{ROLES_WORDS.actingFor}</span>
+        <Hint>{cutAfterTheFirstSentence(said.rule.whatItIs[wordLanguage() === 'zh' ? 'zh' : 'en'] ?? '').first}</Hint>
+      </div>
+      {/* THE PRESS STAYS IN SIGHT, outside the hint. */}
       <RouteLink to={pathFor('embassy')}>{ROLES_WORDS.whereItIsDone}</RouteLink>
     </div>
   )
@@ -603,22 +592,6 @@ export function cutAfterTheFirstSentence(text: string): { first: string; rest: s
   const trimmed = text.trim()
   const cut = /^(.*?(?:[.!?](?=\s)|[。！？]))\s*(\S[\s\S]*)$/u.exec(trimmed)
   return cut === null ? { first: trimmed, rest: '' } : { first: cut[1] ?? trimmed, rest: cut[2] ?? '' }
-}
-
-/**
- * A SERVER'S SENTENCES WITH THE FIRST ONE IN SIGHT AND THE REST ONE PRESS DOWN (wave 13q round
- * 48). The first sentence is cut from the text itself, so the visible line and the fold cannot
- * say different things. A text of one sentence is drawn whole, with no fold, because a fold would hold nothing.
- */
-function FirstSentenceInSight({ className, text, opens }: { className: string; text: string; opens: WordKey }) {
-  const { first, rest } = cutAfterTheFirstSentence(text)
-  // The fold's name is looked up only when a fold is drawn, so a one-sentence text asks for no word it does not show.
-  if (rest === '') return <p className={className}>{first}</p>
-  return (
-    <Explain declares={{ surface: null }} meaning={<span className={className}>{first}</span>} opens={t(opens)}>
-      <p className={className}>{rest}</p>
-    </Explain>
-  )
 }
 
 /**
@@ -811,7 +784,7 @@ function Node({
           // the pictures have arrived.
           portraits === null ? null : <span className="rol-absent rol-tree-no-portrait"><Absence title={ROLES_WORDS.noPortrait} /></span>
         ) : (
-          <img className="rol-tree-portrait" src={whereRequestsGo(smallPortrait(picture))} alt={t('g6b.cardPicture', { name: cardWord(card.name) })} />
+          <img className="rol-tree-portrait" src={whereRequestsGo(smallPortrait(picture))} crossOrigin={theCrossOriginOfALoad()} alt={t('g6b.cardPicture', { name: cardWord(card.name) })} />
         )}
       </div>
       <div className="rol-tree-body">
@@ -826,7 +799,7 @@ function Node({
         </p>
         {record === null ? (
           <p className="rol-tree-no-page">
-            <Absence title={t('g6b.roles.noPageSays')} />
+            <Absence title={ROLES_WORDS.noPage} />
           </p>
         ) : (
           <p className="rol-tree-open">
@@ -840,7 +813,7 @@ function Node({
           holds={{ count: powers.length, what: t('g6b.roles.powerUnit', { n: powers.length }) }}
         >
           {powers.length === 0 ? (
-            <Absence  title={ROLES_WORDS.noPowersSays} />
+            <Absence title={ROLES_WORDS.noPowersWord} />
           ) : (
             <ul className="rol-powers">
               {powers.map((one) => (
@@ -867,7 +840,7 @@ function Powers({ names }: { names: readonly string[] }) {
     <section className="rol-act-group">
       <h4 data-title-is="its-label" className="rol-act-name">{ROLES_WORDS.powers}</h4>
       {names.length === 0 ? (
-        <Absence  title={ROLES_WORDS.noPowersSays} />
+        <Absence title={ROLES_WORDS.noPowersWord} />
       ) : (
         <ul className="rol-powers">
           {names.map((one) => (
@@ -1018,16 +991,6 @@ export const ROLES_CSS = `
   font-size: var(--fs-1); font-weight: 600; color: var(--text-3);
   letter-spacing: .06em; text-transform: uppercase;
 }
-.rol-says {
-  margin: 0; max-width: var(--measure-in-box);
-  font-size: var(--fs-1); line-height: var(--lh-read); color: var(--text-3);
-}
-/* WHERE A ROLE IS ADDED NOW, over the cards the switched-off door wrote. A reader acts on it, so it is
-   not dimmed like the notes beside it. */
-.rol-moved {
-  margin: 0; max-width: var(--measure-in-box);
-  font-size: var(--fs-2); line-height: var(--lh-read); color: var(--text-2);
-}
 
 /* THE POWER TREE, DRAWN AS A HIERARCHY. Criteria P68 and P79. The chain runs top to bottom, so the
    reading does not depend on the window. The card off the tree sits under the chain, to one side.
@@ -1143,7 +1106,7 @@ export const ROLES_CSS = `
 /* WHAT ACTING FOR THE PERSON IS. Criteria P59 and P64. It is a description on a card, so it carries
    the weight of a fact somebody reads rather than of a control: the presses are on the profile. */
 .rol-elev { margin: 0; max-width: var(--measure-in-box); min-width: 0; display: grid; gap: var(--pad); justify-items: start; }
-.rol-elev-says { font-size: var(--fs-1); line-height: var(--lh-read); color: var(--text-2); }
+.rol-elev-head { display: flex; align-items: center; min-width: 0; }
 
 /* AN ABSENCE AND A STALE COPY. Both are quieter than a fact and both say what they are. */
 .rol-absent { margin: 0; font-size: var(--fs-1); font-style: italic; color: var(--text-3); }

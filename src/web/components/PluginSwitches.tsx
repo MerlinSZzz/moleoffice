@@ -8,11 +8,10 @@
  * WHAT IS DRAWN
  * ---------------------------------------------------------------------------------------
  *
- * One sentence saying what a plugin is, then one row per plugin: its name and version, which views of the read
+ * One row per plugin: its name and version, which views of the read
  * interface it reads, and a switch drawn like the inject switch (src/web/components/InjectSwitch.tsx), with the word On
- * or Off beside it so the state is never carried by colour alone. Under the switch one sentence says the state and
- * whether anybody chose it. A refused plugin draws no switch: it says it cannot be switched on and says the reason in
- * plain words, in the page's language, one sentence to a line, in the reading face. The office's reader's own text
+ * or Off beside it so the state is never carried by colour alone. A refused plugin draws no switch: it says "refused"
+ * and says the reason in plain words, in the page's language, one sentence to a line, in the reading face. The office's reader's own text
  * belongs in Developer mode, and is drawn there in `.plgs-raw` for the causes whose reader text says more than the
  * plain words can (a plugin.json that is not JSON, and a manifest whose fields the office does not accept); every
  * other cause's reader text is the same English the words table holds, so it is not drawn twice.
@@ -22,7 +21,7 @@
  * a decision. A refused plugin has no name the office accepted, so its id is drawn in both
  * modes.
  *
- * THE TWO EMPTY STATES ARE DIFFERENT SENTENCES. No plugins folder at all is not the same as a folder with nothing in it.
+ * NO PLUGINS FOLDER AND AN EMPTY ONE BOTH DRAW "none", as decided: in both there is no plugin to switch.
  *
  * THE STATE DRAWN IS THE STORED ONE. After a press the row reads the door's answer, so a switch moves only once the
  * office has stored the change. A refused press leaves the switch where it was and draws the refusal under it.
@@ -42,7 +41,7 @@ import { useLanguage } from '../lib/language.ts'
 import { useInspect } from '../lib/mode.ts'
 import { pluginReasonInPlainWords, theRawTextSaysMore } from '../lib/plugin-reason.ts'
 import { SettingChangedLine } from './SettingChangedLine.tsx'
-import { ErrorNote, Loading, Panel, useAsync } from './ui.tsx'
+import { ErrorNote, Loading, Panel, ServerNote, useAsync } from './ui.tsx'
 
 /** Sent on the window after a switch is stored, so the sidebar lists the switched-on plugins' pages again. */
 export const PLUGINS_CHANGED = 'mole-office.plugins.changed'
@@ -67,11 +66,8 @@ function PluginSwitches({ first }: { first: PluginsReading }) {
   const [changeNumber, setChangeNumber] = useState(0)
   return (
     <div className="plgs">
-      <p className="plgs-what">{t('settingsPanel.plugins.whatTheyAre')}</p>
-      {!first.folderFound ? (
-        <p className="plgs-empty">{t('settingsPanel.plugins.noFolder')}</p>
-      ) : first.plugins.length === 0 ? (
-        <p className="plgs-empty">{t('settingsPanel.plugins.none')}</p>
+      {!first.folderFound || first.plugins.length === 0 ? (
+        <p className="plgs-empty">{t('absence.none')}</p>
       ) : (
         <ul className="plgs-list">
           {first.plugins.map((plugin) => (
@@ -133,7 +129,7 @@ function PluginRow({ first, onChanged }: { first: PluginReading; onChanged: () =
       </div>
       {manifest === null ? (
         <>
-          <p className="plgs-refused">{t('settingsPanel.plugins.refused')}</p>
+          <p className="plgs-refused">{t('pluginState.refused')}</p>
           {/* ONE SENTENCE TO A LINE, in the page's language. Normal mode draws nothing else: the reader's own text is
               not for a person, and nothing raw is drawn here, by 2ofDpr3_ED-D and
               a decision. */}
@@ -169,9 +165,6 @@ function PluginRow({ first, onChanged }: { first: PluginReading; onChanged: () =
               {t(settingsControlWord('settings.plugins', on ? 'settingsPanel.plugins.on' : 'settingsPanel.plugins.off'))}
             </span>
           </div>
-          <p className="plgs-state">
-            {reading.nobodyChose ? t('settingsPanel.plugins.nobodyChose') : on ? t('settingsPanel.plugins.switchedOn') : t('settingsPanel.plugins.switchedOff')}
-          </p>
         </>
       )}
       {fault === null ? null : <p className="plgs-refuse">{fault}</p>}
@@ -191,7 +184,6 @@ function PluginRow({ first, onChanged }: { first: PluginReading; onChanged: () =
  */
 function OfficeMapSettings() {
   useLanguage()
-  const developer = useInspect()
   const [first] = useAsync(() => api.pixelSettings(), [])
   const [stored, setStored] = useState<PixelSettingsReading | null>(null)
   const [busy, setBusy] = useState(false)
@@ -242,18 +234,7 @@ function OfficeMapSettings() {
                 {t(settingsControlWord('settings.plugins', moves ? 'settingsPanel.plugins.on' : 'settingsPanel.plugins.off'))}
               </span>
             </div>
-            <p className="plgs-state">{t(moves ? 'settingsPanel.plugins.officeMap.moves' : 'settingsPanel.plugins.officeMap.still')}</p>
-            {reading.mayChange ? null : (
-              <p className="plgs-state">
-                {t('settingsPanel.plugins.officeMap.notYours')}
-                {developer && reading.refusal !== null ? (
-                  <>
-                    {' '}
-                    <span lang="en">{content(reading.refusal)}</span>
-                  </>
-                ) : null}
-              </p>
-            )}
+            {reading.mayChange ? null : <ServerNote text={reading.refusal} />}
           </>
         )}
         {fault === null ? null : <p className="plgs-refuse">{fault}</p>}
@@ -265,7 +246,6 @@ function OfficeMapSettings() {
 /** The panel's own rules, the inject switch's drawn again under this panel's names. Every value is a token. No backtick inside. */
 const PLUGIN_SWITCHES_CSS = `
 .plgs { display: flex; flex-direction: column; gap: var(--pad); min-width: 0; }
-.plgs-what { margin: 0; max-width: var(--measure-in-box); font: var(--fs-1)/var(--lh-body) var(--font-ui); color: var(--text-3); }
 .plgs-empty { margin: 0; max-width: var(--measure-in-box); font: var(--fs-1)/var(--lh-tight) var(--font-ui); color: var(--text-2); }
 .plgs-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--pad); min-width: 0; }
 .plgs-row {
@@ -276,7 +256,7 @@ const PLUGIN_SWITCHES_CSS = `
 .plgs-name { font: 600 var(--fs-1)/var(--lh-tight) var(--font-ui); color: var(--text); overflow-wrap: anywhere; }
 .plgs-version { font: var(--fs-1)/var(--lh-tight) var(--font-ui); color: var(--text-3); }
 .plgs-id { font: var(--fs-1)/var(--lh-tight) var(--font-mono); color: var(--text-3); overflow-wrap: anywhere; }
-.plgs-reads, .plgs-state { margin: 0; max-width: var(--measure-in-box); font: var(--fs-1)/var(--lh-tight) var(--font-ui); color: var(--text-2); }
+.plgs-reads { margin: 0; max-width: var(--measure-in-box); font: var(--fs-1)/var(--lh-tight) var(--font-ui); color: var(--text-2); }
 .plgs-switch-row { display: flex; align-items: center; gap: var(--pad); }
 .plgs-switch {
   position: relative; flex: none; width: 44px; height: 24px; padding: 0;

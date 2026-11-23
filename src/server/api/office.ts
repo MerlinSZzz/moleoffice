@@ -45,6 +45,8 @@ import { theFirstPortraitThatExists } from '../lib/portraits.ts'
 import {
   EMBASSY_PAGE_ROWS,
   EMBASSY_PAGE_ROWS_MOST,
+  anAskTheEmbassyDraws,
+  hisBrowsersIn,
   isEphemeral,
   theEmbassyPageDrawsThisRow,
   type EmbassyKey,
@@ -61,18 +63,25 @@ import {
   endTheVisitsOfANewlyRegisteredWorld,
   everyCredential,
   issueAPersonsDeviceCredential,
+  pairABrowserAsThePerson,
   refuseIfThisMachineKnockedTooOften,
 } from '../lib/visitors.ts'
-// THE KEYS THE OFFICE HOLDS. Criterion D2, P83 point 4: the asking browser's token is set as the
-// same cookie the loopback press sets, and the read learns which credential the cookie belongs to by
-// its SHA-256 and never by the token.
+// THE KEYS THE OFFICE HOLDS. Criterion D2, P83 point 4: the press and the ask door set the cookie
+// half of a browser's device key, and the read learns which credential the two halves belong to by
+// the SHA-256 of the key they join to and never by the key.
 import {
-  setTheAskingBrowsersCookie,
-  setThePairedBrowserCookie,
+  setTheDeviceHalfCookie,
+  endTheOldCookie,
+  aMovesLogLine,
   everyLiveKeyHeldBy,
   everyLiveKeyOfTheAgentWithThisId,
 } from '../lib/keys.ts'
+// THE MOVE OF THE OLD COOKIE TO TWO HALVES, ONCE. Item 7 of SEC-2's design.
+import { moveTheOldCookie, refuseAMoveThatFoundNothing, whatTheOldCookieMayMove } from '../lib/the-old-cookie.ts'
 import { theHashOfTheKeyOnThisRequest } from '../db/the-key-on-this-request-was-made-for-a-run.ts'
+import { howThisPressProvesTheKeyItMakes } from '../lib/provedkeys.ts'
+// A PRESS THAT GIVES A BROWSER A KEY TAKES A REQUEST FROM A PAGE OF THIS OFFICE, OR FROM NO PAGE.
+import { refuseAPressAnotherSiteSent } from '../lib/a-press-another-site-sent.ts'
 // WHICH MACHINES THIS OFFICE TRUSTS. Criterion P73, and G2 of P83's amendment: the ask press is
 // offered on the listener for other machines, to an address on this list and to nothing else.
 
@@ -102,10 +111,14 @@ import type { PickUpCost } from '@shared/pick-up-cost.ts'
 import type { AHeaderOnlyCaller, WhatTheHeaderOnlyCallersSay } from '@shared/headeronlycalls.ts'
 // WHETHER THIS BROWSER IS PAIRED, criterion P83 point 2. The shape is shared with the pairing page
 // that draws it, so the reader and the writer cannot disagree about either half.
-import type {
-  WhatAskingToPairSays,
-  WhatThePairingSays,
-  WhatThisBrowserIsWaitingOn,
+import { THE_PERSON } from '@shared/person.ts'
+import {
+  thePairingRefusalFor,
+  type WhatAskingToPairSays,
+  type WhatTheMoveSays,
+  type WhatThePairingSays,
+  type WhatThePressSays,
+  type WhatThisBrowserIsWaitingOn,
 } from '@shared/pairing.ts'
 import { asContactsToPlace, theContactsOfOneReader } from '../lib/messages.ts'
 import { groupsOf, placeTheContacts } from '../lib/contacts.ts'
@@ -118,6 +131,8 @@ import { route } from '../lib/route.ts'
 import { PanelError } from '../lib/panel-error.ts'
 import {
   endVisitHere,
+  isAVisitFromThisOfficesFormerHome,
+  isThisOfficesHome,
   openVisitsThisWorldCanSee,
   registerVisitHere,
   reportHeldVisitsToTheOffice,
@@ -185,7 +200,7 @@ const REGISTER_VISIT_NOTE =
   'REGISTER A TRIP. It is sent to the world being ENTERED, which is the world that has to check it, and that ' +
   'world reports it to the office. A visit to the world the visitor already lives in is refused: there is ' +
   'nothing to register, because a citizen at home is never checked. A visit says what you came to do, and one ' +
-  'with that line empty is refused as well.'
+  'with that line empty is refused as well. A visit from a former home of this office answers at home and registers nothing.'
 
 const END_VISIT_NOTE =
   'THE VISIT IS OVER. The row is kept and marked; nothing is deleted. A visit already ended is handed back as ' +
@@ -383,39 +398,62 @@ const HEADER_ONLY_NOTE =
 const PAIRING_NOTE =
   'WHETHER THIS BROWSER HOLDS THE PERSON\'S KEY, WHETHER PAIRING IS OFFERED, WHETHER IT MAY ASK, AND WHAT IT IS ' +
   'WAITING ON. Criterion P83, point 2, and its amendment of 13 September 2026 at 18:50. `paired` is true ' +
-  'only when the request carried the person\'s key — as the cookie the pairing press set, or as the header the ' +
-  'local app holds — and it is deliberately not the one-version window, which also covers a keyless claim: a ' +
+  'only when the request carried the person\'s key — as the two halves the pairing press gave, or as the header ' +
+  'the local app holds — and it is deliberately not the one-version window, which also covers a keyless claim: a ' +
   'browser the window made the person must still be offered pairing, or it would never receive the key that ' +
   'outlives the window. `offered` is true only on the machine Mole Office runs on, which the listener stamped ' +
   'and no caller can set, and only where a program there can pair: not on a Mac or Windows outside the installed ' +
   'app, where Mole Office cannot tell which program sent a request. Inside the installed app a browser is offered ' +
   'it too, and only the window\'s press pairs. `mayAsk` is true only through the listener for other machines, ' +
   'whether the office trusts that machine or not, when this browser holds no key: that is the knock the person ' +
-  'approves on this computer. `waiting` is read from the cookie and names the credential this browser already ' +
-  'asked under, when, and whether it is pending, confirmed or ended, so a reload does not lose it. Reads nothing ' +
-  'and writes nothing.'
+  'approves on this computer. `waiting` is read from the two halves and names the credential this browser already ' +
+  'asked under, when, and whether it is pending, confirmed or ended, so a reload does not lose it. `mayMove` is ' +
+  'true only when the request does not prove the person and its old cookie holds a key the move door moves to two ' +
+  'halves: the person\'s key, or a confirmed person\'s-device credential\'s one-piece token. Never in a test world. ' +
+  'Reads nothing and writes nothing.'
 
 const PAIR_NOTE =
-  'PAIR THIS BROWSER: SET THE PERSON\'S KEY AS A COOKIE, IN ONE PRESS. Criterion P83, point 2. The key is read ' +
-  'from the file the office made at first run and is never returned, logged or stored anywhere else; the reply ' +
-  'says only that this browser is now paired. The cookie is HttpOnly, so page JavaScript cannot read it, and ' +
-  'SameSite strict, so another site cannot make this browser act as the person. KEPT ON THIS MACHINE: pairing is ' +
-  'offered only to a request the listener stamped as this machine, which is one on 127.0.0.1 or one that came to ' +
-  'the address for other machines from one of this computer\'s own addresses, and a caller from another computer ' +
-  'is refused before this handler runs. It is not the person\'s own act in the registry sense — the browser ' +
-  'pressing it holds no key yet, and the listener\'s stamp is the proof — so it asks for no key and changes ' +
-  'nothing but this browser\'s cookie.'
+  'PAIR THIS BROWSER: GIVE IT A DEVICE KEY OF ITS OWN IN TWO HALVES, IN ONE PRESS. Criterion P83, point 2. Body ' +
+  '{"device":"<the name this browser gives itself>"}, 1 to 80 characters. The press issues a person\'s-device ' +
+  'credential, confirms it by the person at once and binds its key. The key is made of two halves and neither is ' +
+  'enough alone. The cookie half is set as an HttpOnly cookie, SameSite strict, so page JavaScript cannot read it ' +
+  'and another site cannot make this browser send it. The header half is in the answer, once, for the page to keep ' +
+  'and send as a header; the answer is never stored. The whole key is never answered, logged or stored. The ' +
+  'browser is listed on the person\'s own card by its name, and ending it there ends this pairing. KEPT ON THIS MACHINE: ' +
+  'pairing is offered only to a request the listener stamped as this machine, which is one on 127.0.0.1 or one ' +
+  'that came to the address for other machines from one of this computer\'s own addresses, and a caller from ' +
+  'another computer is refused before this handler runs. A press another site\'s page sent is refused before ' +
+  'anything is issued. It is not the person\'s own act in the registry sense — the browser pressing it holds no ' +
+  'key yet, and the listener\'s stamp is the proof — so it asks for no key.'
 
 const ASK_TO_PAIR_NOTE =
-  'ASK TO PAIR THIS BROWSER: ISSUE A PERSON\'S-DEVICE CREDENTIAL AND SET ITS TOKEN AS THE SAME COOKIE THE PRESS ON ' +
-  'THIS COMPUTER SETS. Criterion D2 and the amendment of 13 September 2026 at 18:50. Body {"device":"<the name this ' +
-  'browser gives itself>"}. It issues through the same issuing path the credential flow\'s device ask uses, and ' +
-  'it NEVER ANSWERS THE TOKEN: the reply names the credential\'s id, the device\'s name and that the person\'s confirmation ' +
-  'is still needed. Nothing works until the person confirms it at the Embassy on the machine that runs the office. ' +
+  'ASK TO PAIR THIS BROWSER: ISSUE A PERSON\'S-DEVICE CREDENTIAL AND GIVE THIS BROWSER ITS KEY IN TWO HALVES, AS THE ' +
+  'PRESS ON THIS COMPUTER DOES. Criterion D2 and the amendment of 13 September 2026 at 18:50. Body {"device":"<the ' +
+  'name this browser gives itself>"}. It issues through the same issuing path the credential flow\'s device ask uses. ' +
+  'It sets the cookie half as an HttpOnly cookie and answers the header half once, and it NEVER ANSWERS THE WHOLE ' +
+  'KEY: the reply names the credential\'s id, the device\'s name, the header half and that the person\'s ' +
+  'confirmation is still needed. A press another site\'s page sent is refused before anything is issued. ' +
+  'Nothing works until the person confirms it on their own person card, on the machine that runs the office. ' +
   'OFFERED FROM ANOTHER MACHINE, WHETHER THE OFFICE TRUSTS IT OR NOT: the request must have arrived through the ' +
   'listener for other machines, which the listener measured, and this browser must hold no key. A caller from this ' +
   'computer uses the press on this computer instead. One address may ask a bounded number of times in a window; after ' +
   'that the answer is 429 and names the wait, and nothing is written.'
+
+const MOVE_NOTE =
+  'MOVE THIS BROWSER FROM THE OLD COOKIE TO TWO HALVES, ONCE. Item 7 of SEC-2\'s design. Body {"device":"<the name ' +
+  'this browser gives itself>"}, 1 to 80 characters. Before SEC-2 a paired browser held a whole key in the old ' +
+  'cookie, and that cookie is no key now. When it holds the person\'s key, the move issues a person\'s-device ' +
+  'credential under the name given and confirms it by the person, as the press does. When it holds the one-piece ' +
+  'token of a confirmed person\'s-device credential that still works, the move issues a new credential under the ' +
+  'old one\'s name, confirmed by whoever confirmed the old one, and ends the old one, which revokes its key. The ' +
+  'cookie half is set, the header half is answered once with no-store, and the old cookie is ended in the same ' +
+  'answer. The answer says which of the two moved, and the server\'s log says it in one line with no key, half or ' +
+  'token. Nothing else moves: no agent\'s credential, no credential that is waiting, ended or expired, and no key ' +
+  'this office never gave; that is refused with 409, nothing is written, and an old cookie that was sent is ended. ' +
+  'A request that already proves the person does not move, and is refused the same way. A press another ' +
+  'site\'s page sent is refused before anything is read. In a test world nothing moves and no old cookie is ended, ' +
+  'because a cookie goes to every port of its host and the one a world is sent is the office\'s. It asks for no ' +
+  'key and no sandbox check: the old cookie\'s key is the proof, as it was before SEC-2.'
 
 /**
  * WHAT A PAGE OF THE EMBASSY ASKS FOR. Null, the third argument left out, answers the whole roll as
@@ -504,6 +542,8 @@ export function theEmbassy(
     credential: string | null
     /** Whether the reader has this participant on their contacts list. */
     contact: boolean
+    /** Whether the row is a person's browser, which a page of the Embassy never draws. Design C of early idea B9. */
+    device: boolean
     /** The whole row, made when a page draws it. */
     fill: () => EmbassyRow
   }[] = []
@@ -777,6 +817,7 @@ export function theEmbassy(
         closed: kind === 'agent' && (one as { retired?: boolean }).retired === true,
         credential: stored?.credential ?? null,
         contact: contact.contact,
+        device: false,
         fill: () => {
           const known = registered(who)
           return {
@@ -842,6 +883,7 @@ export function theEmbassy(
       closed: false,
       credential: stored?.credential ?? null,
       contact: contact.contact,
+      device: false,
       fill: () => {
         const known = registered(visit.visitor)
         return {
@@ -920,6 +962,7 @@ export function theEmbassy(
       closed: credential.endedAt !== null,
       credential: credential.id,
       contact: contact.contact,
+      device: isAPersonsDeviceCredential(credential),
       fill: () => {
         const known = registered(who)
         const role = known.role ?? credential.role
@@ -995,7 +1038,11 @@ export function theEmbassy(
    * a person is being asked to supervise from.
    */
   const here = theWorldThisDatabaseIs()
-  /** Every citizen a world has, by the identity of the world they live in. Counted before any row is built. */
+  /**
+   * Every citizen a world has, by the identity of the world they live in. Counted before any row is built. A citizen
+   * whose home world is this office's home by `isThisOfficesHome`, a dead home of this installation included, is
+   * counted under this world, so a move of the data folder does not leave this office's own citizens on its old row.
+   */
   const citizensByWorld = new Map<string, number>()
   for (const [kind, list] of [
     ['person', both.people],
@@ -1004,7 +1051,8 @@ export function theEmbassy(
     for (const one of list) {
       if (one.homeWorld === null) continue
       if (officeTest({ kind, id: one.id })) continue
-      citizensByWorld.set(one.homeWorld, (citizensByWorld.get(one.homeWorld) ?? 0) + 1)
+      const world = here !== null && isThisOfficesHome(one.homeWorld) === true ? here : one.homeWorld
+      citizensByWorld.set(world, (citizensByWorld.get(world) ?? 0) + 1)
     }
   }
   /** The world panel's rows, made once when a page draws them. A read about one row does not. */
@@ -1041,8 +1089,16 @@ export function theEmbassy(
   // in the whole answer and in a page alike.
   const projectsByAgent = projectsOfAgents()
   const personalMarks = agentMarksFor(reader)
+  // AND THE PERSON'S OWN ROW CARRIES HOW MANY BROWSERS THEY HAVE AND HOW MANY WAIT, read from the same split their card draws.
+  // Design C of early idea B9. Absent when they have none paired or waiting, so their row is as it was.
+  const his = hisBrowsersIn(credentials)
+  const hisCounts = his.paired.length + his.waiting.length === 0
+    ? undefined
+    : { paired: his.paired.length, waiting: his.waiting.length }
+  const isHim = (who: ParticipantRef): boolean => who.kind === 'person' && who.id === THE_PERSON
   const fillRow = (one: (typeof candidates)[number]): EmbassyRow => {
     const row = one.fill()
+    if (isHim(row.who) && hisCounts !== undefined) return { ...row, hisBrowsers: hisCounts }
     return row.who.kind === 'agent' && row.registered
       ? { ...row, projects: projectsByAgent.get(row.who.id) ?? [], personalTags: personalMarks.get(row.who.id) ?? [] }
       : row
@@ -1058,8 +1114,11 @@ export function theEmbassy(
   const { view, from, limit, row } = asked
   // AN ASK TO COME IN IS NEVER A ROW, in every view: it is drawn in the asking block above the list.
   // The other two presses only widen which of the standings the list draws.
+  // AND A PERSON'S BROWSER IS NEVER A ROW OF A PAGE, in every view: it is drawn on the person's card (design C of early idea B9).
+  // A read about one row still answers it, because the card's key press reads its keys there.
   const inTheView = (one: (typeof candidates)[number]): boolean =>
     one.standing !== 'asks to come in' &&
+    !one.device &&
     (view.retired || !one.closed) &&
     (view.everyone ||
       // A CLOSED ROW IS IN THE VIEW BY THE RETIRED PRESS ON THE LINE ABOVE, so here it is asked only
@@ -1069,6 +1128,8 @@ export function theEmbassy(
         retired: false,
         contact: one.contact,
         credential: one.credential,
+        device: one.device,
+        hisBrowsers: isHim(one.who) && hisCounts !== undefined,
       }))
   const pageRows =
     row === null
@@ -1095,24 +1156,28 @@ export function theEmbassy(
   const hidden = candidates.filter(
     (one) =>
       one.standing !== 'asks to come in' &&
+      !one.device &&
       !one.closed &&
       !theEmbassyPageDrawsThisRow({
         standing: one.standing,
         retired: one.closed,
         contact: one.contact,
         credential: one.credential,
+        device: one.device,
+        hisBrowsers: isHim(one.who) && hisCounts !== undefined,
       }),
   ).length
   return {
     rows: pageRows.map(fillRow),
     // A READ ABOUT ONE ROW CARRIES NO ASKING LIST AND NO WORLD PANEL: the panel that asks for it
     // draws one participant's keys, and the confirm reply is the one row the press made.
-    visitors: row === null ? credentials.filter(credentialNeedsOwnerAction) : [],
+    // AN AGENT'S ASK ONLY: a browser's ask is drawn on the person's card. Design C of early idea B9.
+    visitors: row === null ? credentials.filter(anAskTheEmbassyDraws) : [],
     worlds: row === null ? everyWorld : [],
     ...everything,
     rowsTotal: row === null ? rowsTotal : 1,
     hidden: row === null ? hidden : 0,
-    retiredCount: row === null ? candidates.filter((one) => one.closed).length : 0,
+    retiredCount: row === null ? candidates.filter((one) => one.closed && !one.device).length : 0,
     otherWorlds: row === null ? theWorldRows().filter((one) => !stillRunning(one)).length : 0,
     next: theNextPage(),
   }
@@ -1192,7 +1257,13 @@ function theEmbassyRowTheQueryNames(row: string): { kind: 'agent' | 'person' | '
   return { kind, id }
 }
 
-export async function officeRoutes(app: FastifyInstance): Promise<void> {
+/** What the office's routes are told when they are registered. */
+export interface OfficeRoutesOptions {
+  /** Whether this process serves the built page itself. The pairing doors take a same-site press only when it does not. */
+  production: boolean
+}
+
+export async function officeRoutes(app: FastifyInstance, options: OfficeRoutesOptions): Promise<void> {
   app.get('/office/worlds', route('office.worlds', 'remote', LIST_NOTE), async () => whatTheOfficeSays())
 
   app.post('/office/worlds', route('office.register-world', 'remote', REGISTER_NOTE), async (req, reply) => {
@@ -1410,6 +1481,13 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
         409,
       )
     }
+    if (isAVisitFromThisOfficesFormerHome(body.fromWorld, here)) {
+      return {
+        visit: null,
+        atHome: true,
+        nothingWritten: `The world ${body.fromWorld} is a former home of this office, so the visitor lives here and nothing was registered.`,
+      }
+    }
     const visit = registerVisitHere({
       visitor,
       fromWorld: body.fromWorld,
@@ -1449,7 +1527,8 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
   //
   // A LOCAL BROWSER IS PAIRED ONCE. Criterion P83, point 2. The read answers whether this request
   // carried the person's key, whether pairing is offered here, whether this browser may ask, and
-  // what it is already waiting on; the press sets the key as a cookie. `arrivalOf` is the listener's
+  // what it is already waiting on; the press gives this browser a device key of its own in two halves,
+  // the cookie half as a cookie and the header half in the answer. `arrivalOf` is the listener's
   // stamp and is the only thing the offer reads — never an address and never a header — so a caller
   // cannot move the offer to itself. The press is `reach: 'local'`, so `refuseAnActFromAnotherMachine`
   // answers a caller from another computer before this handler runs and no cookie is set.
@@ -1475,38 +1554,46 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
       paired,
       offered: !paired && arrivalOf(req) === 'this machine' && whomThisComputerFinds() !== 'no program',
       mayAsk: !paired && mayThisBrowserKnock(req),
-      // A PAIRED BROWSER IS NOT WAITING. The cookie may still match the credential that made it the
+      mayMove: whatTheOldCookieMayMove(req, actor) !== null,
+      // A PAIRED BROWSER IS NOT WAITING. Its two halves may still match the credential that made it the
       // person, but the page's paired state is the whole answer then; null keeps the two apart.
-      waiting: paired ? null : theCredentialThisCookieIsWaitingOn(req),
+      waiting: paired ? null : theCredentialThisBrowserIsWaitingOn(req),
     }
   })
 
   app.post(
     '/office/pairing',
     route('office.pair', 'local', { because: 'reserved-to-the-owner', act: 'Pairing this browser' }, PAIR_NOTE),
-    async (req, reply): Promise<WhatThePairingSays> => {
-      // The same read as the get above, for the same reason, and the answer is discarded.
-      actorFrom(req)
+    async (req, reply): Promise<WhatThePressSays> => {
+      // A PAGE ON ANOTHER SITE MAY NOT PRESS IT. Asked first, so a refusal issues nothing and sets nothing.
+      refuseAPressAnotherSiteSent(req, options.production)
+      const body = parse(askingToPair, req.body, 'The name this browser gives itself')
+      // The same read as the get above, for the same reason, and it says how the press was proved.
+      const actor = actorFrom(req)
       // NOTHING FROM A SANDBOX IS THE PERSON, AND PAIRING MAKES A BROWSER THE PERSON. A decision on problem
       // T5Dbi_Z55666 says so.
       // An ordinary sandbox shares this computer's network, so its request arrives here as the person's
-      // browser's does, and this press answers the person's key itself. So the office asks which program sent it, and pairs
+      // browser's does, and this press gives a key that is the person. So the office asks which program sent it, and pairs
       // only when it is this computer's own, found, and in no container this server is not in (lib/from-a-sandbox.ts).
       // An in-process caller has no socket and nobody to ask. The reading waits without holding the thread, because
       // inside the installed Windows app it runs PowerShell, and the answer is kept on the socket.
       if (arrivalOf(req) === 'this machine') {
         const sentBy = await readWhoSentItFromThisComputer(req)
         if (sentBy !== THEIR_OWN_PROGRAM) {
-          throw new PanelError(
-            `Pairing gives the browser that asks the person's key, and this request came from ${sentBy}. Nothing that comes from ` +
-              "a sandbox is the person, and a program Mole Office cannot find is not taken for " +
-              `one of theirs. Nothing was paired and no cookie was set. ${theWayToPairOnThisComputer().whoPairs}`,
-            403,
-          )
+          throw new PanelError(`${thePairingRefusalFor(sentBy)} ${theWayToPairOnThisComputer().whoPairs}`, 403)
         }
       }
-      setThePairedBrowserCookie(reply)
-      return { paired: true, offered: false, mayAsk: false, waiting: null }
+      // THE PRESS IS THE PERSON'S CONFIRMATION. The listener's stamp and the program check above are the proof that the
+      // person's own browser on this computer pressed it, so the credential is confirmed in the person's name at once.
+      const from = writtenFrom(req)
+      const { halves } = pairABrowserAsThePerson(
+        { name: body.device, machine: from.machine, machineHow: from.how, runtime: from.program },
+        { kind: 'person', id: THE_PERSON },
+        howThisPressProvesTheKeyItMakes(actor),
+      )
+      setTheDeviceHalfCookie(reply, halves.cookie)
+      void reply.header('cache-control', 'no-store')
+      return { paired: true, offered: false, mayAsk: false, mayMove: false, waiting: null, deviceHalf: halves.header }
     },
   )
 
@@ -1515,10 +1602,10 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
    * that a browser may knock.
    *
    * It issues a person's-device credential through the same `issueAPersonsDeviceCredential` the
-   * credential flow's device ask uses, sets the credential's token as the same cookie the loopback
-   * press sets, and answers neither the token nor anything derived from it. The browser is nobody
-   * until the person confirms the credential at the Embassy; the cookie is the token's only home,
-   * and ending the credential revokes the key that token bound.
+   * credential flow's device ask uses. It sets the cookie half of the credential's key as the same
+   * cookie the loopback press sets, and answers the header half once, with no-store; it never answers
+   * the whole key. The browser is nobody until the person confirms the credential at the Embassy, and
+   * ending the credential revokes the key the two halves join to.
    *
    * IT IS `remote` AND IT IS NOT THE PERSON'S ACT. A caller from this computer is refused because
    * the loopback press is its way in. A caller from another machine, trusted or not, is answered and
@@ -1529,6 +1616,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     '/office/pairing/ask',
     route('office.issue-credential', 'remote', ASK_TO_PAIR_NOTE),
     async (req, reply): Promise<WhatAskingToPairSays> => {
+      refuseAPressAnotherSiteSent(req, options.production)
       actorFrom(req)
       if (!mayThisBrowserKnock(req))
         throw new PanelError(`${WHY_THIS_COMPUTER_DOES_NOT_ASK} ${theWayToPairOnThisComputer().onTheOfficesMachine}`, 403)
@@ -1541,13 +1629,41 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
         machineHow: from.how,
         runtime: from.program,
       })
-      setTheAskingBrowsersCookie(reply, issued.token)
+      setTheDeviceHalfCookie(reply, issued.halves.cookie)
+      void reply.header('cache-control', 'no-store')
       reply.code(201)
       return {
         credentialId: issued.credential.id,
         device: issued.credential.handle,
         waitingForConfirmation: true,
+        deviceHalf: issued.halves.header,
       }
+    },
+  )
+
+  /**
+   * MOVE THIS BROWSER FROM THE OLD COOKIE TO TWO HALVES, ONCE. Item 7 of SEC-2's design; lib/the-old-cookie.ts says
+   * what may move and why.
+   *
+   * IT ASKS FOR NO KEY AND NO SANDBOX CHECK. The old cookie's key is the proof, as it was on every request before SEC-2,
+   * and the move gives nothing that key did not already give. A page on another site may not send it, as it may not
+   * send the press.
+   */
+  app.post(
+    '/office/pairing/move',
+    route('office.move-pairing', 'remote', MOVE_NOTE),
+    async (req, reply): Promise<WhatTheMoveSays> => {
+      refuseAPressAnotherSiteSent(req, options.production)
+      const body = parse(askingToPair, req.body, 'The name this browser gives itself')
+      const actor = actorFrom(req)
+      const may = whatTheOldCookieMayMove(req, actor)
+      if (may === null) return refuseAMoveThatFoundNothing(req, reply)
+      const halves = moveTheOldCookie(req, may, body.device)
+      setTheDeviceHalfCookie(reply, halves.cookie)
+      endTheOldCookie(reply)
+      void reply.header('cache-control', 'no-store')
+      req.log.info(aMovesLogLine(may.moved))
+      return { moved: may.moved, deviceHalf: halves.header }
     },
   )
 }
@@ -1566,15 +1682,15 @@ function mayThisBrowserKnock(req: FastifyRequest): boolean {
 }
 
 /**
- * THE CREDENTIAL THIS BROWSER'S COOKIE BELONGS TO, or null because the cookie matches none.
+ * THE CREDENTIAL THIS BROWSER'S TWO HALVES BELONG TO, or null because the key they join to matches none.
  *
- * IT IS THE HASH AND NEVER THE TOKEN. keys.ts hashes whatever the request carried and hands back
+ * IT IS THE HASH AND NEVER THE KEY. keys.ts hashes whatever the request carried and hands back
  * only the SHA-256, which the office already stores in the clear. The visitor library then reads the
  * credential by that hash. So the page can say which device this browser asked under, when, and
- * whether it is still waiting — across a reload — without the token leaving the two files allowed to
+ * whether it is still waiting — across a reload — without the key leaving the files allowed to
  * hold it.
  */
-function theCredentialThisCookieIsWaitingOn(req: FastifyRequest): WhatThisBrowserIsWaitingOn | null {
+function theCredentialThisBrowserIsWaitingOn(req: FastifyRequest): WhatThisBrowserIsWaitingOn | null {
   const hash = theHashOfTheKeyOnThisRequest(req)
   if (hash === null) return null
   const credential = credentialByTokenHash(hash)

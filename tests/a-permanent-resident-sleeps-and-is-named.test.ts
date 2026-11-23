@@ -19,8 +19,9 @@
  *   held      4. while it sleeps a non-urgent message is not handed to its waiter, does not end a held waiter, and starts
  *                no run; an urgent one is handed; after waking the held ones are handed, in order;
  *   postpone  5. a postponed sleep writes one row and no message, no delivery and no row of what waits on the person;
- *   seen      6. the chat's presence reading carries the sleep line for a resident and nothing for an agent that is not
- *                one, and the resident's reading carries the sleep, the heartbeat and the compactions;
+ *   seen      6. the chat's presence reading carries the sleep line for a resident, with the sleep time its proposal
+ *                named, and nothing for an agent that is not one, and the resident's reading carries the sleep, the
+ *                heartbeat and the compactions;
  *   naming    7. after the confirm, a row waits on the person and the agent is sent one line; after `named` it goes;
  *   who       8. another agent with its own key, the resident without its key, and the person postponing are refused.
  *
@@ -39,7 +40,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { THE_PERSON } from '../src/shared/person.ts'
 import { RESIDENT_TO_BE_NAMED } from '../src/shared/residents.ts'
-import { apiApp, freshDb, type TestDb } from './helpers.ts'
+import { A_SLEEP_TIME, apiApp, freshDb, type TestDb } from './helpers.ts'
 
 let t: TestDb
 let app: FastifyInstance
@@ -107,6 +108,7 @@ async function propose(handle: string, area?: string): Promise<Reply> {
     agentId: handle,
     because: 'It has done steady work here for weeks.',
     ...(area === undefined ? {} : { area }),
+    sleepTime: A_SLEEP_TIME,
   })
 }
 
@@ -327,18 +329,18 @@ describe('where its sleep is seen', () => {
     const presence = async (who: string): Promise<Record<string, any>> =>
       (await inject('GET', `/api/presence/agent/${who}`, AS_THE_PERSON)).json['presence'] as Record<string, any>
 
-    expect(await presence(id)).toHaveProperty('residentSleep', { asleepSince: null, lastSleptAt: null, wakesAt: null, sleepTime: null })
+    expect(await presence(id)).toHaveProperty('residentSleep', { asleepSince: null, lastSleptAt: null, wakesAt: null, sleepTime: A_SLEEP_TIME })
     expect(await presence(idOf('not-resident'))).not.toHaveProperty('residentSleep')
 
     const slept = await inject('POST', `/api/residents/${id}/sleep`, AS_THE_PERSON, {})
     const since = String(slept.json['sleep'].asleep.since)
-    expect((await presence(id))['residentSleep']).toEqual({ asleepSince: since, lastSleptAt: null, wakesAt: null, sleepTime: null })
+    expect((await presence(id))['residentSleep']).toEqual({ asleepSince: since, lastSleptAt: null, wakesAt: null, sleepTime: A_SLEEP_TIME })
     const listed = (await inject('GET', `/api/presence?of=agent:${id}`, AS_THE_PERSON)).json['presence'] as Record<string, any>[] | Record<string, any>
     expect(JSON.stringify(listed)).toContain(since)
 
     const woke = await inject('POST', `/api/residents/${id}/wake`, AS_THE_PERSON)
     const ended = String(woke.json['sleep'].lastSleepEndedAt)
-    expect((await presence(id))['residentSleep']).toEqual({ asleepSince: null, lastSleptAt: ended, wakesAt: null, sleepTime: null })
+    expect((await presence(id))['residentSleep']).toEqual({ asleepSince: null, lastSleptAt: ended, wakesAt: null, sleepTime: A_SLEEP_TIME })
 
     aSession(id, '2026-09-04 10:00:00', { compactions: [{ at: '2026-09-04 11:00:00' }] })
     const reading = await inject('GET', `/api/residents/${id}`, AS_THE_PERSON)

@@ -2,7 +2,7 @@
 // Licensed under the MIT License. See LICENSE.
 import type { FastifyInstance } from 'fastify'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { apiApp, freshDb, thePersonsKeyHeader, type TestDb } from './helpers.ts'
+import { apiApp, freshDb, thePersonsKeyHeader, type TestDb, governsTheWholeProject } from './helpers.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 
 let db: TestDb
@@ -23,7 +23,7 @@ async function file(kind: string, title: string, data: object = {}) {
 }
 const module = () => file('module', 'chat module', { context: 'Made-up chat.', parts: [] })
 const task = () => file('task', 'delegation')
-const decision = () => file('decision', 'parent decision', { replaces: [] })
+const decision = () => file('decision', 'parent decision', { ...governsTheWholeProject(), replaces: [] })
 const point = () => file('backlog_item', 'work point', { line: 'made-up-line', number: 'made-up', why: 'A made-up test.', doneWhen: 'Done.', state: 'todo' })
 const update = (id: string, text = 'A made-up requirement.') => call('POST', `/api/records/${id}/requirements`, { items: [{ id: 'made-up-line', text, state: 'todo' }] }, secretary)
 const packageIt = (id: string, payload: object) => call('POST', `/api/delegation/${id}/package`, payload)

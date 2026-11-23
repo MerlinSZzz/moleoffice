@@ -8,17 +8,17 @@
  *
  * WHAT IT READS, AND HOW MUCH. The live records of the seven kinds the graph draws, in one statement. The links with an
  * end among them, in pieces of ids, never the project's whole link table. The records at the far end of those links, for
- * their titles and kinds. One grouped statement over the project's revision rows, and at most
- * PROJECT_GRAPH_REVISION_ROWS real revision rows of the graph's own records. The plan lines, work windows and
- * allocations whose record is one of the graph's, in pieces of ids, the plans those lines belong to, and a count of
- * those plans' other lines.
+ * their titles and kinds. One grouped statement over the project's revisions, answered from an index without reading
+ * the rows. The newest real revision rows of the graph's own records, in pieces of ids, at most
+ * PROJECT_GRAPH_REVISION_ROWS from each piece. The plan lines, work windows and allocations whose record is one of the
+ * graph's, in pieces of ids, the plans those lines belong to, and a count of those plans' other lines.
  *
  * WHAT IT DOES NOT DO. It resolves no `stoppedAtRevision`: that is a marker the writer chose, not a revision number. It
  * draws no future the product does not store. It chooses no answer where the store holds two: a block carried by two
  * modules is under neither, and a planned state linked both realised and answered instead has no outcome. Each of those
  * is counted in `says`.
  */
-import { and, count, desc, eq, inArray, isNull, max, min, ne, or, sql } from 'drizzle-orm'
+import { and, count, desc, eq, inArray, max, min, ne, or, sql } from 'drizzle-orm'
 
 import { blockIdsOf } from '@shared/blocks.ts'
 import { KIND_SPECS } from '@shared/kinds.ts'
@@ -376,21 +376,25 @@ export function readProjectGraph(workspaceId: string): ProjectGraphReply {
     })
   }
 
-  const ofTheGraph = and(
-    eq(revisions.workspaceId, workspaceId),
-    ne(revisions.op, BASELINE),
-    eq(records.workspaceId, workspaceId),
-    inArray(records.kind, [...GRAPH_KINDS]),
-    isNull(records.deletedAt),
+  // THE NEWEST REAL REVISIONS ARE READ BY THE GRAPH'S RECORD IDS, so a read touches the graph's rows and not the
+  // project's. The `+` keeps SQLite off `revisions_workspace_at_idx`, which it otherwise chooses and which reads every
+  // revision of the project, with its data, to find these. Each piece sorts and cuts only its own rows, so the pieces
+  // are joined, sorted again in the same order and cut.
+  const newestOfEachPiece = readInPieces(graphIds, (piece) =>
+    db
+      .select({ id: revisions.id, recordId: revisions.recordId, seq: revisions.seq, at: revisions.at, op: revisions.op, title: revisions.title })
+      .from(revisions)
+      .where(and(inArray(revisions.recordId, piece), sql`+${revisions.workspaceId} = ${workspaceId}`, ne(revisions.op, BASELINE)))
+      .orderBy(desc(revisions.at), desc(revisions.seq), desc(revisions.id))
+      .limit(PROJECT_GRAPH_REVISION_ROWS)
+      .all(),
   )
-  const entries: ProjectGraphRevisionEntry[] = db
-    .select({ recordId: revisions.recordId, seq: revisions.seq, at: revisions.at, op: revisions.op, title: revisions.title })
-    .from(revisions)
-    .innerJoin(records, eq(records.id, revisions.recordId))
-    .where(ofTheGraph)
-    .orderBy(desc(revisions.at), desc(revisions.seq), desc(revisions.id))
-    .limit(PROJECT_GRAPH_REVISION_ROWS)
-    .all()
+  const entries: ProjectGraphRevisionEntry[] = newestOfEachPiece
+    .sort((one, other) =>
+      one.at !== other.at ? (one.at < other.at ? 1 : -1) : one.seq !== other.seq ? other.seq - one.seq : one.id < other.id ? 1 : one.id > other.id ? -1 : 0,
+    )
+    .slice(0, PROJECT_GRAPH_REVISION_ROWS)
+    .map(({ recordId, seq, at, op, title }) => ({ recordId, seq, at, op, title }))
 
   // ---- checkpoints: each stopping point, with the records its `about` links name
   let stopsWithoutWords = 0

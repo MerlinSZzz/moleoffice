@@ -19,7 +19,8 @@
  *   5. a credential asked for again in the restored office holds a token hash and can be confirmed;
  *   6. in a browser, the credential's page says no token works under it and draws no Confirm press,
  *      and the Embassy shows the waiting one, because the person can still refuse it (problem 4fDIo73TuEoK), with the
- *      credential page's words and no press to let it in.
+ *      state word the credential's page is titled by and no press to let it in. Before, the Embassy card drew the
+ *      credential page's sentence; it draws the state word now, as decided.
  *
  * Case 6 photographs the page at 1440, 990, 660 and 390, light and dark, when RESTORED_VISITOR_SHOTS
  * names a folder.
@@ -210,8 +211,8 @@ describe('what a person sees, in a browser', () => {
       const asking = app.page.locator('.emb-asking-card')
       expect(await asking.count(), 'the pending visitor can still be refused').toBe(1)
       expect(await asking.first().innerText()).toContain('A restored waiting visitor')
-      // THE CARD SAYS WHAT THE CREDENTIAL'S PAGE SAYS, and offers no press to let it in: the confirm is refused.
-      expect(await asking.first().innerText()).toContain(CREDENTIAL_WORDS.tokenRemoved)
+      // THE CARD DRAWS THE STATE THE CREDENTIAL'S PAGE IS TITLED BY, and offers no press to let it in: the confirm is refused.
+      expect(await asking.first().innerText()).toContain(CREDENTIAL_WORDS.tokenRemovedStanding)
       expect(await asking.first().getByRole('button', { name: EMBASSY_WORDS.confirm }).count(), 'a Let it in press the server refuses').toBe(0)
 
       const shots = process.env['RESTORED_VISITOR_SHOTS']

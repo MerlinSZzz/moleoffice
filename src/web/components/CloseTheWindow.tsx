@@ -50,7 +50,7 @@ import { content, t } from '@shared/i18n.ts'
 import { api } from '../api.ts'
 import { useLanguage } from '../lib/language.ts'
 import { TieredPress } from './TieredPress.tsx'
-import { ErrorNote, Loading, useAsync } from './ui.tsx'
+import { ErrorNote, Loading, ServerNote, useAsync } from './ui.tsx'
 
 /** Every word this component draws that is not read off the reply. */
 export const CLOSE_THE_WINDOW_WORDS = {
@@ -60,7 +60,7 @@ export const CLOSE_THE_WINDOW_WORDS = {
    * Said instead of the press to a browser that holds no key. Three ideas, and the door says the
    * same three before it refuses: holds no key, would be shut out, pair first.
    */
-  get refused(): string { return t('settingsPanel.window.refused') },
+  get refused(): string { return t('settingsPanel.window.noKeyHere') },
   /** The press itself. */
   get press(): string { return t(settingsControlWord('settings.headeronly', 'settingsPanel.window.press')) },
   /** What the press says while it is being sent. */
@@ -132,7 +132,8 @@ export function CloseTheWindow() {
           {CLOSE_THE_WINDOW_CSS}
         </style>
         {said.mayPress ? null : <p className="ctw-refused">{CLOSE_THE_WINDOW_WORDS.refused}</p>}
-        {notYet === null ? null : <p className="ctw-not-yet" lang="en">{notYet.says}</p>}
+        {notYet === null ? null : <p className="ctw-not-yet">{t('settingsPanel.window.agentsWithNoKey', { n: notYet.count })}</p>}
+        {notYet === null ? null : <ServerNote text={notYet.says} />}
       </>
     )
   }
@@ -142,7 +143,6 @@ export function CloseTheWindow() {
       <style href="mole-office-close-the-window" precedence="default">
         {CLOSE_THE_WINDOW_CSS}
       </style>
-      <p className="ctw-open">{CLOSE_THE_WINDOW_WORDS.open}</p>
       <TieredPress tier="confirm" press={CLOSE_THE_WINDOW_WORDS.press} pending={CLOSE_THE_WINDOW_WORDS.closing}
         question={CLOSE_THE_WINDOW_WORDS.question} quote={CLOSE_THE_WINDOW_WORDS.open}
         warning={CLOSE_THE_WINDOW_WORDS.warning} cancel={CLOSE_THE_WINDOW_WORDS.cancel} onPress={close} />
@@ -152,7 +152,6 @@ export function CloseTheWindow() {
 
 /** The component's own rules. Every value is a token, and there is no backtick anywhere in here. */
 const CLOSE_THE_WINDOW_CSS = `
-.ctw-open { margin: 0 0 var(--pad); max-width: var(--measure-in-box); color: var(--text); font: var(--fs-1)/var(--lh-read) var(--font-ui); }
 .ctw-refused { margin: 0; max-width: var(--measure-in-box); color: var(--text); font: var(--fs-1)/var(--lh-read) var(--font-ui); }
 .ctw-refused + .ctw-not-yet { margin-top: var(--pad); }
 .ctw-not-yet { margin: 0; max-width: var(--measure-in-box); color: var(--text); font: var(--fs-1)/var(--lh-read) var(--font-ui); overflow-wrap: anywhere; }

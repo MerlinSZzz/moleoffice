@@ -24,7 +24,7 @@ import { api, errorMessage, faultOf } from '../api.ts'
 import { TheItemsWords, theLinksInTheWords } from '../lib/item-words.tsx'
 import { messagePath, recordPath, RouteLink } from './router.tsx'
 import { ThePressReason } from './ThePressReason.tsx'
-import { Btn, ErrorNote, Loading, theRefusalInWords } from './ui.tsx'
+import { Btn, ErrorNote, Loading, theRefusalInWords, type AsyncState } from './ui.tsx'
 import { useProjectAsync } from '../lib/project-async.ts'
 /**
  * THE PARTS THE CHECKLISTS PAGE AND THE CHECKLISTS WINDOW BOTH DRAW: an item, its state, its evidence, its
@@ -79,10 +79,14 @@ export const WINDOW_SWITCHED = WINDOW_SWITCH
 /** The class of the checklists window's press. The review column reads it to be held below the press. */
 export const CHECKLISTS_PRESS = 'ckw-press'
 
+/**
+ * AN ITEM WAITING ON THE OWNER SAYS "WAITS ON YOU", as decided: the browser is the person, so the owner it waits on is
+ * the reader, under whoever's section the item stands.
+ */
 const STATE_KEYS = {
   open: 'checklists.state.open',
   'in progress': 'checklists.state.inProgress',
-  'waiting on the owner': 'checklists.state.waiting',
+  'waiting on the owner': 'checklists.state.waitsOnYou',
   done: 'checklists.state.done',
   superseded: 'checklists.state.superseded',
 } as const satisfies Record<ChecklistItemState, string>
@@ -570,22 +574,107 @@ export function useMovedRows(drawn: readonly DrawnLine[], readings: readonly unk
   return useMemo(() => new Set(until.keys()), [until])
 }
 
+/** What a fold press says: how many finished items it holds, and whether any of them were replaced. */
+export interface TheFold {
+  count: number
+  replaced: boolean
+}
+
+/**
+ * THE FOLD OF A CARD, worked out from its counts, so a card read with only its open items says the same before a press
+ * as a card read whole. `drawnOpen` are finished items the view draws with the open ones instead, as the window draws
+ * an item marked done while it is open, and they are not in the fold.
+ */
+export function theFoldOf(list: ChecklistReading, drawnOpen: readonly ChecklistRequest[] = []): TheFold {
+  const done = list.counts.done - drawnOpen.filter((item) => item.state === 'done').length
+  const replaced = list.counts.superseded - drawnOpen.filter((item) => item.state === 'superseded').length
+  return { count: done + replaced, replaced: replaced > 0 }
+}
+
 /**
  * THE PRESS THAT SHOWS OR HIDES WHAT IS FINISHED, drawn under what is not. Each view starts it closed and
- * keeps whether it is open. Closed, it says how many items it hides and whether any of them were replaced.
+ * keeps whether it is open. Closed, it says how many items it hides and whether any of them were replaced. While the
+ * finished items it was pressed for are still being read, it stays as it is and says it is busy.
  */
-export function FoldPress({ folded, open, onPress }: { folded: readonly ChecklistRequest[]; open: boolean; onPress: () => void }) {
+export function FoldPress({ fold, open, busy = false, onPress }: { fold: TheFold; open: boolean; busy?: boolean; onPress: () => void }) {
   return (
-    <button type="button" className="ckp-fold" aria-expanded={open} onClick={onPress}>
+    <button type="button" className="ckp-fold" aria-expanded={open} aria-busy={busy ? 'true' : undefined} onClick={onPress}>
       <span className="ckp-fold-mark" aria-hidden="true">
         {open ? '▾' : '▸'}
       </span>
-      {t(
-        open ? 'checklists.window.hideDone' : folded.some((item) => item.state === 'superseded') ? 'checklists.window.showDoneAndReplaced' : 'checklists.window.showDone',
-        { n: folded.length },
-      )}
+      {t(open ? 'checklists.window.hideDone' : fold.replaced ? 'checklists.window.showDoneAndReplaced' : 'checklists.window.showDone', { n: fold.count })}
     </button>
   )
+}
+
+/** What a card's fold has to draw: nothing while it is shut, its checklist whole once that is at hand, or the failed read. */
+export type TheFoldsReading = { status: 'shut' } | { status: 'waiting' } | { status: 'ready'; whole: ChecklistReading } | Extract<AsyncState<unknown>, { status: 'error' }>
+
+/** One fold's read of its checklist by its id: the version it was asked for, the last whole reading and a failure. */
+interface AFoldsRead {
+  version: string
+  whole: ChecklistReading | null
+  failed: Extract<AsyncState<unknown>, { status: 'error' }> | null
+}
+
+/**
+ * THE CHECKLISTS WHOLE, FOR THE FOLDS THE READER OPENED, by checklist. A card read whole holds its finished items
+ * already. A card read with only its open items reads its checklist by its id when its fold is pressed, and again while
+ * the fold is open whenever the list read brings another version. Until the next reading comes, the last one stays
+ * drawn, so the finished items do not go and come back. `atHand` is a whole reading the view holds already, used when it
+ * is of the version the list read brought. A fold shut lets its reading go.
+ */
+export function useTheFoldsReadings(lists: readonly ChecklistReading[], wanted: ReadonlySet<string>, atHand: ChecklistReading | null = null): ReadonlyMap<string, TheFoldsReading> {
+  const [reads, setReads] = useState<ReadonlyMap<string, AFoldsRead>>(new Map())
+  const sent = useRef(new Map<string, string>())
+  const heldWhole = (list: ChecklistReading): ChecklistReading | null =>
+    list.finishedItems === undefined ? list : atHand !== null && atHand.id === list.id && atHand.version === list.version ? atHand : null
+  // EACH ASK BY ITS CHECKLIST AND VERSION, in one string, so a read goes out only when a fold opens or its checklist changed.
+  const asks = lists
+    .filter((list) => wanted.has(list.id) && heldWhole(list) === null)
+    .map((list) => `${list.id} ${list.version}`)
+    .join('\n')
+  useEffect(() => {
+    const now = new Map(asks === '' ? [] : asks.split('\n').map((one) => one.split(' ') as [string, string]))
+    for (const id of [...sent.current.keys()]) if (!now.has(id)) sent.current.delete(id)
+    setReads((before) => ([...before.keys()].every((id) => now.has(id)) ? before : new Map([...before].filter(([id]) => now.has(id)))))
+    for (const [id, version] of now) {
+      if (sent.current.get(id) === version) continue
+      sent.current.set(id, version)
+      const answered = (change: (before: AFoldsRead | undefined) => AFoldsRead): void => {
+        if (sent.current.get(id) === version) setReads((before) => new Map([...before, [id, change(before.get(id))]]))
+      }
+      api.readChecklistAcross(id).then(
+        (reply) => answered(() => ({ version, whole: reply.checklist, failed: null })),
+        (error: unknown) =>
+          answered((before) => ({ version, whole: before?.whole ?? null, failed: { status: 'error', message: errorMessage(error), fault: faultOf(error) } })),
+      )
+    }
+  }, [asks])
+  const out = new Map<string, TheFoldsReading>()
+  for (const list of lists) {
+    if (!wanted.has(list.id)) continue
+    const whole = heldWhole(list)
+    const read = reads.get(list.id)
+    out.set(
+      list.id,
+      whole !== null
+        ? { status: 'ready', whole }
+        : read !== undefined && read.failed !== null && read.version === list.version
+          ? read.failed
+          : read !== undefined && read.whole !== null
+            ? { status: 'ready', whole: read.whole }
+            : { status: 'waiting' },
+    )
+  }
+  return out
+}
+
+const SHUT: TheFoldsReading = { status: 'shut' }
+
+/** The fold of one card, as `useTheFoldsReadings` reads it. */
+export function useTheFoldsReading(list: ChecklistReading, wanted: boolean, atHand: ChecklistReading | null = null): TheFoldsReading {
+  return useTheFoldsReadings([list], new Set(wanted ? [list.id] : []), atHand).get(list.id) ?? SHUT
 }
 
 function same(a: ChecklistEvidence, b: ChecklistEvidence | null): boolean {
@@ -784,7 +873,9 @@ export function stepsWaitingOnTheOwner(lists: readonly ChecklistReading[]): numb
  * A checklist with nothing left to count draws neither the bar nor the words.
  */
 export function progressOf(list: ChecklistReading): { done: number; total: number } {
-  return { done: list.counts.done, total: list.items.length - list.counts.superseded - list.counts.standing }
+  // Every item is open work, standing, done or replaced, and a standing item is never done, so the open and the done
+  // together are the items less the replaced and the standing ones, even when the list was read with only its open items.
+  return { done: list.counts.done, total: list.counts.open + list.counts.done }
 }
 
 export function Progress({ list }: { list: ChecklistReading }) {

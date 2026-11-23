@@ -56,7 +56,7 @@ import { spawn, type ChildProcess } from 'node:child_process'
 import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import type { FastifyInstance, InjectOptions } from 'fastify'
@@ -128,7 +128,7 @@ async function inject(
 }
 
 /** Register through the starter door, as the person. */
-async function started(body: Record<string, unknown>): Promise<{ status: number; text: string }> {
+async function started(body: Record<string, unknown>): Promise<{ status: number; text: string; json: Record<string, unknown> }> {
   return inject('POST', '/api/agents/started', body)
 }
 
@@ -366,7 +366,7 @@ describe('the real handbooks from roles.json reach a listening agent in its lang
   })
 
   /** Start the agent's waiter against the listening server, and say what it printed when it stops. */
-  function startTheWaiter(api: string, handle: string, session: string): { said: () => string; ended: Promise<number> } {
+  function startTheWaiter(api: string, handle: string, session: string, keyFile: string): { said: () => string; ended: Promise<number> } {
     const child = spawn(
       process.execPath,
       [
@@ -380,7 +380,7 @@ describe('the real handbooks from roles.json reach a listening agent in its lang
         '--workspace',
         'default',
       ],
-      { env: { ...process.env, MOLE_OFFICE_HANDLE_BEAT_SECONDS: '1' } },
+      { env: { ...process.env, MOLE_AGENT_KEY: '', MOLE_OFFICE_TOOL_CONFIGURATION: '', MOLE_AGENT_KEY_FILE: keyFile, MOLE_OFFICE_HANDLE_BEAT_SECONDS: '1' } },
     )
     waiters.push(child)
     let printed = ''
@@ -412,6 +412,9 @@ describe('the real handbooks from roles.json reach a listening agent in its lang
         const handle = `real-${card.name}-${language}`
         const done = await started({ handle, name: handle, role: card.name, language })
         expect(done.status, done.text).toBe(201)
+        const key = (done.json['whatToGiveIt'] as { key: string }).key
+        const keyFile = join(dirname(t.file), `${handle}.key`)
+        writeFileSync(keyFile, key, { mode: 0o600 })
         const filed = await inject('POST', '/api/records', {
           kind: 'session',
           title: `A terminal answering as ${handle}`,
@@ -420,7 +423,7 @@ describe('the real handbooks from roles.json reach a listening agent in its lang
         expect(filed.status, filed.text).toBe(201)
         const session = (filed.json['record'] as { id: string }).id
 
-        const waiter = startTheWaiter(api, handle, session)
+        const waiter = startTheWaiter(api, handle, session, keyFile)
         const code = await waiter.ended
         const printed = waiter.said()
         expect(code, printed).toBe(0)

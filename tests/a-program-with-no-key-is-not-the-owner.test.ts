@@ -8,6 +8,7 @@
  * and the headers to send. After the close, a read under an agent's name with no key is refused the same way. A request
  * no listener carried (an in-process call) is the office itself and is unchanged, and so are the doors a caller uses to
  * get a key. The owner's paired browser, the owner's devices and the office's own programs carry keys and keep reading.
+ * A browser or a device carries its key as two halves: a cookie half and a header half, joined with a dot in that order.
  *
  * The message here is between two agents, so the only readers who may see it are those two, the person, the secretary
  * and the office's own programs.
@@ -21,7 +22,7 @@
  *   B. the same line removed. Cases 2, 3 and 4 are answered 200.
  *   C. src/server/lib/http.ts, the agent turn after the close: `refuseARequestNobodyProved(req, actor)` removed. Case 5.
  *   D. src/server/lib/not-proved-the-person.ts: the line naming the key header and the two actor headers removed. Case 6.
- *   E. src/server/lib/keys.ts, keyOn: the cookie is no longer read. Case 7.
+ *   E. src/server/db/the-key-on-this-request-was-made-for-a-run.ts, keyOn: the two halves are no longer joined. Case 7.
  *   F. src/server/lib/http.ts, actorFrom's keyless branch: `from !== undefined && ` removed. Case 8.
  *   G. src/server/lib/http.ts: `'office.pairing'` taken out of THE_DOORS_NOBODY_NEEDS_A_KEY_FOR. Case 9.
  *   H. retired: case 10 recorded a gap, and item 1 of a decision closed it.
@@ -43,6 +44,7 @@ import { dirname, join } from 'node:path'
 import type { FastifyInstance } from 'fastify'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 
+import { DEVICE_HALF_COOKIE, DEVICE_HALF_HEADER } from '../src/config/key-header.mjs'
 import { apiApp, freshDb, type TestDb } from './helpers.ts'
 import { forgetTheWorldsOwnAuthority } from '../src/server/lib/worldauthority.ts'
 import { THE_TEST_OFFICES_OWNER } from './a-page-of-a-test-office.ts'
@@ -52,7 +54,8 @@ type ResourcesLib = typeof import('../src/server/lib/resources.ts')
 /** Made-up values. Nothing here is, or was ever, a key any office issued. */
 const A_MADE_UP_PERSON_KEY = randomBytes(32).toString('hex')
 const A_MADE_UP_OFFICE_KEY = randomBytes(32).toString('hex')
-const A_MADE_UP_DEVICE_KEY = randomBytes(32).toString('hex')
+const A_MADE_UP_DEVICE_COOKIE_HALF = randomBytes(32).toString('base64url')
+const A_MADE_UP_DEVICE_HEADER_HALF = randomBytes(32).toString('base64url')
 const THE_LEADS_MADE_UP_KEY = 'made-up-lead-key-for-keyless-reads'
 
 const LEAD = 'a-synthetic-lead'
@@ -63,6 +66,8 @@ const WORDS = 'Synthetic words only the lead and the worker may read.'
 const WORKSPACE = { 'x-mole-office-workspace': 'default' }
 const PERSON = { 'x-mole-office-actor-type': 'human', 'x-mole-office-actor-id': THE_TEST_OFFICES_OWNER.id }
 const NOT_TRUSTED = '203.0.113.77'
+/** The name a browser gives itself at the press. A made-up label. */
+const A_BROWSER_NAME = 'A test browser with no key'
 
 let t: TestDb
 let app: FastifyInstance
@@ -76,6 +81,8 @@ interface Answer {
   status: number
   text: string
   cookie: string | null
+  /** Every Set-Cookie of the answer, one each. */
+  cookies: string[]
 }
 
 /** One request on a connection of its own, so an answer kept on an earlier connection is not what is read. */
@@ -85,7 +92,14 @@ async function ask(door: string, method: string, path: string, headers: Record<s
     headers: { ...(body === undefined ? {} : { 'content-type': 'application/json' }), ...headers, connection: 'close' },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   })
-  return { status: r.status, text: await r.text(), cookie: r.headers.get('set-cookie') }
+  return { status: r.status, text: await r.text(), cookie: r.headers.get('set-cookie'), cookies: r.headers.getSetCookie() }
+}
+
+/** The cookie half a press set, as a browser sends it back: its name and value only. */
+function theCookieHalf(answer: Answer): string {
+  const set = answer.cookies.find((one) => one.startsWith(`${DEVICE_HALF_COOKIE}=`))
+  if (set === undefined) throw new Error('the press set no cookie half')
+  return set.split(';')[0] ?? ''
 }
 
 /** The message by its id, and the list of messages, read with these headers from this door. */
@@ -141,8 +155,14 @@ beforeAll(async () => {
   }
   const keys = await import('../src/server/lib/keys.ts')
   keys.holdTheKeyWhoseHashIs('agent', LEAD, keys.keyHash(THE_LEADS_MADE_UP_KEY), null)
-  // A DEVICE OF THE OWNER'S THE OWNER CONFIRMED: its key proves the person, and a paired browser there holds it as the cookie.
-  keys.holdTheKeyWhoseHashIs('person-device', THE_TEST_OFFICES_OWNER.id, keys.keyHash(A_MADE_UP_DEVICE_KEY), null)
+  // A DEVICE OF THE OWNER'S THE OWNER CONFIRMED: its key proves the person, and a paired browser there holds it as two
+  // halves. The office holds only the hash of the two joined.
+  keys.holdTheKeyWhoseHashIs(
+    'person-device',
+    THE_TEST_OFFICES_OWNER.id,
+    keys.keyHash(`${A_MADE_UP_DEVICE_COOKIE_HALF}.${A_MADE_UP_DEVICE_HEADER_HALF}`),
+    null,
+  )
 
   const sent = await ask(thisMachine, 'POST', '/api/records',
     { ...WORKSPACE, 'x-mole-office-actor-type': 'agent', 'x-mole-office-actor-id': LEAD, 'x-mole-office-key': THE_LEADS_MADE_UP_KEY },
@@ -228,15 +248,21 @@ describe('once the key window is closed', () => {
     expect(error).toContain("A browser on this computer gets the person's key at #/pairing, with one press.")
   })
 
-  it('7: still answers the person\'s paired browser and the person\'s confirmed device, which carry the person\'s key as the cookie', async () => {
-    const paired = await ask(thisMachine, 'POST', '/api/office/pairing', {}, {})
+  it('7: still answers the person\'s paired browser and the person\'s confirmed device, which carry the two halves of a device key', async () => {
+    const paired = await ask(thisMachine, 'POST', '/api/office/pairing', {}, { device: A_BROWSER_NAME })
     expect(paired.status, paired.text.slice(0, 300)).toBe(200)
-    const cookie = (paired.cookie ?? '').split(';')[0] ?? ''
-    expect(cookie).toContain('mole-office-key=')
-    const browser = await readTheMessage({ cookie })
+    const { deviceHalf } = JSON.parse(paired.text) as { deviceHalf: string }
+    const browser = await readTheMessage({ cookie: theCookieHalf(paired), [DEVICE_HALF_HEADER]: deviceHalf })
     expect(browser.one.status, browser.one.text.slice(0, 300)).toBe(200)
     expect(browser.one.text).toContain(WORDS)
-    const device = await readTheMessage({ cookie: `mole-office-key=${A_MADE_UP_DEVICE_KEY}`, 'x-forwarded-for': NOT_TRUSTED }, anotherMachine)
+    const device = await readTheMessage(
+      {
+        cookie: `${DEVICE_HALF_COOKIE}=${A_MADE_UP_DEVICE_COOKIE_HALF}`,
+        [DEVICE_HALF_HEADER]: A_MADE_UP_DEVICE_HEADER_HALF,
+        'x-forwarded-for': NOT_TRUSTED,
+      },
+      anotherMachine,
+    )
     expect(device.one.status, device.one.text.slice(0, 300)).toBe(200)
     expect(device.one.text).toContain(WORDS)
   })
@@ -283,11 +309,12 @@ describe('once the key window is closed', () => {
     expect(error).toContain("A browser on this computer gets the person's key at #/pairing, with one press.")
   })
 
-  it('12: still lets a browser that names the person with no key pair, so it can get the person\'s key', async () => {
+  it('12: still lets a browser that names the person with no key pair, so it can get the two halves of a device key', async () => {
     const read = await ask(thisMachine, 'GET', '/api/office/pairing', { ...WORKSPACE, ...PERSON })
     expect(read.status, read.text.slice(0, 300)).toBe(200)
-    const paired = await ask(thisMachine, 'POST', '/api/office/pairing', { ...WORKSPACE, ...PERSON }, {})
+    const paired = await ask(thisMachine, 'POST', '/api/office/pairing', { ...WORKSPACE, ...PERSON }, { device: A_BROWSER_NAME })
     expect(paired.status, paired.text.slice(0, 300)).toBe(200)
-    expect(paired.cookie ?? '').toContain('mole-office-key=')
+    expect(theCookieHalf(paired)).not.toBe('')
+    expect(typeof (JSON.parse(paired.text) as { deviceHalf?: unknown }).deviceHalf).toBe('string')
   })
 })

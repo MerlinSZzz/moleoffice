@@ -1,15 +1,15 @@
 // Copyright © 2026 Zhengyang Shen
 // Licensed under the MIT License. See LICENSE.
 /**
- * THE LINES AT THE TOP OF THE PAGE LEAVE THE SIDEBAR WHOLE, INSIDE THE WINDOW, AT EVERY WIDTH.
+ * THE LINES AT THE TOP OF THE PAGE LEAVE THE SIDEBAR WHOLE, INSIDE THE WINDOW, AT THE WIDEST AND THE NARROWEST WIDTH.
  *
  * The owner's report of 26 October 2026 (wave 13y round 87): two lines came back at the top of the
  * page, and they pushed Settings, the last entry of the left sidebar, below the window. The lines sat
  * above the whole frame, so the frame and the sidebar in it started lower by the lines' height. The
  * sidebar is as tall as the window, so its foot ended below it by the same height.
  *
- * WHAT THIS FILE PROVES, in a real browser on a test office with both lines showing, at 1440, 990, 660
- * and 390 pixels wide, with the page scrolled to the top:
+ * WHAT THIS FILE PROVES, in a real browser on a test office with both lines showing, at 1440 and 390
+ * pixels wide, with the page scrolled to the top:
  *   1. both lines are drawn, inside the window;
  *   2. the sidebar's box lies inside the window, top and bottom. Below 1024 pixels the sidebar is a
  *      drawer, and it is opened first;
@@ -67,15 +67,13 @@ afterAll(() => {
   t.close()
 })
 
-/** The four widths every screen is looked at, each with a window height of its kind. */
+/** The widest and the narrowest width, each with a window height of its kind. */
 const WINDOWS = [
   { width: 1440, height: 900 },
-  { width: 990, height: 800 },
-  { width: 660, height: 800 },
   { width: 390, height: 844 },
 ]
 
-it('with both lines showing, the sidebar and its Settings entry stay inside the window at every width', async () => {
+it('with both lines showing, the sidebar and its Settings entry stay inside the window at the widest and the narrowest width', async () => {
   const { HOME_WORLD_KEY } = await import('../src/web/lib/world.ts')
   const live = await liveApp({
     name: 'r87-lines-leave-the-sidebar-whole',

@@ -104,8 +104,8 @@ async function answerAsPerson(id: string, answer: 'grant' | 'refuse'): Promise<v
   expect(res.status, text).toBeLessThan(300)
 }
 
-async function openTheAsk(id: string): Promise<void> {
-  await app.page.goto(`${app.site}/#/r/${id}`, { timeout: 60_000 })
+async function openTheAsk(id: string, mode: 'normal' | 'inspect' = 'normal'): Promise<void> {
+  await app.page.goto(`${app.site}/${mode === 'inspect' ? '?mode=inspect' : ''}#/r/${id}`, { timeout: 60_000 })
   await waitForThePage(app.page, 60_000)
   await app.page.reload({ timeout: 60_000 })
   await waitForThePage(app.page, 60_000)
@@ -231,10 +231,11 @@ describe('the names in the new-key and card-ask sentences', () => {
     }
   }, 120_000)
 
-  it('names the new-key withdraw sentence by the office name', async () => {
+  it('names the new-key withdraw sentence by the office name, in developer mode', async () => {
     await startAgent('asks-again', 'The Asking One')
     const id = await askToRegister('asks-again', { newKey: true })
-    await openTheAsk(id)
+    // THE WITHDRAW SENTENCE IS THE SERVER'S, drawn in developer mode only, as decided.
+    await openTheAsk(id, 'inspect')
     const ask = app.page.locator('.tc-ask')
     await ask.waitFor({ state: 'visible', timeout: 30_000 })
     await ask.locator('button', { hasText: 'Give a new key' }).click()
@@ -354,7 +355,7 @@ describe('photographs of who may press', () => {
             } else {
               await press.waitFor({ state: 'visible', timeout: 30_000 })
               await press.scrollIntoViewIfNeeded()
-              expect(await press.locator('.tc-ask-who').count()).toBe(1)
+              expect(await press.locator('.tc-acts button').count()).toBeGreaterThan(0)
             }
             await app.page.screenshot({ path: `${shots}/who-may-press-${viewer}-${lang}-${String(width)}-${theme}.png`, fullPage: false })
           }

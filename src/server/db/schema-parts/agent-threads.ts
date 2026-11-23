@@ -3,6 +3,8 @@
 import { index, sqliteTable, text } from 'drizzle-orm/sqlite-core'
 import { aPartTable } from '../part-tables.ts'
 
+// ---------------------------------------------------------------------------- talking to an agent
+
 /**
  * A CONVERSATION WITH AN AGENT ABOUT REAL WORK.
  *

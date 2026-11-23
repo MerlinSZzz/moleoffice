@@ -599,11 +599,8 @@ function theChecksStillUsingIt(hostOnly, apartFrom) {
 // ============================================================================ the row a sandbox is stopped by
 
 /**
- * THE PROJECT AND THE SESSION THE SANDBOX'S CONTAINER ROW IS IN: those of the check that holds it, as the host's copy
- * of its facts records them: the check it was handed to (containerRowHeldBy), or the check that started it. Acceptance finding 51 (report EnJvvsDTF_Dx, block f-51): the sandbox
- * is shared by checks from every project, the last to leave stops it, and a robotics check asked the robotics
- * ledger for a row that panelx held, so the container was left running. The check's own project and session
- * answer only when the instance records none.
+ * THE PROJECT AND SESSION OF THE CONTAINER ROW, from the holder recorded in the host's facts. Older facts name only
+ * the instance project and starting session; the leaving check's own project and session answer when facts name none.
  * @param {Record<string, any> | null} started the host's copy of the sandbox's facts
  * @param {{workspace: string, check: string}} asked the check that is leaving
  * @returns {{workspace: string, session: string}}
@@ -611,27 +608,25 @@ function theChecksStillUsingIt(hostOnly, apartFrom) {
 export function theRowToStop(started, asked) {
   const said = (/** @type {unknown} */ value) => typeof value === 'string' && value !== ''
   return {
-    workspace: said(started?.workspace) ? started.workspace : asked.workspace,
+    workspace: said(started?.containerRowHeldBy?.workspace) ? started.containerRowHeldBy.workspace
+      : said(started?.workspace) ? started.workspace : asked.workspace,
     session: said(started?.containerRowHeldBy?.session) ? started.containerRowHeldBy.session
       : said(started?.startedBy?.session) ? started.startedBy.session : asked.check,
   }
 }
 
 /**
- * THE CHECK THE CONTAINER'S ROW IS HANDED TO when the check holding it leaves while others still use the container: the
- * longest-running of them, by its process's start, among those whose marker names the row's own project. A marker
- * written before markers named a project names none, and a check of another project would hold a row its project's
- * ledger does not list; neither is chosen, and the row stays with the leaving check's run, as it always did. Null when
- * none is left.
- * @param {string} hostOnly @param {string[]} others the checks still using the container @param {string} workspace
- * @returns {string | null}
+ * THE CHECK THE CONTAINER'S ROW IS HANDED TO when its holder leaves: the longest-running live marker that names a
+ * project. An older marker naming no project is never chosen. Null means no eligible check remains.
+ * @param {string} hostOnly @param {string[]} others the checks still using the container
+ * @returns {{check: string, workspace: string} | null}
  */
-function theCheckToHandTheRowTo(hostOnly, others, workspace) {
+function theCheckToHandTheRowTo(hostOnly, others) {
   const candidates = others
     .map((check) => ({ check, marker: readJson(join(hostOnly, 'checks', `${check}.json`)) }))
-    .filter(({ marker }) => marker?.workspace === workspace && /^\d+$/.test(String(marker?.started ?? '')))
+    .filter(({ marker }) => typeof marker?.workspace === 'string' && marker.workspace.trim() !== '' && /^\d+$/.test(String(marker?.started ?? '')))
     .sort((a, b) => Number(a.marker.started) - Number(b.marker.started))
-  return candidates[0]?.check ?? null
+  return candidates.length === 0 ? null : { check: candidates[0].check, workspace: candidates[0].marker.workspace }
 }
 
 /**
@@ -650,20 +645,20 @@ function theRowHandedOn(sandbox, others) {
   if (facts === null) return null
   const holder = theRowToStop(facts, sandbox.asked)
   if (holder.session !== sandbox.asked.check) return null
-  const to = theCheckToHandTheRowTo(sandbox.hostOnly, others, holder.workspace)
+  const to = theCheckToHandTheRowTo(sandbox.hostOnly, others)
   if (to === null) {
-    return `This check holds the container's ledger row, and no check still using the container says it is in the project ${holder.workspace}, so the row stays with this check's run, which the office will name as having left it open.`
+    return `This check holds the container's ledger row, and no check still using the container names its project, so the row stays with this check's run, which the office will name as having left it open.`
   }
   const args = [
-    THE_LAUNCHER, 'hand-over', sandbox.instance, '--to-session', to, '--json',
+    THE_LAUNCHER, 'hand-over', sandbox.instance, '--to-session', to.check, '--to-workspace', to.workspace, '--json',
     '--as', sandbox.asked.handle, '--session', holder.session, '--api', sandbox.asked.api, '--workspace', holder.workspace,
     ...(sandbox.asked.sandboxes === null ? [] : ['--sandboxes', sandbox.asked.sandboxes]),
   ]
   const ran = spawnSync(process.execPath, args, { encoding: 'utf8', timeout: LAUNCHER_MS, env: { ...process.env, ...theKeyOnTheHost(sandbox.asked) } })
   if (ran.status !== 0) {
-    return `The container's ledger row could NOT be handed to the check ${to} (node tools/sandbox.mjs hand-over exited ${ran.status ?? ran.signal}): ${theEndOf(ran.stderr ?? '', 6)}`
+    return `The hand-over of the container's ledger row to the check ${to.check} did not finish (node tools/sandbox.mjs hand-over exited ${ran.status ?? ran.signal}): ${theEndOf(ran.stderr ?? '', 6)}`
   }
-  return `The container's ledger row is handed to the check ${to}, which is still using it, so this check's run leaves nothing open.`
+  return `The container's ledger row is handed to the check ${to.check}, which is still using it, so this check's run leaves nothing open.`
 }
 
 // ============================================================================ the sandbox's own clone
@@ -870,7 +865,7 @@ export async function aSandboxForThisCheck(asked) {
       // whether a check still uses the container is read from its pid and start ticks (stillThere), never from this.
       const holder = readJson(sandbox.marker)
       if (stillThere(holder) && holder.pid !== process.pid) throw new Error('This check already has a live controller. Nothing was started.')
-      // THE PROJECT TOO, so a check leaving with the container's row can hand it to a check of the row's own project.
+      // THE PROJECT TOO, so a leaving check can hand the container's row to this check in its own project.
       writeFileSync(sandbox.marker, JSON.stringify({ ...thisProcess(), run: asked.run, workspace: asked.workspace, since: localStamp(new Date()) }))
       written = true
       if (container === null || !container.State.Running || needsRoot) {
@@ -1638,9 +1633,8 @@ export function leaveTheSandbox(sandbox, { delivered, left = null }) {
       said.push(`There is no sandbox ${sandbox.instance} to stop: the host holds no copy of the facts of ${sandbox.folder}.`)
       return { ok, says: said.join(' ') }
     }
-    // THE ROW IS IN THE PROJECT, AND UNDER THE SESSION, OF THE CHECK THAT STARTED THE SANDBOX. Acceptance finding 51
-    // (report EnJvvsDTF_Dx, block f-51): the sandbox is shared by checks from every project, and the last to leave
-    // may not be the one that registered it; asked in its own project, the ledger said it held no such row.
+    // THE ROW IS IN THE PROJECT AND UNDER THE SESSION RECORDED FOR ITS HOLDER. The last check to leave may not be
+    // the one that started the sandbox or received its row, so the ledger must be asked in the holder's project.
     const theRow = theRowToStop(readHostInstance(sandbox.folder), sandbox.asked)
     const args = [
       THE_LAUNCHER, 'down', sandbox.instance, '--force', '--json',

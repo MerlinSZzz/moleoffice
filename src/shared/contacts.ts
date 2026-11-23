@@ -400,3 +400,13 @@ export function theTypedWordsFind(name: string, typed: string): boolean {
   const needle = typed.trim().toLowerCase()
   return needle === '' || name.toLowerCase().includes(needle)
 }
+
+/**
+ * WHETHER WHAT WAS TYPED FINDS A CONTACT: by the name its row draws, as `theTypedWordsFind` reads a name, or, for an
+ * agent, by its handle. The chat's filter box, the contact list door and the agent picker read this one rule, so the
+ * same words find the same rows in each.
+ */
+export function theTypedWordsFindAContact(contact: { kind: string | null; name: string | null; handle?: string | null }, typed: string): boolean {
+  if (theTypedWordsFind(contact.name ?? '', typed)) return true
+  return contact.kind === 'agent' && contact.handle != null && contact.handle !== '' && theTypedWordsFind(contact.handle, typed)
+}

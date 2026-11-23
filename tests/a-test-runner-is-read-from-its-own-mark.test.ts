@@ -21,8 +21,8 @@
  *   3. the Linux environment reader reads the environment this worker was started with: `VITEST` is there,
  *      because the runner set it when it started the worker, and a variable set later is not.
  * The case of a real server spawned with `VITEST` removed is measured end to end in
- * tests/the-tools-read-the-office.test.ts ("a server the suite spawns with the test variables
- * unset").
+ * tests/a-server-a-test-started-knows-it-on-a-mac.test.ts ("on Linux, a real server", the case
+ * "says a test runner started it from the mark alone, when the walk up its parents finds nothing").
  *
  * MUTATIONS, each after a control run:
  *   - make the walk read the word vitest in the parent's command line again: cases 1 and 2 go red;

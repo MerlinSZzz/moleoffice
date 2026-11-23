@@ -1,26 +1,33 @@
 // Copyright © 2026 Zhengyang Shen
 // Licensed under the MIT License. See LICENSE.
 /**
- * A WORD DOCUMENT READ AS BLOCKS, AND DRAWN AS ONE SAFE HTML PAGE.
+ * A WORD DOCUMENT READ AS BLOCKS, AND A TEXT FILE READ AS ITS TEXT, FOR THE OFFICE'S PAGE TO DRAW.
  *
  * ---------------------------------------------------------------------------------------
  * WHY THIS IS ONE FILE OF ITS OWN
  * ---------------------------------------------------------------------------------------
  *
  * The file door decides what may be read and which record names it. This file is about one format:
- * what a .docx holds, which of it a reader can see, and how to put it into a page without letting
- * the file's own markup become the page. It imports no package. A .docx is a ZIP, Node ships zlib,
- * and a WordprocessingML document is a small enough vocabulary to read with one scanner.
+ * what a .docx holds and which of it a reader can see. It imports no package. A .docx is a ZIP, Node
+ * ships zlib, and a WordprocessingML document is a small enough vocabulary to read with one scanner.
  *
  * ---------------------------------------------------------------------------------------
  * WHAT IT READS, AND WHAT IT LEAVES OUT
  * ---------------------------------------------------------------------------------------
  *
  * Headings, paragraphs, bold and italic runs, line breaks and tabs, bullet and decimal lists, and
- * tables. Pictures are not decoded, and the page says so when the document had any. A field's
- * instruction text, deleted text and section properties are left out. Every character of the
- * document's text is escaped before it enters the page, so a document that contains
- * `<script>alert(1)</script>` shows exactly those characters and creates no element.
+ * tables. Pictures are not decoded, and the answer says when the document had any. A field's
+ * instruction text, deleted text and section properties are left out. A link's words are kept as
+ * words; its address is never read, so nothing on the page can follow it.
+ *
+ * ---------------------------------------------------------------------------------------
+ * NO MARKUP LEAVES THIS FILE
+ * ---------------------------------------------------------------------------------------
+ *
+ * The answer is data in the shape src/shared/shown-file.ts names: blocks that hold runs of plain
+ * text. No HTML is made here, and none of the document's own markup is passed on. The page draws
+ * each run as text, so a document that contains `<script>alert(1)</script>` shows exactly those
+ * characters and creates no element.
  *
  * ---------------------------------------------------------------------------------------
  * THE REFUSALS, AND WHY THEY REFUSE RATHER THAN GUESS
@@ -29,26 +36,16 @@
  * Encrypted entries, ZIP64, central-directory sizes that disagree with the bytes, a CRC that does
  * not match, a document.xml over 8 MB, more than 40 MB of uncompressed entries, more than 4,000
  * entries, and any document type or entity declaration are refused with a sentence. A truncated or
- * guessed document is a different document presented as this one.
- *
- * The page it produces has no script and no address of its own: `THE_GENERATED_PAGE_POLICY` allows inline
- * styles and nothing else, and the caller puts it in a frame with an empty sandbox. The page is the
- * whole file and nothing but the file: no record, no person and no office is named on it.
+ * guessed document is a different document presented as this one. The door refuses a file over its
+ * own limit before any of it is read here.
  */
 
 import { inflateRawSync } from 'node:zlib'
 import { sayInEnglish } from '@shared/i18n.ts'
+import type { ShownBlock, ShownRun } from '@shared/shown-file.ts'
 import { PanelError } from './panel-error.ts'
 import { crc32 } from './zip-export/zip.ts'
 
-/**
- * What a generated page may do: draw its own words and styles and nothing else. It is stated here
- * because every generated page has the same promise, and the file door reads this constant.
- */
-export const THE_GENERATED_PAGE_POLICY = "default-src 'none'; style-src 'unsafe-inline'; sandbox"
-
-/** The most a generated page's body may be before the file is refused rather than cut. */
-const MOST_GENERATED_PAGE_BYTES = 25 * 1024 * 1024
 /** How many elements a document may hold, so a tiny archive cannot become a huge tree. */
 const MOST_XML_NODES = 500_000
 const MOST_XML_DEPTH = 512
@@ -60,68 +57,6 @@ const MOST_ENTRIES = 4_000
 const LOCAL_HEADER = 0x04034b50
 const CENTRAL_HEADER = 0x02014b50
 const END_RECORD = 0x06054b50
-
-/** The MIME type of the page a generated type is answered as. */
-export const THE_GENERATED_PAGE_TYPE = 'text/html; charset=utf-8'
-
-/** The one place text becomes HTML text. Every caller that has a person's words goes through it. */
-export function escapedForHtml(text: string): string {
-  return text
-    .replace(/&/gu, '&amp;')
-    .replace(/</gu, '&lt;')
-    .replace(/>/gu, '&gt;')
-    .replace(/"/gu, '&quot;')
-    .replace(/'/gu, '&#39;')
-}
-
-/**
- * THE PAGE A READER SEES WHEN A DOCUMENT IS REFUSED. The sentence is the refusal's own, escaped, so
- * the frame shows the reason instead of a download or a blank rectangle.
- */
-export function theRefusalPage(sentence: string): string {
-  return thePage('', `<div class="word-refusal" lang="en">${escapedForHtml(sentence)}</div>`)
-}
-
-/** The whole generated page, with one inline stylesheet and no script of any kind. */
-function thePage(title: string, body: string): string {
-  return `<!doctype html>
-<html>
-<head>
-<meta charset="utf-8">
-<meta name="color-scheme" content="light">
-<title>${escapedForHtml(title)}</title>
-<style>
-  body { margin: 0; padding: 28px 24px 44px; background: #fbfaf7; color: #24201a;
-    font: 16px/1.55 Georgia, 'Times New Roman', serif; }
-  main { max-width: 54rem; margin: 0 auto; }
-  h1, h2, h3, h4, h5, h6 { line-height: 1.2; margin: 1.5em 0 0.45em; }
-  h1 { font-size: 1.9rem; } h2 { font-size: 1.55rem; } h3 { font-size: 1.3rem; }
-  h4 { font-size: 1.15rem; } h5, h6 { font-size: 1rem; }
-  p { margin: 0.55em 0; }
-  strong { font-weight: 700; } em { font-style: italic; }
-  ul, ol { margin: 0.5em 0 0.7em 1.6em; padding: 0; }
-  li { margin: 0.22em 0; }
-  table { border-collapse: collapse; width: 100%; margin: 0.9em 0; font-size: 0.95rem; }
-  th, td { border: 1px solid #b9b1a4; padding: 5px 8px; text-align: left; vertical-align: top; }
-  th { background: #efe9de; }
-  pre { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere;
-    font: 14px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
-  .word-note { margin-top: 2.4em; padding-top: 0.8em; border-top: 1px solid #d8d0c3; color: #6b5d4a;
-    font-size: 0.9rem; }
-  .word-refusal { max-width: 42rem; margin: 10vh auto 0; padding: 18px 20px; border: 1px solid #b9b1a4;
-    border-radius: 8px; background: #fff; font: 16px/1.55 system-ui, sans-serif; }
-  .word-list-level-1 { margin-left: 1.2em; } .word-list-level-2 { margin-left: 2.4em; }
-  .word-list-level-3 { margin-left: 3.6em; } .word-list-level-4 { margin-left: 4.8em; }
-</style>
-</head>
-<body>
-<main>
-${body}
-</main>
-</body>
-</html>
-`
-}
 
 // ============================================================================ the zip
 
@@ -355,18 +290,15 @@ function parseXml(text: string, wanted = 'document'): XmlNode {
   return document
 }
 
-// ============================================================================ what the page shows
+// ============================================================================ what the page draws
 
-interface Run {
-  text: string
-  bold: boolean
-  italic: boolean
-}
-
-interface Block {
-  html: string
-  list: { ordered: boolean; level: number } | null
-}
+/**
+ * A block as it is read, before the list items in one container are gathered into lists. An item
+ * keeps its kind and level until then.
+ */
+type ReadBlock =
+  | Exclude<ShownBlock, { kind: 'list' }>
+  | { kind: 'item'; ordered: boolean; level: number; runs: ShownRun[] }
 
 /** Whether an element with this local name is on (Word writes `<w:b/>` or `<w:b w:val="0"/>`). */
 function isOn(node: XmlNode): boolean {
@@ -400,8 +332,8 @@ function textOfRun(node: XmlNode): string {
   return text
 }
 
-function runsIn(node: XmlNode): Run[] {
-  const runs: Run[] = []
+function runsIn(node: XmlNode): ShownRun[] {
+  const runs: ShownRun[] = []
   for (const child of node.children) {
     if (typeof child === 'string') continue
     if (child.name === 'r') {
@@ -415,18 +347,6 @@ function runsIn(node: XmlNode): Run[] {
     }
   }
   return runs
-}
-
-function inlineHtml(runs: Run[]): string {
-  return runs
-    .map((run) => {
-      let text = escapedForHtml(run.text).replace(/\t/gu, '    ').replace(/\n/gu, '<br>')
-      if (text === '') return ''
-      if (run.bold) text = `<strong>${text}</strong>`
-      if (run.italic) text = `<em>${text}</em>`
-      return text
-    })
-    .join('')
 }
 
 function theHeading(style: string | null): number | null {
@@ -508,7 +428,7 @@ function theNumbering(root: XmlNode | null): Map<string, boolean> {
   return ordered
 }
 
-function paragraphBlock(node: XmlNode, numbering: Map<string, boolean>, styles: Map<string, WordStyle>): Block | null {
+function paragraphBlock(node: XmlNode, numbering: Map<string, boolean>, styles: Map<string, WordStyle>): ReadBlock | null {
   const properties = childNamed(node, 'pPr')
   const styleNode = properties === null ? null : childNamed(properties, 'pStyle')
   const style = styleNode === null ? null : attribute(styleNode, 'val')
@@ -519,9 +439,8 @@ function paragraphBlock(node: XmlNode, numbering: Map<string, boolean>, styles: 
     if (Number.isSafeInteger(outline) && outline >= 0 && outline <= 8) heading = outline + 1
   }
   const runs = runsIn(node)
-  const inline = inlineHtml(runs)
   const numPr = properties === null ? null : childNamed(properties, 'numPr')
-  let list: Block['list'] = null
+  let list: { ordered: boolean; level: number } | null = null
   if (numPr !== null && heading === null) {
     const numIdNode = childNamed(numPr, 'numId')
     const levelNode = childNamed(numPr, 'ilvl')
@@ -532,48 +451,39 @@ function paragraphBlock(node: XmlNode, numbering: Map<string, boolean>, styles: 
         level: Number.isSafeInteger(level) && level >= 0 && level < 9 ? level : 0 }
     }
   }
-  if (inline === '' && list === null) return null
-  if (heading !== null) return { html: `<h${String(heading)}>${inline}</h${String(heading)}>`, list: null }
-  return { html: `<p>${inline}</p>`, list }
+  if (runs.length === 0 && list === null) return null
+  if (heading !== null) return { kind: 'heading', level: heading, runs }
+  if (list !== null) return { kind: 'item', ordered: list.ordered, level: list.level, runs }
+  return { kind: 'paragraph', runs }
 }
 
-function tableHtml(node: XmlNode, numbering: Map<string, boolean>, styles: Map<string, WordStyle>): string {
-  const rows: string[] = []
+function tableBlock(node: XmlNode, numbering: Map<string, boolean>, styles: Map<string, WordStyle>): Extract<ShownBlock, { kind: 'table' }> | null {
+  const rows: { cells: { span: number; blocks: ShownBlock[] }[] }[] = []
   for (const row of childrenNamed(node, 'tr')) {
-    const cells: string[] = []
+    const cells: { span: number; blocks: ShownBlock[] }[] = []
     for (const cell of childrenNamed(row, 'tc')) {
-      const inner: string[] = []
-      for (const block of blocksOf(cell, numbering, styles)) {
-        if (block.list !== null) {
-          const words = block.html.replace(/^<p>|<\/p>$/gu, '')
-          inner.push(`<p class="word-list-level-${String(block.list.level)}">${words}</p>`)
-        } else {
-          inner.push(block.html)
-        }
-      }
-      const span = childNamed(cell, 'tcPr')
-      const grid = span === null ? null : childNamed(span, 'gridSpan')
-      const colspan = grid === null ? null : Number(attribute(grid, 'val') ?? '1')
-      const across = Number.isSafeInteger(colspan) && colspan !== null && colspan > 1 && colspan < 100
-        ? ` colspan="${String(colspan)}"` : ''
-      cells.push(`<td${across}>${inner.join('')}</td>`)
+      const properties = childNamed(cell, 'tcPr')
+      const grid = properties === null ? null : childNamed(properties, 'gridSpan')
+      const across = grid === null ? 1 : Number(attribute(grid, 'val') ?? '1')
+      const span = Number.isSafeInteger(across) && across > 1 && across < 100 ? across : 1
+      cells.push({ span, blocks: gathered(blocksOf(cell, numbering, styles)) })
     }
-    if (cells.length > 0) rows.push(`<tr>${cells.join('')}</tr>`)
+    if (cells.length > 0) rows.push({ cells })
   }
-  return rows.length === 0 ? '' : `<table><tbody>${rows.join('')}</tbody></table>`
+  return rows.length === 0 ? null : { kind: 'table', rows }
 }
 
 /** Paragraphs and tables in one container, descending through the wrappers Word puts around them. */
-function blocksOf(node: XmlNode, numbering: Map<string, boolean>, styles: Map<string, WordStyle>): Block[] {
-  const blocks: Block[] = []
+function blocksOf(node: XmlNode, numbering: Map<string, boolean>, styles: Map<string, WordStyle>): ReadBlock[] {
+  const blocks: ReadBlock[] = []
   for (const child of node.children) {
     if (typeof child === 'string') continue
     if (child.name === 'p') {
       const paragraph = paragraphBlock(child, numbering, styles)
       if (paragraph !== null) blocks.push(paragraph)
     } else if (child.name === 'tbl') {
-      const table = tableHtml(child, numbering, styles)
-      if (table !== '') blocks.push({ html: table, list: null })
+      const table = tableBlock(child, numbering, styles)
+      if (table !== null) blocks.push(table)
     } else if (
       child.name === 'sdt' || child.name === 'sdtContent' || child.name === 'customXml' ||
       child.name === 'ins' || child.name === 'smartTag'
@@ -584,38 +494,29 @@ function blocksOf(node: XmlNode, numbering: Map<string, boolean>, styles: Map<st
   return blocks
 }
 
-function blocksAsHtml(blocks: Block[]): string {
-  let html = ''
-  let open: Block['list'] = null
-  const close = (): void => {
-    if (open !== null) html += open.ordered ? '</ol>' : '</ul>'
-    open = null
-  }
-  for (const block of blocks) {
-    if (block.list !== null) {
-      if (open === null || open.ordered !== block.list.ordered) {
-        close()
-        html += block.list.ordered ? '<ol>' : '<ul>'
-        open = block.list
-      }
-      html += `<li class="word-list-level-${String(block.list.level)}">${block.html.replace(/^<p>|<\/p>$/gu, '')}</li>`
-    } else {
-      close()
-      html += block.html
+/** The items of one container gathered into lists: items next to each other, of one kind, are one list. */
+function gathered(read: ReadBlock[]): ShownBlock[] {
+  const blocks: ShownBlock[] = []
+  let open: Extract<ShownBlock, { kind: 'list' }> | null = null
+  for (const block of read) {
+    if (block.kind !== 'item') {
+      open = null
+      blocks.push(block)
+      continue
     }
+    if (open === null || open.ordered !== block.ordered) {
+      open = { kind: 'list', ordered: block.ordered, items: [] }
+      blocks.push(open)
+    }
+    open.items.push({ level: block.level, runs: block.runs })
   }
-  close()
-  return html
+  return blocks
 }
 
-// ============================================================================ the two pages
+// ============================================================================ the two answers
 
-/**
- * THE WORD DOCUMENT AS ONE PAGE. `limit` is the door's own limit for a file shown whole; a document
- * over it is refused before the ZIP is read, so the page a reader gets is whole or is a sentence.
- */
-export function wordDocumentPage(bytes: Buffer, name: string, limit: number): string {
-  if (bytes.length > limit) throw new PanelError(sayInEnglish('sb.file.tooLargeToShow', { limit }), 413)
+/** A Word document's blocks, and whether it held a picture this reader leaves out. */
+export function wordDocumentBlocks(bytes: Buffer): { blocks: ShownBlock[]; picturesLeftOut: boolean } {
   const parts = thePartsOf(bytes)
   const documentBytes = theBytesOf(bytes, parts.get('word/document.xml') as ZipPart)
   const documentText = documentBytes.toString('utf8')
@@ -626,27 +527,11 @@ export function wordDocumentPage(bytes: Buffer, name: string, limit: number): st
   const styles = theStyles(stylesPart === undefined ? null : parseXml(theBytesOf(bytes, stylesPart).toString('utf8'), 'styles'))
   const body = childNamed(document, 'body')
   if (body === null) throw refusal('sb.word.notAWord', 415)
-  const blocks = blocksOf(body, numbering, styles)
-  const shown = blocksAsHtml(blocks)
-  const pictures = containsPictures(body)
-  const note = pictures ? `<p class="word-note" lang="en">${escapedForHtml(sayInEnglish('sb.word.picturesLeftOut'))}</p>` : ''
-  if (shown === '' && note === '') {
-    return aPageThatFits(thePage(name, `<p class="word-note" lang="en">${escapedForHtml(sayInEnglish('sb.word.nothingToShow'))}</p>`))
-  }
-  return aPageThatFits(thePage(name, shown + note))
+  return { blocks: gathered(blocksOf(body, numbering, styles)), picturesLeftOut: containsPictures(body) }
 }
 
-/** Refuse rather than hand back a page larger than the door will show. */
-function aPageThatFits(page: string): string {
-  if (Buffer.byteLength(page, 'utf8') > MOST_GENERATED_PAGE_BYTES) {
-    throw new PanelError(sayInEnglish('sb.file.tooLargeToShow', { limit: MOST_GENERATED_PAGE_BYTES }), 413)
-  }
-  return page
-}
-
-/** A text file as one escaped page. The whole file or a sentence, never a cut one. */
-export function textFilePage(bytes: Buffer, name: string, limit: number): string {
-  if (bytes.length > limit) throw new PanelError(sayInEnglish('sb.file.tooLargeToShow', { limit }), 413)
+/** A text file's text, whole, or a refusal when it is not UTF-8. A byte order mark is not its text. */
+export function textFileText(bytes: Buffer): string {
   let text: string
   try {
     text = new TextDecoder('utf-8', { fatal: true }).decode(bytes)
@@ -654,5 +539,5 @@ export function textFilePage(bytes: Buffer, name: string, limit: number): string
     throw new PanelError(sayInEnglish('sb.word.notText'), 415)
   }
   if (text.charCodeAt(0) === 0xfeff) text = text.slice(1)
-  return aPageThatFits(thePage(name, `<pre>${escapedForHtml(text)}</pre>`))
+  return text
 }

@@ -31,6 +31,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { AGENT, apiApp, buildTheFirstOfficeInAHook, expectPanelError, freshDb, type TestDb } from './helpers.ts'
 import { HUMAN_ONLY_KINDS, RECORD_KINDS, type PanelRecord, type RecordKind } from '@shared/types.ts'
 import { theCastingRoll } from '@shared/casting-roll.ts'
+import { KNOWLEDGE_KINDS } from '@shared/knowledge/constants.ts'
+import { PACK_KIND } from '@shared/kinds/pack.ts'
 // Type-only, so this import is erased before it runs. A value import of records.ts here would open
 // a database before helpers.ts had pointed MOLE_OFFICE_DB at a throwaway one; helpers.ts explains why.
 import type { Actor } from '../src/server/lib/records.ts'
@@ -346,7 +348,7 @@ describe('a kind only the human may write', () => {
 
 describe('every other kind', () => {
   // `merge_entry` SINCE 21 SEPTEMBER 2026, sandbox v1 piece P6: written only by the merge queue's
-  // doors, and refused to every other write whoever asks — tests/merge-queue-doors.test.ts proves it.
+  // doors, and refused to every other write whoever asks.
   // `counter` SINCE 23 SEPTEMBER 2026, criteria CT1 and CT6: written only by its own doors, because
   // every change to one says who may and keeps why, and POST /api/records carries neither —
   // tests/counter-doors.test.ts proves the refusal.
@@ -369,7 +371,12 @@ describe('every other kind', () => {
   // `design_reminder` SINCE 8 NOVEMBER 2026, wave 13s round 228: kept by the office before a seal, and judged or filed as
   // a miss only through its own doors, the person included, so that the office writes who judged it from the key.
   // tests/a-design-reminder-is-judged-once-and-counted-by-the-day.test.ts (case 6) proves the refusal.
-  const OFFICE_ONLY_KINDS = ['sealed_tip', 'merge_entry', 'counter', 'flow_run', 'checklist', 'booking', 'emergency_push', 'host_job', 'project_chapter', 'design_review', 'design_reminder']
+  // `key_item` SINCE 20 NOVEMBER 2026, wave 13s round 281: written only by its own doors, the person included, so that
+  // the office writes who set its progress and its estimate, and when, from the key and its own clock.
+  // tests/key-items-carry-progress-and-a-time-left-estimate.test.ts (case 1) proves the refusal.
+  // The knowledge kinds SINCE 20 NOVEMBER 2026: written only by their own doors to preserve workspace and review rules.
+  // tests/knowledge-entries-and-changes.test.ts proves the ordinary door's refusals.
+  const OFFICE_ONLY_KINDS = ['sealed_tip', 'merge_entry', 'counter', 'flow_run', 'checklist', 'booking', 'emergency_push', 'host_job', PACK_KIND, 'project_chapter', 'design_review', 'design_reminder', 'key_item', ...KNOWLEDGE_KINDS]
   // `message` SINCE 29 SEPTEMBER 2026, only its writer may change, delete or bring back a message,
   // and the writer may change only its words. This loop has the person write
   // each record and an agent change it, which is exactly what a message now refuses.
@@ -384,7 +391,10 @@ describe('every other kind', () => {
   // `secretary_duties` SINCE WAVE 13S ROUND 92: the person writes one, or the secretary it names with a warrant quoting
   // the person's words from a decision it rests on, and every other agent is refused. tests/secretary-duties.test.ts
   // proves the create and the change.
-  const ON_THE_OWNERS_DECISION_KINDS = ['role_card_words', 'secretary_duties']
+  // `department` SINCE WAVE 13S ROUND 281: the person writes one by a press, or a secretary with its own key and a
+  // warrant quoting the person's words from a decision it rests on, and every other agent is refused.
+  // tests/departments-are-records-of-their-own.test.ts proves the create, the change, the delete and the restore.
+  const ON_THE_OWNERS_DECISION_KINDS = ['role_card_words', 'secretary_duties', 'department']
   // Personal choices use the recipient's own door. This file proves generic writes refuse below;
   // personal-notice-rules-keep-every-message.test.ts proves own edits and restoration work.
   const RECIPIENT_DOOR_KINDS = ['notice_rules']

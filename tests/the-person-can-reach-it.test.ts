@@ -18,7 +18,8 @@
  *   2. A DISABLED SEND SAID NOTHING. It refused for ever with no title, no wording change and no
  *      sentence anywhere in the box.
  *   3. THE COMPOSER PRINTED AN INSTRUCTION THAT WAS FALSE WHERE IT WAS PRINTED — "select inside one
- *      paragraph to quote words exactly", on things that keep no quotable text at all.
+ *      paragraph to quote words exactly", on things that keep no quotable text at all. As decided, the
+ *      composer now draws the short word alone and gives no instruction there.
  *   4. A CONVERSATION COULD NOT BE ANSWERED. The thread had no box to write in and no press with
  *      "reply" in its name.
  *   5. A COMMENT DISPATCH HELD BACK WAS DRAWN EXACTLY LIKE ONE THAT WENT, sitting above the agent's
@@ -40,6 +41,7 @@ import type { AgentMessageView } from '../src/server/lib/agents.ts'
 import type { PickUp, RecipientCandidate } from '../src/server/lib/recipients.ts'
 import { thePersonsKeyHeader, type LiveApp, liveApp, waitForThePage } from './helpers.ts'
 import { THE_TEST_FIXTURE_ROOT, THE_TEST_OFFICES_OWNER } from './a-page-of-a-test-office.ts'
+import { createI18n } from '../src/shared/i18n.ts'
 
 type Talk = typeof import('../src/web/components/agent/TalkBox.tsx')
 type Recipients = typeof import('../src/web/components/agent/Recipients.tsx')
@@ -147,35 +149,15 @@ describe('what the composer says about words it could not place', () => {
    * the quiet substitution invariant 2 forbids.
    */
   it('says the comment is about the whole thing whenever the words could not be placed', () => {
+    const { t } = createI18n('en')
     for (const words of ['across', 'nowhere'] as const) {
-      // THE WORD IS ON THE PAGE AND THE SENTENCE IS ON DEMAND. Both branches used to open with the
-      // same clause — "This comment is about the whole record." — and `Whole record` is that
-      // clause in two words. The sentence is still there, in the `title` and the off-screen span.
-      expect(talk.wordsNotPlacedNote(words, 'record')?.word).toBe('Whole record')
-      expect(talk.wordsNotPlacedNote(words, 'record')?.detail).toContain('about the whole record')
+      // THE WORD IS ON THE PAGE, and it is the whole of what is said, as decided.
+      expect(talk.wordsNotPlacedNote(words, 'record')).toBe(t('talk.whole', { thing: 'record' }))
     }
   })
 
   it('says nothing at all when the words WERE placed', () => {
     expect(talk.wordsNotPlacedNote('placed', 'record')).toBe(null)
-  })
-
-  it('tells somebody to select inside one paragraph only where that would work', () => {
-    expect(talk.wordsNotPlacedNote('across', 'report')?.detail).toContain('Select inside one paragraph')
-  })
-
-  /**
-   * THE DEFECT ITSELF. On a thing that keeps no quotable text, "select inside one paragraph" is an
-   * instruction that cannot be followed, and following it gives the same sentence back. Measured on
-   * the owner's corpus on 19 August 2026 against record wlWeXnjYsYEY, which has one addressable
-   * element and no stored strings on the screen at all.
-   */
-  it('never gives that instruction where no selection could ever be quoted', () => {
-    const said = talk.wordsNotPlacedNote('nowhere', 'record')?.detail ?? ''
-    expect(said).not.toContain('Select inside one paragraph')
-    expect(said).not.toContain('select inside')
-    // It still says what the reader can do about it, which is not an instruction about selecting.
-    expect(said).toContain('say which part you mean')
   })
 })
 
@@ -242,14 +224,20 @@ describe('a half-written comment dropped to make room', () => {
 // ============================================================ 4. a comment that has not gone
 
 describe('a comment dispatch held back is not drawn like one that went', () => {
-  it('marks a comment that is still waiting, and says why in the server words', () => {
-    const html = drawMessage({
+  it('marks a comment that is still waiting, and keeps the server words for developer mode', async () => {
+    const waiting: Partial<AgentMessageView> = {
       state: 'queued',
       recipient: null,
       delivery: { canSend: false, says: 'No recipient chosen yet.' },
-    })
+    }
+    const html = drawMessage(waiting)
     expect(html).toContain('Not sent yet')
-    expect(html).toContain('No recipient chosen yet.')
+    expect(html, 'the server sentence is for a developer').not.toContain('No recipient chosen yet.')
+    const mode = await import('../src/web/lib/mode.ts')
+    mode.setMode('inspect')
+    const inspected = drawMessage(waiting)
+    mode.setMode('normal')
+    expect(inspected).toContain('No recipient chosen yet.')
   })
 
   it('marks nothing on a comment that went, because nobody has to do anything about it', () => {

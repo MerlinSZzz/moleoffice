@@ -223,7 +223,7 @@ describe('the chat’s bar', () => {
     await finish.waitFor({ timeout: 15_000 })
     await finish.click()
     await expect.poll(async () => timesTheAgentIsHanded(HELD), { timeout: 20_000 }).toBe(1)
-    expect(await page.getByText(en.t('chat.commentsChangedAtSend')).count(), 'the bar said the comments had changed').toBe(0)
+    expect(await page.getByText(en.t('review.b.changedNothingSent')).count(), 'the bar said nothing was sent').toBe(0)
     expect(await timesTheAgentIsHanded(SENT), 'the comment sent with Send is handed to the agent again').toBe(1)
     await expect.poll(async () => page.locator('.px-chat-unsent-bar').count(), { timeout: 20_000 }).toBe(0)
   }, 120_000)

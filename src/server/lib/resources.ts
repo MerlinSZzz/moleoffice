@@ -94,17 +94,29 @@ import { ENDED_RUN_LOOK_FIELD } from '@shared/ended-run-resources.ts'
  * at import; that function was deleted when the declaration moved, because two definitions of one
  * table fail at runtime on INSERT rather than at compile time. This file now only reads and
  * writes rows.
+ *
+ * ---------------------------------------------------------------------------------------
+ * A PROGRAM IS FOUND IN THE WHOLE ENVIRONMENT
+ * ---------------------------------------------------------------------------------------
+ *
+ * Each program this file looks up is looked up in a whole environment, and its search path is read
+ * by `theSearchPathIn` of the system (src/config/systems/the-system.mjs). On Windows that is the one
+ * name that is PATH in any case, so a server whose environment holds it as `Path` finds its tools.
+ * On Linux and the Mac it is `PATH` alone. The avatar codec's child is given an environment made
+ * from nothing, so it holds one search path entry, `PATH`, read the same way.
  */
 
 import { execFile, execFileSync, spawn, spawnSync } from 'node:child_process'
 import { AVATAR_CODEC } from '../../config/avatar-codec.mjs'
 import { THE_LEDGER_COUNTS_A_SESSION_OVER_IN } from '../../config/the-ledgers-ended-states.mjs'
 import { installOsProbe, osProbe as installedOsProbe } from './os-probe.ts'
-import { closeSync, constants as fsConstants, mkdirSync, openSync, readFileSync, readdirSync, readlinkSync, realpathSync, statSync, statfsSync } from 'node:fs'
+import { closeSync, constants as fsConstants, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, readlinkSync, realpathSync, rmSync, statSync, statfsSync } from 'node:fs'
 // WHAT THIS MACHINE CALLS ITSELF AND WHICH ADDRESSES IT HAS, for LINUX_PROBE.machineName and
 // LINUX_PROBE.ownAddresses below. This file is the operating system layer, so it is the one place
 // under src/ that may ask.
 import { hostname, loadavg, networkInterfaces } from 'node:os'
+// Where `readThePatchIdsOfALog` writes the patch log it does not hold in memory.
+import { tmpdir } from 'node:os'
 import { delimiter, dirname, isAbsolute, join, resolve as resolvePath } from 'node:path'
 import { anOfficeId } from './ids.ts'
 import { SESSION_STATES, type SessionState } from '@shared/types.ts'
@@ -127,10 +139,12 @@ import { now } from '@shared/now.ts'
 import { PanelError } from './panel-error.ts'
 import type { PanelRecord } from '@shared/types.ts'
 import {
+  anInstantNamesItsStamp,
   clockStamp,
   latestMomentOfStampInZone,
   localStamp,
   momentOfAnInstant,
+  momentOfAStampAndItsInstant,
   momentOfStampInZone,
   parseAnyStamp,
   parseStoredStamp,
@@ -149,12 +163,16 @@ import { gateMet } from './gate-counts.ts'
 import { databaseIdentity } from '../../config/database-identity.mjs'
 import { UNKNOWN } from '../../config/world-header.mjs'
 import { theVersionItPrinted, theWayToStart, type TheSystem, VERSION_MUST_ANSWER_WITHIN_MS, whereIsThisTool } from '../../config/runtimes.mjs'
+import { whatCodexSaysOfItsSignIn } from './what-an-agent-tool-says-of-its-sign-in.ts'
 // The one choice of a process reader per platform, which this file's probes share with the service
 // lock, the worker and the session hook. See the header of src/config/process-reader.mjs.
 import { guardedGitArguments, guardedGitEnvironment } from '../../config/guarded-git.mjs'
 import { linuxProcessReader, THE_PORT_OF_THIS_MODULE, thereAreProcessGroups, theRowIsAboutThisProcess, WHAT_WINDOWS_NEEDS_TO_READ_PROCESSES, WINDOWS_HAS_NO_PROCESS_GROUPS, type RowAndProcess } from '../../config/process-reader.mjs'
 import { theSystemFor } from '../../config/systems/the-system.mjs'
+import { aCommandsProgram } from '../../config/run-permissions.mjs'
+import { theEnvironmentACodexGets } from '../../config/the-environment-a-codex-gets.mjs'
 import { startedByThatStarter, THE_STOP_ANSWER, WINDOWS_STOPS_A_GROUP_ONLY_AT_ONCE } from '../../config/systems/windows-groups.mjs'
+import { THE_STARTERS_MARK } from '../../config/systems/windows-starts.mjs'
 import type { World } from '@shared/runtime.ts'
 import { readLinuxProcessTable, useProcessTableSource } from './adapters/os.ts'
 // A WORLD ENDS WHEN THE LAST PROCESS SERVING IT STOPS, and this file is where a process row ends.
@@ -628,7 +646,7 @@ export const OTHER_FILES_THAT_TOUCH_THE_SYSTEM: readonly { file: string; does: s
   },
   {
     file: 'src/config/systems/windows-processes.mjs',
-    does: 'reads one Windows process at a time through PowerShell and Get-CimInstance Win32_Process, which has run on a Windows 11 machine, and who holds one connection to this server through Get-NetTCPConnection, which has not been run on Windows',
+    does: 'reads one Windows process at a time through PowerShell and Get-CimInstance Win32_Process, which has run on a Windows 11 machine, and who holds one connection to this server through calls to Windows itself, compiled with Add-Type, which has not been run on Windows',
   },
   {
     file: 'src/config/systems/windows-groups.mjs',
@@ -992,6 +1010,19 @@ export interface OsProbe {
    */
   ownAddresses?(): readonly string[]
   /**
+   * THIS MACHINE'S OWN NAME IN ITS TAILNET, from `tailscale status --json`: the DNSName of Self, read by
+   * `ownTailnetNameIn` below. Null when tailscale is not on this server's PATH, fails, runs past its limit or
+   * names no such name.
+   *
+   * The Host check in src/server/lib/a-host-that-is-not-this-office.ts takes this name at the door other machines
+   * reach. It reads it at the server's start and every few minutes, and never because of a request. This is the one
+   * place the office starts tailscale.
+   *
+   * OPTIONAL, for the reason `ownAddresses` above is optional. A probe that does not implement it holds no tailnet
+   * name, and then the Host check takes no such name, which is the answer it gave before this was read.
+   */
+  ownTailnetName?(): Promise<string | null>
+  /**
    * WHETHER ONE OF THE AGENT TOOLS ON THIS MACHINE HOLDS A KEY, ASKED THE TOOL'S OWN WAY.
    *
    * Criterion U2's read-only half. The office hands claude-code, codex and opencode no key: each
@@ -1195,6 +1226,27 @@ function theEndOf(
   return { ok: true, stdout }
 }
 
+/**
+ * THIS MACHINE'S TAILNET NAME IN THE TEXT `tailscale status --json` WRITES: the DNSName of Self, with the final dot
+ * tailscale writes taken off, in lower case. Null when the text is not JSON, names no Self, or gives Self no DNSName
+ * or an empty one. It takes the text, so what is read from it can be proved without running tailscale.
+ */
+export function ownTailnetNameIn(status: string): string | null {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(status)
+  } catch {
+    // Text that is not JSON names nothing, whatever wrote it.
+    return null
+  }
+  const self = typeof parsed === 'object' && parsed !== null ? (parsed as { Self?: unknown }).Self : undefined
+  if (typeof self !== 'object' || self === null) return null
+  const named = (self as { DNSName?: unknown }).DNSName
+  if (typeof named !== 'string') return null
+  const name = (named.endsWith('.') ? named.slice(0, -1) : named).toLowerCase()
+  return name === '' ? null : name
+}
+
 /** What nvidia-smi is asked: the GPU's compute processes. */
 const THE_GPUS_LIST = ['--query-compute-apps=pid,used_gpu_memory,process_name', '--format=csv,noheader,nounits']
 
@@ -1279,7 +1331,7 @@ function runCommandReadingBothStreams(
   args: string[],
   system?: TheSystem,
 ): { ok: true; stdout: string } | { ok: false; missing: boolean; reason: string } {
-  const where = whereIsThisTool(command, process.env['PATH'], system)
+  const where = whereIsThisTool(command, process.env, system)
   if (where === null) return { ok: false, missing: true, reason: `${command} is not installed on this machine` }
   let way: ReturnType<typeof theWayToStart>
   try {
@@ -1292,6 +1344,9 @@ function runCommandReadingBothStreams(
     encoding: 'utf8',
     timeout: 10_000,
     maxBuffer: 8 * 1024 * 1024,
+    // The server's own environment, except that a Codex gets only the names its list keeps
+    // (src/config/the-environment-a-codex-gets.mjs). Undefined is the server's own.
+    env: aCommandsProgram([command]).isCodex ? theEnvironmentACodexGets(process.env) : undefined,
     windowsVerbatimArguments: way.windowsVerbatimArguments,
     windowsHide: true,
   })
@@ -2047,6 +2102,18 @@ class LinuxProbe implements OsProbe {
     return Object.values(networkInterfaces()).flatMap((one) => (one ?? []).filter((entry) => !entry.internal).map((entry) => entry.address))
   }
 
+  // NO `assertLinux` HERE, for the reason `tmuxPanes` below has none: tailscale answers the same way where it runs.
+  // No shell, and 3 seconds at most, so a stuck daemon costs one late read and holds no request. The whole status of
+  // a large tailnet lists every peer, so its text may pass the 1 MB that execFile keeps by default.
+  ownTailnetName(): Promise<string | null> {
+    return new Promise((done) => {
+      const limits = { timeout: 3_000, maxBuffer: 8 * 1024 * 1024 }
+      execFile('tailscale', ['status', '--json'], { ...limits, encoding: 'utf8', windowsHide: true }, (err, stdout) => {
+        done(err === null ? ownTailnetNameIn(stdout) : null)
+      })
+    })
+  }
+
   /**
    * WHETHER AN AGENT TOOL HOLDS ITS OWN KEY, ASKED THE TOOL'S OWN WAY. Criterion U2.
    *
@@ -2064,8 +2131,7 @@ class LinuxProbe implements OsProbe {
       return {
         state: 'nobody-has-looked',
         says:
-          'Not looked at: Claude Code keeps its own credential, and this office does not read that ' +
-          'store. The office passes Claude Code no key.',
+          'Not looked at: Claude Code keeps its own credential, and this office does not read that store.',
         asked: 'no command, because the office does not read the Claude Code credential store',
       }
     }
@@ -2079,10 +2145,12 @@ class LinuxProbe implements OsProbe {
           asked,
         }
       }
-      if (/not logged in|logged out|no credentials|not authenticated/i.test(ran.stdout)) {
+      // CODEX'S WORDS ARE READ IN ONE PLACE, which the harness reading on Terminal management reads too.
+      const said = whatCodexSaysOfItsSignIn(ran.stdout)
+      if (said === 'no') {
         return { state: 'not-set', says: 'Codex says it has no login.', asked }
       }
-      if (/logged in|authenticated/i.test(ran.stdout)) {
+      if (said === 'yes') {
         return { state: 'set', says: 'Codex says it has a login.', asked }
       }
       return {
@@ -2107,7 +2175,7 @@ class LinuxProbe implements OsProbe {
   }
 
   theVersionOfAProgram(program: string, env: Readonly<Record<string, string>>): Promise<{ path: string | null; version: string; versionWasRead: boolean }> {
-    const where = whereIsThisTool(program, env['PATH'])
+    const where = whereIsThisTool(program, env)
     if (where === null) return Promise.resolve(theVersionItPrinted(null, null))
     return new Promise((done) => {
       let stdout = ''
@@ -2121,13 +2189,14 @@ class LinuxProbe implements OsProbe {
       let child: ReturnType<typeof spawn>
       try {
         // NO SHELL, and only the environment the caller gave: the program is asked its version and nothing else. A .cmd
-        // on Windows cannot start without cmd.exe, and theWayToStart in src/config/runtimes.mjs quotes it.
+        // on Windows cannot start without cmd.exe, and theWayToStart in src/config/runtimes.mjs quotes it. A Codex gets
+        // only the names its list keeps (src/config/the-environment-a-codex-gets.mjs).
         const way = theWayToStart(where, ['--version'])
         child = spawn(way.command, way.args, {
           shell: false,
           stdio: ['ignore', 'pipe', 'pipe'],
           timeout: VERSION_MUST_ANSWER_WITHIN_MS,
-          env: { ...env },
+          env: aCommandsProgram([program]).isCodex ? theEnvironmentACodexGets(env) : { ...env },
           windowsVerbatimArguments: way.windowsVerbatimArguments,
           windowsHide: true,
         })
@@ -2158,7 +2227,7 @@ class LinuxProbe implements OsProbe {
       detached: false, windowsHide: true,
       // A codec child needs no office credential, login, database or address.
       // It starts no program of its own, so what the install's Node needs set goes nowhere further.
-      env: { PATH: process.env['PATH'], ...node.environment },
+      env: { PATH: theSystemFor(process.platform).theSearchPathIn(process.env), ...node.environment },
     }
     return spawnSync(node.program, ['-e', AVATAR_CODEC, input.entry, JSON.stringify({
       side: input.side, pixels: input.pixels, format: input.format, dispositions: input.dispositions,
@@ -3587,21 +3656,34 @@ function theStartInWords(proc: OsProcess): string {
  * is written by the caller, so it cannot be what the check is made against. Both stamps hold whole seconds, so one
  * second is the tolerance, as in `theStartTimeTheCallerSentIsThisProcess`.
  *
- * A STAMP THAT CANNOT BE READ IS A REFUSAL, because a check that could not be made must not read as passed.
+ * THE TWO MOMENTS ARE COMPARED WHEN BOTH NAME THEIR STAMPS: the moment the probe read the process begin at
+ * (`startedInstant`, beside `startedAt`) and the moment the record door filed the session at (`data.filedTime`, beside
+ * `createdAt`). Each is read by the rule of `momentOfAStampAndItsInstant` in src/shared/time.ts, as a whole second. On
+ * the night the clocks go back the words alone read the second pass of the hour from 01:00 as the first, so a process
+ * begun after its session could be refused, and one begun before it taken. When either moment is missing or does not
+ * name its stamp, as when a stamp was changed alone, the two stamps are compared, as before, so one stamp is never
+ * compared with the other's moment. The refusal quotes the stamps either way.
+ *
+ * A STAMP THAT CANNOT BE READ IS A REFUSAL, because a check that could not be made must not read as passed. So is a
+ * moment that names its stamp and cannot be read, and the refusal then quotes the two moments.
  */
 function aProcessOlderThanItsSession(
   pid: number,
-  processStartedAt: string,
+  proc: OsProcess,
   session: PanelRecord,
   adopting: string | undefined,
 ): string | null {
   if (adopting !== undefined) return null
-  const processMs = parseStoredStamp(processStartedAt)
-  const sessionMs = parseStoredStamp(session.createdAt)
+  const processStartedAt = proc.startedAt
+  const startedInstant = proc.startedInstant
+  const filedTime = (session.data['filedTime'] as { instant?: unknown } | null | undefined)?.instant
+  const atTheirMoments = anInstantNamesItsStamp(processStartedAt, startedInstant) && anInstantNamesItsStamp(session.createdAt, filedTime)
+  const processMs = momentOfAStampAndItsInstant(processStartedAt, atTheirMoments ? startedInstant : undefined, parseStoredStamp)
+  const sessionMs = momentOfAStampAndItsInstant(session.createdAt, atTheirMoments ? filedTime : undefined, parseStoredStamp)
   if (processMs === null || sessionMs === null) {
     return (
-      `Mole Office could not read when pid ${pid} started ("${processStartedAt}") or when session ${session.id} was ` +
-      `filed ("${session.createdAt}"), so it cannot tell whether this session started the process. Nothing was ` +
+      `Mole Office could not read when pid ${pid} started ("${atTheirMoments ? startedInstant : processStartedAt}") or when session ${session.id} was ` +
+      `filed ("${atTheirMoments ? String(filedTime) : session.createdAt}"), so it cannot tell whether this session started the process. Nothing was ` +
       'recorded. If the session is taking on a process it did not start, send {"adopting":"<why>"}.'
     )
   }
@@ -3822,7 +3904,7 @@ export function registerResource(input: RegisterInput): LedgerEntry {
         const check = theStartTimeTheCallerSentIsThisProcess(pid, input.osStartedAt, proc)
         if (!check.ok) throw new PanelError(check.why)
       }
-      const older = input.sentThroughTheDoor === true ? aProcessOlderThanItsSession(pid, proc.startedAt, owner, adopting) : null
+      const older = input.sentThroughTheDoor === true ? aProcessOlderThanItsSession(pid, proc, owner, adopting) : null
       if (older !== null) throw new PanelError(older)
       pgid = input.groupItsJobObjectHolds ?? proc.pgid
       osStartedAt = proc.startedAt
@@ -3855,7 +3937,7 @@ export function registerResource(input: RegisterInput): LedgerEntry {
         const check = theStartTimeTheCallerSentIsThisProcess(pid, input.osStartedAt, proc)
         if (!check.ok) throw new PanelError(check.why)
       }
-      const older = input.sentThroughTheDoor === true ? aProcessOlderThanItsSession(pid, proc.startedAt, owner, adopting) : null
+      const older = input.sentThroughTheDoor === true ? aProcessOlderThanItsSession(pid, proc, owner, adopting) : null
       if (older !== null) throw new PanelError(older)
       const serves = whatAClientsGroupServes(proc, probe)
       if (serves !== null) {
@@ -6293,8 +6375,12 @@ export interface ReleaseResult {
   acted: boolean
   /** What happened, in a sentence, for the caller and for the change log. */
   outcome: string
-  /** True when the target survived the signal. SIGKILL is never sent automatically. */
-  stillAlive: boolean
+  /**
+   * True when the target survived the signal. SIGKILL is never sent automatically, except to a run's Job Object on
+   * Windows (`endTheJobObject`). `unknown` when whether the target is gone could not be told: then the row is left open,
+   * and `outcome` says why.
+   */
+  stillAlive: boolean | 'unknown'
 }
 
 /** A pause of `ms` milliseconds. The holder's restart waits with it too, so the server has one such timer. */
@@ -6315,6 +6401,16 @@ export const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
  * There is no automatic escalation from SIGTERM to SIGKILL. A process that ignores SIGTERM is
  * reported as still alive with SIGKILL offered, because deciding to SIGKILL something is a
  * second decision and it belongs to the person, not to a timer.
+ *
+ * A RUN ON WINDOWS IS THE ONE EXCEPTION. Its row records the pid of the starter that started it,
+ * and its group is the Job Object that starter made. The run's program has no stop pipe, so there
+ * is nothing to ask: the release ends that Job Object at once, with every process in it, whether
+ * the starter still runs or has ended (`theJobObjectAReleaseEnds`). Then it looks again, as the
+ * listing reads the row, for about five seconds at most (`endTheJobObject`). Only a look that reads
+ * the program gone closes the row. A program still alive, or a look that cannot tell, leaves the
+ * row open, and the answer says which. A row whose starter has ended is never closed as gone while
+ * its reading cannot tell. This is the one place a release reads a run's process, so a shutdown's
+ * pause, the office's pause, a run's stop door and a person's stop of the row all do this.
  */
 export async function releaseResource(
   id: string,
@@ -6324,7 +6420,9 @@ export async function releaseResource(
   // THE PROCESS A RELEASE READS IS READ FIRST, without holding the thread where the probe can (Windows; `readFirst`
   // above), and every check up to the stop is answered from that reading. Only the stop, and the look after it, wait.
   const checked = await readFirst(() => theProcessesAReleaseReads(id, workspaceId), () => theReleaseUpToItsStop(id, input, workspaceId))
-  return checked instanceof AGroupToStop ? await stopTheGroup(checked, input) : checked
+  if (checked instanceof AGroupToStop) return await stopTheGroup(checked, input)
+  if (checked instanceof AJobObjectToEnd) return await endTheJobObject(checked, input)
+  return checked
 }
 
 /**
@@ -6349,8 +6447,17 @@ class AGroupToStop {
   ) {}
 }
 
+/** A RELEASE OF A STARTER'S ROW ON WINDOWS THAT HAS PASSED EVERY CHECK ITS READING ANSWERS, and ends the Job Object next. */
+class AJobObjectToEnd {
+  constructor(
+    readonly entry: LedgerEntry,
+    readonly group: number,
+    readonly jobObjects: NonNullable<TheGroups['jobObjects']>,
+  ) {}
+}
+
 /** Every check of a release that its reading answers, and every release that ends with no stop. */
-function theReleaseUpToItsStop(id: string, input: ReleaseInput, workspaceId: string): ReleaseResult | AGroupToStop {
+function theReleaseUpToItsStop(id: string, input: ReleaseInput, workspaceId: string): ReleaseResult | AGroupToStop | AJobObjectToEnd {
   const row = theRowInThisProject(id, workspaceId)
   const entry = toEntry(row)
   if (entry.releasedAt !== null) {
@@ -6561,6 +6668,23 @@ function theReleaseUpToItsStop(id: string, input: ReleaseInput, workspaceId: str
   const pid = Number(entry.key)
   const target = entry.type === 'port' ? holderOfPort(entry, probe) : probe.processById(pid)
 
+  // A PID THAT HAS ENDED IS NOT CLOSED AS GONE WHILE ITS READING CANNOT TELL whether what it started still runs. That
+  // reading is the one the listing takes: on Windows it asks the ended starter's Job Object (`whatAnEndedPidLeftRunning`).
+  // Nothing is ended and the row stays open, because the program may still run. A port row is read by its holder, as
+  // before.
+  if (target === null && goneNow.state === 'unknown' && entry.type !== 'port') {
+    return {
+      resource: entry,
+      acted: false,
+      outcome: `Nothing was ended, and the row is left open, because whether its program has stopped cannot be told: ${goneNow.reason}`,
+      stillAlive: 'unknown',
+    }
+  }
+  const theStartersJobObject = theJobObjectAReleaseEnds(entry, target, goneNow, probe)
+  if (theStartersJobObject !== null) {
+    assertMayStopAnEndedRunsResource(entry, session, input.actor, workspaceId)
+    return new AJobObjectToEnd(entry, pid, theStartersJobObject)
+  }
   if (target === null) {
     return finish(entry, input, false, describeGone(entry), false)
   }
@@ -6666,6 +6790,94 @@ async function stopTheGroup({ entry, pgid, osStartedAt, target, signal }: AGroup
 }
 
 /**
+ * THE JOB OBJECT A RELEASE OF THIS ROW ENDS, ON WINDOWS: the one the row's pid made as a starter, or null for every
+ * other row and on every other system.
+ *
+ * A run on Windows is started through a starter (src/config/systems/windows-starts.mjs), and its row records the
+ * starter's pid. The starter makes the Job Object named for its own pid and starts the program in it. So that pid is
+ * the run's group, though the row records group 0, as the reader gives every process. Such a row is ended by that Job
+ * Object, at once, because a run's program has no stop pipe to ask. These rows are those, and only once the release's
+ * reading of the row says it is alive:
+ *   - the row's pid has ended, and its Job Object holds a program it started (`whatAnEndedPidLeftRunning`). The
+ *     message worker's starter ends when the worker ends, and the run goes on in that Job Object;
+ *   - the row's pid still runs, as the same process, and its command line carries the starter's mark.
+ * A row that records a group of its own, as the terminal holder's does, is stopped by that group as before.
+ */
+function theJobObjectAReleaseEnds(entry: LedgerEntry, target: OsProcess | null, now: Liveness, probe: OsProbe): NonNullable<TheGroups['jobObjects']> | null {
+  const { jobObjects } = theGroupsOf(probe)
+  if (jobObjects === null || entry.type !== 'process' || !theStarterIsAskedAbout(entry)) return null
+  if (entry.pgid !== null && entry.pgid > 1) return null
+  if (now.state !== 'alive') return null
+  return target === null || target.command.includes(THE_STARTERS_MARK) ? jobObjects : null
+}
+
+/**
+ * END THE JOB OBJECT A RUN WAS STARTED IN, ON WINDOWS, AND LOOK AGAIN UNTIL ITS PROGRAM IS GONE, for a bounded time.
+ *
+ * The end is SIGKILL to the group, through the system layer, which ends every process in the Job Object
+ * (src/config/systems/windows-groups.mjs). There is no ask first. The Job Object must not hold this server, as for any
+ * other group.
+ *
+ * THE LOOK AFTER IT is the reading the listing takes of the row: its pid, and what its starter left in its Job Object
+ * (`theRowReadAfterItsEnd`). Only a look that reads the program gone closes the row. A look that reads it alive leaves
+ * the row open, and the answer says it is still running. A look that cannot tell leaves the row open too, and the
+ * answer says it could not tell. Both are written in the change log, because the end was sent.
+ */
+async function endTheJobObject({ entry, group, jobObjects }: AJobObjectToEnd, input: ReleaseInput): Promise<ReleaseResult> {
+  const probe = osProbe()
+  await refuseAJobObjectThatHoldsThisServer(jobObjects, group)
+  let refused: string | null = null
+  try {
+    probe.killProcessGroup(group, 'SIGKILL')
+  } catch (error) {
+    refused = error instanceof Error ? error.message : String(error)
+  }
+  const after = await theRowReadAfterItsEnd(entry)
+  const ended =
+    refused === null
+      ? `The Job Object of group ${group} was ended at once, with every process in it`
+      : `The Job Object of group ${group} could not be ended: ${refused.replace(/[.\s]+$/u, '')}`
+  if (after.state === 'gone') {
+    return refused === null
+      ? finish(entry, input, true, `${ended}; its program is gone. (${entry.detail})`, false)
+      : finish(entry, input, false, `${ended}. Its program is gone all the same: ${after.detail}`, false, 'closed after the program was found gone')
+  }
+  const outcome =
+    after.state === 'alive'
+      ? `${ended}, and its program is still running after it: ${after.detail}. The row is left open.`
+      : `${ended}, and whether its program has stopped cannot be told: ${after.reason} The row is left open.`
+  if (refused === null) {
+    const note = [input.note?.trim(), input.force === true ? 'forced while the session was still running' : null]
+      .filter((s): s is string => s !== undefined && s !== null && s !== '')
+      .join('; ')
+    logChange(entry.sessionRecordId, 'update', input.actor, `resource.${entry.type}`, `${entry.key} — held`, `${entry.key} — ${outcome}${note === '' ? '' : ` [${note}]`}`)
+  }
+  return { resource: entry, acted: refused === null, outcome, stillAlive: after.state === 'alive' ? true : 'unknown' }
+}
+
+/**
+ * THE ROW READ AGAIN AFTER ITS JOB OBJECT WAS ENDED, as the listing reads it, by the way that waits where the probe has
+ * one (`readFirst`).
+ *
+ * A quarter of a second after the end, and up to three looks in all, a quarter of a second apart, with no new look once
+ * three seconds have passed. Windows ends every process in a Job Object when the Job Object is ended, so the first look
+ * should read the program gone. The later looks are for a process Windows is still taking down. On Windows one look
+ * runs one script while the starter runs, and two once it has ended, and each script takes about a second. So the wait
+ * is about five seconds at most. The last look is the answer.
+ */
+async function theRowReadAfterItsEnd(entry: LedgerEntry): Promise<Liveness> {
+  const look = () => readFirst(() => [{ pid: Number(entry.key), alsoItsStarterIfEnded: true }], () => livenessOf(entry, osProbe()))
+  const until = Date.now() + 3_000
+  await sleep(250)
+  let read = await look()
+  for (let more = 1; more < 3 && read.state !== 'gone' && Date.now() < until; more += 1) {
+    await sleep(250)
+    read = await look()
+  }
+  return read
+}
+
+/**
  * WHAT THE JOB OBJECT OF A ROW'S GROUP MUST SAY BEFORE THE GROUP IS STOPPED, on Windows, asked by the way that waits.
  * It must hold the process the row records, as a process's group is checked elsewhere. It must
  * not hold this server, because a stop of the server's own group would stop the server answering the request. That is
@@ -6688,6 +6900,11 @@ async function refuseWhatTheJobObjectDoesNotHold(jobObjects: NonNullable<TheGrou
       409,
     )
   }
+  await refuseAJobObjectThatHoldsThisServer(jobObjects, pgid)
+}
+
+/** The half of `refuseWhatTheJobObjectDoesNotHold` that refuses a Job Object holding this server, or one that cannot say. */
+async function refuseAJobObjectThatHoldsThisServer(jobObjects: NonNullable<TheGroups['jobObjects']>, pgid: number): Promise<void> {
   const theServer = await jobObjects.readHolds(pgid, process.pid)
   if ('unknown' in theServer) {
     throw new PanelError(
@@ -6885,8 +7102,15 @@ export const GIT_READS = [
 ] as const
 
 /**
+ * WHAT ONE GIT READ MAY TAKE, unless its caller asks for other limits: the bytes a pipe of it may hold, and the time it
+ * may run. A read that prints more than `bytes` ends with ENOBUFS, and one that runs longer than `ms` with ETIMEDOUT.
+ */
+export const A_GIT_READS_LIMITS = { bytes: 64 * 1024 * 1024, ms: 30_000 } as const
+
+/**
  * THE OFFICE'S ONE GIT READER. Every git process the server starts is started here, or by `readGitAsync` below, which
- * starts the same process.
+ * starts the same process, or by `readThePatchIdsOfALog` below, which starts a `git log` and a `git patch-id` with the
+ * same check, the same guard and the same limits.
  *
  * It always runs `git <the guard's options> --literal-pathspecs -C <directory>`, so git reads the checkout it was
  * named and treats a path as a path, never as a pattern. The first argument must be one of `GIT_READS`, and anything
@@ -6929,6 +7153,42 @@ export async function readGitAsync(directory: string, args: string[], options: G
   })
 }
 
+/**
+ * THE PATCH-IDS OF A PATCH LOG THAT MAY BE LARGER THAN ONE GIT READ MAY HOLD. It runs the `git log -p` that
+ * `thePatchIdsOf` (sealed-tip.ts) builds, with its output going to a file in a new private folder under the operating
+ * system's temporary folder. Then it runs `git patch-id --stable` with that file as its input, and answers what
+ * patch-id prints. So neither process's output is held whole in memory, and a log of any size is read.
+ *
+ * It is for this one pair of reads only. Both are checked against `GIT_READS` and started with the guard, as every read
+ * of `readGit` is. Each keeps `readGit`'s limits: `A_GIT_READS_LIMITS.ms` to run, and `A_GIT_READS_LIMITS.bytes` for
+ * what a pipe still holds, which is patch-id's output and each process's stderr. No shell is involved. It throws as
+ * `readGit` does, with `status` and `stderr`, so `whyGitDidNotAnswer` says what went wrong. The folder is removed in
+ * every case, also when git fails.
+ */
+export function readThePatchIdsOfALog(directory: string, log: string[]): Buffer {
+  if (log[0] !== 'log') throw new Error(`The patch log reader runs only a git log, and was given ${JSON.stringify(log[0] ?? null)}.`)
+  const theLog = aGitRead(directory, log, {})
+  const thePatchIds = aGitRead(directory, ['patch-id', '--stable'], {})
+  const folder = mkdtempSync(join(tmpdir(), 'mole-office-patch-log-'))
+  try {
+    const file = join(folder, 'log')
+    const written = openSync(file, 'wx', 0o600)
+    try {
+      execFileSync('git', theLog.args, { ...theLog.options, stdio: ['ignore', written, 'pipe'], windowsHide: true })
+    } finally {
+      closeSync(written)
+    }
+    const read = openSync(file, 'r')
+    try {
+      return execFileSync('git', thePatchIds.args, { ...thePatchIds.options, stdio: [read, 'pipe', 'pipe'], windowsHide: true })
+    } finally {
+      closeSync(read)
+    }
+  } finally {
+    rmSync(folder, { recursive: true, force: true })
+  }
+}
+
 export type GitReadOptions = { input?: string; maxBuffer?: number; timeoutMs?: number; workTree?: string }
 
 /** One read's arguments and limits, after its command is checked against `GIT_READS`. */
@@ -6944,7 +7204,7 @@ function aGitRead(directory: string, args: string[], options: GitReadOptions): {
       before: ['--literal-pathspecs'],
       ...(options.workTree === undefined ? {} : { workTree: options.workTree }),
     }),
-    options: { env: guardedGitEnvironment(), maxBuffer: options.maxBuffer ?? 64 * 1024 * 1024, timeout: options.timeoutMs ?? 30_000 },
+    options: { env: guardedGitEnvironment(), maxBuffer: options.maxBuffer ?? A_GIT_READS_LIMITS.bytes, timeout: options.timeoutMs ?? A_GIT_READS_LIMITS.ms },
   }
 }
 

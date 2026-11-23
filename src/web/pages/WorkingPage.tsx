@@ -58,7 +58,7 @@ import type { WhoIsWorking, WorkingRow } from '../../server/lib/working.ts'
 import { useInspect } from '../lib/mode.ts'
 import { presenceWord } from '../lib/server-sentences.ts'
 import { recordPath, RouteLink } from '../components/router.tsx'
-import { Absence, ErrorNote, Explain, Loading, Panel, Tag } from '../components/ui.tsx'
+import { Absence, ErrorNote, Explain, Loading, Panel, ServerNote, Tag } from '../components/ui.tsx'
 import { useProjectAsync } from '../lib/project-async.ts'
 import { UnregisteredAgents } from '../components/UnregisteredAgents.tsx'
 import { SideBySide } from '../components/SideBySide.tsx'
@@ -83,7 +83,9 @@ export const WORKING_WORDS = {
 
 export function WorkingPage() {
   const workspace = useSyncExternalStore(subscribeWorkspace, currentWorkspace, currentWorkspace)
-  const [state, reload] = useProjectAsync(() => api.whoIsWorking(), [])
+  // A ROW'S PRESENCE COMES FROM ITS AGENT'S OPEN ATTACHMENTS, and opening or closing one is a write of a run record,
+  // which the server announces. The chat dot's presence event is not enough: an attachment can change a row and not the dot.
+  const [state, reload] = useProjectAsync(() => api.whoIsWorking(), [], { follows: { kinds: ['session'], atMostEveryMs: 5000 } })
   const inspect = useInspect()
   // WHICH ROW'S EDITOR IS OPEN, HELD HERE AND NOT IN THE ROW. A write reloads the reading, which
   // unmounts every row and builds them again, so a row that remembered this itself closed its own
@@ -141,7 +143,7 @@ export function WorkingReading({
     <>
       {/* THE SERVER'S OWN SENTENCE ABOUT ITS OWN ANSWER, printed rather than rebuilt here. A second
           count in the browser could disagree with the reply it is describing. */}
-      {inspect ? <p className="wrk-said">{reading.note}</p> : null}
+      <ServerNote text={reading.note} />
 
       {/* THE ROSTER, AND BESIDE IT WHAT THE READING COULD NOT SEE AND HOW IT WAS WORKED OUT, by the
           product's one width rule in components/SideBySide.tsx. The roster is a list of agents; the
@@ -525,7 +527,6 @@ const WORKING_CSS = `
 /* THE ROSTER AND THE NOTES ABOUT IT: the one width rule's columns, each a stack with the page's gap. */
 .wrk-sides { gap: var(--gut); }
 .wrk-main, .wrk-side { display: flex; flex-direction: column; gap: var(--gut); min-width: 0; }
-.wrk-said { color: var(--text-2); font-size: var(--fs-1); margin: 0 0 var(--pad-lg) 0; max-width: var(--measure-in-box); }
 .wrk-none { color: var(--text-2); font-size: var(--fs-1); margin: 0; max-width: var(--measure-in-box); }
 .wrk-list, .wrk-absences, .wrk-domains { list-style: none; margin: 0; padding: 0; }
 .wrk-row { padding: var(--pad) 0; border-top: 1px solid var(--edge); }

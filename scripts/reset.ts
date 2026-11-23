@@ -16,10 +16,10 @@ import { loadPanelEnv } from '../src/server/lib/env.ts'
 import { apiAddressForThisProcess, settingValue, settings, workspaceFrom, whyThisCheckoutMayNotOpenTheDatabase } from '../src/config/settings.mjs'
 import { askWhatHoldsIt, LEDGER_WAIT_S } from '../tools/what-holds-it.mjs'
 import { withTheWayForThisJob } from '../src/config/the-office-tool-environment.mjs'
-// WHICH TABLES HOLD WORK IS THE SCHEMA'S ANSWER. Importing db/schema.ts opens nothing — it declares
-// tables and imports drizzle — which is the whole reason the guard below can ask it before the file
-// is deleted. See the refusal for what it cost when this script asked `records` alone.
-import { irreplaceableTablesWithParts } from '../src/server/db/schema.ts'
+// WHICH TABLES HOLD WORK IS THE SCHEMA'S ANSWER. Importing db/every-part-table.ts opens nothing — it and
+// the files it imports declare tables, make lists of them and import drizzle — which is the whole reason the guard
+// below can ask it before the file is deleted. See the refusal for what it cost when this script asked `records` alone.
+import { irreplaceableTablesWithParts } from '../src/server/db/every-part-table.ts'
 
 // `.env` before MOLE_OFFICE_DB is read, and this script has to do it itself: db/client.ts loads the
 // settings for everything that opens the database, and this is the one command that must read the

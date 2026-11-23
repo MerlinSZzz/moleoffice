@@ -9,7 +9,7 @@
 import { eq } from 'drizzle-orm'
 import { db } from './client.ts'
 import { planLines } from './schema.ts'
-import type { PlanLine, LineRow } from '../lib/plans.ts'
+import type { PlanLine, LineRow } from './types/plans.ts'
 import { parsePlanLine } from '@shared/planline.ts'
 
 /** The lines of one plan, in the order they are written. */

@@ -16,16 +16,23 @@
  *   B. each read is caught as it runs, and SQLite, asked with the values bound to it, plans it:
  *      - the history door's read of a project's pipeline revisions searches the index by the kind and the project;
  *      - the take-back check searches it by the kind, the project and the place in the record;
+ *      - the take-back listing (`asyncTakeBacksForProject` in src/server/lib/async-take-back.ts) reads a problem's
+ *        takeouts twice, once before its git reads and once after, and searches it the same way each time;
  *      - two reads by the project alone (`theRuleThreeSignature` in src/server/lib/rulethree.ts and `actsUnderThePeriod`
  *        in src/server/lib/elevation.ts) still search `revisions_workspace_at_idx`, because the kind comes first;
- *      - none of these reads scans the table;
+ *      - none of these reads scans the table.
+ *    Migration 0353 adds an index on the project, then the record, its op and its `at`. The take-back listing and
+ *    `theRuleThreeSignature` ask for their rows in record order, and SQLite would move both onto that index to skip the
+ *    sort. The first term of each one's ORDER BY has a unary plus, so SQLite does not take that order from an index, and
+ *    both keep the plans held here. `actsUnderThePeriod` keeps its plan with no plus.
  *   C. the way back passes the migration: `theWayBackCheck` in tools/stable/the-way-back.mjs finds that it only adds;
  *   D. a database migrated to just before 0326 reads a project's pipeline revisions through `revisions_workspace_at_idx`,
  *      and the same database migrated the rest of the way searches the new index.
  *
  * Every case but the reads by the project alone fails before the migration. Case B's control: the history door's read
  * and the take-back check are planned as `SEARCH revisions USING INDEX revisions_workspace_at_idx (workspace_id=?)`.
- * Case D shows the same in one run, before 0326 and after it.
+ * Case D shows the same in one run, before 0326 and after it. The take-back listing's case came later, in wave 13s
+ * round 281, and was not run before the migration.
  *
  * MUTATIONS, each after a control run, each put back from the commit:
  *   1. In the migration, make the index on `workspace_id`, then `kind`, then `seq`. Cases A, B and D go red: the index's
@@ -46,6 +53,7 @@ import { join } from 'node:path'
 import type { FastifyInstance } from 'fastify'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
+import { THE_PERSON } from '../src/shared/person.ts'
 import { apiApp, freshDb, type TestDb } from './helpers.ts'
 import { MIGRATIONS, migrationsBefore, partialMigrations, scratch } from './migration-fixtures.ts'
 
@@ -60,6 +68,12 @@ const A_RUN = {
   'x-mole-office-workspace': WORKSPACE,
   'x-mole-office-actor-type': 'agent',
   'x-mole-office-actor-id': 'made-up-r144-runner',
+}
+/** The person, as the tests that file a problem with no data through the record door ask. */
+const THE_PERSON_ASKS = {
+  'x-mole-office-workspace': WORKSPACE,
+  'x-mole-office-actor-type': 'human',
+  'x-mole-office-actor-id': THE_PERSON,
 }
 
 let t: TestDb
@@ -161,6 +175,17 @@ describe('B. the reads', () => {
     const takeBack = await import('../src/server/lib/take-back.ts')
     const reads = await theRevisionReadsDuring(() => takeBack.takeBackAlreadyExists(WORKSPACE, 'made-up-problem'), isAKindRead)
     expectPlanned(reads, 'takeBackAlreadyExists', 1, SEARCHED_TO_THE_PLACE)
+  })
+  it('the take-back listing reads a problem\'s takeouts by the index, once before its git reads and once after', async () => {
+    const filed = await app.inject({ method: 'POST', url: '/api/records', headers: THE_PERSON_ASKS, payload: { kind: 'problem', title: 'Made-up problem of round 281', data: {} } })
+    expect(filed.statusCode, filed.body).toBe(201)
+    const problem = (filed.json() as { record: { id: string } }).record.id
+    const takeBacks = await import('../src/server/lib/async-take-back.ts')
+    const reads = await theRevisionReadsDuring(
+      () => takeBacks.asyncTakeBacksForProject(WORKSPACE, problem),
+      (source) => isAKindRead(source) && source.includes('$.fixRound.kind'),
+    )
+    expectPlanned(reads, 'asyncTakeBacksForProject', 2, SEARCHED_TO_THE_PLACE)
   })
   it('two reads by the project alone still search revisions_workspace_at_idx', async () => {
     const ruleThree = await import('../src/server/lib/rulethree.ts')

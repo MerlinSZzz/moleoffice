@@ -6,6 +6,18 @@ import { repositories } from './repositories.ts'
 
 const existingArchive = { existingArchive: true } as const
 
+/**
+ * A CODE REVISION SOMEBODY NAMED, kept as the opaque string they supplied.
+ *
+ * AUTHORED. A caller supplies a string; Mole Office stores it against a repository and resolves nothing.
+ *
+ * THERE IS NO COLUMN SAYING WHETHER THIS IS A COMMIT, A TAG OR A BRANCH. Those are Git's words,
+ * Mole Office cannot check any of them, and a column holding an unverifiable classification is the fifth
+ * engineering rule broken with extra steps. A caller who wants to say what it is writes it in `note`.
+ *
+ * NOTHING HERE IS A ROW IN `revisions`. That table is the Mole Office record version ledger. A code
+ * revision is a reference a read resolves by joining, never a row copied in.
+ */
 export const implementationRevisions = aPartTable(sqliteTable(
   'implementation_revisions',
   {

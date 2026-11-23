@@ -21,7 +21,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { THE_MESSAGE_WORKER_ID } from '../src/shared/participants.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
-import { apiApp, freshDb, theOfficesKeyHeader, type TestDb } from './helpers.ts'
+import { apiApp, freshDb, theOfficesKeyHeader, type TestDb, governsTheWholeProject } from './helpers.ts'
 
 const WORKSPACE = 'accept-points'
 const MAKER = 'accept-maker'
@@ -39,7 +39,7 @@ const asThePerson = (): Record<string, string> => ({ 'x-mole-office-actor-type':
 const asAgent = (handle: string): Record<string, string> => ({ 'x-mole-office-actor-type': 'agent', 'x-mole-office-actor-id': handle, 'x-mole-office-workspace': WORKSPACE })
 
 async function file(kind: string, title: string, data: Record<string, unknown> = {}, headers = asThePerson()): Promise<string> {
-  const reply = await app.inject({ method: 'POST', url: '/api/records', headers, payload: { kind, title, data: kind === 'decision' ? { replaces: [], ...data } : data } })
+  const reply = await app.inject({ method: 'POST', url: '/api/records', headers, payload: { kind, title, data: kind === 'decision' ? { ...governsTheWholeProject(), replaces: [], ...data } : data } })
   expect(reply.statusCode, reply.body).toBe(201)
   return String(reply.json().record.id)
 }

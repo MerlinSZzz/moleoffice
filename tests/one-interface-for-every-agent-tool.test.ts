@@ -30,7 +30,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { envFor, type RunRequest } from '../src/worker/runtimes/adapter.ts'
 import { ClaudeCodeAdapter, theClaudeConversationFor } from '../src/worker/runtimes/claude-code.ts'
 import { claudeCodeGuard, codexGuard, theGuardOn } from '../src/config/main-world-guard.mjs'
-import { FULL_PERMISSIONS, thePermissionsARunGets } from '../src/config/run-permissions.mjs'
+import { CODEX_SHELL_SNAPSHOT_OFF, FULL_PERMISSIONS, thePermissionsARunGets } from '../src/config/run-permissions.mjs'
 import { CodexAdapter, lastMessagePathOf } from '../src/worker/runtimes/codex.ts'
 import { FakeAdapter } from '../src/worker/runtimes/fake.ts'
 import {
@@ -262,6 +262,7 @@ describe('the command line each real tool would be given', () => {
     expect(fresh.command).toBe('codex')
     expect(fresh.args.slice(0, before)).toEqual([...FULL_PERMISSIONS['codex']!.args])
     expect(fresh.args[before]).toBe('exec')
+    expect(fresh.args.slice(before, before + 1 + CODEX_SHELL_SNAPSHOT_OFF.length)).toEqual(['exec', ...CODEX_SHELL_SNAPSHOT_OFF])
     expect(fresh.args).toContain('--json')
     expect(fresh.args).toContain(lastMessagePathOf(run.outputPath))
     expect(fresh.args).toContain(run.cwd)
@@ -269,7 +270,7 @@ describe('the command line each real tool would be given', () => {
     expect(fresh.args.at(-1)).toBe('-')
     expect(fresh.stdin).toBe('say hello')
     const again = adapter.commandFor(ask('say hello', { resume: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee' }))
-    expect(again.args.slice(before, before + 3)).toEqual(['exec', 'resume', 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'])
+    expect(again.args.slice(before, before + 3 + CODEX_SHELL_SNAPSHOT_OFF.length)).toEqual(['exec', ...CODEX_SHELL_SNAPSHOT_OFF, 'resume', 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'])
   })
 
   it('OpenCode is run with JSON events, a directory, a session to continue, and the model and effort it was given', () => {

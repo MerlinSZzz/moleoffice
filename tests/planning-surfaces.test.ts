@@ -255,17 +255,6 @@ describe("one person's hours, cut by the projects sharing them", () => {
     expect(markup).not.toContain('0.30000000000000004')
   })
 
-  it('says the projects share one set of hours only when there is more than one', () => {
-    const one = renderToStaticMarkup(h(planning.ProjectSplit, { entries: [entry('a', 4, {})] }))
-    expect(one).not.toContain('One person')
-    const two = renderToStaticMarkup(
-      h(planning.ProjectSplit, {
-        entries: [entry('a', 4, {}), entry('b', 4, { workspaceId: 'robotics' })],
-      }),
-    )
-    expect(two).toContain('One person')
-  })
-
   it('draws nothing at all when the period is empty', () => {
     expect(renderToStaticMarkup(h(planning.ProjectSplit, { entries: [] }))).toBe('')
   })
@@ -527,7 +516,7 @@ describe('a week, read top to bottom', () => {
     // confident number about nothing.
     // NOT "a floor", which is a term of art, and not "the hatching", which names a visual texture
     // in prose. Finding 25 of the language audit, 19 August 2026.
-    expect(markup).toContain('2 more have no hours yet, so the real number can only go up')
+    expect(markup).toContain(sayInEnglish('schedule.unstatedCount', { n: 2 }))
     expect(markup).not.toContain('floor')
     expect(markup).not.toContain('hatching')
   })
@@ -915,7 +904,6 @@ describe('a total that counts a piece of work and the parts inside it once', () 
     // The gauge's own text alternative, which is where the total is a number rather than a bar.
     expect(markup).toContain('15 of 20 hours planned this week')
     expect(markup).not.toContain('24 of 20 hours planned this week')
-    expect(note(markup)).toContain('this week comes to 15h')
   })
 
   it('says what is assigned to named parts and what is not yet broken down', () => {
@@ -933,9 +921,7 @@ describe('a total that counts a piece of work and the parts inside it once', () 
     // THE HALF OF THE OLD DOCTRINE THAT SURVIVED. The total is now the envelope rather than the sum,
     // so the sum has to be on the screen next to it: a reader who adds the rows up gets 24 and the
     // page has to say why it says 15, in its own words, rather than leave them to work it out.
-    expect(note(drawWeek(insideBaseline()))).toContain(
-      sayInEnglish('schedule.twoLevels', { unit: sayInEnglish('schedule.week'), total: 15, rows: 24 }),
-    )
+    expect(note(drawWeek(insideBaseline()))).toContain(sayInEnglish('schedule.rowsAddUp', { rows: 24 }))
   })
 
   it('shows parts that come to more than the work holding them, and then costs the larger number', () => {
@@ -959,9 +945,9 @@ describe('a total that counts a piece of work and the parts inside it once', () 
     // And with nothing inside anything there is no envelope: the total is the plain sum of the rows.
     const markup = onScreen(drawWeek(insideBaseline({ pairs: [] })))
     expect(note(markup)).toBe('')
-    expect(markup).not.toContain('planned at two levels')
+    expect(markup).not.toContain(sayInEnglish('schedule.rowsAddUp', { rows: 24 }))
     expect(markup).not.toContain('not yet broken down')
-    expect(markup).not.toContain(sayInEnglish('schedule.containmentUnknown', { unit: sayInEnglish('schedule.week') }))
+    expect(markup).not.toContain(sayInEnglish('schedule.partsNotChecked'))
     expect(markup).toContain('24 of 20 hours planned this week')
   })
 
@@ -969,10 +955,10 @@ describe('a total that counts a piece of work and the parts inside it once', () 
     // `countedTwice: null` is no caller having read what contains what. The total beside it is then
     // the plain sum of every row, which IS a piece of work counted twice when the week holds a tree,
     // and the note says so instead of claiming an envelope nobody read.
-    expect(drawWeek(null)).toContain(sayInEnglish('schedule.containmentUnknown', { unit: sayInEnglish('schedule.week') }))
+    expect(drawWeek(null)).toContain(sayInEnglish('schedule.partsNotChecked'))
   })
 
-  it('says the reading may be short when a row’s containment could not be read', () => {
+  it('draws parent not read beside the row when a row’s containment could not be read', () => {
     const drawn = note(
       drawWeek(
         insideBaseline({
@@ -981,12 +967,9 @@ describe('a total that counts a piece of work and the parts inside it once', () 
         }),
       ),
     )
-    expect(drawn).toContain('could not read')
+    expect(drawn).toContain(sayInEnglish('schedule.parentsNotRead', { n: 1 }))
     expect(drawn).toContain('Tray clamp work')
-    expect(drawn).toContain('The parent work could not be read.')
     expect(drawn).not.toContain('longer than Mole Office walks')
-    // NOT EMPTY MEANS THE TOTAL MAY BE TOO HIGH, said in the note rather than left to the reader.
-    expect(drawn).toContain('may be too high')
   })
 
   it('draws it on a month and on a day too, because every total has the same duty', () => {
@@ -1012,9 +995,7 @@ describe('a total that counts a piece of work and the parts inside it once', () 
         onWrote: () => {},
       }),
     )
-    expect(note(monthMarkup)).toContain(
-      sayInEnglish('schedule.twoLevels', { unit: sayInEnglish('schedule.month'), total: 15, rows: 20 }),
-    )
+    expect(note(monthMarkup)).toContain(sayInEnglish('schedule.rowsAddUp', { rows: 20 }))
     expect(note(monthMarkup)).toContain('10h is not yet broken down')
 
     const dayMarkup = renderToStaticMarkup(
@@ -1040,7 +1021,7 @@ describe('a total that counts a piece of work and the parts inside it once', () 
         onWrote: () => {},
       }),
     )
-    expect(note(dayMarkup)).toContain(sayInEnglish('schedule.twoLevels', { unit: sayInEnglish('schedule.day'), total: 3, rows: 4 }))
+    expect(note(dayMarkup)).toContain(sayInEnglish('schedule.rowsAddUp', { rows: 4 }))
     expect(note(dayMarkup)).toContain('2h is not yet broken down')
   })
 })
@@ -1297,7 +1278,7 @@ describe('choosing the level of work a period is offered', () => {
       }),
     )
     expect(markup).not.toContain('add to this week')
-    expect(markup).toContain('a plan gives time to task, step, obligation, direction, problem')
+    expect(markup).toContain(sayInEnglish('schedule.cannotBePlanned'))
   })
 
   it('still offers the press when the plan has not been read, rather than guessing a refusal', () => {
@@ -1339,7 +1320,7 @@ describe('choosing the level of work a period is offered', () => {
     )
     expect(markup).toContain('in The campaign › Wave 5')
     // 7FEOshq3mBGG: normal mode names the missing reading without its raw field or project id.
-    expect(markup).toContain('The parent work could not be read.')
+    expect(markup).toContain(sayInEnglish('schedule.parentNotRead'))
     expect(markup).not.toContain('two records claim this as a part')
     expect(markup).not.toContain('part of work in robotics')
     expect(markup).toContain('part of work in Project name unavailable')

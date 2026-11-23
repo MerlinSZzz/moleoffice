@@ -5,16 +5,17 @@
  *
  * Question 15 of report n9Mjk3c_sJRu, answered as recommended by a decision: "Let it in" sits on the row of a visitor
  * asking to come in, and Revoke key moves off the Embassy's rows to the citizen's own page, the page the row opens: the
- * profile for a registered agent (ProfilePage.tsx, cleared in SOdG_M9Rqq3J) and the credential page for a device or
- * visitor no registry holds.
+ * profile for a registered agent (ProfilePage.tsx, cleared in SOdG_M9Rqq3J) and the credential page for a
+ * visitor no registry holds. A person's device is on neither since design C of early idea B9: its row and its
+ * Revoke press are on the owner's own person card, and the Embassy draws no device row.
  *
  * This is a browser test against a real stack. Made-up agents, visitors and devices come in through
  * the real doors. Then:
  *   - "Let it in" on a visitor's row lets it in where it stands: the row leaves "Asking to come in",
  *     the visitor is in the citizens' Agents group, and the Embassy is not read again;
  *   - no row on the Embassy draws Revoke key, although the office says rows hold keys;
- *   - the credential page and the profile each draw a Revoke press for the key (Revoke its own key),
- *     take the key back at once and give it back on Undo;
+ *   - his card's row for a device and the profile each draw a Revoke press for the key (Revoke its
+ *     own key), take the key back at once and give it back on Undo;
  *   - the agents at the door are still drawn first, each with its press;
  *   - no citizen row draws a picture that does not load (problem HeAu5V4oRmjn: a card with no
  *     drawings was given the address of a first drawing that does not exist).
@@ -154,13 +155,14 @@ describe('photographs', () => {
     await take('embassy-1440-xx', 1440, 'light', '?lang=xx')
     await app.page.setViewportSize({ width: 1440, height: 1000 })
     await app.page.evaluate(() => localStorage.setItem('mole-office.preset.theme', 'light'))
+    // A DEVICE'S CREDENTIAL PAGE OPENS HIS CARD AT ITS ROW, design C of early idea B9.
     await open(`/visitor/${deviceCredential}`)
-    await app.page.locator('.cred').first().waitFor({ state: 'visible', timeout: 30_000 })
-    await app.page.screenshot({ path: `${shots}/credential-1440-light.png`, fullPage: true })
+    await app.page.locator(`[data-browser="${deviceCredential}"]`).first().waitFor({ state: 'visible', timeout: 30_000 })
+    await app.page.screenshot({ path: `${shots}/card-row-1440-light.png`, fullPage: true })
     await app.page.setViewportSize({ width: 390, height: 1000 })
     await app.page.reload({ timeout: 60_000 })
     await waitForThePage(app.page, 60_000)
-    await app.page.screenshot({ path: `${shots}/credential-390-light.png`, fullPage: true })
+    await app.page.screenshot({ path: `${shots}/card-row-390-light.png`, fullPage: true })
     const pike = (await theEmbassy()).rows.find((one) => one.name === 'Pike Foreman')
     await app.page.setViewportSize({ width: 1440, height: 1000 })
     await open(`/who/agent/${String(pike?.who.id)}`)
@@ -194,20 +196,22 @@ describe('the Embassy after question 15', () => {
     await open('/embassy')
     await app.page.locator('.emb-row').first().waitFor({ state: 'visible', timeout: 30_000 })
     await showEveryone()
-    const row = app.page.locator('.emb-row').filter({ has: app.page.getByRole('link', { name: 'Kitchen tablet', exact: true }) })
-    await row.waitFor({ state: 'visible', timeout: 30_000 })
-    expect(await row.getByRole('button', { name: /^Revoke/ }).count()).toBe(0)
+    await app.page.locator('.emb-row', { hasText: 'Pike Foreman' }).waitFor({ state: 'visible', timeout: 30_000 })
     expect(await app.page.getByRole('button', { name: /^Revoke/ }).count(), 'no row at all').toBe(0)
-    // AND THE ROW OPENS THE PAGE THAT CARRIES IT.
-    expect(await row.getByRole('link', { name: 'Kitchen tablet', exact: true }).getAttribute('href')).toBe(`#/visitor/${deviceCredential}`)
+    // THE DEVICE IS NOT A ROW HERE: it is on his card, which his one row leads to (design C of early idea B9).
+    expect(await app.page.getByRole('link', { name: 'Kitchen tablet', exact: true }).count(), 'no device row').toBe(0)
+    const { hrefOf, whoPath } = await import('../src/web/components/router.tsx')
+    expect(await app.page.locator(`.emb-row a[href="${hrefOf(whoPath('person', THE_PERSON))}"]`).count(), 'his row').toBeGreaterThan(0)
   }, 120_000)
 
-  it('draws Revoke key on the credential page, takes the key back at once, and gives it back on Undo', async () => {
+  it('draws Revoke key on his card\'s row for the device, takes the key back at once, and gives it back on Undo', async () => {
     const keyOf = async () => (await theEmbassy()).rows.find((one) => one.credential === deviceCredential)?.heldKeys[0]?.id ?? null
     const key = await keyOf()
     expect(key).toBeTruthy()
-    await open(`/visitor/${deviceCredential}`)
-    const press = app.page.getByRole('button', { name: en['embassyKeys.revokeOwn'], exact: true })
+    const { hisBrowserPath } = await import('../src/web/components/router.tsx')
+    await open(hisBrowserPath(deviceCredential))
+    const row = app.page.locator(`[data-browser="${deviceCredential}"]`)
+    const press = row.getByRole('button', { name: en['embassyKeys.revokeOwn'], exact: true })
     await press.waitFor({ state: 'visible', timeout: 30_000 })
     await press.click()
     const bar = app.page.locator('.tiered-undo')

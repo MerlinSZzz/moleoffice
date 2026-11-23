@@ -17,9 +17,9 @@
  *   2. live-flags in Developer mode: the technical rows the person's mode leaves out, and a left-out flag drawn by
  *      its name only, so a flag holding a key is not drawn with it (round 10b).
  *   3. an office-held live screen on the actual profile: the show press reuses its stream without a pane POST,
- *      at 1440, 990, 660 and 390, in light and dark, in English, with optional pictures of every combination.
+ *      at 1440 and 390, in the light theme, in English, with optional pictures of each.
  *
- * The earlier general sweeps were taken out in wave 13n round F. The held-screen case checks its own eight views.
+ * The earlier general sweeps were taken out in wave 13n round F. The held-screen case checks its own two views.
  *
  * MUTATIONS (each after a control run; the commit message has the runs):
  *   - AgentLiveSteps asks again with no `after`: case 3 red (19 rows, not 5).
@@ -159,7 +159,11 @@ beforeAll(async () => {
   )
 
   await startAHolder(place)
-  server = await startAServer(place, undefined, { PATH: `${bin}:${process.env['PATH'] ?? '/usr/bin:/bin'}` })
+  // THE PAGE FIRST, SO THE SCRATCH SERVER CAN BE TOLD ITS PORT. The page is on the liveApp's web port and its calls
+  // go to the scratch server, which refuses a page on a loopback port that is not its own unless it is told that
+  // port is its dev page's.
+  app = await liveApp({ name: 'live-parts', viewport: { width: 1440, height: 900 }, database: join(place.dir, 'page.db') })
+  server = await startAServer(place, undefined, { PATH: `${bin}:${process.env['PATH'] ?? '/usr/bin:/bin'}`, MOLE_OFFICE_WEB_PORT: String(app.webPort) })
   personsKey = thePersonsKeyHeader(join(dirname(place.database), 'keys.json'))
   for (const handle of ['live-stopped', 'live-steps', 'live-flags']) await register(handle)
   await register('live-held', work)
@@ -181,7 +185,6 @@ beforeAll(async () => {
     sandbox: { template: 'test-template', container: 'test-row', folder: sandbox },
   })
 
-  app = await liveApp({ name: 'live-parts', viewport: { width: 1440, height: 900 }, database: join(place.dir, 'page.db') })
   context = await app.browser.newContext({ viewport: { width: 1440, height: 900 } })
   const thePagesApiPort = String(app.apiPort)
   const theScratchPort = String(server.port)
@@ -244,7 +247,8 @@ describe("an agent's live parts, in the browser", () => {
     })
     on.on('request', countPress)
     try {
-      for (const theme of ['light', 'dark'] as const) for (const width of [1440, 990, 660, 390]) {
+      const theme = 'light'
+      for (const width of [1440, 390]) {
         await on.setViewportSize({ width, height: 1000 })
         await on.emulateMedia({ colorScheme: theme })
         await on.goto('about:blank')
@@ -287,7 +291,7 @@ describe("an agent's live parts, in the browser", () => {
       // THE COMMAND IS THE SERVER'S (src/config/the-way-back.mjs), drawn whole.
       const command = String(((await ask(server.api, '/api/terminals/agents/live-steps/way-back')).body['way'] as { command: string }).command)
       expect(command).toContain(sandboxed)
-      expect(await theLines(thePanel(t('agentLive.back.title')))).toEqual([t('agentLive.back.sandbox'), command, t('agentLive.back.copy')])
+      expect(await theLines(thePanel(t('agentLive.back.title')))).toEqual([t('agentLive.back.inItsSandbox'), command, t('agentLive.back.copy')])
       expect(await on.getByRole('button', { name: t('agentLive.back.press') }).count()).toBe(0)
       expect(await on.locator('.al-dev').count()).toBe(0)
       }

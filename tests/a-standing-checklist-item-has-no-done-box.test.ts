@@ -2,7 +2,7 @@
 // Licensed under the MIT License. See LICENSE.
 /**
  * A STANDING CHECKLIST ITEM HAS NO DONE BOX, IS NEVER MARKED DONE AND IS NEVER COUNTED AS OPEN WORK. Wave 13j round
- * loop-5, item 0 part a. A decision, in a message the secretary sent on in message Sas0BiNBR7iy, says a checklist
+ * loop-5, item 0 part a. A decision, in a message the secretary sent on, says a checklist
  * item can be set to have no done box. It is a standing entry (such as an
  * experiment manual opened every session), is never marked done, and is never counted as open work.
  *
@@ -25,7 +25,7 @@
  *      superseded only. The brief an agent reads names its open items without its standing ones.
  *   4. In the checklists window a standing item has no box and no "Mark done", says in words that it is a standing
  *      item, stays among the items shown, and is left out of the count on the press and of the progress.
- *   5. The checklist's own page says the same in words, and its counts and progress leave it out.
+ *   5. The checklist's card on the page says the same in words, and its progress number leaves it out.
  *   6. On a phone, where the box takes 44 pixels, the window starts the words of a standing item, and of a done item,
  *      where the words beside a box start, and the facts of a standing item where the facts of a boxed item start.
  *
@@ -42,6 +42,12 @@
  *      goes red.
  *   I. src/web/components/ChecklistsWindow.tsx, on a phone the facts of a row without a box keep no room for one: case 6
  *      goes red.
+ *
+ * Test change (wave 13y round 175): the page and the window draw design E, as decided. Each checklist is a card, and
+ * its progress is a number such as "1 / 3", read here from its word key. Case 5 reads the card the address
+ * `#/checklists/<id>` marks and no longer asks the counts line ("2 still to do, 1 of them waiting on the owner"),
+ * because that line went. Before, the window drew each checklist as a group and its progress in words ("1 of 3 done"),
+ * and the page drew the one opened checklist with its counts line.
  */
 
 import { join } from 'node:path'
@@ -49,6 +55,7 @@ import Database from 'better-sqlite3'
 import type { Page } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { THE_PERSON } from '../src/shared/person.ts'
+import { t } from '../src/shared/i18n.ts'
 import { liveApp, waitForThePage, type LiveApp, theAnswerToAWriteInATestOffice } from './helpers.ts'
 
 let app: LiveApp
@@ -77,6 +84,8 @@ async function send(method: string, url: string, body: object | undefined, heade
 }
 
 const MANUAL = 'My experiment manual'
+/** The progress of the robot checklist: one done of three, the standing item left out. */
+const ONE_OF_THREE = t('checklists.progressNumber', { done: 1, total: 3 })
 let robot = ''
 let doors = ''
 let larkId = ''
@@ -189,8 +198,8 @@ describe('a standing checklist item has no done box, is never marked done and is
     const page = app.page
     await openTheWindow(page)
     expect(await page.locator('.ckw-count').innerText(), 'the press counts the open items alone').toBe('2')
-    const group = page.locator('.ckw-panel .ckw-group', { hasText: 'Robot checklist' })
-    expect(await group.locator('.ckp-progress-words').innerText()).toBe('1 of 3 done')
+    const group = page.locator('.ckw-panel .cks-card', { hasText: 'Robot checklist' })
+    expect(await group.locator('.cks-progress').innerText()).toBe(ONE_OF_THREE)
     const manual = group.locator('.ckp-item', { hasText: MANUAL })
     expect(await manual.isVisible(), 'the standing item is among the items shown').toBe(true)
     expect(await manual.getByRole('button', { name: `Mark as done: ${MANUAL}`, exact: true }).count(), 'no box').toBe(0)
@@ -203,15 +212,14 @@ describe('a standing checklist item has no done box, is never marked done and is
     await page.keyboard.press('Escape')
   }, 120_000)
 
-  it("5. the checklist's own page says it is a standing item, and its counts and progress leave it out", async () => {
+  it("5. the checklist's card on the page says it is a standing item, and its progress leaves it out", async () => {
     const page = app.page
     await page.goto('about:blank')
     await page.goto(`${app.site}/?lang=en#/checklists/${robot}`, { timeout: 60_000 })
     await waitForThePage(page, 60_000)
-    const one = page.locator('.ck1')
-    await one.locator('.ck1-counts').waitFor({ timeout: 30_000 })
-    expect(await one.locator('.ck1-counts').innerText()).toBe('2 still to do, 1 of them waiting on the owner')
-    expect(await one.locator('.ckp-progress-words').first().innerText()).toBe('1 of 3 done')
+    const one = page.locator('.cks-card[data-marked="yes"]')
+    await one.locator('.ckp-item').first().waitFor({ timeout: 30_000 })
+    expect(await one.locator('.cks-progress').innerText()).toBe(ONE_OF_THREE)
     const manual = one.locator('.ckp-item', { hasText: MANUAL })
     await manual.locator('summary').click()
     await expect.poll(() => manual.innerText(), { timeout: 10_000 }).toContain('A standing item: it is never marked done, and it is not counted as open work.')
@@ -222,7 +230,7 @@ describe('a standing checklist item has no done box, is never marked done and is
     await page.setViewportSize({ width: 390, height: 844 })
     try {
       await openTheWindow(page)
-      const group = page.locator('.ckw-panel .ckw-group', { hasText: 'Robot checklist' })
+      const group = page.locator('.ckw-panel .cks-card', { hasText: 'Robot checklist' })
       await group.locator('.ckp-fold').click()
       const row = (words: string) => group.locator('.ckp-item', { hasText: words })
       const leftOf = async (words: string, what: string): Promise<number> => (await row(words).locator(what).first().boundingBox())!.x
@@ -247,5 +255,5 @@ async function openTheWindow(page: Page): Promise<void> {
   await waitForThePage(page, 60_000)
   await page.waitForSelector('.ckw-press', { timeout: 30_000 })
   await page.click('.ckw-press')
-  await page.waitForSelector('.ckw-panel .ckw-group', { timeout: 30_000 })
+  await page.waitForSelector('.ckw-panel .cks-card', { timeout: 30_000 })
 }

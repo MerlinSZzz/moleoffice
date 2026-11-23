@@ -65,6 +65,7 @@ import { sqlite } from '../db/client.ts'
 import type { AttentionInTheShape, AttentionRankingReply, AttentionShape } from './attention-shapes.ts'
 import {
   THE_ATTENTION_THREAD,
+  theClockBothThreadsRead,
   type AttentionAnswer,
   type AttentionAsk,
   type EachProjectsHomeAttention,
@@ -83,6 +84,8 @@ interface TheThread {
   worker: Worker
   /** Settled when the thread has loaded and listens, or when it failed first. */
   ready: Promise<void>
+  /** True once the thread has said it is ready. An ask is then posted in the step it is made (`askTheThread`). */
+  saidItIsReady: boolean
   waiting: Map<number, Waiting>
   /** Set when the server closes, so the reads still waiting are told that, and not that the thread failed. */
   endedByTheServer: boolean
@@ -93,7 +96,8 @@ type Answered = { shaped: unknown; lastChange: number | null; readings: number }
 
 /** The input `attentionNow` takes. */
 type AttentionInput = Parameters<typeof attentionNow>[0]
-type AskWithoutId = AttentionAsk extends infer A ? (A extends unknown ? Omit<A, 'id'> : never) : never
+/** An ask as a caller makes it: `askTheThread` gives it its id and its sent time. */
+type AskWithoutId = AttentionAsk extends infer A ? (A extends unknown ? Omit<A, 'id' | 'sentAt'> : never) : never
 
 let theThread: TheThread | null = null
 let lastAsk = 0
@@ -208,11 +212,24 @@ async function askTheThread(ask: AskWithoutId): Promise<Answered> {
   const answered = new Promise<Answered>((resolveIt, rejectIt) => {
     thread.waiting.set(id, { resolve: resolveIt, reject: rejectIt })
   })
-  // The failure is said by `await thread.ready` below when the start fails, and by the return otherwise.
+  // A start that fails is said by `await thread.ready` below, because an ask to a thread that has not said it is
+  // ready waits there. Every other failure is said by the return.
   answered.catch(() => undefined)
   thread.worker.ref()
-  await thread.ready
-  thread.worker.postMessage({ id, ...ask } satisfies AttentionAsk)
+  // POSTED IN THIS STEP WHEN THE THREAD HAS ALREADY SAID IT IS READY. It waits for the thread only when the thread
+  // has not said so yet. An `await` lets the caller's code run first, even when its promise settled long before.
+  // A caller may ask first and await later, so that the rule runs on its thread while the caller does other work.
+  // With an `await` here, the ask was posted only when that caller reached its own `await`, and the caller gained
+  // nothing. On a made-up office of the live size, one read of GET /api/where-you-stand took about 960 ms on the
+  // request thread. In a CPU profile of 15 reads, reading what waits on a person took 130 to 170 ms. Then the
+  // request thread had nothing to do for 380 to 650 ms while the rule ran. The rest took about 330 ms. In all 15
+  // reads, the rule's thread began 3.4 to 5.1 ms after what waits on a person had been read. The thread had been
+  // ready long before.
+  if (!thread.saidItIsReady) await thread.ready
+  // STAMPED AS IT IS POSTED, by the clock both threads read and not by `performance.now()` alone, which each thread
+  // counts from its own start (`theClockBothThreadsRead` says so). The thread can then say how long the ask waited
+  // at its port before its batch began.
+  thread.worker.postMessage({ id, sentAt: theClockBothThreadsRead(), ...ask } satisfies AttentionAsk)
   return answered
 }
 
@@ -248,6 +265,7 @@ function startTheThread(): TheThread {
       ready = resolveIt
       failed = rejectIt
     }),
+    saidItIsReady: false,
     waiting,
     endedByTheServer: false,
   }
@@ -267,6 +285,7 @@ function startTheThread(): TheThread {
     }
     const answer: AttentionAnswer = said
     if ('ready' in answer) {
+      thread.saidItIsReady = true
       ready()
       return
     }

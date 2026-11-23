@@ -31,6 +31,7 @@ import { askTheOffice, answerWithFields, prepareOfficeRequest, validateRequestFi
 import { workerCheckpoint } from './worker-delivery/checkpoint.mjs'
 import { pictureJudgementTools, callPictureJudgement } from './picture-judgements/index.mjs'
 import { aSecretFromTheEnvironment, THE_AGENT_KEY } from '../for-agents/agent-key.mjs'
+import { OFFICE_TOOL_CONFIGURATION } from '../src/config/run-permissions.mjs'
 import { howAFullPathIsWritten, isAnAbsolutePath, thePathsOf, theSameSpelling, THIS_PLATFORM } from '../src/config/the-paths-of-a-system.mjs'
 
 // The parameters are handed on from the one shared definition, rather than written again here: each one's type and
@@ -97,7 +98,7 @@ export async function answerOfficeMessage(message, options, checkpoint) {
           const read = await aReportFileRead(fromFile, options)
           if (checkpoint) await checkpoint.beforeCall(options)
           // Integrity is judged from the full masked answer before any user-facing selection or cutoff.
-          const answer = await askTheOffice({ ...args, fields: 'whole', body: { ...args.body, bytes: read.bytes.toString('base64') } }, { ...options, longestReply: Number.MAX_SAFE_INTEGER })
+          const answer = await askTheOffice(theRequestWithTheFile(args, read), { ...options, longestReply: Number.MAX_SAFE_INTEGER })
           result = theStoredFileJudged(args, answer, fromFile, read)
         }
       } catch (why) {
@@ -161,6 +162,11 @@ export function theFileAskedFor(args) {
     throw new Error(`"bytes" takes {"${A_FILE_IS_NAMED_BY}": "<the file's full path>"} and nothing else beside it. ${NOTHING_SENT}`)
   }
   return bytes[A_FILE_IS_NAMED_BY]
+}
+
+/** @param {any} args @param {{ bytes: Buffer }} read */
+export function theRequestWithTheFile(args, read) {
+  return { ...args, fields: 'whole', body: { ...args.body, bytes: read.bytes.toString('base64') } }
 }
 
 /**
@@ -330,13 +336,15 @@ export async function aReportFileRead(path, options) {
   }
   const credentials = theCredentialsPartIn(path, platform)
   if (credentials !== undefined) throw new Error(`The file ${path} is in a credentials folder or is a credentials file (${credentials}), and is never sent as a report file. ${NOTHING_SENT}`)
-  const keyFile = env['MOLE_AGENT_KEY_FILE']
-  let theKey = null
-  if (typeof keyFile === 'string' && keyFile !== '') {
+  const keys = []
+  for (const keyFile of [env['MOLE_AGENT_KEY_FILE'], env[OFFICE_TOOL_CONFIGURATION]]) {
+    if (typeof keyFile !== 'string' || keyFile === '') continue
+    let theKey = null
     try { theKey = statSync(keyFile, { bigint: true }) } catch { theKey = null }
     if (dirname(path) === dirname(keyFile) || (theKey !== null && dirname(path) === dirname(realpathSync(keyFile)))) {
       throw new Error(`The file ${path} is the run's key file, or sits in its folder, and is never sent. ${NOTHING_SENT}`)
     }
+    if (theKey !== null) keys.push(theKey)
   }
   let fd = null
   try {
@@ -350,7 +358,7 @@ export async function aReportFileRead(path, options) {
       const refused = theOpenedFileRefused(path, opened, atPath)
       if (refused !== null) throw new Error(refused)
     }
-    if (theKey !== null && opened.dev === theKey.dev && opened.ino === theKey.ino) throw new Error(`The file ${path} is the run's key file, and is never sent. ${NOTHING_SENT}`)
+    if (keys.some((theKey) => opened.dev === theKey.dev && opened.ino === theKey.ino)) throw new Error(`The file ${path} is the run's key file, and is never sent. ${NOTHING_SENT}`)
     if (!opened.isFile()) throw new Error(`The path ${path} is not a regular file. ${NOTHING_SENT}`)
     const size = Number(opened.size)
     if (size === 0) throw new Error(`The file ${path} is empty. ${NOTHING_SENT}`)
@@ -390,28 +398,42 @@ async function theLargestReportFile(options) {
 /**
  * THE OFFICE'S ANSWER, JUDGED AGAINST THE FILE READ: a stored file whose size or short hash is not the file's is an
  * error naming the path and both hashes. Only the office's reply is shown, never the bytes.
+ * @param {import('./office-request.mjs').AnAnswer} answer
+ * @param {string} path
+ * @param {{ size: number, hash: string }} read
+ */
+export function theStoredFileCompared(answer, path, read) {
+  if (answer.status !== 201) return null
+  let stored = null
+  try { stored = JSON.parse(answer.body)?.file ?? null } catch { stored = null }
+  const matches = stored !== null && stored.size === read.size && stored.hash === read.hash
+  const words = matches
+    ? `The stored file matches ${path} as read: ${String(read.size)} bytes, hash ${read.hash}.`
+    : `THE STORED FILE DOES NOT MATCH ${path} AS READ: the office answered size ${String(stored?.size)} and hash ` +
+      `${String(stored?.hash)}, and the file read was ${String(read.size)} bytes with hash ${read.hash}. Do not put this stored file in a ` +
+      'report. Ask again, and tell your supervisor if it does not match a second time.'
+  return { matches, words }
+}
+
+/**
  * @param {any} args
  * @param {import('./office-request.mjs').AnAnswer} answer
  * @param {string} path
  * @param {{ size: number, hash: string }} read
  */
 export function theStoredFileJudged(args, answer, path, read) {
-  let stored = null
-  try { stored = JSON.parse(answer.body)?.file ?? null } catch { stored = null }
-  const matches = stored !== null && stored.size === read.size && stored.hash === read.hash
+  const comparison = theStoredFileCompared(answer, path, read)
   const projected = answerWithFields(answer, args.fields === undefined ? 'short' : args.fields, args.method)
   const shown = renderOfficeAnswer(args, projected)
-  if (answer.status !== 201) return { content: shown, isError: projected.projectionRefused === true }
+  if (comparison === null) return { content: shown, isError: projected.projectionRefused === true }
   const said = shown[0]?.text ?? ''
-  if (matches) {
-    return { content: [{ type: 'text', text: `${said}\nThe stored file matches ${path} as read: ${String(read.size)} bytes, hash ${read.hash}.` }], isError: projected.projectionRefused === true }
+  if (comparison.matches) {
+    return { content: [{ type: 'text', text: `${said}\n${comparison.words}` }], isError: projected.projectionRefused === true }
   }
   return {
     content: [{
       type: 'text',
-      text: `${said}\nTHE STORED FILE DOES NOT MATCH ${path} AS READ: the office answered size ${String(stored?.size)} and hash ` +
-        `${String(stored?.hash)}, and the file read was ${String(read.size)} bytes with hash ${read.hash}. Do not put this stored file in a ` +
-        'report. Ask again, and tell your supervisor if it does not match a second time.',
+      text: `${said}\n${comparison.words}`,
     }],
     isError: true,
   }

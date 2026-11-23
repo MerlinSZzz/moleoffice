@@ -62,6 +62,7 @@ import type { AttentionResult } from '../src/shared/attention.ts'
 import type { PanelRecord } from '../src/shared/types.ts'
 import type { GraphLink, Scope, StructureGraph } from '../src/web/components/graph/model.ts'
 import { englishWords } from '../src/shared/words/joined.ts'
+import { t } from '../src/shared/i18n.ts'
 
 const en = englishWords()
 
@@ -433,12 +434,13 @@ describe('Show all', () => {
     expect(all.empty).toBe(false)
   })
 
-  it('is offered on the page, with the exact number of cards it would add', () => {
+  it('is offered on the page with the number of cards it would draw, and without its old title', () => {
     const html = structureView(FIVE_LINKS)
-    expect(html).toContain('Show all 27')
-    // What it costs, on the control itself rather than after it is pressed.
-    expect(html).toContain('17 that no line touches')
-    expect(html).toContain('strip')
+    expect(html).toContain(t('g7b.StructureView.show_all', { v1: 27 }))
+    // CRITERION CHANGE, as decided: the press no longer carries a title saying what it costs. Its
+    // own words count the cards. The title's word key is gone, and so are its words.
+    expect(Object.hasOwn(en, 'g7b.StructureView.draw_every_card_including_the_that_no')).toBe(false)
+    expect(html).not.toContain('that no line touches')
   })
 
   it('is not offered where it would do nothing', () => {
@@ -612,10 +614,10 @@ describe('the reading layer keeps every card the canvas drops', () => {
     const complete = build(MODULES, FIVE_LINKS)
     const canvas = model.projectForCanvas(complete, 'joined')
     expect(canvas.omitted).toHaveLength(17)
-    // The fold that gets a reader from the count to the cards, named rather than called "more".
-    expect(html).toContain('why these are not on the canvas, and each one named')
+    // The fold that gets a reader from the count to the cards, named by its count.
+    // CRITERION CHANGE, as decided: the fold no longer says why, so its own count and word are read.
+    expect(html).toContain(`>17</b>${t('g7b.StructureView.isolated')}</summary>`)
     expect(html).toContain('10 / 27 drawn')
-    expect(html).toContain('>17<')
     // And each of the seventeen by name, each a link to its own record.
     for (const node of canvas.omitted) {
       expect(html, `${node.title} is counted and not named`).toContain(node.title)
@@ -643,14 +645,16 @@ describe('the reading layer keeps every card the canvas drops', () => {
     expect(complete.omitted).toHaveLength(0)
     expect(structureView(FIVE_LINKS)).not.toContain('Nothing is left out of this drawing')
 
-    // And where every card really is drawn, the zero case is said out loud, exactly as before.
+    // And where every card really is drawn, the heading counts every card.
+    // CRITERION CHANGE, as decided: the sentence on the count's hover is gone, so the count is read.
     const everythingJoined = structureView([
       ...FIVE_LINKS,
       ...MODULES.slice(10).map((module, n) =>
         link({ linkId: `X${n}`, fromId: 'm00', toId: module.id, type: 'relates_to' }),
       ),
     ])
-    expect(everythingJoined).toContain('Every card in this drawing is drawn.')
+    expect(everythingJoined).toContain(t('g7b.StructureView.cards', { v1: 27 }))
+    expect(everythingJoined).not.toContain(' drawn<')
   })
 
   it('states both counts where a reader can see them without pressing anything', () => {
@@ -718,17 +722,14 @@ describe('the reading layer keeps every card the canvas drops', () => {
 
 // ============================================================================ derived, not stored
 
-describe('normal mode leaves the drawing storage explanation to inspection', () => {
-  // Plan 7FEOshq3mBGG replaces the earlier normal-mode storage explanation.
-  it('keeps storage mechanics off the normal drawing and its folds', () => {
+describe('the drawing carries no storage explanation', () => {
+  // CRITERION CHANGE, as decided: the fold that explained what is stored is gone in both modes.
+  it('keeps storage mechanics off the drawing and its folds', () => {
     const page = structureView(FIVE_LINKS)
-    expect(defaultVisible(page)).not.toContain(en['g7b.StructureView.layout_derived_except_where_somebody_moved_a'])
     expect(page).not.toContain('what is stored and what is not')
   })
 
   it('does not repeat the storage explanation on the normal canvas', () => {
-    const page = structureView(FIVE_LINKS)
-    expect(page).not.toContain(en['g7b.StructureView.layout_derived_except_where_somebody_moved_a'])
     const onCanvas = drawCanvas(FIVE_LINKS).replace(/<style[\s\S]*?<\/style>/g, '')
     expect(onCanvas).not.toContain('No position here is stored')
     expect(onCanvas).not.toContain('worked out again on every draw')

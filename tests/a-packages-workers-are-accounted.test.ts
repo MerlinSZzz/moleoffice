@@ -203,7 +203,7 @@ beforeAll(async () => {
 
   await started('xp-quill', asThePerson, 'secretary')
   await started('xp-boss', asOne('xp-quill'))
-  for (const handle of ['xp-accounted', 'xp-noreceipt', 'xp-running', 'xp-old', 'xp-all', 'xp-nodifficulty', 'xp-nowhy', 'xp-badpoint', 'xp-nopackagepoints', 'xp-pointswithoutpackage', 'xp-briefmark', 'xp-conflict', 'xp-nofiling', 'xp-label', 'xp-nolabel', 'xp-notime', 'xp-custom']) {
+  for (const handle of ['xp-accounted', 'xp-noreceipt', 'xp-running', 'xp-old', 'xp-all', 'xp-nodifficulty', 'xp-nowhy', 'xp-badpoint', 'xp-nopackagepoints', 'xp-pointswithoutpackage', 'xp-briefmark', 'xp-conflict', 'xp-nofiling', 'xp-label', 'xp-nolabel', 'xp-notime', 'xp-custom', 'xp-written']) {
     await started(handle, asOne('xp-boss'))
   }
 
@@ -558,5 +558,38 @@ describe('5. a row is never given a time the office did not record', () => {
     expect(read.body['error']).toContain('time')
     expect(read.body['error']).toContain('not recorded')
     expect(read.body).toMatchObject({ code: 'packageWorkerAskHasNoTime', values: { worker: 'xp-notime' } })
+  })
+})
+
+describe('6. a supervisor’s run that asked a packaged worker can still be written', () => {
+  it('takes a change of its doing line and a finish after its ask kept the package', async () => {
+    const terminal = await call('POST', '/api/records', asOne('xp-quill'), { kind: 'session', title: 'A made-up secretary run in a terminal', data: { state: 'running', runtime: 'claude-code' } })
+    expect(terminal.status, JSON.stringify(terminal.body)).toBe(201)
+    const run = await call('POST', '/api/records', asAgent('xp-quill', agents.get('xp-quill')!.key, String(terminal.body['record'].id)), {
+      kind: 'session',
+      title: 'A made-up supervisor run of xp-boss that is written after a packaged ask',
+      data: {
+        state: 'running',
+        servingAgent: 'xp-boss',
+        servingAgentId: idOf('xp-boss'),
+        runtime: 'claude-code',
+        model: `${A_MODEL}-supervisor`,
+        workingDirectory: CHECKOUT,
+        cutFrom: head,
+        sandbox: { template: 'mole-office-dev', container, folder },
+      },
+    })
+    expect(run.status, JSON.stringify(run.body)).toBe(201)
+    const runId = String(run.body['record'].id)
+    const runKey = String(run.body['runKey']?.key)
+    const task = await aTaskWithAPackage(['xp-written-point'])
+    const asked = await call('POST', `/api/agents/${idOf('xp-written')}/worker-run`, asAgent('xp-boss', runKey, runId), { brief, runtime: 'claude-code', model: A_MODEL, package: task, points: ['xp-written-point'], difficulty: 'simple', why: 'A made-up reason.' })
+    expect(asked.status, JSON.stringify(asked.body)).toBe(202)
+    const kept = theWorkerRunOf(runId, 'xp-written')?.['package']
+    expect(kept).toMatchObject({ task })
+    const patched = await call('PATCH', `/api/records/${runId}`, asAgent('xp-boss', runKey, runId), { dataPatch: { doing: 'A made-up line written after a packaged ask' } })
+    expect(patched.status, JSON.stringify(patched.body)).toBe(200)
+    await finish(runId)
+    expect(theWorkerRunOf(runId, 'xp-written')?.['package']).toEqual(kept)
   })
 })

@@ -102,8 +102,8 @@ const asAgent = (id: string): Record<string, string> => ({
   'x-mole-office-workspace': WORKSPACE,
 })
 
-/** One rule of chapter 5, which the briefs below name. Its words prove the chapter was written out. */
-const A_RULE_OF_CHAPTER_FIVE = 'A new test is proved by mutation'
+/** One rule of chapter 5, which the briefs below name, read from the shipped file the office copies. Its words prove the chapter was written out. */
+const A_RULE_OF_CHAPTER_FIVE = SHIPPED_CHAPTERS.find((one) => one.n === 5)!.outline[0]!.name
 /** One rule of chapter 1, which no brief below names, read from the shipped file the office copies. Its words prove the chapter was NOT. */
 const A_RULE_OF_CHAPTER_ONE = SHIPPED_CHAPTERS.find((one) => one.n === 1)!.outline[0]!.name
 

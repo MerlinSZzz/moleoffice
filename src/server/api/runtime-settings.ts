@@ -33,6 +33,7 @@ import { parseDuration } from '../lib/adapters/index.ts'
 import { delimiter, isAbsolute } from 'node:path'
 import { THE_RUNTIMES_THE_OFFICE_DISPATCHES, moleOffice } from '@shared/participants.ts'
 import { moduleReminderSecretariesFrom } from '../lib/env.ts'
+import { readTheLevelOfEachKind } from '@shared/results-at-a-level.ts'
 import { isLanguage, sayInEnglish, type WordKey } from '@shared/i18n.ts'
 import { readSettingsStructure } from '@shared/settings-structure.ts'
 import { inspectionSettings, inspectionApiWaitMilliseconds, inspectionOfficeBackMilliseconds } from '../../config/inspection.mjs'
@@ -40,6 +41,8 @@ import { aSpoolAnotherWorldOwns, handTheGateCountSpoolToThisWorld, type AHandOve
 import { GATES_THE_SPOOL_WAITS_FOR } from '../../config/gate-count-spool.mjs'
 import { whatIsWrongWithAWorkSwitch } from '../lib/work-switches.ts'
 import { whatIsWrongWithACompactionWindow } from '../../config/the-compaction-window.mjs'
+
+import { INSPECTOR_ANSWER_LINES, readInspectorAnswerLines } from '../lib/inspector-answers-lines.ts'
 
 const bodyShape = z.strictObject({
   changes: z.array(z.strictObject({ name: z.string(), value: z.string().trim().max(4000).nullable(), decision: z.string().min(1).nullable().optional(), until: z.string().optional() })).min(1).max(RUNTIME_SETTING_NAMES.length),
@@ -92,16 +95,23 @@ function aSettingReading(s: typeof SETTINGS[number]) {
     because: past.because, lastChange: past.last === null ? null : { ...past.last, by: { ...past.last.by, name: theWritersName(past.last.by) } },
   }
 }
+/** Whether the settings door serves a setting: its name holds no KEY, and its declaration says it serves it. */
+export function theSettingsDoorServes(setting: typeof SETTINGS[number]): boolean {
+  return !setting.name.includes('KEY') && setting.served
+}
 export function runtimeSettingsReading() {
-  return { settings: SETTINGS.filter((s) => !s.name.includes('KEY')).map(aSettingReading) }
+  return { settings: SETTINGS.filter(theSettingsDoorServes).map(aSettingReading) }
 }
 export type RuntimeSettingsReply = ReturnType<typeof runtimeSettingsReading>
 export type ASettingReading = RuntimeSettingsReply['settings'][number]
 
 /** One declared setting's row, read alone: no other setting is read. A name no setting has is a fault of the caller. */
 export function oneSettingReading(name: string): ASettingReading {
-  const declared = SETTINGS.find((s) => s.name === name && !s.name.includes('KEY'))
+  const declared = SETTINGS.find((s) => s.name === name)
   if (declared === undefined) throw new Error(`No setting is declared as ${name}, so it has no reading.`)
+  if (!theSettingsDoorServes(declared)) {
+    throw new Error(`${name} is declared, but the settings door does not serve it, because ${declared.notServedBecause ?? 'its name says it is a key'}.`)
+  }
   return aSettingReading(declared)
 }
 
@@ -307,11 +317,13 @@ export function validateRuntimeValue(name: string, value: string | null): void {
   catch (error) { refuse(error instanceof Error ? error.message : String(error)) }
   const effective = value ?? read!.value
   if (effective === null) return
+  if (name === INSPECTOR_ANSWER_LINES) { try { readInspectorAnswerLines(effective) } catch (error) { refuse(error instanceof Error ? error.message : String(error)) } }
   const short = name.slice('MOLE_OFFICE_'.length)
   if (short === 'MODAL_MONTHLY_CAP_USD' && dollarsWithWholeCents(effective) === null) refuse('Use a non-negative finite dollar amount with whole cents within the safe integer limit.')
   if (short === 'BROADCAST_TIMES' && !effective.split(',').every((s) => /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(s.trim()))) refuse('Report times must be a comma-separated list of HH:MM.')
   if (short.startsWith('MAIN_WORLD_') && !/^x?\d+$/.test(effective)) refuse('Use a whole number, or x followed by a whole number for each secretary.')
   if (short === 'MODULE_REMINDER_SECRETARIES') { try { moduleReminderSecretariesFrom(effective) } catch (error) { refuse(error instanceof Error ? error.message : String(error)) } }
+  if (short === 'RESULT_LEVEL_OF_EACH_KIND') { const levels = readTheLevelOfEachKind(effective); if ('refused' in levels) refuse(levels.refused) }
   if (short === 'LOCK_PATHS' && effective !== '' && !effective.split(delimiter).every((p) => isAbsolute(p))) refuse('Each lock folder must be an absolute path, separated as PATH is.')
   if (short === 'CHORE_RUNTIME' && !(THE_RUNTIMES_THE_OFFICE_DISPATCHES as readonly string[]).includes(effective)) refuse('Choose a runtime the message worker can dispatch.')
   if (short === 'REFUSE_MESSAGE_TO_AGENT_WITH_NO_SESSION_AND_NO_RUN' && !['0','1'].includes(effective)) refuse('Use 1 to refuse or 0 to allow.')

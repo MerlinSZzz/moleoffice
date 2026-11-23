@@ -22,8 +22,8 @@
  *      goes, and the page says the failure in the place of the list. The refusal is a server fault, a
  *      500, so the error panel says the words a page says for a fault on the office's side. The
  *      server's own sentence is shown there only in developer mode.
- *   3. A "CHECK AGAIN" THAT FAILS, WITH NO SWITCH. The run on screen stays, the line under the stamp
- *      says the failure with the reading's own time, and no error panel takes the list's place.
+ *   3. A "CHECK AGAIN" THAT FAILS, WITH NO SWITCH. The run on screen stays, the stamp keeps the
+ *      reading's own time, the line under it says the failure, and no error panel takes the list's place.
  *
  * Every value compared is one this test made: the runs' titles, the projects' names and the words of
  * the refusal, which the line under the stamp says in case 3. The page's sentences are built from the
@@ -339,7 +339,7 @@ describe('the Agent runs page reads again when the reader switches project', () 
     }
   }, 180_000)
 
-  it('3. a "Check again" that fails keeps the run on screen and says the failure with the reading\'s time', async () => {
+  it('3. a "Check again" that fails keeps the run and the reading\'s time on screen and says the failure', async () => {
     const watched = await aBrowser()
     try {
       const { page } = watched
@@ -347,7 +347,6 @@ describe('the Agent runs page reads again when the reader switches project', () 
       const stamp = page.locator('#main .sx-read-at').first()
       const checked = theSentence('g6a.sessions.checked', { at: null }).exec(oneLine(await stamp.innerText()))
       if (checked === null) throw new Error(`the stamp did not read as the sentence of g6a.sessions.checked: "${await stamp.innerText()}"`)
-      const takenAt = checked.groups?.['at'] as string
       const runs = await watched.hold(ALPHA.id, REFUSAL)
       await page.locator('#main .sx-read-act .px-btn').first().click()
       await expect.poll(() => runs.caught(), { timeout: 20_000, message: `the press never asked for ${ALPHA.id}'s runs` }).toBeGreaterThan(0)
@@ -356,8 +355,8 @@ describe('the Agent runs page reads again when the reader switches project', () 
       const failedLine = page.locator('#main .sx-read-failed').first()
       await failedLine.waitFor({ timeout: 20_000 })
 
-      const said = theSentence('g6a.sessions.unreadNewer', { failedAt: null, message: REFUSAL, at: takenAt }).exec(oneLine(await failedLine.innerText()))
-      expect(said, `the failure line "${oneLine(await failedLine.innerText())}" is not the sentence of g6a.sessions.unreadNewer for "${REFUSAL}" and the reading of ${takenAt}`).not.toBeNull()
+      const said = theSentence('g6a.sessions.readFailed', { failedAt: null, message: REFUSAL }).exec(oneLine(await failedLine.innerText()))
+      expect(said, `the failure line "${oneLine(await failedLine.innerText())}" is not the sentence of g6a.sessions.readFailed for "${REFUSAL}"`).not.toBeNull()
       expect(oneLine(await stamp.innerText()), 'the stamp still says the time of the reading on screen').toBe(checked[0])
       expect(await page.locator('#main').innerText(), `"${ALPHA.run}" went from the page when a read of the same project failed`).toContain(ALPHA.run)
       const panels = await page.locator('#main .px-error').evaluateAll((all) => all.filter((one) => one.closest('.px-reread') === null).length)

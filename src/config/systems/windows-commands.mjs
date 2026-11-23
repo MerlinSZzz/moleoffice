@@ -33,6 +33,9 @@
  * starting a program on Windows is done on the thread that asks for it. The PowerShell that stays pays
  * for that once, and each script after it runs in a PowerShell that is already running. Its loop has not
  * been run on Windows. Its Node side is read on Linux, with a stand-in program in PowerShell's place.
+ * A script may be given as a function that makes it at its turn, from the number of the PowerShell it will run in.
+ * The reading of who holds a connection uses that to read together the readings that waited, and to read this
+ * server's own process once in each PowerShell (./windows-processes.mjs).
  */
 
 import { spawn, spawnSync } from 'node:child_process'
@@ -91,13 +94,21 @@ export function theEncodedArguments(script) {
  * list of installed apps (./the-installer-of-a-folder.mjs). The commands and the start of a program
  * use `powershell`, where nothing else is waiting on the thread.
  * `askThePowerShellThatStays` is a third way, which also waits. It runs the script in the one
- * PowerShell this process keeps open (`aPowerShellThatStays`). The reading of who holds a connection
- * uses it. A runner without it, as a test may hand in, runs that reading by `startPowerShell`.
+ * PowerShell this process keeps open (`aPowerShellThatStays`), and it takes a script that is made at its
+ * turn as well. The reading of who holds a connection uses it. A runner without it, as a test may hand
+ * in, runs that reading by `startPowerShell`.
  * @typedef {{
  *   powershell: (script: string) => WhatACommandDid,
  *   startPowerShell: (script: string) => Promise<WhatACommandDid>,
- *   askThePowerShellThatStays?: (script: string) => Promise<WhatTheOneThatStaysDid>,
+ *   askThePowerShellThatStays?: (script: AScriptForTheOneThatStays) => Promise<WhatTheOneThatStaysDid>,
  * }} WindowsCommands
+ */
+
+/**
+ * A script for the PowerShell that stays: the script itself, or a function that makes it at its turn. The
+ * function is given the number of the PowerShell the script will run in. Each PowerShell this process
+ * starts has a number one higher than the one before it, so a new number means a new PowerShell.
+ * @typedef {string | ((program: number) => string)} AScriptForTheOneThatStays
  */
 
 /** How long a script may run, and how much it may print, before it is a command that did not finish. */
@@ -132,12 +143,13 @@ export function theProgramCouldNotBeRunWords(program, why) {
  *
  * It says `ready` on a line of its own once it is running. Then it reads one line at a time: a number,
  * a space and a script in UTF-8 base64. It runs the script in a scope of its own, so nothing the
- * script defines is left for the next one. It writes one line back: JSON with the number, a status
- * of 0, or 1 when the script threw, what the script wrote and the text of what it threw. Each thing
- * the script writes is a line of its own. When the input closes, the loop ends and PowerShell exits.
- * What the script writes to the error stream without throwing goes to PowerShell's own error stream
- * and is not in the answer. A script that calls `exit`, or breaks out of a loop it is not in, would
- * end this loop too. The one script it runs does neither.
+ * script defines is left for the next one, except a type compiled with Add-Type, which stays loaded in
+ * the program. The reading of who holds a connection compiles its calls once that way. It writes one
+ * line back: JSON with the number, a status of 0, or 1 when the script threw, what the script wrote
+ * and the text of what it threw. Each thing the script writes is a line of its own. When the input
+ * closes, the loop ends and PowerShell exits. What the script writes to the error stream without
+ * throwing goes to PowerShell's own error stream and is not in the answer. A script that calls `exit`,
+ * or breaks out of a loop it is not in, would end this loop too. The one script it runs does neither.
  */
 const THE_LOOP_THAT_STAYS = [
   "$ProgressPreference = 'SilentlyContinue'",
@@ -180,8 +192,11 @@ function quoted(line) {
  * THE POWERSHELL THAT STAYS: one program, started at the first script and kept running, that runs
  * each script it is given in turn and answers each on a line of its own (`THE_LOOP_THAT_STAYS`).
  *
- * One script runs at a time, and a script given while another runs waits for its turn. A script may
- * run for `longest` milliseconds from its turn, and the program may take as long to say it is ready.
+ * One script runs at a time, and a script given while another runs waits for its turn. A script given
+ * as a function is made at its turn, after the program is started, so it is made knowing which program
+ * runs it. A function that throws is answered as a script that did not run, with what it threw, and
+ * the next script takes its turn. A script may run for `longest` milliseconds from its turn, and the
+ * program may take as long to say it is ready.
  * A line that is not the answer to the script now running, numbered as that script was, is not taken
  * as any script's answer. Running longer, that line, printing more than `THE_MOST_A_SCRIPT_PRINTS`
  * bytes in one line, and the program ending all stop the program. Each is answered, to the script that
@@ -193,13 +208,13 @@ function quoted(line) {
  * @param {string} program
  * @param {string[]} args
  * @param {number} [longest]
- * @returns {{ ask: (script: string) => Promise<WhatTheOneThatStaysDid>, stop: () => void }}
+ * @returns {{ ask: (script: AScriptForTheOneThatStays) => Promise<WhatTheOneThatStaysDid>, stop: () => void }}
  */
 export function aPowerShellThatStays(program, args, longest = THE_LONGEST_A_SCRIPT_RUNS) {
   /**
-   * @typedef {{ script: string, askedAt: number, answer: (did: WhatTheOneThatStaysDid) => void }} AScript
+   * @typedef {{ script: AScriptForTheOneThatStays, askedAt: number, answer: (did: WhatTheOneThatStaysDid) => void }} AScript
    * @typedef {AScript & { n: number, sentAt: number, timer: ReturnType<typeof setTimeout> | null }} TheScriptThatRuns
-   * @typedef {{ child: import('node:child_process').ChildProcessWithoutNullStreams, readyAt: number | null,
+   * @typedef {{ child: import('node:child_process').ChildProcessWithoutNullStreams, number: number, readyAt: number | null,
    *   heard: string, timer: ReturnType<typeof setTimeout> | null, onExit: () => void }} TheProgram
    */
   /** @type {AScript[]} */
@@ -209,6 +224,8 @@ export function aPowerShellThatStays(program, args, longest = THE_LONGEST_A_SCRI
   /** @type {TheProgram | null} */
   let shell = null
   let given = 0
+  /** How many programs have been started, so the next one's number is one more. */
+  let started = 0
 
   /**
    * @param {AScript} one
@@ -295,8 +312,9 @@ export function aPowerShellThatStays(program, args, longest = THE_LONGEST_A_SCRI
   /** @returns {TheProgram} */
   const start = () => {
     const child = spawn(program, args, { windowsHide: true })
+    started += 1
     /** @type {TheProgram} */
-    const me = { child, readyAt: null, heard: '', timer: null, onExit: () => child.kill('SIGKILL') }
+    const me = { child, number: started, readyAt: null, heard: '', timer: null, onExit: () => child.kill('SIGKILL') }
     me.timer = setTimeout(() => {
       if (shell === me) end(`${program} did not finish (stopped, because it did not say it was ready within ${String(longest)} ms)`)
     }, longest)
@@ -331,15 +349,25 @@ export function aPowerShellThatStays(program, args, longest = THE_LONGEST_A_SCRI
   }
 
   const next = () => {
-    if (running !== null) return
-    const one = waiting.shift()
-    if (one === undefined) return
-    if (shell === null) shell = start()
-    given += 1
-    const me = shell
-    running = { ...one, n: given, sentAt: performance.now(), timer: null }
-    if (me.readyAt !== null) timeTheScript(running)
-    me.child.stdin.write(`${String(given)} ${Buffer.from(one.script, 'utf8').toString('base64')}\n`)
+    while (running === null) {
+      const one = waiting.shift()
+      if (one === undefined) return
+      if (shell === null) shell = start()
+      const me = shell
+      /** @type {string} */
+      let script
+      try {
+        script = typeof one.script === 'string' ? one.script : one.script(me.number)
+      } catch (failed) {
+        const why = failed instanceof Error ? failed.message : String(failed)
+        one.answer({ command: program, ran: false, reason: `${program} did not run this script, because it could not be made: ${why}`, took: theTime(one, null, null, null) })
+        continue
+      }
+      given += 1
+      running = { ...one, n: given, sentAt: performance.now(), timer: null }
+      if (me.readyAt !== null) timeTheScript(running)
+      me.child.stdin.write(`${String(given)} ${Buffer.from(script, 'utf8').toString('base64')}\n`)
+    }
   }
 
   return {

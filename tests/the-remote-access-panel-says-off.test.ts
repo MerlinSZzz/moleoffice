@@ -279,18 +279,17 @@ describe('what the panel draws', () => {
     expect(text).not.toContain('Only this computer')
   })
 
-  it('draws the third state as a whole sentence rather than as a word that contradicts itself', () => {
+  it('draws the third state in its own words rather than as a word that contradicts itself', () => {
     const text = readable(draw(readAccess({ ...sources, arrival: 'this machine', address: '127.0.0.1', remotePort: 8788 })))
     expect(text).toContain('Off while Mole Office is being worked on')
-    expect(text).toContain('Run the built app to let them in')
     // And it still says which machines can reach this one, truthfully.
     expect(text).toContain('Only this computer')
   })
 
-  it('keeps every networking word out of that sentence too', () => {
+  it('keeps every networking word out of that state too', () => {
     const text = readable(draw(readAccess({ ...sources, arrival: 'this machine', address: '127.0.0.1', remotePort: 8788 }))).toLowerCase()
     for (const word of ['vite', 'port', 'proxy', 'bind', 'localhost', 'tailnet']) {
-      expect(text, `the development sentence says the machinery word "${word}"`).not.toContain(word)
+      expect(text, `the development state says the machinery word "${word}"`).not.toContain(word)
     }
   })
 

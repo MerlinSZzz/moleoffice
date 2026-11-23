@@ -21,6 +21,10 @@
  * THE PICTURES are taken only when W13Y_LAYOUT_PICTURES names a folder. They are of a made-up office, and each carries
  * the made-up label above the page. After the three, the person reads the agent's line and settles the fork, and the
  * records list is taken again with no count in the bar.
+ *
+ * Test change (wave 13y round 175): the checklists page draws design E, as decided, so each checklist is a card, and
+ * point 1 measures the boxes in the card the address `#/checklists/<id>` marks. Before, it measured the boxes of the
+ * one opened checklist.
  */
 import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
@@ -36,6 +40,8 @@ const CALLED = 'three-layout-points-at-390'
 const PICTURES = process.env['W13Y_LAYOUT_PICTURES']
 const LABEL = 'Made-up data — an invented office, not real office data'
 const THE_PAGE_TOP = '#main > *:not([data-made-up-label]):not(style)'
+/** The checklist card the address `#/checklists/<id>` marks. */
+const MARKED = '.cks-card[data-marked="yes"]'
 const LOOKS = ['light', 'dark'] as const
 const PHONE = { width: 390, height: 844 }
 const AGENT = { name: 'Made-up Layout Agent', handle: 'made-up-layout-agent' }
@@ -129,8 +135,8 @@ async function open(page: Page, address: string): Promise<void> {
 
 /** Each pressable box on the checklist's page: how far the middle of its mark is from the middle of its words' first line. */
 async function theBoxesAgainstTheirWords(page: Page): Promise<{ words: string; apart: number }[]> {
-  await page.locator('.ck1 .ckp-box').first().waitFor({ timeout: 30_000 })
-  return page.locator('.ck1 .ckp-item[data-box="yes"]').evaluateAll((items) => items.map((item) => {
+  await page.locator(`${MARKED} .ckp-box`).first().waitFor({ timeout: 30_000 })
+  return page.locator(`${MARKED} .ckp-item[data-box="yes"]`).evaluateAll((items) => items.map((item) => {
     const mark = item.querySelector('.ckp-box .ckp-mark')
     const words = item.querySelector('.ckp-words')
     if (mark === null || words === null) throw new Error('a step with a box draws no mark or no words')
@@ -267,7 +273,7 @@ it.skipIf(PICTURES === undefined)('takes the pictures of the three at 390 in bot
       const { context, page } = await aWindow({ theme })
       try {
         await open(page, `/checklists/${checklist}`)
-        await page.locator('.ck1 .ckp-box').first().waitFor({ timeout: 30_000 })
+        await page.locator(`${MARKED} .ckp-box`).first().waitFor({ timeout: 30_000 })
         await label(page)
         await page.screenshot({ path: name('checklist') })
         for (const [what, address] of [['records', pathFor('records')], ['home', '/']] as const) {

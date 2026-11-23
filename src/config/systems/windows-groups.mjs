@@ -66,7 +66,9 @@
  * SOME OF THIS HAS RUN ON A WINDOWS 11 MACHINE, in wave 13t. The stop request through the pipe, and the
  * helper that makes the pipe, ran there in round W8. The readings of a Job Object, for a program's own
  * group and for what a starter started, ran there in rounds W9 and W10. The end of every process in a
- * Job Object has not run there. All of it is read on Linux, with stand-ins for PowerShell in
+ * Job Object has still not run there until a walk shows it. The server's release now ends a run's Job
+ * Object this way, at once, when a run is paused or stopped (`releaseResource` in
+ * src/server/lib/resources.ts). All of it is read on Linux, with stand-ins for PowerShell in
  * tests/the-windows-side-of-the-system-layer.test.ts, and with a socket file in place of the pipe and a
  * stand-in for the helper in tests/a-stop-request-on-windows-reaches-the-program-that-listens.test.ts.
  * What the helper itself does is proved only on Windows.

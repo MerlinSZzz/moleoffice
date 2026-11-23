@@ -9,7 +9,7 @@ import { sqlite } from './client.ts'
 import { readInPieces } from './in-pieces.ts'
 import { asAgent } from './read-participant.ts'
 import { everyAgentsRuntime } from './list-participants.ts'
-import type { RegisteredAgent } from '../lib/participants.ts'
+import type { RegisteredAgent } from './types/participants.ts'
 
 /**
  * THE REGISTRY ROWS OF MANY AGENT RECORDS, in one read: what `agentForRecord` answers for each, keyed by the record's id.

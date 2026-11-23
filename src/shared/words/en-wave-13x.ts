@@ -19,7 +19,6 @@ export const enWave13x = {
   'review.leave.anyway': 'Leave anyway',
   // Round 24: a press of Send in the review column found the review changed since it was drawn,
   // so it sent nothing (YourReview in ReviewBar.tsx).
-  'review.b.changedAtSend': 'Nothing was sent. This review changed somewhere else after it was shown here. It is shown again below as it is now.',
   // The office's own reason for a step somebody did by hand is drawn in the reader's language beside
   // the other fixed step sentences (FlowRunSteps.tsx).
   'flowRunSteps.doneByHandWhy': 'A person did this in the office themself, not a program.',

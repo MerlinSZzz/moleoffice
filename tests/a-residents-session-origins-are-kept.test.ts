@@ -24,7 +24,7 @@ import { dirname, join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { THE_PERSON } from '../src/shared/person.ts'
-import { apiApp, freshDb, type TestDb } from './helpers.ts'
+import { A_SLEEP_TIME, apiApp, freshDb, type TestDb } from './helpers.ts'
 
 let t: TestDb
 let app: FastifyInstance
@@ -84,7 +84,7 @@ function theFileOf(handle: string): string {
 
 async function confirm(handle: string): Promise<Record<string, any>> {
   const secretary = agents.get('sec-origins')!
-  const proposed = await inject('POST', '/api/residents/proposals', asAgent('sec-origins', secretary.key), { agentId: handle, because: 'A made-up reason.' })
+  const proposed = await inject('POST', '/api/residents/proposals', asAgent('sec-origins', secretary.key), { agentId: handle, because: 'A made-up reason.', sleepTime: A_SLEEP_TIME })
   expect(proposed.status, proposed.text).toBe(201)
   const confirmed = await inject('POST', `/api/residents/proposals/${String(proposed.json['proposal'].id)}/confirm`, AS_THE_PERSON)
   expect(confirmed.status, confirmed.text).toBe(200)

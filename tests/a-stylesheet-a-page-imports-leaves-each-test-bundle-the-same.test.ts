@@ -11,11 +11,13 @@
  * esbuild. Each must bundle through that file, or name an empty `.css` loader of its own. The list is
  * read from the files, so a test written later is held to it too.
  *
- * THE OTHER CASES take each file that bundles through it, one case a file. The modules that file names
- * as `./src/...` or `./tests/...` are the ones its page imports. They are bundled twice: as they are,
- * and with a made-up stylesheet imported at the top of every module under src/web. That stylesheet
- * names a font file, as KaTeX's does, and esbuild refuses both when it has no loader for them. The
- * two bundles must be the same bytes. A control bundles the second through esbuild's own `build`,
+ * THE OTHER CASES take the files that bundle through it. The modules such a file names as `./src/...`
+ * or `./tests/...` are the ones its page imports. The modules that all these files name are bundled
+ * together, twice: as they are, and with a made-up stylesheet imported at the top of every module under
+ * src/web. That stylesheet names a font file, as KaTeX's does, and esbuild refuses both when it has no
+ * loader for them. The two bundles must be the same bytes. One bundle of them all reaches every module
+ * that one file's bundle reaches, the worker the lanes drawing starts included, so one pair of bundles
+ * checks what a pair for each file checked. A control bundles the second through esbuild's own `build`,
  * and that must fail, so the import added is one that would have broken the test.
  *
  * A FILE THAT NAMES NO PAGE MODULE has no page module for a stylesheet to reach, so it is not bundled
@@ -129,18 +131,18 @@ describe('a stylesheet a page module imports', () => {
     expect(injected.added()).toBeGreaterThan(0)
   })
 
-  it.each(withPageModules.map(({ file, modules }) => [file, modules] as const))(
-    'leaves the bundle of %s the same bytes', { timeout: 60_000 }, async (_file, modules) => {
-      expect(modules.length).toBeGreaterThan(0)
-      const plain = await bundlePageCode(aBundleOf(modules, false).options)
-      const injected = aBundleOf(modules, true)
-      const withTheSheet = await bundlePageCode(injected.options)
-      expect(injected.added()).toBeGreaterThan(0)
-      expect(withTheSheet.outputFiles!.length).toBe(plain.outputFiles!.length)
-      plain.outputFiles!.forEach((output, at) => {
-        expect(whereTheyDiffer(withTheSheet.outputFiles![at]!.text, output.text), `The bundle ${output.path} changed.`).toBe('the same')
-      })
+  it('leaves the bundle of every page module these tests name the same bytes', { timeout: 60_000 }, async () => {
+    const modules = [...new Set(withPageModules.flatMap((each) => each.modules))].sort()
+    expect(modules.length).toBeGreaterThan(0)
+    const plain = await bundlePageCode(aBundleOf(modules, false).options)
+    const injected = aBundleOf(modules, true)
+    const withTheSheet = await bundlePageCode(injected.options)
+    expect(injected.added()).toBeGreaterThan(0)
+    expect(withTheSheet.outputFiles!.length).toBe(plain.outputFiles!.length)
+    plain.outputFiles!.forEach((output, at) => {
+      expect(whereTheyDiffer(withTheSheet.outputFiles![at]!.text, output.text), `The bundle ${output.path} changed.`).toBe('the same')
     })
+  })
 
   it.each(withoutPageModules.map(({ file, source }) => [file, whatTheBundlesOf(file, source)] as const))(
     'reads every bundle it makes as a script written in place that imports nothing: %s', (_file, trouble) => {

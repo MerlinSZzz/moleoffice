@@ -2,12 +2,14 @@
 // Licensed under the MIT License. See LICENSE.
 import { useCallback, useEffect, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { t } from '@shared/i18n.ts'
-import type { WhatAskingToPairSays, WhatThePairingSays } from '@shared/pairing.ts'
+import type { WhatThePairingSays } from '@shared/pairing.ts'
 import { theNameThisBrowserGivesItself } from '../pages/PairingPage.tsx'
-import { ApiError, moleOfficeRequest } from '../api.ts'
+import { ApiError, api, moleOfficeRequest } from '../api.ts'
 import { useLanguage } from './language.ts'
 import { theShellDrewTheAddress } from './ready.ts'
 import { thisBrowserNeedsPairing, watchWhetherThisBrowserNeedsPairing } from './unpaired.ts'
+import { moveThisBrowserOnce, sayTheMoveAfterTheReload, theMove } from './the-old-cookie.ts'
+import { TheMoveNotice } from '../components/TheMoveNotice.tsx'
 
 /** Replaces the whole shell when a page read is refused for an unproved browser. */
 export function PairingGate({children}:{children?:ReactNode}) {
@@ -28,6 +30,8 @@ export function UnpairedPage() {
     try {
       const answer=await moleOfficeRequest<WhatThePairingSays>('/api/office/pairing')
       if(answer.paired){window.location.reload();return}
+      // A BROWSER PAIRED BEFORE SEC-2 MOVES FIRST, ONCE A LOAD, and the next load says so (./the-old-cookie.ts).
+      if(answer.mayMove&&theMove().state==='not tried'&&await moveThisBrowserOnce()){sayTheMoveAfterTheReload();window.location.reload();return}
       if(answer.waiting?.standing==='ended'){setAsked(false);setAskedDevice(null)}
       setState(answer);setFailed(false)
     }catch{setFailed(true)}
@@ -41,9 +45,9 @@ export function UnpairedPage() {
   const send=async(local:boolean)=>{
     setBusy(true);setFailed(false);setWaitSentence(null)
     try {
-      const path=local?'/api/office/pairing':'/api/office/pairing/ask'
-      const answer=await moleOfficeRequest<WhatAskingToPairSays>(path,{method:'POST',...(local?{}:{body:JSON.stringify({device})})})
-      if(local){window.location.reload();return}
+      // Both presses keep the header half they are answered before this page goes on (api-parts/worlds.ts).
+      if(local){await api.pairThisBrowser(device);window.location.reload();return}
+      const answer=await api.askToPairThisBrowser(device)
       setAskedDevice(answer.device)
       setAsked(true)
     }catch(error){
@@ -65,6 +69,7 @@ export function UnpairedPage() {
     `}</style>
     <section className="unpaired-card">
       <h1>{t('pairing.unpaired.title')}</h1>
+      <TheMoveNotice/>
       {failed?<><p>{t('pairing.unpaired.failed')}</p><button onClick={()=>{void read()}}>{t('pairing.unpaired.retry')}</button></>:
         state===null?<p>{t('pairing.unpaired.loading')}</p>:
         waiting?<><p>{t('pairing.unpaired.waiting')}</p>{pendingDevice?<p>{pendingDevice}</p>:null}</>:

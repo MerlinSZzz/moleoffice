@@ -8,6 +8,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { en as everyWord } from '../src/shared/words/en.ts'
 import { enWave13s as en } from '../src/shared/words/en-wave-13s.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
+import { GOVERNS_FIELD } from '../src/shared/governs.ts'
 import { type LiveApp, liveApp, waitForThePage } from './helpers.ts'
 
 let app: LiveApp
@@ -36,9 +37,16 @@ async function fork(title: string): Promise<string> {
     because: 'The kiln is booked for Friday.', who_settles_it: 'the owner',
   } })).record.id
 }
+// AN EARLIER DECISION GOVERNS A MODULE PAGE OF ITS OWN, because every decision door refuses a decision that
+// names nothing it governs. The module is linked to nothing, so the fork's subjects stay the fork and this
+// decision. The press through the card does not carry this governs, because the promote passes no `replaced`.
 async function earlier(forkId: string, title: string): Promise<string> {
+  const governed = (await post('/api/records', { kind: 'module', title: `What "${title}" governs`, data: {
+    context: 'The glaze of one batch, made up for this test.',
+  } })).record.id as string
   const id = (await post('/api/records', { kind: decisionKind, title, data: {
     [replacesField]: [], decided_by: 'the owner', authority: 'the owner said so', option_taken: 'The celadon',
+    [GOVERNS_FIELD]: [{ record: governed }],
   } })).record.id as string
   await post('/api/links', { fromId: id, toId: forkId, type: 'about' })
   return id

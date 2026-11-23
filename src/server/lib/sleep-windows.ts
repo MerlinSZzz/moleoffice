@@ -1,15 +1,15 @@
 // Copyright © 2026 Zhengyang Shen
 // Licensed under the MIT License. See LICENSE.
 /**
- * A SECRETARY SLEEPS AT ITS OWN TIME: THE MINUTE CLOCK THAT BEGINS AND ENDS THAT SLEEP.
+ * A PERMANENT RESIDENT SLEEPS AT ITS OWN TIME: THE MINUTE CLOCK THAT BEGINS AND ENDS THAT SLEEP.
  *
- * The person's decision of 6 November 2026: each secretary sets its own sleep time, at the hour its
+ * The person's decision of 6 November 2026: each resident sets its own sleep time, at the hour its
  * department is least affected. The time is kept on its agent row (migration 0330, src/server/lib/resident-sleep.ts),
  * and the door that sets it is PUT /api/residents/:agentId/sleep-time. Once a minute in the live office, and every
  * interval a test office sets through MOLE_OFFICE_RUN_THE_SLEEP_CLOCK_EVERY_MS (a second at the shortest), this clock:
  *
  *   - ends each sleep it began whose time is over, and tells the waiters, as a wake press does;
- *   - begins the sleep of each resident that holds the secretary card when its sleep time opens, by Mole Office, and
+ *   - begins the sleep of each resident that is not retired when its sleep time opens, by Mole Office, and
  *     sends it one message in the same transaction: bring its memory file, its secretary notes and its handover document
  *     up to date, and tidy, as an agent does at its sleep. A checklist with many
  *     open items is named in that message as a thing to look at; it holds nothing back, because
@@ -31,7 +31,6 @@ import { stampInZone, theClockZone } from '@shared/time.ts'
 import { sqlite } from '../db/client.ts'
 import { openItemsByChecklistOf } from './checklists.ts'
 import { writeASystemLineToOne } from './groups.ts'
-import { holdsTheSecretaryCard } from './holds-the-secretary-card.ts'
 import { named } from './named-timers.ts'
 import { getRecord } from './records.ts'
 import { endTheOpenSleep, theOpenSleepOf, theSleepTimeHolding, writeASleepRow } from './resident-sleep.ts'
@@ -100,7 +99,7 @@ export function aMinuteOfTheSleepClock(at: number = Date.now(), log: (line: stri
     if (aSleepRowSince(row.agentId, opened) || theOpenSleepOf(row.agentId) !== null) continue
     const residency = residencyOf(row.agentId)
     const who: ParticipantRef = { kind: 'agent', id: row.agentId }
-    if (residency === null || residency.retired || !holdsTheSecretaryCard(who)) continue
+    if (residency === null || residency.retired) continue
     const decision = getRecord(residency.decisionId)
     if (decision === null) {
       throw new Error(`The residency decision ${residency.decisionId} of agent ${row.agentId} is not in the office, so its sleep cannot be begun.`)

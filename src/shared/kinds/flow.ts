@@ -10,8 +10,8 @@
  * still imports the kind from kinds.ts.
  *
  * THIS FILE IMPORTS `commonFields`, `unionOf` AND THE `KindSpec` AND `ShapeSpec` TYPES FROM
- * ./kind-common.ts, `FLOW_RUNNERS` FROM ../flow.ts, `FLOW_ENDING_EVENTS` FROM ../flow-run.ts, AND
- * `FLOW_SCOPES` FROM ../flow-applies-to.ts AND `RETIRED_WHY_MOST` FROM ../flow-retired.ts. IT
+ * ./kind-common.ts, `FLOW_RUNNERS` FROM ../flow.ts, `FLOW_ENDING_EVENTS` AND `FLOW_STARTING_EVENTS` FROM
+ * ../flow-run.ts, AND `FLOW_SCOPES` FROM ../flow-applies-to.ts AND `RETIRED_WHY_MOST` FROM ../flow-retired.ts. IT
  * IMPORTS NOTHING FROM ../types.ts. NO DECLARATION MOVED WITH THIS KIND; `FLOW_SHAPES` holds the
  * shapes moved out of ../kinds.ts, with their comments and text unchanged.
  */
@@ -19,7 +19,7 @@
 // live, and this declaration reads them rather than repeating them.
 import { commonFields, unionOf, type KindSpec, type ShapeSpec } from './kind-common.ts'
 import { FLOW_RUNNERS } from '../flow.ts'
-import { FLOW_ENDING_EVENTS } from '../flow-run.ts'
+import { FLOW_ENDING_EVENTS, FLOW_STARTING_EVENTS } from '../flow-run.ts'
 import { FLOW_SCOPES } from '../flow-applies-to.ts'
 import { RETIRED_WHY_MOST } from '../flow-retired.ts'
 export const flowKind: KindSpec = {
@@ -121,6 +121,20 @@ export const flowKind: KindSpec = {
           'ticks it itself when this event happens on the run that entered. Leave it out when nothing the office sees ends ' +
           'the flow: then the agent or the person ticks the item by hand.',
         example: 'the run is sealed',
+      },
+      {
+        key: 'starts_on',
+        type: `(${unionOf(FLOW_STARTING_EVENTS)})[]`,
+        required: false,
+        description:
+          'THE STARTS OF A RUN THAT FOLLOW THIS FLOW, each one of: ' +
+          FLOW_STARTING_EVENTS.join(', ') +
+          '. When the office files a run that names no flow of its own, it reads how the run started, and names the one ' +
+          'flow of the run\'s project that lists that start and is not deleted, retired or replaced, at its newest ' +
+          'revision. A run that names its own flow is not read. When no such flow lists the start, the run is named no ' +
+          'flow; when two or more do, it is named none of them, and its flow run names the start and each of them. No run ' +
+          'is refused for it, and a run filed before a flow listed its start keeps the flow run it has.',
+        example: [FLOW_STARTING_EVENTS[2]],
       },
       {
         key: 'reviewed_at',

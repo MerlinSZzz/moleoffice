@@ -90,7 +90,7 @@ const SAID_NOTE =
  * sentence, as an unknown value is.
  *
  * `shape=home&doing=<id>,<id>` answers what the runs serving those agents say they are doing, and nothing
- * else: a group Home opens asks it for its own agents (round 31b of wave 13k; `theDoingLinesHomeDraws`).
+ * else: any reader of the API may ask it, and Home reads that run from its roster's rows (`theDoingLinesHomeDraws`).
  * It is a part of Home's shape and is asked under the same route, project and reader rules as the roster.
  * The ids are agent record ids, comma-separated, each of `AGENT_ID_SHAPE`, at least one and at most
  * `DOING_ASKED_AT_ONCE`; a list that breaks any of these is refused with the query's own sentence.

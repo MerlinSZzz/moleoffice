@@ -89,7 +89,9 @@ describe('the integrity check runs beside the preview and still decides first', 
     try {
       const decision = prepareToServe(db, MIGRATIONS)
       expect(decision.serve).toBe(true)
-      if (decision.serve) expect(decision.report).toContain('The integrity check ran on a read-only connection of its own while the copy was measured.')
+      // A START WITH NOTHING PENDING MAKES NO COPY (tests/a-start-with-nothing-pending-makes-no-copy.test.ts), so the
+      // sentence names what was measured, which holds on both paths.
+      if (decision.serve) expect(decision.report).toContain('The integrity check ran on a read-only connection of its own while the migrations were measured.')
     } finally {
       db.close()
     }

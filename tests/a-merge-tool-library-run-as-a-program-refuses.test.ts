@@ -9,27 +9,25 @@
  * WHAT THIS FILE PROVES:
  * 1. Each file of tools/merge-tool that is not one of its programs, run with node and no arguments, exits 2. Nothing
  *    goes to stdout, and stderr is one sentence that begins with the file's path.
- * 2. Given the merge tool's own arguments, which its arguments module accepts, each still exits 2 with that sentence,
- *    and the work folder those arguments name is not made: the refusal comes before the library's other modules run.
- * 3. The sentence of owner-content.mjs, addresses.mjs and commit-addresses.mjs names the module that runs the check,
+ * 2. The sentence of owner-content.mjs, addresses.mjs and commit-addresses.mjs names the module that runs the check,
  *    integrate.mjs, and the functions a check by hand imports from the library. Every other library the office tool
  *    loads has a sentence naming the command that loads it, node tools/the-merger.mjs, and that program's imports do
  *    reach it. A library a project-only program loads names its own loader in the guard's map, and the office tool
  *    must not reach it: the office never uses the local keeper.
- * 4. Imported, no library refuses. A program outside the folder that imports every file of it, as the merge tool does,
+ * 3. Imported, no library refuses. A program outside the folder that imports every file of it, as the merge tool does,
  *    exits 0. So does a process started on one of the folder's own programs, as the cleanup watcher, a merge driver git
  *    starts and the trial replay are, when it loads the guard. This file, run by vitest, imports the three gates itself.
- * 5. The folder's programs are the files that read their own command line, `process.argv[1]` or `process.argv[2]` as
+ * 4. The folder's programs are the files that read their own command line, `process.argv[1]` or `process.argv[2]` as
  *    cleanup.mjs reads its --watch, and the guard's list of programs names exactly those.
  *
  * MUTATION PROOF (control, mutation, restore; the commit message of the code records the runs). Each goes red where named:
  *   - neither owner-content.mjs nor owner-content-allowed.mjs, the one file of the folder it imports, imports the
- *     guard: cases 1, 2 and 3;
- *   - arguments.mjs does not import the guard, and log-and-state.mjs imports it after arguments.mjs: cases 1 and 2;
- *   - the guard refuses in a process started on one of the folder's programs too: case 4;
+ *     guard: cases 1 and 2;
+ *   - arguments.mjs does not import the guard, and log-and-state.mjs imports it after arguments.mjs: case 1;
+ *   - the guard refuses in a process started on one of the folder's programs too: case 3;
  *   - the guard refuses whenever it is loaded: vitest cannot load this file, so no case runs;
- *   - the three gates' sentence names no function to import: case 3;
- *   - the guard's list of programs leaves out cleanup.mjs: cases 4 and 5.
+ *   - the three gates' sentence names no function to import: case 2;
+ *   - the guard's list of programs leaves out cleanup.mjs: cases 3 and 4.
  *
  * Every fixture is synthetic: the home, the work folder and the importing program are made under the temporary
  * directory and removed after, and the office address the child processes get is one that nothing answers on.
@@ -79,12 +77,23 @@ function anEnvironment(home: string) {
   return env
 }
 
-/** Each library run with node and `args`, and what it did that a refusal would not. */
-function runEach(args: (home: string) => string[]) {
+/** One library run with node and no arguments, in a home of its own. */
+function runAlone(name: string) {
+  const home = scratch('home')
+  return { home, ran: spawnSync(process.execPath, [join(FOLDER, name)], { cwd: home, encoding: 'utf8', env: anEnvironment(home), timeout: 30_000 }) }
+}
+
+/** Every library run once with node and no arguments. Cases 1 and 2 both read these runs, so each library starts once. */
+let theRunsAlone: Map<string, ReturnType<typeof runAlone>> | undefined
+function eachLibraryRunAlone() {
+  theRunsAlone ??= new Map(LIBRARIES.map((name) => [name, runAlone(name)]))
+  return theRunsAlone
+}
+
+/** Each library run with node and no arguments, and what it did that a refusal would not. */
+function runEach() {
   const wrong: unknown[] = []
-  for (const name of LIBRARIES) {
-    const home = scratch('home')
-    const ran = spawnSync(process.execPath, [join(FOLDER, name), ...args(home)], { cwd: home, encoding: 'utf8', env: anEnvironment(home), timeout: 30_000 })
+  for (const [name, { home, ran }] of eachLibraryRunAlone()) {
     const sentence = ran.stderr
     const refused = ran.status === 2 && ran.stdout === '' && /^[^\n]+\.\n$/.test(sentence) && sentence.startsWith(`tools/merge-tool/${name} `)
     const madeAFolder = existsSync(join(home, 'workdir'))
@@ -109,20 +118,13 @@ function reachedFrom(program: string) {
 
 it('each library of the merge tool, run with node and no arguments, exits 2 with one sentence', () => {
   expect(LIBRARIES.length).toBeGreaterThan(40)
-  expect(runEach(() => [])).toEqual([])
-}, 120_000)
-
-it('given the merge tool\'s own arguments, each library still refuses, before it makes the work folder they name', () => {
-  expect(runEach(theMergeToolsArguments)).toEqual([])
+  expect(runEach()).toEqual([])
 }, 120_000)
 
 it('the three gates name the module that runs them; the office tool names the rest, and a project-only library names its own loader', () => {
   const merger = reachedFrom(join(ROOT, 'tools', 'the-merger.mjs'))
   const said: Record<string, string> = {}
-  for (const name of LIBRARIES) {
-    const home = scratch('home')
-    said[name] = spawnSync(process.execPath, [join(FOLDER, name)], { cwd: home, encoding: 'utf8', env: anEnvironment(home), timeout: 30_000 }).stderr
-  }
+  for (const [name, { ran }] of eachLibraryRunAlone()) said[name] = ran.stderr
   for (const [name, functions] of Object.entries(GATES)) {
     expect(said[name], name).toContain('tools/merge-tool/integrate.mjs')
     for (const one of functions) expect(said[name], name).toContain(one)

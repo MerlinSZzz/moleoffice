@@ -1,0 +1,5 @@
+{
+  "sort": "kept",
+  "checks": 1,
+  "why": "making a new agent and opening its terminal from the new agent dialog is the person's own press, so an agent is refused and a raise does not carry it. A secretary makes an agent through POST /api/agents/started and opens one through POST /api/terminals/agents, each with its own checks."
+}

@@ -18,7 +18,7 @@ export const PERSONAL_SPACE_DIRECTORY = 'personal-spaces'
 export const MEMORY_FOLDER = 'memory/'
 
 /**
- * A SECRETARY'S OWN SLEEP TIME, the person's decision: each secretary sets the time its sleep begins, at the hour its
+ * A RESIDENT'S OWN SLEEP TIME, the person's decision: each resident sets the time its sleep begins, at the hour its
  * department is least affected. The shortest and longest sleep, in minutes, that the sleep-time door takes. A length
  * outside them is refused, not cut to fit.
  */

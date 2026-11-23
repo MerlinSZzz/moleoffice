@@ -30,7 +30,7 @@ import { useState } from 'react'
 
 import { faultOf, api, errorMessage } from '../api.ts'
 import { RouteLink, recordPath } from '../components/router.tsx'
-import { Btn, Empty, ErrorNote, Loading, Panel, TextArea } from '../components/ui.tsx'
+import { Absence, Btn, ErrorNote, Loading, Panel, TextArea } from '../components/ui.tsx'
 import { useProjectAsync } from '../lib/project-async.ts'
 import { kindWord } from '@shared/words.ts'
 import type { FolderReadingPiece, FolderReading, PieceState } from '@shared/folderreading.ts'
@@ -63,7 +63,6 @@ export function FolderReadingPage() {
         {FOLDER_READING_CSS}
       </style>
       <h1>{t('dev.folderreading.aFolderAnAgentRead')}</h1>
-      <p className="fr-lede prose-measure">{t('dev.folderreading.anAgentReadSomebodySFolderAnd')}</p>
       {readings.status === 'loading' ? <Loading label={t('dev.folderreading.readingWhatAgentsHaveRead')} what={t('dev.folderreading.folderReadings')} /> : null}
       {readings.status === 'error' ? <ErrorNote message={readings.message} fault={readings.fault} /> : null}
       {readings.status === 'ready' ? (
@@ -75,9 +74,7 @@ export function FolderReadingPage() {
 
 function TheReadings({ readings, onDecided }: { readings: FolderReading[]; onDecided: () => void }) {
   if (readings.length === 0) {
-    return (
-      <Empty message={t('dev.folderreading.noAgentHasReadAFolderInto')} />
-    )
+    return <Absence word={t('absence.none')} />
   }
   return (
     <>
@@ -197,7 +194,6 @@ function OnePiece({
 }
 
 const FOLDER_READING_CSS = `
-.fr-lede { color: var(--text-2); }
 .fr-note { color: var(--text-2); font-size: var(--fs-1); margin: 0 0 var(--pad); }
 .fr-said { white-space: pre-wrap; }
 .fr-pieces { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--gut); }

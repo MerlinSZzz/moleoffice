@@ -162,7 +162,7 @@ it('includes the visible word editor and restart searches', async () => {
   const panels = new Map(categories.flatMap((category) => category.panels.map((panel) => [panel.key, panel] as const)))
   const keys = (panel: string) => panels.get(panel)?.controls.map((control) => control.key) ?? []
   for (const key of ['wordTable.english', 'wordTable.chinese', 'wordTable.confirm', 'wordTable.reason', 'wordTable.previous', 'wordTable.more', 'wordTable.notUsedReason', 'wordTable.newerChoices', 'wordTable.olderChoices']) expect(keys('settings.words')).toContain(key)
-  for (const key of ['officeRestart.read', 'officeRestart.searchAgent', 'officeRestart.findAgent', 'officeRestart.searchDecision', 'officeRestart.findDecision', 'officePause.reason']) expect(keys('settings.restart')).toContain(key)
+  for (const key of ['officeRestart.read', 'officeRestart.searchDecision', 'officeRestart.findDecision', 'officePause.reason']) expect(keys('settings.restart')).toContain(key)
 })
 
 
@@ -374,11 +374,13 @@ it('draws the quick-input label from its declaration', async () => {
 }, 120_000)
 
 it('draws the merge-queue picker from its declaration', async () => {
-  await compareChangedControl('settings.mergequeueowner', 'mergeQueueOwner.pick', 'mergeQueueOwner.save', 'chat', '.mqo-field span')
+  await compareChangedControl('settings.mergequeueowner', 'mergeQueueOwner.pick', 'mergeQueueOwner.save', 'chat', '.agp-label')
 }, 120_000)
 
-it('draws the project creation press from its declaration', async () => {
-  await compareChangedControl('settings.projects', 'nav.makeProject', 'nav.renameProject', 'work', '.project-action')
+// Test change (wave 13y round 175): Settings › Projects holds the rename press only, as decided, because a project is
+// made from the end of the sidebar's Switch list now. The case read the make press; it reads the rename press.
+it('draws the project rename press from its declaration', async () => {
+  await compareChangedControl('settings.projects', 'nav.renameProject', 'nav.rename', 'work', '.project-action')
 }, 120_000)
 
 it('draws the run-model runtime label from its declaration', async () => {

@@ -15,8 +15,9 @@ import { settingsControlWord } from '@shared/settings-declaration.ts'
 import { useState } from 'react'
 import { t } from '@shared/i18n.ts'
 import type { HolderState, ListedTerminal, TerminalReading } from '@shared/terminals.ts'
-import { Btn } from './ui.tsx'
+import { Btn, ServerNote } from './ui.tsx'
 import { startTheHolder, whatARefusalSays } from '../lib/terminals.ts'
+import { useInspect } from '../lib/mode.ts'
 
 /**
  * The holder's state: one plain line when it runs, and when it does not, a notice that says what is wrong and what to do,
@@ -29,6 +30,7 @@ import { startTheHolder, whatARefusalSays } from '../lib/terminals.ts'
  * where the holder should be gets no press, because a start would find it there and do nothing.
  */
 export function HolderSays({ holder, onChanged }: { holder: HolderState; onChanged?: () => void }): React.ReactElement {
+  const inspect = useInspect()
   if (holder.state === 'running') {
     return (
       <div className="tm-holder tm-holder-running">
@@ -57,7 +59,7 @@ export function HolderSays({ holder, onChanged }: { holder: HolderState; onChang
     <div className="tm-holder tm-holder-down" role="status">
       <p className="tm-holder-headline">{headline}</p>
       {holder.state === 'not running' ? (
-        <StartTheHolder neverRan={holder.lastWord === null && holder.logUnread === null} onChanged={onChanged} />
+        <StartTheHolder onChanged={onChanged} />
       ) : holder.state === 'unusable' && holder.noAnswerWithinMs !== null && onChanged !== undefined ? (
         <div className="tm-holder-todo">
           <Btn size="sm" onClick={onChanged}>
@@ -65,32 +67,28 @@ export function HolderSays({ holder, onChanged }: { holder: HolderState; onChang
           </Btn>
         </div>
       ) : null}
-      <details className="tm-dev">
-        <summary>{t('terminals.developers')}</summary>
-        <dl className="tm-holder-why">
-          <div>
-            <dt>{t('terminals.holder.says')}</dt>
-            <dd className="tm-mono">{holder.says}</dd>
-          </div>
+      {holder.state !== 'not running' && !inspect ? null : (
+        <details className="tm-dev">
+          <summary>{t('terminals.developers')}</summary>
           {holder.state === 'not running' ? (
-            <div>
-              <dt>{t('terminals.holder.lastWord')}</dt>
-              <dd className="tm-mono">
-                {holder.lastWord ?? (holder.logUnread === null ? t('terminals.holder.noLastWord') : t('terminals.holder.logUnread', { reason: holder.logUnread }))}
-              </dd>
-            </div>
+            <dl className="tm-holder-why">
+              <div>
+                <dt>{t('terminals.holder.lastWord')}</dt>
+                <dd className="tm-mono">
+                  {holder.lastWord ?? (holder.logUnread === null ? t('terminals.holder.noLastWord') : t('terminals.holder.logUnread', { reason: holder.logUnread }))}
+                </dd>
+              </div>
+            </dl>
           ) : null}
-        </dl>
-      </details>
+          <ServerNote text={holder.says} />
+        </details>
+      )}
     </div>
   )
 }
 
-/**
- * What to do about a holder that does not run, and the press that does it. THE FIRST USE (wave 13u, round 6): a holder
- * that has never written a log has not run here, so the sentence does not say "again", or that terminals have ended.
- */
-function StartTheHolder({ neverRan, onChanged }: { neverRan: boolean; onChanged?: () => void }): React.ReactElement {
+/** The press that starts a holder that does not run. */
+function StartTheHolder({ onChanged }: { onChanged?: () => void }): React.ReactElement {
   const [step, setStep] = useState<{ kind: 'idle' } | { kind: 'starting' } | { kind: 'refused'; sentence: string }>({ kind: 'idle' })
   const start = (): void => {
     setStep({ kind: 'starting' })
@@ -104,7 +102,6 @@ function StartTheHolder({ neverRan, onChanged }: { neverRan: boolean; onChanged?
   }
   return (
     <div className="tm-holder-todo">
-      <p className="tm-holder-line">{neverRan ? t('terminals.holder.whatToDoFirst') : t('terminals.holder.whatToDo')}</p>
       <Btn size="sm" variant="primary" onClick={start} pending={step.kind === 'starting'}>
         {step.kind === 'starting' ? t('terminals.holder.starting') : t(settingsControlWord('settings.terminalholder', 'terminals.holder.start'))}
       </Btn>

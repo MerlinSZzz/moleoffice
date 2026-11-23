@@ -28,7 +28,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { THE_PERSON } from '../src/shared/person.ts'
 import { localStamp } from '../src/shared/time.ts'
-import { apiApp, freshDb, type TestDb } from './helpers.ts'
+import { A_SLEEP_TIME, apiApp, freshDb, type TestDb } from './helpers.ts'
 
 let t: TestDb
 let app: FastifyInstance
@@ -97,7 +97,7 @@ async function aResidentWithAnOldRun(handle: string): Promise<void> {
   await started(handle, 'worker')
   aSession(minutesAgo(120), { servingAgentId: agents.get(handle)!.id, state: 'finished', runtime: 'codex' })
   const secretary = agents.get('sec-waits')!
-  const proposed = await inject('POST', '/api/residents/proposals', asAgent('sec-waits', secretary.key), { agentId: agents.get(handle)!.id, because: 'A made-up reason.' })
+  const proposed = await inject('POST', '/api/residents/proposals', asAgent('sec-waits', secretary.key), { agentId: agents.get(handle)!.id, because: 'A made-up reason.', sleepTime: A_SLEEP_TIME })
   expect(proposed.status, proposed.text).toBe(201)
   const confirmed = await inject('POST', `/api/residents/proposals/${String(proposed.json['proposal'].id)}/confirm`, AS_THE_PERSON)
   expect(confirmed.status, confirmed.text).toBe(200)

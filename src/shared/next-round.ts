@@ -56,11 +56,12 @@ export const NEXT_ROUND_STATES = ['wanted', 'starting', 'started', 'failed'] as 
 export type NextRoundState = (typeof NEXT_ROUND_STATES)[number]
 
 /**
- * Who may ask, each proved by its own key or, for the person, the way the person is proved. The office asks only in its
+ * Who may ask, each proved by its own key or, for the person, the way the person is proved. `its leader` is the agent
+ * recorded as the agent's owner, which need not be its starter. The office asks only in its
  * own process, for a fix round of a red merge entry or a hand-back's resolve brief (wave 13u round 90), and for the next
  * round of a run it saw sealed, with its sandbox's briefs/NEXT.md (round 94).
  */
-export const NEXT_ROUND_ASKERS = ['the run’s agent', 'its starter', 'a secretary', 'the person', 'the office'] as const
+export const NEXT_ROUND_ASKERS = ['the run’s agent', 'its starter', 'its leader', 'a secretary', 'the person', 'the office'] as const
 export type NextRoundAsker = (typeof NEXT_ROUND_ASKERS)[number]
 
 /**
@@ -77,7 +78,7 @@ export interface TheEffortTheLauncherIsAnswered {
 export interface TheNextRound {
   state: NextRoundState
   askedAt: string
-  /** Who asked, named as a participant is named everywhere, and as which of the five who may. */
+  /** Who asked, named as a participant is named everywhere, and as which of the six who may. */
   askedBy: { who: ParticipantRef; as: NextRoundAsker; session?: string }
   /** The brief, as a pointer and a hash: an absolute path inside the sandbox folder, its sha256 and its size. */
   brief: { path: string; sha256: string; bytes: number }
@@ -89,10 +90,12 @@ export interface TheNextRound {
   repair?: { entry: string; dueAt: string; capHeldMs?: number; capHeldSince?: number }
   /** The ask this one replaced, when one was still waiting. */
   replaced?: { askedAt: string; askedBy: string }
-  /** The Casting row the ask read for the agent's card, or null when none was in force; absent on an ask made before the ask kept one. */
+  /** The Casting row the ask chose, or null when it kept the run; absent on an ask made before the ask kept one. */
   row?: TheRowAWorkerIsGiven | null
   /** With row null: the model the ask read on the run it continues. */
   model?: string
+  /** With row null when another program's row was in force: what the ask found, for the start's words. */
+  unmatchedRow?: { id: number; card: string; program: string }
   /**
    * Why the round starts on another program's row than the run it continues: the program that was out, and what said so.
    * Set only when the ask drew that row because the run's own program was spent (its row out until a time still to

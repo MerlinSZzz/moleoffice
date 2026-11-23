@@ -39,6 +39,17 @@ function bytesOnDisk(path) {
  */
 export const BETWEEN_SWEEP_ASKS_MS = 2_000
 export const SLOW_CHECKS_PER_START = 5
+/**
+ * A SHORTER PAUSE, FOR A TEST ONLY: SWEEP_PAUSE_MS_FOR_A_TEST in this process's own environment, in milliseconds, never
+ * below THE_SHORTEST_SWEEP_PAUSE_MS. A test of the launcher sets it (tests/sandbox-launcher.test.ts), and tools/sandbox.mjs
+ * passes it into the container only when its own environment has it; nothing else sets it. Unset, or not a number above
+ * 0, the pause is BETWEEN_SWEEP_ASKS_MS. The inspector's view sweep keeps BETWEEN_SWEEP_ASKS_MS whatever it says.
+ */
+export const THE_SHORTEST_SWEEP_PAUSE_MS = 250
+export function theSweepPauseMs() {
+  const asked = Number(process.env['SWEEP_PAUSE_MS_FOR_A_TEST'])
+  return Number.isFinite(asked) && asked > 0 ? Math.max(asked, THE_SHORTEST_SWEEP_PAUSE_MS) : BETWEEN_SWEEP_ASKS_MS
+}
 /** When the sweep last checked `path`, from its own "is kept" lines in the run's finish.log; null when it never did. */
 function lastChecked(log, run, path) {
   if (!existsSync(log)) return null
@@ -70,8 +81,9 @@ function whatStandsAt(path) {
 export async function sweepRunScratch({ root = '/tmp', instanceDir, ask: askNow, workspace, now = Date.now(), processes = theProcessesUsing, free = theScratchFolderIsStillFree,
   ownRun = null, clock = Date.now, sleep = ms => new Promise(done => setTimeout(done, ms)) }) {
   let answered = null
+  const pause = theSweepPauseMs()
   const ask = async (path, project) => {
-    const wait = answered === null ? 0 : answered + BETWEEN_SWEEP_ASKS_MS - clock()
+    const wait = answered === null ? 0 : answered + pause - clock()
     if (wait > 0) await sleep(wait)
     try { return await askNow(path, project) } finally { answered = clock() }
   }

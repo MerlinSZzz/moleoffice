@@ -243,7 +243,8 @@ describe('All records reads across projects', () => {
     const listed = await call<{ workspaces: { id: string; title: string }[] }>('/api/workspaces', person(HERE))
     const name = listed.workspaces.find((workspace) => workspace.id === HERE)?.title
     expect(name).toBeTruthy()
-    for (const theme of ['light', 'dark']) for (const width of [1440, 990, 660]) {
+    for (const width of [1440, 990, 660]) {
+      const theme = 'light'
       await page.evaluate((look) => localStorage.setItem('mole-office.preset.theme', look), theme)
       await open('/records', { width })
       expect(await page.locator('html').getAttribute('data-theme')).toBe(theme)

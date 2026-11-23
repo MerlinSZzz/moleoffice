@@ -69,8 +69,8 @@ import {
   bytesOfTheTranscript,
   findTheTranscript,
   sizeOfTheBrief,
-  textOfTheTranscript,
   theServedOfATranscript,
+  theTextOfTheTranscript,
 } from './served.mjs'
 import { aReceiptReadLately, dshTranscriptUsage, keepingTheOutsideSpend, RECEIPT_NOT_REPORTED, whereItRan } from '../../src/config/usage.mjs'
 import { localStampOf } from '../../src/config/stopped-run-cause.mjs'
@@ -97,7 +97,8 @@ import { readSetting } from '../../src/config/settings.mjs'
  * the invocation when it really ends overwrites with the final numbers; the PATCH that changes
  * nothing writes no revision, so the held stops store nothing but the last one's truth.
  *
- * Hands back the sentence for stderr, or null, and the transcript's text, which the usage receipt is read from.
+ * Hands back the sentence for stderr, or null, the transcript's text, which the usage receipt is read from, and why
+ * there is no text, or null when there is.
  */
 async function writeTheServed(api, id, payload) {
   const dshHome = process.env.DSH_HOME !== undefined && process.env.DSH_HOME !== ''
@@ -109,10 +110,16 @@ async function writeTheServed(api, id, payload) {
     : process.cwd()
   const sessionId = payload !== null && typeof payload === 'object' ? payload['session_id'] : undefined
   let text = ''
+  let unread = 'no transcript of this dsh session was found'
   const transcript = findTheTranscript(dshHome, cwd, sessionId)
   if (transcript !== null) {
     const bytes = bytesOfTheTranscript(transcript)
-    if (bytes !== null) text = textOfTheTranscript(transcript, bytes) ?? ''
+    if (bytes === null) unread = 'its file could not be read'
+    else {
+      const decoded = theTextOfTheTranscript(transcript, bytes)
+      text = decoded.text ?? ''
+      unread = decoded.text === null ? decoded.why : null
+    }
   }
   const served = theServedOfATranscript(text, briefBytes)
   const said = await ask(api, `/api/records/${encodeURIComponent(id.session)}`, {
@@ -121,12 +128,12 @@ async function writeTheServed(api, id, payload) {
     body: { dataPatch: { served } },
   })
   if (said === null) {
-    return { said: `dsh-hooks Served: Mole Office did not answer at ${api} about what run ${id.session} was served, so the run's conditions were not recorded.\n`, text }
+    return { said: `dsh-hooks Served: Mole Office did not answer at ${api} about what run ${id.session} was served, so the run's conditions were not recorded.\n`, text, unread }
   }
   if (!said.ok) {
-    return { said: `dsh-hooks Served: Mole Office answered ${String(said.status)} to the run's own record of what it was served, so the run's conditions were not recorded.\n`, text }
+    return { said: `dsh-hooks Served: Mole Office answered ${String(said.status)} to the run's own record of what it was served, so the run's conditions were not recorded.\n`, text, unread }
   }
-  return { said: null, text }
+  return { said: null, text, unread }
 }
 
 /**
@@ -140,13 +147,17 @@ async function writeTheServed(api, id, payload) {
  * A HELD STOP WRITES IT AT MOST ONCE IN TEN MINUTES; A STOP THAT LETS THE RUN GO ALWAYS DOES (a review, message
  * DLqviJ8nr3yH). A held stop is followed by another turn, and every write is a whole revision of the run, so a held stop
  * that finds a receipt read in the last ten minutes (aReceiptReadLately, src/config/usage.mjs) writes nothing.
+ *
+ * A TRANSCRIPT THAT GAVE NO TEXT IS NAMED IN THE RECEIPT'S WORDS, with why, so a receipt with no numbers is never read as
+ * a run that used nothing.
  * @param {string} api
  * @param {{ agent: string, session: string, workspace: string }} id
  * @param {string} text
+ * @param {string | null} unread Why the transcript gave no text, or null when it did.
  * @param {boolean} held Whether this stop is held, so the run goes on.
  * @returns {Promise<string | null>}
  */
-async function writeTheReceipt(api, id, text, held) {
+async function writeTheReceipt(api, id, text, unread, held) {
   const before = await ask(api, `/api/records/${encodeURIComponent(id.session)}`, { headers: theHeaders(id) })
   if (before === null || !before.ok) {
     return `dsh-hooks Usage: run ${id.session} could not be read first (${before === null ? 'no answer' : String(before.status)}), so its usage receipt was not written.\n`
@@ -154,7 +165,9 @@ async function writeTheReceipt(api, id, text, held) {
   const stored = (before.body?.record ?? before.body)?.data?.usageReceipt
   const readAt = new Date()
   if (held && aReceiptReadLately(stored, readAt.getTime())) return null
-  const usageReceipt = keepingTheOutsideSpend(stored, { ...dshTranscriptUsage(text), paidBy: RECEIPT_NOT_REPORTED, ranIn: whereItRan(process.env), readAt: localStampOf(readAt) })
+  const read = dshTranscriptUsage(text)
+  const says = unread === null ? {} : { says: `The run's own transcript was not read: ${unread}. ${String(read.says)}` }
+  const usageReceipt = keepingTheOutsideSpend(stored, { ...read, ...says, paidBy: RECEIPT_NOT_REPORTED, ranIn: whereItRan(process.env), readAt: localStampOf(readAt) })
   const wrote = await ask(api, `/api/records/${encodeURIComponent(id.session)}`, {
     method: 'PATCH',
     headers: theHeaders(id),
@@ -185,8 +198,9 @@ async function main() {
   // below, so an office that did not answer is named once by the existing sentences and not twice.
   let theServedSaid = null
   let text = ''
+  let unread = null
   try {
-    ;({ said: theServedSaid, text } = await writeTheServed(api, id, payload))
+    ;({ said: theServedSaid, text, unread } = await writeTheServed(api, id, payload))
   } catch (error) {
     theServedSaid = `dsh-hooks Served: ${error instanceof Error ? error.message : String(error)}, so the run's conditions were not recorded.\n`
   }
@@ -197,7 +211,7 @@ async function main() {
     let theReceiptSaid = null
     if (theServedSaid === null) {
       try {
-        theReceiptSaid = await writeTheReceipt(api, id, text, held)
+        theReceiptSaid = await writeTheReceipt(api, id, text, unread, held)
       } catch (error) {
         theReceiptSaid = `dsh-hooks Usage: ${error instanceof Error ? error.message : String(error)}, so run ${id.session}'s usage receipt was not written.\n`
       }

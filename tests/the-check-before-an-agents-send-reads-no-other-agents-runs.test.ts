@@ -196,14 +196,16 @@ beforeAll(async () => {
     const agent = await anAgent('made-up-terminal-holder', 'g. a live session holding the handle', 'green')
     await hold(agent.handle, await aLiveSession())
   }
-  // h.
+  // h. EACH SESSION NAMES A PROCESS OF ITS OWN THAT NO LONGER RUNS, and has no transcript. A hold that still beats
+  // is the session's answer unless what is read of the session says it is gone, and an ended process is that sign.
+  // The two numbers are above any pid the system hands out, so nothing runs under them.
   {
     const agent = await anAgent('made-up-left-behind', 'h. a hold whose session is gone', 'grey, offline')
-    await hold(agent.handle, aSession({ state: 'running', runtime: 'claude-code', doing: 'A made-up terminal that has gone.' }))
+    await hold(agent.handle, aSession({ state: 'running', runtime: 'claude-code', doing: 'A made-up terminal that has gone.', extra: anEndedProcess(2147483000) }))
   }
   {
     const agent = await anAgent('made-up-left-with-a-run', GONE_WITH_A_RUN, 'green')
-    await hold(agent.handle, aSession({ state: 'running', runtime: 'claude-code', doing: 'Another made-up terminal that has gone.' }))
+    await hold(agent.handle, aSession({ state: 'running', runtime: 'claude-code', doing: 'Another made-up terminal that has gone.', extra: anEndedProcess(2147483001) }))
     await aLiveProcessFor(aSession({ state: 'running', runtime: 'claude-code', servingAgentId: agent.id, sandbox: aSandbox('under-a-gone-hold') }))
   }
   // i. Each has a run that held a message and ended, so its reach has a run to read and passes it by.
@@ -325,6 +327,11 @@ function record(id: string, kind: string, data: object, workspace: string): void
 /** A session record of this file's own. */
 function aSession(data: Record<string, unknown>): string {
   return t.api.createRecord({ workspaceId: PROJECT, kind: 'session', title: 'A made-up session', data, actor: t.api.HUMAN }).id
+}
+
+/** The `extra` of a session that recorded a process of its own, under a number nothing runs under. */
+function anEndedProcess(pid: number): Record<string, unknown> {
+  return { discovered: { pid, pidStartedAt: '2026-01-01 00:00:00' } }
 }
 
 /** A run the message worker started that has answered, holding its conversation open until `until`. */

@@ -41,7 +41,7 @@
 import { readFileSync } from 'node:fs'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
-import { apiApp, freshDb, theAnswerToAWriteInATestOffice, type TestDb } from './helpers.ts'
+import { apiApp, freshDb, theAnswerToAWriteInATestOffice, type TestDb, governsTheWholeProject } from './helpers.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { theRoleCardsFile } from '../src/server/lib/roles.ts'
 import type { BuiltServer } from '../src/server/index.ts'
@@ -108,7 +108,7 @@ async function theOwnersDecision(names: string | null): Promise<string> {
   expect(filed.status, filed.said).toBe(200)
   const words = String((filed.body['note'] as { id: string }).id)
   return file(asAgent('quill'), 'decision', 'The spring goal is the owner’s', {
-    replaces: [],
+    ...governsTheWholeProject(), replaces: [],
     decided_by: 'the owner',
     authority: 'the owner said so',
     authority_reference: words,
@@ -228,7 +228,7 @@ describe('a secretary is refused when the evidence does not hold', () => {
   it('is refused with its own decision, even one that names the goal', async () => {
     const goal = await aWorkersGoal('No crawling glaze in the spring batch')
     const own = await file(asAgent('quill'), 'decision', 'The spring goal stands', {
-      replaces: [],
+      ...governsTheWholeProject(), replaces: [],
       decided_by: 'quill',
       authority: 'a measurement',
       authority_reference: 'Two firings without a crawl.',

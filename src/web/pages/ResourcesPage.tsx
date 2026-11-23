@@ -44,11 +44,12 @@ import type { GpuReadingProcess, GpuView } from '../../server/lib/bookings.ts'
 import type { PoolView } from '../../server/lib/slots.ts'
 import { errorMessage, moleOfficeRequest } from '../api.ts'
 import { declaredAttributes } from '../components/declares.ts'
-import { Absence, Btn, ErrorNote, Explain, Field, Loading, Panel, TextInput, useAsync } from '../components/ui.tsx'
+import { Absence, Btn, ErrorNote, Field, Loading, Panel, ServerNote, TextInput, useAsync } from '../components/ui.tsx'
 import { useProjectAsync } from '../lib/project-async.ts'
 import { useLanguage } from '../lib/language.ts'
 import { openTheChatAtGroup } from '../lib/open-chat.ts'
-import { GRACE_MINUTES, gibOfMiB, type CutInChoice } from '@shared/bookings.ts'
+import { stateWord } from '../lib/words.ts'
+import { gibOfMiB, type CutInChoice, type GoFirstState } from '@shared/bookings.ts'
 import { content, t } from '@shared/i18n.ts'
 import { participantKey } from '@shared/messages.ts'
 import type { ParticipantRef } from '@shared/participants.ts'
@@ -70,7 +71,6 @@ export function ResourcesPage() {
         {RESOURCES_CSS}
       </style>
       <h1 className="rs-title">{t('nav.resources')}</h1>
-      <p className="rs-lead">{t('resources.lead')}</p>
       {gpu.status === 'loading' ? <Loading what={t('pageWords.ResourcesPage.001')} /> : null}
       {gpu.status === 'error' ? <ErrorNote message={gpu.message} fault={gpu.fault} /> : null}
       {gpu.status === 'ready' ? <GpuCard gpu={gpu.value} now={Date.now()} onChanged={reload} /> : null}
@@ -78,10 +78,6 @@ export function ResourcesPage() {
       {/* THE SEAT'S FAULT STAYS IN THE SEAT'S PLACE, so a refused GET /api/slots never hides the GPU. */}
       {slots.status === 'error' ? <ErrorNote message={slots.message} fault={slots.fault} /> : null}
       {slots.status === 'ready' ? <SeatCard pool={slots.value.pools.find((p) => p.name === 'full-suite') ?? null} /> : null}
-      {/* WHAT IS NOT ON THIS PAGE STAYS IN SIGHT, AND WHY IS ONE PRESS DOWN. */}
-      <Explain declares={{ surface: null }} meaning={t('w13q.resources.othersMeaning')} opens={t('w13q.resources.othersOpens')}>
-        <p className="rs-others">{t('resources.others')}</p>
-      </Explain>
     </div>
   )
 }
@@ -130,11 +126,11 @@ function TheEnd({ end, now }: { end: BookingEnd; now: number }) {
         {end.expectedEnd !== null && p !== null
           ? t('resources.expectedEnd', { at: whenWord(end.expectedEnd, now), done: p.done, of: p.of, when })
           : p === null
-            ? t('resources.noProgress')
+            ? t('resourcesPage.noProgress')
             : p.done === p.of
               ? t('resources.allDone', { of: p.of, when })
               : p.done === 0
-                ? t('resources.noneDoneYet', { of: p.of, when })
+                ? t('resourcesPage.noneDoneYet', { of: p.of, when })
                 : t('resources.doneSoFar', { done: p.done, of: p.of, when })}
       </p>
     </>
@@ -194,12 +190,12 @@ export function GpuCard({ gpu, now, onChanged, windowOpen = false }: { gpu: GpuV
         ) : null
       }
     >
-      <p className="rs-says">{gpu.says}</p>
+      <ServerNote text={gpu.says} />
       {open && gpu.you.theOwner ? <BookingWindow gpu={gpu} now={now} onClose={() => setOpen(false)} onBooked={onChanged} /> : null}
       <div className="rs-cols">
         <section className="rs-col" data-column="now">
           <h3 className="rs-head">{t('resources.column.now')}</h3>
-          {gpu.running.length === 0 ? <p className="rs-line">{t('resources.nobodyHolds')}</p> : null}
+          {gpu.running.length === 0 ? <p className="rs-line"><Absence tier="told-apart" looked word={t('resources.noRunningBooking')} /></p> : null}
           {gpu.running.map((r) => (
             <div className="rs-item" key={r.booking}>
               <p className="rs-line rs-who" data-lasts={r.end.lasts === 'until its program ends' ? 'program' : 'fixed'}>
@@ -240,7 +236,7 @@ export function GpuCard({ gpu, now, onChanged, windowOpen = false }: { gpu: GpuV
         </section>
         <section className="rs-col" data-column="next">
           <h3 className="rs-head">{t('resources.column.next')}</h3>
-          {waiting.length === 0 ? <p className="rs-line">{t('resources.nothingWaits')}</p> : null}
+          {waiting.length === 0 ? <p className="rs-line"><Absence tier="told-apart" looked word={t('absence.none')} /></p> : null}
           {waiting.map((l) => (
             <div className="rs-item" key={l.booking} data-asks={l.goFirst?.state === 'asked' ? 'yes' : 'no'}>
               {l.goFirst?.state === 'asked' ? <GoFirstAsked gpu={gpu} holder={l.holder} asked={l.goFirst} booking={l.booking} mayAnswer={l.mayAnswer} onChanged={onChanged} /> : null}
@@ -258,7 +254,6 @@ export function GpuCard({ gpu, now, onChanged, windowOpen = false }: { gpu: GpuV
           {second === undefined ? null : <TheWeek gpu={gpu} week={second.week} />}
         </section>
       </div>
-      {gpu.you.theOwner ? null : <p className="rs-line rs-quiet">{t('resources.book.onlyTheOwner')}</p>}
     </Panel>
   )
 }
@@ -281,16 +276,16 @@ function GoFirstAsked({
   const ahead = (asked.ahead === booking ? null : (gpu.secondLevel?.line.find((l) => l.booking === asked.ahead) ?? null))
   const [pending, setPending] = useState(false)
   const [fault, setFault] = useState<string | null>(null)
-  const [said, setSaid] = useState<string | null>(null)
+  const [said, setSaid] = useState<{ state: GoFirstState; says: string } | null>(null)
   const answer = (grant: boolean) => {
     setPending(true)
     setFault(null)
-    moleOfficeRequest<{ says: string }>(`/api/bookings/${encodeURIComponent(booking)}/go-first/answer`, {
+    moleOfficeRequest<{ state: GoFirstState; says: string }>(`/api/bookings/${encodeURIComponent(booking)}/go-first/answer`, {
       method: 'POST',
       body: JSON.stringify({ grant }),
     })
       .then((reply) => {
-        setSaid(reply.says)
+        setSaid({ state: reply.state, says: reply.says })
         onChanged?.()
       })
       .catch((err: unknown) => setFault(errorMessage(err)))
@@ -316,7 +311,8 @@ function GoFirstAsked({
           </Btn>
         )}
       </div>
-      {said === null ? null : <p className="rs-line rs-quiet">{said}</p>}
+      {said === null ? null : <p className="rs-line rs-quiet">{stateWord(said.state).text}</p>}
+      <ServerNote text={said?.says} />
       {fault === null ? null : <p className="rs-line rs-fault">{fault}</p>}
     </div>
   )
@@ -339,13 +335,12 @@ function TheWeek({ gpu, week }: { gpu: GpuView; week: NonNullable<GpuView['secon
       <p className="rs-line rs-hours" data-without="yes">
         <span>{t('resources.week.without')}</span>
         {week.withoutABookingMinutes === null ? (
-          <Absence tier="ordinary" word={t('absence.notLooked')} title={week.says} />
+          <Absence tier="ordinary" word={t('absence.notLooked')} />
         ) : (
           <span>{durationWord(week.withoutABookingMinutes)}</span>
         )}
       </p>
-      <p className="rs-line rs-quiet">{t('resources.week.note')}</p>
-      <p className="rs-line rs-quiet">{week.says}</p>
+      <ServerNote text={week.says} />
     </>
   )
 }
@@ -400,15 +395,14 @@ export function BookingWindow({ gpu, now, onClose, onBooked }: { gpu: GpuView; n
   return (
     <section className="rs-window" aria-label={t('resources.book.title')} {...declaredAttributes({ surface: 'resources.book' })}>
       <h3 className="rs-window-title">{t('resources.book.title')}</h3>
-      <p className="rs-line rs-quiet">{t('resources.book.lead')}</p>
       <div className="rs-box">
         <p className="rs-line">
           <span className="rs-key">{t('resources.column.now')}</span>
-          {someoneRuns ? runningNames : t('resources.nobodyHolds')}
+          {someoneRuns ? runningNames : <Absence tier="told-apart" looked word={t('resources.noRunningBooking')} />}
         </p>
         <p className="rs-line">
           <span className="rs-key">{t('resources.column.next')}</span>
-          {waitingNames.length === 0 ? t('resources.nothingWaits') : waitingNames.join(', ')}
+          {waitingNames.length === 0 ? <Absence tier="told-apart" looked word={t('absence.none')} /> : waitingNames.join(', ')}
         </p>
       </div>
       <fieldset className="rs-starts">
@@ -447,12 +441,7 @@ export function BookingWindow({ gpu, now, onClose, onBooked }: { gpu: GpuView; n
           {(['now', 'after'] as const).map((one) => (
             <label className="rs-choice" key={one} data-chosen={choice === one ? 'yes' : 'no'}>
               <input type="radio" name="mole-office-booking-cut-in" value={one} checked={choice === one} onChange={() => setChoice(one)} />
-              <span className="rs-choice-words">
-                <span className="rs-choice-word">{one === 'now' ? t('resources.book.goFirst') : t('resources.book.letFinish', { who: runningNames })}</span>
-                <span className="rs-quiet">
-                  {one === 'now' ? t('resources.book.goFirstSays', { n: GRACE_MINUTES }) : t('resources.book.letFinishSays')}
-                </span>
-              </span>
+              <span className="rs-choice-word">{one === 'now' ? t('resources.book.goFirst') : t('resources.book.letFinish', { who: runningNames })}</span>
             </label>
           ))}
         </fieldset>
@@ -465,7 +454,8 @@ export function BookingWindow({ gpu, now, onClose, onBooked }: { gpu: GpuView; n
           {t('resources.book.submit')}
         </Btn>
       </div>
-      {said === null ? null : <p className="rs-line">{said}</p>}
+      {said === null ? null : <p className="rs-line">{t('resources.book.done')}</p>}
+      <ServerNote text={said} />
       {fault === null ? null : <p className="rs-line rs-fault">{fault}</p>}
     </section>
   )
@@ -482,13 +472,12 @@ export function SeatCard({ pool }: { pool: PoolView | null }) {
   useLanguage()
   return (
     <Panel titleIs="label" declares={{ surface: 'resources.seat' }} title={surfaceWord('resources.seat')}>
-      <p className="rs-line rs-quiet">{t('resources.seat.note')}</p>
-      {pool === null ? null : <p className="rs-says">{pool.says}</p>}
+      {pool === null ? null : <ServerNote text={pool.says} />}
       {pool === null ? null : (
         <div className="rs-cols">
           <section className="rs-col" data-column="now">
             <h3 className="rs-head">{t('resources.column.now')}</h3>
-            {pool.held.length === 0 ? <p className="rs-line">{t('resources.seat.free')}</p> : null}
+            {pool.held.length === 0 ? <p className="rs-line">{t('resources.seat.freeNow')}</p> : null}
             {pool.held.map((s) => (
               <p className="rs-line rs-who" key={s.id}>
                 {t('resources.seat.holder', { seat: s.seat ?? '?', who: s.session.title === null ? t('resources.seat.unnamed') : content(s.session.title) })}
@@ -497,11 +486,11 @@ export function SeatCard({ pool }: { pool: PoolView | null }) {
           </section>
           <section className="rs-col" data-column="next">
             <h3 className="rs-head">{t('resources.column.next')}</h3>
-            <p className="rs-line">{pool.waiting.length === 0 ? t('resources.nothingWaits') : t('resources.seat.waiting', { n: pool.waiting.length })}</p>
+            <p className="rs-line">{pool.waiting.length === 0 ? <Absence tier="told-apart" looked word={t('absence.none')} /> : t('resources.seat.waiting', { n: pool.waiting.length })}</p>
           </section>
           <section className="rs-col" data-column="week">
             <h3 className="rs-head">{t('resources.column.week')}</h3>
-            <p className="rs-line rs-quiet">{t('resources.seat.week')}</p>
+            <p className="rs-line rs-quiet"><Absence tier="told-apart" looked={false} word={t('word.notRecorded')} /></p>
           </section>
         </div>
       )}
@@ -512,8 +501,6 @@ export function SeatCard({ pool }: { pool: PoolView | null }) {
 const RESOURCES_CSS = `
 .rs { display: flex; flex-direction: column; gap: var(--gut); }
 .rs-title { margin: 0; }
-.rs-lead, .rs-others { margin: 0; color: var(--text-2); font-size: var(--fs-2); }
-.rs-says { margin: 0 0 var(--pad); font-size: var(--fs-2); }
 .rs-cols { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--gut); }
 .rs-col { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .rs-head { margin: 0; font-size: var(--fs-1); color: var(--text-3); text-transform: uppercase; letter-spacing: 0.04em; }
@@ -537,7 +524,6 @@ const RESOURCES_CSS = `
 .rs-pick { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-2); }
 .rs-choice { display: flex; gap: 8px; align-items: flex-start; padding: 6px; border: 1px solid var(--border); border-radius: 6px; }
 .rs-choice[data-chosen='yes'] { border-color: var(--accent); }
-.rs-choice-words { display: flex; flex-direction: column; gap: 2px; }
 .rs-choice-word { font-weight: 600; font-size: var(--fs-2); }
 .rs-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--pad); }
 @media (max-width: 720px) {

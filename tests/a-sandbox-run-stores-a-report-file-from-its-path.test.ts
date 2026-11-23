@@ -19,10 +19,17 @@
  *   - the server skips the size-and-hash comparison                                      -> case 2 red
  *   - the limit read from anywhere but the door's own answer                             -> cases 1, 1b, 2, over-the-limit red
  *   - each refusal in case 3 left out (link, link in the path, a credentials folder, a
- *     credentials file, a second name for the key file, the key file's folder, not a file,
+ *     credentials file, a second name for the key file, the key file's folder, the office tool file,
+ *     the office tool file's folder, not a file,
  *     empty, over the limit, the key file, relative, another door, extra keys)           -> its row red
  *   - every hidden part refused, as first designed (vmKz-CMmzsDs)                 -> case 1b red
  *   - a plain base64 string is read as a path                                            -> case 4 red
+ *   - dsh sends the {fromFile} object unread, skips comparison, or skips either refusal  -> dsh cases a-d red
+ *   - dsh checks the fields only after it sends the file                                 -> dsh case e red
+ *
+ * Cases: 1 and 1b store a file; 2 catches a false hash; 3 refuses unsafe paths and requests;
+ * 4 sends base64 unchanged; dsh a stores a file, b catches a false hash, c refuses another door,
+ * d refuses the office tool file, and e refuses fields it cannot give and sends nothing.
  */
 import { createHash } from 'node:crypto'
 import { closeSync, existsSync, ftruncateSync, linkSync, mkdirSync, mkdtempSync, openSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
@@ -31,6 +38,7 @@ import { dirname, join } from 'node:path'
 import type { FastifyInstance } from 'fastify'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { answerOfficeMessage } from '../tools/office-mcp.mjs'
+import { theOfficeRequestTool } from '../tools/dsh-hooks/office-tool.mjs'
 import { officeHeaders } from '../tools/sandbox-common.mjs'
 import { THE_TEST_OFFICES_OWNER } from './a-page-of-a-test-office.ts'
 import { apiApp, freshDb, type TestDb } from './helpers.ts'
@@ -153,6 +161,8 @@ describe('office_request stores a report file from its path', () => {
     ['a credentials file', async () => { writeFileSync(join(dir, '.env.local'), 'x'); return { args: store(join(dir, '.env.local')) } }, 'credentials'],
     ['a second name for the key file', async () => { mkdirSync(join(dir, 'keys')); writeFileSync(join(dir, 'keys', 'key'), key, { mode: 0o600 }); mkdirSync(join(dir, 'out')); linkSync(join(dir, 'keys', 'key'), join(dir, 'out', 'a.png')); return { args: store(join(dir, 'out', 'a.png')), extra: { MOLE_AGENT_KEY_FILE: join(dir, 'keys', 'key') } } }, 'key file'],
     ['the key file\'s folder', async () => { mkdirSync(join(dir, 'keys')); writeFileSync(join(dir, 'keys', 'key'), key, { mode: 0o600 }); writeFileSync(join(dir, 'keys', 'a.png'), 'x'); return { args: store(join(dir, 'keys', 'a.png')), extra: { MOLE_AGENT_KEY_FILE: join(dir, 'keys', 'key') } } }, 'key file'],
+    ['the office tool file', async () => { mkdirSync(join(dir, 'tool')); writeFileSync(join(dir, 'tool', 'config'), key, { mode: 0o600 }); return { args: store(join(dir, 'tool', 'config')), extra: { MOLE_OFFICE_TOOL_CONFIGURATION: join(dir, 'tool', 'config') } } }, 'never sent'],
+    ['the office tool file\'s folder', async () => { mkdirSync(join(dir, 'tool')); writeFileSync(join(dir, 'tool', 'config'), key, { mode: 0o600 }); writeFileSync(join(dir, 'tool', 'a.png'), 'x'); return { args: store(join(dir, 'tool', 'a.png')), extra: { MOLE_OFFICE_TOOL_CONFIGURATION: join(dir, 'tool', 'config') } } }, 'never sent'],
     ['not a file', async () => { mkdirSync(join(dir, 'folder')); return { args: store(join(dir, 'folder')) } }, 'not a regular file'],
     ['an empty file', async () => { writeFileSync(join(dir, 'empty.png'), ''); return { args: store(join(dir, 'empty.png')) } }, 'empty'],
     // One byte over the real door's own limit, as a sparse file, so nothing that large is ever written or read.
@@ -177,5 +187,51 @@ describe('office_request stores a report file from its path', () => {
     expect(posts()).toHaveLength(1)
     expect(posts()[0]!.body).toEqual({ name: 'tiny.png', bytes: 'aGk=' })
     expect(heard.filter((one) => one.method === 'GET')).toHaveLength(0)
+  })
+})
+
+describe("dsh's office tool stores a report file from its path", () => {
+  const aTool = (extra: NodeJS.ProcessEnv = {}) => theOfficeRequestTool({ defineTool: (options: unknown) => options, fetchImpl, env: env(extra) }) as {
+    execute: (args: object, exec: object) => Promise<{ status: number; added: string | null }>
+  }
+
+  it('a: reads and stores the file as base64', async () => {
+    const bytes = Buffer.from('a report picture')
+    const path = join(dir, 'drawing.png')
+    writeFileSync(path, bytes)
+    const answer = await aTool().execute(store(path, 'drawing.png'), {})
+    expect(answer.status).toBe(201)
+    expect(answer.added).toContain('The stored file matches')
+    expect(posts()).toHaveLength(1)
+    expect(posts()[0]!.body.bytes).toBe(bytes.toString('base64'))
+  })
+
+  it('b: refuses a stored hash that differs from the file', async () => {
+    const path = join(dir, 'drawing.png')
+    writeFileSync(path, 'a report picture')
+    lie = true
+    await expect(aTool().execute(store(path, 'drawing.png'), {})).rejects.toThrow('THE STORED FILE DOES NOT MATCH')
+  })
+
+  it('c: refuses a file on another door and sends nothing', async () => {
+    const path = join(dir, 'drawing.png')
+    writeFileSync(path, 'a report picture')
+    await expect(aTool().execute({ method: 'POST', path: '/api/records', body: { bytes: { fromFile: path } } }, {})).rejects.toThrow('/api/report-files')
+    expect(heard).toHaveLength(0)
+  })
+
+  it('d: refuses the office tool file and sends nothing', async () => {
+    mkdirSync(join(dir, 'tool'))
+    const path = join(dir, 'tool', 'config')
+    writeFileSync(path, key, { mode: 0o600 })
+    await expect(aTool({ MOLE_OFFICE_TOOL_CONFIGURATION: path }).execute(store(path), {})).rejects.toThrow('never sent')
+    expect(posts()).toHaveLength(0)
+  })
+
+  it('e: refuses fields it cannot give before the file is read, and sends nothing', async () => {
+    const path = join(dir, 'drawing.png')
+    writeFileSync(path, 'a report picture')
+    await expect(aTool().execute({ ...store(path), fields: 'no-such-mode' }, {})).rejects.toThrow('Nothing was sent')
+    expect(heard).toHaveLength(0)
   })
 })

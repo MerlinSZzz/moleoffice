@@ -17,7 +17,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ${CLAUDE_PLUGIN_ROOT}/tools/guard/main-world-guard.mjs",
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/for-agents/main-world-guard.mjs",
             "timeout": 30
           }
         ]

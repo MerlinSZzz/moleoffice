@@ -39,8 +39,7 @@ function save(name: string, value: string | null, headers = AS_OWNER) { return a
 // So do the two integration guards of round L, which the next case pins.
 // The sandbox tools' rows offer only the positions they were given (d6SnhY430pQe), and
 // tests/the-sandbox-tools-checks-are-gate-rows.test.ts pins them row by row.
-// The six guards of the merge queue's own steps allow only block, and
-// tests/the-merge-queue-server-gates-are-counted-rows.test.ts pins them row by row.
+// The six guards of the merge queue's own steps allow only block.
 // The six guards of the merge tool's own steps allow block, or block and remind, and
 // tests/the-merge-tool-gate-rows-move-only-as-decided.test.ts pins them row by row.
 // Six more checks of the office's own allow only block, and

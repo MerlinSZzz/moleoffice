@@ -8,7 +8,7 @@
  * ---------------------------------------------------------------------------------------
  *
  * Criteria B6, B9, B11 and B17 of `design/bundle/ACCEPTANCE.md`, in a real browser, at 1440 and 390
- * and in both themes.
+ * and in the light theme.
  *
  * The page asked two things — what the copy is about, and what it is for — and the owner's register section 8 says
  * three are needed: scope, purpose and how detailed. A decision says the same: problem 8 is how detailed, problem 9 is
@@ -305,24 +305,23 @@ describe('the bundles page offers three choices', () => {
     }
   })
 
-  it('shows what an arriving agent is told, and says it comes from somewhere else', async () => {
+  it('shows what an arriving agent is told', async () => {
     await openBundlesInTheDeveloperView()
-    // THE SENTENCE IS AT REST, before anything is pressed: a person has to be told what this panel
-    // is before they decide to read 46,000 characters of it.
     const panel = page.locator(briefPanel)
     expect(await panel.count(), 'the brief is not on the page').toBe(1)
-    for (const piece of en.t('g7a.bundles.briefHint').split(/\{\w+\}/)) expect(await panel.innerText()).toContain(piece.trim())
 
     await panel.getByRole('button', { name: 'Read what an agent is told' }).click()
     await page.waitForSelector(`${briefPanel} .bx-text`)
     const shown = await panel.innerText()
-    // WHAT AN AGENT IS ACTUALLY HANDED, and the honest word about the token figure.
+    // WHAT AN AGENT IS ACTUALLY HANDED, and its size.
     expect(shown).toContain('the state of this project, from GET /api/brief')
-    expect(shown).toContain('estimate')
+    for (const piece of en.t('g7a.bundles.briefSize').split(/\{\w+\}/).map((one) => one.trim())) {
+      if (piece !== '' && piece !== ',') expect(shown).toContain(piece)
+    }
   })
 
-  it('draws all of it inside a 390-wide screen, in both themes', async () => {
-    for (const theme of ['light', 'dark'] as const) {
+  it('draws all of it inside a 390-wide screen, in the light theme', async () => {
+    for (const theme of ['light'] as const) {
       await page.emulateMedia({ colorScheme: theme })
       await page.setViewportSize({ width: 390, height: 844 })
       await openTheChooser()

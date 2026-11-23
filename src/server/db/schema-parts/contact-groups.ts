@@ -5,6 +5,30 @@ import { aPartTable } from '../part-tables.ts'
 
 const existingArchive = { existingArchive: true } as const
 
+/**
+ * HOW ONE PERSON HAS ARRANGED THEIR CONTACTS LIST: the second-level groups, added by migration
+ * 0127 and given a side by 0161.
+ *
+ * Criteria M119 and M120: the first level is two locked top
+ * groups, Human and Agent, and under them sit ordinary groups the person may add, rename and move
+ * contacts between. Under Agent the default arrangement is by role.
+ *
+ * ONLY WHAT SOMEBODY CHANGED IS IN HERE. The second-level defaults are declared in
+ * `src/shared/contacts.ts` and are not rows: a fresh installation has the default arrangement
+ * with this table empty. A row appears when somebody makes a group, or renames or moves one of the
+ * declared ones.
+ *
+ * NOTHING HERE SAYS WHETHER SOMEBODY MADE THE GROUP, because `key` already does: the product's own
+ * groups are keyed `people`, `secretary`, `inspector`, `supervisor`, `worker`, `other` and
+ * `retired`, and a group somebody made is keyed by a fresh id. `isABuiltInGroup` in
+ * `src/shared/contacts.ts` is the one reader of that. A stored row keyed `human`, `agent` or
+ * `special` is a leftover of the arrangement before M119 and is read as naming no group.
+ *
+ * IT NAMES NO PROJECT. Which group an agent belongs in is a fact about the agent, and the registries
+ * this arranges belong to the installation rather than to a project — the same rule `people`,
+ * `agents` and `assets` follow. A workspace column would mean making the groups again in every
+ * project.
+ */
 export const contactGroups = aPartTable(sqliteTable(
   'contact_groups',
   {

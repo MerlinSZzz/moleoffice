@@ -17,10 +17,9 @@
  *   - the meta line drawing the bare name: the place cases go red;
  *   - the screen-reader label drawn on the take-none card: the label cases go red.
  *
- * AN EMPTY PART SAYS WHAT IS MISSING (wave 13q round 41, decision WdlQ2ADlhZUu). The decisions made, the messages not
- * read and the lookup's answer for a place nothing governs each say their sentence where they drew a dash. Mutation:
- * `say` dropped from the Absence of decisionsAsks.none in src/web/components/MessagesYouHaveNotRead.tsx turns the
- * empty-parts case red.
+ * AN EMPTY PART SAYS WHAT IS MISSING (wave 13q round 41, decision WdlQ2ADlhZUu). The decisions made and the lookup's
+ * answer for a place nothing governs each say their sentence where they drew a dash. The messages not read draw the
+ * state word "none" there now, as decided. No case in this file reads an empty part.
  *
  * THE COUNT LINE HAS FOUR PARTS (8 November 2026). The messages the person has not read are counted in a part of
  * their own, between the asked part and the set-aside part, as the page lists them on their own. A new word is written

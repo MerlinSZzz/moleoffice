@@ -63,7 +63,7 @@ import {
 } from './evolution-model.ts'
 import { recordPath } from '../router.tsx'
 import type { Declares } from '../declares.ts'
-import { Absence, DEPTH_MEANING_KEYS, DEPTH_WORD_KEYS, Empty, Explain, Mark, Panel, Tag } from '../ui.tsx'
+import { Absence, DEPTH_MEANING_KEYS, DEPTH_WORD_KEYS, Empty, Mark, Panel, Tag } from '../ui.tsx'
 import { useEffect, useState } from 'react'
 import { api } from '../../api.ts'
 import { COMPOSITION_MARKS, EVOLUTION_MARKS, type CompositionMark } from '@shared/composition.ts'
@@ -194,18 +194,8 @@ function NodeRow({ node, row, gutterWidth }: { node: EvolutionNode; row: Evoluti
  * it is a trunk with branches curving off it, laid out by flow rather than by coordinates, and
  * nothing about it needs measuring.
  */
-/**
- * The one thing about this drawing a reader cannot see and would otherwise get wrong: they will
- * assume somebody arranged it. Written once and used in both branches, so an empty drawing and a
- * full one cannot end up saying it two ways.
- */
-const DERIVED_NOTE =
-  () => t('g7b.Evolution.nothing_here_is_stored_the_shape_is') +
-  t('g7b.Evolution.and_no_position_order_or_colour_is')
-
 export function Evolution({ declares, ...input }: EvolutionInput & { declares: Declares }) {
   useLanguage()
-  const inspect = useInspect()
   const graph = buildEvolution(input)
   const branches = graph.nodes.length - 1
   const aside = graph.nodes.filter((node) => node.setAside.length > 0).length
@@ -217,7 +207,6 @@ export function Evolution({ declares, ...input }: EvolutionInput & { declares: D
       </style>
       <Panel titleIs="label" declares={declares}
         title={t('g7b.Evolution.how_this_subsystem_may_evolve')}
-        kind={t('g7b.Evolution.directions_worked_out_from_links')}
         actions={
           branches > 0 ? (
             <span className="ev-count num">
@@ -233,14 +222,6 @@ export function Evolution({ declares, ...input }: EvolutionInput & { declares: D
           </>
         ) : (
           <>
-            <Explain declares={{ surface: null }} meaning={inspect ? DERIVED_NOTE() : t('g7b.directionReading')} opens={t('g7b.Evolution.what_a_curve_and_a_muted_row')}>
-              <ul className="ev-legend">
-                <li>
-                  <strong>{t('g7b.Evolution.a_curve')}</strong>{t('g7b.Evolution.a_stored_link')}</li>
-                <li>
-                  <strong>{t('g7b.Evolution.muted')}</strong>{t('g7b.Evolution.set_aside_and_kept_on_the_drawing')}</li>
-              </ul>
-            </Explain>
             <ol className="ev-rows">
               {graph.nodes.map((node, i) => (
                 <NodeRow
@@ -375,16 +356,6 @@ a.ev-title:hover, a.ev-title:focus-visible { text-decoration: underline; }
 .ev-row[data-muted="1"] .ev-curve,
 .ev-row[data-muted="1"] .ev-dot { opacity: .4; }
 .ev-row[data-muted="1"] .ev-aside-word { color: var(--text-3); }
-
-.ev-legend {
-  margin: var(--gut) 0 0;
-  padding-left: var(--pad-lg);
-  font-size: var(--fs-1);
-  line-height: var(--lh-body);
-  color: var(--text-3);
-}
-.ev-legend li { margin-top: 4px; }
-.ev-legend strong { color: var(--text-2); }
 `
 
 // ============================================================================ the six marks
@@ -681,7 +652,7 @@ export function CompositionEvolution({
         titleIs="label"
         declares={declares}
         title={titleHere(kind, MADE_OF_KEY)}
-        kind={t('g7b.Evolution.three_sources_one_projection')}
+        kind={t('g7b.Evolution.composition')}
         actions={
           <span className="cp-where num">
             {t('g7b.historyStop', { version: revision === null ? t('g7b.Evolution.no_version') : t('g7b.Evolution.version', { v1: revision.seq }), n: here + 1, total: stops.length })}
@@ -863,19 +834,6 @@ export function CompositionEvolution({
         {reading.subject.kind === 'pipeline' ? (
           <CompareWithAnother recordId={reading.subject.id} workspaceId={reading.subject.workspaceId ?? ''} />
         ) : null}
-
-        <Explain
-          declares={{ surface: null }}
-          meaning={t('g7b.Evolution.membership_comes_from_two_stored_facts_and')}
-          opens={t('g7b.Evolution.how_this_is_worked_out')}
-        >
-          <ul className="ev-legend">
-            <li>
-              <strong>{t('g7b.Evolution.nothing_here_is_stored')}</strong>{t('g7b.Evolution.every_row_is_worked_out_from_revisions')}</li>
-            <li>
-              <strong>{t('g7b.Evolution.a_version_the_ledger_does_not_hold')}</strong>{t('g7b.Evolution.drawn_as_unaccounted_never_left_out')}</li>
-          </ul>
-        </Explain>
       </Panel>
       </div>
     </>

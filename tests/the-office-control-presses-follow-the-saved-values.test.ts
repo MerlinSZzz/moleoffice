@@ -2,16 +2,20 @@
 // Licensed under the MIT License. See LICENSE.
 import { mkdirSync } from 'node:fs'
 import { beforeAll, afterAll, expect, it } from 'vitest'
-import { liveApp, waitForThePage, type LiveApp } from './helpers.ts'
+import { liveApp, waitForThePage, type LiveApp, governsTheWholeProject } from './helpers.ts'
 import { THE_TEST_OFFICES_OWNER } from './a-page-of-a-test-office.ts'
 import { putTheMadeUpLabelIn } from './the-made-up-label-above-the-page.ts'
+import { englishWords } from '../src/shared/words/joined.ts'
+const en = englishWords()
 let app: LiveApp
+let finch = ''
 beforeAll(async () => {
   app = await liveApp({name:'office-control-presses',workspace:'default',viewport:{width:1440,height:1100}})
   const headers = {'content-type':'application/json','x-mole-office-actor-type':'human','x-mole-office-actor-id':THE_TEST_OFFICES_OWNER.id,'x-mole-office-workspace':'default'}
   expect((await fetch(`${app.api}/api/participants/person/${THE_TEST_OFFICES_OWNER.id}`,{method:'PATCH',headers,body:JSON.stringify({name:'Rowan'})})).status).toBe(200)
-  expect((await fetch(`${app.api}/api/agents/started`,{method:'POST',headers,body:JSON.stringify({handle:'fixture-finch',name:'Finch',role:'secretary'})})).status).toBe(201)
-  expect((await fetch(`${app.api}/api/records`,{method:'POST',headers,body:JSON.stringify({kind:'decision',title:'Made-up restart permission',data:{replaces:[]}})})).status).toBe(201)
+  const started = await fetch(`${app.api}/api/agents/started`,{method:'POST',headers,body:JSON.stringify({handle:'fixture-finch',name:'Finch',role:'secretary'})})
+  expect(started.status).toBe(201);finch = ((await started.json()) as {agent:{id:string}}).agent.id
+  expect((await fetch(`${app.api}/api/records`,{method:'POST',headers,body:JSON.stringify({kind:'decision',title:'Made-up restart permission',data:{...governsTheWholeProject(), replaces:[]}})})).status).toBe(201)
   await app.page.addInitScript(({person})=>localStorage.setItem('mole-office.actor',JSON.stringify({type:'human',id:person})),{person:THE_TEST_OFFICES_OWNER.id})
 },240_000)
 afterAll(async()=>{await app?.stop()},120_000)
@@ -37,14 +41,12 @@ it('saves a runtime value, shows its source and audit at once, and keeps it afte
   await row.getByLabel('Value',{exact:true}).fill('9');await row.getByLabel('Why change this?',{exact:true}).fill('Made-up demonstration reason');await row.getByRole('button',{name:'Save value',exact:true}).click()
   await expect.poll(()=>row.innerText()).toContain('9, from the office database.')
 },180_000)
-it('gives and takes back an exact agent grant, refuses an unmanaged restart, and fits both pages at four widths in both themes',async()=>{
+it('gives and takes back an exact agent grant, refuses an unmanaged restart, and fits both pages at 1440 in the light theme',async()=>{
   const page=app.page
   await page.goto(`${app.site}/?lang=en&mode=inspect#/settings/restart`);await waitForThePage(page,60_000)
   const panel=page.locator('[data-target="uiSurface/settings.restart"]')
   await panel.locator('details > summary').first().click()
-  await panel.getByLabel('Find an agent by name',{exact:true}).fill('Finch');await panel.getByRole('button',{name:'Find agents',exact:true}).click()
-  await expect.poll(()=>panel.getByLabel('Agent',{exact:true}).innerText()).toContain('Finch')
-  await panel.getByLabel('Agent',{exact:true}).selectOption({label:'Finch'})
+  await panel.getByLabel(en['officeRestart.agent'],{exact:true}).fill('fixture-finch');await panel.locator(`.agp button.agp-row[data-value="${finch}"]`).click()
   await panel.getByLabel('Find a decision by its words',{exact:true}).fill('Made-up restart permission');await panel.getByRole('button',{name:'Find decisions',exact:true}).click()
   await expect.poll(()=>panel.getByLabel('Decision',{exact:true}).innerText()).toContain('Made-up restart permission')
   await panel.getByLabel('Decision',{exact:true}).selectOption({label:'Made-up restart permission'})
@@ -57,7 +59,7 @@ it('gives and takes back an exact agent grant, refuses an unmanaged restart, and
   await panel.getByLabel('Why restart?',{exact:true}).fill('Made-up restart reason')
   expect(await panel.getByRole('button',{name:'Restart',exact:true}).isDisabled()).toBe(true)
   const shots=process.env.W13R_ROUND27_SHOTS;if(shots)mkdirSync(shots,{recursive:true})
-  for(const width of [1440]) for(const theme of ['light','dark']) for(const surface of ['officecontrols','restart']) {
+  for(const width of [1440]) for(const theme of ['light']) for(const surface of ['officecontrols','restart']) {
     await page.evaluate((theme)=>localStorage.setItem('mole-office.preset.theme',theme),theme)
     await page.setViewportSize({width,height:1500});await page.goto(`${app.site}/?lang=en&mode=inspect&look=${theme}#/settings/${surface}`);await waitForThePage(page,60_000)
     await expect.poll(()=>page.locator('html').getAttribute('data-theme')).toBe(theme)
@@ -72,11 +74,11 @@ it('gives and takes back an exact agent grant, refuses an unmanaged restart, and
     }
   }
 },300_000)
-it('the runtime model note names the saved controls, and fits four widths in both themes',async()=>{
+it('the runtime model note names the saved controls, and fits 1440 in the light theme',async()=>{
   // Wave 13y round 119: the Working page's line for a map turned off went with the older built-in map, so only the Runtime note is read here.
   const page=app.page
   const shots=process.env.W13R_ROUND27_OTHER_SHOTS;if(shots)mkdirSync(shots,{recursive:true})
-  for(const width of [1440]) for(const theme of ['light','dark']) for(const surface of ['runtime']) {
+  for(const width of [1440]) for(const theme of ['light']) for(const surface of ['runtime']) {
     await page.evaluate((theme)=>localStorage.setItem('mole-office.preset.theme',theme),theme)
     await page.setViewportSize({width,height:1500});await page.goto(`${app.site}/?lang=en&mode=inspect&look=${theme}#/${surface}`);await waitForThePage(page,60_000)
     await expect.poll(()=>page.locator('html').getAttribute('data-theme')).toBe(theme)

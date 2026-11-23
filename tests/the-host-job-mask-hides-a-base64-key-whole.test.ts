@@ -34,12 +34,15 @@
  *      files and folders, as they are and under /srv/build/, with 132 made-up notes named in capitals among them;
  *      paths holding the office's ids and generated names; the
  *      names of the toolchain's logs, which hold a moment and random hex characters; and the camelCase names of this
- *      checkout's code in a path and in a line of a stack, where the printed-line mask leaves them as they are.
+ *      checkout's code that begin with a word, in a path and in a line of a stack, where the printed-line mask leaves
+ *      them as they are.
  *   5. A path's first folders that are words stay shown before a generated name, and a key that begins with `/` is
  *      hidden from that `/`.
  *   6. No 8 characters together of any key of the four sets are shown in any of the five places.
  *   7. A camelCase name of this checkout's code that the printed-line mask hides, standing in a sentence with no `+`,
  *      `/`, `_` or `-` beside it, is masked as that mask masks it, and not said to be a key in base64.
+ *   8. Names that need a short word with no vowel after its capital to be read as names, as the checkout's
+ *      reportPdfWroteNoPdf needs Pdf, are left as they are in the forms of 4, and the mask says nothing was masked.
  *
  * ---------------------------------------------------------------------------------------
  * MUTATIONS, NAMED, EACH AFTER A CONTROL RUN (the hand-back of the run that added this file)
@@ -141,11 +144,15 @@ function shownInPart(keys: string[]): string[] {
   )
 }
 
-/** The camelCase names of this checkout's code, of 12 characters or more, made of words, capitals and numbers. */
+/**
+ * The camelCase names of this checkout's code, of 12 characters or more, that begin with a word, and are made of
+ * words, capitals and numbers.
+ */
 function theCodesCamelCaseNames(): string[] {
   const code = execFileSync('git', ['ls-files', 'src/*.ts', 'src/*.tsx', 'src/*.mjs', 'tools/*.mjs'], { encoding: 'utf8' }).split('\n').filter((file) => file !== '')
   return [...new Set(code.flatMap((file) => [...readFileSync(file, 'utf8').matchAll(/\b[a-z][A-Za-z0-9]{11,}\b/g)].map((name) => name[0])))]
     .filter((name) => /^[a-z]{2,}(?:[A-Z][a-z]+|[A-Z]{2,5}(?![a-z])|[0-9]+)+$/.test(name))
+    .filter((name) => /[aeiouy]/.test(/^[a-z]+/.exec(name)?.[0] ?? ''))
 }
 
 /** The texts the mask changes, or says it masked, for the failure message. */
@@ -243,6 +250,17 @@ describe('what a job prints is still shown', () => {
     const hidden = theCodesCamelCaseNames().map((name) => `it calls ${name} here`).filter((text) => maskedAsAPrintedLine(text) !== text)
     expect(hidden.length, 'names the printed-line mask hides').toBeGreaterThan(20)
     expect(hidden.filter((text) => maskedForAHostJob(text).text !== maskedAsAPrintedLine(text))).toEqual([])
+  })
+
+  it('8: names that need a short word with no vowel after its capital, as reportPdfWroteNoPdf needs Pdf, are left as they are in a path and in a line of a stack', () => {
+    // reportPdfWroteNoPdf is a name of this checkout's code, and the only one the mask hid when this case was written.
+    // The other four are made up, of words this checkout's names use: Tsc and Html; Mcp, Asks, All and Ids; Old, Env
+    // and Off; Npm and Argv. Each begins with a word, as theCodesCamelCaseNames asks. They stand in the four forms of
+    // case 4, and only the texts the printed-line mask leaves as they are count.
+    const names = ['reportPdfWroteNoPdf', 'writeTscOutputAsHtml', 'theMcpToolAsksForAllIds', 'theOldEnvIsOffByDefault', 'runNpmWithItsArgv']
+    const inForms = names.flatMap((name) => [`out/${name}`, `src/lib/${name}.ts`, `tests/${name}.test.ts`, `at ${name} (src/${name}.ts:1:2)`]).filter((text) => maskedAsAPrintedLine(text) === text)
+    expect(inForms, 'forms the printed-line mask leaves as they are').toHaveLength(names.length * 4)
+    expect(changed(inForms)).toEqual([])
   })
 })
 

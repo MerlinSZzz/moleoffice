@@ -51,7 +51,7 @@ import { api } from '../api.ts'
 import { Absence } from './ui.tsx'
 import { useProjectAsync } from '../lib/project-async.ts'
 import { RouteLink, recordPath } from './router.tsx'
-import { whereRequestsGo } from '../lib/visiting.ts'
+import { theCrossOriginOfALoad, whereRequestsGo } from '../lib/visiting.ts'
 import { OpensLarge } from './PictureLarge.tsx'
 import { smallPortrait } from '@shared/portraits.ts'
 import { useLanguage } from '../lib/language.ts'
@@ -333,8 +333,8 @@ export function RoleCard({ record, records }: RoleCardProps) {
             // uses: the page's own origin in a build, the API's door under `npm run dev`, and the
             // visited world's address while the page is visiting one. A SMALL COPY IS DRAWN, AND A PRESS OPENS
             // THE WHOLE PICTURE: the portrait is about 1 MB and is drawn 128 pixels wide.
-            <OpensLarge src={whereRequestsGo(portrait)} alt={record.title}>
-              <img className="rc-portrait" src={whereRequestsGo(smallPortrait(portrait))} alt={record.title} />
+            <OpensLarge src={whereRequestsGo(portrait)} crossOrigin={theCrossOriginOfALoad()} alt={record.title}>
+              <img className="rc-portrait" src={whereRequestsGo(smallPortrait(portrait))} crossOrigin={theCrossOriginOfALoad()} alt={record.title} />
             </OpensLarge>
           )}
         </div>
@@ -348,7 +348,7 @@ export function RoleCard({ record, records }: RoleCardProps) {
           </p>
           {goneFromTheDeclaration ? (
             <p className="rc-gone">
-              <Absence tier="told-apart" looked word={t('g6b.profile.cardNotDeclared')} title={t('roleCard.goneSays')} />
+              <Absence tier="told-apart" looked word={t('g6b.profile.cardNotDeclared')} title={t('roleCard.goneTitle')} />
             </p>
           ) : null}
         </div>
@@ -397,7 +397,7 @@ export function RoleCard({ record, records }: RoleCardProps) {
                  out and quietly draw it as a paragraph. Since wave 13k's round 22 its words are read
                  from the word lists by their key, here inside the element, so a Chinese page says it
                  in Chinese; the key is named here and nowhere in the words above. */
-              title={t('roleCard.notActingSays')}
+              title={t('roleCard.notActingTitle')}
             />
           ) : (
             decl.value.elevation.holding.map((one) => (

@@ -38,13 +38,13 @@ import { z } from 'zod'
 import { enWave13y } from '@shared/words/en-wave-13y.ts'
 import { PARTICIPANT_KINDS, isMoleOffice, participantWord, type ParticipantRef } from '@shared/participants.ts'
 import { DELIVERY_MARKS, SEEN_MARKS_IN_ONE_REQUEST_AT_MOST, UNREGISTERED_PREFIX, aMarkSaysItWasRead, participantFromKey, participantKey, unregisteredFromKey, unregisteredName, unregisteredWriterOf, sameParticipant, type PoolEntry } from '@shared/messages.ts'
-import { CONTACT_LIST_MOST, CONTACT_LIST_PAGE, theRowsOnTopInDrawnOrder, theTypedWordsFind } from '@shared/contacts.ts'
+import { CONTACT_LIST_MOST, CONTACT_LIST_PAGE, theRowsOnTopInDrawnOrder, theTypedWordsFindAContact } from '@shared/contacts.ts'
 import { actorFrom } from '../lib/http.ts'
 import { nothingWrittenSentence } from '../lib/records/patching.ts'
 import { parse } from '../lib/parse.ts'
 import { theMessageReadTookIt } from '@shared/handles.ts'
 import { theRunAWriteCameFrom } from '../db/the-run-a-write-came-from.ts'
-import { route } from '../lib/route.ts'
+import { itChangesSomething, route } from '../lib/route.ts'
 import { sendTheHeldDraftsOfThisRequestsRun, theAgentIsReplyingTo } from '../lib/turn-drafts.ts'
 import { localStamp, nowStamp, readATypedTime } from '@shared/time.ts'
 import { aRaiseCarriesIt, assertThePersonIsProved, type Actor } from '../lib/records.ts'
@@ -597,7 +597,8 @@ const CONTACT_LIST_NOTE =
   '`contacts` is the rows drawn on top, at most `limit` of them (' + String(CONTACT_LIST_PAGE) + ' when it is left ' +
   'out, ' + String(CONTACT_LIST_MOST) + ' at most); `folded` is every row folded under a starter on this page ' +
   'that its fold draws. `left` is how many rows on top come after this page, and `next` is the ' +
-  'request for the next page, or null. ?name= keeps the rows whose name holds the words typed, case folded, and ' +
+  'request for the next page, or null. ?name= keeps the rows whose name, or an agent\'s handle, holds the words ' +
+  'typed, case folded, and ' +
   '?project= the rows with a message written in or about that project; both are worked out before the page is cut, ' +
   'so they find a row on any page. `rowsIn` is how many rows each group holds under them, folded rows included. ' +
   '`total` is every row with no narrowing, `inTheProject` how many ?project= keeps (null when it was not asked), ' +
@@ -688,8 +689,8 @@ const REMIND_ME_LATER_NOTE =
 const MARK_BROKEN_NOTE =
   'SAY AN AGENT\'S REPLY BROKE THE MARK ON YOUR MESSAGE: the "mark broken" press on the reply. The id is the ' +
   'agent\'s reply. Body {markedMessage}, the id of your message whose mark it broke: ' +
-  'a message you wrote, marked "just-ask" or "proposal-first", and given to the agent that wrote the reply before it ' +
-  'wrote it. It files one problem naming the message, the mark and the reply, and Mole Office tells the agent in a ' +
+  'a message you wrote, marked "just-ask", "proposal-first", "align" or "give-options", and given to the agent that ' +
+  'wrote the reply before it wrote it. It files one problem naming the message, the mark and the reply, and Mole Office tells the agent in a ' +
   'line to it alone, which its next hand-over carries. A second press on the same reply files nothing and answers ' +
   'with the first problem. Only the person may press it, proved as the person; the secretary card keeps it for them, ' +
   'so a raise carries it only where this office\'s list of what the grant carries says the grant presses it, and then ' +
@@ -949,7 +950,7 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
     return { agentIds: agentsThePressWouldCarryFor(queuedAgentIds(theMessageReader(actorFrom(req))), workspace) }
   })
 
-  app.get('/messages', route('message.pool', 'remote', POOL_NOTE), async (req) => {
+  app.get('/messages', itChangesSomething(route('message.pool', 'remote', POOL_NOTE), (query) => query.markDelivered === '1'), async (req) => {
     const asked = parse(whichPool, req.query ?? {}, 'The narrowing asked for')
     // THE MOMENT a since read names, in the office's stored form. The schema has already refused one that names no
     // moment (`SINCE_REFUSAL`), so this is the moment the reply says it read.
@@ -1344,7 +1345,7 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
    * group follows the conversations and not the project on screen, the same width GET /api/groups
    * reads.
    */
-  app.get('/messages/groups', route('message.groups-new', 'remote', GROUPS_NEW_NOTE), async (req) => {
+  app.get('/messages/groups', itChangesSomething(route('message.groups-new', 'remote', GROUPS_NEW_NOTE), (query) => query.move === '1'), async (req) => {
     const workspaceId = workspaceOf(req)
     const me = whoIsAsking(req)
     const asked = parse(whichGroupsRead, req.query ?? {}, 'Whether to move the read point')
@@ -1511,17 +1512,18 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
     const placed = theContactsPlaced(me, contacts, agents, workspaceId, aliases)
     const contactGroups = groupsOf(me)
     const contactSides = sidesOf(me)
-    // THE NAME A ROW DRAWS, which is what the filter box finds: the registry's name, or the name a writer nobody
-    // registered is drawn under. A registered row whose registry row is gone has no name to find.
-    const names = new Map(everyone.map((one) => [participantKey(one.who), one.name]))
-    const nameOf = (row: ContactLine): string | null =>
-      row.who === null ? unregisteredName(row.unregistered ?? { typed: null, said: null }) : names.get(participantKey(row.who)) ?? null
+    // WHAT THE FILTER BOX FINDS A ROW BY: the name it draws, which is the registry's name or the name a writer nobody
+    // registered is drawn under, and an agent's handle. The panel finds the rows it holds by the same rule
+    // (`theTypedWordsFindARow` in src/web/components/ContactChooser.tsx). A registered row whose registry row is gone
+    // has no name and no handle to find.
+    const known = new Map(everyone.map((one) => [participantKey(one.who), one]))
     const project = asked.project ?? null
     const typed = (asked.name ?? '').trim()
     const inTheProject = project === null ? placed : placed.filter((one) => one.projects.includes(project))
     const kept = typed === '' ? inTheProject : inTheProject.filter((one) => {
-      const name = nameOf(one)
-      return name !== null && theTypedWordsFind(name, typed)
+      if (one.who === null) return theTypedWordsFindAContact({ kind: null, name: unregisteredName(one.unregistered ?? { typed: null, said: null }) }, typed)
+      const found = known.get(participantKey(one.who))
+      return found !== undefined && theTypedWordsFindAContact({ kind: one.who.kind, name: found.name, handle: found.handle }, typed)
     })
     const onTop = theRowsOnTopInDrawnOrder(kept, contactGroups, contactSides)
     const offset = asked.offset ?? 0
@@ -1588,7 +1590,7 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
     },
   )
 
-  app.get('/messages/unregistered', route('message.unregistered', 'remote', UNREGISTERED_NOTE), async (req) => {
+  app.get('/messages/unregistered', itChangesSomething(route('message.unregistered', 'remote', UNREGISTERED_NOTE)), async (req) => {
     const workspaceId = workspaceOf(req)
     const me = whoIsAsking(req)
     const asked = parse(whichWriter, req.query ?? {}, 'The writer asked about')
@@ -1626,7 +1628,7 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
     }
   })
 
-  app.get('/messages/conversation', route('message.conversation', 'remote', CONVERSATION_NOTE), async (req) => {
+  app.get('/messages/conversation', itChangesSomething(route('message.conversation', 'remote', CONVERSATION_NOTE)), async (req) => {
     const workspaceId = workspaceOf(req)
     const me = whoIsAsking(req)
     const asked = parse(whichParticipant, req.query ?? {}, 'The participant asked about')
@@ -1781,7 +1783,7 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
     }
   })
 
-  app.get('/messages/between/:pair', route('message.as-a-side', 'remote', AS_A_SIDE_NOTE), async (req) => {
+  app.get('/messages/between/:pair', itChangesSomething(route('message.as-a-side', 'remote', AS_A_SIDE_NOTE)), async (req) => {
     const workspaceId = workspaceOf(req)
     const me = participantForActor(actorFrom(req))
     const because = whyReadingSomebodyElsesIsRefused(me)

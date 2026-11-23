@@ -171,7 +171,7 @@ async function whatIsDrawn(width: number, theme: 'light' | 'dark') {
   }
 }
 
-for (const theme of ['light', 'dark'] as const) {
+for (const theme of ['light'] as const) {
   for (const width of [1440, 390] as const) {
     describe(`a comment on the page, at ${String(width)} in ${theme}`, () => {
       it('is drawn beside the count and not at the foot of the page', async () => {

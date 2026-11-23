@@ -262,7 +262,7 @@ function oneSecretarysDuties(workspaceId: string, row: RegisteredAgent): OneSecr
  * reads every project. A record may be stored under an old id filed as its secretary's alias: it is read as that
  * secretary's, and the id is shown as stored.
  */
-function everySecretarysDuties(workspaceId: string | null): EverySecretarysDuties {
+export function everySecretarysDuties(workspaceId: string | null): EverySecretarysDuties {
   const records = theDutiesRecords(workspaceId, null)
   const { canonicalOf } = theFiledAliasesReadOnce(sqlite)
   const agents = listParticipants().agents

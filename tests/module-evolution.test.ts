@@ -172,8 +172,8 @@ describe('a direction that was put down stays on the drawing, muted', () => {
     expect(markup).toContain('superseded by')
     // The mute is an attribute on the row, which is what the stylesheet reads. Two rows carry it.
     expect(markup.split('data-muted="1"').length - 1).toBe(2)
-    // The legend now folds to bare clauses; what a muted row means is still named on the page.
-    expect(markup).toContain('kept on the drawing')
+    // CRITERION CHANGE, as decided: the fold that said what a muted row means is gone. Each muted
+    // row still carries its own reason, checked above.
   })
 })
 

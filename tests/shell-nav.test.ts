@@ -439,6 +439,7 @@ describe('the rail separates shared destinations from this project', () => {
     // read in the chat, which reads across projects. Criterion change (wave 13q round 45):
     // Words for you to confirm stands after Decisions. Criterion
     // change (wave 13p round 35): Flows joined after Checklists, on the word of a decision.
+    // Test change (wave 13u round 242, package KN-1): Knowledge joined after Flows, the one new row the knowledge page's drawing drew.
     // Criterion change (wave 13t round 36): each group was one line, so two pages added to the same group
     // conflicted. One key per line, so two rows added in different places go into different
     // places here too. Criterion change (wave 13y round 125, the decision in message 068zuX0EZMQu): Gates and Office
@@ -462,6 +463,7 @@ describe('the rail separates shared destinations from this project', () => {
         'counters',
         'checklists',
         'flows',
+        'knowledge',
         'bundles',
         'records',
       ],
@@ -577,6 +579,8 @@ describe('the rail separates shared destinations from this project', () => {
       // FLOWS, from 11 October 2026 (wave 13p round 35), as a decision asked. Criterion
       // change: the page reads every project's flows, and its row stands under All projects after Checklists.
       'flows',
+      // KNOWLEDGE, wave 13u round 242, package KN-1: the library stands outside projects, so its row narrows to none of them.
+      'knowledge',
       'notes',
       // MY NOTES, from 15 November 2026 (wave 13y round 167, point QN-2 of the quick notes). Criterion change: the page
       // lists every quick note of every project, and its row stands under All projects after Notes.

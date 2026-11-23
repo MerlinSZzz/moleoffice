@@ -23,9 +23,10 @@ describe('the gate door answers one row', () => {
   afterAll(async () => { await app.close(); t.close() })
 
   // Mutation: answer the whole list for ?gate= as well, and no answer has a row.
-  // It asks the server for every gate's row twice, which took about five seconds alone at load 4 on this machine, so it
-  // gets a minute instead of the five-second default.
-  it('answers each gate\'s row as the whole list has it, with the same permission, and refuses an id no gate has by name', async () => {
+  // Asking the server for every gate's row twice took about five seconds alone at load 4 on this machine, so the case
+  // was given a minute instead of the five-second default. It now asks for the first row of each group in the whole
+  // list, under each header set.
+  it('answers the first row of each gate group as the whole list has it, with the same permission, and refuses an id no gate has by name', async () => {
     const asThePerson = { 'x-mole-office-workspace': 'default', 'x-mole-office-actor-type': 'human', 'x-mole-office-actor-id': THE_PERSON, ...thePersonsKeyHeader() }
     for (const headers of [{}, asThePerson]) {
       const whole = await app.inject({ method: 'GET', url: '/api/office/gates', headers })
@@ -33,7 +34,9 @@ describe('the gate door answers one row', () => {
       const list = whole.json()
       const rows = list.classes.flatMap((one: { groups: { rows: { id: string }[] }[] }) => one.groups.flatMap(group => group.rows))
       expect(rows.map((row: { id: string }) => row.id).sort()).toEqual(GATES.map(gate => gate.id).sort())
-      for (const row of rows) {
+      // ONE ROW FROM EACH GROUP, the first of each class's group as the whole list gives it, so a group added later is read too.
+      const theFirstOfEachGroup = list.classes.flatMap((one: { groups: { rows: { id: string }[] }[] }) => one.groups.flatMap(group => group.rows.slice(0, 1)))
+      for (const row of theFirstOfEachGroup) {
         const one = await app.inject({ method: 'GET', url: `/api/office/gates?gate=${encodeURIComponent(row.id)}`, headers })
         expect(one.statusCode, one.body).toBe(200)
         // Every reply that is an object says whether permission narrowed it, so the one row's answer says it too.

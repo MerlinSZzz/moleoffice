@@ -104,6 +104,10 @@ let app: FastifyInstance
 let api = ''
 /** This file's own folder: the stand-ins' bin, the runs' working folder and their output. */
 let folder = ''
+/** The file the whole pass's stand-ins add their words to. */
+let wholePass = ''
+/** The thread each stand-in program prints, the same in every folder of stand-ins. */
+const THE_THREADS = { codex: randomUUID(), claude: randomUUID() }
 let checkout: string
 let settings: WorkerSettings
 const watching: Parameters<typeof onePass>[1] = []
@@ -138,19 +142,10 @@ beforeAll(async () => {
   api = `http://127.0.0.1:${String((app.server.address() as AddressInfo).port)}`
   await theseAgents([[CODEX, 'codex'], [CLAUDE, 'claude-code'], [ROLLED, 'codex'], [PASSED, 'codex'], [MOVED, 'codex']])
   folder = mkdtempSync(join(tmpdir(), 'a-message-run-on-its-kept-row-'))
-  mkdirSync(join(folder, 'bin'))
   mkdirSync(join(folder, 'work'))
   mkdirSync(join(folder, 'outputs'))
-  // THE STAND-INS: each adds the words it was given as one line of the file SYNTHETIC_SEEN names, and ends.
-  for (const program of ['codex', 'claude']) {
-    writeFileSync(join(folder, 'bin', program), `#!${process.execPath}
-const fs = process.getBuiltinModule('node:fs')
-const args = process.argv.slice(2)
-if (args[0] === '--version') { console.log('${program} stand-in'); process.exit(0) }
-if (process.env.SYNTHETIC_SEEN) fs.appendFileSync(process.env.SYNTHETIC_SEEN, JSON.stringify(args) + '\\n')
-console.log(JSON.stringify({ type: 'thread.started', thread_id: '${randomUUID()}' }))
-`, { mode: 0o755 })
-  }
+  wholePass = join(folder, 'whole-pass.seen.json')
+  theStandIns(join(folder, 'bin'), wholePass)
   checkout = aCheckoutForATestRun()
   settings = {
     api,
@@ -161,7 +156,7 @@ console.log(JSON.stringify({ type: 'thread.started', thread_id: '${randomUUID()}
     runs: 2,
     hops: 3,
     outputRoot: join(folder, 'outputs'),
-    env: { ...withoutInheritedEffort(), PATH: `${join(folder, 'bin')}:${process.env['PATH'] ?? ''}`, HOME: folder, SYNTHETIC_SEEN: join(folder, 'whole-pass.seen.json') },
+    env: { ...withoutInheritedEffort(), PATH: `${join(folder, 'bin')}:${process.env['PATH'] ?? ''}`, HOME: folder },
   }
 }, 60_000)
 
@@ -285,6 +280,24 @@ function theOne(command: string[], flag: string): string | undefined {
   return command[command.indexOf(flag) + 1]
 }
 
+/**
+ * THE STAND-INS in `bin`: each adds the words it was given as one line of `seen`, and ends. The file is written into
+ * each one's text, and is not read from its environment: a Codex is given only the names its list keeps
+ * (src/config/the-environment-a-codex-gets.mjs). So each start that needs a file of its own has its own folder of them.
+ */
+function theStandIns(bin: string, seen: string) {
+  mkdirSync(bin, { recursive: true })
+  for (const program of ['codex', 'claude'] as const) {
+    writeFileSync(join(bin, program), `#!${process.execPath}
+const fs = process.getBuiltinModule('node:fs')
+const args = process.argv.slice(2)
+if (args[0] === '--version') { console.log('${program} stand-in'); process.exit(0) }
+fs.appendFileSync(${JSON.stringify(seen)}, JSON.stringify(args) + '\\n')
+console.log(JSON.stringify({ type: 'thread.started', thread_id: '${THE_THREADS[program]}' }))
+`, { mode: 0o755 })
+  }
+}
+
 /** Every command line a stand-in was started with, in the file it adds its words to, in order. */
 function theLinesIn(seen: string): string[][] {
   return existsSync(seen) ? readFileSync(seen, 'utf8').split('\n').filter((line) => line !== '').map((line) => JSON.parse(line) as string[]) : []
@@ -305,7 +318,9 @@ async function theLinesOnce(seen: string, found: (lines: string[][]) => boolean)
 async function theStartOf(handle: string, runtime: 'codex' | 'claude-code', row: Pick<Queued, 'model' | 'variant' | 'kept'>, office = api) {
   const name = randomUUID()
   const seen = join(folder, `${name}.seen`)
-  const adapter = adapterFor(runtime, { PATH: `${join(folder, 'bin')}:${process.env['PATH'] ?? ''}`, HOME: folder, SYNTHETIC_SEEN: seen }, { model: row.model, variant: row.variant })!
+  const bin = join(folder, `${name}-bin`)
+  theStandIns(bin, seen)
+  const adapter = adapterFor(runtime, { PATH: `${bin}:${process.env['PATH'] ?? ''}`, HOME: folder }, { model: row.model, variant: row.variant })!
   asked.length = 0
   let handled: Awaited<ReturnType<typeof adapter.start>>
   try {
@@ -345,7 +360,7 @@ describe('the whole pass: the message worker gives its start the row the queue k
     const started = one((await onePass(settings, watching)).started.filter((run) => run.messageId === message), 'the run started for this message')
     expect(started.agent).toBe(PASSED)
     expect(theRowItAsked(asked.filter((url) => url.startsWith(`/api/office/run-models/for/${PASSED}?`)))).toEqual(row.kept?.row)
-    const lines = await theLinesOnce(settings.env['SYNTHETIC_SEEN']!, (all) => theModelsOf(all).includes(made.native))
+    const lines = await theLinesOnce(wholePass, (all) => theModelsOf(all).includes(made.native))
     expect(theModelsOf(lines)).toContain(made.native)
   }, 60_000)
 
@@ -373,7 +388,7 @@ describe('the whole pass: the message worker gives its start the row the queue k
 
     const next = one((await onePass(settings, watching)).started.filter((run) => run.messageId === message), 'the run the next pass started')
     expect(next.agent).toBe(MOVED)
-    const lines = await theLinesOnce(settings.env['SYNTHETIC_SEEN']!, (all) => theModelsOf(all).includes(`${made.native}-second`))
+    const lines = await theLinesOnce(wholePass, (all) => theModelsOf(all).includes(`${made.native}-second`))
     expect(theModelsOf(lines)).toContain(`${made.native}-second`)
     expect(theModelsOf(lines)).not.toContain(made.native)
   }, 60_000)

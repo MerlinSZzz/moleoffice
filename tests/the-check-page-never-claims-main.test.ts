@@ -16,9 +16,10 @@
  *
  * WHAT THIS PROVES, IN A REAL BROWSER, THE WAY `the-check-is-drawn-on-the-runs-page.test.ts` DOES:
  *
- *   · a run whose checkout resolves a trunk draws THAT branch's name;
- *   · a run whose working directory is not a repository says no branch could be read, and never
- *     says main.
+ *   · a run whose checkout resolves a trunk draws THAT branch's name, on the row of where the work
+ *     was cut from;
+ *   · a run whose working directory is not a repository says on the work folder's row that no
+ *     branch was read, and never says main.
  *
  * The `--against main` claim is the defect, so the case that matters asserts its ABSENCE.
  */
@@ -31,11 +32,13 @@ import type { Page } from 'playwright'
 import { THE_TEST_OFFICES_SECRETARY } from './a-page-of-a-test-office.ts'
 import { liveApp, type LiveApp, waitForThePage } from './helpers.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
+import { createI18n, type WordKey } from '../src/shared/i18n.ts'
 
 let app: LiveApp
 let page: Page
 let trunkRun = ''
 let noTrunkRun = ''
+const en = createI18n('en')
 
 const asPerson: Record<string, string> = {
   'content-type': 'application/json',
@@ -93,7 +96,7 @@ async function aRun(handle: string, title: string, extra: Record<string, unknown
   return made.id
 }
 
-// IN DEVELOPER MODE, because the sentence this file reads names the run's working folder and the
+// IN DEVELOPER MODE, because the rows this file reads name the run's working folder and the
 // branch it was cut from, and since item 3 of a decision, on C27, a run's check panel draws its
 // working folder only there. What it proves about the branch's word is unchanged.
 async function open(where: string): Promise<void> {
@@ -106,6 +109,17 @@ async function open(where: string): Promise<void> {
 /** The whole text of the check panel, or the empty string because no panel was drawn. */
 async function panelText(): Promise<string> {
   return (await page.evaluate(() => document.querySelector('.chk')?.textContent ?? '')) as string
+}
+
+/** Each code row of the check panel: its label, the text of its code element, and the state word after it. */
+async function theCodeRows(): Promise<{ label: string; value: string; state: string | null }[]> {
+  return page.evaluate(() =>
+    [...document.querySelectorAll('.chk dl.code-rows dt')].map((term) => ({
+      label: term.textContent ?? '',
+      value: term.nextElementSibling?.querySelector('code')?.textContent ?? '',
+      state: term.nextElementSibling?.querySelector('.code-rows-state')?.textContent ?? null,
+    })),
+  )
 }
 
 /** What the run's own record stores about the checkout the office asked the check to read. */
@@ -168,10 +182,9 @@ describe('the check page draws the branch the checkout resolved, and never guess
     await open(`/r/${trunkRun}`)
     const checkout = await storedCheckout(trunkRun)
     expect(typeof checkout.cutFrom, `no trunk was stored for ${trunkRun}`).toBe('string')
-    const text = await panelText()
-    // THE SERVER'S OWN BRANCH, drawn by name. This is the branch `inspectionTrunk` read, not a word
-    // this page assumed.
-    expect(text).toContain(`cut from ${String(checkout.cutFrom)}, and that is what the fork point is worked out against`)
+    // THE SERVER'S OWN BRANCH, drawn by name on the row of where the work was cut from. This is the
+    // branch `inspectionTrunk` read, not a word this page assumed.
+    expect(await theCodeRows()).toContainEqual({ label: en.t('chk.row.cutFrom' as WordKey), value: String(checkout.cutFrom), state: null })
   })
 
   it('says no branch could be read where the working directory is not a repository, and never claims main', async () => {
@@ -180,8 +193,10 @@ describe('the check page draws the branch the checkout resolved, and never guess
     expect(checkout.directory, 'the run recorded no working directory, so this case proves nothing').toBeTruthy()
     expect(checkout.cutFrom, 'a trunk was read, so this case proves nothing').toBeUndefined()
 
+    const rows = await theCodeRows()
+    expect(rows).toContainEqual({ label: en.t('chk.row.workFolder' as WordKey), value: String(checkout.directory), state: en.t('chk.row.noBranchRead' as WordKey) })
+    expect(rows.map((row) => row.label), 'a branch is drawn where none was read').not.toContain(en.t('chk.row.cutFrom' as WordKey))
     const text = await panelText()
-    expect(text).toContain('no branch could be read for the fork point')
     // THE DEFECT, WORD FOR WORD. Both the old fallback and any other claim to main fail here.
     expect(text).not.toContain('against main')
     expect(text).not.toContain('so the base is the fork point against main')

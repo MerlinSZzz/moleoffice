@@ -67,6 +67,7 @@ import { guardedGitArguments, guardedGitEnvironment, whatGuardedGitSays } from '
 import { THE_LONGEST_AN_EXPORT_TAKES_MS, theServedOfAnOpenCodeRun } from '../src/config/runtime-served.mjs'
 import { VERSION_MUST_ANSWER_WITHIN_MS } from '../src/config/runtimes.mjs'
 import { REPO_ROOT, howToStart } from '../src/config/settings.mjs'
+import { theEnvironmentACodexGets } from '../src/config/the-environment-a-codex-gets.mjs'
 import { runInTheStableCheckout } from '../src/config/the-office-tool-environment.mjs'
 import { aTestDatabaseFolder, removeThisTestFolder } from './a-test-folder.ts'
 import { freshDb, type TestDb } from './helpers.ts'
@@ -252,14 +253,19 @@ it('3. the runner that reads both outputs starts codex login status hidden', () 
   chmodSync(program, 0o755)
   starts.prints = 'Logged in using ChatGPT\n'
 
-  const said = withThePath(folder, () => res.theProbeForThisPlatform('win32').whatAnAgentToolSaysAboutItsKey!('codex'))
+  // A Codex is started with only the names its list keeps, out of the environment this start saw.
+  let theNamesItKeeps: Record<string, string> = {}
+  const said = withThePath(folder, () => {
+    theNamesItKeeps = theEnvironmentACodexGets(process.env)
+    return res.theProbeForThisPlatform('win32').whatAnAgentToolSaysAboutItsKey!('codex')
+  })
 
   expect(starts.seen).toEqual([
     {
       how: 'spawnSync',
       command: program,
       args: ['login', 'status'],
-      options: { encoding: 'utf8', ...A_COMMANDS_LIMITS, windowsVerbatimArguments: false, windowsHide: true },
+      options: { encoding: 'utf8', ...A_COMMANDS_LIMITS, env: theNamesItKeeps, windowsVerbatimArguments: false, windowsHide: true },
     },
   ])
   expect(said.state).toBe('set')
@@ -354,7 +360,7 @@ it("9. the worker's version read starts the program it found hidden", () => {
   chmodSync(program, 0o755)
   starts.prints = '1.2.3\n'
 
-  const ran = os.theProgramThatRan('a-tool-with-a-version', folder)
+  const ran = os.theProgramThatRan('a-tool-with-a-version', { PATH: folder })
 
   expect(starts.seen).toEqual([
     {

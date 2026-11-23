@@ -126,7 +126,7 @@ import { MEDIA_FORMATS } from '@shared/reportmedia.ts'
 import { MAX_PREVIEW_BYTES } from '@shared/preview-limit.ts'
 import { ACTOR_HEADERS, WORKSPACE_HEADER } from '@shared/request-headers.ts'
 import { sayInEnglish } from '@shared/i18n.ts'
-import { theShownFileKind, WORD_CONTENT_TYPE } from '@shared/shown-file.ts'
+import { theShownFileKind, WORD_CONTENT_TYPE, type ShownFile } from '@shared/shown-file.ts'
 import { records } from '../db/schema.ts'
 import { ACROSS_WORKSPACES, getRecord, listRecords } from '../lib/records.ts'
 import { PanelError } from '../lib/panel-error.ts'
@@ -138,17 +138,11 @@ import { workspaceOf } from '../lib/workspaces.ts'
 import { requireWorkspace } from '../lib/require-workspace.ts'
 import { listWorkspaces } from '../db/list-workspaces.ts'
 import { theCallerHoldsIt } from '../lib/version-tags.ts'
-import { KEY_HEADER } from '../../config/key-header.mjs'
+import { DEVICE_HALF_HEADER, KEY_HEADER } from '../../config/key-header.mjs'
 import { settings } from '../../config/settings.mjs'
 import { theNamesInAPath } from '../../config/the-paths-of-a-system.mjs'
 import { route } from '../lib/route.ts'
-import {
-  THE_GENERATED_PAGE_POLICY,
-  THE_GENERATED_PAGE_TYPE,
-  textFilePage,
-  theRefusalPage,
-  wordDocumentPage,
-} from '../lib/word-document.ts'
+import { textFileText, wordDocumentBlocks } from '../lib/word-document.ts'
 import {
   PREVIEW_ROOTS_VAR,
   STORES_BESIDE_THE_DATABASE,
@@ -273,9 +267,14 @@ const fileQuery = z.strictObject(
       .optional(),
     // THE REPORT'S OWN WORD, for the frame its press creates. It is not the chat's Open: no other
     // caller sends it, and without it even open=1 keeps the answer it had before the report learned
-    // to draw Word, text and PDF files. It only means something beside open=1.
+    // to draw HTML and PDF files in a frame. It only means something beside open=1.
     shown: z
       .literal('1', { error: 'shown takes one value, 1: shown=1 asks for the report\'s showing of the file' })
+      .optional(),
+    // THE PAGE'S OWN READ OF A FILE IT DRAWS AS WORDS: a Word document's blocks, or a text or
+    // Markdown file's text, as data. Asked alone, never beside a save, an open or a metadata read.
+    words: z
+      .literal('1', { error: 'words takes one value, 1: words=1 asks for the file\'s words as data, for the page to draw' })
       .optional(),
     // A RECORD THE PAGE IS DRAWING, used only after its reference and reader are checked.
     record: z.string().optional(),
@@ -288,11 +287,14 @@ const fileQuery = z.strictObject(
       .string({ error: 'workspace must be text: the id of the project the record pointing at this file is in' })
       .min(1, { error: 'workspace must not be empty. Leave it out, or name the project the record is in.' })
       .optional(),
+    // A FILE TICKET, which lib/file-tickets.ts honoured before this route ran, for this path and this browser. A
+    // ticket it did not honour never reaches here. The route reads nothing from it.
+    ticket: z.string().optional(),
   },
   {
     error: (issue) =>
       issue.code === 'unrecognized_keys'
-        ? `GET /api/file takes "path", and may take "download=1" or "open=1", "metadata=1", "shown=1", "workspace", and "record", and this request sent ` +
+        ? `GET /api/file takes "path", and may take "download=1" or "open=1", "metadata=1", "shown=1", "words=1", "workspace", "record", and "ticket", and this request sent ` +
           `${issue.keys.map((k) => `"${k}"`).join(', ')}. There is nothing else to ask for: this endpoint serves ` +
           'one file, named in full, and it has no listing, no directory and no search.'
         : undefined,
@@ -690,9 +692,8 @@ export const PREVIEW_CONTENT_TYPES: Readonly<Record<string, string>> = {
   '.avif': 'image/avif',
   '.svg': 'image/svg+xml',
   '.pdf': 'application/pdf',
-  // A WORD DOCUMENT IS SHOWN AS A PAGE OF ITS OWN WORDS. The type is the one Word gives it, so a
-  // plain read is the file's own bytes, and only the report's press, open=1 together with shown=1,
-  // asks the door for the generated page.
+  // A WORD DOCUMENT IS SHOWN AS ITS OWN WORDS. The type is the one Word gives it, so a plain read
+  // is the file's own bytes, and only the page's read, words=1, asks the door for its blocks.
   '.docx': WORD_CONTENT_TYPE,
   '.md': 'text/markdown; charset=utf-8',
   '.txt': 'text/plain; charset=utf-8',
@@ -801,7 +802,7 @@ const UNCHANGED_FOR = 2_000_000_000n
 const A_NAME_A_STORE_GIVES = /^[A-Za-z0-9_-]{12}(\.[a-z0-9]{0,19})?$/
 
 /** The request headers that say who the reader is and in which project. A kept answer is kept for these values only. */
-const WHO_IS_READING = [ACTOR_HEADERS.type, ACTOR_HEADERS.id, ACTOR_HEADERS.session, KEY_HEADER, WORKSPACE_HEADER, 'cookie'].join(', ')
+const WHO_IS_READING = [ACTOR_HEADERS.type, ACTOR_HEADERS.id, ACTOR_HEADERS.session, KEY_HEADER, DEVICE_HALF_HEADER, WORKSPACE_HEADER, 'cookie'].join(', ')
 
 /**
  * WHAT A BROWSER MAY KEEP OF A FILE IT IS SENT, AND THE VERSION TAG IT ASKS AGAIN WITH.
@@ -871,43 +872,48 @@ function theRangeStillAsked(req: FastifyRequest, tag: string | null): string | u
   return tag !== null && typeof ifRange === 'string' && ifRange.trim() === tag ? range : undefined
 }
 
+/** The most a words answer may be before the file is refused rather than cut. */
+const MOST_WORDS_ANSWER_BYTES = 25 * 1024 * 1024
+
 /**
- * SEND A WORD DOCUMENT OR A TEXT FILE AS THE GENERATED PAGE, WHOLE OR AS A SENTENCE.
+ * SEND A WORD DOCUMENT, A TEXT FILE OR A MARKDOWN FILE AS ITS WORDS, AS DATA, OR REFUSE IT WHOLE.
  *
- * The page is built from the bytes this request already opened, and the same descriptor is closed on
- * every path. A refusal keeps its status and is drawn as a page with the sentence, so the frame says
- * why instead of showing a download or a blank rectangle. A HEAD never reaches here: it is answered
- * with the raw file's headers and no bytes, as every HEAD is. A file over the cap is refused before
- * its bytes are read, because the page is made from the bytes and the cap is on the file.
+ * The page draws the answer itself, so the office's right-click reaches the words. No HTML is made
+ * here and none of the file's markup is sent as markup: a Word document is its blocks of plain runs,
+ * and a text or Markdown file is its text, which the page draws as text or with its one Markdown
+ * reader. The answer is built from the bytes this request already opened, and the same descriptor
+ * is closed on every path. A file over the cap is refused before its bytes are read, because the
+ * answer is made from the bytes and the cap is on the file. A refusal is the JSON sentence every
+ * refusal here is, and carries nothing of the file.
  */
-function sendTheGeneratedPage(reply: FastifyReply, file: OpenFile, name: string, kind: 'word' | 'text'): FastifyReply {
-  let page: string
-  let status = 200
+function sendTheWords(reply: FastifyReply, file: OpenFile, type: string, name: string, reference: StoredPath, readFrom: string | null): FastifyReply {
+  let answer: string
   try {
-    if (file.size > MAX_PREVIEW_BYTES) {
-      status = 413
-      page = theRefusalPage(sayInEnglish('sb.file.tooLargeToShow', { limit: MAX_PREVIEW_BYTES }))
-    } else {
-      const bytes = readFileSync(file.fd)
-      page = kind === 'word'
-        ? wordDocumentPage(bytes, name, MAX_PREVIEW_BYTES)
-        : textFilePage(bytes, name, MAX_PREVIEW_BYTES)
-    }
-  } catch (error) {
-    if (!(error instanceof PanelError)) throw error
-    status = error.status
-    page = theRefusalPage(error.message)
+    const kind = theShownFileKind(type)
+    if (kind === null) throw new PanelError(sayInEnglish('sb.file.notShownAsWords'), 415)
+    if (file.size > MAX_PREVIEW_BYTES) throw new PanelError(sayInEnglish('sb.file.tooLargeToShow', { limit: MAX_PREVIEW_BYTES }), 413)
+    const bytes = readFileSync(file.fd)
+    const shown: ShownFile = kind === 'word'
+      ? { name, kind, ...wordDocumentBlocks(bytes) }
+      : { name, kind, text: textFileText(bytes) }
+    answer = JSON.stringify(shown)
   } finally {
     closeSync(file.fd)
   }
-  return reply
-    .code(status)
-    .type(THE_GENERATED_PAGE_TYPE)
-    .header('content-security-policy', THE_GENERATED_PAGE_POLICY)
-    // A GENERATED PAGE IS NOT A STRETCHED FILE: it has no byte offsets a caller could ask for.
-    .removeHeader('accept-ranges')
-    .header('content-length', String(Buffer.byteLength(page, 'utf8')))
-    .send(page)
+  if (Buffer.byteLength(answer, 'utf8') > MOST_WORDS_ANSWER_BYTES) {
+    throw new PanelError(sayInEnglish('sb.file.tooLargeToShow', { limit: MOST_WORDS_ANSWER_BYTES }), 413)
+  }
+  reply
+    .type('application/json; charset=utf-8')
+    // THE WORDS ARE READ AGAIN EACH TIME: a page that drew a file keeps no copy a later reader could be shown.
+    .header('cache-control', 'no-store')
+    .header('x-content-type-options', 'nosniff')
+    .header('x-mole-office-record', reference.recordId)
+    .header('x-mole-office-reference', reference.where)
+  if (readFrom !== null) reply.header('x-mole-office-read-from', readFrom)
+  // A string would let the shared tag hook add its own tag and a 304 under no-store, as the
+  // metadata answer says.
+  return reply.header('content-length', Buffer.byteLength(answer, 'utf8')).send(Readable.from([answer]))
 }
 
 // ============================================================================ the route
@@ -938,16 +944,29 @@ const FILE_ROUTE_NOTE =
   'which of those it is, and so is one larger than 25 MB that the page would show whole — nothing ever stands in ' +
   'for the content. A video is streamed with no limit, and a Range header asks for one stretch of any file, ' +
   'answered 206 with content-range naming where it sits in the whole. download=1 saves the file whole, of any ' +
-  'size, as an attachment, and open=1 opens it in the browser, streamed, of any size. metadata=1 returns the type and length without file bytes. workspace=<project> in the address means what x-mole-office-workspace means, for a ' +
+  'size, as an attachment, and open=1 opens it in the browser, streamed, of any size. metadata=1 returns the type and length without file bytes. words=1 returns a Word document as its blocks, and a text or Markdown file as its text, as JSON for the page to draw; it is refused for any other kind and beside download=1, open=1 or metadata=1. workspace=<project> in the address means what x-mole-office-workspace means, for a ' +
   'player or a download link that cannot send a header; the two naming different projects is refused. A HEAD ' +
-  'is checked as the GET is and answered with its headers.'
+  'is checked as the GET is and answered with its headers. ticket=<ticket> is an address POST /api/file/ticket made, ' +
+  'for a browser\'s own load: it opens this one path, by a GET or a HEAD, in the browser it was made for, and is ' +
+  'refused anywhere else. Every answer of this door, a refusal included, tells the browser to send no referrer.'
 
 export async function fileRoutes(app: FastifyInstance): Promise<void> {
+  // NO REFERRER FROM ANYTHING THIS DOOR ANSWERS, SEC-2 item 3: the bytes, a generated page, a PDF in a frame and a
+  // refusal. A link in an opened file would otherwise send this address on, and a ticketed address carries its ticket.
+  // Before the route, because a hook added after a route does not run for it.
+  app.addHook('onSend', async (_req, reply, payload) => {
+    reply.header('referrer-policy', 'no-referrer')
+    return payload
+  })
   app.get('/file', route('source.read', 'remote', FILE_ROUTE_NOTE), async (req, reply) => {
     const query = parse(fileQuery, req.query, 'The query string is not usable:')
     const shown = query.shown === '1'
+    const words = query.words === '1'
     if (query.download === '1' && query.open === '1') {
       throw new PanelError('download=1 saves the file and open=1 opens it in the browser, and this request asked for both. Ask for one. Nothing was read.', 400)
+    }
+    if (words && (query.download === '1' || query.open === '1' || query.metadata === '1')) {
+      throw new PanelError('words=1 asks for the file\'s words as data, and this request also asked to save, open or describe the file. Ask for one. Nothing was read.', 400)
     }
     // The same pair every other route uses — the header's shape, then the project's existence — so
     // an unknown project is the standard 404 listing the ones that exist rather than a preview
@@ -1060,6 +1079,10 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
     const opened = query.open === '1'
     const metadata = query.metadata === '1'
 
+    // THE PAGE'S READ OF A FILE IT DRAWS AS WORDS is answered as data, or refused whole, before any
+    // header of the file's own is set. Only words=1 asks for it; every other read is unchanged.
+    if (words) return sendTheWords(reply, file, type, reference.name ?? basename(canonical), reference, at === asked ? null : at)
+
     // WHAT IS SENT, DECIDED BEFORE A HEADER IS SET, so a refusal goes out as the JSON sentence it is
     // and never under the file's own type. A video, a saved file and an opened one are streamed and have no cap;
     // any other file the page shows whole keeps it, as the person asked.
@@ -1096,17 +1119,6 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
 
     // WHERE THE BYTES WERE READ FROM, when that is not the path the record names.
     if (at !== asked) reply.header('x-mole-office-read-from', at)
-
-    // THE ONE PRESS THAT ASKS TO SEE A WORD DOCUMENT OR A TEXT FILE GETS THE GENERATED PAGE, AND
-    // ONLY THE REPORT'S PRESS SENDS shown=1. The type is read from the door's own list, and the raw
-    // file's bytes are never sent under the page's name. open=1 alone is the chat's Open and every
-    // older caller: it keeps its cut answer, whole and of the file's own type. A plain read, a save,
-    // a metadata read and a HEAD are unchanged. A file over the page's cap is a page that says why,
-    // not the raw file in the report's empty frame.
-    if (opened && shown && !saved && !metadata && req.method !== 'HEAD') {
-      const kind = theShownFileKind(type)
-      if (kind !== null) return sendTheGeneratedPage(reply, file, reference.name ?? basename(canonical), kind)
-    }
 
     if (type === PDF_TYPE && opened && shown && !saved && !metadata) {
       // THE PDF IS SHOWN, NOT SAVED OR DESCRIBED: the one answer a frame reads. open=1 alone is the

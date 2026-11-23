@@ -8,7 +8,7 @@
  */
 
 import { sqlite } from './client.ts'
-import type { ReadAll } from '../lib/participants.ts'
+import type { ReadAll } from './types/participants.ts'
 
 /** This agent's own records by the same rule: those of kind `agent`, deleted ones and every project's too. */
 export function theAgentRecordsOf(agentId: string): string[] {

@@ -86,6 +86,16 @@ async function file(kind: string, title: string, data: Record<string, unknown> =
   return (res.json() as { record: { id: string } }).record.id
 }
 
+/**
+ * WHICH AGENT A RUN WORKED AS, the way the office records it: an agent record filed in the run's project, named in the
+ * run's `ranAs` for that project. A comment addressed to a run that names no agent is refused before anything is
+ * written, so every run a case here writes to names one.
+ */
+async function workedAs(handle: string, headers = HUMAN): Promise<{ ranAs: { workspaceId: string; agentId: string }[] }> {
+  const agentId = await file('agent', handle, { handle, state: 'active', runtime: 'claude-code' }, headers)
+  return { ranAs: [{ workspaceId: headers['x-mole-office-workspace'], agentId }] }
+}
+
 /** A run that really can be picked up again: a stamp, and a transcript at the path it names. */
 async function resumableSession(title: string, externalId: string, headers = HUMAN): Promise<string> {
   const logPath = fakeTranscript(externalId)
@@ -95,6 +105,7 @@ async function resumableSession(title: string, externalId: string, headers = HUM
     {
       state: 'idle',
       runtime: 'claude-code',
+      ...(await workedAs(externalId, headers)),
       extra: {
         discovered: {
           tool: 'claude-code',
@@ -162,7 +173,11 @@ describe('a comment is stored whatever its recipient turns out to be', () => {
     // A session record that came in through the generated corpus. `origin` is stamped by the seed;
     // what matters to routing is that nothing ever recorded a transcript for it, which is what
     // `pickUpOf` reads and what 66 of the owner's 91 session records look like.
-    const fixtureRun = await file('session', 'A run from the generated corpus', { state: 'idle', runtime: 'claude-code' })
+    const fixtureRun = await file('session', 'A run from the generated corpus', {
+      state: 'idle',
+      runtime: 'claude-code',
+      ...(await workedAs('corpus-run-unlabelled')),
+    })
     const thread = await startThread('review', 'Round six, read again')
 
     const written = await say(thread, 'The exposure table is unlabelled.', { kind: 'session', sessionId: fixtureRun })
@@ -261,7 +276,11 @@ describe('a comment is stored whatever its recipient turns out to be', () => {
   })
 
   it('lets the address be corrected afterwards, which is the point of storing it wrong', async () => {
-    const fixtureRun = await file('session', 'A run from the generated corpus', { state: 'idle', runtime: 'claude-code' })
+    const fixtureRun = await file('session', 'A run from the generated corpus', {
+      state: 'idle',
+      runtime: 'claude-code',
+      ...(await workedAs('corpus-run-corrected')),
+    })
     const thread = await startThread('direct', 'One thing')
     const written = await say(thread, 'The exposure table is unlabelled.', { kind: 'session', sessionId: fixtureRun })
 

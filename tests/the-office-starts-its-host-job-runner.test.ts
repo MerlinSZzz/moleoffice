@@ -394,7 +394,7 @@ beforeAll(async () => {
   const decided = await send(first, 'POST', '/api/records', AS_THE_PERSON, {
     kind: 'decision',
     title: 'The office runs registered stand-in host tools',
-    data: { replaces: [], option_taken: 'register the stand-ins', because: 'this test office needs them', decided_by: THE_OWNER, authority: 'the owner said so', authority_reference: words.body.record.id },
+    data: { governs: [{ wholeProject: true }], replaces: [], option_taken: 'register the stand-ins', because: 'this test office needs them', decided_by: THE_OWNER, authority: 'the owner said so', authority_reference: words.body.record.id },
   })
   expect(decided.status, decided.text.slice(0, 300)).toBe(201)
   theDecision = decided.body.record.id

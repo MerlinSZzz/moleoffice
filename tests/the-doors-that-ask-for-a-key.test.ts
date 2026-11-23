@@ -37,12 +37,17 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { apiApp, freshDb, type TestDb } from './helpers.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { settings } from '../src/config/settings.mjs'
-import { KEY_COOKIE } from '../src/config/key-header.mjs'
+import { DEVICE_HALF_COOKIE, DEVICE_HALF_HEADER } from '../src/config/key-header.mjs'
 
 const WORKSPACE = 'default'
 const KEY_HEADER = 'x-mole-office-key'
-/** A key that proves nobody rides in the cookie. In the header it is refused before any door, in its own words. */
-const A_COOKIE_THAT_PROVES_NOBODY = `${KEY_COOKIE}=a-key-this-office-never-made`
+/**
+ * A KEY THAT PROVES NOBODY, as the two halves of a device key the office gave and then took back. A key the office never
+ * gave is refused before any door, in its own words, in the header and as two halves alike; the old cookie is no key.
+ */
+const A_REVOKED_COOKIE_HALF = 'a-made-up-cookie-half-of-a-revoked-key'
+const A_REVOKED_HEADER_HALF = 'a-made-up-header-half-of-a-revoked-key'
+const TWO_HALVES_THAT_PROVE_NOBODY = { cookie: `${DEVICE_HALF_COOKIE}=${A_REVOKED_COOKIE_HALF}`, [DEVICE_HALF_HEADER]: A_REVOKED_HEADER_HALF }
 const THE_MESSAGE_WORKER = 'mole-office/the-message-worker'
 const AS_THE_PERSON = {
   'x-mole-office-actor-type': 'human',
@@ -183,6 +188,10 @@ beforeAll(async () => {
     title: 'A terminal answering as holder-one',
     data: { state: 'running', runtime: 'claude-code', doing: 'answering as holder-one' },
   })
+  const keys = await import('../src/server/lib/keys.ts')
+  const revoked = keys.keyHash(`${A_REVOKED_COOKIE_HALF}.${A_REVOKED_HEADER_HALF}`)
+  keys.holdTheKeyWhoseHashIs('person-device', THE_PERSON, revoked, null)
+  if (keys.revokeTheKeyWhoseHashIs(revoked, 'the test took it back') === null) throw new Error('the made-up halves were not revoked')
 }, SETUP_LIMIT_MS)
 
 afterAll(async () => {
@@ -205,7 +214,7 @@ describe('handle.hold', () => {
 
   it('(a) says a key that proves nobody is not "no key", and writes nothing', async () => {
     const before = whatTheOfficeHolds()
-    const said = await throughTheListener(HOLD().url, { ...asAgent('holder-one'), cookie: A_COOKIE_THAT_PROVES_NOBODY }, HOLD().payload)
+    const said = await throughTheListener(HOLD().url, { ...asAgent('holder-one'), ...TWO_HALVES_THAT_PROVE_NOBODY }, HOLD().payload)
     expect(said.status, said.error).toBe(403)
     expect(said.error).toContain('This hold on a handle came with a key that proves nobody here, so it was not taken.')
     expect(said.error).not.toContain('came with no key')

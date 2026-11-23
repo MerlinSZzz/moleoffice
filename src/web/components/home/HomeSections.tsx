@@ -20,6 +20,8 @@ import { ACT_WORDS, aWaitingRowIsARecord, oneNumber, theNameASelfRegistrationIsR
 import { targetAttributes } from '@shared/targets.ts'
 import { DRAWS_THE_NAME } from '../agent/pointing.ts'
 import { Absence, type AsyncState, latePhrase, theSameAnswer } from '../ui.tsx'
+import type { PipelinesStandingStill } from '@shared/pipelines-standing-still.ts'
+import { standingStillLine } from './pipeline-line.ts'
 import { useProjectAsync } from '../../lib/project-async.ts'
 import type { WorkspacesReply } from '../../../server/api/workspaces.ts'
 import type { ClaimOnTheWire } from '@shared/claims.ts'
@@ -34,8 +36,12 @@ import { READ_COST_FACTOR, ROSTER_ASK_FLOOR_MS, oneAsk } from '../../lib/oneask.
 import { useChannel, whenEventsWereLost } from '../../lib/channel.ts'
 import type { ChannelEvent, EventName } from '@shared/events.ts'
 import { HomeParts } from './HomeLayout.tsx'
+import { HomeKeyItems } from './HomeKeyItems.tsx'
+import { HomeFigureDrawn } from './HomeFigures.tsx'
+import { EVERY_PROJECT, type ProjectChoice } from '@shared/across-projects.ts'
+import { HOME_FIGURES, type HomePart } from '@shared/home-layout.ts'
 import { alarmKind, HOME_ALARMS_SHOWN } from '@shared/attention-first-page.ts'
-import { cannotTellIn, HomeAgentBars, theBarOf, useServingRuns } from './HomeAgentBars.tsx'
+import { cannotTellIn, HomeAgentBars, theBarOf } from './HomeAgentBars.tsx'
 import { useTheLineWithItsLinksInWords } from '../ChatLinks.tsx'
 import { CUT_MARK, shortenToWords } from '@shared/shortening.ts'
 
@@ -122,6 +128,7 @@ export function HomeNeedsYou({
   readRecord = (id, workspaceId) => api.getRecord(id, { workspaceId }),
   presses,
   shown,
+  drawnAtTheTop,
 }: {
   waiting: AsyncState<WaitingReply>
   homeRung?: Rung
@@ -133,11 +140,15 @@ export function HomeNeedsYou({
    * page that draws them all; that page gives nothing.
    */
   shown?: number
+  /** The ids of the pairing requests Home draws as cards above its parts: no row is drawn for these, and each is counted. */
+  drawnAtTheTop?: ReadonlySet<string>
 }) {
   const items = waiting.status === 'ready' ? waiting.value.items : []
   // A RESIDENCY PROPOSAL IS COUNTED AND DRAWN ONCE: its row with the person's two presses is in `presses`, so the list leaves it
-  // out when that slot is filled. The number and "nothing needs you" still read the whole reading.
-  const every = presses === undefined ? items : items.filter((item) => item.kind !== RESIDENCY_PROPOSAL)
+  // out when that slot is filled. A PAIRING REQUEST IS TOO: its card is drawn at the top of Home, so the list leaves out
+  // the rows whose id is a credential drawn there, and only those. The number and "nothing needs you" still read the whole reading.
+  const pressed = presses === undefined ? items : items.filter((item) => item.kind !== RESIDENCY_PROPOSAL)
+  const every = drawnAtTheTop === undefined || drawnAtTheTop.size === 0 ? pressed : pressed.filter((item) => !drawnAtTheTop.has(item.id))
   const listed = shown === undefined ? every : every.slice(0, shown)
   // THE ONE NUMBER, from the function the governance queue's count reads too (tests/the-one-number.test.ts).
   const countWord = waiting.status === 'ready' ? count(oneNumber(waiting.value)) : '—'
@@ -187,7 +198,7 @@ export function HomeNeedsYou({
         <h2 className="hm-section-title">{t('home.needsYou')}</h2>
         <span className="hm-needs-count" title={waiting.status === 'ready' ? undefined : reason} aria-live="polite">{countWord}</span>
       </header>
-      {waiting.status === 'ready' && items.length === 0 ? <p className="hm-empty">{t('home.noWaiting')}</p> : null}
+      {waiting.status === 'ready' && items.length === 0 ? <p className="hm-empty">{t('absence.none')}</p> : null}
       {waiting.status === 'loading' ? <p className="hm-empty">{t('home.waitingReading')}</p> : null}
       {waiting.status === 'error' ? <p className="hm-empty"><Absence tier="told-apart" looked={false} title={t('home.waitingFailed')} /></p> : null}
       {listed.length > 0 ? (
@@ -352,9 +363,8 @@ const ROSTER_HEARS: readonly EventName[] = ['presence.changed', 'list.changed']
  * Agents at work reads each project's roster once when Home opens. After that it is read again only
  * when the office's event stream (src/web/lib/channel.ts) says something it draws moved:
  *   - `presence.changed` about an agent on a project's roster reads that project again, because a run
- *     that opened or ended changes the dot; when the project has an alarm on a run, which run serves
- *     each of its agents is read again after the roster answers (HomeAgentBars.tsx, `useServingRuns`),
- *     because the run serving an agent may be another one now;
+ *     that opened or ended changes the dot, and the run serving the agent (each row's `doingFrom`) may
+ *     be another one now;
  *   - `list.changed` naming the participants reads the project it names, or every project when it
  *     names none, because an agent was registered, renamed or retired;
  *   - events lost (the server forgot some, or restarted) reads every project once.
@@ -461,7 +471,7 @@ export function AgentClaims({ projectName }: { projectName: (id: string) => stri
       ) : !drawn ? (
         <p className="hm-empty">{t('home.claims.reading')}</p>
       ) : live.length === 0 ? (
-        <p className="hm-empty">{t('home.claims.none', { project })}</p>
+        <p className="hm-empty">{t('absence.none')}</p>
       ) : (
         <ul className="hm-claim-list">
           {live.map((claim) => (
@@ -662,7 +672,7 @@ export function ProjectCards({
         <p className="hm-empty"><Absence tier="told-apart" looked={false} title={t('home.projectsFailed')} /></p>
       ) : projects.status === 'loading' ? (
         <p className="hm-empty">{t('home.projectsReading')}</p>
-      ) : <p className="hm-empty">{t('home.projectsEmpty')}</p>}
+      ) : <p className="hm-empty">{t('absence.none')}</p>}
     </section>
   )
 }
@@ -677,30 +687,36 @@ export function HomeSections({
   today,
   pause,
   projectName,
-  lead,
-  reports,
+  day,
   developer,
   presses,
+  pairing,
+  pairingCards,
 }: {
   title: string
   waiting: AsyncState<WaitingReply>
   attention: AsyncState<AttentionHome>
   homeRung: Rung
   projects: AsyncState<WorkspacesReply>
-  /** This project's pipelines whose unfinished steps are all paused, each with its standing-still sentence. */
-  stillPipelines: readonly { id: string; title: string; workspaceId: string; line: string }[]
+  /**
+   * This project's pipelines whose unfinished steps are all paused, as the server answers them: the first as many as
+   * Late or stuck draws, each with how many steps are not done, and how many there are in all.
+   */
+  stillPipelines: PipelinesStandingStill
   today: ReactNode
   /** The notice that the office is paused, drawn above the three parts, wherever the person put them. */
   pause?: ReactNode
   projectName: (id: string) => string
-  /** The drawing's line under the title: the day, and that Home is about all projects. */
-  lead?: ReactNode
-  /** The reports waiting for the person (at most five), drawn directly under Needs you. */
-  reports?: ReactNode
+  /** The day the line under the title says, before the projects Home shows. */
+  day?: string
   /** What the old Home drew for a developer: what has been said, the questions, the sessions. Null in normal mode. */
   developer?: ReactNode
   /** Rows with the person's own press, drawn inside Needs you: the residency proposals. */
   presses?: ReactNode
+  /** The pairing requests waiting on the person, drawn right after the pause notice and above the parts. */
+  pairing?: ReactNode
+  /** The ids of the requests `pairing` draws as cards. Needs you draws no row for these, and still counts them. */
+  pairingCards?: ReadonlySet<string>
 }) {
   const workspaces = projects.status === 'ready' ? projects.value.workspaces : []
   const recordReads = useRef(new Map<string, Promise<RecordDetail>>())
@@ -722,11 +738,6 @@ export function HomeSections({
   const again = useRosterRereads(readings, workspaces)
   const attentionOf = useAttentionOfEachProject(attention)
   const alarms = alarmRows(workspaces, readings)
-  const lateTotal = workspaces.reduce((total, workspace) => {
-    const state = readings[workspace.id]?.attention
-    return total + (state?.status === 'ready' ? state.value.alarms.total : 0)
-  }, 0) + stillPipelines.length
-  const servingRuns = useServingRuns(workspaces.map((workspace) => ({ id: workspace.id, ...(readings[workspace.id] ?? READING) })))
   // WORKED OUT AGAIN ONLY WHEN A READING THE BARS ARE COUNTED FROM CHANGED, so the bars below are handed the
   // same projects when the minute's re-read answers what they hold, and do not draw themselves again. A reading
   // can change where the bars count nothing, so a list the same as the last, field by field, is the last one.
@@ -736,45 +747,61 @@ export function HomeSections({
       id: workspace.id,
       name: projectName(workspace.id),
       agents: reading.roster.status === 'ready' ? reading.roster.value.rows.length : undefined,
-      bar: theBarOf({ roster: reading.roster, waiting, attention: reading.attention, doing: servingRuns.get(workspace.id) ?? { status: 'loading' } }),
+      bar: theBarOf({ roster: reading.roster, waiting, attention: reading.attention }),
     }
-  }), [workspaces, readings, waiting, servingRuns, projectName]))
-  const anyLateLoading = projects.status !== 'ready' || workspaces.some((workspace) => (readings[workspace.id]?.attention ?? READING.attention).status === 'loading')
-  const anyLateError = projects.status === 'error' || workspaces.some((workspace) => (readings[workspace.id]?.attention ?? READING.attention).status === 'error')
+  }), [workspaces, readings, waiting, projectName]))
+  // THE PROJECTS HOME SHOWS, as the kept layout chose them: every project, or one. HomeParts hands the choice to the
+  // parts as it draws them, and here only the line under the title and which projects are read follow it.
+  const [project, setProject] = useState<ProjectChoice>(EVERY_PROJECT)
+  const titles = useMemo(() => new Map(workspaces.map((workspace) => [workspace.id, projectName(workspace.id)])), [workspaces, projectName])
+  const read = project === EVERY_PROJECT ? workspaces : workspaces.filter((workspace) => workspace.id === project)
+  const lead = day === undefined ? null : t('home.leadLine', { day, scope: project === EVERY_PROJECT ? t('home.leadAllProjects') : projectName(project) })
 
-  return (
-    <div className="hp-page hm-page">
-      <style href="mole-office-home-sections" precedence="default">{HOME_SECTIONS_CSS}</style>
-      <header className="hm-page-head">
-        <h1 className="hm-page-title">{title}</h1>
-        {lead === undefined || lead === null ? null : <p className="hm-page-lead">{lead}</p>}
-        {/* THE PROJECT CARDS ARE ONE PRESS AWAY, on their own page. */}
-        <p className="hm-elsewhere"><a className="hm-section-link" data-home-goes="projects" href={`#${pathFor('projects')}`}>{t('home.projects')}</a></p>
-      </header>
-      {pause}
-      {/* THE THREE PARTS, in the layout the person kept (HomeLayout.tsx). Needs you holds the reports and the late
-          or stuck alarms, and Schedule holds the week, today's progress and today. */}
-      <HomeParts contents={{
-        needs: (
-          <>
-          <HomeNeedsYou waiting={waiting} homeRung={homeRung} readRecord={readRecord} presses={presses} shown={NEEDS_SHOWN} />
-          {reports}
-          {/* NOTHING LATE OR STUCK, ONCE EVERY PROJECT HAS ANSWERED, DRAWS NO PART: a heading over nothing would only
-              explain that nothing is there. While a project is read, or when one did not answer, the part says so. */}
-          {alarms.length === 0 && stillPipelines.length === 0 && !anyLateError && !anyLateLoading ? null : (
-          <section className="hm-section hm-late" data-home-section="late">
-            <SectionHeading title={t('home.lateOrStuck')}>
-              {lateTotal > LATE_SHOWN ? (
-                <>
-                  <span className="hm-section-count">{t('home.lateShown', { n: LATE_SHOWN, total: lateTotal })}</span>
-                  <a className="hm-section-link" href={`#${familyPath('work')}`}>{t('home.lateAllIn', { page: t(RAIL_WORD_KEYS['rail.work']) })}</a>
-                </>
-              ) : null}
-            </SectionHeading>
-            {alarms.length > 0 || stillPipelines.length > 0 ? (
+  /** What each part draws for the projects chosen. Every count and list below is of those projects only. */
+  function contents(chosen: ProjectChoice): Record<HomePart, ReactNode> {
+    const inTheChoice = (workspaceId: string) => chosen === EVERY_PROJECT || workspaceId === chosen
+    const shown = chosen === EVERY_PROJECT ? workspaces : workspaces.filter((workspace) => workspace.id === chosen)
+    const waitingShown: AsyncState<WaitingReply> = waiting.status === 'ready' && chosen !== EVERY_PROJECT
+      ? { ...waiting, value: { ...waiting.value, items: waiting.value.items.filter((item) => inTheChoice(item.workspaceId)) } }
+      : waiting
+    const alarmsShown = alarms.filter(({ workspace }) => inTheChoice(workspace.id))
+    const stillShown = stillPipelines.rows.filter((pipeline) => inTheChoice(pipeline.workspaceId))
+    // EVERY ROW IS OF THE ONE PROJECT THE ANSWER IS FOR, so its total counts exactly when its rows are in the choice.
+    // With no row the total is 0 too.
+    const stillTotal = stillShown.length === 0 ? 0 : stillPipelines.total
+    const lateTotal = shown.reduce((total, workspace) => {
+      const state = readings[workspace.id]?.attention
+      return total + (state?.status === 'ready' ? state.value.alarms.total : 0)
+    }, 0) + stillTotal
+    const anyLateLoading = projects.status !== 'ready' || shown.some((workspace) => (readings[workspace.id]?.attention ?? READING.attention).status === 'loading')
+    const anyLateError = projects.status === 'error' || shown.some((workspace) => (readings[workspace.id]?.attention ?? READING.attention).status === 'error')
+    const barsShown = chosen === EVERY_PROJECT ? bars : bars.filter((bar) => inTheChoice(bar.id))
+    const figures = Object.fromEntries(HOME_FIGURES.map((figure) => [figure, <HomeFigureDrawn figure={figure} project={chosen} />]))
+    return {
+      keyItems: <HomeKeyItems project={chosen} />,
+      needs: (
+        <>
+        <HomeNeedsYou waiting={waitingShown} homeRung={homeRung} readRecord={readRecord} presses={presses} shown={NEEDS_SHOWN} drawnAtTheTop={pairingCards} />
+        {/* NOTHING LATE OR STUCK, ONCE EVERY PROJECT HAS ANSWERED, DRAWS NO PART: a heading over nothing would only
+            explain that nothing is there. While a project is read, or when one did not answer, the part says so. */}
+        {alarmsShown.length === 0 && stillShown.length === 0 && !anyLateError && !anyLateLoading ? null : (
+        <section className="hm-section hm-late" data-home-section="late">
+          {/* LATE OR STUCK IS ONE NUMBER, and pressing it opens its list here. */}
+          <details className="hm-late-open" data-home-late-open>
+            <summary className="hm-late-summary">
+              <h2 className="hm-section-title">{t('home.lateOrStuck')}</h2>
+              <span className="hm-late-number" data-home-late-number>{anyLateLoading || anyLateError ? '—' : count(lateTotal)}</span>
+            </summary>
+            {lateTotal > LATE_SHOWN ? (
+              <p className="hm-needs-more">
+                <span className="hm-section-count">{t('home.lateShown', { n: LATE_SHOWN, total: lateTotal })}</span>
+                <a className="hm-section-link" href={`#${familyPath('work')}`}>{t('home.lateAllIn', { page: t(RAIL_WORD_KEYS['rail.work']) })}</a>
+              </p>
+            ) : null}
+            {alarmsShown.length > 0 || stillShown.length > 0 ? (
               <>
               <ul className="hm-alarm-list">
-                {alarms.slice(0, LATE_SHOWN).map(({ workspace, row, tone }) => (
+                {alarmsShown.slice(0, LATE_SHOWN).map(({ workspace, row, tone }) => (
                   <li key={`${workspace.id}:${row.key}`}>
                     <AlarmRow workspace={workspace} row={row} tone={tone} homeRung={homeRung} projectName={projectName} readRecord={readRecord} />
                   </li>
@@ -782,7 +809,7 @@ export function HomeSections({
                 {/* A PIPELINE STANDING STILL: every unfinished step paused. Stuck,
                     so it is here, after the attention rows, with its sentence first as the side column
                     draws a state. */}
-                {stillPipelines.slice(0, Math.max(0, LATE_SHOWN - alarms.length)).map((pipeline) => (
+                {stillShown.slice(0, Math.max(0, LATE_SHOWN - alarmsShown.length)).map((pipeline) => (
                   <li key={`${pipeline.workspaceId}:pipeline:${pipeline.id}`}>
                     <a
                       className="hm-alarm-row"
@@ -791,7 +818,7 @@ export function HomeSections({
                       onClick={() => setWorkspace(pipeline.workspaceId)}
                       {...recordTarget(pipeline.id, pipeline.workspaceId)}
                     >
-                      <span className="hm-alarm-state">{pipeline.line}</span>
+                      <span className="hm-alarm-state">{standingStillLine(pipeline.unfinished)}</span>
                       <span className="hm-row-title" {...DRAWS_THE_NAME}>{content(pipeline.title)}</span>
                       <span className="hm-row-meta">{content(projectName(pipeline.workspaceId))}</span>
                     </a>
@@ -803,29 +830,49 @@ export function HomeSections({
             ) : anyLateError ? (
               <p className="hm-empty"><Absence tier="told-apart" looked={false} title={t('home.lateFailed')} /></p>
             ) : <p className="hm-empty">{t('home.lateReading')}</p>}
-          </section>
-          )}
-          </>
-        ),
-        agents: (
-          <section className="hm-section hm-agents" data-home-section="agents">
-            <SectionHeading title={t('home.agentsAtWork')} />
-            {/* ONE BAR PER PROJECT: working, waiting on you and stuck. HomeAgentBars.tsx says what each counts. */}
-            {workspaces.length > 0 ? (
-              <HomeAgentBarsWhenChanged projects={bars} waitingCannotTell={cannotTellIn(waiting)} />
-            ) : projects.status === 'error' ? (
-              <p className="hm-empty"><Absence tier="told-apart" looked={false} title={t('home.agentsFailed')} /></p>
-            ) : projects.status === 'loading' ? (
-              <p className="hm-empty">{t('home.agentsReading')}</p>
-            ) : <p className="hm-empty">{t('home.agentsEmpty')}</p>}
-            {/* THE CLAIMS ARE ONE PRESS AWAY, on their own page. */}
-            <p className="hm-elsewhere"><a className="hm-section-link" data-home-goes="claims" href={`#${pathFor('claims')}`}>{t('w13w.claimsPage.title')}</a></p>
-          </section>
-        ),
-        schedule: today,
-      }} />
+          </details>
+        </section>
+        )}
+        </>
+      ),
+      agents: (
+        <section className="hm-section hm-agents" data-home-section="agents">
+          <SectionHeading title={t('home.agentsAtWork')} />
+          {/* ONE BAR PER PROJECT: working, waiting on you and stuck. HomeAgentBars.tsx says what each counts. */}
+          {shown.length > 0 ? (
+            <HomeAgentBarsWhenChanged projects={barsShown} waitingCannotTell={cannotTellIn(waitingShown)} />
+          ) : projects.status === 'error' ? (
+            <p className="hm-empty"><Absence tier="told-apart" looked={false} title={t('home.agentsFailed')} /></p>
+          ) : projects.status === 'loading' ? (
+            <p className="hm-empty">{t('home.agentsReading')}</p>
+          ) : <p className="hm-empty">{t('absence.none')}</p>}
+          {/* THE CLAIMS ARE ONE PRESS AWAY, on their own page. */}
+          <p className="hm-elsewhere"><a className="hm-section-link" data-home-goes="claims" href={`#${pathFor('claims')}`}>{t('w13w.claimsPage.title')}</a></p>
+        </section>
+      ),
+      schedule: today,
+      ...figures,
+    } as Record<HomePart, ReactNode>
+  }
+
+  return (
+    <div className="hp-page hm-page">
+      <style href="mole-office-home-sections" precedence="default">{HOME_SECTIONS_CSS}</style>
+      <header className="hm-page-head">
+        <h1 className="hm-page-title">{title}</h1>
+        {lead === null ? null : <p className="hm-page-lead">{lead}</p>}
+        {/* THE PROJECT CARDS ARE ONE PRESS AWAY, on their own page. */}
+        <p className="hm-elsewhere"><a className="hm-section-link" data-home-goes="projects" href={`#${pathFor('projects')}`}>{t('home.projects')}</a></p>
+      </header>
+      {pause}
+      {/* A PAIRING REQUEST WAITS ABOVE THE PARTS, wherever the person put them: a browser that asks cannot work until it
+          is answered. With none waiting, nothing is drawn. */}
+      {pairing}
+      {/* HOME'S PARTS, in the layout the person kept (HomeLayout.tsx), for the projects it chose. Needs you holds at most
+          two decisions and the late or stuck number, and Schedule holds the week, today's progress and today. */}
+      <HomeParts titles={titles} onProject={setProject} contents={contents} />
       {developer === undefined || developer === null ? null : <div className="hm-developer">{developer}</div>}
-      {projects.status === 'ready' ? workspaces.map((workspace) => (
+      {projects.status === 'ready' ? read.map((workspace) => (
         <WorkspaceReader key={workspace.id} workspace={workspace} attention={attentionOf(workspace.id)} again={again[workspace.id] ?? 0} onAttention={onAttention} onRoster={onRoster} />
       )) : null}
     </div>
@@ -858,8 +905,8 @@ function SectionHeading({ title, children }: { title: string; children?: ReactNo
   )
 }
 
-/** HOW MANY ROWS NEEDS YOU DRAWS ON HOME; the rest are one press away. */
-export const NEEDS_SHOWN = 5
+/** HOW MANY DECISIONS NEEDS YOU DRAWS ON HOME, by the person's decision: one or two. The rest are one press away. */
+export const NEEDS_SHOWN = 2
 
 /** HOW MANY ROWS LATE OR STUCK DRAWS, as the approved drawing does ("4 of 11", then a link to the rest). */
 const LATE_SHOWN = HOME_ALARMS_SHOWN
@@ -897,6 +944,10 @@ export const HOME_SECTIONS_CSS = `
 :where(:root[data-theme-from='data']) .hm-section-head .hm-section-count { color: var(--module-head-meta, var(--text-3)); }
 .hm-needs-more { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--gut); margin: var(--gut) 0 0; padding-top: var(--gut); border-top: var(--border-w) var(--divider-style, solid) var(--ask-line); }
 .hm-elsewhere { margin: var(--gut) 0 0; }
+.hm-late-summary { display: flex; align-items: baseline; justify-content: space-between; gap: var(--gut); min-width: 0; cursor: pointer; list-style: none; }
+.hm-late-summary::-webkit-details-marker { display: none; }
+.hm-late-number { color: var(--text); font: 700 var(--fs-5)/var(--lh-tight) var(--font-ui); font-variant-numeric: tabular-nums; }
+.hm-late-open[open] > .hm-late-summary { margin: 0 0 var(--gut); }
 .hm-empty { margin: 0; color: var(--text-3); font: var(--fs-2)/var(--lh-body) var(--font-ui); }
 .hm-needs { padding: var(--pad-lg); border: var(--border-w) solid var(--ask-line); border-radius: var(--radius); background: var(--ask-row); box-shadow: var(--elev-1); transition: background-color var(--move), border-color var(--move), box-shadow var(--move); }
 :where(:root[data-theme-from='data']) .hm-needs { border-left-width: calc(var(--border-w) + var(--needs-rail)); }
@@ -944,6 +995,8 @@ export const HOME_SECTIONS_CSS = `
 .hm-agenda-link:has(.px-state-with-source) > .hm-agenda-copy { grid-column: 2; grid-row: 1; }
 .hm-agenda-link:has(.px-state-with-source) > .hm-agenda-state { grid-column: 2; grid-row: 2; justify-self: start; align-self: start; min-width: 0; max-width: 100%; }
 .hm-recurring { margin: var(--gut) 0 0; color: var(--text-3); font: var(--fs-1)/var(--lh-body) var(--font-ui); }
+.hm-pairing { display: grid; gap: var(--gut); }
+.hm-pairing-kept { margin: 0; color: var(--text-3); font: var(--fs-1)/var(--lh-body) var(--font-ui); }
 .hm-alarm-list { display: flex; flex-direction: column; }
 .hm-alarm-row { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-width: 0; min-height: var(--row-h); padding: var(--pad) 0 var(--pad) var(--pad-lg); border-left: var(--rail) solid var(--st-overdue-line); border-bottom: var(--border-w) var(--divider-style, solid) var(--border); color: var(--text); text-decoration: none; transition: background-color var(--move), border-color var(--move); }
 .hm-alarm-list li:last-child .hm-alarm-row { border-bottom: 0; }

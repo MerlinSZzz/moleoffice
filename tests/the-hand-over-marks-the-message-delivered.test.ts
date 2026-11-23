@@ -13,17 +13,19 @@ import type { ChildProcess } from 'node:child_process'
 import { spawn } from 'node:child_process'
 import type { AddressInfo } from 'node:net'
 import { fileURLToPath } from 'node:url'
+import { dirname } from 'node:path'
 
 import type { FastifyInstance } from 'fastify'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { theLiveSessionTookIt } from '../src/shared/handles.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
-import { apiApp, freshDb, one, type TestDb } from './helpers.ts'
+import { apiApp, freshDb, one, aTestAgentsKeyEnvironment, type TestDb } from './helpers.ts'
 
 let t: TestDb
 let app: FastifyInstance
 let api = ''
+let keyEnv: NodeJS.ProcessEnv = {}
 let agentId = ''
 let session = ''
 const started: ChildProcess[] = []
@@ -59,7 +61,7 @@ function startTheWaiter(): { said: () => string; ended: Promise<number> } {
       '--workspace',
       'default',
     ],
-    { env: { ...process.env, MOLE_OFFICE_HANDLE_BEAT_SECONDS: '1' } },
+    { env: { ...keyEnv, MOLE_OFFICE_HANDLE_BEAT_SECONDS: '1' } },
   )
   started.push(child)
   let printed = ''
@@ -93,11 +95,7 @@ beforeAll(async () => {
   await app.ready()
   await app.listen({ host: '127.0.0.1', port: 0 })
   api = `http://127.0.0.1:${String((app.server.address() as AddressInfo).port)}`
-  await post('/api/records', {
-    kind: 'agent',
-    title: 'Seen Hand',
-    data: { handle: 'seen-hand', runtime: 'claude-code', state: 'active' },
-  })
+  keyEnv = await aTestAgentsKeyEnvironment(app, 'seen-hand', dirname(t.file))
   const listed = (await get('/api/participants')) as { agents?: { id: string; handle: string }[] }
   agentId = one((listed.agents ?? []).filter((a) => a.handle === 'seen-hand'), 'the registry row').id
   const filed = await post('/api/records', {

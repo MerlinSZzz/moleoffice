@@ -615,6 +615,11 @@ export interface RuntimeRecord {
    * which tools this installation can actually run.
    */
   installed: RuntimeTool[]
+  /**
+   * EVERY AGENT OF A HARNESS THE OFFICE HAS NO ADAPTER FOR, by handle, with the harness's word. No tool of it is
+   * looked for on this machine; the page says its model is chosen in that harness.
+   */
+  harnesses: { handle: string; harness: string }[]
   standing: RuntimeStanding & { becauseSaid: DevSaying[] }
   freshness: RuntimeFreshness
   /** The settings file this world was read from, and where each value came from. */

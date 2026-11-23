@@ -117,7 +117,11 @@ export function keptAttentionRecords(say: (line: string) => void): KeptAttention
   let askedFor = new Set<string>()
   const lastPlace = sqlite.prepare('SELECT append_order AS "order", id FROM changes ORDER BY append_order DESC LIMIT 1')
   const atThePlace = sqlite.prepare('SELECT id FROM changes WHERE append_order = ?').pluck()
-  const changedSince = sqlite.prepare('SELECT DISTINCT record_id FROM changes WHERE append_order > ?').pluck()
+  // THE READ OF WHAT CHANGED NAMES THE INDEX ON THE APPEND ORDER. Left to choose, SQLite walks the whole change log by
+  // `changes_record_idx`, to give the ids distinct without a sort, and reads every row to find the few written since.
+  // Searched by the append order, it reads only those rows. A database without the index refuses the statement
+  // rather than walking the log.
+  const changedSince = sqlite.prepare('SELECT DISTINCT record_id FROM changes INDEXED BY changes_append_order_idx WHERE append_order > ?').pluck()
   const schemaVersion = (): number => sqlite.pragma('schema_version', { simple: true }) as number
 
   /** Why every record of this project is read again, or what is kept of it and the place to read on from. */

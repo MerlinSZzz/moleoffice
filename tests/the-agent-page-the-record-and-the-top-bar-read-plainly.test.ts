@@ -21,7 +21,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import type { Page } from 'playwright'
-import { liveApp, waitForThePage, type LiveApp } from './helpers.ts'
+import { liveApp, waitForThePage, type LiveApp, governsTheWholeProject } from './helpers.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 
 let app: LiveApp
@@ -43,7 +43,8 @@ beforeAll(async () => {
   // A RAISE, so the agent page draws its acting panel; and the switch line is on every agent page.
   const key = JSON.parse(readFileSync(join(app.dir, 'keys.json'), 'utf8')) as { person: string }
   await post('/api/roles/elevation/test-kite-secretary', { reason: 'Test: a made-up raise', endsWhen: 'when you say' }, { ...AS, 'x-mole-office-key': key.person })
-  decisionId = (await post('/api/records', { kind: 'decision', title: 'Test: mend the tail with tape', data: { option_taken: 'Test: tape', because: 'A made-up reason.', replaces: [] } })).record.id
+  decisionId = (await post('/api/records', { kind: 'decision', title: 'Test: mend the tail with tape', data: { option_taken: 'Test: tape', because: 'A made-up reason.',
+    ...governsTheWholeProject(), replaces: [] } })).record.id
 }, 240_000)
 
 afterAll(async () => {

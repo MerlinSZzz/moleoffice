@@ -14,7 +14,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import type { Page } from 'playwright'
-import { liveApp, waitForThePage, type LiveApp } from './helpers.ts'
+import { liveApp, waitForThePage, type LiveApp, governsTheWholeProject } from './helpers.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { en } from '../src/shared/words/en.ts'
 import { zh } from '../src/shared/words/zh.ts'
@@ -52,7 +52,7 @@ beforeAll(async () => {
   const key = JSON.parse(readFileSync(join(app.dir, 'keys.json'), 'utf8')) as { person: string }
   await post('/api/roles/elevation/test-kite-secretary', { reason: 'Test: a made-up raise', endsWhen: 'when you say' }, { ...AS, 'x-mole-office-key': key.person })
   // A DECISION THE FULL ONE DERIVES FROM, named as its source of authority.
-  const earlier = (await post('/api/records', { kind: 'decision', title: 'Test: the kite flies on calm days', data: { option_taken: 'Test: calm days only', because: 'A made-up reason.', replaces: [] } })).record.id
+  const earlier = (await post('/api/records', { kind: 'decision', title: 'Test: the kite flies on calm days', data: { option_taken: 'Test: calm days only', because: 'A made-up reason.', ...governsTheWholeProject(), replaces: [] } })).record.id
   // A DECISION THAT FILLS ALL FIVE FIELDS, and leaves `replaces` an empty list.
   fullId = (await post('/api/records', {
     kind: 'decision',
@@ -65,7 +65,7 @@ beforeAll(async () => {
       words_since: [{ at: '2026-10-04 21:00:00', words: 'Made-up words added later: the tape held.' }],
       authority: 'an existing decision',
       authority_reference: earlier,
-      replaces: [],
+      ...governsTheWholeProject(), replaces: [],
     },
   })).record.id
   // ONE QUESTION WAITING ON THE PERSON, so the Decisions row of the sidebar has a badge of 1.

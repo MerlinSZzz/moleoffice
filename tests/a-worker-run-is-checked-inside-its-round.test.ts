@@ -13,7 +13,12 @@
  * case also requires the new note, so that complete case is red before the build.
  * The sandbox worker round of the first case writes its supervisor a FEATURE READY: line before its seal, because the
  * office asks for a sandbox round's check only when a whole feature is done.
+ * The owner's decision of 12 November 2026 leaves the supervisor out of a held worker's seal and check notices;
+ * a line's own held round still tells its starter both.
+ * Mutation: the new function answers null always -> the held worker case red.
  * Every record and repository here is synthetic. Only the throwaway app's queue is read.
+ * As decided in November 2026, the page draws the worker round's standing word and no longer the note's sentence under
+ * it; the sentence stays in the API.
  */
 import { execFileSync } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
@@ -24,7 +29,7 @@ import { createElement as h } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import type { FastifyInstance } from 'fastify'
 import { afterAll, beforeAll, expect, it } from 'vitest'
-import { apiApp, freshDb, writeAVerdictAsItsDoorWould, type TestDb } from './helpers.ts'
+import { apiApp, freshDb, theOfficesOwnId, writeAVerdictAsItsDoorWould, type TestDb } from './helpers.ts'
 import { THE_TEST_OFFICES_SECRETARY } from './a-page-of-a-test-office.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { readWorkerCheckNotAsked, workerRoundStanding } from '../src/shared/releasing.ts'
@@ -42,6 +47,7 @@ const person = { 'x-mole-office-workspace': 'default', 'x-mole-office-actor-type
 const as = (id: string): Record<string, string> => ({ ...person, 'x-mole-office-actor-type': 'agent', 'x-mole-office-actor-id': id })
 let t: TestDb
 let app: FastifyInstance
+let secretaryId: string
 let supervisorId: string
 let inspectorId: string
 let inspection: typeof import('../src/server/lib/inspection.ts')
@@ -59,10 +65,11 @@ async function register(handle: string, role: string, headers = as(SECRETARY)): 
   expect(reply.statusCode, reply.body).toBe(201)
   return reply.json().agent.id as string
 }
+/** A run that names its sandbox is filed by its agent's starter, as its launcher files it: the secretary for the supervisor, the supervisor for a worker. */
 async function makeRun(handle = WORKER, extra: Record<string, unknown> = {}, folder = directory): Promise<string> {
   const reply = await call('POST', '/api/records', { kind: 'session', title: 'Synthetic round check criterion', data: {
     state: 'running', servingAgent: handle, workingDirectory: folder, cutFrom: 'main', ...extra,
-  } }, extra.sandbox === undefined ? as(handle) : as(SUPERVISOR))
+  } }, extra.sandbox === undefined ? as(handle) : as(handle === SUPERVISOR ? SECRETARY : SUPERVISOR))
   expect(reply.statusCode, reply.body).toBe(201)
   return reply.json().record.id as string
 }
@@ -92,8 +99,8 @@ function expectNote(check: Record<string, unknown>) {
   expect(check.says).toBe(NOTE)
   for (const key of ['askedOf', 'message', 'eligibility', 'reviewLevel']) expect(check).not.toHaveProperty(key)
 }
-async function realAsk(run: string) {
-  const reply = await call('POST', `/api/checks/${run}/ask-again`, {}, as(supervisorId))
+async function realAsk(run: string, headers = as(supervisorId)) {
+  const reply = await call('POST', `/api/checks/${run}/ask-again`, {}, headers)
   expect(reply.statusCode, reply.body).toBe(200)
   const check = reply.json().theCheck as Record<string, unknown>
   expect(check.askedOf).toBe(INSPECTOR)
@@ -121,7 +128,7 @@ beforeAll(async () => {
   await app.ready()
   inspection = await import('../src/server/lib/inspection.ts')
   ;({ setWordLanguage } = await import('../src/shared/i18n.ts'))
-  await register(SECRETARY, 'secretary', person)
+  secretaryId = await register(SECRETARY, 'secretary', person)
   supervisorId = await register(SUPERVISOR, 'supervisor')
   inspectorId = await register(INSPECTOR, 'inspector', person)
   await register(WORKER, 'worker', as(SUPERVISOR))
@@ -148,7 +155,30 @@ it('files no check ask, inspector delivery or queue row at a full worker seal, a
   expect(JSON.stringify(read.json().stands)).not.toContain('the office is having it checked')
   expect(read.json().stands.waitingFor).toBe(WAITING)
   const lines = t.client.sqlite.prepare("SELECT data FROM records WHERE kind = 'message' AND json_extract(data, '$.aboutRun') = ?").all(run) as { data: string }[]
-  expect(lines.some(line => JSON.parse(line.data).body?.includes(`Run ${run} sealed`))).toBe(true)
+  expect(lines.some(line => JSON.parse(line.data).body?.includes(`Run ${run} sealed`))).toBe(false)
+})
+
+it('holds a worker check without telling its supervisor of the hold or seal', async () => {
+  const run = await makeRun(WORKER, { sandbox: { template: 'synthetic', container: 'synthetic', folder: directory } })
+  const reply = await seal(run)
+  expect(reply.howTheRoundEnded).toMatchObject({ theCheck: 'held' })
+  const rows = t.client.sqlite.prepare("SELECT data FROM records WHERE kind = 'message' AND json_extract(data, '$.aboutRun') = ?").all(run) as { data: string }[]
+  const lines = rows.map(row => JSON.parse(row.data) as { notice?: string; sentBy?: { id: string }; to?: { kind: string; id: string }[] })
+  expect(lines.some(line => line.notice === 'theCheckIsHeld' || line.notice === 'aRunWasSealed')).toBe(false)
+  // A held check asks no inspector, so it writes no noInspectorCheckItYourself line either; allow that notice if written.
+  const officeToSupervisor = lines.filter(line => line.sentBy?.id === theOfficesOwnId(t) && line.to?.some(to => to.kind === 'agent' && to.id === supervisorId))
+  expect(officeToSupervisor.every(line => line.notice === 'noInspectorCheckItYourself')).toBe(true)
+})
+
+it('tells the starter of a line’s own held round about both the hold and seal', async () => {
+  const run = await makeRun(SUPERVISOR, { sandbox: { template: 'synthetic', container: 'synthetic', folder: directory } })
+  const reply = await seal(run, SUPERVISOR)
+  expect(reply.howTheRoundEnded).toMatchObject({ theCheck: 'held' })
+  const rows = t.client.sqlite.prepare("SELECT data FROM records WHERE kind = 'message' AND json_extract(data, '$.aboutRun') = ?").all(run) as { data: string }[]
+  const lines = rows.map(row => JSON.parse(row.data) as { notice?: string; sentBy?: { id: string }; to?: { kind: string; id: string }[] })
+  const toStarter = lines.filter(line => line.sentBy?.id === theOfficesOwnId(t) && line.to?.some(to => to.kind === 'agent' && to.id === secretaryId))
+  expect(toStarter.filter(line => line.notice === 'theCheckIsHeld')).toHaveLength(1)
+  expect(toStarter.filter(line => line.notice === 'aRunWasSealed')).toHaveLength(1)
 })
 
 it('refuses an ineligible worker run at its seal, naming the missing fact', async () => {
@@ -210,6 +240,22 @@ it('the starter replaces the worker note with a real ask through ask-again', asy
   const run = await makeRun()
   expectNote((await seal(run)).theCheck)
   await realAsk(run)
+})
+
+it('the starter sending its handle and its own key replaces the worker note with a real ask', async () => {
+  const run = await makeRun()
+  expectNote((await seal(run)).theCheck)
+  const { makeAnAgentKey } = await import('../src/server/lib/keys.ts')
+  await realAsk(run, { ...as(SUPERVISOR), 'x-mole-office-key': makeAnAgentKey(supervisorId, null) })
+})
+
+it('another agent sending its own handle and its own key is still refused', async () => {
+  const run = await makeRun()
+  expectNote((await seal(run)).theCheck)
+  const { makeAnAgentKey } = await import('../src/server/lib/keys.ts')
+  const reply = await call('POST', `/api/checks/${run}/ask-again`, {}, { ...as(INSPECTOR), 'x-mole-office-key': makeAnAgentKey(inspectorId, null) })
+  expect(reply.statusCode, reply.body).toBe(403)
+  expectNote(t.api.getRecord(run)!.data.theCheck as Record<string, unknown>)
 })
 
 it('a refused explicit worker check is asked again at its next seal', async () => {
@@ -318,7 +364,7 @@ it('a run holding an old note still takes writes', async () => {
   expect(heldNote()).toMatchObject({ decision: madeUpDecision })
 })
 
-it('the check panel says the worker note in both languages without a pending inspector or refusal', async () => {
+it('the check panel draws the worker round standing word in both languages without a pending inspector or refusal', async () => {
   const run = await makeRun()
   await seal(run)
   const record = t.api.getRecord(run)! as PanelRecord
@@ -331,7 +377,7 @@ it('the check panel says the worker note in both languages without a pending ins
     setWordLanguage('en')
     const html = renderToStaticMarkup(h(TheCheckOnARun, { record }))
     const text = html.replace(/&#x27;/g, "'").replace(/<[^>]*>/g, '')
-    expect(text).toContain(NOTE)
+    expect(text).not.toContain(NOTE)
     expect(text).toContain('Awaiting the round')
     expect(text).not.toMatch(/Nobody holds|Waiting for.*inspector|No verdict|Check not started/)
     setWordLanguage('zh')

@@ -25,7 +25,7 @@ import { dirname, join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { THE_PERSON } from '../src/shared/person.ts'
-import { apiApp, freshDb, type TestDb } from './helpers.ts'
+import { A_SLEEP_TIME, apiApp, freshDb, type TestDb, governsTheWholeProject } from './helpers.ts'
 
 let t: TestDb
 let app: FastifyInstance
@@ -65,7 +65,7 @@ beforeAll(async () => {
     'POST',
     '/api/residents/proposals',
     { ...AS_THE_PERSON, 'x-mole-office-actor-type': 'agent', 'x-mole-office-actor-id': 'sec-own-doors', 'x-mole-office-key': String(secretary.json['whatToGiveIt'].key) },
-    { agentId: 'res-own-doors', because: 'A made-up reason.' },
+    { agentId: 'res-own-doors', because: 'A made-up reason.', sleepTime: A_SLEEP_TIME },
   )
   expect(proposed.status, proposed.text).toBe(201)
   proposal = String(proposed.json['proposal'].id)
@@ -87,13 +87,13 @@ describe('a residency proposal', () => {
     const filed = await inject('POST', '/api/records', AS_THE_PERSON, {
       kind: 'decision',
       title: 'A decision filed straight at it',
-      data: { replaces: [] },
+      data: { ...governsTheWholeProject(), replaces: [] },
       links: [{ type: 'derived_from', toId: proposal }],
     })
     expect(filed.status, filed.text).toBe(409)
     expect(count('SELECT count(*) AS n FROM records')).toBe(records)
     // A DECISION THAT EXISTS, pointed at it by POST /api/links.
-    const other = await inject('POST', '/api/records', AS_THE_PERSON, { kind: 'decision', title: 'An unrelated decision', data: { replaces: [] } })
+    const other = await inject('POST', '/api/records', AS_THE_PERSON, { kind: 'decision', title: 'An unrelated decision', data: { ...governsTheWholeProject(), replaces: [] } })
     expect(other.status, other.text).toBe(201)
     const linked = await inject('POST', '/api/links', AS_THE_PERSON, { fromId: other.json['record'].id, toId: proposal, type: 'derived_from' })
     expect(linked.status, linked.text).toBe(409)

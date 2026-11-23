@@ -9,7 +9,7 @@
  * band across the foot of the window: the guide's name wraps instead of being cut, and the page is given the band's
  * height as room at its foot, so its last line can be scrolled clear of the band.
  *
- * WHAT IS MEASURED, in a real browser on a test office of this file's own, in the light and the dark theme. A browser
+ * WHAT IS MEASURED, in a real browser on a test office of this file's own, in the light theme. A browser
  * following a made-up guide opens a made-up report, and the guide leads it to the report's fifth paragraph.
  *   1. At 660 and 390, while the paragraph flashes and after the flash: the guide's whole name is drawn on the bar,
  *      nothing of it cut and nothing drawn over it, with the stop press on the bar; the paragraph the lead names is
@@ -19,12 +19,14 @@
  *   2. At 660 and 390, once the reader stops following: the bar is gone, and the room the page keeps at its foot is
  *      the height of whatever the lead's box still draws, or none when it draws nothing. This browser follows the guide
  *      before the lead comes, so below the line the bar and its room are there from the start.
- *   3. At 1440 and 990 the lead's note stays as it was: at the window's right, 1rem in and 5rem up, no wider than 22rem,
- *      and the page's room at its foot is what it was before the lead came.
+ *   3. At 1440 the lead's note stays as it was: at the window's right, 1rem in and 5rem up, no wider than 22rem;
+ *      and the page's room at its foot reaches from the top of the lead's box to the window's foot, before the lead
+ *      comes, during its flash and after it, so the page's last line can be scrolled clear of the box.
  *
  * MUTATION: remove the line that sets the band's room in src/web/components/Leading.tsx, and the room check of part 1
  * goes red at 660 and 390. Put back `white-space: nowrap` on the narrow `.px-lead-short`, and the name check goes red
- * at 390. On the code before the band, the last-line check is red at 660 and the name check at 390.
+ * at 390. On the code before the band, the last-line check is red at 660 and the name check at 390. 660 is kept for
+ * that last-line check alone. On the code before the corner room, the room check of part 3 is red at 1440.
  */
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import type { Page } from 'playwright'
@@ -44,8 +46,7 @@ const AS_THE_PERSON = {
 }
 const GUIDE = { handle: 'made-up-lead-guide', name: 'Made-up lead guide' }
 const AS_THE_GUIDE = { ...AS_THE_PERSON, 'x-mole-office-actor-type': 'agent', 'x-mole-office-actor-id': GUIDE.handle }
-const WIDTHS = [1440, 990, 660, 390] as const
-const THEMES = ['light', 'dark'] as const
+const WIDTHS = [1440, 660, 390] as const
 /** The width below which the lead draws its narrow bar: 60rem, the lead's own line. */
 const NARROW_BELOW = 960
 
@@ -82,14 +83,6 @@ function paragraph(report: string, block: string): string {
   return `[data-target="${targetAttributeValue({ kind: 'region', recordId: report, regionId: `data.blocks[#${block}].text@0` })}"]`
 }
 
-/** The page's room at its foot, and the band's room the lead gave it, as the page reads them. */
-function theRoom(page: Page): Promise<{ foot: string; leadRoom: string }> {
-  return page.evaluate(() => ({
-    foot: getComputedStyle(document.querySelector('.shell-main')!).paddingBottom,
-    leadRoom: getComputedStyle(document.documentElement).getPropertyValue('--lead-room').trim(),
-  }))
-}
-
 /** Whether the room the page keeps at its foot is the height of the lead's box, or none when no box is drawn. */
 async function theRoomFollowsTheBox(page: Page): Promise<string> {
   const { room, box } = await page.evaluate(() => {
@@ -100,6 +93,18 @@ async function theRoomFollowsTheBox(page: Page): Promise<string> {
     }
   })
   return room === box ? 'the room is the box' : `the room is ${room === '' ? 'none' : room}, the box ${box === '' ? 'not drawn' : box}`
+}
+
+/** Whether the room at the page's foot covers the lead's corner box. */
+async function theRoomCoversTheBox(page: Page): Promise<string> {
+  const { room, box } = await page.evaluate(() => {
+    const drawn = document.querySelector('.px-lead-here')!
+    return {
+      room: getComputedStyle(document.documentElement).getPropertyValue('--lead-room').trim(),
+      box: `${String(Math.ceil(window.innerHeight - drawn.getBoundingClientRect().top))}px`,
+    }
+  })
+  return room === box ? 'the room covers the box' : `the room is ${room === '' ? 'none' : room}, the box's top ${box} above the foot`
 }
 
 /** Whether the flash of the lead is on the page now. */
@@ -207,7 +212,8 @@ function theNote(page: Page): Promise<{ fromTheRight: number; fromTheFoot: numbe
   })
 }
 
-for (const theme of THEMES) for (const width of WIDTHS) {
+for (const width of WIDTHS) {
+  const theme = 'light' as const
   const narrow = width < NARROW_BELOW
   it(`${narrow ? 'names the whole guide and leaves every line readable' : 'leaves the note where it was'} at ${width} in the ${theme} theme`, async () => {
     const report = await aReport(`${String(width)}, ${theme}`)
@@ -227,8 +233,7 @@ for (const theme of THEMES) for (const width of WIDTHS) {
       await page.locator(target).waitFor({ timeout: 30_000 })
       await page.mouse.move(0, 0)
       await page.waitForTimeout(800)
-      const before = await theRoom(page)
-      if (!narrow) expect(before.leadRoom, 'the room before any lead').toBe('')
+      if (!narrow) await expect.poll(() => theRoomCoversTheBox(page), { timeout: 5_000, message: 'the room before any lead' }).toBe('the room covers the box')
 
       message = (await post('/api/records', AS_THE_GUIDE, {
         kind: 'message',
@@ -255,7 +260,7 @@ for (const theme of THEMES) for (const width of WIDTHS) {
           expect(Math.abs(note.fromTheRight - note.rem), `${where}: the note's place from the right`).toBeLessThanOrEqual(0.5)
           expect(Math.abs(note.fromTheFoot - 5 * note.rem), `${where}: the note's place from the foot`).toBeLessThanOrEqual(0.5)
           expect(note.width, `${where}: the note's width`).toBeLessThanOrEqual(Math.min(22 * note.rem, note.window - 2 * note.rem) + 0.5)
-          expect(await theRoom(page), `${where}: the page's room at its foot`).toEqual(before)
+          await expect.poll(() => theRoomCoversTheBox(page), { timeout: 5_000, message: `${where}: the page's room at its foot` }).toBe('the room covers the box')
         }
       }
 

@@ -6,6 +6,27 @@ import { aPartTable } from '../part-tables.ts'
 
 const existingArchive = { existingArchive: true } as const
 
+// ---------------------------------------------------------------------------- session resources
+
+/**
+ * One row per thing a session started and might have left running.
+ *
+ * AUTHORED IN PART, AND THAT SPLIT MATTERS TO ANYONE WRITING AN EXPORT. `registered_by`,
+ * `released_by` and `release_note` are history: somebody shut a server down, or did not, and said
+ * why. `pgid` and `os_started_at` are facts about THIS MACHINE AT THIS MOMENT — a pid is
+ * meaningless after a reboot, and restoring one somewhere else would hand a killer a number that
+ * now belongs to an innocent process. tests/release.test.ts exists to stop anyone acting on a
+ * stale pid, and an export that carried these two columns whole would walk straight past it.
+ *
+ * `key` is the identity checked later: the pid, the port number, the container name, the absolute
+ * path of the lock file. `os_started_at` is the anti-reuse anchor described on `OsProcess` in
+ * lib/resources.ts — without it, releasing a resource whose pid has been recycled kills the wrong
+ * process.
+ *
+ * ROWS ARE NEVER DELETED. A released resource keeps its row with who released it and when,
+ * because "was that server ever shut down, and by whom" is the question this table exists to
+ * answer.
+ */
 export const sessionResources = aPartTable(sqliteTable(
   'session_resources',
   {
@@ -65,6 +86,13 @@ export const sessionResources = aPartTable(sqliteTable(
      */
     world: text('world'),
 
+    /**
+     * Whether Mole Office itself started this process, written when the row is written.
+     *
+     * The owner's F1 answer of 3 September 2026: the product names what it did not start and never
+     * stops it. NULL means nobody recorded this, which is not "no" — but the release door treats it
+     * the same way, because the weakest evidence there is is not permission to signal a process.
+     */
     startedByTheProduct: integer('started_by_the_product'),
   },
   (t) => ({

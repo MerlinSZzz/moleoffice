@@ -65,7 +65,7 @@
 
 import { useState } from 'react'
 import { avatarUrlFor, defaultAvatarAssetId, type ParticipantKind } from '@shared/participants.ts'
-import { whereRequestsGo } from '../lib/visiting.ts'
+import { theCrossOriginOfALoad, whereRequestsGo } from '../lib/visiting.ts'
 
 /**
  * WHEN THIS PAGE LOAD STARTED, as the value the second ask carries.
@@ -167,6 +167,7 @@ export function Avatar({
       <img
         className={className}
         src={showing}
+        crossOrigin={theCrossOriginOfALoad()}
         alt={label}
         title={label}
         width={size}

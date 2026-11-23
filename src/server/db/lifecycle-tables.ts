@@ -46,7 +46,9 @@
  *   2. Add `agent_work_transitions` and `agent_wakes` to `MEASURED_TABLES`.
  *   3. Update the written lists in `tests/schema-tables.test.ts` — the thirty-five names and the
  *      four measured names — because a thirty-sixth table has to be typed there on purpose.
- *   4. Run `npm run db:generate`, which writes the drizzle migration from step 1.
+ *   4. Write the migration for step 1 by hand in `drizzle/`, with `IF NOT EXISTS` on every CREATE
+ *      TABLE and CREATE INDEX, add its entry to `drizzle/meta/_journal.json` in the same commit, and
+ *      ask the coordinator for its number. No script generates a migration.
  *   5. Delete `tests/the-lifecycle-tables-wait-for-the-window.test.ts`, whose whole subject is that
  *      steps 1 to 4 have NOT happened.
  *

@@ -21,10 +21,11 @@
  *   2. the page drawn from the three doors has the General part first and the This project part after it, and each
  *      project rule is drawn there with its source, its check, when it is asked, on or off, and its revision;
  *   3. a general chapter says its revision, or that its text shipped with this release;
- *   4. a project that keeps no chapter says so in its part, and a stored rule that does not read is counted and named;
+ *   4. a project that keeps no chapter draws "No rules" in its part, and a stored rule that does not read is counted and
+ *      named;
  *   6. at 1440, 990, 660 and 390, light and dark, the page with both parts never scrolls sideways;
  *   7. each of the person's regulations in the General part says its record and its revision: the newest revision of
- *      the record (`revision` of GET /api/office-regulations), or that this office keeps none.
+ *      the record (`revision` of GET /api/office-regulations), or "No revision" when this office keeps none.
  *
  * RED BEFORE THE CODE, 8 November 2026, at 036191eef with this file copied in: cases 1 to 5 red, case 6 green. The
  * chapter door answered no revision, the page drew neither part, and the Chinese page had no word for the labels.
@@ -227,7 +228,6 @@ describe('the page draws a General part and a This project part', () => {
     expect(first).toContain(`href="#${router.recordPath(source)}"`)
     expect(first).toContain(asDrawn(word('regulationsPage.checks.evidenceLinked', { evidence: 'grasp_trials' })))
     expect(first).toContain(asDrawn(word('regulationsPage.triggers.methodWork')))
-    expect(first).toContain(asDrawn(word('regulationsPage.rule.reminds')))
     expect(first).toContain(asDrawn(word('regulationsPage.rule.on')))
     expect(first).toContain(asDrawn(word('regulationsPage.revision', { n: trials.revision })))
 
@@ -250,21 +250,21 @@ describe('the page draws a General part and a This project part', () => {
     expect(shipped).not.toContain(asDrawn(word('regulationsPage.revision', { n: 7 })))
   })
 
-  it('says a project keeps no rules of its own, and counts and names a stored rule that does not read', async () => {
+  it('draws "No rules" for a project with no rules of its own, and counts and names a stored rule that does not read', async () => {
     const said = await read<WhatTheOfficeRegulationsSay>('/api/office-regulations', ELSEWHERE)
     const none = await read<TheProjectChapter>(DOOR, ELSEWHERE)
     expect(none.chapter).toBeNull()
     const empty = partOf(drawn(said, undefined, none), 'project')
     expect(empty).toContain(asDrawn(word('regulationsPage.thisProject')))
-    expect(empty).toContain(asDrawn(word('regulationsPage.project.none')))
+    expect(empty).toContain(asDrawn(word('regulationsPage.project.noRules')))
     expect(empty).not.toContain('data-project-rule=')
 
     const project = await read<TheProjectChapter>(DOOR)
     const withAProblem: TheProjectChapter = { ...project, problems: [{ at: 2, rule: 'made-up-broken', code: 'unknownCheck', says: 'Made-up: the check is not on the list.' }] }
     const named = partOf(drawn(said, undefined, withAProblem), 'project')
-    expect(named).toContain(asDrawn(word('regulationsPage.project.notRead', { n: 1 })))
+    expect(named).toContain(asDrawn(word('regulationsPage.project.unread', { n: 1 })))
     expect(named).toContain('made-up-broken')
-    expect(partOf(drawn(said, undefined, project), 'project')).not.toContain(asDrawn(word('regulationsPage.project.notRead', { n: 1 })))
+    expect(partOf(drawn(said, undefined, project), 'project')).not.toContain(asDrawn(word('regulationsPage.project.unread', { n: 1 })))
   })
 })
 
@@ -291,7 +291,7 @@ describe('the page with both parts fits at four widths in both themes', () => {
 })
 
 describe("the person's regulations in the General part", () => {
-  it('each says its record and its revision, or that no revision of it is kept here', async () => {
+  it('each says its record and its revision, or "No revision" when none of it is kept here', async () => {
     const filed = await app.inject({ method: 'POST', url: '/api/records', headers: PERSON, payload: { kind: 'regulation', title: 'Made-up regulation of the made-up lab', data: { sentence: 'Made-up: every made-up trial is written down.', binds: 'person', since: '2026-11-08' } } })
     expect(filed.statusCode, filed.body).toBe(201)
     const id = String(filed.json().record.id)
@@ -314,7 +314,7 @@ describe("the person's regulations in the General part", () => {
     expect(item).toContain(asDrawn(word('regulationsPage.revision', { n: newest })))
 
     const none = regulationIn(partOf(drawn({ ...said, regulations: [{ ...one!, revision: null }] }, selected, project), 'general'), id)
-    expect(none).toContain(asDrawn(word('regulationsPage.noRevision')))
+    expect(none).toContain(asDrawn(word('regulationsPage.revisionNone')))
     expect(none).not.toContain(asDrawn(word('regulationsPage.revision', { n: newest })))
   })
 })

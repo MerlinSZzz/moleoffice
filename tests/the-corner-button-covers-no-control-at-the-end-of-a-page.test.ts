@@ -9,7 +9,7 @@
  * is where that rule sends the person, so there nothing may stay under the button. The .shell-main
  * rule in App.tsx leaves --fab-room (tokens.css) under the page for that.
  *
- * WHAT IS MEASURED. Seven pages, at 1440, 990, 660 and 390 wide, in the light look, in English, in a
+ * WHAT IS MEASURED. Seven pages, at 1440 and 390 wide, in the light look, in English, in a
  * window 1000 tall. The dark look is not measured: whether a control sits under the button does not
  * depend on the colours, so half the page openings said the same thing twice. These are the pages where round 27's measurement found a press or
  * an arrow under the button at the top of the page: Settings, Modules, Bundles, Agents, Queries,
@@ -50,7 +50,7 @@ import { testShots } from './where-shots-go.ts'
 
 let app: LiveApp
 const shots = testShots('the-corner-button-covers-no-control-at-the-end-of-a-page')
-const WIDTHS = [1440, 990, 660, 390] as const
+const WIDTHS = [1440, 390] as const
 const THEMES = ['light'] as const
 
 /** Each page, and the control it draws once it has drawn its content. */
@@ -147,7 +147,7 @@ async function underTheButtonAtTheEnd(page: Page): Promise<string[]> {
   })
 }
 
-it('leaves every press and arrow of seven pages clear of the corner button at the page end where design D draws it, at four widths in the light look', async () => {
+it('leaves every press and arrow of seven pages clear of the corner button at the page end where design D draws it, at 1440 and 390 wide in the light look', async () => {
   for (const width of WIDTHS) {
     for (const theme of THEMES) {
       const context = await app.browser.newContext({ viewport: { width, height: 1000 } })

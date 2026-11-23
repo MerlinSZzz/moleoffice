@@ -7,7 +7,7 @@
  * picture of its drawing; a note opens from it and can be changed; notes do not appear under Reports."
  *
  * WHAT THIS FILE PROVES.
- *   1. With no note, the page says in words that there is no note yet.
+ *   1. With no note, the page says none.
  *   2. With notes in two projects, the page lists every one, the newest started first. Each card shows the note's
  *      first words, and a small picture when the note holds a drawing, with the note's own strokes, boxes and lines.
  *   3. A card opens its note floating over My notes, where it can be changed.
@@ -57,7 +57,7 @@ async function send(app: LiveApp, method: 'GET' | 'POST', path: string, workspac
 async function aNote(app: LiveApp, workspace: string, parts: QuickNotePart[], fromPage?: { address: string; name: string }): Promise<string> {
   const made = await send(app, 'POST', '/api/records', workspace, {
     kind: 'quick_note',
-    title: quickNoteTitleOf(parts) ?? 'A made-up note with no words',
+    title: quickNoteTitleOf(parts) ?? en.t('quickNote.untitled'),
     data: { parts, ...(fromPage === undefined ? {} : { from_page: fromPage }) },
   })
   return String((made['record'] as { id: string }).id)
@@ -146,10 +146,10 @@ describe('My notes, in a browser', () => {
     await app?.stop()
   }, 60_000)
 
-  it('says in words that there is no note yet', async () => {
+  it('says none when there is no note yet', async () => {
     before = await whatReportsCounts(app)
     await open(app, app.page)
-    await app.page.getByText(en.t('myNotes.none')).waitFor()
+    await app.page.locator('.px-empty-text').filter({ hasText: en.t('absence.none') }).waitFor()
     expect(await app.page.locator('[data-note]').count()).toBe(0)
   }, 120_000)
 

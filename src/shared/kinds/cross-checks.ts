@@ -17,12 +17,14 @@
  * `quickNoteCrossChecks` FROM ./quick-note.ts, `mainSuiteFixCrossChecks` FROM ../main-suite-fix.ts,
  * `theHandbookAsWritten` FROM ../handbooks.ts, `sessionWave13nCrossChecks` FROM
  * ../kind-fields/session-wave-13n.ts, `DEFAULT_REMIND_AFTER_MINUTES`, `SENT_AS` AND `SENT_AT` FROM
- * ../drafts.ts, AND `KEPT_HERE`, `PART_OF_THE_OFFICE` AND `TOOL_SLUG_PATTERN` FROM ../toolset.ts.
+ * ../drafts.ts, `KEPT_HERE`, `PART_OF_THE_OFFICE` AND `TOOL_SLUG_PATTERN` FROM ../toolset.ts, AND
+ * `whyThatIsNoRuntimeWord` FROM ../participants.ts.
  * IT IMPORTS NOTHING FROM ../kinds.ts: CROSS_CHECKS is built while this file loads, and every rule
  * it names is declared elsewhere or here.
  */
 import type { RecordKind } from '../types.ts'
 import type { ValidationError } from './describe-value.ts'
+import { GOVERNS_FIELD } from '../governs.ts'
 import { claimProblem } from '../paths.ts'
 import { STABLE_UPGRADE_NOTICE_EVENT } from '../stable-upgrade-notices.ts'
 import { stableBootstrapEvidenceWaiverSchema, stableBootstrapPreparedSchema, stableBootstrapStopScopeSchema, stableOfficeNoticeEventSchema } from '../stable-bootstrap-notices.ts'
@@ -33,6 +35,7 @@ import { theHandbookAsWritten } from '../handbooks.ts'
 import { sessionWave13nCrossChecks } from '../kind-fields/session-wave-13n.ts'
 import { DEFAULT_REMIND_AFTER_MINUTES, SENT_AS, SENT_AT } from '../drafts.ts'
 import { KEPT_HERE, PART_OF_THE_OFFICE, TOOL_SLUG_PATTERN } from '../toolset.ts'
+import { whyThatIsNoRuntimeWord } from '../participants.ts'
 
 // ============================================================================ cross-field rules
 //
@@ -103,30 +106,39 @@ const restrictionCrossCheck = (kind: string): CrossCheck => (data) => {
 
 /**
  * EACH PLACE IN A DECISION'S `governs` NAMES ONE THING, AND A PATH IS ONE THE REPOSITORY COULD HOLD. The shape check
- * has already refused anything but strings in the two fields; this refuses an entry with both or neither, and a path
- * no claim could ever match (`claimProblem`). Whether a named record is there is the server's question.
+ * has already refused anything but strings in `record` and `path` and a boolean in `wholeProject`; this refuses an
+ * entry with more than one or none, a `wholeProject` that is not true, and a path no claim could ever match
+ * (`claimProblem`). Whether a named record is there is the server's question. A path stored here before governsFiles
+ * is still read; the doors refuse a new one (src/server/lib/what-a-record-names.ts).
  */
 function theGovernedPlacesAsWritten(governs: unknown): ValidationError[] {
   if (!Array.isArray(governs)) return []
   const errors: ValidationError[] = []
   governs.forEach((place: unknown, at) => {
     if (place === null || typeof place !== 'object') return
-    const { record, path } = place as { record?: unknown; path?: unknown }
-    if ((record === undefined) === (path === undefined)) {
+    const { record, path, wholeProject } = place as { record?: unknown; path?: unknown; wholeProject?: unknown }
+    const named = [record, path, wholeProject].filter((one) => one !== undefined).length
+    if (named !== 1) {
       errors.push({
-        path: `data.governs[${at}]`,
+        path: `data.${GOVERNS_FIELD}[${at}]`,
         message:
-          `data.governs[${at}] must name exactly one place: a module, flow or pipeline by its id in \`record\`, or a ` +
-          `file, folder or pattern in \`path\`. It names ${record === undefined ? 'neither' : 'both'}.`,
+          `data.${GOVERNS_FIELD}[${at}] must name exactly one place: a page by its id in \`record\`, or the whole project ` +
+          `with \`wholeProject\` true. It names ${named === 0 ? 'none' : 'more than one'}. A file goes in governsFiles.`,
       })
       return
     }
+    if (wholeProject !== undefined && wholeProject !== true) {
+      errors.push({
+        path: `data.${GOVERNS_FIELD}[${at}].wholeProject`,
+        message: `data.${GOVERNS_FIELD}[${at}].wholeProject is false, so it names nothing. Send true, or name a page in \`record\`.`,
+      })
+    }
     if (typeof path === 'string') {
       const problem = claimProblem(path)
-      if (problem !== null) errors.push({ path: `data.governs[${at}].path`, message: `data.governs[${at}].path ${problem}.` })
+      if (problem !== null) errors.push({ path: `data.${GOVERNS_FIELD}[${at}].path`, message: `data.${GOVERNS_FIELD}[${at}].path ${problem}.` })
     }
     if (typeof record === 'string' && record.trim() === '') {
-      errors.push({ path: `data.governs[${at}].record`, message: `data.governs[${at}].record is blank, so it names nothing.` })
+      errors.push({ path: `data.${GOVERNS_FIELD}[${at}].record`, message: `data.${GOVERNS_FIELD}[${at}].record is blank, so it names nothing.` })
     }
   })
   return errors
@@ -154,6 +166,16 @@ export const CROSS_CHECKS: Partial<Record<RecordKind, CrossCheck>> = {
   quick_note: quickNoteCrossChecks,
   handbook: theHandbookAsWritten,
   session: sessionWave13nCrossChecks,
+  /**
+   * AN AGENT'S RUNTIME WORD IS ANY HARNESS'S NAME, WITHIN ONE LENGTH. The bound is the one the hold door
+   * reads, so a word this kind takes is a word the agent can hold the heartbeat in. A value that is not text is
+   * refused by the field's own type, so it is not refused twice here.
+   */
+  agent: (data) => {
+    if (typeof data['runtime'] !== 'string') return []
+    const why = whyThatIsNoRuntimeWord(data['runtime'])
+    return why === null ? [] : [{ path: 'data.runtime', message: why }]
+  },
   /**
    * A FLOW RUN SAYS WHICH VERSION OF A FLOW IT FOLLOWED, OR SAYS WHY IT CANNOT. Exactly one of the two, so a
    * reader never meets a flow run that is silent about its flow, and never one that claims both.
@@ -302,7 +324,7 @@ export const CROSS_CHECKS: Partial<Record<RecordKind, CrossCheck>> = {
    * how "none of these, here is what I am doing instead" is stored.
    */
   decision: (data) => {
-    const errors: ValidationError[] = theGovernedPlacesAsWritten(data['governs'])
+    const errors: ValidationError[] = theGovernedPlacesAsWritten(data[GOVERNS_FIELD])
     const extra = data['extra']
     if (extra && typeof extra === 'object' && !Array.isArray(extra) && Object.hasOwn(extra, 'stableBootstrapStop') &&
         !stableBootstrapStopScopeSchema.safeParse((extra as Record<string, unknown>)['stableBootstrapStop']).success) {

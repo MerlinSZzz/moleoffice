@@ -257,9 +257,11 @@ describe('the agent responsible for a task is named by its registry id', () => {
   })
 })
 
-describe('responsibility that passes up a starter chain names the live agent by handle', () => {
-  // MUTATION: `above.handle` in rule 4's sentence of responsibleFor put back to `above.id`.
-  it('addresses the live starter by its id and names it by its handle', async () => {
+// CRITERION CHANGE: rule 4's sentence named the live starter by its handle, and now names it by its office name, which
+// a person reads. The registered name is not the handle here, so the old words fail this case.
+describe('responsibility that passes up a starter chain names the live agent by its office name', () => {
+  // MUTATION: the office name in rule 4's sentence of responsibleFor put back to `above.id`.
+  it('addresses the live starter by its id and names it by its office name', async () => {
     await started(AS_THE_PERSON, { handle: 'boss-u2', name: 'Boss U2', role: 'supervisor' })
     await started(asAgent('boss-u2'), { handle: 'gone-u2', name: 'Gone U2' })
     const task = t.api.createRecord({
@@ -273,7 +275,7 @@ describe('responsibility that passes up a starter chain names the live agent by 
     const { responsibleFor } = await import('../src/server/lib/delegation.ts')
     const said = responsibleFor(task)
     expect(said.who).toEqual({ kind: 'agent', id: idOf('boss-u2') })
-    expect(said.why).toContain('up its starter chain to "boss-u2"')
+    expect(said.why).toContain('up its starter chain to "Boss U2"')
   })
 })
 

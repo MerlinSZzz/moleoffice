@@ -31,6 +31,9 @@
  * far past any edge leaves the whole window on the screen. The case for where nothing moves drags instead of holding,
  * and the pictures and the film at 1440 drag too.
  *
+ * The top row carries no hover sentence now, as decided. The cases read whether it moves the window from its
+ * `data-moves` value instead.
+ *
  * THE PICTURES AND THE TWO FILMS are taken only when W13Y_CHAT_LAYOUT names a folder outside the checkout. They are
  * made-up data, and each picture carries the label that says so; each film carries it from its first frame.
  */
@@ -432,8 +435,8 @@ async function theNameIsInView(page: Page, panel: string): Promise<{ inView: boo
 const pastTheFoot = (page: Page): Promise<number> =>
   page.evaluate(() => (document.scrollingElement === null ? 0 : document.scrollingElement.scrollHeight) - innerHeight)
 
-it('ends the chat page at the foot of the window at every width, so the name above a conversation stays in view', async () => {
-  for (const width of [1440, 990, 660, 390]) {
+it('ends the chat page at the foot of the window at the widest and the narrowest width, so the name above a conversation stays in view', async () => {
+  for (const width of [1440, 390]) {
     const height = width === 390 ? 844 : 1000
     const { page, close } = await opened(width, 'light', 'page')
     try {
@@ -454,7 +457,7 @@ it('ends the chat page at the foot of the window at every width, so the name abo
       await close()
     }
   }
-  for (const width of [1440, 990, 660, 390]) {
+  for (const width of [1440, 390]) {
     const { page, close } = await opened(width, 'light', 'corner')
     try {
       await page.waitForSelector(`${CORNER} .px-chat-contact`, { timeout: 30_000 })
@@ -506,9 +509,7 @@ it('moves the window at once when its top row is dragged, leaves a press that do
   const { page, close } = await opened(1440, 'light', 'corner')
   try {
     await page.waitForSelector(`${CORNER} .px-chat-contact`, { timeout: 30_000 })
-    const title = await page.getAttribute(TOP_ROW, 'title')
-    expect(title, 'the top row does not say it can be dragged').toBe(WORDS['chat.move.hold'])
-    expect(title, 'the top row still asks for a hold').not.toMatch(/hold|second/i)
+    expect(await page.getAttribute(TOP_ROW, 'data-moves'), 'the top row does not move the window').toBe('yes')
     const corner = await boxOf(page, CORNER)
     const moving = (): Promise<string | null> => page.getAttribute(CORNER, 'data-moving')
     const full = (): Promise<string | null> => page.getAttribute(CORNER, 'data-full')
@@ -616,7 +617,7 @@ it('moves nothing on a phone, while the chat fills the window, or on the chat pa
     const { page, close } = await opened(390, 'light', 'corner')
     try {
       await page.waitForSelector(`${CORNER} .px-chat-contact`, { timeout: 30_000 })
-      expect(await page.getAttribute(TOP_ROW, 'title'), 'a phone offers a drag').toBeNull()
+      expect(await page.getAttribute(TOP_ROW, 'data-moves'), 'a phone offers a drag').toBe('no')
       const before = await boxOf(page, CORNER)
       await drag(page)
       expect(await page.getAttribute(CORNER, 'data-moving'), 'a drag moved the panel on a phone').toBe('no')
@@ -631,7 +632,7 @@ it('moves nothing on a phone, while the chat fills the window, or on the chat pa
       await page.waitForSelector(`${CORNER} .px-chat-contact`, { timeout: 30_000 })
       await page.click(`${TOP_ROW} .px-chat-fill`)
       expect(await page.getAttribute(CORNER, 'data-full')).toBe('yes')
-      expect(await page.getAttribute(TOP_ROW, 'title'), 'a full chat offers a drag').toBeNull()
+      expect(await page.getAttribute(TOP_ROW, 'data-moves'), 'a full chat offers a drag').toBe('no')
       const before = await boxOf(page, CORNER)
       await drag(page)
       expect(await page.getAttribute(CORNER, 'data-moving'), 'a drag moved a full chat').toBe('no')

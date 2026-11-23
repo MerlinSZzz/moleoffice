@@ -57,6 +57,7 @@ import {
   bodySectionsDeclaredBy,
 } from '../src/shared/sections.ts'
 import { sectionsOf } from '../src/web/components/sections.ts'
+import { sayInEnglish } from '../src/shared/i18n.ts'
 import { KIND_SPECS } from '../src/shared/kinds.ts'
 import { RECORD_KINDS, type PanelRecord, type RecordKind } from '../src/shared/types.ts'
 
@@ -214,15 +215,20 @@ describe('the record summary is a part of the record and says so', () => {
       `region/rec000000001/${sectionRegionId(SUMMARY_LINE_KEY)}`,
     )
     // AND IT IS NOT THE ABSENCE LINE EITHER. The record has a summary; the header simply does not
-    // draw it on this kind, so neither the words nor the sentence about their absence belongs here.
-    expect(html, 'the header says nobody wrote a summary for a record that has one').not.toContain(
-      'No summary was written for this record.',
-    )
+    // draw it on this kind, so neither the words nor the word for their absence belongs here.
+    expect(html, 'the header says a record that has a summary has none').not.toContain('class="rp-lede rp-lede-none"')
+    expect(html, 'the header still draws the old sentence').not.toContain(sayInEnglish('record.noSummary'))
   })
 
-  it('draws no target over “No summary was written”, because there is no region to name', () => {
+  it('draws the word for no summary, told apart, with no target over it, because there is no region to name', () => {
     const html = head(record({ kind: 'note', summary: null }))
-    expect(html).toContain('No summary was written for this record.')
+    const none = /<div class="rp-lede rp-lede-none">(.*?)<\/div>/s.exec(html)?.[1] ?? null
+    expect(none, 'a record with no summary drew no line saying so').not.toBeNull()
+    // THE LINE IS ONE SHORT WORD, AND THE OFFICE LOOKED. The summary field was read and is empty,
+    // so the word is drawn told apart with no edge, the mark of an answer that needs nothing.
+    expect(none?.replace(/<[^>]*>/g, ''), 'the line is not the word for no summary').toBe(sayInEnglish('record.noSummaryWord'))
+    expect(none, 'the word is not told apart as looked').toContain('data-edge="none"')
+    expect(html, 'the header still draws the old sentence').not.toContain(sayInEnglish('record.noSummary'))
     expect(html, 'an absence claimed to be a part of the record').not.toContain(
       `region/rec000000001/${sectionRegionId(SUMMARY_LINE_KEY)}`,
     )

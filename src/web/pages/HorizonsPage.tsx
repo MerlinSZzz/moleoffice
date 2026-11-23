@@ -308,13 +308,10 @@ export function HorizonsPage() {
  * project would name every other project's planned work again beside each drawing.
  */
 function TheDrawing({ choice, today }: { choice: ProjectChoice; today: string }) {
+  if (choice === EVERY_PROJECT) return null
   return (
     <section className="hz-drawing">
-      {choice === EVERY_PROJECT ? (
-        <p className="hz-drawing-one">{t('goals.drawingOneProject')}</p>
-      ) : (
-        <PlanGraph period={drawingWeek(today)} project={choice} />
-      )}
+      <PlanGraph period={drawingWeek(today)} project={choice} />
     </section>
   )
 }
@@ -496,7 +493,6 @@ function NeedsYou({
         <span>{canConfirm ? t('goals.needsYou') : t('goals.waitingForThePerson')}</span>
         <span className="hz-count num">{waiting.length}</span>
       </h2>
-      <p className="hz-needs-why">{canConfirm ? t('goals.needsWhyYou') : t('goals.needsWhyPerson')}</p>
       <ul className="hz-needlist">
         {waiting.map(({ goal, horizon }) => {
           const filer = goal.filedBy === null ? undefined : theParticipantAStoredIdNames(participants.agents, goal.filedBy)
@@ -596,7 +592,7 @@ function GoalItem({
           <RouteLink to={recordPath(goal.id)}>{goal.title}</RouteLink>
         </h3>
         <p className="hz-what">
-          {goal.whatUnreadable ? t('g7a.horizons.whatMissing') : goal.what}
+          {goal.whatUnreadable ? t('word.notRecorded') : goal.what}
         </p>
         <p className="hz-facts">
           <RowProject id={project} titles={titles} />
@@ -642,7 +638,7 @@ function ClusterItem({ cluster, participants }: { cluster: HorizonGoal['clusters
           {cluster.parts.map((part) => (
             <li key={part.id} className="hz-part">
               <p className="hz-partwhat">
-                {part.whatUnreadable ? t('g7a.horizons.partMissing') : part.what}
+                {part.whatUnreadable ? t('word.notRecorded') : part.what}
               </p>
               {part.people.length === 0 ? (
                 <p className="hz-none">
@@ -809,7 +805,6 @@ export const HORIZONS_CSS = `
 .hz-span { font-family: var(--font-ui); font-size: var(--fs-1); font-weight: 400; color: var(--text-3); letter-spacing: 0; text-transform: none; }
 .hz-quiet { margin: 0; color: var(--text-3); font-size: var(--fs-2); }
 .hz-none { margin: 0; color: var(--text-2); }
-.hz-needs-why { margin: 0 0 var(--pad); color: var(--text-2); font-size: var(--fs-2); max-width: var(--measure-in-box); }
 .hz-needs-elsewhere { margin: var(--pad) 0 0; display: flex; align-items: center; flex-wrap: wrap; gap: var(--pad) var(--gut); color: var(--text-2); font-size: var(--fs-2); }
 .hz-elsewhere-said { max-width: var(--measure-in-box); }
 
@@ -853,7 +848,6 @@ export const HORIZONS_CSS = `
 .hz-actuallist { display: flex; flex-direction: column; gap: 4px; }
 .hz-actualfact { max-width: var(--measure-in-box); line-height: var(--lh-body); font-size: var(--fs-2); }
 .hz-drawing { min-width: 0; margin-top: var(--pad); }
-.hz-drawing-one { margin: 0; color: var(--text-2); font-size: var(--fs-2); max-width: var(--measure-in-box); }
 .hz-counted { margin: 0; color: var(--text-3); font-size: var(--fs-1); }
 .hz-actualproject { display: block; font-size: var(--fs-1); }
 

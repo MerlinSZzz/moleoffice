@@ -111,6 +111,7 @@ export const presentationIntent = aPartTable(sqliteTable(
      * fails loudly instead.
      */
     updatedAt: text('updated_at').notNull(),
+    /** Who wrote it: `${actor.type}:${actor.id}`, so "human:owner" or "agent:claude-code". */
     updatedBy: text('updated_by').notNull(),
   },
   (t) => ({

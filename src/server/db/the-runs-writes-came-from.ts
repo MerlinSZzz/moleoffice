@@ -8,7 +8,7 @@
 import { sqlite } from './client.ts'
 import { readInPieces } from './in-pieces.ts'
 import { WHICH_RUN_A_SESSION_IS, A_LIVE_SESSION_RECORD, theRunTheRowSays } from './the-run-a-write-came-from.ts'
-import type { SessionRunRow } from '../lib/elevation.ts'
+import type { SessionRunRow } from './types/elevation.ts'
 
 /**
  * WHAT `theRunAWriteCameFrom` ANSWERS FOR EACH OF MANY SESSIONS, in one statement for every 500. A session that is not

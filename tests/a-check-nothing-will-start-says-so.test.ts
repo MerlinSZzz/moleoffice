@@ -35,7 +35,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { THE_TEST_OFFICES_OWNER, THE_TEST_OFFICES_SECRETARY } from './a-page-of-a-test-office.ts'
 import { apiApp, freshDb, writeAVerdictAsItsDoorWould, type TestDb } from './helpers.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
-import { howARunStands } from '../src/shared/releasing.ts'
+import { NEEDS_NO_CHECK_RULES, howARunStands } from '../src/shared/releasing.ts'
 import { localStamp } from '../src/shared/time.ts'
 import {
   A_CHECK_NOTHING_STARTS,
@@ -48,7 +48,6 @@ import {
   WHOEVER_RUNS_THE_OFFICE_CAN_TURN_THE_WORKER_ON,
   aCheckNothingStartsSays,
   aCheckThatWillStartSays,
-  checksAreOnForOtherProjects,
   theOfficeStartedNoCheckOf,
   theOfficeStartedNoCheckSays,
 } from '../src/shared/whether-a-check-would-start.ts'
@@ -100,7 +99,8 @@ async function theSwitch(payload: Record<string, unknown>): Promise<void> {
 }
 
 /** A run of the worker that says it is finished, so the office asks the inspector to check it. */
-async function aFinishedRun(title: string): Promise<{ run: string; check: TheCheck }> {
+async function aFinishedRun(title: string, how: 'ordinary' | 'closed' | 'explicit-off' = 'ordinary'): Promise<{ run: string; check: TheCheck }> {
+  if (how === 'explicit-off') await theSwitch({ on: true })
   const filed = await call('POST', '/api/records', {
     kind: 'session', title, data: { state: 'running', servingAgent: 'the-worker', cutFrom: 'main', tip: fixtureTip, doing: 'made-up work under check' },
   }, as('agent', 'the-worker'))
@@ -109,7 +109,16 @@ async function aFinishedRun(title: string): Promise<{ run: string; check: TheChe
   t.client.sqlite.prepare('INSERT INTO legacy_unsealed_runs VALUES (?)').run(run)
   const finished = await call('PATCH', `/api/records/${run}`, { dataPatch: { state: 'finished', doing: 'the made-up work is done' } }, as('agent', 'the-worker'))
   expect(finished.status, finished.raw).toBe(200)
-  const check = finished.body['theCheck'] as TheCheck | undefined
+  if (how === 'explicit-off') {
+    await theSwitch({ on: false })
+    const asked = await call('POST', `/api/checks/${run}/ask-again`, {}, person)
+    expect(asked.status, asked.raw).toBe(200)
+  }
+  const check = (how === 'explicit-off' ? t.api.getRecord(run)!.data['theCheck'] : finished.body['theCheck']) as TheCheck | undefined
+  if (how === 'closed') {
+    expect(check).toBeUndefined()
+    return { run, check: check! }
+  }
   expect(check?.askedOf, finished.raw).toBe('inspector-one')
   return { run, check: check! }
 }
@@ -183,20 +192,20 @@ describe('what a run stores when the office queues its check', () => {
     expect((t.api.getRecord(check.message!)!.data as { body: string }).body).toBe(check.says)
   })
 
-  it('2. merges-only, and checks are switched off: it says they are off', async () => {
+  it('2. merges-only, and checks are switched off: the seal closes the run', async () => {
     await theSwitch({ on: false })
-    const { run, check } = await aFinishedRun('A made-up run asked while checks are off')
-    expect(check.says).toBe(aCheckNothingStartsSays('Inspector One', check.askedAt, { because: CHECKS_ARE_SWITCHED_OFF, whoCanStartIt: THE_OWNER_OR_A_SECRETARY_CAN_SWITCH_CHECKS_ON }))
-    expect(theMarkOf(run)?.because).toBe(CHECKS_ARE_SWITCHED_OFF)
+    const { run } = await aFinishedRun('A made-up run sealed while checks are off', 'closed')
+    expect(t.api.getRecord(run)!.data['needsNoCheck']).toMatchObject({ rule: NEEDS_NO_CHECK_RULES[1] })
+    expect(howARunStands(t.api.getRecord(run)!.data).standing).toBe('closed')
+    expect(theMarkOf(run)).toBeUndefined()
   })
 
-  it('3. merges-only, and checks are on for another project only: it names that project and this one', async () => {
+  it('3. merges-only, and checks are on for another project only: the seal closes the run', async () => {
     await theSwitch({ on: true, projects: ['second'] })
-    const { run, check } = await aFinishedRun('A made-up run asked while checks are on for another project')
-    const because = checksAreOnForOtherProjects(['second'], WORKSPACE)
-    for (const project of ['second', WORKSPACE]) expect(because).toContain(project)
-    expect(check.says).toBe(aCheckNothingStartsSays('Inspector One', check.askedAt, { because, whoCanStartIt: THE_OWNER_OR_A_SECRETARY_CAN_SWITCH_CHECKS_ON }))
-    expect(theMarkOf(run)?.because).toBe(because)
+    const { run } = await aFinishedRun('A made-up run sealed while checks are on for another project', 'closed')
+    expect(t.api.getRecord(run)!.data['needsNoCheck']).toMatchObject({ rule: NEEDS_NO_CHECK_RULES[1] })
+    expect(howARunStands(t.api.getRecord(run)!.data).standing).toBe('closed')
+    expect(theMarkOf(run)).toBeUndefined()
   })
 
   it('4. where something would start it, the sentence of a check that will start, and no mark', async () => {
@@ -232,7 +241,7 @@ describe('what a run stores when the office queues its check', () => {
 describe("the run's starter is told once, A_CHECK_NOTHING_STARTS_IS_TOLD_AFTER_MS after the ask", () => {
   it('6. nothing a minute before; one line a minute after, with why and who can start it; nothing on the next tick', async () => {
     await theSwitch({ on: false })
-    const { run, check } = await aFinishedRun('A made-up run whose starter is told')
+    const { run, check } = await aFinishedRun('A made-up run whose starter is told', 'explicit-off')
     const mark = theMarkOf(run)!
     const asked = mark.tellAfterMs - A_CHECK_NOTHING_STARTS_IS_TOLD_AFTER_MS
 
@@ -261,17 +270,17 @@ describe("the run's starter is told once, A_CHECK_NOTHING_STARTS_IS_TOLD_AFTER_M
 describe('nobody is told where the check no longer waits on nothing', () => {
   it('7. started, released, refused, replaced, answered, deleted, or something would start it at the tick: no line, and why', async () => {
     await theSwitch({ on: false })
-    const started = (await aFinishedRun('A made-up run whose check started')).run
+    const started = (await aFinishedRun('A made-up run whose check started', 'explicit-off')).run
     theToolStarted(started)
 
-    const released = (await aFinishedRun('A made-up run its starter released')).run
+    const released = (await aFinishedRun('A made-up run its starter released', 'explicit-off')).run
     writeAVerdictAsItsDoorWould(t, released, { released: { by: { kind: 'agent', id: theSecretary }, how: 'its starter', at: localStamp(new Date()) } })
 
-    const refused = (await aFinishedRun('A made-up run the inspector refused')).run
+    const refused = (await aFinishedRun('A made-up run the inspector refused', 'explicit-off')).run
     writeAVerdictAsItsDoorWould(t, refused, { refused: { by: { kind: 'agent', id: 'inspector-one' }, at: localStamp(new Date()), missing: ['a made-up missing thing'] } })
 
     // A NEWER ASK THAT SOMETHING WOULD START writes no mark of its own, so the old mark is the one the tick reads.
-    const replaced = (await aFinishedRun('A made-up run asked again')).run
+    const replaced = (await aFinishedRun('A made-up run asked again', 'explicit-off')).run
     const firstAsk = theMarkOf(replaced)!.message
     await theSwitch({ on: true })
     const again = await call('POST', `/api/checks/${replaced}/ask-again`, {}, person)
@@ -279,16 +288,16 @@ describe('nobody is told where the check no longer waits on nothing', () => {
     expect((t.api.getRecord(replaced)!.data['theCheck'] as TheCheck).message).not.toBe(firstAsk)
     await theSwitch({ on: false })
 
-    const answered = (await aFinishedRun('A made-up run closed unchecked')).run
+    const answered = (await aFinishedRun('A made-up run closed unchecked', 'explicit-off')).run
     inspection.closeARunUnchecked({
       runId: answered, workspaceId: WORKSPACE, because: 'A made-up reason to close it unchecked.',
       actor: { type: 'human', id: THE_TEST_OFFICES_OWNER.id, provedBy: 'the-person-key' },
     })
 
-    const deleted = (await aFinishedRun('A made-up run that was deleted')).run
+    const deleted = (await aFinishedRun('A made-up run that was deleted', 'explicit-off')).run
     t.client.sqlite.prepare('UPDATE records SET deleted_at = ? WHERE id = ?').run(localStamp(new Date()), deleted)
 
-    const switchedOn = (await aFinishedRun('A made-up run whose checks were switched on')).run
+    const switchedOn = (await aFinishedRun('A made-up run whose checks were switched on', 'explicit-off')).run
     const marks = new Map([started, released, refused, replaced, answered, deleted, switchedOn].map((run) => [run, theMarkOf(run)!]))
     await theSwitch({ on: true })
 
@@ -315,7 +324,7 @@ describe('nobody is told where the check no longer waits on nothing', () => {
 
 describe('the runs asked before the mark existed', () => {
   it('8. a run whose check was queued with no mark tells nobody', async () => {
-    const { run } = await aFinishedRun('A made-up run asked before this round')
+    const { run } = await aFinishedRun('A made-up run asked before this round', 'explicit-off')
     t.client.sqlite.prepare("UPDATE records SET data = json_remove(data, '$.aCheckNothingStarts') WHERE id = ?").run(run)
     const at = new Date(Date.now() + 2 * A_CHECK_NOTHING_STARTS_IS_TOLD_AFTER_MS)
     expect(starts.tellTheStartersOfChecksNothingStarts(at)).not.toContain(run)
@@ -331,13 +340,13 @@ describe('the cost of a tick', () => {
     expect(theWordsOfAStoredField(STORED_FIELDS.sessionTellsOfACheckNothingStartsAfter, 'data')).toContain(`'$.${A_CHECK_NOTHING_STARTS}.tellAfterMs'`)
 
     // 300 RUNS ASKED BEFORE THE MARK, and three marks not yet due.
-    const old = await aFinishedRun('A made-up run asked long ago')
+    const old = await aFinishedRun('A made-up run asked long ago', 'explicit-off')
     t.client.sqlite.prepare("UPDATE records SET data = json_remove(data, '$.aCheckNothingStarts') WHERE id = ?").run(old.run)
     // EVERY COLUMN BUT THE ID IS COPIED, so a column the records table gains later needs no change here.
     const columns = (t.client.sqlite.prepare('PRAGMA table_info(records)').all() as { name: string }[]).map((column) => column.name).filter((name) => name !== 'id').join(', ')
     const copy = t.client.sqlite.prepare(`INSERT INTO records (id, ${columns}) SELECT ?, ${columns} FROM records WHERE id = ?`)
     for (let n = 0; n < 300; n += 1) copy.run(`made-up-old-run-${String(n)}`, old.run)
-    for (let n = 0; n < 3; n += 1) await aFinishedRun(`A made-up run not yet due, ${String(n)}`)
+    for (let n = 0; n < 3; n += 1) await aFinishedRun(`A made-up run not yet due, ${String(n)}`, 'explicit-off')
 
     const ran: { sql: string; values: unknown[] }[] = []
     const prepare = t.client.sqlite.prepare.bind(t.client.sqlite)
@@ -371,7 +380,7 @@ describe('the cost of a tick', () => {
 describe('the minute pass', () => {
   it('10. calls the step, and its report names the run whose starter it told', async () => {
     await theSwitch({ on: false })
-    const { run } = await aFinishedRun('A made-up run the minute pass tells of')
+    const { run } = await aFinishedRun('A made-up run the minute pass tells of', 'explicit-off')
     const now = new Date(theMarkOf(run)!.tellAfterMs + MINUTE)
     const steps: { name: string }[] = []
     const pass = reminders.sendTheRemindersThatAreDue(WORKSPACE, now, new Date(now.getTime() - MINUTE), undefined, steps as never)
@@ -391,7 +400,7 @@ describe('a reminder after ownership changes', () => {
     setFixtureOwner(t.client.sqlite, ownerId, worker.id, 'id')
     try {
       await theSwitch({ on: false })
-      const { run } = await aFinishedRun('A made-up run whose owner is told')
+      const { run } = await aFinishedRun('A made-up run whose owner is told', 'explicit-off')
       const mark = theMarkOf(run)!
       expect(starts.tellTheStartersOfChecksNothingStarts(new Date(mark.tellAfterMs + MINUTE))).toContain(run)
       expect(theLinesAbout(run).map((line) => line.to)).toEqual([[{ kind: 'agent', id: ownerId }]])

@@ -12,7 +12,7 @@
 import type { WhatTheKeyWindowSays, WindowClosedBy } from '@shared/keywindow.ts'
 import { settings } from '../../config/settings.mjs'
 import { sqlite } from './client.ts'
-import type { WindowRow } from '../lib/keywindow.ts'
+import type { WindowRow } from './types/keywindow.ts'
 
 /** The cached reading, or the row read and kept for this database path. */
 export function theKeyWindowSays(): WhatTheKeyWindowSays {

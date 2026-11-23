@@ -19,8 +19,9 @@ import { closeSync, existsSync, openSync, readSync, renameSync, rmSync, statSync
  * IT IS JAVASCRIPT FOR THE SAME REASON src/config/key-header.mjs IS. The tools are plain
  * JavaScript run by node and cannot import src/server/db/schema.ts, so until this file existed
  * tools/isolated-mole-office.mjs typed the table's name itself. A table added to one list and not
- * the other would leave key hashes in one kind of copy with nothing failing. schema.ts re-exports
- * the list from here, so every TypeScript reader still imports it from the schema.
+ * the other would leave key hashes in one kind of copy with nothing failing. table-name-lists.ts
+ * in src/server/db/ re-exports the list from here, and schema.ts re-exports that file, so every
+ * TypeScript reader still imports it from the schema.
  *
  * DELETING A ROW DOES NOT TAKE IT OUT OF THE FILE. This build of SQLite does not overwrite deleted
  * content (`secure_delete` is off), so a deleted key hash stays readable in the file's free space
@@ -54,7 +55,7 @@ import { closeSync, existsSync, openSync, readSync, renameSync, rmSync, statSync
 
 /**
  * THE TABLES EVERY COPY EMPTIES. `held_keys` holds the SHA-256 of every key the office issued.
- * The schema's comment on this list, in src/server/db/schema.ts, says why each one is here.
+ * The schema's comment on this list, in src/server/db/table-name-lists.ts, says why each one is here.
  */
 export const NOT_CARRIED_TABLES = /** @type {const} */ (['held_keys', 'run_tokens'])
 

@@ -1,6 +1,7 @@
 // Copyright © 2026 Zhengyang Shen
 // Licensed under the MIT License. See LICENSE.
 import { ProviderKeyPanel } from '../components/settings/ProviderKeyPanel.tsx'
+import { CodingToolsPanel } from '../components/settings/CodingToolsPanel.tsx'
 import { StorageDestinationsPanel } from '../components/StorageDestinations.tsx'
 /**
  * `#/settings` — HOW THIS BROWSER DRAWS MOLE OFFICE, AND WHO YOUR WRITES ARE ATTRIBUTED TO.
@@ -97,6 +98,7 @@ import { PreviewRootsPanel } from '../components/PreviewRoots.tsx'
 import { ReviewMarksPanel } from '../components/ReviewMarks.tsx'
 import { AppearancePanel } from '../components/Appearance.tsx'
 import { ChatCirclePanel } from '../components/ChatCircle.tsx'
+import { ReportCountPanel } from '../components/ReportCount.tsx'
 import { MessageLinksPanel } from '../components/MessageLinks.tsx'
 import { ChatPicturesPanel } from '../components/ChatPictures.tsx'
 import { ChatTextSizePanel } from '../components/ChatTextSize.tsx'
@@ -332,6 +334,9 @@ export function SettingsPage() {
  */
 function PanelBody({ surface, namedButHidden }: { surface: SettingsSurface; namedButHidden: SettingsSurface | null }): ReactNode {
   switch (surface) {
+    // ONE LINE FOR EACH CODING TOOL, WITH ITS SET UP PRESS (wave 13u round 242).
+    case 'settings.codingtools':
+      return <CodingToolsPanel />
     case 'settings.providerkeys':
       return <ProviderKeyPanel />
     case 'settings.look':
@@ -350,6 +355,8 @@ function PanelBody({ surface, namedButHidden }: { surface: SettingsSurface; name
           <DetailSaysPanel />
         </Panel>
       )
+    case 'settings.reportcount':
+      return <ReportCountPanel />
     case 'settings.writer':
       return (
         <Panel titleIs="label" declares={{ surface: 'settings.writer' }} title={t('settingsPanel.title.writer')}>

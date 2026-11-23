@@ -31,7 +31,7 @@ import { THE_TEST_OFFICES_SECRETARY } from './a-page-of-a-test-office.ts'
 import { mkdirSync } from 'node:fs'
 import type { Page } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { liveApp, waitForThePage, type LiveApp } from './helpers.ts'
+import { liveApp, waitForThePage, type LiveApp, governsTheWholeProject } from './helpers.ts'
 import { createI18n } from '../src/shared/i18n.ts'
 import { THE_OWNER } from '../src/shared/kinds.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
@@ -103,7 +103,8 @@ beforeAll(async () => {
   const decision = await write(AS_THE_PERSON, {
     kind: 'decision',
     title: 'Made-up decision: the made-up project secretary keeps this project',
-    data: { option_taken: 'Made-up: the made-up project secretary keeps this project.', because: 'Made-up reason.', decided_by: THE_OWNER, replaces: [] },
+    data: { option_taken: 'Made-up: the made-up project secretary keeps this project.', because: 'Made-up reason.', decided_by: THE_OWNER,
+      ...governsTheWholeProject(), replaces: [] },
   })
   await write(AS_THE_PERSON, {
     kind: 'secretary_duties',

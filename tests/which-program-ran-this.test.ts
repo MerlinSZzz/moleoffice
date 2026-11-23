@@ -79,8 +79,8 @@ describe('which of two programs of the same name answered', () => {
     aProgram(older, 'codex', 'echo "codex-cli 0.137.0"')
     aProgram(newer, 'codex', 'echo "codex-cli 0.147.0"')
 
-    const front = theProgramThatRan('codex', `${newer}:${older}`)
-    const behind = theProgramThatRan('codex', `${older}:${newer}`)
+    const front = theProgramThatRan('codex', { PATH: `${newer}:${older}` })
+    const behind = theProgramThatRan('codex', { PATH: `${older}:${newer}` })
 
     // THE SAME COMMAND, THE SAME TWO PROGRAMS, TWO DIFFERENT ANSWERS. Which one runs is decided by
     // the PATH the worker was started with, and now the answer says so instead of leaving it out.
@@ -98,9 +98,9 @@ describe('which of two programs of the same name answered', () => {
     const counted = join(dir, 'times-it-was-asked')
     aProgram(dir, 'codex', `echo asked >> ${counted}\necho "codex-cli 0.147.0"`)
 
-    const first = theProgramThatRan('codex', dir)
-    const second = theProgramThatRan('codex', dir)
-    const third = theProgramThatRan('codex', dir)
+    const first = theProgramThatRan('codex', { PATH: dir })
+    const second = theProgramThatRan('codex', { PATH: dir })
+    const third = theProgramThatRan('codex', { PATH: dir })
 
     expect(first.version).toBe('codex-cli 0.147.0')
     expect(second.version).toBe(first.version)
@@ -113,7 +113,7 @@ describe('which of two programs of the same name answered', () => {
     const dir = aDirectory()
     aProgram(dir, 'codex', 'echo "codex-cli 0.147.0" 1>&2')
 
-    const read = theProgramThatRan('codex', dir)
+    const read = theProgramThatRan('codex', { PATH: dir })
 
     expect(read.version).toBe('codex-cli 0.147.0')
     expect(read.versionWasRead).toBe(true)
@@ -124,7 +124,7 @@ describe('a version that could not be read says so, and is never a guess', () =>
   it('says nothing of that name is on this PATH, and gives no path', () => {
     const empty = aDirectory()
 
-    const read = theProgramThatRan('codex', empty)
+    const read = theProgramThatRan('codex', { PATH: empty })
 
     expect(read.path).toBeNull()
     expect(read.versionWasRead).toBe(false)
@@ -135,7 +135,7 @@ describe('a version that could not be read says so, and is never a guess', () =>
     const dir = aDirectory()
     aProgram(dir, 'codex', 'echo "unknown option --version" 1>&2\nexit 3')
 
-    const read = theProgramThatRan('codex', dir)
+    const read = theProgramThatRan('codex', { PATH: dir })
 
     // THE PATH IS STILL KNOWN. Which program ran and what version it is are two facts, and failing
     // to read the second does not lose the first.
@@ -148,7 +148,7 @@ describe('a version that could not be read says so, and is never a guess', () =>
     const dir = aDirectory()
     aProgram(dir, 'codex', 'exit 0')
 
-    const read = theProgramThatRan('codex', dir)
+    const read = theProgramThatRan('codex', { PATH: dir })
 
     expect(read.versionWasRead).toBe(false)
     expect(read.version).toContain('printed nothing')

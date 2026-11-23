@@ -43,7 +43,7 @@
 import { join } from 'node:path'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import type { Page } from 'playwright'
-import { liveApp, waitForThePage, type LiveApp } from './helpers.ts'
+import { liveApp, waitForThePage, type LiveApp, governsTheWholeProject } from './helpers.ts'
 import { createI18n } from '../src/shared/i18n.ts'
 import { THE_OWNER } from '../src/shared/kinds.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
@@ -84,7 +84,8 @@ async function aDecision(title: string, replaces: string[]): Promise<string> {
     body: JSON.stringify({
       kind: 'decision',
       title,
-      data: { option_taken: 'Fixture the greenhouse is watered at dawn.', because: 'Fixture a reason.', decided_by: THE_OWNER, replaces },
+      data: { option_taken: 'Fixture the greenhouse is watered at dawn.', because: 'Fixture a reason.', decided_by: THE_OWNER,
+        ...governsTheWholeProject(), replaces },
     }),
   })
   expect(filed.status, await filed.clone().text()).toBe(201)

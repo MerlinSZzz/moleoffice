@@ -18,6 +18,9 @@ import { content, t, type WordKey } from '@shared/i18n.ts'
 import { settingsControlWord } from '@shared/settings-declaration.ts'
 import { api, errorMessage, faultOf } from '../api.ts'
 import { ErrorNote, Loading, Panel, useAsync } from './ui.tsx'
+import { AgentPicker } from './agent/AgentPicker.tsx'
+import { readParticipantsOnce } from '../lib/oneread.ts'
+import { useProjectAsync } from '../lib/project-async.ts'
 import type { RuntimeSettingsReply } from '../../server/api/runtime-settings.ts'
 
 export function OfficeControls() {
@@ -36,7 +39,9 @@ const A_FIELD = `max-width:100%;width:100%;box-sizing:border-box;min-height:32px
 const THE_NOTICE_LOOK = `{prefix} .orc-refused{margin:.6rem 0;padding:var(--pad);border:var(--border-w) solid var(--st-blocked-line);border-left:var(--rail) solid var(--st-blocked);border-radius:var(--radius);background:var(--st-blocked-bg)}{prefix} .orc-refused p{margin:0 0 .4rem}`
 const THE_FIELD_AND_PRESS_LOOK = `{prefix} label{display:block;margin:.6rem 0}{prefix} input{${A_FIELD}}{prefix} button{margin:.4rem .6rem .4rem 0;min-height:32px}`
 function withPrefix(prefix: string, look: string): string { return look.split('{prefix}').join(prefix) }
-function OfficeControlStyle() {return <style href="office-controls" precedence="default">{`.orc{margin-top:1rem;min-width:0}.orc details{border-top:1px solid var(--border);padding:.75rem 0}.orc summary{cursor:pointer;overflow-wrap:anywhere}${withPrefix('.orc', THE_FIELD_AND_PRESS_LOOK)}.orc select{${A_FIELD}}.orc p{overflow-wrap:anywhere}.orc small{display:block;overflow-wrap:anywhere;opacity:.75}.orc .orc-actions{display:flex;flex-wrap:wrap}${withPrefix('.orc', THE_NOTICE_LOOK)}`}</style>}
+// AN AGENT PICKER'S ROWS ARE BUTTONS: they take back the margin and height the panel gives its presses, so a row fills
+// the picker's list and does not spill past it.
+function OfficeControlStyle() {return <style href="office-controls" precedence="default">{`.orc{margin-top:1rem;min-width:0}.orc details{border-top:1px solid var(--border);padding:.75rem 0}.orc summary{cursor:pointer;overflow-wrap:anywhere}${withPrefix('.orc', THE_FIELD_AND_PRESS_LOOK)}.orc .agp-row{margin:0;min-height:var(--row-h)}.orc select{${A_FIELD}}.orc p{overflow-wrap:anywhere}.orc small{display:block;overflow-wrap:anywhere;opacity:.75}.orc .orc-actions{display:flex;flex-wrap:wrap}${withPrefix('.orc', THE_NOTICE_LOOK)}`}</style>}
 // THE BLOCK A NORMAL-MODE SETTINGS PAGE DRAWS FOR SAVED VALUES THIS RELEASE REFUSES. It stands beside
 // OfficeControlStyle and draws the notice, the reason field and the press from the same rules, written once above
 // and filled with this drawing's own class, so the refusal reads and stays dressed the same wherever it is drawn.
@@ -237,21 +242,24 @@ export function RestartControls() {
   </section></Panel>
 }
 function GrantControl({ updated }: { updated: () => void }) {
-  const [agentQuery, setAgentQuery] = useState(''), [decisionQuery, setDecisionQuery] = useState('')
-  const [agents, setAgents] = useState<{id:string;title:string}[]>([]), [decisions, setDecisions] = useState<{id:string;title:string}[]>([])
+  const [decisionQuery, setDecisionQuery] = useState('')
+  const [decisions, setDecisions] = useState<{id:string;title:string}[]>([])
   const [agent, setAgent] = useState(''), [decision, setDecision] = useState(''), [because, setBecause] = useState('')
   const [fault, setFault] = useState<ReturnType<typeof faultFromThrown> | null>(null)
-  async function find(which: 'agent' | 'decision') {
-    try {
-      if (which === 'agent') { const found = await api.restartAgents(agentQuery); setAgents(found.agents.map((a) => ({id:a.id,title:a.name || a.handle}))) }
-      else { const found = await api.search(decisionQuery, 'decision', 10, 'all'); setDecisions(found.results.map((m) => ({id:m.record.id,title:m.record.title}))) }
-    } catch (error) { setFault(faultFromThrown(error)) }
+  // THE AGENTS A GRANT MAY NAME: every agent that is not retired, the agents the grant door's own search offers, read
+  // from the registries the picker reads. Nothing is chosen until a row is pressed.
+  const [participants, refreshParticipants] = useProjectAsync(readParticipantsOnce, [])
+  const agentLabel = t(settingsControlWord('settings.restart', 'officeRestart.agent'))
+  async function findDecisions() {
+    try { const found = await api.search(decisionQuery, 'decision', 10, 'all'); setDecisions(found.results.map((m) => ({id:m.record.id,title:m.record.title}))) }
+    catch (error) { setFault(faultFromThrown(error)) }
   }
   async function save(remove: boolean) { try { await api.restartGrant(agent, remove ? null : decision, because); updated(); setBecause('') } catch (error) { setFault(faultFromThrown(error)) } }
   return <details><summary>{t('officeRestart.grants')}</summary><p>{t('officeRestart.permission')}</p>
-    <label>{t(settingsControlWord('settings.restart', 'officeRestart.searchAgent'))}<input value={agentQuery} onChange={(e) => setAgentQuery(e.target.value)} /></label><button onClick={() => { void find('agent') }}>{t(settingsControlWord('settings.restart', 'officeRestart.findAgent'))}</button>
-    <label>{t(settingsControlWord('settings.restart', 'officeRestart.agent'))}<select aria-label={t(settingsControlWord('settings.restart', 'officeRestart.agent'))} value={agent} onChange={(e) => setAgent(e.target.value)}><option value="">{t('runtimeSettings.unset')}</option>{agents.map((a) => <option key={a.id} value={a.id}>{content(a.title)}</option>)}</select></label>
-    <label>{t(settingsControlWord('settings.restart', 'officeRestart.searchDecision'))}<input value={decisionQuery} onChange={(e) => setDecisionQuery(e.target.value)} /></label><button onClick={() => { void find('decision') }}>{t(settingsControlWord('settings.restart', 'officeRestart.findDecision'))}</button>
+    {participants.status === 'loading' ? <Loading what={agentLabel} rows={1} /> : participants.status === 'error' ? <ErrorNote message={participants.message} fault={participants.fault} label={agentLabel} retry={refreshParticipants} /> : (
+      <AgentPicker label={agentLabel} candidates={participants.value.agents.filter((one) => !one.retired).map((one) => ({ kind: 'agent' as const, id: one.id }))} chosen={agent} onChoose={setAgent} />
+    )}
+    <label>{t(settingsControlWord('settings.restart', 'officeRestart.searchDecision'))}<input value={decisionQuery} onChange={(e) => setDecisionQuery(e.target.value)} /></label><button onClick={() => { void findDecisions() }}>{t(settingsControlWord('settings.restart', 'officeRestart.findDecision'))}</button>
     <label>{t(settingsControlWord('settings.restart', 'officeRestart.decision'))}<select aria-label={t(settingsControlWord('settings.restart', 'officeRestart.decision'))} value={decision} onChange={(e) => setDecision(e.target.value)}><option value="">{t('runtimeSettings.unset')}</option>{decisions.map((d) => <option key={d.id} value={d.id}>{content(d.title)}</option>)}</select></label>
     <label>{t(settingsControlWord('settings.restart', 'officeRestart.grantReason'))}<input value={because} onChange={(e) => setBecause(e.target.value)} maxLength={500} /></label>
     <button disabled={!agent || !decision || !because.trim()} onClick={() => { void save(false) }}>{t(settingsControlWord('settings.restart', 'officeRestart.give'))}</button><button disabled={!agent || !because.trim()} onClick={() => { void save(true) }}>{t(settingsControlWord('settings.restart', 'officeRestart.takeBack'))}</button>

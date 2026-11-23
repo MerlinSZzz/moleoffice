@@ -1675,8 +1675,9 @@ export async function resourceRoutes(app: FastifyInstance): Promise<void> {
       view !== null && view.targets.length > 0
         ? whatWentAway(view.targets, probe)
         : {
-            killed: result.acted && !result.stillAlive ? [description] : [],
-            survived: result.acted && result.stillAlive ? [description] : [],
+            // A release that could not tell whether its target is gone puts it in neither list; its outcome says why.
+            killed: result.acted && result.stillAlive === false ? [description] : [],
+            survived: result.acted && result.stillAlive === true ? [description] : [],
           }
 
     return {

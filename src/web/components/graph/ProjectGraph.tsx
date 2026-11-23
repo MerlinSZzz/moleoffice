@@ -30,11 +30,12 @@ import { PROJECT_GRAPH_LEVELS, type ProjectGraphCheckpoint, type ProjectGraphFut
 import { t, type WordKey } from '@shared/i18n.ts'
 import { linkWord, stateWord } from '@shared/words.ts'
 import { useLanguage } from '../../lib/language.ts'
-import { useMode } from '../../lib/mode.ts'
+import { useInspect, useMode } from '../../lib/mode.ts'
 import { recordPath } from '../router.tsx'
 import { EVOLUTION_WEIGHT } from './evolution-model.ts'
 import { LINE_WEIGHT } from './lines.ts'
 import { lineWithMaths } from '../plans/PlanMaths.tsx'
+import { ServerNote } from '../ui.tsx'
 import {
   futureCurve,
   type GraphLane,
@@ -695,16 +696,14 @@ function PlansAndTime({ model, level }: { model: ProjectGraphModel; level: Proje
 }
 
 function Notes({ model }: { model: ProjectGraphModel }) {
-  const notes = model.notes.length > 0 ? model.notes : model.empty ? [t('projectGraph.emptyFallback')] : []
-  if (notes.length === 0) return null
+  const inspect = useInspect()
+  if (!inspect || model.notes.length === 0) return null
   return (
     <section className="gph-notes" aria-label={t('projectGraph.notes.title')}>
       <h2 className="gph-notes-title">{t('projectGraph.notes.title')}</h2>
-      <ul className="gph-notes-list">
-        {notes.map((note, at) => (
-          <li key={at}>{note}</li>
-        ))}
-      </ul>
+      {model.notes.map((note, at) => (
+        <ServerNote key={at} text={note} />
+      ))}
     </section>
   )
 }
@@ -766,7 +765,7 @@ export function ProjectGraph({ model, level }: { model: ProjectGraphModel; level
         </p>
       ) : null}
       {model.lanes.length === 0 ? (
-        model.empty ? null : <p className="gph-nolanes">{t('projectGraph.noLanes')}</p>
+        <p className="gph-nolanes">{t('projectGraph.lanes.none')}</p>
       ) : (
         <div className="gph-lanes">
           {model.lanes.map((lane) => (
@@ -871,7 +870,7 @@ const PROJECT_GRAPH_CSS = `
 .gph-link:hover, .gph-link:focus-visible { text-decoration-color: var(--text); }
 .gph-item-title { font: 600 var(--fs-2)/var(--lh-body) var(--font-ui); }
 .gph-value { color: var(--text-2); font: var(--fs-1)/var(--lh-body) var(--font-ui); }
-.gph-quiet, .gph-what, .gph-reason, .gph-summary, .gph-line, .gph-notes-list, .gph-nolanes {
+.gph-quiet, .gph-what, .gph-reason, .gph-summary, .gph-line, .gph-nolanes {
   margin: 2px 0 0;
   font: var(--fs-1)/var(--lh-body) var(--font-ui);
   color: var(--text-3);
@@ -1020,8 +1019,6 @@ const PROJECT_GRAPH_CSS = `
 }
 .gph-project-checkpoints { margin-top: var(--pad); }
 .gph-notes { margin-top: calc(var(--gut) * 2); padding-top: var(--gut); border-top: 1px solid var(--border); }
-.gph-notes-list { margin: 0; padding-left: 1.1em; }
-.gph-notes-list li { margin: 0 0 calc(var(--pad) * 0.5); }
 .gph-band {
   margin-top: calc(var(--gut) * 2);
   padding-top: var(--gut);

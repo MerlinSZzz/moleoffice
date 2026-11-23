@@ -27,8 +27,8 @@
  * silent version of that — a control that says nothing about what it does not do — and the shape of
  * the original defect, a preview fed from a second copy of the value.
  *
- *   1. The panel says on the screen, without anything being pressed, that nothing draws these two
- *      colours on a reading yet, and it names what is not built.
+ *   1. The panel says on the screen, without anything being pressed, that the two colours are not
+ *      used on any page yet.
  *   2. The sample follows the token. Change `--review-local` on the root element and the sample's
  *      edge changes with it. A sample fed from React state would not move.
  *   3. Every palette draws both marks in a colour of their own. A palette declaring neither token
@@ -106,21 +106,13 @@ const words = (): string =>
 const sample = (key: string): string => `.rvm-mark[data-mark-key='${key}']`
 
 describe('the panel says what it does not do', () => {
-  it('says on the screen, with nothing pressed, that nothing draws these colours on a reading yet', () => {
+  it('says on the screen, with nothing pressed, that these colours are not used on any page yet', () => {
     // USER.md invariant 3: an unbuilt thing is labelled where it appears. A reader who presses these
-    // controls and sees only the sample move must be told why, on this screen, at rest.
+    // controls and sees only the sample move is shown the state, on this screen, at rest.
     //
-    // THE SENTENCE IS READ FROM THE WORD LIST, not copied here, as the owner decided. The
-    // check of round 153 asked the English to name the two colour choices, as the Chinese does, and a literal in this
-    // test would have to be edited a second time for that.
+    // THE WORDS ARE READ FROM THE WORD LIST by their key, not copied here.
     const { t } = createI18n('en')
-    const sentence = t('settingsPanel.marks.notBuilt')
-    expect(words()).toContain(sentence)
-    // Named, not vague: the sentence names the two colours above and says what is missing, so it is a
-    // pointer rather than an apology, and it says the choice is kept.
-    expect(sentence).toContain('two colours')
-    expect(sentence).toContain('is not built')
-    expect(sentence).toContain('Your choice is kept')
+    expect(words()).toContain(t('settingsPanel.marks.notUsedYet'))
   })
 })
 

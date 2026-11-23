@@ -73,8 +73,6 @@ export const REGULATIONS_WORDS = {
   get keepIt() { return t('unrowedPages.regulations.keepIt') },
   /** Over the list of chapters. */
   get chapters() { return t('unrowedPages.regulations.chapters') },
-  /** The reason behind the short mark when no module record carries a chapter number. */
-  get noChapters() { return t('unrowedPages.regulations.noChapters') },
 }
 
 /** Suggested Chinese titles, keyed by the regulation record id. */
@@ -164,7 +162,6 @@ export function TheRegulations({
   const standing = said.regulations.filter((one) => one.revokedAt === null).length
   return (
     <>
-      <p className="ofc-lead">{t('regulationsPage.lead')}</p>
       {person ? <div className="ofc-mode">
         <Btn variant="ghost" size="sm" onClick={() => setEditing(!editing)}>
           {t(editing ? 'regulationsMode.read' : 'regulationsMode.edit')}
@@ -172,7 +169,7 @@ export function TheRegulations({
       </div> : null}
 
       <section className="ofc-part" data-part="general" aria-labelledby="ofc-part-general">
-      <PartHead id="ofc-part-general" name={t('regulationsPage.general')} says={t('regulationsPage.generalSays')} />
+      <PartHead id="ofc-part-general" name={t('regulationsPage.general')} />
       <section className="ofc-sec" {...declaredAttributes({ surface: 'regulations.person' })}>
         <h3 className="ofc-label">
           <span data-title-is="its-label" {...DRAWS_THE_NAME}>{REGULATIONS_WORDS.theirRegulations}</span>
@@ -192,22 +189,10 @@ export function TheRegulations({
             ))}
           </ul>
         )}
-        {/* THE EXPLANATION IS A CLOSED ONE-LINE FOLD at the section's foot (the shared rule R7 of
-            report n9Mjk3c_sJRu block b-3), so the page leads with the rules and not with a paragraph
-            about where they come from. */}
-        <details className="ofc-fold">
-          <summary>{t('regulationsPage.differs')}</summary>
-          <p>
-            {t('regulationsPage.differsText')}{' '}
-            {selected === undefined ? t('unrowedPages.regulations.lead.chapters', { n: chapterCount }) : t('chapterEdit.readingCount', { n: chapterCount })}{' '}
-            {t('unrowedPages.regulations.lead.regulations', { n: said.regulations.length })}{' '}
-            {t('unrowedPages.regulations.lead.copy')}
-          </p>
-        </details>
       </section>
 
       {selected?.unsupported ? <div role="status" className="ofc-unsupported" data-unsupported-chapters="">
-        <p>{t('chapterEdit.unsupported')}</p>
+        <p>{t('regulationsPage.notInUse')}</p>
         <ul>{selected.unsupported.records.map(id => <li key={id}><RouteLink to={recordPath(id)}>{id}</RouteLink></li>)}</ul>
       </div> : null}
 
@@ -226,7 +211,7 @@ export function TheRegulations({
           )}
           {chapters.length === 0 ? (
             <p className="ofc-none">
-              <Absence tier="ordinary" title={REGULATIONS_WORDS.noChapters} />
+              <Absence tier="ordinary" word={t('absence.none')} />
             </p>
           ) : (
             <ol className="ofc-toc-list">
@@ -254,11 +239,10 @@ export function TheRegulations({
 }
 
 /** A part's name and the one line that says what is in it. */
-function PartHead({ id, name, says }: { id: string; name: string; says: string }) {
+function PartHead({ id, name }: { id: string; name: string }) {
   return (
     <header className="ofc-part-head">
       <h2 className="ofc-part-name" id={id}>{name}</h2>
-      <p className="ofc-part-says">{says}</p>
     </header>
   )
 }
@@ -273,10 +257,10 @@ function PartHead({ id, name, says }: { id: string; name: string; says: string }
 function TheProjectsPart({ project, reminders, judge }: { project: TheProjectChapter; reminders?: TheDesignReminderCount; judge?: TheJudge }) {
   return (
     <section className="ofc-part" data-part="project" aria-labelledby="ofc-part-project">
-      <PartHead id="ofc-part-project" name={t('regulationsPage.thisProject')} says={t('regulationsPage.thisProjectSays')} />
+      <PartHead id="ofc-part-project" name={t('regulationsPage.thisProject')} />
       {project.chapter === null ? (
         <p className="ofc-none">
-          <Absence tier="ordinary" title={t('regulationsPage.project.none')} say />
+          <Absence tier="ordinary" title={t('regulationsPage.project.noRules')} say />
         </p>
       ) : (
         <>
@@ -325,7 +309,7 @@ function ProjectRuleRow({ rule }: { rule: ProjectRule }) {
         <div className="ofc-fact"><dt>{t('regulationsPage.rule.why')}</dt><dd>{content(rule.reason)}</dd></div>
         <div className="ofc-fact"><dt>{t('regulationsPage.rule.source')}</dt><dd><RouteLink to={recordPath(rule.source)} className="ofc-reg-link">{t('regulationsPage.rule.openSource')}</RouteLink></dd></div>
         <div className="ofc-fact"><dt>{t('regulationsPage.rule.check')}</dt><dd>{CHECK_WORDS[rule.check.name](rule)}</dd></div>
-        <div className="ofc-fact"><dt>{t('regulationsPage.rule.when')}</dt><dd>{TRIGGER_WORDS[rule.trigger]()} {t('regulationsPage.rule.reminds')}</dd></div>
+        <div className="ofc-fact"><dt>{t('regulationsPage.rule.when')}</dt><dd>{TRIGGER_WORDS[rule.trigger]()}</dd></div>
         <div className="ofc-fact"><dt>{t('regulationsPage.rule.state')}</dt><dd>{t(rule.on ? 'regulationsPage.rule.on' : 'regulationsPage.rule.off')} · {t('regulationsPage.revision', { n: rule.revision })}</dd></div>
       </dl>
     </li>
@@ -336,7 +320,7 @@ function ProjectRuleRow({ rule }: { rule: ProjectRule }) {
 function ProjectProblems({ problems }: { problems: ProjectRuleProblem[] }) {
   return (
     <div role="status" className="ofc-unsupported" data-project-problems="">
-      <p>{t('regulationsPage.project.notRead', { n: problems.length })}</p>
+      <p>{t('regulationsPage.project.unread', { n: problems.length })}</p>
       <ul>
         {problems.map((problem) => (
           <li key={`${String(problem.at)}-${problem.code}`}>
@@ -414,7 +398,6 @@ function TheDesignReminders({ count, judge }: { count: TheDesignReminderCount; j
         <span>{t('regulationsPage.reminders.title')}</span>
         <span className="ofc-count">{t('regulationsPage.reminders.range', { range: theDaysCounted(count) })}</span>
       </h3>
-      <p className="ofc-rems-says">{t('regulationsPage.reminders.says')}</p>
       <dl className="ofc-rems-counts">
         {COUNT_WORDS.map(([key, word]) => (
           <div key={key} className="ofc-rems-count" data-count={key}>
@@ -426,7 +409,7 @@ function TheDesignReminders({ count, judge }: { count: TheDesignReminderCount; j
       {count.reminders.length === 0 ? (
         // Its own class: an empty count is not one of the empty lists of regulations above it.
         <p className="ofc-rems-none">
-          <Absence tier="ordinary" title={t('regulationsPage.reminders.none')} say />
+          <Absence tier="ordinary" title={t('absence.none')} say />
         </p>
       ) : (
         <ol className="ofc-rems-list">
@@ -557,13 +540,12 @@ function theCopiesInWords(copied: NonNullable<WhatTheOfficeRegulationsSay['copie
   const only = theOnlyCopyIsTheFirst(copied)
   if (only !== null) {
     return copied.notCopied.length === 0
-      ? wordWithSpacedValues(t, 'regulationsPage.copiedFromTheDefaults', { date: theDayCopied(only.at) })
-      : t('regulationsPage.copiedFromTheDefaultsAndAddedLater', { n: copied.notCopied.length, numbers: numbers(copied.notCopied), date: theDayCopied(only.at) })
+      ? wordWithSpacedValues(t, 'regulationsPage.copiedAtTheStart', { date: theDayCopied(only.at) })
+      : t('regulationsPage.copiedAndAddedLater', { n: copied.notCopied.length, numbers: numbers(copied.notCopied), date: theDayCopied(only.at) })
   }
   return sentencesJoined([
-    ...copied.copies.map(copy => t(copy.first ? 'regulationsPage.copiedAtTheFirstStart' : 'regulationsPage.copiedAtALaterStart', { n: copy.chapters.length, numbers: numbers(copy.chapters), date: theDayCopied(copy.at) })),
+    ...copied.copies.map(copy => t(copy.first ? 'regulationsPage.copiedAtTheFirstStart' : 'regulationsPage.laterStartCopied', { n: copy.chapters.length, numbers: numbers(copy.chapters), date: theDayCopied(copy.at) })),
     ...(copied.notCopied.length === 0 ? [] : [t('regulationsPage.notCopied', { n: copied.notCopied.length, numbers: numbers(copied.notCopied) })]),
-    t('regulationsPage.copiedMayChange'),
   ])
 }
 
@@ -737,7 +719,7 @@ function Regulation({ one, onChanged }: { one: OneRegulation; onChanged?: () => 
             </RouteLink>
           </span>
           <span className="ofc-rev">
-            {one.revision === null ? <Absence tier="ordinary" title={t('regulationsPage.noRevision')} /> : t('regulationsPage.revision', { n: one.revision })}
+            {one.revision === null ? <Absence tier="ordinary" word={t('regulationsPage.revisionNone')} /> : t('regulationsPage.revision', { n: one.revision })}
           </span>
           <span>
             {/* WHOM IT BINDS, only as the record says it. A record that says neither is the absence
@@ -747,7 +729,7 @@ function Regulation({ one, onChanged }: { one: OneRegulation; onChanged?: () => 
             ) : one.binds === 'person' ? (
               t('unrowedPages.regulations.bindsPerson')
             ) : (
-              <Absence tier="ordinary" title={t('unrowedPages.regulations.bindsUnknown')} />
+              <Absence tier="ordinary" word={t('regulationsPage.bindsNotRecorded')} />
             )}
           </span>
           {one.since === null ? null : <span>{t('unrowedPages.regulations.since', { date: content(one.since) })}</span>}
@@ -892,7 +874,7 @@ function RuleMark({ chapter, rule, editing, onChanged }: { chapter: string; rule
   }
   return (
     <div className="ofc-rule-mark">
-      {marked ? <p className="ofc-rule-only">{t('regulationsPage.onlyThisOffice')}</p> : null}
+      {marked ? <p className="ofc-rule-only">{t('regulationsPage.onlyForThisOffice')}</p> : null}
       {canMark ? (
         <Btn variant="ghost" size="sm" pending={busy} pendingFailed={failed !== null} pendingSucceeded={failed === null} onClick={() => void press()}>
           {marked ? t('regulationsPage.giveToNewOffices') : t('regulationsPage.keepForThisOffice')}
@@ -914,7 +896,6 @@ export const REGULATIONS_CSS = `
 .ofc-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--gut); min-width: 0; }
 .ofc-title { margin: 0; font: 600 var(--fs-4)/var(--lh-tight) var(--font-ui); color: var(--text); }
 .ofc-mode { display: flex; flex-wrap: wrap; gap: var(--pad); margin-top: var(--pad); }
-.ofc-lead { margin: 4px 0 0; color: var(--text-2); font: var(--fs-2)/var(--lh-read) var(--font-ui); }
 .ofc-unsupported { border-top: 3px solid var(--accent); margin: var(--gut) 0; padding: .5rem 0; font: var(--fs-1)/var(--lh-read) var(--font-ui); overflow-wrap: anywhere; }
 .ofc-unsupported p { margin: .5rem 0; }
 .ofc-unsupported a { color: var(--accent); }
@@ -963,10 +944,6 @@ export const REGULATIONS_CSS = `
 @media (max-width: 60rem) {
   .ofc-reg-title-edit { grid-template-columns: minmax(0, 1fr); }
 }
-/* THE EXPLANATION: one closed line at the section's foot. */
-.ofc-fold { margin: var(--pad-lg) 0 0; color: var(--text-2); font: var(--fs-1)/var(--lh-read) var(--font-ui); }
-.ofc-fold summary { cursor: pointer; color: var(--accent); width: fit-content; }
-.ofc-fold p { margin: var(--pad) 0 0; max-width: var(--measure-read); }
 
 /* THE CHAPTERS. The list first in the source, so a phone shows it above the text; on a wide screen
    it moves beside the text and stays in view while the text scrolls. Where the switch is, and the two
@@ -1005,7 +982,6 @@ export const REGULATIONS_CSS = `
 .ofc-part { margin: calc(var(--pad-lg) * 3) 0 0; min-width: 0; }
 .ofc-part-head { padding-top: var(--pad-lg); border-top: 2px solid var(--text); }
 .ofc-part-name { margin: 0; color: var(--text); font: 600 var(--fs-4)/var(--lh-tight) var(--font-ui); }
-.ofc-part-says { margin: 4px 0 0; max-width: var(--measure-read); color: var(--text-2); font: var(--fs-2)/var(--lh-read) var(--font-ui); }
 .ofc-part .ofc-label { font-weight: var(--section-weight); }
 .ofc-rev { color: var(--text-3); font: var(--fs-1)/var(--lh-tight) var(--font-ui); font-variant-numeric: tabular-nums; }
 
@@ -1023,7 +999,6 @@ export const REGULATIONS_CSS = `
 /* THE DESIGN REMINDERS OF THE DAYS, at the reading width. The five counts sit side by side and wrap; each reminder is a
    row split by a thin line. Every word a person or an agent wrote may break anywhere, so nothing scrolls sideways. */
 .ofc-rems { max-width: var(--measure-read); }
-.ofc-rems-says { margin: var(--pad) 0 0; color: var(--text-2); font: var(--fs-1)/var(--lh-read) var(--font-ui); }
 .ofc-rems-counts { display: flex; flex-wrap: wrap; gap: var(--pad) calc(var(--pad-lg) * 2); margin: var(--pad-lg) 0 0; }
 .ofc-rems-count { min-width: 0; }
 .ofc-rems-count dt { color: var(--text-3); font: var(--fs-1)/var(--lh-tight) var(--font-ui); }

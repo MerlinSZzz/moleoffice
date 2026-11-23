@@ -31,6 +31,7 @@ import { drawnStamp } from '@shared/time.ts'
 import { t } from '@shared/i18n.ts'
 import { NO_FILTERS, theTerminalsShown, type TerminalFilters, type ListedTerminal } from '@shared/terminals.ts'
 import { Absence, Btn, ErrorNote, Field, Loading, Select, TextInput } from '../components/ui.tsx'
+import { AgentPicker, type AnAgentToPick } from '../components/agent/AgentPicker.tsx'
 import { useProjectAsync } from '../lib/project-async.ts'
 import { HolderSays, TERMINAL_PARTS_CSS, terminalStateWord, terminalTitle, theCommandLine } from '../components/TerminalParts.tsx'
 import { TerminalView } from '../components/TerminalView.tsx'
@@ -54,7 +55,6 @@ export function TerminalsPage(): React.ReactElement {
         {TERMINAL_PARTS_CSS + TERMINALS_PAGE_CSS}
       </style>
       <h1 className="tm-title">{t('nav.terminals')}</h1>
-      <p className="tm-intro">{t('terminals.intro')}</p>
       {reply.status === 'loading' ? <Loading what={t('nav.terminals')} /> : null}
       {reply.status === 'error' ? <ErrorNote message={reply.message} fault={reply.fault} label={t('terminals.refused')} retry={readAgain} /> : null}
       {reply.status === 'ready' ? (
@@ -79,6 +79,10 @@ function TheTerminals({ all, onChanged }: { all: ListedTerminal[]; onChanged: ()
   const agentRows = people.status === 'ready' ? people.value.agents : []
   // A DEVELOPER PAGE: an agent this office cannot name is shown by its id rather than hidden.
   const agentLabel = (id: string): string => theParticipantAStoredIdNames(agentRows, id)?.name ?? id
+  // THE AGENT FILTER OFFERS THE AGENTS ON THESE TERMINALS, each handed back as the id its terminal stores. A stored id
+  // the registry names is joined to that agent, so the picker draws its name and handle; one it does not name is drawn
+  // by its id.
+  const agentChoices: AnAgentToPick[] = agents.map((stored) => ({ kind: 'agent', id: theParticipantAStoredIdNames(agentRows, stored)?.id ?? stored, value: stored }))
   const projects = [...new Set(all.map((one) => one.project))].sort()
   const hiding = all.length - shown.length
   const projectTitles = useProjectTitles()
@@ -93,7 +97,7 @@ function TheTerminals({ all, onChanged }: { all: ListedTerminal[]; onChanged: ()
     return (
       <>
         <OpenAShell onOpened={opened} />
-        <p className="tm-none">{t('terminals.none')}</p>
+        <p className="tm-none">{t('terminals.noneOpen')}</p>
       </>
     )
   }
@@ -106,17 +110,16 @@ function TheTerminals({ all, onChanged }: { all: ListedTerminal[]; onChanged: ()
           <Field label={t('terminals.filter.words')}>
             <TextInput value={filters.words} onChange={set('words')} />
           </Field>
-          <Field label={t('terminals.filter.agent')}>
-            <Select
-              value={filters.agent}
-              onChange={set('agent')}
-              options={[
-                { value: '', label: t('terminals.filter.any') },
-                { value: 'none', label: t('terminals.agent.none') },
-                ...agents.map((id) => ({ value: id, label: agentLabel(id) })),
-              ]}
-            />
-          </Field>
+          <AgentPicker
+            label={t('terminals.filter.agent')}
+            candidates={agentChoices}
+            chosen={filters.agent}
+            onChoose={set('agent')}
+            fixed={[
+              { value: '', name: t('terminals.filter.any') },
+              { value: 'none', name: t('terminals.agent.none') },
+            ]}
+          />
           <Field label={t('terminals.filter.project')}>
             <Select value={filters.project} onChange={set('project')} options={[{ value: '', label: t('terminals.filter.any') }, ...projects.map((p) => ({ value: p, label: p }))]} />
           </Field>
@@ -254,11 +257,11 @@ const TERMINALS_PAGE_CSS = `
 .tm > .px-error { margin: 0 0 var(--pad) 0; }
 .tm { max-width: 72rem; }
 .tm-title { margin: 0 0 0.25em 0; }
-.tm-intro { margin: 0 0 var(--pad) 0; color: var(--text-2); }
 .tm-narrow { margin: 0 0 var(--pad) 0; }
 .tm-narrow-open, .tm-open-fold { cursor: pointer; color: var(--text-2); }
 .tm-narrow-open:focus-visible, .tm-open-fold:focus-visible { outline: var(--focus-w) solid var(--focus); outline-offset: 2px; border-radius: var(--radius-sm); }
 .tm-filters { display: grid; grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr)); gap: var(--pad); margin-top: var(--pad); }
+.tm-filters .agp { grid-column: 1 / -1; }
 .tm-hiding { color: var(--text-2); margin: 0 0 var(--pad) 0; }
 .tm-clear { border: 1px solid var(--border-strong); border-radius: 0.25rem; background: none; color: var(--text); padding: 0.1rem 0.4rem; cursor: pointer; font: inherit; }
 .tm-rows { list-style: none; margin: 0 0 var(--pad) 0; padding: 0; display: grid; gap: 0.5rem; }

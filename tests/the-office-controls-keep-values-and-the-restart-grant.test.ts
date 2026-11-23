@@ -3,7 +3,7 @@
 import { execFileSync } from 'node:child_process'
 import { beforeEach, afterEach, expect, it } from 'vitest'
 import type { FastifyInstance } from 'fastify'
-import { apiApp, freshDb, type TestDb } from './helpers.ts'
+import { apiApp, freshDb, type TestDb, governsTheWholeProject } from './helpers.ts'
 import { THE_TEST_OFFICES_OWNER } from './a-page-of-a-test-office.ts'
 import { RUNTIME_SETTING_NAMES } from '../src/config/runtime-settings.mjs'
 import { SETTINGS } from '../src/config/settings.mjs'
@@ -21,12 +21,12 @@ async function register(handle: string, role = 'secretary') {
   return { agent, headers: { ...owner, 'x-mole-office-actor-type': 'agent', 'x-mole-office-actor-id': handle, 'x-mole-office-key': makeAnAgentKey(agent.id, null) } }
 }
 async function decision() {
-  const made = await app.inject({ method: 'POST', url: '/api/records', headers: owner, payload: { kind: 'decision', title: 'Made-up operating choice', data: { replaces: [] } } })
+  const made = await app.inject({ method: 'POST', url: '/api/records', headers: owner, payload: { kind: 'decision', title: 'Made-up operating choice', data: { ...governsTheWholeProject(), replaces: [] } } })
   expect(made.statusCode, made.body).toBe(201); return made.json().record.id as string
 }
 it('reads every non-secret setting and stores atomic values, sources and the audit without editing a file', async () => {
   const read = (await app.inject({ method: 'GET', url: '/api/office/settings' })).json().settings
-  expect(read.map((s: {name:string}) => s.name)).toEqual(SETTINGS.filter((s) => !s.name.includes('KEY')).map((s) => s.name))
+  expect(read.map((s: {name:string}) => s.name)).toEqual(SETTINGS.filter((s) => !s.name.includes('KEY') && s.served === true).map((s) => s.name))
   expect(read.filter((s: {writable:boolean}) => s.writable).map((s:{name:string}) => s.name).sort()).toEqual([...RUNTIME_SETTING_NAMES].sort())
   for (const suffix of ['AVATAR_MAX_BYTES','MESSAGE_PICTURE_MAX_BYTES','RETURNED_FILE_MAX_BYTES']) expect(read.find((s:{name:string})=>s.name==='MOLE_OFFICE_'+suffix).restartRequired).toBe(true)
   const name = 'MOLE_OFFICE_REPLY_REMINDER_MINUTES'

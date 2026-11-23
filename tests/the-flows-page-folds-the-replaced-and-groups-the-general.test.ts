@@ -17,7 +17,7 @@
  */
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import { THE_PERSON } from '../src/shared/person.ts'
-import { liveApp, waitForThePage, type LiveApp } from './helpers.ts'
+import { deleteTheCopiedDefaultFlows, liveApp, waitForThePage, type LiveApp } from './helpers.ts'
 
 let app: LiveApp
 
@@ -64,6 +64,7 @@ async function open(route: string, look: string): Promise<void> {
 
 beforeAll(async () => {
   app = await liveApp({ name: 'flows-fold-and-general', viewport: { width: 1440, height: 1000 }, workspace: 'default' })
+  await deleteTheCopiedDefaultFlows(app.api)
   await app.context.addInitScript(() => {
     localStorage.setItem('mole-office.preset.theme', new URLSearchParams(location.search).get('look') ?? 'light')
   })
@@ -89,13 +90,13 @@ it('1. stands the general flows under General, then each project\'s own, and fol
     expect(await page.locator('.flw-group[data-group="general"] h2').textContent()).toBe('General')
     expect(await page.locator('.flw-group[data-group="general"] .flw-row-title').allTextContents()).toEqual(['Test: answering a customer'])
     expect(await page.locator('.flw-group[data-group="own"] .flw-row-title').allTextContents()).toEqual(['Test: firing the kiln'])
-    expect(await page.locator('.flw-count').textContent()).toContain('2 flows · 2 replaced')
-    const press = page.getByRole('button', { name: 'Show the 2 replaced flows', exact: true })
+    expect(await page.locator('.flw-count').textContent()).toContain('2 office flows · 2 replaced')
+    const press = page.getByRole('button', { name: 'Show the 2 replaced office flows', exact: true })
     expect(await press.getAttribute('aria-expanded')).toBe('false')
     expect(await page.getByText('Test: the old way to answer').count(), 'a replaced flow is drawn before the press').toBe(0)
 
     await open('/flows', look)
-    await page.getByRole('button', { name: 'Show the 2 replaced flows', exact: true }).click()
+    await page.getByRole('button', { name: 'Show the 2 replaced office flows', exact: true }).click()
     const replaced = page.locator('.flw-group[data-group="replaced"] .flw-replaced-row')
     await replaced.first().waitFor({ timeout: 30_000 })
     expect(await replaced.locator('.flw-row-title').allTextContents()).toEqual(['Test: the old way to answer', 'Test: the old way to fire'])
@@ -103,8 +104,8 @@ it('1. stands the general flows under General, then each project\'s own, and fol
     expect(await replaced.first().locator('.flw-replaced-by').textContent()).toContain('Replaced by')
     expect(await by.textContent()).toBe('Test: answering a customer')
     expect(await by.getAttribute('href')).toContain(general)
-    expect(await page.getByRole('button', { name: 'Hide the replaced flows', exact: true }).getAttribute('aria-expanded')).toBe('true')
-    await page.getByRole('button', { name: 'Hide the replaced flows', exact: true }).click()
+    expect(await page.getByRole('button', { name: 'Hide the replaced office flows', exact: true }).getAttribute('aria-expanded')).toBe('true')
+    await page.getByRole('button', { name: 'Hide the replaced office flows', exact: true }).click()
     expect(await page.getByText('Test: the old way to answer').count(), 'the press folds them again').toBe(0)
   }
 }, 600_000)

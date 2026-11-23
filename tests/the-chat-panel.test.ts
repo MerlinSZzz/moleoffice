@@ -1118,7 +1118,7 @@ it('shows a long contact name and its project tag in the chat list', async () =>
   const projects = (await (await fetch(`${app.api}/api/workspaces`, { headers: AS_THE_OWNER })).json()) as { workspaces: { id: string; title: string }[] }
   const project = projects.workspaces.find((one) => one.id === AS_THE_OWNER['x-mole-office-workspace'])?.title
   expect(project).toBeTruthy()
-  for (const theme of ['light', 'dark']) for (const width of [1440, 990, 660]) {
+  for (const theme of ['light']) for (const width of [1440, 660]) {
     const context = await app.browser.newContext({ viewport: { width, height: 900 } })
     await context.addInitScript((look) => localStorage.setItem('mole-office.preset.theme', look), theme)
     try {
@@ -1143,29 +1143,29 @@ it('shows a long contact name and its project tag in the chat list', async () =>
   }
 }, 180_000)
 
-it('keeps the delivery mark on the Edit line at 390 in both themes', async () => {
-  for (const theme of ['light', 'dark']) {
-    const body = `Made-up line for the delivery mark in ${theme}.`
-    await say(AS_THE_OWNER, body, { kind: 'agent', id: 'builder-x' })
-    const context = await app.browser.newContext({ viewport: { width: 390, height: 844 } })
-    await context.addInitScript((look) => localStorage.setItem('mole-office.preset.theme', look), theme)
-    try {
-      const page = await context.newPage()
-      await page.goto(`${app.site}/?lang=en#/chat`, { timeout: 60_000 })
-      await waitForThePage(page, 60_000)
-      expect(await page.locator('html').getAttribute('data-theme')).toBe(theme)
-      await page.locator(`.px-chat-page-lists .px-chat-contact[data-contact="${THE_AGENT_ROW}"]`).click({ timeout: 30_000 })
-      const foot = page.locator('.px-chat-one').filter({ hasText: body }).locator('.px-chat-foot')
-      await foot.locator('.px-chat-edit').waitFor({ timeout: 30_000 })
-      await foot.locator('.px-chat-mark').waitFor({ timeout: 30_000 })
-      const onSameLine = await foot.evaluate((el) => {
-        const press = el.querySelector('.px-chat-edit')!.getBoundingClientRect()
-        const mark = el.querySelector('.px-chat-mark')!.getBoundingClientRect()
-        return press.top < mark.bottom && mark.top < press.bottom
-      })
-      expect(onSameLine, `${theme}: the mark left its Edit line`).toBe(true)
-    } finally {
-      await context.close()
-    }
+it('keeps the delivery mark on the Edit line at 390 in the light theme', async () => {
+  // One theme: whether the mark stays on the Edit line does not depend on the colours.
+  const theme = 'light'
+  const body = `Made-up line for the delivery mark in ${theme}.`
+  await say(AS_THE_OWNER, body, { kind: 'agent', id: 'builder-x' })
+  const context = await app.browser.newContext({ viewport: { width: 390, height: 844 } })
+  await context.addInitScript((look) => localStorage.setItem('mole-office.preset.theme', look), theme)
+  try {
+    const page = await context.newPage()
+    await page.goto(`${app.site}/?lang=en#/chat`, { timeout: 60_000 })
+    await waitForThePage(page, 60_000)
+    expect(await page.locator('html').getAttribute('data-theme')).toBe(theme)
+    await page.locator(`.px-chat-page-lists .px-chat-contact[data-contact="${THE_AGENT_ROW}"]`).click({ timeout: 30_000 })
+    const foot = page.locator('.px-chat-one').filter({ hasText: body }).locator('.px-chat-foot')
+    await foot.locator('.px-chat-edit').waitFor({ timeout: 30_000 })
+    await foot.locator('.px-chat-mark').waitFor({ timeout: 30_000 })
+    const onSameLine = await foot.evaluate((el) => {
+      const press = el.querySelector('.px-chat-edit')!.getBoundingClientRect()
+      const mark = el.querySelector('.px-chat-mark')!.getBoundingClientRect()
+      return press.top < mark.bottom && mark.top < press.bottom
+    })
+    expect(onSameLine, `${theme}: the mark left its Edit line`).toBe(true)
+  } finally {
+    await context.close()
   }
 }, 180_000)

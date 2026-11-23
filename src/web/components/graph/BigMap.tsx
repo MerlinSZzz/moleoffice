@@ -148,10 +148,7 @@ export function BigMap({ map }: { map: TheBigMap }) {
         {BIG_MAP_CSS}
       </style>
       <h3 className="bm-heading">{t('bigMap.heading')}</h3>
-      {/* WHERE A BOX GOES, said once under the heading (wave 13u round 217): a box is pressed to open its block's own
-          pipeline, and nothing else on the map said so. */}
-      <p className="bm-says" data-map-says="">{t('bigMap.boxOpens')}</p>
-      {map.boxes.length === 0 ? <p className="bm-none">{t('bigMap.noBoxes')}</p> : null}
+      {map.boxes.length === 0 ? <p className="bm-none">{t('absence.none')}</p> : null}
       <div ref={frame} className="bm-frame" data-wide={wide ? '1' : '0'}>
         {wide ? (
           <svg className="bm-lines" aria-hidden="true">
@@ -279,7 +276,6 @@ const BIG_MAP_CSS = `
 .bm { display: flex; flex-direction: column; gap: var(--pad); margin: var(--pad-lg) 0; }
 .bm-heading { margin: 0; font-size: var(--fs-3); }
 .bm-none { margin: 0; color: var(--text-2); }
-.bm-says { margin: 0; font-size: var(--fs-2); line-height: var(--lh-read); color: var(--text-2); max-width: var(--measure-in-box); }
 .bm-frame { position: relative; display: grid; gap: var(--pad-lg); }
 .bm-frame[data-wide='1'] {
   grid-template-columns: minmax(0, 1fr) minmax(0, 3fr) minmax(0, 1fr);

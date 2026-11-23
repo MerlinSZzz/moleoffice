@@ -1,6 +1,5 @@
 // Copyright © 2026 Zhengyang Shen
 // Licensed under the MIT License. See LICENSE.
-import { en } from '@shared/words/en.ts'
 import { t } from '@shared/i18n.ts'
 import { saidOnThePage } from '@shared/dev-sayings.ts'
 import { ReceiptTotals } from '../components/UsageReceipt.tsx'
@@ -51,14 +50,12 @@ import type { ReceiptUsage } from '../../shared/usage-receipts.ts'
 import { useState } from 'react'
 import { api } from '../api.ts'
 import { useMode } from '../lib/mode.ts'
-import { Absence, Empty, ErrorNote, Loading, Panel } from '../components/ui.tsx'
+import { Absence, Empty, ErrorNote, Hint, Loading, Panel, ServerNote } from '../components/ui.tsx'
 import { useProjectAsync } from '../lib/project-async.ts'
 import { endedBecauseWord, purposeWord, wantedWord } from '@shared/words.ts'
 import { patternFoundBy } from '@shared/ops.ts'
 import {
   OVERLAP_CLASSES,
-  OVERLAP_NEEDS_THE_LIVE_INDEX,
-  OVERLAP_OVER_A_PAST_RANGE,
   type OverlapClass,
 } from '@shared/workdomain.ts'
 import { Chart, type ChartSpec } from '../components/Chart.tsx'
@@ -226,7 +223,6 @@ export function UsagePage() {
           thread asked for the rail to say "Agent use" and the page to be headed "How agents read
           this project"; that is two names, so the sentence became the line under the heading. */}
       <h1>{t('nav.usage')}</h1>
-      <p className="usage-lede">{t('dev.usage.everyRequestMoleOfficeAnswersIsMeasured')}</p>
 
       {summary.status === 'loading' ? <Loading label={t('dev.usage.readingWhatHasBeenMeasured')} what={t('dev.usage.usage')} /> : null}
       {summary.status === 'error' ? <ErrorNote message={summary.message} fault={summary.fault} /> : null}
@@ -251,7 +247,6 @@ export function UsagePage() {
         {operations.status === 'ready' ? (
           <Operations
             rows={(operations.value as { operations: OperationRow[] }).operations}
-            threshold={(operations.value as { hintThreshold: { share: number; occurrences: number; traces: number } }).hintThreshold}
             showAll={allOperations}
             onShowAll={() => setAllOperations((was) => !was)}
             developer={developer}
@@ -259,8 +254,7 @@ export function UsagePage() {
         ) : null}
       </Panel>
 
-      <Panel titleIs="label" declares={{ surface: 'usage.gaps' }} title={t('dev.usage.whatAgentsWentOutsideMoleOfficeFor')}>
-        <p className="usage-note">{t('dev.usage.everyRowHereIsSomethingAnAgent')}</p>
+      <Panel titleIs="label" declares={{ surface: 'usage.gaps' }} title={t('dev.usage.whatAgentsWentOutsideMoleOfficeFor')} actions={<Hint>{t('dev.usage.agentsOwnReports')}</Hint>}>
         {gaps.status === 'loading' ? <Loading label={t('dev.usage.readingTheClaims')} what={t('dev.usage.claims')} /> : null}
         {gaps.status === 'error' ? <ErrorNote message={gaps.message} fault={gaps.fault} /> : null}
         {gaps.status === 'ready' ? (
@@ -272,7 +266,6 @@ export function UsagePage() {
       </Panel>
 
       <Panel titleIs="label" declares={{ surface: 'usage.patterns' }} title={t('dev.usage.whatHasCrossedAThreshold')}>
-        <p className="usage-note">{t('dev.usage.nothingHereIsFiledForYouA')}</p>
         {patterns.status === 'loading' ? <Loading label={t('dev.usage.readingThePatterns')} what={t('dev.usage.patterns')} /> : null}
         {patterns.status === 'error' ? <ErrorNote message={patterns.message} fault={patterns.fault} /> : null}
         {patterns.status === 'ready' ? <Patterns rows={(patterns.value as { patterns: PatternRow[] }).patterns} /> : null}
@@ -354,16 +347,12 @@ export function TheWindow({ summary, developer }: { summary: Summary; developer:
         {summary.calls === 0 && summary.foldedCalls === 0
           ? t('dev.usage.noRequest')
           : t('dev.usage.ofStoredRequestsNamedAPiece', { tracedCalls: String(summary.tracedCalls), calls: String(summary.calls) }) +
-            t('dev.usage.didNotThatIsThisBrowser', { untracedCalls: String(summary.untracedCalls) }) +
+            t('dev.usage.untracedDidNot', { untracedCalls: String(summary.untracedCalls) }) +
             (summary.foldedCalls === 0
               ? ''
               : t('dev.usage.wereCountedByTheHourRather', { value1: t('dev.usage.countMoreCall', { n: summary.foldedCalls }) }))}
       </p>
-      <p>
-        {summary.oldestCallAt === null
-          ? t('dev.usage.requestsThatNamedNoPieceOf', { untraced: String(summary.windowDays.untraced), traced: String(summary.windowDays.traced) })
-          : t('dev.usage.theOldestMeasurementIsFrom', { oldestCallAt: summary.oldestCallAt })}
-      </p>
+      {summary.oldestCallAt === null ? null : <p>{t('dev.usage.theOldestMeasurementIsFrom', { oldestCallAt: summary.oldestCallAt })}</p>}
       {/* WHETHER ANYTHING HAS ENFORCED THE TWO WINDOWS, which is not the same fact as what they are.
           The windows were published here for a fortnight while nothing called the prune, so a reader
           was told how long rows are kept by a page that had no way of knowing whether any had gone.
@@ -376,7 +365,7 @@ export function TheWindow({ summary, developer }: { summary: Summary; developer:
           tier="told-apart"
           looked={false}
           word={t('dev.usage.nothingTidiedAwayYet')}
-          title={t('dev.usage.nothingHasBeenTidiedAwaySinceThis')}
+          title={t('dev.usage.nothingTidiedAwayYet')}
         />
       ) : (
         <p>{lastPruneSentence(summary)}</p>
@@ -413,7 +402,7 @@ export function Stretches({
 }) {
   if (rows.length === 0) {
     return (
-      <Empty message={t('dev.usage.noAgentHasNamedAPieceOf')} />
+      <Empty message={t('absence.none')} />
     )
   }
   return (
@@ -514,30 +503,24 @@ function TraceEvents({ traceId }: { traceId: string }) {
 
 export function Operations({
   rows,
-  threshold,
   showAll,
   onShowAll,
   developer,
 }: {
   rows: OperationRow[]
-  threshold: { share: number; occurrences: number; traces: number }
   showAll: boolean
   onShowAll: () => void
   developer: boolean
 }) {
   if (rows.length === 0) {
-    return <Empty message={t('dev.usage.nothingHasBeenAskedForYetA')} />
+    return <Empty message={t('absence.none')} />
   }
   // A FOLDED OPERATION IS ALWAYS SHOWN, even when it has no bytes to sort on. It is one of the
   // commonest things the office is asked, and the count is exactly what this table is for.
   const shown = showAll ? rows : rows.filter((row, index) => index < TOP_OPERATIONS || row.foldedCalls > 0)
   const readBack = rows.filter((row) => row.readBackShare !== null && row.readBackOf > 0)
-  const anyFolded = rows.some((row) => row.foldedCalls > 0)
   return (
     <>
-      {anyFolded ? (
-        <p className="usage-note">{t('dev.usage.someOperationsAreCountedOnceAnHour')}</p>
-      ) : null}
       <ul className="usage-rows">
         {shown.map((row) => (
           <li key={row.operation} className="usage-row usage-row-flat">
@@ -564,9 +547,6 @@ export function Operations({
       {readBack.length === 0 ? null : (
         <div className="usage-readback">
           <h3>{t('dev.usage.afterAWriteHowOftenARead')}</h3>
-          <p className="usage-note">
-            {t('dev.usage.thisIsTheMeasurementAndNot', { value1: String(Math.round(threshold.share * 100)), occurrences: String(threshold.occurrences), traces: String(threshold.traces) })}
-          </p>
           <ul className="usage-rows">
             {readBack.map((row) => (
               <li key={row.operation} className="usage-row usage-row-flat">
@@ -646,7 +626,7 @@ export function Frameworks({ reading }: { reading: AgentUsageReply }) {
   const rows = reading.byFramework
   // THE EMPTY LINE IS DRAWN AS ITS SENTENCE, since a phone has no hover to read a dash's reason from (wave 13y round 142).
   if (rows.length === 0) {
-    return <Absence tier="ordinary" say title={t('dev.usage.nothingHasCalledMoleOfficeInThis')} />
+    return <Absence tier="ordinary" word={t('absence.none')} />
   }
   const spec: ChartSpec = {
     kind: 'bar',
@@ -664,7 +644,6 @@ export function Frameworks({ reading }: { reading: AgentUsageReply }) {
   }
   return (
     <>
-      <p className="usage-note">{t('dev.usage.callsAreCountedByTheToolTheRunDeclared')}</p>
       <Chart spec={spec} />
       <ul className="usage-rows">
         {rows.map((row) => (
@@ -677,9 +656,12 @@ export function Frameworks({ reading }: { reading: AgentUsageReply }) {
         ))}
       </ul>
       {reading.notAttributed.calls === 0 ? null : (
-        <p className="usage-note">
-          {t('dev.usage.callsInRunsAreUnderNotDeclared', { value1: t('dev.usage.countCall', { n: reading.notAttributed.calls }), value2: t('dev.usage.countRun', { n: reading.notAttributed.sessions }), why: saidOnThePage(reading.notAttributed.whySaid, reading.notAttributed.why) })}
-        </p>
+        <>
+          <p className="usage-note">
+            {t('dev.usage.notDeclaredCount', { value1: t('dev.usage.countCall', { n: reading.notAttributed.calls }), value2: t('dev.usage.countRun', { n: reading.notAttributed.sessions }) })}
+          </p>
+          <ServerNote text={saidOnThePage(reading.notAttributed.whySaid, reading.notAttributed.why)} />
+        </>
       )}
       <Chart spec={projects} />
     </>
@@ -690,7 +672,7 @@ export function Frameworks({ reading }: { reading: AgentUsageReply }) {
 function Refusals({ reading }: { reading: AgentUsageReply }) {
   const rows = reading.refusals
   if (rows.length === 0) {
-    return <Empty message={t('dev.usage.nothingHasBeenRefusedInThisWindow')} />
+    return <Empty message={t('absence.none')} />
   }
   const spec: ChartSpec = {
     kind: 'bar',
@@ -735,7 +717,7 @@ function Arrivals({ reading }: { reading: AgentUsageReply }) {
   const timed = reading.arrivals.filter((row) => row.msToFirstWrite !== null && row.msToFirstWrite >= 0)
   const silent = reading.arrivals.length - timed.length
   if (reading.arrivals.length === 0) {
-    return <Empty message={t('dev.usage.noRunHasArrivedInThisWindow')} />
+    return <Empty message={t('absence.none')} />
   }
   const withMedian = reading.byFramework.filter((row) => row.msToFirstWriteMedian !== null)
   const spec: ChartSpec = {
@@ -752,12 +734,11 @@ function Arrivals({ reading }: { reading: AgentUsageReply }) {
   }
   return (
     <>
-      <p className="usage-note">{t('dev.usage.aRunArrivesWhenItMakesIts')}</p>
       {withMedian.length === 0 ? (
         <Absence
           tier="told-apart"
           looked
-          title={t('dev.usage.noRunInThisWindowBothArrived')}
+          title={t('absence.none')}
         />
       ) : (
         <Chart spec={spec} />
@@ -775,7 +756,7 @@ function Arrivals({ reading }: { reading: AgentUsageReply }) {
       ) : null}
       {silent === 0 ? null : (
         <p className="usage-note">
-          {t('dev.usage.arrivedAndWroteNothingAnybodyCan', { value1: t('dev.usage.countRun', { n: silent }) })}
+          {t('dev.usage.noFirstWrite', { value1: t('dev.usage.countRun', { n: silent }) })}
         </p>
       )}
     </>
@@ -791,7 +772,7 @@ function Gaps({
 }) {
   if (rows.length === 0) {
     return (
-      <Empty message={t('dev.usage.noAgentHasReportedGoingOutsideMole')} />
+      <Empty message={t('absence.none')} />
     )
   }
   return (
@@ -820,7 +801,6 @@ function Gaps({
       {withNoWordYet.length === 0 ? null : (
         <div className="usage-nowords">
           <h3>{t('dev.usage.questionsWithNoWordYet')}</h3>
-          <p className="usage-note">{t('dev.usage.thisIsHowTheListOfQuestions')}</p>
           <ul className="usage-rows">
             {withNoWordYet.map((row) => (
               <li key={`${row.at}-${row.what}`} className="usage-row usage-row-flat">
@@ -851,14 +831,14 @@ function subjectOf(key: string): string {
 
 function Patterns({ rows }: { rows: PatternRow[] }) {
   if (rows.length === 0) {
-    return <Empty message={t('dev.usage.noPatternHasEnoughBehindItTo')} />
+    return <Empty message={t('absence.none')} />
   }
   const crossed = rows.filter((row) => row.crossed)
   const approaching = rows.filter((row) => !row.crossed).slice(0, 8)
   return (
     <>
       {crossed.length === 0 ? (
-        <p className="usage-note">{t('dev.usage.nothingHasCrossedAThreshold')}</p>
+        <Empty message={t('absence.none')} />
       ) : (
         <ul className="usage-rows">
           {crossed.map((row) => (
@@ -929,7 +909,7 @@ function Patterns({ rows }: { rows: PatternRow[] }) {
 function Sequences({ rows, developer }: { rows: SequenceRow[]; developer: boolean }) {
   if (rows.length === 0) {
     return (
-      <Empty message={t('dev.usage.noAgentHasMadeTwoRequestsIn')} />
+      <Empty message={t('absence.none')} />
     )
   }
   return (
@@ -978,30 +958,6 @@ export interface HotspotRow {
   word: string | null
 }
 
-/** What the reader is told when the read cannot answer about a range. */
-export const HOTSPOTS_ANSWER_ABOUT_NOW =
-  en['dev.usage.hotspotsNow']
-
-/**
- * WHICH KINDS OF MEETING A PAST RANGE WOULD SHOW, AND THE ONE IT WOULD LOSE.
- *
- * §9.4a asks this band for five of the six classes over a past range and for the SIXTH TO BE NAMED
- * with the reason. It drew none of the six and its one sentence named no class at all, so a reader
- * was told the band was empty and never told what was missing from it.
- *
- * The words and the split both come from `@shared/workdomain.ts`. Nothing here decides which class
- * is lost and nothing here writes a class key. A test deleted on 13 November 2026 walked `src/web` for a quoted
- * key, comments included, because a second list in a component is the defect that walk was for.
- */
-export function hotspotClassesOverAPastRange(): { five: string[]; lost: string[]; why: string } {
-  return {
-    five: OVERLAP_OVER_A_PAST_RANGE.map(overlapWord),
-    lost: OVERLAP_NEEDS_THE_LIVE_INDEX.map(overlapWord),
-    // The English is `WHY_A_PAST_RANGE_LOSES_IT`, which the word list's English entry reads.
-    why: t('devWords.overlap.whyAPastRangeLosesIt'),
-  }
-}
-
 /**
  * A CLASS'S WORD IN THE PAGE'S LANGUAGE. The English entry of each is `OVERLAP_CLASSES[key].word`
  * itself (src/shared/words/en.ts), so the Work Domain thread's list stays the one place the English is.
@@ -1040,21 +996,7 @@ function Hotspots() {
   if (overlaps.status === 'error') return <ErrorNote message={overlaps.message} fault={overlaps.fault} />
   const rows = hotspotRows(overlaps.value as OverlapReply)
   if (rows === null) {
-    const { five, lost, why } = hotspotClassesOverAPastRange()
-    return (
-      <Empty
-        message={
-          <>
-            <p className="usage-note">{t('dev.usage.hotspotsNow')}</p>
-            {/* THE STEP'S OTHER HALF: which kinds a past range would show, and which one it loses.
-                Drawn whether or not the band has rows, because "what is missing from this" is not a
-                fact about today's answer. */}
-            <p className="usage-note">{t('dev.usage.pastClasses', { n: five.length, kinds: five.join('; ') })}</p>
-            <p className="usage-note">{t('dev.usage.pastLost', { kinds: lost.join('; '), why })}</p>
-          </>
-        }
-      />
-    )
+    return <Empty message={t('dev.usage.notShownOnThisPageYet')} />
   }
   return (
     <ul className="usage-rows">
@@ -1066,7 +1008,7 @@ function Hotspots() {
                 tier="told-apart"
                 looked={false}
                 word={t('dev.usage.notRecorded')}
-                title={t('dev.usage.thisOverlapArrivedWithoutThePathOr')}
+                title={t('dev.usage.notRecorded')}
               />
             )}
           </span>
@@ -1076,7 +1018,7 @@ function Hotspots() {
                 tier="told-apart"
                 looked
                 word={t('dev.usage.noWordYet')}
-                title={t('dev.usage.theWorkDomainThreadDeclaresNoWord')}
+                title={t('dev.usage.noWordYet')}
               />
             )}
           </span>
@@ -1110,7 +1052,6 @@ function Hotspots() {
 function Lifecycle() {
   return (
     <>
-      <p className="usage-note">{t('dev.usage.workingTimeIsCountedFromTheMoment')}</p>
       <ul className="usage-rows">
         <li className="usage-row usage-row-flat">
           <span className="usage-row-what">{t('dev.usage.workingReportingStandingByAndBlockedTime')}</span>
@@ -1122,7 +1063,7 @@ function Lifecycle() {
               tier="told-apart"
               looked={false}
               word={t('dev.usage.neverRecorded')}
-              title={t('dev.usage.moleOfficeHasNeverRecordedWhenAn')}
+              title={t('dev.usage.neverRecorded')}
             />
           </span>
         </li>
@@ -1133,7 +1074,7 @@ function Lifecycle() {
               tier="told-apart"
               looked={false}
               word={t('dev.usage.neverFiled')}
-              title={t('dev.usage.theseAreReadFromAnAttachmentS')}
+              title={t('dev.usage.neverFiled')}
             />
           </span>
         </li>
@@ -1144,7 +1085,7 @@ function Lifecycle() {
               tier="told-apart"
               looked={false}
               word={t('dev.usage.neverRecorded')}
-              title={t('dev.usage.aWakeIsCountedFromTheTransition')}
+              title={t('dev.usage.neverRecorded')}
             />
           </span>
         </li>
@@ -1155,7 +1096,7 @@ function Lifecycle() {
               tier="told-apart"
               looked={false}
               word={t('dev.usage.notShownOnThisPageYet')}
-              title={t('dev.usage.theRequestLogHoldsThisTimeBut')}
+              title={t('dev.usage.notShownOnThisPageYet')}
             />
           </span>
         </li>
@@ -1165,7 +1106,6 @@ function Lifecycle() {
 }
 
 const USAGE_CSS = `
-.usage-lede { color: var(--text-2); max-width: 62ch; }
 .usage-note { color: var(--text-2); max-width: 68ch; font-size: 0.9375rem; }
 .usage-window { margin-bottom: 1.25rem; }
 .usage-window p { margin: 0.25rem 0; color: var(--text-2); }

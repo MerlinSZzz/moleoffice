@@ -586,8 +586,16 @@ export const A_PATHS_SHARE_OF_WORDS = 1 / 4
 const A_NAMES_WORD = /[A-Z][a-z]+|(?<![a-z])[a-z]{2,}/g
 /** The vowels, and y. */
 const A_VOWEL = /[aeiouy]/
-/** The short words a name is made of whose only vowel is their capital, which count as words too. */
-const SHORT_WORDS = new Set(['An', 'And', 'As', 'Ask', 'At', 'End', 'If', 'In', 'Is', 'It', 'Its', 'Of', 'On', 'Or', 'Own', 'Up', 'Us'])
+/**
+ * The short words a name is made of whose lower-case letters hold no vowel, which count as words too. They are the
+ * words of two letters whose only vowel is their capital, as `If` and `Of`; those of three letters or more that this
+ * checkout's names use as words, as `Ids` in `agentsWithTheseIds` and `Pdf` in `reportPdfWroteNoPdf`; and Http and
+ * Https, which hold no vowel at all, as in `openHttpsOutside`. No other word of two letters is added, such as `Id` or
+ * `Ms`, because a run of two letters is far more common in a key than a longer one. A word counts only as it is written
+ * here, with its capital, so a run of lower-case letters never matches one: the folder `src` before a key does not
+ * count.
+ */
+const SHORT_WORDS = new Set(['Ack', 'Act', 'Acts', 'Add', 'Adds', 'All', 'An', 'And', 'App', 'Apps', 'Arg', 'Args', 'Argv', 'Arm', 'Art', 'As', 'Ask', 'Asks', 'At', 'Aws', 'Css', 'Dsh', 'Elk', 'End', 'Ends', 'Env', 'Exp', 'Gpt', 'Html', 'Http', 'Https', 'Icc', 'Ids', 'Idx', 'If', 'In', 'Ink', 'Ins', 'Is', 'It', 'Its', 'Mcp', 'Npm', 'Odd', 'Of', 'Off', 'Old', 'On', 'Ops', 'Or', 'Own', 'Owns', 'Pdf', 'Rss', 'Sql', 'Src', 'Tsc', 'Tsx', 'Up', 'Url', 'Us', 'Zstd'])
 /** A run is a name when the words of names in it hold this share of its letters and digits or more. */
 export const A_NAMES_SHARE_OF_WORDS = 6 / 10
 /**

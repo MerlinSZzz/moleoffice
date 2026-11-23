@@ -35,6 +35,7 @@ import { request, type Server } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import type { FastifyInstance } from 'fastify'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
+import { DEVICE_HALF_COOKIE } from '../src/config/key-header.mjs'
 import { apiApp, freshDb, type TestDb } from './helpers.ts'
 import type { OsProbe } from '../src/server/lib/resources.ts'
 
@@ -99,7 +100,7 @@ interface Answer {
 /** One request to a door, sent FROM `from` (or from whatever the kernel picks, when undefined). */
 function ask(
   door: Server,
-  input: { from?: string; method?: string; path: string; headers?: Record<string, string> },
+  input: { from?: string; method?: string; path: string; headers?: Record<string, string>; body?: string },
 ): Promise<Answer> {
   const port = (door.address() as AddressInfo).port
   const host = (door.address() as AddressInfo).address
@@ -111,7 +112,11 @@ function ask(
         path: input.path,
         method: input.method ?? 'GET',
         ...(input.from === undefined ? {} : { localAddress: input.from }),
-        headers: { 'x-mole-office-workspace': 'default', ...input.headers },
+        headers: {
+          'x-mole-office-workspace': 'default',
+          ...(input.body === undefined ? {} : { 'content-type': 'application/json' }),
+          ...input.headers,
+        },
       },
       (res) => {
         let text = ''
@@ -130,7 +135,7 @@ function ask(
       },
     )
     req.once('error', fail)
-    req.end()
+    req.end(input.body)
   })
 }
 
@@ -210,11 +215,16 @@ describe('the door bound to the address other machines reach', () => {
       const offer = await ask(door, { from: ownAddress, path: '/api/office/pairing' })
       expect(offer.status, JSON.stringify(offer.body)).toBe(200)
       expect(offer.body['offered'], 'pairing was not offered at this machine\'s own address').toBe(true)
-      const pressed = await ask(door, { from: ownAddress, method: 'POST', path: '/api/office/pairing' })
+      const pressed = await ask(door, {
+        from: ownAddress,
+        method: 'POST',
+        path: '/api/office/pairing',
+        body: JSON.stringify({ device: 'Test browser at this machine\'s own address' }),
+      })
       expect(pressed.status, JSON.stringify(pressed.body)).toBe(200)
       expect(pressed.body['paired']).toBe(true)
-      // The cookie's value is the person's key, so only its name is looked at.
-      expect(pressed.setCookie?.startsWith('mole-office-key='), 'the press set no pairing cookie').toBe(true)
+      // The cookie's value is one half of a device key, so only its name is looked at.
+      expect(pressed.setCookie?.startsWith(`${DEVICE_HALF_COOKIE}=`), 'the press set no cookie half').toBe(true)
     })
   })
 })

@@ -12,8 +12,8 @@
  *   - on the run's own page the mark had no stylesheet, because its styles were in the sessions list's, which that page
  *     does not load. So the sentence was not in the colour the list draws it in, and it touched the tag.
  *
- * THE SENTENCE SITS BESIDE THE TAG ONLY WHILE THE TAG IS ON ONE LINE. Otherwise it goes under it. A box that let the two
- * shrink side by side kept them inside the row at 390, as two narrow columns of two to four words a line.
+ * THE SENTENCE IS THE MARK'S TITLE, as decided in November 2026, when the explanations were taken off the pages. So the
+ * tag is what is measured, and its title is read for the reader's sentence.
  *
  * THE OTHER MARK IS CHECKED THE SAME WAY, so the row with no process seen is held to the same edges.
  *
@@ -76,29 +76,21 @@ interface Fit {
   clientWidth: number
   /** Each named box, with the box it must stay inside, in pixels. */
   boxes: { what: string; left: number; right: number; insideLeft: number; insideRight: number }[]
-  /** The sentence's colour, and the colour the page draws an inferred word in. */
-  sentenceColour: string | null
-  inferredColour: string | null
-  /** Pixels between the tag's right edge and the sentence's first line, or null when the sentence starts on a line of its own. */
-  gap: number | null
-  /** How many lines the third mark's words take. */
-  tagLines: number | null
+  /** The third mark's title, or null when it has none. */
+  title: string | null
 }
 
 /** One mark to measure: the row it is on, by words of its title, or null for the only run on the page, and its word. */
 interface Mark { row: string | null; word: string }
 
 /**
- * Measure each mark against the box it must stay inside, which `container` names: the tag with the mark's word, and
- * after the third mark the reader's sentence, its colour and its distance from the tag.
+ * Measure each mark against the box it must stay inside, which `container` names: the tag with the mark's word. The
+ * third mark's title is read as well.
  */
-async function measure(container: string, marks: Mark[], sentence: string): Promise<Fit> {
-  return app.page.evaluate(({ container, marks, sentence }) => {
+async function measure(container: string, marks: Mark[]): Promise<Fit> {
+  return app.page.evaluate(({ container, marks }) => {
     const boxes: Fit['boxes'] = []
-    let sentenceColour: string | null = null
-    let inferredColour: string | null = null
-    let gap: number | null = null
-    let tagLines: number | null = null
+    let title: string | null = null
     for (const { row, word } of marks) {
       const scope = row === null ? document.body
         : [...document.querySelectorAll('.sx-line')].find((one) => (one.querySelector('.px-scan-title')?.textContent ?? '').includes(row))
@@ -111,44 +103,25 @@ async function measure(container: string, marks: Mark[], sentence: string): Prom
       const box = tag.getBoundingClientRect()
       boxes.push({ what: `the mark "${word}"`, left: box.left, right: box.right, insideLeft: inside.left, insideRight: inside.right })
       if (!word.includes('not shown')) continue
-      const said = [...holder.querySelectorAll('span')].find((one) => one.textContent === sentence)
-      if (said === undefined) throw new Error(`the sentence "${sentence}" is not written beside the mark`)
-      const line = said.getBoundingClientRect()
-      boxes.push({ what: 'the sentence', left: line.left, right: line.right, insideLeft: inside.left, insideRight: inside.right })
-      sentenceColour = getComputedStyle(said).color
-      const probe = document.createElement('span')
-      probe.style.color = 'var(--st-inferred)'
-      holder.appendChild(probe)
-      inferredColour = getComputedStyle(probe).color
-      probe.remove()
-      const first = said.getClientRects()[0]!
-      gap = first.top >= box.bottom - 1 ? null : first.left - box.right
-      const words = document.createRange()
-      words.selectNodeContents(tag)
-      tagLines = new Set([...words.getClientRects()].map((one) => Math.round(one.top))).size
+      title = tag.getAttribute('title')
     }
     return {
       scrollWidth: document.documentElement.scrollWidth,
       clientWidth: document.documentElement.clientWidth,
       boxes,
-      sentenceColour,
-      inferredColour,
-      gap,
-      tagLines,
+      title,
     }
-  }, { container, marks, sentence })
+  }, { container, marks })
 }
 
-function expectItFits(fit: Fit, where: string): void {
+function expectItFits(fit: Fit, sentence: string, where: string): void {
   expect(fit.scrollWidth, `${where}: the page is ${fit.scrollWidth}px wide in a ${fit.clientWidth}px window`).toBeLessThanOrEqual(fit.clientWidth)
   for (const box of fit.boxes) {
     const said = `${where}: ${box.what} runs from ${Math.round(box.left)} to ${Math.round(box.right)}, and its row from ${Math.round(box.insideLeft)} to ${Math.round(box.insideRight)}`
     expect(box.left, said).toBeGreaterThanOrEqual(box.insideLeft - 0.5)
     expect(box.right, said).toBeLessThanOrEqual(box.insideRight + 0.5)
   }
-  expect(fit.sentenceColour, `${where}: the sentence is not in the colour of an inferred word`).toBe(fit.inferredColour)
-  if (fit.gap !== null) expect(fit.gap, `${where}: the sentence starts ${fit.gap}px after the mark`).toBeGreaterThanOrEqual(4)
-  if (fit.gap !== null) expect(fit.tagLines, `${where}: the sentence is beside a mark broken over ${fit.tagLines ?? 0} lines`).toBe(1)
+  expect(fit.title, `${where}: the mark's title holds the reader's sentence`).toContain(sentence)
 }
 
 async function keep(locator: string, name: string): Promise<void> {
@@ -178,14 +151,14 @@ describe('a running row’s process mark', () => {
       await app.page.locator('.sx-line', { hasText: NONE_TITLE }).first().waitFor({ timeout: 30_000 })
       await keep(`.sx-line:has-text("${OTHER_TITLE}")`, `sessions-${width}-${theme}`)
       const marks = [{ row: OTHER_TITLE, word: NOT_ITS_OWN }, { row: NONE_TITLE, word: NONE }]
-      expectItFits(await measure('.px-scan-main', marks, says), `Agent runs at ${width}px in ${theme}`)
+      expectItFits(await measure('.px-scan-main', marks), says, `Agent runs at ${width}px in ${theme}`)
     })
 
     it(`stays inside its fact on the run’s own page at ${width}px in ${theme}`, async () => {
       await open(sessionPath(other), width, theme)
       await app.page.locator('.px-tag', { hasText: NOT_ITS_OWN }).first().waitFor({ timeout: 30_000 })
       await keep(`.sp-fact:has-text("${NOT_ITS_OWN}")`, `session-${width}-${theme}`)
-      expectItFits(await measure('dd', [{ row: null, word: NOT_ITS_OWN }], says), `the run’s page at ${width}px in ${theme}`)
+      expectItFits(await measure('dd', [{ row: null, word: NOT_ITS_OWN }]), says, `the run’s page at ${width}px in ${theme}`)
     })
   }
 })

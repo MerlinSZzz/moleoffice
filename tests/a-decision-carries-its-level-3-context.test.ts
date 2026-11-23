@@ -31,7 +31,7 @@ import type { FastifyInstance } from 'fastify'
 import { DECISION_SUMMARY_BELONGS } from '../src/shared/kinds.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { recordPath } from '../src/web/components/router.tsx'
-import { apiApp, freshDb, liveApp, waitForThePage, type TestDb } from './helpers.ts'
+import { apiApp, freshDb, liveApp, waitForThePage, type TestDb, governsTheWholeProject } from './helpers.ts'
 
 /**
  * Two projects, so "by project" is a claim this file can check rather than assume. They are made
@@ -94,7 +94,7 @@ async function fileDecision(title: string, over: { summary?: string; data?: Reco
   const payload: Record<string, unknown> = {
     kind: 'decision',
     title,
-    data: { replaces: [], ...(over.data ?? { because: 'The gripper crushed a cup, so the force limit is not a preference.' }) },
+    data: { ...governsTheWholeProject(), replaces: [], ...(over.data ?? { because: 'The gripper crushed a cup, so the force limit is not a preference.' }) },
   }
   if (over.summary !== undefined) payload['summary'] = over.summary
   const made = await post('/api/records', payload, workspace)
@@ -116,7 +116,7 @@ describe('a decision filed without a summary is accepted and listed as incomplet
     const made = await post('/api/records', {
       kind: 'decision',
       title: 'The gripper closes on measured force',
-      data: { replaces: [], because: 'Two demos crushed a cup each; the load cell is already on the bench.' },
+      data: { ...governsTheWholeProject(), replaces: [], because: 'Two demos crushed a cup each; the load cell is already on the bench.' },
     })
     expect(made.statusCode, JSON.stringify(made.body)).toBe(201)
     expect(made.body.record.summary).toBeNull()
@@ -284,7 +284,7 @@ describe('the record page of a decision with no summary is looked at', () => {
           body: JSON.stringify({
             kind: 'decision',
             title: 'A decision whose context nobody has written yet',
-            data: { replaces: [], because: 'The reason for the choice is written down; the level-3 context is not.' },
+            data: { ...governsTheWholeProject(), replaces: [], because: 'The reason for the choice is written down; the level-3 context is not.' },
           }),
         })
         expect(filed.status, await filed.clone().text()).toBe(201)

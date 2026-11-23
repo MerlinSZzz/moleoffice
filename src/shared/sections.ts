@@ -107,7 +107,13 @@
  * part; a problem's `attempts` is drawn by its own panel and is not here at all.
  */
 
-import { GOVERNS_FIELD, theGovernedPlaces } from './governs.ts'
+import {
+  DRAWN_IN_THE_GOVERNS_SECTION,
+  GOVERNS_FIELD,
+  theGovernedPartsNameSomething,
+  theGovernedPlaces,
+  theGovernsSectionIsFilled,
+} from './governs.ts'
 import { KIND_SPECS, blocksFieldOf, declaredTypeOf } from './kinds.ts'
 // THE KEY THE PATH OF A QUESTION IS STORED UNDER. Criterion P55.
 import { CONFIRMED_BY } from './confirming.ts'
@@ -529,6 +535,11 @@ export const RECORD_ID_LISTS: Partial<Record<RecordKind, readonly string[]>> = {
   obligation: ['nextDay'],
   // ONE ID: the design a design review reviews (the design-first build of wave 13s's requirements).
   design_review: ['design'],
+  // ONE ID EACH, AND A LIST: the department above, the one it was merged into, and the person's decisions it rests on
+  // (step 1 of departments and posts).
+  department: ['parent', 'mergedInto', 'restsOn'],
+  // A LIST: the packages a key item counts its progress from (point HD-2c of home as a data dashboard).
+  key_item: ['packages'],
 }
 
 /** True when this field of this kind holds record ids rather than words somebody wrote. */
@@ -572,6 +583,10 @@ export function writerIn(stored: unknown): { actorType: string; actorId: string 
  */
 export const PARTICIPANT_FIELDS: Partial<Record<RecordKind, readonly string[]>> = {
   secretary_duties: ['secretary'],
+  // A department's one supervisor (step 1 of departments and posts).
+  department: ['supervisor'],
+  // Who set a key item's progress, and who made its estimate (point HD-2c of home as a data dashboard).
+  key_item: ['progressSetBy', 'estimatedBy'],
   watch: ['holder'],
   backlog_item: ['placedBy'],
   task: ['holder'],
@@ -636,6 +651,19 @@ export function holdsDatedWords(kind: RecordKind, key: string): boolean {
  */
 export function holdsGovernedPlaces(kind: RecordKind, key: string): boolean {
   return kind === 'decision' && key === GOVERNS_FIELD
+}
+
+/**
+ * WHETHER A DECISION'S GOVERNS SECTION, OR A FIELD IT DRAWS INSIDE IT, IS ON THIS RECORD'S PAGE; null for any other field.
+ *
+ * The Governs section draws the records part, the files part and what no page fits together. So it is there when any of
+ * the three holds something, and the other two are never sections of their own. The body's list (`filledBodySections`)
+ * and the region tree (`sectionsOnThisRecord` in src/shared/regions.ts) both ask this, so they agree.
+ */
+export function theGovernsSectionDecides(kind: RecordKind, key: string, data: Readonly<Record<string, unknown>>): boolean | null {
+  if (holdsGovernedPlaces(kind, key)) return theGovernsSectionIsFilled(data)
+  if (holdsGovernedPlaces(kind, GOVERNS_FIELD) && DRAWN_IN_THE_GOVERNS_SECTION.includes(key)) return false
+  return null
 }
 
 /** One entry of a list of dated words, with its place in the stored list, which is the path a quote of it names. */
@@ -806,6 +834,12 @@ export const OPEN_AROUND_KEY = 'openAround'
  * anybody has to finish.
  */
 export const DECIDED_HERE_KEY = 'decidedHere'
+
+/**
+ * The key *Checklists about this …* sits under: the checklists with an item linked to this record or to a part of it,
+ * read by the related door (GET /api/records/:id/related) as the decisions and the reports beside it are.
+ */
+export const CHECKLISTS_ABOUT_KEY = 'checklistsAbout'
 
 /** The key *Where this lives* sits under: the files this record's work is in. */
 export const WHERE_IT_LIVES_KEY = 'whereItLives'
@@ -1032,6 +1066,8 @@ export type SectionFrom =
   | { readonly holds: 'openAround' }
   /** The decisions about this record: linked to it, or settling a fork that is. Not in `data`. */
   | { readonly holds: 'decidedHere' }
+  /** The checklists with an item linked to this record or to a part of it. Not in `data`. */
+  | { readonly holds: 'checklistsAbout' }
   /**
    * THE FILES THIS RECORD'S WORK LIVES IN, read from the repository index rather than from `data`.
    *
@@ -1244,6 +1280,20 @@ const FIELD_TITLES: Partial<Record<RecordKind, Readonly<Record<string, string>>>
     methodWork: 'Marked as method work or as the go for a pilot',
   },
   // On a secretary's duties, three keys say less than they mean when read on their own.
+  // On a department, the names and what it does are each in one language, and its parent is the department above it.
+  department: {
+    nameEn: 'Name in English',
+    nameZh: 'Name in Chinese',
+    doesEn: 'What it does, in English',
+    doesZh: 'What it does, in Chinese',
+    parent: 'The department above it',
+    restsOn: "The person's decisions it rests on",
+  },
+  // On a key item, its place is its place in the order, and its hours left are an estimate, which the title says.
+  key_item: {
+    place: 'Place in the order',
+    hoursLeft: 'Estimated hours left',
+  },
   secretary_duties: {
     lines: 'Lines of work',
     doors: "The person's doors it presses",
@@ -1445,6 +1495,13 @@ function sectionsDeclaredBy(kind: RecordKind): readonly SectionSpec[] {
       from: { holds: 'decidedHere' },
       inside: null,
     })
+    // THE CHECKLISTS ABOUT IT, read by the one door the reports and the decisions above are read by.
+    out.push({
+      key: CHECKLISTS_ABOUT_KEY,
+      title: `Checklists about this ${kindWord(kind).text}`,
+      from: { holds: 'checklistsAbout' },
+      inside: null,
+    })
   }
 
   out.push({
@@ -1520,6 +1577,12 @@ function sectionsDeclaredBy(kind: RecordKind): readonly SectionSpec[] {
  * quietly has no sections.
  */
 export const SECTIONS_OF: { readonly [K in RecordKind]: readonly SectionSpec[] } = {
+  knowledge_entry: sectionsDeclaredBy('knowledge_entry'),
+  knowledge_category: sectionsDeclaredBy('knowledge_category'),
+  knowledge_bookmark: sectionsDeclaredBy('knowledge_bookmark'),
+  knowledge_change: sectionsDeclaredBy('knowledge_change'),
+  knowledge_query: sectionsDeclaredBy('knowledge_query'),
+  knowledge_rating: sectionsDeclaredBy('knowledge_rating'),
   whole_suite_receipt: sectionsDeclaredBy('whole_suite_receipt'),
   sealed_tip: sectionsDeclaredBy('sealed_tip'),
   merge_entry: sectionsDeclaredBy('merge_entry'),
@@ -1563,6 +1626,7 @@ export const SECTIONS_OF: { readonly [K in RecordKind]: readonly SectionSpec[] }
   flow: sectionsDeclaredBy('flow'),
   flow_run: sectionsDeclaredBy('flow_run'),
   host_job: sectionsDeclaredBy('host_job'),
+  pack: sectionsDeclaredBy('pack'),
   notice_rules: sectionsDeclaredBy('notice_rules'),
   quick_note: sectionsDeclaredBy('quick_note'),
   counter: sectionsDeclaredBy('counter'),
@@ -1571,6 +1635,8 @@ export const SECTIONS_OF: { readonly [K in RecordKind]: readonly SectionSpec[] }
   checklist: sectionsDeclaredBy('checklist'),
   booking: sectionsDeclaredBy('booking'),
   secretary_duties: sectionsDeclaredBy('secretary_duties'),
+  department: sectionsDeclaredBy('department'),
+  key_item: sectionsDeclaredBy('key_item'),
   watch: sectionsDeclaredBy('watch'),
   backlog_item: sectionsDeclaredBy('backlog_item'),
   handbook: sectionsDeclaredBy('handbook'),
@@ -1778,8 +1844,9 @@ export function drawableAsWords(kind: RecordKind, key: string, value: unknown): 
     (holdsDoors(kind, key) && Array.isArray(value)) ||
     // A LIST OF DATED WORDS IS WORDS, drawn by the one reader of its entries rather than as "[object Object]".
     (holdsDatedWords(kind, key) && datedWordsIn(value).length > 0) ||
-    // WHAT A DECISION GOVERNS IS NAMES AND PATHS, drawn by the one reader of its entries.
-    (holdsGovernedPlaces(kind, key) && theGovernedPlaces(value).length > 0)
+    // WHAT A DECISION GOVERNS IS NAMES, THE WHOLE PROJECT AND OLD PATHS, drawn by the one reader of its entries, which
+    // also names an entry it could not read.
+    (holdsGovernedPlaces(kind, key) && theGovernedPartsNameSomething(theGovernedPlaces(value)))
   )
 }
 
@@ -1801,6 +1868,8 @@ export function drawableAsWords(kind: RecordKind, key: string, value: unknown): 
  */
 export function filledBodySections(record: { kind: RecordKind; data: PanelRecord['data'] }): readonly SectionSpec[] {
   return bodySectionsDeclaredBy(record.kind).filter((section) => {
+    const governed = theGovernsSectionDecides(record.kind, section.key, record.data)
+    if (governed !== null) return governed
     const value = record.data[section.key]
     return isWritten(value) && drawableAsWords(record.kind, section.key, value)
   })

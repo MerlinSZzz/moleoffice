@@ -41,7 +41,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { THE_OWNER } from '../src/shared/kinds.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { THE_SECRETARY, THE_SUPERVISOR, THE_WORKER } from '../src/shared/roles.ts'
-import { apiApp, freshDb, thePersonsKeyHeader, type TestDb } from './helpers.ts'
+import { apiApp, freshDb, thePersonsKeyHeader, type TestDb, governsTheWholeProject } from './helpers.ts'
 import { SECRETARY_DUTIES_KIND } from '../src/shared/secretary-duties-record.ts'
 
 type TheGuard = typeof import('../src/server/lib/grant/secretary-duties.ts')
@@ -167,7 +167,7 @@ beforeAll(async () => {
   const filed = await call('POST', '/api/records', PERSON, {
     kind: 'decision',
     title: 'A made-up decision on the map secretary and its supervisors',
-    data: { option_taken: WORDS, because: 'A made-up reason.', decided_by: THE_OWNER, replaces: [] },
+    data: { option_taken: WORDS, because: 'A made-up reason.', decided_by: THE_OWNER, ...governsTheWholeProject(), replaces: [] },
   })
   expect(filed.status, filed.raw).toBe(201)
   decision = String(filed.body.record.id)

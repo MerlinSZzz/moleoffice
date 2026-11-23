@@ -23,10 +23,12 @@
  * Everything here is made up.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { createI18n } from '../src/shared/i18n.ts'
 import { en } from '../src/shared/words/en.ts'
 import { liveApp, waitForThePage, type LiveApp } from './helpers.ts'
 import { THE_TEST_OFFICES_OWNER } from './a-page-of-a-test-office.ts'
 
+const { t } = createI18n('en')
 const PROJECT = 'test-greenhouse'
 const AS_THE_PERSON_IN = (project: string) => ({
   'content-type': 'application/json',
@@ -101,7 +103,7 @@ describe("a review's Change after a project switch", () => {
     await expect
       .poll(async () => (await chip.locator('.px-b-chip-words').textContent()) ?? '', { timeout: 30_000 })
       .toContain('Kiln Keeper')
-    expect(await app.page.getByText(en['review.pane.contacts.noRecord'], { exact: true }).count(), 'the press said the agent has no record here').toBe(0)
+    expect(await app.page.getByText(t('savedComment.agentHasNoRecord'), { exact: true }).count(), 'the press said the agent has no record here').toBe(0)
     const stored = (await (await fetch(`${app.api}/api/reviews/${reviewId}`, { headers: AS_THE_PERSON_IN(PROJECT) })).json()) as {
       goesTo: { recipient: unknown; name: string | null }
     }

@@ -25,6 +25,7 @@ import { THE_MIGRATIONS_PATH, THE_STEPS_FILE, theStepNames, theWayBackCheck, wha
 import { artifactIdentity, processIdentity, returnToThePreviousStable } from '../tools/stable/stable-upgrade-transaction.mjs'
 import { fakeReleasePolicyFixture, historyPage } from './stable-release-policy-fixture.ts'
 import { aLineThatStopsAServerWithItsStarterOrOwner, aStandInOwner, commandUnderTheOwnerWatchingGate, endTheStandIns, theseGroupsEndAfterASigkillOf } from './the-owner-watching-gate.ts'
+import { aMadeUpElectronPackage } from './stable-upgrade-fixture.ts'
 
 const root = resolve(import.meta.dirname, '..')
 const zone = theClockZone()
@@ -126,7 +127,9 @@ async function world(newerMigration: [string, string[]], newestWentInAsAnEmergen
   write(join(dev, 'fixture-loader/package.json'), JSON.stringify({ name: 'tsx', version: '0.0.0', type: 'module', exports: './loader.mjs' }))
   write(join(dev, 'fixture-loader/loader.mjs'), '// The fixture entries contain only erasable types.\n')
   run(dev, 'tar', ['-czf', 'fixture-loader.tgz', 'fixture-loader']); rmSync(join(dev, 'fixture-loader'), { recursive: true })
-  write(join(dev, 'package.json'), JSON.stringify({ name: 'synthetic-way-back-office', version: '1.0.0', type: 'module', scripts: { typecheck: 'node typecheck.mjs', 'db:migrate': 'node migrate.mjs' }, dependencies: { tsx: 'file:fixture-loader.tgz' } }))
+  // The way back runs electron's install.js after npm ci, so the made-up office carries the made-up electron package.
+  const electron = aMadeUpElectronPackage(dev)
+  write(join(dev, 'package.json'), JSON.stringify({ name: 'synthetic-way-back-office', version: '1.0.0', type: 'module', scripts: { typecheck: 'node typecheck.mjs', 'db:migrate': 'node migrate.mjs' }, dependencies: { tsx: 'file:fixture-loader.tgz', ...electron } }))
   write(join(dev, 'typecheck.mjs'), `import{mkdirSync,writeFileSync}from'node:fs';mkdirSync('dist',{recursive:true});writeFileSync('dist/fixture-typechecked','checked');`)
   write(join(dev, 'tools/build-the-page.mjs'), `import{existsSync,mkdirSync,readFileSync,writeFileSync}from'node:fs';import{execFileSync}from'node:child_process';export async function buildThePage(){if(!existsSync('dist/fixture-typechecked'))return{ok:false,output:'Typecheck was skipped'};mkdirSync('dist/web',{recursive:true});writeFileSync('dist/web/index.html',readFileSync('version.txt'));writeFileSync('dist/web/build-stamp.json',JSON.stringify({builtAt:'2026-10-23 01:00:00',builtAtMs:1,newestSourceAt:null,newestSourceAtMs:null,newestSourceFile:null,newestSourceFiles:null,commit:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim()}));return{ok:true}}`)
   // The way back never migrates, so this marker row in the office database must never appear.

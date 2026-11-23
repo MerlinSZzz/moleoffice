@@ -7,8 +7,8 @@
  *
  * CERTAIN AND LIKELY. Wave 13j round 56: a program checks the rules that need no judgement, so a
  * check stops refusing runs for paperwork. An item is `mechanical` when the branch and the records alone decide it: the
- * report's links and fields, the commits and their files. A test proof is read from the lines a run's test tool wrote,
- * which may hide what they ran, and a starter's item is a sentence nobody can check for the run; neither is certain.
+ * report's links and fields, the commits and their files. A starter's item is a sentence nobody can check for the run,
+ * so it is never certain.
  * A test line that reads the whole machine is likely too, because a test that must read it can keep the line with a
  * reason (./machine-wide-scans.ts). Every item is named. The owner's first decision made every item a reminder; their
  * decision on migration items narrowed it for a migration item. Their later decision on faults of form took the hard gate
@@ -23,6 +23,7 @@ import { MAX_PROSE } from '@shared/prose-cap.ts'
 import type { ANamedItem } from '@shared/before-the-seal.ts'
 import { CHAPTERS_READ, whatAReportSaysItRead } from '@shared/chapters.ts'
 import { DECISION_AUTHORITY_NEEDS, type DecisionAuthority } from '@shared/kinds.ts'
+import { thePageKindsInWords } from '@shared/page-kinds-in-words.ts'
 import { theAttributionLinesOf, theMessagesIn, theMessagesOfARange } from '../../config/attribution-lines.mjs'
 import { theMachineWideScansIn, WHAT_THE_FINDER_CANNOT_SEE } from './machine-wide-scans.ts'
 import { COPIED_NOT_READ, type Finding } from './copied-test-literals.ts'
@@ -77,7 +78,10 @@ export interface TheRunsCommits {
 /** Everything the reminder judges, read before it judges, so the judging is a pure function that a test can hand facts. */
 export interface TheFactsBeforeTheSeal {
   runTitle: string
-  /** The `said` of each named-tests use line on the run, oldest first. */
+  /**
+   * The `said` of each named-tests use line on the run, oldest first. No item judges them since mutation proofs stopped
+   * being proof (chapter 5).
+   */
   testRuns: string[]
   /**
    * The named-tests lines among them whose proof that tools/use-line.mjs sent them was missing or did not match, oldest
@@ -129,8 +133,12 @@ export interface TheFactsBeforeTheSeal {
    * caller did not look.
    */
   earlierRefusal?: TheEarlierRefusal | null | { couldNotRead: string }
-  /** Each report filed in the run, and whether it is linked about a run. Absent when the caller did not read them. */
-  reportsFiled?: { id: string; aboutARun: boolean }[]
+  /**
+   * Each report filed in the run: whether it is linked about a run, whether it is linked about a live page, and whether
+   * it holds a nothingFits entry. Absent when the caller did not read them; a part left out was not read, and then no
+   * item is named from it.
+   */
+  reportsFiled?: { id: string; aboutARun: boolean; aboutAPage?: boolean; namesNothingFits?: boolean }[]
   /**
    * THE PACKAGES THE RUN TOOK INSIDE AND HAS NOT HANDED BACK (the inside doors in ./delegation.ts): for each, its task
    * id and title, its number of points, and whether its latest restatement was answered `aligned`. `couldNotRead` when
@@ -209,9 +217,6 @@ export type TheOtherWorktrees =
     }
   | { couldNotLook: string }
 
-/** The four widths and two themes chapter 6 asks for, which the report's words are searched for. */
-const WIDTHS = ['1440', '990', '660', '390'] as const
-const THEMES = ['light', 'dark'] as const
 const THE_JOURNAL = 'drizzle/meta/_journal.json'
 /** How many named-tests lines not shown to come through the tool the reminder names one by one, and how much of each. */
 const LINES_NAMED_MOST = 3
@@ -228,31 +233,8 @@ const isAMigration = (path: string): boolean => /^drizzle\/\d{4}_[^/]+\.sql$/u.t
 const fileName = (path: string): string => path.slice(path.lastIndexOf('/') + 1)
 /** The authority whose decision must say what would reopen it. Exported so a test reads it rather than copying it. */
 export const A_REVERSIBLE_JUDGEMENT: DecisionAuthority = 'reversible engineering judgement'
-/** A file's name without its last extension: what a report would call the page. */
-const pageName = (path: string): string => fileName(path).replace(/\.[^.]+$/u, '')
 const atItsLine = (file: AFileOfACommit): string => (typeof file.firstLine === 'number' ? `${file.path}:${file.firstLine}` : file.path)
 const theCommit = (commit: ACommitOfTheRun): string => `Commit ${commit.commit.slice(0, 9)} ("${commit.subject}")`
-
-/** How one named-tests line ended: green, red, or null when it says neither. */
-function howItEnded(said: string): 'green' | 'red' | null {
-  if (/parts [\d, ]+ of \d+ failed|vitest was ended by|vitest exited [1-9]/u.test(said)) return 'red'
-  if (/vitest exited 0\b/u.test(said)) return 'green'
-  return null
-}
-
-/** The file names one named-tests line shows, and whether it hid more behind "and K more" or a --list. */
-function theNamesShown(said: string): { names: string[]; hidesMore: boolean } {
-  const list = /^named \d+ files? \((.*?)\); /u.exec(said)?.[1]
-  if (list === undefined) return { names: [], hidesMore: true }
-  const parts = list.split(', ').map((one) => one.replace(/^and /u, ''))
-  const hidesMore = parts.some((one) => /^\d+ more$|^\d+ names$|^--list /u.test(one))
-  return { names: parts.filter((one) => !/^\d+ more$|^\d+ names$|^--list /u.test(one)), hidesMore }
-}
-
-/** Every string anywhere in a report's blocks, joined, for the words a check looks for. */
-function theWordsOf(report: { title: string; data: Record<string, unknown> }): string {
-  return `${report.title} ${JSON.stringify(report.data['blocks'] ?? [])}`
-}
 
 function theBlocksOf(report: { data: Record<string, unknown> }): Record<string, unknown>[] {
   const blocks = report.data['blocks']
@@ -265,7 +247,6 @@ function theBlocksOf(report: { data: Record<string, unknown> }): Record<string, 
  */
 function whatTheRunChanged(git: TheFactsBeforeTheSeal['git']): {
   existed: (path: string) => boolean
-  testsAdded: string[]
   testsChanged: string[]
   pagesChanged: string[]
 } {
@@ -275,7 +256,6 @@ function whatTheRunChanged(git: TheFactsBeforeTheSeal['git']): {
   const existed = 'commits' in git ? git.existedAtTheForkBase : () => true
   return {
     existed,
-    testsAdded: [...lastDone].filter(([path, status]) => isATest(path) && status !== 'D' && !existed(path)).map(([path]) => path),
     testsChanged: [...lastDone].filter(([path, status]) => isATest(path) && status !== 'D').map(([path]) => path),
     pagesChanged: [...lastDone].filter(([path, status]) => isAPage(path) && status !== 'D').map(([path]) => path),
   }
@@ -294,29 +274,6 @@ export function theWriteOfTheChaptersRead(report: string): string {
   return `PATCH /api/records/${report} {"dataPatch":{"${CHAPTERS_READ}":[<the number of each chapter the run read>]}}`
 }
 
-/**
- * WHETHER THE RUN'S named-tests LINES SHOW A CONTROL RUN, A MUTATION THAT TURNED IT RED AND A RESTORE, in that order, for one
- * test file. `hidden` says some line hid part of what it ran behind "and K more" or a --list, so the proof may be there.
- */
-function whatTheTestRunsProve(path: string, testRuns: readonly string[]): { proved: boolean; hidden: boolean } {
-  const name = fileName(path)
-  const short = name.replace(/\.test\.(ts|tsx|mjs|js)$/u, '')
-  let step = 0
-  let hidden = false
-  for (const said of testRuns) {
-    const shown = theNamesShown(said)
-    const named = shown.names.some((one) => one === name || one === short || one === path)
-    if (!named) {
-      if (shown.hidesMore) hidden = true
-      continue
-    }
-    const ended = howItEnded(said)
-    if ((step === 0 || step === 2) && ended === 'green') step += 1
-    else if (step === 1 && ended === 'red') step = 2
-  }
-  return { proved: step >= 3, hidden }
-}
-
 /** A record the seal reads the form of, named as an item names it: its kind, its id, and why the seal answers for it. */
 function theRecordAsTheSealReadsIt(read: AFormReading): string {
   const noun = read.about === 'report' ? 'Report' : read.about === 'decision' ? 'Decision' : 'Record'
@@ -325,6 +282,19 @@ function theRecordAsTheSealReadsIt(read: AFormReading): string {
 }
 
 const THE_PACKAGE_ITEM_KIND = 'package'
+
+/**
+ * THE ITEM'S WORDS FOR A REPORT THE RUN FILED THAT IS LINKED ABOUT NO PAGE AND HOLDS NO NOTHINGFITS ENTRY: what to add.
+ * Exported so a test reads the words from here.
+ */
+export function whatAReportAboutNoPageIsTold(report: string): string {
+  return (
+    `Report ${report}, which this run filed, is linked about no page and says no page fits it. ` +
+    `Link it about each page it is about: ${thePageKindsInWords()}. ` +
+    `Send POST /api/links {"fromId":"${report}","toId":"<that page>","type":"about"}. ` +
+    `If no page fits, add a nothingFits entry to the report: the kind of page that is missing, a few words, and the nearest live page if there is one.`
+  )
+}
 
 /** The key of the item naming a package the run took inside and has not handed back. */
 export function theKeyOfAPackageToHandBack(taskId: string): string {
@@ -527,32 +497,23 @@ export function whatAnInspectorWouldMostLikelyRefuse(facts: TheFactsBeforeTheSea
     }
   }
   for (const report of facts.reportsFiled ?? []) {
-    if (report.aboutARun) continue
-    certain({
-      key: `report:${report.id}:about-a-run`,
-      about: 'report',
-      says:
-        `Report ${report.id}, which this run filed, is linked about no run. Link it to the run it is about with POST /api/links ` +
-        `{"fromId":"${report.id}","toId":"<that run>","type":"about"}.`,
-    })
-  }
-
-  // ------------------------------------------------------------------------------------------------ test proofs
-  for (const path of testsChanged) {
-    const { proved, hidden } = whatTheTestRunsProve(path, facts.testRuns)
-    if (!proved) {
-      likely({
-        key: `test:${path}`,
-        about: 'test proof',
+    if (!report.aboutARun) {
+      certain({
+        key: `report:${report.id}:about-a-run`,
+        about: 'report',
         says:
-          `${path} changed, and this run's named-tests lines do not show a control run, a mutation that turned it red and a restore, in that order` +
-          (hidden ? '. Some lines hide part of what they ran, so it may be among those.' : '.') +
-          ' Chapter 5: a test is proved by mutation, after a control run.',
+          `Report ${report.id}, which this run filed, is linked about no run. Link it to the run it is about with POST /api/links ` +
+          `{"fromId":"${report.id}","toId":"<that run>","type":"about"}.`,
       })
+    }
+    // A REPORT NAMES THE PAGE IT IS ABOUT, OR SAYS NO PAGE FITS (src/shared/what-a-record-names.ts). Held at the finish,
+    // never refused when it is written.
+    if (report.aboutAPage === false && report.namesNothingFits === false) {
+      certain({ key: `report:${report.id}:about-a-page`, about: 'report', says: whatAReportAboutNoPageIsTold(report.id) })
     }
   }
 
-  // A LINE THE TOOL DID NOT SEND STILL COUNTS ABOVE, and is named here: the mark is a reminder, not a refusal.
+  // A LINE THE TOOL DID NOT SEND is named here: the mark is a reminder, not a refusal.
   const notFromTheTool = facts.testRunsNotFromTheTool ?? []
   if (notFromTheTool.length > 0) {
     const shown = notFromTheTool.slice(0, LINES_NAMED_MOST).map((one) => `use ${String(one.seq)} ("${one.said.length > SAID_SHOWN_MOST ? `${one.said.slice(0, SAID_SHOWN_MOST)}…` : one.said}"): ${one.mark}`)
@@ -563,29 +524,8 @@ export function whatAnInspectorWouldMostLikelyRefuse(facts: TheFactsBeforeTheSea
       says:
         `${String(notFromTheTool.length)} of this run's named-tests line${notFromTheTool.length === 1 ? ' is' : 's are'} not shown to have come through tools/use-line.mjs. ` +
         `${shown.join(' ')}${more > 0 ? ` And ${String(more)} more.` : ''} ` +
-        'Their results are still counted above. A test run through tools/run-named-tests.mjs sends its own line, with its proof.',
+        'A test run through tools/run-named-tests.mjs sends its own line, with its proof.',
     })
-  }
-
-  // ------------------------------------------------------------------------------------------------ pictures
-  if (pagesChanged.length > 0) {
-    for (const report of facts.reports) {
-      const words = theWordsOf(report)
-      const images = theBlocksOf(report).filter((one) => one['type'] === 'image').length
-      const unnamedPages = pagesChanged.filter((path) => !words.includes(pageName(path)))
-      const missing = [...unnamedPages, ...[...WIDTHS, ...THEMES].filter((one) => !new RegExp(`\\b${one}\\b`, 'iu').test(words))]
-      if (images === 0 || missing.length > 0) {
-        const lacks = [...(images === 0 ? ['has no image blocks'] : []), ...(missing.length > 0 ? [`does not name ${missing.join(', ')}`] : [])]
-        certain({
-          key: `pictures:${report.id}`,
-          about: 'pictures',
-          says:
-            `This run changed ${pagesChanged.length} page files (${pagesChanged.join(', ')}), and report ${report.id} ${lacks.join(' and ')}. ` +
-            'Chapter 6: every changed screen is looked at, at 1440, 990, 660 and 390, light and dark, and the 1440 ones go in the report. ' +
-            'What to do: take the pictures of each changed screen, look at them, and name each page and what it shows in the report.',
-        })
-      }
-    }
   }
 
   // ------------------------------------------------------------------------------------------------ commits
@@ -821,9 +761,15 @@ export function theComparableItems(items: readonly ANamedItem[], copiedReadable:
 export interface WhatTheReportLacks {
   /** Each missing piece, in words the run can act on. Empty when nothing is missing. */
   lacks: string[]
-  /** The test files the run added whose proof was not found. */
+  /**
+   * The test files a lack names. None does since the report check stopped asking for mutation proofs (chapter 5); the
+   * merge queue's bounce still reads the field.
+   */
   files: string[]
-  /** What could not be read. It is counted neither as missing nor as there. */
+  /**
+   * What could not be read. Empty since the report check stopped reading the test files the run added; the merge queue
+   * still reads the field.
+   */
   notRead: string[]
 }
 
@@ -838,21 +784,15 @@ export function whatTheDoingLineLacks(doing: string | null, run = '<run>'): stri
 
 /**
  * WHAT A RUN'S REPORT LACKS, read by the merge queue before any check starts. That is part 1 of a
- * decision: a doing line, chapters read, and a control, mutation and restore
- * for every test file the run added. Pure, and it costs no tokens.
+ * decision: a doing line and chapters read. Pure, and it costs no tokens.
  *
- * A PROOF IS FOUND IN ONE OF TWO PLACES. The run's named-tests lines, read from the tool_uses rows, show a green run, a red
- * one and a green one naming the file, in that order. Or one block of a linked report names the file, with its extension,
- * and says control, mutation and restore. The chapters are judged as the reminder judges them (`theChaptersAReportMustList`); one linked
- * report must list them all. When git could not be read, the test files are not judged and `notRead` says so.
+ * The chapters are judged as the reminder judges them (`theChaptersAReportMustList`); one linked report must list them all.
  */
 export function whatTheReportLacks(facts: TheFactsBeforeTheSeal & { doing: string | null }): WhatTheReportLacks {
   const lacks: string[] = []
-  const files: string[] = []
-  const notRead: string[] = []
   const doing = whatTheDoingLineLacks(facts.doing)
   if (doing !== null) lacks.push(doing)
-  const { testsAdded, testsChanged, pagesChanged } = whatTheRunChanged(facts.git)
+  const { testsChanged, pagesChanged } = whatTheRunChanged(facts.git)
   const wanted = theChaptersAReportMustList(facts.mustRead, testsChanged, pagesChanged)
   if (facts.reports.length === 0) {
     lacks.push('No report is linked to the run. Link one with POST /api/links {"fromId":"<report>","toId":"<run>","type":"about"}.')
@@ -869,29 +809,7 @@ export function whatTheReportLacks(facts: TheFactsBeforeTheSeal & { doing: strin
       lacks.push(`No linked report lists the chapters read. ${had}, and ${each.join('; ')}. Write them in a report: ${theWriteOfTheChaptersRead(report)}.`)
     }
   }
-  if ('couldNotRead' in facts.git) {
-    notRead.push(`The test files the run added: git could not be read (${facts.git.couldNotRead}).`)
-  } else {
-    const blocks = facts.reports.flatMap((report) => theBlocksOf(report).map((block) => JSON.stringify(block)))
-    let hidden = false
-    for (const path of testsAdded) {
-      const name = fileName(path)
-      const runs = whatTheTestRunsProve(path, facts.testRuns)
-      const named = blocks.some((words) => words.includes(name) && /control/iu.test(words) && /mutat/iu.test(words) && /restor/iu.test(words))
-      if (runs.proved || named) continue
-      files.push(path)
-      if (runs.hidden) hidden = true
-    }
-    if (files.length > 0) {
-      lacks.push(
-        `No control, mutation and restore was found for ${files.length === 1 ? 'the new test' : `${files.length} new tests`} ${files.join(', ')}. ` +
-          'Neither the run\'s named-tests lines show a green run, a red one and a green one naming it, in that order, nor does one block of a ' +
-          'linked report name it with its control, mutation and restore' +
-          (hidden ? '. Some named-tests lines hide part of what they ran, so naming the proof in the report answers this.' : '.'),
-      )
-    }
-  }
-  return { lacks, files, notRead }
+  return { lacks, files: [], notRead: [] }
 }
 
 /**
@@ -920,7 +838,7 @@ const THE_CHAPTERS_READ = 'a report lists in chaptersRead the chapters the run h
  * coordinator said yes to this list). A program finds each of them in the records the seal answers for, so the
  * reminder can list it and a run can fix it before a check is spent. The hard gate never refuses one; only the block
  * position refuses a certain item the reminder named. An item's kind is its key's first and last part:
- * `report:<id>:title` is `report:title`. The finder names each of these as certain, and test proofs, pictures, commits,
+ * `report:<id>:title` is `report:title`. The finder names each of these as certain, and test proofs, commits,
  * design, check-also, machine-wide tests and copied test values are not here.
  */
 export const THE_FAULTS_OF_FORM: Readonly<Record<string, string>> = {
@@ -942,6 +860,7 @@ export const THE_FAULTS_OF_FORM: Readonly<Record<string, string>> = {
   'run:doing': 'chapter 9 rule 6: a run changes its doing line as soon as it knows what it is working on',
   'run:refusal': 'the rule of every line, "Link the round\'s run to the record that asks for its change" (the coordinator, 31 October)',
   'report:about-a-run': A_REPORT_IS_LINKED,
+  'report:about-a-page': A_REPORT_IS_LINKED,
 }
 
 /** An item's kind: its key's first and last part, or the whole key when it has two parts or fewer. */
@@ -1073,11 +992,17 @@ export function theRunsCommitsOf(carried: TheRunsCommitsCarried): TheRunsCommits
   return { commits: carried.commits, existedAtTheForkBase: (path) => there.has(path), earlier: carried.earlier, messages: carried.messages, testLinesAtTheTip: carried.testLinesAtTheTip }
 }
 
-/** What `theCommitsReadWith` reads, as `TheRunsCommitsCarried`. */
-export function theCommitsCarriedReadWith(git: (...args: string[]) => string, forkBase: string, tip: string, startedMs: number | null): TheRunsCommitsCarried {
-  const { listed, start } = theCommitsSince(git, forkBase, tip, startedMs)
+/**
+ * What `theCommitsReadWith` reads, as `TheRunsCommitsCarried`. With `judged`, the run's own commits that are not carried
+ * (./a-runs-own-commits.ts), the commits are those among them, and not those from the start: the earlier ones are every
+ * other commit since the fork base, and the run's change is read from the commit before the first of its own.
+ */
+export function theCommitsCarriedReadWith(git: (...args: string[]) => string, forkBase: string, tip: string, startedMs: number | null, judged?: ReadonlySet<string>): TheRunsCommitsCarried {
+  const { listed, start: fromTheStart } = theCommitsSince(git, forkBase, tip, startedMs)
+  const ours = judged === undefined ? null : listed.filter(([commit]) => judged.has(commit))
+  const start = ours === null ? fromTheStart : ours.length === 0 ? listed.length : listed.indexOf(ours[0]!)
   const before = start === 0 ? forkBase : listed[start - 1]![0]
-  const commits = listed.slice(start).map(([commit]): ACommitOfTheRun => {
+  const commits = (ours ?? listed.slice(start)).map(([commit]): ACommitOfTheRun => {
     const message = git('log', '-1', '--format=%B', commit)
     const [subject = '', ...rest] = message.split('\n')
     const statuses = git('diff-tree', '--no-commit-id', '-r', '--no-renames', '--name-status', '--root', commit)
@@ -1113,7 +1038,8 @@ export function theCommitsCarriedReadWith(git: (...args: string[]) => string, fo
   // tests enter the same finder as tests/; select their test directories without reading plugin source as test lines.
   const testLinesAtTheTip = [...theLinesOf(git('diff-tree', '-r', '-p', '-U0', '--no-renames', before, tip, '--', 'tests/', ':(glob)plugins/*/tests/**'))]
     .map(([path, read]) => ({ path, added: read.added }))
-  return { commits, earlier: startedMs === null ? null : start, messages, testLinesAtTheTip, atTheStart, authorTimes: listed.map(([, at]) => Number(at)) }
+  const earlier = ours !== null ? listed.length - ours.length : startedMs === null ? null : start
+  return { commits, earlier, messages, testLinesAtTheTip, atTheStart, authorTimes: listed.map(([, at]) => Number(at)) }
 }
 
 /** Every commit between the fork base and the tip, oldest first in the order written, and where the run's own begin. */

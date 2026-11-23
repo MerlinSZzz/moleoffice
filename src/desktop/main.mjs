@@ -52,6 +52,13 @@
  *      as before, and its log says so. A healthy service whose health check has no version field is read as older.
  *      When the service says its version is null or something that is not a version, or the window knows no version
  *      of its own, the window compares nothing and does as before.
+ *  11. A WEB PAGE IN THE WINDOW (package OT-B). The office page lays out a box for one web page, in its own place or
+ *      in a column on its left or right, and says where the box is through the bridge src/desktop/preload.cjs gives
+ *      it on the office's own origin. The window draws the page in a view of its own over that box. The view is kept
+ *      out of the office by src/desktop/the-web-page.mjs: its own session, no preload, no loopback address and no
+ *      office address. Every bridge call is checked for its sender and its arguments. The view hides when the
+ *      office page asks, and while the window does not show the office page. The address and the place are kept in
+ *      the window's own data folder and opened again after a restart. The office never sees that file.
  *
  * ONLY THE OFFICE ON THIS MACHINE. The window opens the office its checkout declares, on this
  * machine; another machine's office stays in the browser (the plan's question 1, answer A, for the
@@ -60,22 +67,26 @@
  *
  * THE WORDS are in src/config/the-self-check-words.mjs, in English and Chinese, chosen by the language a
  * `--lang` switch names (`--lang=zh-CN` gives Chinese), and otherwise by the system's first language.
+ *
+ * FROM A CHECKOUT, THE NODE THE SERVICE COMMAND RUNS ON is looked up in the window's whole environment, so on Windows a
+ * search path held as `Path` is found.
  */
 
 import { spawn } from 'node:child_process'
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import inspector from 'node:inspector'
 import { BrowserWindow, Menu, Tray, WebContentsView, app, dialog, globalShortcut, ipcMain, nativeImage, nativeTheme } from 'electron'
 import { readHowTheServerEnded } from '../config/how-the-server-ended.mjs'
+import { DEVICE_HALF_HEADER, DEVICE_HALF_KEY } from '../config/key-header.mjs'
 import { whereIsThisTool } from '../config/runtimes.mjs'
 import { ENV_FILE, REPO_ROOT, THE_INSTALL, howToStart, settingValue, settings, theInstallsNode, thePerUserDataFolder, theVersion } from '../config/settings.mjs'
 import { theSandboxWarning, theWorldTheDeclarationNames, whatAnswersForThisOffice, whatTheWindowSays } from '../config/the-self-check.mjs'
 import { WINDOW_WORDS, theSystemsLanguage } from '../config/the-self-check-words.mjs'
 import { theQuickNoteAddress } from '../config/the-quick-note-address.mjs'
 import { readTheServiceLock } from '../config/the-service-lock.mjs'
-import { THE_PAGE_SAYS, THE_TRAY_ASKS_TO_SHUT_DOWN, markEveryPageOf } from '../config/the-window-mark.mjs'
+import { THE_PAGE_SAYS, THE_TRAY_ASKS_TO_SHUT_DOWN, markEveryPageOf, withoutTheWindowsMarks } from '../config/the-window-mark.mjs'
 import { isSetToOpenAtLogin, listenToTheSystem, theTrayItems, theTrayPicture } from './the-window-on-this-system.mjs'
 import { A_NOTE_ASKED_FOR_WITHOUT_THE_NOTE_PAGE, THE_MAIN_WINDOW, THE_NOTE_WINDOW, giveTheWindowItsMenuRow, theNotesOpen, theQuickNoteKey, theQuickNoteWindowOptions } from './the-quick-note.mjs'
 import { oneLoadAtATime } from './one-load-at-a-time.mjs'
@@ -83,6 +94,21 @@ import { START_AGAIN_AFTER_MS, TRIES_COUNT_WITHIN_MS, WATCH_EVERY_MS, howTheWatc
 import { whatTheShutDownLeft, whatTheWindowSaysOfTheStop } from './what-the-shut-down-left.mjs'
 import { THE_DEBUGGING_SETTING, keepTheInspectorShut, whyTheWindowRefusesToStart } from './the-debugging-switches.mjs'
 import { howTheServicesVersionCompares } from './the-services-version.mjs'
+import { printAPage, thePrintAsked } from './print-a-page.mjs'
+import {
+  THE_KEPT_PAGES_FILE,
+  fromTheOfficePage,
+  keepTheContentsOut,
+  keepTheSessionOut,
+  theDownloadAnswerAsked,
+  theHttpsAddressAsked,
+  theKeptPage,
+  theKeptPagesText,
+  theOpeningAsked,
+  theRectangleAsked,
+  theWebPagesPreferences,
+  whyTheAddressIsRefused,
+} from './the-web-page.mjs'
 
 /**
  * 0. NO DEBUGGING SWITCH, before anything else (wave 13t, round 23). A window given --remote-debugging-port,
@@ -100,6 +126,18 @@ import { howTheServicesVersionCompares } from './the-services-version.mjs'
  * stays open while the box waits, and answered nothing then, measured on Linux. On Windows the words go to
  * stderr only, as before; whether a box is shown there is the Windows port's to decide.
  */
+// A PRINT RUN is read first, from the command line alone (src/desktop/print-a-page.mjs). A print switch that is
+// not followed by the page and the PDF ends the run at once with 1, and so does a refused print run below: the
+// office's door is waiting for the program to end, and nobody is there to press a box.
+/** @type {{ html: string, pdf: string } | null} */
+let THE_PRINT = null
+try {
+  THE_PRINT = thePrintAsked(process.argv)
+} catch (err) {
+  process.stderr.write(`${err instanceof Error ? err.message : String(err)}\n`)
+  app.exit(1)
+  process.exit(1)
+}
 // A setting that is neither on nor off is refused in the same way: thrown here, it would leave Electron's
 // error box open with the window's program still running, measured on Linux.
 /** @type {string | null} */
@@ -107,8 +145,10 @@ let THE_DEBUGGING_ALLOWED = null
 /** @type {string | null} */
 let THE_REFUSAL = null
 try {
-  // A kept choice that could not be read is thrown here, by its name, and refuses the window below.
-  THE_DEBUGGING_ALLOWED = settingValue(THE_DEBUGGING_SETTING)
+  // A kept choice that could not be read is thrown here, by its name, and refuses the window below. A print run
+  // asks for no setting at all and is judged as if the setting were off: the door starts it with the office's own
+  // environment, and reading the setting there would open the office's database.
+  THE_DEBUGGING_ALLOWED = THE_PRINT === null ? settingValue(THE_DEBUGGING_SETTING) : 'off'
   THE_REFUSAL = whyTheWindowRefusesToStart({
     platform: process.platform,
     hasSwitch: (name) => app.commandLine.hasSwitch(name),
@@ -128,7 +168,10 @@ if (THE_REFUSAL !== null) {
     app.exit(1)
     process.exit(1)
   }
-  if (process.platform === 'linux') app.whenReady().then(showTheBoxAndEnd)
+  if (THE_PRINT !== null) {
+    app.exit(1)
+    process.exit(1)
+  } else if (process.platform === 'linux') app.whenReady().then(showTheBoxAndEnd)
   else if (process.platform === 'darwin') showTheBoxAndEnd()
   else {
     app.exit(1)
@@ -302,16 +345,22 @@ const theLanguage = () => theSystemsLanguage(app.commandLine.hasSwitch('lang') ?
 // src/desktop/main.mjs` it would otherwise be called Electron and keep its data under that name. The
 // single-instance lock below lives in this folder too.
 app.setName('Mole Office')
-// The same folder the declaration names for a bundle's data, so the window and the office share one.
-app.setPath('userData', thePerUserDataFolder())
-// Every page this app opens carries the window's marks: that it is the window, and which system it
-// stands on. The Settings sentence names the menu as each system names it (round W32).
-markEveryPageOf(app, process.platform)
+// A print run keeps its own folder beside the page instead, and opens no page of the office.
+if (THE_PRINT === null) {
+  // The same folder the declaration names for a bundle's data, so the window and the office share one.
+  app.setPath('userData', thePerUserDataFolder())
+  // Every page this app opens carries the window's marks: that it is the window, and which system it
+  // stands on. The Settings sentence names the menu as each system names it (round W32).
+  markEveryPageOf(app, process.platform)
+}
 
 // 1. ONE WINDOW PER USER. A second launch hands over and exits.
 if (THE_REFUSAL !== null) {
   // A refused window asks for no lock, so a window started while its box waits does not hand over to it
   // (0 above).
+} else if (THE_PRINT !== null) {
+  // A print run takes no lock either: it neither waits for a running window nor hands its page over to one.
+  printAPage(app, THE_PRINT)
 } else if (!app.requestSingleInstanceLock()) {
   app.quit()
 } else {
@@ -377,7 +426,7 @@ export function runTheCommand(what) {
   if (THE_INSTALL.from === 'bundle' && !existsSync(installs.program)) {
     return Promise.resolve({ ok: false, code: null, said: words().noShippedNode(installs.program) })
   }
-  const node = THE_INSTALL.from === 'bundle' ? installs.program : whereIsThisTool(installs.program, process.env['PATH'])
+  const node = THE_INSTALL.from === 'bundle' ? installs.program : whereIsThisTool(installs.program, process.env)
   if (node === null) return Promise.resolve({ ok: false, code: null, said: words().noNode })
   return new Promise((done) => {
     const child = spawn(node, [...THE_COMMAND_ARGS, what], { cwd: REPO, env: { ...process.env, ...installs.environment }, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true })
@@ -420,49 +469,89 @@ function theCheckAsShown() {
   return { lines: [...waiting, ...lines, ...(THE_SANDBOX_IS_OFF ? theSandboxWarning(theLanguage()) : [])], offers, busy, answer }
 }
 
+/** The isolated world the pairing script runs in: not 0, the page's own, and not 999, the preload's. */
+const THE_PAIRING_WORLD = 1
+
 /**
  * THE WINDOW PAIRS ITSELF, BEFORE IT OPENS AN OFFICE THAT OFFERS PAIRING, so the person never sees
- * the Pairing page in the window. A web browser still shows it. The window reads the pairing door
- * and presses it through the window's own session: session.fetch leaves from Electron's network
- * process, as the page's own requests do, and the cookie it is given goes into the store the page
- * reads. Node's fetch would leave from the main process, which the office on Windows would not count
- * as the app, and its cookie would reach no page. A press refused as senderNotReadInTime is made once
- * more. Any other refusal of the read or the press is handed back with the office's reason. A read or a
- * press that gets no answer at all is handed back with the window's own error, because the office said
- * nothing.
+ * the Pairing page in the window. A web browser still shows it. The window opens a hidden page of its
+ * own on the pairing door's address, in the window's own session, with no preload and no Node, and one
+ * script on that page reads the door and presses it. So the press is the office origin's own request,
+ * and the cookie half it is given goes into the store the window's page reads. The header half has one
+ * keeper: the office origin's storage, where the window's page reads it. The main process never holds
+ * a half, and the script hands back only what happened. A press refused as senderNotReadInTime is made
+ * once more. Any other refusal of the read or the press is handed back with the office's reason. A
+ * load, a read or a press that gets no answer at all is handed back with the window's own error,
+ * because the office said nothing.
  *
  * @param {string} address
  * @returns {Promise<{ refused: string } | { unreached: string } | null>} null when the window is paired or the office offers no pairing
  */
 async function pairTheWindowWith(address) {
-  const session = theWindow?.webContents.session
-  if (session === undefined) return null
+  if (theWindow === null) return null
   const door = `${address}/api/office/pairing`
+  const page = new BrowserWindow({
+    show: false,
+    webPreferences: { session: theWindow.webContents.session, contextIsolation: true, nodeIntegration: false, sandbox: true },
+  })
   try {
-    const read = await theAnswerOf(await session.fetch(door, { credentials: 'include' }))
-    if ('refused' in read) return { refused: read.refused }
-    if (read.said['paired'] === true || read.said['offered'] !== true) return null
-    const press = async () => theAnswerOf(await session.fetch(door, { method: 'POST', credentials: 'include' }))
-    let pressed = await press()
-    if ('refused' in pressed && pressed.code === 'senderNotReadInTime') pressed = await press()
-    return 'refused' in pressed ? { refused: pressed.refused } : null
+    await page.loadURL(door)
+    const script = thePairingScript(door, words().theWindowsDeviceName)
+    const handed = /** @type {unknown} */ (await page.webContents.executeJavaScriptInIsolatedWorld(THE_PAIRING_WORLD, [{ code: script }]))
+    if (typeof handed === 'object' && handed !== null) {
+      if ('refused' in handed && typeof handed.refused === 'string') return { refused: handed.refused }
+      if ('unreached' in handed && typeof handed.unreached === 'string') return { unreached: handed.unreached }
+      if ('mayOpen' in handed && handed.mayOpen === true) return null
+    }
+    throw new Error(`The pairing page handed back ${JSON.stringify(handed)}.`)
   } catch (err) {
     return { unreached: err instanceof Error ? err.message : String(err) }
+  } finally {
+    page.destroy()
   }
 }
 
 /**
- * What the pairing door answered: its body when it answered yes, else its own error, or the HTTP status.
+ * The one script the hidden pairing page runs. It reads the door with the header half it keeps, if it
+ * keeps one, and presses only when the office says the window is not paired and offers pairing. Its
+ * requests skip the browser's kept copy, because the page's own load of the door has just kept the
+ * office's answer, tagged and marked no-cache, so a plain read would be answered 304 from that copy and
+ * not by the office. It hands back the office's own error or the HTTP status when the office refused,
+ * the page's own error when nothing answered, and mayOpen otherwise. It never hands back a half.
  *
- * @param {Response} reply
- * @returns {Promise<{ said: Record<string, unknown> } | { refused: string, code: unknown }>}
+ * @param {string} door the pairing door's whole address
+ * @param {string} device the name the window gives itself at the press
  */
-async function theAnswerOf(reply) {
-  const body = /** @type {unknown} */ (await reply.json().catch(() => null))
-  const said = typeof body === 'object' && body !== null ? /** @type {Record<string, unknown>} */ (body) : null
-  if (reply.ok && said !== null) return { said }
-  const error = typeof said?.['error'] === 'string' && said['error'] !== '' ? said['error'] : `${reply.status} ${reply.statusText}`
-  return { refused: error, code: said?.['code'] ?? null }
+function thePairingScript(door, device) {
+  return `(async () => {
+  const door = ${JSON.stringify(door)}
+  const key = ${JSON.stringify(DEVICE_HALF_KEY)}
+  const device = ${JSON.stringify(device)}
+  const kept = localStorage.getItem(key)
+  const half = kept === null || kept === '' ? {} : { ${JSON.stringify(DEVICE_HALF_HEADER)}: kept }
+  const ask = async (init) => {
+    let reply
+    try {
+      reply = await fetch(door, { credentials: 'include', cache: 'no-store', ...init })
+    } catch (err) {
+      return { unreached: err instanceof Error ? err.message : String(err) }
+    }
+    const body = await reply.json().catch(() => null)
+    const said = typeof body === 'object' && body !== null ? body : null
+    if (reply.ok && said !== null) return { said }
+    const error = typeof said?.error === 'string' && said.error !== '' ? said.error : reply.status + ' ' + reply.statusText
+    return { refused: error, code: said?.code ?? null }
+  }
+  const read = await ask({ headers: half })
+  if (!('said' in read)) return read
+  if (read.said.paired === true || read.said.offered !== true) return { mayOpen: true }
+  const press = () => ask({ method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ device }) })
+  let pressed = await press()
+  if ('refused' in pressed && pressed.code === 'senderNotReadInTime') pressed = await press()
+  if (!('said' in pressed)) return pressed
+  if (typeof pressed.said.deviceHalf === 'string') localStorage.setItem(key, pressed.said.deviceHalf)
+  return { mayOpen: true }
+})()`
 }
 
 /**
@@ -834,6 +923,299 @@ function removeTheShutDownQuestion() {
   setTimeout(() => {
     if (!view.webContents.isDestroyed()) view.webContents.close()
   }, 200)
+}
+
+// ---------------------------------------------------------------------------- 11. a web page in the window
+
+/**
+ * THE WEB PAGE THE WINDOW DRAWS OVER THE OFFICE PAGE'S BOX, or null when none is open. One at a time.
+ *
+ * @type {{
+ *   view: WebContentsView,
+ *   address: string,
+ *   place: import('./the-web-page.mjs').Place,
+ *   title: string,
+ *   bounds: { x: number, y: number, width: number, height: number } | null,
+ *   hiddenByThePage: boolean,
+ *   theOfficeIsAway: boolean,
+ * } | null}
+ */
+let theWebPage = null
+/** What the bar was last told: a refusal, a page that did not load, or how a download ended. */
+let theWebPagesSaid = /** @type {import('./the-web-page.mjs').Said | null} */ (null)
+/** The downloads waiting for the person's answer on the bar, by the id the session gave each. */
+const theDownloadsAsked = new Map(/** @type {[number, { asked: import('./the-web-page.mjs').AskedDownload, answer: (yes: boolean) => void }][]} */ ([]))
+/** The sessions given their rules. Every view of the partition shares one, and it is given them once. */
+const theSessionsKeptOut = new WeakSet()
+/** The names given to downloads since the window started. */
+const theNamesGiven = new Set(/** @type {string[]} */ ([]))
+/** Whether the page kept from the last run was read. It is read once, when the office page first asks. */
+let theKeptPageWasRead = false
+const theKeptPagesPath = () => join(app.getPath('userData'), THE_KEPT_PAGES_FILE)
+
+/** What the bar draws: the page's address, title and place, whether it can go back or forward, and what it was told. */
+function theWebPagesState() {
+  const asked = theDownloadsAsked.values().next().value?.asked ?? null
+  if (theWebPage === null) return { open: false, said: theWebPagesSaid, asked }
+  const contents = theWebPage.view.webContents
+  return {
+    open: true,
+    address: theWebPage.address,
+    place: theWebPage.place,
+    title: theWebPage.title,
+    canGoBack: contents.navigationHistory.canGoBack(),
+    canGoForward: contents.navigationHistory.canGoForward(),
+    loading: contents.isLoading(),
+    said: theWebPagesSaid,
+    asked,
+  }
+}
+
+/** Tell the office page the bar has changed. A check page the window shows instead has no listener, and is told nothing it can use. */
+function sayTheWebPageChanged() {
+  if (theWindow !== null && !theWindow.webContents.isDestroyed()) theWindow.webContents.send('the-web-page-changed', theWebPagesState())
+}
+
+/** @param {import('./the-web-page.mjs').Said} said */
+function tellTheBar(said) {
+  theWebPagesSaid = said
+  sayTheWebPageChanged()
+}
+
+/** Put the view over its box, and show it only while the office page has placed it, has not hidden it, and is shown. */
+function showOrHideTheWebPage() {
+  if (theWebPage === null) return
+  if (theWebPage.bounds !== null) theWebPage.view.setBounds(theWebPage.bounds)
+  theWebPage.view.setVisible(theWebPage.bounds !== null && !theWebPage.hiddenByThePage && !theWebPage.theOfficeIsAway)
+}
+
+/** Keep the page's address and place for the next start, or forget them once it is closed. */
+function keepTheWebPage() {
+  try {
+    if (theWebPage === null) rmSync(theKeptPagesPath(), { force: true })
+    else writeFileSync(theKeptPagesPath(), theKeptPagesText(theWebPage))
+  } catch (err) {
+    process.stderr.write(`The window could not keep the web page for its next start: ${err instanceof Error ? err.message : String(err)}\n`)
+  }
+}
+
+/** The page the last run kept, checked again as if it were asked for now, or null. */
+function readTheKeptPage() {
+  /** @type {string | null} */
+  let text = null
+  try {
+    text = readFileSync(theKeptPagesPath(), 'utf8')
+  } catch (err) {
+    if (/** @type {NodeJS.ErrnoException} */ (err).code !== 'ENOENT') {
+      process.stderr.write(`The window could not read the web page it kept, so it opens none: ${err instanceof Error ? err.message : String(err)}\n`)
+    }
+  }
+  const kept = theKeptPage(text, theOfficeAddress)
+  if (text !== null && kept === null) process.stderr.write('The web page the window kept is not one it may open, so it opens none.\n')
+  return kept
+}
+
+/**
+ * THE SESSION'S RULES, given once (src/desktop/the-web-page.mjs). A download is saved in the downloads folder, and
+ * waits for the person's answer on the bar first.
+ *
+ * @param {Electron.Session} session
+ */
+function keepTheWebPagesSessionOut(session) {
+  if (theSessionsKeptOut.has(session)) return
+  theSessionsKeptOut.add(session)
+  keepTheSessionOut({
+    session,
+    office: () => theOfficeAddress,
+    userAgent: withoutTheWindowsMarks(app.userAgentFallback),
+    downloads: {
+      // A name given to a download still being saved is taken too, though its file is not in the folder yet.
+      isTaken: (name) => theNamesGiven.has(name) || existsSync(join(app.getPath('downloads'), name)),
+      pathOf: (name) => {
+        theNamesGiven.add(name)
+        return join(app.getPath('downloads'), name)
+      },
+      ask: (asked) =>
+        new Promise((answer) => {
+          theDownloadsAsked.set(asked.id, { asked, answer })
+          sayTheWebPageChanged()
+        }),
+    },
+    tell: tellTheBar,
+  })
+}
+
+/**
+ * OPEN THE PAGE THE OFFICE PAGE ASKED FOR, already checked. With a page open, the same view goes to the new address,
+ * and the same address only moves it to the new place.
+ *
+ * @param {{ address: string, place: import('./the-web-page.mjs').Place }} opening
+ */
+function openTheWebPage({ address, place }) {
+  if (theWindow === null) return
+  if (theWebPage !== null) {
+    theWebPage.place = place
+    if (theWebPage.address !== address) {
+      theWebPage.address = address
+      theWebPagesSaid = null
+      void theWebPage.view.webContents.loadURL(address).catch(() => undefined)
+    }
+    keepTheWebPage()
+    sayTheWebPageChanged()
+    return
+  }
+  const view = new WebContentsView({ webPreferences: theWebPagesPreferences() })
+  const contents = view.webContents
+  keepTheWebPagesSessionOut(contents.session)
+  keepTheContentsOut({ contents, office: () => theOfficeAddress, tell: tellTheBar })
+  const page = { view, address, place, title: '', bounds: null, hiddenByThePage: false, theOfficeIsAway: false }
+  /** @param {string} url */
+  const wentTo = (url) => {
+    if (theWebPage !== page) return
+    page.address = url
+    if (theWebPagesSaid !== null && !('download' in theWebPagesSaid)) theWebPagesSaid = null
+    keepTheWebPage()
+    sayTheWebPageChanged()
+  }
+  contents.on('did-navigate', (_event, url) => wentTo(url))
+  contents.on('did-navigate-in-page', (_event, url, isMainFrame) => {
+    if (isMainFrame) wentTo(url)
+  })
+  contents.on('page-title-updated', (_event, title) => {
+    if (theWebPage !== page) return
+    page.title = title
+    sayTheWebPageChanged()
+  })
+  contents.on('did-start-loading', () => sayTheWebPageChanged())
+  contents.on('did-stop-loading', () => sayTheWebPageChanged())
+  contents.on('did-fail-load', (_event, code, description, url, isMainFrame) => {
+    // -3 is a load another load replaced, and -20 one the rules refused, which the bar was told of already.
+    if (theWebPage === page && isMainFrame && code !== -3 && code !== -20) tellTheBar({ failed: description, address: url })
+  })
+  view.setVisible(false)
+  theWindow.contentView.addChildView(view)
+  // The shut-down question draws above everything, so it is put on top again (7 above).
+  if (theQuestion !== null) theWindow.contentView.addChildView(theQuestion)
+  theWebPage = page
+  theWebPagesSaid = null
+  keepTheWebPage()
+  sayTheWebPageChanged()
+  void contents.loadURL(address).catch(() => undefined)
+}
+
+/** Close the page. A download still waiting for an answer is not saved. */
+function closeTheWebPage() {
+  if (theWebPage === null) return
+  const { view } = theWebPage
+  theWebPage = null
+  for (const { answer } of theDownloadsAsked.values()) answer(false)
+  theDownloadsAsked.clear()
+  theWindow?.contentView.removeChildView(view)
+  if (!view.webContents.isDestroyed()) view.webContents.close()
+  keepTheWebPage()
+  sayTheWebPageChanged()
+}
+
+/**
+ * THE WEB PAGE'S BRIDGE, from the office page. Each call is refused, and does nothing, unless it came from the office
+ * page the window shows, from its main frame and on the office's own origin. Each argument is checked by
+ * src/desktop/the-web-page.mjs before it is used. "Open in the ordinary browser" takes no address from the office
+ * page: it opens the view's own, and only an http or https one. The call for an account sign-in's address (round 242)
+ * takes one, and opens it in the system's browser only when it is https (theHttpsAddressAsked).
+ *
+ * Electron's shell is asked for where it is used, so the stand-in Electron of
+ * tests/eleven-more-starts-ask-for-no-window.test.ts need not carry it.
+ */
+function giveTheOfficePageItsBridge() {
+  /** @param {Electron.IpcMainInvokeEvent} event */
+  const fromTheOffice = (event) => fromTheOfficePage(event, theWindow?.webContents ?? null, theOfficeAddress)
+  // The preload asks for the office's origin before the page's own code runs, and gives the bridge only there.
+  ipcMain.on('the-offices-origin', (event) => {
+    event.returnValue = theWindow !== null && event.sender === theWindow.webContents && theOfficeAddress !== null ? new URL(theOfficeAddress).origin : null
+  })
+  ipcMain.handle('the-web-page', (event) => {
+    if (!fromTheOffice(event)) return null
+    if (theWebPage === null && !theKeptPageWasRead) {
+      theKeptPageWasRead = true
+      const kept = readTheKeptPage()
+      if (kept !== null) openTheWebPage(kept)
+    }
+    return theWebPagesState()
+  })
+  ipcMain.handle('web-page-open', (event, asked) => {
+    if (!fromTheOffice(event)) return false
+    const opening = theOpeningAsked(asked, theOfficeAddress)
+    if (opening === null) return false
+    theKeptPageWasRead = true
+    openTheWebPage(opening)
+    return true
+  })
+  ipcMain.handle('web-page-place', (event, asked) => {
+    if (!fromTheOffice(event) || theWebPage === null || theWindow === null) return false
+    const { width, height } = theWindow.getContentBounds()
+    const bounds = theRectangleAsked(asked, { width, height, zoom: theWindow.webContents.getZoomFactor() })
+    if (bounds === null) return false
+    theWebPage.bounds = bounds
+    theWebPage.theOfficeIsAway = false
+    showOrHideTheWebPage()
+    return true
+  })
+  for (const [channel, hidden] of /** @type {const} */ ([['web-page-hide', true], ['web-page-show', false]])) {
+    ipcMain.handle(channel, (event) => {
+      if (!fromTheOffice(event) || theWebPage === null) return false
+      theWebPage.hiddenByThePage = hidden
+      theWebPage.theOfficeIsAway = false
+      showOrHideTheWebPage()
+      return true
+    })
+  }
+  ipcMain.handle('web-page-back', (event) => {
+    if (!fromTheOffice(event) || theWebPage === null || !theWebPage.view.webContents.navigationHistory.canGoBack()) return false
+    theWebPage.view.webContents.navigationHistory.goBack()
+    return true
+  })
+  ipcMain.handle('web-page-forward', (event) => {
+    if (!fromTheOffice(event) || theWebPage === null || !theWebPage.view.webContents.navigationHistory.canGoForward()) return false
+    theWebPage.view.webContents.navigationHistory.goForward()
+    return true
+  })
+  ipcMain.handle('web-page-reload', (event) => {
+    if (!fromTheOffice(event) || theWebPage === null) return false
+    theWebPage.view.webContents.reload()
+    return true
+  })
+  ipcMain.handle('web-page-close', (event) => {
+    if (!fromTheOffice(event) || theWebPage === null) return false
+    closeTheWebPage()
+    return true
+  })
+  ipcMain.handle('web-page-outside', async (event) => {
+    if (!fromTheOffice(event) || theWebPage === null) return false
+    const address = theWebPage.view.webContents.getURL()
+    if (whyTheAddressIsRefused(address, theOfficeAddress) !== null) return false
+    const { shell } = await import('electron')
+    await shell.openExternal(address)
+    return true
+  })
+  // Round 242: an account sign-in's address, opened in the system's browser. Only an https address is opened.
+  ipcMain.handle('web-page-https', async (event, asked) => {
+    if (!fromTheOffice(event)) return false
+    const address = theHttpsAddressAsked(asked)
+    if (address === null) return false
+    const { shell } = await import('electron')
+    await shell.openExternal(address)
+    return true
+  })
+  ipcMain.handle('web-page-download', (event, asked) => {
+    if (!fromTheOffice(event)) return false
+    const answer = theDownloadAnswerAsked(asked)
+    const waiting = answer === null ? undefined : theDownloadsAsked.get(answer.id)
+    if (answer === null || waiting === undefined) return false
+    theDownloadsAsked.delete(answer.id)
+    waiting.answer(answer.save)
+    sayTheWebPageChanged()
+    return true
+  })
 }
 
 /**
@@ -1234,6 +1616,16 @@ async function start() {
     if (answer !== 'yes' && answer !== 'cancel') return
     await answerTheShutDownQuestion(answer)
   })
+
+  // THE WEB PAGE (11 above). When the window's own page is replaced, by a reload or by the check page, its box is gone
+  // with it, so the view is hidden until an office page places it again. A route change inside the office page is not
+  // a new page, and keeps the view where it is.
+  theWindow.webContents.on('did-start-navigation', (details) => {
+    if (!details.isMainFrame || details.isSameDocument || theWebPage === null) return
+    theWebPage.theOfficeIsAway = true
+    showOrHideTheWebPage()
+  })
+  giveTheOfficePageItsBridge()
 
   /**
    * WHAT A TEST READS AND PRESSES, from the main process. Playwright's `electron.evaluate` reaches

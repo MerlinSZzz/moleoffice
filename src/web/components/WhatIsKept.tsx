@@ -20,9 +20,9 @@
  * NULL IS A THIRD ANSWER AND IT IS DRAWN AS ONE
  * ---------------------------------------------------------------------------------------
  *
- * A number nobody has chosen is drawn with the default in force AND the sentence saying nobody
- * chose. A stored value that cannot be read is drawn as the refusal that names it, never as the
- * default. That is invariant 5 of USER.md, and it is the pattern `Loading pictures and video` sets.
+ * A number nobody has chosen is drawn with the default in force AND the word saying it is the
+ * default. A stored value that cannot be read is drawn as "not read", never as the default. That
+ * is invariant 5 of USER.md, and it is the pattern `Loading pictures and video` sets.
  *
  * ---------------------------------------------------------------------------------------
  * THE FOLDER IS READ AT THE MOMENT SOMEBODY ASKS
@@ -54,7 +54,7 @@ import {
   type TheBackupsFolder,
   type WhatTheOfficeKeeps,
 } from '@shared/what-is-kept.ts'
-import { Absence, ErrorNote, Loading, Panel, useAsync } from './ui.tsx'
+import { Absence, ErrorNote, Loading, Panel, ServerNote, useAsync } from './ui.tsx'
 import { api, errorMessage } from '../api.ts'
 import { useLanguage } from '../lib/language.ts'
 import { useInspect } from '../lib/mode.ts'
@@ -105,16 +105,11 @@ export function WhatIsKeptPanel() {
   )
 }
 
-/**
- * The whole section: what a backup is, the three numbers, and the folder as it stands now. What a backup is takes one
- * line; developer mode draws the full sentences in its place, so it is said once (wave 13y round 122).
- */
+/** The whole section: the three numbers, and the folder as it stands now. */
 function WhatIsKept({ said, onChanged, changeNumber }: { said: WhatTheOfficeKeeps; onChanged: () => void; changeNumber: number }) {
   useLanguage()
-  const developer = useInspect()
   return (
     <div className="wik">
-      <p className="wik-lead">{t(developer ? 'settingsPanel.kept.whatABackupIs' : 'settingsPanel.kept.backupInShort')}</p>
       <div className="wik-numbers">
         {said.numbers.map((one) => (
           <KeptNumberRow
@@ -140,19 +135,16 @@ function WhatIsKept({ said, onChanged, changeNumber }: { said: WhatTheOfficeKeep
  */
 function KeptNumberRow({ one, onChanged }: { one: KeptNumberOnScreen; onChanged: () => void }) {
   useLanguage()
-  const developer = useInspect()
   const words = KEPT_WORDS[one.key]
   const label = t(settingsControlWord('settings.whatiskept', words.label))
-  // THE SERVER'S SENTENCE, SAID IN THE PAGE'S LANGUAGE. The first two are picked by where the value came from.
-  // An unreadable value's sentence quotes the raw stored value, which only developer mode shows.
+  // THE STATE IN SHORT WORDS, picked by where the value came from. An unreadable value's server sentence quotes the raw
+  // stored value, which only developer mode shows.
   const says =
     one.from === 'the default'
       ? t('settingsPanel.kept.defaultInForce', { n: String(one.inForce) })
       : one.from === "the person's setting"
-        ? t('settingsPanel.kept.youChose', { n: String(one.inForce) })
-        : developer
-          ? one.says
-          : t('settingsPanel.kept.unreadable', { label })
+        ? t('settingsPanel.kept.setHere', { n: String(one.inForce) })
+        : t('settingsState.notRead')
   const [text, setText] = useState(one.inForce === null ? '' : String(one.inForce))
   const [fault, setFault] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -207,10 +199,8 @@ function KeptNumberRow({ one, onChanged }: { one: KeptNumberOnScreen; onChanged:
           {t(settingsControlWord('settings.whatiskept', 'settingsPanel.kept.keep'))}
         </button>
       </div>
-      {/* The server's own sentence, drawn only in developer mode, is its English and is marked so. */}
-      <p className={unreadable ? 'wik-refuse' : 'wik-state'} lang={unreadable && developer ? 'en' : undefined}>
-        {says}
-      </p>
+      <p className={unreadable ? 'wik-refuse' : 'wik-state'}>{says}</p>
+      {unreadable ? <ServerNote text={one.says} /> : null}
       {fault === null ? null : <p className="wik-refuse">{fault}</p>}
     </div>
   )
@@ -224,14 +214,13 @@ export function BackupsFolder({ said }: { said: TheBackupsFolder }) {
   useLanguage()
   const developer = useInspect()
   // THE FOLDER'S PATH IS SHOWN ONLY IN DEVELOPER MODE, and the server's two sentences name it, so normal mode
-  // draws the page's own sentence instead of the server's.
+  // draws a short state word and developer mode the server's sentence as well.
   if (!said.readable) {
     return (
       <div className="wik-folder">
         <p className="wik-folder-name">{t('settingsPanel.kept.backups')}</p>
-        <p className="wik-refuse" lang={developer ? 'en' : undefined}>
-          {developer ? said.says : t('settingsPanel.kept.folderUnreadable')}
-        </p>
+        <p className="wik-refuse">{t('settingsState.notRead')}</p>
+        <ServerNote text={said.says} />
       </div>
     )
   }
@@ -278,7 +267,6 @@ export function BackupsFolder({ said }: { said: TheBackupsFolder }) {
 /** The section's own rules. Every value is a token, so a preset swap re-skins it with everything else. */
 const WHAT_IS_KEPT_CSS = `
 .wik { display: flex; flex-direction: column; gap: var(--gut); min-width: 0; }
-.wik-lead { margin: 0; max-width: var(--measure-in-box); font: var(--fs-1)/var(--lh-body) var(--font-ui); color: var(--text-2); }
 .wik-numbers { display: flex; flex-direction: column; gap: var(--pad); min-width: 0; }
 .wik-row {
   display: flex; flex-wrap: wrap; align-items: flex-start; gap: 4px var(--gut);

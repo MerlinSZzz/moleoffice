@@ -29,8 +29,9 @@ import { t } from '@shared/i18n.ts'
  * A plan's lines carry no creation stamp: a line stores when it was last written and by whom, and
  * nothing stores when it first appeared. So a line written after the plan was made is marked as
  * that and no further — whether it was added or edited is not recorded. A line removed from the
- * plan leaves no row, so a line that is gone cannot be drawn at all. Both are said on the drawing
- * rather than left as an absence a reader would take for a zero.
+ * plan leaves no row, so a line that is gone cannot be drawn at all. The drawing gives the line
+ * history one label and the state not recorded, rather than an absence a reader would take for a
+ * zero.
  */
 
 import { progressOf, type Progress } from '@shared/work.ts'
@@ -123,11 +124,11 @@ export function PlanProgress({ lines, planCreatedAt, answers = [], participants 
         </div>
         <div>
           <dt>{t('g8.progress.plannedHours')}</dt>
-          <dd>{anyPlanned ? t('g8.progress.h', { value1: planned }) : <Absence />}</dd>
+          <dd>{anyPlanned ? t('g8.progress.h', { value1: planned }) : <Absence tier="told-apart" looked={false} word={t('g8.progress.hoursNotStated')} />}</dd>
         </div>
         <div>
           <dt>{t('g8.progress.spentHours')}</dt>
-          <dd>{anyActual ? t('g8.progress.h', { value1: actual }) : <Absence />}</dd>
+          <dd>{anyActual ? t('g8.progress.h', { value1: actual }) : <Absence tier="told-apart" looked={false} word={t('g8.progress.hoursNotStated')} />}</dd>
         </div>
       </dl>
 
@@ -225,7 +226,14 @@ export function PlanProgress({ lines, planCreatedAt, answers = [], participants 
         </ul>
       )}
 
-      <p className="pp-unknown">{t('g8.progress.whenEachLineFirstAppearedAndWhyItWas')}</p>
+      {/* WHAT NOTHING STORES, AS A LABEL AND A STATE. When a line first appeared and why it was
+          added or changed are not recorded, so this is one row like the tally's, saying so. */}
+      <dl className="pp-tally pp-unknown">
+        <div>
+          <dt>{t('g8.progress.lineHistory')}</dt>
+          <dd>{t('word.notRecorded')}</dd>
+        </div>
+      </dl>
     </section>
   )
 }

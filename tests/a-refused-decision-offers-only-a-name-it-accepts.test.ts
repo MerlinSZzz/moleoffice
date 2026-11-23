@@ -34,7 +34,7 @@ import type { FastifyInstance } from 'fastify'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { THE_OWNER } from '../src/shared/kinds.ts'
-import { apiApp, freshDb, type TestDb } from './helpers.ts'
+import { apiApp, freshDb, type TestDb, governsTheWholeProject } from './helpers.ts'
 
 let t: TestDb
 let app: FastifyInstance
@@ -68,7 +68,8 @@ function insertAgent(who: { id: string; handle: string; name: string }): void {
 
 /** Send a decision with this data, and give back the status and the words of the answer. */
 async function aDecisionSent(caller: string, data: Record<string, unknown>, title: string): Promise<{ code: number; said: string }> {
-  const reply = await app.inject({ method: 'POST', url: '/api/records', headers: asAgent(caller), payload: { kind: 'decision', title, data } })
+  const payload = { kind: 'decision', title, data: { ...governsTheWholeProject(), ...data } }
+  const reply = await app.inject({ method: 'POST', url: '/api/records', headers: asAgent(caller), payload })
   return { code: reply.statusCode, said: reply.body }
 }
 

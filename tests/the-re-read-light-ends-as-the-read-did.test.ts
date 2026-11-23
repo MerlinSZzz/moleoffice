@@ -258,7 +258,7 @@ async function theLightThroughASwitch(how: 'answered' | 'refused' | 'a foregroun
     release()
     if (how === 'refused') {
       // After a switch with no kept answer of the new project, the page says the refusal itself, not the strip.
-      await page.locator('.px-reread[data-says="failed"]').or(page.locator('#main').getByText('A failed read, not an empty list.')).first().waitFor({ timeout: 20_000 })
+      await page.locator('.px-reread[data-says="failed"]').or(page.locator('#main .px-error[role="alert"]')).first().waitFor({ timeout: 20_000 })
     } else {
       await page.locator('#main').getByText(BETA.idea).first().waitFor({ timeout: 20_000 })
     }

@@ -29,7 +29,10 @@
  * stays with the thing when the page scrolls without anything measuring again. THE PAGE MAKES ROOM
  * FOR IT: that element is given a bottom margin as tall as the card, so what the page draws next
  * starts below the card and the card covers nothing. `theElementTheCardHangsUnder` says why that
- * is the only placement now, and `measure` says how the room is made.
+ * is the only placement now, and `measure` says how the room is made. A card on a whole record is
+ * put at the top of the record page's second column instead, with that column's top padding as its
+ * room, but only when that column stands beside the first and is at least as wide as the card;
+ * otherwise it hangs under the head as before, with the bottom margin.
  *
  * A COMMENT WHOSE THING THIS PAGE IS NOT DRAWING GETS NO CARD, and that is the honest answer rather
  * than a card floating at the top saying nothing about where it belongs. The mark layer already
@@ -40,6 +43,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { targetKey, type Context } from '@shared/targets.ts'
 import { SAID_HERE, participantKey, targetOfRecord } from '@shared/messages.ts'
+import { t } from '@shared/i18n.ts'
 import type { ParticipantKind, ParticipantRef } from '@shared/participants.ts'
 import { api, errorMessage, type CommentOnThePage, type ParticipantOnTheWire } from '../../api.ts'
 import { TextArea } from '../ui.tsx'
@@ -52,7 +56,7 @@ import { Avatar } from '../Avatar.tsx'
 import { KeyQuestion, useAKeyQuestion } from '../AKeyQuestion.tsx'
 import { useMarks } from './marks.ts'
 import { showMeThat } from './MarkLayer.tsx'
-import { isTheRecordsOwnHead, quotedKey, theBlockDrawnFor } from './theblock.ts'
+import { isTheRecordsOwnHead, quotedKey, theBlockDrawnFor, theSideColumnBeside } from './theblock.ts'
 import { theLayerFor } from '../../lib/page-scroll.ts'
 
 /** One agent's comment, and the answers to it, about one place on this page. */
@@ -174,7 +178,10 @@ const GAP = 8
  *
  * So there is one placement now: under the thing, in room the page makes for it. `measure` below
  * puts a bottom margin the height of the card on this element, so what the page draws next starts
- * below the card instead of under it.
+ * below the card instead of under it. A card on a whole record stands at the top of the record
+ * page's second column instead, with that column's top padding as its room, but only when that
+ * column stands beside the first and is at least as wide as the card; otherwise it hangs under the
+ * head as before, with the bottom margin.
  *
  * WHICH ELEMENT THAT IS is `theBlockDrawnFor` in `theblock.ts`, which the circle carrying the count
  * asks the same question of. A card hanging under one element while the circle points at another
@@ -190,6 +197,8 @@ const theElementTheCardHangsUnder = theBlockDrawnFor
  * record, where the card goes under the block's RIGHT edge, because that is where the count is drawn
  * and the words belong beside the number. `isTheRecordsOwnHead` says which, and
  * `wide` is the card's own measured width, so the two edges line up whatever the card holds.
+ * There is a third place, which this function does not give: on a wide screen, a card on the whole
+ * record stands at the top of the record page's second column, in `whereItStandsInTheColumn` below.
  */
 function whereItIs(host: HTMLElement, wide: number): CardPlace | null {
   const box = host.getBoundingClientRect()
@@ -197,6 +206,21 @@ function whereItIs(host: HTMLElement, wide: number): CardPlace | null {
   const left = isTheRecordsOwnHead(host) && wide > 0 ? box.right - wide : box.left
   const { layer, x, y } = theLayerFor(host)
   return { top: box.bottom + GAP + y, left: Math.max(8, left) + x, layer }
+}
+
+/**
+ * Where a card on the whole record goes when it stands in the record page's second column, in the
+ * same coordinates as `whereItIs`. `theSideColumnBeside` in `theblock.ts` says when that is.
+ *
+ * AT THE COLUMN'S OWN TOP, AGAINST ITS RIGHT EDGE. The room `measure` makes here is the column's top
+ * padding, which leaves the column's top where it is, so the card does not move when the room is
+ * made. The card's right edge is the column's right edge once `wide` is known. Before the card has
+ * been drawn, `wide` is 0 and the card starts at the column's left edge, as `whereItIs` does.
+ */
+function whereItStandsInTheColumn(column: HTMLElement, wide: number): CardPlace {
+  const box = column.getBoundingClientRect()
+  const { layer, x, y } = theLayerFor(column)
+  return { top: box.top + y, left: Math.max(8, wide > 0 ? box.right - wide : box.left) + x, layer }
 }
 
 export function AgentSaidHere() {
@@ -224,14 +248,17 @@ export function AgentSaidHere() {
   /**
    * THE ROOM MADE FOR EACH CARD, AND WHAT THE ELEMENT SAID BEFORE IT WAS MADE.
    *
-   * The value is the element's own `style.marginBottom`, which is almost always the empty string,
-   * kept so the page can be put back exactly as it was when the card goes.
+   * For each element given room, the property that holds the room and that property's own value
+   * before the room was made. The property is `style.marginBottom` on the element a card hangs
+   * under, and `style.paddingTop` on the record page's second column when a card stands at its top.
+   * The value is almost always the empty string, kept so the page can be put back exactly as it was
+   * when the card goes.
    */
-  const roomMade = useRef(new Map<HTMLElement, string>())
+  const roomMade = useRef(new Map<HTMLElement, { property: 'marginBottom' | 'paddingTop'; was: string }>())
 
   const measure = useCallback(() => {
     const next: Record<string, CardPlace> = {}
-    const hosts = new Map<string, HTMLElement>()
+    const hosts = new Map<string, { host: HTMLElement; column: HTMLElement | null }>()
     for (const group of groups) {
       const host = theElementTheCardHangsUnder(group.key)
       if (host === null) continue
@@ -240,9 +267,13 @@ export function AgentSaidHere() {
       // and the first measurement then places it at the left edge; the card's own watcher measures
       // again as soon as it has a size, which is the same two-pass shape the room below is made in.
       const drawn = document.querySelector(`.px-said[data-said-on="${quotedKey(group.key)}"]`)
-      const at = whereItIs(host, drawn === null ? 0 : drawn.getBoundingClientRect().width)
+      const wide = drawn === null ? 0 : drawn.getBoundingClientRect().width
+      // THE SIDE COLUMN IS ASKED FOR ONCE, and that one answer gives both the card's place and where
+      // the room is made, so the two cannot disagree.
+      const column = theSideColumnBeside(host, wide)
+      const at = column === null ? whereItIs(host, wide) : whereItStandsInTheColumn(column, wide)
       if (at === null) continue
-      hosts.set(group.key, host)
+      hosts.set(group.key, { host, column })
       next[group.key] = at
     }
     /**
@@ -250,9 +281,15 @@ export function AgentSaidHere() {
      *
      * The card is drawn over the page rather than in it, because it has to line up with something
      * the page's own components drew and this component cannot reach inside them. So the room it
-     * needs is made the only other way there is: a bottom margin on the element it hangs under, as
-     * tall as the card and the gap either side of it. What the page draws next then starts below
-     * the card instead of underneath it.
+     * needs is made the only other way there is, in one of two places. Where the card hangs under an
+     * element, the room is a bottom margin on that element, as tall as the card and the gap either
+     * side of it. What the page draws next then starts below the card instead of underneath it.
+     *
+     * WHERE THE CARD STANDS AT THE TOP OF THE RECORD PAGE'S SECOND COLUMN, the room is that column's
+     * own top padding, as tall as the card and the gap under it, and the head gets no margin. So the
+     * record's first column starts right under the head. It is padding and not a margin because
+     * padding keeps the column's own top where it is, and the card is placed from that top, so the
+     * card does not move when the room is made.
      *
      * THE HEIGHT IS THE CARD'S OWN, MEASURED, and there is no card to measure until one has been
      * drawn once. So the first measurement places the card, the card's own watcher in `OneCard`
@@ -261,19 +298,23 @@ export function AgentSaidHere() {
      * the room grows with it. That is why a long exchange can no longer reach the card below it.
      */
     const kept = new Set<HTMLElement>()
-    for (const [key, host] of hosts) {
+    for (const [key, { host, column }] of hosts) {
       const card = document.querySelector(`.px-said[data-said-on="${quotedKey(key)}"]`)
       const height = card === null ? 0 : card.getBoundingClientRect().height
       if (height === 0) continue
-      kept.add(host)
-      if (!roomMade.current.has(host)) roomMade.current.set(host, host.style.marginBottom)
-      const want = `${String(Math.ceil(height + GAP * 2))}px`
-      if (host.style.marginBottom !== want) host.style.marginBottom = want
+      const element = column ?? host
+      const property = column === null ? 'marginBottom' : 'paddingTop'
+      kept.add(element)
+      if (!roomMade.current.has(element)) roomMade.current.set(element, { property, was: element.style[property] })
+      const want = `${String(Math.ceil(column === null ? height + GAP * 2 : height + GAP))}px`
+      if (element.style[property] !== want) element.style[property] = want
     }
-    for (const [host, was] of roomMade.current) {
-      if (kept.has(host)) continue
-      host.style.marginBottom = was
-      roomMade.current.delete(host)
+    // AN ELEMENT NO LONGER GIVEN ROOM GETS ITS OWN PROPERTY PUT BACK. So a window made narrower puts
+    // the column's padding back and gives the head its margin, and a window made wider does the opposite.
+    for (const [element, { property, was }] of roomMade.current) {
+      if (kept.has(element)) continue
+      element.style[property] = was
+      roomMade.current.delete(element)
     }
     // THE OLD OBJECT IS KEPT WHEN NOTHING MOVED, AND THAT IS NOT AN OPTIMISATION.
     //
@@ -336,7 +377,7 @@ export function AgentSaidHere() {
   const made = roomMade.current
   useEffect(
     () => () => {
-      for (const [host, was] of made) host.style.marginBottom = was
+      for (const [element, { property, was }] of made) element.style[property] = was
       made.clear()
     },
     [made],
@@ -435,7 +476,7 @@ function OneCard({
                   size={22}
                 />
               )}
-              <span className="px-said-name">{known?.name ?? SAID_HERE.writerNotInAnyRegistry}</span>
+              <span className="px-said-name">{known?.name ?? t('saidHere.writerUnknown')}</span>
             </span>
             <p className="px-said-words">{one.body}</p>
           </div>
@@ -478,7 +519,7 @@ function OneCard({
         </button>
       </div>
       <KeyQuestion question={keyQuestion} />
-      {sent ? <p className="px-said-note">{SAID_HERE.waiting}</p> : null}
+      {sent ? <p className="px-said-note">{t('talk.sent')}</p> : null}
       {fault === null ? null : <p className="px-said-fault">{fault}</p>}
     </aside>
   )

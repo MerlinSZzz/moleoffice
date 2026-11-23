@@ -1,0 +1,397 @@
+{
+  "about": "The general office flows that a fresh Mole Office copies into its own flow records at its first start, so every new office begins with the office's own ten flows. The words are English only; the Chinese waits for the translation round.",
+  "flows": [
+    {
+      "title": "Answering the person",
+      "declared_in": "Copied from Mole Office's default flows at this office's first start.",
+      "runs": "Every role, in every department. Whoever they write to answers.",
+      "trigger": "Their words reach an agent: a chat message, a comment or an answer in a report, or words said in a terminal.",
+      "stages": [
+        {
+          "n": 1,
+          "does": "The agent they wrote to reads their words at once and answers in their language, conclusion first, in plain words."
+        },
+        {
+          "n": 2,
+          "does": "When the agent cannot answer within a short time, it first replies that it is working on it and how long it needs. Then it adds an item to its own checklist with a timed reminder, so the answer is not forgotten. It answers by that time, or says again how long."
+        },
+        {
+          "n": 3,
+          "does": "The agent answers a question and stops. It acts only on what they clearly ask. If it cannot tell, it asks one short question."
+        },
+        {
+          "n": 4,
+          "does": "The agent records what they decided as a decision that quotes their words whole and cites their own record. Words said in a terminal go in as a note that only they file."
+        },
+        {
+          "n": 5,
+          "does": "The agent hands anything outside its own role to the role that holds it: work as delegation packages through the flow Handing a requirement to a supervisor, a design to the flow Options for the person. A new series or a new format also goes through the flow Options for the person before they see it."
+        }
+      ],
+      "leaves_behind": "Their decisions quoting their words; notes of their terminal words waiting for them; a reply where they wrote.",
+      "applies_to": {
+        "scope": "general",
+        "roles": [
+          "worker",
+          "supervisor",
+          "secretary",
+          "inspector"
+        ]
+      }
+    },
+    {
+      "title": "Handing a requirement to a supervisor",
+      "declared_in": "Copied from Mole Office's default flows at this office's first start.",
+      "runs": "Secretary and supervisor, in any department that builds something.",
+      "trigger": "Work that needs design or more than a short while, whether the person asked for it or the secretary found it.",
+      "stages": [
+        {
+          "n": 1,
+          "does": "Secretary writes the requirement into the module the work belongs to: what is wanted, why, their words quoted whole, what done looks like, what is out of bounds, what the module already has and what is in progress there, and the decisions that govern it. The secretary writes no plan: not how it will be built, not in how many waves, not who does what."
+        },
+        {
+          "n": 2,
+          "does": "Secretary turns every open requirement of that module into delegation packages at once, each naming its module and the decision it comes from, and files them into the office's shared package list. It hands no package to a named supervisor. The package door refuses a package that names no module, or whose module's requirements were not updated after that decision."
+        },
+        {
+          "n": 3,
+          "does": "A supervisor takes a package from the list itself and restates it with its plan: how it splits the package into worker-sized parts, who does each, which files, how hard each part is and so which model, and its answers to four questions: does it conflict with a decision, is it already there, would a local fix do, and where is it least sure. It asks back about anything unclear. The secretary answers at the align door, aligned or differs; an aligned answer is the confirmed requirement."
+        },
+        {
+          "n": 4,
+          "does": "Secretary, from then on, stays out of the rounds. The align door has already recorded the confirmed requirement on the package."
+        },
+        {
+          "n": 5,
+          "does": "Supervisor owns the package through Running the work to done to its hand-back, splitting it further itself where a part is too big, and asks the secretary only what its role cannot settle: a change to the requirement, or a choice that is the person's."
+        }
+      ],
+      "leaves_behind": "A confirmed requirement on the work's record; one supervisor that owns it.",
+      "applies_to": {
+        "scope": "general",
+        "roles": [
+          "supervisor",
+          "secretary"
+        ]
+      }
+    },
+    {
+      "title": "Running the work to done",
+      "declared_in": "Copied from Mole Office's default flows at this office's first start.",
+      "runs": "Supervisor and its workers, in any department that builds. A secretary doing a small change itself follows the same stages.",
+      "trigger": "A requirement confirmed through the flow Handing a requirement to a supervisor.",
+      "starts_on": [
+        "a supervisor run starts",
+        "a worker run starts"
+      ],
+      "stages": [
+        {
+          "n": 1,
+          "does": "Supervisor splits the package into parts of about a worker-hour, and starts its own rounds and its workers. Each worker's model is named by its part's difficulty. Where a supervisor cannot start its own round or a worker, the role with host access starts it for the supervisor, and only starts it."
+        },
+        {
+          "n": 2,
+          "does": "Supervisor gives each worker one brief: the piece quoted whole, its folders, and that the last message comes back to the supervisor. A worker never holds a paid key; the supervisor runs a paid call."
+        },
+        {
+          "n": 3,
+          "does": "Worker builds its part, runs only the test files it touched, by name, and hands in what it did and could not do. It runs no whole-tree check."
+        },
+        {
+          "n": 4,
+          "does": "Supervisor checks each part as soon as its worker hands it in: its tests and the project's whole-tree checks at that part's tip, and every changed output by looking at it. There is no joined whole-tree check before the work lands. A proof the supervisor cannot run where it works is named in the report as not run."
+        },
+        {
+          "n": 5,
+          "does": "Supervisor writes the report and seals the run. Where the project's inspector is switched on, the office asks it to check the package's hand-back (The check); where it is off, no check starts and the secretary's review in Reviewing and releasing finished work is the check."
+        },
+        {
+          "n": 6,
+          "does": "Supervisor answers an inspector's refusal: it fixes the point, or answers it with evidence. It starts the next round itself."
+        },
+        {
+          "n": 7,
+          "does": "Supervisor, when the package's points are met, hands it back on the package, point by point, saying which are done, with one message to the secretary for review in Reviewing and releasing finished work. Only the package's maker accepts its points: the secretary, or the supervisor for a part it split and handed out. A taker never accepts its own package. At the same hand-back the supervisor updates the module the package names: what the module now has, which of its requirements are met, and what comes next. Workers do not change modules."
+        },
+        {
+          "n": 8,
+          "does": "Supervisor, after the secretary's yes, tells the integrator the work is ready before the project's next landing time, and the integrator carries it onto main then. The supervisor fixes any red that is traced to its work after it lands."
+        }
+      ],
+      "leaves_behind": "Rounds, each sealed and checked; workers' runs under the supervisor's; reports; one hand-over message; the work landed on main after the secretary's yes.",
+      "applies_to": {
+        "scope": "general",
+        "roles": [
+          "worker",
+          "supervisor",
+          "secretary"
+        ]
+      }
+    },
+    {
+      "title": "The check",
+      "declared_in": "Copied from Mole Office's default flows at this office's first start.",
+      "runs": "Inspector. Off the power tree, in every department that builds code.",
+      "trigger": "A run is sealed.",
+      "starts_on": [
+        "a check starts"
+      ],
+      "stages": [
+        {
+          "n": 1,
+          "does": "The office records the seal. Where the project's inspector is switched on, it queues a check of the package's hand-back; where it is off, no inspector takes it, and the secretary closes it unchecked once the work has landed on main or was not for main."
+        },
+        {
+          "n": 2,
+          "does": "Inspector reads the package, its points and the hand-back, and the rules the work falls under. It runs no code and gates no code step."
+        },
+        {
+          "n": 3,
+          "does": "Inspector, as a critic, says for each point whether it is really met and whether a rule is broken, so that a drift from worker to supervisor to secretary is caught. It passes the hand-back or refuses it, naming the point or the rule."
+        },
+        {
+          "n": 4,
+          "does": "Inspector reports to the supervisor that owns the work, and to the person."
+        }
+      ],
+      "leaves_behind": "A release or a refusal on the run, naming the points or rules it found.",
+      "applies_to": {
+        "scope": "general",
+        "roles": [
+          "inspector"
+        ]
+      }
+    },
+    {
+      "title": "Reviewing and releasing finished work",
+      "declared_in": "Copied from Mole Office's default flows at this office's first start.",
+      "runs": "Secretary, for finished work that a supervisor in its department hands over.",
+      "trigger": "A supervisor hands over work whose requirement is met (Running the work to done, stage 7). None of it has landed yet.",
+      "stages": [
+        {
+          "n": 1,
+          "does": "Secretary reads the hand-over as a draft: finished work from a supervisor. Each key conclusion must name its evidence: a file and line, or a record."
+        },
+        {
+          "n": 2,
+          "does": "Secretary checks at least the most important conclusion against the raw data. For code it screens the tip: what it is based on, its authors, no record ids or private words, no server or migration change it did not expect, and the before-and-after pictures at the widths that matter. A public product is checked at full size and in motion."
+        },
+        {
+          "n": 3,
+          "does": "Secretary says yes to the integrator for the next landing, or returns the work with the points."
+        },
+        {
+          "n": 4,
+          "does": "Secretary, once the work is live in the person's office (after the upgrade that carries it), looks at it there, checks that the module says what is now there, and accepts the package's points. It tells the person only what they must know or decide, in their language, in the next status report (The office report) or one message."
+        }
+      ],
+      "leaves_behind": "A release, or a return with points, before anything lands; the work closed after it lands; what reaches the person.",
+      "applies_to": {
+        "scope": "general",
+        "roles": [
+          "secretary"
+        ]
+      }
+    },
+    {
+      "title": "Options for the person",
+      "declared_in": "Copied from Mole Office's default flows at this office's first start.",
+      "runs": "Any role, only when the person asks for designs or options. Not for the office's own flows or its architecture: the person designs those.",
+      "trigger": "They ask for a design or for options.",
+      "stages": [
+        {
+          "n": 1,
+          "does": "Supervisor first finds out how others do the same thing, with a source for each finding. This flow also runs, before they see anything, for a new series, a new format or a new review, not only when they ask for options."
+        },
+        {
+          "n": 2,
+          "does": "For method or design work, design comes before building: several candidates, a table that weighs them, a small pilot of the strongest, and a source for each threshold."
+        },
+        {
+          "n": 3,
+          "does": "Secretary writes the standard: what they asked, their settled style and their decisions on it."
+        },
+        {
+          "n": 4,
+          "does": "Supervisor has several makers draw many whole options, and an agent that made none critique them against the standard."
+        },
+        {
+          "n": 5,
+          "does": "Secretary shows them two or three whole options with one question and a recommendation."
+        },
+        {
+          "n": 6,
+          "does": "Supervisor after they pick, settles the details as its own decision, having read their answers first."
+        }
+      ],
+      "leaves_behind": "Options they saw, their pick, the details as an agent's decision.",
+      "applies_to": {
+        "scope": "general",
+        "roles": [
+          "worker",
+          "supervisor",
+          "secretary",
+          "inspector"
+        ]
+      }
+    },
+    {
+      "title": "The office report",
+      "declared_in": "Copied from Mole Office's default flows at this office's first start.",
+      "runs": "Secretaries, by project. Each project with work in a slot has one status report for that slot.",
+      "trigger": "A slot in a project's report schedule.",
+      "stages": [
+        {
+          "n": 1,
+          "does": "Each department in the project writes its own part on the template; one with nothing new says so in one line."
+        },
+        {
+          "n": 2,
+          "does": "The role that holds the slot joins the parts into the project's one report and sends one chat line with a button. What waits on the person goes on their checklist as one short line: read report X and decide N points."
+        },
+        {
+          "n": 3,
+          "does": "Each project keeps its own report times."
+        },
+        {
+          "n": 4,
+          "does": "Any role tells them something urgent at once, in chat, and does not wait for the next report slot."
+        }
+      ],
+      "leaves_behind": "One status report per project with work, per slot, each with one chat line; product outputs at their own times.",
+      "applies_to": {
+        "scope": "general",
+        "roles": [
+          "secretary"
+        ]
+      }
+    },
+    {
+      "title": "Backups",
+      "declared_in": "Copied from Mole Office's default flows at this office's first start.",
+      "runs": "The role that runs the backups, and each department's secretary for its own folders.",
+      "trigger": "A backup's schedule.",
+      "stages": [
+        {
+          "n": 1,
+          "does": "Each department's secretary keeps its folders on the backup list. A new working folder joins the list the day it is made. A removed folder's entry is retired, and its last copy is kept where the backups go."
+        },
+        {
+          "n": 2,
+          "does": "Each department snapshots its own changed data before its project's report of the day, or when the role that runs the backups reminds it. Work not yet committed is packed first, so it is in the copy. The role that runs the backups tells each department whose folders changed."
+        },
+        {
+          "n": 3,
+          "does": "The backup job redacts before anything leaves the machine. Conversations are redacted first. Private material that cannot be redacted, such as voice samples, goes only into the locked private copy."
+        },
+        {
+          "n": 4,
+          "does": "The backup job copies what its list names, to where its list says."
+        },
+        {
+          "n": 5,
+          "does": "The backup job scans for suspected keys after redaction and only reminds. The reminder names the file and the kind of match, never the value. It never stops the backup for a suspected key. When the scan cannot finish, the night's backup still goes, and the reminder says the scan did not finish."
+        },
+        {
+          "n": 6,
+          "does": "The backup job writes off-site copies that are locked against deletion for a set time, with a key that can write but not delete."
+        },
+        {
+          "n": 7,
+          "does": "The backup job reads the copy back, and only then deletes local staging."
+        },
+        {
+          "n": 8,
+          "does": "The role that runs the backups checks that each job ran. A backup that did not run counts as a failure. It hears of a failure at once, and of success only in the status report."
+        },
+        {
+          "n": 9,
+          "does": "The role that runs the backups rehearses a restore once a month, and again after any change to the backup job: it downloads a whole day's copy, checks every file against its checksums, and opens the database it holds.",
+          "evidence": "the rehearsal's record: which day was restored, when, and what was checked"
+        }
+      ],
+      "leaves_behind": "A backup list kept current; redacted copies, locked off-site and read back; reminders naming files, never values; one line in the status report; a record of each restore rehearsal.",
+      "applies_to": {
+        "scope": "general",
+        "roles": [
+          "secretary"
+        ]
+      }
+    },
+    {
+      "title": "The decision reminder",
+      "declared_in": "Copied from Mole Office's default flows at this office's first start.",
+      "runs": "Secretary.",
+      "trigger": "A secretary asks the person to decide, or finds work blocked by their decision. Every scheduled report reminder asks the secretary to look for both.",
+      "stages": [
+        {
+          "n": 1,
+          "does": "At each scheduled report reminder, the secretary looks for what is blocked by the person and what waits on their decision: its messages that ask them something, questions in its reports they have not answered, proposals that are theirs to settle, and work it holds that cannot go on without their word.",
+          "evidence": "the reminder line before each report slot"
+        },
+        {
+          "n": 2,
+          "does": "For each one, the secretary adds an item to its own checklist with state \"waiting on the person\". The item's words say what waits, since when, and what it blocks, and the item links the record that waits.",
+          "evidence": "a checklist item in state waiting on the person, on the secretary's own checklist"
+        },
+        {
+          "n": 3,
+          "does": "The secretary switches the item's reminder on for 2 hours after it asked them. If that time falls between 21:00 and 08:00, it sets 08:00 the next morning instead.",
+          "evidence": "the item's reminder, with its time"
+        },
+        {
+          "n": 4,
+          "does": "When the reminder fires, the office's line wakes the secretary. The secretary checks whether they have answered: for a message, a later message from them to the secretary; for a report question, its sent answer; for a proposal, a decision that settles it. If they have not, it sends them one short message in chat, saying what waits, since when, and what it blocks.",
+          "evidence": "the office line \"A checklist item is due\" to the secretary, and the secretary's message to them"
+        },
+        {
+          "n": 5,
+          "does": "After the first nudge the secretary switches the reminder on once more, 6 hours later, again moved to 08:00 if it falls between 21:00 and 08:00. When that one fires and they still have not answered, it nudges them a second and last time and switches no further reminder.",
+          "evidence": "the item's second reminder, and the second message to them"
+        },
+        {
+          "n": 6,
+          "does": "When they answer, the secretary switches the item's reminder off and moves the item out of waiting on the person: to in progress while it acts on their answer, and to done, with evidence, when the work is done.",
+          "evidence": "the item's reminder off, and its state changed in the checklist's change log"
+        }
+      ],
+      "leaves_behind": "Checklist items waiting on the person on each secretary's checklist, with their reminders; at most two short messages to them per item; the item's state changes in the checklist's change log.",
+      "applies_to": {
+        "scope": "general",
+        "roles": [
+          "secretary"
+        ]
+      }
+    },
+    {
+      "title": "While the person is away",
+      "declared_in": "Copied from Mole Office's default flows at this office's first start.",
+      "runs": "Every role, in every department, whenever a question comes up that they would usually see.",
+      "trigger": "A question needs an answer while they are away: at night, asleep, or not answering for a while.",
+      "stages": [
+        {
+          "n": 1,
+          "does": "The agent settles an engineering question itself, as its own reversible decision, and does not wait for them."
+        },
+        {
+          "n": 2,
+          "does": "What the agent can judge for itself while they are away, such as an editorial judgement or merging a reviewed tool change, it settles itself and lists in the next report."
+        },
+        {
+          "n": 3,
+          "does": "Only five kinds of choice wait for them: direction and design, their rules and numbers, making something public, money and accounts, and deleting. Each goes to them as one question with a recommendation, in a report, with one line on their checklist and one in the chat. Everything else the agent decides and reports after."
+        }
+      ],
+      "leaves_behind": "The agent's own reversible decisions, listed in the next report; their choices waiting as one question each, with a recommendation, in a report and on their checklist.",
+      "applies_to": {
+        "scope": "general",
+        "roles": [
+          "worker",
+          "supervisor",
+          "secretary",
+          "inspector"
+        ]
+      }
+    }
+  ]
+}

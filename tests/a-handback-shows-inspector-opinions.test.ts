@@ -46,13 +46,14 @@ it('draws an objection and the rules answer beside the point it judges', () => {
   expect(row).toContain(why)
 })
 
+// CRITERION CHANGE, as decided: a point nobody has checked draws the short state word "not looked at", not a sentence.
 it('distinguishes a point with no check from a judgment stored before opinions', () => {
   const waiting = draw(true)
-  expect(waiting).toContain(t('delegation.inspection.notLookedAt'))
+  expect(waiting).toContain(t('absence.notLooked'))
   const older = draw(true, [check('part')])
   expect(older).toContain(t('delegation.inspection.judged.part'))
   expect(older).toContain(why)
-  expect(older).not.toContain(t('delegation.inspection.notLookedAt'))
+  expect(older).not.toContain(t('absence.notLooked'))
 })
 
 
@@ -60,6 +61,6 @@ it('does not assign an unnumbered older check to a later hand-back', () => {
   const held = data([check('part')])
   held.package.handedBack.push({ by: { actorType: 'agent', actorId: 'made-up-worker' }, at: '2026-01-01 12:01:00', points: [{ pointId: point, outcome: 'done', words: 'Made up again.' }] })
   const html = renderToStaticMarkup(h(panel.PackageHandbackPoints, { data: held, enabled: true }))
-  expect(html).toContain(t('delegation.inspection.notLookedAt'))
+  expect(html).toContain(t('absence.notLooked'))
   expect(html).not.toContain(why)
 })

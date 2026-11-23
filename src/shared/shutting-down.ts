@@ -22,6 +22,12 @@ export interface ALiveRun {
   conversation: string | null
   /** Whether a shutdown can pause it. Only a run the office started can be. */
   pausable: boolean
+  /**
+   * What its process read when the list was read: `running`, or `not known` because the reading could not tell. Only a
+   * run the office started is listed as not known. A session the office did not start is listed only while a process of
+   * it is read running.
+   */
+  state: 'running' | 'not known'
   /** One plain sentence saying what a shutdown does to it. */
   says: string
 }
@@ -32,9 +38,12 @@ export interface TheLiveRuns {
   notPausable: ALiveRun[]
 }
 
-/** What happened to one run when a shutdown paused it. */
+/** What happened to one run when a shutdown paused it. Its `state` is the list's, from before the pause. */
 export interface APausedRun extends ALiveRun {
-  /** True once its process is gone and its record says `paused`. False when it survived the signal. */
+  /**
+   * True once its process is gone and its record says `paused`. False when it survived the signal, when whether it
+   * stopped could not be told, or when it had ended before the pause.
+   */
   paused: boolean
   /** What happened, in one sentence. */
   outcome: string

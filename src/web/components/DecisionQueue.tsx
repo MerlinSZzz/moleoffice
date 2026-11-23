@@ -48,7 +48,7 @@ import { messagesYouHaveNotRead } from './MessagesYouHaveNotRead.tsx'
 import { useInspect } from '../lib/mode.ts'
 import { currentWorkspace, setWorkspace } from '../lib/workspace.ts'
 import { readForksOnce, useSharedRead } from '../lib/homereads.ts'
-import { Absence, ErrorNote, Hint, NumberInItsWord, Panel, type AsyncState } from './ui.tsx'
+import { Absence, ErrorNote, NumberInItsWord, Panel, type AsyncState } from './ui.tsx'
 // The rule that only a person may decide is written once, in the file that carries the act. It used
 // to be typed here and twice more inside the form, in three slightly different wordings.
 import {
@@ -212,26 +212,7 @@ export function DecisionQueue({
            pass added mean "decisions live here" — which is how a reserved colour dies. */
         rank={rows.length === 0 && !anyAsk ? 1 : 0}
         tone="ask"
-        actions={
-          <>
-            <WaitingCount waiting={waiting} />
-            {/* THE ONE HINT ON THIS PAGE, and it is here because deletion cannot carry it.
-                Everything else the band says is drawn: the count is a number, the age is a number,
-                the chip is words, the rail is a colour with a heading beside it. What no
-                arrangement of pixels can say is WHY this block exists at all — that promoting a
-                proposal into a decision is refused to every agent except the secretary carrying the
-                person's authorization, so these will
-                sit here for ever unless a person or that secretary acts, and that this is the one block on Home that
-                is not about the project in the switcher. Both are facts about the system, not
-                descriptions of the interface. */}
-            <Hint label={t('home.whyOnlyYou')}>
-              <p className="dq-hint-p">{t('decisions.whyOnlyYou')}</p>
-              <p className="dq-hint-p">
-                {t('home.decisionMeaning')}
-              </p>
-            </Hint>
-          </>
-        }
+        actions={<WaitingCount waiting={waiting} />}
       >
         {/* AN AGENT ASKING TO COME IN, OR FOR A CARD, AT THE TOP, with the person's press on the row.
             Problem NXEhOBumu5ZZ: the ask was counted in the number beside the title and drawn nowhere.
@@ -321,10 +302,8 @@ export function throughWords(waiting: AsyncState<WaitingReply>, drawn: number, f
  if (waiting.status !== 'ready') return ''
  const total = oneNumber(waiting.value)
  if (total === 0) return ''
- if (forks === 0) return t('home.allOnQueue', { n: total })
- if (drawn < forks) return total === forks ? t('home.mostWaiting', { n: drawn, forks }) : t('home.mostForks', { n: drawn, forks, total })
- if (drawn === total) return t('home.allHere', { n: total })
- return t('home.forksHere', { n: drawn, total })
+ if (drawn < forks && forks < total) return t('home.queue.forksHere', { n: drawn, forks, total })
+ return t('home.queue.here', { n: drawn, total })
 }
 
 /**
@@ -634,10 +613,6 @@ export const DECISION_QUEUE_CSS = `
 .dq-q { font-size: var(--fs-1); }
 .dq-raw { color: var(--text-3); font-size: var(--fs-1); }
 .dq-raw code { font-family: var(--font-mono); overflow-wrap: anywhere; }
-
-/* ---- the one hint on this page. Only its fit is set here; the mark itself is ui.tsx's. */
-.dq-hint-p { margin: 0 0 6px; max-width: var(--measure-in-box); font: var(--fs-2)/1.72 var(--font-ui); }
-.dq-hint-p:last-child { margin-bottom: 0; }
 
 /* ---- WHAT YOU DECIDED, AS CARDS.
    The owner settled one and could not find it again, and when the way back was a column of grey

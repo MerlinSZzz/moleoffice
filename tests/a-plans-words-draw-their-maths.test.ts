@@ -372,7 +372,7 @@ describe('a plan’s own words draw their maths', () => {
     await waitForThePage(page, 60_000)
     const card = page.locator('.pl-card', { hasText: 'A made-up plan with maths in its table' })
     await card.locator('.pl-card-line').first().waitFor({ timeout: 30_000 })
-    await page.waitForTimeout(800)
+    await card.locator('.pl-card-line').first().locator('.katex').first().waitFor({ timeout: 30_000 })
     expect(await card.locator('.pl-card-line .katex').count(), 'the plan’s first line drew no formula').toBeGreaterThan(0)
     const words = await card.locator('.pl-card-line').first().evaluate((p) => {
       const copy = p.cloneNode(true) as HTMLElement

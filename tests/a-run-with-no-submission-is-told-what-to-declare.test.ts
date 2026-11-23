@@ -24,6 +24,8 @@
  *   (c) a run already written orphaned by its launcher is finished by its starter the same way.
  *   (d) a run that declares a git submission and has no work area is still told the work area is missing, because
  *       then that is what is missing.
+ *   (e) a run that declares a mixed submission and has no work area is told the exact work-area write for its own
+ *       agent, named by its registry id, and run, and the records submission; nothing is written.
  *
  * ---------------------------------------------------------------------------------------
  * MUTATION PROOF, after a green control
@@ -39,6 +41,7 @@ import { THE_TEST_OFFICES_OWNER } from './a-page-of-a-test-office.ts'
 
 let t: TestDb
 let app: FastifyInstance
+let workerId = ''
 const WORKER = 'files-worker'
 const asWorker = { 'x-mole-office-workspace': 'default', 'x-mole-office-actor-type': 'agent', 'x-mole-office-actor-id': WORKER }
 const actor = { type: 'agent' as const, id: WORKER }
@@ -82,6 +85,7 @@ beforeAll(async () => {
     payload: { handle: WORKER, name: 'Test files worker', workArea: [] },
   })
   expect(worker.statusCode, worker.body).toBe(201)
+  workerId = (worker.json() as { agent: { id: string } }).agent.id
 })
 
 afterAll(async () => {
@@ -122,5 +126,18 @@ describe('a run whose agent has no work area', () => {
     const refused = await finishWith(run, { state: 'finished', submission: { kind: 'git' } })
     expect(refused.status, refused.body).toBe(409)
     expect(refused.error).toContain('no registered work area')
+  })
+
+  it('(e) is told the work-area write for its own agent and run, and the records submission, when it declares a mixed submission', async () => {
+    const { run, report } = aRunWithItsReport('running')
+    const refused = await finishWith(run, { state: 'finished', submission: { kind: 'mixed', records: [report] } })
+    expect(refused.status, refused.body).toBe(409)
+    expect(refused.error).toContain('no registered work area')
+    expect(refused.error).toContain('Nothing was written.')
+    expect(refused.error).toContain(`POST /api/participants/agent/${workerId}/work-area`)
+    expect(refused.error, 'a handle may be shared with a live agent once the run’s agent is retired').not.toContain('/agent/files-worker/')
+    expect(refused.error).toContain(`"forRun":"${run}"`)
+    expect(refused.error).toContain(`{"kind":"records","records":["${report}"]}`)
+    expect(t.api.getRecord(run)?.data['state']).toBe('running')
   })
 })

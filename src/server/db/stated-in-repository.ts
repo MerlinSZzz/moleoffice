@@ -7,7 +7,7 @@
 
 import { sqlite } from './client.ts'
 import { MAP_COLUMNS, toStated } from './stated-for.ts'
-import type { StatedRelationship, MapRow } from '../lib/implementation.ts'
+import type { StatedRelationship, MapRow } from './types/implementation.ts'
 
 /** Every live relationship somebody stated about one repository. */
 export function statedInRepository(repositoryId: string, workspaceId: string): StatedRelationship[] {

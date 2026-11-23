@@ -145,7 +145,16 @@ export function whyARunsMachineIsNotKnown(named: unknown): string | null {
  */
 export function anAddressOfThisMachine(address: string | undefined): boolean {
   if (address === undefined) return false
-  return (osProbe().ownAddresses?.() ?? []).includes(address)
+  return theAddressesOfThisMachine().includes(address)
+}
+
+/**
+ * THIS MACHINE'S OWN ADDRESSES, loopback left out, as the probe names them now, or none when it cannot say. The one
+ * place they are read, so the Host check's list of the office's pages (./a-host-that-is-not-this-office.ts) and the
+ * question above give one answer.
+ */
+export function theAddressesOfThisMachine(): readonly string[] {
+  return osProbe().ownAddresses?.() ?? []
 }
 
 /**

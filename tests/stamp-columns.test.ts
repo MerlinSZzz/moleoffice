@@ -70,7 +70,7 @@ import { join } from 'node:path'
 import { clockStamp, localStamp, stampWrittenIn } from '../src/shared/time.ts'
 import { STRUCTURE_SCOPE } from '../src/shared/presentation.ts'
 import { THE_TEST_OFFICES_OWNER } from './a-page-of-a-test-office.ts'
-import { apiApp, buildTheFirstOfficeInAHook, freshDb, type TestDb } from './helpers.ts'
+import { A_SLEEP_TIME, apiApp, buildTheFirstOfficeInAHook, freshDb, type TestDb } from './helpers.ts'
 
 // ============================================================================ the inventory
 
@@ -480,18 +480,21 @@ describe.each(ZONES)('in %s, where a UTC stamp is visibly not a local one', (zon
 
   it('the real machine probe reports a process start time in local time', () => {
     // The one stamp in the database that does not come from `now()`. It is built by LINUX_PROBE
-    // out of /proc, and this asks it about THIS process, whose start time is a few seconds ago.
+    // out of /proc, and this asks it about THIS process.
     //
-    // The tolerance is ten minutes rather than five seconds because the runner forked this process
-    // before the test began. Ten minutes is still twenty times smaller than the smaller of the two
-    // offsets used here, so a UTC reading could not slip through it.
+    // The stamp is compared with this process's own start, read from Node's uptime, and not with
+    // now. When test files share a process, this file can run long after the process started, and
+    // a comparison with now would fail on that age alone. /proc and Node each read the start their
+    // own way, so the tolerance stays at ten minutes. Ten minutes is still twenty times smaller than
+    // the smaller of the two offsets used here, so a UTC reading could not slip through it.
     const me = h.res.LINUX_PROBE.processById(process.pid)
     expect(
       me,
       `LINUX_PROBE could not read pid ${process.pid} out of /proc on ${process.platform}. This test ` +
         'reads the real machine, the way tests/resources.test.ts does.',
     ).not.toBeNull()
-    expectLocal('OsProbe.processById().startedAt', me?.startedAt ?? '', new Date(), 10 * 60_000)
+    const started = new Date(Date.now() - process.uptime() * 1000)
+    expectLocal('OsProbe.processById().startedAt', me?.startedAt ?? '', started, 10 * 60_000)
   })
 
   // -------------------------------------------------------------------------- the source index
@@ -573,7 +576,7 @@ describe.each(ZONES)('in %s, where a UTC stamp is visibly not a local one', (zon
     const resident = idOf('stamp-resident', 'worker')
     const reader = idOf('stamp-reader', 'worker')
     const heir = idOf('stamp-heir', 'worker')
-    const proposal = residents.proposeAResident({ agentId: resident, because: 'A made-up reason.' }, byKey('stamp-secretary', secretary), 'default')
+    const proposal = residents.proposeAResident({ agentId: resident, because: 'A made-up reason.', sleepTime: A_SLEEP_TIME }, byKey('stamp-secretary', secretary), 'default')
     const beforeConfirm = new Date()
     residents.confirmAResident(proposal.id, HUMAN)
     expectLocal('agents.resident_since', stored('SELECT resident_since FROM agents WHERE id = ?', resident), beforeConfirm)
@@ -626,7 +629,7 @@ describe.each(ZONES)('in %s, where a UTC stamp is visibly not a local one', (zon
     const byKey = (handle: string, id: string) => ({ type: 'agent' as const, id: handle, provedBy: 'an-agent-key' as const, keyHolder: id })
     const proposer = idOf('stamp-sleep-proposer')
     const sleeper = idOf('stamp-sleeper')
-    const proposal = residents.proposeAResident({ agentId: sleeper, because: 'A made-up reason.' }, byKey('stamp-sleep-proposer', proposer), 'default')
+    const proposal = residents.proposeAResident({ agentId: sleeper, because: 'A made-up reason.', sleepTime: A_SLEEP_TIME }, byKey('stamp-sleep-proposer', proposer), 'default')
     residents.confirmAResident(proposal.id, HUMAN)
     const opens = new Date(Math.floor(Date.now() / 60_000) * 60_000 + 5 * 60_000)
     const beforeSet = new Date()
@@ -680,6 +683,35 @@ describe.each(ZONES)('in %s, where a UTC stamp is visibly not a local one', (zon
     const id = moved.change?.id ?? 'no change was written'
     expectLocal('agent_starter_changes.asked_at', stored('SELECT asked_at FROM agent_starter_changes WHERE id = ?', id), before)
     expectLocal('agent_starter_changes.applied_at', stored('SELECT applied_at FROM agent_starter_changes WHERE id = ?', id), before)
+  })
+
+  it('the owner hand-over writers store local time when an owner is handed over and when the office began to keep them', async () => {
+    // Migration 0356. Neither column has a SQL default, so `new Date().toISOString()` in place of `nowStamp()` in
+    // writeAnOwnerHandOver or keepTheDayTheHandOversBeganOnce turns this case red in both zones. Every name and value
+    // is made up.
+    const roleCards = await import('../src/server/lib/roles.ts')
+    if (!roleCards.theRoleCardsAreRead()) {
+      const { GOVERNANCE_GUARDS } = await import('../src/server/lib/records.ts')
+      roleCards.readTheRoleCards({ guardActKeys: GOVERNANCE_GUARDS.flatMap((one) => [one.actKey, one.personAct]) })
+    }
+    const { keepTheDayTheHandOversBeganOnce, writeAnOwnerHandOver } = await import('../src/server/lib/agent-owner-changes.ts')
+    const { THE_PERSON } = await import('../src/shared/person.ts')
+    const idOf = (handle: string) => (h.t.client.sqlite.prepare('SELECT id FROM agents WHERE handle = ?').get(handle) as { id: string }).id
+    for (const handle of ['stamp-handed-over', 'stamp-new-owner']) {
+      h.t.api.createRecord({ workspaceId: 'default', kind: 'agent', title: handle, data: { handle, state: 'active', runtime: 'claude-code', role: 'worker' }, actor: HUMAN })
+    }
+    const before = new Date()
+    const id = writeAnOwnerHandOver({
+      agent: idOf('stamp-handed-over'),
+      to: { kind: 'agent', id: idOf('stamp-new-owner') },
+      by: { kind: 'person', id: THE_PERSON },
+      underTheGrant: null,
+      because: 'A made-up reason.',
+    })
+    expectLocal('agent_owner_changes.made_at', stored('SELECT made_at FROM agent_owner_changes WHERE id = ?', id), before)
+    const beforeTheDay = new Date()
+    keepTheDayTheHandOversBeganOnce()
+    expectLocal('installation.owner_changes_since', stored('SELECT owner_changes_since FROM installation WHERE only_row = 1'), beforeTheDay)
   })
 
   it('the settings door stores the local end time the person typed for a gate choice', async () => {

@@ -9,25 +9,29 @@
  *
  *   1. DF18: the panel is in Settings, in "What the office keeps", straight after "What the office keeps" is decided,
  *      drawn in Normal mode and in a browser, titled with its surface's label.
- *   2. DF18: each state of the last move draws its own words with the two paths the mark holds, and a moving state
- *      whose mover has died says the move did not finish and never says it is still moving.
- *   3. DF18: an office that does not run from a bundle says so and draws no press; a caller who may not move gets no
- *      move field; a started mark draws the confirm press only when the caller may confirm, and never a move field.
+ *   2. DF18: each state of the last move draws its own words, and the two folders the mark holds as a From row and a
+ *      To row, each path in a code element and none inside the words. A moving state whose mover has died says the
+ *      move did not finish and never says it is still moving.
+ *   3. DF18: an office that does not run from a bundle reads "runs from source code" and draws no press; a caller who
+ *      may not move gets no move field and no press; the person's own reading draws the field and the check press, and
+ *      no move press before a check; a started mark draws the confirm press only when the caller may confirm, and
+ *      never a move field.
  *   4. DF18: Developer mode draws the server's own English (who chose the folder, the mark's sentence and why an
- *      unreadable mark cannot be read), marked as English; Normal mode draws none of it.
+ *      unreadable mark cannot be read), marked as English, and the database's file name in a code element; Normal mode
+ *      draws none of it.
  *   5. DF22: the one exported question "does this reading keep the panel waiting?" answers true for each moving state
  *      while the mover lives, and false when the mover has died and for every state that is not a move in progress.
  *   6. DF19, as the panel draws it: in a browser with no route answered by the test, the panel draws the real door's
- *      reading of a scratch office that runs from a checkout: it says the office is not a bundle and draws no press.
+ *      reading of a scratch office that runs from a checkout: it reads "runs from source code" and draws no press.
  *   7. DF22: after the move press answers 202 the panel asks the office again every two seconds, one read at a time,
  *      draws the waiting words and the count of failed reads while the office does not answer, stops when a read
  *      answers a started mark, draws that reading and the confirm press, and asks no more.
  *   8. DF22: a read that fails when no move was pressed draws the unread note, not the waiting words.
  *   9. When TEST_SHOTS names a folder, the panel is photographed at 1440, 990, 660 and 390 wide, in light and dark,
  *      in eight states, and nothing on the page scrolls sideways.
- *  10. DF22: a reply from an office with another identity ends the wait, says why, mentions the move and the identity
- *      made from the database's place, offers to load the page again, draws none of the waiting words and none of the
- *      older reading, asks no more, and the press loads the page again.
+ *  10. DF22: a reply from an office with another identity ends the wait, reads "Another office answered.", offers to
+ *      load the page again, draws none of the waiting words and none of the older reading, asks no more, and the press
+ *      loads the page again.
  *  11. DF28: after this page's own move press, a reply from the moved office is read as this page's new home. The moved
  *      office is the one this page opened against with only its database identity changed, and its moved-home header
  *      names that same database. No banner is drawn over the panel's press, the page keeps the new home and says so,
@@ -48,10 +52,10 @@
  *      confirm press, so its writes are held.
  *  17. DF28: when the moved-home header arrives, the banner goes with nothing reloaded, the page keeps the moved
  *      database as its home, and the panel stops saying another identity and reads the new home.
- *  18. DF28: with no move of this page under way, the banner still shuts the page: a press at the panel's move press
+ *  18. DF28: with no move of this page under way, the banner still shuts the page: a press at the panel's check press
  *      lands on the sheet, not on the press.
- *  19. DF28: with no move of this page under way, a move pressed through the banner reaches nothing, and the banner
- *      stays.
+ *  19. DF28: with no move of this page under way, a check pressed through the banner reaches nothing, no move press
+ *      comes after it, no move reaches the office, and the banner stays.
  *
  * THE WORLD WITHOUT A SERVER. The static cases draw the panel with renderToStaticMarkup and the real components from
  * ui.tsx, with only useAsync answered by the reading the case hands it. EVERY READING THOSE CASES DRAW IS MADE BY THE
@@ -98,7 +102,6 @@
  *   - the count of reads with no answer is passed as count rather than n: case 7, DF22 after the move;
  *   - the count of removed files is passed as count rather than n: case 8, DF22 a press waits;
  *   - "Check" gives the field's hint while a press waits: case 8, DF22 a press waits;
- *   - "Move the data folder" gives the field's hint while a press waits: case 8, DF22 a press waits;
  *   - "Check" says a press is waiting when the field is empty: case 8, DF22 a press waits;
  *   - "Stop the office and move" gives the warning as its reason: case 8, DF22 a press waits;
  *   - Cancel gives the start-at-login panel's reason: case 8, DF22 a press waits;
@@ -153,6 +156,7 @@ import type {
   TheMoveMark,
   TheStateOfAMove,
 } from '../src/shared/data-folder.ts'
+import type { WordKey } from '../src/shared/i18n.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 import type { ListedTerminal, TheTerminalsNow } from '../src/shared/terminals.ts'
 import { WORLD_HEADER, formatWorldHeader, parseWorldHeader, type WorldOnTheWire } from '../src/config/world-header.mjs'
@@ -259,6 +263,34 @@ function held(markup: string, text: string): boolean {
   return markup.includes(asDrawn(text))
 }
 
+/** A text as a pattern that matches only itself as it is drawn into markup. */
+function asPattern(text: string): string {
+  return asDrawn(text).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+/** Whether the markup draws this path or file name, whole, in a code element. */
+function inCode(markup: string, path: string): boolean {
+  return new RegExp(`<code[^>]*>${asPattern(path)}</code>`).test(markup)
+}
+
+/** Whether the markup draws a row with this label and this path in a code element beside it. */
+function aRow(markup: string, label: WordKey, path: string): boolean {
+  return new RegExp(`<dt[^>]*>${asPattern(i18n.t(label))}</dt><dd[^>]*><code[^>]*>${asPattern(path)}</code></dd>`).test(markup)
+}
+
+/** The text of each sentence the markup draws. */
+function theSentences(markup: string): string[] {
+  return [...markup.matchAll(/<p(?:\s[^>]*)?>([\s\S]*?)<\/p>/g)].map((sentence) => sentence[1] ?? '')
+}
+
+/** Whether the markup draws the mark's From row and To row, and no sentence holds a path. */
+function theTwoRowsAndNoPathInASentence(markup: string): boolean {
+  const sentences = theSentences(markup)
+  return aRow(markup, 'dataFolder.row.from', THE_OLD_FOLDER)
+    && aRow(markup, 'dataFolder.row.to', THE_NEW_FOLDER)
+    && sentences.every((sentence) => !sentence.includes(THE_OLD_FOLDER) && !sentence.includes(THE_NEW_FOLDER))
+}
+
 describe('DF18: the panel is on Settings, in "What the office keeps"', () => {
   it('DF18: sits straight after "What the office keeps", in Normal mode and outside the window', () => {
     const declared = PANELS.find((one) => one.key === 'settings.datafolder')
@@ -278,126 +310,110 @@ describe('DF18: the panel is on Settings, in "What the office keeps"', () => {
 })
 
 describe('DF18: the words of the last move', () => {
-  it('DF18: draws each of the nine states with the mark\'s own paths, and a dead mover is never said to be moving', () => {
+  it('DF18: draws each of the nine states with the mark\'s own two folders as rows, and a dead mover is never said to be moving', () => {
     for (const state of THE_MOVING_STATES) {
       const moving = drawn(aReading({ mark: aReadMark(state) }))
-      expect(moving, state).toContain(asDrawn(i18n.t('dataFolder.mark.moving', { from: THE_OLD_FOLDER, to: THE_NEW_FOLDER })))
+      expect(moving, state).toContain(asDrawn(i18n.t('dataFolder.lastMove.moving')))
       expect(moving, state).toContain(asDrawn(i18n.t(panel.THE_STEP_WORDS[state])))
-      expect(moving, state).not.toContain(asDrawn(i18n.t('dataFolder.mark.didNotFinish', { from: THE_OLD_FOLDER, to: THE_NEW_FOLDER, step: i18n.t(panel.THE_STEP_WORDS[state]) })))
+      expect(moving, state).not.toContain(asDrawn(i18n.t('dataFolder.lastMove.didNotFinish', { step: i18n.t(panel.THE_STEP_WORDS[state]) })))
+      expect(theTwoRowsAndNoPathInASentence(moving), state).toBe(true)
 
       const dead = drawn(aReading({ mark: aReadMark(state, false) }))
-      const didNotFinish = i18n.t('dataFolder.mark.didNotFinish', {
-        from: THE_OLD_FOLDER,
-        to: THE_NEW_FOLDER,
-        step: i18n.t(panel.THE_STEP_WORDS[state]),
-      })
+      const didNotFinish = i18n.t('dataFolder.lastMove.didNotFinish', { step: i18n.t(panel.THE_STEP_WORDS[state]) })
       if (state === 'switched') {
         // A SWITCHED MARK WHOSE MOVER ENDED IS NOT A STEP THAT STOPPED: the office may run from the new folder, and the
         // confirm ends the move (DF21).
-        expect(dead, state).toContain(asDrawn(i18n.t('dataFolder.mark.switchedAndEnded', {
-          from: THE_OLD_FOLDER,
-          to: THE_NEW_FOLDER,
-          folder: THE_OLD_FOLDER,
-        })))
+        expect(dead, state).toContain(asDrawn(i18n.t('dataFolder.lastMove.switchedAndEnded')))
         expect(dead, state).not.toContain(asDrawn(didNotFinish))
       } else {
         expect(dead, state).toContain(asDrawn(didNotFinish))
       }
-      expect(dead, state).not.toContain(asDrawn(i18n.t('dataFolder.mark.moving', { from: THE_OLD_FOLDER, to: THE_NEW_FOLDER })))
+      expect(dead, state).not.toContain(asDrawn(i18n.t('dataFolder.lastMove.moving')))
+      expect(theTwoRowsAndNoPathInASentence(dead), state).toBe(true)
     }
     for (const [state, word] of [
-      ['started', 'dataFolder.mark.started'],
-      ['confirmed', 'dataFolder.mark.confirmed'],
-      ['stopped-before-the-switch', 'dataFolder.mark.stoppedBeforeTheSwitch'],
-      ['switched-back', 'dataFolder.mark.switchedBack'],
+      ['started', 'dataFolder.lastMove.started'],
+      ['confirmed', 'dataFolder.lastMove.confirmed'],
+      ['stopped-before-the-switch', 'dataFolder.lastMove.stoppedBeforeTheSwitch'],
+      ['switched-back', 'dataFolder.lastMove.switchedBack'],
     ] as const) {
       const markup = drawn(aReading({ mark: aReadMark(state) }))
-      expect(markup, state).toContain(asDrawn(i18n.t(word, { from: THE_OLD_FOLDER, to: THE_NEW_FOLDER })))
+      expect(markup, state).toContain(asDrawn(i18n.t(word)))
+      expect(theTwoRowsAndNoPathInASentence(markup), state).toBe(true)
     }
     const absent = drawn(aReading({ mark: { state: 'absent' } }))
-    expect(absent).toContain(asDrawn(i18n.t('dataFolder.mark.absent')))
+    expect(absent).toContain(asDrawn(i18n.t('dataFolder.state.lastMoveNone')))
     const unreadable = drawn(aReading({ mark: { state: 'unreadable', why: 'The test made the mark unreadable.' } }))
-    expect(unreadable).toContain(asDrawn(i18n.t('dataFolder.mark.unreadable')))
+    expect(unreadable).toContain(asDrawn(i18n.t('dataFolder.state.lastMoveNotRead')))
   })
 
-  it('DF18: draws where the data is, who chose it, and the earlier folders', () => {
+  it('DF18: draws where the data is as a row, who chose it, and the earlier folders, each path in a code element', () => {
     const markup = drawn(aReading({
       chosenBy: 'the .env line',
       mark: aReadMark('confirmed', true, { earlier: ['/srv/made-up/first-data', '/srv/made-up/second-data'] }),
     }))
-    expect(markup).toContain(asDrawn(i18n.t('dataFolder.where', { folder: THE_OLD_FOLDER })))
-    expect(markup).toContain(asDrawn(i18n.t('dataFolder.chosenBy.envLine')))
+    expect(aRow(markup, 'dataFolder.row.folder', THE_OLD_FOLDER)).toBe(true)
+    expect(markup).toContain(asDrawn(i18n.t('dataFolder.state.chosenBy.envLine')))
     expect(markup).toContain(asDrawn(i18n.t('dataFolder.earlier')))
-    expect(markup).toContain(asDrawn('/srv/made-up/first-data'))
-    expect(markup).toContain(asDrawn('/srv/made-up/second-data'))
+    expect(inCode(markup, '/srv/made-up/first-data')).toBe(true)
+    expect(inCode(markup, '/srv/made-up/second-data')).toBe(true)
+    expect(theSentences(markup).some((sentence) => sentence.includes('/srv/made-up/')), 'a sentence holds a path').toBe(false)
   })
 })
 
 describe('DF18: what may be pressed', () => {
-  it('DF18: an office that is not a bundle says so and draws no press', () => {
+  it('DF18: an office that is not a bundle reads "runs from source code" and draws no press', () => {
     const markup = drawn(aReading({ fromABundle: false }))
-    expect(markup).toContain(asDrawn(i18n.t('dataFolder.notABundle')))
+    expect(markup).toContain(asDrawn(i18n.t('dataFolder.state.notABundle')))
     expect(markup).not.toContain('<input')
     expect(markup).not.toContain('<button')
   })
 
-  it('DF18: a caller who may not move gets no field and is told who presses', () => {
+  it('DF18: a caller who may not move gets no field and no press', () => {
     const markup = drawn(aReading({ mayMove: false }))
-    expect(markup).toContain(asDrawn(i18n.t('dataFolder.onlyThePerson')))
     expect(markup).not.toContain('<input')
     expect(markup).not.toContain(asDrawn(i18n.t('dataFolder.move')))
+    expect(markup).not.toContain('<button')
   })
 
-  it('DF18: a caller who may press only under the grant is told to press through the door, and draws no press', () => {
+  it('DF18: a caller who may press only under the grant gets no field and no press', () => {
     const markup = drawn(aReading({ theCallerIsThePerson: false, mayMove: true }))
-    expect(markup).toContain(asDrawn(i18n.t('dataFolder.throughTheDoor')))
-    expect(markup).not.toContain(asDrawn(i18n.t('dataFolder.onlyThePerson')))
     expect(markup).not.toContain('<input')
     expect(markup).not.toContain('<button')
   })
 
-  it("DF18: the person's own reading draws the move and the confirm presses", () => {
+  it("DF18: the person's own reading draws the field with the check press, and the confirm press after a move", () => {
     const move = drawn(aReading())
     expect(move).toContain('<input')
-    expect(move).toContain(asDrawn(i18n.t('dataFolder.move')))
-    expect(move).not.toContain(asDrawn(i18n.t('dataFolder.throughTheDoor')))
+    expect(move).toContain(asDrawn(i18n.t('dataFolder.check')))
+    // ONE PRESS AT A TIME: the move press comes only once a check has said a move to the folder would go ahead.
+    expect(move).not.toContain(asDrawn(i18n.t('dataFolder.move')))
 
     const confirm = drawn(aReading({ mark: aReadMark('started') }))
     expect(confirm).toContain(asDrawn(i18n.t('dataFolder.confirm')))
     expect(confirm).toContain('<button')
-    expect(confirm).not.toContain(asDrawn(i18n.t('dataFolder.throughTheDoor')))
   })
 
   it('DF21: a switched mark whose mover has ended draws the confirm, and one whose mover lives draws none', () => {
     const ended = drawn(aReading({ mark: aReadMark('switched', false) }))
-    expect(ended).toContain(asDrawn(i18n.t('dataFolder.mark.switchedAndEnded', {
-      from: THE_OLD_FOLDER,
-      to: THE_NEW_FOLDER,
-      folder: THE_OLD_FOLDER,
-    })))
+    expect(ended).toContain(asDrawn(i18n.t('dataFolder.lastMove.switchedAndEnded')))
     expect(ended).toContain(asDrawn(i18n.t('dataFolder.confirm')))
     expect(ended).toContain('<button')
 
     const alive = drawn(aReading({ mark: aReadMark('switched', true) }))
-    expect(alive).not.toContain(asDrawn(i18n.t('dataFolder.mark.switchedAndEnded', {
-      from: THE_OLD_FOLDER,
-      to: THE_NEW_FOLDER,
-      folder: THE_OLD_FOLDER,
-    })))
+    expect(alive).not.toContain(asDrawn(i18n.t('dataFolder.lastMove.switchedAndEnded')))
     expect(alive).not.toContain(asDrawn(i18n.t('dataFolder.confirm')))
     expect(alive).not.toContain('<button')
   })
 
   it('DF18: a started mark draws the confirm press only when the caller may confirm, and never a move field', () => {
     const may = drawn(aReading({ mark: aReadMark('started') }))
-    expect(may).toContain(asDrawn(i18n.t('dataFolder.confirm.what', { from: THE_OLD_FOLDER })))
     expect(may).toContain(asDrawn(i18n.t('dataFolder.confirm')))
-    expect(may).toContain(asDrawn(i18n.t('dataFolder.confirmFirst')))
     expect(may).not.toContain('<input')
     expect(may).not.toContain(asDrawn(i18n.t('dataFolder.move')))
 
     const mayNot = drawn(aReading({ mark: aReadMark('started'), mayConfirm: false }))
-    expect(mayNot).toContain(asDrawn(i18n.t('dataFolder.onlyThePerson')))
+    expect(mayNot).not.toContain('<button')
     expect(mayNot).not.toContain(asDrawn(i18n.t('dataFolder.confirm')))
     expect(mayNot).not.toContain('<input')
   })
@@ -412,7 +428,7 @@ describe('DF18: what may be pressed', () => {
 })
 
 describe('DF18: Developer mode shows the office\'s own English', () => {
-  it('DF18: shows who chose the folder, the mark\'s sentence and an unreadable mark\'s why, marked English; Normal shows none', () => {
+  it('DF18: shows who chose the folder, the mark\'s sentence and an unreadable mark\'s why, marked English, and the database\'s file name in code; Normal shows none', () => {
     const reading = aReading({
       mark: aReadMark('started', true, { says: 'The test mover says the office is up.' }),
       chosenBy: 'the process environment',
@@ -420,7 +436,8 @@ describe('DF18: Developer mode shows the office\'s own English', () => {
     })
     const developer = drawn(reading, 'inspect')
     expect(drawnAsEnglish(developer, reading.chosenBySays)).toBe(true)
-    expect(drawnAsEnglish(developer, reading.database)).toBe(true)
+    // A FILE NAME IS NOT ENGLISH: it is drawn in the office's code style, as every path on the panel is.
+    expect(inCode(developer, reading.database)).toBe(true)
     expect(drawnAsEnglish(developer, (reading.mark as Extract<TheMarkInTheReading, { state: 'read' }>).mark.says as string)).toBe(true)
 
     const normal = drawn(reading, 'normal')
@@ -622,6 +639,12 @@ async function answerAsTheOfficeAfterTheMove(page: Page, how: () => HowTheMovedO
   })
 }
 
+/** Press the check, and wait for its words that a move to the folder would go ahead, after which the move press is drawn. */
+async function checkTheNewFolder(page: Page): Promise<void> {
+  await page.getByRole('button', { name: i18n.t('dataFolder.check') }).click()
+  await page.getByText(i18n.t('dataFolder.check.thisFolderIsFine'), { exact: true }).waitFor({ timeout: 15_000 })
+}
+
 /** How far a DF28 move has gone, for a case's own routes: the move press has had its 202, and the office after the move answers. */
 interface HowFarTheMoveIs {
   pressed: () => boolean
@@ -680,11 +703,12 @@ async function moveIntoTheOfficeAfterTheMove(
   await theCasesOwnRoutes({ pressed: () => pressed, movedOn: () => movedOn })
   await openThePanel(page, width, look)
   await page.locator(`${PANEL} input`).fill(THE_NEW_FOLDER)
+  await checkTheNewFolder(page)
   await page.getByRole('button', { name: i18n.t('dataFolder.move') }).click()
   await page.getByRole('button', { name: i18n.t('dataFolder.move.sure') }).click()
   await page.waitForFunction(
     (word) => document.querySelector('[data-target="uiSurface/settings.datafolder"]')?.textContent?.includes(word) === true,
-    i18n.t('dataFolder.waiting'),
+    i18n.t('dataFolder.state.stopped'),
     { timeout: 15_000 },
   )
   movedOn = true
@@ -705,7 +729,7 @@ async function theMovedOfficeWithoutAMoveOfThisPage(page: Page): Promise<{ moveP
     if (await answerThePreflight(route)) return
     if (route.request().method() !== 'GET') return route.fallback()
     const asked = new URL(route.request().url()).searchParams.get('to')
-    const reading = aReading(asked === null ? {} : { wouldRefuse: { to: asked, why: null } })
+    const reading = aReading(asked === null ? {} : { wouldRefuse: { to: asked, why: null, code: null, values: null } })
     if (!movedOn) return answerWithJson(route, 200, reading)
     return route.fulfill({ status: 200, headers: theMovedOfficeHeaders(answerHeaders, route.request(), 'the moved office'), body: JSON.stringify(reading) })
   })
@@ -784,13 +808,13 @@ async function forgetTheHomeThisCaseLeft(page: Page): Promise<void> {
 }
 
 describe('DF19: the panel draws the real door\'s reading', () => {
-  it('DF19: a checkout office is not a bundle, so the panel says so and draws no press', async () => {
+  it('DF19: a checkout office is not a bundle, so the panel reads "runs from source code" and draws no press', async () => {
     const page = await aPage()
     try {
       await openThePanel(page)
       expect(await page.locator(ENTRY).count()).toBe(1)
       expect((await page.locator(`${PANEL} .px-panel-title`).innerText()).trim()).toBe(i18n.t('settingsPanel.title.datafolder'))
-      expect(await page.locator(PANEL).innerText()).toContain(i18n.t('dataFolder.notABundle'))
+      expect(await page.locator(PANEL).innerText()).toContain(i18n.t('dataFolder.state.notABundle'))
       expect(await page.locator(`${PANEL} input`).count()).toBe(0)
       expect(await page.locator(`${PANEL} button`).count()).toBe(0)
     } finally {
@@ -811,16 +835,16 @@ describe('DF22: the panel waits for the office during a move', () => {
       await page.route(READ, async (route) => {
         if (await answerThePreflight(route)) return
         if (route.request().method() !== 'GET') return route.fallback()
-        readTimes.push(Date.now())
+        const asked = new URL(route.request().url()).searchParams.get('to')
+        // THE CHECK'S OWN READ IS NOT ONE OF THE WAIT'S, so it is not timed with them.
+        if (asked === null) readTimes.push(Date.now())
         if (pressedAt > 0) readsAfterTheMove += 1
         if (answer === 'abort') {
           // THE FIRST THREE READS AFTER THE 202 FAIL; THE FOURTH ANSWERS A STARTED MARK.
           if (readsAfterTheMove <= 3) return route.abort('failed')
           return answerWithJson(route, 200, aStartedReading())
         }
-        const url = new URL(route.request().url())
-        const asked = url.searchParams.get('to')
-        return answerWithJson(route, 200, aReading(asked === null ? {} : { wouldRefuse: { to: asked, why: null } }))
+        return answerWithJson(route, 200, aReading(asked === null ? {} : { wouldRefuse: { to: asked, why: null, code: null, values: null } }))
       })
       await page.route(MOVE, async (route) => {
         if (await answerThePreflight(route)) return
@@ -835,8 +859,9 @@ describe('DF22: the panel waits for the office during a move', () => {
 
       await openThePanel(page)
       await page.locator(`${PANEL} input`).fill(THE_NEW_FOLDER)
+      await checkTheNewFolder(page)
       await page.getByRole('button', { name: i18n.t('dataFolder.move') }).click()
-      // NOTHING IS SENT BY THE FIRST PRESS: only the warning and its two presses are drawn.
+      // NOTHING IS SENT BY THE MOVE PRESS: only the warning and its two presses are drawn.
       expect(await page.getByText(i18n.t('dataFolder.move.warn')).count()).toBe(1)
       expect(moveBodies).toEqual([])
       expect(pressedAt).toBe(0)
@@ -849,7 +874,7 @@ describe('DF22: the panel waits for the office during a move', () => {
       answer = 'abort'
       await page.waitForFunction(
         (word) => document.querySelector('[data-target="uiSurface/settings.datafolder"]')?.textContent?.includes(word) === true,
-        i18n.t('dataFolder.waiting'),
+        i18n.t('dataFolder.state.stopped'),
         { timeout: 15_000 },
       )
       // ONE FAILED READ, THEN TWO, EACH COUNTED IN ITS OWN WORDS: the word for one is not the word for many.
@@ -863,7 +888,7 @@ describe('DF22: the panel waits for the office during a move', () => {
       expect(await page.locator(`${PANEL} .px-error`).count(), 'a failed read while waiting draws no refusal').toBe(0)
 
       // THE FOURTH READ ANSWERS A STARTED MARK, AND THE PANEL STOPS ASKING.
-      const started = i18n.t('dataFolder.mark.started', { from: THE_OLD_FOLDER, to: THE_NEW_FOLDER })
+      const started = i18n.t('dataFolder.lastMove.started')
       await page.waitForFunction(
         (word) => document.querySelector('[data-target="uiSurface/settings.datafolder"]')?.textContent?.includes(word) === true,
         started,
@@ -883,7 +908,7 @@ describe('DF22: the panel waits for the office during a move', () => {
     }
   }, 180_000)
 
-  it('DF22: a reply from an office with another identity ends the wait, says so, and offers to load the page again', async () => {
+  it('DF22: a reply from an office with another identity ends the wait, reads "Another office answered.", and offers to load the page again', async () => {
     const page = await aPage()
     const readTimes: number[] = []
     let pressedAt = 0
@@ -908,22 +933,24 @@ describe('DF22: the panel waits for the office during a move', () => {
 
       await openThePanel(page)
       await page.locator(`${PANEL} input`).fill(THE_NEW_FOLDER)
+      await checkTheNewFolder(page)
       await page.getByRole('button', { name: i18n.t('dataFolder.move') }).click()
       await page.getByRole('button', { name: i18n.t('dataFolder.move.sure') }).click()
 
-      const otherIdentity = i18n.t('dataFolder.waiting.otherIdentity')
+      const otherIdentity = i18n.t('dataFolder.state.otherIdentity')
       await page.waitForFunction(
         (word) => document.querySelector('[data-target="uiSurface/settings.datafolder"]')?.textContent?.includes(word) === true,
         otherIdentity,
         { timeout: 25_000 },
       )
       const panel = page.locator(PANEL)
-      expect(await panel.innerText()).toContain(i18n.t('dataFolder.waiting.otherIdentity'))
+      expect(await panel.innerText()).toContain(i18n.t('dataFolder.state.otherIdentity'))
       expect(await page.getByRole('button', { name: i18n.t('dataFolder.loadAgain') }).count()).toBe(1)
       const drawn = await panel.innerText()
-      expect(drawn, 'the waiting words are not drawn').not.toContain(i18n.t('dataFolder.waiting'))
+      expect(drawn, 'the waiting words are not drawn').not.toContain(i18n.t('dataFolder.state.stopped'))
       for (const n of [1, 2, 3]) expect(drawn, `the count for ${String(n)} is not drawn`).not.toContain(i18n.t('dataFolder.waiting.asked', { n }))
-      expect(drawn, 'no older reading is drawn').not.toContain(i18n.t('dataFolder.where', { folder: THE_OLD_FOLDER }))
+      expect(drawn, 'no older reading is drawn').not.toContain(i18n.t('dataFolder.row.folder'))
+      expect(drawn, 'no older reading is drawn').not.toContain(THE_OLD_FOLDER)
 
       const atTheWords = readTimes.length
       await new Promise((resolve) => setTimeout(resolve, 5000))
@@ -955,7 +982,7 @@ describe('DF22: the panel waits for the office during a move', () => {
       })
       await openThePanel(page)
       expect(await page.locator(PANEL).innerText()).toContain(i18n.t('dataFolder.unread'))
-      expect(await page.locator(PANEL).innerText()).not.toContain(i18n.t('dataFolder.waiting'))
+      expect(await page.locator(PANEL).innerText()).not.toContain(i18n.t('dataFolder.state.stopped'))
       expect(await page.getByRole('button', { name: i18n.t('error.tryAgain') }).count()).toBe(1)
     } finally {
       await page.close()
@@ -1105,7 +1132,7 @@ describe('DF28: during its own move the page reads the moved office as its new h
         })
         // THE TERMINAL'S STREAM, answered by the moved office with one screen. THE BODY HAS NO CLOSING EVENT. A closing
         // event makes the Terminals page put the view away at once, before xterm draws the screen. A stream that ends
-        // with none leaves the view drawn, and the view then says that the stream was cut off.
+        // with none leaves the view drawn, and the view then says that it stopped.
         await page.route(isTheTerminalsStream, async (route) => {
           if (await answerThePreflight(route)) return
           terminalStreams += 1
@@ -1139,8 +1166,8 @@ describe('DF28: during its own move the page reads the moved office as its new h
       }).toContain(THE_TERMINALS_LINE)
       await expect.poll(() => page.locator('.tm-view .tm-view-broken').innerText().catch(() => ''), {
         timeout: 15_000,
-        message: 'the view did not say that the stream was cut off, so the page did not read the stream to its end',
-      }).toContain(i18n.t('terminals.view.cutOff'))
+        message: 'the view did not say that it stopped, so the page did not read the stream to its end',
+      }).toContain(i18n.t('terminals.view.gone'))
     } finally {
       await forgetTheHomeThisCaseLeft(page)
       await page.close()
@@ -1156,7 +1183,7 @@ describe('DF28: during its own move the page reads the moved office as its new h
         await page.getByText(i18n.t('frameFiles.wrongWorld.head'), { exact: true }).waitFor({ timeout: 25_000 })
         await page.waitForFunction(
           (word) => document.querySelector('[data-target="uiSurface/settings.datafolder"]')?.textContent?.includes(word) === true,
-          i18n.t('dataFolder.waiting.otherIdentity'),
+          i18n.t('dataFolder.state.otherIdentity'),
           { timeout: 25_000 },
         )
         expect(await page.locator(PANEL).getByRole('button', { name: i18n.t('dataFolder.confirm'), exact: true }).count(), how).toBe(0)
@@ -1177,7 +1204,7 @@ describe('DF28: during its own move the page reads the moved office as its new h
         if (await answerThePreflight(route)) return
         if (route.request().method() !== 'GET') return route.fallback()
         const asked = new URL(route.request().url()).searchParams.get('to')
-        const reading = aReading(asked === null ? {} : { wouldRefuse: { to: asked, why: null } })
+        const reading = aReading(asked === null ? {} : { wouldRefuse: { to: asked, why: null, code: null, values: null } })
         if (!movedOn) return answerWithJson(route, 200, reading)
         return route.fulfill({ status: 200, headers: theMovedOfficeHeaders(answerHeaders, route.request(), 'the moved office'), body: JSON.stringify(reading) })
       })
@@ -1210,7 +1237,7 @@ describe('DF28: during its own move the page reads the moved office as its new h
       await page.getByText(banner, { exact: true }).waitFor({ timeout: 25_000 })
       await page.waitForFunction(
         (word) => document.querySelector('[data-target="uiSurface/settings.datafolder"]')?.textContent?.includes(word) === true,
-        i18n.t('dataFolder.waiting.otherIdentity'),
+        i18n.t('dataFolder.state.otherIdentity'),
         { timeout: 25_000 },
       )
 
@@ -1265,7 +1292,7 @@ describe('DF28: during its own move the page reads the moved office as its new h
       await page.getByText(banner, { exact: true }).waitFor({ timeout: 25_000 })
       await page.waitForFunction(
         (word) => document.querySelector('[data-target="uiSurface/settings.datafolder"]')?.textContent?.includes(word) === true,
-        i18n.t('dataFolder.waiting.otherIdentity'),
+        i18n.t('dataFolder.state.otherIdentity'),
         { timeout: 25_000 },
       )
       // A MARKER THAT ONLY A RELOAD TAKES AWAY.
@@ -1294,7 +1321,7 @@ describe('DF28: during its own move the page reads the moved office as its new h
       await expect.poll(() => page.locator(PANEL).innerText(), {
         timeout: 15_000,
         message: 'the panel still says an office answered under another identity after the page took the new home',
-      }).not.toContain(i18n.t('dataFolder.waiting.otherIdentity'))
+      }).not.toContain(i18n.t('dataFolder.state.otherIdentity'))
     } finally {
       await forgetTheHomeThisCaseLeft(page)
       await page.close()
@@ -1305,14 +1332,14 @@ describe('DF28: during its own move the page reads the moved office as its new h
     const page = await aPage()
     try {
       await theMovedOfficeWithoutAMoveOfThisPage(page)
-      const press = page.locator(PANEL).getByRole('button', { name: i18n.t('dataFolder.move'), exact: true })
+      const press = page.locator(PANEL).getByRole('button', { name: i18n.t('dataFolder.check'), exact: true })
       await press.scrollIntoViewIfNeeded()
       const hit = await press.evaluate((button) => {
         const box = button.getBoundingClientRect()
         const top = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2)
         return { reached: top !== null && (top === button || button.contains(top)), over: top?.className ?? 'nothing' }
       })
-      expect(hit.reached, 'a press at the move press lands on the page').toBe(false)
+      expect(hit.reached, 'a press at the check press lands on the page').toBe(false)
       expect(hit.over, 'the sheet is not what a press lands on').toMatch(/^px-ww/)
       expect(await page.locator('.px-ww-block').count(), 'no sheet is drawn').toBe(1)
     } finally {
@@ -1321,20 +1348,23 @@ describe('DF28: during its own move the page reads the moved office as its new h
     }
   }, 120_000)
 
-  it('DF28: a move pressed while the banner shuts the page reaches nothing', async () => {
+  it('DF28: a check pressed while the banner shuts the page reaches nothing, and no move press comes after it', async () => {
     const page = await aPage()
     const banner = i18n.t('frameFiles.wrongWorld.head')
     try {
       const seen = await theMovedOfficeWithoutAMoveOfThisPage(page)
-      const press = page.locator(PANEL).getByRole('button', { name: i18n.t('dataFolder.move'), exact: true })
+      const press = page.locator(PANEL).getByRole('button', { name: i18n.t('dataFolder.check'), exact: true })
       await press.scrollIntoViewIfNeeded()
       const box = await press.boundingBox()
-      if (box === null) throw new Error('the move press has no box to press')
+      if (box === null) throw new Error('the check press has no box to press')
       await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2)
       await new Promise((resolve) => setTimeout(resolve, 500))
-      // THE FIRST MOVE PRESS OPENS THE WARNING, AND THE SURE PRESS UNDER IT IS THE WRITE. Neither is drawn by a press
-      // through the sheet, so the write is held at its first step.
-      expect(await page.getByText(i18n.t('dataFolder.move.warn')).count(), 'the move press under the banner opened its warning').toBe(0)
+      // THE CHECK IS THE FIRST STEP OF A MOVE: the move press comes only after a check that says a move would go ahead,
+      // the warning only after the move press, and the sure press under the warning is the write. The check under the
+      // banner was answered by another office, so none of them is drawn, and the write is held at its first step.
+      expect(await page.getByText(i18n.t('dataFolder.check.thisFolderIsFine'), { exact: true }).count(), 'a check under the banner said the move would go ahead').toBe(0)
+      expect(await page.locator(PANEL).getByRole('button', { name: i18n.t('dataFolder.move'), exact: true }).count(), 'a move press came after a check under the banner').toBe(0)
+      expect(await page.getByText(i18n.t('dataFolder.move.warn')).count(), 'the warning was drawn under the banner').toBe(0)
       expect(await page.locator(PANEL).getByRole('button', { name: i18n.t('dataFolder.move.sure'), exact: true }).count()).toBe(0)
       expect(seen.movePresses(), 'a write pressed through the banner reached the office').toBe(0)
       expect(await page.getByText(banner, { exact: true }).count(), 'the banner went without the world being right').toBe(1)
@@ -1358,7 +1388,7 @@ describe('DF22: a press waits for its answer, and says so', () => {
       await page.route(READ, async (route) => {
         if (await answerThePreflight(route)) return
         const asked = new URL(route.request().url()).searchParams.get('to')
-        if (asked !== null) return holdThen(() => answerWithJson(route, 200, aReading({ wouldRefuse: { to: asked, why: null } })))
+        if (asked !== null) return holdThen(() => answerWithJson(route, 200, aReading({ wouldRefuse: { to: asked, why: null, code: null, values: null } })))
         return answerWithJson(route, 200, aReading())
       })
       await page.route(MOVE, async (route) => {
@@ -1375,16 +1405,17 @@ describe('DF22: a press waits for its answer, and says so', () => {
       await press(i18n.t('dataFolder.check')).click({ force: true })
       expect(await why(i18n.t('dataFolder.check')).innerText()).toBe(i18n.t('dataFolder.toHint'))
 
-      // A CHECK IS IN FLIGHT: both presses say the office has not answered, and not what to write.
+      // A CHECK IS IN FLIGHT: the check says the office has not answered, and not what to write. It is still the one
+      // press, because the step it is is not done.
       await page.locator(`${PANEL} input`).fill(THE_NEW_FOLDER)
       await press(i18n.t('dataFolder.check')).click()
       await expect.poll(() => held.length, { timeout: 10_000 }).toBe(1)
       await press(i18n.t('dataFolder.check')).click({ force: true })
       expect(await why(i18n.t('dataFolder.check')).innerText()).toBe(i18n.t('dataFolder.busy'))
-      await press(i18n.t('dataFolder.move')).click({ force: true })
-      expect(await why(i18n.t('dataFolder.move')).innerText()).toBe(i18n.t('dataFolder.busy'))
+      expect(await press(i18n.t('dataFolder.move')).count(), 'the move press is drawn before the check has answered').toBe(0)
       held.shift()?.()
-      await page.getByText(i18n.t('dataFolder.check.fine', { to: THE_NEW_FOLDER })).waitFor({ timeout: 15_000 })
+      await page.getByText(i18n.t('dataFolder.check.thisFolderIsFine'), { exact: true }).waitFor({ timeout: 15_000 })
+      expect(await press(i18n.t('dataFolder.check')).count(), 'the check press is still drawn after its step is done').toBe(0)
 
       // A MOVE IS IN FLIGHT: the sure press and the cancel say the office has not answered, and not the warning.
       await press(i18n.t('dataFolder.move')).click()
@@ -1450,7 +1481,14 @@ describe('DF22: the panel photographed', () => {
                 const asked = url.searchParams.get('to')
                 return answerWithJson(route, 200, asked === null
                   ? aReading()
-                  : aReading({ wouldRefuse: { to: asked, why: 'The test refuses this place because it holds files.' } }))
+                  : aReading({
+                    wouldRefuse: {
+                      to: asked,
+                      why: i18n.sayInEnglish('server.dataFolderPlaceNotEmpty', { to: asked }),
+                      code: 'dataFolderPlaceNotEmpty',
+                      values: { to: asked },
+                    },
+                  }))
               })
             } else if (state === 'waiting') {
               await page.route(READ, async (route) => {
@@ -1468,7 +1506,7 @@ describe('DF22: the panel photographed', () => {
                 return route.fulfill({ status: 200, headers: otherWorld, body: JSON.stringify(aStartedReading()) })
               })
             } else if (state === 'throughTheDoor') {
-              // A SECRETARY WHOSE GRANT MAY PRESS: the panel draws no press and says to press through the door.
+              // A SECRETARY WHOSE GRANT MAY PRESS: the panel draws where the data is, and no press.
               await page.route(READ, async (route) => {
                 if (await answerThePreflight(route)) return
                 return answerWithJson(route, 200, aReading({ theCallerIsThePerson: false, mayMove: true }))
@@ -1498,32 +1536,32 @@ describe('DF22: the panel photographed', () => {
               await page.getByRole('button', { name: i18n.t('dataFolder.check') }).click()
               await page.waitForFunction(
                 (word) => document.querySelector('[data-target="uiSurface/settings.datafolder"]')?.textContent?.includes(word) === true,
-                i18n.t('dataFolder.check.refused', { to: THE_NEW_FOLDER }),
+                i18n.t('dataFolder.check.thisFolderIsRefused'),
                 { timeout: 15_000 },
               )
             } else if (state === 'waiting') {
               await page.waitForFunction(
                 (word) => document.querySelector('[data-target="uiSurface/settings.datafolder"]')?.textContent?.includes(word) === true,
-                i18n.t('dataFolder.waiting'),
+                i18n.t('dataFolder.state.stopped'),
                 { timeout: 15_000 },
               )
             } else if (state === 'throughTheDoor') {
               await page.waitForFunction(
                 (word) => document.querySelector('[data-target="uiSurface/settings.datafolder"]')?.textContent?.includes(word) === true,
-                i18n.t('dataFolder.throughTheDoor'),
+                THE_OLD_FOLDER,
                 { timeout: 15_000 },
               )
             } else if (state === 'otherIdentity') {
               await page.waitForFunction(
                 (word) => document.querySelector('[data-target="uiSurface/settings.datafolder"]')?.textContent?.includes(word) === true,
-                i18n.t('dataFolder.waiting.otherIdentity'),
+                i18n.t('dataFolder.state.otherIdentity'),
                 { timeout: 25_000 },
               )
             } else if (state === 'movedBeforeHeader') {
               await page.getByText(i18n.t('frameFiles.wrongWorld.head'), { exact: true }).waitFor({ timeout: 25_000 })
               await page.waitForFunction(
                 (word) => document.querySelector('[data-target="uiSurface/settings.datafolder"]')?.textContent?.includes(word) === true,
-                i18n.t('dataFolder.waiting.otherIdentity'),
+                i18n.t('dataFolder.state.otherIdentity'),
                 { timeout: 25_000 },
               )
             } else {

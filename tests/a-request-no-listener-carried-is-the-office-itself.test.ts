@@ -24,7 +24,13 @@
  */
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { buildTheFirstOfficeInAHook, apiApp, freshDb, type TestDb } from './helpers.ts'
+import {
+  buildTheFirstOfficeInAHook,
+  apiApp,
+  freshDb,
+  type TestDb,
+  governsTheWholeProject,
+} from './helpers.ts'
 import { THE_TEST_OFFICES_OWNER } from './a-page-of-a-test-office.ts'
 
 // The first office of this process is built in a hook, so each case below keeps its 5 s for what it tests.
@@ -74,7 +80,9 @@ describe('a request no listener carried', () => {
       payload: {
         kind: 'decision',
         title: 'A decision from a caller on no socket at all',
-        data: { replaces: [], because: 'no listener saw this, so there is nothing to place' },
+        data: {
+          ...governsTheWholeProject(),
+          replaces: [], because: 'no listener saw this, so there is nothing to place' },
       },
     })
     expect(res.statusCode, res.body).toBe(201)
@@ -91,7 +99,8 @@ describe('a request no listener carried', () => {
       payload: {
         kind: 'decision',
         title: 'A decision with a made-up key on no socket',
-        data: { replaces: [], because: 'an in-process caller is the office itself' },
+        data: {
+          ...governsTheWholeProject(), replaces: [], because: 'an in-process caller is the office itself' },
       },
     })
     expect(res.statusCode, res.body).toBe(201)

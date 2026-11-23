@@ -149,11 +149,11 @@ it('1. asks for the cause first, picks it as a record, and saves a changed stage
   // The cause is the one thing missing, and Save waits for it.
   expect(await bar(page).textContent()).toContain(en.t('flowEditor.missing', { n: 1 }))
   expect(await bar(page).textContent()).toContain('Pick the record that caused this change.')
-  expect(await page.getByRole('button', { name: 'Save the flow' }).isDisabled()).toBe(true)
+  expect(await page.getByRole('button', { name: 'Save the office flow' }).isDisabled()).toBe(true)
   await pick(page, page.locator('.fle-cause'), 'kiln cracked', 'Test pottery cause: the kiln cracked a pot')
   expect(await page.locator('.fle-cause .rpk-named').textContent()).toContain('Test pottery cause: the kiln cracked a pot')
   expect(await bar(page).textContent()).toContain('Ready to save.')
-  await page.getByRole('button', { name: 'Save the flow' }).click()
+  await page.getByRole('button', { name: 'Save the office flow' }).click()
   await page.waitForFunction((id) => location.hash === `#/flows/${id}`, flow, { timeout: 15_000 })
   const stages = await stagesOf(flow)
   expect(stages.map((stage) => stage.does)).toEqual(['Test stage 1.', 'Test stage 2, glazed twice.', 'Test stage 3.'])
@@ -180,7 +180,7 @@ it('2. marks a new stage in place, and the save bar names each missing thing by 
   await added.getByLabel('Why it is here').fill('Test: a hot pot cracks.')
   await pick(page, added, 'thrown', 'Test pottery source: how a pot is thrown')
   expect(await added.locator('.fle-field[data-lacking="yes"]').count()).toBe(0)
-  await page.getByRole('button', { name: 'Save the flow' }).click()
+  await page.getByRole('button', { name: 'Save the office flow' }).click()
   await page.waitForFunction((id) => location.hash === `#/flows/${id}`, flow, { timeout: 15_000 })
   expect((await stagesOf(flow)).map((stage) => stage.does)).toEqual(['Test stage 1.', 'Test stage: cool the kiln.', 'Test stage 2.', 'Test stage 3.'])
 }, 120_000)
@@ -210,7 +210,7 @@ it('3. shows why a stage is there before it goes, undoes with "Keep it after all
   await third.getByRole('button', { name: 'Remove' }).click()
   await third.getByLabel('Why does it go?').fill('Test: the pots are carried, not packed.')
   await pick(page, page.locator('.fle-cause'), 'kiln cracked', 'Test pottery cause: the kiln cracked a pot')
-  await page.getByRole('button', { name: 'Save the flow' }).click()
+  await page.getByRole('button', { name: 'Save the office flow' }).click()
   await page.waitForFunction((id) => location.hash === `#/flows/${id}`, flow, { timeout: 15_000 })
   expect((await stagesOf(flow)).map((stage) => stage.does)).toEqual(['Test stage 1.', 'Test stage 2.'])
   expect((await changesOf(flow)).at(-1)?.['why']).toBe('Test: the pots are carried, not packed.')
@@ -233,7 +233,7 @@ it('4. places a refusal the page could not see beside its stage, by its code, an
   } finally {
     db.close()
   }
-  await page.getByRole('button', { name: 'Save the flow' }).click()
+  await page.getByRole('button', { name: 'Save the office flow' }).click()
   await first.locator('.fle-refusal').waitFor({ timeout: 15_000 })
   expect(await first.locator('.fle-refusal').textContent()).toContain('A source or a cause names a record that is not there.')
   expect(await bar(page).textContent()).toContain(en.t('flowEditor.refused'))
@@ -246,7 +246,7 @@ it('4. places a refusal the page could not see beside its stage, by its code, an
 it('5. files a new flow from the same editor, empty, without asking for a cause', async () => {
   const page = app.page
   await open(page, '/flows', '.flw-title')
-  await page.getByRole('link', { name: '+ New flow' }).click()
+  await page.getByRole('link', { name: '+ New office flow' }).click()
   await page.waitForSelector('.fle-facts')
   expect(page.url()).toContain('#/flows/new')
   expect(await page.locator('.fle-cause').count()).toBe(0)
@@ -263,7 +263,7 @@ it('5. files a new flow from the same editor, empty, without asking for a cause'
   expect(await bar(page).locator('.fle-bar-list li').allTextContents()).toEqual(['Stage 1: write why it is here.', 'Stage 1: pick at least one source.'])
   await stage.getByLabel('Why it is here').fill('Test: a pot starts on the wheel.')
   await pick(page, stage, 'thrown', 'Test pottery source: how a pot is thrown')
-  await page.getByRole('button', { name: 'Save the flow' }).click()
+  await page.getByRole('button', { name: 'Save the office flow' }).click()
   await page.waitForFunction(() => /^#\/flows\/[A-Za-z0-9_-]+$/.test(location.hash) && !location.hash.endsWith('/new'), null, { timeout: 15_000 })
   await page.waitForSelector('.flw-stage')
   expect(await page.locator('.flw-title').textContent()).toBe('Test: a new pottery flow')
@@ -283,7 +283,7 @@ it('6. shows an agent the office has not registered no Edit, and the editor says
     expect(await page.getByRole('link', { name: 'Edit', exact: true }).count()).toBe(0)
     await open(page, `/flows/${flow}/edit`, '.fle-refused')
     expect(await page.locator('.fle-refused').textContent()).toContain('test-nobody-registered')
-    expect(await page.getByRole('button', { name: 'Save the flow' }).count()).toBe(0)
+    expect(await page.getByRole('button', { name: 'Save the office flow' }).count()).toBe(0)
   } finally {
     await page.evaluate(() => localStorage.removeItem('mole-office.actor'))
   }
@@ -317,7 +317,7 @@ it('7. shows Edit and the editor to every agent the doors accept: a retired agen
       await page.getByRole('link', { name: 'Edit', exact: true }).waitFor({ timeout: 15_000 })
       await open(page, `/flows/${flow}/edit`, '.fle-stage')
       expect(await page.locator('.fle-refused').count(), id).toBe(0)
-      expect(await page.getByRole('button', { name: 'Save the flow' }).count(), id).toBe(1)
+      expect(await page.getByRole('button', { name: 'Save the office flow' }).count(), id).toBe(1)
     } finally {
       await page.evaluate(() => localStorage.removeItem('mole-office.actor'))
     }

@@ -1,5 +1,17 @@
 // Copyright © 2026 Zhengyang Shen
 // Licensed under the MIT License. See LICENSE.
+// Criterion change (wave 13s round 281, decision srwXywF1oYIs): case 3 holds that each roster reads whole only the
+// runs that could serve an active agent: the whole roster reads every run but the retired agent's, and Home's roster
+// the open ones of those. Before, case 3 held the whole roster to a read of every run of the project, and Home's
+// roster to a read of every open run.
+// Criterion change (wave 13s round 281, decisions OQR0WDVq0FkP and M1ngfatGQcwn, H9): case 5 is new. Both rosters
+// draw only the agent whose state is active, and count four agents, one active and three retired, when the other
+// three are retired, have no state, or have the state "Active". Before, no case here held an agent with no state or
+// with the state "Active", or held the counts.
+// Criterion change (wave 13s round 281, decisions OQR0WDVq0FkP and M1ngfatGQcwn, F2): case 4 also holds that each
+// row of Home's roster names the run serving its agent, the whole roster's doingFrom for the same agent.
+// Home reads the serving run from its roster's rows, so the run a bar counts as stuck is read there.
+// Before, case 4 held only Home's doing lines to the whole roster's.
 /**
  * THE ROSTER ASKS THE CALLS ONCE FOR EVERY OPEN RUN, READS THE PROJECT'S RUNS WHOLE ONLY IN THE LISTS OF THEM IT DRAWS
  * FROM, AND DRAWS EVERY ROW AS IT DID.
@@ -17,11 +29,14 @@
  * WHAT IS HELD HERE:
  *   1. The whole roster and Home's roster each ask the calls in one statement, for more open runs than two pieces hold.
  *   2. That one statement gives each run, and every run together, what `newestRequestFor` gives them.
- *   3. The whole roster reads every run's record once, for its last progress and the open runs together, and the
- *      records of the runs that serve an agent besides. Home's roster reads them only in the list of the open runs.
+ *   3. The whole roster reads the records of the runs that could serve an active agent once, for its last progress and
+ *      the open runs together, and the records of the runs that serve an agent besides. Home's roster reads them only
+ *      in the list of the open ones.
  *   4. Each row's doing line, the run it comes from, the run serving it and its last progress are what they are worked
  *      out to be here from the stored rows, as the roster worked them out before this round, and Home's doing lines are
- *      the whole roster's.
+ *      the whole roster's. So is the run serving each agent that Home's roster names.
+ *   5. Both rosters draw only an agent whose state is `active`, and count every live agent record, the others as
+ *      retired: an agent with no state and one whose state is `Active` are not active.
  *
  * Every row is made up. Most runs are copies of one run the store opened, so each carries what the store writes.
  */
@@ -121,7 +136,7 @@ function aChangeBy(runId: string, at: string): void {
  * newest open run says what it is doing in other words than the rest; a quiet agent with two open runs and a closed
  * one; an idle agent with no run; and a retired agent with runs the roster does not draw.
  */
-function aBusyOffice(): { busy: string; quiet: string; runs: string[] } {
+function aBusyOffice(): { busy: string; quiet: string; runs: string[]; retiredRuns: string[] } {
   const busy = anAgent('busy')
   const first = aRunFor(busy, 'the busy run', 'made up: the line every copy carries')
   const copies = copiesOf(first, BUSY_RUNS - 1)
@@ -146,7 +161,7 @@ function aBusyOffice(): { busy: string; quiet: string; runs: string[] } {
   const retiredRuns = [aRunFor(retired, 'a retired agent run'), aRunFor(retired, 'another retired agent run')]
   for (const run of retiredRuns) aRequestFrom(run, 2)
   aRequestFrom(null, 0)
-  return { busy, quiet, runs: [first, ...copies, quietOne, quietTwo, quietClosed, ...retiredRuns] }
+  return { busy, quiet, runs: [first, ...copies, quietOne, quietTwo, quietClosed, ...retiredRuns], retiredRuns }
 }
 
 /** Every statement run while `run` runs, with the rows it handed back. */
@@ -205,18 +220,29 @@ describe('the roster', () => {
     expect(arrivals.newestRequestAmong(runs, read)).toBe(arrivals.newestRequestFor(runs))
   })
 
-  it("3. reads every run's record whole only in the lists it draws from, and the whole roster the serving runs' besides", () => {
-    const { runs } = aBusyOffice()
-    const open = runs.length - 1
+  it("3. reads the runs that could serve an active agent whole only in the lists it draws from, and the whole roster the serving runs' besides", () => {
+    const { runs, retiredRuns } = aBusyOffice()
+    // THE RUNS THAT COULD SERVE AN ACTIVE AGENT are every run but the retired agent's. Every one of them is open but the
+    // quiet agent's closed run.
+    const couldServe = runs.length - retiredRuns.length
+    const openCouldServe = runs.length - 1 - retiredRuns.length
     const whole = theStatementsOf(() => working.whoIsWorking(WORKSPACE))
     const home = theStatementsOf(() => working.theRosterHomeDraws(WORKSPACE))
-    // THE LISTS: every run once, which the whole roster reads its last progress and the open runs from together. Home
-    // draws no closed run, so its list is the open ones and stays a read of its own.
+    // THE LISTS: the runs that could serve an active agent once, which the whole roster reads its last progress and the
+    // open runs from together. Home draws no closed run, so its list is the open ones of those and stays a read of its
+    // own. A read of every run of the project, or of every open one, is at least as long as the shorter list, so it is
+    // counted here and fails.
     const rowsOf = (ran: { rows: number }[]): number[] => ran.map((one) => one.rows).sort((a, b) => a - b)
-    expect(rowsOf(theWholeRuns(whole, open)), 'the whole roster: the reads of every run, whole').toEqual([runs.length])
-    expect(rowsOf(theWholeRuns(home, open)), "Home's roster: the reads of every run, whole").toEqual([open])
+    expect(
+      rowsOf(theWholeRuns(whole, openCouldServe)),
+      'the whole roster: the reads of the runs that could serve an active agent, whole',
+    ).toEqual([couldServe])
+    expect(
+      rowsOf(theWholeRuns(home, openCouldServe)),
+      "Home's roster: the reads of the open runs that could serve an active agent, whole",
+    ).toEqual([openCouldServe])
     // THE SERVING RUNS: one for each of the two agents a run serves.
-    const serving = whole.filter((one) => /from\s+"?records"?/i.test(one.sql) && /"data"/.test(one.sql) && one.rows > 0 && one.rows < open)
+    const serving = whole.filter((one) => /from\s+"?records"?/i.test(one.sql) && /"data"/.test(one.sql) && one.rows > 0 && one.rows < openCouldServe)
     expect(serving.map((one) => one.rows).filter((rows) => rows === 2), "the read of the serving runs' records").toHaveLength(1)
   })
 
@@ -252,5 +278,23 @@ describe('the roster', () => {
     expect(byId.get(quiet)?.lastProgress.at, 'a closed run counts for the last progress').toBe('2026-10-30 18:00:00')
     const home = working.theDoingLinesHomeDraws(WORKSPACE, roster.rows.map((row) => row.agentId))
     expect(home.rows, "Home's doing lines").toEqual(roster.rows.map((row) => ({ agentId: row.agentId, doing: row.doing, doingFrom: row.doingFrom })))
+    const homeRoster = working.theRosterHomeDraws(WORKSPACE)
+    const servedBy = (rows: { agentId: string; doingFrom: string | null }[]) => rows.map((row) => ({ agentId: row.agentId, doingFrom: row.doingFrom }))
+    expect(servedBy(homeRoster.rows), "the run serving each agent of Home's roster").toEqual(servedBy(roster.rows))
+  })
+
+  it('5. draws only the agents whose state is active, and counts every other agent as retired, whole and as Home draws it', () => {
+    const active = anAgent('active')
+    anAgent('retired', 'retired')
+    const noState = anAgent('no-state')
+    const capital = anAgent('capital')
+    // THE KIND TAKES NEITHER OF THESE, so they are written round it, straight into the stored data.
+    t.client.sqlite.prepare("UPDATE records SET data = json_remove(data, '$.state') WHERE id = ?").run(noState)
+    t.client.sqlite.prepare("UPDATE records SET data = json_set(data, '$.state', 'Active') WHERE id = ?").run(capital)
+    const rosters = [['the whole roster', working.whoIsWorking(WORKSPACE)], ["Home's roster", working.theRosterHomeDraws(WORKSPACE)]] as const
+    for (const [name, roster] of rosters) {
+      expect(roster.rows.map((row) => row.agentId), `the agents ${name} draws`).toEqual([active])
+      expect(roster.counts, `the agents ${name} counts`).toMatchObject({ agents: 4, active: 1, retired: 3 })
+    }
   })
 })

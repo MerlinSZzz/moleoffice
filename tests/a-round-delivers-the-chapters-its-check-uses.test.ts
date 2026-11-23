@@ -18,7 +18,7 @@ import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { join, resolve } from 'node:path'
 import { runInNewContext } from 'node:vm'
-import { madeUpRound } from './round-chapters-fixture.ts'
+import { MADE_UP_CHAPTER_2, madeUpRound, theMadeUpOfficesAnswer, THE_MADE_UP_OFFICE_WITH_CHAPTER_2 } from './round-chapters-fixture.ts'
 import { FULL_PERMISSIONS } from '../src/config/run-permissions.mjs'
 import { noSuchEndpoint } from '../src/server/api/kinds.ts'
 import { THE_PROGRAM_A_RUNTIME_RUNS } from '../src/config/launcher-selection.mjs'
@@ -45,7 +45,7 @@ function actual(name: string, globals: Record<string, unknown>) {
 
 async function deliveryModule(): Promise<Record<string, any>> {
   // Before implementation the existing launcher still runs: the red is missing delivery, never a missing import.
-  return existsSync(moduleFile) ? { ...await import(moduleFile), ...await import('../src/shared/round-chapters/manifest.ts'), ...existsSync(backlogFile) ? await import(backlogFile) : {}, ...existsSync(standingFile) ? await import(standingFile) : {}, ...existsSync(delegationsFile) ? await import(delegationsFile) : {} } : {}
+  return existsSync(moduleFile) ? { ...await import(moduleFile), ...await import('../src/shared/round-chapters/manifest.ts'), ...existsSync(backlogFile) ? await import(backlogFile) : {}, ...existsSync(standingFile) ? await import(standingFile) : {}, ...existsSync(delegationsFile) ? await import(delegationsFile) : {}, ...await import('../src/shared/round-start-rules.ts') } : {}
 }
 
 describe('a round files and delivers one saved chapter selection', () => {
@@ -82,10 +82,13 @@ describe('a round files and delivers one saved chapter selection', () => {
       theClaudeCodeCommand: ({ brief }: any) => ['claude', brief],
       anAgentsRunFiledHere: async (_sb: any, _who: any, args: any) => { filedArgs = args; events.push('filed'); return { id: 'filed', words: ['--filed', 'filed', '--brief', args.brief] } },
       api: 'synthetic', theCallerNamed: () => ({}),
-      // WITH NO STAND-IN NO OFFICE ANSWERS, as the real ask says once it has asked again long enough.
-      askTheOfficeWhileItRestarts: (_api: string, path: string, options: any, waiting: any) => older === null
-        ? Promise.resolve({ status: null, why: 'made-up: no office answers this round' })
-        : askTheOfficeWhileItRestarts(older, path, options, waiting),
+      // THE TWO RULES DOORS ANSWER AS A MADE-UP OFFICE THAT HOLDS ONLY A MADE-UP CHAPTER 2, the chapter the round's
+      // policy selects. WITH NO STAND-IN NO OTHER DOOR ANSWERS, as the real ask says once it has asked again long enough.
+      askTheOfficeWhileItRestarts: (_api: string, path: string, options: any, waiting: any) => theMadeUpOfficesAnswer(path, THE_MADE_UP_OFFICE_WITH_CHAPTER_2) !== null
+        ? Promise.resolve({ status: 200, body: theMadeUpOfficesAnswer(path, THE_MADE_UP_OFFICE_WITH_CHAPTER_2) })
+        : older === null
+          ? Promise.resolve({ status: null, why: 'made-up: no office answers this round' })
+          : askTheOfficeWhileItRestarts(older, path, options, waiting),
       // The round asks for the start values before it delivers the chapters. These answer as the real ones do when the office applies none.
       THE_PROGRAM_A_RUNTIME_RUNS, theStartValues: async (command: string[]) => ({ command, env: {}, start: null }), theClaudeCodeEnvironment: () => ({}), theSecretsFor: () => ({ lines: [], says: '', file: null, quiet: true, warning: null }),
       askTheOffice: async (_api: any, path: string, options: any = {}) => {
@@ -111,10 +114,14 @@ describe('a round files and delivers one saved chapter selection', () => {
     expect(filedArgs.brief.startsWith(join(f.dir, 'out'))).toBe(true)
     const delivered = readFileSync(filedArgs.brief, 'utf8')
     expect(delivered).toContain(readFileSync(f.brief, 'utf8'))
-    expect(delivered).toContain('PORTS'); expect(delivered).toContain('CHOSEN'); expect(delivered).toContain('GARDEN')
+    // CHAPTER 2 IS THE OFFICE'S, and the worktree's CODE.md, which holds PORTS under its chapter 2, is not given. The round
+    // is given the chapters at outline: each chapter's heading and its first line that is not empty, which in the CODE.md
+    // text made from the office is the chapter's title in bold. The rule's words are under "### The rules", one read away.
+    expect(delivered).toContain(`**${MADE_UP_CHAPTER_2.title}**`); expect(delivered).not.toContain(MADE_UP_CHAPTER_2.rules[0]!.text)
+    expect(delivered).toContain('CHOSEN'); expect(delivered).toContain('GARDEN')
     expect(delivered).toContain(module.roundChaptersOutline(manifest))
-    for (const omitted of ['CHILD', 'TESTS', 'OMITTED', 'OTHER', 'KITCHEN']) expect(delivered).not.toContain(omitted)
-    expect(said.join('\n')).toContain('Chapter 2 — Made-up ports')
+    for (const omitted of ['PORTS', 'CHILD', 'TESTS', 'OMITTED', 'OTHER', 'KITCHEN']) expect(delivered).not.toContain(omitted)
+    expect(said.join('\n')).toContain(`Chapter 2 — ${MADE_UP_CHAPTER_2.label}`)
     expect(said.join('\n')).toContain('Common / Local / Chosen')
     expect(said.join('\n')).not.toContain('Omitted')
     if (runtime === 'codex' || runtime === 'opencode') {
@@ -134,10 +141,12 @@ describe('a round files and delivers one saved chapter selection', () => {
   }
 
   it.each([['codex', true], ['opencode', true], ['claude-code', true], ['claude-code', false], ['dsh', false]])('%s, direct stdin %s', async (runtime, direct) => {
-    // A BRIEF THAT NAMES NO LINE IS DELIVERED BYTE FOR BYTE AS BEFORE the backlog: the brief, then the rules.
+    // A BRIEF THAT NAMES NO LINE IS DELIVERED BYTE FOR BYTE AS BEFORE the backlog: the brief, then the person's
+    // regulations as the office answered them, here none, then the rules.
     const { manifest, delivered, module } = await aRoundStarts(String(runtime), Boolean(direct))
     expect(manifest.backlog).toBeUndefined()
-    expect(delivered).toBe(manifest.brief.text + '\n\n---\n\n' + module.WHERE_A_NAME_IS_DEFINED + '\n\n' + module.roundChaptersGivenText(manifest))
+    expect(manifest.regulations.text).toBe(module.regulationsText(manifest.regulations.at, []))
+    expect(delivered).toBe(manifest.brief.text + '\n\n---\n\n' + manifest.regulations.text + '\n\n---\n\n' + module.WHERE_A_NAME_IS_DEFINED + '\n\n' + module.roundChaptersGivenText(manifest))
   })
 
   it('a round whose brief names a line starts against an office with no backlog door, and its brief says so in one sentence that points to the file', async () => {
@@ -154,7 +163,7 @@ describe('a round files and delivers one saved chapter selection', () => {
       expect(heard).toEqual(['/api/backlog?line=made-up-line', '/api/participants/agent/synthetic'])
       const sentence = 'This office has no backlog door (it answered GET /api/backlog with 404), so this round reads its items in briefs/REQUIREMENTS.md as before.'
       expect(manifest.backlog).toMatchObject({ line: 'made-up-line', named: ['2'], from: 'the file', items: [], text: sentence })
-      expect(delivered.startsWith(manifest.brief.text + '\n\n---\n\n' + sentence + '\n\n---\n\n')).toBe(true)
+      expect(delivered.startsWith(manifest.brief.text + '\n\n---\n\n' + manifest.regulations.text + '\n\n---\n\n' + sentence + '\n\n---\n\n')).toBe(true)
       expect(said.join('\n')).toContain('Backlog of line made-up-line: none from the office; this round reads briefs/REQUIREMENTS.md.')
     } finally {
       await new Promise((done) => standIn.close(done))

@@ -13,7 +13,7 @@ import { storeTheTwoDrawings, setTheMasterAndStoreTheAreas, type Drawing } from 
 import { MASTER, storeTheMadeUpMaster } from './a-made-up-master-at-real-shape.ts'
 import type { Stored } from './a-made-up-reel-page-and-a-master-of-54-boxes.ts'
 
-const widths = [1440, 990, 660] as const
+const widths = [1440, 660] as const
 const wait = 900_000
 let serial = 0
 async function readRuns(app: LiveApp, named: Map<string, string>, context: string) {

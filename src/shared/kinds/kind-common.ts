@@ -46,8 +46,9 @@ export interface FieldSpec {
    *
    * The forms are: `string`, `number`, `boolean`, `date`; a union of quoted values written
    * `'todo' | 'doing'`; a named shape from SHAPE_SPECS such as `ProgressItem`; any of those with
-   * `[]` after it; and `Record<string, X>` for an open bag of X. `null` is a form only as one side
-   * of a choice, `string | null`, for a field where a stored null is an answer of its own.
+   * `[]` after it, with a union of quoted values in brackets, `('todo' | 'doing')[]`; and
+   * `Record<string, X>` for an open bag of X. `null` is a form only as one side of a choice,
+   * `string | null`, for a field where a stored null is an answer of its own.
    */
   type: string
   /**

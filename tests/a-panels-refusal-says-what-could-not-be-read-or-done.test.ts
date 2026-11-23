@@ -30,7 +30,7 @@
  * the person. It holds no person's key, so every refusal below is the door answering an agent
  * that is not the person, and nothing is stubbed or routed around.
  *
- * The entry panel is only drawn in Developer mode, so it is opened with `mode=inspect`. The
+ * The entry panel is opened with `mode=inspect`, as it was when only Developer mode drew it. The
  * test file's own home is supplied by the runner's setup file; this file does not move HOME.
  * After the entry press it compares what is under the home's `.claude` before and after, and
  * requires the refused press to have written nothing there.
@@ -47,6 +47,7 @@ import { existsSync, readdirSync, statSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { DEVICE_HALF_COOKIE, KEY_COOKIE } from '../src/config/key-header.mjs'
 import type { Page } from 'playwright'
 
 import { THE_PERSON } from '../src/shared/person.ts'
@@ -130,7 +131,7 @@ beforeAll(async () => {
   await live.page.addInitScript((who) => localStorage.setItem('mole-office.actor', JSON.stringify(who)), { type: 'agent', id: AGENT.handle })
   await live.page.addInitScript((theme) => localStorage.setItem('mole-office.preset.theme', theme), 'light')
   const held = await live.context.cookies()
-  expect(held.some((one) => one.name === 'mole-office-key'), 'the browser was given the person key').toBe(false)
+  expect(held.some((one) => one.name === KEY_COOKIE || one.name === DEVICE_HALF_COOKIE), 'the browser was given the person key or a half of a device key').toBe(false)
 }, 240_000)
 
 afterAll(async () => {

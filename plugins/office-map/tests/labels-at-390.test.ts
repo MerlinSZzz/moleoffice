@@ -26,7 +26,10 @@ type Box = { x: number; y: number; width: number; height: number }
 const texts: { value: string; x: number; y: number; maxWidth?: number; width: number }[] = [], boxes: Box[] = [], plates: Box[] = []
 const target = { font: '12px system-ui', fillStyle: '',
   fillText(value: string, x: number, y: number, maxWidth?: number) { texts.push({ value, x, y, maxWidth, width: this.measureText(value).width }) },
-  fillRect(x: number, y: number, width: number, height: number) { if (this.fillStyle === '#fffdf5') boxes.push({ x, y, width, height }); if (this.fillStyle === '#f5f0dc') plates.push({ x, y, width, height }) },
+  fillRect(x: number, y: number, width: number, height: number) { if (this.fillStyle === '#fffdf5') boxes.push({ x, y, width, height }) },
+  path: null as Box | null,
+  roundRect(x: number, y: number, width: number, height: number) { this.path = { x, y, width, height } },
+  fill() { if (this.fillStyle === '#f5f0dc' && this.path) plates.push(this.path); this.path = null },
   measureText(value: string) { return { width: [...value].reduce((n, c) => n + (c.charCodeAt(0) < 128 ? .5 : 1), 0) * parseFloat(this.font) } },
   getImageData: () => ({ data: new Uint8Array(4) }), createPattern: () => null }
 const context = new Proxy(target, { get: (a, k) => Reflect.get(a, k) ?? (() => {}) })
@@ -69,7 +72,7 @@ const reaches = (rect: Box, view: { left: number; top: number; width: number; he
   rect.x < view.left + view.width && view.left < rect.x + rect.width && rect.y < view.top + view.height && view.top < rect.y + rect.height
 const inside = (point: { x: number; y: number }, view: { left: number; top: number; width: number; height: number }) =>
   point.x >= view.left && point.x < view.left + view.width && point.y >= view.top && point.y < view.top + view.height
-const drawnAt = (rect: Box) => plates.some(p => p.x === rect.x && p.y === rect.y)
+const drawnAt = (rect: Box) => plates.some(p => p.y === rect.y + 2 && p.x >= rect.x && p.x + p.width <= rect.x + rect.width && p.height === 16)
 const awayActor = (layout: Layout) => Object.keys(layout.seats)[0]!
 
 for (const language of ['en', 'zh'] as const) it(`names the sleeping house in ${language} on the fitted map at 390 px, where no house sign is drawn`, () => {
@@ -90,7 +93,7 @@ for (const language of ['en', 'zh'] as const) it(`names the sleeping house in ${
   } finally { map.dispose() }
 })
 
-it('keeps the hall of 13\'s whole name in view, and its sign above its own house, in the square view at 390 px, where the view starts inside the hall', () => {
+it('keeps the hall of 13\'s fitted name in view, and its sign above its own house, in the square view at 390 px, where the view starts inside the hall', () => {
   const found = example(13), { layout } = found, bounds = layout.bounds, square = layout.square
   const zoom = Math.min(1, (362 - 24) / (square.width + 80))
   const scrollLeft = (square.x + square.width / 2 - bounds.x) * zoom - 362 / 2
@@ -101,11 +104,16 @@ it('keeps the hall of 13\'s whole name in view, and its sign above its own house
     const sign = texts.filter(t => t.value.endsWith(' · 13'))
     expect(sign, 'the hall sign drawn once').toHaveLength(1)
     expect(sign[0]!.x, 'the sign text starts inside the view').toBeGreaterThanOrEqual(left)
-    expect(sign[0]!.value, 'the sign holds the hall\'s whole name and its count').toBe(`${hall.label} · 13`)
-    // A canvas narrows a text wider than the width it is given, so the name ends within that width.
-    expect(sign[0]!.maxWidth, 'the sign gives its text a width').toBeDefined()
-    expect(sign[0]!.x + Math.min(sign[0]!.width, sign[0]!.maxWidth!), 'the hall\'s whole name ends inside the view').toBeLessThanOrEqual(left + 362 / zoom)
+    const name = sign[0]!.value.slice(0, -' · 13'.length)
+    expect(name === hall.label || (name.endsWith('…') && hall.label?.startsWith(name.slice(0, -1)) === true), 'the hall name is whole or cut at the end').toBe(true)
+    expect(sign[0]!.maxWidth, 'the sign text is not squeezed').toBeUndefined()
+    expect(sign[0]!.x + sign[0]!.width, 'the hall name ends inside the view').toBeLessThanOrEqual(left + 362 / zoom)
     const box = boxes.find(b => b.y < sign[0]!.y && sign[0]!.y <= b.y + b.height && b.x <= sign[0]!.x && sign[0]!.x <= b.x + b.width)!
+    expect(box, 'the sign has its own box').toBeDefined()
+    target.font = `${11 / zoom}px system-ui`
+    const wholeFits = target.measureText(`${hall.label} · 13`).width <= box.width - 12 / zoom
+    expect(name === hall.label, 'the name stays whole exactly when it fits').toBe(wholeFits)
+    expect(sign[0]!.x + sign[0]!.width, 'the hall name ends inside its sign box').toBeLessThanOrEqual(box.x + box.width)
     expect(box.x, 'the sign stays above its own house').toBeGreaterThanOrEqual(hall.x)
     expect(box.x + box.width, 'the sign stays above its own house').toBeLessThanOrEqual(hall.x + hall.width + 1e-9)
     // The sign starts in view, unless the end of its house pushes it out, as here by 13 of 568 px.

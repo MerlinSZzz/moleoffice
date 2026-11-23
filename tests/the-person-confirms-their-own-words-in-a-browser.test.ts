@@ -9,7 +9,7 @@
  *      the note down;
  *   3. Confirm files the words in the note's own project, "Not what I said" keeps the note and marks it, and Confirm
  *      all says how many it will confirm and files them; the count beside the row moves with each press;
- *   4. with nothing waiting, the page says so in words;
+ *   4. with nothing waiting, the page draws the state word "none";
  *   5. an agent reading the page sees the notes and no button.
  *
  * PICTURES. With W13Q_YOUR_WORDS_SHOTS naming a folder, a second office is photographed empty and then with notes, at
@@ -161,10 +161,10 @@ describe('the page of words waiting for the person, in a browser', () => {
     await theRowsCount(page, null)
   }, 120_000)
 
-  it('says in words that nothing is waiting', async () => {
+  it('draws the state word none when nothing is waiting', async () => {
     const page = app.page
     await open(app, page)
-    await page.getByText(en.t('w13q.yourWords.none')).waitFor()
+    await page.locator('.page.yw').getByText(en.t('absence.none'), { exact: true }).waitFor()
     expect(await page.locator('.yw-note-row').count()).toBe(0)
   }, 120_000)
 
@@ -179,7 +179,6 @@ describe('the page of words waiting for the person, in a browser', () => {
       await page.locator(`[data-note="${id}"]`).waitFor()
       expect(await page.locator(`[data-note="${id}"] [data-part="their-words"]`).textContent()).toBe('Cut the hedge in June.')
       expect(await page.locator('.yw-body button').count()).toBe(0)
-      expect(await page.getByText('Only the person can confirm these words.').count()).toBe(1)
     } finally {
       await context.close()
     }

@@ -6,12 +6,20 @@ import { drizzle } from 'drizzle-orm/better-sqlite3'
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator'
 import { expect, it, vi } from 'vitest'
 import { aTestDatabaseFolder, removeThisTestFolder } from './a-test-folder.ts'
-import { journal, MIGRATIONS, migrationsBefore, partialMigrations } from './migration-fixtures.ts'
+import { readFileSync, writeFileSync } from 'node:fs'
+import { journal, MIGRATIONS, partialMigrations } from './migration-fixtures.ts'
 
 it('keeps whole revisions written before stored parts and reads them after the upgrade', async () => {
   const tag = journal(MIGRATIONS).find(entry => entry.tag.endsWith('_a_revision_stores_a_runs_chapters_once'))?.tag
   if (tag === undefined) throw new Error('The stored-parts migration is missing from the journal.')
-  const partial = partialMigrations(migrationsBefore(tag))
+  // EVERY MIGRATION BUT THE STORED-PARTS ONE. The two revisions below are written with no `parts` column, and today's
+  // code still finds every other column it reads. A folder that ended before that migration lacked every later one
+  // too, and today's code reads later columns: a run's change reads its hold's `last_heard_instant`. The migrator
+  // takes a missing migration by its hash, so the whole upgrade below applies that one schema migration alone.
+  const partial = partialMigrations(journal(MIGRATIONS).length)
+  const journalFile = join(partial, 'meta', '_journal.json')
+  const folder = JSON.parse(readFileSync(journalFile, 'utf8')) as { entries: { tag: string }[] }
+  writeFileSync(journalFile, JSON.stringify({ ...folder, entries: folder.entries.filter(entry => entry.tag !== tag) }))
   const dir = aTestDatabaseFolder('revision-before-parts')
   const file = join(dir, 'panelx.db')
   const originalDb = process.env.MOLE_OFFICE_DB

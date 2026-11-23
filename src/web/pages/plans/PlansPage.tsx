@@ -106,9 +106,7 @@ export function PlansPage() {
       {open.status === 'loading' ? <Loading label={t('g8.shelf.yourPlans')} rows={3} /> : null}
 
       {open.status === 'error' ? (
-        <ErrorNote message={open.message} fault={open.fault} retry={reloadOpen}>
-          <span className="pl-note">{t('g8.shelf.thisIsAFailedRequestNotAnEmptyShelf')}</span>
-        </ErrorNote>
+        <ErrorNote message={open.message} fault={open.fault} retry={reloadOpen} />
       ) : null}
 
       {open.status === 'ready' ? <PlansGrid reply={open.value} /> : null}
@@ -377,7 +375,7 @@ const PLANS_CSS = `
   color: var(--text-2);
 }
 
-.pl-limit, .pl-note {
+.pl-limit {
   margin: 0;
   font-size: var(--fs-2);
   line-height: var(--lh-body);

@@ -9,6 +9,9 @@
  * described in src/config/the-data-folder-move.mjs; the shapes here are the one place they are written for the wire.
  */
 
+import type { WordValues } from './i18n.ts'
+import type { DataFolderRefusalCode } from './refusal-codes.ts'
+
 /** What a move is doing, as the mark says it. */
 export type TheStateOfAMove =
   | 'stopping'
@@ -73,8 +76,11 @@ export interface DataFolderReading {
   mayMove: boolean
   /** Whether this caller may press the confirm, by the press's own check. */
   mayConfirm: boolean
-  /** With `?to=`: whether a move to that place would be refused, and the sentence why, or null when it would go on. */
-  wouldRefuse?: { to: string; why: string | null }
+  /**
+   * With `?to=`: whether a move to that place would be refused. A refusal is its code and values, which the page says in
+   * its own language, and `why` is their English. All three are null when the move would go on.
+   */
+  wouldRefuse?: { to: string; why: string | null; code: DataFolderRefusalCode | null; values: WordValues | null }
 }
 
 /** What the move press answers once the mark names the mover alive. */

@@ -1,5 +1,11 @@
 // Copyright © 2026 Zhengyang Shen
 // Licensed under the MIT License. See LICENSE.
+// Criterion change (wave 13s round 281, message jQp5CV6A3RsB): Home and the first-run guide in a named office join
+// the not-yet list.
+// Since HD-2d, Home draws on arrival the one plain choice of project of src/web/components/ProjectChoice.tsx. In an
+// office with a named owner, #/welcome opens Home. This turns two cases around: "draws no box and no dropdown on home"
+// and "draws no box and no dropdown on the first-run guide in a named office". Before, Home was held to draw no
+// control, and so was #/welcome.
 // Criterion change (wave 13y round 125, item 62, message ypSj7D2-j2bA): Settings
 // joins the not-yet list.
 // Layout A was chosen, in which every panel of the chosen category is open with no fold,
@@ -96,6 +102,9 @@ import { KIND_FAMILIES } from '../src/shared/work.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { settingsPath } from '../src/shared/addresses.ts'
 import { PLUGIN_READ_INTERFACE } from '../src/shared/plugins.ts'
+import { createI18n, sayInEnglish } from '../src/shared/i18n.ts'
+
+const { t } = createI18n('en')
 
 // ---------------------------------------------------------------------------- the routes
 
@@ -182,6 +191,14 @@ const ALWAYS_WRITABLE: Readonly<Record<string, string>> = {
     'button, and #/plans/<id>/edit lands on the same always-writable page',
 }
 
+// Home's reason, written once: both its entries in `NOT_YET` below use it, Home's own and the one for #/welcome.
+const HOMES_REASON =
+  'the one plain choice of project of src/web/components/ProjectChoice.tsx is drawn on arrival on Home. Home reads ' +
+  'across projects and keeps one plain choice to show a single project, as HD-2d asks ("for every project or one"). ' +
+  'It narrows what is shown, like the kind menu on Everything. It writes only when a project is chosen, as the field ' +
+  'to add an item on the checklists writes only when Enter is pressed: the choice is kept in the person\'s own Home ' +
+  'layout, with one line in the change log, as a moved part is. It files no record'
+
 /**
  * THE SURFACES THAT DO NOT KEEP THIS RULE YET, each with the reason and who owns it.
  *
@@ -222,6 +239,9 @@ const NOT_YET: Readonly<Record<string, string>> = {
     'the one project control on src/web/pages/CountersPage.tsx is drawn on arrival: the page reads across ' +
     'projects and keeps one plain choice to show a single project, as the owner decided on 29 September ' +
     '2026. It narrows the list and writes nothing, like the kind menu on Everything',
+  home: HOMES_REASON,
+  'the first-run guide in a named office':
+    '#/welcome opens Home in an office with a named owner, and ' + HOMES_REASON,
   'context bundles':
     'criterion B33 of design/bundle/ACCEPTANCE.md, from the owner\'s words of 8 September 2026: 去掉 choose a ' +
     'reading，直接显示点击后的内容. The making section is drawn on arrival — the subject radios, the ' +
@@ -232,10 +252,10 @@ const NOT_YET: Readonly<Record<string, string>> = {
     'of src/web/components/ProjectChoice.tsx, and a project dropdown in its About row when Every project ' +
     'is chosen. Both choose what is read and write nothing',
   'the checklists':
-    'src/web/pages/ChecklistsPage.tsx draws two dropdowns on arrival: whose checklists, and the one plain ' +
-    'choice of project of src/web/components/ProjectChoice.tsx. Both were in look B of the checklists design, ' +
-    'which was chosen on 9 October 2026. Both choose what is read and write ' +
-    'nothing, like the kind menu on Everything',
+    'src/web/pages/ChecklistsPage.tsx draws on arrival the one plain choice of project of ' +
+    'src/web/components/ProjectChoice.tsx, which chooses what is read and writes nothing, like the kind ' +
+    'menu on Everything, and under each checklist\'s card a field to add an item. Both are in design E ' +
+    'of the checklists, as decided in wave 13y round 175. The field writes only when Enter is pressed in it',
   'the flows':
     'the search box on src/web/pages/FlowsPage.tsx is drawn on arrival, as in the proposal chosen ' +
     '(report 4mwraeIStEe8 block "page"). It narrows the list by title and writes ' +
@@ -262,6 +282,9 @@ const NOT_YET: Readonly<Record<string, string>> = {
 
 function visits(): Visit[] {
   const rows: Visit[] = [
+    // HOME, as HD-2d makes it. A reading: the key items, Needs you, Agents at work, the schedule and the figures, in
+    // the layout its person kept, with each part's move menu behind a closed fold. Its one dropdown chooses the
+    // project it reads, and it is in `NOT_YET` above with that reason.
     { route: 'home', name: 'home', address: () => '#/' },
     { route: 'records', name: 'everything', address: () => '#/records' },
     { route: 'modules', name: 'modules', address: () => '#/modules' },
@@ -414,8 +437,9 @@ function visits(): Visit[] {
      */
     { route: 'roleNew', name: 'a new role card', address: () => '#/roles/new' },
     // THE FIRST-RUN GUIDE. It is a form, like a new role card, but it is drawn
-    // only in an office with no named owner. This test's office has one, so #/welcome opens Home, and
-    // what is checked here is that the address reads without offering to edit anything.
+    // only in an office with no named owner. This test's office has one, so #/welcome opens Home here. It
+    // draws Home's project choice, and it is in `NOT_YET` above with Home's reason.
+    // Test change (wave 13s round 281): before, this said the address reads without offering to edit anything.
     { route: 'welcome', name: 'the first-run guide in a named office', address: () => '#/welcome' },
     // WHO HOLDS EACH CARD, criterion P72. A page of numbers and lists: nothing on it is typed into,
     // which is what this rule asks, and checking it here is what keeps that true.
@@ -442,9 +466,11 @@ function visits(): Visit[] {
     // filter of three presses. The one box to type in, the why of a confirmation, is drawn only
     // after the person presses "Confirm this category".
     { route: 'toolset', name: 'the toolset', address: () => '#/toolset' },
-    // THE CHECKLISTS PAGE KEEPS THE RULE (wave 13n round 52). A reading: a table of checklists grouped by
-    // project or by owner. Its controls are presses and one switch; an item is marked done in the window,
-    // by picking its evidence, never by typing into a box.
+    // THE CHECKLISTS PAGE (wave 13n round 52, drawn as design E since wave 13y round 175). A reading: a
+    // section for each person, with the reader's checklists open as cards. Its project choice and each
+    // card's field to add an item are drawn on arrival, and it is in `NOT_YET` above with that reason.
+    // Test change (wave 13y round 175): before, this said the page kept the rule with a table of
+    // checklists, though the page was on that list for its two dropdowns.
     { route: 'checklists', name: 'the checklists', address: () => '#/checklists' },
     // THE WORDS FOR THE PERSON TO CONFIRM KEEP THE RULE, wave 13q round 45. A
     // reading: each waiting note's words as they were kept, with two presses per note and Confirm all.
@@ -875,7 +901,19 @@ describe('a page being read', () => {
           expect(await page.locator('#main h1').innerText()).toBe(visit.route === 'shelved' ? 'Shelved' : 'Counters')
           expect(await page.locator('#main .px-absent').count()).toBeGreaterThan(0)
         } else if (visit.route === 'toolset') {
-          expect(await page.locator('#main .tls-none').innerText()).toBe('No tool is filed yet.')
+          expect(await page.locator('#main .tls-none').innerText()).toBe(sayInEnglish('absence.none'))
+        } else if (visit.route === 'claims') {
+          // A fresh office has claimed nothing, and the empty line is one word, so this page draws fewer than 40 characters.
+          expect(await page.locator('#main h1').innerText()).toBe(t('w13w.claimsPage.title'))
+          expect(await page.locator('#main .hm-claims .hm-empty').innerText()).toBe(t('absence.none'))
+        } else if (visit.route === 'interrupted') {
+          // A fresh office has no interrupted run, and the empty line is one short state, so this page draws fewer than 40 characters.
+          expect(await page.locator('#main .ir .ir-title').innerText()).toBe(t('w13t.nav.interrupted'))
+          expect(await page.locator('#main .ir .px-mark .px-chip-word').innerText()).toBe(t('w13t.interrupted.none'))
+        } else if (visit.route === 'folderreading') {
+          // A fresh office holds no folder reading, and the empty line is one word, so this page draws fewer than 40 characters.
+          expect(await page.locator('#main h1').innerText()).toBe(t('dev.folderreading.aFolderAnAgentRead'))
+          expect(await page.locator('#main .px-absent').innerText()).toBe(t('absence.none'))
         } else {
           expect(found.text, `${at} drew no text at all, so what follows would prove nothing`).toBeGreaterThan(40)
         }

@@ -4,7 +4,7 @@
  * THE MAIN-WORLD GUARD'S POLICY, AS A TABLE OF COMMANDS IT STOPS AND COMMANDS IT LETS THROUGH.
  *
  * One office guard, the same policy for every runtime, stops the dangerous
- * acts and lets everything else through. The policy is tools/guard/policy.mjs. This file hands it a
+ * acts and lets everything else through. The policy is for-agents/main-world-guard-policy.mjs. This file hands it a
  * home, a checkout and an environment of its own making — nothing here is ever run, the policy only
  * reads the command text and the disk — and pins what it answers for each command, including the
  * shapes of 16 September 2026 (HOME=$SH …; rm -rf "$SH" with SH empty or the home;
@@ -35,7 +35,7 @@ import { fileURLToPath } from 'node:url'
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
-import { areaReasons, lookAt, theProtectedPaths, type Asker, type World } from '../tools/guard/policy.mjs'
+import { areaReasons, lookAt, theProtectedPaths, type Asker, type World } from '../for-agents/main-world-guard-policy.mjs'
 import { aTestDatabaseFolder } from './a-test-folder.ts'
 import { settingNamed } from '../src/config/settings.mjs'
 

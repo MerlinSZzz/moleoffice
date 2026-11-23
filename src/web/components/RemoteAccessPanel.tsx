@@ -89,7 +89,7 @@ import { api } from '../api.ts'
 import { useLanguage } from '../lib/language.ts'
 import { useInspect } from '../lib/mode.ts'
 import { AddressForBrowsers } from './AddressForBrowsers.tsx'
-import { Absence, Explain, Loading, Panel, useAsync } from './ui.tsx'
+import { Absence, Loading, Panel, useAsync } from './ui.tsx'
 
 /**
  * WHERE TRUST IS ARRANGED, AND MOLE OFFICE IS NOT IN IT.
@@ -175,17 +175,7 @@ export function AccessRead({ reply, developer, children }: { reply: AccessReply;
         <div className="rax-pair">
           <dt className="rax-key">{t('settingsPanel.access.canOpen')}</dt>
           <dd className="rax-val" data-on={machine.remoteAccess === 'listening' ? 'yes' : 'no'}>
-            {machine.remoteAccess === 'development' ? (
-              <Explain
-                declares={{ surface: 'settings.access' }}
-                meaning={<strong>{on}</strong>}
-                opens={t('settingsPanel.access.whyNot')}
-              >
-                <p className="rax-because">{t('settingsPanel.access.developmentSays')}</p>
-              </Explain>
-            ) : (
-              on
-            )}
+            {on}
           </dd>
         </div>
         <div className="rax-pair">
@@ -210,11 +200,7 @@ export function AccessRead({ reply, developer, children }: { reply: AccessReply;
           <dt className="rax-key">{t('settingsPanel.access.openedIt')}</dt>
           <dd className="rax-val">
             {machine.machines.length === 0 ? (
-              <Absence
-                tier="ordinary"
-                word={t('settingsPanel.access.noneYet')}
-                title={t('settingsPanel.access.noneYetSays')}
-              />
+              <Absence tier="ordinary" word={t('settingsPanel.access.noneYet')} />
             ) : (
               <MachinesSeen machines={machine.machines} />
             )}
@@ -244,7 +230,7 @@ export function AccessRead({ reply, developer, children }: { reply: AccessReply;
               <dt className="rax-key">{t('settingsPanel.access.arrivedAt')}</dt>
               <dd className="rax-val rax-mono">
                 {content(machine.hostAndPort) ?? (
-                  <Absence tier="ordinary" word={t('settingsPanel.access.noAddress')} title={t('settingsPanel.access.noAddressSays')} />
+                  <Absence tier="ordinary" word={t('settingsPanel.access.noAddress')} />
                 )}
               </dd>
             </div>
@@ -258,11 +244,7 @@ export function AccessRead({ reply, developer, children }: { reply: AccessReply;
               <dt className="rax-key">{t('settingsPanel.access.refusedActs')}</dt>
               <dd className="rax-val">
                 {caller.refusedHere.length === 0 ? (
-                  <Absence
-                    tier="ordinary"
-                    word={t('settingsPanel.access.nothingFromHere')}
-                    title={t('settingsPanel.access.nothingFromHereSays')}
-                  />
+                  <Absence tier="ordinary" word={t('settingsPanel.access.nothingFromHere')} />
                 ) : (
                   <RefusedList acts={caller.refusedHere} />
                 )}
@@ -272,11 +254,7 @@ export function AccessRead({ reply, developer, children }: { reply: AccessReply;
               <dt className="rax-key">{t('settingsPanel.access.refusalsRecorded')}</dt>
               <dd className="rax-val">
                 {machine.refused === null ? (
-                  <Absence
-                    tier="ordinary"
-                    word={t('settingsPanel.access.nobodyLooked')}
-                    title={t('settingsPanel.access.nobodyLookedSays')}
-                  />
+                  <Absence tier="ordinary" word={t('settingsPanel.access.nobodyLooked')} />
                 ) : (
                   machine.refused.map((one) => `${one.reason} ${one.count}`).join(', ')
                 )}
@@ -370,7 +348,6 @@ const ACCESS_CSS = `
 .rax-val[data-on='yes'] { font-weight: 700; }
 /* THE SECOND LINE IS NOT AN AFTERTHOUGHT AND IS NOT A WARNING. It is the rest of a true sentence,
    so it takes the ordinary secondary ink and no hue: nothing here is a fault to be fixed. */
-.rax-because { margin: 0; font-size: var(--fs-1); font-weight: 400; color: var(--text-2); }
 .rax-dev { margin: var(--gut) 0 0; padding: var(--pad-lg) 0 0; border-top: var(--border-w) solid var(--border); }
 .rax-devhead { margin: 0 0 var(--pad); font-size: var(--fs-1); font-weight: 600; letter-spacing: .04em; color: var(--text-3); }
 .rax-mono { font-family: var(--font-mono); font-size: var(--fs-1); }

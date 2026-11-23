@@ -14,8 +14,8 @@ import { tmpdir } from 'node:os'
 import { basename, join, resolve } from 'node:path'
 import { markdownSections, prepareRoundChapters, ROUND_CHAPTERS_POLICY_FILE } from '../src/shared/round-chapters/delivery.ts'
 import {
-  bytes, codeChapters, deliveredRoundBrief, roundChaptersGivenText, roundChaptersOutline, roundChaptersText,
-  savedChaptersLine,
+  bytes, codeChapters, deliveredRoundBrief, roundChaptersOutline, roundChaptersText,
+  savedChaptersLine, THE_SAVED_SELECTION_HOLDS_TERRITORIES_IN_FULL,
 } from '../src/shared/round-chapters/manifest.ts'
 import { THE_FALLBACK_RULE } from '../src/shared/round-start-pack.ts'
 
@@ -96,7 +96,10 @@ describe("a round's start gives CODE.md at outline", () => {
 
     expect(manifest.chapters.map(chapter => chapter.chapter)).toEqual(chosen)
     expect(delivered).toBe(deliveredRoundBrief(manifest))
-    expect(delivered).toContain(roundChaptersGivenText(manifest))
+    // THE CHAPTERS ARE GIVEN AT OUTLINE, beside the line's own part of TERRITORIES.md. A heading names the sandbox and the
+    // policy gives '*', so the saved selection is already the line's own section, and does not hold the file in full.
+    expect(delivered).toContain(roundChaptersOutline(manifest))
+    expect(delivered).not.toContain(THE_SAVED_SELECTION_HOLDS_TERRITORIES_IN_FULL)
 
     const given = chapterHeadings(manifest.sources[0]!.sections)
     expect(given.map(heading => seen(delivered, heading))).toEqual(given.map(() => 1))

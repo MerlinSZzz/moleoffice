@@ -70,6 +70,7 @@ import { readElevations, readElevation } from '@shared/read-elevations.ts'
 import { A_SETTING_ON_THE_LEDGER } from '@shared/a-setting-on-the-ledger.ts'
 import { theGrantOnTheRow } from './elevations-that-end-with.ts'
 import { theElevationOn } from './elevations-that-end-with.ts'
+import type { SessionRunRow } from '../db/types/elevation.ts'
 
 export { readElevations, readElevation }
 
@@ -456,10 +457,6 @@ export { theRunsWritesCameFrom } from '../db/the-runs-writes-came-from.ts'
 export { WHICH_RUN_A_SESSION_IS } from '../db/the-run-a-write-came-from.ts'
 export { A_LIVE_SESSION_RECORD } from '../db/the-run-a-write-came-from.ts'
 
-export interface SessionRunRow {
-  id?: unknown
-  serving?: unknown
-  started?: unknown
-}
+export type { SessionRunRow } from '../db/types/elevation.ts'
 
 export { theRunTheRowSays } from '../db/the-run-a-write-came-from.ts'

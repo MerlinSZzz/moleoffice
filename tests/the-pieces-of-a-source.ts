@@ -96,17 +96,32 @@ export function piecesOf(text: string): Piece[] {
         if (text[j] === '$' && text[j + 1] === '{') {
           let depth = 1
           let k = j + 2
-          // The placeholder is code, so a `/` after an operator or an opening bracket opens a regular expression here
-          // too, and a quote inside it opens no string: `${name.replace(/"/g, '""')}` closes where the brace does.
+          // The placeholder is code. A comment is looked for first: a `//` runs to the end of its line and a `/*` runs
+          // past its `*/`, and neither changes the depth of braces, opens a quote or counts as the code before a `/`.
+          // Then a `/` after an operator or an opening bracket opens a regular expression here too, and a quote inside
+          // it opens no string: `${name.replace(/"/g, '""')}` closes where the brace does. A ' or " quote ends at its
+          // match or at a newline, as at the top level; a backtick runs to its match, because a template may span lines.
+          // The template is still one string piece with the placeholder written out, and no piece is listed inside it,
+          // so the pieces stay in order and never overlap.
           let before = '{'
           while (k < text.length && depth > 0) {
+            if (text[k] === '/' && text[k + 1] === '/') {
+              const stop = text.indexOf('\n', k)
+              k = stop === -1 ? text.length : stop
+              continue
+            }
+            if (text[k] === '/' && text[k + 1] === '*') {
+              const stop = text.indexOf('*/', k + 2)
+              k = stop === -1 ? text.length : stop + 2
+              continue
+            }
             if (text[k] === '{') depth += 1
             else if (text[k] === '}') depth -= 1
             else if (text[k] === '/' && opensARegularExpression(text, k, before)) k = closingSlashOf(text, k)
             else if (text[k] === "'" || text[k] === '"' || text[k] === '`') {
               const quote = text[k]
               k += 1
-              while (k < text.length && text[k] !== quote) {
+              while (k < text.length && text[k] !== quote && (quote === '`' || text[k] !== '\n')) {
                 if (text[k] === '\\') k += 1
                 k += 1
               }

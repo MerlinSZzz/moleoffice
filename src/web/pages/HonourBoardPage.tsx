@@ -51,14 +51,10 @@ export function HonourBoardPage() {
       <header className="hb-head">
         {/* THE NAME, TYPED: the same words as the rail row that opens this page. */}
         <h1 className="hb-title" data-title-is="its-label">{t('nav.honourBoard')}</h1>
-        <p className="hb-intro">{t('honourBoard.intro')}</p>
         {first.status === 'ready' ? (
-          <>
-            <p className="hb-cost" data-honour-cost={`${String(first.value.cost.records)} ${String(first.value.cost.ms)}`}>
-              {t('honourBoard.cost', { records: first.value.cost.records, ms: first.value.cost.ms })}
-            </p>
-            <p className="hb-threshold">{t('honourBoard.threshold', { threshold: first.value.threshold })}</p>
-          </>
+          <p className="hb-cost" data-honour-cost={`${String(first.value.cost.records)} ${String(first.value.cost.ms)}`}>
+            {t('honourBoardPage.readCost', { records: first.value.cost.records, ms: first.value.cost.ms })}
+          </p>
         ) : null}
       </header>
       {first.status === 'loading' ? <Loading label={t('honourBoard.loading')} rows={2} /> : null}
@@ -175,7 +171,7 @@ function RunRow({ row }: { row: HonourBoardRow }) {
           </ul>
         </dd>
         <dt>{t('honourBoard.conditions')}</dt>
-        <dd>{row.served === null ? <span className="hb-absent">{t('honourBoard.conditionsNotRecorded')}</span> : <Conditions served={row.served} />}</dd>
+        <dd>{row.served === null ? <span className="hb-absent">{t('g6a.common.notRecorded')}</span> : <Conditions served={row.served} />}</dd>
         <dt>{t('honourBoard.brief')}</dt>
         <dd>
           {row.brief === null ? (
@@ -236,9 +232,6 @@ function WeeklyTable({ board }: { board: HonourBoard }) {
   )
   return (
     <div className="hb-table-wrap">
-      <p className="hb-counts-by">
-        {t('honourBoard.tableCountsBy', { servedOn: table.servedModel.on, tempOn: table.temperature.on, of: table.servedModel.of })}
-      </p>
       {/* ON A PHONE THE TABLE SCROLLS SIDEWAYS IN ITS OWN BOX, and InReach marks the edge it carries on past. */}
       <InReach box="hb-scroll" name={t('honourBoard.tableTitle')} shape={table.lines.map((line) => `${line.model}:${line.temperature}`).join(',')}>
         <table className="hb-table">
@@ -286,8 +279,7 @@ export const HONOUR_BOARD_CSS = `
 .hb { display: grid; gap: var(--gut); min-width: 0; }
 .hb-head { display: grid; gap: var(--pad); min-width: 0; }
 .hb-title { margin: 0; color: var(--text); font: 600 var(--fs-4)/var(--lh-tight) var(--font-ui); overflow-wrap: anywhere; }
-.hb-intro { margin: 0; max-width: 70ch; color: var(--text-2); font: var(--fs-2)/var(--lh-read) var(--font-ui); }
-.hb-cost, .hb-threshold { margin: 0; max-width: 70ch; color: var(--text-3); font: var(--fs-1)/var(--lh-read) var(--font-ui); overflow-wrap: anywhere; }
+.hb-cost { margin: 0; max-width: 70ch; color: var(--text-3); font: var(--fs-1)/var(--lh-read) var(--font-ui); overflow-wrap: anywhere; }
 .hb-runs { display: grid; gap: var(--pad); min-width: 0; }
 .hb-rows { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; min-width: 0; }
 .hb-row { display: grid; gap: 6px; padding: 10px 12px; border: var(--border-w) solid var(--border); border-radius: var(--radius-sm); min-width: 0; }
@@ -310,7 +302,6 @@ export const HONOUR_BOARD_CSS = `
 .hb-fold-head { cursor: pointer; color: var(--text); font: 600 var(--fs-2)/var(--lh-tight) var(--font-ui); }
 .hb-count { margin-left: 6px; color: var(--text-3); font-weight: 400; }
 .hb-table-wrap { display: grid; gap: var(--pad); min-width: 0; }
-.hb-counts-by { margin: 0; max-width: 70ch; color: var(--text-2); font: var(--fs-1)/var(--lh-read) var(--font-ui); }
 .hb-scroll { overflow-x: auto; min-width: 0; }
 .hb-table { border-collapse: collapse; font: var(--fs-1)/var(--lh-read) var(--font-ui); color: var(--text); }
 .hb-table th, .hb-table td { padding: 4px 10px; border-bottom: var(--border-w) solid var(--border); text-align: right; white-space: nowrap; }

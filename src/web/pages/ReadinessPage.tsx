@@ -14,13 +14,15 @@
  */
 
 import { content, t, type WordKey } from '@shared/i18n.ts'
+import { THE_PERSON } from '@shared/person.ts'
 import type { ReadinessState } from '@shared/readiness-checklists.ts'
 import { drawnStamp } from '@shared/time.ts'
 import { useState } from 'react'
 import type { AReadinessChecklist } from '../../server/lib/readiness.ts'
 import { api, errorMessage, faultOf } from '../api.ts'
 import { readinessPath } from '../components/router.tsx'
-import { Absence, Btn, ErrorNote, Field, Loading, Panel, Select, Stamp, useAsync } from '../components/ui.tsx'
+import { Absence, Btn, ErrorNote, Loading, Panel, ServerNote, Stamp, useAsync } from '../components/ui.tsx'
+import { AgentPicker, type AnAgentToPick } from '../components/agent/AgentPicker.tsx'
 import { useLanguage } from '../lib/language.ts'
 
 const STATE_WORDS: Record<ReadinessState, WordKey> = {
@@ -50,7 +52,6 @@ export function ReadinessPage({ id }: { id?: string }) {
       <header className="rd-head">
         {/* THE NAME, TYPED: the same words as the rail row that opens this page. */}
         <h1 className="rd-title" data-title-is="its-label">{t('nav.readiness')}</h1>
-        <p className="rd-intro">{t('readiness.intro')}</p>
       </header>
       {id === undefined ? null : <OneChecklist key={`${id}-${String(again)}`} id={id} onPressed={reload} />}
       <WaitingForASigner key={`waiting-${String(again)}`} />
@@ -60,8 +61,8 @@ export function ReadinessPage({ id }: { id?: string }) {
 }
 
 /**
- * WHAT WAITS FOR ONE SIGNER. The person's by default; the picker offers every agent that a waiting checklist names,
- * so an agent's queue can be read here too. The list itself is the server's answer for that signer.
+ * WHAT WAITS FOR ONE SIGNER. The person's by default; the agent picker offers every agent that a waiting checklist
+ * names, so an agent's queue can be read here too. The list itself is the server's answer for that signer.
  */
 function WaitingForASigner() {
   const [signer, setSigner] = useState('person')
@@ -71,17 +72,20 @@ function WaitingForASigner() {
   if (waiting.status === 'ready') {
     for (const checklist of waiting.value) for (const one of checklist.signers) if (one.kind === 'agent') agents.set(one.id, signerName(one))
   }
-  const options = [
-    { value: 'person', label: t('readiness.signer.you') },
-    ...[...agents].map(([agentId, name]) => ({ value: `agent:${agentId}`, label: name })),
+  const candidates: AnAgentToPick[] = [
+    { kind: 'person', id: THE_PERSON, value: 'person', name: t('readiness.signer.you') },
+    ...[...agents].map(([agentId, name]) => ({ kind: 'agent' as const, id: agentId, value: `agent:${agentId}`, name })),
   ]
   return (
     <Panel declares={{ surface: 'readiness.waiting' }} title={t('readiness.waitingTitle')} titleIs="label">
       <div className="rd-waiting">
         <div className="rd-picker">
-          <Field label={t('readiness.waitingFor')}>
-            <Select value={options.some((o) => o.value === signer) ? signer : 'person'} onChange={setSigner} options={options} />
-          </Field>
+          <AgentPicker
+            label={t('readiness.waitingFor')}
+            candidates={candidates}
+            chosen={candidates.some((one) => one.value === signer) ? signer : 'person'}
+            onChoose={setSigner}
+          />
         </div>
         {state.status === 'loading' ? <Loading label={t('readiness.loading')} rows={1} /> : null}
         {state.status === 'error' ? <ErrorNote message={state.message} fault={state.fault ?? null} retry={reload} /> : null}
@@ -223,7 +227,6 @@ export function TheChecklist({ checklist, onPressed }: { checklist: AReadinessCh
             <li key={`${one.kind}:${one.id}`} className="rd-signer" data-signed={one.signedAt === null ? 'no' : 'yes'}>
               <span className="rd-signer-mark" aria-hidden="true">{one.signedAt === null ? '○' : '●'}</span>
               <span className="rd-signer-name">{signerName(one)}</span>
-              <span className="rd-signer-why">{t(`readiness.why.${one.why}`)}</span>
               <span className="rd-signer-when">
                 {one.signedAt === null ? t('readiness.notSigned') : (
                   <>
@@ -234,7 +237,12 @@ export function TheChecklist({ checklist, onPressed }: { checklist: AReadinessCh
             </li>
           ))}
         </ul>
-        {ran === null ? null : <p className="rd-ran" role="status">{t('readiness.ranNow', { said: ran })}</p>}
+        {ran === null ? null : (
+          <>
+            <p className="rd-ran" role="status">{t('readiness.state.ran')}</p>
+            <ServerNote text={ran} />
+          </>
+        )}
         {fault === null ? null : <ErrorNote message={fault.message} fault={fault.fault} />}
         {waiting ? (
           <div className="rd-presses">
@@ -253,7 +261,6 @@ export function TheChecklist({ checklist, onPressed }: { checklist: AReadinessCh
             </Btn>
           </div>
         ) : null}
-        {waiting && person !== undefined ? <p className="rd-only">{t('readiness.onlyYou')}</p> : null}
       </div>
     </Panel>
   )

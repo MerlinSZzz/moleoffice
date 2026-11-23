@@ -23,6 +23,10 @@
  * 18 on the owner's machine and strips no types, so a TypeScript import anywhere on the stamp's path would make the
  * hook throw there. This machine has no Node 18, and Node 22 with stripping off refuses a TypeScript import the same way.
  *
+ * THE AGENT THE RUNS ANSWER AS HOLDS A KEY OF ITS OWN, from the door that registers it, and every run of the hook is
+ * given it. A session that names an agent and holds no key of it sends the name alone, and the office lets no name
+ * alone change a run, so the stamps these cases read on a run filed beforehand would not be written without the key.
+ *
  * It runs the real hook, as Claude Code runs it, against a listening server on a throwaway database. Every name, folder
  * and value is made up.
  */
@@ -37,7 +41,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { theClaudeWayBack } from '../src/config/the-way-back.mjs'
 import { THE_PERSON } from '../src/shared/person.ts'
-import { apiApp, freshDb, type TestDb } from './helpers.ts'
+import { A_SLEEP_TIME, apiApp, freshDb, type TestDb } from './helpers.ts'
 
 const CHECKOUT = fileURLToPath(new URL('..', import.meta.url))
 const HOOK = join(CHECKOUT, 'tools', 'session-hook.mjs')
@@ -134,7 +138,8 @@ function todaysStamp(sessionId: string, transcript: string): Record<string, unkn
 
 /**
  * Run the hook as Claude Code runs it, with type stripping off, and hand back what it printed. `run`, when given, is the
- * run its environment names. HOME, TMUX_PANE, any key and the office tool's configuration are never inherited.
+ * run its environment names. The agent's own key goes as MOLE_AGENT_KEY. HOME, TMUX_PANE, any other key, any key file
+ * and the office tool's configuration are never inherited.
  */
 async function theHook(
   mode: 'start' | 'stop',
@@ -149,8 +154,9 @@ async function theHook(
     MOLE_OFFICE_DB: t.file,
     MOLE_HOOK_DETAILS_FOLDER: join(scratch, 'hook-details'),
     MOLE_OFFICE_AGENT: HANDLE,
+    MOLE_AGENT_KEY: agents.get(HANDLE)!.key,
   }
-  for (const name of ['TMUX_PANE', 'CLAUDE_PID', 'MOLE_AGENT_KEY', 'SANDBOX_DIR', 'MOLE_OFFICE_TOOL_CONFIGURATION', 'MOLE_OFFICE_SESSION']) delete env[name]
+  for (const name of ['TMUX_PANE', 'CLAUDE_PID', 'MOLE_AGENT_KEY_FILE', 'SANDBOX_DIR', 'MOLE_OFFICE_TOOL_CONFIGURATION', 'MOLE_OFFICE_SESSION']) delete env[name]
   if (more.run !== undefined) env['MOLE_OFFICE_SESSION'] = more.run
   Object.assign(env, more.env ?? {})
   const child: ChildProcess = spawn(process.execPath, ['--no-experimental-strip-types', HOOK, mode], { env })
@@ -174,7 +180,7 @@ async function theProfilesOriginLines(): Promise<Record<string, any>[]> {
     method: 'POST',
     url: '/api/residents/proposals',
     headers: { ...AS_THE_PERSON, 'x-mole-office-actor-type': 'agent', 'x-mole-office-actor-id': SECRETARY, 'x-mole-office-key': secretary.key },
-    payload: { agentId, because: 'A made-up reason.' },
+    payload: { agentId, because: 'A made-up reason.', sleepTime: A_SLEEP_TIME },
   })
   expect(proposed.statusCode, proposed.body).toBe(201)
   const proposal = (proposed.json() as { proposal: { id: string } }).proposal.id

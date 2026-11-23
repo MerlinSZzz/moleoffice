@@ -1,0 +1,65 @@
+{
+  "why": "The PDF door's refusals (POST /api/report-pdf). tests/the-pdf-door-refuses-and-the-install-finds-its-program.test.ts meets reportPdfTooLarge through the door with a page past the limit, case 3, and reportPdfNoDisplay through the door on Linux with no screen, case 4; tests/a-visitor-may-not-print-a-pdf.test.ts meets reportPdfNoDisplay again, case 7. tests/the-pdf-door-prints-one-page-at-a-time.test.ts meets reportPdfBusy, case 1, reportPdfExited, case 2, reportPdfExitedSaying, case 3, and reportPdfCouldNotStart, case 4, through the door on Linux, with a made-up xvfb-run on PATH. tests/the-window-program-prints-a-page-as-a-pdf.test.ts meets the door's print under a virtual display, case 2. No case meets reportPdfTimedOut, reportPdfWroteNoPdf, reportPdfSignalled or reportPdfSignalledSaying through the door: a time-out takes the door's whole 60 seconds, and no door case was written for the other three. Case 9 of tests/the-pdf-door-refuses-and-the-install-finds-its-program.test.ts meets those four and the other three print codes, from made-up endings given to whatThePrintGave. No door here can meet any of the door's refusals safely: a page past the limit is 64 MB, the screen variables and PATH are read by the whole process, and a print starts a program.",
+  "refusals": [
+    {
+      "code": "reportPdfNoDisplay",
+      "status": 409,
+      "english": "Test: this office runs on a computer with no screen, so it cannot print a PDF.",
+      "values": {}
+    },
+    {
+      "code": "reportPdfBusy",
+      "status": 409,
+      "english": "Test: another PDF is being printed.",
+      "values": {}
+    },
+    {
+      "code": "reportPdfTimedOut",
+      "status": 500,
+      "english": "Test: the office's own program did not finish printing the PDF in time.",
+      "values": { "seconds": 60 }
+    },
+    {
+      "code": "reportPdfCouldNotStart",
+      "status": 500,
+      "english": "Test: the office could not start its own program to print the PDF.",
+      "values": {}
+    },
+    {
+      "code": "reportPdfWroteNoPdf",
+      "status": 500,
+      "english": "Test: the office's own program ended without writing the PDF.",
+      "values": {}
+    },
+    {
+      "code": "reportPdfExited",
+      "status": 500,
+      "english": "Test: the office's own program ended with an exit code before it printed the PDF.",
+      "values": { "code": 3 }
+    },
+    {
+      "code": "reportPdfExitedSaying",
+      "status": 500,
+      "english": "Test: the office's own program ended with an exit code and a last line before it printed the PDF.",
+      "values": { "code": 3, "line": "a made-up last line" }
+    },
+    {
+      "code": "reportPdfSignalled",
+      "status": 500,
+      "english": "Test: the office's own program was stopped by a signal before it printed the PDF.",
+      "values": { "signal": "SIGKILL" }
+    },
+    {
+      "code": "reportPdfSignalledSaying",
+      "status": 500,
+      "english": "Test: the office's own program was stopped by a signal, with a last line, before it printed the PDF.",
+      "values": { "signal": "SIGKILL", "line": "a made-up last line" }
+    },
+    {
+      "code": "reportPdfTooLarge",
+      "status": 413,
+      "english": "Test: this report is too large to print as a PDF.",
+      "values": { "megabytes": 64 }
+    }
+  ]
+}

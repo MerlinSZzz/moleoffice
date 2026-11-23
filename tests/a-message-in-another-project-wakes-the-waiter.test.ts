@@ -43,12 +43,13 @@
 
 import { spawn, type ChildProcess } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
+import { dirname } from 'node:path'
 
 import type { FastifyInstance } from 'fastify'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { THE_PERSON } from '../src/shared/person.ts'
-import { apiApp, freshDb, one, type TestDb } from './helpers.ts'
+import { apiApp, freshDb, one, aTestAgentsKeyEnvironment, type TestDb } from './helpers.ts'
 
 const HERE = 'panelx'
 const THERE = 'robotics'
@@ -56,6 +57,7 @@ const THERE = 'robotics'
 let t: TestDb
 let app: FastifyInstance
 let api = ''
+let keyEnv: NodeJS.ProcessEnv = {}
 let agentId = ''
 let session = ''
 /** Every waiter this file started, killed by the pid recorded at start. */
@@ -84,12 +86,7 @@ beforeAll(async () => {
     expect(made.statusCode, made.body).toBe(201)
   }
   // THE AGENT AND ITS SESSION ARE IN ROBOTICS, which is the project the waiter will be started in.
-  await app.inject({
-    method: 'POST',
-    url: '/api/records',
-    headers: inProject(THERE),
-    payload: { kind: 'agent', title: 'Quill', data: { handle: 'quill', state: 'active', runtime: 'claude-code' } },
-  })
+  keyEnv = await aTestAgentsKeyEnvironment(app, 'quill', dirname(t.file), THERE)
   const listed = (await app.inject({ method: 'GET', url: '/api/participants', headers: inProject(THERE) })).json() as {
     agents?: { id: string; handle: string }[]
   }
@@ -135,7 +132,7 @@ function startTheWaiter(): { said: () => string; ended: Promise<number> } {
       '--workspace',
       THERE,
     ],
-    { env: { ...process.env, MOLE_OFFICE_HANDLE_BEAT_SECONDS: '1' } },
+    { env: { ...keyEnv, MOLE_OFFICE_HANDLE_BEAT_SECONDS: '1' } },
   )
   started.push(child)
   let printed = ''

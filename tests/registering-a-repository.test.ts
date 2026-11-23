@@ -237,12 +237,12 @@ describe('the panel draws every repository in the project', () => {
   })
 
   /**
-   * THE SERVER'S NOTE IS MACHINERY AND STAYS IN DEVELOPER MODE, which is not this panel's decision:
-   * `ServerNote` renders nothing at all in Normal mode, so a route's paragraph — written for an
-   * agent, naming routes and tables — cannot leak onto a person's screen from any surface. What a
-   * person needs here is the form, and the form is what they get.
+   * THE LINE UNDER REGISTER STAYS IN DEVELOPER MODE. It was the route's own paragraph, drawn through
+   * `ServerNote`; it is now the panel's own words in the page's language
+   * (tests/the-repositories-line-is-in-the-page-language.test.ts), drawn in the same mode. What a person
+   * needs here in Normal mode is the form, and the form is what they get.
    */
-  it('keeps the route’s own paragraph in Developer mode and draws it nowhere else', () => {
+  it('draws the line under Register in Developer mode only', () => {
     expect(drawnText(draw(HELD([SCANNED, NO_FOLDER_HERE])))).not.toContain('2 repositories')
     mode.setMode('inspect')
     expect(drawnText(draw(HELD([SCANNED, NO_FOLDER_HERE])))).toContain('2 repositories')

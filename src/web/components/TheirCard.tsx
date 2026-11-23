@@ -42,17 +42,17 @@ import { WhatTheGrantCarries } from './WhatTheGrantCarries.tsx'
 import { RaiseEndChoice, howLongInWords, whenInWords } from './RaiseEndChoice.tsx'
 import { momentOfStampInZone } from '@shared/time.ts'
 import { actingForHead, theEndOfTheLine } from '../lib/acting-line.ts'
-import { gapBetween, wordWithSpacedValues } from '@shared/spacing.ts'
+import { wordWithSpacedValues } from '@shared/spacing.ts'
 import { thePress } from '@shared/the-press.ts'
 import { useInspect } from '../lib/mode.ts'
 import { NotebookNumbers, ParticipantName } from '../pages/NotebookPage.tsx'
-import { Absence, Btn, ErrorNote, Panel, TextArea } from './ui.tsx'
+import { Absence, Btn, ErrorNote, Panel, ServerNote, TextArea } from './ui.tsx'
 import { useProjectAsync } from '../lib/project-async.ts'
 import { ThePressReason } from './ThePressReason.tsx'
 // THE LIMIT ON A GOVERNANCE ACT, DRAWN AND NEVER RETYPED. Criteria P20 and P16: this is the one
 // exported sentence, and a second copy of it is the defect P16 exists to stop.
 import { RouteLink, pathFor, notebookPath, recordPath } from './router.tsx'
-import { whereRequestsGo } from '../lib/visiting.ts'
+import { theCrossOriginOfALoad, whereRequestsGo } from '../lib/visiting.ts'
 import { OpensLarge } from './PictureLarge.tsx'
 import { smallPortrait } from '@shared/portraits.ts'
 import { whatAdmittingSays, type AGrantToWithdraw, type ProfileFacts, type TheAgentsRuns, type TheCardDrawn, type TheCardTheyHold, type WaitingCardAsk, type WhatAnAskShows } from '@shared/profile.ts'
@@ -95,7 +95,6 @@ export function TheirCard({ said, onChanged }: { said: ProfileReply; onChanged: 
         <p className="tc-card-all">
           <RouteLink to={pathFor('roles')} className="tc-card-all-link">
             <span className="tc-card-all-title">{wordWithSpacedValues(t, 'agentPage.card.whatItDoes', { card: cardWord(held.card.name) })}</span>
-            <span className="tc-card-all-sub">{t('agentPage.card.onRoleCards')}</span>
           </RouteLink>
         </p>
       )}
@@ -117,7 +116,7 @@ function ItsModel({ runs }: { runs: TheAgentsRuns }) {
   const inspect = useInspect()
   const newest = runs.runs[0]
   let says: string
-  if (newest === undefined) says = t('agentPage.model.noRun')
+  if (newest === undefined) says = t('agentPage.model.noRunWord')
   else if (newest.model === null) says = t('agentPage.model.notRecorded')
   else {
     const name = theModelsName(newest.model)
@@ -194,8 +193,6 @@ function ItsNotebook({ handle, notebook }: { handle: string; notebook: NotebookO
     <div className="tc-notebook">
       <p className="tc-notebook-line">
         <RouteLink to={notebookPath('agent', handle)}>{t('g6b.profile.notebookOpen')}</RouteLink>
-        {gapBetween(t('g6b.profile.notebookOpen'), t('g6b.profile.notebookSays'))}
-        <span className="tc-notebook-says">{t('g6b.profile.notebookSays')}</span>
       </p>
       {/* Criterion N3: the server counts these values. NotebookNumbers draws the same translated
           labels here and on the Role cards page, and reads the last writer's name. */}
@@ -212,20 +209,12 @@ function ItsNotebook({ handle, notebook }: { handle: string; notebook: NotebookO
   )
 }
 
-/** Which sentence says where a step stands among the tree's steps. */
-function stepSaysKey(rung: number, steps: number): 'g6b.profile.cardStepTop' | 'g6b.profile.cardStepBottom' | 'g6b.profile.cardStepMiddle' | 'g6b.profile.cardStepOnly' {
-  if (steps <= 1) return 'g6b.profile.cardStepOnly'
-  if (rung >= steps) return 'g6b.profile.cardStepTop'
-  if (rung <= 1) return 'g6b.profile.cardStepBottom'
-  return 'g6b.profile.cardStepMiddle'
-}
-
 function TheCardItself({ said }: { said: TheCardTheyHold }) {
   const card: TheCardDrawn | null = said.card
   if (card === null) {
     return (
       <p className="tc-card-gone">
-        <Absence tier="told-apart" looked word={t('g6b.profile.cardNotDeclared')} title={t('g6b.profile.cardNotDeclaredSays')} />
+        <Absence tier="told-apart" looked word={t('g6b.profile.cardNotDeclared')} title={t('g6b.profile.cardNotDeclaredTitle')} />
       </p>
     )
   }
@@ -234,8 +223,8 @@ function TheCardItself({ said }: { said: TheCardTheyHold }) {
       {/* THE PICTURE, from the card's own set. It is the card's face and not the agent's: the
           agent's own picture is at the top of this page, where a reader looks for a face. A small copy
           is drawn, and a press opens the whole picture. */}
-      <OpensLarge src={whereRequestsGo(card.portrait)} alt={t('g6b.cardPicture', { name: cardWord(card.name) })}>
-        <img className="tc-card-portrait" src={whereRequestsGo(smallPortrait(card.portrait))} alt={t('g6b.cardPicture', { name: cardWord(card.name) })} />
+      <OpensLarge src={whereRequestsGo(card.portrait)} crossOrigin={theCrossOriginOfALoad()} alt={t('g6b.cardPicture', { name: cardWord(card.name) })}>
+        <img className="tc-card-portrait" src={whereRequestsGo(smallPortrait(card.portrait))} crossOrigin={theCrossOriginOfALoad()} alt={t('g6b.cardPicture', { name: cardWord(card.name) })} />
       </OpensLarge>
       <div className="tc-card-body">
         <div className="tc-card-top">
@@ -244,12 +233,10 @@ function TheCardItself({ said }: { said: TheCardTheyHold }) {
             {card.rung === null ? t('g6b.profile.cardNoRung') : t('g6b.profile.cardRung', { n: card.rung, steps: card.steps })}
           </span>
         </div>
-        {/* WHAT THE STEP MEANS, in a sentence a person can act on, and the way to the tree itself (the review of wave
-            13q's round 32). The number stays on the card, as the owner's decision says in
-            answer 4. */}
+        {/* THE WAY TO THE TREE ITSELF (the review of wave 13q's round 32). The number stays on the card, as the
+            owner's decision says in answer 4. */}
         {card.rung === null ? null : (
           <p className="tc-card-step">
-            {t(stepSaysKey(card.rung, card.steps))}{gapBetween(t(stepSaysKey(card.rung, card.steps)), t('g6b.profile.cardSeeTree'))}
             <RouteLink to={pathFor('roles')} className="tc-card-tree">{t('g6b.profile.cardSeeTree')}</RouteLink>
           </p>
         )}
@@ -426,7 +413,6 @@ export function TheCardAsk({
         {THEIR_CARD_CSS}
       </style>
       <p className="tc-ask-says">{says}</p>
-      {ask.whoMayPress === undefined ? null : <p className="tc-ask-who">{t(`w13w.ask.whoMayPress.${ask.whoMayPress}`)}</p>}
       {/* A FAILED PRESS SAYS SO in a plain sentence, and the reason follows. */}
       {fault === null ? null : <p className="tc-ask-failed">{whatAFailedPressSays(ask)}</p>}
       {fault === null ? null : <ErrorNote message={fault.message} fault={fault.fault} />}
@@ -500,7 +486,7 @@ export function ThePressOnAnAsk({ ask, onChanged }: { ask: WaitingCardAsk | unde
  * THE PRESS THAT WITHDRAWS A NEW-KEY GRANT NOBODY COLLECTED, by point 9 of a decision.
  *
  * Drawn on the ask's own record page, to the person only, while the ask is granted and nobody has
- * collected the key: the server sends it only then. The sentence of what it does is the server's.
+ * collected the key: the server sends it only then. The server's sentence of what it does is drawn in developer mode.
  * A starter that granted the ask withdraws it through the door with its own key, not here.
  */
 export function TheGrantToWithdraw({ grant, onChanged }: { grant: AGrantToWithdraw; onChanged: () => void }) {
@@ -528,7 +514,7 @@ export function TheGrantToWithdraw({ grant, onChanged }: { grant: AGrantToWithdr
       <style href="mole-office-their-card" precedence="default">
         {THEIR_CARD_CSS}
       </style>
-      <p className="tc-ask-says">{grant.says}</p>
+      <ServerNote text={grant.says} />
       {fault === null ? null : <ErrorNote message={fault.message} fault={fault.fault} />}
       <div className="tc-acts">
         <Btn onClick={withdraw} disabled={busy} reason={busy ? WITHDRAW_WORDS.working : undefined}>
@@ -869,7 +855,7 @@ function TheActsOfThisPeriod({
     <div className="tc-period">
       <p className="tc-period-head">
         <span className="tc-label">{t('g6b.profile.periodActs')}</span>
-        {period.holds ? null : <span className="tc-period-ended">{t('g6b.profile.periodEnded')}</span>}
+        {period.holds ? null : <span className="tc-period-ended">{t('g6b.profile.periodEndedWord')}</span>}
       </p>
       {acts.length === 0 ? (
         <p className="tc-period-none"><Absence say title={t('g6b.profile.periodNothingYet')} /></p>
@@ -958,7 +944,6 @@ function TheDoorPressed({ door }: { door: ActUnderThePeriod['door'] }) {
 const THEIR_CARD_CSS = `
 .tc-notebook { margin: var(--gut) 0 0 0; }
 .tc-notebook-line { margin: 0; }
-.tc-notebook-says { color: var(--text-3); }
 .tc-notebook-none { margin: var(--pad) 0 0 0; }
 .tc-notebook-counts { display: flex; flex-wrap: wrap; gap: var(--gut); margin: var(--pad) 0 0 0; }
 .tc-notebook-count { min-width: 0; display: flex; gap: var(--pad); align-items: baseline; }
@@ -986,7 +971,6 @@ const THEIR_CARD_CSS = `
 .tc-card-all-link { display: flex; flex-direction: column; gap: 2px; min-width: 0; color: var(--text); text-decoration: none; }
 .tc-card-all-link:hover .tc-card-all-title { text-decoration: underline; }
 .tc-card-all-title { font-size: var(--fs-2); overflow-wrap: anywhere; }
-.tc-card-all-sub { font-size: var(--fs-1); color: var(--text-3); overflow-wrap: anywhere; }
 .tc-card-gone { margin: 0 0 var(--pad); }
 /* WHICH MODEL ITS NEWEST RUN HERE WAS STARTED ON: one quiet line under the card. */
 .tc-model { margin: 0 0 var(--pad); color: var(--text-2); font-size: var(--fs-1); overflow-wrap: anywhere; }
@@ -1041,7 +1025,6 @@ const THEIR_CARD_CSS = `
   color: var(--text);
   font: var(--fs-2)/var(--lh-read) var(--font-ui);
 }
-.tc-ask-who { margin: 0 0 var(--pad); max-width: var(--measure); color: var(--text-2); font: var(--fs-2)/var(--lh-read) var(--font-ui); }
 .tc-pick { flex: 1 1 12rem; min-width: 0; max-width: 20rem; }
 .tc-acts { display: flex; flex-wrap: wrap; align-items: center; gap: var(--pad); min-width: 0; }
 

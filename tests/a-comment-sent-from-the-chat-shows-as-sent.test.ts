@@ -143,7 +143,7 @@ it('reads the shown conversation comments fresh at Send, redraws an edited body 
     await intercepted.continue()
   }, { times: 1 })
   await page.getByRole('button', { name: 'Send them', exact: true }).click()
-  await page.getByText('Nothing was sent. The unsent comments or their review changed after they were shown. The conversation has been read again.', { exact: true }).waitFor({ timeout: 10_000 })
+  await page.getByText(en.t('review.b.changedNothingSent'), { exact: true }).waitFor({ timeout: 10_000 })
   await page.getByText('The shelf was measured twice.', { exact: true }).waitFor({ timeout: 10_000 })
   expect(freshReads, 'the successful fresh reply itself supplies the redraw').toBe(1)
   expect((await ask(`/api/reviews/${review.review.id}`)).review.state).toBe('collecting')
@@ -164,7 +164,7 @@ it('reads the shown conversation comments fresh at Send, redraws an edited body 
 
 // THE OTHER BRANCH OF `sendTheComments`: the review shows no change, so the narrowed read is asked, and it differs.
 // The body is changed inside the narrowed read, after the review was read, so only that read can see the new one.
-// It has its own agent: an earlier case leaves an unsent comment of an abandoned review in its conversation with fern, and with that comment shown the narrowed read is not asked.
+// It has its own agent, so the unsent comment of the abandoned review an earlier case leaves with fern is not in its conversation.
 it('compares the unsent comments through the narrowed read at Send, reads the conversation whole when they differ and sends nothing', async () => {
   const page = app.page
   await file('agent', 'Sage Test', { handle: 'sage-narrowed-test', runtime: 'codex', state: 'active' })
@@ -194,7 +194,7 @@ it('compares the unsent comments through the narrowed read at Send, reads the co
     await intercepted.continue()
   })
   await page.getByRole('button', { name: 'Send them', exact: true }).click()
-  await page.getByText(en.t('chat.commentsChangedAtSend'), { exact: true }).waitFor({ timeout: 10_000 })
+  await page.getByText(en.t('review.b.changedNothingSent'), { exact: true }).waitFor({ timeout: 10_000 })
   await page.getByText('The ferns were watered twice.', { exact: true }).waitFor({ timeout: 10_000 })
   // WHAT EACH READ ASKED: its query's names, with the narrowing's value. A whole read asks for no page and no narrowing.
   const asked = reads.map(one => [...new URL(one).searchParams].map(([name, value]) => name === 'only' ? `only=${value}` : name).sort())

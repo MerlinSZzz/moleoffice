@@ -1,5 +1,9 @@
 // Copyright © 2026 Zhengyang Shen
 // Licensed under the MIT License. See LICENSE.
+// Criterion change (wave 13s round 281, decision OQR0WDVq0FkP, H13 of decision zuYDJZ36Z-5A): the point counts hold
+// each value a point's state, briefId and briefsCarried can hold, at the count it has today. Before, the cases wrote
+// only the four words, a missing state, one other stored word, an integer briefsCarried given by packaging and a
+// briefId given by packaging, so counts worked out another way could differ on every other value with nothing failing.
 /**
  * THE PROJECT'S PROGRESS, READ FROM ITS POINTS AND ITS INSIDE BRIEFS. Wave 13s round 235, on a decision and the design
  * report 1NH-LLi6LGb-.
@@ -15,7 +19,12 @@
  *   3. a point carried through three inside briefs is counted until it is marked done, when the count falls to 0;
  *   4. a point with no state, and a stored state that is not one of the four, are both gaps and never `todo`;
  *   5. a read writes no record, a POST to the read's address is 404, and there is no `progress` record kind;
- *   6. `?line` narrows the points to exactly that line and is echoed; without it every live point is counted.
+ *   6. `?line` narrows the points to exactly that line and is echoed; without it every live point is counted;
+ *   7 to 17. one point each, with a value written under the door, and every count of the reply as it is today:
+ *      - a state of 1 or of true is a gap;
+ *      - a briefId that is empty, the number 7 or an object is in no brief, and a non-empty one is in a brief;
+ *      - briefsCarried of 3.5 is carried, and 2.5 and the string "3" are not;
+ *      - a dropped point carried through 3 briefs is not counted, and a point with no state carried through 3 is.
  *
  * MUTATIONS, each run alone after a green control and restored after:
  *   - the gap is counted into `todo`: case 1 and case 4 go red on the counts;
@@ -29,7 +38,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import type { ProjectProgress } from '../src/shared/progress.ts'
 import { THE_MESSAGE_WORKER_ID } from '../src/shared/participants.ts'
 import { RECORD_KINDS } from '../src/shared/types.ts'
-import { apiApp, freshDb, theOfficesKeyHeader, type TestDb } from './helpers.ts'
+import { apiApp, freshDb, theOfficesKeyHeader, type TestDb, governsTheWholeProject } from './helpers.ts'
 import { THE_TEST_OFFICES_OWNER } from './a-page-of-a-test-office.ts'
 
 let t: TestDb
@@ -74,7 +83,7 @@ async function file(
   data: Record<string, unknown> = {},
   headers: Record<string, string> = human(),
 ): Promise<string> {
-  const withReplaces = kind === 'decision' && !Object.hasOwn(data, 'replaces') ? { replaces: [], ...data } : data
+  const withReplaces = kind === 'decision' ? { ...governsTheWholeProject(), replaces: [], ...data } : data
   const res = await app.inject({ method: 'POST', url: '/api/records', headers, payload: { kind, title, data: withReplaces } })
   expect(res.statusCode, res.body).toBe(201)
   return (res.json() as { record: { id: string } }).record.id
@@ -166,6 +175,16 @@ async function step(
 /** How many records the table holds, deleted or not. */
 function recordsStored(): number {
   return (t.client.sqlite.prepare('SELECT count(*) AS n FROM records').get() as { n: number }).n
+}
+
+/**
+ * Write fields of a point under the door, as case 4 writes its stored word: values the door would not take, from a
+ * record filed by an older spec or changed by a hand the server did not see. Each value is given as JSON text.
+ */
+function writeUnderTheDoor(id: string, fields: Record<string, string>): void {
+  for (const [field, json] of Object.entries(fields)) {
+    t.client.sqlite.prepare("UPDATE records SET data = json_set(data, '$.' || ?, json(?)) WHERE id = ?").run(field, json, id)
+  }
 }
 
 describe("the project's progress", () => {
@@ -375,5 +394,67 @@ describe("the project's progress", () => {
     expect(narrowed.points.inNoBrief).toBe(2)
     expect(narrowed.says).toContain('13s')
     expect(narrowed.says).toContain('outside packages')
+  })
+
+  it('7. counts a point whose state is the number 1 as a gap: noState 1, todo 0', async () => {
+    writeUnderTheDoor(await point('number state point'), { state: '1' })
+    expect((await progress()).points).toEqual({ total: 1, todo: 0, doing: 0, done: 0, dropped: 0, noState: 1, inNoBrief: 1, carriedThreeBriefs: 0 })
+  })
+
+  it('8. counts a point whose state is true as a gap: noState 1, todo 0', async () => {
+    writeUnderTheDoor(await point('true state point'), { state: 'true' })
+    expect((await progress()).points).toEqual({ total: 1, todo: 0, doing: 0, done: 0, dropped: 0, noState: 1, inNoBrief: 1, carriedThreeBriefs: 0 })
+  })
+
+  it('9. counts a point whose briefId is an empty string as in no brief: inNoBrief 1', async () => {
+    writeUnderTheDoor(await point('empty brief point'), { briefId: '""' })
+    expect((await progress()).points).toEqual({ total: 1, todo: 1, doing: 0, done: 0, dropped: 0, noState: 0, inNoBrief: 1, carriedThreeBriefs: 0 })
+  })
+
+  it('10. counts a point whose briefId is the number 7 as in no brief: inNoBrief 1', async () => {
+    writeUnderTheDoor(await point('number brief point'), { briefId: '7' })
+    expect((await progress()).points).toEqual({ total: 1, todo: 1, doing: 0, done: 0, dropped: 0, noState: 0, inNoBrief: 1, carriedThreeBriefs: 0 })
+  })
+
+  it('11. counts a point whose briefId is an object as in no brief: inNoBrief 1', async () => {
+    writeUnderTheDoor(await point('object brief point'), { briefId: '{"id":"made-up-brief"}' })
+    expect((await progress()).points).toEqual({ total: 1, todo: 1, doing: 0, done: 0, dropped: 0, noState: 0, inNoBrief: 1, carriedThreeBriefs: 0 })
+  })
+
+  it('12. counts a point whose briefId is a non-empty string written under the door as in a brief: inNoBrief 0', async () => {
+    writeUnderTheDoor(await point('written brief point'), { briefId: '"made-up-brief"' })
+    expect((await progress()).points).toEqual({ total: 1, todo: 1, doing: 0, done: 0, dropped: 0, noState: 0, inNoBrief: 0, carriedThreeBriefs: 0 })
+  })
+
+  it('13. counts a point carried through 3.5 briefs: carriedThreeBriefs 1', async () => {
+    writeUnderTheDoor(await point('three and a half point'), { briefsCarried: '3.5' })
+    expect((await progress()).points).toEqual({ total: 1, todo: 1, doing: 0, done: 0, dropped: 0, noState: 0, inNoBrief: 1, carriedThreeBriefs: 1 })
+  })
+
+  it('14. does not count a point carried through 2.5 briefs: carriedThreeBriefs 0', async () => {
+    writeUnderTheDoor(await point('two and a half point'), { briefsCarried: '2.5' })
+    expect((await progress()).points).toEqual({ total: 1, todo: 1, doing: 0, done: 0, dropped: 0, noState: 0, inNoBrief: 1, carriedThreeBriefs: 0 })
+  })
+
+  it('15. does not count a point whose briefsCarried is the string "3": carriedThreeBriefs 0', async () => {
+    writeUnderTheDoor(await point('string carried point'), { briefsCarried: '"3"' })
+    expect((await progress()).points).toEqual({ total: 1, todo: 1, doing: 0, done: 0, dropped: 0, noState: 0, inNoBrief: 1, carriedThreeBriefs: 0 })
+  })
+
+  it('16. does not count a dropped point carried through 3 briefs: carriedThreeBriefs 0', async () => {
+    writeUnderTheDoor(await point('dropped carried point', { state: 'dropped' }), { briefsCarried: '3' })
+    expect((await progress()).points).toEqual({ total: 1, todo: 0, doing: 0, done: 0, dropped: 1, noState: 0, inNoBrief: 1, carriedThreeBriefs: 0 })
+  })
+
+  it('17. counts a point with no state carried through 3 briefs: carriedThreeBriefs 1, noState 1', async () => {
+    const stateless = await file('backlog_item', 'no state carried point', {
+      line: '13s',
+      number: 'one',
+      placedBy: { kind: 'person', id: THE_TEST_OFFICES_OWNER.id },
+      why: 'Made-up: this point was filed with no state at all.',
+      doneWhen: 'Made-up: it is true.',
+    })
+    writeUnderTheDoor(stateless, { briefsCarried: '3' })
+    expect((await progress()).points).toEqual({ total: 1, todo: 0, doing: 0, done: 0, dropped: 0, noState: 1, inNoBrief: 1, carriedThreeBriefs: 1 })
   })
 })

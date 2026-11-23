@@ -5,7 +5,8 @@ import { useLanguage } from '../lib/language.ts'
 import { useEffect, useState, type ReactNode } from 'react'
 import type { WhatThePairingSays } from '@shared/pairing.ts'
 import { faultOf, api, errorMessage } from '../api.ts'
-import { RouteLink } from '../components/router.tsx'
+import { RouteLink, whoPath } from '../components/router.tsx'
+import { THE_PERSON } from '@shared/person.ts'
 import { Absence, Btn, ErrorNote, Loading, Panel, type AsyncState } from '../components/ui.tsx'
 import { isTheWindow } from '../../config/the-window-mark.mjs'
 /**
@@ -17,6 +18,15 @@ import { isTheWindow } from '../../config/the-window-mark.mjs'
 function inTheWindow(): boolean {
   return typeof navigator !== 'undefined' && isTheWindow(navigator.userAgent)
 }
+/**
+ * THE TWO WORDS THAT LEAD TO THE PERSON'S CARD, design C of early idea B9. A paired browser is led to their own
+ * card, where their browsers are, and a waiting one is told to confirm it there. Both meant another page
+ * before, so they are new words rather than new meanings for the old ones.
+ */
+export const PAIRING_KEYS_ON_HIS_CARD = {
+  go: 'w13s.pairing.goToYourCard',
+  waitingAt: 'w13s.pairing.confirmOnYourCard',
+} as const
 export const PAIRING_WORDS = {
   get what() { return inTheWindow() ? t('w13t.pairing.window.what') : t('g4.pairing.what') },
   get onePress() { return inTheWindow() ? t('w13t.pairing.window.onePress') : t('g4.pairing.onePress') },
@@ -24,13 +34,13 @@ export const PAIRING_WORDS = {
   get paired() { return inTheWindow() ? t('w13t.pairing.window.paired') : t('g4.pairing.paired') },
   get press() { return inTheWindow() ? t('w13t.pairing.window.press') : t('g4.pairing.press') },
   get pressing() { return inTheWindow() ? t('w13t.pairing.window.pressing') : t('g4.pairing.pressing') },
-  get go() { return t('g4.pairing.go') },
+  get go() { return t(PAIRING_KEYS_ON_HIS_CARD.go) },
   get askWhat() { return t('g4.pairing.askWhat') },
   get askUnder() { return t('g4.pairing.askUnder') },
   get ask() { return t('g4.pairing.ask') },
   get asking() { return t('g4.pairing.asking') },
   get waitingUnder() { return t('g4.pairing.waitingUnder') },
-  get waitingAt() { return t('g4.pairing.waitingAt') },
+  get waitingAt() { return t(PAIRING_KEYS_ON_HIS_CARD.waitingAt) },
   get ended() { return inTheWindow() ? t('w13t.pairing.window.ended') : t('g4.pairing.ended') },
   get endedAsk() { return t('g4.pairing.endedAsk') },
   get elsewhere() { return t('g4.pairing.elsewhere') },
@@ -86,6 +96,21 @@ function whatThisBrowserIs(): string {
 export function theNameThisBrowserGivesItself(): string {
   return t('g4.pairing.deviceName', { browser: whatThisBrowserIs(), tail: aShortTail() })
 }
+/**
+ * THE NAME THIS BROWSER GAVE ITSELF, read without writing, or null where it never made its tail. The person's
+ * card compares it with their live browsers to mark the one they read on, so reading it must not make one.
+ */
+export function theNameThisBrowserGaveItself(): string | null {
+  const held = ((): string | null => {
+    try {
+      return window.localStorage.getItem(DEVICE_TAIL_KEY)
+    } catch {
+      return null
+    }
+  })()
+  if (held === null || !/^[0-9a-f]{4}$/.test(held)) return null
+  return t('g4.pairing.deviceName', { browser: whatThisBrowserIs(), tail: held })
+}
 export function PairingPage({
   said,
   onPaired,
@@ -112,7 +137,7 @@ export function PairingPage({
     setFault(null)
     setBusy(true)
     void api
-      .pairThisBrowser()
+      .pairThisBrowser(deviceName)
       .then(() => {
         setBusy(false)
         onPaired()
@@ -172,7 +197,7 @@ export function PairingPage({
     body = (
       <>
         <p className="pair-say">{PAIRING_WORDS.paired}</p>
-        <RouteLink to="/" className="pair-go">
+        <RouteLink to={whoPath('person', THE_PERSON)} className="pair-go">
           {PAIRING_WORDS.go}
         </RouteLink>
       </>

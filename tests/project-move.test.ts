@@ -24,8 +24,9 @@
  * `the line on every record page` is that name reaching a screen. A test of `projectName` alone
  * would prove the function and not the line, and the line is where the reader meets it.
  *
- * `what the panel says` is the sentences a person reads before pressing, and the destinations they
- * are offered. Rendered with react-dom/server, as every component test in this repository is: the
+ * `what the panel says` is what a person reads before pressing: the project's name, the destinations they
+ * are offered, and "No other project" when there are none. Before, it was three sentences about how a
+ * move works; the panel draws no explanation now, as decided. Rendered with react-dom/server, as every component test in this repository is: the
  * runner's environment is `node` and there is no DOM, so what these CANNOT see is anything behind a
  * press. That is the next group's job.
  *
@@ -42,6 +43,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { PanelRecord } from '../src/shared/types.ts'
 import { UNASSIGNED_WORKSPACE, type WorkspaceReading } from '../src/shared/workspaces.ts'
 import type { MoveReport } from '../src/server/lib/move.ts'
+import { sayInEnglish } from '../src/shared/i18n.ts'
 import { THE_TEST_OFFICES_OWNER } from './a-page-of-a-test-office.ts'
 import { apiApp, freshDb, type TestDb } from './helpers.ts'
 
@@ -210,28 +212,21 @@ describe('what the panel says before anything is pressed', () => {
   const panel = (r: PanelRecord, list = installation()): ReactElement =>
     h(projects.MoveToProject, { record: r, projects: list })
 
-  it('says a record is in one project at a time, and what moving takes it out of', () => {
-    const said = words(panel(record({ workspaceId: 'robotics' })))
-    expect(said).toContain('This record is in Robotics')
-    expect(said).toContain('one project at a time')
-    expect(said).toContain('takes it out of this one')
+  /** The panel's own lines, in order, as text. */
+  const lines = (el: ReactElement): string[] =>
+    [...body(el).matchAll(/<p class="mv-line[^"]*">([^<]*)<\/p>/gu)].map((m) => m[1] ?? '')
+
+  it('names the project the record is in, as its one line before a choice', () => {
+    // Before, this line was a sentence on how a move works, followed by another on links. The panel
+    // draws no explanation now, as decided: the name under the panel's heading is the whole line.
+    expect(lines(panel(record({ workspaceId: 'robotics' })))).toEqual(['Robotics'])
   })
 
-  it('answers the question about links in words, not in a comment', () => {
-    const said = words(panel(record()))
-    expect(said).toContain('A link cannot join two projects')
-    expect(said).toContain('has to move with it')
-    expect(said).toContain('Nothing is ever unlinked to make a move possible')
-  })
-
-  it('says what being in Unassigned means, on the records that are in it', () => {
-    // THE SENTENCE THAT TELLS UNASSIGNED FROM GENERAL. Both are catch-alls and their names do not
-    // say the difference, so the one screen where somebody chooses between them says it.
-    expect(words(panel(record({ workspaceId: UNASSIGNED_WORKSPACE })))).toContain(projects.unassignedMeans())
-    expect(words(panel(record({ workspaceId: 'robotics' })))).not.toContain(projects.unassignedMeans())
-    // And it is not said about General, which is the other catch-all and means the opposite: work
-    // somebody deliberately put there.
-    expect(words(panel(record({ workspaceId: 'general' })))).not.toContain(projects.unassignedMeans())
+  it('draws the same one line on a record in Unassigned or General as on any other', () => {
+    // Before, a record in Unassigned drew a sentence on what being in it means. That sentence was an
+    // explanation of a state, and the panel draws none now, as decided.
+    expect(lines(panel(record({ workspaceId: UNASSIGNED_WORKSPACE })))).toEqual(['Unassigned'])
+    expect(lines(panel(record({ workspaceId: 'general' })))).toEqual(['General'])
   })
 
   it('offers every other project by its plain name and its size, and never the one it is in', () => {
@@ -245,10 +240,10 @@ describe('what the panel says before anything is pressed', () => {
     expect(said).not.toContain('Unassigned — 92 records')
   })
 
-  it('says so when there is nowhere to move it to, instead of an empty list', () => {
+  it('draws "No other project" when there is nowhere to move it to, instead of an empty list', () => {
     const alone = installation().filter((w) => w.id === 'robotics')
     const said = words(panel(record({ workspaceId: 'robotics' }), alone))
-    expect(said).toContain('is the only project this installation has')
+    expect(said).toContain(sayInEnglish('moveToProject.noOtherProject'))
     expect(said).not.toContain('Move it to')
   })
 })
@@ -326,11 +321,12 @@ describe('the requests the panel sends, against the real server', () => {
     const done = JSON.parse(made.body) as MoveReport
     expect(done.dryRun).toBe(false)
 
-    // THE SCREEN THAT FOLLOWS, drawn from the report the server really sent. It has to quote what
-    // happened, name both projects in the reader's words, and say that the rest of the page is a
-    // moment old — that last one is what keeps it from being a page that looks current and is not.
+    // THE SCREEN THAT FOLLOWS, drawn from the report the server really sent. It has to name both
+    // projects in the reader's words and say that the rest of the page is a moment old — that last
+    // one is what keeps it from being a page that looks current and is not. The server's own
+    // sentence is drawn in developer mode only, as decided; before, it was quoted whole here.
     const said = words(h(projects.Moved, { report: done, projects: installation() }))
-    expect(said).toContain(done.note)
+    expect(said, 'the server’s sentence is drawn in developer mode only').not.toContain(done.note)
     expect(said).toContain('This record is in Robotics now')
     // BOTH PROJECTS BY THE TITLE THE SERVER STORES. This said "Not in a project" until the owner
     // settled decision `AtiSHfG00BVV` and the browser stopped renaming the catch-all.

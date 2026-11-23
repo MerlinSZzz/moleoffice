@@ -133,7 +133,7 @@ export async function beforeTheOfficeStarts(kind: OfficeKind, bad?: RecoveryCase
       if (decision.serve || decision.update === undefined) throw new Error('The main fixture must need the two pending migrations.')
       const backups = join(folder, 'backups'); mkdirSync(backups)
       const { theReducedMode } = await import('../src/server/lib/the-update.ts')
-      const reduced = theReducedMode({ sqlite, offer: { file, holds: decision.update.holds, wouldWrite: decision.update.wouldWrite, backups }, migrationsFolder: migrations, headers: () => ({}) })
+      const reduced = theReducedMode({ sqlite, offer: { file, holds: decision.update.holds, wouldWrite: decision.update.wouldWrite, measuredOn: decision.update.measuredOn, backups }, migrationsFolder: migrations, headers: () => ({}) })
       const { chromium } = await import('playwright')
       const browser = await chromium.launch()
       try {
@@ -449,7 +449,7 @@ export async function storedSidebarStillLoads(office: Office) {
   expect(moved.groups.find(group => group.key === 'office')!.keys).toEqual(stored.groups.find(group => group.key === 'office')!.keys)
   // The moved page reads every project, so the phone's top bar names no project over it; Modules reads one, and names it.
   await open(office, 'flows', 390)
-  expect(await office.app.page.locator('.shell-bar-page').textContent()).toBe('Flows')
+  expect(await office.app.page.locator('.shell-bar-page').textContent()).toBe('Office flows')
   expect(await office.app.page.locator('.shell-bar-project').count()).toBe(0)
   await open(office, 'modules', 390)
   expect(await office.app.page.locator('.shell-bar-project').count()).toBe(1)

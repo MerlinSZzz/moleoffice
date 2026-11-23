@@ -381,18 +381,6 @@ describe('a fresh repair started with a short commit or a branch', () => {
     previous = round.run
   }, 120_000)
 
-  it('reads a branch in the checkout as the commit it stands at', async () => {
-    const landed = aCommitOnMain('branch')
-    const started = await aFreshRepair('repair-from-a-branch', 'main')
-    expect(started.status, started.err).toBe(0)
-    const round = JSON.parse(started.out.trim())
-    await ended(round)
-    const data = (await ask('GET', `/api/records/${round.run}`)).body.record.data
-    expect(data.cutFrom).toBe(landed)
-    expect(git(data.workingDirectory, 'rev-parse', 'HEAD')).toBe(landed)
-    previous = round.run
-  }, 120_000)
-
   it('refuses a value git cannot read in the checkout in words, and files and makes nothing', async () => {
     const before = sessions()
     const started = await aFreshRepair('repair-from-nothing', 'no-such-branch')

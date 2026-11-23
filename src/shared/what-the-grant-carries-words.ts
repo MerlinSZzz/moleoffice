@@ -108,6 +108,10 @@ export const THE_DOORS_THE_LIST_NAMES: Readonly<Record<string, WhatADoorDoes>> =
     en: 'Installing agent tools',
     zh: '安装智能体工具',
   },
+  'harnesses.signed-in': {
+    en: 'Reading an agent tool\'s sign-in state',
+    zh: '读取智能体工具的登录状态',
+  },
   'terminals.list': {
     en: 'Reading the office\'s terminals. A secretary may do this with its own key.',
     zh: '读取办公室的终端列表',
@@ -117,7 +121,7 @@ export const THE_DOORS_THE_LIST_NAMES: Readonly<Record<string, WhatADoorDoes>> =
     zh: '打开一个终端',
   },
   'terminals.read': {
-    en: 'Reading a terminal. With its own key and no grant, a secretary may read only agents\' terminals.',
+    en: 'Reading a terminal. With its own key and no grant, a secretary may read only agents\' terminals, and a terminal it prepared for the person while it runs.',
     zh: '读取一个终端的内容',
   },
   'terminals.type': {
@@ -155,6 +159,11 @@ export const THE_DOORS_THE_LIST_NAMES: Readonly<Record<string, WhatADoorDoes>> =
   'terminals.set-keeping': {
     en: 'Turning on or off keeping what is typed in a terminal',
     zh: '开启或关闭终端保留输入内容',
+  },
+  // THE CHINESE IS THE ENGLISH until the translation round writes it.
+  'terminals.name': {
+    en: 'Giving a terminal a name, a group and tags',
+    zh: 'Giving a terminal a name, a group and tags',
   },
   'message.remind-me-later': {
     en: 'Asking to be reminded about a message later',

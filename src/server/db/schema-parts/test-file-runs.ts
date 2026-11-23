@@ -8,6 +8,12 @@ import { toolUses } from './tool-uses.ts'
 const existingArchive = { existingArchive: true } as const
 
 
+/**
+ * ONE TEST FILE'S RESULT IN ONE USE, migration 0279.
+ * Authored: a named test run observed this result, and nothing can recreate that observation.
+ * The use owns the run and the time; neither is copied here. Tree commit and change repeat on each
+ * file of a use because a table was chosen, not a column on tool_uses. Its project follows the use.
+ */
 export const testFileRuns = aPartTable(sqliteTable(
   'test_file_runs',
   {

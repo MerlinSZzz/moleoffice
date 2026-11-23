@@ -5,13 +5,9 @@ import { parseLocalStamp } from './time.ts'
 import { wordsIn, type EnglishWords } from './words/joined.ts'
 import { EFFECTIVE_WORD_LISTS, savedWords } from './word-settings.ts'
 import { connectStoredWordReader } from './stored-word-reader.ts'
+import { LANGUAGES, type Language } from './languages.ts'
 
-/**
- * The account and the pages share this declaration. The test language is never stored. The six languages after
- * Chinese are named in their own language, as a person choosing one expects to read it.
- */
-export const LANGUAGES = { en: 'English', zh: '中文', el: 'Ελληνικά', es: 'Español', it: 'Italiano', ko: '한국어', pt: 'Português', th: 'ไทย' } as const
-export type Language = keyof typeof LANGUAGES
+export { LANGUAGES, type Language }
 export type PageLanguage = Language | 'xx'
 export type WordKey = keyof EnglishWords
 export type WordValues = Readonly<Record<string, string | number>>

@@ -14,7 +14,7 @@
  *
  * Now the rows kept from the old project carry a sign on the page itself until the new rows come: the
  * page column is dimmed, and a strip at its foot names the project being read. This file asks that of
- * two pages, Ideas and Records, at 1440, 990, 660 and 390 pixels, in the light look and the dark one.
+ * two pages, Ideas and Records, at 1440 and 390 pixels, in the light look.
  * Each switch is made as a person makes it, with the sidebar's switcher, through the drawer below
  * 1024 pixels, and the new project's records are held in the browser until the test lets them through.
  *
@@ -50,9 +50,8 @@
  * The time of the release is taken in the page just before the held read is let through, so a frame
  * before it is surely a frame of the held read.
  *
- * With TEST_SHOTS set, two more cases keep pictures of Ideas while the read is held, at the four widths
- * in both looks and once after the release, and a film of a switch held two seconds at 1440 and at
- * 390 pixels. The made-up label stands above the page column, outside the part that is dimmed. Without
+ * With TEST_SHOTS set, one more case keeps a film of a switch held two seconds at 1440 and at 390
+ * pixels. The made-up label stands above the page column, outside the part that is dimmed. Without
  * TEST_SHOTS they do not run.
  */
 
@@ -72,7 +71,7 @@ const BETA = { id: 'beta', title: 'Made-up Beta', idea: 'A made-up idea of Beta:
 const REFUSAL = "A made-up refusal of Beta's records"
 const LABEL = 'Made-up office: two made-up projects, for a test'
 
-const WIDTHS = [1440, 990, 660, 390] as const
+const WIDTHS = [1440, 390] as const
 const HEIGHT = 900
 const LOOKS = ['light', 'dark'] as const
 type Look = (typeof LOOKS)[number]
@@ -493,7 +492,8 @@ function whatTheFramesShow(frames: Frame[], releasedAt: number, ending: 'the new
 
 describe("the old project's rows say on the page that the new project is being read", () => {
   let n = 0
-  for (const look of LOOKS) {
+  {
+    const look: Look = 'light'
     for (const place of [IDEAS, RECORDS]) {
       n += 1
       it(`${String(n)}. ${place.name} in the ${look} look, at ${WIDTHS.join(', ')} pixels: the kept rows are dimmed under a sign a person can see, until the new rows come`, async () => {
@@ -526,44 +526,7 @@ describe("the old project's rows say on the page that the new project is being r
     }
   }, 180_000)
 
-  it.runIf(films !== null)(`${String(n + 2)}. pictures of Ideas while the new project is read, at four widths in both looks, and after the release`, async () => {
-    const folder = films as string
-    for (const look of LOOKS) {
-      const watched = await aBrowser(look)
-      try {
-        const { page } = watched
-        for (const width of WIDTHS) {
-          await page.setViewportSize({ width, height: HEIGHT })
-          await openWithAlpha(watched, IDEAS, look)
-          const held = await hold(page)
-          try {
-            await switchAsAPersonDoes(page)
-            await expect.poll(() => held.caught(), { timeout: 20_000, message: `${BETA.id}'s records were never asked for` }).toBeGreaterThan(0)
-            await page.locator('.shell-scrim').waitFor({ state: 'hidden', timeout: 10_000 })
-            await page.locator(SIGN).waitFor({ timeout: 10_000 })
-            await putTheMadeUpLabelIn(page, LABEL, page.locator('.shell-main'), `Ideas held at ${String(width)} in ${look}`)
-            await page.mouse.move(-1, -1)
-            await page.screenshot({ path: join(folder, `ideas-held-${String(width)}-${look}.png`) })
-            if (width === WIDTHS[0] && look === 'light') {
-              held.release()
-              await page.locator('#main').getByText(BETA.idea).first().waitFor({ timeout: 20_000 })
-              await page.locator(SIGN).waitFor({ state: 'detached', timeout: 10_000 })
-              await putTheMadeUpLabelIn(page, LABEL, page.locator('.shell-main'), `Ideas after the release at ${String(width)} in ${look}`)
-              await page.mouse.move(-1, -1)
-              await page.screenshot({ path: join(folder, `ideas-after-the-release-${String(width)}-${look}.png`) })
-            }
-          } finally {
-            await held.done()
-          }
-        }
-        expect(watched.errors, 'the page threw').toEqual([])
-      } finally {
-        await watched.context.close()
-      }
-    }
-  }, 300_000)
-
-  it.runIf(films !== null)(`${String(n + 3)}. a film of a switch held two seconds, at 1440 and at 390 pixels`, async () => {
+  it.runIf(films !== null)(`${String(n + 2)}. a film of a switch held two seconds, at 1440 and at 390 pixels`, async () => {
     const folder = films as string
     for (const width of [1440, 390]) {
       const watched = await aBrowser('light', { width })

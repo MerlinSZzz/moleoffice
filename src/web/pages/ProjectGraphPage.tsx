@@ -85,10 +85,6 @@ export function ProjectGraphPage() {
         {PROJECT_GRAPH_PAGE_CSS}
       </style>
       <h1 className="gph-page-title">{t('projectGraph.title')}</h1>
-      <p className="gph-page-lead">{t('projectGraph.lead')}</p>
-      <p className="gph-page-lead" data-graph-says="key">
-        {sentencesJoined([t('projectGraph.legend.future'), t('projectGraph.legend.present'), t('projectGraph.legend.canvas')])}
-      </p>
       {read.status === 'ready' ? (
         <p className="gph-page-lead" data-graph-says="coverage">
           {theSourceMapSentence(read.value)}
@@ -124,9 +120,9 @@ export function ProjectGraphPage() {
  * are different sentences because they are different facts; a missing map is not a read that failed.
  */
 export function theSourceMapSentence(read: Pick<ThePagesRead, 'sourceIndexBuilt' | 'coverage'>): string {
-  if (read.sourceIndexBuilt === false) return t('projectGraph.coverage.none')
+  if (read.sourceIndexBuilt === false) return t('projectGraph.coverage.noMap')
   const coverage = read.coverage?.coverage ?? null
-  if (coverage === null) return t('projectGraph.coverage.failed')
+  if (coverage === null) return t('projectGraph.coverage.notRead')
   return sentencesJoined([
     t('projectGraph.coverage', { total: coverage.totalFiles, claimed: coverage.claimedFiles, n: coverage.totalFiles }),
     t('projectGraph.coverage.unclaimed', { n: coverage.unclaimedFiles }),

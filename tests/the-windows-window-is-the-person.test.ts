@@ -14,7 +14,8 @@
  * find", which is not the person (src/server/lib/from-a-sandbox.ts).
  *
  * WHAT IS HELD HERE. The Windows probe and the real Windows reader (src/config/systems/windows-processes.mjs) over a
- * stand-in for PowerShell. The stand-in answers the one script that reads a connection with what that script prints.
+ * stand-in for PowerShell. The stand-in knows one script, the reading of connections. It reads the connections the
+ * script names on its first line, as JSON, and answers each with what the script prints for it.
  * Each refusal case makes every fact match the window but one, so each refusal is held by its own case:
  *
  *   W1 the owner's program is another program;      W2 the owner runs as another user, or as no user Windows names;
@@ -43,8 +44,9 @@
  * AND OVER A REAL LISTENER, with the installed probe in the server:
  *
  *   L1 every door the window's page calls before it is paired, and that asks who sent it, reads the connection by the
- *      way that waits;
- *   L2 a request that carries the person's key, or an agent's name, starts no PowerShell at all;
+ *      way that waits. The press is sent as the page sends it, with the name the browser gives itself;
+ *   L2 a request that carries both halves of the device key the press made, or an agent's name, starts no PowerShell
+ *      at all;
  *   L3 two requests on one connection read it once;
  *   L4 a keyless request the window would count is read first at every door that may ask. A door that asks reads it
  *      once, and a door that never asks but is not declared so (T1) may read it once too. No door holds the thread.
@@ -88,6 +90,20 @@
  *      (tests/installed/time-the-sender-reading.mjs) reads the same numbers from that line;
  *   S5 a reading that failed leaves one line that says why, and the measuring tool reads it as a reading that failed.
  *
+ * READINGS THAT WAIT ARE READ TOGETHER, AND THIS SERVER ONCE IN EACH POWERSHELL. Inside the installed app one reading
+ * took about three seconds, and readings that came together waited for each other. Now the script reads through
+ * Windows' own calls, and the stand-in's way that stays runs one script at a time, as the PowerShell that stays does:
+ *
+ *   R1 this server's own process is read in the first script of a PowerShell that stays and not again, and every
+ *      reading gets the same Server; a new PowerShell reads it again, and so does the next script when Windows gave a
+ *      field of it as null;
+ *   R2 readings that arrive while a script runs go together in the next script, and each gets its own answer, its own
+ *      line in the log and its own wait;
+ *   R3 a script that fails fails each reading in it, in words that name that reading's connection, and answers none of
+ *      them as "not the window";
+ *   R4 the script calls no CIM, by either way, whether or not it reads this server and however many connections it
+ *      names. R4 is the one case that reads the script's text, and it reads it only for that.
+ *
  * THE MUTATIONS, each run after a control and then restored, are listed in the commit message that added the code and
  * in the round's report.
  *
@@ -100,7 +116,7 @@ import { request, Agent } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import Fastify, { type FastifyInstance } from 'fastify'
+import Fastify, { type FastifyInstance, type FastifyRequest } from 'fastify'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 
 import type { WhatACommandDid } from '../src/config/process-reader.mjs'
@@ -148,12 +164,16 @@ interface AProcess {
   ExecutablePath: string | null
   Sid: string | null
 }
-/** What the script prints: the connection, each owner with its parent, this server, and the connection again. */
+/**
+ * What the script prints about one connection: its rows, each owner with its parent, this server, its rows again, and,
+ * when a case gives them, how long the script's four steps took.
+ */
 interface WhatTheScriptPrints {
   Before: AConnection[]
   Holders: { ProcessId: number; Holder: AProcess | null; Parent: AProcess | null }[]
   Server: AProcess | null
   After: AConnection[]
+  Took?: { Before: number; Holders: number; Server: number; After: number }
 }
 
 const aProcess = (pid: number, ppid: number, created: number | null, program: string | null, sid: string | null): AProcess => ({
@@ -215,18 +235,39 @@ let answering: (peerPort: number, ourPort: number) => WhatTheScriptPrints | What
 const held: string[] = []
 const waited: string[] = []
 
-/** The one script this stand-in knows: the reading of one connection, which names both ports and this server. */
-function theAnswerTo(script: string): { asks: string; answer: WhatACommandDid } {
-  const ports = /Get-NetTCPConnection -LocalPort (\d+) -RemotePort (\d+)/u.exec(script)
-  if (ports === null) {
+/** What the script names on its first line: each connection, by its two ports, and this server when it reads it. */
+interface WhatTheScriptAsks {
+  Connections: { Peer: number; Ours: number }[]
+  Server: number | null
+}
+
+/**
+ * The one script this stand-in knows: the reading of connections. Each connection is answered by `answering`, and the
+ * script prints them together, with this server when it names it. A connection answered by a failed command fails the
+ * whole script with that answer. `asks` names each connection, joined by "and". `readsTheServer` says whether the
+ * script names this server.
+ */
+function theAnswerTo(script: string): { asks: string; answer: WhatACommandDid; readsTheServer: boolean } {
+  const line = /^\$asked = ConvertFrom-Json '(.+)'$/mu.exec(script)
+  if (line === null) {
     throw new Error(`This stand-in for PowerShell does not know the script that begins ${JSON.stringify(script.slice(0, 160))}.`)
   }
-  if (!new RegExp(`\\b${String(process.pid)}\\b`, 'u').test(script)) {
-    throw new Error("The script about a connection does not read this server's own process.")
+  const asked = JSON.parse(line[1]!) as WhatTheScriptAsks
+  if (asked.Server !== null && asked.Server !== process.pid) {
+    throw new Error(`The script about a connection reads process ${String(asked.Server)} as this server.`)
   }
-  const said = answering(Number(ports[1]), Number(ports[2]))
-  const answer = 'Before' in said ? printed(`${JSON.stringify(said)}\r\n`) : said
-  return { asks: `the connection from port ${ports[1]!} to port ${ports[2]!}`, answer }
+  const asks = asked.Connections.map((one) => `the connection from port ${String(one.Peer)} to port ${String(one.Ours)}`).join(' and ')
+  const each = asked.Connections.map((one) => answering(one.Peer, one.Ours))
+  const failed = each.find((one): one is WhatACommandDid => !('Before' in one))
+  const readsTheServer = asked.Server !== null
+  if (failed !== undefined) return { asks, answer: failed, readsTheServer }
+  const prints = each as WhatTheScriptPrints[]
+  const said = {
+    Connections: asked.Connections.map((one, i) => ({ Peer: one.Peer, Ours: one.Ours, Before: prints[i]!.Before, Holders: prints[i]!.Holders, After: prints[i]!.After })),
+    Server: asked.Server === null ? null : prints[0]!.Server,
+    ...(prints[0]!.Took === undefined ? {} : { Took: prints[0]!.Took }),
+  }
+  return { asks, answer: printed(`${JSON.stringify(said)}\r\n`), readsTheServer }
 }
 
 /** How long the way that waits takes to answer, in milliseconds, when a case makes it slow. Null is the next turn. */
@@ -323,6 +364,15 @@ function aSocket(peer = WINDOW, ours = SERVER): { remoteAddress: string; remoteP
 }
 
 /**
+ * A request on `socket`, as a door is handed one. Fastify gives every request its method and address, and the reading
+ * names the request by both in the log (src/server/lib/from-a-sandbox.ts), so a request with neither is not one a door
+ * can be handed.
+ */
+function aRequestOn(socket = aSocket(), more: Record<string, unknown> = {}): FastifyRequest {
+  return { method: 'GET', url: '/api/office/pairing', socket, ...more } as unknown as FastifyRequest
+}
+
+/**
  * Ask who sent a request on the connection from `peer` to `ours`, with the probe built for the install given and the
  * stand-in printing `given`. Both are read by the way that waits, as the doors read it. Answers the probe's own
  * answer, the doors' verdict, how many scripts were started, and the ones that held the server's thread.
@@ -332,7 +382,7 @@ async function ask(given: WhatTheScriptPrints | WhatACommandDid, peer = WINDOW, 
   held.length = 0
   waited.length = 0
   res.useOsProbe(aWindowsProbe(install))
-  const verdict = await sandbox.readWhoSentItFromThisComputer({ socket: aSocket(peer, ours) } as never)
+  const verdict = await sandbox.readWhoSentItFromThisComputer(aRequestOn(aSocket(peer, ours)))
   const probe = aWindowsProbe(install)
   let sender: unknown = 'the probe has no question'
   if (probe.readSenderOfAConnection !== undefined) {
@@ -529,7 +579,7 @@ describe("inside the installed app, no door reads who sent a request on the serv
 
   it("D2: the question that holds the thread refuses when the answer was not read first, and starts no script", async () => {
     theWindowPrints(theWindow())
-    const req = { socket: aSocket() } as never
+    const req = aRequestOn()
     expect(() => sandbox.whoSentItFromThisComputer(req)).toThrow(/server's thread/u)
     expect(held).toEqual([])
     expect(waited).toEqual([])
@@ -543,7 +593,7 @@ describe("inside the installed app, no door reads who sent a request on the serv
     const { mayPressTheUpdate } = await import('../src/server/lib/the-update.ts')
     for (const [owner, may] of [[THE_APP, true], [A_BROWSER, false]] as const) {
       theWindowPrints(theWindowWith({ holder: { ExecutablePath: owner } }))
-      expect(await mayPressTheUpdate({ headers: {}, socket: aSocket() } as never), owner).toBe(may)
+      expect(await mayPressTheUpdate(aRequestOn(aSocket(), { headers: {} })), owner).toBe(may)
       expect(held, `${owner}: these readings held the server's thread`).toEqual([])
       expect(waited.length, owner).toBe(1)
     }
@@ -552,7 +602,7 @@ describe("inside the installed app, no door reads who sent a request on the serv
   it("D4: a secretary's terminal doors read who sent it by the way that waits", async () => {
     const { assertATerminalAgentIsHere } = await import('../src/server/api/terminals.ts')
     const anAgent = { type: 'agent', id: 'an-agent', from: 'this machine' } as never
-    const theAssert = (): Promise<void> => Promise.resolve().then(() => assertATerminalAgentIsHere({ socket: aSocket() } as never, anAgent))
+    const theAssert = (): Promise<void> => Promise.resolve().then(() => assertATerminalAgentIsHere(aRequestOn(), anAgent))
     theWindowPrints(theWindow())
     await expect(theAssert()).resolves.toBeUndefined()
     expect(held, "the window's reading held the server's thread").toEqual([])
@@ -565,7 +615,7 @@ describe("inside the installed app, no door reads who sent a request on the serv
 
   it('D5: the ledger reads the program behind a request by the way that waits', async () => {
     theWindowPrints(theWindow())
-    expect(await sandbox.readTheProgramBehind({ socket: aSocket() } as never)).toEqual({ pid: 42, inAnotherContainer: false })
+    expect(await sandbox.readTheProgramBehind(aRequestOn())).toEqual({ pid: 42, inAnotherContainer: false })
     expect(held).toEqual([])
     expect(waited.length).toBe(1)
   })
@@ -612,6 +662,9 @@ const THE_PERSON = {
   'x-mole-office-actor-type': 'human',
   'x-mole-office-actor-id': THE_TEST_OFFICES_OWNER.id,
 }
+
+/** The press to pair, as the window's page sends it: with the name the browser gives itself (src/web/api-parts/worlds.ts). */
+const A_PRESS = JSON.stringify({ device: 'The window' })
 
 interface AnAnswer {
   status: number
@@ -668,7 +721,7 @@ const THE_DOORS_THAT_ASK: { method: string; path: string; body?: string; status:
   { method: 'GET', path: '/api/messages/forced', status: 200 },
   { method: 'GET', path: '/api/messages?only=waiting-for-me&leads=1', status: 200 },
   { method: 'GET', path: '/api/events', status: 200, stream: true },
-  { method: 'POST', path: '/api/office/pairing', status: 200 },
+  { method: 'POST', path: '/api/office/pairing', body: A_PRESS, status: 200 },
   { method: 'GET', path: '/api/events/state?tag=a-window&connectingFor=500', status: 200 },
 ]
 
@@ -685,15 +738,20 @@ describe("over a real listener, inside the installed app, the window's doors rea
   })
 
   it('L2: a request that is never asked who sent it starts no PowerShell', async () => {
+    const { DEVICE_HALF_COOKIE, DEVICE_HALF_HEADER } = await import('../src/config/key-header.mjs')
     res.useOsProbe(aWindowsProbe())
-    const paired = await send('POST', '/api/office/pairing', THE_PERSON)
+    const paired = await send('POST', '/api/office/pairing', THE_PERSON, { body: A_PRESS })
     expect(paired.status).toBe(200)
-    const theKey = paired.setCookie?.split(';')[0]
-    expect(theKey?.startsWith('mole-office-key='), 'the pairing press set no key').toBe(true)
+    // THE TWO HALVES, kept as the page keeps them: the cookie half from the answer's cookie, the header half from its body.
+    const theCookieHalf = paired.setCookie?.split(';')[0]
+    expect(theCookieHalf?.startsWith(`${DEVICE_HALF_COOKIE}=`), 'the pairing press set no cookie half').toBe(true)
+    const theHeaderHalf = (JSON.parse(paired.body) as { deviceHalf?: unknown }).deviceHalf
+    expect(typeof theHeaderHalf, 'the pairing press answered no header half').toBe('string')
+    const bothHalves = { ...THE_PERSON, cookie: theCookieHalf!, [DEVICE_HALF_HEADER]: theHeaderHalf as string }
     const neverAsked: [string, string, Record<string, string>][] = [
-      // A door that asks, from a browser that holds the person's key.
-      ['GET', '/api/office/pairing', { ...THE_PERSON, cookie: theKey! }],
-      ['GET', '/api/waiting', { ...THE_PERSON, cookie: theKey! }],
+      // A door that asks, from a browser that holds both halves of the key the press made.
+      ['GET', '/api/office/pairing', bothHalves],
+      ['GET', '/api/waiting', bothHalves],
       // A door that asks, under an agent's name: an agent's own claim is not narrowed.
       ['GET', '/api/office/pairing', { 'x-mole-office-actor-type': 'agent', 'x-mole-office-actor-id': 'a-made-up-agent' }],
     ]
@@ -956,20 +1014,36 @@ const A_TIME = { queuedMs: 12.4, startingMs: 0, ranMs: 803.6, scriptMs: 790 }
 /** How the script's four steps were timed in PowerShell, as the script prints them. */
 const THE_STEPS = { Before: 101, Holders: 402, Server: 55, After: 98 }
 
+/** The number of the PowerShell the stand-in's way that stays runs each script in. A case adds one for a new one. */
+let theProgram = 1
+
+/** The number of the PowerShell each script the stand-in's way that stays ran in, for each script that read this server. */
+const theServerReadIn: number[] = []
+
+/** The script the stand-in's way that stays runs now, or ran last. Each script waits for the one before it to end. */
+let theTurn: Promise<unknown> = Promise.resolve()
+
 /**
- * The stand-in with the way that stays as well. It answers on a later turn, or after `theReadTakes`, what the way that
- * waits answers for the same script. With `refusing`, it answers as a PowerShell that stays and did not run the script.
+ * The stand-in with the way that stays as well. It runs one script at a time. A script given as a function is made at
+ * its turn, with the number of the PowerShell, as the PowerShell that stays makes it. It answers on a later turn, or
+ * after `theReadTakes`, what the way that waits answers for the same script. With `refusing`, it answers as a
+ * PowerShell that stays and did not run the script.
  */
 let refusing: string | null = null
 const withTheOneThatStays = {
   ...commands,
-  askThePowerShellThatStays: async (script: string): Promise<WhatTheOneThatStaysDid> => {
-    const { asks, answer } = theAnswerTo(script)
-    stayed.push(asks)
-    const takes = theReadTakes
-    await new Promise((later) => (takes === null ? setImmediate(later) : setTimeout(later, takes)))
-    if (refusing !== null) return { command: 'powershell.exe', ran: false, reason: refusing, took: { ...A_TIME, scriptMs: null } }
-    return { ...answer, took: A_TIME }
+  askThePowerShellThatStays: (script: string | ((program: number) => string)): Promise<WhatTheOneThatStaysDid> => {
+    const itsTurn = theTurn.then(async (): Promise<WhatTheOneThatStaysDid> => {
+      const { asks, answer, readsTheServer } = theAnswerTo(typeof script === 'string' ? script : script(theProgram))
+      stayed.push(asks)
+      if (readsTheServer) theServerReadIn.push(theProgram)
+      const takes = theReadTakes
+      await new Promise((later) => (takes === null ? setImmediate(later) : setTimeout(later, takes)))
+      if (refusing !== null) return { command: 'powershell.exe', ran: false, reason: refusing, took: { ...A_TIME, scriptMs: null } }
+      return { ...answer, took: A_TIME }
+    })
+    theTurn = itsTurn.catch(() => undefined)
+    return itsTurn
   },
 }
 
@@ -982,6 +1056,15 @@ function aProbeThatStays(): OsProbe {
 async function theSenderBy(probe: OsProbe): Promise<unknown> {
   try {
     return await probe.readSenderOfAConnection!(WINDOW, SERVER)
+  } catch (why) {
+    return `the probe threw: ${String(why)}`
+  }
+}
+
+/** What a probe answers for a connection from the window's address and the port given: the sender, or the words it threw. */
+async function theSenderFrom(probe: OsProbe, port: number): Promise<unknown> {
+  try {
+    return await probe.readSenderOfAConnection!({ address: WINDOW.address, port }, SERVER)
   } catch (why) {
     return `the probe threw: ${String(why)}`
   }
@@ -1004,6 +1087,7 @@ describe('inside the installed app, the reading runs in the PowerShell that stay
   afterEach(() => {
     refusing = null
     stayed.length = 0
+    theServerReadIn.length = 0
   })
 
   it('S1: for the same answer, the way that stays finds the same sender, or fails with the same words', async () => {
@@ -1045,19 +1129,20 @@ describe('inside the installed app, the reading runs in the PowerShell that stay
           `the probe threw: Error: Who holds the connection from port 60001 to port 8787 is unknown: ${reason}`,
         )
         res.useOsProbe(aProbeThatStays())
-        const verdict = await sandbox.readWhoSentItFromThisComputer({ socket: aSocket() } as never)
+        const verdict = await sandbox.readWhoSentItFromThisComputer(aRequestOn())
         expect(verdict, `${reason}: the door's verdict`).toBe(NOT_FOUND)
         expect(verdict, `${reason}: a reading that failed was taken as the person`).not.toBe(sandbox.THEIR_OWN_PROGRAM)
         // OVER THE LISTENER: the person's press to pair is not the person's, and sets no key.
         res.useOsProbe(aProbeThatStays())
         stayed.length = 0
-        const paired = await send('POST', '/api/office/pairing', THE_PERSON)
+        const paired = await send('POST', '/api/office/pairing', THE_PERSON, { body: A_PRESS })
         expect(stayed.length, `${reason}: the press was not read by the way that stays`).toBe(1)
         expect(paired.status, `${reason}: ${paired.body}`).toBe(403)
         expect(paired.setCookie, `${reason}: the press set a cookie`).toBeNull()
-        expect((JSON.parse(paired.body) as { error?: string }).error, `${reason}: the refusal lost its sentence`).toMatch(
-          /^Pairing gives the browser that asks the person's key, and this request came from a program Mole Office could not find\. .*Nothing was paired and no cookie was set\./su,
-        )
+        // The press's door says the refusal by src/shared/pairing.ts, for the program the reading named.
+        const { thePairingRefusalFor } = await import('../src/shared/pairing.ts')
+        const said = (JSON.parse(paired.body) as { error?: string }).error
+        expect(said?.startsWith(`${thePairingRefusalFor(verdict)} `), `${reason}: the refusal lost its sentence: ${said}`).toBe(true)
       }
     } finally {
       warned.mockRestore()
@@ -1085,7 +1170,7 @@ describe('inside the installed app, the reading runs in the PowerShell that stay
     const said = vi.spyOn(console, 'log').mockImplementation(() => undefined)
     try {
       // BY THE WAY THAT STAYS, with the steps PowerShell timed.
-      answering = () => printed(`${JSON.stringify({ ...theWindow(), Took: THE_STEPS })}\r\n`)
+      answering = () => ({ ...theWindow(), Took: THE_STEPS })
       expect(await theSenderBy(aProbeThatStays())).toEqual(THE_WINDOWS_SENDER)
       const lines = theReadingLines(said)
       expect(lines, 'one reading did not leave one line').toHaveLength(1)
@@ -1135,6 +1220,167 @@ describe('inside the installed app, the reading runs in the PowerShell that stay
       said.mockRestore()
     }
   })
+})
+
+describe('inside the installed app, readings that wait are read together, and this server once in each PowerShell', () => {
+  afterEach(() => {
+    refusing = null
+    stayed.length = 0
+    theServerReadIn.length = 0
+  })
+
+  it('R1: this server is read in the first script of a PowerShell that stays, and again only in a new one', async () => {
+    answering = () => theWindow()
+    const reader = reading.windowsProcessReader(withTheOneThatStays)
+    const probe = new windows.WindowsProbe(theBorrowedHalf(), reader, withTheOneThatStays, INSTALLED)
+    const first = theProgram
+    for (let one = 1; one <= 3; one += 1) expect(await theSenderBy(probe), `reading ${String(one)}`).toEqual(THE_WINDOWS_SENDER)
+    expect(theServerReadIn, 'this server was not read once in the first PowerShell').toEqual([first])
+    // EVERY READING GETS THE SERVER THE FIRST SCRIPT READ.
+    for (let one = 1; one <= 2; one += 1) {
+      const read = await reader.readWhoHoldsAConnection(WINDOW.port, SERVER.port, process.pid)
+      expect(read.Server, `reading ${String(one)} after the first`).toEqual(theWindow().Server)
+    }
+    expect(theServerReadIn).toEqual([first])
+    // A NEW POWERSHELL, after the old one was stopped, reads it again, once.
+    theProgram += 1
+    for (let one = 1; one <= 2; one += 1) expect(await theSenderBy(probe), `reading ${String(one)} in a new PowerShell`).toEqual(THE_WINDOWS_SENDER)
+    expect(theServerReadIn, 'this server was not read again in a new PowerShell').toEqual([first, first + 1])
+    // A ROW OF THIS SERVER WITH A FIELD WINDOWS GAVE AS NULL is not kept: the next script reads it again.
+    theProgram += 1
+    answering = () => theWindowWith({ server: { Sid: null } })
+    expect(await theSenderBy(probe)).toBeNull()
+    answering = () => theWindow()
+    for (let one = 1; one <= 2; one += 1) expect(await theSenderBy(probe)).toEqual(THE_WINDOWS_SENDER)
+    expect(theServerReadIn, 'a row of this server with a null field was kept').toEqual([first, first + 1, first + 2, first + 2])
+  })
+
+  it('R2: readings that arrive while a script runs go together in the next script, each with its own answer, line and wait', async () => {
+    const said = vi.spyOn(console, 'log').mockImplementation(() => undefined)
+    try {
+      // The connection from port 60002 is a browser's. The ones from 60001 and 60003 are the window's.
+      answering = (peerPort, ourPort) => {
+        const window = theWindow({ address: '127.0.0.1', port: peerPort }, { address: '127.0.0.1', port: ourPort })
+        if (peerPort !== 60002) return window
+        const [ours, ...rest] = window.Holders
+        return { ...window, Holders: [{ ...ours!, Holder: { ...ours!.Holder!, ExecutablePath: A_BROWSER } }, ...rest] }
+      }
+      theReadTakes = 1_500
+      const probe = aProbeThatStays()
+      for (const list of [held, waited, stayed]) list.length = 0
+      const first = theSenderFrom(probe, 60001)
+      await new Promise((later) => setTimeout(later, 100))
+      const second = theSenderFrom(probe, 60002)
+      await new Promise((later) => setTimeout(later, 100))
+      const third = theSenderFrom(probe, 60003)
+      expect(await Promise.all([first, second, third]), 'a reading got another reading\'s answer').toEqual([THE_WINDOWS_SENDER, null, THE_WINDOWS_SENDER])
+      expect(stayed, 'the two readings that waited were not read in one script').toEqual([
+        'the connection from port 60001 to port 8787',
+        'the connection from port 60002 to port 8787 and the connection from port 60003 to port 8787',
+      ])
+      expect(held, 'a reading held the thread').toEqual([])
+      expect(waited, 'a PowerShell was started where one stays').toEqual([])
+      const lines = theReadingLines(said)
+        .map((line) => readTheLine(line))
+        .sort((a, b) => (a?.peerPort ?? 0) - (b?.peerPort ?? 0))
+      // A LINE THAT SAYS A READING FAILED is kept whole, so the case fails on it and shows its words.
+      expect(
+        lines.map((one) => (one === null || one.failed !== null ? one : [one.peerPort, one.serverPort, one.theWindow])),
+        'a reading did not leave its own line',
+      ).toEqual([
+        [60001, 8787, true],
+        [60002, 8787, false],
+        [60003, 8787, true],
+      ])
+      // EACH READING'S OWN WAIT. The stand-in says each script waited 12.4 ms from the first reading in it. The third
+      // reading came at least 100 ms after the second, so none of that wait was its own.
+      expect(
+        lines.map((one) => (one === null || one.failed !== null ? one : one.where?.queuedMs)),
+        'a reading was given another reading\'s wait',
+      ).toEqual([12, 12, 0])
+    } finally {
+      said.mockRestore()
+    }
+  }, 30_000)
+
+  it('R3: a script that fails fails each reading in it, in words, and answers none of them as not the window', async () => {
+    const warned = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const said = vi.spyOn(console, 'log').mockImplementation(() => undefined)
+    const refused = 'Exception calling "Read" with "0" argument(s): "Access is denied."'
+    try {
+      // The first script reads the window. The script with the two readings that waited exits 1.
+      answering = (peerPort, ourPort) =>
+        peerPort === 60001 ? theWindow({ address: '127.0.0.1', port: peerPort }, { address: '127.0.0.1', port: ourPort }) : printed('', 1, refused)
+      theReadTakes = 1_500
+      const probe = aProbeThatStays()
+      stayed.length = 0
+      const first = theSenderFrom(probe, 60001)
+      await new Promise((later) => setTimeout(later, 100))
+      const second = theSenderFrom(probe, 60002)
+      const third = theSenderFrom(probe, 60003)
+      expect(await Promise.all([first, second, third]), 'a reading in the failed script was answered').toEqual([
+        THE_WINDOWS_SENDER,
+        `the probe threw: Error: Who holds the connection from port 60002 to port 8787 is unknown: ${refused}`,
+        `the probe threw: Error: Who holds the connection from port 60003 to port 8787 is unknown: ${refused}`,
+      ])
+      expect(stayed, 'the two readings that waited were not read in one script').toEqual([
+        'the connection from port 60001 to port 8787',
+        'the connection from port 60002 to port 8787 and the connection from port 60003 to port 8787',
+      ])
+      expect(
+        theReadingLines(said).map((line) => readTheLine(line)?.peerPort),
+        'a reading in the failed script was logged as read',
+      ).toEqual([60001])
+      const failed = theReadingLines(warned)
+        .map((line) => readTheLine(line))
+        .sort((a, b) => (a?.peerPort ?? 0) - (b?.peerPort ?? 0))
+      expect(failed.map((one) => [one?.peerPort, one?.failed]), 'a reading in the failed script did not leave its own line').toEqual([
+        [60002, `Who holds the connection from port 60002 to port 8787 is unknown: ${refused}`],
+        [60003, `Who holds the connection from port 60003 to port 8787 is unknown: ${refused}`],
+      ])
+    } finally {
+      warned.mockRestore()
+      said.mockRestore()
+    }
+  }, 30_000)
+
+  it('R4: the script about connections calls no CIM, by either way', async () => {
+    // CIM BY ANY OF ITS NAMES. Get-NetTCPConnection is a CIM command too: it reads the class MSFT_NetTCPConnection.
+    const CIM =
+      /\b(?:Get|Invoke|New|Set|Remove|Register)-Cim\w*|\bCimSession\b|\bGet-WmiObject\b|\bgwmi\b|\bgcim\b|\[wmi(?:class|searcher)?\]|System\.Management\b|\bWin32_\w+|\bMSFT_\w+|\bGet-Net\w+/iu
+    answering = (peerPort, ourPort) => theWindow({ address: '127.0.0.1', port: peerPort }, { address: '127.0.0.1', port: ourPort })
+    const scripts: string[] = []
+    const watched = {
+      ...withTheOneThatStays,
+      startPowerShell: (script: string): Promise<WhatACommandDid> => {
+        scripts.push(script)
+        return commands.startPowerShell(script)
+      },
+      askThePowerShellThatStays: (script: string | ((program: number) => string)): Promise<WhatTheOneThatStaysDid> =>
+        withTheOneThatStays.askThePowerShellThatStays((program) => {
+          const made = typeof script === 'string' ? script : script(program)
+          scripts.push(made)
+          return made
+        }),
+    }
+    // BY A POWERSHELL STARTED FOR THE READING.
+    const started = { powershell: watched.powershell, startPowerShell: watched.startPowerShell }
+    expect(await theSenderBy(new windows.WindowsProbe(theBorrowedHalf(), reading.windowsProcessReader(started), started, INSTALLED))).toEqual(THE_WINDOWS_SENDER)
+    // BY THE WAY THAT STAYS: a script that reads this server, then one that does not and names two connections.
+    theReadTakes = 300
+    const probe = new windows.WindowsProbe(theBorrowedHalf(), reading.windowsProcessReader(watched), watched, INSTALLED)
+    stayed.length = 0
+    theServerReadIn.length = 0
+    const first = theSenderFrom(probe, 60001)
+    await new Promise((later) => setTimeout(later, 50))
+    const together = [theSenderFrom(probe, 60002), theSenderFrom(probe, 60003)]
+    expect(await Promise.all([first, ...together])).toEqual([THE_WINDOWS_SENDER, THE_WINDOWS_SENDER, THE_WINDOWS_SENDER])
+    expect(stayed, 'the case did not read two connections in one script').toHaveLength(2)
+    expect(theServerReadIn, 'the case did not read this server in exactly one script of the way that stays').toEqual([theProgram])
+    // THE CONTROL: each script the case means to read was read.
+    expect(scripts, 'the case did not see the three scripts').toHaveLength(3)
+    for (const [at, script] of scripts.entries()) expect(CIM.exec(script)?.[0] ?? null, `script ${String(at + 1)} calls CIM`).toBeNull()
+  }, 30_000)
 })
 
 /** How long `mole-office start`, `status` and `stop` wait for each answer, read from the command itself. */

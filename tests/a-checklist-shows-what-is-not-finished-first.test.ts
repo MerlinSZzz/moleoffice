@@ -4,7 +4,7 @@
  * A CHECKLIST SHOWS WHAT IS NOT FINISHED FIRST, AND FOLDS WHAT IS FINISHED AT THE BOTTOM. Wave 13j round loop-5, part f:
  * in every checklist view, items not finished are shown first, in their order; finished items (done or
  * superseded) are moved to the bottom and folded together by default, so they are not shown until the person opens
- * the fold. That message was sent on by the secretary in message INzewGF10rF0. A
+ * the fold. That message was sent on by the secretary. A
  * standing item with no done box, such as an experiment manual, counts with the items not finished and
  * stays in the open part.
  *
@@ -20,8 +20,13 @@
  *   1. The page draws the items not finished first, with the standing item among them though it was added last, and
  *      draws no finished item until its one fold press is pressed. The press says how many, and whether any were
  *      replaced; pressed, it draws them below it and says it hides them; pressed again, it hides them. A checklist with
- *      nothing finished has no fold press, and another checklist opened from the table starts folded.
+ *      nothing finished has no fold press, and another checklist's card beside it stays folded.
  *   2. The window draws the same items in the same order, the finished ones folded under the same press.
+ *
+ * Test change (wave 13y round 175): the page and the window draw design E, as decided. Each checklist is a card, and
+ * the page's cases read the card the address `#/checklists/<id>` marks. Case 1 now asks that the card of another
+ * checklist beside it stays folded while this card's fold is open. Before, case 1 opened that other checklist from the
+ * table of checklists, which went, and the page drew one opened checklist at a time.
  *
  * Mutations, one at a time, restored with cp and checked with cmp:
  *   J. src/web/pages/ChecklistsPage.tsx, the finished items drawn among the others with no fold: case 1 goes red.
@@ -104,15 +109,18 @@ async function openThePage(page: Page, id: string): Promise<void> {
   await page.goto('about:blank')
   await page.goto(`${app.site}/?lang=en#/checklists/${id}`, { timeout: 60_000 })
   await waitForThePage(page, 60_000)
-  await page.locator('.ck1 .ck1-counts').waitFor({ timeout: 30_000 })
+  await page.locator(`${MARKED} .ckp-item`).first().waitFor({ timeout: 30_000 })
 }
+
+/** The card the address `#/checklists/<id>` marks on the page. */
+const MARKED = '.cks-card[data-marked="yes"]'
 
 describe('a checklist shows what is not finished first, and folds what is finished at the bottom', () => {
   it('1. the page draws what is not finished first, the standing item with it, and folds what is finished', async () => {
     const page = app.page
     await openThePage(page, lab)
-    const one = page.locator('.ck1')
-    const lists = one.locator('.ck1-items')
+    const one = page.locator(MARKED)
+    const lists = one.locator('.cks-items')
     expect(await wordsIn(lists.first())).toEqual(NOT_FINISHED)
     for (const words of FINISHED) expect(await one.locator('.ckp-item', { hasText: words }).count(), `${words} is folded`).toBe(0)
     const fold = one.locator('.ckp-fold')
@@ -133,20 +141,19 @@ describe('a checklist shows what is not finished first, and folds what is finish
     await fold.click()
     await expect.poll(() => one.locator('.ckp-item', { hasText: 'Fire the test tiles' }).count(), { timeout: 10_000 }).toBe(0)
 
-    // ANOTHER CHECKLIST OPENED FROM THE TABLE BESIDE IT STARTS FOLDED, though the fold was left open on this one.
+    // ANOTHER CHECKLIST'S CARD BESIDE IT STAYS FOLDED, though the fold is open on this one.
     await fold.click()
     await expect.poll(() => fold.getAttribute('aria-expanded'), { timeout: 10_000 }).toBe('true')
-    await page.locator('.ckb-row', { hasText: 'Shelf checklist' }).click()
-    await page.locator('.ck1 h2', { hasText: 'Shelf checklist' }).waitFor({ timeout: 20_000 })
-    const shelfFold = page.locator('.ck1 .ckp-fold')
+    const shelfCard = page.locator('.cks-card', { has: page.locator('.cks-title', { hasText: 'Shelf checklist' }) })
+    const shelfFold = shelfCard.locator('.ckp-fold')
     expect(await shelfFold.getAttribute('aria-expanded')).toBe('false')
     expect(await shelfFold.innerText()).toContain('Show 1 done')
     expect(await shelfFold.innerText()).not.toContain('replaced')
-    expect(await wordsIn(page.locator('.ck1 .ck1-items').first())).toEqual(['Label the jars'])
+    expect(await wordsIn(shelfCard.locator('.cks-items').first())).toEqual(['Label the jars'])
 
     await openThePage(page, fresh)
-    expect(await page.locator('.ck1 .ckp-fold').count(), 'nothing finished, no fold press').toBe(0)
-    expect(await wordsIn(page.locator('.ck1 .ck1-items').first())).toEqual(['Order more clay'])
+    expect(await page.locator(`${MARKED} .ckp-fold`).count(), 'nothing finished, no fold press').toBe(0)
+    expect(await wordsIn(page.locator(`${MARKED} .cks-items`).first())).toEqual(['Order more clay'])
   }, 180_000)
 
   it('2. the window draws the same items in the same order, the finished ones folded under the same press', async () => {
@@ -156,9 +163,9 @@ describe('a checklist shows what is not finished first, and folds what is finish
     await waitForThePage(page, 60_000)
     await page.waitForSelector('.ckw-press', { timeout: 30_000 })
     await page.click('.ckw-press')
-    const group = page.locator('.ckw-panel .ckw-group', { hasText: 'Lab checklist' })
+    const group = page.locator('.ckw-panel .cks-card', { hasText: 'Lab checklist' })
     await group.locator('.ckp-item').first().waitFor({ timeout: 30_000 })
-    expect(await wordsIn(group.locator('.ckw-items').first())).toEqual(NOT_FINISHED)
+    expect(await wordsIn(group.locator('.cks-items').first())).toEqual(NOT_FINISHED)
     for (const words of FINISHED) expect(await group.locator('.ckp-item', { hasText: words }).count(), `${words} is folded`).toBe(0)
     const fold = group.locator('.ckp-fold')
     expect(await fold.getAttribute('aria-expanded')).toBe('false')

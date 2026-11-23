@@ -22,6 +22,10 @@
  * filed here* as *a decision somebody wrote about this module*. Each row carries which way it came
  * and, for the second, the fork it came through — and that is what these cases hold.
  *
+ * A THIRD WAY CAME LATER, and it is the strongest: the decision's own governs field names the module. A press on a fork
+ * about the module that names nothing it governs gets that field filled with the module. So the fork case and the
+ * linked case settle their fork with governs naming another module, and one case holds the third way.
+ *
  * AND IT IS NOT PART OF THE OPEN-LOOP READING. `LOOP_KINDS` is what somebody still has to finish; a
  * decision is settled by definition. The last case checks the two populations stayed apart, because
  * folding decisions into the loops would pass every other assertion in this file.
@@ -32,6 +36,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { FastifyInstance } from 'fastify'
 import { apiApp, freshDb, type TestDb } from './helpers.ts'
 import { DECIDED_HERE_KEY, titleOfSection } from '../src/shared/sections.ts'
+import { GOVERNS_FIELD } from '../src/shared/governs.ts'
 
 let t: TestDb
 let app: FastifyInstance
@@ -76,12 +81,20 @@ function aFork(title: string, aboutId: string): string {
   return id
 }
 
-async function settle(forkId: string, title: string): Promise<string> {
+/**
+ * Settles a fork through the promote door. With no `page`, the press says nothing about what the decision governs, and
+ * the door fills governs with the pages the fork is linked to. With a `page`, the press says the decision governs that
+ * page.
+ */
+async function settle(forkId: string, title: string, page?: string): Promise<string> {
   const res = await app.inject({
     method: 'POST',
     url: `/api/records/${forkId}/promote`,
     headers: { ...AS_AGENT, 'x-mole-office-actor-type': 'human', 'x-mole-office-actor-id': THE_TEST_OFFICES_OWNER.id },
-    payload: { title, data: { because: 'the owner said so' } },
+    payload: {
+      title,
+      data: { because: 'the owner said so', ...(page === undefined ? {} : { [GOVERNS_FIELD]: [{ record: page }] }) },
+    },
   })
   expect(res.statusCode, res.body.slice(0, 300)).toBe(201)
   return (res.json() as { decision: { id: string } }).decision.id
@@ -107,13 +120,16 @@ async function context(id: string): Promise<{ decided: TheSection; loops: { id: 
   return { decided: body.decisionsAboutThis, loops: body.loops }
 }
 
-// ================================================== the two ways in
+// ================================================== the three ways in
 
 describe('a module lists the decisions about it', () => {
   it('lists a decision that settled a fork filed about the module, and names the fork', async () => {
     const module = aModule('The close-up camera')
     const fork = aFork('Which lens?', module)
-    const decision = await settle(fork, 'The 16mm lens')
+    // THE DECISION GOVERNS ANOTHER MODULE, so the fork is the only way it reaches this one. A press that named nothing
+    // would govern this module, and that reading is the stronger one (the next case).
+    const elsewhere = aModule('The lens mount')
+    const decision = await settle(fork, 'The 16mm lens', elsewhere)
 
     const { decided } = await context(module)
     const row = decided.decisions.find((one) => one.id === decision)
@@ -121,6 +137,17 @@ describe('a module lists the decisions about it', () => {
     expect(row?.how).toBe('settled a fork about it')
     expect(row?.throughTheFork?.id, 'and the row says which fork it came through').toBe(fork)
     expect(decided.about).toBe(module)
+  })
+
+  it('says a decision governs the module when the press on its fork named nothing it governs', async () => {
+    const module = aModule('The tool changer')
+    const fork = aFork('Which tool changer?', module)
+    const decision = await settle(fork, 'A magnetic tool changer')
+
+    const stored = t.api.getRecord(decision) as { data: Record<string, unknown> }
+    expect(stored.data[GOVERNS_FIELD], 'the door filled governs with the module the fork is about').toEqual([{ record: module }])
+    const { decided } = await context(module)
+    expect(decided.decisions.find((one) => one.id === decision)?.how).toBe('governs it')
   })
 
   it('lists a decision somebody linked straight to the module, and says so', async () => {
@@ -143,7 +170,9 @@ describe('a module lists the decisions about it', () => {
   it('keeps the stronger reading when a decision is both linked and reached through a fork', async () => {
     const module = aModule('The wrist')
     const fork = aFork('Which wrist?', module)
-    const decision = await settle(fork, 'A three-axis wrist')
+    // THE DECISION GOVERNS ANOTHER MODULE, so it reaches this one only by the link and the fork.
+    const elsewhere = aModule('The forearm')
+    const decision = await settle(fork, 'A three-axis wrist', elsewhere)
     t.api.createLink({ fromId: decision, toId: module, type: 'about', actor: { type: 'human', id: THE_TEST_OFFICES_OWNER.id, stated: true } })
 
     const { decided } = await context(module)

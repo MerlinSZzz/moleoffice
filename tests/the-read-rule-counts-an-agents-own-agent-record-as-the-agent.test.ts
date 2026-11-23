@@ -145,8 +145,11 @@ beforeAll(async () => {
   // kind, `older` by a delete. bell's record in the other project keeps bell a live agent all the while.
   bellsRecords.gone = await anAgentRecord('bell-ringer')
   bellsRecords.elsewhere = await anAgentRecord('bell-ringer', ELSEWHERE)
-  const changed = await send('PATCH', `/api/records/${bellsRecords.gone}`, { kind: 'note' }, OWNER)
-  expect(changed.status, changed.body).toBe(200)
+  // A RECORD WRITE NO LONGER CHANGES AN AGENT RECORD'S KIND, so `gone` is stored as the note such a change left:
+  // every field under `extra`, and the mapping kept.
+  const held = db.prepare('SELECT data FROM records WHERE id = ?').get(bellsRecords.gone) as { data: string }
+  const { extra, ...fields } = JSON.parse(held.data) as Record<string, unknown>
+  db.prepare("UPDATE records SET kind = 'note', data = ? WHERE id = ?").run(JSON.stringify({ extra: { ...(extra as object | undefined), ...fields } }), bellsRecords.gone)
   bellsRecords.older = await anAgentRecord('bell-ringer')
   const deleted = await app.inject({ method: 'DELETE', url: `/api/records/${bellsRecords.older}`, headers: OWNER })
   expect(deleted.statusCode, deleted.body).toBe(200)

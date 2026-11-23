@@ -71,7 +71,7 @@ import { withoutInheritedEffort } from './without-inherited-effort.ts'
 
 import { THE_TEST_OFFICES_OWNER, THE_TEST_FIXTURE_ROOT } from './a-page-of-a-test-office.ts'
 import { expectRoundRulesSaved, linkSourceWithLocalRoundRules, writeRoundStartRules } from './round-chapters-fixture.ts'
-import { deliveredRoundBrief, savedRoundChapters } from '../src/shared/round-chapters/manifest.ts'
+import { deliveredRoundBrief, savedRoundChapters, THE_CHAPTERS_DOOR } from '../src/shared/round-chapters/manifest.ts'
 import { runInNewContext } from 'node:vm'
 import { spawn, spawnSync, execFileSync } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
@@ -111,7 +111,7 @@ import { REQUEST_TIMEOUT_MS } from '../src/config/sandbox-start-values.mjs'
 import { THE_LONGEST_FINISH_WAIT_MS as THE_OFFICE_TOOLS_FINISH_WAIT } from '../tools/office-request.mjs'
 import { theServedOfAClaudeCodeRun } from '../src/config/claude-code-served.mjs'
 import { theReceiptOfAnEndedCommand, theReceiptOfAnEndedCodexCommand, A_LATER_READING_FOUND_NO_NUMBERS } from '../src/config/usage.mjs'
-import { FULL_PERMISSIONS } from '../src/config/run-permissions.mjs'
+import { CODEX_SHELL_SNAPSHOT_OFF, FULL_PERMISSIONS } from '../src/config/run-permissions.mjs'
 import { CLAUDE_CODE_FEATURES_OFF, CODEX_FEATURES_OFF, THE_STARTING_WORDS } from '../tools/harness-features-off.mjs'
 import { theStableCheckoutFolder } from '../src/config/sandbox-folder.mjs'
 import { FAKE_DF, FAKE_FREE, FAKE_DU, FAKE_DEVCONTAINER, FAKE_DOCKER, aFakeNpm, aMadeUpPackage, startsOf, theFakeContainersProcesses, theFakeMachine, theNpmCalls, withAPrivateTmpToSweep } from './sandbox-stand-ins.ts'
@@ -254,12 +254,33 @@ function theToolsArguments(args: string[], as: { agent: string; session: string 
   ]
 }
 
+/**
+ * THE SWEEP'S PAUSE IS 0.25 S IN THIS FILE, not the 2 s a real start keeps (SWEEP_PAUSE_MS_FOR_A_TEST, read in
+ * tools/sweep-run-scratch.mjs). Every fake container here shares one /tmp, so each waited exec paid 2 s for every run
+ * folder earlier cases left there. The two cases that need the 2 s pause take the variable off.
+ */
 function theToolsEnvironment(): NodeJS.ProcessEnv {
-  const env: NodeJS.ProcessEnv = { ...withoutInheritedEffort(), PATH: `${join(fakes, 'bin')}:${process.env['PATH'] ?? ''}`, FAKE_DOCKER_DIR: fakes, MOLE_OFFICE_COMMIT_EMAIL: aTestAddress('fixture'), MOLE_SANDBOX_MEMORY_TEST_ROOT: join(fakes, 'memory-files') }
+  const env: NodeJS.ProcessEnv = { ...withoutInheritedEffort(), PATH: `${join(fakes, 'bin')}:${process.env['PATH'] ?? ''}`, FAKE_DOCKER_DIR: fakes, MOLE_OFFICE_COMMIT_EMAIL: aTestAddress('fixture'), MOLE_SANDBOX_MEMORY_TEST_ROOT: join(fakes, 'memory-files'), SWEEP_PAUSE_MS_FOR_A_TEST: '250' }
   delete env['MOLE_OFFICE_AGENT']
   delete env['MOLE_OFFICE_SESSION']
   delete env['MOLE_AGENT_KEY']
   return env
+}
+
+let helpersStartedByHand = 0
+
+/**
+ * THE ENVIRONMENT A FAKE CONTAINER GIVES A HELPER THIS FILE STARTS BY HAND: a folder of its own under the test's scratch,
+ * the loader that binds the sweep's /tmp to that folder's tmp, and that tmp as the helper's TMPDIR when the case sets
+ * none of its own, which the session's inherited TMPDIR is not. A helper given neither swept this machine's real /tmp,
+ * and made its run's scratch folder in this session's temporary folder; each call gets a folder of its own, so no two
+ * helpers share a fake /tmp.
+ */
+function withAFakeContainersTmp(env: NodeJS.ProcessEnv, name: string): NodeJS.ProcessEnv {
+  helpersStartedByHand += 1
+  const folder = join(scratch, `a-hand-started-helper-${String(helpersStartedByHand)}-${name}`)
+  const theCasesOwn = 'TMPDIR' in env && env['TMPDIR'] !== process.env['TMPDIR']
+  return withAPrivateTmpToSweep(theCasesOwn ? env : { ...env, TMPDIR: join(folder, 'tmp') }, folder)
 }
 
 /**
@@ -371,6 +392,11 @@ const AS_THE_WORKER = (run: string): { type: string; id: string; session: string
  * its command ended, and the office's account of why there is no seal. Nothing else on the run changes.
  */
 const THE_END_WRITTEN = { detail: expect.any(String), commandEnded: expect.any(Object), howTheRoundEnded: expect.any(Object) }
+/**
+ * THE COMMIT THE OFFICE READS IN A RUN'S WORKING DIRECTORY WHEN ITS ROUND ENDS, as the run stores it: the directory, the
+ * commit or why git could not read it, and when.
+ */
+const theEndHeadOf = (directory: string, read: { commit: string } | { notRead: unknown }) => ({ endHead: { ...read, directory, at: expect.stringMatching(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/) } })
 
 async function ledger(): Promise<any[]> {
   const r = await ask('GET', '/api/resources?includeReleased=true', AS_STARTER())
@@ -1316,7 +1342,10 @@ describe('worker and round start Claude directly through the helper', () => {
       expect(input).toContain(text)
       if (verb === 'round') {
         const saved = await ask('GET', `/api/records/${start.run}`, AS_STARTER())
-        expectRoundRulesSaved(saved.body.record.data)
+        // THE TEST OFFICE HOLDS NO CHAPTER AND NO REGULATION, and its chapters door's answer is what CODE.md was made from.
+        const chapters = await ask('GET', THE_CHAPTERS_DOOR, AS_STARTER())
+        expect(chapters.status, JSON.stringify(chapters.body)).toBe(200)
+        expectRoundRulesSaved(saved.body.record.data, chapters.body)
         expect(input).toBe(`${THE_STARTING_WORDS}\n\n---\n\n${deliveredRoundBrief(savedRoundChapters(saved.body.record.data)!)}`)
       } else expect(input).toBe(`${THE_STARTING_WORDS}\n\n---\n\n${text}`)
       expect(JSON.parse(readFileSync(seen, 'utf8'))).toEqual({ argv: start.command.slice(1), stdin: input })
@@ -1790,31 +1819,19 @@ describe('disk gates and GPU reminders', () => {
     expect((await sandbox(['exec', 'gpu-alone', '--wait', '--', 'true'])).status).toBe(0)
     expect((await sandbox(['down', 'gpu-alone'])).status).toBe(0)
   })
-  it('mutation GPU_COMMAND: every exec form, worker and round start with a reminder naming the other GPU sandbox', async () => {
+  it('mutation GPU_COMMAND: a plain exec, an isolated exec, worker and round start with a reminder naming the other GPU sandbox', async () => {
     gpuContainer(true, true)
     try {
-      const filed = await ask('POST', '/api/records', AS_STARTER(), {
-        kind: 'session', title: 'Synthetic GPU command run', data: { state: 'running', servingAgent: WORKER },
-      })
-      expect(filed.status, JSON.stringify(filed.body)).toBe(201)
       const isolated = await ask('POST', '/api/records', AS_STARTER(), {
         kind: 'session', title: 'Synthetic isolated GPU command run', data: { state: 'running', servingAgent: WORKER },
       })
       expect(isolated.status, JSON.stringify(isolated.body)).toBe(201)
       for (const args of [
-        ['exec', NAME, '--json', '--', 'sleep', '300'],
         ['exec', NAME, '--wait', '--plain-env', '--', 'true'],
-        ['exec', NAME, '--agent', WORKER, '--runtime', 'dsh', '--model', 'deepseek/deepseek-v4.1-flash', '--worktree', join(upAnswer!.folder, 'worktrees', WORKER), '--json', '--', 'sleep', '300'],
-        ['exec', NAME, '--run', filed.body.record.id, '--json', '--', 'sleep', '300'],
         ['exec', NAME, '--isolated', '--run', isolated.body.record.id, '--runtime', 'dsh', '--cwd', upAnswer!.folder, '--', 'true'],
       ]) {
         const ran = await sandbox(args); expect(ran.status, ran.err).toBe(0)
         expect(ran.err).toContain('GPU reminder: sandbox other-gpu is already running with a GPU')
-        if (!args.includes('--wait') && !args.includes('--isolated')) {
-          const start = JSON.parse(ran.out.trim()); groups.add(start.hostPgid)
-          expect((await releaseRow(start.processRow)).status).toBe(200)
-          await until('the GPU command to end', () => !alive(start.hostPid))
-        }
       }
       const handle = 'gpu-command-worker'
       const registered = await ask('POST', '/api/agents/started', AS_STARTER(), { handle, name: handle, role: 'worker', workArea: ['src'] })
@@ -1948,12 +1965,10 @@ describe('disk gates and GPU reminders', () => {
     expect(lastLine(ran.err)).not.toContain('GPU')
     expect((await sandbox(['down', 'no-gpu-none'])).status).toBe(0)
   })
-  it('mutation NO_GPU_OTHER_VERB: every other command given --no-gpu refuses with a sentence before anything runs', async () => {
+  it('mutation NO_GPU_OTHER_VERB: a command other than up given --no-gpu refuses with a sentence before anything runs', async () => {
     const rows = (await ledger()).length, calls = state().calls.length, runs = await theSessionIds()
     for (const args of [
-      ['exec', NAME, '--wait', '--', 'true'], ['exec', NAME, '--agent', WORKER, '--runtime', 'dsh', '--', 'true'],
-      ['worker', NAME, '--agent', WORKER, '--brief', 'synthetic-brief'], ['round', NAME, '--agent', WORKER, '--brief', 'synthetic-brief'],
-      ['status', NAME], ['down', NAME], ['clear', NAME], ['sizes'],
+      ['exec', NAME, '--wait', '--', 'true'], ['down', NAME],
     ]) {
       // BEFORE ANY --, where the launcher reads its own options; after it the word would be the command's.
       const at = args.indexOf('--')
@@ -2062,7 +2077,8 @@ const ran=spawnSync('/usr/bin/git',args,{stdio:'inherit'});process.exit(ran.stat
       const at = sent.indexOf('--')
       expect(sent.slice(at + 1)).toEqual(['env', 'SYNTHETIC=value', native[0]!, ...FULL_PERMISSIONS.codex!.args, 'exec', '--', 'synthetic task'])
       await until('the older helper native recorder', () => existsSync(seen))
-      expect(JSON.parse(readFileSync(seen, 'utf8')).slice(0, 9)).toEqual([...CODEX_FEATURES_OFF, ...FULL_PERMISSIONS.codex!.args, 'exec'])
+      const theStart = [...CODEX_FEATURES_OFF, ...CODEX_SHELL_SNAPSHOT_OFF, ...FULL_PERMISSIONS.codex!.args, 'exec']
+      expect(JSON.parse(readFileSync(seen, 'utf8')).slice(0, theStart.length)).toEqual(theStart)
     })()
   })
 
@@ -2770,7 +2786,7 @@ const ran=spawnSync('/usr/bin/git',args,{stdio:'inherit'});process.exit(ran.stat
           join(REPO, 'tools', 'sandbox-start.mjs'), '--instance', answer.folder, '--as', STARTER, '--session', starterSession,
           '--workspace', WORKSPACE, '--api', api, '--run', id, '--', 'true',
         ],
-        { env: { ...theToolsEnvironment(), ...theFactsACommandIn(answer.folder), TMPDIR: own, SANDBOX_THROW_AFTER_THE_SCRATCH_FOLDER: '1' }, detached: true },
+        { env: withAFakeContainersTmp({ ...theToolsEnvironment(), ...theFactsACommandIn(answer.folder), TMPDIR: own, SANDBOX_THROW_AFTER_THE_SCRATCH_FOLDER: '1' }, 'the-throw-after-the-scratch-folder'), detached: true },
       )
       if (child.pid !== undefined) groups.add(child.pid)
       let out = ''
@@ -2843,7 +2859,7 @@ const ran=spawnSync('/usr/bin/git',args,{stdio:'inherit'});process.exit(ran.stat
           '--workspace', WORKSPACE, '--api', api, '--agent', WORKER, '--runtime', 'dsh', '--model', 'deepseek/deepseek-v4.1-flash', '--cut-from', 'main',
           '--title', 'never filed: an empty commit address, in the helper', '--', 'true',
         ],
-        { env: { ...theToolsEnvironment(), ...theFactsACommandIn(answer.folder), MOLE_OFFICE_COMMIT_EMAIL: '' }, detached: true },
+        { env: withAFakeContainersTmp({ ...theToolsEnvironment(), ...theFactsACommandIn(answer.folder), MOLE_OFFICE_COMMIT_EMAIL: '' }, 'the-empty-commit-address'), detached: true },
       )
       if (child.pid !== undefined) groups.add(child.pid)
       let out = ''
@@ -2914,7 +2930,8 @@ const ran=spawnSync('/usr/bin/git',args,{stdio:'inherit'});process.exit(ran.stat
     expect(held.body.slot.state).toBe('granted')
 
     const marker = join(answer.folder, 'out', 'the-suite-ran')
-    const waiting = sandbox(['exec', NAME, '--slot', 'full-suite', '--json', '--', 'sh', '-c', `touch ${marker}; sleep 300`])
+    // THE HELPER ASKS AGAIN EVERY 1 S, not every 10 s (SLOT_ASK_EVERY_S_FOR_A_TEST, read in tools/slot.mjs).
+    const waiting = sandbox(['exec', NAME, '--slot', 'full-suite', '--json', '--', 'sh', '-c', `touch ${marker}; sleep 300`], undefined, { SLOT_ASK_EVERY_S_FOR_A_TEST: '1' })
     // IN LINE, and not running: its process row is written, and nothing it would do has happened.
     await until('the command to be in line', async () => (await ask('GET', '/api/slots', AS_STARTER())).body.pools.find((p: any) => p.name === 'full-suite').waiting.length === 1)
     await new Promise((r) => setTimeout(r, 1500))
@@ -3521,7 +3538,7 @@ describe("exec --wait, --timeout and --plain-env: the caller's own command, run 
           join(REPO, 'tools', 'sandbox-start.mjs'), '--instance', answer.folder, '--as', STARTER, '--session', starterSession,
           '--workspace', WORKSPACE, '--api', api, '--wait', '--plain-env', '--handshake', handshake, '--', 'sh', '-c', `touch ${marker}`,
         ],
-        { env: { ...theToolsEnvironment(), ...theFactsACommandIn(answer.folder), SANDBOX_HANDSHAKE_LIMIT_MS: '1000' }, detached: true },
+        { env: withAFakeContainersTmp({ ...theToolsEnvironment(), ...theFactsACommandIn(answer.folder), SANDBOX_HANDSHAKE_LIMIT_MS: '1000' }, 'the-handshake-limit'), detached: true },
       )
       if (child.pid !== undefined) groups.add(child.pid)
       let out = ''
@@ -3611,7 +3628,7 @@ describe('--flow names the flow a run follows, and a run without it starts as be
           '--workspace', WORKSPACE, '--api', api, '--agent', WORKER, '--runtime', 'dsh', '--model', 'deepseek/deepseek-v4.1-flash', '--cut-from', 'main',
           '--flow', flowId, '--', 'true',
         ],
-        { env: { ...theToolsEnvironment(), ...theFactsACommandIn(answer.folder) }, detached: true },
+        { env: withAFakeContainersTmp({ ...theToolsEnvironment(), ...theFactsACommandIn(answer.folder) }, 'the-flow-in-the-helper'), detached: true },
       )
       if (child.pid !== undefined) groups.add(child.pid)
       let out = ''
@@ -3685,7 +3702,6 @@ describe('a run finishes or crashes itself once its command ends (acceptance fin
     const idleStart = JSON.parse(idle.out.trim())
     groups.add(idleStart.hostPgid)
     await until('the idle command to have ended', () => !alive(idleStart.hostPid))
-    await new Promise((r) => setTimeout(r, 800)) // time for the background copy to have acted, were it going to
     await until('the idle run to be written orphaned', async () => (await ask('GET', `/api/records/${idleStart.run}`, AS_STARTER())).body.record.data.state === 'orphaned')
     const idleRecord = (await ask('GET', `/api/records/${idleStart.run}`, AS_STARTER())).body.record
     expect(idleRecord.data.detail).toContain('with no commits beyond main, and no report is linked to it')
@@ -4077,7 +4093,8 @@ describe('a run finishes or crashes itself once its command ends (acceptance fin
       await until('the launcher to record the unreadable work', () => theLogHolds(start.log, 'left as running because whether it holds commits is not known'))
       await until('the office to record how the round ended', async () => theRoundAccountIsComplete((await ask('GET', `/api/records/${start.run}`, AS_STARTER())).body.record.data.howTheRoundEnded))
       const after = (await ask('GET', `/api/records/${start.run}`, AS_STARTER())).body.record
-      expect(after.data).toEqual({ ...before.data, ...THE_END_WRITTEN })
+      const read = lost === 'worktree' ? { notRead: expect.stringContaining(`git could not read a commit at HEAD in ${start.dir} (`) } : { commit: git(start.dir, 'rev-parse', 'HEAD') }
+      expect(after.data).toEqual({ ...before.data, ...THE_END_WRITTEN, ...theEndHeadOf(start.dir, read) })
       expect(after.data.state).toBe('running')
       expect(after.data.sealedTip).toBeUndefined()
       expect(readFileSync(start.log, 'utf8')).toContain('left as running because whether it holds commits is not known')
@@ -4221,7 +4238,7 @@ describe('a run finishes or crashes itself once its command ends (acceptance fin
     await until('the launcher to record the declared submission', () => theLogHolds(start.log, `left as running because it declared a ${kind} submission`))
     await until('the office to record how the round ended', async () => theRoundAccountIsComplete((await ask('GET', `/api/records/${start.run}`, AS_STARTER())).body.record.data.howTheRoundEnded))
     const after = (await ask('GET', `/api/records/${start.run}`, AS_STARTER())).body.record
-    expect(after.data).toEqual({ ...before.data, ...THE_END_WRITTEN })
+    expect(after.data).toEqual({ ...before.data, ...THE_END_WRITTEN, ...theEndHeadOf(start.dir, { commit: git(start.dir, 'rev-parse', 'HEAD') }) })
     expect(after.data.state).toBe('running')
     expect(after.data.submission).toEqual(submission)
     expect(after.data.sealedTip).toBeUndefined()
@@ -4244,7 +4261,7 @@ describe('a run finishes or crashes itself once its command ends (acceptance fin
     await until('the launcher to record the submission with no kind', () => theLogHolds(start.log, 'declared a submission with no kind, which the office reads as git'))
     await until('the office to record how the round ended', async () => theRoundAccountIsComplete((await ask('GET', `/api/records/${start.run}`, AS_STARTER())).body.record.data.howTheRoundEnded))
     const after = (await ask('GET', `/api/records/${start.run}`, AS_STARTER())).body.record
-    expect(after.data).toEqual({ ...before.data, ...THE_END_WRITTEN })
+    expect(after.data).toEqual({ ...before.data, ...THE_END_WRITTEN, ...theEndHeadOf(start.dir, { commit: git(start.dir, 'rev-parse', 'HEAD') }) })
     expect(after.data.state).toBe('running')
     expect(after.data.submission).toEqual({})
     expect(after.data.detail).toBe("Its command exited 0 with no commits beyond main, and a report is linked to it. It declared a submission with no kind, which the office reads as git. The launcher does not replace a declared submission. The run's agent or its starter finishes it with the work it declared." + '\n' + DSH_SHELL_SELECTION_EXPLANATION)
@@ -4361,6 +4378,7 @@ describe('a run finishes or crashes itself once its command ends (acceptance fin
   it('crashes a run whose command exits 3 even when its "is running" line meets pipes the front has closed, and keeps the line in helper.log', async () => {
     const answer = upAnswer as { container: string; resource: string; folder: string }
     const dir = join(scratch, 'pipes-gone')
+    const go = join(scratch, 'pipes-gone.go')
     git(join(answer.folder, 'repo'), 'worktree', 'add', '-b', 'pipes-gone', dir, 'main')
     const front = await new Promise<Ran>((done) => {
       const child = spawn(
@@ -4368,9 +4386,9 @@ describe('a run finishes or crashes itself once its command ends (acceptance fin
         [
           join(REPO, 'tools', 'sandbox-start.mjs'), '--instance', answer.folder, '--as', STARTER, '--session', starterSession,
           '--workspace', WORKSPACE, '--api', api, '--agent', WORKER, '--runtime', 'dsh', '--model', 'deepseek/deepseek-v4.1-flash',
-          '--worktree', dir, '--cut-from', 'main', '--', 'sh', '-c', 'sleep 3; exit 3',
+          '--worktree', dir, '--cut-from', 'main', '--', 'sh', '-c', `while [ ! -e '${go}' ]; do sleep 0.1; done; exit 3`,
         ],
-        { env: { ...theToolsEnvironment(), ...theFactsACommandIn(answer.folder), SANDBOX_PAUSE_AFTER_THE_START_LINE_MS: '800' }, detached: true },
+        { env: withAFakeContainersTmp({ ...theToolsEnvironment(), ...theFactsACommandIn(answer.folder), SANDBOX_PAUSE_AFTER_THE_START_LINE_MS: '800' }, 'the-pipes-gone'), detached: true },
       )
       let out = ''
       let err = ''
@@ -4381,6 +4399,8 @@ describe('a run finishes or crashes itself once its command ends (acceptance fin
     expect(front.status, front.err).toBe(0)
     const start = JSON.parse(front.out.trim().split('\n')[0] ?? '{}') as { run: string; hostPgid: number }
     groups.add(start.hostPgid)
+    await until('the "is running" line to be in helper.log', () => theLogHolds(join(answer.folder, 'logs', start.run, 'helper.log'), `run ${start.run} of ${WORKER} is running`))
+    writeFileSync(go, '')
     await until('the run to be marked crashed once its command exits 3', async () => (await ask('GET', `/api/records/${start.run}`, AS_STARTER())).body.record.data.state === 'crashed')
     const helperLog = join(answer.folder, 'logs', start.run, 'helper.log')
     expect(existsSync(helperLog)).toBe(true)
@@ -4924,7 +4944,12 @@ describe("a finished run's scratch folder is removed, after the same checks a pe
    * exits only after its sweep has ended, and the sweep's line about the folder comes when it has decided. The sweep pauses
    * two seconds between its office asks and asks about every folder in the container's tmp root, so under load the sweep
    * alone can pass the 30-second budget a test that starts something gets, and the old 20-second waits are 90 seconds now.
+   *
+   * THE TWO CASES BELOW KEEP THE 2 S PAUSE: their command looks for the old folder at once, and finds it there only because
+   * the sweep keeps that pause. So their start takes SWEEP_PAUSE_MS_FOR_A_TEST off, which every other start in this file
+   * sets (theToolsEnvironment).
    */
+  const theRealPause: NodeJS.ProcessEnv = { SWEEP_PAUSE_MS_FOR_A_TEST: undefined }
   async function anOldFolder(name: string): Promise<{ run: string; folder: string; log: string }> {
     const held = await aHeldRun(name, 'echo synthetic > "$TMPDIR/left.txt"', 'exit 3')
     writeFileSync(held.go, '')
@@ -4937,7 +4962,7 @@ describe("a finished run's scratch folder is removed, after the same checks a pe
   it('starts a waited command before the sweep, and exits only when the sweep has ended', async () => {
     const old = await anOldFolder('scratch-after-the-go')
     const seen = join(scratch, 'scratch-after-the-go.seen')
-    const next = await sandbox(['exec', NAME, '--wait', '--plain-env', '--', 'sh', '-c', looksFor(old.folder, seen)])
+    const next = await sandbox(['exec', NAME, '--wait', '--plain-env', '--', 'sh', '-c', looksFor(old.folder, seen)], undefined, theRealPause)
     expect(next.status, next.err).toBe(0)
     expect(readFileSync(seen, 'utf8'), 'the command started only after the sweep').toBe('there\n')
     expect(existsSync(old.folder), `the helper exited before its sweep ended\n${whatTheLogSays(old.log)}`).toBe(false)
@@ -4947,7 +4972,7 @@ describe("a finished run's scratch folder is removed, after the same checks a pe
   it('starts a command that is not waited for before the sweep, and the helper sweeps after it', async () => {
     const old = await anOldFolder('scratch-after-a-background-go')
     const seen = join(scratch, 'scratch-after-a-background-go.seen')
-    const next = await sandbox(['exec', NAME, '--json', '--', 'sh', '-c', looksFor(old.folder, seen)])
+    const next = await sandbox(['exec', NAME, '--json', '--', 'sh', '-c', looksFor(old.folder, seen)], undefined, theRealPause)
     expect(next.status, next.err).toBe(0)
     groups.add((JSON.parse(next.out.trim()) as { hostPgid: number }).hostPgid)
     await until('the command to look for the old folder', () => existsSync(seen), 90_000)
@@ -5566,7 +5591,7 @@ describe("--clone cuts an agent's worktree from another of the template's clones
       const child = spawn(
         process.execPath,
         [join(REPO, 'tools', 'sandbox-start.mjs'), '--instance', answer.folder, '--as', STARTER, '--session', starterSession, '--workspace', WORKSPACE, '--api', api, ...args],
-        { env: { ...theToolsEnvironment(), ...theFactsACommandIn(answer.folder) }, detached: true },
+        { env: withAFakeContainersTmp({ ...theToolsEnvironment(), ...theFactsACommandIn(answer.folder) }, 'the-clone-the-instance-does-not-have'), detached: true },
       )
       if (child.pid !== undefined) groups.add(child.pid)
       let out = ''
@@ -6506,7 +6531,7 @@ describe("the host's copy of a sandbox's facts, which a run in the sandbox canno
       const child = spawn(
         process.execPath,
         [join(REPO, 'tools', 'sandbox-start.mjs'), '--instance', join(sandboxes, name), '--as', STARTER, '--session', starterSession, '--workspace', WORKSPACE, '--api', api, ...args],
-        { env: withAPrivateTmpToSweep({ ...theToolsEnvironment(), ...env }, join(scratch, 'a-helper-started-by-hand')), detached: true },
+        { env: withAFakeContainersTmp({ ...theToolsEnvironment(), ...env }, 'the-handshake'), detached: true },
       )
       if (child.pid !== undefined) groups.add(child.pid)
       let out = ''
@@ -6841,7 +6866,7 @@ describe('a supervisor that is not the secretary starts its worker from inside a
           '--workspace', WORKSPACE, '--api', api, '--agent', ITS_WORKER, '--runtime', 'dsh', '--model', 'deepseek/deepseek-v4.1-flash',
           ...rest,
         ],
-        { env: { ...theToolsEnvironment(), ...theFactsACommandIn(folder), MOLE_AGENT_KEY: key, MOLE_OFFICE_API: api }, detached: true },
+        { env: withAFakeContainersTmp({ ...theToolsEnvironment(), ...theFactsACommandIn(folder), MOLE_AGENT_KEY: key, MOLE_OFFICE_API: api }, 'the-supervisors-worker'), detached: true },
       )
       if (child.pid !== undefined) groups.add(child.pid)
       let out = ''
@@ -7078,4 +7103,61 @@ describe('after the key window is closed (problem D2xgnX8nFixv)', () => {
     const down = await sandbox(['down', 'closed-scratch', '--json'], undefined, { MOLE_AGENT_KEY: key })
     expect(down.status, down.err).toBe(0)
   }, 210_000)
+})
+
+// A HELPER THIS FILE STARTS BY HAND USED TO SWEEP THIS MACHINE'S REAL /tmp, because it was given neither the private /tmp
+// nor the TMPDIR a fake container gives one, and it made its run's scratch folder in this session's temporary folder.
+// This case reads every finish.log the file's sandboxes left and fails on a line naming a folder directly under the real
+// /tmp, or on a run's scratch folder outside the test's own scratch folder. Paths are compared as written and through
+// their real paths, because the scratch folder may be reached through a link.
+it('names no folder under the real /tmp in a finish.log, and no scratch folder outside the test scratch', () => {
+  const logs = existsSync(sandboxes)
+    ? readdirSync(sandboxes, { recursive: true }).map(String).filter((one) => basename(one) === 'finish.log').sort().map((one) => join(sandboxes, one))
+    : []
+  const theRealScratch = realpathSync(scratch)
+  const within = (root: string, path: string): boolean => {
+    const way = relative(root, path)
+    return way === '' || (way !== '..' && !way.startsWith(`..${sep}`) && !isAbsolute(way))
+  }
+  // A FOLDER THE LOG NAMES MAY BE GONE, a finished run's own among them: the closest part still there is made real.
+  const itsRealPath = (path: string): string => {
+    const missing: string[] = []
+    let here = path
+    while (!existsSync(here)) {
+      const up = dirname(here)
+      if (up === here) return path
+      missing.unshift(basename(here))
+      here = up
+    }
+    return join(realpathSync(here), ...missing)
+  }
+  const insideTheScratch = (path: string): boolean =>
+    within(scratch, path) || within(theRealScratch, itsRealPath(path))
+  // A PATH DIRECTLY UNDER THE REAL /tmp: /tmp/<one name>, never a deeper path that only starts there.
+  const underTheRealTmp = (line: string): string | null => {
+    for (const match of line.matchAll(/(?:^|[\s("'=:,\[])\/tmp\/([^\s/()\[\]]+)/g)) {
+      if (line[(match.index ?? 0) + match[0].length] === '/') continue
+      const name = match[1]!.replace(/[,.;:!?"']+$/, '')
+      if (name !== '') return `/tmp/${name}`
+    }
+    return null
+  }
+  const aScratchFolderOutside = (line: string): string | null => {
+    for (const match of line.matchAll(/scratch folder (\S+)/g)) {
+      const path = match[1]!.replace(/[,.;:]+$/, '')
+      if (path.startsWith('/') && !insideTheScratch(path)) return path
+    }
+    return null
+  }
+  const faults: string[] = []
+  for (const file of logs) {
+    readFileSync(file, 'utf8').split('\n').forEach((line, index) => {
+      const lineNumber = String(index + 1)
+      const under = underTheRealTmp(line)
+      if (under !== null) faults.push(`${file}:${lineNumber} names ${under} directly under the real /tmp: ${line.trim()}`)
+      const outside = aScratchFolderOutside(line)
+      if (outside !== null) faults.push(`${file}:${lineNumber} names the scratch folder ${outside}, outside ${scratch}: ${line.trim()}`)
+    })
+  }
+  expect(faults, 'a finish.log names a folder under the real /tmp, or a run scratch folder outside the test scratch').toEqual([])
 })

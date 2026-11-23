@@ -137,6 +137,9 @@ function theRungALevelWordNames(word: string): Rung | null {
   return theRungACardMeans(trimmed)
 }
 
+/** Why a chapter given as a number that is not whole is not read, in either shape. */
+const NOT_A_WHOLE_NUMBER = 'its chapter is not a whole number.'
+
 /**
  * READ ONE ENTRY OF A CHAPTERS LINE.
  *
@@ -144,6 +147,11 @@ function theRungALevelWordNames(word: string): Rung | null {
  * `Tests and gates`, `tests and gates:digest`. An entry already stored as `{chapter, level}` is
  * taken as it is, which is what a second registration of the same agent sends back. Its level word
  * is read as the text shape's is, by `theRungALevelWordNames`.
+ *
+ * A WHOLE NUMBER IS READ AS ITS TEXT IS (invariant 8: loose input). `5` sent as a JSON number names
+ * chapter 5 at the named-chapter default, exactly as `"5"` does, and a number with no chapter is
+ * refused as its text would be. A number that is not whole is refused as not whole. Until 22 November
+ * 2026 any bare number was refused as no chapter number at all.
  */
 function readOne(said: unknown, chapters: readonly ChapterName[]): ChapterNamed | ChapterNotRead {
   if (typeof said === 'object' && said !== null && !Array.isArray(said)) {
@@ -152,7 +160,7 @@ function readOne(said: unknown, chapters: readonly ChapterName[]): ChapterNamed 
     const word = held['level'] ?? A_NAMED_CHAPTER_IS_READ_AT
     const level = typeof word === 'string' ? theRungALevelWordNames(word) : null
     if (typeof chapter !== 'number' || !Number.isInteger(chapter)) {
-      return { said: JSON.stringify(said), because: 'its chapter is not a whole number.' }
+      return { said: JSON.stringify(said), because: NOT_A_WHOLE_NUMBER }
     }
     if (level === null) {
       return { said: JSON.stringify(said), because: notARungSaid(String(word)) }
@@ -161,6 +169,11 @@ function readOne(said: unknown, chapters: readonly ChapterName[]): ChapterNamed 
       return { said: String(chapter), because: `the office regulations have no chapter ${String(chapter)}.` }
     }
     return { chapter, level }
+  }
+
+  if (typeof said === 'number') {
+    if (!Number.isInteger(said)) return { said: String(said), because: NOT_A_WHOLE_NUMBER }
+    return readOne(String(said), chapters)
   }
 
   if (typeof said !== 'string' || said.trim() === '') {

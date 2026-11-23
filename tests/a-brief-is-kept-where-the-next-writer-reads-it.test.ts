@@ -51,9 +51,19 @@ let app: FastifyInstance
 let api = ''
 let scratch = ''
 
-async function register(headers: Record<string, string>, payload: Record<string, unknown>): Promise<void> {
+/** The agent a registration made, as the registration door answers it. */
+interface Registered {
+  id: string
+  name: string
+}
+
+/** The agent the runs in this file work as, read from the reply that registered it. */
+let theRunsAgent: Registered
+
+async function register(headers: Record<string, string>, payload: Record<string, unknown>): Promise<Registered> {
   const reply = await app.inject({ method: 'POST', url: '/api/agents/started', headers, payload })
   expect(reply.statusCode, reply.body).toBe(201)
+  return (reply.json() as { agent: Registered }).agent
 }
 
 async function theDataOf(id: string): Promise<{ data: Record<string, unknown>; links: { type: string; isBacklink: boolean; other?: { id: string } }[] }> {
@@ -88,7 +98,7 @@ beforeAll(async () => {
   api = `http://127.0.0.1:${String((app.server!.address() as { port: number }).port)}`
   scratch = mkdtempSync(join(tmpdir(), 'brief-kept-'))
   await register(AS_THE_PERSON, { handle: 'brief-starter', name: 'Brief starter', role: 'supervisor' })
-  await register(asAgent('brief-starter'), { handle: 'brief-worker', name: 'Brief worker', role: 'worker' })
+  theRunsAgent = await register(asAgent('brief-starter'), { handle: 'brief-worker', name: 'Brief worker', role: 'worker' })
 }, 60_000)
 
 afterAll(async () => {
@@ -138,12 +148,16 @@ describe('the runner keeps the brief on the office at the run\u2019s start', () 
     // starts, so a check refuses the worker for a record it could not have labelled (the secretary,
     // message KsSsRY6WH1Ea of 22 September 2026).
     const forms = (await app.inject({ method: 'GET', url: `/api/records/${kept!.id}/short-forms`, headers: AS_THE_PERSON })).json() as {
-      levels: { rung: string; state: string; text: string | null; by: string | null }[]
+      levels: { rung: string; state: string; text: string | null; by: string | null; byName: string | null }[]
     }
     const label = forms.levels.find((one) => one.rung === 'label')
     expect(label?.state, JSON.stringify(label)).toBe('current')
     expect(label?.text).toBe('Brief for brief-worker')
-    expect(label?.by, 'the hook writes it as the run, not as somebody else').toBe('brief-worker')
+    // A FORM STORES ITS WRITER AS A STAMP: the registry id of the agent the request named, which is the one agent that
+    // answers to it, and the reading gives that agent's name beside it. Both are read from the reply that registered
+    // the run's agent, so a label written as anybody else still fails here.
+    expect(label?.by, 'the hook writes it as the run, not as somebody else').toBe(theRunsAgent.id)
+    expect(label?.byName, 'the reading does not name the run as the writer').toBe(theRunsAgent.name)
   })
 
   it('names the report the run filed beside the brief', async () => {

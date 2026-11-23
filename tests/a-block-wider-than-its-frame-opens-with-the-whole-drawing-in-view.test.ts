@@ -30,7 +30,7 @@ const PROJECT = { id: 'test-block-wider-than-its-frame', title: 'Example office 
 // Of the blocks with two boxes, the one with the most module cards carrying them: eleven.
 const BLOCK = MASTER.blockPipelines.find((block) => block.key === 'block-03')!
 const MODULES = [...new Set(MASTER.links.filter((link) => link.type === 'implements' && BLOCK.boxes.includes(link.to)).map((link) => link.from))]
-const WIDTHS = [1440, 990, 660] as const
+const WIDTHS = [1440, 660] as const
 // Each case's BLOCK_FIT line says how long the block took to draw; two minutes is room for a loaded machine.
 const DRAWN_WITHIN = 120_000
 const CASE_ALLOWANCE = 240_000

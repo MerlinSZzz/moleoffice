@@ -2,6 +2,41 @@
 // Licensed under the MIT License. See LICENSE.
 import { getTableName } from 'drizzle-orm'
 
+/**
+ * Every table in this database, by its SQL name, split by whether its contents were authored.
+ *
+ * WHY THIS LIST IS IN THE SCHEMA AND NOT IN THE EXPORTER THAT WILL NEED IT. A durable format has
+ * to know which tables exist, and the answer has been wrong three times already: README.md says
+ * three, this file said five until migration 0003, its own header said eleven until the planning
+ * layer was counted, and a live database has fifteen. A list kept anywhere other than beside the
+ * declarations drifts from them the first time somebody adds a table and only reads the file they
+ * are editing. tests/schema-tables.test.ts checks these two arrays against the drizzle table
+ * objects declared above AND against a freshly migrated database, so a table added without being
+ * listed here fails the suite rather than being silently left out of a backup.
+ *
+ * AUTHORED means a person or an agent made it and it exists nowhere else, so it must round-trip
+ * through any durable format. DERIVED means a scan rebuilds it wholesale, so it must be
+ * REGENERATED rather than exported — a restored copy would describe the machine it came from.
+ *
+ * `__drizzle_migrations` is in neither list. It is drizzle's own bookkeeping; a restore applies
+ * the migrations, which writes it, and then imports the data.
+ *
+ * ---------------------------------------------------------------------------------------
+ * EVERYTHING BELOW THIS LIST IS DERIVED FROM IT, AND THAT IS THE POINT
+ * ---------------------------------------------------------------------------------------
+ *
+ * `records`, `links` and `changes` were used as a stand-in for "the tables that hold authored
+ * work" in FOUR places — the reset guard, the scoped archive's notes, the backup verifier and the
+ * migration loss-guard — and by 2026-08-12 there were twelve authored tables. Nothing derived any
+ * of those lists from any other, so each was separately wrong and nothing failed: `npm run
+ * db:reset` deleted a planning-only database without a word, a project archive said "Nothing has
+ * been drafted" over a database full of drafts, `--check-only` called a backup with no planning
+ * layer usable, and a server start migrated somebody's plan in place, unattended.
+ *
+ * So the lists below are computed from `AUTHORED_TABLES` and from the drizzle declarations
+ * themselves, and every one of those four places reads one of them. A table added to
+ * `AUTHORED_TABLES` and nowhere else fixes all four at once, or fails to compile.
+ */
 export const AUTHORED_TABLES = [
   'office_scene_settings',
   'office_map_layouts',
@@ -51,7 +86,7 @@ export const AUTHORED_TABLES = [
   // Planning. Authored like the rest — somebody committed these hours — and the only tables in the
   // database with no workspace column, for the settled reason in `allocations`. There were four of
   // them until migration 0196 moved `planning_drafts` into `plans`; nothing here says how many,
-  // because `PERSON_LEVEL_TABLES` in schema.ts counts them.
+  // because `PERSON_LEVEL_TABLES` in authored-table-of.ts counts them.
   'allocations',
   'planning_capacity',
   'planning_recurrences',
@@ -88,7 +123,7 @@ export const AUTHORED_TABLES = [
   // messages back first would hold comments belonging to a conversation that is not there yet, the
   // same rule `workspaces` and `plans` come first for.
   //
-  // These two are the reason `WORKSPACE_COLUMN` in schema.ts has a third form. They carry no
+  // These two are the reason `WORKSPACE_COLUMN` in authored-table-of.ts has a third form. They carry no
   // `workspace_id` — a copy of it on every message would be the same fact in two places — and they
   // are NOT person-level: each belongs to exactly one project, the one its thread names. Until
   // 18 August 2026 all three were left out of this list, because the rule could only say "this
@@ -127,7 +162,7 @@ export const AUTHORED_TABLES = [
   // it was reached by.
   'revalidations',
   // The one-way marker for comments whose words went out before Mole Office stored a word for it. AFTER
-  // `records`, because every row names one. It has no `workspace_id`; `SCOPED_THROUGH` in schema.ts says
+  // `records`, because every row names one. It has no `workspace_id`; `SCOPED_THROUGH` in authored-table-of.ts says
   // which project a row is in.
   'annotation_words_fixed',
   // Whether the stored reading-measure words carry their new names, added by migration 0173. AFTER
@@ -140,7 +175,7 @@ export const AUTHORED_TABLES = [
   //
   // None of the four names a project, and that is what they are: the people and the durable agents
   // of this installation are the same in every project on this machine (criterion M2 of
-  // design/messages/ACCEPTANCE.md). `WORKSPACE_COLUMN` in schema.ts therefore answers null for all four,
+  // design/messages/ACCEPTANCE.md). `WORKSPACE_COLUMN` in authored-table-of.ts therefore answers null for all four,
   // and `PERSON_LEVEL_TABLES` — the tables a project-scoped archive cannot carry — now holds two
   // kinds of table rather than one. Its own note says which.
   //
@@ -380,3 +415,23 @@ function isArchived(table: AuthoredTable): table is ArchivedTable {
 
 /** The authored tables an archive carries, in `AUTHORED_TABLES` order. */
 export const ARCHIVED_TABLES: readonly ArchivedTable[] = AUTHORED_TABLES.filter(isArchived)
+
+/**
+ * THE TABLES NO COPY OF THIS DATABASE MAY CARRY.
+ *
+ * `held_keys` holds the SHA-256 of every key the office ever issued: agents' keys, the person's own
+ * devices' keys, live ones and revoked ones. A key hash is a secret one step from its key, and the owner
+ * ruled that no copy, backup or export carries a key. The export honours it
+ * because only `AUTHORED_TABLES` are exported and `held_keys` is not among them. The backup command
+ * copies the WHOLE file with SQLite's online backup, so it must empty these tables IN THE COPY after
+ * writing it, and the restore proof must count them among the tables a restore must not bring back.
+ *
+ * NAMED ONCE, in src/config/what-a-copy-must-not-carry.mjs, and re-exported here. The backup
+ * command and the restore proof ask the same question of the same list, and so do the two plain
+ * JavaScript tools that copy the file, tools/isolated-mole-office.mjs and tools/office-copy.mjs. They
+ * cannot import this TypeScript module, so the list lives where all four can read it. A table emptied
+ * by one and left in another is the drift that one list exists to stop.
+ */
+export { NOT_CARRIED_TABLES } from '../../config/what-a-copy-must-not-carry.mjs'
+
+export type NotCarriedTable = (typeof import('../../config/what-a-copy-must-not-carry.mjs').NOT_CARRIED_TABLES)[number]

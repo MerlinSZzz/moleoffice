@@ -46,7 +46,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import type { FastifyInstance } from 'fastify'
 
-import { apiApp, freshDb, thePersonsKeyHeader, FOR_THE_PERSON, type TestDb } from './helpers.ts'
+import { apiApp, freshDb, thePersonsKeyHeader, FOR_THE_PERSON, type TestDb, governsTheWholeProject } from './helpers.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { PROFILE_WORDS } from '../src/shared/profile.ts'
 import { THE_TEST_OFFICES_SECRETARY } from './a-page-of-a-test-office.ts'
@@ -98,7 +98,7 @@ async function aDecisionUnderThePeriod(title: string): Promise<string> {
     ...FOR_THE_PERSON,
     kind: 'decision',
     title,
-    data: { replaces: [], decided_by: 'the owner', authority: 'the owner said so', because: 'Because they said so.' },
+    data: { ...governsTheWholeProject(), replaces: [], decided_by: 'the owner', authority: 'the owner said so', because: 'Because they said so.' },
   })
   expect(done.status, done.said).toBe(201)
   return String((done.body['record'] as { id: string }).id)

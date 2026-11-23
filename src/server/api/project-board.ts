@@ -6,6 +6,7 @@
  *   GET /api/projects/:project/master-pipeline   which pipeline is the project's master, or that none is marked
  *   PUT /api/projects/:project/master-pipeline   mark one, or mark none
  *   GET /api/projects/:project/board             one row for each step of the master, worked out now and not stored
+ *   GET /api/projects/:project/people-and-packages  line by line, who acts now, under whom, and the packages counted
  *   GET /api/map/dictionary                      a file path or a module in, its block, module and owning line out
  *
  * The id in a /projects path is a project, not a record in one: the Settings page and an agent may mark a project's master
@@ -20,11 +21,13 @@ import { z } from 'zod'
 
 import type { MapDictionary } from '@shared/big-map-reading.ts'
 import type { ProjectBoard } from '@shared/project-board.ts'
+import type { PeopleAndPackages } from '@shared/project-people.ts'
 import { actorFrom } from '../lib/http.ts'
 import { parse } from '../lib/parse.ts'
 import { readTheMapDictionary } from '../lib/map-dictionary.ts'
 import { markTheMasterPipeline, theMasterPipeline, type TheMasterPipeline } from '../lib/master-pipeline.ts'
 import { readTheProjectBoard } from '../lib/project-board.ts'
+import { readThePeopleAndPackages } from '../lib/project-people.ts'
 import { theKeyProvesASecretary } from '../lib/the-key-proves-a-secretary.ts'
 import { PanelError } from '../lib/panel-error.ts'
 import {
@@ -59,7 +62,9 @@ const BOARD_NOTE =
   'depth, their unfinished steps with each one\'s age in days, the runs that sent the office a request within ' +
   'actingWithinHours, open packages, open backlog items and the landings on main of the last 7 days. ' +
   'actingWithinHours is the idle reminder\'s setting, the hours an agent may go idle before the office reminds it of ' +
-  'its role, so the board and the reminder count the same runs as quiet. lines is the same reading by line. When no ' +
+  'its role, so the board and the reminder count the same runs as quiet. lines is the same reading by line; each ' +
+  'line\'s department is the department its code names, by id, names, level and team count, or that no department ' +
+  'holds it, read from the department records when asked, and null for the line not recorded. When no ' +
   'master is marked, or the mark is broken, master says so and rows is empty. PUT ' +
   '/api/projects/:project/master-pipeline marks the master. The owner may mark it, with or without a reason. A ' +
   'secretary proved by its own key may mark it, and must give a reason. No other agent may. When main\'s history ' +
@@ -67,6 +72,22 @@ const BOARD_NOTE =
   'red: the board\'s quick view reads them from GET /api/merge-queue/measures, the merge queue\'s own measure. The ' +
   'board gives no estimate, because no way of working one out from the records has been chosen yet. The shapes are ' +
   'in src/shared/project-board.ts.'
+
+const PEOPLE_NOTE =
+  "This project's people and packages, line by line, worked out from runs, agents and packages when asked, and " +
+  'nothing stored. Read only, and no body is read. Each line has its department, read as the board reads it; its ' +
+  'secretary, or null when the department record names none; how many supervisors and workers act on it now; its ' +
+  'packages counted by state, over every package whose lines name it, ended or not; and its agents acting now. An ' +
+  'agent acts when its run sent the office a request within actingWithinHours, the board\'s own setting. Each agent ' +
+  'has its post, the role card on its registry row or null, the model and runtime of its run, and its packages. A ' +
+  "supervisor's packages are those whose newest inside take names it, the accepted ones left out, and its workers " +
+  "are the acting workers its run's workerRuns started. A worker's package is the one its run's workerPackage " +
+  'names, with that field\'s points, or none, and no other package is put in its place. A worker whose starting run ' +
+  'does not act is in workersUnderNoSupervisor. An agent whose card is neither supervisor nor worker, or that has no ' +
+  "card, is listed in supervisors by its post. A package counts as blocked when its task's own state is blocked; " +
+  'otherwise to_do is not taken, taken, aligned and returned are in progress, handed_back is handed back and done is ' +
+  "accepted: the package's maker accepted every point. A package on two lines counts on each, and total counts it " +
+  'once. A project that is not there is a 404. The shapes are in src/shared/project-people.ts.'
 
 const DICTIONARY_NOTE =
   'For a file path or a module, its block on the big map, the module and the line that owns it. Ask with ' +
@@ -147,6 +168,15 @@ export async function projectBoardRoutes(app: FastifyInstance): Promise<void> {
     async (req): Promise<ProjectBoard> => {
       const { project } = parse(projectParam, req.params, 'The project')
       return readTheProjectBoard(project)
+    },
+  )
+
+  app.get(
+    '/projects/:project/people-and-packages',
+    route('project.people-and-packages', 'remote', PEOPLE_NOTE),
+    async (req): Promise<PeopleAndPackages> => {
+      const { project } = parse(projectParam, req.params, 'The project')
+      return readThePeopleAndPackages(project)
     },
   )
 

@@ -16,9 +16,10 @@
  * THE TOKEN IS GENERATED HERE AND LEAVES ONCE
  * ---------------------------------------------------------------------------------------
  *
- * `issueACredential` is the only function in this product that returns a token. It stores SHA-256 of
- * it and hands the plain secret back exactly once, in the reply to the request that asked for it.
- * There is no route that reads it back, and there could not be: the office does not hold it.
+ * `issueACredential` and `issueAPersonsDeviceCredential` are the only functions in this product that return a token.
+ * Each stores SHA-256 of it and hands the plain secret back exactly once, in the reply to the request that asked for
+ * it. A browser's token is handed back in two halves, one in a cookie and one in the answer. There is no route that
+ * reads it back, and there could not be: the office does not hold it.
  *
  * A 256-BIT SECRET FROM `randomBytes`, not a nanoid. nanoid is what ids are made of here and an id
  * is not a secret — it is drawn on pages, quoted in refusals and put in briefs. A token that looked
@@ -35,6 +36,7 @@
 
 import { createHash, randomBytes } from 'node:crypto'
 import { anOfficeId } from './ids.ts'
+import { announce } from './events.ts'
 
 import { ASKS_TO_PAIR_ALLOWED } from '@shared/pairing.ts'
 import { localStamp, nowStamp, parseStoredStamp } from '@shared/time.ts'
@@ -59,7 +61,7 @@ import {
   revokeTheKeyWhoseHashIs,
   type AHeldKeyRow,
 } from './keys.ts'
-import { theHeldKeyRowWhoseHashIs } from '../db/the-key-on-this-request-was-made-for-a-run.ts'
+import { aDeviceKeyFrom, theHeldKeyRowWhoseHashIs } from '../db/the-key-on-this-request-was-made-for-a-run.ts'
 import type { HowAKeysMintWasProved } from './provedkeys.ts'
 import { type AgentIdentity } from './agent-references.ts'
 import { everyAgentAReferenceCouldName } from '../db/agent-references.ts'
@@ -376,12 +378,12 @@ export function issueACredential(asked: CredentialAsked): { credential: VisitorC
  * WHY THIS EXISTS AS WELL AS `issueACredential`
  * ---------------------------------------------------------------------------------------
  *
- * There are two doors a browser's credential can be asked from — the credential flow's device ask
- * (`POST /api/office/visitors` with `{"device": …}`) and the pairing page's own ask
- * (`POST /api/office/pairing/ask`) — and they must issue the SAME credential. `issueACredential` is
- * the one issuing path; this is the one place the device's shape is filled in, so the role, the
- * absent world and the four empty run facts cannot drift between the two doors. Invariant 9: one
- * fact worked out in one place.
+ * There are three doors a browser's credential can come from — the credential flow's device ask
+ * (`POST /api/office/visitors` with `{"device": …}`), the pairing page's own ask
+ * (`POST /api/office/pairing/ask`) and the pairing press (`POST /api/office/pairing`) — and they must
+ * issue the SAME credential. `issueACredential` is the one issuing path; this is the one place the
+ * device's shape is filled in, so the role, the absent world and the four empty run facts cannot
+ * drift between the doors. Invariant 9: one fact worked out in one place.
  *
  * A DEVICE NAMES NO RUN AND NO WORLD. It has no handle it chose and no role card, so the empty word
  * `A_DEVICE_ASKS_FOR_NO_CARD` is what marks it, and `isAPersonsDeviceCredential` reads that mark at
@@ -392,21 +394,66 @@ export function issueAPersonsDeviceCredential(asked: {
   machine: string | null
   machineHow: string
   runtime: string | null
-}): { credential: VisitorCredential; token: string } {
-  return issueACredential({
-    handle: asked.name,
-    name: asked.name,
-    role: A_DEVICE_ASKS_FOR_NO_CARD,
-    world: null,
-    machine: asked.machine,
-    machineHow: asked.machineHow,
-    facts: {
-      conversationPath: null,
-      startDirectory: null,
-      runtime: asked.runtime,
-      sessionRecord: null,
+}): { credential: VisitorCredential; token: string; halves: ADeviceKeyInTwoHalves } {
+  // A BROWSER'S KEY IS MADE IN TWO HALVES, and the token is the key they join to (`aDeviceKeyFrom`), so the stored
+  // hash is the hash of the key a request with both halves carries. The door sets the cookie half and answers the
+  // header half; neither is kept here.
+  const halves = { cookie: aSecret(), header: aSecret() }
+  const now = new Date()
+  const ends = new Date(now.getTime() + HOW_LONG_A_CREDENTIAL_LASTS_DAYS * 24 * 60 * 60 * 1000)
+  const issued = writeACredential(
+    {
+      handle: asked.name,
+      name: asked.name,
+      role: A_DEVICE_ASKS_FOR_NO_CARD,
+      world: null,
+      machine: asked.machine,
+      machineHow: asked.machineHow,
+      facts: {
+        conversationPath: null,
+        startDirectory: null,
+        runtime: asked.runtime,
+        sessionRecord: null,
+      },
     },
-  })
+    { standing: 'pending', confirmedBy: null, at: now, endsAt: ends },
+    aDeviceKeyFrom(halves.cookie, halves.header),
+  )
+  return { ...issued, halves }
+}
+
+/** A browser's device key in its two halves: the cookie half and the header half. */
+export interface ADeviceKeyInTwoHalves {
+  cookie: string
+  header: string
+}
+
+/**
+ * PAIR A BROWSER AS THE PERSON AT ONCE: the whole write of the pairing press on this computer.
+ *
+ * The press issues a person's-device credential, confirms it in the person's name and binds its key, in that order and
+ * with the same three functions the ask and the confirm use, so a browser paired here is the same row and the same key
+ * as one confirmed at the Embassy. It hands back the credential and the two halves; the caller sets the cookie half and
+ * answers the header half, and nothing here keeps either. `provedBy` is how the press that asked was proved, for the
+ * key's row.
+ */
+export function pairABrowserAsThePerson(
+  asked: { name: string; machine: string | null; machineHow: string; runtime: string | null },
+  confirmedBy: ParticipantRef,
+  provedBy: HowAKeysMintWasProved | null,
+): { credential: VisitorCredential; halves: ADeviceKeyInTwoHalves } {
+  const issued = issueAPersonsDeviceCredential(asked)
+  const credential = confirmACredential(issued.credential.id, confirmedBy)
+  theKeyOneConfirmedCredentialBinds(credential, provedBy)
+  return { credential, halves: issued.halves }
+}
+
+/**
+ * 256 BITS FROM THE OPERATING SYSTEM'S OWN GENERATOR, in base64url. See this file's header for why it is not a nanoid:
+ * an id here is public, and a secret that looked like one would be pasted into a report.
+ */
+function aSecret(): string {
+  return randomBytes(32).toString('base64url')
 }
 
 /**
@@ -462,12 +509,10 @@ export function registerACitizenOfAKnownWorld(
 function writeACredential(
   asked: CredentialAsked,
   how: { standing: VisitorStanding; confirmedBy: ParticipantRef | null; at: Date; endsAt: Date },
+  token: string = aSecret(),
 ): { credential: VisitorCredential; token: string } {
   const handle = asked.handle.trim()
   if (handle === '') throw new PanelError('A credential is issued to a handle, and this request named none.', 400)
-  // 256 BITS FROM THE OPERATING SYSTEM'S OWN GENERATOR. See this file's header for why it is not a
-  // nanoid: an id here is public, and a secret that looked like one would be pasted into a report.
-  const token = randomBytes(32).toString('base64url')
   const id = anOfficeId()
   const at = localStamp(how.at)
   sqlite
@@ -499,7 +544,20 @@ function writeACredential(
     )
   const written = credentialById(id)
   if (written === null) throw new PanelError('The credential was issued and could not be read back.', 500)
+  // A PENDING CREDENTIAL WAITS ON THE PERSON; a trusted one waits on nobody, so only the first is announced.
+  if (written.standing === 'pending') tellThePages()
   return { credential: written, token }
+}
+
+/**
+ * TELL EVERY OPEN PAGE THAT THE LIST OF WHAT WAITS ON THE PERSON CHANGED.
+ *
+ * Every pending credential is a row of that list (src/server/lib/waiting.ts), and Home draws a waiting browser's ask at
+ * its top. An open page reads the list again at once only on this event, so without it an ask reached Home at its
+ * minute's re-read, and a press elsewhere left the answered ask on Home as long.
+ */
+function tellThePages(): void {
+  announce({ name: 'list.changed', workspaceId: null, lists: ['needsYou'], about: null, groupId: null, because: 'A pairing request was asked, confirmed or ended.' })
 }
 
 /** A blank string is nobody having said, which is what NULL means in every column here. */
@@ -550,6 +608,7 @@ export function confirmACredential(id: string, by: ParticipantRef): VisitorCrede
     .run('trusted', by.kind, by.id, nowStamp(), id)
   const written = credentialById(id)
   if (written === null) throw new PanelError('The credential was confirmed and could not be read back.', 500)
+  tellThePages()
   return written
 }
 
@@ -723,6 +782,7 @@ export function endACredential(id: string, because: string): VisitorCredential {
   }
   const written = credentialById(id)
   if (written === null) throw new PanelError('The credential was ended and could not be read back.', 500)
+  tellThePages()
   return written
 }
 

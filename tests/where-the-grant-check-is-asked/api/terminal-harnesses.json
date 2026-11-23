@@ -1,7 +1,8 @@
 {
   "doors": [
     "harnesses.list",
-    "harnesses.install"
+    "harnesses.install",
+    "harnesses.signed-in"
   ],
-  "why": "Reading and installing the agent tools go through the same guard, which asks the check after the person. A waiting install under the grant signs only as the secretary and records its press before answering 409."
+  "why": "Reading the agent tools, installing them and reading whether one is signed in go through the same guard, which asks the check after the person. A waiting install under the grant signs only as the secretary and records its press before answering 409."
 }

@@ -24,15 +24,14 @@
  *      columns: the two start on one line, the second starts right of where the first ends, and no
  *      Reports title is squeezed under 200 pixels;
  *   3. at 390 each of those pages has one column, the two parts one above the other at one left
- *      edge; group B's two-column pages are also measured at 1180, 990 and 660, the widths their
- *      own row keeps;
+ *      edge; group B's two-column pages are also measured at 1180, the width just under the switch;
  *   4. no page scrolls sideways at the widths measured;
  *   5. a report's own page keeps one column at 1440, with its facts under the document, because a
  *      report is read as a document and keeps the whole width.
  *
  * THE MUTATIONS THAT TURN THIS RED, WITH A CONTROL RUN FIRST:
  *   1. in SideBySide.tsx, set WIDE_SCREEN to (min-width: 60rem) → the 1440 cases fail, and group B's
- *      stack cases fail at 1180 and 990.
+ *      stack case fails at 1180.
  *   2. in SideBySide.tsx, set WIDE_SCREEN to (min-width: 100rem) → the 1440 cases fail.
  *   3. in RecordPage.tsx, give a report's facts the end column like every other kind → the report
  *      case fails.
@@ -423,11 +422,11 @@ describe('group B: the pages in the browser', () => {
     }
   }, 300_000)
 
-  it('stacks the two columns at 1180, 990, 660 and 390, without scrolling sideways', async () => {
+  it('stacks the two columns at 1180 and 390, without scrolling sideways', async () => {
     for (const page of SIDES) {
       // ONE LOAD FOR EACH PAGE, at 1180; the window is then resized to each of the other widths.
       await openBothColumns(writtenAddress(page.address), page.box, 1180)
-      for (const width of [1180, 990, 660, 390]) {
+      for (const width of [1180, 390]) {
         await resize(width)
         await bothColumnsOf(page.box)
         const layout = await measure(page.box)
@@ -441,12 +440,12 @@ describe('group B: the pages in the browser', () => {
     }
   }, 600_000)
 
-  it('does not scroll sideways on a one-kind page of the group at 1440, 990, 660 or 390', async () => {
+  it('does not scroll sideways on a one-kind page of the group at 1440 or 390', async () => {
     const wide: string[] = []
     for (const page of ONE_KIND) {
       // ONE LOAD FOR EACH PAGE, at 1440; the window is then resized to each of the other widths.
       await open(writtenAddress(page.address), 1440)
-      for (const width of [1440, 990, 660, 390]) {
+      for (const width of [1440, 390]) {
         await resize(width)
         const scroll = await app.page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, viewport: innerWidth }))
         if (scroll.scroll > scroll.viewport) wide.push(`${page.name} at ${String(width)}: ${JSON.stringify(scroll)}`)

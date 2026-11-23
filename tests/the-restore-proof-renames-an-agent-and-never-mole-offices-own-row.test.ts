@@ -96,8 +96,9 @@ async function whyTheProofRefusesToFillTheRenames(): Promise<string | null> {
   // (scripts/restore-check.ts, fillEmptyTables). Loading it here is the same reach the proof has.
   await import('../src/server/lib/agent-names.ts')
   const schema = await import('../src/server/db/schema.ts')
+  const { everyPartTable } = await import('../src/server/db/every-part-table.ts')
   const part = one(
-    schema.everyPartTable().filter((table) => table.table === schema.agentRenames),
+    everyPartTable().filter((table) => table.table === schema.agentRenames),
     'the part table agent_renames',
   )
   if (part.says.restore === 'not in this proof') {

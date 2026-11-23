@@ -14,11 +14,16 @@
  *   4. entering a world sends this page's requests there, and coming home sends them back;
  *   5. the trip survives a reload, because it is written where a reload can read it;
  *   6. the strip says which world, brings the page back in one press, and says when the world being
- *      visited is on a different commit from the one that served this page.
+ *      visited is on a different commit from the one that served this page;
+ *   7. a page a world served starts no trip and changes no world: no row has Enter, Rename or Stop, the
+ *      office's row is a link to the office's own address, another world's row says that a world is
+ *      entered, renamed and stopped from the office's page, and a page on a trip keeps its Enter, Rename
+ *      and Stop.
  */
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { createI18n, type WordKey } from '../src/shared/i18n.ts'
 import { theAddressToReachAWorldBy, type Visit, type World } from '../src/shared/worlds.ts'
 import { THE_TEST_FIXTURE_ROOT, THE_TEST_OFFICES_OWNER } from './a-page-of-a-test-office.ts'
 
@@ -26,12 +31,15 @@ type WorldsPageModule = typeof import('../src/web/pages/WorldsPage.tsx')
 type StripModule = typeof import('../src/web/components/VisitingStrip.tsx')
 type VisitingModule = typeof import('../src/web/lib/visiting.ts')
 type WorldModule = typeof import('../src/web/lib/world.ts')
+type ModeModule = typeof import('../src/web/lib/mode.ts')
 
 let page: WorldsPageModule
 let strip: StripModule
 let visiting: VisitingModule
 let world: WorldModule
+let mode: ModeModule
 let store: Map<string, string>
+const en = createI18n('en')
 
 beforeAll(async () => {
   store = new Map<string, string>()
@@ -53,6 +61,7 @@ beforeAll(async () => {
   strip = await import('../src/web/components/VisitingStrip.tsx')
   visiting = await import('../src/web/lib/visiting.ts')
   world = await import('../src/web/lib/world.ts')
+  mode = await import('../src/web/lib/mode.ts')
 })
 
 beforeEach(() => {
@@ -133,15 +142,16 @@ function theOffice(worlds: World[], visits: Visit[] = []): string {
   )
 }
 
-describe('a short list says why it is short', () => {
+describe('a short list says where it was read from', () => {
   /**
    * "read from this world alone" ON ITS OWN IS THREE DIFFERENT FACTS WEARING ONE SENTENCE: a main
    * world that is down, a copy that was never written, and a world that may read no copy at all.
-   * The server says which of the three in `mirrorNote`; this is the page drawing it rather than
-   * leaving the reader to guess, which is what criterion C2's own note refuses.
+   * The server says which of the three in `mirrorNote`. Before, the page drew that sentence for
+   * every reader. It draws the short words "read from this world alone" now, as decided, and the
+   * server's sentence only in developer mode.
    */
-  it('draws the reason the server gave when the list came from this world alone', () => {
-    const html = body(
+  it('draws where the list came from, and the reason the server gave only in developer mode', () => {
+    const draw = (): string => body(
       createElement(page.TheOffice, {
         office: {
           worlds: [aWorld()],
@@ -158,9 +168,16 @@ describe('a short list says why it is short', () => {
         trusts: null, onReadAgain: () => {},
       }),
     )
+    const html = draw()
     expect(html).toContain('read from')
     expect(html).toContain('this world alone')
-    expect(html).toContain('started by a test runner')
+    expect(html).not.toContain('started by a test runner')
+    mode.setMode('inspect')
+    try {
+      expect(draw()).toContain('started by a test runner')
+    } finally {
+      mode.setMode('normal')
+    }
   })
 
   it('says nothing extra when the list came from the office itself', () => {
@@ -708,12 +725,42 @@ describe('a copy of the main world’s database, drawn', () => {
     )
   }
 
-  it('says a copy is not a second world, and names both databases', () => {
-    const html = withOffice({ theHomeRowBelongsTo: 'ffffffffffffffff', thisWorld: 'aaaaaaaaaaaaaaaa' })
+  /** The copy notice alone, from its start to the end of its element. */
+  function theNotice(html: string): string {
+    const at = html.indexOf('class="wd-copy"')
+    expect(at, 'the copy notice was not drawn').toBeGreaterThan(-1)
+    const start = html.lastIndexOf('<', at)
+    const tag = /^<(\w+)/.exec(html.slice(start))![1]!
+    return html.slice(start, html.indexOf(`</${tag}>`, at) + tag.length + 3)
+  }
+
+  /** Each row's label, with the tag and text of the first element in its value and the state word after it. */
+  function theRows(markup: string): { label: string; tag: string; value: string; state: string | null }[] {
+    return [...markup.matchAll(/<dt>([^<]*)<\/dt><dd><(\w+)[^>]*>([^<]*)<\/\2>(?:<span[^>]*>([^<]*)<\/span>)?<\/dd>/g)].map((m) => ({
+      label: m[1]!, tag: m[2]!, value: m[3]!, state: m[4] ?? null,
+    }))
+  }
+
+  it('says a copy is not a second world, and draws both databases as rows', () => {
+    const html = withOffice({ theHomeRowBelongsTo: 'ffffffffffffffff', thisWorld: 'cccccccccccccccc' })
     expect(html).toContain('copy of the main world')
-    expect(html).toContain('ffffffffffffffff')
-    expect(html).toContain('aaaaaaaaaaaaaaaa')
-    expect(html, 'a reader is left without the way out').toContain('empty database')
+    const notice = theNotice(html)
+    expect(theRows(notice)).toEqual([
+      { label: en.t('worldsPage.copy.row.homeRow' as WordKey), tag: 'code', value: 'ffffffffffffffff', state: null },
+      { label: en.t('worldsPage.copy.row.thisDatabase' as WordKey), tag: 'code', value: 'cccccccccccccccc', state: null },
+    ])
+    const outsideTheRows = notice.replace(/<dl[\s\S]*?<\/dl>/g, '')
+    expect(outsideTheRows, 'a sentence holds the home row’s database').not.toContain('ffffffffffffffff')
+    expect(outsideTheRows, 'a sentence holds this database').not.toContain('cccccccccccccccc')
+    expect(outsideTheRows, 'a reader is left without the way out').toContain(en.t('worldsPage.copy.wayOut' as WordKey))
+  })
+
+  it('says on the row when this server could not identify its database', () => {
+    const rows = theRows(theNotice(withOffice({ theHomeRowBelongsTo: 'ffffffffffffffff', thisWorld: null })))
+    expect(rows.map((row) => [row.label, row.state])).toEqual([
+      [en.t('worldsPage.copy.row.homeRow' as WordKey), null],
+      [en.t('worldsPage.copy.row.thisDatabase' as WordKey), en.t('worldsPage.copy.row.notIdentified' as WordKey)],
+    ])
   })
 
   it('says nothing of the kind on an ordinary world', () => {
@@ -820,5 +867,123 @@ describe('the address a page reaches a world by', () => {
     expect(html).toContain('from here')
     expect(html, 'the sentence does not say what is wrong').toContain('another machine')
     expect(html, 'the control was taken away instead of being tried').toContain('Enter')
+  })
+})
+
+/**
+ * A PAGE A WORLD SERVED STARTS NO TRIP AND CHANGES NO WORLD (SEC-2). A world takes as a page's origin only one of the
+ * office's own pages, so a trip started on another world's page would be refused by the world it went to. Rename and
+ * Stop on such a page go to the world that served it, which renames or stops its own copy of the row, a row the page
+ * does not draw, or answers that it has no such world. So no row has Enter, Rename or Stop. The office's row is a link
+ * to the office's own address, by the address this page reaches it at, and another world's row says that a world is
+ * entered, renamed and stopped from the office's page. A page on a trip was served by the office, whichever world it
+ * reads, so it keeps its Enter, Rename and Stop.
+ */
+describe('a page a world served', () => {
+  const THE_OFFICE = 'aaaaaaaaaaaaaaaa'
+  const THIS_WORLD = 'eeeeeeeeeeeeeeee'
+  const theOfficesRow = aWorld({ id: 'the-office', name: 'the office', kind: 'home', databaseIdentity: THE_OFFICE, address: 'http://127.0.0.1:41601' })
+  // BOTH WORLDS ARE KEPT UP FOR THE PERSON, so a row would draw its Stop if anything let it.
+  const thisWorldsRow = aWorld({ id: 'this-world', name: 'this world', kind: 'agent-made', databaseIdentity: THIS_WORLD, address: 'http://127.0.0.1:41600', purpose: 'the new list of worlds' })
+  const anotherWorldsRow = aWorld({ id: 'another-world', name: 'another world', kind: 'agent-made', databaseIdentity: 'bbbbbbbbbbbbbbbb', address: 'http://127.0.0.1:41602', purpose: 'the old list of worlds' })
+
+  /** The Worlds page as a world that is not the office draws it, from the office's mirror. */
+  function aWorldsPage(): string {
+    return body(
+      createElement(page.TheOffice, {
+        office: {
+          worlds: [theOfficesRow, thisWorldsRow, anotherWorldsRow],
+          from: 'the mirror' as const,
+          mirrorWrittenAt: '2026-11-22 04:00:00',
+          mirrorFile: `${THE_TEST_FIXTURE_ROOT}/checkout/data/worlds.json`,
+          mirrorNote: 'the main world writes it, and this world is one the office may list',
+          theHomeRowBelongsTo: null,
+          thisWorld: THIS_WORLD,
+          isTheOffice: false,
+          office: 'http://127.0.0.1:41601',
+        },
+        visits: [],
+        trusts: null, onReadAgain: () => {},
+      }),
+    )
+  }
+
+  /** The page calls home the world that served it. */
+  function servedBy(database: string, port: string): void {
+    world.rememberTheHomeWorld({
+      database,
+      repository: `${THE_TEST_FIXTURE_ROOT}/checkout`,
+      port,
+      head: '905d1df',
+      standing: 'canonical',
+    })
+  }
+
+  /** The markup of one world's row, found by its name, with the apostrophes a person reads. */
+  function theRowOf(html: string, name: string): string {
+    const row = html.split('<li class="wd-world"').slice(1).find((one) => one.includes(`<span class="wd-name">${name}</span>`))
+    if (row === undefined) throw new Error(`the page drew no row for ${name}`)
+    return row.split('</li>')[0]!.replace(/&#x27;/g, "'")
+  }
+
+  /** Each link in some markup: where it leads, and its words. */
+  function theLinksIn(markup: string): [string, string][] {
+    return [...markup.matchAll(/<a [^>]*href="([^"]*)"[^>]*>([^<]*)<\/a>/g)].map((m) => [m[1]!, m[2]!])
+  }
+
+  it('offers Enter on no row, and the office\'s row is a link to the office\'s own address', () => {
+    servedBy(THIS_WORLD, '41600')
+    const html = aWorldsPage()
+    expect(html, 'a row of a page a world served offers Enter').not.toContain(`>${en.t('dev.worlds.enter')}<`)
+    expect(html, 'a row of a page a world served has the press that starts a trip').not.toContain('class="wd-enter"')
+    const theOffices = theAddressToReachAWorldBy(theOfficesRow, '127.0.0.1').address
+    if (theOffices === null) throw new Error('the office\'s row has no address on this computer')
+    expect(theLinksIn(theRowOf(html, 'the office')), 'the office\'s row is no link to the office\'s own address').toEqual([
+      [theOffices, en.t('w13s.worlds.goToTheOffice')],
+    ])
+  })
+
+  it('has no Rename and no Stop on any row, and no row draws a press', () => {
+    servedBy(THIS_WORLD, '41600')
+    const html = aWorldsPage()
+    for (const name of ['the office', 'this world', 'another world']) {
+      const row = theRowOf(html, name)
+      expect(row, `the row of ${name} offers Rename`).not.toContain(`>${en.t('dev.worlds.rename')}<`)
+      expect(row, `the row of ${name} offers Stop`).not.toContain(`>${en.t('dev.worlds.stop')}<`)
+      expect(row, `the row of ${name} has the press that stops a world`).not.toContain('class="tiered-press"')
+      expect(row, `the row of ${name} draws a press`).not.toContain('<button')
+    }
+  })
+
+  it('says on another world\'s row that a world is entered, renamed and stopped from the office\'s page, and nowhere else', () => {
+    servedBy(THIS_WORLD, '41600')
+    const html = aWorldsPage()
+    const sentence = en.t('w13s.worlds.fromTheOfficesPage')
+    expect(theRowOf(html, 'another world'), 'another world\'s row does not say where a world is entered').toContain(sentence)
+    expect(theRowOf(html, 'another world'), 'another world\'s row offers Enter').not.toContain(`>${en.t('dev.worlds.enter')}<`)
+    // THIS WORLD'S OWN ROW SAYS WHERE THE READER IS, and the office's row leads to the office, so neither says it.
+    expect(theRowOf(html, 'this world')).toContain(en.t('dev.worlds.youAreHere'))
+    expect(theRowOf(html, 'this world')).not.toContain(sentence)
+    expect(theRowOf(html, 'the office')).not.toContain(sentence)
+  })
+
+  it('keeps Enter, Rename and Stop on a page on a trip, though the world answering is not the office', () => {
+    servedBy(THE_OFFICE, '41601')
+    visiting.thisPageIsVisiting({
+      worldId: 'this-world',
+      worldName: 'this world',
+      databaseIdentity: THIS_WORLD,
+      address: 'http://127.0.0.1:41600',
+      head: '905d1df',
+      visitId: 'a-visit',
+    })
+    const html = aWorldsPage()
+    expect(theRowOf(html, 'another world'), 'a page on a trip lost its Enter').toContain(`>${en.t('dev.worlds.enter')}<`)
+    expect(theRowOf(html, 'the office'), 'a page on a trip lost its way home').toContain(`>${en.t('dev.worlds.returnHome')}<`)
+    expect(theRowOf(html, 'another world'), 'a page on a trip lost its Rename').toContain(`>${en.t('dev.worlds.rename')}<`)
+    expect(theRowOf(html, 'another world'), 'a page on a trip lost its Stop').toContain(`>${en.t('dev.worlds.stop')}<`)
+    expect(html.replace(/&#x27;/g, "'"), 'a page on a trip says a world is entered from the office\'s page').not.toContain(
+      en.t('w13s.worlds.fromTheOfficesPage'),
+    )
   })
 })

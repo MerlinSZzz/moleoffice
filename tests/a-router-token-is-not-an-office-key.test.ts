@@ -6,7 +6,7 @@ import { dirname, join } from 'node:path'
 import type { AddressInfo } from 'node:net'
 import type { FastifyInstance } from 'fastify'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { KEY_COOKIE, KEY_HEADER } from '../src/config/key-header.mjs'
+import { DEVICE_HALF_COOKIE, DEVICE_HALF_HEADER, KEY_COOKIE, KEY_HEADER } from '../src/config/key-header.mjs'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { apiApp, freshDb, type TestDb } from './helpers.ts'
 
@@ -43,12 +43,22 @@ beforeAll(async () => {
 afterAll(async () => { await app?.close(); db?.close() })
 
 describe('a router token cannot prove an office identity', () => {
-  it.each(['header', 'cookie'] as const)('refuses the router token in the %s while accepting the same run’s office key', async (place) => {
-    const headers = (value: string): Record<string, string> => place === 'header' ? { [KEY_HEADER]: value } : { cookie: `${KEY_COOKIE}=${value}` }
-    const body = { kind: 'note', title: 'A run writes a note', data: { body: 'A made-up note.' } }
-    const refused = await post('/api/records', headers(routerToken), body)
+  const body = { kind: 'note', title: 'A run writes a note', data: { body: 'A made-up note.' } }
+
+  it('refuses the router token in the header while accepting the same run’s office key', async () => {
+    const refused = await post('/api/records', { [KEY_HEADER]: routerToken }, body)
     expect(refused.status).toBeGreaterThanOrEqual(400)
-    const accepted = await post('/api/records', headers(runKey), body)
+    const accepted = await post('/api/records', { [KEY_HEADER]: runKey }, body)
     expect(accepted.status).toBe(201)
+  })
+
+  // A BROWSER'S KEY IS NOW TWO HALVES, a cookie half and a header half, and the old cookie is no key. A run key is never
+  // sent as two halves, so the router token is refused in the two places a browser's key is, with nothing accepted.
+  it.each(['the old cookie', 'two halves'] as const)('refuses the router token in %s', async (place) => {
+    const headers: Record<string, string> = place === 'the old cookie'
+      ? { cookie: `${KEY_COOKIE}=${routerToken}` }
+      : { cookie: `${DEVICE_HALF_COOKIE}=${routerToken.slice(0, 16)}`, [DEVICE_HALF_HEADER]: routerToken.slice(16) }
+    const refused = await post('/api/records', headers, body)
+    expect(refused.status).toBeGreaterThanOrEqual(400)
   })
 })

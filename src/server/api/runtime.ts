@@ -278,19 +278,24 @@ export async function runtimeRoutes(app: FastifyInstance): Promise<void> {
    * 2. The process group the ledger recorded for the run is stopped through `releaseResource`, on the row
    *    `theToolsOwnProcessRow` reads: the row the launcher marked as the run's own, which the shutdown pause stops
    *    the same way. Never a process found by its name or by a port.
-   * 3. The run's `doing` says who stopped it and why, but only when this call signalled its group. It is written
-   *    `crashed` only when that group is gone after the signal, as a stop from the product writes it
-   *    (`sayARunWasStopped`): a run whose process still runs has not ended.
+   * 3. The run's `doing` says who stopped it and why, but only when this call signalled its group. Of a group it
+   *    signalled, the run is written `crashed` only when that group is gone after the signal, as a stop from the
+   *    product writes it (`sayARunWasStopped`): a run whose process still runs has not ended. A group that had ended
+   *    before the stop is the case below.
    *
    * A caller the rule does not admit is refused before anything is done (`whyThisCallerMayNotStopTheRun`).
    *
    * WHEN THIS CALL SIGNALLED NOTHING, the reply is a refusal that says what was found: a 409 when no group is recorded,
-   * its row was closed already, or its group had ended already (its row is then closed, with no signal), and the
-   * release's own status when the release refused. The key is revoked all the same, because the key is what stops
-   * the run's writes, whether or not there is a group to signal. The run is never told it was stopped by this call
+   * its row was closed already, or its group had ended already (its row is then closed, with no signal), a 503 when
+   * nothing was ended and its program may still run, and the release's own status when the release refused. On
+   * Windows the group is the Job Object the run's starter made, which the release ends at once. The key is revoked
+   * all the same, because the key is what stops the run's writes, whether or not there is a group to signal. The run is never told it was stopped by this call
    * (invariant 1). When the call revoked the key, the run's `doing` says that and what was found, and keeps what it
-   * said before after it. When it revoked none either, nothing is written on the run: its `doing` and its state are
-   * as they were.
+   * said before after it. When its group had ended already, the run is written `crashed` as well, unless its state
+   * says it has ended, by the rule `stoppedIt` uses: nothing of it runs, and with its key revoked nothing can write
+   * for it. The answer is still a 409, because this call signalled nothing. With no group recorded, a closed row, a
+   * release that refused or a 503, nobody knows its program has ended, so its state is left as it was. When the call
+   * revoked no key either, nothing is written on the run: its `doing` and its state are as they were.
    */
   app.post('/runtime/runs/:id/stop', route('runtime.claim', 'local', {
     because: 'acts-on-this-machine',
@@ -323,19 +328,30 @@ export async function runtimeRoutes(app: FastifyInstance): Promise<void> {
       tellTheStarterACheckWasStopped(run, actor, why, workspaceId)
       return doing
     }
-    /** This call signalled nothing. The refusal it is answered, after the key is written on the run if it was revoked. */
-    const signalledNothing = (found: string, status: number): PanelError => {
+    /**
+     * This call signalled nothing. The refusal it is answered, after the key is written on the run if it was revoked.
+     * `ended` is true only when the release found the run's group ended already. Then, when this call revoked the key,
+     * the run is written crashed as well, by the rule `stoppedIt` uses. Every other caller passes false, because there
+     * nobody knows the run's program has ended, so its state is left as it was.
+     */
+    const signalledNothing = (found: string, status: number, ended: boolean): PanelError => {
       if (!keyRevoked) {
         return new PanelError(`${found} ${theKey} Nothing was written on the run: its doing line and its state are as they were.`, status)
       }
+      const crashed = ended && !theRunHasEnded(run.data['state'])
       const earlier = run.data['doing']
       const before = typeof earlier === 'string' && earlier.trim() !== ''
         ? `Before this, the run said: ${earlier}`
         : 'Before this, its doing line was empty.'
       const doing = `The agent ${actor.id} revoked this run's key through its stop door: ${why}. Its writes to the office stop now. ${found} ${before}`
-      patchRecord(run.id, { dataPatch: { doing } }, actor)
+      patchRecord(run.id, { dataPatch: { doing, ...(crashed ? { state: 'crashed' } : {}) } }, actor)
       tellTheStarterACheckWasStopped(run, actor, why, workspaceId)
-      return new PanelError(`${found} The run's key was revoked all the same, and its state was left as it was. The run now says: ${doing}`, status)
+      return new PanelError(
+        crashed
+          ? `${found} The run's key was revoked all the same, and its state is now crashed, because its program had ended before this stop. The run now says: ${doing}`
+          : `${found} The run's key was revoked all the same, and its state was left as it was. The run now says: ${doing}`,
+        status,
+      )
     }
 
     const own = theToolsOwnProcessRow(workspaceId, run.id)
@@ -345,6 +361,7 @@ export async function runtimeRoutes(app: FastifyInstance): Promise<void> {
           ? `Mole Office has no process group recorded for run ${run.id}, so nothing was signalled.`
           : `Mole Office has no process group recorded as running for run ${run.id}: its process row ${own.id} was closed at ${own.releasedAt ?? ''}, so nothing was signalled.`,
         409,
+        false,
       )
     }
     let result: Awaited<ReturnType<typeof releaseResource>>
@@ -352,15 +369,25 @@ export async function runtimeRoutes(app: FastifyInstance): Promise<void> {
       result = await releaseResource(own.id, { actor, force: true, note: `stopped through its run's stop door: ${why}` }, workspaceId)
     } catch (error) {
       if (!(error instanceof PanelError)) throw error
-      throw signalledNothing(`Its process group ${String(own.pgid)} was not signalled: ${error.message}`, error.status)
+      throw signalledNothing(`Its process group ${String(own.pgid)} was not signalled: ${error.message}`, error.status, false)
     }
+    // ON WINDOWS A RUN'S ROW RECORDS GROUP 0, as the reader gives every process, and the release ends the Job Object
+    // its starter made (`endTheJobObject` in lib/resources.ts). There the release's own sentence says what it did.
+    const itsGroup = own.pgid !== null && own.pgid > 1 ? `its process group ${String(own.pgid)}` : null
     // A GROUP THAT HAD ENDED ALREADY had its row closed with no signal (`releaseResource`), so this call stopped nothing.
-    if (!result.acted) throw signalledNothing(`Mole Office found its process group ${String(own.pgid)} ended already. ${result.outcome}`, 409)
+    // A release that ended nothing while its program may still run says why, and never that it ended.
+    if (!result.acted) {
+      throw result.stillAlive === false
+        ? signalledNothing(`Mole Office found ${itsGroup ?? 'its program'} ended already. ${result.outcome}`, 409, true)
+        : signalledNothing(`Mole Office stopped nothing of run ${run.id}. ${result.outcome}`, 503, false)
+    }
     const doing = stoppedIt(
-      result.stillAlive
+      itsGroup !== null && result.stillAlive === true
         ? `Its process group ${String(own.pgid)} was sent SIGTERM and is still running.`
-        : `Its process group ${String(own.pgid)} has ended.`,
-      !result.stillAlive,
+        : itsGroup !== null && result.stillAlive === false
+          ? `Its process group ${String(own.pgid)} has ended.`
+          : result.outcome,
+      result.stillAlive === false,
     )
     return {
       run: run.id,

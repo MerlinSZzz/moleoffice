@@ -10,7 +10,7 @@
  *   on Home, both under the English heading "Needs you".
  *
  * Held here: every count phrase on the work page's chips draws on one line, every state word on its chip draws
- * unbroken, and neither runs past its chip's edge, at 1440, 990 and 660, in English and in Chinese.
+ * unbroken, and neither runs past its chip's edge, at 1440 and 660, in English and in Chinese.
  *
  * MUTATIONS: the work page's state column no longer putting the count on a line of its own (the `.wk-state` selectors
  * taken off the severity column's rule in src/web/components/ui.tsx). It is red.
@@ -48,9 +48,9 @@ afterAll(async () => {
   await app?.stop()
 }, 60_000)
 
-it('draws every count phrase on one line and every state word unbroken, at 1440, 990 and 660, in English and Chinese', async () => {
+it('draws every count phrase on one line and every state word unbroken, at 1440 and 660, in English and Chinese', async () => {
   for (const language of ['en', 'zh'] as const) {
-    for (const width of [1440, 990, 660]) {
+    for (const width of [1440, 660]) {
       await app.page.setViewportSize({ width, height: 1000 })
       await app.page.goto(`${app.site}/?lang=${language}#/work`)
       await app.page.reload()

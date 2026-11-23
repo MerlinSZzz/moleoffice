@@ -8,6 +8,8 @@
  * and the page draws it. Each value says where it came from in its field's comment.
  */
 
+import type { BoardDepartment } from './departments.ts'
+
 /** Which pipeline is a project's master, as src/server/lib/master-pipeline.ts reads it. */
 export type TheMasterPipeline =
   | { project: string; state: 'marked'; id: string; title: string }
@@ -127,6 +129,11 @@ export interface BoardLine {
   next: BoardPackage[]
   /** Its backlog items in state `todo`. */
   later: BoardBacklogItem[]
+  /**
+   * THE DEPARTMENT THE LINE'S CODE NAMES, read from the department records when the board is asked, or null for the
+   * line not recorded. A code no department holds says so, and is still shown by its code.
+   */
+  department: BoardDepartment | null
 }
 
 /** What the landings read gave, or why it was not read. */

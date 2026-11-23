@@ -94,6 +94,7 @@ import {
 } from '../lib/agents.ts'
 import { actorFrom, explain, takesNoInput } from '../lib/http.ts'
 import { parse } from '../lib/parse.ts'
+import { MAX_REPORT_FILE_NAME } from '../lib/reportfiles.ts'
 import { theMessageReader } from '../lib/messages.ts'
 // WHO A DURABLE AGENT IS AND WHAT IS WAITING FOR IT. The route is the door; every rule about
 // resolution, about which words count as waiting, and about the inbox being a query rather than a
@@ -247,6 +248,16 @@ const place = z.discriminatedUnion('at', [
         'Without them nothing is kept at all.',
     }),
     cut: z.literal(true).optional(),
+    // THE FILE AND ITS PAGE THE WORDS WERE SELECTED IN, so the quote an agent is handed can name them. A page without a
+    // file is refused by `checkPlace`, which every door reaches.
+    file: z
+      .string()
+      .min(1, { error: 'file is the name the file was shown under, so it is not empty' })
+      .max(MAX_REPORT_FILE_NAME, {
+        error: `file is a file's name, so it is at most ${String(MAX_REPORT_FILE_NAME)} characters`,
+      })
+      .optional(),
+    page: z.number().int().min(1, { error: 'page is the page of a PDF the words were on, counted from 1' }).optional(),
   }),
   z.strictObject({
     at: z.literal('run'),
@@ -599,7 +610,9 @@ export async function agentRoutes(app: FastifyInstance): Promise<void> {
         'that named more than one. WHO IT IS FOR NEVER STOPS THE WORDS BEING STORED: a recipient that names ' +
         'nobody, names the wrong kind of thing, or names a run whose transcript is not on this machine is stored ' +
         'as it was sent, and the reply carries `delivery`, which says whether it can be sent and, when it cannot, ' +
-        'why in one sentence. That is the same sentence dispatch acts on. AND A RECIPIENT IN A SHAPE THIS ROUTE ' +
+        'why in one sentence. That is the same sentence dispatch acts on. ONE EXCEPTION: a run that answers as ' +
+        'no agent is refused with 422 in the words a message record addressed to it gets, and nothing is written. ' +
+        'AND A RECIPIENT IN A SHAPE THIS ROUTE ' +
         'CANNOT READ AT ALL IS THE SAME CASE: the comment is stored, `recipient.kind` is "unresolved", and ' +
         '`recipient.why` holds what was sent along with what was wrong with it. Fix it with PATCH ' +
         '/api/agent/messages/<id>, which does check the shape — a refused correction loses nothing, because what ' +
@@ -639,7 +652,9 @@ export async function agentRoutes(app: FastifyInstance): Promise<void> {
       'Change a comment WHILE IT IS STILL WAITING. Takes {intent?, body?, context?, recipient?} — the same shapes ' +
         'POST /api/agent/threads/<id>/messages takes, and recipient:null takes the address off again. This is how ' +
         'a comment dispatch could not send is corrected, so a new recipient is stored without being checked and ' +
-        'the reply says what Mole Office makes of it. A comment that has already been sent is refused with 409 naming ' +
+        'the reply says what Mole Office makes of it. The one exception is the one the POST door makes: a run ' +
+        'that answers as no agent is refused with 422, and the comment keeps the recipient it had. ' +
+        'A comment that has already been sent is refused with 409 naming ' +
         'what it went out with: changing the question after the answer was given would leave an answer nobody can ' +
         'check. An agent\'s answer is refused too, in any state: nothing may rewrite what an agent said. ' +
         'A comment somebody else wrote is refused with 403, because only its writer may change it.',

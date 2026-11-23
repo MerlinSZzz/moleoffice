@@ -1,21 +1,21 @@
 // Copyright © 2026 Zhengyang Shen
 // Licensed under the MIT License. See LICENSE.
 /**
- * A COUNT IS READABLE ON THE GROUND IT STANDS ON, IN EVERY THEME: AT THE FOOT OF NEEDS YOU, IN LATE OR STUCK'S
- * HEADING, AND ON THE PROJECTS PAGE.
+ * A COUNT IS READABLE ON THE GROUND IT STANDS ON, IN EVERY THEME: AT THE FOOT OF NEEDS YOU, LATE OR STUCK'S
+ * NUMBER, AND ON THE PROJECTS PAGE.
  *
- * The three counts share one class, `.hm-section-count`. Only Late or stuck's stands in a heading, on the
- * heading's ground. Needs you's foot stands on the ask row, and the Projects page's count on the page. High
- * contrast draws its headings black with a near-white count, so a count drawn in the heading's colour away from
- * the heading cannot be read, and the heading's count drawn in the page's colour cannot be read either.
+ * Needs you's foot and the Projects page's count share one class, `.hm-section-count`. Late or stuck is one number
+ * beside its heading, which opens its list. Needs you's foot stands on the ask row, and the Projects page's count on
+ * the page. High contrast draws its headings black with a near-white count, so a count drawn in the heading's colour
+ * away from the heading cannot be read, and a count drawn in the page's colour on a heading's ground cannot either.
  *
  * Each count's colour, as the browser computes it, is measured against the first solid ground beneath it, with
  * any see-through ground laid over the one below. Each is held to 4.5, the floor for text that is not body text
  * (src/shared/readability.ts). An image under a count stops the case with a sentence, because its ground cannot
  * be read from the styles.
  *
- * Seven made-up questions fill Needs you past its five rows, and five made-up pipelines stand still, so Late or
- * stuck says "4 of 5" in its heading.
+ * Seven made-up questions fill Needs you past its rows, and five made-up pipelines stand still, so Late or stuck's
+ * number is 5.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { FLOORS } from '../src/shared/readability.ts'
@@ -28,7 +28,7 @@ const OWNER = { 'content-type': 'application/json', 'x-mole-office-workspace': '
 const AN_AGENT = { 'content-type': 'application/json', 'x-mole-office-workspace': 'default', 'x-mole-office-actor-type': 'agent', 'x-mole-office-actor-id': 'claude-code' }
 const COUNTS = {
   'the foot of Needs you': '[data-home-needs-more] .hm-section-count',
-  "Late or stuck's heading": '[data-home-section="late"] .hm-section-head .hm-section-count',
+  "Late or stuck's number": '[data-home-section="late"] [data-home-late-number]',
   'the Projects page': '[data-home-section="projects"] > .hm-section-count',
 } as const
 let app: LiveApp
@@ -113,7 +113,7 @@ describe('a count on Home and on the Projects page', () => {
     expect(await app.page.getAttribute('html', 'data-theme'), 'the theme is the one chosen').toBe(theme)
     const measured: Record<string, { ink: string; ground: string; ratio: number }> = {}
     measured['the foot of Needs you'] = await measure(COUNTS['the foot of Needs you'])
-    measured["Late or stuck's heading"] = await measure(COUNTS["Late or stuck's heading"])
+    measured["Late or stuck's number"] = await measure(COUNTS["Late or stuck's number"])
     await app.page.goto(`${app.site}/?lang=en&mode=normal#/projects`)
     measured['the Projects page'] = await measure(COUNTS['the Projects page'])
     const unreadable = Object.entries(measured).filter(([, one]) => one.ratio < FLOORS.text)

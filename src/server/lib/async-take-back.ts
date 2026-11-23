@@ -135,7 +135,8 @@ function capture(workspaceId: string, only?: string) {
         if (status === undefined || status.deleted_at !== null) throw new Stale('changed')
       }
       const agent = facts?.line.agent == null ? null : theOneAgentAStringNames(sqlite, facts.line.agent)
-      const takeouts = sqlite.prepare("SELECT record_id, data FROM revisions WHERE workspace_id = ? AND seq = 1 AND op = 'create' AND kind = 'merge_entry' AND json_extract(data, '$.fixRound.problem') = ? AND json_extract(data, '$.fixRound.kind') = 'takeout' ORDER BY record_id").all(workspaceId, problem.id)
+      // The `+` keeps SQLite from choosing `revisions_workspace_record_op_at_idx` to skip the sort.
+      const takeouts = sqlite.prepare("SELECT record_id, data FROM revisions WHERE workspace_id = ? AND seq = 1 AND op = 'create' AND kind = 'merge_entry' AND json_extract(data, '$.fixRound.problem') = ? AND json_extract(data, '$.fixRound.kind') = 'takeout' ORDER BY +record_id").all(workspaceId, problem.id)
       const push = problem.kind === 'problem' ? thePushHandBackOf(problem) : null
       const due = push !== null && 'facts' in push && push.facts.deadline !== undefined && push.facts.timeZone !== undefined
         ? whenAHandBackIsDue({ deadline: push.facts.deadline, timeZone: push.facts.timeZone, ...(push.facts.dueAt === undefined ? {} : { dueAt: push.facts.dueAt }) })

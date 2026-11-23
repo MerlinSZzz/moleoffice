@@ -78,7 +78,9 @@ const RELEASE_NOTE =
   'nothing is deleted. Whoever made the claim may release it. The secretary may also release a claim whose run is ' +
   'not running — one waiting for a check, or one whose run is already over — because nobody else can; a claim of a ' +
   'run that is still running stays its author’s alone. A claim whose run has already ended may still be released, ' +
-  'because the run ending and somebody saying they finished are two different facts.'
+  'because the run ending and somebody saying they finished are two different facts. An agent started for the work ' +
+  'is retired when the card’s retire rule lets the releaser retire it. One it does not is left live, and the answer ' +
+  'names it and says why.'
 
 // ============================================================================ what a caller sends
 
@@ -252,6 +254,9 @@ export async function claimRoutes(app: FastifyInstance): Promise<void> {
     const body = parse(releaseBody, req.body ?? {}, 'Why it is being released')
     // READ FIRST, so a claim in another project is refused by name before anything is written.
     theClaimOrARefusal(asked.id, workspaceId)
-    return { claim: releaseAClaim(asked.id, workspaceId, me, body.because), workspaceId }
+    // THE CALLER AS THE REQUEST CARRIED IT, which the retire rule reads for each agent started for the work. An agent
+    // the releaser may not retire is left live, and the answer names it beside the claim.
+    const { agentsLeftLive, ...claim } = releaseAClaim(asked.id, workspaceId, me, body.because, actorFrom(req))
+    return { claim, workspaceId, ...(agentsLeftLive === undefined ? {} : { agentsLeftLive }) }
   })
 }

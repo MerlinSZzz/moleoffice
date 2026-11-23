@@ -19,8 +19,9 @@
  *      hold is given by its stored id with no name. A continued run under the same parent that no entry names, a run
  *      whose entry is still `starting`, a run whose parent is deleted, and the supervisor's run itself answer null. A
  *      record that is not a run has no `askedForBy` key.
- *   2. The run's own page draws it in words, with a link to the supervisor's run; the no-name asker is said to be one
- *      the registry does not hold. A continued run and a starting one draw nothing.
+ *   2. The run's own page names who asked, with a link to the supervisor's run; the no-name asker is drawn as an
+ *      agent not in the registry. A continued run and a starting one draw nothing. (As decided in November 2026, the
+ *      sentence around the name is gone; the name and the link are what is drawn.)
  *   3. The run's record page draws the same, and draws nothing for the continued run.
  *   4. WHO STARTED IT, on the run's own page (wave 13j round loop-7, item 1; the secretary's answer 3 in X8LBo7MOvvMp). On a
  *      worker's run the "Started by" fact names the agent that asked for it, read from `askedForBy` and not worked out
@@ -50,6 +51,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { THE_PERSON } from '../src/shared/person.ts'
 import type { TheWorkerRun } from '../src/shared/worker-runs.ts'
 import { liveApp, waitForThePage, type LiveApp } from './helpers.ts'
+import { enWave13y } from '../src/shared/words/en-wave-13y.ts'
 
 let app: LiveApp
 
@@ -173,7 +175,7 @@ describe("a worker's run names the supervisor's run that asked for it", () => {
     await open(page, `/session/${runs.ada}`, 'Ada glazes the test tiles')
     const asked = page.locator('.wr-asked')
     await asked.waitFor({ timeout: 20_000 })
-    expect(await asked.innerText()).toContain('Kiln supervisor asked the office to start this run as one of its workers.')
+    expect(await asked.locator('.wr-asked-who').textContent()).toBe('Kiln supervisor')
     const link = asked.getByRole('link', { name: SUPERVISOR_TITLE, exact: true })
     expect(await link.getAttribute('href')).toBe(`#/session/${runs.supervisor}`)
     // ITS TEXT, AND NOT ITS DRAWN CASE: on this page the title is a label (case 5), which the light theme draws in capitals.
@@ -181,7 +183,7 @@ describe("a worker's run names the supervisor's run that asked for it", () => {
 
     await open(page, `/session/${runs.ed}`, 'Ed fires the kiln')
     await asked.waitFor({ timeout: 20_000 })
-    expect(await asked.innerText()).toContain('An agent the registry does not hold asked the office to start this run as one of its workers.')
+    expect(await asked.locator('.wr-asked-who').textContent()).toBe(enWave13y['w13j.askedFor.notInRegistry'])
     expect(await asked.getByRole('link', { name: GONE_TITLE, exact: true }).getAttribute('href')).toBe(`#/session/${runs.gone}`)
 
     for (const [id, title] of [[runs.continued, 'the kiln supervisor, continued'], [runs.cy, 'Cy, whose ask is still starting']] as const) {
@@ -196,7 +198,7 @@ describe("a worker's run names the supervisor's run that asked for it", () => {
     await open(page, `/r/${runs.ada}`, 'Ada glazes the test tiles')
     const asked = page.locator('.wr-asked')
     await asked.waitFor({ timeout: 20_000 })
-    expect(await asked.innerText()).toContain('Kiln supervisor asked the office to start this run as one of its workers.')
+    expect(await asked.locator('.wr-asked-who').textContent()).toBe('Kiln supervisor')
     expect(await asked.getByRole('link', { name: SUPERVISOR_TITLE, exact: true }).getAttribute('href')).toBe(`#/session/${runs.supervisor}`)
 
     await open(page, `/r/${runs.continued}`, 'the kiln supervisor, continued')
@@ -290,6 +292,6 @@ it('a hand-started noKey worker names the asking run on its page through the han
   await open(app.page, `/session/${run}`, 'hand-started kiln worker')
   const asked = app.page.locator('.wr-asked')
   await asked.waitFor({ timeout: 20_000 })
-  expect(await asked.innerText()).toContain('Hand kiln supervisor asked the office to start this run as one of its workers.')
+  expect(await asked.locator('.wr-asked-who').textContent()).toBe('Hand kiln supervisor')
   expect(await asked.getByRole('link', { name: 'Made-up hand asking run', exact: true }).getAttribute('href')).toBe(`#/session/${askingId}`)
 }, 120_000)

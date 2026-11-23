@@ -7,7 +7,7 @@
 
 import { sqlite } from './client.ts'
 import { asAgent } from './read-participant.ts'
-import type { RegisteredAgent } from '../lib/participants.ts'
+import type { RegisteredAgent } from './types/participants.ts'
 
 /**
  * EVERY ACTIVE AGENT THAT WAS STARTED FOR ONE RECORD. Criterion P15.

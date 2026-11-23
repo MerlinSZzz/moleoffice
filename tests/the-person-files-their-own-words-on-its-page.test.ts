@@ -6,10 +6,9 @@
  * The review of round 11's pictures (report lwzz__d186xM, block b-argus-review).
  *
  * In a real browser against a Mole Office of its own:
- *   1. a note a secretary prepared for the person to file draws the person's press, says beside it that only they can
- *      press it, and does not quote the words again above the note's own body; one press files them as the person's
- *      own note, and the page then names that note;
- *   2. the same page, read as an agent, draws no press and says only the person can file the words;
+ *   1. a note a secretary prepared for the person to file draws the person's press, and does not quote the words again
+ *      above the note's own body; one press files them as the person's own note, and the page then names that note;
+ *   2. the same page, read as an agent, draws no press under its heading for others;
  *   3. an old decision in the person's name that cites a note a secretary wrote carries the mark and what the reader
  *      can do, on its own page, and the same page says the decision may be changed by whoever made it "and you"
  *      (the review of round 11b, report dCtqt9ETTmco); the Decisions page lists every marked decision, each with
@@ -31,7 +30,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { en } from '../src/shared/words/en.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { theRoleCardsFile } from '../src/server/lib/roles.ts'
-import { liveApp, waitForThePage, type LiveApp, theAnswerToAWriteInATestOffice } from './helpers.ts'
+import { liveApp, waitForThePage, type LiveApp, theAnswerToAWriteInATestOffice, governsTheWholeProject } from './helpers.ts'
 
 let app: LiveApp
 let prepared = ''
@@ -106,7 +105,7 @@ beforeAll(async () => {
   ]
   for (const one of cases) {
     const id = await file(AS_QUILL, 'decision', one.title, {
-      replaces: [],
+      ...governsTheWholeProject(), replaces: [],
       decided_by: 'the owner',
       authority: 'the owner said so',
       authority_reference: message,
@@ -142,7 +141,7 @@ afterAll(async () => {
 }, 60_000)
 
 describe('the person files words said elsewhere as their own', () => {
-  it('draws no press for an agent, and says only the person can file the words', async () => {
+  it('draws no press for an agent, under the heading for others', async () => {
     // WHO THIS BROWSER WRITES AS, set the way the actor picker in the sidebar sets it, and put back afterwards.
     await app.page.goto(`${app.site}/#/`, { timeout: 60_000 })
     await app.page.evaluate(() => {
@@ -150,10 +149,9 @@ describe('the person files words said elsewhere as their own', () => {
     })
     try {
       await openRecord(prepared, '')
-      await app.page.getByText(en['ownWords.door.onlyThePerson']).waitFor({ timeout: 30_000 })
+      await app.page.getByText(en['ownWords.door.headingForOthers'], { exact: true }).waitFor({ timeout: 30_000 })
       expect(await app.page.getByText(en['ownWords.door.headingForOthers'], { exact: true }).count()).toBe(1)
       expect(await app.page.getByRole('button', { name: en['ownWords.door.press'] }).count()).toBe(0)
-      expect(await app.page.locator('[data-part="only-you-can-press"]').count()).toBe(0)
     } finally {
       await app.page.evaluate(() => {
         window.localStorage.removeItem('mole-office.actor')
@@ -161,11 +159,9 @@ describe('the person files words said elsewhere as their own', () => {
     }
   }, 180_000)
 
-  it('says only the person can press, shows the words once, and files them on the person\'s press', async () => {
+  it('draws the person\'s press, shows the words once, and files them on the person\'s press', async () => {
     await openRecord(prepared, '')
-    const onlyYou = app.page.locator('[data-part="only-you-can-press"]')
-    await onlyYou.waitFor({ timeout: 30_000 })
-    expect(await onlyYou.innerText()).toBe(en['ownWords.door.onlyYou'])
+    await app.page.getByRole('button', { name: en['ownWords.door.press'] }).waitFor({ timeout: 30_000 })
     expect(await app.page.getByText(en['ownWords.door.heading'], { exact: true }).count()).toBe(1)
     // THE WORDS ONCE: in the note's own body, and not again in the panel above it.
     expect(await app.page.getByText(WORDS, { exact: true }).count()).toBe(1)
@@ -232,9 +228,9 @@ describe('an old decision not based on the person\'s own words is marked', () =>
           const name = `${String(width)}-${theme}-${language}.png`
 
           await openRecord(second, `?lang=${language}`)
-          await app.page.locator('[data-part="only-you-can-press"]').waitFor({ timeout: 30_000 })
+          await app.page.locator('.tow-acts').waitFor({ timeout: 30_000 })
           await pagesWidth(width)
-          await app.page.locator('[data-part="only-you-can-press"]').scrollIntoViewIfNeeded()
+          await app.page.locator('.tow-acts').scrollIntoViewIfNeeded()
           await app.page.screenshot({ path: join(shots, `door-${name}`) })
 
           // A WINDOW TALL ENOUGH FOR THE WHOLE LIST: nine marked decisions, one for each wording the mark can give.

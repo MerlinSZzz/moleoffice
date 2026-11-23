@@ -404,7 +404,6 @@ describe('the presence mark under a contact name', () => {
     expect(dot.colour, 'the inactive agent is not drawn under the grey offline draws').toBe('grey')
     expect(dot.word).toBe('Inactive')
     expect(dot.title).toContain('Inactive')
-    expect(dot.title).toContain('Registered, and no run recorded')
   }, 180_000)
 })
 

@@ -37,7 +37,7 @@ import { THE_TEST_OFFICES_SECRETARY } from './a-page-of-a-test-office.ts'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { FastifyInstance } from 'fastify'
 
-import { apiApp, freshDb, thePersonsKeyHeader, FOR_THE_PERSON, type TestDb } from './helpers.ts'
+import { apiApp, freshDb, thePersonsKeyHeader, FOR_THE_PERSON, type TestDb, governsTheWholeProject } from './helpers.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 
 let t: TestDb
@@ -137,7 +137,7 @@ describe('the revoke press, on an act made under a period', () => {
       ...FOR_THE_PERSON,
       kind: 'decision',
       title: 'A decision made under the period',
-      data: { replaces: [], decided_by: 'the owner', authority: 'the owner said so', because: 'Because the owner said so.' },
+      data: { ...governsTheWholeProject(), replaces: [], decided_by: 'the owner', authority: 'the owner said so', because: 'Because the owner said so.' },
     })
     expect(written.status, written.said).toBe(201)
     const id = String((written.body['record'] as { id: string }).id)

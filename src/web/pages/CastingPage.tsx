@@ -175,6 +175,14 @@ export function TheCasting({
       ) : (
         <>
           <Glance reading={reading} picked={picked} onPick={setPicked} />
+          {/* AN AGENT OF A HARNESS WITH NO ADAPTER has no row here, because no row can start it; it is named, not hidden. */}
+          {reading.harnesses.length === 0 ? null : (
+            <ul aria-label={t('casting.harnesses')}>
+              {reading.harnesses.map((one) => (
+                <li key={one.handle}>{`${content(one.handle)}: ${t('g6b.model.chosenInTheHarness', { runtime: content(one.harness) })}`}</li>
+              ))}
+            </ul>
+          )}
           <div className="cast-pick" role="group" aria-label={t('casting.roles')}>
             {reading.roles.map((one) => (
               <button key={one.role} type="button" className="cast-tab" data-role={one.role} aria-pressed={one.role === picked.role} onClick={() => setPicked({ role: one.role, project: '' })}>
@@ -326,7 +334,7 @@ function RoleSection({
           ),
         )}
       </div>
-      {card.scopes.length === 0 ? <Absence word={t('casting.nobodyCast')} /> : null}
+      {card.scopes.length === 0 ? <Absence word={t('casting.glance.nobody')} /> : null}
       {scope === null ? (
         card.scopes.length === 0 ? null : (
           <div className="cast-scope" data-project={project}>
@@ -419,7 +427,7 @@ function TheDraws({ draws, rows, labels }: { draws: readonly CastingLabelDraw[];
                 ? t('casting.draw.drawn', { rows: draw.rows.map((one) => `${rowName(theRowIn(rows, one.rowId))} ${shareAsPercentage(one.share)}`).join(', ') })
                 : draw.choice === 'marked'
                   ? t('casting.draw.marked', { row: draw.rows.map((one) => rowName(theRowIn(rows, one.rowId))).join(', ') })
-                  : t('casting.draw.none')}
+                  : t('casting.notDrawn')}
             </li>
           ))}
         </ul>
@@ -1037,10 +1045,7 @@ function CellsForm({
       {start === null ? (
         <div className="cast-native-selection">
           <p className="cast-said"><strong>{t('casting.native')}</strong></p>
-          <p className="cast-said">{t('casting.nativeWhat')}</p>
           <CastingNativeInputs id={id} value={native} busy={busy} providers={providers} providersUnread={providersUnread} onChange={setNative} />
-          <p className="cast-said">{t('casting.nativeEmpties')}</p>
-          <p className="cast-said">{t('casting.nativeAddEmpties')}</p>
         </div>
       ) : null}
       <div className="cast-form-presses">

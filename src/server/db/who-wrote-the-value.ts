@@ -7,7 +7,7 @@
  */
 
 import type { ActorType } from '@shared/types.ts'
-import type { WhoWroteTheValue } from '../lib/revisions.ts'
+import type { WhoWroteTheValue } from './types/revisions.ts'
 import { desc, eq, sql } from 'drizzle-orm'
 import { db } from './client.ts'
 import { keptStatement } from './kept-statement.ts'

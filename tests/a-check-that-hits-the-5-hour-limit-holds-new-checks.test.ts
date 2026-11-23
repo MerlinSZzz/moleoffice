@@ -22,9 +22,12 @@
  *      office's limit notice to the person is not sent and the casting roll counts no limit.
  *   4. THE HOLD. With that stop cause, a new check on Claude Code waits with the hold's sentence, and one pass holds it.
  *      The switch's reading carries the same sentence, which names the login and the reset. The secretary is told once.
+ *      The line stores the reset as an instant with its offset, written by `clockStamp`, and a start line that holds its
+ *      reset in UTC words, as lines did before, names the same moment and is not said again.
  *   5. ANOTHER LOGIN. With the inspector cast on Codex, the same check does not wait.
  *   6. AFTER THE RESET. The secretary is told once that the hold ended. Once the reset has passed, the check does not
- *      wait, the switch's reading no longer says it, and the next pass starts it.
+ *      wait, the switch's reading no longer says it, and the next pass starts it. The end line finds a start line that holds
+ *      its reset in UTC words by its moment, and stores its own reset with its offset.
  *   7. ONE OPEN. The worker reads the words of a limit and the time its output was last written from one open of the
  *      file, and writes that time as an instant with its offset. A second look at the file's path is never taken.
  *   8. NO MOMENT. A limit whose cause carries no `at` holds nothing and is not said, however recently its record was
@@ -32,6 +35,9 @@
  *   9. THE REPEATED HOUR. A limit hit at 01:30 GMT on 25 October 2026, the second time that hour came in London, is said
  *      from its instant for exactly as long as a 5-hour limit can last: five hours, and the minute Claude's words round to.
  *  10. WORDS ARE NO MOMENT. An `at` written as a time in words, with no offset, is read as no moment.
+ *  11. NOBODY HOLDS THE CARD. While a hold is owed and no agent holds the secretary card, the office says once that
+ *      nobody was told, and says nothing on the calls after. A second hold owed makes it say so once more. No line is
+ *      written. When an agent holds the card again, the owed lines are written to it, and the answer says what was said.
  *
  * WHAT WOULD MAKE EACH CASE GO RED is in the commit that adds the code, with the control run and the restore.
  *
@@ -190,13 +196,13 @@ function theIdOf(handle: string): string {
 }
 
 /** The office's lines about the hold, oldest first. */
-function theLinesAboutTheHold(): { notice: string; body: string; said: string; to: { kind: string; id: string }[] }[] {
+function theLinesAboutTheHold(): { notice: string; body: string; said: string; to: { kind: string; id: string }[]; until: unknown }[] {
   const rows = t.client.sqlite
     .prepare("SELECT data FROM records WHERE kind = 'message' AND json_extract(data, '$.notice') IN ('checksAreHeldForALimit', 'checksGoOnAfterALimit') ORDER BY rowid")
     .all() as { data: string }[]
   return rows.map((row) => {
-    const data = JSON.parse(row.data) as { notice: string; body: string; saidInFull?: string; to: { kind: string; id: string }[] }
-    return { notice: data.notice, body: data.body, said: data.saidInFull ?? '', to: data.to }
+    const data = JSON.parse(row.data) as { notice: string; body: string; saidInFull?: string; to: { kind: string; id: string }[]; extra?: { checksHeld?: { until?: unknown } } }
+    return { notice: data.notice, body: data.body, said: data.saidInFull ?? '', to: data.to, until: data.extra?.checksHeld?.until }
   })
 }
 
@@ -391,6 +397,16 @@ describe('a check whose login hit its 5-hour limit', () => {
     expect(told[0]!.said).toContain(until)
     expect(told[0]!.said).toContain('Claude Code')
     expect(told[0]!.said).toContain(theLimitedCheck)
+
+    // THE RESET IS STORED AS LOCAL WALL-CLOCK WITH ITS OFFSET, by the one writer in src/shared/time.ts, and not in UTC.
+    expect(told[0]!.until).toBe(clockStamp(() => new Date(reset.until)).instant)
+    // A LINE WRITTEN BEFORE THE RESET WAS STORED WITH ITS OFFSET holds it in UTC words. It names the same moment, so the
+    // hold is not said again. Case 6 then finds this line by its moment when the hold ends.
+    t.client.sqlite
+      .prepare("UPDATE records SET data = json_set(data, '$.extra.checksHeld.until', ?) WHERE kind = 'message' AND json_extract(data, '$.notice') = 'checksAreHeldForALimit'")
+      .run(new Date(reset.until).toISOString())
+    tellTheSecretaryOfTheHold(Date.now(), THE_OFFICE)
+    expect(theLinesAboutTheHold().map((one) => one.notice)).toEqual(['checksAreHeldForALimit'])
   })
 
   it('5: does not hold a check that runs on another login', async () => {
@@ -418,6 +434,10 @@ describe('a check whose login hit its 5-hour limit', () => {
     expect(told[1]!.to).toEqual([{ kind: 'agent', id: theIdOf(THE_TEST_OFFICES_SECRETARY.handle) }])
     expect(told[1]!.said).toContain(until)
     expect(told[1]!.said).toContain('Claude Code')
+    // THE START LINE CASE 4 LEFT HOLDS ITS RESET IN UTC WORDS; the end line found it by its moment, and is written once,
+    // with its own reset stored with its offset.
+    expect(told[0]!.until).toBe(new Date(reset.until).toISOString())
+    expect(told[1]!.until).toBe(clockStamp(() => new Date(reset.until)).instant)
 
     // THE RESET HAS PASSED: the fixture moves the limit three hours back, with a reset one hour ago.
     const now = Date.now()
@@ -507,5 +527,72 @@ describe('the moment a limit is said from', () => {
     const now = Date.now()
     const session = aLimitedCheck(localStamp(new Date(now)))
     expect(await whatTheHoldSaysOf(session, now + HOUR)).toEqual({ said: false, holds: false })
+  })
+})
+
+// ============================================================================ 11. while nobody holds the secretary card
+
+describe('the hold on new checks while nobody holds the secretary card', () => {
+  const NOBODY_WAS_TOLD = 'Nobody holds the secretary card, so nobody was told that new checks are held for a 5-hour limit or start again.'
+
+  /** A synthetic check session that stopped on the 5-hour limit of this login ten minutes before `nowMs`, with a reset two hours after it. */
+  function aCheckThatHitTheLimitOf(login: string, nowMs: number): string {
+    return t.api.createRecord({
+      kind: 'session',
+      title: 'Synthetic check that stopped on a 5-hour limit',
+      workspaceId: WORKSPACE,
+      actor: THE_OFFICE,
+      origin: 'fixture',
+      data: {
+        state: 'finished',
+        runtime: INSPECTION_RUNTIME,
+        stopCause: { kind: 'session-limit', said: THE_SAMPLES_WORDS, at: clockStamp(() => new Date(nowMs - 10 * 60_000)).instant, resetsAt: aClaudeClock(nowMs + 2 * HOUR) },
+        usageReceipt: { runtime: login },
+      },
+    }).id
+  }
+
+  /**
+   * THE CARD IS MOVED THROUGH THE PERSON'S CARD DOOR, which writes the agent's record, so the registry that
+   * `whoHoldsTheSecretaryCard` reads moves with it. The worker card takes the secretary card away; the secretary card
+   * gives it back.
+   */
+  async function theSecretaryCardTo(role: 'secretary' | 'worker'): Promise<void> {
+    const given = await call('POST', `/api/roles/card/${THE_TEST_OFFICES_SECRETARY.handle}`, asPerson, { role })
+    expect(given.status, given.raw).toBe(201)
+  }
+
+  it('11: says once that nobody was told, says it once more when another hold is owed, and writes the lines when a holder is back', async () => {
+    const { tellTheSecretaryOfTheHold } = await import('../src/server/lib/checks-held-for-a-limit.ts')
+    const { whoHoldsTheSecretaryCard } = await import('../src/server/lib/inspection.ts')
+    const before = theLinesAboutTheHold().length
+    const now = Date.now()
+    await theSecretaryCardTo('worker')
+    try {
+      expect(whoHoldsTheSecretaryCard()).toBeNull()
+      aCheckThatHitTheLimitOf('codex', now)
+      // ONE HOLD IS OWED. The first call says that nobody was told; the next finds the same line owed and says nothing.
+      expect(tellTheSecretaryOfTheHold(now, THE_OFFICE)).toEqual([NOBODY_WAS_TOLD])
+      expect(tellTheSecretaryOfTheHold(now + 60_000, THE_OFFICE)).toEqual([])
+      // A SECOND HOLD IS OWED, so the owed lines have changed and it is said once more.
+      aCheckThatHitTheLimitOf('opencode', now)
+      expect(tellTheSecretaryOfTheHold(now + 120_000, THE_OFFICE)).toEqual([NOBODY_WAS_TOLD])
+      expect(tellTheSecretaryOfTheHold(now + 180_000, THE_OFFICE)).toEqual([])
+      expect(theLinesAboutTheHold()).toHaveLength(before)
+    } finally {
+      await theSecretaryCardTo('secretary')
+    }
+
+    // A HOLDER IS BACK: both owed lines are written to it, and the answer says what was said, one sentence for each line.
+    const told = tellTheSecretaryOfTheHold(now + 240_000, THE_OFFICE)
+    expect(told.map((one) => one.slice(0, one.indexOf(' (reset ')))).toEqual([
+      `${THE_TEST_OFFICES_SECRETARY.handle} was told that new checks on Codex are held`,
+      `${THE_TEST_OFFICES_SECRETARY.handle} was told that new checks on OpenCode are held`,
+    ])
+    const written = theLinesAboutTheHold().slice(before)
+    expect(written.map((one) => one.notice)).toEqual(['checksAreHeldForALimit', 'checksAreHeldForALimit'])
+    for (const one of written) expect(one.to).toEqual([{ kind: 'agent', id: theIdOf(THE_TEST_OFFICES_SECRETARY.handle) }])
+    expect(written[0]!.said).toContain('Codex')
+    expect(written[1]!.said).toContain('OpenCode')
   })
 })

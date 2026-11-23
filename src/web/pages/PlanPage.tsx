@@ -111,6 +111,7 @@ import {
   ErrorNote,
   Field,
   Loading,
+  ServerNote,
   TextInput,
   useAsync,
   type AsyncState,
@@ -403,7 +404,7 @@ export function PlanHead({
               allocations are read for the period with no project filter at all, so every total
               and every row of hours covers every project. The goals further down are one
               project's, and their own line says which. */}
-          <span className="px-plan-scope" title={t('g8.schedulePage.aPlanSHoursBelongToAPersonNot')}>
+          <span className="px-plan-scope">
             {t('g8.schedulePage.hoursFromEveryProject')}
           </span>
         </p>
@@ -481,7 +482,6 @@ export function PeriodBar({
                   key={h}
                   to={planPeriodPath(to)}
                   className={current ? 'px-plan-h px-plan-h-now' : 'px-plan-h'}
-                  {...(current ? { title: t('g8.schedulePage.youAreLookingAtOne', { value1: GRAIN_WORDS[h] }) } : {})}
                 >
                   {GRAIN_WORDS[h]}
                 </RouteLink>
@@ -715,8 +715,8 @@ function PlanView({
           how long… It holds 10, so 0 hours are free" — which is the API's note doing the page's
           job. It is the authority on the arithmetic, so it is one press away rather than gone. */}
       {inspect ? (
-        <PlanSection declares={{ surface: 'plan.server' }} title={t('g8.schedulePage.whatTheServerSaysThisPeriodAddsUpTo')} kind={t('g8.schedulePage.theReplySOwnNote')}>
-          <p className="px-plan-note">{reply.note}</p>
+        <PlanSection declares={{ surface: 'plan.server' }} title={t('g8.schedulePage.whatTheServerSaysThisPeriodAddsUpTo')}>
+          <ServerNote text={reply.note} />
         </PlanSection>
       ) : null}
     </>
@@ -817,7 +817,6 @@ const PLAN_CSS = `
    something you just typed and not a warning. */
 .px-plan-when-said { margin: 0; font-size: var(--fs-1); color: var(--text-3); line-height: var(--lh-body);
   max-width: 24rem; text-align: right; }
-.px-plan-note { font-size: var(--fs-2); color: var(--text-2); line-height: var(--lh-body); margin: 0 0 var(--pad-lg); }
 @media (max-width: 40rem) {
   /* One step down, so the page name is still the biggest thing on the screen. Nothing here centres. */
   .px-plan-page { font-size: var(--fs-5); }

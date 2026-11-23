@@ -37,6 +37,9 @@
  *
  * A LINE `{"tokens": {"input": …, "cacheWrites": …, "cacheReads": …, "output": …}}` IS ONE ANSWER'S TOKENS, so a
  * test's stand-in can make a run spend tokens while it runs (wave 14d). `tokensSoFar` adds them up.
+ *
+ * ITS PROGRAM IS LOOKED UP IN THE WHOLE ENVIRONMENT IT WAS GIVEN, through `whereItIs` in ./os.ts, so on Windows a
+ * search path held as `Path` is found.
  */
 
 import { NO_CONVERSATION_ID, theModelForTheCommand, type RunHandle, type RunRequest, type RunResult, type RuntimeAdapter, type ServedReading } from './adapter.ts'
@@ -78,7 +81,7 @@ export class FakeAdapter implements RuntimeAdapter {
   ) {}
 
   whereItIs(): string | null {
-    return whereItIs(this.command, this.from['PATH'])
+    return whereItIs(this.command, this.from)
   }
 
   /**

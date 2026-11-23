@@ -49,8 +49,6 @@ import type { Page } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { liveApp, type LiveApp } from './helpers.ts'
 
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
-
 let app: LiveApp
 let page: Page
 
@@ -142,7 +140,6 @@ describe('the copy buttons put the assembled text on the clipboard and never the
     const name = await theNameInTheBox()
     await page.getByRole('button', { name: /^Keep it for later/ }).click()
     await page.waitForSelector('.bx-said')
-    await sleep(500)
 
     const row = page.locator('.bx-row', { hasText: name }).first()
     await row.waitFor({ timeout: 15_000 })

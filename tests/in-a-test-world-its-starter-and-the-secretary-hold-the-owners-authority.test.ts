@@ -67,7 +67,7 @@ import type { FastifyInstance } from 'fastify'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { THE_TEST_OFFICES_SECRETARY } from './a-page-of-a-test-office.ts'
-import { apiApp, freshDb, type TestDb } from './helpers.ts'
+import { apiApp, freshDb, type TestDb, governsTheWholeProject } from './helpers.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { forgetTheWorldsOwnAuthority, theWorldsOwnAuthority } from '../src/server/lib/worldauthority.ts'
 
@@ -264,7 +264,7 @@ describe(`a world started by builder-pb, copied from an office whose secretary i
       stack.at,
       'POST',
       '/api/records',
-      { kind: 'decision', title: 'A decision the person made here', data: { replaces: [], option_taken: 'the first' } },
+      { kind: 'decision', title: 'A decision the person made here', data: { ...governsTheWholeProject(), replaces: [], option_taken: 'the first' } },
       PERSON,
     )
     expect(made.status, JSON.stringify(made.body).slice(0, 400)).toBe(201)
@@ -465,7 +465,7 @@ describe('every other door of the owner\'s, in a world started by builder-pb (pr
       stack.at,
       'POST',
       '/api/records',
-      { kind: 'decision', title: 'Left', data: { replaces: [], decided_by: 'the owner', authority: 'the owner said so', because: 'It is shorter.' } },
+      { kind: 'decision', title: 'Left', data: { ...governsTheWholeProject(), replaces: [], decided_by: 'the owner', authority: 'the owner said so', because: 'It is shorter.' } },
       PERSON,
     )
     expect(decision.status, JSON.stringify(decision.body).slice(0, 300)).toBe(201)
@@ -519,7 +519,7 @@ describe('every other door of the owner\'s, in a world started by builder-pb (pr
       stack.at,
       'POST',
       '/api/records',
-      { kind: 'decision', title: 'Yes, as written', data: { replaces: [], decided_by: 'the owner', authority: 'the owner said so', because: 'It is right.' } },
+      { kind: 'decision', title: 'Yes, as written', data: { ...governsTheWholeProject(), replaces: [], decided_by: 'the owner', authority: 'the owner said so', because: 'It is right.' } },
       PERSON,
     )
     expect(decision.status, JSON.stringify(decision.body).slice(0, 300)).toBe(201)

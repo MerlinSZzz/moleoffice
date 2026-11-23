@@ -300,7 +300,7 @@ describe('an agent-made world is named after what it was started for', () => {
  * The rule is that a person may name a world freely. `registerWorldHere` never renames a LIVE row, and that was the whole
  * of it until C3 gave a world a death: the row is closed on the way down, so the next start found no
  * live row, inserted a fresh one, and wrote the default name over the person's. The citizens
- * verifier measured it twice — `jamies world` and then `jamies own world`, both back to `my world`
+ * verifier measured it twice — `wrens world` and then `wrens own world`, both back to `my world`
  * after a stop and a start. Problem `RRC8NNCUl0jo`.
  *
  * AND THE ROWS ARE STILL ONE PER APPEARANCE, which is the other half of the rule:

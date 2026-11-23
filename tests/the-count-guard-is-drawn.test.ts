@@ -37,8 +37,6 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { type LiveApp, liveApp, waitForThePage } from './helpers.ts'
 import { countDisagreementIn } from '../src/shared/waitingclaims.ts'
 
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
-
 let app: LiveApp
 let page: Page
 let reportId: string
@@ -89,7 +87,8 @@ async function open(id: string, width: number): Promise<void> {
   await page.setViewportSize({ width, height: width === 390 ? 844 : 1100 })
   await page.goto(`${app.site}/#/r/${id}`, { timeout: 60_000 })
   await waitForThePage(page, 60_000)
-  await sleep(1500)
+  // The mark is drawn only once the live count is read, so the wait is for the mark itself.
+  await page.locator('.sb-countmark').first().waitFor({ state: 'attached', timeout: 30_000 })
 }
 
 beforeAll(async () => {

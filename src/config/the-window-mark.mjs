@@ -14,9 +14,10 @@
  * tests/the-window-opens-the-office.test.ts was one) still drew "this browser". `userAgentFallback`
  * is what every page the app opens starts with, so every way reads the one mark.
  *
- * It is the user agent and not the preload because the preload gives the office's pages nothing, and
- * a word on the screen is not a reason to open a bridge into them. A browser could send the mark
- * too, and it would then be told it is a window: the mark changes words and grants nothing.
+ * It is the user agent and not the preload because the preload gives the office's pages only the web
+ * page's bridge (src/desktop/preload.cjs), and a word on the screen is not a reason to open more of one
+ * into them. A browser could send the mark too, and it would then be told it is a window: the mark
+ * changes words and grants nothing.
  *
  * It is JavaScript because the window's main process cannot read TypeScript.
  */
@@ -71,6 +72,21 @@ export function markEveryPageOf(app, platform) {
 }
 
 /**
+ * A USER AGENT WITHOUT THE WINDOW'S MARKS, for the web page the window draws (src/desktop/the-web-page.mjs). The
+ * marks are on the whole app, so that page's session would start with them too, and a page from the internet would
+ * read itself as the window. Its session is given this instead.
+ *
+ * @param {string} userAgent
+ * @returns {string}
+ */
+export function withoutTheWindowsMarks(userAgent) {
+  return userAgent
+    .split(' ')
+    .filter((word) => word !== THE_WINDOW_MARK && !word.startsWith(THE_SYSTEM_MARK))
+    .join(' ')
+}
+
+/**
  * THE SHUTDOWN BETWEEN THE WINDOW AND ITS PAGE (criteria W5 and W6, piece H8), named once for both sides.
  *
  * The tray's Shut down and the page's Shutdown press ask the one question, the page's
@@ -81,7 +97,7 @@ export const THE_TRAY_ASKS_TO_SHUT_DOWN = 'mole-office:the-tray-asks-to-shut-dow
 
 /**
  * WHAT THE PAGE TELLS THE WINDOW, as a line on its console, because the office's pages are given no
- * bridge (src/desktop/preload.cjs). A line grants nothing: when the page says the office is shutting
+ * bridge but the web page's (src/desktop/preload.cjs). A line grants nothing: when the page says the office is shutting
  * down, the window asks the office itself and closes only once it no longer answers, and when the page
  * says to close only the window, the window closes and the service keeps running, as a quit always does.
  * When the page says its office has the note page, the window only offers what opens that page.

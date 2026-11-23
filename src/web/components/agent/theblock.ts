@@ -30,6 +30,7 @@
 
 import { TARGET_ATTRIBUTE } from '@shared/targets.ts'
 import { thePageScroller } from '../../lib/page-scroll.ts'
+import { SIDE_BY_SIDE } from '../SideBySide.tsx'
 
 /** A `data-target` value, safe to put inside a quoted CSS attribute selector. */
 export function quotedKey(key: string): string {
@@ -174,6 +175,38 @@ function theRecordsOwnHead(node: HTMLElement): HTMLElement | null {
  */
 export function isTheRecordsOwnHead(block: HTMLElement): boolean {
   return block.classList.contains(A_RECORD_PAGES_HEAD)
+}
+
+/**
+ * THE RECORD PAGE'S SECOND COLUMN, WHEN A CARD ON THE WHOLE RECORD CAN STAND AT ITS TOP, OR NULL.
+ *
+ * `wide` is the card's own measured width, or 0 before the card has been drawn.
+ *
+ * The record page draws its two columns side by side only on a wide screen (`WIDE_SCREEN` in
+ * SideBySide.tsx), and only when both columns hold something. Below that width, the second column
+ * stands under the first. With one column empty, the empty one is not drawn. So the two boxes
+ * answer exactly when the card can stand in the column: the second column has a width, and it
+ * starts at or after the first column's right edge.
+ *
+ * A report's facts stand across the page, under the report, so a report has no end column and this
+ * answers null for it.
+ *
+ * A column narrower than the card would leave the card hanging past its edge, so a narrower column
+ * answers null too.
+ */
+export function theSideColumnBeside(block: HTMLElement, wide: number): HTMLElement | null {
+  if (!isTheRecordsOwnHead(block)) return null
+  const parent = block.parentElement
+  if (parent === null) return null
+  const start = parent.querySelector(`:scope > .${SIDE_BY_SIDE} > [data-column="start"]`)
+  const end = parent.querySelector(`:scope > .${SIDE_BY_SIDE} > [data-column="end"]`)
+  if (!(start instanceof HTMLElement) || !(end instanceof HTMLElement)) return null
+  const first = start.getBoundingClientRect()
+  const second = end.getBoundingClientRect()
+  if (first.width === 0 || second.width === 0) return null
+  if (second.left < first.right) return null
+  if (second.width < wide) return null
+  return end
 }
 
 /**

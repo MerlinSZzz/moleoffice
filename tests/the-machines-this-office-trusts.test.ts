@@ -30,7 +30,8 @@
  *   · confirming a visitor credential adds the machine it was confirmed for, and confirming a
  *     second credential from the same machine adds nothing rather than a second row;
  *   · GET /api/access answers from the SAME list, so the two cannot name different machines;
- *   · the panel is drawn with presses on the world's page and without them in Settings.
+ *   · the panel is drawn with presses on his person card and without them in Settings, which leads
+ *     there (design C of early idea B9 moved the presses off the world's page).
  *
  * ---------------------------------------------------------------------------------------
  * THE MUTATIONS THAT TURN THIS RED, WITH A CONTROL RUN FIRST
@@ -208,7 +209,8 @@ describe('trusting a machine', () => {
     // the owner's id: it is the sentence an agent reads, and an id is a stored word.
     expect(said.said, 'whose act it is').toContain("the owner's own act")
     expect(said.said, 'and who asked').toContain('builder-cl')
-    expect(said.said, 'and where the owner does it, which is not the Embassy').toContain("at the world's page")
+    const { ON_HIS_OWN_CARD } = await import('../src/shared/visitors.ts')
+    expect(said.said, 'and where the owner does it, which is his own card').toContain(ON_HIS_OWN_CARD)
     expect(said.said).toContain('Nothing was done')
     expect((await trusted()).machines.map((one) => one.address), 'nothing was written').toEqual(['windows-box.test'])
   })
@@ -314,12 +316,13 @@ describe('GET /api/access', () => {
 // ============================================================ 5. where the presses are
 
 describe('the panel', () => {
-  it('carries the presses on the world’s page', async () => {
+  it('carries the presses on his card', async () => {
     const said = await trusted()
     const page = drawn(said, true)
     expect(page).toContain(tm.TRUSTED_WORDS.add)
     expect(page).toContain(tm.TRUSTED_WORDS.remove)
-    expect(page, 'and the server’s own sentence about what the list decides').toContain(said.says.slice(0, 40))
+    expect(said.machines.length, 'the list holds a machine to draw').toBeGreaterThan(0)
+    for (const machine of said.machines) expect(page).toContain(`<span class="tm-address">${machine.address}</span>`)
   })
 
   it('carries none in Settings, and says where they are', async () => {
@@ -327,7 +330,9 @@ describe('the panel', () => {
     expect(page, 'the owner\'s words: they looked in Settings and could change nothing').not.toContain(tm.TRUSTED_WORDS.add)
     expect(page).not.toContain(tm.TRUSTED_WORDS.remove)
     expect(page, 'the press that goes where the list is set').toContain(tm.TRUSTED_WORDS.setOn)
-    expect(page, 'and takes the owner there').toContain('/worlds')
+    const { hrefOf, whoPath } = await import('../src/web/components/router.tsx')
+    expect(page, 'and takes the owner to his card').toContain(`href="${hrefOf(whoPath('person', THE_PERSON))}"`)
+    expect(page, 'not to the world\'s page').not.toContain('/worlds')
   })
 
   it('says the office trusts nobody where the list is empty', async () => {

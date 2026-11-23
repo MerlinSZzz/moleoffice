@@ -83,12 +83,12 @@ import {
   AUTHORED_TABLES,
   DERIVED_TABLES,
   IRREPLACEABLE_TABLES,
-  everyPartTable,
   MEASURED_TABLES,
   MIGRATION_DECLARED_TABLES,
-  PERSON_LEVEL_TABLES,
   RECORD_TEXT_INDEX_TABLES,
 } from '../src/server/db/schema.ts'
+import { everyPartTable } from '../src/server/db/every-part-table.ts'
+import { PERSON_LEVEL_TABLES } from '../src/server/db/authored-table-of.ts'
 import { GATE_KINDS } from '../src/shared/work.ts'
 import { latestMomentOfStampInZone, parseLocalStamp } from '../src/shared/time.ts'
 import {
@@ -1399,12 +1399,15 @@ describe('migration 0004 against a database that already has rows', () => {
     // The columns the later migrations add are NOT ignored, they are checked separately: each one
     // has to be there, and to be NULL on a row that existed before it did. Held aside above and
     // unexamined would let a migration add a column full of invented values and call it additive.
+    // WHETHER A COLUMN IS THERE IS READ FROM THE TABLE ITSELF, once for each column, and not from the
+    // keys of its rows: a table with no row here had every one of its named columns checked zero times.
     const copied = new Set(COLUMNS_COPIED_FROM_ANOTHER_ROW.map((c) => `${c.table}.${c.column}`))
     for (const [table, added] of Object.entries(ALL_COLUMNS_ADDED_AFTER_THE_REBUILD)) {
+      const has = columnNames(s.db, table)
       const rows = s.db.prepare(`SELECT * FROM "${table}"`).all() as Record<string, unknown>[]
       for (const column of added) {
+        expect(has, `${table}.${column} is not in the database`).toContain(column)
         for (const row of rows) {
-          expect(Object.keys(row), `${table}.${column} is not in the database`).toContain(column)
           if (copied.has(`${table}.${column}`)) continue
           expect(row[column], `${table}.${column} was filled in on a row that predates it`).toBeNull()
         }

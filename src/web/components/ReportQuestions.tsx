@@ -443,7 +443,6 @@ export function ChoiceQuestion({
     <>
     <div className="sb-block rq rq-choice" data-state="answering" {...mark}>
       <div id={`${group}-q`} className="rq-q">{question}</div>
-      {many ? <p className="rq-hint">{t('rq.choice.many')}</p> : null}
       <div className="rq-options" role={many ? 'group' : 'radiogroup'} aria-labelledby={`${group}-q`}>
         {block.options.map((option, at) => (
           <label key={option.id} className="rq-option" data-chosen={chosen.includes(option.id) ? 'yes' : undefined}>
@@ -698,7 +697,7 @@ function WhatIsKept({ block, kept }: { block: AnsweredBlock; kept: AnswersOfABlo
 /**
  * THE LINE SAYING AN ANSWER WAS SENT: who sent it, when, who chose it, and the decision a choice was recorded as.
  * `saysWhat` adds what was sent, for where the answer is not drawn above the line already. Who chose it is a part of
- * its own after the time, so a sentence about the chooser never runs on from the sender's name. A send under the
+ * its own after the time, so the words about the chooser never run on from the sender's name. A send under the
  * person's grant says so in words, and the grant's id is never drawn, because no page opens one grant.
  */
 function SentLine({ block, sent, saysWhat }: { block: AnsweredBlock; sent: AnswerSent; saysWhat: boolean }) {
@@ -711,7 +710,7 @@ function SentLine({ block, sent, saysWhat }: { block: AnsweredBlock; sent: Answe
       </span>
       <Stamp at={sent.at} />
       {sent.chosenBy === undefined ? (
-        <span className="rq-chooser">{t('rq.sent.chooserNotRecorded')}</span>
+        <span className="rq-chooser">{t('rq.sent.chooserUnrecorded')}</span>
       ) : sent.chosenBy.kind === (sent.underTheGrant === undefined ? 'person' : 'agent') && sent.chosenBy.id === sent.by ? null : (
         <span className="rq-chooser">
           {t('rq.sent.chosenBy')} <ParticipantName kind={sent.chosenBy.kind} id={sent.chosenBy.id} />
@@ -756,7 +755,6 @@ const REPORT_QUESTIONS_CSS = `
 .rq-q p, .rq-q { margin: 0; }
 .rq-q > *, .rq-asks { font-weight: var(--heading-weight); line-height: var(--lh-read); overflow-wrap: anywhere; }
 .rq-asks, .rq-asks-words { display: block; margin: 0; }
-.rq-hint { margin: 0; font-size: var(--fs-1); color: var(--text-2); }
 .rq { --rq-option-most: 36rem; }
 /* A CHOICE'S OPTIONS ARE AS WIDE AS THEIR WORDS, NOT AS WIDE AS THE PAGE.
    Each option is fit-content up to 36rem and wraps inside it: 36rem is about 65 Latin letters or

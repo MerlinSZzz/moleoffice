@@ -27,9 +27,11 @@
  *      answer move. A private copy of the constant in either reader would stay at the old number
  *      and go red here, which is the point of this file. The ninth invariant names this defect:
  *      one fact worked out in two places, free to drift.
- *   4. THE PANEL CARRIES IT TOO, beside the bytes, in the same sentence. This is a browser check
- *      because a panel is drawn, not served: the same page a person reads is opened and its own
- *      words are read back.
+ *   4. THE PANEL CARRIES THE TOKEN SIZE TOO, beside the bytes, in the same sentence, as about so
+ *      many tokens. This is a browser check because a panel is drawn, not served: the same page a
+ *      person reads is opened and its own words are read back. Criterion change: the panel no longer
+ *      draws the sentence that the figure is an estimate and that no tokenizer is installed, as
+ *      decided, since explanations come off the pages. The reply still says it, for agents (case 2).
  *
  * ---------------------------------------------------------------------------------------
  * MUTATIONS, PROVED IN THIS FILE'S OWN RUN
@@ -252,7 +254,7 @@ describe('the panel says what the copy costs to read, beside the bytes', () => {
     await live?.stop()
   }, 90_000)
 
-  it('draws the token estimate beside the bytes and says it is an estimate', async () => {
+  it('draws the token estimate beside the bytes, as about so many tokens', async () => {
     await page.goto(`http://127.0.0.1:${String(live.webPort)}/#/bundles`, { waitUntil: 'domcontentloaded' })
     await page.reload({ waitUntil: 'domcontentloaded' })
     await waitForThePage(page, 60_000)
@@ -269,10 +271,5 @@ describe('the panel says what the copy costs to read, beside the bytes', () => {
     expect(words, `the size line does not carry both sizes: ${words}`).toMatch(
       /\d+ characters, \d+ bytes, about \d+ tokens/,
     )
-    // AND THE WORDS SAY IT IS AN ESTIMATE AND WHY.
-    expect(words.toLowerCase(), 'the panel does not say the token figure is an estimate').toContain(
-      'estimate',
-    )
-    expect(words, 'the panel does not say no tokenizer is installed').toContain('no tokenizer is installed')
   }, 120_000)
 })

@@ -2,6 +2,8 @@
 // Licensed under the MIT License. See LICENSE.
 import { PixelAppearanceEditor } from '../components/pixel-office/PixelAppearanceEditor.tsx'
 import { RevokeTheirKey } from '../components/RevokeTheirKey.tsx'
+import { YourBrowsersAndMachines } from '../components/YourBrowsersAndMachines.tsx'
+import { THE_PERSON } from '@shared/person.ts'
 /**
  * `#/who/<kind>/<id>` — ONE PARTICIPANT'S OWN PAGE.
  *
@@ -44,7 +46,7 @@ import { RevokeTheirKey } from '../components/RevokeTheirKey.tsx'
  * would fill in themselves.
  */
 
-import { api, ApiError, errorMessage, faultOf, getActor, type ProfileReply, type ParticipantOnTheWire, type ReleaseReadingReply } from '../api.ts'
+import { api, ApiError, errorMessage, faultOf, getActor, type ProfileReply, type ParticipantOnTheWire, type ReleaseReadingReply, type TheOwnerOfAnAgent } from '../api.ts'
 import type { ParticipantsNamed } from '../lib/participant-lookup.ts'
 import { Avatar } from '../components/Avatar.tsx'
 import { BackLink } from '../components/BackLink.tsx'
@@ -57,13 +59,13 @@ import { TheAgentsRuns } from '../components/TheAgentsRuns.tsx'
 import { TheLoginsWeek } from '../components/TheLoginsWeek.tsx'
 import { TheModelThisAgentsRunsGet } from '../components/TheModelThisAgentsRunsGet.tsx'
 import { AgentRenames } from '../components/AgentRenames.tsx'
+import { AgentOwnerHandOvers, theWordForAnOwnerWithNoName } from '../components/AgentOwnerHandOvers.tsx'
 import { Dot } from '../components/ContactChooser.tsx'
-import { Absence, Btn, ErrorNote, Panel, TextArea } from '../components/ui.tsx'
+import { Absence, Btn, ErrorNote, Hint, Panel, ServerNote, TextArea } from '../components/ui.tsx'
 import { useProjectAsync } from '../lib/project-async.ts'
-import { RouteLink, recordPath } from '../components/router.tsx'
+import { RouteLink, recordPath, whoPath } from '../components/router.tsx'
 import { type MayRetire, type TheHandoverPart } from '@shared/profile.ts'
 import { whoRegisteredTheWorkAreaSays } from '@shared/roles.ts'
-import { saidOnThePage } from '@shared/dev-sayings.ts'
 import { presenceWord, sentenceOnThePage, worldNameOnThePage } from '../lib/server-sentences.ts'
 import { groupHeading } from '@shared/contacts.ts'
 import { RUNTIME_WORDS, type AgentRuntime, type ParticipantKind, type ParticipantRef } from '@shared/participants.ts'
@@ -108,7 +110,16 @@ function broadcastTimeInWords(stamp: string, zone: string | null): string {
   return at === null ? stamp : whenInWords(at, Date.now(), zone)
 }
 
-export function ProfilePage({ kind, id }: { kind: ParticipantKind; id: string }) {
+export function ProfilePage({
+  kind,
+  id,
+  browser = null,
+}: {
+  kind: ParticipantKind
+  id: string
+  /** On the person's own card, the browser an address names, whose row in their browsers is marked. */
+  browser?: string | null
+}) {
   useLanguage()
   const [held] = useState(() => peekPreparedProfile(kind, id))
   const used = useRef(false)
@@ -133,7 +144,7 @@ export function ProfilePage({ kind, id }: { kind: ParticipantKind; id: string })
       {reply.status === 'error' ? (
         <ErrorNote message={reply.message} fault={reply.fault} label={t('g6b.profile.notFound')} />
       ) : null}
-      {reply.status === 'ready' ? <TheProfile said={reply.value} onChanged={reload} /> : null}
+      {reply.status === 'ready' ? <TheProfile said={reply.value} onChanged={reload} browser={browser} /> : null}
     </div>
   )
 }
@@ -144,7 +155,15 @@ export function ProfilePage({ kind, id }: { kind: ParticipantKind; id: string })
  * EXPORTED SO A TEST CAN DRAW IT WITHOUT A SERVER, the way `TheOffice` on the Worlds page is: this
  * half is a pure function of what was fetched, and that is the half a test can hold still.
  */
-export function TheProfile({ said, onChanged }: { said: ProfileReply; onChanged: () => void }) {
+export function TheProfile({
+  said,
+  onChanged,
+  browser = null,
+}: {
+  said: ProfileReply
+  onChanged: () => void
+  browser?: string | null
+}) {
   useLanguage()
   const inspect = useInspect()
   const who = said.participant
@@ -191,8 +210,6 @@ export function TheProfile({ said, onChanged }: { said: ProfileReply; onChanged:
           <p className="prof-presence">
             <Dot reading={{ ...said.presence, word: presenceWord(said.presence), says: inspect ? sentenceOnThePage(said.presence.says) : '' }} />
             <span className="prof-presence-word">{presenceWord(said.presence)}</span>
-            {/* IN THE PAGE'S LANGUAGE (wave 13k round 35): the server's presence sentence, by its word. */}
-            <span className="prof-presence-says">{inspect ? sentenceOnThePage(said.presence.says) : null}</span>
           </p>
         </div>
       </header>
@@ -231,8 +248,8 @@ export function TheProfile({ said, onChanged }: { said: ProfileReply; onChanged:
      NOT: criterion M97 sends a person here by a lead to press Change work area, so normal mode
      keeps the panel with the press alone, wherever this reader may change the area. */
   const workArea = kind === 'agent' ? <WorkArea said={said} onChanged={onChanged} inspect={inspect} /> : null
-  /* WHETHER A RELEASE WAKES THIS AGENT, on its page in normal mode, with who said so and why (the first condition,
-     HeBxwj6QRGjS). The press is drawn only for the two who may say it: the owner, and the agent itself. */
+  /* WHETHER A RELEASE WAKES THIS AGENT, on its page in normal mode, as a switch, with who set it and why behind the "?"
+     on its heading. Only the two who may say it can press it: the owner, and the agent itself. */
   const releases = kind === 'agent' ? <ReleaseReading agentId={who.id} zone={said.theCardTheyHold?.elevation?.officeTimeZone ?? null} /> : null
 
   /* WHAT EACH RUN OF THIS AGENT DECLARED, AND THE TOTALS OVER THEM. Criterion P91. Its own
@@ -268,13 +285,17 @@ export function TheProfile({ said, onChanged }: { said: ProfileReply; onChanged:
           <Panel declares={{ surface: 'profile.facts' }} titleIs="label" title={t('g6b.profile.facts')}>
             <dl className="prof-facts">
               <Fact label={t('g6b.profile.status')} value={who.state} missing={<Absence say title={t('g6b.profile.noStatus')} />} />
+              {kind !== 'agent' || who.owner === undefined ? null : <TheOwner owner={who.owner} />}
               {inspect ? <Fact label={t('g6b.profile.handle')} value={who.handle} missing={<Absence />} /> : null}
               {!inspect || kind !== 'agent' ? null : (
                 <Fact
                   label={t('g6b.profile.runtime')}
                   // THE TOOL'S OWN WORD, from the one table that holds it. `claude-code` never reaches
-                  // this screen; a runtime nobody declared is absent rather than guessed.
-                  value={who.runtime == null ? null : RUNTIME_WORDS[who.runtime as AgentRuntime].full}
+                  // this screen; a runtime nobody declared is absent rather than guessed. A harness with no
+                  // adapter is shown by its stored word, with the short words saying the office does not start it.
+                  value={who.runtime != null
+                    ? RUNTIME_WORDS[who.runtime as AgentRuntime].full
+                    : who.harness == null ? null : t('g6b.profile.runtimeNoAdapter', { runtime: content(who.harness) })}
                   missing={<Absence say title={t('g6b.profile.noRuntime')} />}
                 />
               )}
@@ -290,7 +311,6 @@ export function TheProfile({ said, onChanged }: { said: ProfileReply; onChanged:
                 label={t('g6b.profile.world')}
                 value={said.citizenOf === null ? null : said.citizenOf.name === null ? (inspect ? said.citizenOf.databaseIdentity : null) : worldNameOnThePage(said.citizenOf.name, said.citizenOf.kind, inspect)}
                 missing={<Absence say title={t('g6b.profile.noWorld')} />}
-                says={inspect ? saidOnThePage(said.citizenshipSaid, sentenceOnThePage(said.citizenshipSays)) : undefined}
               />
               {/* TO THE MINUTE, as every time on this page, by the shared rule R7. */}
               <Fact label={t('g6b.profile.registered')} value={who.createdAt == null ? who.createdAt : writtenMoment(who.createdAt)} missing={<Absence say title={t('g6b.profile.noStatus')} />} />
@@ -303,14 +323,12 @@ export function TheProfile({ said, onChanged }: { said: ProfileReply; onChanged:
                   label={t('g6b.profile.credential')}
                   value={who.credential}
                   missing={<Absence say title={t('g6b.profile.noCredential')} />}
-                  says={who.credential === null ? undefined : t('g6b.profile.credentialSays')}
                 />
               )}
             </dl>
-            {/* AND WHETHER THIS ROW WAS ADMITTED BEFORE P88. Criterion P88. The sentence names the
-                runtime the row declares and the date it was registered, so a row the old door let in is
-                never read as one the new gate governs. Absent on every row P88 does not. */}
-            {!inspect || said.admittedBeforeP88 === null ? null : <p className="prof-says">{said.admittedBeforeP88}</p>}
+            {/* AND WHETHER THIS ROW WAS ADMITTED BEFORE P88. Criterion P88. A small label, so a row the old door let
+                in is never read as one the new gate governs. Absent on every row P88 does not. */}
+            {!inspect || said.admittedBeforeP88 === null ? null : <p className="prof-label">{t('g6b.profile.registeredBeforeTheRules')}</p>}
           </Panel>
   )
 
@@ -320,31 +338,15 @@ export function TheProfile({ said, onChanged }: { said: ProfileReply; onChanged:
      panel of what they may change, below. */
   const addressAs = <HowToAddress who={who} yours={yours} />
 
-  /* WHETHER A SESSION HOLDS THIS AGENT'S HANDLE RIGHT NOW. It is its own panel and not a row
-     above, because the sentence is the answer: "a run is answering" and "a terminal is
-     answering" send a message to two different places. */
-  const answering = !inspect || said.answering === null ? null : (
-    <Panel declares={{ surface: 'profile.answering' }} titleIs="label" title={t('g6b.profile.answering')}>
-      <p className="prof-answering">
-        <span className="prof-how">{said.answering.how === 'nobody' ? t('chat.answeringNow.nobody') : said.answering.how}</span>
-        {/* IN THE PAGE'S LANGUAGE (wave 13k round 35): the server sends the sentence as a code beside its English. */}
-        <span className="prof-says">{saidOnThePage(said.answering.said, said.answering.says)}</span>
-      </p>
-    </Panel>
-  )
-
   /* THE SHORT NAME PROPOSED FOR THIS AGENT, criterion M50. It is here because this is where a
      name is chosen; it was on the Settings page, which is a page about this browser and no place
      for it. The panel draws nothing once the name has
      been changed, so this is empty on every agent nobody has proposed a name for. */
   const proposedName = kind !== 'agent' || said.proposedName === null ? null : <ProposedNamesPanel only={who.id} />
 
-  /* WHAT THIS AGENT HOLDS: the records it filed in this project lately. The sentence beside the
-     list says what was counted, because "nothing filed" and "this counts only what it created"
-     are different answers and a reader cannot tell them apart from an empty list. */
+  /* WHAT THIS AGENT HOLDS: the records it filed in this project lately. */
   const filed = said.filedLately === null ? null : (
             <Panel declares={{ surface: 'profile.filed' }} titleIs="label" title={t('g6b.profile.filedLately')}>
-              {inspect ? <p className="prof-says">{sentenceOnThePage(said.filedLatelySays ?? '')}</p> : null}
               {said.filedLately.length === 0 ? (
                 <p className="prof-none">{<Absence say title={t('g6b.profile.nothingFiled')} />}</p>
               ) : (
@@ -366,7 +368,6 @@ export function TheProfile({ said, onChanged }: { said: ProfileReply; onChanged:
   /* THE MACHINES THEIR REQUESTS ARRIVED FROM. A network address and not a name: nothing gave
      these machines a name, so a friendly one here would be invented. */
   const machines = inspect ? <Panel declares={{ surface: 'profile.machines' }} titleIs="label" title={t('g6b.profile.seenFrom')}>
-            <p className="prof-says">{sentenceOnThePage(said.seenFromSays)}</p>
             {said.seenFrom.length === 0 ? (
               <p className="prof-none">{<Absence say title={t('g6b.profile.noMachines')} />}</p>
             ) : (
@@ -388,7 +389,6 @@ export function TheProfile({ said, onChanged }: { said: ProfileReply; onChanged:
      from and when, which is the same pair the embassy draws. */
   const visits = (
           <Panel declares={{ surface: 'profile.visits' }} titleIs="label" title={t('g6b.profile.visits')}>
-            {inspect ? <p className="prof-says">{sentenceOnThePage(said.visitsSay)}</p> : null}
             {said.visits.length === 0 ? (
               <p className="prof-none">{<Absence say title={t('g6b.profile.noVisits')} />}</p>
             ) : (
@@ -412,11 +412,7 @@ export function TheProfile({ said, onChanged }: { said: ProfileReply; onChanged:
 
   /* YOUR OWN PICTURE, NAME AND STATUS, THROUGH THE CONTROL THE SETTINGS PAGE DRAWS. The same
      component and the same two routes; nothing about the rules is decided twice. */
-  const yourOwn = !yours ? (
-            kind === 'person' ? (
-              <p className="prof-not-yours">{t('g6b.profile.notYours')}</p>
-            ) : null
-          ) : (
+  const yourOwn = !yours ? null : (
             <Panel declares={{ surface: 'profile.yours' }} titleIs="label" title={t('g6b.profile.yours')}>
               <YourAppearance
                 person={who}
@@ -504,6 +500,8 @@ export function TheProfile({ said, onChanged }: { said: ProfileReply; onChanged:
         <TheirCard said={said} onChanged={onChanged} />
         {broadcasts}
         {facts}
+        {/* EVERY HAND-OVER OF ITS OWNER THE OWNER DOOR KEPT, and from when they are kept (wave 13s round 281). */}
+        <AgentOwnerHandOvers agentId={who.id} />
         {handover}
         {/* ITS LIVE VIEW AND THE WAY BACK, wave 13u's three parts (a decision, agreed in message kS6lqIJaMnc7): the
             terminals the office holds, then its own pane when it runs on this computer, or its steps when it runs in
@@ -530,7 +528,6 @@ export function TheProfile({ said, onChanged }: { said: ProfileReply; onChanged:
         <ResidentSleepPlace agentId={who.id} newestRun={said.agentRuns?.runs[0]?.id ?? null} />
         {runs}
         {loginsWeek}
-        {answering}
         {machines}
         {proposedName}
         {filed}
@@ -551,6 +548,9 @@ export function TheProfile({ said, onChanged }: { said: ProfileReply; onChanged:
   return (
     <>
       {head}
+      {/* THE PERSON'S BROWSERS AND THE MACHINES THIS OFFICE TRUSTS, design C of early idea B9: on the office owner's own
+          card only, after the head and before the card's other parts, which keep their order. */}
+      {kind === 'person' && who.id === THE_PERSON ? <YourBrowsersAndMachines browser={browser} /> : null}
       {/* THE CARD AND THE FACTS ARE TWO KINDS, so they stand side by side on a wide window by the
           shared rule, item 2 of a decision: the card this one holds on the left, what is known
           about them on the right. This is a person's page; an agent's page
@@ -570,7 +570,6 @@ export function TheProfile({ said, onChanged }: { said: ProfileReply; onChanged:
           {inject}
           {facts}
           {addressAs}
-          {answering}
           {proposedName}
           {filed}
           {machines}
@@ -605,19 +604,16 @@ function HowItLooksOnTheMap({ agentId }: { agentId: string }) {
  * ONE LABEL AND ONE VALUE, with the words for missing where there is no value.
  *
  * `missing` is drawn quieter than a value and is never dressed as one, so a reader can tell "nobody
- * has said" from something somebody said. `says` is the sentence that explains an absence that has
- * more than one possible reason.
+ * has said" from something somebody said. A value may be a link, as an agent's owner is.
  */
 function Fact({
   label,
   value,
   missing,
-  says,
 }: {
   label: string
-  value: string | null | undefined
+  value: ReactNode
   missing: ReactNode
-  says?: string
 }) {
   const empty = value === null || value === undefined || value === ''
   return (
@@ -625,9 +621,26 @@ function Fact({
       <dt className="prof-label">{label}</dt>
       <dd className="prof-value" data-empty={empty ? 'yes' : 'no'}>
         {empty ? missing : value}
-        {says === undefined ? null : <span className="prof-says-inline">{says}</span>}
       </dd>
     </div>
+  )
+}
+
+/**
+ * WHO OWNS THIS AGENT (wave 13s round 281): the owner's office name, as a link to the owner's page. Where no name
+ * can be drawn, the word says why: nobody recorded an owner, the row holds one that cannot be read, or the owner's
+ * id names nobody registered. Nothing here hands the agent over.
+ */
+function TheOwner({ owner }: { owner: TheOwnerOfAnAgent }) {
+  const why = theWordForAnOwnerWithNoName(owner)
+  return (
+    <Fact
+      label={t('profileOwner.label')}
+      value={owner.state !== 'held' || owner.name === null ? null : (
+        <RouteLink to={whoPath(owner.kind, owner.id)} className="prof-owner-name">{content(owner.name)}</RouteLink>
+      )}
+      missing={<Absence say title={t(why)} />}
+    />
   )
 }
 
@@ -847,7 +860,6 @@ export const PROFILE_CSS = `
 .prof-name { margin: 0; color: var(--text); font: 600 var(--fs-6)/var(--lh-tight) var(--font-ui); overflow-wrap: anywhere; }
 .prof-presence { margin: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; min-width: 0; }
 .prof-presence-word { font-size: var(--fs-2); color: var(--text-2); }
-.prof-presence-says { font-size: var(--fs-1); color: var(--text-3); overflow-wrap: anywhere; }
 
 .prof-facts { margin: 0; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .prof-fact { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; min-width: 0; }
@@ -863,16 +875,37 @@ export const PROFILE_CSS = `
 .prof-value { margin: 0; font-size: var(--fs-2); color: var(--text); min-width: 0; overflow-wrap: anywhere; }
 /* NOBODY HAS SAID, DRAWN QUIETER THAN AN ANSWER. It must never read as a value somebody set. */
 .prof-value[data-empty='yes'] { color: var(--text-3); font-style: italic; }
-.prof-says-inline { display: block; font-size: var(--fs-1); font-style: normal; color: var(--text-3); }
 
 .prof-says { margin: 0 0 var(--pad) 0; max-width: var(--measure-in-box); font-size: var(--fs-1); color: var(--text-3); }
 .prof-none { margin: 0; font-size: var(--fs-2); font-style: italic; color: var(--text-3); }
 
-.prof-answering { margin: 0; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-.prof-how { font-size: var(--fs-2); font-weight: 600; color: var(--text); }
 .prof-says { overflow-wrap: anywhere; }
 /* A REASON A PERSON TYPED, in a box of several lines, keeps its line breaks when it is read back. */
 .prof-said-why { white-space: pre-wrap; }
+
+/* THE RELEASE SWITCH, drawn as the inject switch on the Settings page is: a track and a knob in the product's own
+   tokens, and the word On or Off beside it, so the state is never carried by colour alone. */
+.prof-release-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--pad); min-width: 0; }
+.prof-release-label { font-size: var(--fs-2); color: var(--text); }
+.prof-release-switch {
+  position: relative; flex: none; width: 44px; height: 24px; padding: 0;
+  border: var(--border-w) solid var(--border-strong); border-radius: 12px;
+  background: var(--panel); cursor: pointer;
+  transition: background-color .15s ease, border-color .15s ease;
+}
+.prof-release-switch[aria-checked='true'] { background: var(--accent); border-color: var(--accent); }
+.prof-release-switch:focus-visible { outline: var(--focus-w) solid var(--focus); outline-offset: var(--focus-offset); }
+.prof-release-switch:disabled { cursor: default; opacity: .6; }
+.prof-release-knob {
+  position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%;
+  background: var(--text-2); transition: left .15s ease, background-color .15s ease;
+}
+.prof-release-switch[aria-checked='true'] .prof-release-knob { left: 22px; background: var(--panel); }
+.prof-release-word { font: 600 var(--fs-1)/var(--lh-tight) var(--font-ui); color: var(--text); }
+.prof-release-default { font: var(--fs-1)/var(--lh-tight) var(--font-ui); color: var(--text-3); }
+@media (prefers-reduced-motion: reduce) {
+  .prof-release-switch, .prof-release-knob { transition: none; }
+}
 
 /* WHO REGISTERED THE WORK AREA, criterion P85. An aside under the paths and quieter than them, and
    a block rather than one line because wave 3 (P92-P95) adds a second sentence under the same
@@ -917,15 +950,12 @@ export const PROFILE_CSS = `
 .prof-not-yours { margin: 0; max-width: var(--measure-in-box); font-size: var(--fs-2); color: var(--text-3); }
 
 /* THE AGENT'S RUNS, criterion P91. One row per run, separated by a rule; each value that nobody
-   recorded is drawn quieter than a value somebody did. The timeline place is set apart because it
-   is an explanation and not a measurement. */
+   recorded is drawn quieter than a value somebody did. */
 .prof-runs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--pad); min-width: 0; }
 .prof-run { display: flex; flex-direction: column; gap: 6px; min-width: 0; border-top: 1px solid var(--border); padding-top: var(--pad); }
 .prof-run-head { margin: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; min-width: 0; }
 .prof-run-title { font-weight: 600; color: var(--text); overflow-wrap: anywhere; }
-.prof-run-facts { margin: 0; display: flex; flex-wrap: wrap; gap: 6px 1rem; min-width: 0; }
 .prof-run-says { margin: 0; max-width: var(--measure-in-box); font-size: var(--fs-1); color: var(--text-3); overflow-wrap: anywhere; }
-.prof-timeline { margin-top: var(--pad); font-style: italic; }
 /* WHAT IS SUMMED ON THE AGENT BESIDE THE TOKENS (wave 13k round 52): a label over a sentence or a short list. */
 .prof-summed { display: flex; flex-direction: column; gap: 4px; min-width: 0; margin-top: var(--pad); }
 .prof-summed > .prof-label { margin: 0; }
@@ -999,22 +1029,21 @@ function RetireThisAgent({
   }
 
   /**
-   * A READER WHO MAY NOT GETS THE SENTENCE AND NO PRESS. Criterion P82.
+   * A READER WHO MAY NOT GETS A SHORT STATE AND NO PRESS. Criterion P82.
    *
-   * The door's own words, so the page never composes a second version of the rule. Chapter 6's
-   * sixth rule puts this quietly: nobody reading it has to do anything about it.
+   * The door's own words are drawn for a developer, so the page never composes a second version of the rule.
    */
   if (!may.may) {
     return (
       <Panel declares={{ surface: 'profile.retire' }} titleIs="label" title={t('g6b.profile.retire')}>
-        <p className="prof-not-yours">{may.whyNot}</p>
+        <p className="prof-not-yours">{t('g6b.profile.notYoursToRetire')}</p>
+        <ServerNote text={may.whyNot} />
       </Panel>
     )
   }
 
   return (
     <Panel declares={{ surface: 'profile.retire' }} titleIs="label" title={t('g6b.profile.retire')}>
-      <p className="prof-says">{t('g6b.profile.retireSays')}</p>
       {!asking ? (
         <Btn variant="ghost" onClick={() => setAsking(true)}>
           {t('g6b.profile.retire')}
@@ -1029,7 +1058,7 @@ function RetireThisAgent({
               empty box and no reason on it, `Btn` then refused to draw such a button and threw while
               drawing, and React unmounted the page before anything was sent. A disabled control
               that will not say what would enable it is a dead end; here it says. */}
-          <TieredPress tier="confirm" press={t('g6b.profile.retire')} pending={t(why.trim() === '' ? 'g6b.profile.retireNeedsWhy' : 'g6b.profile.retiring')}
+          <TieredPress tier="confirm" press={t('g6b.profile.retire')} pending={t(why.trim() === '' ? 'g6b.profile.retireWriteWhyFirst' : 'g6b.profile.retiring')}
             disabled={why.trim() === ''}
             question={t('g6b.profile.retireQuestion')} quote={who.name}
             warning={t('g6b.profile.retireSays')} cancel={t('g6b.profile.retireKeep')} onPress={retire} />
@@ -1068,7 +1097,7 @@ export function TheHandover({ part }: { part: TheHandoverPart }) {
   return (
     <Panel declares={{ surface: 'profile.handover' }} titleIs="label" title={t('handoverPlace.title')}>
       {!part.read ? (
-        <p className="prof-says">{t('handoverPlace.notRead')}</p>
+        <p className="prof-none">{t('handoverPlace.notShown')}</p>
       ) : current === null ? (
         <p className="prof-none">{t('handoverPlace.none')}</p>
       ) : (
@@ -1092,7 +1121,13 @@ export function TheHandover({ part }: { part: TheHandoverPart }) {
   )
 }
 
-/** Whether a release wakes this agent, said in words, and the press that changes it. */
+/**
+ * WHETHER A RELEASE WAKES THIS AGENT, as one switch, "Wake it on release". As decided: the door's `on` means the agent
+ * reads a release from the check itself, so the switch is on where the door's value is not. While nobody has set it,
+ * the switch shows the default, on, with the word "default" beside it. Who set it and why are behind the "?" on the
+ * heading. A press opens the reason box, because the door takes a reason; Save writes the other value through the
+ * same door, and Cancel leaves the switch as it was.
+ */
 function ReleaseReading({ agentId, zone }: { agentId: string; zone: string | null }) {
   const [reply, readAgain] = useProjectAsync(() => api.releaseReading(agentId), [agentId])
   const [participants] = useProjectAsync(readParticipantsOnce, [])
@@ -1112,15 +1147,33 @@ function ReleaseReading({ agentId, zone }: { agentId: string; zone: string | nul
   }
   const said = reply.value.readsReleasesFromTheCheck
   const on = said?.on === true
+  const wakes = !on
   return (
-    <Panel declares={{ surface: 'profile.releases' }} titleIs="label" title={t('releaseReading.title')}>
-      <p className="prof-says">{t(said === null ? 'releaseReading.nobody' : on ? 'releaseReading.on' : 'releaseReading.off')}</p>
-      {said === null ? null : (
-        <p className="prof-says prof-said-why">
-          {whoSaidTheReleaseReading(said, agentId, participants.status === 'ready' ? participants.value : undefined, zone)}
-        </p>
+    <Panel
+      declares={{ surface: 'profile.releases' }}
+      titleIs="label"
+      title={t('releaseReading.title')}
+      actions={said === null ? undefined : (
+        <Hint>{whoSaidTheReleaseReading(said, agentId, participants.status === 'ready' ? participants.value : undefined, zone)}</Hint>
       )}
-      {!mayChange ? null : editing ? (
+    >
+      <div className="prof-release-row">
+        <span className="prof-release-label" aria-hidden="true">{t('releaseReading.wake')}</span>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={wakes}
+          aria-label={t('releaseReading.wake')}
+          className="prof-release-switch"
+          disabled={!mayChange || editing || saving}
+          onClick={() => { setError(null); setEditing(true) }}
+        >
+          <span className="prof-release-knob" aria-hidden="true" />
+        </button>
+        <span className="prof-release-word" aria-hidden="true">{t(wakes ? 'releaseReading.switchOn' : 'releaseReading.switchOff')}</span>
+        {said === null ? <span className="prof-release-default">{t('switch.byDefault')}</span> : null}
+      </div>
+      {!mayChange || !editing ? null : (
         <form style={{ display: 'grid', gap: '0.75rem' }} onSubmit={(event) => {
           event.preventDefault()
           setSaving(true)
@@ -1137,10 +1190,6 @@ function ReleaseReading({ agentId, zone }: { agentId: string; zone: string | nul
           <Btn type="button" variant="ghost" onClick={() => setEditing(false)}>{t('releaseReading.cancel')}</Btn>
           {error === null ? null : <ErrorNote message={error.message} fault={error.fault} />}
         </form>
-      ) : (
-        <Btn variant="ghost" onClick={() => { setError(null); setEditing(true) }}>
-          {t(on ? 'releaseReading.turnOff' : 'releaseReading.turnOn')}
-        </Btn>
       )}
     </Panel>
   )

@@ -16,6 +16,10 @@
  *
  * Mutations tried against it, in tools/session-hook.mjs: where-you-stand sent before the one read; the role part dropped.
  * In this file: the startup's read not refused (the kept answer is then given); the compaction's read not slowed.
+ *
+ * THE AGENT HOLDS THE KEY ITS REGISTRATION GAVE, and both runs of the hook are given it. A session that names an
+ * agent and holds no key of it sends the name alone, and the office lets no name alone change a run, so the
+ * compaction this file counts could not be recorded without the key.
  */
 import { execFile } from 'node:child_process'
 import { mkdtempSync, rmSync } from 'node:fs'
@@ -58,6 +62,8 @@ let t: TestDb
 let server: Awaited<ReturnType<typeof apiApp>>
 let url = ''
 let scratch = ''
+/** The key the office gave AGENT when it was registered. Both runs of the hook are given it. */
+let agentsKey = ''
 /** Every request the office was sent, in the order it arrived. */
 const asked: string[] = []
 
@@ -75,11 +81,13 @@ async function runHook(conversation: string, source: string): Promise<{ out: str
     MOLE_OFFICE_WORKSPACE: WORKSPACE,
     MOLE_OFFICE_DB: t.file,
     MOLE_OFFICE_AGENT: AGENT,
+    MOLE_AGENT_KEY: agentsKey,
     HOME: scratch,
     MOLE_HOOK_DETAILS_FOLDER: join(scratch, 'details'),
   }
   delete env['TMUX_PANE']
   delete env['MOLE_OFFICE_SESSION']
+  delete env['MOLE_AGENT_KEY_FILE']
   // THE HOOK IS TIMED BY THE SHELL THAT STARTS IT, not by this process. This process is also the office, and while
   // the slowed door holds its thread, it cannot see the hook end until the door's work is done.
   const timed = 'began=$(date +%s%N); node "$0" start; status=$?; ended=$(date +%s%N); echo "HOOK-MS $(( (ended - began) / 1000000 ))" >&2; exit $status'
@@ -124,6 +132,8 @@ beforeAll(async () => {
     payload: { handle: AGENT, name: 'Compacted Agent', role: 'worker' },
   })
   expect(registered.statusCode, registered.body).toBe(201)
+  agentsKey = String((registered.json() as { whatToGiveIt?: { key?: string } }).whatToGiveIt?.key ?? '')
+  expect(agentsKey, 'the registration gave the agent no key').not.toBe('')
   const written = await server.app.inject({ method: 'PUT', url: `/api/agents/${AGENT}/handover`, headers: AS_THE_PERSON, payload: { text: HANDOVER } })
   expect(written.statusCode, written.body).toBe(200)
 }, 60_000)

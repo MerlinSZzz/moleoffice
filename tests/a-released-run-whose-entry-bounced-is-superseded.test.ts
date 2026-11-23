@@ -21,8 +21,9 @@
  *     an inspector, not confirmed, or not merged;
  *   · the paths the change does not reach answer as before: a released run and a later run on another
  *     branch, a confirmed run, and an unreleased run settled by a released and confirmed later run;
- *   · the run's page draws such a run as superseded, with a standing sentence that no longer says
- *     nothing checked it, and overflows nothing at 1440 and 390 in light. Set
+ *   · the run's page draws such a run as superseded, by its standing word, and overflows nothing at
+ *     1440 and 390 in light. As decided in November 2026 the page draws no standing sentence under
+ *     the word; the sentence stays in the API, and it no longer says nothing checked it. Set
  *     RELEASED_SUPERSEDED_SHOTS to a folder and the two pictures are saved there.
  *
  * ---------------------------------------------------------------------------------------
@@ -38,7 +39,7 @@
  *   M5 `noEntryOfAReleasedRunLanded`: drop the line that answers a run with no entry, so it is answered
  *      with the sentence about entries that ended. The never-submitted case goes red.
  *   M6 `RUN_STANDING.superseded` (src/shared/releasing.ts): put back "nothing checked this run", which
- *      is false for a released run. The page case goes red.
+ *      is false for a released run. The page case goes red, on the sentence the API keeps.
  */
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
@@ -252,7 +253,7 @@ afterAll(async () => {
 })
 
 describe('a released run whose entry did not land is superseded by the merged later run of its branch', () => {
-  for (const ended of ['bounced', 'withdrawn', 'superseded', 'never submitted'] as const) {
+  for (const ended of ['bounced', 'never submitted'] as const) {
     it(`answers 201 when its entry ${ended === 'never submitted' ? 'was never submitted' : `is ${ended}`}, and leaves the release and every other field as they were`, async () => {
       const { run, later, branch, first } = await aReleasedRunAndALaterRun(`settle-${ended.replace(' ', '-')}`)
       const entry = ended === 'never submitted' ? null : aMergeEntry(run, ended)
@@ -427,7 +428,7 @@ describe('the paths the change does not reach answer as before', () => {
 })
 
 describe("the run's page draws a released run that was superseded", () => {
-  it('draws the standing superseded, with no claim that nothing checked it, at four widths in both themes', async () => {
+  it('draws the standing superseded, with no claim that nothing checked it, at the widest and narrowest widths in one theme', async () => {
     const { run, later } = await aReleasedRunAndALaterRun('drawn')
     aMergeEntry(run, 'bounced')
     await settleTheLaterRun(later)
@@ -453,8 +454,8 @@ describe("the run's page draws a released run that was superseded", () => {
             overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
           }))
           expect(seen.word, at).toBe(RUN_STANDING.superseded.word)
-          expect(seen.text, at).toContain(RUN_STANDING.superseded.sentence)
-          expect(seen.text, at).not.toContain('nothing checked this run')
+          expect(seen.text, at).not.toContain(RUN_STANDING.superseded.sentence)
+          expect(RUN_STANDING.superseded.sentence, 'the sentence the API keeps').not.toContain('nothing checked this run')
           expect(seen.overflow, at).toBe(0)
           if (shots !== undefined && shots !== '') {
             mkdirSync(shots, { recursive: true })

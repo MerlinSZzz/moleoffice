@@ -10,12 +10,17 @@
  *
  * THE SHUTDOWN ITSELF IS INTERCEPTED here, so the test office keeps running; what it would do is
  * tests/a-shutdown-pauses-the-runs-at-work.test.ts. The runs in the lists are made up, and say so.
+ *
+ * A RUN WHOSE STATE THE SERVER COULD NOT TELL is listed like the others, with the state word "not known" beside it in
+ * the weight of the line's other parts. Which runs the server lists so is
+ * tests/a-run-whose-state-cannot-be-told-is-listed.test.ts.
  */
 import type { Page, Route } from 'playwright'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 
 import { liveApp, waitForThePage, type LiveApp } from './helpers.ts'
 import { enWave13n } from '../src/shared/words/en-wave-13n.ts'
+import { enWave13t } from '../src/shared/words/en-wave-13t.ts'
 import type { ALiveRun, TheLiveRunsReading, TheShutDownAnswer } from '../src/shared/shutting-down.ts'
 import { THE_TRAY_ASKS_TO_SHUT_DOWN } from '../src/config/the-window-mark.mjs'
 import { WORLD_HEADER } from '../src/config/world-header.mjs'
@@ -35,7 +40,7 @@ beforeAll(async () => {
 afterAll(async () => { await app?.stop() })
 
 /** A made-up run, labelled as one. */
-function aMadeUpRun(n: number): ALiveRun {
+function aMadeUpRun(n: number, state: 'running' | 'not known' = 'running'): ALiveRun {
   return {
     session: `made-up-run-${String(n)}`,
     workspaceId: 'default',
@@ -44,6 +49,7 @@ function aMadeUpRun(n: number): ALiveRun {
     since: `2026-10-11 09:0${String(n)}`,
     conversation: null,
     pausable: true,
+    state,
     says: 'A made-up run, for this test.',
   }
 }
@@ -104,7 +110,7 @@ it('shuts down at once with no runs at work, reading the runs from the server', 
 }, 120_000)
 
 it('lists the runs at work, warns, and shuts down only on the second press with the runs it showed', async () => {
-  const runs = [aMadeUpRun(1), aMadeUpRun(2)]
+  const runs = [aMadeUpRun(1), aMadeUpRun(2, 'not known')]
   const posted = await intercept(app.page, { pausable: runs, notPausable: [], mayPress: true, says: 'made up' })
   await openTheOffice(app.page)
   await app.page.locator('.sbp-shut-down').click()
@@ -115,6 +121,17 @@ it('lists the runs at work, warns, and shuts down only on the second press with 
   expect(await first.locator('.sd-run-agent').innerText()).toBe('made-up-agent-1')
   expect(await first.locator('.sd-run-message').innerText()).toBe('A made-up message 1')
   expect(await first.locator('.sd-run-since').innerText()).toContain('2026-10-11 09:01')
+  // THE RUN WHOSE STATE COULD NOT BE TOLD carries the state word, and only it, in the weight of the other parts.
+  const second = question.locator('.sd-run').nth(1)
+  expect(await first.locator('.sd-run-state').count()).toBe(0)
+  expect(await second.locator('.sd-run-state').innerText()).toBe(enWave13t['shutDown.stateNotKnown'])
+  const looks = (selector: string): Promise<string> =>
+    app.page.locator(selector).evaluate((element) => {
+      const style = getComputedStyle(element)
+      return [style.fontWeight, style.fontSize, style.color, style.backgroundColor, style.borderTopColor].join(' | ')
+    })
+  expect(await looks('.sd-run[data-session="made-up-run-2"] .sd-run-state')).toBe(await looks('.sd-run[data-session="made-up-run-2"] .sd-run-since'))
+  expect(await looks('.sd-run[data-session="made-up-run-2"]')).toBe(await looks('.sd-run[data-session="made-up-run-1"]'))
   expect(await question.locator('.sd-warn').innerText()).toBe(word('shutDown.warning'))
   expect(posted, 'nothing is pressed before the second question is answered').toEqual([])
 

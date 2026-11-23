@@ -7,7 +7,7 @@
 
 import { sqlite } from './client.ts'
 import { asAgent } from './read-participant.ts'
-import type { RegisteredAgent } from '../lib/participants.ts'
+import type { RegisteredAgent } from './types/participants.ts'
 
 /** The registry row a record of kind `agent` is, or null because nothing has mapped it. */
 export function agentForRecord(recordId: string): RegisteredAgent | null {

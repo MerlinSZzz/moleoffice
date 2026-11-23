@@ -6,7 +6,7 @@ import { afterAll, beforeAll, expect, it } from 'vitest'
 import type { AgentMessageView, AgentRunView, AgentThreadListView, AgentThreadView, ThreadDetail } from '../src/server/lib/agents.ts'
 import { pathFor } from '../src/web/components/router.tsx'
 import { THE_TEST_OFFICES_OWNER } from './a-page-of-a-test-office.ts'
-import { deleteTheCopiedDefaultChapters, deleteTheFiledCardWords, liveApp, waitForThePage, type LiveApp } from './helpers.ts'
+import { deleteTheCopiedDefaultChapters, deleteTheCopiedDefaultFlows, deleteTheFiledCardWords, liveApp, waitForThePage, type LiveApp } from './helpers.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { en } from '../src/shared/words/en.ts'
 import { zh } from '../src/shared/words/zh.ts'
@@ -100,6 +100,7 @@ beforeAll(async () => {
   // The default chapters a fresh office copies at its first start (wave 13s round 7) are module records
   // this test did not file, and it counts or draws modules, so it deletes them first.
   await deleteTheCopiedDefaultChapters(app.api)
+  await deleteTheCopiedDefaultFlows(app.api)
   // The five role card text records a fresh office files at its first start (wave 13w round 3) are records
   // this test did not file, and it counts the project's work, so they go too.
   await deleteTheFiledCardWords(app.api)

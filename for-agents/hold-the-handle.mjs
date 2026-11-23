@@ -127,8 +127,8 @@
  * (POST /api/office/visitors, confirmed at the Embassy), and every request it sends carries its
  * token on `x-mole-office-credential`. An agent confirmed since the key change also holds an agent
  * key of its own, travelling on `x-mole-office-key`. The waiter sends each of the two secrets when
- * it was given it, and else falls back to the office's own key file, which is beside the
- * database and therefore exists only on the machine the office runs on — the local case.
+ * it was given it. The key may instead come from the matching run's configuration; without an
+ * agent or run key the waiter refuses before sending anything.
  *
  * BOTH SECRETS ARE READ FROM FILES WHOSE PATHS THE ENVIRONMENT GIVES, AND NEVER FROM A COMMAND-LINE
  * FLAG. A key on a command line lands in the shell's history and in the process list, where anything
@@ -149,11 +149,9 @@ import { whereIsTheApi, whichAgent, whichWorkspace } from './where-is-the-api.mj
 import { ENV_FILE, REPO_ROOT, THE_FOR_AGENTS_FOLDER, THE_INSTALL, readSettingHere, settingValue, theInstallsNode, theInstallsNodeInALine } from '../src/config/settings.mjs'
 import { HOME_HEADER } from '../src/config/visit-headers.mjs'
 import { WORLD_HEADER, parseWorldHeader } from '../src/config/world-header.mjs'
-import { KEY_HEADER } from '../src/config/key-header.mjs'
 import { CREDENTIAL_HEADER } from '../src/config/visitor-headers.mjs'
-import { theOfficeKey } from '../src/config/office-key.mjs'
 import { theKeyARunsToolSends } from '../src/config/run-permissions.mjs'
-import { A_VISITORS_TOKEN, aSecretFromTheEnvironment, anAgentsToolHeaders, THE_AGENT_KEY } from './agent-key.mjs'
+import { A_VISITORS_TOKEN, aSecretFromTheEnvironment, anAgentsToolHeaders, theNoKeyLine, THE_AGENT_KEY } from './agent-key.mjs'
 import { CONNECTION_TAG_PARAM } from '../src/shared/events.ts'
 import {
   DELIVERY_ENVELOPE,
@@ -165,9 +163,12 @@ import {
   theRoutedLineFor,
 } from '../src/shared/messages.ts'
 import { whatTheWaiterDoes } from '../src/shared/waking.ts'
+import { AGENT_RUNTIMES, isAgentRuntime } from '../src/shared/participants.ts'
+import { readStoredWord } from '../src/shared/i18n.ts'
 import { THE_GROUPS_NEWS_AT_A_HAND_OVER } from '../src/shared/group-news.ts'
 import { THE_WAKE_LINE, whenAHandOverWakes } from './when-a-hand-over-wakes.mjs'
 import { theSessionProcessForTheWaiter } from '../src/config/session-process.mjs'
+import { THE_KEY_FILE_ENTRY_SAYS, aConversationANoteCanName, theSessionNote, writeTheSessionNote } from '../src/config/the-session-note.mjs'
 
 /**
  * HOW TO RUN THIS TOOL AGAIN, as the line after a hand-over prints it. From a checkout it is run from the
@@ -187,22 +188,16 @@ const THIS_TOOL_AS_A_COMMAND =
  * key goes on the key header under this waiter's own handle, `AGENT`, and so does a key read from the
  * file MOLE_AGENT_KEY_FILE names.
  *
- * ONLY WHEN THE AGENT HOLDS NO KEY does the office's own key go instead, as it did before. The hold,
- * took, process and release doors refuse a request a listener carried with no key the office knows,
- * and the secretary's waiter holds no key of its own yet. THIS FALLBACK GOES ONCE EACH AGENT HOLDS ITS OWN KEY
- * . The office's key is read here per request, as it always was, because a
- * waiter may start before the office has made its key file and should pick it up the day it appears.
- *
- * The visitor credential goes beside either, when this waiter was given one.
+ * When the agent holds no key of its own, its run's key may be read from its tool configuration.
+ * Without either key the waiter refuses before sending. The visitor credential goes alongside the
+ * key when this waiter was given one.
  *
  * @returns {Record<string, string>}
  */
 function theCallerHeaders() {
   const named = anAgentsToolHeaders({ self: AGENT, withoutAKey: AGENT, key: AGENT_KEY })
-  const officeKey = named[KEY_HEADER] === undefined ? theOfficeKey().key : null
   return {
     ...named,
-    ...(officeKey === null ? {} : { [KEY_HEADER]: officeKey }),
     ...(CREDENTIAL_TOKEN === null ? {} : { [CREDENTIAL_HEADER]: CREDENTIAL_TOKEN }),
   }
 }
@@ -300,7 +295,10 @@ if (argv.includes('--help') || argv.includes('-h')) {
       '  --api        where Mole Office is. Without it, the address .env declares.',
       '  --workspace  which project. Without it, the project is taken from the session record, then from',
       '               the agent record, and from .env last; the first line printed says which it used.',
-      '  --runtime    claude-code, codex or opencode. Without it, claude-code.',
+      '  --runtime    the harness serving this session, by its own name. Any harness\'s word is taken. Mole',
+      `               Office can start ${AGENT_RUNTIMES.join(', ')} itself; for any other word this waiter holds the`,
+      '               heartbeat and waits for messages. Without it, the session record\'s runtime word, and',
+      '               claude-code only when the record names none.',
       '  --wake       for an opencode session: http://127.0.0.1:<the --port it was started with>.',
       '  --kept-by-the-kit  the kit’s waiter runs this tool in a loop and will run it again itself. With',
       '               this, a hand-over says so instead of telling the session to start another waiter.',
@@ -312,8 +310,8 @@ if (argv.includes('--help') || argv.includes('-h')) {
       'x-mole-office-credential). MOLE_AGENT_KEY_FILE is the full path of the file holding your own agent key',
       '(sent on x-mole-office-key); for a visitor that is the same token file. Each file must be yours, of',
       'mode 600. MOLE_OFFICE_CREDENTIAL and MOLE_AGENT_KEY may hold the values instead, but never beside their',
-      'files. An agent on the machine the office runs on needs neither; the office key file beside its',
-      'database answers there.',
+      'files. The matching run can supply its key through MOLE_OFFICE_TOOL_CONFIGURATION instead.',
+      'Without an agent key or run key this waiter sends nothing.',
       '',
       'It holds the handle, says every few seconds that this session is still there, and waits. When a message',
       'addressed to that agent arrives it prints it and exits, which is what wakes the session that started it.',
@@ -374,13 +372,8 @@ const THE_VISITORS_CREDENTIAL = {
  * this waiter's environment or a child's. MOLE_OFFICE_CREDENTIAL and
  * MOLE_AGENT_KEY may still hold the values themselves; a value beside its file is refused. A key on a command line is
  * in every process list on this machine, so no flag takes either; a secret printed is copied into a transcript. The
- * office's own key, the third and local way of proving something, is the file beside the database, which
- * `theCallerHeaders` reads per request.
- *
- * A NULL HERE IS A REAL ANSWER AND NOT A FAULT: an agent on the machine the office runs on holds
- * neither, and today it still works under the window. What may not happen is a caller with none of
- * the three pointed at an office on another machine, which is the refusal below. A file that cannot
- * be used stops the waiter here, before it asks anything.
+ * When no agent key is given, the run's own configuration may supply its key. A file that cannot
+ * be used stops the waiter here, before it asks anything; with no key the refusal below stops it.
  */
 const NOTHING_ASKED = 'This waiter asked nothing and wrote nothing.'
 let CREDENTIAL_TOKEN = null
@@ -392,6 +385,13 @@ try {
   process.stderr.write(`${why instanceof Error ? why.message : String(why)}\n`)
   await writeThenExit(2, 'error: a secret this waiter was given could not be used')
 }
+/**
+ * THE FULL PATH OF THE FILE THIS WAITER'S AGENT KEY CAME FROM, or null when the key did not come from a file. A value
+ * beside its file is refused above, and a file named by a path that is not a full one too, so a key read while the file
+ * variable is set came from that file. It goes into the session's note once the office has taken the hold
+ * (`noteTheKeyFileForTheHook`), beside the address of the office that took it, `API`, and neither is printed.
+ */
+const AGENT_KEY_FILE = AGENT_KEY !== null && (process.env[THE_AGENT_KEY.file] ?? '') !== '' ? String(process.env[THE_AGENT_KEY.file]) : null
 const NAMED_WORKSPACE = flag('workspace')
 /**
  * WHICH PROJECT THIS WAITER SPEAKS FOR, RESOLVED BELOW BEFORE ANYTHING IS ASKED OF MOLE OFFICE.
@@ -414,13 +414,17 @@ if (runsKey?.key) AGENT_KEY = runsKey.key
 const MACHINE = process.env.HOSTNAME ?? hostname()
 
 /**
- * WHICH TOOL THIS SESSION IS A SESSION OF.
+ * WHICH HARNESS THIS SESSION IS A SESSION OF.
  *
- * It is claude-code unless the caller says otherwise, and `--runtime` is how Codex and OpenCode
- * sessions say so. There is no sniffing of the process tree: a wrong answer here would put a wrong
- * word on a screen a person reads, and the caller always knows.
+ * `--runtime` wins. Without it, the session record's own runtime word is taken once the record is read, and only
+ * when the record names none is it claude-code. There is no sniffing of the process tree: a wrong answer here would
+ * put a wrong word on a screen a person reads. Any harness's word is taken: the office can start some of them itself,
+ * and this waiter holds the heartbeat for every one.
  */
-const RUNTIME = flag('runtime') ?? 'claude-code'
+const NAMED_RUNTIME = flag('runtime')
+let RUNTIME = NAMED_RUNTIME ?? 'claude-code'
+/** The runtime word the session record names, or null because it names none or could not be read. */
+let theSessionsRuntime = null
 
 /**
  * TRUE WHEN THE KIT'S WAITER IS THE CALLER, AND IT WILL RUN THIS TOOL AGAIN BY ITSELF.
@@ -506,40 +510,9 @@ if (SESSION === null) {
 // out why it gave no key; its words are printed as they are rather than matched here, so a change in
 // that reader reaches this refusal instead of leaving a wrong summary behind. The path is this
 // environment's value as it is, so replacing that value leaves no path in anything printed.
-if (AGENT_KEY === null && theOfficeKey().key === null) {
-  const why = runsKey?.why ?? 'it was not used'
-  const configuration = process.env.MOLE_OFFICE_TOOL_CONFIGURATION
-  const detail = configuration
-    ? why.replaceAll(configuration, 'named by MOLE_OFFICE_TOOL_CONFIGURATION')
-    : why
-  process.stderr.write(`No MOLE_AGENT_KEY or MOLE_AGENT_KEY_FILE is available (a remote visitor also needs MOLE_OFFICE_CREDENTIAL_FILE), and the run's office tool file named by MOLE_OFFICE_TOOL_CONFIGURATION was missing or not used (${detail}); the run's starter can fix this by starting the run again through tools/sandbox.mjs, which writes that file.\n`)
+if (AGENT_KEY === null) {
+  process.stderr.write(`${theNoKeyLine(runsKey?.why ?? 'it was not used', process.env)}\n`)
   await writeThenExit(2)
-}
-
-/**
- * HOLDING NOTHING AND CALLING AN OFFICE ON ANOTHER MACHINE, SO THIS SAYS IT AND STOPS.
- *
- * With neither a credential nor an agent key nor an office key file, every request this waiter
- * would send is a request under nobody's name. A caller pointed at the loopback still works under
- * the one-version window, so nothing changes there. Closing that window is their press under P83 point 6,
- * and this tool does not do it here. Pointed at an address a loopback
- * cannot name, the office on the other end measures the caller the registration door does, and the
- * sentence below says what actually makes a visiting agent work: a confirmed credential and the
- * agent key bound to it, both read from the token file.
- */
-if (CREDENTIAL_TOKEN === null && AGENT_KEY === null && theOfficeKey().key === null && !isAlikeLoopback(API)) {
-  process.stderr.write(
-    'Mole Office is at ' +
-      API +
-      ', which is not this machine, and this waiter holds neither the visitor credential (MOLE_OFFICE_CREDENTIAL_FILE) ' +
-      'nor an agent key (MOLE_AGENT_KEY_FILE) nor the office key file, so it could only call under nobody’s name — ask ' +
-      'the person to confirm a visitor credential for your handle, set both variables to the full path of your token ' +
-      'file, and start this again, which holds nothing and writes nothing here.\n',
-  )
-  await writeThenExit(
-    2,
-    'error: Mole Office is at ' + API + ', which is not this machine, and no credential or agent key is held',
-  )
 }
 
 // ------------------------------------------------------------------ talking to Mole Office
@@ -623,7 +596,9 @@ async function projectOfTheRecord(path, because) {
   if (seen === null) return { id: null, because: null, why: 'Mole Office did not answer' }
   if (seen.status === 200) {
     const id = seen.body?.workspaceId
-    if (typeof id === 'string' && id !== '') return { id, because, why: null }
+    // A SESSION'S OWN RUNTIME WORD comes with where it is, and the waiter takes it when no --runtime was named.
+    const runtime = typeof seen.body?.runtime === 'string' && seen.body.runtime.trim() !== '' ? seen.body.runtime : null
+    if (typeof id === 'string' && id !== '') return { id, because, why: null, runtime }
     return { id: null, because: null, why: `the reply for ${path} named no project` }
   }
   const elsewhere = seen.body?.elsewhere?.workspaceId
@@ -659,6 +634,7 @@ async function projectOfTheAgent() {
 async function resolveTheProject() {
   // ONLY WHERE THE RECORD IS: a run's whole record answered 30 MB, and the waiter needs its project alone.
   const fromTheSession = await projectOfTheRecord(`/api/records/${encodeURIComponent(SESSION)}?shape=where`, 'the session record')
+  theSessionsRuntime = fromTheSession.runtime ?? null
   if (NAMED_WORKSPACE !== null) {
     if (fromTheSession.id !== null && fromTheSession.id !== NAMED_WORKSPACE) {
       return {
@@ -756,6 +732,13 @@ WORKSPACE = project.id
  */
 if (!AGAIN) process.stdout.write(`Project "${WORKSPACE}" taken from ${project.because}.\n`)
 
+// THE SESSION RECORD'S RUNTIME WORD, WHEN NO --runtime WAS NAMED. It is said once when it is not claude-code, which is
+// the word this waiter took before it read the record, so a reader can tell where another word came from.
+if (NAMED_RUNTIME === null && theSessionsRuntime !== null) {
+  RUNTIME = theSessionsRuntime
+  if (!AGAIN && RUNTIME !== 'claude-code') process.stdout.write(`Runtime "${RUNTIME}" taken from the session record.\n`)
+}
+
 process.on('SIGINT', () => void letGo('the session stopped the waiter'))
 process.on('SIGTERM', () => void letGo('the session stopped the waiter'))
 
@@ -794,6 +777,8 @@ takingHold = false
 // A RUN THAT HAS ENDED IS HELD AS THE LIVE RUN OF ITS CONVERSATION: every later call names the run the hold is on.
 if (typeof held.body?.hold?.session === 'string' && held.body.hold.session !== '') SESSION = held.body.hold.session
 if (typeof held.body?.endedRunAsked?.says === 'string') process.stdout.write(`${held.body.endedRunAsked.says}\n`)
+// A HARNESS THE OFFICE CANNOT START: the hold's answer says so in one sentence, printed once.
+if (!AGAIN && typeof held.body?.cannotStart === 'string') process.stdout.write(`${held.body.cannotStart}\n`)
 // The successful hold names the agent by its registry id. Its handle is only the address used
 // to take the hold; routing compares stored participant references.
 const theHeldAgent = held.body?.hold?.agent
@@ -803,15 +788,6 @@ if (theHeldAgent?.kind !== 'agent' || typeof theHeldAgent.id !== 'string' || the
 }
 if (stopAfterHold !== null) await letGo(stopAfterHold)
 
-/**
-
-/**
- * WHAT THIS SESSION'S TOOL LETS A MESSAGE DO, read from the measurements once.
- *
- * AFTER THE HOLD, because the hold is what checks that `--runtime` is a word this product has an
- * adapter for. Asking the table about a word nobody declared would be asking about a runtime that
- * does not exist.
- */
 /**
  * HOW LONG THIS WAITS BEFORE TRYING AGAIN WHEN MOLE OFFICE IS NOT ANSWERING, and how long it will
  * ever wait.
@@ -874,6 +850,10 @@ function endTheConnection() {
   }
 }
 
+/**
+ * WHAT THIS SESSION'S HARNESS LETS A MESSAGE DO, read from the measurements once. For a harness nobody has
+ * measured the answer is "not known", and the sentence printed says so rather than promising a wake.
+ */
 const WAKING = whatTheWaiterDoes(RUNTIME, WAKE_AT)
 
 const beatEvery = Number(held.body.beatEvery ?? settingValue('MOLE_OFFICE_HANDLE_BEAT_SECONDS'))
@@ -914,9 +894,13 @@ if (!AGAIN) {
  * line.
  */
 async function recordThisSessionsProcess() {
-  // ONLY A CLAUDE-CODE SESSION HAS A CLAUDE PROCESS. Nothing is printed for the other two runtimes:
-  // a line about a reading that was never going to be made says nothing.
-  if (RUNTIME !== 'claude-code') return
+  // ONLY A CLAUDE-CODE SESSION HAS A CLAUDE PROCESS. Nothing is printed for the other runtimes the office has an
+  // adapter for: a line about a reading that was never going to be made says nothing. For any other harness one line
+  // says this waiter cannot read its process and goes on holding the heartbeat, so it is never told to stop.
+  if (RUNTIME !== 'claude-code') {
+    if (!AGAIN && !isAgentRuntime(RUNTIME)) process.stdout.write(`${readStoredWord('devWords.waiter.harnessNotRead', { runtime: RUNTIME })}\n`)
+    return
+  }
   if (!isAlikeLoopback(API)) {
     process.stdout.write(
       'This waiter cannot tell that Mole Office is on this machine, so it recorded no process: a process ' +
@@ -969,6 +953,57 @@ async function recordThisSessionsProcess() {
         : "found through CLAUDE_PID in this waiter's environment.\n"),
   )
 }
+
+/**
+ * TELL THE SESSION'S NOTE WHICH FILE THIS WAITER'S AGENT KEY IS IN, AND WHICH OFFICE IT HOLDS ITS HANDLE ON, so a
+ * session hook that asks that same office sends the agent's key at a compaction, a stop and an end
+ * (src/config/the-session-note.mjs). A session started by hand names its agent and holds no key of it, and the office
+ * lets no name alone stamp, change or end a run. The office is `API`, as this waiter asked it, written at the same
+ * moment as the path and only then: the hook sends the key to no other office.
+ *
+ * Only after the office has taken the hold, and only when the key came from a file, CLAUDE_CODE_SESSION_ID names a
+ * conversation, and that conversation's note names the record this waiter holds its handle on. Every other entry of the
+ * note is kept, and the note is written only through its one writer. No note is ever made here, and no CLAUDE_PID is
+ * read. When the key came from a file and nothing was written, one line says why. When the path was written, one line
+ * says so, left out when the waiter starts again. Neither line names the path, the office's address or the key.
+ */
+function noteTheKeyFileForTheHook() {
+  if (AGENT_KEY_FILE === null) return
+  const conversation = process.env['CLAUDE_CODE_SESSION_ID']
+  if (!aConversationANoteCanName(conversation)) {
+    process.stdout.write(`${THE_KEY_FILE_ENTRY_SAYS.noConversation}\n`)
+    return
+  }
+  const note = theSessionNote(conversation)
+  if (note === null) {
+    process.stdout.write(`${THE_KEY_FILE_ENTRY_SAYS.noNote}\n`)
+    return
+  }
+  if (note.id !== SESSION) {
+    process.stdout.write(`${THE_KEY_FILE_ENTRY_SAYS.anotherRecord}\n`)
+    return
+  }
+  const now = new Date()
+  const pad = (/** @type {number} */ n) => String(n).padStart(2, '0')
+  const at = note.at ?? `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`
+  try {
+    writeTheSessionNote(conversation, note.id, at, note.supersedes, {
+      workspace: note.workspace,
+      supersedesWorkspace: note.supersedesWorkspace,
+      supersededBecause: note.supersededBecause,
+      childOf: note.childOf,
+      agentKeyFile: AGENT_KEY_FILE,
+      agentKeyOffice: API,
+    })
+  } catch (why) {
+    const code = /** @type {NodeJS.ErrnoException} */ (why)?.code
+    process.stdout.write(`${THE_KEY_FILE_ENTRY_SAYS.notWritten(typeof code === 'string' ? code : 'no reason given')}\n`)
+    return
+  }
+  if (!AGAIN) process.stdout.write(`${THE_KEY_FILE_ENTRY_SAYS.written}\n`)
+}
+
+noteTheKeyFileForTheHook()
 
 await recordThisSessionsProcess()
 
@@ -1485,7 +1520,9 @@ async function wakeTheSessionWith(waitingRows) {
       // print --workspace only when the message came from another project, so a secretary in another
       // project copied a command that failed with "is in another project". The workspace this waiter
       // resolved is known here, so the copyable command names it and only it.
-      `    ${THIS_TOOL_AS_A_COMMAND} --agent ${AGENT} --session ${SESSION} --workspace ${WORKSPACE}`,
+      // A NAMED --runtime IS CARRIED ON, so the waiter started again holds in the same harness.
+      `    ${THIS_TOOL_AS_A_COMMAND} --agent ${AGENT} --session ${SESSION} --workspace ${WORKSPACE}` +
+        (NAMED_RUNTIME === null ? '' : ` --runtime ${NAMED_RUNTIME}`),
       'Until then this session still holds the handle: nothing is lost, and no run answers in your place.',
     )
   }

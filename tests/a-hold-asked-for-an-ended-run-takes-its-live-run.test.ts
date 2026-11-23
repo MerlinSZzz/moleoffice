@@ -35,6 +35,7 @@
  */
 import type { ChildProcess } from 'node:child_process'
 import { spawn } from 'node:child_process'
+import { dirname } from 'node:path'
 import type { AddressInfo } from 'node:net'
 import { fileURLToPath } from 'node:url'
 
@@ -44,7 +45,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { theLiveSessionTookIt } from '../src/shared/handles.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { THE_TEST_FIXTURE_ROOT } from './a-page-of-a-test-office.ts'
-import { apiApp, freshDb, one, type TestDb } from './helpers.ts'
+import { apiApp, freshDb, one, aTestAgentsKeyEnvironment, type TestDb } from './helpers.ts'
 
 const HANDLE = 'late-hand'
 const ANOTHER_PROJECT = 'another-project'
@@ -53,6 +54,7 @@ let t: TestDb
 let app: FastifyInstance
 let api = ''
 let agentId = ''
+let keyEnv: NodeJS.ProcessEnv = {}
 const started: ChildProcess[] = []
 
 const AS_THE_OWNER = {
@@ -168,13 +170,7 @@ beforeAll(async () => {
   api = `http://127.0.0.1:${String((app.server.address() as AddressInfo).port)}`
   const { createWorkspace } = await import('../src/server/lib/workspaces.ts')
   createWorkspace({ id: ANOTHER_PROJECT, title: 'Made-up other project' })
-  t.api.createRecord({
-    workspaceId: 'default',
-    kind: 'agent',
-    title: 'Late Hand',
-    data: { handle: HANDLE, runtime: 'claude-code', state: 'active' },
-    actor: { type: 'human', id: THE_PERSON },
-  })
+  keyEnv = await aTestAgentsKeyEnvironment(app, HANDLE, dirname(t.file))
   const listed = (await app.inject({ method: 'GET', url: '/api/participants', headers: AS_THE_OWNER })).json() as {
     agents?: { id: string; handle: string }[]
   }
@@ -371,7 +367,7 @@ describe('the waiter started with an ended run', () => {
         '--workspace',
         'default',
       ],
-      { env: { ...process.env, MOLE_OFFICE_HANDLE_BEAT_SECONDS: '1' } },
+      { env: { ...keyEnv, MOLE_OFFICE_HANDLE_BEAT_SECONDS: '1' } },
     )
     started.push(child)
     let printed = ''

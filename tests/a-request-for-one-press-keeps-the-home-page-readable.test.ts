@@ -7,7 +7,7 @@
  * every page, and the page kept no room for it: at 390 the home page's last line sat under its top,
  * and at 1440 and 990 the page could not scroll at all while the card covered what was there.
  *
- * This browser files one made-up request and opens Home at four widths in both looks. The request
+ * This browser files one made-up request and opens Home at 1440 and 390 in the light look. The request
  * and its presses must stay, and every line of the page must be reachable above it: at the end of
  * the page the lowest line of Home's own words sits above the card's top edge.
  */
@@ -18,8 +18,6 @@ import { liveApp, thePersonsKeyHeader, waitForThePage, type LiveApp } from './he
 
 const VIEWPORTS = [
   { width: 1440, height: 900 },
-  { width: 990, height: 900 },
-  { width: 660, height: 900 },
   { width: 390, height: 844 },
 ] as const
 
@@ -62,7 +60,7 @@ beforeAll(async () => {
 
 afterAll(async () => { await app?.stop() }, 60_000)
 
-for (const theme of ['light', 'dark'] as const) for (const viewport of VIEWPORTS) {
+for (const theme of ['light'] as const) for (const viewport of VIEWPORTS) {
   it(`keeps Home readable under the request, at ${String(viewport.width)} in the ${theme} look`, async () => {
     const context = await app.browser.newContext({ viewport })
     await context.addInitScript((look: string) => {

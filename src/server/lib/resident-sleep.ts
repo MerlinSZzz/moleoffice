@@ -8,7 +8,7 @@
  * reported to the person and shows on the agent's chat side and on its profile.
  *
  * A sleep is an act the resident or the person records: begin, wake, postpone. The rows are in `resident_sleeps`
- * (migration 0233). The person's decision of 6 November 2026 adds a secretary's own sleep time: the time of day its
+ * (migration 0233). The person's decision of 6 November 2026 adds a resident's own sleep time: the time of day its
  * sleep begins and how long it lasts, on the office's clock, kept on its agent row (migration 0330). The minute timer
  * in src/server/lib/sleep-windows.ts begins a sleep when that time opens and ends it when it is over; such a sleep
  * names when it ends (`wakesAt`) and the message the office sent when it began (`reminderId`). This file works out
@@ -128,7 +128,7 @@ export function heldWhileItSleeps(handle: string, since: string | null, theRemin
 /** What the waiting door adds to its note when it hands a resident asleep the reminder that began its sleep. */
 export const THE_REMINDER_IS_HANDED_OVER_TOO = 'The reminder Mole Office sent when the sleep began is handed over too.'
 
-// ============================================================================ a secretary's own sleep time
+// ============================================================================ a resident's own sleep time
 
 /** A sleep time as it is kept: the time of day it begins, as HH:MM on the office's clock, and how many minutes it lasts. */
 export interface ASleepTime {
@@ -204,7 +204,7 @@ export function theSleepTimeOf(agentId: string, at: number = Date.now()): TheSle
 
 /**
  * WRITE ONE AGENT'S SLEEP TIME, the one UPDATE of these four columns. Who may set it, and whether the agent is a
- * secretary that is a resident, is asked in src/server/lib/residents.ts. The time is kept as given: the door has already
+ * resident that is not retired, is asked in src/server/lib/residents.ts. The time is kept as given: the door has already
  * read it as HH:MM and checked the minutes.
  */
 export function writeTheSleepTime(agentId: string, time: ASleepTime, setBy: ParticipantRef['kind']): void {

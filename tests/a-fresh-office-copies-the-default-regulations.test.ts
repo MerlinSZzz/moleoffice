@@ -24,10 +24,10 @@
  *   6. on a real start: the first start copies, the page draws the chapters, a chapter changed through
  *      the page's own request stays changed after a restart, and the restart copies nothing.
  *
- * THE PICTURES. The real start photographs the page with the marked rule on it at each width in the
- * light and dark looks, in English, and once in Chinese, into the folder TEST_SHOTS names
- * (tests/where-shots-go.ts). The four-width, two-language sweep of the page without the mark was
- * dropped: the page check above it already reads what the page draws.
+ * THE PICTURES. The real start photographs the page with the marked rule on it at 1440 in the light
+ * look, in English and in Chinese, into the folder TEST_SHOTS names (tests/where-shots-go.ts). The
+ * four-width, two-language sweep of the page without the mark was dropped: the page check above it
+ * already reads what the page draws.
  *
  * WHAT IS REAL HERE. The migrations, the record door, the server's own start and the page are real.
  * Every database is a temporary one this file makes; nothing reaches the live office.
@@ -42,6 +42,7 @@ import { THE_PERSON } from '../src/shared/person.ts'
 import { A_CHAPTER } from '../src/shared/office-rules.ts'
 import { DEFAULT_WORKSPACE } from '../src/shared/workspaces.ts'
 import { testShots } from './where-shots-go.ts'
+import { theWordAPageDraws } from './words-waiting-for-translation.ts'
 import type { WhatTheOfficeRegulationsSay } from '../src/shared/office-rules.ts'
 
 const REPO = join(import.meta.dirname, '..')
@@ -321,21 +322,20 @@ describe('a real start of a fresh office, and a restart', () => {
         ask(first.api, '/api/office-regulations/only-this-office', { method: 'POST', body: JSON.stringify({ chapter: one.id, rule: one.outline[0]!.id, only }) })
       const marked = await marking(true)
       expect(marked.status, await marked.clone().text()).toBe(200)
-      for (const [lang, widths] of [['en', [1440, 990, 660, 390]], ['zh', [1440]]] as const) {
-        for (const width of widths) {
-          for (const scheme of ['light', 'dark'] as const) {
-            await first.page.setViewportSize({ width, height: 1000 })
-            await first.page.emulateMedia({ colorScheme: scheme })
-            await first.page.goto('about:blank')
-            await first.page.goto(`${first.site}/?lang=${lang}#/regulations`, { waitUntil: 'domcontentloaded', timeout: 60_000 })
-            await first.page.reload({ timeout: 60_000 })
-            await waitForThePage(first.page, 60_000)
-            const text = await first.page.locator('main').innerText()
-            expect(text).toContain(lang === 'en' ? 'Only for this office: a new office does not get this rule.' : '只用于这个办公室：新办公室不会得到这一条。')
-            await first.page.locator('.ofc-rule-only').first().scrollIntoViewIfNeeded()
-            await first.page.screenshot({ path: join(shots, `regulations-marked-${String(width)}-${lang}-${scheme}.png`) })
-          }
-        }
+      // The mark is read in each language at one width and in one look: the words it adds do not depend on either.
+      const width = 1440
+      const scheme = 'light'
+      for (const lang of ['en', 'zh'] as const) {
+        await first.page.setViewportSize({ width, height: 1000 })
+        await first.page.emulateMedia({ colorScheme: scheme })
+        await first.page.goto('about:blank')
+        await first.page.goto(`${first.site}/?lang=${lang}#/regulations`, { waitUntil: 'domcontentloaded', timeout: 60_000 })
+        await first.page.reload({ timeout: 60_000 })
+        await waitForThePage(first.page, 60_000)
+        const text = await first.page.locator('main').innerText()
+        expect(text).toContain(theWordAPageDraws(lang, 'regulationsPage.onlyForThisOffice'))
+        await first.page.locator('.ofc-rule-only').first().scrollIntoViewIfNeeded()
+        await first.page.screenshot({ path: join(shots, `regulations-marked-${String(width)}-${lang}-${scheme}.png`) })
       }
       const unmarked = await marking(false)
       expect(unmarked.status, await unmarked.clone().text()).toBe(200)

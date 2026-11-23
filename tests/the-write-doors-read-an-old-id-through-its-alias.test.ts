@@ -59,7 +59,7 @@ import { THE_OWNER } from '../src/shared/kinds.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { THE_SECRETARY, THE_SUPERVISOR, THE_WORKER } from '../src/shared/roles.ts'
 import { THE_TEST_OFFICES_OWNER } from './a-page-of-a-test-office.ts'
-import { apiApp, freshDb, type TestDb } from './helpers.ts'
+import { apiApp, freshDb, type TestDb, governsTheWholeProject } from './helpers.ts'
 
 const A_MADE_UP_OFFICE_KEY = randomBytes(32).toString('hex')
 const A_MADE_UP_PERSON_KEY = randomBytes(32).toString('hex')
@@ -146,7 +146,7 @@ async function aDecision(words: string): Promise<string> {
   const filed = await call('POST', '/api/records', PERSON, {
     kind: 'decision',
     title: 'A made-up decision for duties',
-    data: { option_taken: words, because: 'A made-up reason.', decided_by: THE_OWNER, replaces: [] },
+    data: { option_taken: words, because: 'A made-up reason.', decided_by: THE_OWNER, ...governsTheWholeProject(), replaces: [] },
   })
   expect(filed.status, filed.raw).toBe(201)
   return String(filed.body.record.id)

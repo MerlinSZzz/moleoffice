@@ -125,7 +125,9 @@ export interface ReportSummary {
   /** The stored path the form came from, such as `data.shortForms.gist`. Null when there is none. */
   field: string | null
   /**
-   * WHICH AGENT OR PERSON WROTE THIS FORM, by actor id, or null where nobody recorded one.
+   * WHICH AGENT OR PERSON WROTE THIS FORM, by registry id, or null where nobody recorded one. Where
+   * no registry row was found, or the form was stored before writers were stored by id, it is the
+   * actor id.
    *
    * A summary of a report records who produced it.
    * Read off the stored form, which is the only place it is written.

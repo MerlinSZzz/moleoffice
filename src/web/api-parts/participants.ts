@@ -104,7 +104,7 @@ export const participantsDoors = {
       shortcuts?: ShortcutSettings | null
       /** The person's own labels for the messages they write, in their order, unreadable with the reader's sentences, or null for none. */
       chatLabels?: TheStoredMessageLabels
-      /** The person's own settings for the two shipped flags and 'No mark', or null for every default; migration 0346. */
+      /** The person's own settings for the four shipped flags and 'No mark', or null for every default; migration 0346. */
       shippedFlags?: import('@shared/intent-mark.ts').StoredShippedFlags | null
       /** The person's look and own themes, or null for none; theirs alone (migration 0347). */
       themes?: import('@shared/own-themes.ts').TheLook | null

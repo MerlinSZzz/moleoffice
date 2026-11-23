@@ -34,8 +34,9 @@ import { aSecretaryWithItsOwnKey } from './runtime-settings.ts'
 
 const LIVE_RUNS_NOTE =
   'THE RUNS AT WORK ON THIS MACHINE, in every project, as a shutdown would find them. `pausable` ' +
-  'is every agent run Mole Office started whose process is still going, with the agent, the message it is ' +
-  'answering, when it started and its conversation id. `notPausable` is every session Mole Office did not start ' +
+  'is every agent run Mole Office started whose process is still going, or whose reading cannot tell whether it is, ' +
+  'with the agent, the message it is answering, when it started and its conversation id. Each run\'s `state` is ' +
+  '`running`, or `not known` where the reading could not tell. `notPausable` is every session Mole Office did not start ' +
   'that still has a live process — a terminal a person is working in — which a shutdown cannot pause and which ' +
   'keeps running after it. `mayPress` says whether this caller may press the shutdown, by the same check the press ' +
   'asks, so a page does not offer a press the door would refuse. Writes nothing.'
@@ -52,7 +53,8 @@ const SHUT_DOWN_NOTE =
   '`paused` with who asked, when and why, and says so on the message it was answering. A paused run keeps its ' +
   'conversation id and is never carried on by itself: it waits for a press. Then the server shuts down through ' +
   'its one way out, after this answer is sent. With no run at work it shuts down at once. A run that survives ' +
-  'its stop signal is reported as still running and not called paused. Sessions Mole Office did not start are ' +
+  'its stop signal is reported as still running and not called paused. A run whose state cannot be told is listed, ' +
+  'goes to the same stop, and is called paused only once it is read gone. Sessions Mole Office did not start are ' +
   'listed and left running. This is not `mole-office stop`, which leaves every run going for the next start to ' +
   'pick up.'
 
@@ -129,13 +131,19 @@ export async function shutdownRoutes(app: FastifyInstance): Promise<void> {
     // no press row. The shutdown is named beside the route's own read: a row this office set for the shutdown is what
     // decides, and the card keeps it until the office says otherwise.
     const mayPress = thePersonIsProved(actor) || mayPressForThePerson(actor, false, { also: ['office.shut-down'] }).may
+    const notKnown = live.pausable.filter((run) => run.state === 'not known').length
     return {
       ...live,
       mayPress,
       says:
         live.pausable.length === 0
           ? 'No agent run Mole Office started is at work, so a shutdown would close at once.'
-          : `${String(live.pausable.length)} agent ${live.pausable.length === 1 ? 'run is' : 'runs are'} at work, and a shutdown would pause ${live.pausable.length === 1 ? 'it' : 'them'} first.`,
+          : `${String(live.pausable.length)} agent ${live.pausable.length === 1 ? 'run is' : 'runs are'} at work, and a shutdown would pause ${live.pausable.length === 1 ? 'it' : 'them'} first.` +
+            (notKnown === 0
+              ? ''
+              : live.pausable.length === 1
+                ? ' Whether it still runs cannot be told.'
+                : ` Whether ${String(notKnown)} of them still ${notKnown === 1 ? 'runs' : 'run'} cannot be told.`),
     }
   })
 
@@ -198,7 +206,7 @@ export async function shutdownRoutes(app: FastifyInstance): Promise<void> {
           paused.length === 0
             ? 'No agent run Mole Office started was at work, so Mole Office is shutting down at once.'
             : `${String(paused.length - stillRunning.length)} of ${String(paused.length)} agent runs were paused, and Mole Office is shutting down.` +
-              (stillRunning.length === 0 ? '' : ` ${String(stillRunning.length)} did not stop and are still running; each says why.`),
+              (stillRunning.length === 0 ? '' : ` ${String(stillRunning.length)} ${stillRunning.length === 1 ? 'was' : 'were'} not paused; each says why.`),
       }
     },
   )

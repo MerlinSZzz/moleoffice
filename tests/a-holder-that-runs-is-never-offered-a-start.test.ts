@@ -110,6 +110,8 @@ async function aStandIn(socketPath: string, database: string, mode: Mode, asker:
 }
 
 let place: Place
+/** The page's stack. It starts before the scratch server, which is told its web port. */
+let app: LiveApp | null = null
 let server: ScratchServer | null = null
 let standIn: StandIn | null = null
 let personsKey: Record<string, string> = {}
@@ -119,7 +121,11 @@ let mayBeStopped: number | null = null
 
 beforeAll(async () => {
   place = aPlace('runs')
-  server = await startAServer(place, undefined, { MOLE_OFFICE_TERMINAL_HOLDER: 'on' })
+  // THE PAGE FIRST, SO THE SCRATCH SERVER CAN BE TOLD ITS PORT. The page is on the liveApp's web port and its calls
+  // go to the scratch server, which refuses a page on a loopback port that is not its own unless it is told that
+  // port is its dev page's.
+  app = await liveApp({ name: 'holder-runs', viewport: { width: 1440, height: 900 }, database: join(place.dir, 'page.db') })
+  server = await startAServer(place, undefined, { MOLE_OFFICE_TERMINAL_HOLDER: 'on', MOLE_OFFICE_WEB_PORT: String(app.webPort) })
   personsKey = thePersonsKeyHeader(join(dirname(place.database), 'keys.json'))
 }, 300_000)
 
@@ -127,6 +133,7 @@ afterAll(async () => {
   try {
     if (mayBeStopped !== null) process.kill(mayBeStopped, 'SIGCONT')
     await standIn?.stop()
+    await app?.stop()
   } finally {
     await stopEverything()
   }
@@ -135,6 +142,11 @@ afterAll(async () => {
 function theServer(): ScratchServer {
   if (server === null) throw new Error('No scratch server.')
   return server
+}
+
+function theApp(): LiveApp {
+  if (app === null) throw new Error("No page's stack.")
+  return app
 }
 
 /** Put a stand-in on the place's socket in this mode, or none at all. */
@@ -193,7 +205,6 @@ describe('the read of a holder that runs', () => {
 })
 
 describe("an agent's page", () => {
-  let app: LiveApp | null = null
   let context: BrowserContext | null = null
   let page: Page | null = null
   /** The path of every request the page sent, in order. */
@@ -227,9 +238,8 @@ describe("an agent's page", () => {
     })
     expect(filed.status, JSON.stringify(filed.body)).toBe(201)
 
-    app = await liveApp({ name: 'holder-runs', viewport: { width: 1440, height: 900 }, database: join(place.dir, 'page.db') })
-    context = await app.browser.newContext({ viewport: { width: 1440, height: 900 } })
-    const thePagesApiPort = String(app.apiPort)
+    context = await theApp().browser.newContext({ viewport: { width: 1440, height: 900 } })
+    const thePagesApiPort = String(theApp().apiPort)
     const theScratchPort = String(theServer().port)
     await context.route(
       (url) => url.hostname === '127.0.0.1' && url.port === thePagesApiPort,
@@ -248,7 +258,6 @@ describe("an agent's page", () => {
 
   afterAll(async () => {
     await context?.close()
-    await app?.stop()
   }, 120_000)
 
   function thePage(): Page {
@@ -280,7 +289,6 @@ describe("an agent's page", () => {
     expect(await headline.innerText()).toBe(t('terminals.holder.noAnswer', { n: 1 }))
     expect(t('terminals.holder.noAnswer', { n: 1 })).toContain('Nothing has ended.')
     expect(await panel.getByRole('button', { name: t('terminals.holder.start') }).count()).toBe(0)
-    expect(await panel.innerText()).not.toContain(t('terminals.holder.whatToDo'))
     const before = asked('GET /api/terminals')
     await theHolderIs('answers')
     await panel.getByRole('button', { name: t('agentLive.terminal.lookAgain') }).click()
@@ -310,8 +318,8 @@ describe("an agent's page", () => {
     expect(await until(async () => asked('GET /api/terminals'), (n) => n > before, 15_000), 'the list was not read again').toBeGreaterThan(before)
     await panel.locator('.tm-prof-sub').first().waitFor({ state: 'visible', timeout: 15_000 })
     expect(await panel.locator('.tm-holder-headline').count()).toBe(0)
-    expect(t('terminals.profile.noOwn')).toContain('a terminal you opened yourself')
-    expect(await panel.innerText()).toContain(t('terminals.profile.noOwn'))
+    expect(t('terminals.profile.notListed')).toContain('a terminal you opened yourself')
+    expect(await panel.innerText()).toContain(t('terminals.profile.notListed'))
   }, 180_000)
 
   it("6: a newest run filed in another project is said, by the project's name, and its steps are not asked again", async () => {
@@ -337,8 +345,8 @@ describe("an agent's page", () => {
 
     // THE PRESS SHOWS THE PAGE IN THAT PROJECT, where the pane panel answers about the run.
     await pane.getByRole('button', { name: press }).click()
-    await pane.locator('.al-why').waitFor({ state: 'visible', timeout: 30_000 })
-    expect(await pane.locator('.al-why').innerText()).toBe(t('server.paneNotRunning'))
+    await pane.locator('.al-state').waitFor({ state: 'visible', timeout: 30_000 })
+    expect(await pane.locator('.al-state').innerText()).toBe(t('agentLive.pane.notRunning'))
     expect(await pane.locator('.al-elsewhere').count()).toBe(0)
   }, 180_000)
 })

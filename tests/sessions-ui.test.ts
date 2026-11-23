@@ -1131,13 +1131,6 @@ describe('an explanation several rows share is said once, with how many say it',
     expect(notes.shared.map((note) => note.count)).toEqual([3, 2])
     expect(notes.shared.map((note) => note.varies)).toEqual([false, false])
   })
-
-  it('counts an absence rather than repeating it under every row', () => {
-    const none = allLines().map((line) => ({ ...line, resumeCommand: null }))
-    expect(sp.missingCount(none, (line) => line.resumeCommand)).toBe(none.length)
-    // Three of the eight in the fixture carry no resume command; the other five do.
-    expect(sp.missingCount(allLines(), (line) => line.resumeCommand)).toBe(3)
-  })
 })
 
 // ============================================================================ placing a run
@@ -1344,7 +1337,7 @@ describe('every run is under one pipeline or module, and the counts balance', ()
   })
 })
 
-describe('a project group with nothing alive in it is folded, and says that is why', () => {
+describe('a project group with nothing alive in it is folded', () => {
   const quiet = () => {
     const lines = allLines()
       .filter((line) => line.state === 'finished' || line.state === 'unknown')
@@ -1352,21 +1345,12 @@ describe('a project group with nothing alive in it is folded, and says that is w
     return groupsOf(lines)
   }
 
-  it('folds it, names the count, and gives the reason in words', () => {
+  it('folds it and keeps its runs inside the fold', () => {
     const gripper = quiet().find((group) => group.project?.id === 'mod-gripper')!
     expect(gripper.counts.action + gripper.counts.alive).toBe(0)
     const html = body(h(sp.ProjectBlock, { entry: gripper, now: NOW, placements: new Map() }))
     expect(html).toContain('<details')
-    expect(html).toContain('Nothing here is running, waiting, crashed or holding anything')
     expect(html).toContain('Tray clamp')
-  })
-
-  it('says that reason in a sentence a reader sees, not only on a hover (wave 13y round 142)', () => {
-    const gripper = quiet().find((group) => group.project?.id === 'mod-gripper')!
-    const html = body(h(sp.ProjectBlock, { entry: gripper, now: NOW, placements: new Map() }))
-    const why = html.match(/<p class="sx-band-what">([\s\S]*?)<\/p>/)?.[1]
-    expect(why, 'the folded group gives no reason').toBeDefined()
-    expect(seen(why!)).toBe(t('g6a.sessions.noneAliveReason'))
   })
 
   it('names every state group behind the fold, with its own count, before it is opened', () => {
@@ -1694,39 +1678,6 @@ describe('a placement sentence more than one row shares is said once, above them
   })
 })
 
-describe('the explanations are said once, at the head, over every run on the page', () => {
-  it('names what every row can open onto, so the count on a row means something', () => {
-    const html = body(h(sp.SessionExplanations, { lines: allLines() }))
-    for (const held of sp.ROW_HOLDS) expect(html).toContain(held)
-    expect(html).toContain(`how many of these ${sp.ROW_HOLDS.length}`)
-  })
-
-  it('says what each state group means, once, with its exact count', () => {
-    const html = body(h(sp.SessionExplanations, { lines: allLines() }))
-    expect(html).toContain(t('g6a.sessions.nobodyHasSaidWhatHappenedToTheseIt'))
-    expect(html).toContain(t('g6a.sessions.somebodyLookedAtEachOfTheseAndCould'))
-    expect(html).toContain('8 state groups on this page')
-  })
-
-  it('says the rule it places runs by, and says what it refuses to place them by', () => {
-    const html = body(h(sp.SessionExplanations, { lines: allLines() }))
-    expect(html).toContain('A title is never read')
-    expect(html).toContain('the folder does not decide where a run belongs')
-    expect(html).toContain('A working folder can contain several modules')
-  })
-
-  it('measures a shared sentence over the whole page instead of over one small group', () => {
-    // Five crashed runs across three different projects still share one sentence, and the count is
-    // five — which is the point of measuring here rather than inside each project group.
-    const many = [
-      ...allLines(),
-      ...Array.from({ length: 4 }, (_, i) => ({ ...allLines()[0]!, id: `extra-${i}`, title: `extra ${i}` })),
-    ]
-    const html = body(h(sp.SessionExplanations, { lines: many }))
-    expect(html).toContain('All 5 say the same thing about how Mole Office knows')
-  })
-})
-
 // ============================================================================ the machine
 
 /** GET /api/resources/orphans with a sweep in which one process holds three ports. */
@@ -1832,31 +1783,21 @@ describe('the machine is grouped by the process holding it, not by the port', ()
     expect(groups[0]?.command).toBeNull()
   })
 
-  it('says the explanation once for the surface and keeps every row’s own sentence', () => {
+  it('heads the surface with its count and keeps every row’s own sentence', () => {
     const html = body(h(sp.MachineSurface, { unclaimed: sweep() }))
     // One heading, counted in processes as well as in things.
     expect(html).toContain('4 resources running that no session claims, held by 2 processes')
-    // The paragraph that used to sit under every row appears exactly once.
-    expect(html.split('No session registered these resources or described how to release them').length - 1).toBe(1)
     // And the server's own sentence for each row is kept, behind a fold that counts them.
     expect(html).toContain('The server&#x27;s own sentence for each of these 3')
     expect(html).toContain('kill -TERM -2813')
   })
 
-  // The summary names the unregistered resources once. Opening it adds the release limitation.
-  it('says the sentence on the fold once, and opens onto what it costs instead of repeating it', () => {
+  // The sweep's own sentence is the server's note, drawn once for a developer.
+  it('draws the sweep’s own sentence once, as the server’s note', () => {
     const html = body(h(sp.MachineSurface, { unclaimed: sweep() }))
-    const summary = /<span class="px-explain-meaning"[^>]*><span>([\s\S]*?)<\/span>/.exec(html)?.[1] ?? null
-    const lede = /<p class="sx-unclaimed-lede">([\s\S]*?)<\/p>/.exec(html)?.[1] ?? null
-    expect(summary).toContain('No session registered these resources, so their ownership is unknown.')
-    // Once in the whole surface, summary included.
-    expect(html.split('No session registered these resources, so their ownership is unknown.').length - 1).toBe(1)
-    // And what is behind the control is what the control does not say.
-    expect(lede).not.toContain('Nobody wrote')
-    expect(lede).toContain('No session registered these resources or described how to release them.')
-    // The other subject is still gone: two sentences about one fact were what the reader was
-    // reading, and rewording is how that comes back.
-    expect(html).not.toContain('Nothing wrote')
+    const note = /<p class="px-server-note">([\s\S]*?)<\/p>/.exec(html)?.[1] ?? null
+    expect(note).toBe('4 live things are running on this machine that no session claims.')
+    expect(html.split('4 live things are running on this machine that no session claims.').length - 1).toBe(1)
   })
 
   it('says the machine was not swept, rather than drawing a clean bill of health', () => {
@@ -2003,14 +1944,18 @@ describe('the sessions page', () => {
     expect(clear).not.toContain('no session claims, held by')
   })
 
-  it('heads every group with its exact count and says what the group means', () => {
+  it('counts every group exactly, and counts a group alone in its project in that project’s heading', () => {
     const html = view()
     expect(html.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ')).toContain('1 crashed')
-    expect(html.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ')).toContain('1 idle')
+    // A GROUP ALONE IN ITS PROJECT HAS NO HEADING OF ITS OWN. The idle run is the only run filed under its pipeline,
+    // so that pipeline's heading carries its count. A list at the head of the page counted every group until
+    // November 2026, when the explanations were taken off the page, as decided.
+    expect(html.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ')).not.toContain(`1 ${t('g6a.sessions.idle')}`)
+    expect(html.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ')).toContain(
+      `${t('g6a.sessions.runCount', { n: 1 })} — 1 ${t('g6a.sessions.aliveRightNow')}`,
+    )
     expect(html.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ')).toContain('1 with no state ever written')
     expect(html.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ')).toContain('1 recorded as unknown')
-    expect(html).toContain(t('g6a.sessions.nobodyHasSaidWhatHappenedToTheseIt'))
-    expect(html).toContain(t('g6a.sessions.somebodyLookedAtEachOfTheseAndCould'))
   })
 
   it('states the arithmetic of what needs a person and what folding cost', () => {
@@ -2020,7 +1965,6 @@ describe('the sessions page', () => {
     // No whole group is folded here, so the including clause is left out rather than spelling out two zeros.
     expect(html).toContain(t('g6a.sessions.foldedEndedNoGroups', { n: 4 }))
     expect(html).not.toContain(t('g6a.sessions.foldedEnded', { n: 4, rows: 0, groups: 0 }))
-    expect(html).toContain(t('g6a.sessions.aRunThatHasMerelyGoneQuietIs'))
   })
 
   it('heads the one group it can honestly draw with the name the reader is owed', () => {
@@ -2029,30 +1973,21 @@ describe('the sessions page', () => {
     expect(html).toContain('no pipeline or module')
   })
 
-  it('says the repeated sentence once per group instead of once per row', () => {
-    const many = [
-      ...allLines(),
-      ...Array.from({ length: 4 }, (_, i) => ({ ...allLines()[0]!, id: `extra-${i}`, title: `extra ${i}` })),
-    ]
-    const html = view({ lines: many })
-    // Five crashed rows, one copy of the sentence the server says about all five.
-    expect(html.split('this session was filed by hand').length - 1).toBeLessThanOrEqual(
-      new Set(many.map((line) => line.stateReason)).size,
-    )
-    expect(html).toContain('All 5 say the same thing about how Mole Office knows')
-  })
-
-  it('keeps the resume command whole, and a fold that names what it holds', () => {
+  it('keeps the resume command whole, and a fold that names and counts what it holds', () => {
     const html = view()
     expect(html).toContain(`cd &#x27;${THE_TEST_FIXTURE_ROOT}/proj_1st_baseline&#x27; &amp;&amp; claude --resume crash`)
     expect(html).toContain('the resume command')
-    expect(html).toContain('how it ended')
+    // EACH ROW'S FOLD NAMES WHAT IT HOLDS, AND COUNTS IT. A list at the head of the page named what a row can hold,
+    // how it ended among them, until November 2026, when the explanations were taken off the page, as decided.
+    expect(html).toContain(`<span class="px-scan-opens">${t('g6a.sessions.facts')}</span>`)
+    expect(html).toMatch(new RegExp(`<span class="px-scan-holds num">\\d+ ${t('g6a.sessions.factCount')}</span>`))
+    expect(html, 'and the list at the head of the page is gone').not.toContain(t('g6a.sessions.howItEnded'))
     expect(html).toContain('exit 137, out of memory while collating the force tables')
   })
 
-  it('says once, for the group, that nothing in it can be resumed', () => {
-    // Three crashed rows, none of which can be resumed: the sentence belongs at the head with its
-    // count, not three times over.
+  it('says on each row that it carries no resume command and no log path', () => {
+    // Three crashed rows, none of which can be resumed. The group's count of them at the head of the
+    // page was taken off in November 2026, as decided, so each row says it for itself.
     const crashed = allLines()[0]!
     const html = view({
       lines: [crashed, { ...crashed, id: 'c2' }, { ...crashed, id: 'c3' }].map((line) => ({
@@ -2061,9 +1996,9 @@ describe('the sessions page', () => {
         logPath: null,
       })),
     })
-    expect(html).toContain('Not one of these 3 carries a resume command')
-    expect(html).toContain('Not one of these 3 carries a log path')
-    expect(html).not.toContain('No resume command was recorded')
+    expect(html.split('class="sx-cmd-missing"').length - 1).toBe(6)
+    expect(html).toContain(t('g6a.sessions.noResumeCommand'))
+    expect(html).toContain(t('g6a.sessions.noLogPath'))
   })
 
   it('shows the machine on its own surface, at the foot, grouped by holder', () => {
@@ -2116,8 +2051,7 @@ describe('the sessions page', () => {
 
   it('calls out an orphan no session on the page claims', () => {
     const html = view()
-    expect(html).toContain('not claimed by any session on this page')
-    expect(html).toContain('nothing is going to end and clean it up')
+    expect(html).toContain(t('g6a.sessions.notClaimedCount', { n: 1 }))
   })
 
   /**
@@ -2133,7 +2067,7 @@ describe('the sessions page', () => {
    */
   it('counts the orphans it cannot release, and leaves the reason on the row', () => {
     const html = view()
-    expect(html).toContain('One of these has no release button, and the row says why.')
+    expect(html).toContain(t('g6a.sessions.noReleaseButtonCount', { n: 1 }))
     // The lock file's own sentence, whole, on the page — not only in the component's own test.
     expect(html).toContain('Mole Office never deletes lock files, and this is one.')
     expect(html).toContain('lets a second copy start on the same data')
@@ -2148,14 +2082,13 @@ describe('the sessions page', () => {
    * read and nothing registered has outlived its session. Round 142 drew them as a lone "none" at the
    * foot, under a corner that already says "0 orphaned". What may never go is the distinction the
    * fifth invariant is about: this is "somebody looked and there are none", and it must not read the
-   * same as "nobody looked". The corner's count says that, and the sentence stays for a screen reader.
+   * same as "nobody looked". The corner's count says that. The sentence a screen reader read was taken off the page in
+   * November 2026, as decided.
    */
   it('says no orphans once, in the corner, and draws nothing at the foot', () => {
     const html = view({ orphans: [] })
     // The corner's count, with the white space React leaves between its parts.
     expect(seen(html).replace(/\s+/g, ' ')).toContain(`0 ${t('g6a.sessions.orphaned')}`)
-    // The sentence is not deleted: a screen reader still reads it, whole, at the panel's foot.
-    expect(html).toContain(`<p class="px-sr">${t('g6a.sessions.nothingASessionRegisteredHasOutlivedTheSession')}</p>`)
     // Somebody LOOKED, so the page never says nobody did.
     expect(html).not.toContain('not looked at')
     expect(html).not.toContain('No orphans:')

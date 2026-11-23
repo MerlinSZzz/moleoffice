@@ -57,7 +57,7 @@ import { join } from 'node:path'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import type { Page } from 'playwright'
 import { THE_PERSON } from '../src/shared/person.ts'
-import { liveApp, type LiveApp } from './helpers.ts'
+import { liveApp, type LiveApp, governsTheWholeProject } from './helpers.ts'
 import { notReloaded, open as openIn, type HeardOffice } from './a-page-that-hears-changes.ts'
 import { putTheMadeUpLabelIn, THE_MADE_UP_LABEL_MARKER } from './the-made-up-label-above-the-page.ts'
 
@@ -354,7 +354,7 @@ it("12. words added to a decision ask first, and Save mine keeps the words the p
   const made = await send('POST', '/api/records', {
     kind: 'decision',
     title: 'Fire the kiln twice',
-    data: { replaces: [], option_taken: 'a — Fire it twice.', because: 'The glaze needs a second firing.', decided_by: 'the owner', authority: 'the owner said so', authority_reference: words['record'].id },
+    data: { ...governsTheWholeProject(), replaces: [], option_taken: 'a — Fire it twice.', because: 'The glaze needs a second firing.', decided_by: 'the owner', authority: 'the owner said so', authority_reference: words['record'].id },
   }, PERSON)
   const decision = made['record'].id as string
   await open(app.page, `/r/${decision}/edit`, '.px-gov-m83')
@@ -466,7 +466,7 @@ it.runIf(shots)("15. photographs the kept lines, the close form on both of a pro
   const decided = await send('POST', '/api/records', {
     kind: 'decision',
     title: 'Fire the kiln twice',
-    data: { replaces: [], option_taken: 'a — Fire it twice.', because: 'The glaze needs a second firing.', decided_by: 'the owner', authority: 'the owner said so', authority_reference: words['record'].id },
+    data: { ...governsTheWholeProject(), replaces: [], option_taken: 'a — Fire it twice.', because: 'The glaze needs a second firing.', decided_by: 'the owner', authority: 'the owner said so', authority_reference: words['record'].id },
   }, PERSON)
   const decision = decided['record'].id as string
   await open(app.page, `/r/${decision}/edit`, '.px-gov-m83')

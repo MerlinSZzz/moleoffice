@@ -28,7 +28,8 @@ function ordinal(place: number): string {
   return String(place) + (last >= 11 && last <= 13 ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' }[place % 10] ?? 'th'))
 }
 /**
- * A preview fixes both the arrangement and its version. Editing again requires a new preview. With `reading`, as the
+ * A preview fixes both the arrangement and its version, and only a preview that names no problem brings the reason and
+ * Apply, in place of the preview press. Editing again requires a new preview. With `reading`, as the
  * page opens: the groups and their pages in order, and the history, with no control that moves a page, because a page
  * opens as a reading (tests/read-before-edit.test.ts). Both views start with the person's own pinned pages, which are
  * kept at once with no reason (SidebarPins.tsx); a page is pinned on All pages, so the groups draw no pin press.
@@ -43,6 +44,7 @@ export function SidebarArrangementPanel({ reading: readOnly = false, editPress }
   const [past, setPast] = useState(false), [offset, setOffset] = useState(0)
   const pinWrites = usePinWrites()
   const [history] = useAsync(() => past ? moleOfficeRequest<SidebarHistory>('/api/sidebar/history?offset=' + offset) : Promise.resolve(null), [past, offset, reading.version])
+  const theReviewIsGood = reviewed !== null && reviewed.problems.length === 0
   const caption = (key: string) => railGroups().find(group => group.key === key)?.caption ?? sidebarName(key)
   const label = (key: string) => DESTINATIONS.find(page => page.key === key)?.label ?? sidebarName(key)
   const edit = (next: SidebarArrangement) => { setDraft(next); setReviewed(null); setFault(null); setNotice('') }
@@ -95,7 +97,7 @@ export function SidebarArrangementPanel({ reading: readOnly = false, editPress }
         </div>}
       </li>)}</ol>
     </section>)}
-    {readOnly ? null : <><div className="sa-actions"><Btn disabled={busy} reason={busy ? t('sidebarSetting.busy') : undefined} onClick={() => { void preview() }}>{t('sidebarSetting.preview')}</Btn><Btn disabled={busy} reason={busy ? t('sidebarSetting.busy') : undefined} onClick={() => { void preview(base.shipped, 'shipped') }}>{t('sidebarSetting.shipped')}</Btn></div>
+    {readOnly ? null : <><div className="sa-actions">{theReviewIsGood ? null : <Btn disabled={busy} reason={busy ? t('sidebarSetting.busy') : undefined} onClick={() => { void preview() }}>{t('sidebarSetting.preview')}</Btn>}<Btn disabled={busy} reason={busy ? t('sidebarSetting.busy') : undefined} onClick={() => { void preview(base.shipped, 'shipped') }}>{t('sidebarSetting.shipped')}</Btn></div>
     {reviewed === null ? null : <section className="sa-preview" data-sidebar-preview="" aria-live="polite">
       <h3>{t('sidebarSetting.previewTitle')}</h3>
       {reviewed.problems.length > 0 ? <><p>{t('sidebarSetting.refused')}</p><ul>{reviewed.problems.map((line, i) => <li key={i}>{line}</li>)}</ul></> : <p>{t('sidebarSetting.valid')}</p>}
@@ -104,10 +106,10 @@ export function SidebarArrangementPanel({ reading: readOnly = false, editPress }
       <ul>{reviewed.moves.map(move => <li key={move.key}>{t(move.from.group === move.to.group ? 'sidebarSetting.moveWithin' : 'sidebarSetting.moveAcross', { page: label(move.key), before: ordinal(move.from.place), after: ordinal(move.to.place), from: caption(move.from.group), to: caption(move.to.group) })}</li>)}</ul>
       {reviewed.moves.length === 0 && reviewed.problems.length === 0 ? <p>{t('sidebarSetting.noMoves')}</p> : null}
     </section>}
-    <label className="sa-reason">{t('sidebarSetting.reason')}<input required maxLength={500} value={because} disabled={busy} onChange={event => setBecause(event.target.value)} /></label>
+    {theReviewIsGood ? <label className="sa-reason">{t('sidebarSetting.reason')}<input required maxLength={500} value={because} disabled={busy} onChange={event => setBecause(event.target.value)} /></label> : null}
     {fault === null ? null : <ErrorNote message={errorMessage(fault)} fault={faultOf(fault)} />}
     {notice ? <p role="status">{notice}</p> : null}
-    <Btn disabled={busy || reviewed === null || reviewed.problems.length > 0 || !because.trim()} reason={busy ? t('sidebarSetting.busy') : reviewed === null ? t('sidebarSetting.previewFirst') : reviewed.problems.length > 0 ? t('sidebarSetting.fixProblems') : !because.trim() ? t('sidebarSetting.needReason') : undefined} onClick={() => { void apply() }}>{t('sidebarSetting.apply')}</Btn></>}
+    {theReviewIsGood ? <Btn disabled={busy || !because.trim()} reason={busy ? t('sidebarSetting.busy') : !because.trim() ? t('sidebarSetting.needReason') : undefined} onClick={() => { void apply() }}>{t('sidebarSetting.apply')}</Btn> : null}</>}
     <details onToggle={event => setPast(event.currentTarget.open)}><summary>{t('sidebarSetting.history')}</summary>
       {history.status === 'loading' ? <Loading what={t('sidebarSetting.history')} /> : null}
       {history.status === 'error' ? <ErrorNote message={history.message} fault={history.fault} /> : null}

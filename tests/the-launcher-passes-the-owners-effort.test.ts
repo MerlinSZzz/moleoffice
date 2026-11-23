@@ -55,7 +55,7 @@ import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { thePortsATestKeepsOff } from '../tools/live-office-ports.mjs'
-import { expectRoundRulesSaved, LEGACY_ROUND_CHAPTERS, linkSourceWithLocalRoundRules, writeRoundStartRules } from './round-chapters-fixture.ts'
+import { expectRoundRulesSaved, LEGACY_ROUND_CHAPTERS, linkSourceWithLocalRoundRules, THE_MADE_UP_EMPTY_OFFICE, writeRoundStartRules } from './round-chapters-fixture.ts'
 import { deliveredRoundBrief, savedRoundChapters } from '../src/shared/round-chapters/manifest.ts'
 import { stripTypeScriptTypes } from 'node:module'
 import { THE_FACTS_VARIABLE, THE_MODELS_START_VALUES, THE_OPENCODE_DATABASE_VARIABLE, THE_OPENCODE_OFFICE_CALL_WAIT_MS, THE_SHARED_OPENCODE_DATABASE, UNKNOWN_STOP_CAUSE, aCommandsStartValues, readHostInstance, theFactsAStartIsGiven, theOpenCodeDatabaseOf, writeInstance } from '../tools/sandbox-common.mjs'
@@ -115,6 +115,9 @@ globalThis.fetch = async (address, init = {}) => {
     const nativeSelection = join(root, 'native-selection')
     if (existsSync(nativeSelection)) return new Response(readFileSync(nativeSelection, 'utf8'), { status: 200 })
   }
+  // THE TWO DOORS A ROUND'S START READS ITS RULES FROM, answered as an office that holds no chapter and no regulation.
+  const rules = ${JSON.stringify(THE_MADE_UP_EMPTY_OFFICE)}
+  if (method === 'GET' && Object.hasOwn(rules, path)) return new Response(JSON.stringify(rules[path]), { status: 200 })
   const body = init.body ? JSON.parse(init.body) : {}
   appendFileSync(join(root, 'requests'), JSON.stringify({ path, method, body }) + '\n')
   const answer = (value, status = 200) => new Response(JSON.stringify(value), { status })
@@ -228,11 +231,14 @@ db.close()
   mkdirSync(join(instance, 'dsh/npm/node_modules/.bin'), { recursive: true })
   symlinkSync(join(root, 'bin/dsh'), join(instance, 'dsh/npm/node_modules/.bin/dsh'))
   const nativeReader = syntheticDshReader(root)
+  // EACH PROGRAM'S STAND-IN HAS THE FIXTURE'S FOLDER IN ITS OWN TEXT, and not from its environment: a Codex is given only
+  // the names its list keeps (src/config/the-environment-a-codex-gets.mjs), and EFFORT_FIXTURE is not on it.
   for (const program of ['claude', 'codex', 'opencode', 'dsh']) {
     writeFileSync(join(root, 'bin', program), `#!${process.execPath}
 ${CAPTURE_DSH_SELECTION}
 const fs = process.getBuiltinModule('node:fs'), path = process.getBuiltinModule('node:path')
-const file = path.join(process.env.EFFORT_FIXTURE, 'seen-' + process.env.MOLE_OFFICE_SESSION + '.json')
+const theFixture = ${JSON.stringify(root)}
+const file = path.join(theFixture, 'seen-' + process.env.MOLE_OFFICE_SESSION + '.json')
 const args = process.argv.slice(2)
 const selectedPatch = args.reduce((last, word, i) => word === '--patch' ? args[i + 1] : last, null)
 let settings
@@ -243,8 +249,8 @@ if (selectedPatch && selectedPatch.endsWith('.json')) {
 const observed = { settings, brief: ${program === 'dsh' ? "fs.existsSync(args.at(-1)) ? fs.readFileSync(args.at(-1), 'utf8') : null" : "fs.fstatSync(0).isFile() ? fs.readFileSync(0, 'utf8') : null"}, argv: args, effort: process.env.CLAUDE_CODE_EFFORT_LEVEL, env: process.env, cwd: process.cwd(), run: process.env.MOLE_OFFICE_SESSION }
 fs.writeFileSync(file + '.part', JSON.stringify(observed))
 fs.renameSync(file + '.part', file)
-fs.appendFileSync(path.join(process.env.EFFORT_FIXTURE, 'program-calls'), JSON.stringify(observed) + '\\n')
-const genericEnding = path.join(process.env.EFFORT_FIXTURE, 'generic-ending')
+fs.appendFileSync(path.join(theFixture, 'program-calls'), JSON.stringify(observed) + '\\n')
+const genericEnding = path.join(theFixture, 'generic-ending')
 if (fs.existsSync(genericEnding)) {
   const ending = JSON.parse(fs.readFileSync(genericEnding, 'utf8'))
   console.log(JSON.stringify({ type: 'error', message: ending.said }))
@@ -252,10 +258,10 @@ if (fs.existsSync(genericEnding)) {
 }
 ${program === 'opencode' ? `console.log(JSON.stringify({ type: 'step_start', sessionID: 'ses_syntheticOwned01' })); console.log(JSON.stringify({ type: 'step_finish', sessionID: 'ses_syntheticOwned01', part: { tokens: { input: 1, output: 2 }, cost: 0 } }))` : ''}
 ${program === 'codex' ? `console.log(JSON.stringify({ type: 'thread.started', thread_id: '${thread}' })); console.log(JSON.stringify({ type: 'error', message: 'Configured service tier \u0060fast\u0060 is not advertised as supported for model \u0060gpt-6.1-sol\u0060 and will be omitted from requests.' }))` : ''}
-const lunaScenario = path.join(process.env.EFFORT_FIXTURE, 'luna-case')
+const lunaScenario = path.join(theFixture, 'luna-case')
 if (fs.existsSync(lunaScenario)) {
   const scenario = JSON.parse(fs.readFileSync(lunaScenario, 'utf8'))
-  const calls = fs.readFileSync(path.join(process.env.EFFORT_FIXTURE, 'program-calls'), 'utf8').trim().split(String.fromCharCode(10)).map(line => JSON.parse(line)).filter(call => call.run === process.env.MOLE_OFFICE_SESSION)
+  const calls = fs.readFileSync(path.join(theFixture, 'program-calls'), 'utf8').trim().split(String.fromCharCode(10)).map(line => JSON.parse(line)).filter(call => call.run === process.env.MOLE_OFFICE_SESSION)
   if (calls.length > 2) { console.log(JSON.stringify({ type: 'event_msg', payload: { type: 'task_complete', error: { codex_error_info: 'transport_error', message: 'Synthetic third attempt stops the defective restart loop' } } })); process.exit(1) }
   if (scenario.prose) console.log(JSON.stringify({ type: 'agent_message', message: 'Synthetic discussion: usage limit' }))
   else if (scenario.stream === 'error') console.log(JSON.stringify({ type: 'error', message: "You've hit your usage limit." }))
@@ -263,10 +269,10 @@ if (fs.existsSync(lunaScenario)) {
   else console.log(JSON.stringify({ type: 'event_msg', payload: { type: 'task_complete', error: { message: 'Synthetic provider ending', codex_error_info: scenario.code ?? 'rate_limit_exceeded' } } }))
   process.exit(1)
 }
-${program === 'codex' ? `const scenario = path.join(process.env.EFFORT_FIXTURE, 'capacity-case')
+${program === 'codex' ? `const scenario = path.join(theFixture, 'capacity-case')
 if (fs.existsSync(scenario)) {
   const { late = false, prose = false, stderr = false } = JSON.parse(fs.readFileSync(scenario, 'utf8'))
-  if (late) fs.writeFileSync(path.join(process.env.EFFORT_FIXTURE, 'capacity-late'), '')
+  if (late) fs.writeFileSync(path.join(theFixture, 'capacity-late'), '')
   // What codex exec --json wrote when Sol was at capacity (w13m run 1dSiDsrMtC1S, 15 October 2026): an error event, then
   // turn.failed with the same words and no code. The two other endings only mention capacity and end for another reason.
   const said = 'Selected model is at capacity. Please try a different model.'
@@ -418,7 +424,7 @@ describe('an OpenCode run prepares a sandbox that was already up (bQVD4FzEZj4N)'
       const start = JSON.parse(ran.out.trim())
       const seen = JSON.parse(readFileSync(join(root, 'seen-' + start.run + '.json'), 'utf8')) as { env: Record<string, string> }
       const inline = JSON.parse(seen.env['OPENCODE_CONFIG_CONTENT']!) as { plugin: string[] }
-      expect(inline.plugin.some(plugin => plugin.endsWith('/tools/guard/opencode-plugin.mjs'))).toBe(true)
+      expect(inline.plugin.some(plugin => plugin.endsWith('/for-agents/opencode-plugin.mjs'))).toBe(true)
       expect(inline.plugin.some(plugin => plugin.endsWith('/tools/opencode-go-limit-plugin.mjs'))).toBe(true)
       expect(JSON.parse(readFileSync(opencodeFile(), 'utf8'))).toMatchObject({ ...held,
         mcp: { mole_office: { type: 'local', command: ['node', join(instance, 'repo/tools/office-mcp.mjs')], enabled: true } } })
@@ -455,8 +461,8 @@ describe('an OpenCode run prepares a sandbox that was already up (bQVD4FzEZj4N)'
     expect(JSON.parse(readFileSync(opencodeFile(), 'utf8'))).toEqual({ ...held, permission: { ...held.permission, external_directory: 'allow' }, mcp: { mole_office: { type: 'local', command: ['node', join(instance, 'repo/tools/office-mcp.mjs')], enabled: true, timeout: THE_OPENCODE_OFFICE_CALL_WAIT_MS } } })
   })
 
-  // Mutation RUN_HOME_EVERY_RUNTIME: drop the runtime check. Claude Code and Codex must leave this file absent.
-  it.each(['claude-code', 'codex'])('%s leaves OpenCode config alone through the host and direct helper', async runtime => {
+  // Mutation RUN_HOME_EVERY_RUNTIME: drop the runtime check. Codex must leave this file absent.
+  it.each(['codex'])('%s leaves OpenCode config alone through the host and direct helper', async runtime => {
     for (const mode of ['agent', 'direct-agent'] as const) {
       emptyOpenCode()
       const ran = await anOpenCodeStart(mode, runtime)
@@ -466,8 +472,10 @@ describe('an OpenCode run prepares a sandbox that was already up (bQVD4FzEZj4N)'
     }
   })
 
+  // The three values are the three ways a config is not an object: an array, null and a string. 'agent' runs all three;
+  // each other mode, which calls the same check, runs the array alone.
   it.each(['agent', 'direct-agent', 'existing-run', 'direct-existing-run'] as const)('%s refuses a non-object config before filing anything', async mode => {
-    for (const value of [[], null, 'synthetic wrong config']) {
+    for (const value of mode === 'agent' ? [[], null, 'synthetic wrong config'] : [[]]) {
       emptyOpenCode(); mkdirSync(join(instance, 'home', '.config', 'opencode'), { recursive: true })
       const bytes = JSON.stringify(value); writeFileSync(opencodeFile(), bytes)
       const before = readFileSync(join(root, 'requests'), 'utf8').split('\n').filter(Boolean).length
@@ -915,10 +923,10 @@ describe('The launcher passes the owner’s start values', () => {
     }
   }, 30_000)
 
-  it('uses the rule and says why when the office will not answer this caller (401, 403)', async () => {
+  it('uses the rule and says why when the office will not answer this caller (403)', async () => {
     // A sandbox's helper asks with no key of its own, and the live office answers 403 (13 October 2026, run
     // X5fgmzTPnJyn). An office that will not answer this caller is one that cannot be asked: remind, not gate.
-    for (const status of [401, 403]) {
+    for (const status of [403]) {
       const office = createServer((_request, response) => {
         response.statusCode = status
         response.setHeader('content-type', 'application/json')

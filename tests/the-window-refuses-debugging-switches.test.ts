@@ -132,8 +132,10 @@ describe('the window refuses to start with a debugging switch', () => {
     expect(main).toContain('inspectorUrl: inspector.url()')
     expect(main).toContain('settingValue(THE_DEBUGGING_SETTING)')
     expect(main).toContain("if (THE_DEBUGGING_ALLOWED !== 'on') keepTheInspectorShut(process)")
-    // The lock is asked for only in the branch a refused window does not take.
-    expect(main).toMatch(/\nif \(THE_REFUSAL !== null\) \{[^}]*\} else if \(!app\.requestSingleInstanceLock\(\)\) \{/)
+    // The lock is asked for only in the branch that neither a refused window nor a print run takes. The print
+    // run's branch comes between the two, before the lock: a print run takes no lock, so it neither waits for
+    // a running window nor hands its page over to one.
+    expect(main).toMatch(/\nif \(THE_REFUSAL !== null\) \{[^}]*\} else if \(THE_PRINT !== null\) \{[^}]*\} else if \(!app\.requestSingleInstanceLock\(\)\) \{/)
     expect(main.match(/app\.requestSingleInstanceLock\(\)/g)).toHaveLength(1)
   })
 })

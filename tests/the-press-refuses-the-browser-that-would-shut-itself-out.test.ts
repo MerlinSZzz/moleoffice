@@ -71,6 +71,10 @@ import type { FastifyInstance } from 'fastify'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { apiApp, freshDb, liveApp, waitForThePage, type TestDb } from './helpers.ts'
 import { settings } from '../src/config/settings.mjs'
+import { createI18n } from '../src/shared/i18n.ts'
+import { settingsControlWord } from '../src/shared/settings-declaration.ts'
+
+const { t: say } = createI18n('en')
 
 /** The person's headers and no key: exactly the claim the window is about. */
 const THE_PERSON = {
@@ -270,7 +274,7 @@ describe('a caller that holds the person’s key presses it', () => {
  */
 describe('the panel a paired browser is drawn', () => {
   it.skipIf(!process.env['KEY_WINDOW_OPEN_SHOTS'])(
-    'photographs the sentence before the press, and the press, at 1440, 990, 660 and 390 in both themes',
+    'photographs the press at 1440, 990, 660 and 390 in both themes',
     async () => {
       const shots = process.env['KEY_WINDOW_OPEN_SHOTS'] as string
       mkdirSync(shots, { recursive: true })
@@ -287,9 +291,9 @@ describe('the panel a paired browser is drawn', () => {
         await live.page.waitForTimeout(1000)
         await live.page.goto(`${live.site}/?mode=inspect#/settings`, { timeout: 60_000 })
         await waitForThePage(live.page, 60_000)
-        await live.page.waitForSelector('.ctw-open', { timeout: 30_000 })
         const panel = live.page.locator('.px-panel[data-target="uiSurface/settings.headeronly"]')
-        expect(await panel.innerHTML()).toContain('whether it is yours or an agent')
+        const press = say(settingsControlWord('settings.headeronly', 'settingsPanel.window.press'))
+        await panel.getByRole('button', { name: press, exact: true }).waitFor({ timeout: 30_000 })
         for (const width of [1440, 990, 660, 390]) {
           for (const theme of ['light', 'dark'] as const) {
             await live.page.setViewportSize({ width, height: 1000 })
@@ -326,8 +330,7 @@ describe('the panel a browser that cannot press is drawn', () => {
         // THE PICTURE IS OF THE REFUSAL AND NOT THE PRESS: the sentence is drawn and no button is.
         const panel = live.page.locator('.px-panel[data-target="uiSurface/settings.headeronly"]')
         const drawn = await panel.innerHTML()
-        expect(drawn, 'the refused sentence is not drawn').toContain('holds no key')
-        expect(drawn, 'a press is drawn to a caller that may not press').not.toContain('ctw-open')
+        expect(drawn, 'the refusal is not drawn').toContain(say('settingsPanel.window.noKeyHere'))
         // AND NO BUTTON AT ALL, so nothing that looks live can fail the way the door refuses.
         expect(drawn, 'a button a person can press is drawn').not.toContain('<button')
 

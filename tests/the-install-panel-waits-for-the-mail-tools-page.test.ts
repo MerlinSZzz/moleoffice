@@ -37,6 +37,7 @@ import { readFileSync } from 'node:fs'
 import { bundlePageCode } from './a-bundle-of-page-code.ts'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { liveApp, type LiveApp } from './helpers.ts'
+import { t } from '../src/shared/i18n.ts'
 import { en } from '../src/shared/words/en.ts'
 
 /** The tool as the office answers it, in the three states these cases need. The page's address is a stand-in. */
@@ -149,7 +150,9 @@ describe('the install panel waits for the mail tool’s page', () => {
   it('reads a tool that never says where it answers a bounded number of times, and keeps its words', async () => {
     await draw([STARTING], [])
     expect(await readsOnceTheyStop(1 + atMost, (atMost + 8) * every + 10_000)).toBe(1 + atMost)
-    expect(await theState().innerText()).toBe(en['settingsPanel.mailtool.state.noPageYet'])
+    // Test change (as decided, the panel draws no explanation): the words it keeps are the state word "Starting",
+    // where they were a sentence saying the tool runs and has not yet said where its page is.
+    expect(await theState().innerText()).toBe(t('settingsPanel.mailtool.state.starting'))
     expect(await theSettings().count()).toBe(0)
     expect(errors).toEqual([])
   }, 60_000)

@@ -10,7 +10,7 @@ import { and, eq } from 'drizzle-orm'
 import { db } from './client.ts'
 import { revisions } from './schema.ts'
 import { whoRevokedIt } from '@shared/warrant.ts'
-import type { ActOnTheirWords } from '../lib/warrants.ts'
+import type { ActOnTheirWords } from './types/warrants.ts'
 
 /** The later revision that took this act back, when there is one. The period's list asks it too (lib/elevation.ts). */
 export function revocationOf(recordId: string, seq: number): ActOnTheirWords['revoked'] {

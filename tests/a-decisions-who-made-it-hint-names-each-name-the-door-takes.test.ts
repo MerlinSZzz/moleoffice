@@ -22,7 +22,7 @@
  */
 import type { FastifyInstance } from 'fastify'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { apiApp, freshDb, type TestDb } from './helpers.ts'
+import { apiApp, freshDb, type TestDb, governsTheWholeProject } from './helpers.ts'
 
 let t: TestDb
 let app: FastifyInstance
@@ -57,7 +57,8 @@ async function aDecisionSignedBy(decidedBy: string, title: string): Promise<{ co
     method: 'POST',
     url: '/api/records',
     headers: asAgent(AGENT.id),
-    payload: { kind: 'decision', title, data: { replaces: [], decided_by: decidedBy, authority: 'a measurement', because: 'The counter missed 2 leaves in 50.' } },
+    payload: { kind: 'decision', title, data: {
+      ...governsTheWholeProject(), replaces: [], decided_by: decidedBy, authority: 'a measurement', because: 'The counter missed 2 leaves in 50.' } },
   })
   return { code: reply.statusCode, said: reply.body }
 }

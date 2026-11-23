@@ -51,7 +51,7 @@ import { THE_TEST_OFFICES_OWNER, THE_TEST_OFFICES_SECRETARY } from './a-page-of-
 import { createElement as h } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
-import { apiApp, freshDb, thePersonsKeyHeader, FOR_THE_PERSON, FOR_THE_PERSON_IN_THE_QUERY, type TestDb } from './helpers.ts'
+import { apiApp, freshDb, thePersonsKeyHeader, FOR_THE_PERSON, FOR_THE_PERSON_IN_THE_QUERY, type TestDb, governsTheWholeProject } from './helpers.ts'
 import { END_IT, WHY_ASKS } from '../src/shared/elevation.ts'
 import { thePress } from '../src/shared/the-press.ts'
 
@@ -180,7 +180,7 @@ describe('a raise', () => {
     const decision = await ask('POST', '/api/records', { ...BY_THEIR_NAME, ...thePersonsKeyHeader() }, {
       kind: 'decision',
       title: 'A decision filed by mistake',
-      data: { replaces: [], decided_by: 'the owner', authority: 'the owner said so', because: 'It was filed by mistake.' },
+      data: { ...governsTheWholeProject(), replaces: [], decided_by: 'the owner', authority: 'the owner said so', because: 'It was filed by mistake.' },
     })
     expect(decision.status, decision.said).toBe(201)
     const deleted = await ask('DELETE', `/api/records/${String(decision.body['record'].id)}?${FOR_THE_PERSON_IN_THE_QUERY}`, asArgus())
@@ -198,7 +198,7 @@ describe('a raise', () => {
     const decision = await ask('POST', '/api/records', { ...BY_THEIR_NAME, ...thePersonsKeyHeader() }, {
       kind: 'decision',
       title: 'A decision the person made',
-      data: { replaces: [], decided_by: 'the owner', authority: 'the owner said so', because: 'It stands.' },
+      data: { ...governsTheWholeProject(), replaces: [], decided_by: 'the owner', authority: 'the owner said so', because: 'It stands.' },
     })
     expect(decision.status, decision.said).toBe(201)
     const no = await ask('DELETE', `/api/records/${String(decision.body['record'].id)}`, asArgus())

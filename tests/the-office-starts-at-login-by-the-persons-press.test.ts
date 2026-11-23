@@ -45,10 +45,28 @@
  *  21. A press refused at the write whose file written beside the unit cannot be taken away, when its copy is taken
  *      away, is refused with its own code, naming that file, so its words no longer say nothing changed. A page reads
  *      the code with the values its door sends, as the registry declares them (round W29).
- *  Cases 13, 15, 17, 19 and 20 need a folder the press may not write in, so where a shut folder takes a write, as it
- *  does for root, they skip and say why (tests/root-may-write-in-any-folder.ts, rounds W27 and W28).
+ *  22. In an AppImage, the read says neither on nor off and asks systemd nothing, and says that the .deb install has it.
+ *      The press On refuses with its own code, asks systemd nothing and writes no unit. A unit would name the folder the
+ *      AppImage is mounted at, which is new at each start, so a unit written there fails at the next login. The press
+ *      Off with no unit there answers that it is already off, and asks systemd nothing.
+ *  23. In an AppImage, a unit an older press wrote for another mount of it is out of date. The read names its file and
+ *      says the press Off removes it. The press Off asks systemd to disable it, copies it to the first backup, removes
+ *      its file and asks systemd to read its units again, and its sentence says where the copy is. The read after it
+ *      finds no unit, and a data folder move no longer counts the unit. The press On still refuses.
+ *  24. In an AppImage, a unit of that name the press did not write is refused by the press Off with its code and left
+ *      as it is.
+ *  25. In an AppImage, when systemd will not disable the unit, the press Off refuses with its code and changes nothing.
+ *  26. In an AppImage, when the unit cannot be copied, the press Off refuses with its own code, naming the copy's name,
+ *      says the unit was disabled, and leaves the file.
+ *  27. In an AppImage, when the unit's file cannot be removed, the press Off refuses with its own code, naming the copy,
+ *      and says the unit was disabled and copied.
+ *  28. In an AppImage, when systemd will not read its units again, the press Off refuses with its own code, naming the
+ *      copy, and says the unit was disabled, copied and removed.
+ *  Cases 13, 15, 17, 19, 20 and 26 need a folder the press may not write in, so where a shut folder takes a write, as
+ *  it does for root, they skip and say why (tests/root-may-write-in-any-folder.ts, rounds W27 and W28).
  *  Cases 20 and 21 give the press a stand-in for its write. The copy and the file written beside the unit are in the
- *  unit's folder, so no folder can be made to keep one of them and let the other go (round W29).
+ *  unit's folder, so no folder can be made to keep one of them and let the other go (round W29). Case 27 gives the
+ *  press Off a stand-in for its removal, for the same reason: the copy and the unit are in one folder.
  *
  * MUTATIONS (each after a control run; the commit message names the runs and the logs):
  *   - KillMode=process taken out of the unit: case 1 goes red.
@@ -103,10 +121,13 @@ import {
   START_AT_LOGIN_UNIT_MARK,
   theOfficeThisServerIs,
   theStartAtLoginUnit,
+  readStartAtLogin,
   theStartAtLoginUnitPath,
+  turnStartAtLoginOff,
   turnStartAtLoginOn,
 } from '../src/config/start-at-login.mjs'
 import { howToStart, settings } from '../src/config/settings.mjs'
+import { theLoginUnitWouldStartTheOldFolder } from '../src/config/the-data-folder-move.mjs'
 
 let t: TestDb
 let app: FastifyInstance
@@ -146,7 +167,7 @@ const press = (on: boolean) => ask('POST', '/api/office/start-at-login', AS_THE_
 const read = () => ask('GET', '/api/office/start-at-login', AS_THE_PERSON)
 
 /** What the stand-in systemd and loginctl say. */
-function systemd(state: { down?: boolean; active?: boolean; enabled?: boolean; refuseEnable?: boolean; linger?: 'yes' | 'no' | 'fail' }): void {
+function systemd(state: { down?: boolean; active?: boolean; enabled?: boolean; refuseEnable?: boolean; refuseDisable?: boolean; refuseReload?: boolean; linger?: 'yes' | 'no' | 'fail' }): void {
   const now = existsSync(systemdState) ? (JSON.parse(readFileSync(systemdState, 'utf8')) as Record<string, unknown>) : {}
   writeFileSync(systemdState, JSON.stringify({ ...now, ...state }))
 }
@@ -181,6 +202,19 @@ function aUnitForAnotherOffice(databasePath: string): string {
   return other
 }
 
+/**
+ * AN APPIMAGE MOUNTED NOW, the office run from it, and a unit an older press wrote for an office run from another mount of
+ * it, put where the unit goes. The unit names the older mount, so it reads as out of date.
+ */
+function anOlderAppImagesUnit(): { input: { home: string; office: ReturnType<typeof theOfficeThisServerIs>; platform: string; appImage: string }; old: string } {
+  const appImage = join(scratch, 'the-mount-now')
+  const office = { ...theOfficeThisServerIs(), command: join(appImage, 'mole-office') }
+  const old = theStartAtLoginUnit({ ...office, command: join(scratch, 'an-older-mount', 'mole-office') })
+  mkdirSync(dirname(unitPath()), { recursive: true })
+  writeFileSync(unitPath(), old)
+  return { input: { home, office, platform: 'linux', appImage }, old }
+}
+
 beforeAll(async () => {
   scratch = mkdtempSync(join(tmpdir(), 'start-at-login-test-'))
   home = join(scratch, 'home')
@@ -206,11 +240,13 @@ if (args[0] !== '--user') { process.stderr.write('not as the person\\n'); proces
 if (state.down) { process.stderr.write('Failed to connect to bus: No medium found\\n'); process.exit(1) }
 const verb = args[1]
 if (verb === 'show-environment') { process.stdout.write('HOME=${home}\\n'); process.exit(0) }
+if (verb === 'daemon-reload' && state.refuseReload) { process.stderr.write('Failed to reload daemon: Access denied\\n'); process.exit(1) }
 if (verb === 'daemon-reload') process.exit(0)
 if (verb === 'is-active') { process.stdout.write(state.active ? 'active\\n' : 'inactive\\n'); process.exit(state.active ? 0 : 3) }
 if (verb === 'is-enabled') { process.stdout.write(state.enabled ? 'enabled\\n' : 'disabled\\n'); process.exit(state.enabled ? 0 : 1) }
 if (verb === 'enable' && state.refuseEnable) { process.stderr.write('Failed to enable unit: Access denied\\n'); process.exit(1) }
 if (verb === 'enable' && args.length === 3) { state.enabled = true; save(); process.exit(0) }
+if (verb === 'disable' && state.refuseDisable) { process.stderr.write('Failed to disable unit: Access denied\\n'); process.exit(1) }
 if (verb === 'disable' && args.length === 3) { state.enabled = false; save(); process.exit(0) }
 process.stderr.write('The stand-in does not take: ' + args.join(' ') + '\\n'); process.exit(1)
 `,
@@ -628,5 +664,148 @@ describe('start at login', () => {
     expect(existsSync(firstCopy()), 'the press left its copy, though the copy could be taken away').toBe(false)
     expect(readFileSync(theTemporaryFile(), 'utf8')).toBe('half a unit')
     expect(systemctlVerbs(from)).toEqual(['show-environment'])
+  })
+
+  it('22: in an AppImage, the read says neither on nor off and asks systemd nothing, the press On refuses with its code, Off with no unit is already off, and neither writes anything', () => {
+    // THE APPIMAGE'S OWN FOLDER, given as the read and the presses take it. A systemd that was asked would say on.
+    systemd({ enabled: true, active: true, linger: 'yes' })
+    const appImage = join(scratch, 'a-mount-of-the-appimage')
+    const from = calls().length
+    const seen = readStartAtLogin({ home, office: theOfficeThisServerIs(), platform: 'linux', appImage })
+    expect(seen).toMatchObject({ systemd: 'not asked', fromAnAppImage: true, unit: 'none', setInTheMenuBar: false, setInTheTray: false, startsAtLogin: null, enabledWord: null, activeWord: null, linger: null })
+    expect(seen.says).toContain('not available from the AppImage')
+    expect(seen.says).toContain('The .deb install has it.')
+    const refused = turnStartAtLoginOn({ home, office: theOfficeThisServerIs(), platform: 'linux', appImage })
+    expect(refused).toMatchObject({ ok: false, code: 'startAtLoginInAnAppImage' })
+    expect(refused.says).toContain('not available from the AppImage')
+    expect(refused.says).toContain('The .deb install has it.')
+    // THE PRESS OFF WITH NO UNIT THERE has nothing to turn off, so it says so, and systemd is not asked.
+    expect(turnStartAtLoginOff({ home, office: theOfficeThisServerIs(), platform: 'linux', appImage })).toMatchObject({ ok: true, turned: 'already off' })
+    // A PAGE READS THE CODE, with no values, in the words of the list.
+    expect(readRefusal('startAtLoginInAnAppImage', {})).toEqual({ code: 'startAtLoginInAnAppImage', values: {} })
+    const words = theWordsFor('startAtLoginInAnAppImage')
+    expect(typeof words).toBe('string')
+    expect(words).toContain('AppImage')
+    expect(words).toContain('.deb install')
+    expect(existsSync(unitPath()), 'a press in an AppImage wrote the unit').toBe(false)
+    expect(existsSync(dirname(unitPath())), "a press in an AppImage made the unit's folder").toBe(false)
+    expect(calls(from), 'the read or a press in an AppImage asked systemd or loginctl').toEqual([])
+  })
+
+  it('23: in an AppImage, the press Off disables, copies and removes a unit an older press wrote for another mount, and On still refuses', () => {
+    const { input, old } = anOlderAppImagesUnit()
+    // A SYSTEMD THAT WAS ASKED would say the unit is enabled. The press Off does its steps whatever systemd says.
+    systemd({ enabled: true })
+    const from = calls().length
+    const before = readStartAtLogin(input)
+    expect(before).toMatchObject({ systemd: 'not asked', fromAnAppImage: true, unit: 'out of date', startsAtLogin: null, enabledWord: null, activeWord: null })
+    expect(before.says).toContain(unitPath())
+    expect(before.says).toContain('off removes it')
+    expect(theLoginUnitWouldStartTheOldFolder(before), 'a data folder move does not count the unit an older press wrote').toBe(true)
+    expect(calls(from), 'the read in an AppImage asked systemd or loginctl').toEqual([])
+
+    const off = turnStartAtLoginOff(input)
+    expect(off).toMatchObject({ ok: true, turned: 'off' })
+    expect(off.says, 'the answer does not say where the copy is').toContain(firstCopy())
+    expect(existsSync(unitPath()), 'the press Off left the unit').toBe(false)
+    expect(readFileSync(firstCopy(), 'utf8')).toBe(old)
+    expect(systemctlVerbs(from)).toEqual([`disable ${START_AT_LOGIN_UNIT}`, 'daemon-reload'])
+    expect(calls(from).filter((call) => call[0] !== 'systemctl'), 'the press Off asked loginctl').toEqual([])
+
+    const from2 = calls().length
+    const after = readStartAtLogin(input)
+    expect(after).toMatchObject({ systemd: 'not asked', fromAnAppImage: true, unit: 'none', startsAtLogin: null })
+    expect(theLoginUnitWouldStartTheOldFolder(after), 'a data folder move still counts a unit that is gone').toBe(false)
+    expect(turnStartAtLoginOn(input)).toMatchObject({ ok: false, code: 'startAtLoginInAnAppImage' })
+    expect(existsSync(unitPath()), 'the press On wrote a unit in an AppImage').toBe(false)
+    expect(calls(from2), 'the read or the press On in an AppImage asked systemd or loginctl').toEqual([])
+  })
+
+  it('24: in an AppImage, the press Off refuses a unit of that name the press did not write, and leaves it as it is', () => {
+    const appImage = join(scratch, 'a-mount-of-the-appimage')
+    mkdirSync(dirname(unitPath()), { recursive: true })
+    writeFileSync(unitPath(), '[Service]\nExecStart=/usr/bin/true\n')
+    const from = calls().length
+    const refused = turnStartAtLoginOff({ home, office: theOfficeThisServerIs(), platform: 'linux', appImage })
+    expect(refused).toMatchObject({ ok: false, code: 'startAtLoginNotOurs', path: unitPath() })
+    expect(readFileSync(unitPath(), 'utf8')).toBe('[Service]\nExecStart=/usr/bin/true\n')
+    expect(existsSync(firstCopy())).toBe(false)
+    expect(calls(from)).toEqual([])
+  })
+
+  it('25: in an AppImage, the press Off refuses with its code and changes nothing when systemd will not disable the unit', () => {
+    const { input, old } = anOlderAppImagesUnit()
+    systemd({ refuseDisable: true })
+    const from = calls().length
+    const refused = turnStartAtLoginOff(input)
+    expect(refused).toMatchObject({ ok: false, code: 'startAtLoginSystemdRefused' })
+    expect(refused.says).toContain('Failed to disable unit: Access denied')
+    expect(refused.says).toContain('Nothing was changed.')
+    expect(readFileSync(unitPath(), 'utf8')).toBe(old)
+    expect(existsSync(firstCopy())).toBe(false)
+    expect(systemctlVerbs(from)).toEqual([`disable ${START_AT_LOGIN_UNIT}`])
+  })
+
+  it('26: in an AppImage, the press Off refuses with its own code, naming the copy, when the unit cannot be copied, and says the unit was disabled', (context) => {
+    if (skippedAsRoot(context)) return
+    const { input, old } = anOlderAppImagesUnit()
+    const from = calls().length
+    let refused: ReturnType<typeof turnStartAtLoginOff>
+    chmodSync(dirname(unitPath()), 0o500)
+    try {
+      refused = turnStartAtLoginOff(input)
+    } finally {
+      chmodSync(dirname(unitPath()), 0o700)
+    }
+    expect(refused).toMatchObject({ ok: false, code: 'startAtLoginOffNotCopied', path: firstCopy() })
+    expect(refused.says).toContain('disabled')
+    expect(refused.says).toContain(firstCopy())
+    expect(readRefusal('startAtLoginOffNotCopied', { path: firstCopy() })).toEqual({ code: 'startAtLoginOffNotCopied', values: { path: firstCopy() } })
+    const words = String(theWordsFor('startAtLoginOffNotCopied'))
+    expect(words).toContain('disabled')
+    expect(words).toContain('{path}')
+    expect(readFileSync(unitPath(), 'utf8')).toBe(old)
+    expect(existsSync(firstCopy())).toBe(false)
+    expect(systemctlVerbs(from)).toEqual([`disable ${START_AT_LOGIN_UNIT}`])
+  })
+
+  it('27: in an AppImage, the press Off refuses with its own code, naming the copy, when the unit cannot be removed, and says it was disabled and copied', () => {
+    const { input, old } = anOlderAppImagesUnit()
+    const from = calls().length
+    const refused = turnStartAtLoginOff({
+      ...input,
+      remove: () => {
+        throw new Error('a stand-in removal that failed')
+      },
+    })
+    expect(refused).toMatchObject({ ok: false, code: 'startAtLoginOffNotRemoved', path: firstCopy() })
+    expect(refused.says).toContain('disabled')
+    expect(refused.says).toContain(firstCopy())
+    expect(refused.says).toContain('a stand-in removal that failed')
+    expect(readRefusal('startAtLoginOffNotRemoved', { path: firstCopy() })).toEqual({ code: 'startAtLoginOffNotRemoved', values: { path: firstCopy() } })
+    const words = String(theWordsFor('startAtLoginOffNotRemoved'))
+    expect(words).toContain('disabled')
+    expect(words).toContain('{path}')
+    expect(readFileSync(unitPath(), 'utf8')).toBe(old)
+    expect(readFileSync(firstCopy(), 'utf8')).toBe(old)
+    expect(systemctlVerbs(from)).toEqual([`disable ${START_AT_LOGIN_UNIT}`])
+  })
+
+  it('28: in an AppImage, the press Off refuses with its own code, naming the copy, when systemd will not read its units again, and says the unit was removed', () => {
+    const { input, old } = anOlderAppImagesUnit()
+    systemd({ refuseReload: true })
+    const from = calls().length
+    const refused = turnStartAtLoginOff(input)
+    expect(refused).toMatchObject({ ok: false, code: 'startAtLoginOffNotReloaded', path: firstCopy() })
+    expect(refused.says).toContain('removed')
+    expect(refused.says).toContain(firstCopy())
+    expect(refused.says).toContain('Failed to reload daemon: Access denied')
+    expect(readRefusal('startAtLoginOffNotReloaded', { path: firstCopy() })).toEqual({ code: 'startAtLoginOffNotReloaded', values: { path: firstCopy() } })
+    const words = String(theWordsFor('startAtLoginOffNotReloaded'))
+    expect(words).toContain('removed')
+    expect(words).toContain('{path}')
+    expect(existsSync(unitPath())).toBe(false)
+    expect(readFileSync(firstCopy(), 'utf8')).toBe(old)
+    expect(systemctlVerbs(from)).toEqual([`disable ${START_AT_LOGIN_UNIT}`, 'daemon-reload'])
   })
 })

@@ -528,10 +528,10 @@ describe('the settings page offers report content exactly the five', () => {
    * font, the density or the wording can take away with nothing failing — problem `7anOzYmzR4oO`
    * says so about the label on the report control — so the measurement is here.
    */
-  it('keeps the row’s mark inside its own column, at every width', async () => {
+  it('keeps the row’s mark inside its own column, at the widest and the narrowest width', async () => {
     const was = browser.viewportSize()
     try {
-      for (const width of [1440, 990, 660, 390]) {
+      for (const width of [1440, 390]) {
         await browser.setViewportSize({ width, height: 1000 })
         await browser.goto(`${app.site}/#/settings`, { timeout: 60_000 })
         await waitForThePage(browser, 60_000)
@@ -615,6 +615,8 @@ describe('a list row still draws the label at Level 1', () => {
     )
     await browser.reload({ timeout: 60_000 })
     await waitForThePage(browser, 60_000)
+    // LATE OR STUCK IS ONE NUMBER, and pressing it opens its list, so its rows are among the words the page draws.
+    await browser.locator('[data-home-section="late"] summary').click({ timeout: 30_000 })
     // THE ROW FIRST DRAWS THE TITLE THE LATE LIST CARRIES, then the words at the asked length once
     // the record is read. So this waits for Late or stuck's row to stop drawing the title.
     await browser.waitForFunction(

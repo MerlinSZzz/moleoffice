@@ -41,7 +41,7 @@ import { randomUUID } from 'node:crypto'
 import type { FastifyInstance } from 'fastify'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 
-import { apiApp, freshDb, type TestDb } from './helpers.ts'
+import { apiApp, freshDb, type TestDb, governsTheWholeProject } from './helpers.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { nativeRefusalWithCode } from '../src/config/launcher-selection.mjs'
 import { GATES } from '../src/config/gates.mjs'
@@ -132,7 +132,7 @@ async function register(headers: Record<string, string>, payload: Record<string,
 
 async function file(kind: string, title: string): Promise<string> {
   // A DECISION SAYS WHAT IT REPLACES (problem ZSWftCSVUP2r); a test decision replaces none.
-  const reply = await call('POST', '/api/records', PERSON, { kind, title, data: kind === 'decision' ? { replaces: [] } : {} })
+  const reply = await call('POST', '/api/records', PERSON, { kind, title, data: kind === 'decision' ? { ...governsTheWholeProject(), replaces: [] } : {} })
   expect(reply.statusCode, reply.body).toBe(201)
   return (reply.json() as { record: { id: string } }).record.id
 }

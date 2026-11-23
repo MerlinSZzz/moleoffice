@@ -12,11 +12,10 @@ import { withoutInheritedEffort } from './without-inherited-effort.ts'
  * that record as a run because the office's own agent-run row was claimed by the same worker session
  * the record names as its parent.
  *
- * WHILE PROBLEM J60KF9L_OR-X IS OPEN, a write with a dispatched run's key may not name a run at all
- * (round 63, problem TwH5ICyRxLVd): the office cannot yet tie that key to its run. So every one of the
- * six messages is refused, naming that problem, and none is stored. The run is held more tightly than
- * the limit holds it, not less. When J60KF9L_OR-X is fixed, this file goes back to three stored and
- * three refused by the limit.
+ * A WRITE WITH A DISPATCHED RUN'S KEY HOLDS THE SESSION THE WORKER FILED FOR THAT RUN: the newest
+ * session the office's key filed naming the run, while the run is claimed or running
+ * (src/server/lib/the-run-a-key-holds.ts). So the run may name it, and its messages are stored and
+ * counted: three are stored, and three are refused by the limit in the limit's own words.
  *
  * WHAT IS REAL HERE AND WHAT IS NOT. The server, the queued agent run, the claim and the worker are
  * real: this runs the real `tools/agent-worker.mjs` against a real API. The `claude` it starts is a
@@ -207,15 +206,24 @@ describe('a run the agent worker started, writing messages straight to POST /api
     expect(said.session, `the prompt named no session:\n${out}`).toBe(theRecordOfTheRun(runId).id)
   })
 
-  // A DISPATCHED RUN'S KEY MAY NOT NAME A RUN YET (src/server/lib/the-run-a-key-holds.ts). Mutation: that refusal
-  // taken out of src/server/lib/http.ts: red, three stored and three refused by the limit.
-  it('refuses every one of the six, naming the problem that keeps a dispatched run from naming its run', () => {
-    expect(said.statuses.map((one) => one.status), said.statuses.map((one) => one.body).join('\n')).toEqual(Array.from({ length: WRITES }, () => 403))
-    for (const one of said.statuses) expect(one.body).toContain('until problem J60KF9L_OR-X is fixed')
+  // A DISPATCHED RUN'S KEY HOLDS THE SESSION ITS WORKER FILED (src/server/lib/the-run-a-key-holds.ts), so the
+  // records door knows the run and holds it to the limit. The stand-in keeps the first 400 characters of each
+  // answer, so the refusal is matched by the first sentence of the limit's own words.
+  it('stores three, and refuses the next three in the words of the limit', async () => {
+    expect(said.statuses.map((one) => one.status), said.statuses.map((one) => one.body).join('\n')).toEqual(
+      Array.from({ length: WRITES }, (_, at) => (at < ALLOWED ? 201 : 400)),
+    )
+    const { whyThisRunMayFileNoMore } = await import('../src/server/lib/worker.ts')
+    const words = whyThisRunMayFileNoMore(theRecordOfTheRun(runId).id, 'panelx')
+    expect(words, 'the limit says this run may still file').not.toBeNull()
+    const ends = String(words).indexOf('. ')
+    expect(ends, 'the limit spoke no whole first sentence').toBeGreaterThan(0)
+    const firstSentence = String(words).slice(0, ends + 1)
+    for (const one of said.statuses.slice(ALLOWED)) expect(one.body).toContain(firstSentence)
   })
 
-  it('stores no message that names the run', () => {
-    expect(messagesNaming(theRecordOfTheRun(runId).id)).toBe(0)
+  it('stores three messages that name the run', () => {
+    expect(messagesNaming(theRecordOfTheRun(runId).id)).toBe(ALLOWED)
   })
 })
 

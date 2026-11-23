@@ -1,0 +1,23 @@
+{
+  "why": "The refusals of a browser's two key halves (wave 13s, line 13s, SEC-2): one half without the other; a press another site's page sent to the pairing press, the ask door or the move; and a move of the old cookie that finds nothing to move. No request in this test carries a half of a device key, and none presses pairing, asks or moves. Each is met through its door elsewhere. tests/a-browser-proves-the-person-with-two-halves.test.ts meets oneHalfOfADeviceKey in cases 3 to 5. tests/the-old-cookie-moves-once.test.ts meets nothingToMove in case 2. A press and a move sent with Sec-Fetch-Site cross-site are refused with 403 in case 12 of the first and case 5 of the second; those cases check the status and that nothing was set, and not the code.",
+  "refusals": [
+    {
+      "code": "oneHalfOfADeviceKey",
+      "status": 401,
+      "english": "Test: this request carried one half of a browser's key and not the other.",
+      "values": {}
+    },
+    {
+      "code": "aPressFromAnotherSite",
+      "status": 403,
+      "english": "Test: a page on another site sent this press.",
+      "values": {}
+    },
+    {
+      "code": "nothingToMove",
+      "status": 409,
+      "english": "Test: this browser sent no key this office can move.",
+      "values": {}
+    }
+  ]
+}

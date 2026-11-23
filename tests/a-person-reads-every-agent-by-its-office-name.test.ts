@@ -1,5 +1,14 @@
 // Copyright © 2026 Zhengyang Shen
 // Licensed under the MIT License. See LICENSE.
+// Criterion change (wave 13s round 281, decision mFgspTpVWJqy): the admission's Home case reads the admission among
+// the rows Home draws.
+// Since HD-2d, Home's Needs you draws only its first `NEEDS_SHOWN` rows. When this case read Home, four rows waited for
+// the person, written in the same second: the one-press request, the card ask's message, the admission and the card
+// ask. The waiting reading orders rows of one second by id, and the ids are random, so the admission was left out about
+// one run in two. The press-words case now runs before the admission's Home case, so its request is withdrawn first.
+// The Home case has the person read the card ask's message, so the admission and the card ask are the only rows
+// waiting. It checks by `GET /api/waiting` that the admission is among the first `NEEDS_SHOWN` rows before it reads
+// Home. Before, the admission's Home case was held to find the admission's row on Home whatever rows waited beside it.
 /**
  * A PERSON READS EVERY AGENT BY ITS OFFICE NAME, WHEREVER THE OFFICE NAMES WHO FILED, WROTE OR DID SOMETHING.
  *
@@ -29,27 +38,44 @@
  * The title and the small line of a waiting registration's Needs you row are read too, and the
  * handle it stores is checked on the record and in the waiting reading, so the display name and the
  * stored reference cannot be confused.
+ * Home is read once the press request is withdrawn and the person has read the card ask's message,
+ * after the waiting reading shows the admission among the rows Home draws.
  *
- * PICTURES: only when AGENT_NAME_SHOTS names a folder. The Needs you page of the made-up office,
- * with the admission and the card ask on it, at 1440, 990, 660 and 390 pixels wide, in the light
- * and the dark theme.
+ * THE MERGE QUEUE'S AND DELEGATION'S SENTENCES, in a throwaway office of their own (the last
+ * describe). Made-up agents are registered with office names that are not their handles. Each case
+ * reads one sentence the server makes about them, as a person reads it on an entry's page, a
+ * door's answer or the packaged-tasks panel.
+ *
+ * OLD:
+ *   - the merge queue's line for the secretary, its `Told ...` sentence at an entry's end and the
+ *     answer of turning a line named each agent by its handle;
+ *   - who is responsible for a task named the live creator, the live agent above it and the
+ *     secretary by their handles, and a retired creator by the stamp its create row stores.
+ *
+ * NEW:
+ *   - each of these sentences names each agent by its office name;
+ *   - a stamp no single agent row answers is shown as the change log stores it, and is never said
+ *     as an unregistered agent;
+ *   - the stored fields keep what they stored: a run's agent and an entry's recipients by id.
  */
-import { mkdirSync } from 'node:fs'
-import { join } from 'node:path'
+import { randomBytes } from 'node:crypto'
+import { writeFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import type { FastifyInstance } from 'fastify'
 import type { Page } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createI18n } from '../src/shared/i18n.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { recordPath } from '../src/web/components/router.tsx'
-import { deleteTheCopiedDefaultChapters, liveApp, waitForThePage, type LiveApp } from './helpers.ts'
+import { apiApp, deleteTheCopiedDefaultChapters, freshDb, liveApp, waitForThePage, type LiveApp, type TestDb } from './helpers.ts'
 import { THE_TEST_FIXTURE_ROOT } from './a-page-of-a-test-office.ts'
+import { NEEDS_SHOWN } from '../src/web/components/home/HomeSections.tsx'
 
 const HANDLE = 'glaze-tally'
 const NAME = 'Glaze Tally'
 const INSPECTOR_HANDLE = 'glaze-inspector'
 const INSPECTOR_NAME = 'Glaze Inspector'
 const WORKSPACE = 'default'
-const SHOTS_FOLDER = 'AGENT_NAME_SHOTS'
 const SELF_HANDLE = 'beacon-shuffle'
 const SELF_NAME = 'Beacon Shuffle'
 
@@ -72,6 +98,7 @@ let taskId = ''
 let selfAskId = ''
 let cardAskId = ''
 let onePressId = ''
+let cardAskMessageId = ''
 
 /** One request to the test office, with a JSON reply. */
 async function ask(
@@ -245,6 +272,7 @@ describe('the report page, the record page and the office notices a person reads
     // the person's press without answering it.
     const card = await ask('POST', '/api/roles/requests', AS_THE_AGENT, { asking: 'supervisor', because: 'Made-up: to lead a wave.' })
     cardAskId = String(card.body['request'])
+    cardAskMessageId = String(card.body['message'])
     const press = await ask('POST', '/api/one-press', AS_THE_AGENT, {
       act: 'answer-an-ask-at-the-door',
       inputs: { request: cardAskId, answer: 'grant' },
@@ -298,6 +326,15 @@ describe('the report page, the record page and the office notices a person reads
     expect(item?.because, 'the admission sentence does not draw the office name').toContain(SELF_NAME)
   }, 120_000)
 
+  it('names the asking agent by its office name in the words of the person\'s press, never its handle', async () => {
+    const reply = await ask('GET', `/api/one-press/${onePressId}`, AS_THE_PERSON)
+    const request = reply.body['request'] as { shows: string }
+    expect(request.shows).toBe(`Give "${NAME}" the supervisor card it asked for.`)
+    expect(request.shows).not.toContain(HANDLE)
+    const withdrawn = await ask('POST', `/api/one-press/${onePressId}/withdraw`, AS_THE_AGENT)
+    expect(withdrawn.status, 'the asker withdrew its own press request').toBe(200)
+  }, 120_000)
+
   it('names the waiting registration by its office name on both lines of its Needs you row, and keeps the stored handle', async () => {
     // THE STORED IDENTITY STAYS THE HANDLE, on the record and in the waiting reading. The name is a
     // second field the row draws, so neither surface may lose the handle it stores.
@@ -344,6 +381,20 @@ describe('the report page, the record page and the office notices a person reads
     expect(crumb, 'the page breadcrumb draws the stored handle').not.toContain(SELF_HANDLE)
     expect(crumb, 'the page breadcrumb does not draw the office name').toContain(SELF_NAME)
 
+    // THE PERSON READS THE CARD ASK'S MESSAGE. The press-words case has withdrawn its request, so the admission and the
+    // card ask are the only rows waiting.
+    await ask('POST', `/api/messages/${cardAskMessageId}/mark`, AS_THE_PERSON, { mark: 'seen' })
+    // THE ADMISSION IS AMONG THE ROWS HOME DRAWS, or the case says what crowded it out.
+    const beforeHome = await ask('GET', '/api/waiting', AS_THE_PERSON)
+    const rows = (beforeHome.body['items'] ?? []) as { id: string; title: string }[]
+    const place = rows.findIndex((one) => one.id === selfAskId)
+    const ahead = (place < 0 ? rows : rows.slice(0, place)).map((one) => one.title)
+    const why =
+      `the admission's place in the waiting reading is ${String(place)} (-1 means it is not a row); Home draws the ` +
+      `first ${String(NEEDS_SHOWN)}; the rows ahead of it, or every row when it is not one, are ` +
+      JSON.stringify(ahead)
+    expect(place, why).toBeGreaterThanOrEqual(0)
+    expect(place, why).toBeLessThan(NEEDS_SHOWN)
     await openHomeAtTheAdmission()
     const row = browser.locator(`[data-home-section="needs"] [data-home-waiting-id="${selfAskId}"]`)
     const title = (await row.locator('.hm-row-title').innerText()).replace(/\s+/g, ' ').trim()
@@ -372,54 +423,6 @@ describe('the report page, the record page and the office notices a person reads
     expect(item?.why).not.toContain(HANDLE)
   }, 120_000)
 
-  it('names the asking agent by its office name in the words of the person\'s press, never its handle', async () => {
-    const reply = await ask('GET', `/api/one-press/${onePressId}`, AS_THE_PERSON)
-    const request = reply.body['request'] as { shows: string }
-    expect(request.shows).toBe(`Give "${NAME}" the supervisor card it asked for.`)
-    expect(request.shows).not.toContain(HANDLE)
-    // THE REQUEST WAS FILED TO READ THE PRESS'S WORDS, NOT TO WAIT ON THE PERSON. Withdraw it so the picture of the
-    // made-up office shows the admission and the card ask it is meant to show, and no test-only request beside them.
-    const withdrawn = await ask('POST', `/api/one-press/${onePressId}/withdraw`, AS_THE_AGENT)
-    expect(withdrawn.status, 'the asker withdrew its own press request').toBe(200)
-  }, 120_000)
-
-  it.skipIf(!process.env[SHOTS_FOLDER])(
-    'photographs the Needs you page of the made-up office, with both waiting items, at four widths in both themes',
-    async () => {
-      const shots = process.env[SHOTS_FOLDER] as string
-      mkdirSync(shots, { recursive: true })
-      const waitForBoth = async (): Promise<void> => {
-        await browser
-          .locator(`[data-home-section="needs"] a.hm-needs-link[data-home-waiting-id="${selfAskId}"]`)
-          .waitFor({ timeout: 30_000 })
-        await browser
-          .locator(`[data-home-section="needs"] a.hm-needs-link[data-home-waiting-id="${cardAskId}"]`)
-          .waitFor({ timeout: 30_000 })
-      }
-      for (const width of [1440, 990, 660, 390]) {
-        const taken: Partial<Record<'light' | 'dark', Buffer>> = {}
-        for (const theme of ['light', 'dark'] as const) {
-          await browser.setViewportSize({ width, height: 1000 })
-          await browser.goto(`${app.site}/?lang=en#/`, { waitUntil: 'domcontentloaded', timeout: 60_000 })
-          await browser.evaluate((chosen) => {
-            localStorage.setItem('mole-office.mode', 'normal')
-            localStorage.setItem('mole-office.preset.theme', chosen)
-          }, theme)
-          await browser.reload({ timeout: 60_000 })
-          await waitForThePage(browser, 60_000)
-          await waitForBoth()
-          await browser.locator('[data-home-section="needs"]').scrollIntoViewIfNeeded()
-          await browser.waitForTimeout(300)
-          const sideways = await browser.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
-          expect(sideways, `the Needs you page is wider than the window at ${String(width)} in the ${theme} theme`).toBe(0)
-          taken[theme] = await browser.screenshot({ path: join(shots, `needs-${String(width)}-${theme}.png`), fullPage: true })
-        }
-        expect(taken.dark!.equals(taken.light!), `Needs you at ${String(width)}: the dark picture is the light one`).toBe(false)
-      }
-    },
-    900_000,
-  )
-
   it('names the asking agent by its office name in the answer of the press that grants it, never its handle', async () => {
     const reply = await ask('POST', `/api/roles/requests/${cardAskId}/grant`, AS_THE_PERSON, {})
     const said = reply.body as { agent?: string; note?: string }
@@ -428,4 +431,194 @@ describe('the report page, the record page and the office notices a person reads
     expect(String(said.note)).not.toContain(HANDLE)
   }, 120_000)
 
+})
+
+/** The made-up agents of the last describe, each with an office name that is not its handle. */
+const LEAD = { handle: 'made-up-lead', name: 'Lead Of The Made-up Line' }
+const BUILDER = { handle: 'made-up-builder', name: 'Builder On The Made-up Line' }
+const LEAVER = { handle: 'made-up-leaver', name: 'Leaver Of The Made-up Line' }
+const LONER = { handle: 'made-up-loner', name: 'Loner With No Live Starter' }
+const KEEPER = { handle: 'made-up-keeper', name: 'Keeper Of The Made-up Cards' }
+const EVERY_MADE_UP_AGENT = [LEAD, BUILDER, LEAVER, LONER, KEEPER]
+/** A create row's stamp that no agent row answers. */
+const A_STAMP_NO_AGENT_HAS = 'made-up-stamp-no-agent-has'
+const AN_ENTRY_NOBODY_FILED = 'made-up-entry-not-filed'
+
+describe("the merge queue's and delegation's sentences name each agent by its office name", () => {
+  let t: TestDb
+  let server: FastifyInstance
+  const PERSON = { type: 'human', id: THE_PERSON } as const
+  const asAgentHere = (handle: string): Record<string, string> => ({
+    ...AS_THE_PERSON,
+    'x-mole-office-actor-type': 'agent',
+    'x-mole-office-actor-id': handle,
+  })
+  let builderRun = ''
+  let leaverRun = ''
+  let builderTask = ''
+  let leaverTask = ''
+  let lonerTask = ''
+  let strangerTask = ''
+
+  /** Registers an agent through the starter door and insists the door wrote it. */
+  async function started(by: Record<string, string>, payload: Record<string, unknown>): Promise<void> {
+    const reply = await server.inject({ method: 'POST', url: '/api/agents/started', headers: by, payload })
+    expect(reply.statusCode, reply.body).toBe(201)
+  }
+
+  /** The registry id of the agent registered under this handle. */
+  function idOf(handle: string): string {
+    const row = t.client.sqlite.prepare('SELECT id FROM agents WHERE handle = ?').get(handle) as { id: string } | undefined
+    expect(row, `nothing is registered as ${handle}`).toBeDefined()
+    return row!.id
+  }
+
+  /** A running run of the agent, filed through the record door as that agent. */
+  async function aRunOf(handle: string, title: string): Promise<string> {
+    const reply = await server.inject({
+      method: 'POST',
+      url: '/api/records',
+      headers: asAgentHere(handle),
+      payload: { kind: 'session', title, data: { state: 'running', servingAgent: handle, workingDirectory: process.cwd() } },
+    })
+    expect(reply.statusCode, reply.body).toBe(201)
+    return String((reply.json() as { record: { id: string } }).record.id)
+  }
+
+  /** A task whose create row is stamped with the agent's handle, as the agent's own write leaves it. */
+  function aTaskBy(handle: string, title: string): string {
+    return t.api.createRecord({ workspaceId: WORKSPACE, kind: 'task', title, actor: { type: 'agent', id: handle }, data: {} }).id
+  }
+
+  /** The words hold no made-up agent's handle. */
+  function holdsNoHandle(words: string): void {
+    for (const agent of EVERY_MADE_UP_AGENT) expect(words, `the words draw ${agent.handle}`).not.toContain(agent.handle)
+  }
+
+  beforeAll(async () => {
+    t = await freshDb()
+    const { copyTheDefaultRegulationsOnce } = await import('../src/server/lib/default-regulations.ts')
+    expect(copyTheDefaultRegulationsOnce().copied).toBeGreaterThan(0)
+    writeFileSync(
+      join(dirname(t.file), 'keys.json'),
+      `${JSON.stringify({ person: randomBytes(32).toString('hex'), office: randomBytes(32).toString('hex'), providers: {} }, null, 2)}\n`,
+      { mode: 0o600 },
+    )
+    server = (await apiApp()).app
+    await server.ready()
+    await started(AS_THE_PERSON, { handle: KEEPER.handle, name: KEEPER.name, role: 'secretary' })
+    await started(AS_THE_PERSON, { handle: LEAD.handle, name: LEAD.name, role: 'supervisor' })
+    await started(asAgentHere(LEAD.handle), { handle: BUILDER.handle, name: BUILDER.name })
+    await started(asAgentHere(LEAD.handle), { handle: LEAVER.handle, name: LEAVER.name })
+    await started(AS_THE_PERSON, { handle: LONER.handle, name: LONER.name })
+    builderRun = await aRunOf(BUILDER.handle, 'A made-up run whose merge entry ends')
+    leaverRun = await aRunOf(LEAVER.handle, 'A made-up run of an agent that retires')
+    builderTask = aTaskBy(BUILDER.handle, 'A made-up task a live agent made')
+    leaverTask = aTaskBy(LEAVER.handle, 'A made-up task an agent made before it retired')
+    lonerTask = aTaskBy(LONER.handle, 'A made-up task of an agent the person started, now retired')
+    strangerTask = aTaskBy(BUILDER.handle, 'A made-up task whose stamp no agent has')
+    // THE STAMP IS SET AT THE TABLE, since no write of an agent's own could leave a string no agent has.
+    t.client.sqlite.prepare('UPDATE changes SET actor_id = ? WHERE record_id = ?').run(A_STAMP_NO_AGENT_HAS, strangerTask)
+    t.client.sqlite.prepare('UPDATE revisions SET actor_id = ? WHERE record_id = ?').run(A_STAMP_NO_AGENT_HAS, strangerTask)
+    t.client.sqlite.prepare('UPDATE agents SET retired = 1 WHERE handle IN (?, ?)').run(LEAVER.handle, LONER.handle)
+  }, 120_000)
+
+  afterAll(async () => {
+    await server?.close()
+    t?.close()
+  })
+
+  /** An entry's reading as the line for the secretary reads it: no entry record is filed, so it counts no files. */
+  const aReading = (state: string, more: Record<string, unknown> = {}): never =>
+    ({
+      id: AN_ENTRY_NOBODY_FILED,
+      lane: '/made-up/lanes/lane-one',
+      run: builderRun,
+      state,
+      submittedBy: { kind: 'person', id: THE_PERSON },
+      changeset: { adapter: 'files' },
+      ...more,
+    }) as never
+
+  it("names the run's agent by its office name in the merged, bounced and other lines for the secretary", async () => {
+    const { oneLineForTheSecretary } = await import('../src/server/lib/merge-state-machine.ts')
+    for (const state of ['merged', 'bounced', 'testing']) {
+      const line = oneLineForTheSecretary(aReading(state))
+      expect(line, state).toContain(`: ${BUILDER.name} #${AN_ENTRY_NOBODY_FILED}`)
+      holdsNoHandle(line)
+    }
+    expect(oneLineForTheSecretary(aReading('bounced'))).toContain(`→ back to ${BUILDER.name}`)
+    // A SUBMITTER NO RUN AND NO ROW ANSWERS is shown as the entry stores it.
+    const nobodysRun = { run: 'made-up-run-not-filed', submittedBy: { kind: 'agent', id: A_STAMP_NO_AGENT_HAS } }
+    const stored = oneLineForTheSecretary(aReading('testing', nobodysRun))
+    expect(stored).toContain(`: ${A_STAMP_NO_AGENT_HAS} #${AN_ENTRY_NOBODY_FILED}`)
+  }, 60_000)
+
+  it("names the run's agent and the agent that withdrew the entry by their office names in the withdrawn line", async () => {
+    const { oneLineForTheSecretary } = await import('../src/server/lib/merge-state-machine.ts')
+    const withdrawn = { by: { kind: 'agent', id: idOf(LEAD.handle) }, because: 'Made up: the work moved.', at: '2026-11-21 21:00:00' }
+    const line = oneLineForTheSecretary(aReading('withdrawn', { withdrawn }))
+    expect(line).toContain(`: ${BUILDER.name} #${AN_ENTRY_NOBODY_FILED} by ${LEAD.name}: Made up: the work moved.`)
+    holdsNoHandle(line)
+  }, 60_000)
+
+  it("names each agent told of an entry's end by its office name, and tells each by its registry id", async () => {
+    const { whoIsToldOfAnEntrysEnd } = await import('../src/server/lib/merge-queue.ts')
+    const told = whoIsToldOfAnEntrysEnd({ run: builderRun, submittedBy: { kind: 'person', id: THE_PERSON } } as never)
+    expect(told.to).toContainEqual({ kind: 'agent', id: idOf(BUILDER.handle) })
+    for (const agent of EVERY_MADE_UP_AGENT) {
+      if (told.to.some((one) => one.kind === 'agent' && one.id === idOf(agent.handle))) expect(told.says).toContain(agent.name)
+    }
+    expect(told.says).toContain(BUILDER.name)
+    holdsNoHandle(told.says)
+  }, 60_000)
+
+  it("names a retired run agent and the starter told in its place by their office names at an entry's end", async () => {
+    const { whoIsToldOfAnEntrysEnd } = await import('../src/server/lib/merge-queue.ts')
+    const told = whoIsToldOfAnEntrysEnd({ run: leaverRun, submittedBy: { kind: 'person', id: THE_PERSON } } as never)
+    expect(told.to).toContainEqual({ kind: 'agent', id: idOf(LEAD.handle) })
+    expect(told.says).toContain(LEAD.name)
+    expect(told.says).toContain(`The agent ${LEAVER.name} is retired, so its starter is told in its place.`)
+    holdsNoHandle(told.says)
+  }, 60_000)
+
+  it("names the line's agent by its office name when its line is turned off, and keeps its registry id", async () => {
+    const { turnALine } = await import('../src/server/lib/merge-queue-at-the-seal.ts')
+    const turned = turnALine({ workspaceId: WORKSPACE, agent: BUILDER.handle, on: false, because: 'Made up: the line waits.', actor: PERSON })
+    expect(turned.agent).toBe(idOf(BUILDER.handle))
+    expect(turned.says).toContain(`The line of ${BUILDER.name} is turned off`)
+    holdsNoHandle(turned.says)
+  }, 60_000)
+
+  it('names a live creator by its office name as the agent responsible for its task (rule 3)', async () => {
+    const { responsibleFor } = await import('../src/server/lib/delegation.ts')
+    const said = responsibleFor(builderTask)
+    expect(said.who).toEqual({ kind: 'agent', id: idOf(BUILDER.handle) })
+    expect(said.why).toContain(`The agent "${BUILDER.name}" created this task and is still live`)
+    holdsNoHandle(said.why)
+  }, 60_000)
+
+  it('names a retired creator and the live agent above it by their office names (rule 4)', async () => {
+    const { responsibleFor } = await import('../src/server/lib/delegation.ts')
+    const said = responsibleFor(leaverTask)
+    expect(said.who).toEqual({ kind: 'agent', id: idOf(LEAD.handle) })
+    expect(said.why).toContain(`The agent "${LEAVER.name}" created this task and is retired or gone`)
+    expect(said.why).toContain(`up its starter chain to "${LEAD.name}", the first live agent above it (rule 4)`)
+    holdsNoHandle(said.why)
+  }, 60_000)
+
+  it('names the secretary by its office name, and keeps a stamp no agent row answers as stored (rule 5)', async () => {
+    const { responsibleFor } = await import('../src/server/lib/delegation.ts')
+    const alone = responsibleFor(lonerTask)
+    expect(alone.who).toEqual({ kind: 'agent', id: idOf(KEEPER.handle) })
+    expect(alone.why).toContain(`The agent "${LONER.name}" created this task`)
+    expect(alone.why).toContain(`the secretary "${KEEPER.name}" is responsible (rule 5)`)
+    holdsNoHandle(alone.why)
+    const stranger = responsibleFor(strangerTask)
+    expect(stranger.who).toEqual({ kind: 'agent', id: idOf(KEEPER.handle) })
+    expect(stranger.why).toContain(`The agent "${A_STAMP_NO_AGENT_HAS}" created this task`)
+    expect(stranger.why).toContain(`the secretary "${KEEPER.name}" is responsible (rule 5)`)
+    expect(stranger.why).not.toContain(createI18n('en').t('record.writer.unregisteredAgent'))
+    holdsNoHandle(stranger.why)
+  }, 60_000)
 })

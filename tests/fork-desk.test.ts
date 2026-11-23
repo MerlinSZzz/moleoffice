@@ -31,7 +31,7 @@
 import type { FastifyInstance } from 'fastify'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { THE_TEST_OFFICES_OWNER } from './a-page-of-a-test-office.ts'
-import { apiApp, freshDb, one, type TestDb } from './helpers.ts'
+import { apiApp, freshDb, governsTheWholeProject, one, type TestDb } from './helpers.ts'
 import type { ForksReply } from '../src/server/api/forks.ts'
 import type { NeedsYouReply } from '../src/server/api/needs-you.ts'
 
@@ -139,7 +139,14 @@ async function fileDecision(workspaceId: string, title: string, data: unknown = 
     method: 'POST',
     url: '/api/records',
     headers: asPerson(workspaceId),
-    payload: { kind: 'decision', title, data: data !== null && typeof data === 'object' && !Array.isArray(data) ? { replaces: [], ...(data as Record<string, unknown>) } : data },
+    payload: {
+      kind: 'decision',
+      title,
+      data:
+        data !== null && typeof data === 'object' && !Array.isArray(data)
+          ? { ...governsTheWholeProject(), replaces: [], ...(data as Record<string, unknown>) }
+          : data,
+    },
   })
   expect(res.statusCode, res.body).toBe(201)
   return (res.json() as { record: { id: string } }).record.id

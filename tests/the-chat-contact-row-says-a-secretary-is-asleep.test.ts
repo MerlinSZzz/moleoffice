@@ -13,21 +13,23 @@
  * made up; none of it is a real person's or a real office's.
  *
  * WHAT IS PROVED, for a secretary that is a permanent resident and has set a sleep time:
- *   shown while open  1. The chat is open on the contact list, and its row for the secretary says the sleep time. The
+ *   shown while open  1. The chat is open on the contact list. Its row for the secretary has drawn the office's
+ *                       reading in its dot, and draws no sleep word, because the secretary is awake. The
  *                       office begins the sleep by its clock, at a moment inside the sleep time. With no reload, the
  *                       row's `.px-chat-sleep` comes to say it is asleep within the time the server promises for a
  *                       presence change: one look of its presence clock (THE LOOK, below).
  *   after a reload    2. The chat is open on the secretary's conversation, and this browser remembers that. No page of
- *                       this browser watches while the clock begins the sleep, so the answer kept for it still says
- *                       the sleep time. The page is loaded again into the conversation and the back arrow is pressed:
+ *                       this browser watches while the clock begins the sleep, so the answer kept for it still reads
+ *                       the secretary awake. The page is loaded again into the conversation and the back arrow is pressed:
  *                       the row must say it is asleep, from a reading of its own and not only the kept one.
- *   once it has ended 3. The person wakes it. The row stops saying asleep within one look of the same clock.
+ *   once it has ended 3. The person wakes it. Within one look of the same clock, the row draws no sleep word at all,
+ *                       as for any awake resident.
  *
  * THE CLOCK. The test office's API server is a child process of its own, so a minute of `aMinuteOfTheSleepClock` cannot
  * be run in it from here, and the test never runs one. The office's own sleep clock is given one run a second through
  * `liveApp`'s `runTheSleepClockEveryMs` (the setting MOLE_OFFICE_RUN_THE_SLEEP_CLOCK_EVERY_MS), so the wait left is the
- * wait for the sleep time's minute to open. The test first sets a sleep time thirty minutes ahead, so each contact row
- * has a sleep time to say when its page opens. It opens the two pages below and parks one of them. It then sets the
+ * wait for the sleep time's minute to open. The test first sets a sleep time thirty minutes ahead, so the office begins
+ * no sleep while the pages open. It opens the two pages below and parks one of them. It then sets the
  * sleep time to the first whole minute at least ten seconds ahead, checks that the door answered before that minute
  * opened, and waits for the office's own clock to begin the sleep. That wait is at most the chosen minute, under seventy
  * seconds away, and then two runs of the short clock (2,000 ms); it is never 200,000 ms. The presence read after the
@@ -62,7 +64,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { createI18n } from '../src/shared/i18n.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
-import { liveApp, thePersonsKeyHeader, waitForThePage, type LiveApp } from './helpers.ts'
+import { A_SLEEP_TIME, liveApp, thePersonsKeyHeader, waitForThePage, type LiveApp } from './helpers.ts'
 import { openTheChat } from './open-the-chat.ts'
 
 const t = createI18n('en').t
@@ -98,8 +100,6 @@ let person: Record<string, string>
 let sleeperId = ''
 /** The words the row must say once the office has begun the sleep, read from the office's own answer. */
 let asleepWords = ''
-/** The words the row says before the sleep begins: the sleep time it was set to. */
-let sleepTimeWords = ''
 /** The parked browser whose kept answer is the contact list read before the sleep began. */
 let parked: BrowserContext | null = null
 
@@ -142,8 +142,17 @@ async function started(handle: string, name: string, role: string): Promise<{ id
 /** One contact row, by the registry id it is drawn for. */
 const theContactRow = (page: Page, id: string): ReturnType<Page['locator']> => page.locator(`.px-chat-contact[data-contact="agent:${id}"]`).first()
 
-/** That row's sleep line. */
+/** That row's sleep word. */
 const theSleepLine = (page: Page, id: string): ReturnType<Page['locator']> => theContactRow(page, id).locator('.px-chat-sleep')
+
+/** Wait until the row's dot has drawn the office's reading, so a sleep word that is not drawn is not a reading still on its way. */
+async function theReadingHasLanded(page: Page, id: string): Promise<void> {
+  await theContactRow(page, id).waitFor({ state: 'visible', timeout: 30_000 })
+  await theContactRow(page, id)
+    .locator('.px-chat-dot:not([data-colour="none"])')
+    .first()
+    .waitFor({ state: 'attached', timeout: 30_000 })
+}
 
 /** The words the line draws, trimmed; empty when it is not drawn. */
 async function theWordsOf(line: ReturnType<Page['locator']>): Promise<string> {
@@ -203,34 +212,33 @@ beforeAll(async () => {
   const proposed = await call('POST', '/api/residents/proposals', asAgent(PROPOSER.handle, proposer.key), {
     agentId: sleeperId,
     because: 'Made-up reason: it has kept this office’s schedule for weeks.',
+    sleepTime: A_SLEEP_TIME,
   })
   expect(proposed.status, proposed.text).toBe(201)
   const confirmed = await call('POST', `/api/residents/proposals/${String(proposed.json['proposal'].id)}/confirm`, asPerson())
   expect(confirmed.status, confirmed.text).toBe(200)
 
-  // THE FIRST SLEEP TIME, thirty minutes ahead, so each contact row has a sleep time to say when its page opens. Its
-  // minute is never the minute chosen below.
+  // THE FIRST SLEEP TIME, thirty minutes ahead, so the office begins no sleep while the pages open. Its minute is never
+  // the minute chosen below.
   const farBegins = Math.ceil((Date.now() + THE_FIRST_SLEEP_TIME_IS_MS_AHEAD) / 60_000) * 60_000
   const far = new Date(farBegins)
   const farStartsAt = `${String(far.getHours()).padStart(2, '0')}:${String(far.getMinutes()).padStart(2, '0')}`
   const firstSet = await call('PUT', `/api/residents/${sleeperId}/sleep-time`, asPerson(), { startsAt: farStartsAt, minutes: SLEEPER.minutes })
   expect(firstSet.status, firstSet.text).toBe(200)
   expect(firstSet.json['sleep'].sleepTime.startsAt).toBe(farStartsAt)
-  sleepTimeWords = t('resident.sleep.line.sleepsAt', { at: farStartsAt })
 
-  // THE PAGE THAT STAYS OPEN, on the contact list, while the office begins the sleep.
+  // THE PAGE THAT STAYS OPEN, on the contact list, while the office begins the sleep. Its row has drawn the office's
+  // reading once its dot has a colour, and an awake secretary has no sleep word.
   await openTheContactList(app.page)
-  const line = theSleepLine(app.page, sleeperId)
-  await line.waitFor({ state: 'visible', timeout: 30_000 })
-  expect(await theWordsOf(line), 'the contact row did not first say the sleep time the office had just set').toBe(sleepTimeWords)
+  await theReadingHasLanded(app.page, sleeperId)
+  expect(await theSleepLine(app.page, sleeperId).count(), 'the contact row drew a sleep word for the awake secretary').toBe(0)
 
   // THE PAGE THAT IS PARKED IN THE CONVERSATION, so its kept answer is the list read before the sleep began.
   parked = await app.browser.newContext({ viewport: { width: 1440, height: 900 } })
   const parkedPage = await parked.newPage()
   await openTheContactList(parkedPage)
-  const parkedLine = theSleepLine(parkedPage, sleeperId)
-  await parkedLine.waitFor({ state: 'visible', timeout: 30_000 })
-  expect(await theWordsOf(parkedLine), 'the parked page did not first say the sleep time').toBe(sleepTimeWords)
+  await theReadingHasLanded(parkedPage, sleeperId)
+  expect(await theSleepLine(parkedPage, sleeperId).count(), 'the parked page drew a sleep word for the awake secretary').toBe(0)
   await theContactRow(parkedPage, sleeperId).click()
   await parkedPage.locator('.px-chat-back').first().waitFor({ state: 'visible', timeout: 30_000 })
   // THE PAGE CACHE WRITES WHAT THE DRAWING HOLDS 400 MS AFTER ITS LAST CHANGE; the kept answer must be on disk.
@@ -302,19 +310,19 @@ describe('the chat’s contact row for a sleeping secretary', () => {
     }
   }, 120_000)
 
-  it('3: once the person wakes it, the row stops saying asleep', async () => {
+  it('3: once the person wakes it, the row draws no sleep word', async () => {
     const line = theSleepLine(app.page, sleeperId)
     await expect.poll(() => theWordsOf(line), { timeout: 30_000, message: 'the row was not asleep before the wake was pressed' }).toBe(asleepWords)
     const woke = await call('POST', `/api/residents/${sleeperId}/wake`, asPerson())
     expect(woke.status, woke.text).toBe(200)
+    // A COUNT, so the poll never reads the words or a mark of a word that is already gone.
     await expect
-      .poll(() => theWordsOf(line), {
+      .poll(() => line.count(), {
         timeout: THE_LOOK_THIS_OFFICE_IS_GIVEN_MS + 20_000,
         message:
-          'the contact row still said the secretary was asleep after the person woke it, past the look this office ' +
+          'the contact row still drew a sleep word after the person woke it, past the look this office ' +
           `was given (${String(THE_LOOK_THIS_OFFICE_IS_GIVEN_MS)} ms)`,
       })
-      .not.toBe(asleepWords)
-    expect(await line.getAttribute('data-sleep')).not.toBe('asleep')
+      .toBe(0)
   }, A_CASE_MAY_TAKE_MS)
 })

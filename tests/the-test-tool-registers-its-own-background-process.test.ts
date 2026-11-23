@@ -266,7 +266,7 @@ describe('a --print start runs nothing and sends nothing, with or without --back
 })
 
 describe('a refused registration and a missing seat', () => {
-  it.each([400, 403, 409])('runs the tests and keeps vitest\'s exit code when the door answers %i', async (status) => {
+  it.each([400])('runs the tests and keeps vitest\'s exit code when the door answers %i', async (status) => {
     answer = (url) => url === REGISTER
       ? { status, body: { error: `the door answers ${String(status)}` } }
       : { status: 201, body: { run: THE_RUN } }

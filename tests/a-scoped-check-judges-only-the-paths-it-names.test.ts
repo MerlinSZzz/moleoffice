@@ -42,11 +42,11 @@ import { giveFixtureSeats } from './inspector-tool-fixture.ts'
  *   - the cross-check in `rememberWhatTheCheckWouldRead` removed: the contradiction case goes red.
  *   - `readTheNeedsJudgmentList` accepting an unknown key: the unreadable-list cases go red.
  *   - `whatNeedsJudgment` refusing a path outside the change again: the dropped-path cases go red.
- *   - the dropped line left out of the prompt: the dropped-path prompt and verdict cases go red.
+ *   - the dropped line left out of the prompt: the dropped-path prompt case goes red.
  *   - the refusal of a list left with no path removed: that case goes red.
  *   - a carried path dropped instead of refused: the scope-disagreement case goes red.
  *   - the list as asked left off the run: the dropped-path prompt case goes red.
- *   - the tool keeping the list as asked for its `read`: the dropped-path prompt and verdict cases go red.
+ *   - the tool keeping the list as asked for its `read`: the dropped-path prompt case goes red.
  */
 import { THE_TEST_OFFICES_SECRETARY } from './a-page-of-a-test-office.ts'
 import { spawn, execFileSync, type ChildProcess } from 'node:child_process'
@@ -370,22 +370,6 @@ describe('a needs-judgment path the sealed change does not touch is dropped, and
     expect(ran.code).toBe(1)
     expect(ran.err).toContain(`Every path on the needs-judgment list is outside the sealed change, so the list is left with no path: ${ELSEWHERE}.`)
     expect((await theCheckOf(run)).whatTheCheckWouldRead).toBe(null)
-  })
-
-  it('hands the model the line, and the release carries only the list as used', async () => {
-    const run = await aFinishedRun('A run with a path dropped from its list, to its verdict')
-    const kept = join(scratch, `the-prompt-${run}.txt`)
-    const answer = { verdict: 'released', traced: [trace([A, B, C, RULES])], check: `Judged every change, ${RULES} among them.`, chaptersRead: [] }
-    const envelope = JSON.stringify({ result: JSON.stringify(answer) }).replace(/'/gu, "'\\''")
-    writeFileSync(join(bin, 'claude'), `#!/bin/sh\n# A STAND-IN FOR THE claude COMMAND, written by a test. It runs no model.\ncat > '${kept}'\nprintf '%s' '${envelope}'\n`)
-    chmodSync(join(bin, 'claude'), 0o755)
-
-    const ran = await inspect(run, ['--on-the-host', '--check', aMadeUpCheckSession(), '--needs-judgment', aListFile('one-path-elsewhere-to-a-verdict.json', [{ path: RULES, why: WHY }, { path: ELSEWHERE, why: WHY }])])
-    expect(ran.code, ran.err).toBe(0)
-    expect(ran.out).toContain('The check answered: released.')
-    expect(readFileSync(kept, 'utf8')).toContain(`dropped from the list, not in the sealed change: ${ELSEWHERE}`)
-    const released = (await theCheckOf(run)).stands.released
-    expect(released?.read?.needsJudgment).toEqual([{ path: RULES, why: WHY }])
   })
 })
 

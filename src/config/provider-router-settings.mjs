@@ -23,6 +23,8 @@ export const PROVIDER_ROUTER_SETTINGS = [
     absentMeans: null,
     inTemplate: true,
     notInTemplateBecause: null,
+    served: true,
+    notServedBecause: null,
     emptyMeans: null,
   },
   {
@@ -33,6 +35,8 @@ export const PROVIDER_ROUTER_SETTINGS = [
     absentMeans: 'no run cap is set, so the office issues no router token and no dsh run starts through the provider router',
     inTemplate: true,
     notInTemplateBecause: null,
+    served: true,
+    notServedBecause: null,
     emptyMeans: null,
   },
 ]

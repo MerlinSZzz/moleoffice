@@ -154,7 +154,8 @@ it('the actual renderer emits zero selection for preview/village/district/low/ag
 it('either view reporting notAgents removes the previously loaded actor and explicitly labels its nameplate and target without a project filter', () => {
   documentStub(); const { fixture, roster } = build(), id = roster.agents[0]!.id, state = factsFor(fixture, [id])[id]!
   const labels: string[] = [], begin = vi.fn()
-  const drawing = { fillText: (value: string) => labels.push(value), fillRect: () => {}, beginPath: begin } as unknown as CanvasRenderingContext2D
+  const drawing = { fillText: (value: string) => labels.push(value), fillRect: () => {}, beginPath: begin, roundRect: () => {}, fill: () => {}, stroke: () => {}, moveTo: () => {}, lineTo: () => {}, closePath: () => {}, measureText: (_value: string) => ({ width: 0 }) } as unknown as CanvasRenderingContext2D
+  const nameplateDrawing = { ...drawing, beginPath: () => {} } as CanvasRenderingContext2D
   for (const view of ['people', 'work'] as const) {
     const model = mapOffice(roster, null, null, { [id]: { ...state, [view]: { status: 'absent', receivedAt: 2, error: null } } })
     const person = model.occupants[0]!, key = person.key, foot = { x: 100, y: 100 }
@@ -163,7 +164,7 @@ it('either view reporting notAgents removes the previously loaded actor and expl
     Object.assign(map, { occupants: new Map([[key, person]]), model, individuals: true, layout: { bounds: { x: 0, y: 0, width: 800, height: 600 }, seats: { [key]: { foot } } } })
     const inner = map as unknown as { actor(ctx: CanvasRenderingContext2D, key: string, point: object): void; nameplate(ctx: CanvasRenderingContext2D, key: string, rect: object): void; targetSteps(keys: string[]): Generator<void>; targets: Node }
     inner.actor(drawing, key, foot); expect(begin).not.toHaveBeenCalled()
-    labels.length = 0; inner.nameplate(drawing, key, { x: 0, y: 0, width: 180, height: 40 })
+    labels.length = 0; inner.nameplate(nameplateDrawing, key, { x: 0, y: 0, width: 180, height: 40 })
     expect(labels).toContain(words.en.agentAbsent)
     const targets = inner.targetSteps([key]); while (!targets.next().done) {}
     expect(inner.targets.children[0]!.attributes['aria-label']).toContain(words.en.agentAbsent)

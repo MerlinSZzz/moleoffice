@@ -1,6 +1,11 @@
 // Copyright © 2026 Zhengyang Shen
 // Licensed under the MIT License. See LICENSE.
-/** The real confirmation answer supplies every waiting line. All runs here are invented in a throwaway office. */
+/**
+ * The real confirmation answer supplies every waiting line. All runs here are invented in a throwaway office.
+ *
+ * As decided in November 2026 (explanations off the pages), the press that closes a run has no sentence above it, and a
+ * closed run's panel draws its standing word without the fixed sentence. The waiting line names who may confirm.
+ */
 import { createElement as h } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import type { FastifyInstance } from 'fastify'
@@ -97,11 +102,13 @@ async function sentences(run: string, expected: string[], rule: string) {
   const shared = whatTheRunWaitsFor(record.data, stands, word, nameOf, permission)
   const html = renderToStaticMarkup(h(panel, { record, reportConfirmation: permission, participants: { agents: Object.entries(names).map(([handle, id]) => ({ id, handle, name: handle })) } as any }))
   const waiting = plain(/class="chk-waiting[^"]*">(.*?)<\/p>/s.exec(html)?.[1] ?? '')
-  const press = plain(/class="chk-part chk-confirm">.*?<p class="chk-said">(.*?)<\/p>/s.exec(html)?.[1] ?? '')
+  const press = /class="chk-part chk-confirm">(.*?)<\/section>/s.exec(html)?.[1]
+  expect(press, 'the press is drawn').toBeDefined()
+  expect(press, 'no sentence above the press').not.toContain('chk-said')
   const server = await app.inject({ method: 'GET', url: `/api/checks/${run}`, headers: person })
   expect(server.statusCode, server.body).toBe(200)
   const serverWait = server.json().stands.waitingFor
-  for (const [surface, sentence] of Object.entries({ shared, waiting, press, howARunStands: stands.waitingFor, server: serverWait })) {
+  for (const [surface, sentence] of Object.entries({ shared, waiting, howARunStands: stands.waitingFor, server: serverWait })) {
     expect(sentence, surface).toBeTruthy()
     for (const handle of expected) expect(sentence, surface).toContain(handle)
     for (const handle of ['asker', 'registrar'].filter(handle => !expected.includes(handle))) expect(sentence, surface).not.toContain(handle)
@@ -135,11 +142,10 @@ describe('the confirm sentences are true on every path', () => {
     const f = await fixture({ noAsker: true, nobodyTold: true })
     await sentences(f.worker, [], 'any-registered')
   })
-  it('names no supervisor in the reporting heading or the no-verdict explanation, and keeps the stored standing word', () => {
+  it('names no supervisor in the reporting heading or the no-verdict state, and keeps the stored standing word', () => {
     expect(RUN_STANDING.reporting.word).toBe('Waiting for its report to be confirmed')
     expect(word('chk.standing.reporting.word')).toBe(RUN_STANDING.reporting.word)
-    expect(word('chk.noVerdictYet')).not.toContain('supervisor')
-    expect(word('chk.noVerdictYet')).toContain('closes when the report is confirmed')
+    expect(word('chk.noVerdictYetWord')).not.toContain('supervisor')
     expect(word('chk.says.standingNamed.reporting')).toBe('reporting')
   })
   for (const [who, path] of [['person', 'asker'], ['person', 'registrar-after-asker-ended'], ['person', 'reported-to'], ['person', 'any-registered'], ['registrar', 'registrar-after-asker-ended']] as const) {
@@ -153,7 +159,8 @@ describe('the confirm sentences are true on every path', () => {
       expect(confirmed.by).toEqual(who === 'person' ? { kind: 'person', id: THE_PERSON } : ref(names['registrar']!))
       expect(RUN_STANDING.closed.sentence).toBe('The report was confirmed, so this run is over and what it was holding can be let go.')
       const html = plain(renderToStaticMarkup(h(panel, { record: answer['record'] })))
-      expect(html).toContain(RUN_STANDING.closed.sentence)
+      expect(html).toContain(RUN_STANDING.closed.word)
+      expect(html).not.toContain(RUN_STANDING.closed.sentence)
       expect(html).not.toContain('The supervisor confirmed')
       const row = db.client.sqlite.prepare("SELECT data FROM records WHERE kind = 'flow_run' AND json_extract(data, '$.run') = ?").get(f.worker) as { data: string }
       const steps = JSON.parse(row.data).stepsTaken as { does: string; actor?: unknown }[]

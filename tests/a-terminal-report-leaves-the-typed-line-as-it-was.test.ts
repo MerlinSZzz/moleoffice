@@ -9,8 +9,9 @@
  * program asked for focus reports. So opening or collapsing the view left an empty line half typed, and every line a
  * secretary or a quick input typed after it was refused as typed onto a half line.
  *
- * Every report that library sends back as input, by its source (InputHandler.ts, CoreBrowserTerminal.ts and
- * CoreMouseService.ts), is named below, with what it does to the line now. A real holder runs for a database of this
+ * One report of each form the holder takes out, and every report that still marks the line, of those that library sends
+ * back as input by its source (InputHandler.ts, CoreBrowserTerminal.ts and CoreMouseService.ts), is named below, with
+ * what it does to the line now. A real holder runs for a database of this
  * test's own (tests/terminal-holder-stand.ts). Its terminals run /bin/sh reading lines with the terminal's own line
  * editing, so a report's bytes reach the program as they are and no shell reads them as a key.
  *
@@ -26,7 +27,7 @@
  * MUTATIONS, of src/holder/index.mjs, each alone after a control run, then restored, 5 November 2026, from the logs of
  * the runs:
  *   1. the holder reads every report as typing, as it did before: cases 1, 2 and 3 go red (3 of 4); case 1 on the line
- *      for somebody else after focus in, case 2 on the person's Enter, case 3 on all fifteen reports.
+ *      for somebody else after focus in, case 2 on the person's Enter, case 3 on every report.
  *   2. focus in is not taken out: cases 1 and 2 go red (2 of 4); case 1 on the line for somebody else after focus in.
  *   3. focus out is not taken out: cases 1 and 2 go red (2 of 4); case 1 on the quick input after focus out.
  *   4. a report is taken out only when it is the whole piece: case 1 goes red (1 of 4), on the line after the joined
@@ -34,7 +35,7 @@
  *   5. a report is read as a printable character: cases 1, 2 and 3 go red (3 of 4); case 2 on the person's Enter, after
  *      its refusal held.
  *   6. focus in or out drops the person's line and makes it plain: case 2 goes red (1 of 4), on the refusal.
- *   7. only focus is taken out: case 3 goes red (1 of 4), on all fifteen reports.
+ *   7. only focus is taken out: case 3 goes red (1 of 4), on every report.
  *   8. the cursor position on the first row and both mouse forms are taken out too: case 4 goes red (1 of 4), on all
  *      three.
  */
@@ -55,23 +56,16 @@ const AFTER_THE_SCREEN_MS = 500
 const FOCUS_IN = '\x1b[I'
 const FOCUS_OUT = '\x1b[O'
 
-/** EVERY OTHER REPORT THE PAGE'S TERMINAL SENDS ON ITS OWN, which no key sends, as the library writes each one. */
+/** ONE REPORT OF EACH OTHER FORM THE HOLDER TAKES OUT (TERMINAL_REPORTS in src/holder/index.mjs), which no key sends, as the library writes it. */
 const THE_REPORTS_NO_KEY_SENDS = [
   { report: 'the primary device attributes', bytes: '\x1b[?1;2c' },
-  { report: 'the primary device attributes of a VT102', bytes: '\x1b[?6c' },
-  { report: 'the secondary device attributes', bytes: '\x1b[>0;276;0c' },
   { report: 'the status report', bytes: '\x1b[0n' },
   { report: 'the cursor position on a row below the first', bytes: '\x1b[12;40R' },
   { report: 'the cursor position in its private form', bytes: '\x1b[?1;5R' },
   { report: "a private mode's state", bytes: '\x1b[?1004;1$y' },
-  { report: "a mode's state", bytes: '\x1b[4;2$y' },
   { report: "the text area's size in characters", bytes: '\x1b[8;30;100t' },
-  { report: "the text area's size in pixels", bytes: '\x1b[4;510;900t' },
-  { report: "a character cell's size in pixels", bytes: '\x1b[6;17;9t' },
   { report: "a setting's value", bytes: '\x1bP1$r1;30r\x1b\\' },
-  { report: 'a setting the terminal does not report', bytes: '\x1bP0$r\x1b\\' },
   { report: "the background colour's value", bytes: '\x1b]11;rgb:1e1e/1e1e/1e1e\x1b\\' },
-  { report: "a palette colour's value", bytes: '\x1b]4;1;rgb:cdcd/3131/3131\x1b\\' },
 ] as const
 
 /**

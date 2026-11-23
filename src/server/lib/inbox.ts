@@ -40,7 +40,7 @@
  * it, silently, which is the one thing this whole area exists to prevent.
  */
 
-import { and, asc, eq, inArray, sql } from 'drizzle-orm'
+import { and, asc, eq, inArray, isNull, sql, type SQL, type SQLWrapper } from 'drizzle-orm'
 import { db } from '../db/client.ts'
 import { agentMessages, agentThreads, records, revisions } from '../db/schema.ts'
 import { PanelError } from './panel-error.ts'
@@ -52,6 +52,30 @@ import { checkSubtraction, type InboxBucket, type LeftOutCounts, type LeftOutGro
 
 /** The kind whose records are durable agents. Written out once so a typo cannot widen a query. */
 export const AGENT_KIND = 'agent'
+
+/** The columns of a record `isAnActiveAgent` reads: the records table's own, or a subquery's by its alias. */
+export interface TheColumnsOfAnAgentRecord {
+  kind: SQLWrapper
+  data: SQLWrapper
+  deletedAt: SQLWrapper
+}
+
+/**
+ * THE CONDITION THAT A RECORD IS AN ACTIVE AGENT: a live record of the agent kind whose stored state is "active", one
+ * that may still be given work. The roster's read of a project's agents and the list of the runs that could serve an
+ * active agent both ask it, so one place says who is active (decision srwXywF1oYIs). The kind and the state are
+ * handed to SQL as values.
+ */
+export function isAnActiveAgent(record: TheColumnsOfAnAgentRecord): SQL {
+  // ABSENT IS NOT ASSUMED ACTIVE. The kind requires `state`, so an agent without one is a record
+  // that was written round the validator, and drawing it as active would be a guess about
+  // whether the owner may still give it work. Its state reads as null here, which equals nothing.
+  return and(
+    eq(record.kind, AGENT_KIND),
+    isNull(record.deletedAt),
+    eq(sql`json_extract(${record.data}, '$.state')`, 'active'),
+  ) as SQL
+}
 
 /**
  * Whether a string is a handle at all, said as a sentence rather than as a pattern. The rule is the

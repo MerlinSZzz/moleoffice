@@ -24,7 +24,7 @@ import { z } from 'zod'
  * route should not be the place that knows the order of them.
  */
 
-import { and, eq, sql } from 'drizzle-orm'
+import { and, eq, sql, type SQL } from 'drizzle-orm'
 import { existsSync } from 'node:fs'
 import { db, sqlite } from '../db/client.ts'
 import { changes, records } from '../db/schema.ts'
@@ -68,7 +68,7 @@ import { getWorkspace } from '../db/get-workspace.ts'
 import { packageInspectionOf } from '@shared/workspaces.ts'
 import { readParticipant } from '../db/read-participant.ts'
 import { theOneAgentAStringNames } from './agent-references.ts'
-import { theInspectorCardHeldBy, theInspectorOfTheRun, theNameAPersonReads, whoHoldsTheSecretaryCard, writeAMessage } from './inspection.ts'
+import { theInspectorCardHeldBy, theInspectorOfTheRun, theNameAPersonReads, theOfficeNameOf, whoHoldsTheSecretaryCard, writeAMessage } from './inspection.ts'
 import { THE_OFFICE } from './the-office.ts'
 import type { AnotherNoticeKind, NoticeKind } from './notices.ts'
 import { aJudgedPoint } from '@shared/the-verdict-door.ts'
@@ -103,12 +103,13 @@ import {
   type PackageSuit,
   type ReturnForm,
   type PackageParent, type PackageMaterial, type InsideTake, type PackageRestatement, type PackageAlignmentAnswer, type PackagePointOutcome, type PackageHandback, type PackageCheck, type PackageCheckPoint,
-  type PackageAcceptance, type PackageAcceptedPoint, type PackageActs,
+  type PackageAcceptance, type PackageAcceptedPoint, type PackageActs, type PackageSelfCompletion, type PackageAuditVerdict,
   type PackagePlanShape, type PlanHint, type StoredPlan,
-  PLAN_HINT_CODES, PLAN_HINT_WORD_KEYS, readAStoredPlan,
-  theAlignmentOf, theAnswerToTheNewest, theNextOrderOf,
+  PLAN_HINT_CODES, PLAN_HINT_WORD_KEYS, PACKAGE_WORK_ENTRY_KEYS, readAStoredPlan,
+  theAlignmentOf, theAnswerToTheNewest, theNextOrderOf, thePointsDoneFromActs,
 } from '@shared/delegation.ts'
 import { thePlansHints } from './package-plan-hints.ts'
+import { alignedPlanOf, enrollmentReading, checkRawWork, checkWorkEntries, progressOf, writeProgress } from './package-progress.ts'
 
 // ============================================================================ who is responsible
 
@@ -134,7 +135,7 @@ function theCreateRow(recordId: string): { actorType: string; actorId: string; s
 }
 
 /**
- * THE REGISTRY ROW A LIVE AGENT ANSWERS TO, read with the stored reader the caller made, or null.
+ * THE REGISTRY ROW ONE STRING NAMES, live or retired, read with the stored reader the caller made, or null.
  *
  * THE STORED READER'S THREE-WAY RULE. An EXACT ID first, and it settles it alone, because an id is
  * never reused; failing that, the ONE agent bearing the string as a handle; and NONE where more than
@@ -144,14 +145,13 @@ function theCreateRow(recordId: string): { actorType: string; actorId: string; s
  * here a second time, over every agent read into memory; the caller now hands it the reader of the
  * rows each string names (`theStarterEachStringNames`), and the row it names is read by its id.
  *
- * A RETIRED ROW IS NOT LIVE and returns null either way: this function's callers ask who answers for
- * the work now.
+ * A RETIRED ROW IS RETURNED TOO, because a sentence names a retired creator by its office name. The
+ * caller asks whether the row is live: who answers for the work now is only ever a live agent.
  */
-function aLiveAgent(handle: string, theAgentThisNames: (id: string) => AStarter | null): RegisteredAgent | null {
+function theRowAStringNames(handle: string, theAgentThisNames: (id: string) => AStarter | null): RegisteredAgent | null {
   const named = theAgentThisNames(handle)
   if (named === null) return null
-  const row = readParticipant({ kind: 'agent', id: named.id }) as RegisteredAgent | null
-  return row === null || row.retired === true ? null : row
+  return readParticipant({ kind: 'agent', id: named.id }) as RegisteredAgent | null
 }
 
 /**
@@ -205,16 +205,21 @@ export function responsibleFor(recordId: string, readers?: ResponsibilityReaders
 
   if (create.actorType === 'agent') {
     const theAgentThisNames = readers?.agent ?? theStarterEachStringNames()
-    const live = readers === undefined ? (id: string) => aLiveAgent(id, theAgentThisNames) : (id: string) => {
-      const agent = readers.agent(id)
+    const rowOf = readers === undefined ? (id: string) => theRowAStringNames(id, theAgentThisNames) : readers.agent
+    const live = (id: string) => {
+      const agent = rowOf(id)
       return agent === null || agent.retired === true ? null : agent
     }
-    const creator = live(create.actorId)
+    const stamped = rowOf(create.actorId)
+    // A PERSON READS THE CREATOR BY ITS OFFICE NAME where one row answers its stamp, retired or not. Where none
+    // does, the stamp is shown as the change log stores it.
+    const creatorsName = stamped === null ? create.actorId : theOfficeNameOf(stamped)
+    const creator = stamped === null || stamped.retired === true ? null : stamped
     if (creator !== null) {
       return {
         who: { kind: 'agent', id: creator.id },
         why:
-          `The agent "${creator.handle}" created this task and is still live, so it is responsible for it to ` +
+          `The agent "${creatorsName}" created this task and is still live, so it is responsible for it to ` +
           `the end (rule 3).` + personNote,
       }
     }
@@ -230,8 +235,8 @@ export function responsibleFor(recordId: string, readers?: ResponsibilityReaders
       return {
         who: { kind: 'agent', id: above.id },
         why:
-          `The agent "${create.actorId}" created this task and is retired or gone, so responsibility passes ` +
-          `up its starter chain to "${above.handle}", the first live agent above it (rule 4).` + personNote,
+          `The agent "${creatorsName}" created this task and is retired or gone, so responsibility passes ` +
+          `up its starter chain to "${theOfficeNameOf(above)}", the first live agent above it (rule 4).` + personNote,
       }
     }
 
@@ -241,14 +246,14 @@ export function responsibleFor(recordId: string, readers?: ResponsibilityReaders
       return {
         who: { kind: 'agent', id: secretary.id },
         why:
-          `The agent "${create.actorId}" created this task and the chain of starters above it reaches no live ` +
-          `agent, so the secretary "${secretary.handle}" is responsible (rule 5).` + personNote,
+          `The agent "${creatorsName}" created this task and the chain of starters above it reaches no live ` +
+          `agent, so the secretary "${theOfficeNameOf(secretary)}" is responsible (rule 5).` + personNote,
       }
     }
     return {
       who: null,
       why:
-        `The agent "${create.actorId}" created this task, the chain of starters above it reaches no live agent, ` +
+        `The agent "${creatorsName}" created this task, the chain of starters above it reaches no live agent, ` +
         `and no agent holds the secretary card today, so no agent answers for it (rule 5, with no secretary to ` +
         `fall to).` + personNote,
     }
@@ -262,7 +267,7 @@ export function responsibleFor(recordId: string, readers?: ResponsibilityReaders
       who: { kind: 'agent', id: secretary.id },
       why:
         `The create row names a ${actorTypeWord(create.actorType).text} write ("${create.actorId}"), which is ` +
-        `neither the person nor an agent, so the secretary "${secretary.handle}" is responsible (rule 5).` +
+        `neither the person nor an agent, so the secretary "${theOfficeNameOf(secretary)}" is responsible (rule 5).` +
         personNote,
     }
   }
@@ -299,6 +304,8 @@ export interface StoredPackage {
   handedBack?: PackageHandback[]
   checks?: PackageCheck[]
   acceptances?: PackageAcceptance[]
+  selfCompletions?: PackageSelfCompletion[]
+  auditVerdicts?: PackageAuditVerdict[]
   at: string
   by: { actorType: string; actorId: string }
 }
@@ -335,13 +342,15 @@ const packageSchema = z.object({
     )).optional(),
   })).optional(),
   acceptances: z.array(entrySchema.extend({ points: z.array(anAcceptedPoint) })).optional(),
+  selfCompletions: z.array(entrySchema.extend({ points: z.array(z.object({ pointId: z.string(), answer: z.enum(['completed', 'reopened']), evidence: z.string().trim().min(1) }).strict()) })).optional(),
+  auditVerdicts: z.array(entrySchema.extend({ audit: z.string().trim().min(1), verdict: z.enum(['pass', 'fail', 'unknown']), evidence: z.string().trim().min(1), words: z.string().trim().min(1) })).optional(),
   at: z.string().refine(value => value.trim() !== ''), by: z.object({ actorType: z.string(), actorId: z.string() }),
 }).passthrough()
 export function packageOf(data: unknown): StoredPackage | null {
   const parsed = packageSchema.safeParse(asBag(data)['package'])
   if (!parsed.success) return null
   const pkg = parsed.data
-  const inside = pkg.parent !== undefined || pkg.lines !== undefined || pkg.pointIds !== undefined || pkg.takenInside !== undefined || pkg.alignments !== undefined || pkg.alignmentAnswers !== undefined || pkg.handedBack !== undefined || pkg.checks !== undefined || pkg.acceptances !== undefined
+  const inside = pkg.parent !== undefined || pkg.lines !== undefined || pkg.pointIds !== undefined || pkg.takenInside !== undefined || pkg.alignments !== undefined || pkg.alignmentAnswers !== undefined || pkg.handedBack !== undefined || pkg.checks !== undefined || pkg.acceptances !== undefined || pkg.selfCompletions !== undefined || pkg.auditVerdicts !== undefined
   if (inside ? !pkg.parent || !pkg.lines?.length || !pkg.pointIds?.length : !pkg.suits || !pkg.acceptanceSource) return null
   // Only outside packages require these fields; inside packages never export them.
   return { ...pkg, moduleIds: pkg.moduleIds ?? [] } as StoredPackage
@@ -523,17 +532,11 @@ function readDelegationColumn(workspaceId: string, inside: boolean, onlyTakenAnd
   for (const task of tasks) {
     if (!hasAPackageKey(task.data)) continue
     const rawPackage = asBag(asBag(task.data)['package'])
-    const markedInside = ['parent', 'lines', 'pointIds', 'takenInside', 'alignments', 'alignmentAnswers', 'handedBack', 'checks', 'acceptances'].some(key => Object.hasOwn(rawPackage, key))
+    const markedInside = ['parent', 'lines', 'pointIds', 'takenInside', 'alignments', 'alignmentAnswers', 'handedBack', 'checks', 'acceptances', 'selfCompletions', 'auditVerdicts'].some(key => Object.hasOwn(rawPackage, key))
     if (markedInside !== inside) continue
     const held = packageOf(task.data)
     if (held === null) {
-      couldNotRead.push({
-        recordId: task.id,
-        title: task.title,
-        because:
-          "This task's package is missing a required part or names a kind of outside work Mole Office does not " +
-          'know. The record is unchanged.',
-      })
+      couldNotRead.push({ recordId: task.id, title: task.title, because: A_PACKAGE_THAT_CANNOT_BE_READ })
       continue
     }
     if (Boolean(held.parent) !== inside) continue
@@ -581,19 +584,7 @@ function readDelegationColumn(workspaceId: string, inside: boolean, onlyTakenAnd
     create: creators.get(id) ?? null,
   }]))
   let claimByRecord: Map<string, ReturnType<typeof liveClaimsForColumn>> | undefined
-  const claimsOn = (recordId: string) => {
-    if (claimByRecord === undefined) {
-      claimByRecord = new Map()
-      for (const claim of liveClaimsForColumn(workspaceId)) {
-        for (const id of new Set(claim.things.filter((thing) => thing.what === 'record').map((thing) => thing.id))) {
-          const list = claimByRecord.get(id) ?? []
-          list.push(claim)
-          claimByRecord.set(id, list)
-        }
-      }
-    }
-    return claimByRecord.get(recordId) ?? []
-  }
+  const claimsOn = (recordId: string) => (claimByRecord ??= theLiveClaimsByRecord(workspaceId)).get(recordId) ?? []
   let agents: ReturnType<typeof listParticipants>['agents'] | undefined
   let agentReader: ReturnType<typeof theAgentAStoredReferenceNamesIn> | undefined
   const agent = (id: string) => (agentReader ??= theAgentAStoredReferenceNamesIn(agents ??= listParticipants().agents))(id)
@@ -619,13 +610,7 @@ function readDelegationColumn(workspaceId: string, inside: boolean, onlyTakenAnd
     const returns = returnsOf(task.data)
     const completed = completionOf(task.data)
     const outsideName = takes.length === 0 ? null : (takes[takes.length - 1]?.who ?? null)
-    const state = packageStateOf({
-      completed: completed !== null,
-      returned: returns.length > 0,
-      outside: takes.length > 0,
-      claimed: claims.length > 0,
-      inside: !inside ? undefined : theActsOf(held),
-    })
+    const state = theStateOfAPackagedTask(task.data, held, inside, claims.length > 0)
     const check = latestCheck?.answer ?? 'none'
     if (progressOnly) {
       progressRows.push({ state, inside: { check } })
@@ -684,6 +669,122 @@ function readDelegationColumn(workspaceId: string, inside: boolean, onlyTakenAnd
   // second would otherwise come back in whatever order the store gave.
   rows.sort((a, b) => b.packagedAt.localeCompare(a.packagedAt) || b.recordId.localeCompare(a.recordId))
   return { rows, progressRows, couldNotRead, workspaceId }
+}
+
+/** Why a task whose package key is there is named rather than read. */
+const A_PACKAGE_THAT_CANNOT_BE_READ =
+  "This task's package is missing a required part or names a kind of outside work Mole Office does not " +
+  'know. The record is unchanged.'
+
+/** Every live claim of one project, by each record it names. */
+function theLiveClaimsByRecord(workspaceId: string): Map<string, ReturnType<typeof liveClaimsForColumn>> {
+  const byRecord = new Map<string, ReturnType<typeof liveClaimsForColumn>>()
+  for (const claim of liveClaimsForColumn(workspaceId)) {
+    for (const id of new Set(claim.things.filter((thing) => thing.what === 'record').map((thing) => thing.id))) {
+      const list = byRecord.get(id) ?? []
+      list.push(claim)
+      byRecord.set(id, list)
+    }
+  }
+  return byRecord
+}
+
+/**
+ * THE STATE OF ONE PACKAGED TASK, as the delegation column draws it: from its completion, its returns, its takes outside,
+ * whether a live claim is on it, and the acts on an inside package. The figures count by the same function.
+ */
+function theStateOfAPackagedTask(data: unknown, held: StoredPackage, inside: boolean, claimed: boolean): PackageState {
+  return packageStateOf({
+    completed: completionOf(data) !== null,
+    returned: returnsOf(data).length > 0,
+    outside: takesOf(data).length > 0,
+    claimed,
+    inside: !inside ? undefined : theActsOf(held),
+  })
+}
+
+/**
+ * WHEN A DONE PACKAGE TURNED DONE: the earlier of its confirmation and the answer that last made every point
+ * accepted or self-completed. A reopened point undoes its completion. The answer is found by working the state out again
+ * with the answers cut short, back to the last one without which the package is not done. Null when it is not done.
+ */
+function whenItTurnedDone(data: unknown, held: StoredPackage | null, claimed: boolean, state: PackageState): string | null {
+  if (state !== 'done') return null
+  const confirmed = completionOf(data)?.at ?? null
+  let accepted: string | null = null
+  if (held !== null) {
+    const answers = [...(held.acceptances ?? []), ...(held.selfCompletions ?? [])].filter(one => one.order !== undefined).sort((a, b) => a.order! - b.order!)
+    const doneThrough = (order: number) => packageStateOf({ completed: false, returned: false, outside: false, claimed, inside: theActsOf({ ...held,
+      acceptances: (held.acceptances ?? []).filter(one => one.order === undefined || one.order <= order),
+      selfCompletions: (held.selfCompletions ?? []).filter(one => one.order === undefined || one.order <= order),
+    }) }) === 'done'
+    let n = answers.length
+    if (n > 0 && doneThrough(answers[n - 1]!.order!)) {
+      while (n > 1 && doneThrough(answers[n - 2]!.order!)) n -= 1
+      accepted = answers[n - 1]!.at
+    }
+  }
+  if (confirmed === null || accepted === null) return confirmed ?? accepted
+  return accepted.localeCompare(confirmed) < 0 ? accepted : confirmed
+}
+
+/** One packaged task as the figures count it. */
+export interface CountedPackage {
+  recordId: string
+  title: string
+  state: PackageState
+  lines: string[]
+  /** The inside package, or null for a package for the outside. */
+  inside: StoredPackage | null
+  /** When its state turned done (`whenItTurnedDone`); null unless it is done. */
+  doneAt: string | null
+}
+
+/**
+ * EVERY PACKAGED TASK OF ONE PROJECT THAT `alsoWhere` LETS THROUGH, WITH ITS STATE, for the figures
+ * (./figures-by-line.ts, ./figures-done-per-day.ts and ./figures-time-to-live.ts). Inside and outside packages are read
+ * together, in one read of the four fields the column reads, and each is stated by `theStateOfAPackagedTask`, so a figure
+ * cannot count a package in a state the column does not draw. An unreadable package is named in `couldNotRead` with the
+ * column's sentence. The live claims are read once, and only when a package is there.
+ */
+export function thePackagesCounted(workspaceId: string, alsoWhere?: SQL): { packages: CountedPackage[]; couldNotRead: DelegationReading['couldNotRead'] } {
+  const packaged = sql`json_type(${records.data}, '$.package') is not null`
+  const tasks = listRecordsWithDataAs({
+    workspaceId, kind: 'task', alsoWhere: alsoWhere === undefined ? packaged : sql`${packaged} and (${alsoWhere})`,
+  }, onlyTheseFieldsOf(['package', 'takenOutside', 'returns', 'completed']))
+  const packages: CountedPackage[] = []
+  const couldNotRead: DelegationReading['couldNotRead'] = []
+  let claimByRecord: Map<string, ReturnType<typeof liveClaimsForColumn>> | undefined
+  for (const task of tasks) {
+    if (!hasAPackageKey(task.data)) continue
+    const held = packageOf(task.data)
+    if (held === null) {
+      couldNotRead.push({ recordId: task.id, title: task.title, because: A_PACKAGE_THAT_CANNOT_BE_READ })
+      continue
+    }
+    // A READABLE PACKAGE CARRYING ANY KEY ONLY AN INSIDE PACKAGE CARRIES HAS A PARENT (`packageOf`), so the parent alone
+    // says which column draws it.
+    const inside = held.parent !== undefined
+    const claimed = ((claimByRecord ??= theLiveClaimsByRecord(workspaceId)).get(task.id) ?? []).length > 0
+    const state = theStateOfAPackagedTask(task.data, held, inside, claimed)
+    packages.push({
+      recordId: task.id, title: task.title, state, lines: held.lines ?? [], inside: inside ? held : null,
+      doneAt: whenItTurnedDone(task.data, inside ? held : null, claimed, state),
+    })
+  }
+  return { packages, couldNotRead }
+}
+
+/** The kind of record a package is carried on. */
+const PACKAGED_KIND = 'task'
+
+/** The stamp of the first package made in one project, or null when none was. Only a stamp that starts with a date counts. */
+export function theFirstPackageMadeIn(workspaceId: string): string | null {
+  const row = sqlite.prepare(
+    "SELECT MIN(json_extract(data, '$.package.at')) AS first FROM records WHERE workspace_id = ? AND kind = ? AND deleted_at IS NULL " +
+      "AND json_type(data, '$.package') = 'object' AND json_extract(data, '$.package.at') GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]*'",
+  ).get(workspaceId, PACKAGED_KIND) as { first: string | null } | undefined
+  return row?.first ?? null
 }
 
 // ============================================================================ making a package
@@ -1550,7 +1651,7 @@ function optionalWords(value: unknown, name: string): string | undefined {
   const trimmed = value.trim()
   return trimmed === '' ? undefined : trimmed
 }
-function appendInside(task: PanelRecord, pkg: StoredPackage, key: 'takenInside' | 'alignments' | 'alignmentAnswers' | 'handedBack' | 'checks' | 'acceptances', entry: object, actor: Actor): PanelRecord {
+function appendInside(task: PanelRecord, pkg: StoredPackage, key: 'takenInside' | 'alignments' | 'alignmentAnswers' | 'handedBack' | 'checks' | 'acceptances' | 'selfCompletions' | 'auditVerdicts', entry: object, actor: Actor): PanelRecord {
   return patchRecord(task.id, { dataPatch: { package: { ...pkg, [key]: [...(pkg[key] ?? []), entry] } } }, actor).record
 }
 /**
@@ -1558,7 +1659,7 @@ function appendInside(task: PanelRecord, pkg: StoredPackage, key: 'takenInside' 
  * written in the same second keep their order by it, and `packageStateOf` reads the acts in that order.
  */
 function anAct<E extends object>(pkg: StoredPackage, entry: E): E & { order: number } {
-  return { ...entry, order: theNextOrderOf([pkg.takenInside, pkg.alignments, pkg.alignmentAnswers, pkg.handedBack, pkg.checks, pkg.acceptances]) }
+  return { ...entry, order: theNextOrderOf([pkg.takenInside, pkg.alignments, pkg.alignmentAnswers, pkg.handedBack, pkg.checks, pkg.acceptances, pkg.selfCompletions, pkg.auditVerdicts]) }
 }
 /**
  * THE PACKAGE DOORS REFUSE NO JUDGEMENT CALL. Whether to take a package again, restate it again, answer again, hand it
@@ -1599,11 +1700,12 @@ export function takeThePackageInside(input: InsideInput) {
 }
 /** The refusal when the `plan` sent with an alignment is neither the older free text nor the fixed shape. */
 export const THE_PLANS_SHAPE =
-  'A plan is either the older free text or the fixed shape {workers, waves, waits}. Each worker names worker, outcome, ' +
-  'points, files, difficulty, difficultyWhy, model and modelWhy. There is no field for a worker’s own steps. Nothing was written.'
+  'A plan is either the older free text or the fixed shape {workers, waves, waits}, with an optional ordered work list, `work`. Each worker names worker, outcome, ' +
+  'points, files, difficulty, difficultyWhy, model and modelWhy. There is no field for a worker’s own steps. ' +
+  `Each work entry is a package {${PACKAGE_WORK_ENTRY_KEYS.package.join(', ')}} or an audit {${PACKAGE_WORK_ENTRY_KEYS.audit.join(', ')}}. Nothing was written.`
 
 /** The shape's plan in the office's words, for the notice the maker reads. */
-function thePlanSaidInEnglish(plan: PackagePlanShape): string {
+function thePlanSaidInEnglish(plan: PackagePlanShape, inspectors: Map<string, { id: string; handle: string }>): string {
   const workers = plan.workers.map(worker => {
     const said = [sayInEnglish('delegation.plan.worker', {
       worker: worker.worker, outcome: worker.outcome, points: worker.points.join(', '), files: worker.files.join(', '),
@@ -1622,7 +1724,10 @@ function thePlanSaidInEnglish(plan: PackagePlanShape): string {
       ? sayInEnglish('delegation.plan.waitMissing', { wave })
       : sayInEnglish('delegation.plan.wait', { wave, why }))
   }
-  return [...workers, ...waves].join(' ')
+  const work = (plan.work ?? []).map(entry => 'package' in entry
+    ? sayInEnglish('packageProgress.planChild', entry)
+    : sayInEnglish('packageProgress.planAudit', { ...entry, handle: inspectors.get(entry.audit)!.handle }))
+  return [...workers, ...waves, ...work].join(' ')
 }
 
 /** The hints in the office's words, for the align reply and the notice the maker reads. */
@@ -1637,8 +1742,15 @@ export function restateThePackage(input: InsideInput & { restated?: unknown; pla
   const restated = requiredWords(input.restated, 'restated')
   // THE PLAN IS CHECKED AS DATA. The older free text is taken as it was; the fixed shape is read by the one
   // reading the page reads, so the two cannot disagree about what a plan is.
-  const plan: StoredPlan | null = readAStoredPlan(input.plan)
+  checkRawWork(input.plan)
+  let plan: StoredPlan | null = readAStoredPlan(input.plan)
   if (plan === null) throw new PanelError(THE_PLANS_SHAPE, 400)
+  let inspectors = new Map<string, { id: string; handle: string }>()
+  if (plan.kind === 'shape' && plan.plan.work !== undefined) {
+    const checked = checkWorkEntries(task, plan.plan.work)
+    plan = { kind: 'shape', plan: { ...plan.plan, work: checked.work } }
+    inspectors = checked.inspectors
+  }
   const goOnWhy = optionalWords(input.goOnWhy, 'goOnWhy')
   // HINTS NEVER REFUSE. They are worked out once, here, from the shape and the Casting rows for the package's project,
   // and stored on the alignment beside the act; an older free-text plan cannot be compared, so it stores no hint and is
@@ -1661,7 +1773,7 @@ export function restateThePackage(input: InsideInput & { restated?: unknown; pla
       ? withTheReminder(
         sayInEnglish('delegation.notice.alignedBodyShape', {
           who: whoActed(input.actor), title: task.title, task: task.id, restated,
-          plan: thePlanSaidInEnglish(plan.plan), hints: theHintsSaidInEnglish(hints),
+          plan: thePlanSaidInEnglish(plan.plan, inspectors), hints: theHintsSaidInEnglish(hints),
         }) + (goOnWhy === undefined ? '' : ` ${sayInEnglish('delegation.notice.goOnWithHints', { why: goOnWhy })}`),
         reminder,
       )
@@ -1741,6 +1853,80 @@ export function acceptThePackage(input: InsideInput & { points?: unknown }) {
   refuseTheTaker(pkg, input.actor)
   if (input.actor.type === 'human') assertThePersonIsProved(input.actor, 'Accepting the points of an inside package')
   else if (!isTheMaker(pkg, input.actor)) throw new PanelError(ONLY_THE_MAKER_MAY_ACCEPT, 403)
+  return writeThePackageAnswer(input, task, pkg)
+}
+
+/** A supervisor's own, evidenced answer for an enrolled child. */
+export function selfCompleteThePackage(input: InsideInput & { points?: unknown }) {
+  const { task, pkg } = insidePackage(input)
+  const reading = enrollmentReading(task)
+  if (reading.state === 'unknown') throw new PanelError(sayInEnglish('packageProgress.planUnknown'), 409)
+  if (reading.state !== 'enrolled') throw new PanelError(sayInEnglish('packageProgress.notEnrolled'), 409)
+  const enrollment = reading.enrollment
+  const caller = participantForActor(input.actor)
+  const latestTake = enrollment.pkg.takenInside?.at(-1)
+  const taker = latestTake ? theParticipantAWriterNames(latestTake.by) : null
+  if (!isTheMaker(pkg, input.actor) || !sameParticipant(caller, taker)) {
+    throw new PanelError(sayInEnglish('packageProgress.notSelfMaker'), 403)
+  }
+  if (input.actor.type === 'human') assertThePersonIsProved(input.actor, sayInEnglish('packageProgress.selfDoor'))
+  const parsed = z.array(z.object({ pointId: z.string().trim().min(1), answer: z.enum(['completed', 'reopened']), evidence: z.string().trim().min(1) }).strict()).min(1).safeParse(input.points)
+  const lack = parsed.success ? whatThePointsLack(pkg.pointIds!, parsed.data.map(point => point.pointId)) : null
+  if (!parsed.success || (lack && (lack.strangers.length || lack.twice.length))) throw new PanelError(sayInEnglish('packageProgress.badSelfPoints'), 400)
+  const selfCompletion = anAct(pkg, { by: whoWrote(input.actor), at: nowStamp(), points: parsed.data })
+  const before = theStateOfTheActs(pkg) === 'done'
+  const after = theStateOfTheActs({ ...pkg, selfCompletions: [...(pkg.selfCompletions ?? []), selfCompletion] }) === 'done'
+  const maker = theMakerOf(enrollment.pkg)
+  return sqlite.transaction(() => {
+    let written = appendInside(task, pkg, 'selfCompletions', selfCompletion, input.actor)
+    for (const point of parsed.data) {
+      const state = getRecord(point.pointId)?.data['state']
+      if (point.answer === 'completed' && state !== 'done') patchRecord(point.pointId, { dataPatch: { state: 'done' } }, input.actor)
+      if (point.answer === 'reopened' && state === 'done') patchRecord(point.pointId, { dataPatch: { state: 'doing' } }, input.actor)
+    }
+    if (before !== after) written = patchRecord(task.id, { dataPatch: { state: after ? 'done' : 'doing' } }, input.actor).record
+    writeProgress(task.id, input.actor)
+    writeAMessage({ workspaceId: task.workspaceId, to: [maker], onlyThem: true, aboutRun: input.actor.ownKeyRun ?? null,
+      actor: THE_OFFICE, notice: 'packageReminder', title: sayInEnglish('packageProgress.selfTitle', { title: task.title }),
+      body: sayInEnglish('packageProgress.selfBody', { who: whoActed(input.actor), task: task.id, evidence: parsed.data.map(point => `${point.pointId}: ${point.evidence}`).join('; ') }) })
+    return { task: written, selfCompletion }
+  })()
+}
+
+/** An audit is an ordered package act, but does not answer a package point. */
+export function auditThePackage(input: InsideInput & { audit?: unknown; verdict?: unknown; evidence?: unknown; words?: unknown }) {
+  const { task, pkg } = insidePackage(input)
+  const parsed = z.object({ audit: z.string().trim().min(1), verdict: z.enum(['pass', 'fail', 'unknown']), evidence: z.string().trim().min(1), words: z.string().trim().min(1) }).safeParse(input)
+  if (!parsed.success) throw new PanelError(sayInEnglish('packageProgress.badVerdict'), 400)
+  const plan = alignedPlanOf(pkg)
+  if (plan.state === 'unknown') throw new PanelError(sayInEnglish('packageProgress.planUnknown'), 409)
+  const work = plan.work
+  const index = work?.findIndex(entry => 'audit' in entry && entry.audit === parsed.data.audit) ?? -1
+  const entry = index < 0 ? undefined : work?.[index]
+  if (!entry || !('audit' in entry)) throw new PanelError(sayInEnglish('packageProgress.noAudit'), 409)
+  const taker = theTakerOf(pkg)
+  const caller = participantForActor(input.actor)
+  if (sameParticipant(caller, taker) || (input.actor.type !== 'human' && (caller?.kind !== 'agent' || caller.id !== entry.inspector))) {
+    throw new PanelError(sayInEnglish('packageProgress.notInspector'), 403)
+  }
+  if (input.actor.type === 'human') assertThePersonIsProved(input.actor, sayInEnglish('packageProgress.auditDoor'))
+  const auditVerdict = anAct(pkg, { by: whoWrote(input.actor), at: nowStamp(), ...parsed.data })
+  return sqlite.transaction(() => {
+    const written = appendInside(task, pkg, 'auditVerdicts', auditVerdict, input.actor)
+    for (const next of work!.slice(index + 1)) if ('package' in next) writeProgress(next.package, input.actor)
+    writeAMessage({ workspaceId: task.workspaceId, to: [taker], onlyThem: true, aboutRun: input.actor.ownKeyRun ?? null,
+      actor: THE_OFFICE, notice: 'packageReminder', title: sayInEnglish('packageProgress.auditTitle', { title: task.title }),
+      body: sayInEnglish('packageProgress.auditBody', { who: whoActed(input.actor), task: task.id, ...parsed.data }) })
+    return { task: written, auditVerdict }
+  })()
+}
+
+export function readPackageProgress(input: InsideInput) {
+  return progressOf(recordInWorkspace(input.taskId, input.workspaceId))
+}
+
+/** The same answer writer is used by the maker's door and by the verdict transaction. */
+function writeThePackageAnswer(input: InsideInput & { points?: unknown }, task: PanelRecord, pkg: StoredPackage) {
   const latest = pkg.handedBack?.at(-1)
   if (latest === undefined) throw new PanelError('Nothing has been handed back, so no point can be accepted or returned. Nothing was written.', 409)
   const parsed = z.array(anAcceptedPoint).min(1).safeParse(input.points)
@@ -1757,6 +1943,7 @@ export function acceptThePackage(input: InsideInput & { points?: unknown }) {
   const returned = points.filter((point) => point.answer === 'returned')
   return sqlite.transaction(() => {
     let written = appendInside(task, pkg, 'acceptances', acceptance, input.actor)
+    let progress: { state: 'unknown'; reason: string } | undefined
     for (const point of points) {
       const state = getRecord(point.pointId)?.data['state']
       if (point.answer === 'accepted' && state !== 'done') patchRecord(point.pointId, { dataPatch: { state: 'done' } }, input.actor)
@@ -1765,7 +1952,10 @@ export function acceptThePackage(input: InsideInput & { points?: unknown }) {
     if (doneAfter !== doneBefore) {
       const state = doneAfter ? 'done' : 'doing'
       written = patchRecord(task.id, { dataPatch: { state } }, input.actor).record
-      for (const block of theBlocksLinkedTo(task.id)) patchRecord(block, { dataPatch: { state } }, input.actor)
+      const enrollment = enrollmentReading(task)
+      if (enrollment.state === 'enrolled') writeProgress(task.id, input.actor)
+      else if (enrollment.state === 'legacy') for (const block of theBlocksLinkedTo(task.id)) patchRecord(block, { dataPatch: { state } }, input.actor)
+      else progress = { state: 'unknown', reason: sayInEnglish('packageProgress.planUnknown') }
     }
     const waiting = pkg.pointIds!.filter((pointId) => !doneAfter && !points.some((point) => point.pointId === pointId && point.answer === 'accepted'))
     const standing = doneAfter ? sayInEnglish('delegation.notice.everyPointAccepted')
@@ -1778,9 +1968,48 @@ export function acceptThePackage(input: InsideInput & { points?: unknown }) {
         points: points.map((point) => point.answer === 'accepted'
           ? sayInEnglish('delegation.notice.acceptedPoint', { point: point.pointId })
           : sayInEnglish('delegation.notice.returnedPoint', { point: point.pointId, words: point.words ?? '' })).join(' '),
-      }))
-    return { task: written, acceptance }
+      }) + (progress ? ` ${sayInEnglish('packageProgress.noProgressMoved')}` : ''))
+    return { task: written, acceptance, ...(progress ? { progress } : {}) }
   })()
+}
+
+/** Called only after this run's inspector check was written inside the verdict transaction. */
+export function answerTheInspectedPackage(input: InsideInput & { run: string }): void {
+  const { task, pkg } = insidePackage(input)
+  const handback = pkg.handedBack?.at(-1)
+  const check = pkg.checks?.at(-1)
+  if (handback?.run !== input.run || check?.run !== input.run || check.points === undefined) return
+  // A person's earlier answer, or an earlier verdict on this hand-back, takes precedence.
+  const wasAfterHandback = (key: 'acceptances', count: number): boolean => {
+    if (count === 0) return false
+    const row = sqlite.prepare(`SELECT data FROM revisions WHERE record_id = ?
+      AND json_extract(data, '$.package.bundleId') = ?
+      AND json_array_length(json_extract(data, '$.package.${key}')) = ? ORDER BY seq ASC LIMIT 1`)
+      .get(task.id, pkg.bundleId, count) as { data: string } | undefined
+    if (row === undefined) return true
+    const atAct = packageOf(JSON.parse(row.data) as unknown)
+    return atAct === null || (atAct.handedBack?.length ?? 0) >= (pkg.handedBack?.length ?? 0)
+  }
+  if (wasAfterHandback('acceptances', pkg.acceptances?.length ?? 0)) return
+  const failed = check.points.filter((point) => !point.holds)
+  const points: PackageAcceptedPoint[] = failed.length > 0
+    ? failed.map((point) => ({ pointId: point.pointId, answer: 'returned', words: point.why }))
+    : check.points.every((point) => point.rulesKept === true) && handback.points.every((point) => point.outcome === 'done')
+      ? check.points.map((point) => ({ pointId: point.pointId, answer: 'accepted', words: point.why }))
+      : []
+  if (points.length > 0) {
+    writeThePackageAnswer({ ...input, points }, task, pkg)
+    return
+  }
+  const why = [
+    ...(handback.points.some((point) => point.outcome !== 'done') ? [sayInEnglish('inspectorAnswers.waitPart')] : []),
+    ...(check.points.some((point) => point.rulesKept !== true)
+      ? [sayInEnglish('inspectorAnswers.waitRules', { why: check.points.filter((point) => point.rulesKept !== true).map((point) => point.why).join(' ') })] : []),
+  ].join(' ')
+  writeAMessage({ workspaceId: input.workspaceId, to: [theMakerOf(pkg)], onlyThem: true, aboutRun: input.run,
+    actor: THE_OFFICE, notice: 'packageReminder',
+    title: sayInEnglish('inspectorAnswers.waitTitle', { title: task.title }),
+    body: sayInEnglish('inspectorAnswers.waitBody', { task: task.id, why }) })
 }
 /** True when the caller is the participant that made the package. */
 function isTheMaker(pkg: StoredPackage, actor: Actor): boolean {
@@ -1792,16 +2021,29 @@ function isTheMaker(pkg: StoredPackage, actor: Actor): boolean {
 function theActsOf(pkg: StoredPackage): PackageActs {
   return {
     pointIds: pkg.pointIds ?? [], takenInside: pkg.takenInside ?? [], alignments: pkg.alignments ?? [],
-    alignmentAnswers: pkg.alignmentAnswers ?? [], handedBack: pkg.handedBack ?? [], acceptances: pkg.acceptances ?? [],
+    alignmentAnswers: pkg.alignmentAnswers ?? [], handedBack: pkg.handedBack ?? [], acceptances: pkg.acceptances ?? [], selfCompletions: pkg.selfCompletions ?? [],
   }
 }
 /** The state the acts on an inside package give, with no claim, no outside take and no completion beside them. */
-function theStateOfTheActs(pkg: StoredPackage): PackageState {
+export function theStateOfTheActs(pkg: StoredPackage): PackageState {
   return packageStateOf({ completed: false, returned: false, outside: false, claimed: false, inside: theActsOf(pkg) })
 }
 
+/**
+ * HOW MANY POINTS OF A TASK'S INSIDE PACKAGE ARE DONE, OF ALL ITS POINTS, as a key item that names the package counts
+ * them (./key-items.ts). Null for a task that holds no inside package. A completed task has every point done; otherwise
+ * a point is done when the maker's newest answer to it accepted it, read as `packageStateOf` reads the answers.
+ */
+export function thePointsDoneOf(data: unknown): { done: number; of: number } | null {
+  const pkg = packageOf(data)
+  const of = pkg?.pointIds?.length ?? 0
+  if (pkg === null || of === 0) return null
+  if (completionOf(data) !== null) return { done: of, of }
+  return { done: thePointsDoneFromActs(theActsOf(pkg)).length, of }
+}
+
 /** The maker of a package, whom its notices are for. Refused when the stored maker names no one agent, so no door writes without its notice. */
-function theMakerOf(pkg: StoredPackage): ParticipantRef {
+export function theMakerOf(pkg: StoredPackage): ParticipantRef {
   const maker = theParticipantAWriterNames(pkg.by)
   if (maker === null) throw new PanelError(sayInEnglish('delegation.notice.noMaker', { who: pkg.by.actorId }), 409)
   return maker
@@ -2029,8 +2271,8 @@ export interface ThePackagesARunHandedBack { packages: APackageToJudge[]; unread
  * no check has answered since (`theLatestHandBackWaits`, the check door's own reading). The prompt lists them, and the
  * verdict door asks the verdict to judge each.
  */
-export function thePackagesThisRunHandedBack(runId: string, workspaceId: string): ThePackagesARunHandedBack {
-  if (!packageInspectionOf(getWorkspace(workspaceId)!.packageInspection)) return { packages: [], unread: [] }
+export function thePackagesThisRunHandedBack(runId: string, workspaceId: string, all = false): ThePackagesARunHandedBack {
+  if (!all && !packageInspectionOf(getWorkspace(workspaceId)!.packageInspection)) return { packages: [], unread: [] }
   const rows = sqlite.prepare(`SELECT id FROM records WHERE workspace_id = ? AND kind = 'task' AND deleted_at IS NULL
     AND json_valid(data) AND json_extract(data, '$.package.handedBack[#-1].run') = ? ORDER BY id`).all(workspaceId, runId) as { id: string }[]
   const packages: APackageToJudge[] = []
@@ -2041,7 +2283,7 @@ export function thePackagesThisRunHandedBack(runId: string, workspaceId: string)
     const pkg = packageOf(task.data)
     const latest = pkg?.handedBack?.at(-1)
     if (pkg === null || !pkg.pointIds || latest === undefined) { unread.push({ task: task.id, title: task.title }); continue }
-    if (theLatestHandBackWaits(task, pkg, anyCheck) !== 'waits') continue
+    if (!all && theLatestHandBackWaits(task, pkg, anyCheck) !== 'waits') continue
     packages.push({
       task: task.id,
       title: task.title,
@@ -2156,6 +2398,8 @@ export const A_PACKAGES_NOTICES_THAT_STAY: readonly NoticeKind[] = [
   'packageAlignAnswered',
   // The hand-back is told to the package's maker, who made the package.
   'packageHandedBack',
+  // A package waiting for an answer reminds the maker, who can answer it.
+  'packageReminder',
   // The maker's acceptance is told to the one that took the package, who handed it back.
   'packageAccepted',
   // The points the maker returned go back to the one that took the package, who must hand them back again.

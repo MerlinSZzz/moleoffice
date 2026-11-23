@@ -277,11 +277,13 @@ export const TASK_SHAPES: Record<string, ShapeSpec> = {
       { key: 'pointIds', type: 'string[]', required: false, description: 'The backlog points carried, in order, written by the packaging door; absent means none were named. Nothing infers them.', example: [] },
       { key: 'materials', type: 'PackageMaterial[]', required: false, description: 'The bundle, parent and points packed by the program; absent means no materials were recorded. Nothing infers them.', example: [] },
       { key: 'takenInside', type: 'InsideTake[]', required: false, description: 'Inside takes, oldest first and append-only, written by the take door; absent means nobody took it. A second take is recorded too, and the newest names the taker. Nothing infers a take.', example: [] },
-      { key: 'alignments', type: 'PackageRestatement[]', required: false, description: 'The taker’s restatements and plans, oldest first and append-only, written by the alignment door; absent means none were made. A restatement made while another waits, or after one was aligned, is recorded too, and an answer answers the newest. A plan is the fixed shape {workers, waves, waits} — each worker naming worker, outcome, points, files, difficulty, difficultyWhy, model and modelWhy, with no field for the worker’s own steps — or the older free text, stored and shown as it was. `goOnWhy` keeps the supervisor’s sentence for going on past the office’s hints, and `hints` keeps the hints the align door worked out and stored when it wrote the entry. An entry written before hints were stored has no `hints`, which says they were not stored and never that there were none. Nothing infers any of them.', example: [] },
+      { key: 'alignments', type: 'PackageRestatement[]', required: false, description: 'The taker’s restatements and plans, oldest first and append-only, written by the alignment door; absent means none were made. A restatement made while another waits, or after one was aligned, is recorded too, and an answer answers the newest. A plan is the fixed shape {workers, waves, waits} — each worker naming worker, outcome, points, files, difficulty, difficultyWhy, model and modelWhy, with no field for the worker’s own steps — or the older free text, stored and shown as it was. A fixed-shape plan may also hold `work`, an optional ordered list of child packages and audits. `goOnWhy` keeps the supervisor’s sentence for going on past the office’s hints, and `hints` keeps the hints the align door worked out and stored when it wrote the entry. An entry written before hints were stored has no `hints`, which says they were not stored and never that there were none. Nothing infers any of them.', example: [] },
       { key: 'alignmentAnswers', type: 'PackageAlignmentAnswer[]', required: false, description: 'The parent’s answers to restatements, oldest first and append-only, written by the answer door; absent means none were given. A second answer to one restatement is recorded too, and the newest counts. Nothing infers them.', example: [] },
       { key: 'handedBack', type: 'PackageHandback[]', required: false, description: 'The taker’s per-point hand-backs, oldest first and append-only, written by the hand-back door; absent means none were made. Nothing infers them.', example: [] },
       { key: 'checks', type: 'PackageCheck[]', required: false, description: 'The parent’s answers to hand-backs, oldest first and append-only, written by the check door; absent means none were made. Nothing infers them.', example: [] },
-      { key: 'acceptances', type: 'PackageAcceptance[]', required: false, description: 'The maker’s or the person’s answers to the points of hand-backs, oldest first and append-only, written by the accept door; absent means no point was answered. A point is done only when an acceptance accepts it. Nothing infers them, and a landing writes none.', example: [] },
+      { key: 'acceptances', type: 'PackageAcceptance[]', required: false, description: 'The maker’s or the person’s answers to the points of hand-backs, oldest first and append-only, written by the accept door; absent means no point was answered. A point is done when its newest answer, here or in selfCompletions, accepts or completes it. Nothing infers them, and a landing writes none.', example: [] },
+      { key: 'selfCompletions', type: 'PackageSelfCompletion[]', required: false, description: 'The child maker who is the latest parent taker writes self-completions or reopenings with evidence, oldest first and append-only; absent means none were recorded.', example: [] },
+      { key: 'auditVerdicts', type: 'PackageAuditVerdict[]', required: false, description: 'The named inspector or the person writes audit verdicts with evidence, oldest first and append-only; absent means none were recorded.', example: [] },
       {
         key: 'at',
         type: 'date',
@@ -349,7 +351,7 @@ export const TASK_SHAPES: Record<string, ShapeSpec> = {
       { key: 'at', type: 'date', required: true, description: 'When the door wrote this entry.', example: '2026-11-09 12:30:00' },
       { key: 'order', type: 'number', required: false, description: 'The place of this act among every act on the package, from 1, written by the door: one more than the entries the package held. Absent on an entry written before acts were numbered; such an entry is read by the older rule.', example: 4 },
       { key: 'restated', type: 'string', required: true, description: 'The taker’s own words restating the points.', example: 'example' },
-      { key: 'plan', type: 'string | Record<string, unknown>', required: true, description: 'The taker’s plan: the fixed shape {workers, waves, waits}, each worker naming worker, outcome, points, files, difficulty, difficultyWhy, model and modelWhy, or the older free text kept as the words it was.', example: { workers: [{ worker: 'worker', outcome: 'The whole outcome', points: ['point'], files: ['src/'], difficulty: 'simple', difficultyWhy: 'One file.', model: 'deepseek-v4.1-flash', modelWhy: 'One file needs no stronger model.' }], waves: 1, waits: [] } },
+      { key: 'plan', type: 'string | Record<string, unknown>', required: true, description: 'The taker’s plan: the fixed shape {workers, waves, waits}, each worker naming worker, outcome, points, files, difficulty, difficultyWhy, model and modelWhy, or the older free text kept as the words it was. A fixed-shape plan may also hold `work`, an optional ordered list of package entries {package, module, item} and audit entries {audit, scope, evidence, inspector}. The inspector is stored as the id of the agent the align door read from the name given.', example: { workers: [{ worker: 'worker', outcome: 'The whole outcome', points: ['point'], files: ['src/'], difficulty: 'simple', difficultyWhy: 'One file.', model: 'deepseek-v4.1-flash', modelWhy: 'One file needs no stronger model.' }], waves: 1, waits: [] } },
       { key: 'hints', type: 'PlanHint[]', required: false, description: 'The office’s hints about the plan, worked out once by the align door when it wrote this entry and stored here so the page draws what was said rather than working them out again from rows that may have moved since. Present, possibly empty, on an entry written from the round that stored them. Absent on an earlier entry, which says they were not stored and never that there was no hint.', example: [{ code: 'strongModelNoReason', values: { worker: 'worker', difficulty: 'simple', model: 'claude-opus-4', models: 'deepseek-v4.1-flash' } }] },
       { key: 'goOnWhy', type: 'string', required: false, description: 'The supervisor’s sentence for going on past the office’s hints, when it wrote one; absent when it wrote none.', example: 'One worker covers both files, and the second wave is worth the wait.' },
     ],
@@ -421,6 +423,41 @@ export const TASK_SHAPES: Record<string, ShapeSpec> = {
       { key: 'pointId', type: 'string', required: true, description: 'The backlog point answered, one of the package’s points.', example: 'example' },
       { key: 'answer', type: "'accepted' | 'returned'", required: true, description: 'Accepted marks the point done. Returned sends it back to the taker, and it is not done until a later answer accepts it.', example: 'returned' },
       { key: 'words', type: 'string', required: false, description: 'Why the point was returned, in the answerer’s words. The door refuses a returned point without them.', example: 'example' },
+    ],
+  },
+
+  PackageSelfCompletion: {
+    name: 'PackageSelfCompletion',
+    description: 'A self-completion or reopening with its evidence, appended by the child maker who is also the latest parent taker.',
+    fields: [
+      { key: 'by', type: 'BundleExporter', required: true, description: 'Who wrote the act, recorded by the door.', example: { actorType: 'agent', actorId: 'agent' } },
+      { key: 'at', type: 'date', required: true, description: 'When the door wrote the act.', example: '2026-01-01 12:00:00' },
+      { key: 'order', type: 'number', required: true, description: 'The place of this act among every act on the package, from 1, written by the door.', example: 1 },
+      { key: 'points', type: 'PackageSelfCompletedPoint[]', required: true, description: 'The points answered by this act, each point once.', example: [] },
+    ],
+  },
+
+  PackageSelfCompletedPoint: {
+    name: 'PackageSelfCompletedPoint',
+    description: 'One point completed or reopened with evidence by the child maker.',
+    fields: [
+      { key: 'pointId', type: 'string', required: true, description: 'The package point answered.', example: 'point' },
+      { key: 'answer', type: "'completed' | 'reopened'", required: true, description: 'Whether the point was completed or reopened.', example: 'completed' },
+      { key: 'evidence', type: 'string', required: true, description: 'The non-empty evidence supplied with this answer.', example: 'evidence' },
+    ],
+  },
+
+  PackageAuditVerdict: {
+    name: 'PackageAuditVerdict',
+    description: 'An audit verdict appended by its named inspector or by the person, with evidence and words.',
+    fields: [
+      { key: 'by', type: 'BundleExporter', required: true, description: 'Who wrote the act, recorded by the door.', example: { actorType: 'agent', actorId: 'agent' } },
+      { key: 'at', type: 'date', required: true, description: 'When the door wrote the act.', example: '2026-01-01 12:00:00' },
+      { key: 'order', type: 'number', required: true, description: 'The place of this act among every act on the package, from 1, written by the door.', example: 1 },
+      { key: 'audit', type: 'string', required: true, description: 'The planned audit answered.', example: 'audit' },
+      { key: 'verdict', type: "'pass' | 'fail' | 'unknown'", required: true, description: 'Whether the audit passed, failed, or is unknown.', example: 'pass' },
+      { key: 'evidence', type: 'string', required: true, description: 'The non-empty evidence supplied with this answer.', example: 'evidence' },
+      { key: 'words', type: 'string', required: true, description: 'The words supplied with the verdict.', example: 'words' },
     ],
   },
 

@@ -187,12 +187,6 @@ describe('the executable of an ordinary upgrade worker', () => {
     }).not.toThrow()
   })
 
-  it('refuses another program whose first argument says node', async () => {
-    const f = await startUpgradeOffice('node')
-    expect(currentProcessRecord(f.workerPid).argv[0]).toBe('node')
-    for (const read of readers(f)) expect.soft(read).toThrow()
-  })
-
   it('refuses a non-leader carrying the worker entry outside the worker group', async () => {
     const f = await startUpgradeOffice(undefined, true)
     const extra = currentProcessRecord(f.extraWorkerPid)

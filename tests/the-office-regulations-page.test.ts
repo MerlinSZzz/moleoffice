@@ -249,6 +249,9 @@ function drawn(said: WhatTheOfficeRegulationsSay): string {
   return renderToStaticMarkup(h(pg.TheRegulations, { said }))
 }
 
+/** The list of chapters when there is none: the short state word under the heading "Chapters". */
+const noChapter = (): string => `<p class="ofc-none"><span class="px-absent">${word('absence.none')}</span></p>`
+
 describe('the page draws what the records say', () => {
   it("draws the owner's sentence, whom it binds, and the standing state", () => {
     const html = drawn(REVOKED)
@@ -274,7 +277,7 @@ describe('the page draws what the records say', () => {
   it('says when nothing has been filed, rather than drawing an empty list', () => {
     const html = drawn({ regulations: [], chapters: [], says: 'nothing here', workspaceId: 'default', copiedFromTheDefaults: null })
     expect(html).toContain(String(pg.REGULATIONS_WORDS.noneYet))
-    expect(html).toContain(String(pg.REGULATIONS_WORDS.noChapters))
+    expect(html).toContain(noChapter())
   })
 
   it("draws the office's chapter in a project that files none, as the door answers it there", async () => {
@@ -288,7 +291,7 @@ describe('the page draws what the records say', () => {
     expect(html).toContain('Record-reading rules')
     expect(html).toContain(RULE_NAME)
     expect(html).toContain(RULE_TEXT)
-    expect(html).not.toContain(String(pg.REGULATIONS_WORDS.noChapters))
+    expect(html).not.toContain(noChapter())
   })
 
   it("draws the person's regulation in a project that files none, as the door answers it there", async () => {
@@ -342,14 +345,14 @@ describe('the page draws what the records say', () => {
   it('keeps office-only marks readable without drawing a press under marked or unmarked rules', () => {
     // WAVE 13S ROUND 9. A marked rule is left out of the default regulations.
     const unmarked = drawn(REVOKED)
-    expect(unmarked).not.toContain(word('regulationsPage.onlyThisOffice'))
+    expect(unmarked).not.toContain(word('regulationsPage.onlyForThisOffice'))
     expect(unmarked).not.toContain(word('regulationsPage.keepForThisOffice'))
     const chapter = REVOKED.chapters[0]!
     const marked = drawn({
       ...REVOKED,
       chapters: [{ ...chapter, outline: chapter.outline.map((rule) => ({ ...rule, onlyThisOffice: { by: THE_PERSON, at: '2026-10-02 21:00:00' } })) }],
     })
-    expect(marked).toContain(word('regulationsPage.onlyThisOffice'))
+    expect(marked).toContain(word('regulationsPage.onlyForThisOffice'))
     expect(marked).not.toContain(word('regulationsPage.giveToNewOffices'))
     expect(marked).not.toContain(word('regulationsPage.keepForThisOffice'))
   })
@@ -364,18 +367,20 @@ describe('the page draws what the records say', () => {
     const copied = drawn(said)
     expect(copied).toContain(`These chapters were copied from the default regulations when this office first started, on ${i18n.dayInThePageLanguage(new Date(2026, 9, 2), true)}.`)
     // WAVE 13W ROUND 5: the sentence that said this first set is about developing Mole Office went with the export from the
-    // reworded chapter records; the page says the person may change them, and nothing about what the set is for.
-    expect(copied).toContain('You may change any of them.')
+    // reworded chapter records; the page says nothing about what the set is for.
     expect(copied).not.toContain('developing Mole Office')
     expect(copied).not.toContain('2026-10-02')
     i18n.setWordLanguage('zh')
     let inChinese = ''
+    let dayInChinese = ''
     try {
       inChinese = drawn(said)
+      dayInChinese = i18n.dayInThePageLanguage(new Date(2026, 9, 2), true)
     } finally {
       i18n.setWordLanguage('en')
     }
-    expect(inChinese).toContain('这些章节是这个办公室在 2026 年 10 月 2 日第一次启动时从默认规定复制来的。你可以修改其中任何一条。')
+    expect(dayInChinese).toBe('2026 年 10 月 2 日')
+    expect(inChinese).toContain(dayInChinese)
     expect(inChinese).not.toContain('2026-10-02')
   })
 })

@@ -85,7 +85,7 @@ import { PanelError } from './panel-error.ts'
 // WHICH SESSION STATES MEAN THE RUN IS OVER, so this file and the one that revokes a run's key
 // cannot hold two different answers to that question.
 import { theRunHasEnded } from '@shared/run-has-ended.ts'
-import { theNewestUsesOf } from './newest-use.ts'
+import { theNewestUsesWithTheirMomentsOf } from './newest-use.ts'
 import { type RegisteredAgent, type RegisteredPerson } from './participants.ts'
 import { agentForRecord } from '../db/agent-for-record.ts'
 import { recordForAgentIn } from '../db/record-for-agent-in.ts'
@@ -106,7 +106,7 @@ import {
 import { runsStillInsideTheirWaitAmong, theAnsweringReading, theMessageRunRowsByTheAgentTheyServe, theRunningRowsByTheAgentTheyServe, type HowTheAnsweringIsRead, type TheAnsweringReading, type WaitingRun } from './worker.ts'
 import { NEWEST_SESSION_FIRST } from '../db/newest-session-first.ts'
 import { type theRunRowsOfOneReach } from './the-run-rows-of-one-reach.ts'
-import { localStamp, parseAnyStamp } from '@shared/time.ts'
+import { localStamp, momentOfAStampAndItsInstant, parseAnyStamp } from '@shared/time.ts'
 import {
   PRESENCE_BEFORE_ANYBODY_CHOOSES,
   participantWord,
@@ -142,6 +142,7 @@ import { theSessionCandidates } from '../db/these-agents-only.ts'
 import { theProcessRowStatements } from '../db/these-agents-only.ts'
 import { theCandidateBuckets } from '../db/these-agents-only.ts'
 import { theRowCouldBeOneOf } from '../db/these-agents-only.ts'
+import type { TheseAgentsOnly } from '../db/types/presence.ts'
 
 /** The three inputs a presence reading may be taken from, strongest first. */
 export const PRESENCE_INPUTS = ['listen', 'request', 'attachment-opened'] as const
@@ -604,10 +605,10 @@ export interface ParticipantPresenceReading {
   /** When they said it, for a reader who is allowed to know the choice. Null otherwise. */
   choiceAt: string | null
   /**
-   * A PERMANENT RESIDENT'S SLEEP, for the chat's short line beside it: "Asleep since 14:02" or "Last slept 3 h ago", both
-   * null for a resident with no sleep recorded. Absent on every participant that is not a resident that is not retired,
-   * which draws no line, as item 1 of a decision says. Read by `theSleepLineOf`, the one reader
-   * of `resident_sleeps`.
+   * A PERMANENT RESIDENT'S SLEEP: since when it is asleep and until when, when its last sleep ended, and its sleep time.
+   * The chat draws from it only a short word while the resident is asleep, such as "Asleep since 14:02", and nothing
+   * while it is awake. Absent on every participant that is not a resident that is not retired, which draws no word, as
+   * item 1 of a decision says. Read by `theSleepLineOf`, the one reader of `resident_sleeps`.
    */
   residentSleep?: TheSleepLine
 }
@@ -846,17 +847,17 @@ export { theCandidateBuckets } from '../db/these-agents-only.ts'
 
 /**
  * ONLY THE DATA THE PRESENCE AND ANSWERING READERS INSPECT. The output and recorded-run signs use ranAs, the field
- * the open rule in attachments.ts reads, state and lastOutputAt. The terminal sign uses servingAgentId, extra,
- * workingDirectory and startedAt. The answering readers use the two serving references, state, deliveringMessage,
- * providerSession, runtime, waitsUntil, startedByMoleOffice and sandbox. The hold and process readers fetch their own
- * session facts separately.
+ * the open rule in attachments.ts reads, state, lastOutputAt and the instant beside it in lastOutputTime. The terminal
+ * sign uses servingAgentId, extra, workingDirectory and startedAt. The answering readers use the two serving references,
+ * state, deliveringMessage, providerSession, runtime, waitsUntil, startedByMoleOffice and sandbox. The hold and process
+ * readers fetch their own session facts separately.
  *
  * The JSON arrow preserves each value's JSON type, including true, arrays and objects. A missing field becomes null;
  * these readers test types or use nullish defaults, so both mean the same absence. Non-objects and malformed JSON are
  * passed through to the ordinary decoder and readers, preserving their failures. No row or reading is kept here.
  */
 export const PRESENCE_SESSION_FIELDS = [
-  'ranAs', theFieldTheOpenRuleReads(), 'state', 'lastOutputAt', 'servingAgentId', 'servingAgent', 'extra',
+  'ranAs', theFieldTheOpenRuleReads(), 'state', 'lastOutputAt', 'lastOutputTime', 'servingAgentId', 'servingAgent', 'extra',
   'workingDirectory', 'startedAt', 'deliveringMessage', 'providerSession', 'runtime', 'waitsUntil',
   'startedByMoleOffice', 'sandbox',
 ] as const
@@ -1129,6 +1130,13 @@ function theTerminalsTheseRunsAreIn(rows: readonly PanelRecord[], aliases: TheFi
  *    `updatedAt` is NOT used, deliberately: editing a session record's title would then change what the
  *    dot says, and words a person can change by editing a record are not a measurement. A run with
  *    neither clock reads as nobody having said, which is the honest answer and not a green dot.
+ *
+ * EACH CLOCK'S STAMP IS READ WITH THE INSTANT KEPT BESIDE IT, by the rule of `momentOfAStampAndItsInstant`:
+ * `data.lastOutputTime` beside the output, and the use's `at_instant` (migration 0358). On the night the clocks go back a
+ * stamp alone reads the second pass of the hour from 01:00 as the first, so output two minutes old read as 62. An
+ * instant that names the stamp gives that second in its offset, and one that names it and cannot be read is passed
+ * over, as a stamp that cannot be read is. A clock with no instant, or whose stamp was changed without it, is read from
+ * its stamp, as before.
  */
 function minutesSinceARunOfThisAgentSpoke(
   agentId: string,
@@ -1146,11 +1154,11 @@ function minutesSinceARunOfThisAgentSpoke(
 ): { minutes: number; from: 'output' | 'tool-use' } | null {
   const rows = sessions === undefined ? sessionRecordsIn(workspaceId) : sessions()
   let newest: { ms: number; from: 'output' | 'tool-use' } | null = null
-  const keep = (stamp: unknown, from: 'output' | 'tool-use'): void => {
-    if (typeof stamp !== 'string' || stamp === '') return
-    const at = parseAnyStamp(stamp)
-    if (at === null) return
-    if (newest === null || at.getTime() > newest.ms) newest = { ms: at.getTime(), from }
+  // `instant` is the instant kept beside the stamp, null or undefined when none is kept.
+  const keep = (stamp: unknown, instant: unknown, from: 'output' | 'tool-use'): void => {
+    const ms = momentOfAStampAndItsInstant(stamp, instant, (alone) => (typeof alone === 'string' && alone !== '' ? (parseAnyStamp(alone)?.getTime() ?? null) : null))
+    if (ms === null) return
+    if (newest === null || ms > newest.ms) newest = { ms, from }
   }
   const live: string[] = []
   for (const row of rows) {
@@ -1162,10 +1170,12 @@ function minutesSinceARunOfThisAgentSpoke(
     const state = data['state']
     if (theRunHasEnded(state)) continue
     live.push(record.id)
-    keep(data['lastOutputAt'], 'output')
+    keep(data['lastOutputAt'], (data['lastOutputTime'] as { instant?: unknown } | null | undefined)?.instant, 'output')
   }
   // ONLY THE RUNS THAT HAVE NOT ENDED ARE ASKED, one indexed lookup each, and an agent with none asks nothing.
-  if (live.length > 0) for (const at of theNewestUsesOf(live).values()) keep(at, 'tool-use')
+  if (live.length > 0) {
+    for (const use of theNewestUsesWithTheirMomentsOf(live).values()) keep(use.at, use.atInstant, 'tool-use')
+  }
   const found = newest as { ms: number; from: 'output' | 'tool-use' } | null
   if (found === null) return null
   return { minutes: Math.floor((now.getTime() - found.ms) / 60_000), from: found.from }
@@ -1634,13 +1644,16 @@ function whoAnswersAsThisAgent(
       'a run answering as it',
     )
   }
-  // A SESSION HOLDING THE HANDLE IS ANSWERING (criteria M74 and M106): the hold is fresh or kept,
-  // and the session named on it was read as still there.
+  // A SESSION HOLDING THE HANDLE IS ANSWERING: its hold beats and no sign turned it, or its hold is
+  // kept and the session named on it was read as still there. The reading's own sentence follows,
+  // because it says what the answer rests on.
   if (answering.how === 'a live session') {
+    const restsOn = behindTheHold !== null && behindTheHold.answering ? behindTheHold.says : null
     return green(
       ANSWERING_WORD,
       `The session filed as record ${String(answering.session)} is answering as this agent and is holding its ` +
-        'handle, so a message sent now goes to that session rather than starting a run.',
+        'handle, so a message sent now goes to that session rather than starting a run.' +
+        (restsOn === null ? '' : ` ${restsOn}`),
       'a session answering as it',
     )
   }
@@ -2102,14 +2115,7 @@ export function theUnreleasedProcessRowsOnce(recordsOf?: ReadonlyMap<string, Rea
   return () => (read ??= theUnreleasedProcessRows(recordsOf, aliases))
 }
 
-/**
- * A READING OF SOME AGENTS ONLY (wave 13y round 51): the condition that keeps the session records of one project that
- * could be a run of theirs (`aSessionThatCouldBeOneOf`), and their registry ids.
- */
-export interface TheseAgentsOnly {
-  sessions: (workspaceId: string) => SQL
-  ids: readonly string[]
-}
+export type { TheseAgentsOnly } from '../db/types/presence.ts'
 
 export { theseAgentsOnly } from '../db/these-agents-only.ts'
 

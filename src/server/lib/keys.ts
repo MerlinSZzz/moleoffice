@@ -77,7 +77,7 @@ import { existsSync, linkSync, mkdirSync, readFileSync, renameSync, rmSync, stat
 import { dirname, join } from 'node:path'
 import type { FastifyReply, FastifyRequest } from 'fastify'
 
-import { KEY_COOKIE, KEY_HEADER } from '../../config/key-header.mjs'
+import { DEVICE_HALF_COOKIE, KEY_COOKIE } from '../../config/key-header.mjs'
 import { keysPathFrom } from '../../config/settings.mjs'
 import { thisSystem, type WhatSettingTheListDid } from '../../config/systems/the-system.mjs'
 import { refuseADataFolderInAWorktree } from './git-checkout.ts'
@@ -89,6 +89,7 @@ import { KEY_REVOCATION_UNDO_GRACE_MS, KEY_REVOCATION_UNDO_MS } from '@shared/da
 // the key comparison since P83 landed.
 import type { HowACallerProvedItself } from '@shared/types.ts'
 import type { EmbassyKey as AKeyOfAHolder, EmbassyKeyRunState as KeyRunState } from '@shared/worlds.ts'
+import type { WhatTheMoveMoved } from '@shared/pairing.ts'
 import { sqlite } from '../db/client.ts'
 // THE RUN KEY A SESSION'S RECORD OR A REVISION NAMES, in the one wording of migration 0277's indexes. SQLite finds a
 // lookup by key through one of them only when it asks these same words, so they are written once, in the schema.
@@ -120,7 +121,6 @@ import { keyHash } from '../db/the-key-on-this-request-was-made-for-a-run.ts'
 import { whatTheKeyWithThisIdIsFor } from '../db/the-key-on-this-request-was-made-for-a-run.ts'
 import { THE_RUN_KEY_NAMED } from '../db/the-key-on-this-request-was-made-for-a-run.ts'
 import { keyOn } from '../db/the-key-on-this-request-was-made-for-a-run.ts'
-import { oneHeader } from '../db/the-key-on-this-request-was-made-for-a-run.ts'
 import { whereARunStands } from '../db/the-key-on-this-request-was-made-for-a-run.ts'
 import { theKeyFile } from './a-provider-secret-is-set.ts'
 import { alreadyRead } from './a-provider-secret-is-set.ts'
@@ -131,6 +131,7 @@ import { THEIR_TOOL_KEY_KIND } from './how-this-request-proved-itself.ts'
 import { keysMatch } from './how-this-request-proved-itself.ts'
 import { heldKeyByHash } from './how-this-request-proved-itself.ts'
 import { aHeldKeyThisWorldTrusts } from './how-this-request-proved-itself.ts'
+import { theKeyAFileTicketStoodInFor } from './file-tickets.ts'
 import { theHandleOfTheAgentAKeyProves } from './the-handle-of-the-agent-a-key-proves.ts'
 
 export { THEIR_TOOL_KEY_KIND } from './how-this-request-proved-itself.ts'
@@ -283,7 +284,15 @@ export { aPrivateKeyFileBeside } from './a-provider-secret-is-set.ts'
  * about the write, not about the cleanup, and the leftover is named by the thrown message's own path.
  */
 function writeTheKeyFileAt(path: string, contents: KeyFile): void {
-  const body = `${JSON.stringify(contents, null, 2)}\n`
+  writeAPrivateFile(path, `${JSON.stringify(contents, null, 2)}\n`)
+}
+
+/**
+ * ONE PRIVATE FILE, WRITTEN WHOLE OR NOT AT ALL, by the rules above: a temporary file beside it, private before the
+ * secret is in it, renamed over the target. The office's key file is written by it, and so are the agent key files of
+ * lib/an-agents-key-file.ts, so every file that holds a key is made private the same way.
+ */
+export function writeAPrivateFile(path: string, body: string): void {
   const privately = thisSystem().aFileIsMadePrivate
   const temporary =
     privately.by === 'its-access-list'
@@ -373,13 +382,7 @@ export interface HeldKeyRow {
 
 export { heldKeyByHash } from './how-this-request-proved-itself.ts'
 
-/** One key row looked up by its hash, standing or not. The id is public; the hash is not the token. */
-export interface AHeldKeyRow {
-  id: string
-  whoseKind: string
-  whoseId: string
-  revokedAt: string | null
-}
+export type { AHeldKeyRow } from '../db/types/keys.ts'
 
 export { theHeldKeyRowWhoseHashIs } from '../db/the-key-on-this-request-was-made-for-a-run.ts'
 
@@ -394,16 +397,17 @@ export { keyOn } from '../db/the-key-on-this-request-was-made-for-a-run.ts'
 export { theHashOfTheKeyOnThisRequest } from '../db/the-key-on-this-request-was-made-for-a-run.ts'
 
 /**
- * THE SHA-256 OF A KEY IN THE KEY HEADER THAT THIS OFFICE NEVER GAVE, OR NULL. Null when the header carries no key, or
- * a key the key file holds, or a key that has a row in `held_keys`, live or revoked. A revoked key is one this office
- * gave, so it is never answered here.
+ * THE SHA-256 OF A KEY THIS OFFICE NEVER GAVE, OR NULL. The key is the one in the key header, or else the one a
+ * browser's two halves join to (`keyOn`). Null when the request carries no key, or a key the key file holds, or a key
+ * that has a row in `held_keys`, live or revoked. A revoked key is one this office gave, so it is never answered here.
  *
- * THE HEADER ONLY, NEVER THE COOKIE. A browser cannot clear a cookie the office set as HttpOnly, so a refusal of the
- * cookie would leave that browser refused on every request with nothing it could do. A waiting credential's token has
- * no row here either; lib/keyheader.ts asks the credentials for it, because lib/visitors.ts imports this file.
+ * NEVER THE OLD COOKIE. It is no key, and a browser cannot clear a cookie the office set as HttpOnly. A browser whose
+ * two halves join to a key this office never gave still reaches the pairing page, which gives it two new halves
+ * (lib/keyheader.ts). A waiting credential's token has no row here either; lib/keyheader.ts asks the credentials for
+ * it, because lib/visitors.ts imports this file.
  */
 export function theHashOfAHeaderKeyNoKeyFileOrRowHolds(req: FastifyRequest): string | null {
-  const presented = oneHeader(req.headers[KEY_HEADER])
+  const presented = keyOn(req)
   if (presented === undefined) return null
   const keys = theKeyFile()
   if (keysMatch(presented, keys.person) || keysMatch(presented, keys.office)) return null
@@ -412,79 +416,54 @@ export function theHashOfAHeaderKeyNoKeyFileOrRowHolds(req: FastifyRequest): str
 }
 
 /**
- * THE COOKIE THE PAIRING PAGE SETS, WHETHER IT HOLDS THE PERSON'S KEY OR A DEVICE'S TOKEN.
+ * THE COOKIE HALF'S ATTRIBUTES, WHETHER THE PRESS OR THE ASK DOOR SETS IT.
  *
- * It is one string in one place because the pairing press and the ask door must set the same
- * cookie: HttpOnly so page JavaScript cannot read it, SameSite strict so another site cannot make
- * this browser act as the person, Path=/ so every route receives it, a long Max-Age because "paired
- * once" means once, and no Secure because the office is reached over plain HTTP on the machine it
- * runs on.
+ * It is one string in one place because both doors must set the same cookie: HttpOnly so page JavaScript cannot
+ * read it, SameSite strict so another site cannot make this browser send it, Path=/ so every route receives it, a long
+ * Max-Age because "paired once" means once, and no Secure because the office is reached over plain HTTP on the machine
+ * it runs on.
  */
 const THE_BROWSER_COOKIE_ATTRIBUTES = 'Max-Age=34560000; Path=/; HttpOnly; SameSite=Strict'
 
 /**
- * PAIR THIS BROWSER: PUT THE PERSON'S KEY IN A COOKIE, ONCE. Criterion P83, point 2.
+ * SET THE COOKIE HALF OF A BROWSER'S DEVICE KEY. The press and the ask door each issue a device key in two halves
+ * (src/server/lib/visitors.ts). The cookie half goes here, where page JavaScript cannot read it. The header half
+ * is answered once, with no-store, and the page keeps it. Neither half alone is a key.
  *
- * ---------------------------------------------------------------------------------------
- * THE VALUE NEVER LEAVES THIS FUNCTION
- * ---------------------------------------------------------------------------------------
- *
- * The caller is the pairing door, and all it learns is that a reply now carries a cookie. The key
- * itself is read here from the file the office made at first run and written straight into the
- * header; it is never returned, never logged and never put on a record or a page. This is the same
- * rule `setProviderSecret` follows about a provider's value, and it is why the route can be a door
- * that sets a cookie without any code outside this file ever holding the person's key.
- *
- * ---------------------------------------------------------------------------------------
- * THE TWO ATTRIBUTES THE CRITERION NAMES, AND THE REST
- * ---------------------------------------------------------------------------------------
- *
- * `HttpOnly` means page JavaScript cannot read the cookie. That is the point of it: a script on a
- * page the browser later loads cannot lift the person's key, and the browser attaches it to the
- * request by itself. `SameSite=Strict` means the browser does not send it on a request started by
- * another site, so a page anywhere else cannot make this browser act as the person. Both are named
- * by P83 point 2 and both are load-bearing rather than stylistic.
- *
- * `Path=/` so every route this app calls receives it. `Max-Age` is long because "paired once" means
- * once: a session cookie would make the person pair again every time the browser restarts. There is
- * no `Secure`, because the office is reached over plain HTTP on the machine it runs on and a Secure
- * cookie would simply never be sent there.
- *
- * A COOKIE IS NOT A HEADER, and this is a convenience rather than a new identity fact: the same
- * value sent as KEY_HEADER reads identically in `howThisRequestProvedItself`. The local app holds
- * the key and sends the header; the paired browser is given this cookie.
+ * THE PERSON'S WHOLE KEY IS NEVER PUT IN A BROWSER. It used to be, in the old cookie, and a cookie goes to every port of
+ * its host.
  */
-export function setThePairedBrowserCookie(reply: FastifyReply): void {
-  const keys = theKeyFile()
-  reply.header('set-cookie', `${KEY_COOKIE}=${encodeURIComponent(keys.person)}; ${THE_BROWSER_COOKIE_ATTRIBUTES}`)
+export function setTheDeviceHalfCookie(reply: FastifyReply, half: string): void {
+  reply.header('set-cookie', `${DEVICE_HALF_COOKIE}=${encodeURIComponent(half)}; ${THE_BROWSER_COOKIE_ATTRIBUTES}`)
 }
 
 /**
- * ASK TO PAIR: SET THIS BROWSER'S OWN CREDENTIAL TOKEN AS THE SAME COOKIE, AND ANSWER NO TOKEN.
- * Criterion D2, P83 point 4.
- *
- * ---------------------------------------------------------------------------------------
- * WHY THE TOKEN GOES INTO THE COOKIE AND NOWHERE ELSE
- * ---------------------------------------------------------------------------------------
- *
- * A browser on a trusted machine asks for a person's-device credential. The token it is issued is
- * the key it will hold once the person confirms it, and this is where that token is installed: the
- * cookie, exactly as `setThePairedBrowserCookie` installs the person's key. The caller — the ask
- * door — learns only that a reply now carries a cookie; the value never appears in the reply, a
- * log, a record or a page. Ending the credential revokes the key the token bound, so the cookie is
- * the same one the loopback press sets and the same one the office can take back.
- *
- * ---------------------------------------------------------------------------------------
- * THE ATTRIBUTES ARE ONE DECLARATION, NOT TWO COPIES
- * ---------------------------------------------------------------------------------------
- *
- * HttpOnly, SameSite=Strict, Path=/ and the same Max-Age are named once, in
- * `THE_BROWSER_COOKIE_ATTRIBUTES` above, because the criterion says this cookie is *the same* one
- * the loopback press sets. A second hand-written attribute list is the defect this repository keeps
- * producing: somebody tightens one and the other is the one an attacker finds.
+ * END THE OLD COOKIE, which held a whole key. A Set-Cookie with no value and Max-Age=0, on the same Path the old cookie
+ * was set on, so the browser drops it. The move door sends it in the answer that moves the browser, and in a refusal
+ * that was sent an old cookie (src/server/lib/the-old-cookie.ts). Fastify sends it beside the cookie half: a second
+ * `set-cookie` is added, not put in place of the first.
  */
-export function setTheAskingBrowsersCookie(reply: FastifyReply, token: string): void {
-  reply.header('set-cookie', `${KEY_COOKIE}=${encodeURIComponent(token)}; ${THE_BROWSER_COOKIE_ATTRIBUTES}`)
+export function endTheOldCookie(reply: FastifyReply): void {
+  reply.header('set-cookie', `${KEY_COOKIE}=; Max-Age=0; Path=/; HttpOnly; SameSite=Strict`)
+}
+
+/**
+ * WHETHER THIS VALUE IS THE PERSON'S KEY FROM THE KEY FILE. The move door asks it of the old cookie's value
+ * (src/server/lib/the-old-cookie.ts). It answers a boolean, as every reader here but `makeAnAgentKey` does, so the key
+ * itself is read only in this file.
+ */
+export function isThePersonsKey(value: string): boolean {
+  return keysMatch(value, theKeyFile().person)
+}
+
+/**
+ * THE ONE LINE THE SERVER'S LOG WRITES FOR A MOVE OF THE OLD COOKIE. It names what moved and nothing else: no key, no
+ * half and no token, so the log shows that a browser moved without holding anything that proves anybody.
+ */
+export function aMovesLogLine(moved: WhatTheMoveMoved): string {
+  return moved === 'the-person-key'
+    ? "A browser that sent the person's key in the old cookie moved to two halves, and the old cookie was ended."
+    : 'A browser that sent a device credential\'s token in the old cookie moved to a new credential in two halves, and the old credential and the old cookie were ended.'
 }
 
 /**
@@ -494,10 +473,12 @@ export function setTheAskingBrowsersCookie(reply: FastifyReply, token: string): 
  * "nothing was proved", and this reader refuses neither. A key in the header that this office never
  * gave is refused before any door, by `refuseAKeyThisOfficeNeverGave` in lib/keyheader.ts, unless no
  * listener carried the request or the office is a test world; those two still get undefined here.
+ *
+ * A load with no whole key that a file ticket was honoured on is read by the ticket (`aFileTicketsProof` below).
  */
 export function howThisRequestProvedItself(req: FastifyRequest): KeyProof | undefined {
   const presented = keyOn(req)
-  if (presented === undefined) return undefined
+  if (presented === undefined) return aFileTicketsProof(req)
   const keys = theKeyFile()
   if (keysMatch(presented, keys.person)) return { how: 'the-person-key', whoseId: THE_PERSON }
   if (keysMatch(presented, keys.office)) return { how: 'the-office-key', whoseId: moleOfficeId() }
@@ -529,6 +510,19 @@ export function howThisRequestProvedItself(req: FastifyRequest): KeyProof | unde
     return { how: 'an-agent-key', whoseId: acts.agentId, actingFor: { run: acts.run, holder: held.whose_id, holdersRun: acts.holdersRun } }
   }
   return { how: 'an-agent-key', whoseId: held.whose_id }
+}
+
+/**
+ * WHAT A FILE TICKET PROVES ON A LOAD THAT CARRIES NO WHOLE KEY: the person, when the ticket was made under a live
+ * device key of theirs, and nothing otherwise. lib/file-tickets.ts honoured the ticket before any door, for one file and
+ * the cookie half it was made under. A key taken back since proves nothing, as it would on the request itself.
+ */
+function aFileTicketsProof(req: FastifyRequest): KeyProof | undefined {
+  const hash = theKeyAFileTicketStoodInFor(req)
+  if (hash === undefined) return undefined
+  const held = heldKeyByHash(hash)
+  if (held === undefined || !aHeldKeyThisWorldTrusts(held) || held.whose_kind !== 'person-device') return undefined
+  return { how: 'the-person-key', whoseId: held.whose_id }
 }
 
 /**
@@ -858,7 +852,7 @@ type AMintRow = { record_id:string; seq:number; kind:string; op:string; data:str
 
 /**
  * THE RUN A KEY'S ORIGINAL MINT BOUND IT TO, read from the mint's own revisions and never from a record's
- * `data.extra.runKeyId`, which any later patch may copy. The session door mints on a running, noninspection create,
+ * `data.extra.runKeyId`, which any later patch may copy. The session door mints on an eligible running create,
  * and `recordTheOriginalRunKeyMint` in lib/records.ts writes the binding as the create's second revision, by the same
  * caller, at the key row's own `made_at`. So the first revision that names the key is that seq 2, beside that seq 1.
  * A terminal's open is minted the same way. Undefined where any of that does not hold.
@@ -878,7 +872,7 @@ function theOriginalMintOf(keyId: string, whoseId: string): { run: string; seq: 
   const created = JSON.parse(original.data) as Record<string,unknown>, minted = JSON.parse(mint.data) as Record<string,unknown>
   const extra = created['extra'] as { purpose?:unknown; runKeyId?:unknown } | undefined
   const holder = theOneAgentAStringNames(sqlite, whoseId)
-  if (created['state'] !== 'running' || extra?.purpose === 'inspection' || extra?.runKeyId !== undefined || holder === null || theAgentARunServes(created)?.id !== holder.id || theAgentARunServes(minted)?.id !== holder.id) return undefined
+  if (created['state'] !== 'running' || extra?.runKeyId !== undefined || holder === null || theAgentARunServes(created)?.id !== holder.id || theAgentARunServes(minted)?.id !== holder.id) return undefined
   return { run: mint.record_id, seq: mint.seq, holder, mint, created }
 }
 
@@ -1006,7 +1000,7 @@ function theCurrentParentDataNamesThisStart(created: Record<string, unknown>, ru
 
 /**
  * The actual live session whose original create transaction minted this key. The normal session
- * door always mints on a proved starter's running, noninspection create, before exposing the token.
+ * door mints on a proved starter's eligible running create, before exposing the token.
  * Its first key-row occurrence is therefore seq2 beside that seq1, by the same proved caller
  * (`theOriginalMintOf` above). Ordinary later metadata stays editable; it cannot move this authority
  * to another run. A terminal's key is bound by its open and its reopen, by the office and with no
@@ -1099,6 +1093,7 @@ export function aKeyWasEverHeldBy(whoseKind: string, whoseId: string): boolean {
 }
 
 import { revokeTheKeyNamed } from './held-keys-made-and-revoked.ts'
+import type { AHeldKeyRow } from '../db/types/keys.ts'
 export { revokeTheKeyNamed } from './held-keys-made-and-revoked.ts'
 
 /** Only the Embassy press writes this reason. Other revocations cannot be undone here. */

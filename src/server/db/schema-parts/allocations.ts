@@ -5,6 +5,64 @@ import { aPartTable } from '../part-tables.ts'
 
 const existingArchive = { existingArchive: true } as const
 
+/**
+ * WHEN THIS PERSON WILL SPEND REAL TIME ON WORK THAT ALREADY EXISTS.
+ *
+ * ---------------------------------------------------------------------------------------
+ * WHY THIS TABLE HAS NO `workspace_id`, AND IT IS THE ONLY ONE
+ * ---------------------------------------------------------------------------------------
+ *
+ * Every other authored table in this database carries a workspace, because every fact Mole Office stores
+ * belongs to exactly one project. A planning period does not, and that is a settled owner decision
+ * rather than an omission: **a plan is a person-level time-allocation overlay across
+ * workspace-owned canonical work.** The two answer different questions — a workspace answers which
+ * project owns the work, planning answers when this person will allocate real time to it — so one
+ * week may hold Mole Office work, greenhouse work and a dentist appointment at once.
+ *
+ * That is NOT a cross-workspace link and must never be read as one:
+ *
+ *   - `record_id` names a record that stays in its own project. Nothing here moves it, copies it,
+ *     or gives it a second home.
+ *   - **An allocation carries no authority.** It is an id and a number of hours. Reading the record
+ *     it names goes through `workspaceOf` like every other read, so an allocation can name a
+ *     greenhouse task without being a way to read greenhouse.
+ *   - There is no `links` row involved, so the boundary rules that refuse cross-project links are
+ *     untouched and keep meaning exactly what they meant.
+ *
+ * `explore.md` — *Why a planning period is person-level and not workspace-owned* — has the whole of
+ * it, including what happens when Mole Office is ever multi-user: who may SEE an allocation becomes a
+ * real question, and project ownership is not part of it.
+ *
+ * ---------------------------------------------------------------------------------------
+ * WHICH HALF OF CRITERION P8 IS TRUE TODAY, AND WHICH HALF CANNOT BE BUILT YET
+ * ---------------------------------------------------------------------------------------
+ *
+ * Criterion P8 of `design/planning/ACCEPTANCE.md` is half true today and the rest cannot be built
+ * yet. TRUE TODAY: no planning table carries a `workspace_id` — not `allocations`,
+ * `planning_capacity`, `planning_intents`, `plans`, `plan_lines`, `planning_recurrences` or
+ * `work_windows` — so plans and the schedule live outside every workspace, and
+ * `tests/an-allocation-reads-back-from-a-second-workspace.test.ts` proves it by reading an
+ * allocation back from a second workspace. A test deleted on 13 November 2026 failed if any of the seven gained a
+ * column that names a workspace.
+ *
+ * NOT BUILT, AND NOT BUILDABLE YET. "The schedule per person" is true only because there is one
+ * person: no planning table has a person or owner column, each carries a free-text `created_by` of
+ * the form `<type>:<id>`, and the multi-user question above is open. Sync between worlds does not
+ * exist, so a plan line can name a record in another workspace of this world and cannot name one in
+ * another world — a record id is a bare local id, and P8 needs a world-qualified one, and a person
+ * on these tables once there is more than one person. P8 keeps the line that is already true; it is
+ * not the wave that adds any of those.
+ *
+ * ---------------------------------------------------------------------------------------
+ * WHAT IS NOT IN THIS TABLE
+ * ---------------------------------------------------------------------------------------
+ *
+ * No title, no summary, no state of the work, no kind, no workspace. **Planning is allocation, not
+ * duplication**: every one of those is on the record `record_id` names, and a copy here would be a
+ * second place that has to agree with it. What a reader sees is assembled per request.
+ *
+ * AUTHORED. Somebody committed these hours; nothing rebuilds them from anything.
+ */
 export const allocations = aPartTable(sqliteTable(
   'allocations',
   {

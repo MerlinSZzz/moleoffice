@@ -9,7 +9,7 @@ import { desc, eq } from 'drizzle-orm'
 import { db } from './client.ts'
 import { revisions } from './schema.ts'
 import type { ActorType } from '@shared/types.ts'
-import type { WhoWroteTheColumn } from '../lib/revisions.ts'
+import type { WhoWroteTheColumn } from './types/revisions.ts'
 
 /**
  * WHO PUT THE VALUE ONE OF A RECORD'S OWN COLUMNS HOLDS THERE, AND IN WHICH RUN.

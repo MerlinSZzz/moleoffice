@@ -25,7 +25,8 @@
  * `/api/records/:id/short-forms`, checked against the body by the same door. The report body draws
  * the one written for the length being read, and right-clicking it opens the composer, which says
  * what it stands for and who wrote it. "The panel is gone" and "the forms are gone" are one mistake
- * apart, so both are checked in the same browser on the same record.
+ * apart, so both are checked in the same browser on the same record. The composer on the form is
+ * checked in tests/who-wrote-a-form-is-not-on-the-page.test.ts.
  *
  * AND A MODULE PAGE IS OPENED, because the panel sat inside `RecordDetail`, which draws every kind.
  * A cut that took a neighbouring element with it would leave a module page blank, and no test of a
@@ -40,17 +41,14 @@
  *
  *   draw one row of class `rd-short-says` anywhere on the page → *no row of the panel* goes red.
  *
- *   make `formDrawnAt` answer null at every length → *the body still draws the form* goes red, and
- *   so does *the composer names the form* — which is the pair this file exists to keep apart.
+ *   make `formDrawnAt` answer null at every length → *the body still draws the form* goes red —
+ *   which is the pair this file exists to keep apart.
  */
 import { THE_TEST_OFFICES_OWNER } from './a-page-of-a-test-office.ts'
 import type { Page } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { type LiveApp, liveApp, waitForThePage } from './helpers.ts'
 import { DETAIL_KEY_EVERYWHERE } from '../src/shared/detail.ts'
-import { sectionRegionId } from '../src/shared/regions.ts'
-import { SUMMARY_LINE_KEY } from '../src/shared/sections.ts'
-import { targetAttributeValue } from '../src/shared/targets.ts'
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
@@ -168,28 +166,6 @@ describe('the forms are still stored, still drawn and still pointable', () => {
     expect(said, 'the body stopped drawing the form written for this length').toContain(GIST)
   }, 180_000)
 
-  it('opens the composer on it, naming what it stands for', async () => {
-    await openAt(reportId, 'gist')
-    const where = `[data-target="${targetAttributeValue({
-      kind: 'region',
-      recordId: reportId,
-      // THE REGION IS THE RECORD'S OWN SUMMARY, which is what reading length 3 draws. It was
-      // `shortFormRegionId('gist')` while a gist was stored beside the record.
-      regionId: sectionRegionId(SUMMARY_LINE_KEY),
-    })}"]`
-    await page.locator(where).first().waitFor({ timeout: 30_000 })
-    await page.locator(where).first().click({ button: 'right' })
-    await page.locator('.px-talk').first().waitFor({ timeout: 15_000 })
-    await sleep(1200)
-    const said = await page.evaluate(() => {
-      const talk = [...document.querySelectorAll('.px-talk')].find(
-        (one) => one.getAttribute('data-target') === 'uiSurface/composer',
-      )
-      return talk === undefined ? null : (talk.textContent ?? '').trim()
-    })
-    expect(said, 'the composer did not open on the form').not.toBeNull()
-    expect(said ?? '', 'the composer no longer says what the form stands for').toContain('Stands for the whole report.')
-  }, 180_000)
 })
 
 // ============================================================ 3. the rest of the page still draws

@@ -250,7 +250,7 @@ describe('the region walk is one tab stop, whatever the report holds', () => {
     const standingOn = await page.evaluate(() => document.activeElement?.getAttribute('data-target') ?? null)
     expect(standingOn, 'nothing was focused to talk about').not.toBeNull()
     await page.keyboard.press('Enter')
-    await page.waitForTimeout(600)
+    await page.locator('[data-target="uiSurface/composer"]').first().waitFor({ state: 'attached', timeout: 10_000 }).catch(() => undefined)
     // The composer says what it is through the surface registry, the same way every other part of
     // Mole Office's own screen does, so this looks for the thing rather than for a class name.
     const composerIsOpen = await page.evaluate(

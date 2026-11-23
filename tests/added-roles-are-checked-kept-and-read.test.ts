@@ -6,7 +6,7 @@ import { afterAll, beforeAll, beforeEach, expect, it } from 'vitest'
 import type { FastifyInstance } from 'fastify'
 import type { RoleCard } from '../src/shared/roles.ts'
 import { THE_TEST_OFFICES_OWNER, THE_TEST_OFFICES_SECRETARY } from './a-page-of-a-test-office.ts'
-import { apiApp, freshDb, theAnswerToAWriteInATestOffice, type TestDb } from './helpers.ts'
+import { apiApp, freshDb, theAnswerToAWriteInATestOffice, type TestDb, governsTheWholeProject } from './helpers.ts'
 
 let db: TestDb, app: FastifyInstance
 /** Each case's own added role, so its history and its held cards are only the ones that case made. */
@@ -179,7 +179,7 @@ it('requires the person or owner authority, or a secretary with words bound to t
   const message = await fileAsTheOwner('message', 'Made-up words about the archive role', { body: `Made-up first line.\n\n${said}\n\nMade-up last line.`, to: [{ kind: 'agent', id: THE_TEST_OFFICES_SECRETARY.handle }] })
   const onIt = `message:${message}`
   await refusedOnTheWords(() => apply(card(), { warrant: words(card(), theRole, onIt) }, secretary), `No live decision of the owner's rests on message ${message}.`)
-  await fileAsTheOwner('decision', 'Made-up decision on the archive role', { replaces: [], decided_by: 'the owner', authority: 'the owner said so', authority_reference: message, option_taken: 'Made-up.', because: 'Made-up.' })
+  await fileAsTheOwner('decision', 'Made-up decision on the archive role', { ...governsTheWholeProject(), replaces: [], decided_by: 'the owner', authority: 'the owner said so', authority_reference: message, option_taken: 'Made-up.', because: 'Made-up.' })
   expect((await apply(card(), { warrant: words(card(), theRole, onIt) }, secretary)).statusCode).toBe(200)
   const audit = db.client.sqlite.prepare('SELECT warrant,actor_id FROM changes WHERE record_id=?').get(`setting:role:${theRole}`) as { warrant: string; actor_id: string }
   expect(JSON.parse(audit.warrant).for).toEqual(words(card()).for)

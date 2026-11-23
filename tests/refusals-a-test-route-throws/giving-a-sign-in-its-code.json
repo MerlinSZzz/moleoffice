@@ -1,0 +1,35 @@
+{
+  "why": "Giving an agent tool's own sign-in the code its sign-in page showed, POST /api/harnesses/:id/sign-in/code. Each refusal needs a sign-in the office started from the sign-in door, which runs an agent tool on the PATH the office's terminals get, and here that would be this computer's real tool and a real account. They are met through their door with made-up tools on a made-up PATH in tests/a-sign-in-code-reaches-only-the-sign-in-its-press-started.test.ts. The English is the door's own, with the tool the door names.",
+  "refusals": [
+    {
+      "code": "harnessSignInCodeShape",
+      "status": 400,
+      "english": "The code was not sent in the form this door reads: the sign-in's id, and the code as one line of printable characters, at most 2048. Nothing was sent to the sign-in.",
+      "values": {}
+    },
+    {
+      "code": "harnessNoSuchSignIn",
+      "status": 404,
+      "english": "No sign-in the office started for Claude Code has that id. Nothing was sent to it.",
+      "values": {}
+    },
+    {
+      "code": "harnessSignInTakesNoCode",
+      "status": 409,
+      "english": "Codex's sign-in takes no code from the office. Nothing was sent to it.",
+      "values": {}
+    },
+    {
+      "code": "harnessSignInEnded",
+      "status": 409,
+      "english": "That sign-in of Claude Code's has ended or ran past its ten minutes. Nothing was sent to it. Press Sign in again.",
+      "values": {}
+    },
+    {
+      "code": "harnessSignInCodeGiven",
+      "status": 409,
+      "english": "That sign-in of Claude Code's has had its code already, and takes one. Nothing more was sent to it.",
+      "values": {}
+    }
+  ]
+}

@@ -42,7 +42,16 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify'
 import { z } from 'zod'
 
-import { isAPersonsDeviceCredential, whyTheseFactsAreNotEnough, type VisitorCredential } from '@shared/visitors.ts'
+import {
+  isAPersonsDeviceCredential,
+  ON_HIS_OWN_CARD,
+  whyTheseFactsAreNotEnough,
+  type VisitorCredential,
+} from '@shared/visitors.ts'
+// THE PERSON'S OWN CARD, AS AN ADDRESS, for the sentence that tells a browser where it is confirmed. Design C of early idea
+// B9 put the person's browsers there. Built when the sentence is said, because THE_PERSON is set when the office starts.
+import { participantPagePath } from '@shared/addresses.ts'
+import { THE_PERSON } from '@shared/person.ts'
 // THE CARDS THE TREE HOLDS, criterion P81: a credential names the card it asks for, the door refuses
 // a word no card holds, and the confirm gives that card unless it is one that only the owner appoints.
 import {
@@ -208,7 +217,7 @@ const untrustBody = z.object({ because: z.string().min(1).max(500).optional() })
 const TRUSTED_NOTE =
   'The machines this office trusts, criterion P73. `machines` is what it trusts now and `removed` is what it once ' +
   'trusted: a row is never deleted, so the office does not lose the record of who it let in. `how` says where each ' +
-  'row came from — a press at the world\'s page, the confirmation of a visitor credential, or the environment, ' +
+  'row came from — a press on the owner\'s own person card, the confirmation of a visitor credential, or the environment, ' +
   'which is MOLE_OFFICE_ADDRESS_FOR_OTHER_MACHINES written in when the server started so the list says what the ' +
   'office actually opened a door for. `boundByTheEnvironment` is that address, or null because the environment ' +
   'named none and nothing but this computer can reach this server. WHAT THE LIST DECIDES is in `says`, and the ' +
@@ -618,14 +627,18 @@ export async function visitorRoutes(app: FastifyInstance): Promise<void> {
         runtime: body.runtime ?? from.program,
       })
       reply.code(201)
+      // THE WHOLE TOKEN, AND NOT ITS HALVES. A device that asks here sends its key on the key header, so it is given
+      // the key the two halves join to; only a browser is given the two halves.
       return {
-        ...issued,
+        credential: issued.credential,
+        token: issued.token,
         confirmationAsked: true,
         says:
           'Keep this token: it is shown once and this is that once, and the office stores only a hash of it. This ' +
           'is a person\'s device asking to come in, so it names no card. NOTHING WORKS YET: the credential is ' +
-          'pending until the owner confirms it at the Embassy — open #/embassy on the machine that runs the ' +
-          `office, open the credential ${issued.credential.id}, and press Confirm. Once it is confirmed, send ` +
+          `pending until the owner confirms it on their own person card — open ${participantPagePath('person', THE_PERSON)} ` +
+          'on the machine that runs the office, find this device among those waiting for them, and press Confirm. ' +
+          'Once it is confirmed, send ' +
           'this same token on x-mole-office-key and the request is the person. It runs out on ' +
           `${issued.credential.endsAt}, ${String(HOW_LONG_A_CREDENTIAL_LASTS_DAYS)} days from now.`,
       }
@@ -774,7 +787,7 @@ export async function visitorRoutes(app: FastifyInstance): Promise<void> {
     ), async (req) => {
     const body = parse(trustBody, req.body ?? {}, 'The machine to trust')
     const actor = actorFrom(req)
-    onlyThePersonMay(actor, req, 'at the world\'s page')
+    onlyThePersonMay(actor, req, ON_HIS_OWN_CARD)
     // WHO DID IT, AS THEY ARE. Criterion P84: in a test world the starter or a secretary may make
     // this act, and the row says which agent made it. Writing `person` for an agent that holds the person's
     // authority would put a false name in a permanent record — chapter 8's first rule — and would
@@ -793,7 +806,7 @@ export async function visitorRoutes(app: FastifyInstance): Promise<void> {
     const asked = parse(whichMachine, req.params, 'The machine to stop trusting')
     const body = parse(untrustBody, req.body ?? {}, 'Why it is being removed')
     const actor = actorFrom(req)
-    onlyThePersonMay(actor, req, 'at the world\'s page')
+    onlyThePersonMay(actor, req, ON_HIS_OWN_CARD)
     const machine = stopTrustingThisMachine(asked.id, whoAsked(actor), body.because ?? null)
     sayItWasDoneFromAnotherComputer(req, 'A machine was removed from the ones this office trusts')
     return { machine }
@@ -849,10 +862,14 @@ export async function visitorRoutes(app: FastifyInstance): Promise<void> {
     async (req) => {
     const asked = parse(whichCredential, req.params, 'The credential to confirm')
     const actor = actorFrom(req)
+    // WHERE THE OWNER CONFIRMS IT, in the refusal's words: a browser of theirs on their own person card, and anything
+    // else at the Embassy. The credential is read before the check for these words only; the 404 is asked after it.
+    const named = credentialById(asked.id)
+    const aBrowserOfTheirs = named !== null && isAPersonsDeviceCredential(named)
     onlyThePersonMay(
       actor,
       req,
-      'at the Embassy, on either machine',
+      aBrowserOfTheirs ? `${ON_HIS_OWN_CARD}, on either machine` : 'at the Embassy, on either machine',
     )
     /**
      * AND THE CARD IT ASKS FOR IS NOT ABOVE THE VISITOR CARD CEILING. Criterion P86. It is asked
@@ -865,7 +882,7 @@ export async function visitorRoutes(app: FastifyInstance): Promise<void> {
      * about a visitor's CARD, and a device asks for none. The branch is the first thing the press
      * decides, and every other credential still asks.
      */
-    const wanted = credentialById(asked.id)
+    const wanted = named
     if (wanted === null) throw new PanelError(`No credential here has the id "${asked.id}".`, 404)
     const itIsAPersonsDevice = isAPersonsDeviceCredential(wanted)
     if (!itIsAPersonsDevice) {
@@ -1043,7 +1060,10 @@ export async function visitorRoutes(app: FastifyInstance): Promise<void> {
       if (key === null) {
         throw new PanelError(`No live key here has the id "${asked}". It was revoked already. Nothing was revoked.`, 404)
       }
-      onlyThePersonMay(actor, req, 'at the Embassy', key.whoseKind === 'agent' ? null : 'office.revoke-key:a-persons-key')
+      // WHERE IT IS DONE, in the refusal's words: an agent's key on its page from the Embassy, and the owner's own keys on
+      // their own person card, where design C of early idea B9 put their browsers.
+      const where = key.whoseKind === 'agent' ? 'at the Embassy' : ON_HIS_OWN_CARD
+      onlyThePersonMay(actor, req, where, key.whoseKind === 'agent' ? null : 'office.revoke-key:a-persons-key')
       // LOCAL WALL CLOCK, the form held_keys.revoked_at stores for every revocation, and the one the undo matches.
       const revokedAt = nowStamp()
       const revoked = revokeTheKeyNamed(
@@ -1074,7 +1094,9 @@ export async function visitorRoutes(app: FastifyInstance): Promise<void> {
       const asked = parse(whichHeldKey, req.params, 'The key to bring back').id
       const body = parse(undoKeyBody, req.body ?? {}, 'The revocation to undo')
       const actor = actorFrom(req)
-      onlyThePersonMay(actor, req, 'at the Embassy', theKindOfHolderOfTheKey(asked) === 'agent' ? null : 'office.undo-key-revocation:a-persons-key')
+      const anAgents = theKindOfHolderOfTheKey(asked) === 'agent'
+      const where = anAgents ? 'at the Embassy' : ON_HIS_OWN_CARD
+      onlyThePersonMay(actor, req, where, anAgents ? null : 'office.undo-key-revocation:a-persons-key')
       const refusal = undoEmbassyKeyRevocation(asked, body.revokedAt)
       if (refusal !== null) throw new PanelError(refusal, 409)
       writeDownAnActUnderTheRaise(actor, { setting: 'held-keys', field: `brought back the key ${asked}`, before: 'revoked', after: 'live', workspaceId: workspaceOf(req) })
@@ -1098,16 +1120,19 @@ export async function visitorRoutes(app: FastifyInstance): Promise<void> {
     // AN AGENT'S CREDENTIAL IS CARRIED BY THE PERSON'S RAISE; A PERSON'S DEVICE IS NOT, because ending it takes
     // a device that is the person away from them, and a decision keeps changing who the owner is out
     // of a raise.
+    const anAgents = ending !== null && !isAPersonsDeviceCredential(ending)
     onlyThePersonMay(
       actor,
       req,
-      'at the Embassy, on either machine',
-      ending !== null && !isAPersonsDeviceCredential(ending) ? null : 'office.end-visitor:a-persons-device',
+      anAgents ? 'at the Embassy, on either machine' : `${ON_HIS_OWN_CARD}, on either machine`,
+      anAgents ? null : 'office.end-visitor:a-persons-device',
     )
     // ONE PRESS, SO THE REASON IS OPTIONAL. Criterion P29 says a credential ends in one
     // press, and a required sentence would make it two. What is written when the person says nothing is
     // that they ended it, which is true and is the whole of what the press means.
-    const credential = endACredential(asked.id, body.because ?? 'The owner ended it at the Embassy.')
+    // A BROWSER OF THEIRS IS ENDED ON THEIR OWN PERSON CARD, and an agent's ask is refused at the Embassy.
+    const said = anAgents ? 'The owner ended it at the Embassy.' : 'The owner ended it on their own person card.'
+    const credential = endACredential(asked.id, body.because ?? said)
     writeDownAnActUnderTheRaise(actor, { setting: 'visitor-credentials', field: `ended the credential ${asked.id}`, before: ending?.standing ?? null, after: credential.standing, workspaceId: workspaceOf(req) })
     sayItWasDoneFromAnotherComputer(req, `The credential ${asked.id} was ended`)
     return { credential }

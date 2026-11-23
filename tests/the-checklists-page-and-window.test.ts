@@ -1,13 +1,24 @@
 // Copyright © 2026 Zhengyang Shen
 // Licensed under the MIT License. See LICENSE.
 /**
- * THE CHECKLISTS PAGE AND THE CHECKLISTS WINDOW, AS CHOSEN. Wave 13n round 52, from a decision,
- * on design nukmat0TERRF. In a real browser, on this test's own office:
+ * THE CHECKLISTS PAGE AND THE CHECKLISTS WINDOW, AS CHOSEN. Wave 13n round 52, from a decision. In a real browser,
+ * on this test's own office.
  *
- * 1. THE PAGE HAS NO SECTION OF THE READER'S OWN. It is the table grouped by project or owner, and nothing else:
- *    every heading on it is a group's, and the reader's own checklist is one row in it, once.
- *    MUTATION: `TheList` in src/web/pages/ChecklistsPage.tsx drew a "Mine" section above the table, holding the
- *    reader's own checklists. This case went red.
+ * Test change (wave 13y round 175): the page and the window draw design E, as decided. The page is one section per
+ * person, and each checklist is a card; the window has a row of names across its top. The table grouped by project or
+ * by owner went, and with it case 1, which held that the page had no section of the reader's own. The window's full
+ * view of whose checklists went, and with it cases 7 and 8. Case 6 now holds the row of names. The other cases ask what
+ * they asked before, of the card that holds the checklist: on the page the card the address marks, in the window the
+ * card of the reader's own checklist. Before, they asked it of the one opened checklist on the page and of a group in
+ * the window. tests/the-checklists-page-and-window-draw-a-section-per-person.test.ts holds the sections and the adding.
+ *
+ * Test change (wave 13y round 175, the names behind Back): the window's names are folded behind a Back press at the
+ * start of its head, as decided. Back shows the names in the cards' place, and choosing a name shows that person's
+ * cards and folds the names again. The names are plain presses, and the press of the person shown is marked with
+ * aria-current, not aria-selected. Case 6 presses Back, found by its words, each time before it reads or chooses a
+ * name, and reads aria-current where it read aria-selected. It reads the cards before Back, and asks for no select
+ * on both screens. Before, the names were tabs drawn above the cards. What the case checks is unchanged.
+ *
  * 2. DONE ITEMS ARE FOLDED AND OPEN WITH ONE PRESS. In the window, a checklist's done item is not drawn until its
  *    press is pressed once; then it is, and the press says it hides them. Closing the window folds them again.
  *    MUTATION: in src/web/components/ChecklistsWindow.tsx, `isOpen` read `!unfolded.has(list.id)`, so done items
@@ -29,28 +40,11 @@
  * 5. A SOURCE LINE IS NOT DRAWN ON EACH ROW. "From a message" is drawn under an item only when that item is opened,
  *    on the page and in the window.
  *    MUTATION: in ChecklistParts.tsx each item's `<details>` was drawn open. This case went red.
+ * 6. THE WINDOW OPENS ON THE READER'S OWN NAME. The reader's checklist is drawn and another person's is not. Back
+ *    shows the names, the reader's first and current, and no select. Choosing another name draws that person's
+ *    checklists, and that name is the current one; a window closed on another name opens again on the reader's.
  *
- * CONTROL: 5 passed. Each mutation alone: 1 failed, 4 passed. RESTORE: 5 passed. The logs are named in the round's
- * report.
- *
- * Wave 13n round 53: the window opens on the reader's own checklists, and one press opens the full
- * view where the reader chooses whose.
- *
- * 6. THE DEFAULT VIEW HAS NO CHOICE OF WHOSE. The open window is headed "My checklists"; it has no select and no
- *    "Whose" label, and nobody else's checklist is drawn in it.
- *    MUTATION: the "Whose" label in ChecklistsWindow.tsx was drawn in both views (`{full ? (` read `{true ? (`).
- *    Cases 6 and 8 went red; 8 also looks for the choice after the way back.
- * 7. THE PRESS OPENS THE FULL VIEW. "All checklists" in the window's top line, whose hover text is its name, opens a
- *    view with the "Whose" choice, everyone's checklists each naming its owner, the read-only note and no "Mark
- *    done"; choosing an owner shows only that owner's checklists.
- *    MUTATION: the press's onClick read `setFull(false)`. Cases 7 and 8 went red; 8 opens the full view first.
- *    MUTATION: the owner line under each of everyone's checklists was not drawn. Case 7 went red, alone.
- * 8. THE WAY BACK RETURNS TO THE READER'S OWN. "My checklists" in the full view's top line brings back the default
- *    view, with the left boxes (a plain one and a special one) and without the choice; a window closed in the full
- *    view opens again on the reader's own.
- *    MUTATION: the back press's onClick read `setFull(true)`. Case 8 went red, alone.
- *
- * CONTROL: 8 passed. MUTATIONS: 2 failed, 2 failed, 1 failed and 1 failed, as above. RESTORE: 8 passed.
+ * The mutation lines above were run when each case was written, before round 175.
  *
  * THE OFFICE IS THIS TEST'S OWN. `liveApp` starts its own API and database. Every checklist, message and report
  * here is made up.
@@ -58,6 +52,7 @@
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { Page } from 'playwright'
+import { t } from '../src/shared/i18n.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { liveApp, waitForThePage, type LiveApp, theAnswerToAWriteInATestOffice } from './helpers.ts'
 
@@ -127,8 +122,11 @@ async function open(page: Page, hash: string, waitFor: string): Promise<void> {
 async function openTheWindow(page: Page): Promise<void> {
   await open(page, '/decisions', '.ckw-press')
   await page.click('.ckw-press')
-  await page.waitForSelector('.ckw-panel .ckw-group', { timeout: 30_000 })
+  await page.waitForSelector('.ckw-panel .cks-card', { timeout: 30_000 })
 }
+
+/** The card the address `#/checklists/<id>` marks on the page. */
+const MARKED = '.cks-card[data-marked="yes"]'
 
 /** Every item's words on screen that are cut, clamped or overflow their box, with why. */
 async function cutWords(page: Page, within: string): Promise<string[]> {
@@ -157,23 +155,11 @@ async function cutWords(page: Page, within: string): Promise<string[]> {
 }
 
 describe('the checklists page and window', () => {
-  it("1. the page has no section of the reader's own: every heading is a group's, and the reader's checklist is one row", async () => {
-    const page = app.page
-    await page.setViewportSize({ width: 1440, height: 900 })
-    await open(page, '/checklists', '.ckb-row')
-    const heads = await page.locator('.ckl h2, .ckl h3').evaluateAll((els) => els.map((el) => `${el.className}: ${el.textContent ?? ''}`))
-    expect(heads.length).toBeGreaterThan(0)
-    expect(heads.filter((one) => !one.startsWith('ckb-head:'))).toEqual([])
-    const text = await page.locator('.ckl').innerText()
-    expect(text.split('Kiln checklist').length - 1).toBe(1)
-    expect(await page.locator('.ckb-row', { hasText: "Quill's shelf list" }).count()).toBe(1)
-  }, 90_000)
-
   it('2. done items are folded in the window, and open with one press', async () => {
     const page = app.page
     await page.setViewportSize({ width: 1440, height: 900 })
     await openTheWindow(page)
-    const group = page.locator('.ckw-group', { hasText: 'Kiln checklist' })
+    const group = page.locator('.ckw-panel .cks-card', { hasText: 'Kiln checklist' })
     const fold = group.locator('.ckp-fold')
     await expect.poll(() => fold.getAttribute('aria-expanded')).toBe('false')
     expect(await fold.innerText()).toContain('Show 1 done')
@@ -184,8 +170,8 @@ describe('the checklists page and window', () => {
     expect(await fold.innerText()).toContain('Hide the done items')
     await page.keyboard.press('Escape')
     await page.click('.ckw-press')
-    await page.waitForSelector('.ckw-panel .ckw-group')
-    expect(await page.locator('.ckw-group', { hasText: 'Kiln checklist' }).getByText('Fire the test tiles').count()).toBe(0)
+    await page.waitForSelector('.ckw-panel .cks-card')
+    expect(await page.locator('.ckw-panel .cks-card', { hasText: 'Kiln checklist' }).getByText('Fire the test tiles').count()).toBe(0)
     await page.keyboard.press('Escape')
   }, 90_000)
 
@@ -193,8 +179,8 @@ describe('the checklists page and window', () => {
     const page = app.page
     for (const width of [1440, 390]) {
       await page.setViewportSize({ width, height: width === 390 ? 844 : 900 })
-      await open(page, `/checklists/${own}`, '.ck1-items .ckp-words')
-      expect(await cutWords(page, '.ck1'), `the page at ${String(width)}`).toEqual([])
+      await open(page, `/checklists/${own}`, `${MARKED} .ckp-words`)
+      expect(await cutWords(page, MARKED), `the page at ${String(width)}`).toEqual([])
       await page.click('.ckw-press')
       await page.waitForSelector('.ckw-panel .ckp-words')
       expect(await cutWords(page, '.ckw-panel'), `the window at ${String(width)}`).toEqual([])
@@ -207,11 +193,11 @@ describe('the checklists page and window', () => {
     const page = app.page
     await page.setViewportSize({ width: 1440, height: 900 })
     await openTheWindow(page)
-    const item = page.locator('.ckw-group .ckp-item', { hasText: 'Write how the kiln is loaded' })
+    const item = page.locator('.ckw-panel .ckp-item', { hasText: 'Write how the kiln is loaded' })
     const box = item.getByRole('button', { name: 'Mark done with evidence or words: Write how the kiln is loaded', exact: true })
     expect(await box.count(), "the special item's left box").toBe(1)
     expect(await item.locator('.ckp-mark[data-special="yes"]').count(), 'the special icon in that box').toBe(1)
-    const plain = page.locator('.ckw-group .ckp-item', { hasText: 'Fire the test tiles' })
+    const plain = page.locator('.ckw-panel .ckp-item', { hasText: 'Fire the test tiles' })
     expect(await plain.locator('.ckp-mark[data-special="yes"]').count(), 'a plain item keeps the plain box').toBe(0)
     await box.click({ timeout: 10_000 })
     const picker = item.locator('.ckw-picker')
@@ -256,7 +242,7 @@ describe('the checklists page and window', () => {
     const page = app.page
     await page.setViewportSize({ width: 1440, height: 900 })
     await openTheWindow(page)
-    const item = page.locator('.ckw-group .ckp-item', { hasText: 'Write how the kiln is loaded' })
+    const item = page.locator('.ckw-panel .ckp-item', { hasText: 'Write how the kiln is loaded' })
     await item
       .getByRole('button', { name: 'Mark done with evidence or words: Write how the kiln is loaded', exact: true })
       .click({ timeout: 10_000 })
@@ -282,12 +268,12 @@ describe('the checklists page and window', () => {
     const page = app.page
     await page.setViewportSize({ width: 1440, height: 900 })
     const shown = (within: string) => page.locator(within).getByRole('link', { name: 'From a message' }).filter({ visible: true })
-    await open(page, `/checklists/${own}`, '.ck1-items .ckp-words')
-    expect(await page.locator('.ck1').getByRole('link', { name: 'From a message', includeHidden: true }).count()).toBe(2)
-    expect(await shown('.ck1').count()).toBe(0)
-    await page.locator('.ck1 .ckp-summary', { hasText: 'Choose the glaze' }).click()
-    await expect.poll(() => shown('.ck1').count()).toBe(1)
-    expect(await page.locator('.ck1 .ckp-item', { hasText: 'Choose the glaze' }).getByRole('link', { name: 'From a message' }).isVisible()).toBe(true)
+    await open(page, `/checklists/${own}`, `${MARKED} .ckp-words`)
+    expect(await page.locator(MARKED).getByRole('link', { name: 'From a message', includeHidden: true }).count()).toBe(2)
+    expect(await shown(MARKED).count()).toBe(0)
+    await page.locator(`${MARKED} .ckp-summary`, { hasText: 'Choose the glaze' }).click()
+    await expect.poll(() => shown(MARKED).count()).toBe(1)
+    expect(await page.locator(`${MARKED} .ckp-item`, { hasText: 'Choose the glaze' }).getByRole('link', { name: 'From a message' }).isVisible()).toBe(true)
     await page.click('.ckw-press')
     await page.waitForSelector('.ckw-panel .ckp-words')
     expect(await shown('.ckw-panel').count()).toBe(0)
@@ -296,65 +282,34 @@ describe('the checklists page and window', () => {
     await page.keyboard.press('Escape')
   }, 90_000)
 
-  it('6. the window opens on the reader\'s own checklists, with no choice of whose', async () => {
+  it("6. the window opens on the reader's own name, first among its names behind Back, and another name draws that person's checklists", async () => {
     const page = app.page
     await page.setViewportSize({ width: 1440, height: 900 })
     await openTheWindow(page)
     const panel = page.locator('.ckw-panel')
-    expect(await panel.locator('.ckw-title').innerText()).toBe('My checklists')
+    const back = panel.getByRole('button', { name: t('checklists.window.back'), exact: true })
+    const names = panel.locator('.ckw-names .ckw-name')
     expect(await panel.locator('select').count()).toBe(0)
-    expect(await panel.getByText('Whose', { exact: true }).count()).toBe(0)
-    expect(await panel.locator('.ckw-group', { hasText: "Quill's shelf list" }).count()).toBe(0)
-    expect(await panel.locator('.ckw-group', { hasText: 'Kiln checklist' }).count()).toBe(1)
-    await page.keyboard.press('Escape')
-  }, 90_000)
-
-  it('7. "All checklists" in the top line opens the full view, where the reader chooses whose and marks nothing', async () => {
-    const page = app.page
-    await page.setViewportSize({ width: 1440, height: 900 })
-    await openTheWindow(page)
-    const panel = page.locator('.ckw-panel')
-    const press = panel.locator('.ckw-head').getByRole('button', { name: 'All checklists', exact: true })
-    expect(await press.getAttribute('title')).toBe('All checklists')
-    await press.click()
-    // THE CHOICE IS NAMED BY ITS LABEL; the name a browser gives a select in its label also holds the chosen option.
-    const whose = panel.getByRole('combobox', { name: /^Whose\b/ })
-    await whose.waitFor({ timeout: 10_000 })
-    await panel.locator('.ckw-group', { hasText: "Quill's shelf list" }).waitFor({ timeout: 20_000 })
-    expect(await panel.locator('.ckw-group', { hasText: 'Kiln checklist' }).count()).toBe(1)
-    expect(await panel.locator('.ckw-group', { hasText: "Quill's shelf list" }).locator('.ckw-owner').innerText()).toBe('Quill, agent')
-    expect(await panel.locator('.ckw-title').innerText()).toBe('All checklists')
-    expect(await panel.getByText('Shown to read. Items are marked done on your own checklists.').count()).toBe(1)
-    expect(await panel.getByRole('button', { name: 'Mark done' }).count()).toBe(0)
-    await whose.selectOption({ label: 'Quill, agent' })
-    await expect.poll(() => panel.locator('.ckw-group').count(), { timeout: 20_000 }).toBe(1)
-    expect(await panel.locator('.ckw-group', { hasText: "Quill's shelf list" }).count()).toBe(1)
-    expect(await panel.locator('.ckw-title').innerText()).toBe("Quill's checklists")
-    await page.keyboard.press('Escape')
-  }, 90_000)
-
-  it('8. "My checklists" in the full view goes back to the reader\'s own, and the window opens there again after closing', async () => {
-    const page = app.page
-    await page.setViewportSize({ width: 1440, height: 900 })
-    await openTheWindow(page)
-    const panel = page.locator('.ckw-panel')
-    await panel.locator('.ckw-head').getByRole('button', { name: 'All checklists', exact: true }).click()
-    await panel.locator('.ckw-group', { hasText: "Quill's shelf list" }).waitFor({ timeout: 20_000 })
-    const back = panel.locator('.ckw-head').getByRole('button', { name: 'My checklists', exact: true })
-    expect(await back.getAttribute('title')).toBe('My checklists')
+    expect(await panel.locator('.cks-card', { hasText: "Quill's shelf list" }).count()).toBe(0)
+    expect(await panel.locator('.cks-card', { hasText: 'Kiln checklist' }).count()).toBe(1)
     await back.click()
-    await expect.poll(() => panel.locator('.ckw-group', { hasText: "Quill's shelf list" }).count(), { timeout: 10_000 }).toBe(0)
-    expect(await panel.locator('.ckw-title').innerText()).toBe('My checklists')
+    await expect.poll(() => names.count(), { message: 'the reader and Quill', timeout: 20_000 }).toBeGreaterThanOrEqual(2)
+    expect(await names.first().getAttribute('aria-current'), "the reader's name is first and current").toBe('true')
     expect(await panel.locator('select').count()).toBe(0)
-    expect(await panel.locator('.ckw-mark').count(), 'no right-hand "Mark done"').toBe(0)
-    expect(await panel.locator('.ckw-group', { hasText: 'Kiln checklist' }).getByRole('button', { name: /^Mark done with evidence or words:/ }).count()).toBeGreaterThan(0)
-    await panel.locator('.ckw-head').getByRole('button', { name: 'All checklists', exact: true }).click()
-    await panel.locator('.ckw-group', { hasText: "Quill's shelf list" }).waitFor({ timeout: 20_000 })
+    const theirs = names.filter({ hasText: 'Quill' })
+    await theirs.click()
+    await panel.locator('.cks-card', { hasText: "Quill's shelf list" }).waitFor({ timeout: 20_000 })
+    expect(await panel.locator('.cks-card', { hasText: 'Kiln checklist' }).count()).toBe(0)
+    await back.click()
+    await theirs.waitFor({ timeout: 10_000 })
+    expect(await theirs.getAttribute('aria-current')).toBe('true')
     await page.keyboard.press('Escape')
     await page.click('.ckw-press')
-    await page.waitForSelector('.ckw-panel .ckw-group')
-    expect(await panel.locator('.ckw-title').innerText()).toBe('My checklists')
-    expect(await panel.locator('select').count()).toBe(0)
+    await panel.locator('.cks-card', { hasText: 'Kiln checklist' }).waitFor({ timeout: 20_000 })
+    expect(await panel.locator('.cks-card', { hasText: "Quill's shelf list" }).count()).toBe(0)
+    await back.click()
+    await names.first().waitFor({ timeout: 10_000 })
+    expect(await names.first().getAttribute('aria-current'), 'closing goes back to the reader').toBe('true')
     await page.keyboard.press('Escape')
   }, 90_000)
 })

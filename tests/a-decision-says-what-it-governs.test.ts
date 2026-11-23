@@ -5,7 +5,7 @@
  *
  * What is proved, against a test office started once for the file, with a project of its own for each case:
  *   1. `governs` holds records and paths. An entry with both or neither, a path that can never match, and a record
- *      that is not a module, flow or pipeline of the same project are each refused with nothing written, on create
+ *      that is not a page of the same project are each refused with nothing written, on create
  *      and on a patch.
  *   2. GET /api/decisions/governing answers for a path and for a record, newest first, marks a replaced decision with
  *      what replaced it, and refuses a question with both or neither of `path` and `record`.
@@ -263,7 +263,7 @@ describe('a decision says what it governs', () => {
     const night = new Date(2026, 9, 5, 3, 5)
     expect(governs.sendTheGovernsCheck(ws, night, t.api.HUMAN)).toBe(
       `The governs check for ${ws}: 0 decisions with nothing in governs, 0 pairs governing one thing without one ` +
-        'replacing the other, 0 replaced decisions still cited by later work. No reminder sent: all three lists are empty.',
+        `replacing the other, 0 replaced decisions still cited by later work. ${governs.NOTHING_FOR_THE_NIGHTLY_REMINDER}`,
     )
     aDecision('Test: placed nowhere')
     expect(governs.sendTheGovernsCheck(ws, night, t.api.HUMAN)).toBe(

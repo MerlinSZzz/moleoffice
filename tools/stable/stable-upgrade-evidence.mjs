@@ -10,7 +10,7 @@ import { receiptFromArtifacts, theFilesLeftNotRunAlone } from '../periodic-main-
 import { requireIndependentGitObjects } from '../independent-storage.mjs'
 import { requireReadOnlyGitConfig } from '../read-only-git-config.mjs'
 import { readsOnDisk, THE_READS_ARCHIVE } from '../reads-archive.mjs'
-import { parseWholeSuiteReceipt, wholeSuiteReceiptIsGreen } from '../../src/shared/whole-suite-receipt.ts'
+import { parseWholeSuiteReceipt, wholeSuiteReceiptIsGreen, wholeSuiteReceiptOutcome } from '../../src/shared/whole-suite-receipt.ts'
 
 const fail = (message) => { throw new Error(`Upgrade evidence refused: ${message}`) }
 const object = (value) => value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -203,12 +203,11 @@ export async function verifyOriginalReceiptEvidence({ repository, commit, eviden
   if (!isDeepStrictEqual(json(last, 'The original door output'), answer)) fail('The original door result disagrees with its kept final output.')
   const carriedOver = await theCarriedOverPinned(attempt, evidence.recordId, answer, officeRequest)
   // Version 2 rebuilds each run alone from its own files in alone/; version 1 reads none of them.
-  const rebuilt = receiptFromArtifacts({ repository, commit, tree, clone, paths, result, startedAt: receipt.startedAt, endedAt: receipt.endedAt, allowsVersion2: receipt.version === 2, allowsWorkerCrashes: receipt.workerCrashes !== undefined, carriedOver })
+  const rebuilt = receiptFromArtifacts({ repository, commit, tree, clone, paths, result, startedAt: receipt.startedAt, endedAt: receipt.endedAt, allowsVersion2: receipt.version === 2, allowsWorkerCrashes: receipt.workerCrashes !== undefined, namesSkippedCases: receipt.skippedCases !== undefined, carriedOver })
   if (!isDeepStrictEqual(receipt, rebuilt)) fail('The original receipt facts or artifact hashes differ from the recomputed evidence.')
   const green = wholeSuiteReceiptIsGreen(rebuilt)
-  const coverage = rebuilt.coverage
-  const complete = rebuilt.buildExitCode !== 0 || (coverage?.expectedCount > 0 && coverage.expectedCount === coverage.observedCount && coverage.missing.length === 0 && coverage.unexpected.length === 0)
-  const outcome = !complete ? 'incomplete' : green ? 'green' : rebuilt.buildExitCode !== 0 ? 'build-failed' : 'red'
+  const outcome = wholeSuiteReceiptOutcome(rebuilt)
+  const complete = outcome !== 'incomplete'
   return { receipt, original, result, artifacts: rebuilt.artifacts, green, complete, outcome }
 }
 

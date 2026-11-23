@@ -222,7 +222,7 @@ describe('two decisions on one file may both stand', () => {
       const quiet = governs.sendTheGovernsCheck(ws, new Date(2026, 9, 5, 3, 5), t.api.HUMAN)
       expect(quiet).toContain(
         '0 pairs governing one thing without one replacing the other, 1 more pairs naming one file that are linked as both standing, ' +
-          '0 replaced decisions still cited by later work. No reminder sent: all three lists are empty.',
+          `0 replaced decisions still cited by later work. ${governs.NOTHING_FOR_THE_NIGHTLY_REMINDER}`,
       )
       expect(nightlyMessages(), 'a quiet project sent a nightly message').toEqual(messagesBefore)
 

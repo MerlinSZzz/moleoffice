@@ -47,7 +47,7 @@ export function PackageAlignmentPlan({ record }: { record: PanelRecord }) {
         {PAP_CSS}
       </style>
       <h3 className="pap-title">{t('planShape.title')}</h3>
-      {newest === undefined ? <p className="pap-quiet">{t('planShape.noPlan')}</p> : null}
+      {newest === undefined ? <p className="pap-quiet">{t('absence.none')}</p> : null}
       {newest === undefined ? null : (
         <>
           {restated === '' ? null : (
@@ -56,12 +56,9 @@ export function PackageAlignmentPlan({ record }: { record: PanelRecord }) {
               {content(restated)}
             </p>
           )}
-          {plan === null ? <p className="pap-quiet">{t('planShape.unreadable')}</p> : null}
+          {plan === null ? <p className="pap-quiet">{t('planning.notReadable')}</p> : null}
           {plan !== null && plan.kind === 'text' ? (
-            <>
-              <p className="pap-quiet">{t('planShape.oldPlan')}</p>
-              <pre className="pap-text">{plan.text}</pre>
-            </>
+            <pre className="pap-text">{plan.text}</pre>
           ) : null}
           {plan !== null && plan.kind === 'shape' ? (
             <>
@@ -120,13 +117,13 @@ export function PackageAlignmentPlan({ record }: { record: PanelRecord }) {
               {hints === null ? (
                 <div className="pap-hints">
                   <p className="pap-key">{t('planShape.hints')}</p>
-                  <p className="pap-quiet">{t('planShape.hintsNotStored')}</p>
+                  <p className="pap-quiet">{t('word.notRecorded')}</p>
                 </div>
               ) : (
                 <div className="pap-hints">
                   <p className="pap-key">{t('planShape.hints')}</p>
                   {hints.length === 0 ? (
-                    <p className="pap-quiet">{t('planShape.noHints')}</p>
+                    <p className="pap-quiet">{t('absence.none')}</p>
                   ) : (
                     <ul className="pap-hint-list">
                       {hints.map((hint, index) => (

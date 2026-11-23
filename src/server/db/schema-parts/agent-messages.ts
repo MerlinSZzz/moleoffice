@@ -22,7 +22,7 @@ import { aPartTable } from '../part-tables.ts'
  *
  * NO `workspace_id`: the thread it belongs to has one, and a copy here would be a second place that
  * has to agree with it. THAT DOES NOT MAKE IT PERSON-LEVEL. This row belongs to exactly one project
- * — the one its thread names — and `WORKSPACE_COLUMN` at the foot of this file says so, by naming
+ * — the one its thread names — and `WORKSPACE_COLUMN` in authored-table-of.ts says so, by naming
  * the thread and the column that reaches it.
  *
  * ---------------------------------------------------------------------------------------------

@@ -17,6 +17,10 @@
  *   (b2) With a look in the office, a different stored choice does not override it, and the load
  *        sends no change.
  *
+ * NO MODE IS STORED IN (a) EITHER. Its contexts come from `aContextThatStoresNoMode` (tests/helpers.ts
+ * stores Normal mode in every other one), so the page opens in the person's starting mode. The look
+ * it draws does not depend on the mode.
+ *
  * Every theme and name here is made up or read from the shared code.
  */
 import { join } from 'node:path'
@@ -26,7 +30,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { aCopyOf, type TheLook } from '../src/shared/own-themes.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { THEMES } from '../src/shared/themes.ts'
-import { liveApp, thePersonsKeyHeader, waitForThePage, type LiveApp } from './helpers.ts'
+import { aContextThatStoresNoMode, liveApp, thePersonsKeyHeader, waitForThePage, type LiveApp } from './helpers.ts'
 import { openSettingsPanel } from './settings-folds.ts'
 
 const STORED = 'mole-office.preset.theme'
@@ -105,7 +109,7 @@ describe('the look a person chooses in the page is kept in the office, and a pag
   }, 120_000)
 
   it('(a) draws the look the office keeps in a second browser whose storage is empty', async () => {
-    const context = await app.browser.newContext({ viewport: { width: 1440, height: 900 } })
+    const context = await aContextThatStoresNoMode(app.browser, { viewport: { width: 1440, height: 900 } })
     try {
       const page = await context.newPage()
       expect(await page.evaluate(() => localStorage.length).catch(() => 0)).toBe(0)
@@ -136,7 +140,7 @@ describe('the look a person chooses in the page is kept in the office, and a pag
     const look: TheLook = { chosen: id, own: [copy] }
     const kept = await fetch(`${app.api}/api/participants/person/${THE_PERSON}`, { method: 'PATCH', headers: asThePerson, body: JSON.stringify({ themes: look }) })
     expect(kept.status, await kept.text()).toBe(200)
-    const context = await app.browser.newContext({ viewport: { width: 1440, height: 900 } })
+    const context = await aContextThatStoresNoMode(app.browser, { viewport: { width: 1440, height: 900 } })
     try {
       const page = await context.newPage()
       await load(page, () => page.goto(`${app.site}/?lang=en#/settings`))

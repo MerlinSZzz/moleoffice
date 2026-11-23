@@ -255,20 +255,9 @@ describe('a block says when, and never how much', () => {
     }
   })
 
-  it('tells the reader in the interface that a block is days and not hours', () => {
-    expect(planning.BOARD_HELP).toContain('not a number of hours')
-  })
-
-  it('says how to work the board from the keyboard, in the interface rather than in a manual', () => {
-    // A board that can only be driven with a mouse fails this repository's accessibility standard,
-    // and a keyboard equivalent nobody can find is the same failure with an extra step.
-    expect(planning.BOARD_HELP).toContain('arrow keys')
-    expect(planning.BOARD_HELP).toContain('Shift')
-  })
-
-  it('says what the seven columns become on a narrow screen', () => {
-    expect(planning.BOARD_HELP).toContain('narrow screen')
-  })
+  // CRITERION CHANGE, as decided: the board no longer carries a paragraph of help. Its heading has
+  // one sentence on the keys, behind a "?", and tests/the-smallest-thing-you-pointed-at.test.ts
+  // opens it in a browser.
 })
 
 // ============================================================================ 4 — the finishing word

@@ -95,7 +95,7 @@ export interface SearchResult<R extends PanelRecord = PanelRecord> {
  * term frequency, no field weighting anybody has to defend, and no recency: a record that mentions
  * the word twice is not more about it than one that mentions it once.
  */
-const FIELD_RANK: Record<'title' | 'summary' | 'data', number> = { title: 0, summary: 1, data: 2 }
+export const FIELD_RANK: Record<'title' | 'summary' | 'data', number> = { title: 0, summary: 1, data: 2 }
 
 /** How much of the text around a match comes back. Enough to read the clause it is in. */
 export const SNIPPET_RADIUS = 60
@@ -221,10 +221,51 @@ export function theBestFieldThatSays(record: PanelRecord, query: string): number
 }
 
 /**
+ * THE BEST FIELD THAT SAYS THIS, OF A RECORD AS IT IS STORED, with its `data` still the stored JSON text: what
+ * `theBestFieldThatSays` gives for the record made from it. The title and the summary are looked in as there, and the
+ * `data` is read as JSON only when its stored text may say it (`theStoredTextMaySay`), and then walked as there.
+ */
+export function theBestFieldAsStored(stored: { title: string; summary: string | null; data: string }, query: string): number | null {
+  const needle = theNeedle(query)
+  if (needle === '') return null
+  let best: number | null = null
+  const inTitleOrSummary = eachTextOf({ title: stored.title, summary: stored.summary, data: null }, false, (text, _where, rank) => {
+    if (!fold(text).includes(needle)) return false
+    best = rank
+    return true
+  })
+  if (inTitleOrSummary) return best
+  return theStoredTextMaySay(stored.data, needle) && theDataSays(JSON.parse(stored.data), query) ? FIELD_RANK.data : null
+}
+
+/** WHETHER A TEXT VALUE INSIDE THIS `data` SAYS THIS: the body's part of `theBestFieldThatSays`. */
+export function theDataSays(data: unknown, query: string): boolean {
+  const needle = theNeedle(query)
+  return needle !== '' && eachTextIn(data, null, (text) => fold(text).includes(needle))
+}
+
+/**
+ * WHETHER THE STORED JSON TEXT OF A RECORD'S `data` MAY HOLD A TEXT VALUE THAT SAYS THIS NEEDLE. False only when none
+ * does. True says only that the text must be read as JSON to know: the stored text also holds the field names, the
+ * numbers and the escapes, so it may say the needle where no value does.
+ *
+ * WHY FALSE IS CERTAIN. A string value is stored with each of its letters as it is, except `"`, `\`, `/` and the control
+ * letters, which JSON may write as two letters, and any letter, which JSON may write as `\u` and four digits. A needle
+ * with none of those letters, in a stored text with no `\u`, is therefore found in the stored text wherever it is found
+ * in a value. Folding is the same in both, letter by letter, except for the capital sigma: toLowerCase makes it ς at the
+ * end of a word and σ elsewhere, and in the stored text the letters around it may differ from the value's (`a\tΣ` is
+ * stored as a, backslash, t, Σ). So a needle with σ or ς is read as JSON too.
+ */
+function theStoredTextMaySay(text: string, needle: string): boolean {
+  if (text.includes('\\u') || /["\\/\u0000-\u001f\u03c2\u03c3]/.test(needle)) return true
+  return fold(text).includes(needle)
+}
+
+/**
  * EVERY TEXT A RECORD IS SEARCHED IN, best field first: its title, its summary when it has one, and each text value in
  * its `data`. `searchRecord` and `saysIt` both look through here, so they cannot look in different places.
  */
-function eachTextOf(record: PanelRecord, withPaths: boolean, visit: (text: string, where: string | null, rank: number) => boolean): boolean {
+function eachTextOf(record: { title: string; summary: string | null; data: unknown }, withPaths: boolean, visit: (text: string, where: string | null, rank: number) => boolean): boolean {
   if (visit(record.title, 'title', FIELD_RANK.title)) return true
   if (record.summary !== null && visit(record.summary, 'summary', FIELD_RANK.summary)) return true
   return eachTextIn(record.data, withPaths ? 'data' : null, (text, where) => visit(text, where, FIELD_RANK.data))
@@ -275,6 +316,6 @@ export function theRecordsThatSay<R extends PanelRecord>(records: readonly R[], 
  * titles both carry the word are told apart by which one somebody wrote most recently and by nothing else this function
  * is willing to guess at. Records with the same `createdAt` stay in the order they were given in.
  */
-function inTheSearchOrder<M extends { record: PanelRecord; rank: number }>(found: M[]): M[] {
+export function inTheSearchOrder<M extends { record: { createdAt: string }; rank: number }>(found: M[]): M[] {
   return found.sort((a, b) => a.rank - b.rank || b.record.createdAt.localeCompare(a.record.createdAt))
 }

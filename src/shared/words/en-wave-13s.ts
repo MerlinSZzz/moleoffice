@@ -2,7 +2,15 @@
 // Licensed under the MIT License. See LICENSE.
 // The English list's place for wave 13s's new words, in English only. Their Chinese is written in
 // the translation round before a version, and until then a Chinese page shows the English. joined.ts reads this file.
-import type { CastingLabelRefusalCode, CastingProbabilityRefusalCode, TerminalGrantRefusalCode, TerminalTypedForAnotherRefusalCode } from '../refusal-codes.ts'
+import type {
+  CastingLabelRefusalCode,
+  CastingProbabilityRefusalCode,
+  DecisionNamesRefusalCode,
+  DepartmentDecisionRefusalCode,
+  TerminalGrantRefusalCode,
+  TerminalTypedForAnotherRefusalCode,
+} from '../refusal-codes.ts'
+import type { ConversationExportRefusalCode } from '../conversation-export.ts'
 import { CASTING_LABEL_RULES, type CastingLabelRule } from '../casting-label-rules.ts'
 import { NOTICE_WORDS, SETTING_WORDS } from '../../config/word-sources.mjs'
 import { SURFACES } from '../surfaces.ts'
@@ -12,9 +20,7 @@ export const enWave13s = {
   'checks.retiredWorkerNoOwner': 'No owner is available to receive the verdict.',
   'checks.retiredWorkerReachesOwner': 'The worker "{name}" is retired, so this reaches you, its owner, in its place.',
   'checks.retiredWorkerOwnerWasTold': 'The worker {worker} is retired, so its owner {owner} was told instead.',
-  'deadLetterSecretary.ownerRoute': 'When an agent cannot receive a message, the office follows its owners. The message reaches the first owner able to receive it, or an owner when availability cannot be determined. If it finds no recipient, the message stays addressed to the agent and waits.',
   'deadLetterSecretary.noticeNamed': '{who} receives the dead-letter notice.',
-  'deadLetterSecretary.noticeRole': 'The named secretary receives the office’s dead-letter notice in the Secretariat group if the secretary is a member.',
   'deadLetterSweep.ownerWaiting.fromThePerson.one': 'A letter from the person to a retired agent waits for an owner that can receive it.',
   'deadLetterSweep.ownerWaiting.fromThePerson.many': '{n} letters from the person to retired agents wait for owners that can receive them.',
   'deadLetterSweep.ownerWaiting.fromAgents.one': 'A letter from an agent to a retired agent waits for an owner that can receive it.',
@@ -38,7 +44,6 @@ export const enWave13s = {
   'sharedBlock.removeWarning': 'The block will leave this pipeline’s order. It will be deleted only if no other pipeline lists it.',
   'sharedBlock.removedStillListed': '“{v1}” is out of the order of “{v2}” and is not deleted. It is still listed by: {v3}.',
   'decisions.replaces.heading': 'Earlier decisions this replaces',
-  'decisions.replaces.why': 'The office found these on the same records as this decision. Choose the ones it changes or replaces, or none of them.',
   'decisions.replaces.none': 'None of them',
   'decisions.replaces.noneWhy': 'This decision replaces no earlier decision.',
   'decisions.replaces.chooseFirst': 'Choose the ones it replaces, or none of them.',
@@ -60,18 +65,13 @@ export const enWave13s = {
   'conversation.state.too-large': 'the file is over the size limit',
   'conversation.state.deleted': 'the file is gone since the last copy',
   'conversation.state.not-synced': 'not copied',
-  'conversation.sync.on': 'The conversation sync is on for this workspace.',
-  'conversation.sync.off': 'The person has not turned the conversation sync on for this workspace.',
-  'conversation.sync.noOptIn': 'No conversation is synced before the person turns the sync on for this workspace.',
   'conversation.sync.title': 'Conversations between machines',
   'conversation.sync.loading': 'the conversation copies',
   'conversation.sync.turnOn': 'Turn it on',
   'conversation.sync.turnOff': 'Turn it off',
   'conversation.sync.run': 'Copy the conversations now',
   'conversation.sync.copying': 'Copying…',
-  'conversation.sync.none': 'No conversation has been copied yet.',
   'conversation.sync.more': '{shown} of {total} conversations shown.',
-  'conversation.sync.personOnly': 'The person turns the sync on and runs it.',
   'conversation.sync.bounds': 'One sync copies at most {files} files, each at most {bytes} bytes. Anything over is counted and named.',
   'conversation.sync.read': 'Read the conversation copy for this run, its runtime and the path map it was scrubbed with.',
   'conversation.sync.restore': 'Put a scrubbed conversation copy back on this machine at its mapped checkout path and return the resume command.',
@@ -166,7 +166,6 @@ export const enWave13s = {
   // THE RESOURCES PAGE (round 30, design peyJSnLoz_Bk). The rail row's name is the surface's own word.
   get 'nav.resources'(): string { return SURFACES['rail.resources'] },
   'nav.what.resources': "Shared resources: each one's holder, next booking and use this week.",
-  'resources.lead': 'What you and the agents share on this machine.',
   'resources.column.now': 'In use now',
   'resources.column.next': 'Booked next',
   'resources.column.week': 'This week',
@@ -200,20 +199,16 @@ export const enWave13s = {
   'resources.group': 'Open the group',
   'resources.answered': 'Your answer is in. It waits for the others asked.',
   'resources.week.without': 'Without a booking',
-  'resources.week.note': 'Hours with a job on the card, as the GPU watcher saw them.',
   'resources.week.nobody': 'No use counted this week.',
   'resources.duration': '{h} h {m} min',
   'resources.durationMinutes': '{m} min',
-  'resources.seat.note': 'Held while a program runs the full test suite.',
   'resources.seat.holder': 'Seat {seat}: {who}',
   'resources.seat.waiting': { one: '{n} waiting for a seat.', other: '{n} waiting for a seat.' },
   'resources.seat.free': 'Free now.',
   'resources.seat.week': 'Not recorded yet.',
   'resources.seat.unnamed': 'A run with no title',
-  'resources.others': 'The office does not record their use.',
   'resources.book.open': 'Book the GPU for me',
   'resources.book.title': 'Book the GPU for you',
-  'resources.book.lead': 'Waiting bookings never delay yours.',
   'resources.book.start': 'Start',
   'resources.book.start.now': 'Now',
   'resources.book.start.whenFree': 'When the card is free',
@@ -224,16 +219,13 @@ export const enWave13s = {
   'resources.book.purpose': 'What for',
   'resources.book.daily': 'Repeat every day at this time',
   'resources.book.goFirst': 'Go first now',
-  'resources.book.goFirstSays': { one: 'Each holder is told and has {n} minute to stop.', other: 'Each holder is told and has {n} minutes to stop.' },
   'resources.book.letFinish': 'Let {who} finish first',
-  'resources.book.letFinishSays': 'Yours starts when the running bookings end.',
   'resources.book.submit': 'Book',
   'resources.book.close': 'Cancel',
   'resources.book.done': 'Booked.',
   'resources.book.needsPurpose': 'Say what the booking is for.',
   'resources.book.needsNumbers': 'Give the minutes and the card memory as whole numbers.',
   'resources.book.needsTime': 'Give the date and time to start.',
-  'resources.book.onlyTheOwner': 'Only the person books from this page.',
   // A RUN'S TOOL USES on its record page (round 33): rows of tool_uses, newest first, a page at a time.
   'toolUses.loading': 'tool uses',
   'toolUses.shown': '{shown} of {total}',
@@ -250,9 +242,7 @@ export const enWave13s = {
   'resources.plannedEnd': 'Planned to end at {at}',
   'resources.expectedEnd': 'Expected to end about {at}: {done} of {of} done at {when}',
   'resources.allDone': 'All {of} done at {when}.',
-  'resources.noProgress': 'No progress reported, so no expected end.',
   'resources.doneSoFar': '{done} of {of} done at {when}',
-  'resources.noneDoneYet': 'None of {of} done yet at {when}, so no end is expected.',
   'resources.extended': { one: 'Extended {n} time: {because}', other: 'Extended {n} times. Last: {because}' },
   'resources.overThePlan': 'Past its planned end by {m} min',
   // THE CASTING TABLE'S PROBABILITY CELL (round 44, migration 0268): its column, its placeholder, and the refusal of
@@ -270,12 +260,6 @@ export const enWave13s = {
   'record.section.stopCause': 'Why it stopped',
   'record.section.waitingOnALimit': 'Waiting on a usage limit',
   // The two panels that draw those fields in words on the run's page (round 50): TheStopAndWaitOfARun.tsx.
-  'w13s.stop.sessionLimit': 'It stopped because it reached a session limit.',
-  'w13s.stop.quota': 'It stopped because it reached a usage limit.',
-  'w13s.stop.login': 'It stopped because it was not logged in.',
-  'w13s.stop.other': 'It stopped for a reason the office has no words for: {kind}.',
-  'w13s.wait.waiting': 'It is waiting for a usage limit to reset. OpenCode will try again by itself.',
-  'w13s.wait.notGoing': 'It is still marked as waiting on a usage limit, but it is not marked as running.',
   'w13s.limit.said': 'What it said',
   'w13s.limit.quoted': '“{said}”',
   'w13s.limit.noWords': 'Nobody recorded what it said.',
@@ -305,6 +289,12 @@ export const enWave13s = {
   'sandboxCap.unread': 'The memory limit of the sandboxes could not be read.',
   'sandboxCap.notChanged': 'The memory limit of the sandboxes was not changed.',
   'settingsPanel.entry.notPut': 'The entry was not put in place.',
+  // The state of this computer's entry key, drawn under the entry press: none yet, held, or refused.
+  'settingsPanel.entry.key.noneYet': 'Agent key: none yet. The same press gives one.',
+  'settingsPanel.entry.key.held': 'Agent key: held.',
+  'settingsPanel.entry.key.refused': 'Agent key: refused.',
+  // Drawn in the state word's place when the state could not be read; the reason is the office's own sentence.
+  'settingsPanel.entry.key.unread': "The state of this computer's agent key could not be read: {reason}",
   // The titles of the mail tool panel's refusals, so each says what could not be read or done and not only "Failed." (round 72).
   'settingsPanel.mailtool.unread': 'The state of the mail tool could not be read.',
   'settingsPanel.mailtool.install.failed': 'Installing the mail tool failed.',
@@ -314,16 +304,10 @@ export const enWave13s = {
   // words and never by its id: the person can neither read nor follow an id, and no page opens one grant.
   'rq.sent.underTheGrant': 'sent this for you, under your grant.',
   'rq.sent.chosenBy': 'Chosen by',
-  'rq.sent.chooserNotRecorded': 'Nobody recorded who chose this answer.',
   // Closing under the person's grant, wave 13s round 81.
   ...{
     'server.terminalHoldsAnAgentsRun': "Under the person's grant, a secretary may close only a terminal no agent runs in. Nothing was closed.",
   } satisfies Record<`server.${TerminalGrantRefusalCode}`, string>,
-  // The line beside the two role card doors on the list of what the grant carries: only a change to a card's words
-  // needs the person's words (round 81).
-  'grantList.alsoNeedsYourWordsForACardsWords':
-    "A change to a card's words also needs your own words, so the grant alone does not make it. Where this list lets the " +
-    "grant press this door, the grant alone may make a change that leaves the words as they are, such as the card's powers.",
   // The tags on a sent choice nobody recorded the person as choosing: a secretary's under the grant, or an older answer
   // (round 81). "Your choice" and "Your own words" stay for the person's own.
   'rq.sent.chosenAsSent': 'Chosen',
@@ -345,8 +329,6 @@ export const enWave13s = {
   // A secretary's line in the list of where a terminal's typing came from (round 83). A secretary is a source of its own,
   // never the person, so its row names the secretary and whether its own key proved it.
   'terminals.typedFrom.level.secretary': 'A secretary typed one whole line for you',
-  'terminalHolder.anotherCopy':
-    'The terminal holder comes from {copy}. The press below replaces it with a holder from this copy of Mole Office, which ends the terminals it holds.',
   'terminals.typedFrom.secretary.who': 'Typed by {agent}',
   'terminals.typedFrom.proof.secretaryKey': "proved by the secretary's own key",
   'terminals.typedFrom.proof.secretaryNoKey': "the secretary's name, sent with no key",
@@ -373,7 +355,7 @@ export const enWave13s = {
   'record.section.secretary': 'Secretary',
   'record.section.area': 'Area',
   'record.section.responsibleFor': 'Responsible for',
-  'record.section.lines': 'Lines of work',
+  'record.section.lines': 'Teams',
   'record.section.doors': "The person's doors it presses",
   'record.section.reportsToThePerson': 'Reports to the person',
   'record.section.restsOn': "The person's decisions it rests on",
@@ -420,13 +402,13 @@ export const enWave13s = {
   // sections it adds, each the section's own title (src/shared/sections.ts). Its `why` section takes the word other
   // kinds already have (round 142).
   get 'kind.backlog_item'(): string { return englishWord('kind.backlog_item') },
-  'record.section.line': 'Line',
-  'record.section.number': 'Its number in the line',
+  'record.section.line': 'Team',
+  'record.section.number': 'Its number in the team',
   'record.section.placedBy': 'Placed by',
   'record.section.placedAt': 'When it was placed',
   'record.section.doneWhen': 'Done when',
   'record.section.files': 'Files',
-  'record.section.order': 'Its place in the line',
+  'record.section.order': 'Its place in the team',
   'record.section.landedIn': 'Landed in',
   // An obligation's repeat on the record page, read by optionWord (round 142).
   'record.option.obligation.repeat.daily': 'Every day',
@@ -478,7 +460,6 @@ export const enWave13s = {
   'newKeyAsk.stands.unanswered': 'This ask has not been answered yet. Nothing about the keys of "{handle}" has changed.',
   // The Embassy's section for the office's own sender row, which holds no card, and its one sentence.
   'embassyPage.group.office': 'The office itself',
-  'embassyPage.theOffice.sends': 'It sends reminders, notices, and the results of checks and merges.',
   // The message Mole Office sends a secretary when its sleep time begins (src/server/lib/sleep-windows.ts).
   'noticeWords.yourSleepTimeHasBegun': NOTICE_WORDS.yourSleepTimeHasBegun,
   // A secretary's own sleep time, on its profile beside its last sleep (src/web/components/ResidentSleep.tsx).
@@ -487,8 +468,6 @@ export const enWave13s = {
   'resident.sleep.time.setByItself': 'Set by {name}, {when}.',
   'resident.sleep.time.setByYou': 'Set by you, {when}.',
   'resident.sleep.time.setByThePerson': 'Set by the owner, {when}.',
-  'resident.sleep.time.none': 'None is set, so the office begins no sleep by itself.',
-  'resident.sleep.time.notASecretary': 'Only a secretary has a sleep time, so the office begins no sleep for this one by itself.',
   'resident.sleep.time.startsAt': 'Sleep begins at (HH:MM, office clock)',
   'resident.sleep.time.minutes': 'For how many minutes ({shortest} to {longest})',
   'resident.sleep.time.press': 'Set the sleep time',
@@ -496,8 +475,6 @@ export const enWave13s = {
   // While the sleep the office began at the sleep time goes on: on the profile, and on the chat line.
   'resident.sleep.asleepUntil': 'Asleep since {when}, until {until}',
   'resident.sleep.line.asleepUntil': 'Asleep until {until}',
-  'resident.sleep.line.lastSleptSleepsAt': 'Last slept {ago}, sleeps at {at}',
-  'resident.sleep.line.sleepsAt': 'Sleeps at {at}',
   // The title of a message's section naming the comments a sent review gave it, the section's own title.
   'record.section.carries': 'Carries',
   // Why a decision's "Add words" and "Choose again" presses are off before the form is filled in.
@@ -545,45 +522,29 @@ export const enWave13s = {
   'record.section.reviewer': 'Reviewer',
   // The regulations page's two parts (src/web/pages/RegulationsPage.tsx): General, and This project with its own rules.
   'regulationsPage.general': 'General',
-  'regulationsPage.generalSays': 'Every project of this office reads these: the person’s own regulations and the office’s chapters.',
   'regulationsPage.thisProject': 'This project',
-  'regulationsPage.thisProjectSays': 'The rules this project keeps beside the general ones. A rule here only reminds. It never sets a general rule aside.',
   'regulationsPage.revision': 'Revision {n}',
-  'regulationsPage.noRevision': 'This office keeps no revision of this record.',
   'regulationsPage.shipped': 'The text shipped with this release',
   // A role chapter is read only by the card its record names, so the page says which card, beside the revision line and in the chapter list.
   'regulationsPage.forRole': 'For the {role} card',
-  // The note above the chapter list, when some chapters in use were filed after the office copied the default set.
-  'regulationsPage.copiedFromTheDefaultsAndAddedLater': {
-    one: 'Chapter {numbers} was added later. The other chapters were copied from the default regulations when this office first started, on {date}. You may change any of them.',
-    other: 'Chapters {numbers} were added later. The other chapters were copied from the default regulations when this office first started, on {date}. You may change any of them.',
-  },
   // The same note when more than one start copied chapters, or when a later start copied some and no start copied the
   // others: one sentence for each copy, one for the chapters no start copied, and one saying they may be changed.
   'regulationsPage.copiedAtTheFirstStart': {
     one: 'Chapter {numbers} was copied from the default regulations when this office first started, on {date}.',
     other: 'Chapters {numbers} were copied from the default regulations when this office first started, on {date}.',
   },
-  'regulationsPage.copiedAtALaterStart': {
-    one: 'Chapter {numbers} was copied from the default regulations at a later start, on {date}, because this office did not hold it.',
-    other: 'Chapters {numbers} were copied from the default regulations at a later start, on {date}, because this office did not hold them.',
-  },
   'regulationsPage.notCopied': {
     one: 'No start of this office recorded copying chapter {numbers}.',
     other: 'No start of this office recorded copying chapters {numbers}.',
   },
-  'regulationsPage.copiedMayChange': 'You may change any of them.',
-  'regulationsPage.project.none': 'This project keeps no rules of its own.',
   'regulationsPage.project.record': 'Open the chapter’s record',
   'regulationsPage.project.ruleCount': { one: '{n} rule', other: '{n} rules' },
-  'regulationsPage.project.notRead': { one: '{n} stored rule does not read as a rule, so it is not checked.', other: '{n} stored rules do not read as rules, so they are not checked.' },
   'regulationsPage.project.problemAt': 'Rule {n} of the chapter',
   'regulationsPage.rule.why': 'Why',
   'regulationsPage.rule.source': 'Comes from',
   'regulationsPage.rule.openSource': 'Open the record it comes from',
   'regulationsPage.rule.check': 'Checks',
   'regulationsPage.rule.when': 'Asked',
-  'regulationsPage.rule.reminds': 'It only reminds.',
   'regulationsPage.rule.state': 'State',
   'regulationsPage.rule.on': 'On',
   'regulationsPage.rule.off': 'Off',
@@ -595,14 +556,12 @@ export const enWave13s = {
   // The design reminders of the days, in the This project part (part 6, decision bYwACBK03tGT). Each lack is drawn by
   // its answer in these words, never in the server's English sentence.
   'regulationsPage.reminders.title': 'Design reminders',
-  'regulationsPage.reminders.says': 'Before a run marked as method work or as the go for a pilot is sealed, the office reminds it of a reviewed design it lacks. The person, or the secretary the marking agent answers to, judges each reminder once.',
   'regulationsPage.reminders.range': 'Days counted: {range}',
   'regulationsPage.reminders.right': 'Right',
   'regulationsPage.reminders.wrongNotMethodWork': 'Wrong: not method work',
   'regulationsPage.reminders.wrongItWasThere': 'Wrong: it was there',
   'regulationsPage.reminders.notJudged': 'Not judged',
   'regulationsPage.reminders.misses': 'Misses',
-  'regulationsPage.reminders.none': 'On these days the office gave no design reminder, and nobody filed a miss.',
   'regulationsPage.reminders.openRun': 'Open the run',
   'regulationsPage.reminders.openRecord': 'Open its record',
   'regulationsPage.reminders.openDesign': 'Open the design',
@@ -655,7 +614,6 @@ export const enWave13s = {
   // THE PROJECT GRAPH (round 241): one page for the project's past, present and live futures. The four level names
   // are the keys PROJECT_GRAPH_LEVEL_WORD_KEYS names, in the owner's order.
   'projectGraph.title': 'Project graph',
-  'projectGraph.lead': 'One graph of this project: where it has been, what it holds now, and which futures are still alive.',
   'projectGraph.level.label': 'How much detail',
   'projectGraph.level.modules': 'Modules',
   'projectGraph.level.revisionsAndCheckpoints': 'Revisions and checkpoints',
@@ -665,12 +623,7 @@ export const enWave13s = {
   'projectGraph.zone.now': 'Now',
   'projectGraph.zone.futures': 'Futures',
   'projectGraph.legend': 'How to read this drawing',
-  'projectGraph.legend.future': 'A possible future is a light curve. Nothing about it is running.',
-  'projectGraph.legend.present': 'Work that runs is a direct line. The pipeline drawing is where the running structure is drawn.',
-  'projectGraph.legend.canvas': 'There is no boxes-and-lines canvas here. One lane is one module, in the project’s own order.',
   'projectGraph.notes.title': 'What this project does not hold',
-  'projectGraph.emptyFallback': 'This project holds nothing the graph can draw.',
-  'projectGraph.noLanes': 'This project holds no module, pipeline or block, so there is no lane to draw.',
   'projectGraph.noRealRevision': 'no real revision yet',
   'projectGraph.revision': 'Revision',
   'projectGraph.checkpoint': 'Checkpoint',
@@ -705,9 +658,6 @@ export const enWave13s = {
     one: '{n} file has no module.',
     other: '{n} files have no module.',
   },
-  'projectGraph.coverage.none':
-    'This project has no source map yet, so the files no module claims are not known here.',
-  'projectGraph.coverage.failed': 'The source map could not be read, so the files no module claims are not known here.',
   'projectGraph.count.module': { one: '{n} module', other: '{n} modules' },
   'projectGraph.count.pipeline': { one: '{n} pipeline', other: '{n} pipelines' },
   'projectGraph.count.block': { one: '{n} block', other: '{n} blocks' },
@@ -758,7 +708,6 @@ export const enWave13s = {
   'casting.draw.heading': 'What the roll draws for each label',
   'casting.draw.drawn': 'Drawn from {rows}',
   'casting.draw.marked': 'The marked row is taken: {row}',
-  'casting.draw.none': 'Nothing is drawn, and a start for this label is refused.',
   'casting.labels.heading': 'Labels',
   'casting.label.col.name': 'Label',
   'casting.label.col.meaning': 'Meaning',
@@ -780,6 +729,376 @@ export const enWave13s = {
   get 'casting.rule.markedRow'(): string { return theRuleSays('markedRow') },
   get 'casting.rule.outUntil'(): string { return theRuleSays('outUntil') },
   get 'casting.rule.projectReplaces'(): string { return theRuleSays('projectReplaces') },
+  // ONE SET OF PICTURE PARTS FOR HOME (round 281, point HD-2b, src/web/components/picture-parts/). The short words a part
+  // draws in place of its data while it is read, when it could not be read and when nobody recorded it; the words a
+  // part writes around its numbers; and the labels of the first two figures.
+  'pictureParts.reading': 'Reading…',
+  'pictureParts.notRead': 'not read',
+  'pictureParts.notRecorded': 'not recorded',
+  'pictureParts.notRecordedSays': 'The office answered, and nobody has recorded this.',
+  'pictureParts.doneOf': '{done} of {total}',
+  'pictureParts.dayValue': '{day}: {value}',
+  'pictureParts.figure.packagesByState': 'Packages by state',
+  'pictureParts.figure.packagesUnread': 'Could not be read',
+  'pictureParts.figure.agentsByPresence': 'Agents by presence',
+  // A DEPARTMENT (round 281, step 1 of departments and posts). The kind word and its state `resting`, read from KIND_WORDS
+  // and STATE_WORDS so each is spelled once. The titles of its sections, each the section's own title
+  // (src/shared/sections.ts); its `restsOn` takes the title a secretary's duties already have. Each field's word is its
+  // section's title as a label reads it inside a sentence, because both name one field of one kind.
+  get 'kind.department'(): string { return englishWord('kind.department') },
+  get 'state.resting'(): string { return englishWord('state.resting') },
+  'record.section.codes': 'Codes',
+  'record.section.nameEn': 'Name in English',
+  'record.section.nameZh': 'Name in Chinese',
+  'record.section.doesEn': 'What it does, in English',
+  'record.section.doesZh': 'What it does, in Chinese',
+  'record.section.parent': 'The department above it',
+  'record.section.supervisor': 'Supervisor',
+  'record.section.mergedInto': 'Merged into',
+  'record.field.department.codes': 'codes',
+  'record.field.department.nameEn': 'name in English',
+  'record.field.department.nameZh': 'name in Chinese',
+  'record.field.department.doesEn': 'what it does, in English',
+  'record.field.department.doesZh': 'what it does, in Chinese',
+  'record.field.department.parent': 'the department above it',
+  'record.field.department.supervisor': 'supervisor',
+  'record.field.department.mergedInto': 'merged into',
+  'record.field.department.restsOn': "the person's decisions it rests on",
+  // A KEY ITEM (round 281, point HD-2c of home as a data dashboard). The kind word, read from KIND_WORDS so it is spelled
+  // once. The titles of its sections, each the section's own title (src/shared/sections.ts); its `progress` takes the
+  // title that is already there. Each field's word is its section's title as a label reads it inside a sentence.
+  get 'kind.key_item'(): string { return englishWord('kind.key_item') },
+  'record.section.place': 'Place in the order',
+  'record.section.packages': 'Packages',
+  'record.section.progressSetBy': 'Progress set by',
+  'record.section.progressSetAt': 'Progress set at',
+  'record.section.hoursLeft': 'Estimated hours left',
+  'record.section.estimatedBy': 'Estimated by',
+  'record.section.estimatedAt': 'Estimated at',
+  'record.field.key_item.place': 'place in the order',
+  'record.field.key_item.packages': 'packages',
+  'record.field.key_item.progress': 'progress',
+  'record.field.key_item.progressSetBy': 'progress set by',
+  'record.field.key_item.progressSetAt': 'progress set at',
+  'record.field.key_item.hoursLeft': 'estimated hours left',
+  'record.field.key_item.estimatedBy': 'estimated by',
+  'record.field.key_item.estimatedAt': 'estimated at',
+  // The word a department is called by: team with no live sub-department that is not merged, department otherwise.
+  // Worked out when it is read (theLevelWord in src/shared/departments.ts), never stored.
+  'department.level.team': 'team',
+  'department.level.department': 'department',
+  // A department as a page names it (src/web/lib/department-words.ts): its level word with its team count, and the words
+  // for a name not recorded in the reader's language, which is never taken from the other.
+  'department.level.withTeams': { one: '{level}, {n} team', other: '{level}, {n} teams' },
+  'department.name.notRecorded': 'no name in English',
+  // The board's view by line: a line titled by the department its code names, or marked as held by none.
+  'board.line.department': '{name} ({level})',
+  'board.line.marked': '{title} ({mark})',
+  'board.line.notFiled': 'not filed as a department',
+  'board.line.heldBySeveral': 'held by {n} merged departments that ended in different places',
+  // The board's view by line leads to the departments page.
+  'board.line.departments': 'The departments',
+  // What a department does, where nothing is written in the reader's language (theDoesShown in
+  // src/web/lib/department-words.ts).
+  'department.does.notRecorded': 'Nothing is written in English about what it does.',
+  // THE DEPARTMENTS PAGE (src/web/pages/DepartmentsPage.tsx): the tree, one department with its history, and the form
+  // that files or changes one. Its field labels are the department's section titles above.
+  'departments.title': 'Departments',
+  'departments.none': 'Nobody has filed a department in this project.',
+  'departments.add': 'Add a department',
+  'departments.addUnder': 'Add a department under it',
+  'departments.change': 'Change it',
+  'departments.all': 'All departments',
+  'departments.page.previous': 'Previous',
+  'departments.page.next': 'Next',
+  'departments.page.first': 'This is the first page.',
+  'departments.page.last': 'This is the last page.',
+  'departments.page.shown': 'Top departments {from} to {to} of {total}',
+  'departments.fact.leader': 'Leader',
+  'departments.fact.state': 'State',
+  'departments.leader.noSupervisor': 'No supervisor',
+  'departments.leader.notInRegistry': 'Its supervisor is not in the registry',
+  'departments.leader.notRecorded': "Nobody has recorded its supervisor's owner",
+  'departments.leader.unreadable': "Its supervisor's owner could not be read",
+  // THE TREE'S ROWS: the project's row on top with its counts, the column headings, the in-charge words a row starts
+  // with where the columns stop, and a department's head, worked out from its lines when it is read
+  // (src/server/lib/departments.ts).
+  'departments.tree.project': 'project',
+  'departments.tree.inCharge': 'In charge',
+  'departments.tree.inChargeIs': 'In charge:',
+  'departments.tree.does': 'What it does',
+  'departments.tree.noState': 'none',
+  'departments.tree.noneStored': 'none stored',
+  'departments.tree.leaderIs': 'Leader:',
+  'departments.tree.departments': { one: '{n} department', other: '{n} departments' },
+  'departments.tree.teams': { one: '{n} team', other: '{n} teams' },
+  'departments.tree.counts': '{departments}, {teams}',
+  'departments.head.fromItsLines': '(from its lines)',
+  'departments.head.disagree': 'Its lines disagree:',
+  'departments.head.separator': ', ',
+  'departments.head.none': 'No line has a leader',
+  'departments.codes.none': 'No code',
+  'departments.parent.none': 'None: it is a top department',
+  'departments.mergedInto.none': 'Not recorded',
+  'departments.sub': 'Departments under it',
+  'departments.sub.none': 'No department is under it.',
+  'departments.history': 'History',
+  'departments.history.words': 'Written on these words: “{words}”',
+  'departments.history.older': { one: '{n} older change is not shown.', other: '{n} older changes are not shown.' },
+  'departments.form.noCodes': 'No code is typed.',
+  'departments.form.codesRead': 'Read as the codes {codes}.',
+  'departments.form.noSupervisor': 'No supervisor',
+  'departments.form.refused': 'Not saved.',
+  'departments.form.needsAName': 'Write a name in English or in Chinese first.',
+  'departments.form.save': 'Save',
+  'departments.form.cancel': 'Cancel',
+  'departments.form.top': 'None: a top department',
+  'departments.form.chooseOne': 'Choose one',
+  'departments.form.notOffered': 'The department named now, which this list does not hold',
+  'departments.form.notAllOffered': {
+    one: 'Only the first {n} top department and the departments under it are offered.',
+    other: 'Only the first {n} top departments and the departments under them are offered.',
+  },
+  // The four figures the home page lacks (src/server/api/figures.ts).
+  'figures.byLine.says': {
+    one: 'A package counts once in each of its lines, and a package with no line counts in the last row. {n} package is in more than one line.',
+    other: 'A package counts once in each of its lines, and a package with no line counts in the last row. {n} packages are in more than one line.',
+  },
+  'figures.done.says': 'A package counts on the day it turned done: the day every point of it was accepted, or the day its task was confirmed complete, whichever came first. A package returned after that counts on no day.',
+  'figures.done.beforeTheRecords': 'Not recorded: the records start on {day}.',
+  'figures.done.afterToday': 'Not recorded: this day has not come yet.',
+  'figures.done.noPackages': 'Not recorded: no package has been made.',
+  'figures.live.says': 'Each package first taken inside the span. On main is the landing of the run its last hand-back names. Live is the first completed upgrade of the live office to main as that landing, or a later one, left it. Each median is over the packages that have both times.',
+  'figures.live.noHandBack': 'Not handed back yet.',
+  'figures.live.handBackNamesNoRun': 'Not recorded: the hand-back names no run.',
+  'figures.live.noLanding': 'Not recorded: no landing on main names the run {run}.',
+  'figures.live.notOnMain': 'Not recorded, because its time on main is not recorded.',
+  'figures.live.noUpgrade': 'Not recorded: no completed upgrade of the live office ran it.',
+  'figures.live.upgradesUnread': 'Not read: the upgrade history could not be read. {why}',
+  'figures.suite.says': 'Each run is one whole-suite receipt that ended inside the span, with its minutes from start to end. The median is over the runs that have minutes.',
+  'figures.suite.none': 'No whole-suite run ended from {from} to {to}. {held}',
+  'figures.suite.heldNone': 'The records hold no whole-suite run with an end time.',
+  'figures.suite.heldLast': {
+    one: 'The records hold {n} whole-suite run with an end time, which ended at {last}.',
+    other: 'The records hold {n} whole-suite runs with an end time, and the last ended at {last}.',
+  },
+  'figures.suite.noTimes': 'Not measured: its start or its end names no single moment.',
+  'figures.suite.endsBeforeStart': 'Not measured: its end is before its start.',
+  'figures.span.notADay': '"{value}" is not a day. Write a day as YYYY-MM-DD.',
+  'figures.span.backwards': 'The span ends on {to}, before it starts on {from}.',
+  'figures.span.tooLong': 'A span may cover at most {most} days.',
+  'figures.myDecisions.says': 'Each fork you settled from {from} to {to}, counted once. Its time runs from when the fork was filed to when your decision settled it, and each day\'s figure is the average over the forks settled that day.',
+  'figures.myDecisions.none': 'Not known: you settled no fork from {from} to {to}.',
+  'home.layout.hide': 'Hide',
+  'home.layout.hiddenParts': 'Hidden parts',
+  'home.layout.showInBand': 'Show in the band',
+  'home.layout.showInFirst': 'Show in the first column',
+  'home.layout.showInSecond': 'Show in the second column',
+  'home.keyItems.title': 'Key items',
+  'home.keyItems.you': 'you',
+  'home.keyItems.aPerson': 'a person',
+  'home.keyItems.anAgent': 'an agent',
+  'home.keyItems.fromPackages': 'Progress, counted from its packages',
+  'home.keyItems.setBy': 'Progress set at {percent}% by {who} on {when}',
+  'home.keyItems.notSet': 'Progress: nobody set one',
+  'home.keyItems.estimate': 'Estimate by {who} on {when}: {days} d {hours} h left',
+  'home.keyItems.notEstimated': 'Time left: nobody made an estimate.',
+  'home.keyItems.none': 'No key item is kept.',
+  'home.keyItems.howToAdd': 'Ask a secretary to add one, with its title and the packages it counts.',
+  'home.keyItems.reading': 'The key items are still being read.',
+  'home.keyItems.notRead': 'The key items could not be read.',
+  'home.keyItems.noSuchProject': 'no project has its id',
+  'home.figure.myChecklist': 'Your checklist',
+  'home.figure.myDecisions': 'Your decisions',
+  'home.figure.myDecisionTime': 'Hours a decision waits on you',
+  'home.figure.packagesByLine': 'Packages per line',
+  'home.figure.packagesDone': 'Packages finished per day',
+  'home.figure.timeToLive': 'Lead time',
+  'home.figure.suiteMinutes': 'Whole suite\'s test time',
+  'home.figure.openItems': 'open items',
+  'home.figure.forksSettled': 'forks settled',
+  'home.figure.minutes': 'minutes',
+  'home.figure.line': 'Line',
+  'home.figure.noLine': 'No line',
+  'home.figure.packages': 'Packages',
+  'home.figure.stretch': 'From and to',
+  'home.figure.medianHours': 'Median hours',
+  'home.figure.fromTo': '{from} to {to}',
+  'home.figure.stage.taken': 'taken',
+  'home.figure.stage.handedBack': 'handed back',
+  'home.figure.stage.onMain': 'on main',
+  'home.figure.stage.live': 'live',
+  // An agent's owner, as a fact on its page (src/web/pages/ProfilePage.tsx): the label, and the word for each state
+  // in which no owner's name can be drawn.
+  'profileOwner.label': 'Owner',
+  'profileOwner.none': 'none recorded',
+  'profileOwner.unreadable': 'not readable',
+  'profileOwner.namesNobody': 'not registered',
+  // An agent's owner hand-overs, in their own panel on its page (src/web/components/AgentOwnerHandOvers.tsx). An owner
+  // with no name to draw takes the owner fact's word above.
+  'ownerHandOvers.heading': 'Owner hand-overs',
+  'ownerHandOvers.since': 'This list holds the hand-overs of this agent’s owner made at the owner door since {when}. This office began to keep them that day.',
+  'ownerHandOvers.noDay': 'This list holds the hand-overs of this agent’s owner made at the owner door since this office began to keep them. The day it began was not recorded.',
+  'ownerHandOvers.none': 'none',
+  'ownerHandOvers.changed': 'On {when} the owner changed from {from} to {to}.',
+  'ownerHandOvers.madeBy': 'Made by {who}.',
+  'ownerHandOvers.madeByUnderTheGrant': 'Made by {who}, under your grant.',
+  'ownerHandOvers.reason': 'Reason: {because}',
+  'ownerHandOvers.readFailed': 'The owner hand-overs of this agent could not be read.',
+  'server.hostIsNotThisOffice': 'This office does not answer to the name this request used. Nothing was done. On this computer it answers at http://127.0.0.1:{port}. The person chooses the name it answers to on the Settings page.',
+  'server.writeWithoutTheOfficesMark': 'The office changes nothing for a request that carries neither a header of its own nor JSON. Nothing was done. A program that writes to the office sends one of them: a header whose name starts with x-mole-office-, or the Content-Type application/json.',
+  // THE DECISIONS A DEPARTMENT RESTS ON (departments step 1b): a secretary taking a department away while it rests on a
+  // decision a department may no longer rest on, and an act on a decision while departments or duties rest on it. The
+  // server's English says more: what is wrong with the decision, or the act refused, and the doors.
+  ...{
+    'server.departmentTakenAwayOnADecisionItMayNotRestOn':
+      'Department {department} was not taken away. It rests on decision {decision}, which a department may no longer rest on. Rest it on a decision that stands first, then take it away, or ask the person to take it away. Nothing was written.',
+    'server.departmentsRestOnTheDecision':
+      'Decision {decision} was not changed, because departments or secretary duties rest on it: {resting}. Change them first, so that they rest on another decision, or take them away. Nothing was written.',
+  } satisfies Record<`server.${DepartmentDecisionRefusalCode}`, string>,
+  'server.oneHalfOfADeviceKey': 'This request carried one half of this browser\'s key and not the other, so it was refused. Nothing was done. Pair this browser again on the Pairing page.',
+  'server.aPressFromAnotherSite': 'A page on another site sent this press, so it was refused. Nothing was paired, no cookie was set and no key was given. Pair this browser on this office\'s own Pairing page.',
+  'server.originIsNotThisOffice': 'This request came from a page that is not one of this office\'s own pages, so it was refused. Nothing was done. Open the page at this office\'s own address and try again.',
+  // A file ticket (src/server/lib/file-tickets.ts and src/server/api/file-tickets.ts): an address that opens one file,
+  // for a while, in the browser it was made for.
+  'server.fileTicketNotHonoured': 'This file address was refused. Nothing was read or written. An address like this opens one file, for a while, in the browser it was made for. Open the file again from its page.',
+  'server.fileTicketNeedsTwoHalves': 'Only a browser paired on the Pairing page is given a file address, and this request did not carry both halves of a paired browser\'s key. Nothing was made. Pair this browser on the Pairing page.',
+  // A video, a sound or a framed file whose load was refused twice (src/web/lib/file-tickets.ts).
+  'w13s.file.notLoaded': 'not loaded',
+  // On the Worlds page a world served: the office's row, a link to the office, and every other world's row
+  // (src/web/pages/WorldsPage.tsx).
+  'w13s.worlds.goToTheOffice': 'Go to the office',
+  'w13s.worlds.fromTheOfficesPage': 'A world is entered, renamed and stopped from the office\'s page.',
+  // The move of the old cookie (src/server/api/office.ts and src/web/lib/the-old-cookie.ts): the refusal of a move
+  // that found nothing to move, why an old credential that moved was ended, and what the page says once after a move or
+  // a failed one.
+  'server.nothingToMove': 'This browser sent no key this office can move, so nothing was moved and no key was given. Pair this browser on the Pairing page.',
+  'w13s.pairing.oldCredentialEnded': 'This browser moved to a new credential in two halves, so the one-piece token it held before was ended.',
+  'w13s.pairing.moved': 'This browser was moved to the new way of proving it is you. It does not need to be paired again.',
+  'w13s.pairing.notMoved': 'This browser could not be moved to the new way of proving it is you: {reason}',
+  // The person's one card holds their browsers and the machines this office trusts
+  // (src/web/components/YourBrowsersAndMachines.tsx), and the old pages lead there.
+  'w13s.card.browsers.title': 'Your browsers and machines',
+  'w13s.card.browsers.waiting': 'Waiting for you',
+  'w13s.card.browsers.paired': 'Your browsers',
+  'w13s.card.browsers.ended': 'Ended browsers',
+  'w13s.card.browsers.machines': 'Machines this office trusts',
+  'w13s.card.browsers.thisBrowser': 'this browser',
+  'w13s.card.browsers.from': 'Paired from',
+  'w13s.card.browsers.joined': 'Joined',
+  'w13s.card.browsers.lastUsed': 'Last used',
+  'w13s.card.browsers.endedAt': 'Ended at',
+  'w13s.card.browsers.end': 'End this browser',
+  'w13s.card.browsers.ending': 'Ending this browser',
+  'w13s.card.browsers.endQuestion': 'End this browser?',
+  'w13s.card.browsers.endWarning': 'Its key stops working at once. To come in again, it must be paired again.',
+  'w13s.card.browsers.keptHere': 'Only on the office\'s own computer.',
+  'w13s.card.browsers.notRead': 'not read',
+  'w13s.card.browsers.none': 'none',
+  'w13s.embassy.hisBrowsers': { one: '{n} browser', other: '{n} browsers' },
+  'w13s.embassy.hisBrowsersWaiting': { one: '{n} waiting for you', other: '{n} waiting for you' },
+  'w13s.worlds.machinesOnYourCard': { one: '{n} machine, set on your card', other: '{n} machines, set on your card' },
+  'w13s.trusted.setOnYourCard': 'Set them on your card',
+  'w13s.pairing.goToYourCard': 'Open your card',
+  'w13s.pairing.confirmOnYourCard':
+    'Confirm it on your card, on the office\'s own computer. This page moves on by itself once you do.',
+  'resident.proposal.sleepTime': 'Sleep time: from {startsAt} each day, for {minutes} minutes.',
+  'resident.proposal.sleepTimeNone': 'No sleep time: this proposal was filed before a proposal had to name one, so it cannot be confirmed.',
+  // WHAT A DECISION NAMES AND WHAT A REPORT IS ABOUT (src/shared/what-a-record-names.ts). The three new fields, the
+  // refusals of a decision door (src/server/lib/what-a-record-names.ts), the notice that no page fits, and the two
+  // entries the record page draws in a decision's Governs section.
+  'record.field.governsFiles': 'Files it governs',
+  'record.field.aboutFiles': 'Files it is about',
+  'record.field.nothingFits': 'What no page fits',
+  'noticeWords.nothingFitsAPage': NOTICE_WORDS.nothingFitsAPage,
+  'w13s.governs.wholeProject': 'The whole project',
+  'w13s.governs.notRead': 'not read',
+  'w13s.governing.reaches.inferred': 'Inferred: {module} states {claim}, which holds {place}',
+  // WHAT A DECISION GOVERNS, IN ITS THREE PARTS (src/web/components/GovernedPlaces.tsx). An entry not read is named by
+  // its part and its number counted from 1, and then the not-read word above.
+  'w13s.governs.partRecords': 'the pages it governs',
+  'w13s.governs.partFiles': 'the files it governs',
+  'w13s.governs.skippedEntry': 'Entry {n} of {part}',
+  'w13s.governs.skippedField': 'The whole of {part}, which is not a list',
+  'w13s.governs.nothingFits': 'No page fits: {what}',
+  'w13s.governs.nearest': 'nearest page',
+  // WHAT IS RELATED TO A MODULE OR A PIPELINE (src/web/components/RelatedHere.tsx), and a module's checklists section.
+  // Each of through, inferred, none and not read is said by one word only, so a row can be read by it.
+  'record.section.checklistsAbout': 'Checklists about this {kind}',
+  'w13s.related.through': 'through',
+  'w13s.related.alsoThrough': 'also through',
+  'w13s.related.inferred': 'inferred',
+  'w13s.related.inferredTitle': 'Worked out from the files this decision governs and the files a module here states. Nobody linked it here.',
+  'w13s.related.none': 'none',
+  'w13s.related.notRead': 'not read',
+  'w13s.related.more': { one: 'Show {n} more', other: 'Show {n} more' },
+  'w13s.related.left': { one: '{n} more was found and is not listed here', other: '{n} more were found and are not listed here' },
+  'w13s.related.replacedLeftOut': { one: '{n} replaced decision is left out', other: '{n} replaced decisions are left out' },
+  'w13s.related.deletedLeftOut': { one: '{n} deleted one is left out', other: '{n} deleted ones are left out' },
+  'w13s.related.decisionsFor': 'Decisions about {title}',
+  'w13s.related.checklistsFor': 'Checklists about {title}',
+  ...{
+    'server.decisionNamesNothingItGoverns':
+      'This decision names nothing it governs, so it was refused. Nothing was written. Send governs with the pages it governs, such as a module or a flow, each as a record. A rule for everywhere sends governs with the whole project alone. If no page fits, send nothingFits with the missing kind, a few words, and the nearest page.',
+    'server.decisionGovernsIsEmpty':
+      'Governs was sent as an empty list, so this decision was refused. Nothing was written. Name the pages it governs, or the whole project alone. If no page fits, leave governs out and send nothingFits.',
+    'server.decisionGovernsNamesAPath':
+      'Governs names the path {path}, so this decision was refused. Nothing was written. Governs holds pages only. Send the path in governsFiles, and name in governs the module that holds it, or the whole project.',
+    'server.decisionGovernsTheWholeProjectBesideOthers':
+      'Governs names the whole project beside other entries, so this decision was refused. Nothing was written. The whole project stands alone. Send it alone, or send only the pages.',
+    'server.decisionNearestIsNotALivePage':
+      'nothingFits names {nearest} as the nearest page, and it is not a live page in this project, so this decision was refused. Nothing was written. Send the id of a live module, pipeline, step, flow, regulation, role card, tool, tool category or department, or leave nearest out.',
+  } satisfies Record<`server.${DecisionNamesRefusalCode}`, string>,
+  // THE EXPORT OF ONE RUN'S CONVERSATION (src/web/components/ConversationExportPress.tsx), on the run's page: the press,
+  // the four parts the person ticks, what the look first found, and the refusals of the two export doors
+  // (src/server/lib/conversation-export.ts).
+  'w13s.conversationExport.title': 'Export',
+  'w13s.conversationExport.open': 'Export this conversation',
+  'w13s.conversationExport.loading': 'what the file would hold',
+  'w13s.conversationExport.always': 'The conversation and its handover always go.',
+  'w13s.conversationExport.part.notebook': 'The notebook',
+  'w13s.conversationExport.part.memory': 'The memory folder',
+  'w13s.conversationExport.part.space': 'The personal space',
+  'w13s.conversationExport.part.address': 'The name and address',
+  'w13s.conversationExport.piece.run': 'The run\'s details',
+  'w13s.conversationExport.piece.conversation': 'The conversation',
+  'w13s.conversationExport.piece.handover': 'The handover',
+  'w13s.conversationExport.notThere': 'not there',
+  'w13s.conversationExport.bytes': { one: '{n} byte', other: '{n} bytes' },
+  'w13s.conversationExport.files': { one: '{n} file', other: '{n} files' },
+  'w13s.conversationExport.inAll': 'In all: {size}',
+  'w13s.conversationExport.scrub': 'Paths replaced: {paths}. Secrets removed: {secrets}.',
+  'w13s.conversationExport.leftOut': 'Left out',
+  'w13s.conversationExport.notScreened': 'Not screened, carried as they are',
+  'w13s.conversationExport.findings': 'What the screen found',
+  'w13s.conversationExport.none': 'none',
+  'w13s.conversationExport.wholeFile': 'the whole file',
+  'w13s.conversationExport.why.over-the-line': 'over the size one export carries',
+  'w13s.conversationExport.why.over-the-count': 'over the number of files one export carries',
+  'w13s.conversationExport.why.name-unfit': 'a name a zip cannot hold',
+  'w13s.conversationExport.why.not-a-markdown-file': 'not a markdown file',
+  'w13s.conversationExport.why.a-folder': 'a folder',
+  'w13s.conversationExport.why.not-an-ordinary-file': 'not an ordinary file',
+  'w13s.conversationExport.download': 'Download the file',
+  'w13s.conversationExport.working': 'Making the file',
+  'w13s.conversationExport.pressAgain': 'Look at what the screen found. Then press again to download.',
+  'w13s.conversationExport.handed': 'The file was handed to the browser: {name}',
+  ...{
+    'server.conversationExportNoRuntime': 'No runtime was recorded for this run, so its conversation cannot be found. Nothing was made.',
+    'server.conversationExportRuntimeNotRead': 'This release reads no conversation of the runtime {runtime}. Nothing was made.',
+    'server.conversationExportNoConversationId': 'No conversation id was recorded for this run, so its conversation cannot be found. Nothing was made.',
+    'server.conversationExportConversationIdUnfit':
+      'This run\'s conversation id cannot be used as a file name, so its conversation was not looked for. Nothing was made.',
+    'server.conversationExportNoWorkingDirectory':
+      'No working directory was recorded for this run, so its conversation cannot be found. Nothing was made.',
+    'server.conversationExportNotThere': 'This run\'s conversation file is not on this computer. Nothing was made.',
+    'server.conversationExportUnreadable': 'This run\'s conversation could not be read. Nothing was made.',
+    'server.conversationExportOverTheLine': 'This run\'s conversation is over the {megabytes} MB one export carries. Nothing was made.',
+    'server.conversationExportHomePath': '{file} still holds a home folder path after the scrub, so it cannot leave. Nothing was made.',
+    'server.conversationExportKeyInText': '{file} holds something shaped like a key, so it cannot leave. Nothing was made.',
+    'server.conversationExportKeyHash': '{file} holds a key hash this office issued, so it cannot leave. Nothing was made.',
+    'server.conversationExportLookFirst': 'Look at what the screen found first: {count} in all. Then press again. Nothing was made.',
+  } satisfies Record<`server.${ConversationExportRefusalCode}`, string>,
 } as const
 
 /** The English of one fixed rule of labels and the roll: the rule's own sentence, read where the code keeps it. */

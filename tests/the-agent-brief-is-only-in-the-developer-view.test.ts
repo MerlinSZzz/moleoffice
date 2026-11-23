@@ -42,9 +42,11 @@ import { createI18n } from '../src/shared/i18n.ts'
 
 /** How a panel that declares a surface is found, from the one function that writes the attribute. */
 const briefPanel = `[data-target="${targetAttributeValue({ kind: 'uiSurface', surfaceId: 'bundles.brief' })}"]`
-/** A sentence only that panel says, so its absence can be measured in the page's words as well. */
+/** The words on that panel's press, which only that panel draws, so its absence can be measured in the page's words as well. */
 const en = createI18n('en')
-const ONLY_THE_BRIEF_SAYS = en.t('g7a.bundles.briefHint').split(/\{\w+\}/).map((piece) => piece.trim())
+const ONLY_THE_BRIEF_SAYS = [en.t('g7a.bundles.readBrief')]
+/** The size line the panel draws once the brief is read, in the pieces around its numbers. */
+const THE_BRIEF_SIZE = en.t('g7a.bundles.briefSize').split(/\{\w+\}/).map((piece) => piece.trim()).filter((piece) => piece !== '' && piece !== ',')
 
 let app: LiveApp
 let page: Page
@@ -96,15 +98,14 @@ describe('the agent brief is a developer-view thing', () => {
     await open('developer')
     const panel = page.locator(briefPanel)
     expect(await panel.count(), 'the brief panel is gone from the developer view too').toBe(1)
-    // THE SENTENCE IS AT REST, before anything is pressed: a person has to be told what this panel
-    // is before they decide to read 46,000 characters of it.
+    // THE PRESS IS AT REST, before anything is pressed: the panel is named by the words on its press.
     for (const piece of ONLY_THE_BRIEF_SAYS) expect(await panel.innerText()).toContain(piece)
 
     await panel.getByRole('button', { name: 'Read what an agent is told' }).click()
     await page.waitForSelector(`${briefPanel} .bx-text`)
     const shown = await panel.innerText()
     expect(shown).toContain('the state of this project, from GET /api/brief')
-    expect(shown).toContain('estimate')
+    for (const piece of THE_BRIEF_SIZE) expect(shown).toContain(piece)
   }, 180_000)
 
   it('changes nothing else: both views open on the same heading and the same controls', async () => {

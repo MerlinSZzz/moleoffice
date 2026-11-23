@@ -43,6 +43,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { THE_TEST_FIXTURE_ROOT } from './a-page-of-a-test-office.ts'
 import { freshDb, type TestDb } from './helpers.ts'
+import { t } from '../src/shared/i18n.ts'
 import type { AdapterEnv } from '../src/server/lib/adapters/types.ts'
 // Type-only, and erased before this file runs: naming a type does not import the module, so
 // nothing here loads browser code before the window stand-in is in place.
@@ -183,7 +184,7 @@ describe('the sessions page says when it was read', () => {
     expect(html).not.toContain('Checked again every')
   })
 
-  it('keeps a good reading on screen when a re-read fails, and says nothing newer has been seen', () => {
+  it('keeps a good reading on screen when a re-read fails, and says what failed', () => {
     const failedAt = NOW + 30_000
     const html = page(readAt({ failed: { at: failedAt, message: 'Cannot reach the Mole Office server.' } }))
 
@@ -191,10 +192,9 @@ describe('the sessions page says when it was read', () => {
     // later one did not arrive would lose the only evidence on the screen.
     expect(html).toContain('handover replay sweep')
     expect(html).toContain('force-table collation')
-    // And the failure is not silent, and does not pretend the page is current.
-    expect(html).toContain('Nothing newer has been read.')
-    expect(html).toContain(`The attempt at ${sp.readingStamp(failedAt)} failed: Cannot reach the Mole Office server.`)
-    expect(html).toContain(`What is above is still the reading from ${NOW_STAMP}.`)
+    // And the failure is not silent, and the stamp keeps the time of the reading on screen.
+    expect(html).toContain(t('g6a.sessions.readFailed', { failedAt: sp.readingStamp(failedAt), message: 'Cannot reach the Mole Office server.' }))
+    expect(html).toContain(`Last checked at ${NOW_STAMP}.`)
   })
 })
 

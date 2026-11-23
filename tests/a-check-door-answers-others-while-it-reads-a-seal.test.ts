@@ -342,7 +342,7 @@ describe('the door that reads a check says its parts in the log, as the doors th
     const fields = [
       'run', 'title', 'stands', 'agent', 'brief', 'chapters', 'chaptersSays', 'savedChapters', 'precedents', 'reports', 'wrote',
       'decisions', 'decisionsComplete', 'workArea', 'workAreaSays', 'filesArea', 'checkout', 'submission', 'submissionStatus',
-      'theCheck', 'whatTheCheckWouldRead', 'whatTheCheckWouldReadSays', 'workspaceId', 'narrowedByPermission',
+      'theCheck', 'whatTheCheckWouldRead', 'whatTheCheckWouldReadSays', 'readingOnly', 'workspaceId', 'narrowedByPermission',
     ]
     const before = await aRead()
     expect(Object.keys(before)).toEqual(fields)

@@ -122,9 +122,9 @@ describe('a message sent in one shows in the other', () => {
     await app.page.waitForSelector('.px-chat[data-where="page"]', { state: 'detached', timeout: 20_000 })
     await openTheChat(app.page)
     const beside = '.px-chat[data-where="split"]'
-    // THE FIRST CASE LEFT THE WINDOW OPEN, and the browser remembers it; the sidebar's row is how a person puts the
-    // chat beside the page from the window, so the test presses it when the split is not already drawn.
-    if ((await app.page.locator(beside).count()) === 0) await app.page.click('.shell-side .shell-chat')
+    // THE FIRST CASE LEFT THE WINDOW OPEN, and the browser remembers it; the window's own press is how a person puts
+    // the chat beside the page from the window, so the test presses it when the split is not already drawn.
+    if ((await app.page.locator(beside).count()) === 0) await app.page.click('.px-chat[data-where="corner"] .px-chat-beside')
     await app.page.waitForSelector(beside, { timeout: 20_000 })
     if ((await app.page.$(`${beside} .px-chat-said`)) === null) {
       await app.page.click(`${beside} .px-chat-contact:has(.px-chat-name:text-is("Page Agent"))`)

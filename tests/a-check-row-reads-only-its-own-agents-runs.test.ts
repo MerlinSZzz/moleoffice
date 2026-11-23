@@ -210,6 +210,11 @@ function aSession(data: Record<string, unknown>, workspace = PROJECT): string {
   return t.api.createRecord({ workspaceId: workspace, kind: 'session', title: 'A made-up session', data, actor: t.api.HUMAN }).id
 }
 
+/** The `extra` of a session that recorded a process of its own, under a number nothing runs under. */
+function anEndedProcess(pid: number): Record<string, unknown> {
+  return { discovered: { pid, pidStartedAt: '2026-01-01 00:00:00' } }
+}
+
 /** A sandbox whose folder ends in its own name, so each run's sentence names the run it came from. */
 const aSandbox = (name: string) => ({ template: 'a-made-up-template', folder: `/made/up/sandboxes/${name}` })
 
@@ -352,13 +357,16 @@ describe('2 and 3. who is answering, as each row said it before', () => {
       },
     })
 
+    // h AND i. EACH SESSION NAMES A PROCESS OF ITS OWN THAT NO LONGER RUNS, and has no transcript. A hold that still
+    // beats is the session's answer unless what is read of the session says it is gone, and an ended process is that
+    // sign. The two numbers are above any pid the system hands out, so nothing runs under them.
     const h = await anAgent('made-up-gone-session')
-    const hSession = aSession({ state: 'running', runtime: 'claude-code', doing: 'A made-up terminal that has gone.' })
+    const hSession = aSession({ state: 'running', runtime: 'claude-code', doing: 'A made-up terminal that has gone.', extra: anEndedProcess(2147483010) })
     await hold(h.handle, hSession)
     guard.set('h', { agent: h, ask: aCheckAskedOf(h), expected: { ...nobody, heldByALiveSession: aLiveSessionHasIt(h.handle, hSession) } })
 
     const i = await anAgent('made-up-gone-session-and-a-run')
-    const iSession = aSession({ state: 'running', runtime: 'claude-code', doing: 'Another made-up terminal that has gone.' })
+    const iSession = aSession({ state: 'running', runtime: 'claude-code', doing: 'Another made-up terminal that has gone.', extra: anEndedProcess(2147483011) })
     await hold(i.handle, iSession)
     const iRun = aSession({ state: 'running', runtime: 'claude-code', servingAgentId: i.id, sandbox: aSandbox('under-the-hold') })
     await aLiveProcessFor(iRun)

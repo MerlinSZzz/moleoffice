@@ -272,7 +272,16 @@ beforeAll(async () => {
   sender = await register('made-up-sender', 'Sender Agent')
   held = await register('made-up-held', 'Held Agent')
   startedBy(held, { kind: 'agent', id: reachable })
-  await hold('made-up-held', aSessionOf(held, 'made-up-held', 'A made-up session holding the handle', { state: 'running' }))
+  // THE SESSION BEHIND THE HOLD IS GONE: it recorded a process of its own under a number above any pid the system hands
+  // out, so that process reads ended, and it has no transcript. A beating hold answers unless something read of its
+  // session says otherwise, and an ended process is that sign.
+  await hold(
+    'made-up-held',
+    aSessionOf(held, 'made-up-held', 'A made-up session holding the handle', {
+      state: 'running',
+      extra: { discovered: { pid: 2147483002, pidStartedAt: '2026-01-01 00:00:00' } },
+    }),
+  )
   const { THE_LAST_RUNS_READ } = await import('../src/server/lib/presence.ts')
   atTheEdge = await anAgentInATerminalBehind('made-up-at-the-edge', THE_LAST_RUNS_READ - 1)
   pastTheEdge = await anAgentInATerminalBehind('made-up-past-the-edge', THE_LAST_RUNS_READ)

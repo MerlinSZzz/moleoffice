@@ -20,6 +20,7 @@
  *
  *   · the register-myself door, which asks whether a live agent already bears a handle;
  *   · the started door, which asks the same before it registers an agent with no key of its own;
+ *   · the new agent door, which asks the same before it makes an agent from a name;
  *   · the visitor confirm, which asks the same about a credential's handle;
  *   · the role-request answer that admits a waiting self-registration, which asks whether the
  *     handle the waiting session asked for is already a row;
@@ -84,6 +85,14 @@ const ALLOWED: { file: string; calls: number; reason: string }[] = [
       "The visitor confirm asks whether a LIVE agent already bears a credential's handle. The confirm " +
       'door has already refused every other taken handle (problem z-9zXhVeAPvA), so the only row that ' +
       'answers here carries this credential, and the confirm writes nothing on it and no second row.',
+  },
+  {
+    file: 'src/server/api/new-agent.ts',
+    calls: 1,
+    reason:
+      'The new agent door asks whether a LIVE agent already bears the handle the name gives, before it makes ' +
+      "one, as the started door does: an agent record with a handle a live agent bears in any project would join " +
+      "that agent's registry row. It is a name-taken question.",
   },
   // THE ROLE-REQUEST ANSWER MOVED OUT OF src/server/api/roles.ts with its one call and its reason. It is still guarded,
   // because the route and the person's one press both run it.

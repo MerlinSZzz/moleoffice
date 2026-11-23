@@ -2,29 +2,29 @@
 // Licensed under the MIT License. See LICENSE.
 /**
  * A PERMANENT RESIDENT'S SLEEP PRESSES STAND BESIDE ITS SLEEP, FOR THOSE WHO MAY PRESS THEM, AND ITS OFFICE FLOW STANDS
- * BESIDE ITS COMPACTIONS. Item 1 of a decision (wave 13k, round 47) says how long ago it last slept
- * shows on its chat side and on its profile, "together with its compactions and its office flow".
+ * BESIDE ITS COMPACTIONS, on its profile. Item 1 of a decision (wave 13k, round 47) puts how long ago it last slept
+ * on its profile, "together with its compactions and its office flow". The presses are drawn on the profile only.
  * The presses are the ones the doors in
  * src/server/api/residents.ts allow; tests/a-permanent-resident-sleeps-and-is-named.test.ts proves the doors.
  *
  * WHAT IS MEASURED, each drawn with renderToStaticMarkup from a reading written here, with no server:
- *   1. the person sees Sleep now on an awake resident and Wake now on a sleeping one, and no Postpone;
- *   2. the resident itself sees Sleep now and Postpone this sleep while awake, and only Wake now while asleep;
+ *   1. the person sees Sleep now on an awake resident and Wake now on a sleeping one, and no Postpone, and the
+ *      sleep-time editor on a resident without the secretary card;
+ *   2. the resident itself sees Sleep now and Postpone this sleep while awake, and only Wake now while asleep, and
+ *      the sleep-time editor;
  *   3. another agent sees no press, and nobody sees one on a retired resident;
  *   4. the office flow is drawn after the Sleep place's facts and before the naming place, and an agent with no run
  *      here is told so in words rather than shown an empty list;
  *   5. the three presses ask the three doors, by path, method and body;
  *   6. on the profile the resident's own section leaves out how it wishes to be addressed and its heartbeat, which the
- *      profile draws already, and elsewhere draws both;
- *   7. the chat's line after a press says what the door answered, by the same two facts the office's line holds.
+ *      profile draws already, and elsewhere draws both.
  *
  * MUTATIONS, EACH AFTER A CONTROL RUN AND RESTORED (round 47's report names each run):
  *   - `whoMayPress` gives the person Postpone as well: case 1 goes red;
  *   - `whoMayPress` forgets the resident itself: case 2 goes red;
  *   - the Sleep place draws its office flow before its facts: case 4 goes red;
  *   - `residentWake` asks the sleep door: case 5 goes red;
- *   - `onTheProfile` no longer leaves out the address: case 6 goes red;
- *   - the line after a press forgets when the last sleep ended: case 7 goes red.
+ *   - `onTheProfile` no longer leaves out the address: case 6 goes red.
  */
 
 import { createElement as h } from 'react'
@@ -52,7 +52,6 @@ const storage = {
 let sleep: typeof import('../src/web/components/ResidentSleep.tsx')
 let presses: typeof import('../src/web/components/SleepPresses.tsx')
 let section: typeof import('../src/web/components/ResidentSection.tsx')
-let line: typeof import('../src/web/components/SleepLine.tsx')
 let api: typeof import('../src/web/api.ts')['api']
 const realFetch = globalThis.fetch
 
@@ -60,7 +59,6 @@ beforeAll(async () => {
   sleep = await import('../src/web/components/ResidentSleep.tsx')
   presses = await import('../src/web/components/SleepPresses.tsx')
   section = await import('../src/web/components/ResidentSection.tsx')
-  line = await import('../src/web/components/SleepLine.tsx')
   api = (await import('../src/web/api.ts')).api
 })
 
@@ -96,6 +94,7 @@ function aReading(over: Partial<OneResidentReading['resident']>): OneResidentRea
       decisionId: 'test-decision',
       confirmedBy: { kind: 'person', id: 'test-owner' },
       factsAtProposal: null,
+      homeWorldIsThisOffice: null,
       retired: false,
       retiredAt: null,
       successor: null,
@@ -128,13 +127,13 @@ function drawn(reading: OneResidentReading, looking: { type: string; id: string 
 
 describe('the sleep presses on the profile', () => {
   it('1: the person sees Sleep now on an awake resident and Wake now on a sleeping one, and no Postpone', () => {
-    expect(buttons(drawn(aReading({}), THE_PERSON, true))).toEqual(['Sleep now'])
-    expect(buttons(drawn(aReading({ sleep: asleepNow }), THE_PERSON, true))).toEqual(['Wake now'])
+    expect(buttons(drawn(aReading({}), THE_PERSON, true))).toEqual(['Sleep now', 'Set the sleep time'])
+    expect(buttons(drawn(aReading({ sleep: asleepNow }), THE_PERSON, true))).toEqual(['Wake now', 'Set the sleep time'])
   })
 
   it('2: the resident itself sees Sleep now and Postpone this sleep while awake, and only Wake now while asleep', () => {
-    expect(buttons(drawn(aReading({}), ITSELF, false))).toEqual(['Sleep now', 'Postpone this sleep'])
-    expect(buttons(drawn(aReading({ sleep: asleepNow }), ITSELF, false))).toEqual(['Wake now'])
+    expect(buttons(drawn(aReading({}), ITSELF, false))).toEqual(['Sleep now', 'Postpone this sleep', 'Set the sleep time'])
+    expect(buttons(drawn(aReading({ sleep: asleepNow }), ITSELF, false))).toEqual(['Wake now', 'Set the sleep time'])
   })
 
   it('3: another agent sees no press, and nobody sees one on a retired resident', () => {
@@ -145,7 +144,7 @@ describe('the sleep presses on the profile', () => {
 })
 
 describe('the office flow beside the compactions', () => {
-  it('4: is drawn after the facts and before the naming place, and an agent with no run here is told so', () => {
+  it('4: is drawn after the facts and before the naming place, and an agent with no run here draws its state word', () => {
     const markup = drawn(aReading({ naming: { askedAt: stamp, namedAt: null, namedBy: null } }), THE_PERSON, true, h('p', { 'data-test-flow': '' }, 'Test: the flow'))
     const compactions = markup.indexOf('Compactions its runs reported')
     const flow = markup.indexOf('data-test-flow')
@@ -156,7 +155,7 @@ describe('the office flow beside the compactions', () => {
 
     const none = renderToStaticMarkup(h(sleep.OfficeFlowOfARun, { runId: null }))
     expect(strip(none)).toContain('Office flow of its newest run')
-    expect(strip(none)).toContain('No run of it is on record in this project, so there is no office flow to show.')
+    expect(strip(none)).toContain('No run in this project')
     expect(none).toContain('data-office-flow="none"')
   })
 })
@@ -195,13 +194,5 @@ describe("the resident's own section", () => {
     expect(onTheProfile).not.toContain('data-heartbeat')
     expect(strip(onTheProfile)).not.toContain('wishes to be addressed')
     expect(onTheProfile).toContain('resident.residency')
-  })
-})
-
-describe("the chat's line after a press", () => {
-  it('7: says asleep since when the door answered asleep, and when the last sleep ended otherwise', () => {
-    expect(line.theLineAfterAPress(asleepNow)).toEqual({ asleepSince: stamp, lastSleptAt: null, wakesAt: null, sleepTime: null })
-    expect(line.theLineAfterAPress({ asleep: null, lastSleepEndedAt: stamp, sleepTime: null })).toEqual({ asleepSince: null, lastSleptAt: stamp, wakesAt: null, sleepTime: null })
-    expect(line.theLineAfterAPress({ asleep: null, lastSleepEndedAt: null, sleepTime: null })).toEqual({ asleepSince: null, lastSleptAt: null, wakesAt: null, sleepTime: null })
   })
 })

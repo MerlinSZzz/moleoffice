@@ -392,5 +392,5 @@ export function MarksOnMarkdownStyle(): React.JSX.Element {
 export const MARKS_ON_MARKDOWN_CSS = `
 .px-chat-marked[data-whole='yes'] { text-decoration: none; border-bottom: 2px solid var(--label-ink); }
 .px-chat-marked[data-whole='yes'] a, .px-chat-marked[data-whole='yes'] button { color: inherit; }
-.px-chat-marked-not-shown { color: var(--muted); font-size: 0.72rem; }
+.px-chat-marked-not-shown { color: var(--text-3); font-size: 0.72rem; }
 `

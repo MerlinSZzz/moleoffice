@@ -1,14 +1,15 @@
 // Copyright © 2026 Zhengyang Shen
 // Licensed under the MIT License. See LICENSE.
 /**
- * HOME'S LATE OR STUCK DRAWS FOUR ROWS, SAYS HOW MANY THERE ARE, AND LINKS TO THE REST.
+ * HOME'S LATE OR STUCK IS ONE NUMBER, WHICH OPENS FOUR ROWS, SAYS HOW MANY THERE ARE, AND LINKS TO THE REST.
  *
+ * By the person's decision, Late or stuck on home is one number, and pressing it opens its list in place.
  * The approved drawing (report Nr5dZygiWTy0, block b-3) shows "4 of 11" beside the heading and a link
  * to the rest. The first build drew every row: on a busy office the side
  * column ran to seventy rows and Home to 7,014 pixels at 1440. Now it draws four, says "4 of N", and
  * links to Work to do. The link does not claim a number, because Work to do is its own list.
  *
- * Five made-up pipelines stand still here, so Late or stuck holds five rows. MUTATION: draw every
+ * Five made-up pipelines stand still here, so Late or stuck's number is 5 and its list holds five rows. MUTATION: draw every
  * row (no cap); the row count and the count line go red.
  */
 import { afterAll, beforeAll, expect, it } from 'vitest'
@@ -39,13 +40,17 @@ afterAll(async () => {
   await app?.stop()
 }, 60_000)
 
-it('draws four of five rows, says "4 of 5", and links to Work to do, in both languages', async () => {
+it('draws the number 5, and pressed, four of five rows, "4 of 5" and a link to Work to do, in both languages', async () => {
   for (const language of ['en', 'zh'] as const) {
     const { t } = createI18n(language)
     await app.page.goto(`${app.site}/?lang=${language}&mode=normal#/`)
     await app.page.reload()
     await waitForThePage(app.page, 30_000)
     const late = app.page.locator('[data-home-section="late"]')
+    // A NUMBER IS DRAWN IN DIGITS in both languages.
+    await expect.poll(async () => (await late.locator('[data-home-late-number]').innerText()).trim(), { timeout: 20_000 }).toBe('5')
+    expect(await late.locator('.hm-alarm-row').first().isVisible(), `${language}: the list is closed until the number is pressed`).toBe(false)
+    await late.locator('summary').click()
     await late.locator('.hm-alarm-row').first().waitFor({ timeout: 20_000 })
     await app.page.waitForTimeout(500)
     expect(await late.locator('.hm-alarm-row').count(), `${language}: rows drawn`).toBe(4)

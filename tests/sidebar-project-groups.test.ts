@@ -10,6 +10,12 @@
 // The block and its Switch then went back to the sidebar, and the block draws a row only for
 // a project page the person pinned. So the project's name, its Switch and its words are read in the sidebar again,
 // as before, and the project's rows in This project's group on All pages.
+// Test change (wave 13y round 175): a project is made at the end of the Switch's list now, as decided, and Settings ›
+// Projects keeps only the rename press. The check made Paper Kites and tried a name with no letter or digit in
+// Settings; it does both in the Switch's list, with the same name, the same disabled Make, the same words and the same
+// switch, and asks that Settings › Projects draw no make press. It no longer asks that the sidebar draw none.
+// Test change (wave 13y round 175, the field's name): the form in the Switch's list labels its field Name, as decided,
+// so the check finds the field by that word and no longer by the label of Settings › Projects.
 import { THE_TEST_FIXTURE_ROOT } from './a-page-of-a-test-office.ts'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -17,7 +23,7 @@ import { afterAll, beforeAll, expect, it } from 'vitest'
 import { liveApp, waitForThePage, type LiveApp } from './helpers.ts'
 import { openSettingsPanel } from './settings-folds.ts'
 import { fallbackRowsNotWaiting, howManyWaitWithNoChinese } from './words-waiting-for-translation.ts'
-import { switchTheProject, theProjectIdOnScreen, theProjectOnScreen, waitForTheProjects } from './switch-the-project.ts'
+import { openTheProjectList, switchTheProject, theProjectIdOnScreen, theProjectOnScreen, waitForTheProjects } from './switch-the-project.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { createI18n, type PageLanguage, type WordKey } from '../src/shared/i18n.ts'
 import { targetAttributeValue } from '../src/shared/targets.ts'
@@ -32,9 +38,10 @@ const wordPanel = `[data-target="${targetAttributeValue({ kind: 'uiSurface', sur
 beforeAll(async () => {
   app = await liveApp({ name: 'sidebar-s1', workspace: 'default', viewport: { width: 1440, height: 1100 } })
   const headers = { 'content-type': 'application/json', 'x-mole-office-workspace': 'default', 'x-mole-office-actor-type': 'human', 'x-mole-office-actor-id': THE_PERSON }
-  // This case exercises the explicit unread-only choice.
+  // This case exercises the explicit unread-only choice. The person last had the chat beside the page, which is the
+  // way the sidebar's Chat row opens it below.
   const unreadOnly = await fetch(`${app.api}/api/participants/person/${THE_PERSON}`, {
-    method: 'PATCH', headers: headers, body: JSON.stringify({ chatButtonStays: 'when-unread' }),
+    method: 'PATCH', headers: headers, body: JSON.stringify({ chatButtonStays: 'when-unread', chatOpensAs: 'split' }),
   })
   expect(unreadOnly.status, await unreadOnly.clone().text()).toBe(200)
   for (const project of projects) {
@@ -56,7 +63,7 @@ beforeAll(async () => {
 
 afterAll(async () => { await app?.stop() })
 
-it('draws the shared levels, switches only the project area, opens the shared chat and keeps project actions in Settings, with all four word checks', async () => {
+it('draws the shared levels, switches only the project area, opens the shared chat, makes a project in the Switch’s list and renames it in Settings, with all four word checks', async () => {
   const page = app.page
   // A PAGE OF THE PROJECT, so switching the project changes what it lists. All records stands under
   // All projects and reads across projects, as a decision set it. So a switch no longer
@@ -88,7 +95,6 @@ it('draws the shared levels, switches only the project area, opens the shared ch
   ])
   expect(await page.locator('#main .ap-group[data-group="developer"]').count()).toBe(0)
   await page.evaluate(() => { location.hash = '#/ideas' })
-  expect(await page.locator('#shell-side').getByRole('button', { name: 'Make a project', exact: true }).count()).toBe(0)
   expect(await page.locator('#shell-side').getByRole('button', { name: 'Rename this project', exact: true }).count()).toBe(0)
   await page.getByText('Copper Studio fixture task', { exact: true }).first().waitFor()
   // Everything in the column but the project block stays as it was when the project changes.
@@ -131,11 +137,16 @@ it('draws the shared levels, switches only the project area, opens the shared ch
   await page.locator('#settings-project-rename').fill('Discard this name')
   await page.locator(panel).getByRole('button', { name: 'Cancel', exact: true }).click()
   expect(await theProjectOnScreen(page)).toBe('Lake Library')
-  await page.locator(panel).getByRole('button', { name: 'Make a project', exact: true }).click()
-  await page.locator('#settings-project-make').fill('Paper Kites')
-  await page.locator(panel).getByRole('button', { name: 'Make it', exact: true }).click()
+  const en = createI18n('en')
+  expect(await page.locator(panel).getByRole('button', { name: en.t('nav.makeProject'), exact: true }).count()).toBe(0)
+  expect(await page.locator(panel).getByRole('button', { name: en.t('sidebarProject.newProject'), exact: true }).count()).toBe(0)
+  const list = await openTheProjectList(page)
+  await list.getByRole('button', { name: en.t('sidebarProject.newProject'), exact: true }).click()
+  await list.getByLabel(en.t('sidebarProject.newProjectName'), { exact: true }).fill('Paper Kites')
+  await list.getByRole('button', { name: en.t('nav.make'), exact: true }).click()
   await page.waitForFunction(() => document.querySelector('.sbp-name')?.textContent === 'Paper Kites')
   expect(await theProjectIdOnScreen(page)).toBe('paper-kites')
+  await list.waitFor({ state: 'hidden' })
   await switchTheProject(page, 'test-copper')
 
   for (const language of ['zh', 'xx'] as const) {
@@ -155,14 +166,16 @@ it('draws the shared levels, switches only the project area, opens the shared ch
       const contentWords = new Set(['Mole Office', 'Copper Studio', 'Lake Library', 'Paper Kites', 'Default', PERSON])
       expect(words.filter(word => !contentWords.has(word) && !/^⟦[\s\S]*⟧$/.test(word) && !/^\d+$/.test(word))).toEqual([])
     }
+    const choices = await openTheProjectList(page)
+    await choices.getByRole('button', { name: reader.t('sidebarProject.newProject'), exact: true }).click()
+    await choices.getByLabel(reader.t('sidebarProject.newProjectName'), { exact: true }).fill('...')
+    expect(await choices.innerText()).toContain(reader.t('nav.nameForCreation'))
+    expect(await choices.getByRole('button', { name: reader.t('nav.make'), exact: true }).isDisabled()).toBe(true)
+    await choices.getByRole('button', { name: reader.t('nav.cancel'), exact: true }).click()
+    await choices.getByRole('button', { name: reader.t('sidebarProject.newProject'), exact: true }).waitFor()
     await page.goto(`${app.site}/?lang=${language}#/settings`)
     await waitForThePage(page, 30_000)
     await openSettingsPanel(page, 'settings.projects')
-    await page.locator(panel).getByRole('button', { name: reader.t('nav.makeProject'), exact: true }).click()
-    await page.locator('#settings-project-make').fill('...')
-    expect(await page.locator(panel).innerText()).toContain(reader.t('nav.nameForCreation'))
-    expect(await page.locator(panel).getByRole('button', { name: reader.t('nav.make'), exact: true }).isDisabled()).toBe(true)
-    await page.locator(panel).getByRole('button', { name: reader.t('nav.cancel'), exact: true }).click()
     await page.locator(panel).getByRole('button', { name: reader.t('nav.renameProject'), exact: true }).click()
     await page.locator('#settings-project-rename').fill('')
     expect(await page.locator(panel).innerText()).toContain(reader.t('nav.nameRequired'))

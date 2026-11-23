@@ -24,6 +24,7 @@ import { SYSTEM_LINES } from '@shared/groups.ts'
 import { howTheRoundEndedAsStored, HOW_THE_ROUND_ENDED, readHowTheRoundEnded, type HowTheRoundEnded } from '@shared/how-the-round-ended.ts'
 import { nowStamp } from '@shared/time.ts'
 import { workerRoundStanding } from '@shared/releasing.ts'
+import { sayInEnglish } from '@shared/i18n.ts'
 import { enWave14c } from '@shared/words/en-wave-14c.ts'
 import { isASessionState, type PanelRecord } from '@shared/types.ts'
 import { sqlite } from '../db/client.ts'
@@ -33,16 +34,18 @@ import { readTheFinishApart } from './the-seal-read-apart.ts'
 import { whenStored } from '../db/told-when-stored.ts'
 import { getRevision } from './revisions.ts'
 import { writeASystemLineToOne } from './groups.ts'
-import { theAgentOfARunForItsSeal } from './inspection.ts'
+import { theAgentOfARunForItsSeal, whyAWorkersSupervisorIsNotTold } from './inspection.ts' // the owner's decision of 12 November 2026
 import { THE_OFFICE } from './the-office.ts'
 import { theOrderWritten } from '@shared/the-order-written.ts'
-import { createRecordWithReport, getRecord, writeHowTheRoundEnded, type Actor } from './records.ts'
+import { createRecordWithReport, getRecord, writeHowTheRoundEnded, writeTheEndHead, type Actor } from './records.ts'
+import { theEndHeadToStore, theEndToRead, theHeadIn, theHeadReadOnTheThread, type TheHeadRead } from './a-runs-own-commits.ts'
 import { PanelError } from './panel-error.ts'
 import { captureGit, eachWasWrittenInPlace, theBaseARunNames, theRunsOwnMessageTo } from './sealed-tip.ts'
 import { whoIsToldOfASeal, whoIsToldOfTheRun } from './who-is-told-of-a-seal.ts'
 import { moleOffice, type ParticipantRef } from '@shared/participants.ts'
 import { theStaleForkBases } from './the-stale-fork-bases.ts'
 import { thePackagesThisRunHandedBack } from './delegation.ts'
+import { inspectorAnswersRun } from './inspector-answers-lines.ts'
 import { aCheckOfHandedBackPackages } from '../../config/verdict-kinds.mjs'
 import {
   theHoldOfARoundWithNoCaseSays,
@@ -66,6 +69,14 @@ const text = (value: unknown): string | null => (typeof value === 'string' && va
 export function thisWriteEndedARoundWithoutASeal(before: Record<string, unknown>, after: Record<string, unknown>): boolean {
   if (!isObject(after['sandbox']) || after[HOW_THE_ROUND_ENDED] !== undefined) return false
   if (text(after['sealedTip']) !== null || after['state'] === 'finished') return false
+  return thisWriteEndedTheRun(before, after)
+}
+
+/**
+ * Whether this write is a run's end, in or out of a sandbox: the run became crashed or orphaned, or the launcher first
+ * wrote `commandEnded`. The end commit of a run is read at the same end (./a-runs-own-commits.ts).
+ */
+export function thisWriteEndedTheRun(before: Record<string, unknown>, after: Record<string, unknown>): boolean {
   const becameAnEnd = !ENDS_WITHOUT_A_SEAL.has(String(before['state'])) && ENDS_WITHOUT_A_SEAL.has(String(after['state'])) &&
     !(after['state'] === 'crashed' && isObject(before['commandEnded']))
   const commandEndedNow = before['commandEnded'] === undefined && isObject(after['commandEnded'])
@@ -87,7 +98,8 @@ function theFolderItWasFiledIn(runId: string): string | null {
 
 /**
  * Reports this run filed (its session wrote their first revision) that are not linked about it, with what each is linked
- * to: the 25 written last, newest first, in the order written and not by their times in words.
+ * to: the 25 written last, newest first, in the order written and not by their times in words. Each also says whether an
+ * about link goes the other way, from the run to the report. That link does not make it a report about the run.
  */
 function theReportsItFiledElsewhere(runId: string, about: readonly string[]): TheFactsAtTheEnd['reportsElsewhere'] {
   const filed = sqlite
@@ -100,7 +112,8 @@ function theReportsItFiledElsewhere(runId: string, about: readonly string[]): Th
     .filter((one) => !about.includes(one.id))
     .map((one) => {
       const link = sqlite.prepare("SELECT to_id AS toId FROM links WHERE from_id = ? AND type = 'about' ORDER BY rowid LIMIT 1").get(one.id) as { toId: string } | undefined
-      return { report: one.id, linkedTo: link?.toId ?? null }
+      const fromTheRun = sqlite.prepare("SELECT 1 AS one FROM links WHERE from_id = ? AND to_id = ? AND type = 'about' LIMIT 1").get(runId, one.id) !== undefined
+      return { report: one.id, linkedTo: link?.toId ?? null, ...(fromTheRun ? { theRunLinksToIt: true as const } : {}) }
     })
 }
 
@@ -181,6 +194,9 @@ function queueTheUnsealedEnd(runId: string, seq: number, late: boolean): void {
 
 /** Read git on the existing seal thread, then write the account and its one line together. */
 async function completeTheUnsealedEnd(runId: string, seq: number, late: boolean): Promise<void> {
+  // THE DATABASE CLOSED BEFORE THIS STEP CAME: the account keeps its git-being-read reason, and
+  // finishTheRoundAccountsLeftAtAStop finishes it at the next start.
+  if (!sqlite.open) return
   const run = getRecord(runId)
   if (run === null || run.kind !== 'session') return
   try {
@@ -189,9 +205,14 @@ async function completeTheUnsealedEnd(runId: string, seq: number, late: boolean)
     const ask = theGitFactsAskOf(endedRun, undefined, false)
     let git: NonNullable<Parameters<typeof theFactsBeforeTheSealOf>[1]> = { couldNotRead: 'the run names no working directory' }
     let forkBase: string | null = null
+    // AND THE RUN'S END COMMIT, when no request read it at the end, on the same thread (./a-runs-own-commits.ts).
+    const endAsk = theEndToRead(run.data)
+    let endRead: TheHeadRead | null = null
+    if (endAsk !== null && ask === null) endRead = await theHeadReadOnTheThread(endAsk.directory)
     if (ask !== null) {
       const seals = [{ directory: ask.directory, prior: null, named: ask.cutFrom, area: [] }]
-      const read = await readTheFinishApart({ facts: [ask], seals })
+      const read = await readTheFinishApart({ facts: [ask], seals, ...(endAsk === null ? {} : { heads: [endAsk] }) })
+      if (endAsk !== null) endRead = theHeadIn(read, endAsk.directory)
       const facts = read.facts[0]?.read
       if (facts === undefined) throw new Error('The seal-read thread answered with no round-end facts.')
       if ('failed' in facts) throw new Error(facts.failed)
@@ -202,6 +223,10 @@ async function completeTheUnsealedEnd(runId: string, seq: number, late: boolean)
     sqlite.transaction(() => {
       const latest = getRecord(runId)
       if (latest === null || latest.kind !== 'session') return
+      // Kept only when no other run was filed in the directory first (`theEndHeadToStore`).
+      if (endAsk !== null && endRead !== null && theEndToRead(latest.data) !== null) {
+        writeTheEndHead(runId, theEndHeadToStore(runId, endAsk.directory, endRead), theAccountIsWrittenBy())
+      }
       const pending = readHowTheRoundEnded(latest.data[HOW_THE_ROUND_ENDED])
       if (pending === null || pending.sealed || !pending.reasons.some((reason) => reason.why === 'git-being-read') ||
           text(latest.data['sealedTip']) !== null || latest.data['state'] === 'finished') return
@@ -352,7 +377,7 @@ export function theCheckOfASealedRound(run: PanelRecord): TheSealedRoundsCheck |
   if (message !== null && starter !== null && said.says === 'not-for-a-check') {
     return { case: 'not-for-a-check', hold: false, message: message.id, starter, says: theRoundNotForACheckSays(run.id, message.id, said.line) }
   }
-  if (aCheckOfHandedBackPackages(thePackagesThisRunHandedBack(run.id, run.workspaceId))) return { case: 'a-package', hold: false, message: message?.id ?? null, starter }
+  if (inspectorAnswersRun(run.id, run.workspaceId) || aCheckOfHandedBackPackages(thePackagesThisRunHandedBack(run.id, run.workspaceId))) return { case: 'a-package', hold: false, message: message?.id ?? null, starter }
   if (said.says === 'feature-ready') return { case: 'feature-ready', hold: false, message: message?.id ?? null, starter }
   if (itWasStartedAsARepair(run.id, run.workspaceId)) return { case: 'a-repair', hold: false, message: message?.id ?? null, starter }
   return { case: 'none', hold: true, message: message?.id ?? null, starter, says: theHoldOfARoundWithNoCaseSays(starter !== null) }
@@ -366,16 +391,17 @@ export function recordHowASealedRoundEnded(
   run: PanelRecord,
   check: TheSealedRoundsCheck,
   asked: boolean,
+  checksOff = false,
 ): { kept: true; howTheRoundEnded: HowTheRoundEnded; line?: string } | { kept: false; because: string } {
   try {
     return sqlite.transaction(() => {
       const sealedTip = text(run.data['sealedTip']) ?? 'unknown'
       const workerNote = workerRoundStanding(run.data, 'inspecting')
       let line: string | undefined
-      const agent = check.hold ? theAgentOfARunForItsSeal(run) : null
+      const agent = check.hold && !checksOff ? theAgentOfARunForItsSeal(run) : null
       const told = agent === null ? null : whoIsToldOfTheRun(agent)
       const owner = told !== null && 'to' in told ? told.to : null
-      if (check.hold && owner !== null) {
+      if (check.hold && owner !== null && whyAWorkersSupervisorIsNotTold(run, owner) === null) {
         const said =
           `Run ${run.id} ("${run.title}") was sealed, and its check is held. ${check.says} ${check.message === null ? 'If' : 'Read the message; if'} the round is ` +
           `done, release the check with POST /api/records/${run.id}/release-the-held-check {"because":"<why>"}. If it is not, ` +
@@ -386,8 +412,10 @@ export function recordHowASealedRoundEnded(
         sealed: true,
         at: nowStamp(),
         sealedTip,
-        theCheck: check.hold ? 'held' : check.case === 'not-for-a-check' || workerNote !== null ? 'not asked' : asked ? 'asked' : 'not asked',
-        says: check.hold || check.case === 'not-for-a-check'
+        theCheck: checksOff ? 'not asked' : check.hold ? 'held' : check.case === 'not-for-a-check' || workerNote !== null ? 'not asked' : asked ? 'asked' : 'not asked',
+        says: checksOff && check.case !== 'not-for-a-check'
+          ? sayInEnglish('chk.says.checksOffNeedsNoCheck')
+          : check.hold || check.case === 'not-for-a-check'
           ? check.says
           : workerNote !== null
             ? workerNote.sentence

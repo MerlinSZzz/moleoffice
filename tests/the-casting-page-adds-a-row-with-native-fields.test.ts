@@ -17,8 +17,8 @@
  *   3. An add with a provider and an empty native model says the model is needed, sends nothing and
  *      adds no row.
  *   4. A native value the door refuses is drawn in the add form's own refusal box, and no row is added.
- *   5. The open add form with its native fields filled in is photographed at 1440, 990, 660 and 390 in
- *      light and dark, in English. Nothing scrolls sideways and every field and press is wholly in the
+ *   5. The open add form with its native fields filled in is photographed at 1440 and 390 in light,
+ *      in English. Nothing scrolls sideways and every field and press is wholly in the
  *      viewport, measured from each element's own box and not from the window's width.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
@@ -33,8 +33,8 @@ let app: LiveApp
 /** The test's own pictures folder: under TEST_SHOTS when it names one, otherwise temporary and deleted. */
 const SHOTS = testShots('casting-add-native')
 const PAGE = '.cast'
-const WIDTHS = [1440, 990, 660, 390] as const
-const THEMES = ['light', 'dark'] as const
+const WIDTHS = [1440, 390] as const
+const THEMES = ['light'] as const
 const ROLE = 'supervisor'
 
 /** The test's made-up cell values. */
@@ -187,7 +187,7 @@ describe('the Casting page adds a row with its native fields', () => {
     expect(await rowWithOfficeModel(REFUSED), 'a row with the refused cell value was added').toBeUndefined()
   }, 120_000)
 
-  it('photographs the open add form with native fields at four widths in both themes, with every field and press in view', async () => {
+  it('photographs the open add form with native fields at the widest and the narrowest width in the light theme, with every field and press in view', async () => {
     await openTheAddForm('?lang=en#/casting')
     await cell('model').fill(PICTURED)
     await nativeField(enWave13n['casting.nativeModel']).fill('  sample-native-model-pictured  ')

@@ -88,7 +88,9 @@ const proposal: AResidencyProposal = {
   proposedAt: stamp,
   because: 'Test reason, written by the secretary.',
   facts: { measuredAt: stamp, citizenSince: null, daysSinceCitizen: null, daysWithARun: 31, runs: 40, recordsWritten: 96, retired: false, homeWorld: null },
+  homeWorldIsThisOffice: null,
   area: null,
+  sleepTime: { startsAt: '03:00', minutes: 120 },
   criterion: {
     days: { needed: 3, have: 31, part: 'met' },
     compactions: { needed: 5, have: null, part: 'not-measured' },
@@ -208,6 +210,7 @@ const reading: OneResidentReading = {
     decisionId: 'test-decision',
     confirmedBy: { kind: 'person', id: 'test-owner' },
     factsAtProposal: proposal.facts,
+    homeWorldIsThisOffice: null,
     retired: false,
     retiredAt: null,
     successor: null,

@@ -15,8 +15,9 @@
  *      hold is taken on one agent's handle, the list drops that agent and the count says one, with
  *      the panel left open and the page not loaded again. When the hold is let go, the agent is back
  *      and the count says two. Nothing reads the list again in five quiet seconds before the hold.
- *   2. In the chat, the New agent chooser does the same for the other agent, with the chooser left
- *      open.
+ *   2. In the chat, the New agent press opens the new agent dialog, and the dialog draws no list of
+ *      agents nothing is answering as. The right-click panel is the one place that list is drawn, so
+ *      case 1 is the one that reads it following the answering.
  *
  * Taking and letting go of a hold announce `answering.changed` (src/server/lib/handles.ts), and that
  * event is the only thing that can make an open list read again. The page's clock is not moved.
@@ -30,7 +31,7 @@
  * being listed. MUTATION 2, the list also read every second on a timer: case 1 red, because the reads
  * never stop long enough for the quiet seconds to begin. RESTORE: both cases green.
  *
- * PICTURES, when CANNOT_REACH_LIST_SHOTS names a folder: the chat with the New agent chooser open,
+ * PICTURES, when CANNOT_REACH_LIST_SHOTS names a folder: the right-click panel with its list open,
  * before and after one agent answers again, at 1440, 990, 660 and 390, light and dark, in English.
  */
 
@@ -176,12 +177,14 @@ async function openTheContacts(): Promise<void> {
   await app.page.waitForSelector('.px-chat-contact', { timeout: 30_000 })
 }
 
-/** Open the New agent chooser, unless it is open already. */
-async function openTheChooser(): Promise<void> {
-  if ((await app.page.$('.px-chat-new-agent-ask')) !== null) return
-  await openTheContacts()
-  await app.page.click('.px-chat-top-group[data-side="agent"] .px-chat-top-heading .px-chat-new-agent')
-  await app.page.waitForSelector('.px-chat-new-agent-ask', { timeout: 20_000 })
+/** Open the right-click panel's list of agents nothing is answering as, unless it is open already. */
+async function openThePanelsList(): Promise<void> {
+  if ((await app.page.$('.px-talk-more .px-start-agent-here-name')) !== null) return
+  await app.page.click('body', { button: 'right' })
+  await app.page.click('.px-talk-more-btn')
+  await app.page.waitForSelector('.px-talk-more-line', { timeout: 20_000 })
+  await app.page.click('.px-talk-more-line')
+  await app.page.waitForSelector('.px-talk-more .px-start-agent-here-name', { timeout: 20_000 })
 }
 
 beforeAll(async () => {
@@ -253,30 +256,22 @@ describe('problem KH2cuddacYXJ: the list follows the answering while it is open'
     await app.page.waitForFunction(() => document.querySelector('.px-talk') === null, undefined, { timeout: 30_000 })
   }, 180_000)
 
-  it('2: the chat\'s New agent chooser does the same, while it stays open', async () => {
+  it('2: the chat\'s New agent press opens the new agent dialog, which draws no list of agents to follow', async () => {
     await app.page.goto(`${app.site}/#/`, { timeout: 60_000 })
     await waitForThePage(app.page, 60_000)
-    await openTheChooser()
-    await theListNames('.px-chat-new-agent-ask', [PLOVER, TERN], 'the chooser did not open on both agents')
+    await openTheContacts()
+    await app.page.click('.px-chat-top-group[data-side="agent"] .px-chat-top-heading .px-chat-new-agent')
+    await app.page.waitForSelector('.px-new-agent-dialog', { timeout: 20_000 })
+    expect(await app.page.locator('.px-new-agent-dialog .px-start-agent-here-name').count(), 'the dialog drew a list of agents nothing answers as').toBe(0)
+    expect(await app.page.locator('.px-chat-new-agent-ask').count(), 'the old chooser was drawn beside the dialog').toBe(0)
 
-    const session = await itAnswersAgain(TERN)
-    let letGo = false
-    try {
-      await theListNames('.px-chat-new-agent-ask', [PLOVER], 'the open chooser still lists an agent that answers again')
-      letGo = true
-      await itStopsAnswering(TERN, session)
-      await theListNames('.px-chat-new-agent-ask', [PLOVER, TERN], 'the open chooser did not take back an agent that stopped answering')
-    } finally {
-      if (!letGo) await itStopsAnswering(TERN, session)
-    }
-
-    await app.page.click('.px-chat-new-agent-close')
-    await app.page.waitForFunction(() => document.querySelector('.px-chat-new-agent-ask') === null, undefined, { timeout: 20_000 })
+    await app.page.click('.px-new-agent-dialog-cancel')
+    await app.page.waitForFunction(() => document.querySelector('.px-new-agent-dialog') === null, undefined, { timeout: 20_000 })
   }, 180_000)
 })
 
 describe('pictures', () => {
-  it.skipIf(!process.env['CANNOT_REACH_LIST_SHOTS'])('photographs the chooser before and after an agent answers again', async () => {
+  it.skipIf(!process.env['CANNOT_REACH_LIST_SHOTS'])('photographs the right-click panel\'s list before and after an agent answers again', async () => {
     const shots = process.env['CANNOT_REACH_LIST_SHOTS'] as string
     mkdirSync(shots, { recursive: true })
     const widths = [1440, 990, 660, 390]
@@ -289,21 +284,22 @@ describe('pictures', () => {
       await waitForThePage(app.page, 60_000)
       for (const width of widths) {
         await app.page.setViewportSize({ width, height: 1000 })
-        await openTheChooser()
-        await theListNames('.px-chat-new-agent-ask', [PLOVER, TERN], `the ${theme} chooser at ${String(width)} did not list both`)
+        await openThePanelsList()
+        await theListNames('.px-talk-more', [PLOVER, TERN], `the ${theme} panel at ${String(width)} did not list both`)
         await app.page.waitForTimeout(400)
         await app.page.screenshot({ path: join(shots, `cannot-reach-list-${String(width)}-${theme}-before.png`) })
       }
       const session = await itAnswersAgain(PLOVER)
       for (const width of widths) {
         await app.page.setViewportSize({ width, height: 1000 })
-        await openTheChooser()
-        await theListNames('.px-chat-new-agent-ask', [TERN], `the ${theme} chooser at ${String(width)} still listed the agent that answers`)
+        await openThePanelsList()
+        await theListNames('.px-talk-more', [TERN], `the ${theme} panel at ${String(width)} still listed the agent that answers`)
         await app.page.waitForTimeout(400)
         await app.page.screenshot({ path: join(shots, `cannot-reach-list-${String(width)}-${theme}-after.png`) })
       }
       await itStopsAnswering(PLOVER, session)
-      await theListNames('.px-chat-new-agent-ask', [PLOVER, TERN], `the ${theme} chooser did not take the agent back`)
+      await theListNames('.px-talk-more', [PLOVER, TERN], `the ${theme} panel did not take the agent back`)
+      await app.page.keyboard.press('Escape')
     }
   }, 600_000)
 })

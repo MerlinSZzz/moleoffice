@@ -70,6 +70,7 @@ import {
 } from '@shared/worlds.ts'
 import type { ParticipantRef } from '@shared/participants.ts'
 import { PanelError } from './panel-error.ts'
+import { theOriginsOfThisOfficesPages } from './a-host-that-is-not-this-office.ts'
 import { worldKindWord } from '@shared/words.ts'
 import { theWorldThisDatabaseIs } from './world.ts'
 // The visits the mirror carries. The import goes this way because lib/visits.ts asks this file where
@@ -481,9 +482,9 @@ export function theReportsKeyRowOf(worldId: string): string | null {
  * that rule until C3 gave a world a death: the row is now closed on the way down, so the next start
  * found no live row, inserted a fresh one, and wrote the default name over the person's.
  *
- * Measured twice by the citizens verifier. `JBcKyo5VWOF0` was renamed `jamies world`, the server was
+ * Measured twice by the citizens verifier. `JBcKyo5VWOF0` was renamed `wrens world`, the server was
  * stopped and started, and at 17:44:19 that row closed and `9E6lZ4BtIysA` was born called
- * `my world`. Under `npm run dev`: `f77hILd0hxIt` renamed `jamies own world`, the stack stopped by
+ * `my world`. Under `npm run dev`: `f77hILd0hxIt` renamed `wrens own world`, the stack stopped by
  * its group and started again, and `WNaVOUWOeoee` was born called `my world`. Problem
  * `RRC8NNCUl0jo`.
  *
@@ -780,12 +781,27 @@ export function writeTheMirror(): void {
     writtenBy: databaseIdentityOfThisOffice(),
     worlds: worldsHere(),
     visits: openVisitsHere(),
+    pageOrigins: theOriginsOfThisOfficesPages(),
   }
   const path = mirrorBesideThisDatabase()
   mkdirSync(dirname(path), { recursive: true })
   const beside = `${path}.writing`
   writeFileSync(beside, `${JSON.stringify(mirror, null, 2)}\n`, 'utf8')
   renameSync(beside, path)
+  thePageOriginsLastWritten = JSON.stringify(mirror.pageOrigins)
+}
+
+/** The list of the office's pages in the last mirror this process wrote, as JSON, or undefined before it wrote one. */
+let thePageOriginsLastWritten: string | undefined
+
+/**
+ * WRITE THE MIRROR AGAIN WHEN THE LIST OF THE OFFICE'S PAGES HAS CHANGED since this process last wrote it. `start()` in
+ * src/server/index.ts calls it after each read of this machine's tailnet name, so a new name reaches the office's
+ * worlds within 5 minutes, and an unchanged list writes nothing.
+ */
+export function writeTheMirrorWhenThePagesChanged(): void {
+  if (JSON.stringify(theOriginsOfThisOfficesPages()) === thePageOriginsLastWritten) return
+  writeTheMirror()
 }
 
 /**
@@ -805,6 +821,10 @@ export function readTheMirror(path: string | null): Mirror | null {
       writtenBy: typeof said.writtenBy === 'string' ? said.writtenBy : '',
       worlds: said.worlds as World[],
       visits: said.visits as Visit[],
+      // A MIRROR WITHOUT THE LIST IS READ AS NO LIST: an older office's, or one written before the office knew its
+      // listeners. A list that holds anything but text is no list either.
+      pageOrigins:
+        Array.isArray(said.pageOrigins) && said.pageOrigins.every((one) => typeof one === 'string') ? said.pageOrigins : null,
     }
   } catch {
     // Catching to the letter of invariant 4: what is handled here is "this file is not a mirror this

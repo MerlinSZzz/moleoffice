@@ -51,7 +51,8 @@ import { withoutInheritedEffort } from './without-inherited-effort.ts'
  */
 import { THE_TEST_FIXTURE_ROOT } from './a-page-of-a-test-office.ts'
 import { spawn } from 'node:child_process'
-import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -616,6 +617,127 @@ describe('Stop holds a supervisor and lets a worker go', () => {
     expect(again.stdout).toBe('')
     expect(parsed(await runHook(STOP, 'hook-sup-msg', { cwd }))?.['decision']).toBe('block')
     expect((await runHook(STOP, 'hook-sup-msg', { cwd })).stdout).toBe('')
+  })
+
+  it('lets a finished supervisor stop with an old unseen backlog, leaving it unseen', async () => {
+    const handle = 'hook-sup-old'
+    await started(handle, 'supervisor')
+    await clearInbox(handle)
+    const over = await aRunThatIsOver(handle)
+    const old = await writeTo(handle, 'an older message')
+    // sentAt is derived from the message record's created_at in the test office.
+    expect(t.client.sqlite.prepare('UPDATE records SET created_at = ? WHERE id = ?').run('2000-01-01 00:00:00', old).changes).toBe(1)
+    const markBefore = await theMark(old, handle)
+    const ran = await runHook(STOP, handle, { session: over, cwd: aScratchDirectory('old-backlog') })
+    expect(ran.status, ran.stderr).toBe(0)
+    expect(ran.stderr).toBe('')
+    expect(ran.stdout).toBe('')
+    expect(await unseenIdsFor(handle)).toContain(old)
+    expect(await theMark(old, handle)).toBe(markBefore)
+  })
+
+  it('holds for a new message without naming the old backlog in the reason or fingerprint', async () => {
+    const handle = 'hook-sup-new'
+    await started(handle, 'supervisor')
+    await clearInbox(handle)
+    const over = await aRunThatIsOver(handle)
+    const old = await writeTo(handle, 'an older message')
+    expect(t.client.sqlite.prepare('UPDATE records SET created_at = ? WHERE id = ?').run('2000-01-01 00:00:00', old).changes).toBe(1)
+    const current = await writeTo(handle, 'a new message')
+    const markBefore = await theMark(old, handle)
+    const cwd = aScratchDirectory('new-message')
+    const ran = await runHook(STOP, handle, { session: over, cwd })
+    expect(ran.status, ran.stderr).toBe(0)
+    expect(parsed(ran)?.['decision']).toBe('block')
+    const reason = String(parsed(ran)?.['reason'] ?? '')
+    expect(reason).toContain(current)
+    expect(reason).not.toContain(old)
+    const state = JSON.parse(readFileSync(join(cwd, '.logs', 'dsh-hooks-stop.json'), 'utf8')) as { fingerprint: string }
+    expect(state.fingerprint).toBe(`messages:${current}`)
+    expect(await unseenIdsFor(handle)).toEqual(expect.arrayContaining([old, current]))
+    expect(await theMark(current, handle)).toBe('delivered')
+    expect(await theMark(old, handle)).toBe(markBefore)
+  })
+
+  it('holds every unseen message and says when the run start cannot be read', async () => {
+    const handle = 'hook-sup-no-start'
+    await started(handle, 'supervisor')
+    await clearInbox(handle)
+    const over = await aRunThatIsOver(handle)
+    const old = await writeTo(handle, 'an older message')
+    expect(t.client.sqlite.prepare('UPDATE records SET created_at = ? WHERE id = ?').run('2000-01-01 00:00:00', old).changes).toBe(1)
+    const current = await writeTo(handle, 'a new message')
+    const server = createServer((req, res) => {
+      void (async () => {
+        if (req.url === `/api/records/${over}`) {
+          res.writeHead(403, { 'content-type': 'application/json' })
+          res.end(JSON.stringify({ error: 'The run record cannot be read.' }))
+          return
+        }
+        const chunks: Buffer[] = []
+        for await (const chunk of req) chunks.push(chunk as Buffer)
+        const headers: Record<string, string> = {}
+        for (const [name, value] of Object.entries(req.headers)) {
+          if (typeof value === 'string' && (name.startsWith('x-mole-office-') || name === 'content-type')) headers[name] = value
+        }
+        const answer = await fetch(`${api}${req.url ?? ''}`, { method: req.method ?? 'GET', headers, ...(chunks.length === 0 ? {} : { body: Buffer.concat(chunks) }) })
+        res.writeHead(answer.status, { 'content-type': answer.headers.get('content-type') ?? 'application/json' })
+        res.end(Buffer.from(await answer.arrayBuffer()))
+      })()
+    })
+    await new Promise<void>((listening) => server.listen(0, '127.0.0.1', listening))
+    try {
+      const refusing = `http://127.0.0.1:${String((server.address() as AddressInfo).port)}`
+      const ran = await runHook(STOP, handle, { session: over, cwd: aScratchDirectory('no-start'), api: refusing })
+      expect(ran.status, ran.stderr).toBe(0)
+      expect(parsed(ran)?.['decision']).toBe('block')
+      const reason = String(parsed(ran)?.['reason'] ?? '')
+      expect(reason).toContain(old)
+      expect(reason).toContain(current)
+      expect(reason).toContain("the run's start could not be read")
+    } finally {
+      await new Promise<void>((closed) => server.close(() => closed()))
+    }
+  })
+
+  it('holds and says so when a message that holds cannot be marked delivered', async () => {
+    const handle = 'hook-sup-mark-refused'
+    await started(handle, 'supervisor')
+    await clearInbox(handle)
+    const over = await aRunThatIsOver(handle)
+    const current = await writeTo(handle, 'a new message')
+    const server = createServer((req, res) => {
+      void (async () => {
+        if (req.method === 'POST' && req.url === `/api/messages/${current}/mark`) {
+          res.writeHead(403, { 'content-type': 'application/json' })
+          res.end(JSON.stringify({ error: 'The mark was refused.' }))
+          return
+        }
+        const chunks: Buffer[] = []
+        for await (const chunk of req) chunks.push(chunk as Buffer)
+        const headers: Record<string, string> = {}
+        for (const [name, value] of Object.entries(req.headers)) {
+          if (typeof value === 'string' && (name.startsWith('x-mole-office-') || name === 'content-type')) headers[name] = value
+        }
+        const answer = await fetch(`${api}${req.url ?? ''}`, { method: req.method ?? 'GET', headers, ...(chunks.length === 0 ? {} : { body: Buffer.concat(chunks) }) })
+        res.writeHead(answer.status, { 'content-type': answer.headers.get('content-type') ?? 'application/json' })
+        res.end(Buffer.from(await answer.arrayBuffer()))
+      })()
+    })
+    await new Promise<void>((listening) => server.listen(0, '127.0.0.1', listening))
+    try {
+      const refusing = `http://127.0.0.1:${String((server.address() as AddressInfo).port)}`
+      const ran = await runHook(STOP, handle, { session: over, cwd: aScratchDirectory('mark-refused'), api: refusing })
+      expect(ran.status, ran.stderr).toBe(0)
+      expect(parsed(ran)?.['decision']).toBe('block')
+      const reason = String(parsed(ran)?.['reason'] ?? '')
+      expect(reason).toContain(current)
+      expect(reason).toContain('could not be marked delivered')
+      expect(reason).toContain('The mark was refused.')
+      expect(await theMark(current, handle)).toBe('queued')
+    } finally {
+      await new Promise<void>((closed) => server.close(() => closed()))
+    }
   })
 
   it('holds a supervisor while a worker it started has a run in state running, and names the worker', async () => {

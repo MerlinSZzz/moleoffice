@@ -95,7 +95,7 @@ import { readHowTheRoundEnded } from '../src/shared/how-the-round-ended.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { clockStamp, parseAnyStamp } from '../src/shared/time.ts'
 import type { PanelRecord } from '../src/shared/types.ts'
-import { aLabelFor, EVERY_CHAPTER } from './a-run-in-form.ts'
+import { aLabelFor, EVERY_CHAPTER, thePageOf } from './a-run-in-form.ts'
 import { apiApp, freshDb, type TestDb } from './helpers.ts'
 
 const A_MADE_UP_OFFICE_KEY = randomBytes(32).toString('hex')
@@ -145,14 +145,14 @@ async function aRun(options: { sandbox: boolean }): Promise<ARun> {
 let reportsFiled = 0
 
 /**
- * The run files a report linked about itself, as an agent does before its command ends. It is in form, so no fault of
- * form refuses the run's seal: complete, with a title of its own and its label.
+ * The run files a report linked about itself and about a page, as an agent does before its command ends. It is in form,
+ * so no fault of form refuses the run's seal: complete, with a title of its own and its label.
  */
 async function itsReport(run: ARun): Promise<string> {
   reportsFiled += 1
   const report = await app.inject({
     method: 'POST', url: '/api/records', headers: asTheRun(run.id, run.key),
-    payload: { kind: 'report', title: `Synthetic report number ${String(reportsFiled)} of a launched round`, links: [{ type: 'about', toId: run.id }],
+    payload: { kind: 'report', title: `Synthetic report number ${String(reportsFiled)} of a launched round`, links: [{ type: 'about', toId: run.id }, { type: 'about', toId: thePageOf(t) }],
       data: { for: 'The starter of the made-up round', date: '2026-10-18', chaptersRead: EVERY_CHAPTER, blocks: [{ id: 'b1', type: 'text', text: 'A made-up report.' }] } },
   })
   expect(report.statusCode, report.body.slice(0, 400)).toBe(201)

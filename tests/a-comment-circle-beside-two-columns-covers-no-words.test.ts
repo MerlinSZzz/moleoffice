@@ -22,23 +22,25 @@
  *
  * WHAT IS MEASURED, in a browser on a test office of this file's own (liveApp). A session nobody started registers
  * itself, so Home's second column draws a note under its agents. An agent the person started asks for a card, which
- * sends the person a message about the ask, so the ask's row on Home carries a circle. The person comments on the
- * cause of a problem, and on the Decisions page's panel of what is asked of them. At each of 1440, 990, 660 and 390
- * wide, in the light and the dark look:
- *   1 to 4. on Home, in English and in Chinese, at least one circle is drawn, no circle covers any of the page's
- *      words, no circle stands in the gap between two columns set side by side, every circle is inside the window,
- *      and the page is no wider than the window;
- *   5 to 8. on the problem's page, in English, the same;
- *   9 to 12. on the Decisions page, in English, the same.
+ * sends the person a message about the ask, so the ask's row on Home carries a circle. The person reads that message,
+ * so the two asks are the only rows under Needs you, and Home draws both. The person comments on the
+ * cause of a problem, and on the Decisions page's panel of what is asked of them. At 1440 and at 390 wide, the widest
+ * and the narrowest, in the light look:
+ *   1 and 2. on Home, in English and in Chinese, the ask's row is drawn, at least one circle is drawn, no circle covers
+ *      any of the page's words, no circle stands in the gap between two columns set side by side, every circle is
+ *      inside the window, and the page is no wider than the window;
+ *   5 and 6. on the problem's page, in English, the same;
+ *   9 and 10. on the Decisions page, in English, the same.
  * Words under a circle are the harm a person meets, but whether a circle lands on them depends on which row it marks
- * and where the other column's lines fall. Home's rows here do not always come in the same order: before the change,
- * one run put the ask's row first and its circle covered the start of "Agents at work", and another put it third, level
- * with no words. The gap does not depend on that, so a circle drawn there is a fault whatever the other column says.
+ * and where the other column's lines fall. Home's two rows here do not always come in the same order: before the
+ * change, one run put the ask's row first and its circle covered the start of "Agents at work". While the message about
+ * the ask was a third row, some runs put the ask's row third, where Home draws no row, and no circle was drawn at all.
+ * The gap does not depend on the order, so a circle drawn there is a fault whatever the other column says.
  * A picture of each is kept in the folder TEST_SHOTS names.
  *
  * MUTATIONS, after a control run, in src/web/components/agent/CommentCircle.tsx:
  *   the room is measured to the page's right edge again. Cases 1, 5 and 9 go red;
- *   a first column with no box counts as beside the second. Cases 10, 11 and 12 go red.
+ *   a first column with no box counts as beside the second. Case 10 goes red.
  */
 
 import { join } from 'node:path'
@@ -52,6 +54,8 @@ import { testShots } from './where-shots-go.ts'
 
 let app: LiveApp
 let problem = ''
+/** The target of the ask's row on Home, the row the message about the ask is a comment on. */
+let theAsksRow = ''
 
 const shots = testShots('a-comment-circle-beside-two-columns')
 
@@ -81,6 +85,22 @@ async function open(path: string, query: string): Promise<void> {
   await expect
     .poll(async () => app.page.evaluate(() => document.documentElement.getAttribute('data-comment-circles')), { timeout: 30_000, message: 'the circles were never placed' })
     .toBe('placed')
+}
+
+/**
+ * Waits for Home to draw the ask's row, the row the message about the ask is a comment on, and then for the circles to
+ * be placed again. False when the row is not drawn within 30 seconds.
+ */
+async function theAsksRowIsDrawn(): Promise<boolean> {
+  try {
+    await app.page.locator(`[data-target="${theAsksRow}"]`).first().waitFor({ state: 'attached', timeout: 30_000 })
+  } catch {
+    return false
+  }
+  await expect
+    .poll(async () => app.page.evaluate(() => document.documentElement.getAttribute('data-comment-circles')), { timeout: 30_000, message: 'the circles were never placed' })
+    .toBe('placed')
+  return true
 }
 
 /**
@@ -149,7 +169,13 @@ beforeAll(async () => {
   // AN AGENT THE PERSON STARTED ASKS THE PERSON FOR A CARD, and the person is sent a message about the ask. Its key is
   // not kept: it is never needed here.
   await post('/api/agents/started', { ...AS_THE_PERSON, ...thePersonsKeyHeader(join(app.dir, 'keys.json')) }, { handle: 'asks-for-a-card', name: 'Asks for a card', role: 'worker', workArea: ['work'] })
-  await post('/api/roles/requests', asAgent('asks-for-a-card'), { asking: 'supervisor', because: 'Test: to lead a wave' })
+  const asked = await post('/api/roles/requests', asAgent('asks-for-a-card'), { asking: 'supervisor', because: 'Test: to lead a wave' })
+  theAsksRow = `record/${String(asked['request'])}/default`
+  // THE PERSON READS THE MESSAGE ABOUT THE ASK, so it is not a third row under Needs you. Home draws two rows, in an order
+  // the second each was written in and their ids decide. With the message as a third row, the ask's row came third in
+  // some runs, Home drew no row for the circle to mark, and no circle was drawn. A message the person has read is still
+  // a comment on the ask, so its circle is still drawn.
+  await post(`/api/messages/${String(asked['message'])}/mark`, { ...AS_THE_PERSON, ...thePersonsKeyHeader(join(app.dir, 'keys.json')) }, { mark: 'seen' })
   // A PROBLEM, AND THE PERSON'S COMMENT ON ITS CAUSE, which its page draws in the first column.
   const made = await post('/api/records', AS_THE_PERSON, {
     kind: 'problem',
@@ -187,7 +213,7 @@ afterAll(async () => {
   await app?.stop()
 }, 60_000)
 
-const WIDTHS = [1440, 990, 660, 390] as const
+const WIDTHS = [1440, 390] as const
 
 describe('a comment circle on a page of two columns', () => {
   for (const [first, name, picture, path, languages] of [
@@ -196,15 +222,16 @@ describe('a comment circle on a page of two columns', () => {
     [9, 'the Decisions page', 'decisions', () => governancePath(), ['en']],
   ] as const) {
     WIDTHS.forEach((width, n) => {
-      // MUTATIONS: red at 1440 on each page; red at 990, 660 and 390 on the Decisions page.
-      it(`${String(first + n)}. on ${name} at ${String(width)}, in both looks, no circle covers words`, async () => {
+      // MUTATIONS: red at 1440 on each page; red at 390 on the Decisions page.
+      it(`${String(first + n)}. on ${name} at ${String(width)}, in the light look, no circle covers words`, async () => {
         const faults: string[] = []
-        for (const look of ['light', 'dark'] as const) {
+        for (const look of ['light'] as const) {
           await app.page.setViewportSize({ width, height: 1000 })
           await app.page.emulateMedia({ colorScheme: look })
           for (const lang of languages) {
             await open(path(), `?lang=${lang}&look=${look}`)
             const at = `${lang} in the ${look} look`
+            if (first === 1 && !(await theAsksRowIsDrawn())) faults.push(`${at}: the ask's row, which the circle marks, is not drawn`)
             const read = await whatTheCirclesCover()
             if (read.circles === 0) faults.push(`${at}: no circle is drawn`)
             for (const one of read.covered) faults.push(`${at}: ${one}`)

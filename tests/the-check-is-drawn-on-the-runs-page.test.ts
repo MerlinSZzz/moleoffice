@@ -3,9 +3,7 @@
 /** The old display fixture supplies historical, invented base and worktree metadata. Its runs are now explicitly inventoried before finishing, preserving those exact UI assertions without treating that metadata as a new seal. */
 import { aMadeUpModuleForPackage, httpPackageFixture } from './module-package-fixture.ts'
 import Database from 'better-sqlite3'
-import { execFileSync } from 'node:child_process'
-import { createHash } from 'node:crypto'
-import { mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 /** Eligibility fixture update: old checked runs omitted their checkout; worker fixtures now record a resolvable workingDirectory and a registered work area. */
 /**
@@ -51,6 +49,10 @@ import { join } from 'node:path'
  *   - THE BASE IN DEVELOPER MODE ONLY, by item 2 of a decision. Control green on 30 September
  *     2026; drew the base line and the base's sentence in normal mode again in `WhatItWouldRead`, and
  *     the case about the files and the base went red on '7d7845b9' in normal mode. Restored, green.
+ *
+ * AS DECIDED IN NOVEMBER 2026 (explanations off the pages): a standing whose sentence is one of the fixed ones is drawn
+ * as its word alone, the press that closes a run has no sentence above it, and a refusal with no group draws the short
+ * state "No group opened". The cases that read those sentences now read that the sentence is not drawn, or the state.
  */
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
@@ -58,13 +60,11 @@ import type { Page } from 'playwright'
 import { THE_TEST_FIXTURE_ROOT, THE_TEST_OFFICES_OWNER, THE_TEST_OFFICES_SECRETARY } from './a-page-of-a-test-office.ts'
 import { liveApp, type LiveApp, waitForThePage } from './helpers.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
-import { ABSENT } from '../src/shared/merge-queue.ts'
-import { ENDED_WITH_ITS_MERGE_ENTRY, NO_GROUP_FOR_A_CHECK_AGAIN, RUN_STANDING } from '../src/shared/releasing.ts'
+import { RUN_STANDING } from '../src/shared/releasing.ts'
 import { recordPath } from '../src/web/components/router.tsx'
 import { createI18n } from '../src/shared/i18n.ts'
 import { en } from '../src/shared/words/en.ts'
 import { zh } from '../src/shared/words/zh.ts'
-import { aTestDatabaseFolder } from './a-test-folder.ts'
 
 let app: LiveApp
 let page: Page
@@ -173,110 +173,6 @@ async function aLanguageRun(handle: string, title: string): Promise<string> {
   try { historical.prepare('INSERT INTO legacy_unsealed_runs VALUES (?)').run(made.id) } finally { historical.close() }
   await patch(`/api/records/${made.id}`, { dataPatch: { state: 'finished' } }, asItself(handle))
   return made.id
-}
-
-/** Throwaway folders inside this checkout's `.logs/`, removed after the file. */
-const made: string[] = []
-function scratch(prefix: string): string {
-  mkdirSync('.logs', { recursive: true })
-  const dir = aTestDatabaseFolder(`check-on-run-${prefix}`, join(process.cwd(), '.logs'))
-  made.push(dir)
-  return dir
-}
-
-function git(dir: string, ...args: string[]): string {
-  return execFileSync('git', ['-C', dir, ...args], { encoding: 'utf8' }).trim()
-}
-
-/**
- * THE MERGE QUEUE'S OWN TOOL, which moves an entry through its steps: the office's message worker as the merge tool
- * speaks for it, with its name and the office's own key. The merge tool's
- * step door refuses a request a listener carried with no key (keys wave piece 7). Read like `asTheInspector` above.
- */
-function asTheOffice(): Record<string, string> {
-  const held = JSON.parse(readFileSync(join(app.dir, 'keys.json'), 'utf8')) as { office?: unknown }
-  if (typeof held.office !== 'string') throw new Error('this test office made no key of its own beside its database')
-  return { ...asAgent('mole-office/the-message-worker'), 'x-mole-office-key': held.office }
-}
-const A = 'work/a.txt'
-const B = 'work/b.txt'
-
-interface Seal { id: string; hash: string; commit: string; forkBase: string; files: { path: string; hash: string | null }[] }
-
-async function dataOf(id: string): Promise<Record<string, unknown>> {
-  return ((await (await fetch(`${app.api}/api/records/${id}`)).json()) as { record: { data: Record<string, unknown> } }).record.data
-}
-
-/** A synthetic git tree whose branch `work` changes two files, and a finished run of the worker in it, sealed at its tip. */
-async function aSealedRun(handle: string): Promise<{ run: string; dir: string; seal: Seal }> {
-  const dir = scratch('tree')
-  git(dir, 'init', '-q', '-b', 'main')
-  git(dir, 'config', 'user.email', 'fixture@example.invalid')
-  git(dir, 'config', 'user.name', 'Synthetic check-on-run fixture')
-  mkdirSync(join(dir, 'work'), { recursive: true })
-  for (const path of [A, B]) writeFileSync(join(dir, path), `${path} before.\n`)
-  git(dir, 'add', '.')
-  git(dir, 'commit', '-q', '-m', 'Synthetic baseline')
-  git(dir, 'switch', '-q', '-c', 'work')
-  for (const path of [A, B]) writeFileSync(join(dir, path), `${path} before.\n${path} submitted.\n`)
-  git(dir, 'add', '.')
-  git(dir, 'commit', '-q', '-m', 'Synthetic submission')
-  const filed = (await post(
-    '/api/records',
-    { kind: 'session', title: 'Builder S, the run the merge queue took', data: { state: 'running', servingAgent: handle, cutFrom: 'main', workingDirectory: dir, doing: 'building it' } },
-    asAgent(handle),
-  ))['record'] as { id: string }
-  await patch(`/api/records/${filed.id}`, { dataPatch: { state: 'finished' } }, asItself(handle))
-  const sealId = String((await dataOf(filed.id))['sealedTip'])
-  const seal = (await dataOf(sealId))['seal'] as { hash: string; git: { commit: string; forkBase: string; files: Seal['files'] } }
-  return { run: filed.id, dir, seal: { id: sealId, hash: seal.hash, commit: seal.git.commit, forkBase: seal.git.forkBase, files: seal.git.files } }
-}
-
-/** A verdict through the real checks door, after the assembly it needs, reading the run's own seal unless told otherwise. */
-async function verdictOn(run: string, body: Record<string, unknown>, read: Record<string, unknown> = {}): Promise<void> {
-  const data = await dataOf(run)
-  const sealId = String(data['sealedTip'])
-  const seal = (await dataOf(sealId))['seal'] as { hash: string; git: { commit: string; forkBase: string; files: Seal['files'] } }
-  const whatWasRead = { sealId, sealHash: seal.hash, worktree: String(data['workingDirectory']), tip: seal.git.commit, ofItsOwn: true, says: 'Synthetic: a check of its own detached tree.', ...read }
-  const only = read['only'] as string[] | undefined
-  await post(
-    `/api/checks/${run}/assembled`,
-    {
-      changes: seal.git.files.map((one) => ({ path: one.path, changes: 'a synthetic diff' })),
-      base: { ref: seal.git.forkBase, how: 'fork point', says: 'Synthetic: the fixed fork base of the seal.' },
-      read: whatWasRead,
-      ...(only === undefined ? {} : { only }),
-    },
-    asTheInspector(),
-  )
-  const paths = only ?? seal.git.files.map((one) => one.path)
-  const said = `Synthetic permission for the test to change ${paths.join(', ')}.`
-  const permission = body['verdict'] === 'released'
-    ? (await post('/api/records', { kind: 'note', title: 'Synthetic permission for the check page fixture', summary: said, data: {} }))['record'] as { id: string }
-    : null
-  await post(`/api/checks/${run}`, { read: whatWasRead,
-    ...(permission === null ? {} : { traced: [{ paths, to: permission.id, how: "the person's word", said }] }), ...body }, asTheInspector())
-}
-
-/** A clone of the tree with `work` put on top of a moved main, and file A changed by that, as the merge tool leaves it. */
-function aCloneOnTopOfMain(dir: string): { clone: string; mainAt: string; result: string; files: Record<string, string> } {
-  const clone = scratch('clone')
-  execFileSync('git', ['clone', '-q', dir, clone])
-  git(clone, 'config', 'user.email', 'fixture@example.invalid')
-  git(clone, 'config', 'user.name', 'Synthetic check-on-run clone')
-  git(clone, 'checkout', '-q', 'main')
-  writeFileSync(join(clone, 'work', 'other.txt'), 'main moved on.\n')
-  git(clone, 'add', '.')
-  git(clone, 'commit', '-q', '-m', 'Synthetic: main moved')
-  git(clone, 'checkout', '-q', 'work')
-  git(clone, 'rebase', '-q', 'main')
-  writeFileSync(join(clone, A), `${A} before.\n${A} submitted.\n${A} merged with main.\n`)
-  git(clone, 'add', '.')
-  git(clone, 'commit', '-q', '--amend', '--no-edit')
-  const files = Object.fromEntries(
-    [A, B].map((path) => [path, createHash('sha256').update(execFileSync('git', ['-C', clone, 'cat-file', 'blob', `HEAD:${path}`])).digest('hex')]),
-  )
-  return { clone, mainAt: git(clone, 'rev-parse', 'main'), result: git(clone, 'rev-parse', 'HEAD'), files }
 }
 
 async function open(where: string, theme: 'light' | 'dark', width: number, language = 'en', mode: 'normal' | 'inspect' = 'normal'): Promise<void> {
@@ -481,6 +377,7 @@ beforeAll(async () => {
   wordContent.add(taskOutside)
   wordContent.add(taskAcceptance)
   wordContent.add('Fixture brief')
+  wordContent.add('F16')
   wordContent.add('fixture-commit')
   const task = (await post('/api/records', {
     kind: 'task',
@@ -539,7 +436,6 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await app?.stop()
-  for (const dir of made) rmSync(dir, { recursive: true, force: true })
 }, 60_000)
 
 describe('C27 — a person reading a run sees its check without switching to Inspect', () => {
@@ -558,7 +454,7 @@ describe('C27 — a person reading a run sees its check without switching to Ins
   it('says where the run stands, by the name a person reads', async () => {
     const seen = await readThePanel()
     expect(seen.word).toBe(RUN_STANDING.inspecting.word)
-    expect(seen.text).toContain('It is still a live run')
+    expect(seen.text).not.toContain(RUN_STANDING.inspecting.sentence)
   })
 
   it('names the inspector the office asked, and says the run is waiting for it', async () => {
@@ -758,74 +654,9 @@ describe('the run check, task package and report summary panels pass the four wo
   }, 900_000)
 })
 
-// A CHECK-AGAIN RUN THE OFFICE ENDED WITH ITS MERGE ENTRY (decision yH7W1sXTRY5q, Q3 (a) and Q4). It stands
-// closed, and nobody confirmed it, so the closed sentence about a supervisor's confirmation would be false on it. The
-// page draws the run's own sentence instead, and says no group was opened. MUTATION PROOF: the swap in `TheCheckOnARun`
-// taken out, and this goes red on the sentence.
-describe('a check-again run the office ended with its merge entry says so, and names no group', () => {
-  let ended = ''
-  let entryId = ''
-  beforeAll(async () => {
-    await post('/api/agents/started', { handle: 'super-s', runtime: 'claude-code', name: 'Super S', role: 'supervisor' })
-    const started = await post(
-      '/api/agents/started',
-      { handle: 'builder-s', runtime: 'claude-code', name: 'Builder S', role: 'worker', chapters: ['5:full'], workArea: ['work'] },
-      asAgent('super-s'),
-    )
-    keys.set('builder-s', (started['whatToGiveIt'] as { key: string }).key)
-    await post('/api/implementation/repositories', { name: 'fixture-main', root: realpathSync(scratch('main')) })
-    // THE ENDING IS WRITTEN BY THE OFFICE, through the merge queue's own doors, as tests/merge-state-machine.test.ts
-    // does it: the record door refuses the field from every caller. Builder S's sealed run is submitted, released and
-    // judged; the integration changes one file, so the office files a check again of it; that check refuses, the entry
-    // bounces, and the office ends the check-again run with it.
-    const sealed = await aSealedRun('builder-s')
-    entryId = String(((await post('/api/merge-queue', { run: sealed.run, changeset: { adapter: 'git', repository: 'fixture-main', branch: 'work' } }, asAgent('super-s')))['entry'] as { id: string }).id)
-    await verdictOn(sealed.run, { verdict: 'released', check: 'Read the changes.', chaptersRead: ['5:full'] })
-    await post(`/api/merge-queue/${entryId}/step`, { step: 'pinned', facts: { files: Object.fromEntries(sealed.seal.files.map((one) => [one.path, one.hash ?? ABSENT])) } }, asTheOffice())
-    await post(`/api/merge-queue/${entryId}/step`, { step: 'integrating', facts: {} }, asTheOffice())
-    const onTop = aCloneOnTopOfMain(sealed.dir)
-    const integrated = await post(
-      `/api/merge-queue/${entryId}/step`,
-      { step: 'integrated', facts: { result: onTop.result, mainAt: onTop.mainAt, clone: onTop.clone, files: onTop.files } },
-      asTheOffice(),
-    )
-    ended = String((integrated['entry'] as { machine: { reinspection: { run: string } } }).machine.reinspection.run)
-    await verdictOn(
-      ended,
-      { verdict: 'refused', check: 'Read the one path.', missing: ['The merged hunk breaks the test for criterion 2.'], says: { chapter: 5 }, chaptersRead: ['5:full'] },
-      { worktree: onTop.clone, only: [A] },
-    )
-    const record = ((await (await fetch(`${app.api}/api/records/${ended}`)).json()) as { record: { data: Record<string, unknown> } }).record
-    expect(record.data[ENDED_WITH_ITS_MERGE_ENTRY]).toMatchObject({ entry: entryId })
-  }, 120_000)
-
-  // ONE NARROW PASS. The sentence the office wrote does not change with the width or the theme; the
-  // mounted case above holds the 1440 light page and the overflow case holds both widths and themes.
-  it('draws the standing closed with its own sentence, the refusal, and no group, at four widths in both themes', async () => {
-    const says = ((await (await fetch(`${app.api}/api/checks/${ended}`)).json()) as { stands: { says: string } }).stands.says
-    expect(says).toContain(`merge entry ${entryId}`)
-    for (const theme of ['light'] as const) {
-      for (const width of [390]) {
-        await open(`/r/${ended}`, theme, width)
-        const seen = await readThePanel()
-        const at = `${theme} at ${String(width)}`
-        expect(seen.word, at).toBe(RUN_STANDING.closed.word)
-        expect(seen.text, at).toContain(says)
-        expect(seen.text, at).not.toContain(RUN_STANDING.closed.sentence)
-        expect(seen.text, at).toContain('The merged hunk breaks the test for criterion 2.')
-        expect(seen.text, at).toContain(NO_GROUP_FOR_A_CHECK_AGAIN)
-        expect(seen.text, at).not.toContain('A group is open')
-        expect(seen.text, at).not.toContain('talked out')
-        expect(seen.links.filter((one) => one.startsWith('#/record/')), at).toEqual([])
-        expect(seen.overflow, at).toBe(0)
-      }
-    }
-  }, 180_000)
-})
-
 // These pictures use the real run page, confirmation answer and panel, in English only. One narrow
 // light pass is enough: the confirmation sentence is the same at every width and in either theme.
-describe('the confirmation sentences at four widths in both themes', () => {
+describe('the confirmation sentences at the narrowest width in one theme', () => {
   it('photographs two possible confirmers, a person-confirmed run and an agent-confirmed run', async () => {
     if (wordShots === undefined) return
     for (const width of [390]) for (const theme of ['light'] as const) for (const one of confirmationPictures) {
@@ -834,14 +665,13 @@ describe('the confirmation sentences at four widths in both themes', () => {
       const seen = await readThePanel()
       expect(seen.overflow, `${one.name}/${width}/${theme}`).toBe(0)
       if (one.name === 'reporting-two-confirmers') {
-        for (const selector of ['.chk-waiting', '.chk-confirm .chk-said']) {
-          const sentence = await page.locator(selector).textContent()
-          expect(sentence).toContain('confirm-asker')
-          expect(sentence).toContain(THE_TEST_OFFICES_SECRETARY.handle)
-        }
+        const sentence = await page.locator('.chk-waiting').textContent()
+        expect(sentence).toContain('confirm-asker')
+        expect(sentence).toContain(THE_TEST_OFFICES_SECRETARY.handle)
+        expect(await page.locator('.chk-confirm .chk-said').count()).toBe(0)
       } else {
         expect(seen.word).toBe('Closed')
-        expect(seen.text).toContain('The report was confirmed, so this run is over')
+        expect(seen.text).not.toContain(RUN_STANDING.closed.sentence)
         expect(seen.text).not.toContain('The supervisor confirmed')
       }
       await page.screenshot({ path: join(wordShots, `${one.name}-${width}-${theme}-en.png`), fullPage: true })

@@ -197,15 +197,20 @@ export function checkLinkKinds(
     return
   }
 
-  // WHAT MOVES FROM ONE STEP TO ANOTHER, and nothing else. The pipeline page and the big map read it between two
-  // blocks only, so on any other pair it would say a thing nothing draws.
+  // WHAT MOVES FROM ONE BLOCK OR MODULE TO ANOTHER, and nothing else. A block or a module may be at either end, by the
+  // decision that a feeds link also takes a module, so that a person or an outside part drawn as a module is joined to
+  // the boxes it connects to by a link that says what it does. The pipeline page and the big map read it between two
+  // blocks only; the master's Boxes level draws it where a module is at one end or both. On any other pair it would say
+  // a thing nothing draws.
   if (type === 'feeds') {
-    if (from.kind !== BLOCK_KIND || to.kind !== BLOCK_KIND) {
+    const mayFeed = (kind: string): boolean => kind === BLOCK_KIND || kind === 'module'
+    if (!mayFeed(from.kind) || !mayFeed(to.kind)) {
       refuse(
-        `A \`feeds\` link says what moves from one step of a pipeline to another, and this one runs from ` +
+        `A \`feeds\` link says what moves from one block or module to another, and this one runs from ` +
           `${withArticle(kindWord(from.kind).text)}, "${from.title}", to ${withArticle(kindWord(to.kind).text)}, ` +
-          `"${to.title}". It joins two blocks and nothing else. If one waits for the other, the link type is ` +
-          '`blocks`; if you do not want to say how they are joined, `relates_to`. Nothing was written.',
+          `"${to.title}". It joins blocks and modules, a block or a module at each end, and nothing else. ` +
+          'If one waits for the other, the link type is `blocks`; if you do not want to say how they are joined, ' +
+          '`relates_to`. Nothing was written.',
       )
     }
     return

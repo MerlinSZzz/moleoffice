@@ -56,16 +56,16 @@
 import { useRef, useState } from 'react'
 import { t, content } from '@shared/i18n.ts'
 import type { PanelRecord } from '@shared/types.ts'
-import { UNASSIGNED_WORKSPACE, type WorkspaceReading } from '@shared/workspaces.ts'
+import type { WorkspaceReading } from '@shared/workspaces.ts'
 // TYPE ONLY, and erased before this module runs — the same rule api.ts follows for
 // `WorkspacesReply`. Imported rather than restated so the browser cannot hold a second idea of
 // what the move route answers.
 import type { MoveReport } from '../../server/lib/move.ts'
 import { errorMessage, moleOfficeRequest } from '../api.ts'
-import { projectName, unassignedMeans } from '../lib/projects.ts'
+import { projectName } from '../lib/projects.ts'
 import { setWorkspace } from '../lib/workspace.ts'
 import { InReachMark, reachBox, useReach } from './InReach.tsx'
-import { Btn, Field, Panel, Select } from './ui.tsx'
+import { Btn, Field, Panel, Select, ServerNote } from './ui.tsx'
 
 // ============================================================================ what it is called
 
@@ -179,11 +179,11 @@ export function Moved({
       <style href="mole-office-projects" precedence="default">
         {PROJECT_CSS}
       </style>
-      <Said cap={t('g2d.projects.capWhatHappened')}>{report.note}</Said>
-      {report.sessionNote === null ? null : <Said cap={t('g2d.projects.capAboutRuns')}>{report.sessionNote}</Said>}
       <p className="mv-line">
         {t('g2d.projects.movedLine', { there: content(there), here: content(here) })}
       </p>
+      <ServerNote text={report.note} />
+      <ServerNote text={report.sessionNote} />
       <div className="mv-act">
         <Btn variant="primary" onClick={() => setWorkspace(report.to)}>
           {t('g2d.projects.readButton', { there: content(there) })}
@@ -289,20 +289,10 @@ export function MoveToProject({
           Not in a project", back when the browser drew the catch-all as that phrase, which is what
           a phrase does to a sentence built around a project's title. "this one" says the same thing
           and reads for every name. */}
-      <p className="mv-line">
-        {t('g2d.projects.hereLine', { here: content(here) })}
-      </p>
-      <p className="mv-line">
-        {t('g2d.projects.linkCannotJoin')}
-      </p>
-      {record.workspaceId === UNASSIGNED_WORKSPACE ? (
-        <p className="mv-line mv-quiet">{unassignedMeans()}</p>
-      ) : null}
+      <p className="mv-line">{content(here)}</p>
 
       {others.length === 0 ? (
-        <p className="mv-line mv-quiet">
-          {t('g2d.projects.onlyProject', { here: content(here) })}
-        </p>
+        <p className="mv-line mv-quiet">{t('moveToProject.noOtherProject')}</p>
       ) : (
         <Field label={t('g2d.projects.moveItToLabel')}>
           <Select value={to} onChange={choose} options={options} />
@@ -310,7 +300,7 @@ export function MoveToProject({
       )}
 
       {check.status === 'checking' ? (
-        <p className="mv-line mv-quiet">{t('g2d.projects.checking')}</p>
+        <p className="mv-line mv-quiet">{t('moveToProject.checking')}</p>
       ) : null}
 
       {check.status === 'refused' ? (
@@ -333,8 +323,9 @@ export function MoveToProject({
               also where a move that would be refused says so. Nothing is read out of it here, so
               nothing can be dropped from it. It scrolls rather than being cut, because a move can
               reach a hundred records and a page that grows to fit one is unreadable. */}
-          <Said cap={t('g2d.projects.capWhatWouldHappen')}>{check.report.note}</Said>
-          {check.report.sessionNote === null ? null : <Said cap={t('g2d.projects.capAboutRuns')}>{check.report.sessionNote}</Said>}
+          {check.report.crossing.length === 0 ? null : <p className="mv-line mv-quiet">{t('moveToProject.wouldBeRefused')}</p>}
+          <ServerNote text={check.report.note} />
+          <ServerNote text={check.report.sessionNote} />
           <div className="mv-act">
             <Btn variant="primary" pending={moving} onClick={() => void move(check.report)}>
               {check.report.moving.length === 1

@@ -147,7 +147,7 @@ describe('an agent away from its desk is drawn where it is', () => {
     vi.spyOn(map as unknown as { dynamic(regions: Rect[]): void }, 'dynamic').mockImplementation(() => {})
     map.update(layout, model, options, null)
     const fillText = vi.fn()
-    const labelContext = { fillRect: vi.fn(), fillText } as unknown as CanvasRenderingContext2D
+    const labelContext = { fillRect: vi.fn(), fillText, beginPath: vi.fn(), roundRect: vi.fn(), fill: vi.fn(), stroke: vi.fn(), moveTo: vi.fn(), lineTo: vi.fn(), closePath: vi.fn(), measureText: (_value: string) => ({ width: 0 }) } as unknown as CanvasRenderingContext2D
     const plate = map as unknown as { nameplate(ctx: CanvasRenderingContext2D, key: string, rect: Rect): void }
     // A sleeper the office's asleep read named is plainly asleep; only a picture seam's sleeper is made up.
     plate.nameplate(labelContext, sleeper, { x: 0, y: 0, width: 100, height: 32 })

@@ -12,6 +12,8 @@
  * HOW. tools/run-named-tests.mjs calls aGroupOfItsOwn before anything else. When the tool is not the leader of its
  * own process group, it starts itself again in a new group (spawn with detached), with the same arguments, variables
  * and standard streams, and only waits. The seat, the ledger row and every test process then belong to that group.
+ * A descriptor holding the tsc lock is passed on at its own number, so the restarted batch sees the shell's hold and
+ * does not deadlock at the gate with a tsc waiting for the lock held by the outer process.
  * This outer process passes SIGTERM, SIGINT and SIGHUP on to the batch's group, and ends with the batch's exit code, or
  * by the signal that ended it. When it ends, it stops whatever of the batch's group is still running, and says so.
  * When the tool already leads its group, as when the merge tool or a test starts it with detached, it starts nothing.
@@ -28,6 +30,7 @@
 import { spawn } from 'node:child_process'
 import { Socket } from 'node:net'
 import { thereAreProcessGroups } from '../src/config/process-reader.mjs'
+import { theDescriptorThatHoldsTheTscLock } from './the-tsc-lock.mjs'
 
 /** The variable that tells the batch its starter holds the other end of the pipe at fd 3. */
 const THE_STARTERS_PIPE = 'RUN_NAMED_TESTS_STARTERS_PIPE'
@@ -64,9 +67,22 @@ export async function aGroupOfItsOwn(say = (words) => console.error(words)) {
     process.exit(1)
   }
 
+  const descriptor = theDescriptorThatHoldsTheTscLock()
+  /** @type {Array<'inherit' | 'pipe' | 'ignore' | number>} */
+  const stdio = ['inherit', 'inherit', 'inherit', 'pipe']
+  if (descriptor !== null) {
+    const number = Number(descriptor)
+    if (number <= 3) {
+      say(`run-named-tests: the shell handed the tsc lock in on descriptor ${descriptor}, which the restart needs, so start the batch without that shell.`)
+      process.exit(1)
+    }
+    while (stdio.length < number) stdio.push('ignore')
+    stdio.push(number)
+  }
+
   const batch = spawn(process.execPath, [...process.execArgv, ...process.argv.slice(1)], {
     detached: true,
-    stdio: ['inherit', 'inherit', 'inherit', 'pipe'],
+    stdio,
     env: { ...process.env, [THE_STARTERS_PIPE]: '1' },
   })
   const passOn = PASSED_ON.map((signal) => /** @type {const} */ ([signal, () => {

@@ -147,7 +147,7 @@ async function sendMessage(env: Record<string, string>, args: string[] = [], cop
   }
   const body = join(folder, 'body.txt')
   writeFileSync(body, 'Synthetic words.\n')
-  return run('python3', [script, 'panelx', 'someone', 'A title', body, '--as', 'an-agent', ...args], env)
+  return run('python3', [script, 'panelx', 'someone', 'A title', body, '--as', 'an-agent', ...args], { ...env, MOLE_AGENT_KEY: 'made-up-key-for-the-stand-in' })
 }
 
 /**

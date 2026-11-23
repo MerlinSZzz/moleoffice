@@ -36,6 +36,10 @@
  * page draws only "Nobody recorded what this record cost." and developer mode draws the rest. Mutation:
  * the fold drawn in normal mode again (the `runs.length === 0 && !inspect` line in `WhatWasSpent` taken
  * out) turns case c red.
+ *
+ * The explanations change, as decided, changed case c's line again in its own commit. The line is now
+ * the section's label and the word for not recorded, drawn told apart as nobody having recorded it,
+ * in both modes. Both are read from their keys.
  */
 
 import { createElement as h } from 'react'
@@ -47,6 +51,7 @@ import { apiApp, freshDb, liveApp, waitForThePage, type TestDb } from './helpers
 import { historicalSession } from './synthetic-submission-fixtures.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { SPENT_WORDS, type SpentOnThis } from '../src/shared/spent.ts'
+import { sayInEnglish } from '../src/shared/i18n.ts'
 import type { PanelRecord } from '../src/shared/types.ts'
 
 type Page = typeof import('../src/web/pages/RecordPage.tsx')
@@ -288,12 +293,24 @@ describe('changes that name no run are counted and said out loud', () => {
     // account of runs and changes is a fact a person cannot act on (the secretary's review in 3Zgf2lTGanJw), so
     // normal mode says only that nobody recorded a cost; the count of changes naming no run stays, whole,
     // in developer mode.
+    //
+    // THE LINE IS THE SECTION'S LABEL AND ONE SHORT WORD. Nobody recorded a cost, so the word is drawn
+    // told apart with a dashed edge, which marks a thing nobody recorded.
+    const line = `${sayInEnglish('record.section.spent')} ${sayInEnglish('word.notRecorded')}`
     const normal = drawn(await boot(), t.api.getRecord(quiet) as PanelRecord, spent)
-    expect(normal).toContain(SPENT_WORDS.summaryNoRuns)
+    const plain = /<p class="rd-spent-none"[^>]*>(.*?)<\/p>/s.exec(normal)?.[1] ?? null
+    expect(plain, 'a normal page drew no line for a record nobody recorded a cost of').not.toBeNull()
+    expect(plain?.replace(/<[^>]*>/g, ''), 'the normal line is not the label and the word').toBe(line)
+    expect(plain, 'the word is not told apart as nobody having recorded it').toContain('data-edge="dashed"')
+    expect(normal).not.toContain(SPENT_WORDS.summaryNoRuns)
     expect(normal).not.toContain(SPENT_WORDS.nobodyChangedIt)
     expect(normal).not.toContain(SPENT_WORDS.namesNoRun(1))
     const html = drawn(await boot('?mode=inspect'), t.api.getRecord(quiet) as PanelRecord, spent)
-    expect(html).toContain(SPENT_WORDS.summaryNoRuns)
+    const fold = /data-testid="spent-on-this"[^>]*><summary[^>]*>(.*?)<\/summary>/s.exec(html)?.[1] ?? null
+    expect(fold, 'developer mode drew no fold for a record nobody recorded a cost of').not.toBeNull()
+    expect(fold?.replace(/<[^>]*>/g, ''), 'the fold line is not the label and the word').toBe(line)
+    expect(fold, 'the word is not told apart as nobody having recorded it').toContain('data-edge="dashed"')
+    expect(html).not.toContain(SPENT_WORDS.summaryNoRuns)
     expect(html).toContain(SPENT_WORDS.nobodyChangedIt)
     expect(html).toContain(SPENT_WORDS.namesNoRun(1))
   })

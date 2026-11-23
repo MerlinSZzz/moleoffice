@@ -56,7 +56,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import type { FastifyInstance } from 'fastify'
 import { THE_TEST_OFFICES_OWNER } from './a-page-of-a-test-office.ts'
-import { apiApp, freshDb, type TestDb } from './helpers.ts'
+import { apiApp, freshDb, type TestDb, governsTheWholeProject } from './helpers.ts'
 // TYPE-ONLY AT THE TOP, VALUES INSIDE THE TESTS. `openloops.ts` reaches src/server/db/client.ts,
 // which refuses to open a database nobody named — so a value import here would land on that refusal
 // before `freshDb()` had a chance to name a throwaway one. `tests/helpers.ts` is written for this
@@ -172,7 +172,7 @@ async function aProjectThatDropsSomethingForEveryReason(): Promise<string> {
   })
   await link(fork, anchor, 'about')
   const decided = await file('decision', 'Re-texture the pads', {
-    replaces: [],
+    ...governsTheWholeProject(), replaces: [],
     decided_on: '2026-08-26',
     because: 'Changing the tray and the controller in one week makes a regression impossible to attribute.',
     option_taken: 're-texture the pads',

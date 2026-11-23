@@ -27,15 +27,15 @@ import { useLanguage } from '../lib/language.ts'
 import { useInspect } from '../lib/mode.ts'
 import { showThePaneOf, thePaneOf, whatARefusalSays } from '../lib/terminals.ts'
 
-/** The sentence for each state that shows no pane, by its refusal code's words (src/shared/words, server.pane*). */
-const WHY_NO_PANE: Record<Exclude<AnAgentsPane['state'], 'shown'>, WordKey> = {
-  'no-run': 'server.paneNoRun',
-  // Never drawn: this part draws nothing for a run in a sandbox. Here so every state has its sentence.
-  sandbox: 'server.paneInASandbox',
-  'not-running': 'server.paneNotRunning',
-  'not-in-a-terminal': 'server.paneNotInATerminal',
-  'not-in-tmux': 'server.paneNotInTmux',
-  'no-tmux': 'server.paneNoTmux',
+/** The state word for each state that shows no pane. */
+const NO_PANE_WORD: Record<Exclude<AnAgentsPane['state'], 'shown'>, WordKey> = {
+  'no-run': 'agentLive.pane.noRun',
+  // Never drawn: this part draws nothing for a run in a sandbox. Here so every state has its word.
+  sandbox: 'agentLive.pane.inASandbox',
+  'not-running': 'agentLive.pane.notRunning',
+  'not-in-a-terminal': 'agentLive.pane.notInATerminal',
+  'not-in-tmux': 'agentLive.pane.notInTmux',
+  'no-tmux': 'agentLive.pane.noTmux',
 }
 
 export function AgentLiveTerminal({ agentId }: { agentId: string }): React.ReactElement | null {
@@ -83,7 +83,7 @@ export function AgentLiveTerminal({ agentId }: { agentId: string }): React.React
       return (
         <>
           <div className="al-row">
-            <p className="al-line al-why">{t(WHY_NO_PANE[state])}</p>
+            <p className="al-line al-state">{t(NO_PANE_WORD[state])}</p>
             <Btn size="sm" onClick={readAgain}>
               {t('agentLive.terminal.lookAgain')}
             </Btn>

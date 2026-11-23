@@ -386,6 +386,14 @@ function aVersion(draft: string, version: number): string {
 }
 
 /**
+ * THE DRAFT VERSIONS A PASS HAS ALREADY LOOKED AT in this run of the server, one key per version (`aVersion`). A version
+ * goes in once a pass has decided about it: it found the version said, or said it. It is kept in memory and nowhere
+ * else, so after a restart the first pass with a due draft reads the said set once. A key is never dropped: a version
+ * is looked at once, and a key left by a draft since sent, deleted or changed is never asked for again.
+ */
+const lookedAt = new Set<string>()
+
+/**
  * ONE PASS OF THE DRAFT REMINDER, in every project of the installation. Called by the office's
  * reminder tick, `sendTheRemindersThatAreDue` in lib/reminders.ts, with its clock.
  *
@@ -418,15 +426,21 @@ export function sendTheDraftRemindersThatAreDue(now: Date, by: Actor): string[] 
       if (draft === null || ends === undefined) continue
       const due = whenTheReminderIsDue(ends.newestAt, draft.data)
       if (due === null || at < due.ms) continue
-      said ??= draftRemindersAlreadySaid()
-      if (said.has(aVersion(draft.id, ends.newestSeq))) continue
-      const who = whoIsReminded(draft, ends)
-      writeASystemLineToOne(who.to, project.id, SYSTEM_LINES.aDraftIsNotSent(who.said), by, undefined, {
-        draft: draft.id,
-        draftVersion: ends.newestSeq,
-      })
-      said.add(aVersion(draft.id, ends.newestSeq))
-      reminded.push(draft.id)
+      const version = aVersion(draft.id, ends.newestSeq)
+      // A VERSION AN EARLIER PASS LOOKED AT is said already, so the messages are not read again for it.
+      if (!lookedAt.has(version)) {
+        said ??= draftRemindersAlreadySaid()
+        if (!said.has(version)) {
+          const who = whoIsReminded(draft, ends)
+          writeASystemLineToOne(who.to, project.id, SYSTEM_LINES.aDraftIsNotSent(who.said), by, undefined, {
+            draft: draft.id,
+            draftVersion: ends.newestSeq,
+          })
+          said.add(version)
+          reminded.push(draft.id)
+        }
+      }
+      lookedAt.add(version)
     }
   }
   return reminded

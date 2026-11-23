@@ -28,6 +28,10 @@
  *      was stopped. What the run said before is kept after it, and its state is left as it was.
  *  10. The agent a run ran as is the run's own agent too, and is refused with its own key in the same words, and
  *      nothing is done. The office's rule on who may end a run admits it, as it admits the agent a run serves.
+ *  11. A running run whose command exited without a finish, its row still open, is stopped by its starter. The door
+ *      finds its group ended already and signals nothing, so it still answers 409. It revokes the run's key, closes
+ *      the row, and writes the run crashed, because nothing of the run runs and nothing can write for it. The run
+ *      says its key was revoked and what it said before, and never that it was stopped.
  *
  * Cases 7 to 9 are item 1 of round 62's fix round: the door wrote "stopped this run" on every call, including calls
  * that revoked no key and signalled nothing. Case 6 is that round's item 3.
@@ -64,6 +68,7 @@
  *   j. The door's words for the run's own agent renamed away from their export. Case 10 goes red, on the export.
  *
  * The run that added case 10 ran b and d again, and i and j, each after a control run.
+ * Case 11 has none, because the round that added it made no mutation proofs.
  */
 
 import type { FastifyInstance } from 'fastify'
@@ -424,6 +429,28 @@ describe('a run that will not stop is stopped through its door', () => {
         'Before this, the run said: reading the brief for its third round',
     )
     expect(doing).not.toContain('stopped this run')
+  })
+
+  it('writes a running run crashed when its group had ended before the stop, revokes its key, and still answers 409', async () => {
+    const run = await aWorkersRun({ doing: 'running its last command' })
+    // ITS COMMAND EXITED WITHOUT A FINISH: its process is gone, its row is still open, and the run still says running.
+    live.delete(run.pid ?? 0)
+    expect(theRowIsOpen(run.row ?? ''), 'the run’s row was closed before the stop').toBe(true)
+    expect(theRun(run.id).state).toBe('running')
+
+    const stop = await ask('POST', `/api/runtime/runs/${run.id}/stop`, asAgent('the-starter', starterKey), { why: 'its command exited' })
+    expect(stop.status, said(stop.body)).toBe(409)
+    expect(said(stop.body)).toContain(`Mole Office found its process group ${String(run.pid)} ended already. Nothing was signalled`)
+    expect(said(stop.body)).toContain("The run's key was revoked all the same, and its state is now crashed")
+    expect(signalled).toEqual([])
+    expect(theRowIsOpen(run.row ?? ''), 'the row of a process that had gone is still open').toBe(false)
+    const after = theRun(run.id)
+    expect(after.state, 'the run still says running with no process and no key').toBe('crashed')
+    const doing = String(after.doing)
+    expect(doing).toContain("revoked this run's key through its stop door: its command exited.")
+    expect(doing).toContain('Before this, the run said: running its last command')
+    expect(doing).not.toContain('stopped this run')
+    expect(await theRunsKeyStillProvesIt(run), 'the run’s key still proves it after the stop').toEqual({ door: false, note: false })
   })
 
   it('answers 404 for a record that is no run', async () => {

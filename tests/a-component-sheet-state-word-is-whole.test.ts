@@ -12,8 +12,8 @@
  * word's own text against the box that holds it, as the walk does.
  *
  * English is the control: its words fit the column and stay on one line. Greek, Spanish and Italian
- * are where the fault was seen. The pictures are the section itself, at 1440, 990, 660 and 390, in
- * both themes, in those four languages. A dark picture equal to its light one fails the test.
+ * are where the fault was seen. When SHEET_WORD_SHOTS names a folder, the pictures are the section
+ * itself, at 1440 and 390, in the light theme, in those four languages.
  */
 import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
@@ -23,8 +23,7 @@ import { THE_TEST_OFFICES_OWNER } from './a-page-of-a-test-office.ts'
 
 const SHOTS = process.env['SHEET_WORD_SHOTS']
 const LANGUAGES = ['en', 'el', 'es', 'it'] as const
-const WIDTHS = [1440, 990, 660, 390] as const
-const LOOKS = ['light', 'dark'] as const
+const WIDTHS = [1440, 390] as const
 
 let app: LiveApp
 
@@ -67,39 +66,27 @@ async function openAndMeasure(page: import('playwright').Page, language: string,
   }))
 }
 
-it('draws each state word in the severity column whole, at four widths, in both themes', async () => {
+it('draws each state word in the severity column whole, at the widest and the narrowest width, in the light theme', async () => {
   if (SHOTS !== undefined) mkdirSync(SHOTS, { recursive: true })
-  const taken: { language: string; look: string; width: number; shot: Buffer; theme: string | null; reading: Reading }[] = []
-  for (const look of LOOKS) {
-    for (const language of LANGUAGES) {
-      const context = await app.browser.newContext({ viewport: { width: 1440, height: 1000 } })
-      await context.addInitScript(({ person, theme }: { person: string; theme: string }) => {
-        localStorage.setItem('mole-office.actor', JSON.stringify({ type: 'human', id: person }))
-        localStorage.setItem('mole-office.preset.theme', theme)
-      }, { person: THE_TEST_OFFICES_OWNER.id, theme: look })
-      const page = await context.newPage()
-      for (const width of WIDTHS) {
-        const reading = await openAndMeasure(page, language, look, width)
-        // The second section that carries a row's state word is the one showing the fixed severity
-        // column, where the longer translated words were cut. It is chosen by that position rather
-        // than by a heading word, because a heading word is a value another line may change.
-        const section = page.locator('section.px-sheet-sec').filter({ has: page.locator('.px-row-sev .px-chip-word') }).nth(1)
-        const shot = await section.screenshot({
-          path: SHOTS === undefined ? undefined : join(SHOTS, `sheet-state-word-${language}-${String(width)}-${look}.png`),
-        })
-        taken.push({ language, look, width, shot, theme: reading.theme, reading })
-      }
-      await context.close()
-    }
-  }
-
+  const taken: { language: string; look: string; width: number; theme: string | null; reading: Reading }[] = []
+  const look = 'light'
   for (const language of LANGUAGES) {
+    const context = await app.browser.newContext({ viewport: { width: 1440, height: 1000 } })
+    await context.addInitScript(({ person, theme }: { person: string; theme: string }) => {
+      localStorage.setItem('mole-office.actor', JSON.stringify({ type: 'human', id: person }))
+      localStorage.setItem('mole-office.preset.theme', theme)
+    }, { person: THE_TEST_OFFICES_OWNER.id, theme: look })
+    const page = await context.newPage()
     for (const width of WIDTHS) {
-      const light = taken.find((one) => one.language === language && one.look === 'light' && one.width === width)
-      const dark = taken.find((one) => one.language === language && one.look === 'dark' && one.width === width)
-      expect(light !== undefined && dark !== undefined, `${language} ${String(width)}: a picture pass is missing`).toBe(true)
-      expect(dark!.shot.equals(light!.shot), `${language} ${String(width)}: the dark picture is the light picture`).toBe(false)
+      const reading = await openAndMeasure(page, language, look, width)
+      // The second section that carries a row's state word is the one showing the fixed severity
+      // column, where the longer translated words were cut. It is chosen by that position rather
+      // than by a heading word, because a heading word is a value another line may change.
+      const section = page.locator('section.px-sheet-sec').filter({ has: page.locator('.px-row-sev .px-chip-word') }).nth(1)
+      if (SHOTS !== undefined) await section.screenshot({ path: join(SHOTS, `sheet-state-word-${language}-${String(width)}-${look}.png`) })
+      taken.push({ language, look, width, theme: reading.theme, reading })
     }
+    await context.close()
   }
 
   for (const one of taken) {

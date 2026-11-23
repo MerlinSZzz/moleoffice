@@ -5,8 +5,11 @@
  * handoff). Without --continues, `round` takes the agent's last run on its runtime. With --continues, which the
  * next-round door always passes (RoundAdapter.commandFor in src/worker/runtimes/round.ts), it takes the run named. It
  * starts a new conversation when there is no such run, when the run named ran on another runtime, when the run's
- * worktree is gone, or when the worktree holds no A_ROUNDS_RULES (src/shared/round-chapters/delivery.ts), the file the
- * round reads its chapters from.
+ * worktree is gone, or when the worktree holds no A_ROUNDS_RULES (src/shared/round-chapters/delivery.ts), the rules
+ * file a worktree must hold for a round to work in it. The round reads its chapters from the office, at
+ * GET THE_CHAPTERS_DOOR (src/shared/round-chapters/manifest.ts), and checks them against the rules files in the worktree
+ * it works in: the worktree of the run it takes, or, for a fresh round, its own new worktree, made at its cut before the
+ * chapters are read. A refusal after that making and before the run is filed removes the new worktree.
  * When only the runtime of the run named differs, the new conversation works in that run's worktree and takes its title
  * and cut. Otherwise it works in the worktree of the agent's newest started run, on any runtime, whose worktree is there
  * and holds that file, and takes that run's title and cut. With no such run, the round is refused and nothing is filed.
@@ -43,6 +46,7 @@ import { LAUNCHER_MODEL_COMPATIBILITY } from '../src/config/model-efforts.mjs'
 import { withoutInheritedEffort } from './without-inherited-effort.ts'
 import { RoundAdapter } from '../src/worker/runtimes/round.ts'
 import { A_ROUNDS_RULES } from '../src/shared/round-chapters/delivery.ts'
+import { THE_CHAPTERS_DOOR, theChaptersReadAt } from '../src/shared/round-chapters/manifest.ts'
 
 type ResourcesLib = typeof import('../src/server/lib/resources.ts')
 
@@ -56,7 +60,7 @@ const DOOR_AGENT = 'fresh-round-door-worker'
 const NAME = 'fresh-rounds'
 const CODEX_MODEL = 'openai/the-codex-model'
 const CLAUDE_MODEL = 'anthropic/claude-opus-5-5'
-/** The file a round reads its chapters from, as the delivery reads it, so the two cannot drift. */
+/** The rules file a worktree must hold for a round to work in it, the name the launcher imports, so the two cannot drift. */
 const RULES = A_ROUNDS_RULES
 const TITLE = 'The line of the made-up worker'
 const DOOR_TITLE = 'The line the made-up door follows'
@@ -570,9 +574,10 @@ describe('rounds in a made-up sandbox', () => {
     expect((await whatItWasGiven('claude', start.run)).argv).not.toContain('--continue')
     expect(ran.err).toContain(
       `sandbox: this round starts a new conversation on runtime claude-code, because ${AGENT} has no start on runtime claude-code in sandbox ${NAME}; ` +
-        `it works in ${first.cwd}, the worktree of run ${first.run}, and reads its chapters from ${join(first.cwd, RULES)}.`,
+        `it works in ${first.cwd}, the worktree of run ${first.run}, and reads its chapters from GET ${THE_CHAPTERS_DOOR}, checked against the rules files in ${first.cwd}.`,
     )
-    expect(ran.err).toContain(`— ${realpathSync(join(first.cwd, RULES))} — SHA-256`)
+    expect(ran.err).toContain(`CODE.md — ${theChaptersReadAt('')}`)
+    expect(ran.err).not.toContain(`— ${realpathSync(join(first.cwd, RULES))} — SHA-256`)
     const read = await ask('GET', `/api/records/${start.run}`)
     // The run keeps the name claude is given for the model, as a worker's run does.
     expect(read.body.record).toMatchObject({ title: TITLE, data: { runtime: 'claude-code', workingDirectory: first.cwd, model: CLAUDE_MODEL.slice('anthropic/'.length) } })
@@ -592,7 +597,7 @@ describe('rounds in a made-up sandbox', () => {
     expect((await whatItWasGiven('claude', start.run)).argv).not.toContain('--continue')
     expect(ran.err).toContain(
       `sandbox: this round starts a new conversation on runtime claude-code, because run ${doorFirst.run}, which --continues names, ran on runtime codex; ` +
-        `it works in ${doorFirst.cwd}, the worktree of run ${doorFirst.run}, and reads its chapters from ${join(doorFirst.cwd, RULES)}.`,
+        `it works in ${doorFirst.cwd}, the worktree of run ${doorFirst.run}, and reads its chapters from GET ${THE_CHAPTERS_DOOR}, checked against the rules files in ${doorFirst.cwd}.`,
     )
     expect(ran.err).toContain(`sandbox: round: run ${start.run} of ${DOOR_AGENT} is started in sandbox ${NAME}, following run ${doorFirst.run} in a new conversation. Model `)
     const read = await ask('GET', `/api/records/${start.run}`)
@@ -626,14 +631,16 @@ describe('rounds in a made-up sandbox', () => {
     expect(String(receipt.source)).not.toContain('less the total')
   }, 90_000)
 
-  // THE START SENTENCE'S FRESH BRANCH: a fresh repair after a run on another runtime works in its new worktree, and reads
-  // its chapters from the run it follows. MUTATION: the sentence names the worktree of the run it follows: red.
-  it('says a fresh repair after a run on another runtime works in its new worktree, and links it to that run', async () => {
+  // THE START SENTENCE'S FRESH BRANCH: a fresh repair after a run on another runtime works in its new worktree, and checks
+  // its chapters against the rules files in that new worktree, made at its cut, and not in the worktree of the run it
+  // follows. MUTATION: the sentence says it works in the worktree of the run it follows: red. And: its chapters are
+  // checked against the worktree of the run it follows, as before: red.
+  it('says a fresh repair after a run on another runtime works in its new worktree and checks its chapters there, and links it to that run', async () => {
     const repair = aFreshRepair(`${DOOR_AGENT}-fresh-claude`, 'claude-code', CLAUDE_MODEL)
     const { ran, start } = await started(repair.words)
     expect(ran.err).toContain(
       `sandbox: this round starts a new conversation on runtime claude-code, because run ${doorFirst.run}, which --continues names, ran on runtime codex; ` +
-        `it works in ${repair.worktree}, a new worktree, and reads its chapters from ${join(doorFirst.cwd, RULES)}.`,
+        `it works in ${repair.worktree}, a new worktree, and reads its chapters from GET ${THE_CHAPTERS_DOOR}, checked against the rules files in ${repair.worktree}.`,
     )
     expect(start.cwd).toBe(repair.worktree)
     expect((await whatItWasGiven('claude', start.run)).argv).not.toContain('--continue')
@@ -653,9 +660,10 @@ describe('rounds in a made-up sandbox', () => {
     inTheSecond = start
     expect(ran.err).toContain(
       `sandbox: this round starts a new conversation on runtime codex, because run ${first.run}, the last run of ${AGENT} on runtime codex in sandbox ${NAME}, works in ${first.cwd}, which is gone; ` +
-        `it works in ${second}, the worktree of run ${other.run}, and reads its chapters from ${join(second, RULES)}.`,
+        `it works in ${second}, the worktree of run ${other.run}, and reads its chapters from GET ${THE_CHAPTERS_DOOR}, checked against the rules files in ${second}.`,
     )
-    expect(ran.err).toContain(`— ${realpathSync(join(second, RULES))} — SHA-256`)
+    expect(ran.err).toContain(`CODE.md — ${theChaptersReadAt('')}`)
+    expect(ran.err).not.toContain(`— ${realpathSync(join(second, RULES))} — SHA-256`)
     expect(start.cwd).toBe(second)
     expect(start.command).not.toContain('resume')
     expect((await whatItWasGiven('codex', start.run)).cwd).toBe(second)
@@ -672,7 +680,7 @@ describe('rounds in a made-up sandbox', () => {
     const door = await started(theDoorsWords({ handle: AGENT, brief: brief('named.md', '# A made-up brief that names its run\n'), model: CODEX_MODEL, runtime: 'codex', follows: first.run }))
     expect(door.ran.err).toContain(
       `sandbox: this round starts a new conversation on runtime codex, because run ${first.run}, which --continues names, works in ${first.cwd}, which is gone; ` +
-        `it works in ${second}, the worktree of run ${start.run}, and reads its chapters from ${join(second, RULES)}.`,
+        `it works in ${second}, the worktree of run ${start.run}, and reads its chapters from GET ${THE_CHAPTERS_DOOR}, checked against the rules files in ${second}.`,
     )
     expect(door.start.cwd).toBe(second)
     expect(door.start.command).not.toContain('resume')
@@ -717,11 +725,12 @@ describe('rounds in a made-up sandbox', () => {
   // A FRESH REPAIR NEEDS NO OTHER RUN'S WORKTREE (NWfZVDPq9OKB, 9 November 2026): 13n's next round was refused with
   // "nowhere to work" when a cleanup had taken the worktree of the run it followed, although the door gave it a new worktree
   // and its cut. Here every worktree of the line is gone, as in the case above. The repair works in its new worktree,
-  // follows the run the door names, and reads its chapters from the sandbox's own repository, which its new worktree is cut
-  // from, because that run's worktree is gone.
+  // follows the run the door names, and checks the chapters it reads from the office against the rules files in that new
+  // worktree, made at its cut before they are read.
   // MUTATION: commandRound asks a fresh repair for another run's worktree, as before: red (refused, nowhere to work).
-  // And: its chapters are read from the gone worktree: red.
-  it("starts a fresh repair whose followed run's worktree is gone in its new worktree, reading its chapters from the sandbox's repository", async () => {
+  // And: its chapters are checked against the gone worktree: red. And: they are checked against the sandbox's own
+  // repository, as before: red.
+  it("starts a fresh repair whose followed run's worktree is gone in its new worktree, checking its chapters against that worktree", async () => {
     // Every worktree of the line is let go here too, so the case stands alone: the first, and the second the cases above made.
     rmSync(first.cwd, { recursive: true, force: true })
     rmSync(join(dir, 'worktrees', `${AGENT}-second`), { recursive: true, force: true })
@@ -730,12 +739,107 @@ describe('rounds in a made-up sandbox', () => {
     const { ran, start } = await started(words)
     expect(start.cwd).toBe(worktree)
     expect(start.command).not.toContain('resume')
-    const from = [join(dir, 'repo', RULES), join(realpathSync(dir), 'repo', RULES)]
-    expect(from.some((one) => ran.err.includes(
+    expect(ran.err).toContain(
       `sandbox: this round starts a new conversation on runtime codex, because run ${first.run}, which --continues names, works in ${first.cwd}, which is gone; ` +
-        `it works in ${worktree}, a new worktree, and reads its chapters from ${one}.`)), ran.err).toBe(true)
-    expect(from.some((one) => ran.err.includes(`— ${realpathSync(one)} — SHA-256`)), ran.err).toBe(true)
+        `it works in ${worktree}, a new worktree, and reads its chapters from GET ${THE_CHAPTERS_DOOR}, checked against the rules files in ${worktree}.`,
+    )
+    expect(ran.err).toContain(`CODE.md — ${theChaptersReadAt('')}`)
+    expect(ran.err).not.toContain(`— ${realpathSync(join(worktree, RULES))} — SHA-256`)
     expect(await theRunsItContinues(start.run)).toEqual([first.run])
     expect((await ask('GET', `/api/records/${start.run}`)).body.record).toMatchObject({ title: TITLE, data: { runtime: 'codex', workingDirectory: worktree } })
+  }, 90_000)
+
+  // A FRESH ROUND NEEDS NO RULES FILE BUT ITS OWN NEW WORKTREE'S. Here the worktree of the run it follows is gone, and the
+  // sandbox's own repository holds no rules file either. Before, a fresh round looked for the rules files in those two
+  // places only, and was refused with "has no chapters to read", although the commit its new worktree is cut from holds
+  // them. Now its new worktree is made at that cut first, and the round starts there and checks its chapters against it.
+  // MUTATION: commandRound checks a fresh round's chapters against the sandbox's repository when the worktree of the run
+  // it follows is gone, as before: red (refused, no chapters to read).
+  it("starts a fresh round whose followed run's worktree is gone when the sandbox's repository holds no rules file", async () => {
+    rmSync(first.cwd, { recursive: true, force: true })
+    rmSync(join(dir, 'worktrees', `${AGENT}-second`), { recursive: true, force: true })
+    const clones = join(dir, 'repo', RULES)
+    const kept = readFileSync(clones, 'utf8')
+    rmSync(clones)
+    try {
+      const worktree = join(realpathSync(join(dir, 'worktrees')), `${AGENT}-fresh-no-clone-rules`)
+      const words = theDoorsWords({ handle: AGENT, brief: brief('fresh-no-clone-rules.md', '# A made-up repair brief\n'), model: CODEX_MODEL, runtime: 'codex', follows: first.run, worktree, cutFrom: git(join(scratch, 'main'), 'rev-parse', 'HEAD') })
+      const { ran, start } = await started(words)
+      expect(start.cwd).toBe(worktree)
+      expect(ran.err).toContain(
+        `sandbox: this round starts a new conversation on runtime codex, because run ${first.run}, which --continues names, works in ${first.cwd}, which is gone; ` +
+          `it works in ${worktree}, a new worktree, and reads its chapters from GET ${THE_CHAPTERS_DOOR}, checked against the rules files in ${worktree}.`,
+      )
+      expect(ran.err).toContain(`CODE.md — ${theChaptersReadAt('')}`)
+      expect(existsSync(clones), "the round wrote a rules file into the sandbox's repository").toBe(false)
+    } finally {
+      writeFileSync(clones, kept)
+    }
+  }, 90_000)
+
+  // THE NEW WORKTREE IS MADE BEFORE THE CHAPTERS ARE READ. The launcher says that it made the worktree when it makes it,
+  // and lists the chapters, CODE.md among them, once it has read them. So the making line coming before that list proves
+  // the chapters were read with the new worktree already there, at the round's cut, and checked against it. Before, a
+  // fresh round's worktree was made inside the filing, after its chapters were read and listed, so the line came after.
+  // MUTATION: commandRound leaves the making of a fresh round's worktree to the filing, as before: red.
+  it("makes a fresh repair's new worktree at its cut before it reads its chapters", async () => {
+    const cut = git(join(scratch, 'main'), 'rev-parse', 'HEAD')
+    const repair = aFreshRepair(`${DOOR_AGENT}-fresh-made-first`, 'codex', CODEX_MODEL)
+    const { ran, start } = await started(repair.words)
+    const made = ran.err.indexOf(`sandbox: --worktree ${repair.worktree} did not exist, so it was made: `)
+    const read = ran.err.indexOf(`CODE.md — ${theChaptersReadAt('')}`)
+    expect(made, ran.err).toBeGreaterThanOrEqual(0)
+    expect(read, ran.err).toBeGreaterThan(made)
+    expect(start.cwd).toBe(repair.worktree)
+    expect(git(repair.worktree, 'rev-parse', 'HEAD')).toBe(cut)
+  }, 90_000)
+
+  // A REFUSAL AFTER THE MAKING REMOVES THE NEW WORKTREE, AND NO RUN IS FILED. First a cut whose tree holds no rules file:
+  // the round makes its worktree there, finds no rules file to check its chapters against, and is refused. Before, it
+  // checked them against the worktree of the run it follows, which holds one, and started. Then a declaration beside the
+  // brief that the chapter reader refuses: that reader throws after the making, and the throw is refused as the round's
+  // own refusal, which removes the worktree. Before, the declaration was read before anything was made, so the second
+  // part fails on the old code only on the making line; it proves that a thrown refusal leaves no worktree behind.
+  // MUTATION: commandRound checks a fresh round's chapters against the worktree of the run it follows, as before: red (it
+  // starts). And: refuse() leaves the unfiled worktree: red. And: the round's dispatch lets a thrown refusal end the
+  // process without refuse(): red (the second worktree is left).
+  it("removes a fresh repair's new worktree when the round is refused after the making, and files no run", async () => {
+    const main = join(scratch, 'main')
+    const kept = readFileSync(join(main, RULES), 'utf8')
+    git(main, 'rm', '-q', RULES)
+    git(main, 'commit', '-q', '-m', 'a cut with no rules file')
+    try {
+      const cut = git(main, 'rev-parse', 'HEAD')
+      const worktree = join(realpathSync(join(dir, 'worktrees')), `${DOOR_AGENT}-fresh-no-rules`)
+      const before = { runs: await theRuns(), starts: startsOf(dir).length }
+      const words = theDoorsWords({ handle: DOOR_AGENT, brief: brief('fresh-no-rules.md', '# A made-up repair brief\n'), model: CODEX_MODEL, runtime: 'codex', follows: doorFirst.run, worktree, cutFrom: cut })
+      const ran = await sandbox([...words, '--verbose'])
+      expect(ran.status, ran.err).toBe(1)
+      expect(ran.err).toContain(`sandbox: --worktree ${worktree} did not exist, so it was made: `)
+      expect(ran.err).toContain(`A fresh round of ${DOOR_AGENT} has no chapters to read: its new worktree ${worktree}, made at its cut ${cut}, holds no ${RULES}. Nothing was started.`)
+      expect(ran.err).not.toContain('was left for inspection')
+      expect(existsSync(worktree), 'the refused round left its new worktree').toBe(false)
+      expect(startsOf(dir).length).toBe(before.starts)
+      expect(await theRuns(), 'a refused round filed a run').toEqual(before.runs)
+    } finally {
+      mkdirSync(join(main, dirname(RULES)), { recursive: true })
+      writeFileSync(join(main, RULES), kept)
+      git(main, 'add', RULES)
+      git(main, 'commit', '-q', '-m', 'the rules file again')
+    }
+
+    const worktree = join(realpathSync(join(dir, 'worktrees')), `${DOOR_AGENT}-fresh-bad-declaration`)
+    const file = brief('fresh-bad-declaration.md', '# A made-up repair brief\n')
+    writeFileSync(`${file}.round.json`, JSON.stringify({ notAKeyOfADeclaration: 1 }))
+    const before = { runs: await theRuns(), starts: startsOf(dir).length }
+    const words = theDoorsWords({ handle: DOOR_AGENT, brief: file, model: CODEX_MODEL, runtime: 'codex', follows: doorFirst.run, worktree, cutFrom: git(main, 'rev-parse', 'HEAD') })
+    const ran = await sandbox([...words, '--verbose'])
+    expect(ran.status, ran.err).toBe(1)
+    expect(ran.err).toContain(`sandbox: --worktree ${worktree} did not exist, so it was made: `)
+    expect(ran.err).toContain('sandbox: Round chapter delivery: invalid declaration ')
+    expect(ran.err).not.toContain('was left for inspection')
+    expect(existsSync(worktree), 'the refused round left its new worktree').toBe(false)
+    expect(startsOf(dir).length).toBe(before.starts)
+    expect(await theRuns(), 'a refused round filed a run').toEqual(before.runs)
   }, 90_000)
 })

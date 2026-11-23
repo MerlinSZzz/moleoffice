@@ -121,6 +121,14 @@ export interface Pointed {
    */
   kept: Range | null
   /**
+   * THE WORDS A VIEW GAVE FOR THE PRESS, WHOLE AND AS THE VIEW GAVE THEM: the words selected in it, or with none
+   * selected, the words it draws under the pointer. Absent when no view around the press gave any.
+   *
+   * A terminal keeps its selection where the page's selection does not see it, so `kept` is null there. `place` is a
+   * quote of these words, and a quote keeps only the opening of long words. The box's Copy press takes these.
+   */
+  held?: string
+  /**
    * Every `data-target` this walk had to skip because it could not be read.
    *
    * A malformed attribute names a different thing from the one the element meant, so the walk
@@ -128,6 +136,16 @@ export interface Pointed {
    * It is reported so a screen can say so instead of the mark silently not appearing.
    */
   problems: string[]
+  /**
+   * THE NAME OF THE FILE THE PRESS WAS IN, when it was inside the office's reader of one file, and no key otherwise.
+   * It is read off `SHOWN_FILE_ATTRIBUTE` for the chip above the composer. It is sent as the `file` of a quote place.
+   */
+  inFile?: string
+  /**
+   * THE PAGE OF THAT FILE, counted from 1, when the press was on one page of a PDF the office draws, and no key
+   * otherwise. It is read off `SHOWN_PAGE_ATTRIBUTE` for the same chip. It is sent as the `page` of a quote place.
+   */
+  inPage?: number
 }
 
 // ============================================================================ walking the tree
@@ -475,6 +493,52 @@ export function nameAttributes(name: string): Record<string, string> {
  * renders it. So it points at that element instead of quoting it.
  */
 export const DRAWS_THE_NAME: Readonly<Record<string, string>> = { [NAME_ATTRIBUTE]: '' }
+
+/**
+ * THE FILE WHOSE WORDS AN ELEMENT DRAWS, on the root of the office's reader of one file: a Word document, a text file
+ * or a Markdown file drawn as the page's own words (src/web/components/SummaryBlocks.tsx).
+ *
+ * The file's words are held in no record, so words selected there are kept as a quote. A quote says what the words
+ * are and not where they came from, so the chip reads the file's name off this mark. It is drawn on the chip and is
+ * not stored: what a comment is filed against is still the target of the element that holds the reader.
+ */
+export const SHOWN_FILE_ATTRIBUTE = 'data-shown-file'
+
+/** `{ 'data-shown-file': 'notes.docx' }` — the name the record gives the file, on the reader that draws its words. */
+export function shownFileAttributes(name: string): Record<string, string> {
+  return { [SHOWN_FILE_ATTRIBUTE]: name }
+}
+
+/**
+ * THE PAGE A PDF'S WORDS ARE DRAWN ON, on each page of a PDF the office draws, counted from 1. The words of a PDF do
+ * not say which page they are on, so the chip reads the page off this mark, as it reads the file, and a quote place
+ * sends both.
+ */
+export const SHOWN_PAGE_ATTRIBUTE = 'data-shown-page'
+
+/**
+ * The file whose reader holds this node, and the page of it when the node is on one page of a PDF, or no key at all
+ * when no reader of one file holds it. A page mark outside a file's reader names no file, so it is not read.
+ */
+function theFileThisWasIn(node: Node | null): { inFile?: string; inPage?: number } {
+  const element = elementOf(node)
+  const name = element?.closest(`[${SHOWN_FILE_ATTRIBUTE}]`)?.getAttribute(SHOWN_FILE_ATTRIBUTE) ?? null
+  if (name === null || name.trim() === '') return {}
+  const page = Number(element?.closest(`[${SHOWN_PAGE_ATTRIBUTE}]`)?.getAttribute(SHOWN_PAGE_ATTRIBUTE) ?? '')
+  return Number.isInteger(page) && page >= 1 ? { inFile: name, inPage: page } : { inFile: name }
+}
+
+/**
+ * A QUOTE PLACE WITH THE FILE AND THE PAGE ITS WORDS WERE SELECTED IN, so the quote an agent is handed names them. No
+ * stored string holds words drawn from a file, so only a quote place carries them, and every other place is left as
+ * it is.
+ */
+function withTheFile(place: Place, inside: { inFile?: string; inPage?: number }): Place {
+  if (place.at !== 'quote' || inside.inFile === undefined) return place
+  return inside.inPage === undefined
+    ? { ...place, file: inside.inFile }
+    : { ...place, file: inside.inFile, page: inside.inPage }
+}
 
 /**
  * `{ 'data-target': 'uiSurface/composer.intent', 'data-name': 'Kind of ask' }` — a part of Mole Office's
@@ -1133,17 +1197,26 @@ function acrossPlace(range: Range, within: HTMLElement): Place | null {
  * engines, so one shape would carry two precisions with nothing saying which — and the drawing is
  * the run either way. The answer it needs was already computed at `runAt` and was thrown away.
  *
+ * AHEAD OF THE SEVEN, THE WORDS A VIEW GIVES. A terminal keeps its own selection, which neither
+ * the page's selection nor a box reports. `held` is those words, or with none selected, the words the view
+ * draws under the pointer, which `openAbout` asks of the view through `chooseTheRightClickIn` in open.ts.
+ * They are kept verbatim as a `quote`, as rule 4 keeps words that no stored string holds.
+ *
  * Exported so a test can put the six rules without opening the composer.
  */
 export function placeOf(
   node: Node | null,
   selection: Selection | null,
   pressed: { element: HTMLElement; target: Target },
+  held?: string,
 ): { place: Place; on: { element: HTMLElement; target: Target }; kept: Range | null } {
   const here = (place: Place, kept: Range | null = null) => ({ place, on: pressed, kept })
   // A page and a part of Mole Office's own screen hold no stored string, so a position inside one would
   // name characters nothing keeps. The server refuses it; this never sends it.
   const quotable = targetSpec(pressed.target.kind).holdsText
+
+  const quoted = heldQuote(held)
+  if (quoted !== null) return here(quoted)
 
   // 1. WORDS SELECTED INSIDE A BOX SOMEBODY TYPES IN, which no document selection reports. It is
   // asked first because a box holding a selection is where the person's words are, and the
@@ -1198,6 +1271,21 @@ export function placeOf(
   const words = range.toString().trim()
   if (words === '') return { place: { at: 'surface' }, on: wider, kept: null }
   return { place: boundedPlace({ at: 'quote', words }), on: wider, kept }
+}
+
+/**
+ * The words a view gave, whole and as the view gave them, or null when it gave none. Blank space alone is
+ * none. The quote and the words the box copies are both read from this, so the two cannot disagree about whether
+ * words were held. open.ts reads the words selected in a view with it, to say whether any were selected.
+ */
+export function heldWords(held: string | undefined): string | null {
+  return held === undefined || held.trim() === '' ? null : held
+}
+
+/** The words a view gave, as a `quote`, or null when it gave none. */
+function heldQuote(held: string | undefined): Place | null {
+  const words = heldWords(held)
+  return words === null ? null : boundedPlace({ at: 'quote', words: words.trim() })
 }
 
 /**
@@ -1261,8 +1349,11 @@ function runRepeatsTheRegion(target: Target, run: { field: string; offset: numbe
  * a thing that holds no words of its own — the second branch when the press lands on a part of the
  * rail, the first when it lands on nothing at all and the answer is the page. A press on anything
  * that holds stored text gets none, and `seenRuleFor` is the one place that is decided.
+ *
+ * `held` IS THE WORDS A VIEW GIVES, quoted ahead of every other place on both branches. Both branches
+ * also carry them whole, for the box's Copy press, since the quote keeps only the opening of long words.
  */
-export function pointedAt(node: Node | null, selection: Selection | null): Pointed {
+export function pointedAt(node: Node | null, selection: Selection | null, held?: string): Pointed {
   const found = addressableAt(node)
   if (found === null) {
     // THE PAGE IS NAMED ONCE. The shell draws the page's own name beside the page's key, so when
@@ -1274,21 +1365,27 @@ export function pointedAt(node: Node | null, selection: Selection | null): Point
     const floor = theFloor()
     const page = thePage()
     const element = floor ?? document.body
+    const inside = theFileThisWasIn(node)
     return {
       element,
       context: { target: page, ...withSeen(theScreenThisWasSeenOn(element, page)) },
       about: floor === null ? pageName() : nameOnScreen(floor),
-      place: { at: 'surface' },
+      place: withTheFile(heldQuote(held) ?? { at: 'surface' }, inside),
       kept: null,
+      ...withHeld(held),
       problems: [],
+      ...inside,
     }
   }
   const { element, target, problems } = found
-  const { place, on, kept } = placeOf(node, selection, { element, target })
+  const inside = theFileThisWasIn(node)
+  const { place: placed, on, kept } = placeOf(node, selection, { element, target }, held)
+  const place = withTheFile(placed, inside)
   return {
     element: on.element,
     about: nameOnScreen(on.element),
     problems,
+    ...inside,
     // THE PLACE IS WHAT IS SENT, AND THE SPAN IS NOT SENT BESIDE IT. `checkPlace` on the server
     // refuses a context carrying both, because one fact in two fields is free to name two different
     // sets of words. Every reader that wants a span calls `spanOf(context.place)`.
@@ -1316,7 +1413,14 @@ export function pointedAt(node: Node | null, selection: Selection | null): Point
     },
     place,
     kept,
+    ...withHeld(held),
   }
+}
+
+/** `held` when a view gave words, and no key at all when it did not, as `withSeen` below does for `seen`. */
+function withHeld(held: string | undefined): { held?: string } {
+  const words = heldWords(held)
+  return words === null ? {} : { held: words }
 }
 
 /**

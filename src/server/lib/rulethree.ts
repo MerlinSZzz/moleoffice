@@ -39,7 +39,7 @@
  * looking at is the refusal that came first, and that is the part nobody can look up.
  */
 
-import { and, asc, eq } from 'drizzle-orm'
+import { and, asc, eq, sql } from 'drizzle-orm'
 
 import { db } from '../db/client.ts'
 import { changes, revisions } from '../db/schema.ts'
@@ -110,7 +110,8 @@ export function theRuleThreeSignature(workspaceId: string): RuleThreeReading {
     .select()
     .from(revisions)
     .where(eq(revisions.workspaceId, workspaceId))
-    .orderBy(asc(revisions.recordId), asc(revisions.seq))
+    // The `+` keeps SQLite from choosing `revisions_workspace_record_op_at_idx` to skip the sort.
+    .orderBy(sql`+${revisions.recordId}`, asc(revisions.seq))
     .all()
 
   const candidates: ACandidate[] = []

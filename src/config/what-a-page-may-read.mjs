@@ -24,7 +24,6 @@
  * it without a build step.
  */
 
-import { aPageOnThisMachine } from './settings.mjs'
 import { CALL_ID_HEADER } from './call-header.mjs'
 import { FRESHNESS_HEADER } from './freshness-header.mjs'
 import { VERSION_TAG_HEADER } from './version-tag-header.mjs'
@@ -70,8 +69,9 @@ export const METHODS_A_PAGE_MAY_USE = ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'D
  * another origin cannot prove who it is. That is the shape `npm run dev` has: Vite serves the page on
  * one port and the API answers on another.
  *
- * IT LETS NO NEW PAGE IN. The origins admitted are still only the ones `mayAPageOnThisOriginRead`
- * admits, and the reply names that one origin rather than `*`, which is what the browser demands.
+ * IT LETS NO NEW PAGE IN. The origins admitted are only the ones the Origin check in
+ * `src/server/lib/an-origin-that-is-not-this-office.ts` takes as this office's, and the reply names that one origin
+ * rather than `*`, which is what the browser demands.
  *
  * ONE RULE, READ IN TWO PLACES. `src/server/index.ts` passes it to the CORS plugin as `credentials`.
  * `whatToTellAPageOnAnotherOrigin` below writes the header for the event stream, whose reply no hook
@@ -84,50 +84,24 @@ export const METHODS_A_PAGE_MAY_USE = ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'D
 export const A_PAGE_MAY_SEND_ITS_COOKIE = true
 
 /**
- * The CORS headers a reply owes a page on another origin, or nothing at all.
+ * The CORS headers a reply that writes its own headers owes a page whose origin the Origin check took.
  *
- * NOTHING AT ALL IS AN ANSWER, and it is the right one twice: for a caller that sent no `Origin` —
- * curl, a tool, an agent, anything that is not a page — and for a page on an origin this
- * installation does not declare. In the second case the browser refuses the reply, which is what
- * `originsAPageMayBeOn` is for.
+ * IT IS FOR A REPLY THAT WRITES ITS OWN HEADERS: the event stream and a terminal's stream, whose hijacked replies no
+ * hook reaches. Everything else gets these from the CORS answer in `src/server/index.ts`, which reads the same decision
+ * of the Origin check, this same list of headers and the same cookie rule. Which origins are taken, and which get no
+ * headers at all, is decided once, in `src/server/lib/an-origin-that-is-not-this-office.ts`.
  *
- * IT IS FOR A REPLY THAT WRITES ITS OWN HEADERS. Everything else gets these from the CORS plugin,
- * which reads the same list of origins, this same list of headers and the same cookie rule.
- *
- * @param {string | undefined} origin The `Origin` header the request carried, if any.
- * @param {readonly string[]} originsAllowed What `originsAPageMayBeOn` says for this installation.
+ * @param {string} origin The `Origin` header the request carried, which the Origin check took.
+ * @param {boolean} withItsCookie Whether the page may also send its cookie, when `A_PAGE_MAY_SEND_ITS_COOKIE` allows it.
  * @returns {Record<string, string>}
  */
-export function whatToTellAPageOnAnotherOrigin(origin, originsAllowed) {
-  if (origin === undefined || !mayAPageOnThisOriginRead(origin, originsAllowed)) return {}
+export function whatToTellAPageOnAnotherOrigin(origin, withItsCookie) {
   return {
     'access-control-allow-origin': origin,
     // WHICH REPLY IS FOR WHICH ORIGIN. Without it a cache could hand a reply made for one origin to
     // a page on another, and the page would be refused for a reason nothing on it explains.
     vary: 'Origin',
     'access-control-expose-headers': HEADERS_A_PAGE_MAY_READ.join(', '),
-    ...(A_PAGE_MAY_SEND_ITS_COOKIE ? { 'access-control-allow-credentials': 'true' } : {}),
+    ...(withItsCookie && A_PAGE_MAY_SEND_ITS_COOKIE ? { 'access-control-allow-credentials': 'true' } : {}),
   }
-}
-
-/**
- * MAY A PAGE ON THIS ORIGIN READ THIS INSTALLATION'S REPLIES? One answer, asked in two places.
- *
- * `src/server/index.ts` asks it in the CORS plugin's callback, for every ordinary reply.
- * `src/server/api/events.ts` asks it through `whatToTellAPageOnAnotherOrigin` above, because a
- * hijacked reply gets no hook of any kind and has to write its own headers. Until 4 September the
- * two disagreed: the plugin allowed a page anywhere on this machine and the stream allowed only the
- * declared origins, so a page that had walked into another world could read every record and lost
- * its live channel with nothing on screen saying why. Problem `PjlpSf-hizZA`.
- *
- * NO ORIGIN IS NOT A PAGE. curl, a tool and an agent send none, and there is nothing to allow or
- * refuse; the caller above turns that into no headers rather than into a refusal.
- *
- * @param {string | undefined} origin
- * @param {readonly string[]} originsAllowed What `originsAPageMayBeOn` says for this installation.
- * @returns {boolean}
- */
-export function mayAPageOnThisOriginRead(origin, originsAllowed) {
-  if (origin === undefined) return true
-  return originsAllowed.includes(origin) || aPageOnThisMachine(origin)
 }

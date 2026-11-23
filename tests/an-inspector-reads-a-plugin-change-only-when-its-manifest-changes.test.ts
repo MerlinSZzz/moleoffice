@@ -17,9 +17,8 @@ import { THE_TEST_OFFICES_SECRETARY } from './a-page-of-a-test-office.ts'
  *   3. A change to a plugin and to anything else, here the interface the plugin reads, is read as any change: the
  *      normal path. The prompt says nothing of the rule, and the line says it does not apply.
  *
- * The secret scan and the privacy gate of a plugin-only change run at the merge queue's test step, which
- * tests/a-plugin-only-change-is-tested-by-its-own-check.test.ts proves; the queue's half of this rule, which asks no
- * check again for such a change, is proved in tests/merge-state-machine.test.ts, section 12.
+ * The secret scan and the privacy gate of a plugin-only change run at the merge queue's test step. The queue's half
+ * of this rule asks no check again for such a change.
  *
  * The plugin is made up, and every file in the checkouts is synthetic. The checkouts are made in the system's temporary
  * folder and removed after. Nothing here touches the live office's port.

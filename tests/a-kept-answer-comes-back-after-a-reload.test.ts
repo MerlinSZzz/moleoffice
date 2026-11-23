@@ -201,8 +201,10 @@ it('3. an answer kept in another tab comes into the box, and a change still wait
     await route.continue()
   })
   const first = app.page.waitForResponse((reply) => reply.url().endsWith('/answers/q-glaze'))
+  // The pause keeps the words: the person types on once that keep has left, not after a fixed time.
+  const keptByThePause = app.page.waitForRequest((request) => request.url().endsWith('/answers/q-glaze'))
   await typeLines(choiceBox(), [MINE[0]!])
-  await app.page.waitForTimeout(1300)
+  await keptByThePause
   await app.page.keyboard.press('Enter')
   await app.page.keyboard.type(MINE[1]!)
   await first

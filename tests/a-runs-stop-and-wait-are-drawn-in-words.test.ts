@@ -3,6 +3,7 @@
 import { createElement as h } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { enWave13y } from '../src/shared/words/en-wave-13y.ts'
 
 type Shown = typeof import('../src/web/components/TheStopAndWaitOfARun.tsx')
 type Mode = typeof import('../src/web/lib/mode.ts')
@@ -27,6 +28,10 @@ beforeAll(async () => {
 afterAll(() => {
   mode.setMode('normal')
 })
+
+/** The state line a panel draws above its facts, as the markup holds it. */
+const stateLine = (key: 'w13s.stop.sessionLimitWord' | 'w13s.stop.quotaWord' | 'w13s.stop.loginWord' | 'w13s.wait.waitingWord' | 'w13s.wait.notGoingWord') =>
+  `<p class="sw-state">${enWave13y[key]}</p>`
 
 /** The drawn text, with the style sheet and the tags taken out and the quotes put back. */
 function textOf(html: string): string {
@@ -64,16 +69,18 @@ describe("a run's stop and its wait on a limit, on the run's page", () => {
   it('1. a stop is drawn at alarm rank with its cause, its words, its time and its reset', () => {
     const html = stopOf({ state: 'crashed', stopCause: A_GO_STOP })
     expect(html).toContain('data-rank="0"')
+    expect(html).toContain(stateLine('w13s.stop.quotaWord'))
     const text = textOf(html)
     expect(text).toContain('Why it stopped')
-    expect(text).toContain('It stopped because it reached a usage limit.')
     expect(text).toContain('“Made-up: Go usage limit reached. It will reset in 2 hours.”')
     expect(text).toContain(`When ${drawnTime(A_GO_STOP.at)}`)
     expect(text).toContain(`Resets ${drawnTime(A_GO_STOP.resetsAt)} Reset time named by the error, as OpenCode's retry read it: "It will reset in 2 hours".`)
 
-    expect(textOf(stopOf({ stopCause: { ...A_GO_STOP, kind: 'session-limit' } }))).toContain('It stopped because it reached a session limit.')
-    expect(textOf(stopOf({ stopCause: { ...A_GO_STOP, kind: 'login' } }))).toContain('It stopped because it was not logged in.')
-    expect(textOf(stopOf({ stopCause: { ...A_GO_STOP, kind: 'made-up-cause' } }))).toContain('It stopped for a reason the office has no words for: made-up-cause.')
+    expect(stopOf({ stopCause: { ...A_GO_STOP, kind: 'session-limit' } })).toContain(stateLine('w13s.stop.sessionLimitWord'))
+    expect(stopOf({ stopCause: { ...A_GO_STOP, kind: 'login' } })).toContain(stateLine('w13s.stop.loginWord'))
+    expect(stopOf({ stopCause: { ...A_GO_STOP, kind: 'made-up-cause' } })).toContain(
+      `<p class="sw-state">${enWave13y['w13s.stop.otherWord'].replace('{kind}', 'made-up-cause')}</p>`,
+    )
   })
 
   it('2. a reset in words is drawn as written, and a stop with no time and no reset says so', () => {
@@ -89,9 +96,9 @@ describe("a run's stop and its wait on a limit, on the run's page", () => {
   it('3. a wait is drawn plainly with its words, when it was seen, its reset, the attempt and whose limit it is', () => {
     const html = waitOf({ state: 'running', waitingOnALimit: A_GO_WAIT })
     expect(html).toContain('data-rank="1"')
+    expect(html).toContain(stateLine('w13s.wait.waitingWord'))
     const text = textOf(html)
     expect(text).toContain('Waiting on a usage limit')
-    expect(text).toContain('It is waiting for a usage limit to reset. OpenCode will try again by itself.')
     expect(text).toContain('“Made-up: Go usage limit reached. It will reset in 2 hours.”')
     expect(text).toContain(`Seen ${drawnTime(A_GO_WAIT.seenAt)}`)
     expect(text).toContain(`Resets ${drawnTime(A_GO_WAIT.resetsAt)} Reset time assumed: five hours, Go's allowance window (OpenCode's retry named no reset).`)
@@ -101,16 +108,16 @@ describe("a run's stop and its wait on a limit, on the run's page", () => {
 
   it('4. a run that is not running is not said to be waiting', () => {
     for (const state of ['finished', 'crashed', 'unknown', undefined]) {
-      const text = textOf(waitOf({ state, waitingOnALimit: A_GO_WAIT }))
-      expect(text, String(state)).toContain('It is still marked as waiting on a usage limit, but it is not marked as running.')
-      expect(text, String(state)).not.toContain('It is waiting for a usage limit to reset.')
+      const html = waitOf({ state, waitingOnALimit: A_GO_WAIT })
+      expect(html, String(state)).toContain(stateLine('w13s.wait.notGoingWord'))
+      expect(html, String(state)).not.toContain(stateLine('w13s.wait.waitingWord'))
     }
-    expect(textOf(waitOf({ state: 'idle', waitingOnALimit: A_GO_WAIT }))).toContain('It is waiting for a usage limit to reset.')
+    expect(waitOf({ state: 'idle', waitingOnALimit: A_GO_WAIT })).toContain(stateLine('w13s.wait.waitingWord'))
   })
 
   it('5. a run that keeps either in extra, as older runs do, is drawn too', () => {
-    expect(textOf(stopOf({ state: 'crashed', extra: { stopCause: A_GO_STOP } }))).toContain('It stopped because it reached a usage limit.')
-    expect(textOf(waitOf({ state: 'running', extra: { waitingOnALimit: A_GO_WAIT } }))).toContain('It is waiting for a usage limit to reset.')
+    expect(stopOf({ state: 'crashed', extra: { stopCause: A_GO_STOP } })).toContain(stateLine('w13s.stop.quotaWord'))
+    expect(waitOf({ state: 'running', extra: { waitingOnALimit: A_GO_WAIT } })).toContain(stateLine('w13s.wait.waitingWord'))
   })
 
   it('6. a run that holds neither draws nothing', () => {

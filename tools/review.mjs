@@ -6,7 +6,7 @@
  *   node tools/review.mjs
  *
  * It picks two ports nothing is holding, seeds a throwaway database, starts the API and Vite on
- * those ports, photographs every page at 1440, 990, 660 and 390 in light and dark, writes a sheet,
+ * those ports, photographs every page at 1440, 1200, 990, 660 and 390 in light and dark, writes a sheet,
  * and then SHUTS BOTH DOWN and proves the ports came back.
  *
  * THE EXIT CODE. 0 when the run reached its end, every picture was taken and every check passed.
@@ -48,15 +48,15 @@
 import { spawn } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { once } from 'node:events'
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:net'
 import { tmpdir } from 'node:os'
-import { join, relative, resolve } from 'node:path'
+import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath, URL } from 'node:url'
 import { chromium, errors } from 'playwright'
 
 import { profileSegmentFrom, recordPrefixFrom, segmentFrom, visitorSegmentFrom } from './read-the-router.mjs'
-import { refuseAStaleWorld } from './freshness.mjs'
+import { askAboutFreshness, whyNotToMeasure } from './freshness.mjs'
 import { waitForThePage } from './the-page-is-ready.mjs'
 import { whyItDrewNothing } from './the-content-floor.mjs'
 import { localStamp } from '../src/shared/time.ts'
@@ -85,18 +85,25 @@ const workFile = join(root, 'src', 'shared', 'work.ts')
 const publicCorpusFile = join(root, 'scripts', 'seed-corpus', 'public.json')
 
 /**
- * The four sizes and the two themes.
+ * The five sizes and the two themes.
  *
- * WHY FOUR AND NOT TWO. The interface is cut by two `rem` media breakpoints, `max-width: 40rem`
- * (640px) and `max-width: 60rem` (960px), written seven times between them in `src/web`. Those two
- * lines make three bands with different layouts, and until 25 August 2026 this tool took 1440 and
- * 390 — the outer two bands and nothing else. The middle band, where the records table turns into
- * one card per record while the planning board is still a board, had never been photographed. 660
- * sits inside it. 990 sits just past its top edge, which is also the narrowest window the
- * `min-width: 960px` two-column rule fires at and so the tightest the wide layout ever gets.
+ * WHY FOUR AND NOT TWO. This paragraph says what held on 25 August 2026. The interface was cut by
+ * two `rem` media breakpoints, `max-width: 40rem` (640px) and `max-width: 60rem` (960px). Those two
+ * lines made three bands with different layouts, and until that day this tool took 1440 and 390 —
+ * the outer two bands and nothing else. The middle band, where the records table turned into one
+ * card per record while the planning board was still a board, had never been photographed. 660 sat
+ * inside it. 990 sat just past its top edge, which was also the narrowest window the
+ * `min-width: 960px` two-column rule fired at and so the tightest the wide layout ever got.
+ * `src/web` has held two more `rem` breakpoints since, `min-width: 64rem` (1024px) and
+ * `min-width: 80rem` (1280px), and the next paragraph says which width covers the band between them.
  *
- * The widths are also what `design/round-ten/before/` was taken at, so a picture from that set and
- * a picture from a run today are the same width and can be put side by side.
+ * WHY 1200 AS WELL. The departments page changes at `min-width: 80rem` (1280px): from there a row's
+ * "what it does" takes a fourth column. No width here sat between 1024px and 1280px, so the
+ * three-column layout of that band was never photographed. 1200 sits inside it. Not 1280, because
+ * `min-width: 80rem` already applies at 1280px, so a picture there draws what 1440 draws.
+ *
+ * 1440, 990, 660 and 390 are also what `design/round-ten/before/` was taken at, so a picture from
+ * that set and a picture from a run today are the same width and can be put side by side.
  *
  * `name` is for a person reading this list. Nothing reads it — a picture is named by its width.
  *
@@ -110,6 +117,7 @@ const publicCorpusFile = join(root, 'scripts', 'seed-corpus', 'public.json')
  */
 const VIEWPORTS = [
   { name: 'desktop', width: 1440, height: 1000 },
+  { name: 'wide desk', width: 1200, height: 1000 },
   { name: 'narrow desk', width: 990, height: 1000 },
   { name: 'tablet', width: 660, height: 900 },
   { name: 'phone', width: 390, height: 844 },
@@ -1296,6 +1304,7 @@ async function proveLayoutIsDerived(browser, records, shots, pageAddress) {
     const withLink = await shoot('derived-2-with-a-new-link.png', 'with one more stored link')
     const removed = await fetch(`http://127.0.0.1:${apiPort}/api/links/${encodeURIComponent(linkId)}`, {
       method: 'DELETE',
+      headers: { 'x-mole-office-workspace': 'default' },
     })
     if (!removed.ok) {
       return `NOT PROVED — the link was added and could not be removed again (${removed.status}), so the third picture is missing and the claim is only half tested. The database is a throwaway, so nothing real was left behind.`
@@ -1991,7 +2000,20 @@ ${sections}
 
 // ---------------------------------------------------------------------------- the run
 
-const dbFile = join(tmpdir(), `mole-office-review-${process.pid}.db`)
+/**
+ * A new, empty folder for one review, and the throwaway database it names in that folder. The API server writes more
+ * beside its database than the database: keys.json, its lock or its end note, and the folders avatars and
+ * portrait-copies. In a folder of the review's own, all of that is removed with the folder, and two reviews share no path.
+ * @param {string} [under] the folder to make it in; the temporary folder unless a caller names another
+ */
+export function aFolderForTheReview(under = tmpdir()) {
+  const folder = mkdtempSync(join(under, 'mole-office-review-'))
+  return { folder, db: join(folder, 'review.db') }
+}
+
+/** The review's own folder and its database, made in main and removed by the shutdown; null until main makes them. */
+let runFolder = null
+let dbFile = null
 let apiPort = null
 let webPort = null
 
@@ -2078,6 +2100,9 @@ export function theReviewEnvironment(caller, apiPort, webPort, dbFile, say = con
     MOLE_OFFICE_PORT: String(apiPort),
     MOLE_OFFICE_WEB_PORT: String(webPort),
     MOLE_OFFICE_DB: dbFile,
+    // ITS OWN VITE CACHE, in the folder of its database, so that it goes with that folder. With none named here, Vite
+    // kept its dependency cache in the checkout the review ran from, at .cache/vite.
+    MOLE_OFFICE_VITE_CACHE: join(dirname(dbFile), 'vite-cache'),
     // Round 16 draws the first-run guide on every page until the owner is named. Give this
     // throwaway office a made-up owner so review photographs the pages (wPqnA92Ta8Kb; GB5jW-UGbDA0).
     // It is the test offices' invented owner, read from the one place it is written, and never the
@@ -2122,6 +2147,22 @@ export function theRunThisReviewPhotographs(records) {
   return found[0]
 }
 
+/**
+ * Whether the API this review started serves the checkout's code: the reply when it does, and a throw when it does not
+ * or nothing answers. It throws rather than end the process as refuseAStaleWorld in tools/freshness.mjs does, because
+ * the process's end would skip the `finally` that stops the two servers this review started.
+ * @param {string} api the address of the API
+ */
+export async function theWorldIsFreshOrThrow(api) {
+  const what = 'tools/review.mjs'
+  const reply = await askAboutFreshness(api).catch((err) => {
+    throw new Error(`${what} did not measure anything.\n${err.message}`)
+  })
+  const why = whyNotToMeasure(reply)
+  if (why !== null) throw new Error(`${what} did not measure anything, because the world it would have measured is stale.\n${why}`)
+  return reply
+}
+
 async function main() {
   // READ THE ARGUMENT BEFORE SPENDING THREE MINUTES. `--expected` with no reason is refused, and
   // finding that out after 101 screenshots have been taken is a waste of somebody's afternoon. The
@@ -2143,6 +2184,9 @@ async function main() {
   // escaping.
   const visitorSegment = visitorSegmentFrom(readFileSync(visitorFile, 'utf8'), visitorFile)
 
+  const made = aFolderForTheReview()
+  runFolder = made.folder
+  dbFile = made.db
   apiPort = await freePort()
   webPort = await freePort()
   const env = theReviewEnvironment(process.env, apiPort, webPort, dbFile)
@@ -2176,7 +2220,7 @@ async function main() {
   // check is cheap to keep: the one time it is not, the pictures are of code nobody has any more,
   // and two whole gate runs were invalidated by exactly that on 2 September 2026. Asking the server
   // is the only honest way: only it knows what it loaded.
-  await refuseAStaleWorld(`http://127.0.0.1:${apiPort}`, 'tools/review.mjs')
+  await theWorldIsFreshOrThrow(`http://127.0.0.1:${apiPort}`)
 
   // A real record id, so the record page is a page and not a not-found.
   //
@@ -2771,9 +2815,9 @@ async function main() {
 async function shutdown() {
   for (const service of [...started].reverse()) await stopGroup(service)
 
-  // SQLite leaves two sidecar files next to the database; deleting only the database would leave
-  // a journal for a file that no longer exists.
-  for (const file of [dbFile, `${dbFile}-wal`, `${dbFile}-shm`]) rmSync(file, { force: true })
+  // THE WHOLE FOLDER GOES. Beside the database, SQLite keeps two journal files and the API server writes keys.json, its
+  // lock or end note and two folders. Removing only the database and its journals left the rest in the temporary folder.
+  if (runFolder !== null) rmSync(runFolder, { recursive: true, force: true })
 
   const stuck = []
   for (const [label, port] of [

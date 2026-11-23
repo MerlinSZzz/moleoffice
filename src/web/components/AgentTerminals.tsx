@@ -70,9 +70,9 @@ export function AgentTerminals({ agentId }: { agentId: string }): React.ReactEle
     if (terminals === null) return <HolderSays holder={holder} onChanged={readAgain} />
     const { own, views, opened } = theAgentsTerminals(terminals, agentId)
     const theOpenOne = [...own, ...views, ...opened].find((one) => one.id === open) ?? null
-    const rows = (list: ListedTerminal[], none: string, said = false) =>
+    const rows = (list: ListedTerminal[], none: string, word?: string) =>
       list.length === 0 ? (
-        <p className="tm-prof-none"><Absence tier="ordinary" title={none} say={said} /></p>
+        <p className="tm-prof-none"><Absence tier="ordinary" word={word} title={none} /></p>
       ) : (
         <ul className="tm-prof-rows">
           {list.map((one) => (
@@ -92,17 +92,16 @@ export function AgentTerminals({ agentId }: { agentId: string }): React.ReactEle
           <Btn size="sm" onClick={() => void openIt()} pending={opening}>
             {t('terminals.agent.openPress')}
           </Btn>
-          {opening ? <span className="tm-prof-note">{t('terminals.agent.opening')}</span> : null}
         </div>
         {refused === null ? null : (
-          <p className="tm-prof-note" role="alert">
+          <p className="tm-prof-line" role="alert">
             {t('terminals.agent.openRefused')} {refused}
           </p>
         )}
-        {openedWithoutAKey ? <p className="tm-prof-note" role="status">{t('terminals.agent.noKey')}</p> : null}
+        {openedWithoutAKey ? <p className="tm-prof-line" role="status">{t('terminals.agent.noKeyWord')}</p> : null}
         <h3 className="tm-prof-sub">{t('terminals.profile.own')}</h3>
-        {/* SAID, NOT A DASH (round 109): an agent in a terminal the person opened is not listed, and the page says so. */}
-        {rows(own, t('terminals.profile.noOwn'), true)}
+        {/* A WORD, NOT A DASH (round 109): an agent in a terminal the person opened is not listed, and the tooltip says so. */}
+        {rows(own, t('terminals.profile.notListed'), t('absence.none'))}
         {/* A VIEW OF ITS PANE IS NOT ITS OWN TERMINAL (round 11), and is listed only when one is held. */}
         {views.length === 0 ? null : (
           <>
@@ -152,6 +151,6 @@ const AGENT_TERMINALS_CSS = `
 .tm-prof-state { color: var(--text-2); white-space: nowrap; }
 .tm-prof-project { color: var(--text-2); }
 .tm-prof-open { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin: 0.25em 0 0.5em 0; }
-.tm-prof-note { margin: 0.25em 0; color: var(--text-2); }
+.tm-prof-line { margin: 0.25em 0; color: var(--text-2); }
 .tm-prof-all { margin: 0.75em 0 0 0; }
 `

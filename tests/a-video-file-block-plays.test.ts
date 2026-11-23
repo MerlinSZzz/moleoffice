@@ -139,9 +139,10 @@ it('plays a video by the door content type, keeps every file press, and draws a 
   expect(properties.preload).toBe('metadata')
   expect(properties.src).toContain(`/api/file?path=${encodeURIComponent(videoPath)}&record=${report}&workspace=default`)
   expect(properties.src).not.toMatch(/^blob:/)
-  // THE VIDEO FIGURE AND THE SOURCE FILE EACH CARRY ONE OPEN PRESS; THE PDF CARRIES THE SHOW PRESS.
-  // In the current drawing a PDF is drawn by FileShownHere, so it has no Open link and one press to show it.
-  expect(await app.page.locator('.sb-file-open').count()).toBe(2)
+  // THE VIDEO FIGURE, THE PDF AND THE SOURCE FILE EACH CARRY ONE OPEN PRESS; THE PDF ALSO CARRIES THE
+  // SHOW PRESS. In the current drawing a PDF is drawn by FileShownHere, so its Open link goes to the
+  // office's own page for the file, and one press shows it here.
+  expect(await app.page.locator('.sb-file-open').count()).toBe(3)
   expect(await app.page.locator('.sb-file-show').count()).toBe(1)
   expect(await app.page.locator('.sb-file-name').allTextContents()).toEqual([
     'synthetic-recording.txt', 'not-a-video.mp4', 'source.ts',

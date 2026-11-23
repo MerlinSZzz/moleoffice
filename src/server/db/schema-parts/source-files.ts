@@ -5,6 +5,23 @@ import { aPartTable } from '../part-tables.ts'
 
 const existingDerived = { existingDerived: true } as const
 
+// ---------------------------------------------------------------------------- the derived layer
+
+/**
+ * One row per source file, as the last scan found it.
+ *
+ * DERIVED. Every row is replaced wholesale on every rebuild, so nothing a person types may live
+ * here — the next scan would delete it. shared/types.ts states that rule and lib/sourceindex.ts
+ * gives the three reasons this is not the `records` table: a rebuild would eat anything written on
+ * a record, one rebuild would bury a fortnight of work in `changes`, and a hundred scanned files
+ * next to ten curated modules makes the Records page mostly machine noise.
+ *
+ * AN EXPORT MUST NOT CARRY THIS TABLE. It is rebuilt by `POST /api/source/reindex`, and a restored
+ * copy would describe the files of whichever machine it came from.
+ *
+ * No index beyond the primary key. Every query reads the whole table — a repository is hundreds of
+ * rows, not millions — and an index nothing uses still has to be written on every rebuild.
+ */
 export const sourceFiles = aPartTable(sqliteTable(
   'source_files',
   {

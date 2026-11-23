@@ -7,8 +7,8 @@
  * failed, and ends plainly when nobody proved either. These are the three callers of audit report XIHE6Qc5EGNd that
  * are drawn on a page at 1adcfbcb2:
  *
- *   1. `MarkRead` on Home ("I have read this"). Its success replaces the button with a sentence, so the press unmounts
- *      and only a refusal can show. The refusal fades with no flash, and the line that already said it failed stays.
+ *   1. `MarkRead` on a report's own page ("I have read this"), where it is drawn since the reports left Home. Its
+ *      success replaces the button with a sentence, so the press unmounts and only a refusal can show. The refusal fades with no flash, and the line that already said it failed stays.
  *   2. `LookForRuns` on Agent runs ("Look for runs on this computer"). A resolved reply proves success only when the
  *      sweep says nothing was left unread and no observed state was unstorable; a reply that says either happened
  *      ends plainly. A rejected reply is a failure. A `where` row marked "not filed" is a fact about a folder, not a
@@ -25,6 +25,7 @@
 
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import type { Page } from 'playwright'
+import { HEADERS_A_PAGE_MAY_READ } from '../src/config/what-a-page-may-read.mjs'
 import { WORLD_HEADER } from '../src/config/world-header.mjs'
 import { t } from '../src/shared/i18n.ts'
 import { THE_TEST_OFFICES_OWNER } from './a-page-of-a-test-office.ts'
@@ -40,14 +41,17 @@ const PERSON_HEADERS = {
 let app: LiveApp
 /** Which world the test office says answered, copied onto every reply this file makes up. */
 let worldAnswered = ''
-/** The reply headers a page is allowed to read, copied from the real office's own health answer. */
-let exposedHeaders = ''
+/**
+ * The reply headers a page is allowed to read: the office's own list, joined as the office joins it for a page it
+ * takes. A reply to a request with no Origin carries no CORS headers, so the test process's own health read has none
+ * to copy.
+ */
+const exposedHeaders = HEADERS_A_PAGE_MAY_READ.join(', ')
 
 beforeAll(async () => {
   app = await liveApp({ name: 'page-button-outcomes', viewport: { width: 1440, height: 900 } })
   const health = await fetch(`${app.api}/api/health`)
   worldAnswered = health.headers.get(WORLD_HEADER) ?? ''
-  exposedHeaders = health.headers.get('access-control-expose-headers') ?? ''
   if (worldAnswered === '') throw new Error('the test office did not say which world answered GET /api/health')
 }, 240_000)
 
@@ -113,7 +117,7 @@ function theHeadersThePageMayRead(): Record<string, string> {
   }
 }
 
-it('MarkRead on Home fades after a refused "I have read this", with no flash, and keeps its failure line', async () => {
+it('MarkRead on a report\'s page fades after a refused "I have read this", with no flash, and keeps its failure line', async () => {
   const made = await fetch(`${app.api}/api/records`, {
     method: 'POST',
     headers: PERSON_HEADERS,
@@ -141,7 +145,7 @@ it('MarkRead on Home fades after a refused "I have read this", with no flash, an
     await route.fulfill({ status: 500, headers: theHeadersThePageMayRead(), contentType: 'application/json', body: JSON.stringify({ error: 'The reading point could not be stored in this test.' }) })
   })
   try {
-    await page.goto(`${app.site}/#/`)
+    await page.goto(`${app.site}/#/r/${report.id}`)
     await waitForThePage(page)
     const press = page.locator('.att-rep-press .px-btn')
     await press.waitFor({ timeout: 30_000 })
@@ -227,7 +231,7 @@ it('LookForRuns flashes only for a whole sweep, ends plainly for a partial one, 
     await page.locator('.sx-look-did').waitFor({ timeout: 30_000 })
     await expect.poll(async () => (await howTheLightEnded(page)).fade, { timeout: 10_000 }).toBe(await token(page, '--motion-settle'))
     expect((await howTheLightEnded(page)).flash, 'a whole sweep lights the whole frame').toBe('yes')
-    expect(await page.locator('.sx-look-did').innerText()).toContain(t('g6a.sessions.notFiledHere', { n: 1 }))
+    expect(await page.locator('.sx-look-did').innerText()).toContain(t('g6a.sessions.notFiledCount', { n: 1 }))
 
     // A PLACE THE SWEEP COULD NOT READ: part of it was not done, so the press proves nothing.
     await forgetTheLastLight(page)
@@ -382,7 +386,7 @@ it('Install opens a terminal on success, ends plainly on a checklist, and fades 
     await page.locator('.ih-waits').waitFor({ timeout: 30_000 })
     await theLightHasGone(page)
     expect(await howTheLightEnded(page), 'a press waiting for signatures is not drawn as a success').toEqual({ flash: null, fade: null })
-    expect(await page.locator('.ih-waits').innerText()).toContain(t('harnesses.waiting.signed'))
+    expect(await page.locator('.ih-waits').innerText()).toContain(t('harnesses.state.waitingForSignatures'))
 
     // ANY OTHER REFUSAL: a failure, fading with no flash, and its own line is drawn.
     await forgetTheLastLight(page)

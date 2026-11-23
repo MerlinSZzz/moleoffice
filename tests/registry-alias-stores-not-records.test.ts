@@ -22,9 +22,9 @@
  * of the seven tables out of the census, and the sixth case goes red. Read every row whatever rows the census is given,
  * or learn a record's kind only from the records and revisions it is given, or let a list that leaves a table out pass,
  * and the seventh case goes red. Give a stamp a type that is not a string, or list who pressed a goal's confirmation or
- * who filed a goal as a registry id, and the eighth case goes red. In identity-positions.ts, give the exporter or a
- * run's opener back its actor-pair parse, or read ShortForm.by as a stamp, and the eighth case goes red, because the
- * list of stamps is not the one it names.
+ * who filed a goal as a registry id, and the eighth case goes red. In identity-positions.ts, give the exporter, a run's
+ * opener, ShortForm.by or ReportParts.by back its actor-pair parse, and the eighth case goes red, because the list of
+ * stamps is not the one it names.
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { CastingCell, CastingImage, CastingStoredCell } from '../src/shared/casting.ts'
@@ -301,7 +301,7 @@ describe('the register of the stores that are not records', () => {
     const stamps = IDENTITY_POSITIONS.filter(entry => entry.parse === 'stamp')
     expect(stamps.map(entry => entry.site).sort()).toEqual([
       'BundleExporter.actorId', 'CastingWriter.id', 'CheckAlsoGivenBy.actorId', 'GoalConfirmation.pressed_by', 'NotebookEntry.writtenById', 'ProvedHolder.claimed',
-      'RunRequest.actorId', 'SessionOpenedBy.id', 'TheCheckTheOfficeAskedFor.askedOf', 'decision.decided_by', 'goal.filed_by',
+      'ReportParts.by', 'RunRequest.actorId', 'SessionOpenedBy.id', 'ShortForm.by', 'TheCheckTheOfficeAskedFor.askedOf', 'decision.decided_by', 'goal.filed_by',
     ])
     for (const entry of stamps) {
       expect(typeOf(fieldOf(entry.site)!.type), entry.site).toEqual(typeOf('string'))

@@ -59,13 +59,9 @@ import { theKeyWindowSays } from '../db/the-key-window-says.ts'
 import { alreadyRead } from '../db/the-key-window-says.ts'
 import { theKeyWindowPath } from '../db/the-key-window-says.ts'
 import { readTheKeyWindow } from '../db/the-key-window-says.ts'
+import type { WindowRow } from '../db/types/keywindow.ts'
 
-/** How the columns read, exactly as SQLite hands them over. */
-export interface WindowRow {
-  window_closed_at: string | null
-  window_closed_by_kind: string | null
-  window_closed_by_id: string | null
-}
+export type { WindowRow } from '../db/types/keywindow.ts'
 
 export { alreadyRead } from '../db/the-key-window-says.ts'
 

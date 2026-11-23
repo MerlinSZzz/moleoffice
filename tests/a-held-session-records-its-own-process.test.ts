@@ -8,8 +8,8 @@
  * ---------------------------------------------------------------------------------------
  *
  * A durable agent's letters went to the owner twice — one agent's on 23 September 2026, another's on the 24th
- * — because the record holding the agent's handle named no process. The reading that decides needs
- * both a transcript and a live process (criteria M106 and M126), the start hook writes the process
+ * — because the record holding the agent's handle named no process. The reading that decided then
+ * needed both a transcript and a live process (criteria M106 and M126), the start hook writes the process
  * on the record IT filed, and that is not always the record a waiter holds for. So the waiter now
  * asks the office to write it: POST /api/handles/:handle/process.
  *
@@ -91,9 +91,8 @@ const AS_ARGUS = {
 /**
  * A TRANSCRIPT THAT WAS LAST WRITTEN TO TWO HOURS AGO.
  *
- * The record must carry one — without a transcript the office answers "could not be read" whatever
- * the process says (criterion M126) — and it must be old, because a fresh one would make the session
- * answer on its own and the process would be proving nothing.
+ * The record carries one, and it must be old, because a fresh one would make the session answer on
+ * its own and the process would be proving nothing.
  */
 function anOldTranscript(): string {
   transcriptNumber += 1
@@ -339,13 +338,17 @@ afterAll(async () => {
 // ============================================================ the session records its own process
 
 describe('a session holding a handle records its own process', () => {
-  it('turns the reading from nobody into a live session, from its process', async () => {
+  it('turns the reading from a live session on its hold into a live session, from its process', async () => {
     nameThisProcess('claude')
     await hold(argusSession)
 
-    // BEFORE. The handle is held and the transcript is two hours old, so nothing says the session
-    // can answer — which is exactly the state both incidents were in.
-    expect(worker.whoIsAnsweringAs(argusId, 'default').how).toBe('nobody')
+    // BEFORE. The handle is held and the transcript is two hours old. No process is recorded, so no
+    // sign turns the beating hold to not answering: the session answers on its hold alone. That was
+    // "nobody" until the hold became the base answer for every tool.
+    expect(worker.whoIsAnsweringAs(argusId, 'default').how).toBe('a live session')
+    const before = handles.theLiveHoldOn(argusId, true)
+    expect(before).not.toBeNull()
+    expect(answering.theSessionBehindTheHold(before!, 'default', new Date()).from).toBe('its hold')
 
     const said = await recordTheProcess({
       session: argusSession,

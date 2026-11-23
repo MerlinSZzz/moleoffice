@@ -1,27 +1,23 @@
 // Copyright © 2026 Zhengyang Shen
 // Licensed under the MIT License. See LICENSE.
-import { content, t } from '@shared/i18n.ts'
+import { content, sentencesJoined, t } from '@shared/i18n.ts'
+import { useState } from 'react'
 import { useLanguage } from '../lib/language.ts'
-import { sentenceOnThePage } from '../lib/server-sentences.ts'
 /**
  * THE CITIZEN'S PAGE RECORDS ITS RUNS. Criterion P91, amended 12 September 2026.
  *
  * ---------------------------------------------------------------------------------------
- * WHAT THIS DRAWS, AND WHAT IT REFUSES TO DRAW
+ * WHAT THIS DRAWS
  * ---------------------------------------------------------------------------------------
  *
- * Per run: the model and the effort the run declared, the state it ended in, its runtime, and the
- * tokens from the runtime's own receipt. The totals over the runs are drawn by `ReceiptTotals`, the
- * one summation `GET /api/usage/agents` already draws, so this page never works the tokens out a
- * second time.
+ * The newest 10 runs, one row each: the run's title, its state and its time, and a press on a row opens the run's own
+ * page, which holds its model, effort, receipt and compactions. Under them one line, "All N runs", opens every run in
+ * pages of 50 with the pager. The list is cut here; the server sends every run.
  *
- * A run with no receipt says so in words and is not drawn as zero tokens. A run with no compaction
- * draws the server's sentence for its runtime and never a zero; a run the session hook recorded
- * compactions for draws them and says who reported them. Under the totals, the compactions summed on
- * the agent say which runs the count can see, and the models and efforts its runs declared are
- * counted (wave 13k round 52). WHERE THE TIMELINE WOULD BE, the page says the timeline is not built
- * and names 11 September 2026, the day the step log was withdrawn: nothing smaller is drawn there
- * under the timeline's name.
+ * The totals over the runs are drawn by `ReceiptTotals`, the one summation `GET /api/usage/agents` already draws, so
+ * this page never works the tokens out a second time. Under the totals, the compactions summed on the agent are a
+ * short state of the server's counts, with which runs the count can see, and the models and efforts its runs declared
+ * are counted (wave 13k round 52).
  *
  * THE SERVER DECIDES EVERYTHING AND THIS DRAWS IT. The runs, the totals and the binding are worked
  * out in `theAgentsRuns`; this file has no arithmetic and no second reading of `ranAs`.
@@ -29,63 +25,86 @@ import { sentenceOnThePage } from '../lib/server-sentences.ts'
 
 import { stateWord } from '@shared/words.ts'
 import { waitingOnALimitUntil } from '../lib/a-long-wait.ts'
-import { saidOnThePage } from '@shared/dev-sayings.ts'
-import { type OneOfItsRuns, type TheAgentsDeclarations, type TheAgentsRuns as Reading } from '@shared/profile.ts'
-import { Absence, Panel } from './ui.tsx'
-import { ReceiptTotals, UsageReceipt } from './UsageReceipt.tsx'
+import { type OneOfItsRuns, type TheAgentsCompactions, type TheAgentsDeclarations, type TheAgentsRuns as Reading } from '@shared/profile.ts'
+import { Pager } from './Pager.tsx'
+import { recordPath, RouteLink } from './router.tsx'
+import { Btn, Hint, Panel } from './ui.tsx'
+import { ReceiptTotals } from './UsageReceipt.tsx'
 
-/** What is drawn where a value the run did not declare would be. Never a default. */
-function declared(value: string | null) {
-  return value ?? <Absence title={t('g6b.runs.didNotSay')} />
+/** How many of the newest runs are drawn before the line that opens them all. */
+const NEWEST = 10
+/** How many rows one page holds once every run is open. */
+const PAGE_SIZE = 50
+
+/**
+ * THE RUN'S STATE, as a person reads it. `run.state` holds the word the database keeps — `running`, `finished` — and
+ * `stateWord` gives the reading, and for a state no table names it says so rather than passing the raw word through.
+ * Criterion P91. A running run waiting more than an hour on a usage limit is drawn as waiting until its next try.
+ */
+function stateOf(run: OneOfItsRuns): string {
+  return run.waitsLongUntil === undefined ? stateWord(run.state, 'normal', 'session').text : waitingOnALimitUntil(run.waitsLongUntil)
 }
 
-function OneRun({ run }: { run: OneOfItsRuns }) {
+/** One run as one row: its title, state and time. A press opens the run's own page. */
+function OneRow({ run }: { run: OneOfItsRuns }) {
   return (
-    <li className="prof-run" data-testid="profile-run" data-run={run.id}>
-      <p className="prof-run-head">
-        <span className="prof-run-title">{run.title}</span>
-        <span className="prof-when">{run.when}</span>
-        <span className="prof-key">{t('g6b.profile.status')}</span>
-        {/*
-          THE WORD A PERSON READS AND NOT THE STORED ONE. `run.state` holds the word the database
-          keeps — `running`, `finished` — and drawing it straight into a sentence is what the
-          machine-word gate refuses: a state nobody has a reading for would then appear on their page
-          as whatever the column happened to say. `stateWord` gives the reading, and for a state no
-          table names it says so rather than passing the raw word through. Criterion P91. A running
-          run waiting more than an hour on a usage limit is drawn as waiting until its next try.
-        */}
-        <span className="prof-when">{run.waitsLongUntil === undefined ? stateWord(run.state, 'normal', 'session').text : waitingOnALimitUntil(run.waitsLongUntil)}</span>
-      </p>
-      <dl className="prof-run-facts">
-        <div className="prof-fact">
-          <dt className="prof-label">{t('g6b.runs.model')}</dt>
-          <dd className="prof-value" data-empty={run.model === null ? 'yes' : 'no'}>{declared(run.model)}</dd>
-        </div>
-        <div className="prof-fact">
-          <dt className="prof-label">{t('g6b.runs.effort')}</dt>
-          <dd className="prof-value" data-empty={run.effort === null ? 'yes' : 'no'}>{declared(run.effort)}</dd>
-        </div>
-        <div className="prof-fact">
-          <dt className="prof-label">{t('g6b.runs.runtime')}</dt>
-          <dd className="prof-value" data-empty={run.runtime === null ? 'yes' : 'no'}>{declared(run.runtime)}</dd>
-        </div>
-      </dl>
-      {run.usageReceipt === null ? (
-        <p className="prof-run-says" data-testid="run-receipt-missing">{sentenceOnThePage(run.receiptSays)}</p>
-      ) : (
-        <UsageReceipt receipt={run.usageReceipt} />
-      )}
-      {/* THE COMPACTIONS PLACE. The session hook records each compaction Claude Code reports (wave 13k
-          round 46), and a run with none draws the server's sentence for its runtime. A zero here would
-          be a measurement nobody made. With some, the server's sentence says who reported them. Both
-          are drawn in the page's language (wave 13k round 52). */}
-      <p className="prof-run-says" data-testid="run-compactions">
-        {t('g6b.runs.compactions')}: {run.compactions.length === 0
-          ? sentenceOnThePage(run.compactionsSay)
-          : `${run.compactions.map((one) => one.what === null ? one.at : t('g6b.runs.at', { what: content(one.what), at: content(one.at) })).join(', ')} (${sentenceOnThePage(run.compactionsSay)})`}
-      </p>
+    <li data-testid="profile-run" data-run={run.id}>
+      <RouteLink to={recordPath(run.id, 'session')} className="prof-row">
+        <span className="prof-row-title">{run.title}</span>
+        <span className="prof-row-state">{stateOf(run)}</span>
+        <span className="prof-row-when">{run.when}</span>
+      </RouteLink>
     </li>
   )
+}
+
+/** Every run as rows, in pages of 50, with the pager above the rows and its presses again below them. */
+function EveryRun({ runs }: { runs: readonly OneOfItsRuns[] }) {
+  const [offset, setOffset] = useState(0)
+  return (
+    <>
+      <Pager offset={offset} pageSize={PAGE_SIZE} total={runs.length} onGo={setOffset} />
+      <ul className="prof-rows">
+        {runs.slice(offset, offset + PAGE_SIZE).map((run) => <OneRow key={run.id} run={run} />)}
+      </ul>
+      <Pager offset={offset} pageSize={PAGE_SIZE} total={runs.length} onGo={setOffset} line={false} />
+    </>
+  )
+}
+
+/** The newest 10 runs as rows, and under them one line that opens every run. */
+function TheNewestRuns({ runs }: { runs: readonly OneOfItsRuns[] }) {
+  const [all, setAll] = useState(false)
+  if (all) return <EveryRun runs={runs} />
+  return (
+    <>
+      <ul className="prof-rows">
+        {runs.slice(0, NEWEST).map((run) => <OneRow key={run.id} run={run} />)}
+      </ul>
+      {runs.length <= NEWEST ? null : (
+        <div className="prof-runs-all">
+          <Btn variant="ghost" size="sm" onClick={() => setAll(true)}>
+            {t('agentRuns.all', { n: runs.length })}
+          </Btn>
+        </div>
+      )}
+    </>
+  )
+}
+
+/**
+ * THE COMPACTIONS SUMMED ON THE AGENT, as a short state of the server's counts: how many are recorded and on how many
+ * Claude Code runs, and how many runs the count cannot see. With no Claude Code run there is no number, never a zero.
+ */
+function compactionsState(counted: TheAgentsCompactions): string {
+  const parts = [
+    counted.recorded === null
+      ? t('agentRuns.compactions.noClaudeCodeRun')
+      : t('agentRuns.compactions.counted', { n: counted.recorded, runs: counted.claudeCodeRuns }),
+  ]
+  if (counted.otherRuntimeRuns > 0) parts.push(t('agentRuns.compactions.otherRuntime', { n: counted.otherRuntimeRuns }))
+  if (counted.noRuntimeRuns > 0) parts.push(t('agentRuns.compactions.noRuntime', { n: counted.noRuntimeRuns }))
+  return sentencesJoined(parts)
 }
 
 /** A value the runs declared, or the word for one they did not. Never a default. */
@@ -107,7 +126,7 @@ function TheDeclared({ declared }: { declared: TheAgentsDeclarations }) {
           ))}
         </ul>
       )}
-      {declared.neither === 0 ? null : <p className="prof-run-says">{t('g6b.runs.declaredNeither', { n: declared.neither })}</p>}
+      {declared.neither === 0 ? null : <p className="prof-runs-count">{t('g6b.runs.declaredNeither', { n: declared.neither })}</p>}
     </div>
   )
 }
@@ -116,26 +135,21 @@ export function TheAgentsRuns({ reading }: { reading: Reading }) {
   useLanguage()
   return (
     <Panel titleIs="label" declares={{ surface: 'profile.runs' }} title={t('g6b.runs.title')}>
-      {/* IN THE PAGE'S LANGUAGE (wave 13k round 35): the server's sentence, by its word. */}
-      <p className="prof-says">{sentenceOnThePage(reading.runsSay)}</p>
-      {reading.runs.length === 0 ? null : (
-        <ul className="prof-runs">
-          {reading.runs.map((run) => <OneRun key={run.id} run={run} />)}
-        </ul>
-      )}
-      {/* WHERE THE TIMELINE WOULD BE. Criterion P91: it is out until F8 comes back, and the page
-          says why and names the day rather than drawing a shorter thing under the same name. */}
-      <p className="prof-run-says prof-timeline" data-testid="run-timeline">{sentenceOnThePage(reading.timelineSays)}</p>
+      <style href="mole-office-the-agents-runs" precedence="default">
+        {THE_AGENTS_RUNS_CSS}
+      </style>
+      {reading.runs.length === 0 ? null : <TheNewestRuns runs={reading.runs} />}
       <div data-testid="agent-receipt-totals">
         <ReceiptTotals reading={reading.totals} />
       </div>
-      {/* WHAT IS SUMMED BESIDE THE TOKENS, once there is a run to sum (wave 13k round 52). The compaction count says
-          which runs it can see, in the page's language; the server decides every number. */}
       {reading.runs.length === 0 ? null : (
         <>
           <div className="prof-summed" data-testid="agent-compactions-counted">
-            <p className="prof-label">{t('g6b.runs.compactionsSummed')}</p>
-            <p className="prof-run-says">{saidOnThePage(reading.compactionsCounted.said, reading.compactionsCounted.says)}</p>
+            <div className="prof-label prof-summed-head">
+              {t('g6b.runs.compactionsSummed')}
+              <Hint>{t('devWords.said.agentCompactionsOnlyClaudeCode')}</Hint>
+            </div>
+            <p className="prof-runs-count">{compactionsState(reading.compactionsCounted)}</p>
           </div>
           <TheDeclared declared={reading.declared} />
         </>
@@ -143,3 +157,26 @@ export function TheAgentsRuns({ reading }: { reading: Reading }) {
     </Panel>
   )
 }
+
+/**
+ * A row is the title, then the state and the time at its right; the line under the rows opens them all.
+ *
+ * NO BACKTICK ANYWHERE IN HERE, comments included: this is a template literal inside a .tsx file.
+ */
+const THE_AGENTS_RUNS_CSS = `
+.prof-rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; min-width: 0; border-top: 1px solid var(--border); }
+.prof-rows > li { min-width: 0; border-bottom: 1px solid var(--border); }
+.prof-row {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: baseline; gap: 1rem;
+  padding: 6px var(--pad); min-width: 0;
+  color: var(--text); text-decoration: none; font-size: var(--fs-1); line-height: var(--lh-body);
+}
+a.prof-row:hover { background: var(--hover); }
+a.prof-row:focus-visible { outline: var(--focus-w) solid var(--focus); outline-offset: var(--focus-offset); }
+.prof-row-title { min-width: 0; font-weight: 600; overflow-wrap: anywhere; }
+.prof-row-state { color: var(--text-2); white-space: nowrap; }
+.prof-row-when { color: var(--text-2); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.prof-runs-all { margin-top: 4px; }
+.prof-summed-head { display: flex; align-items: center; gap: 6px; margin: 0; }
+.prof-runs-count { margin: 0; max-width: var(--measure-in-box); font-size: var(--fs-1); color: var(--text-2); overflow-wrap: anywhere; }
+`

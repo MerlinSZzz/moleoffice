@@ -19,7 +19,8 @@
  *
  * CONTROL: every test passes at the tip. MUTATIONS, each run and each red:
  *   1. `readSessionEvidence` reads `listChanges` again (src/server/lib/sessions.ts): a statement selects the values.
- *   2. `sayTheHold` counts a request that arrived after the hold began (src/server/lib/loop-watch.ts): it is named.
+ *   2. `sayTheHold` counts a request that arrived after the hold ended (src/server/lib/loop-watch.ts): it is named.
+ *      Not run since this case changed from a request that arrived after the hold began.
  *   3. `watchTheLoop` compares the histogram's delay with `every` instead of `heldOver`: a short hold writes a line.
  *   4. the server's threshold raised from 0.5 s to 1,000 s (src/server/index.ts): its log has no line.
  *   5. `withinOneRead` no longer holds one reading of the sessions (src/server/lib/reviews.ts): three comments read
@@ -80,12 +81,12 @@ it('the line names the requests open across the hold, and says what it cannot kn
   const line = sayTheHold(30_000, 100_000, [
     open('/api/messages/comments', 69_000, false),
     open('/api/plan-graph', 60_000, true),
-    open('/api/arrived-after', 99_000, false),
+    open('/api/arrived-after', 100_500, false),
   ])
   expect(line).toContain('held for at least 30.0 s')
   expect(line).toContain(`Making an answer across it: GET /api/messages/comments (no route matched, started ${localStamp(new Date(performance.timeOrigin + 69_000))}, project panelx, open 31.0 s, still making its answer)`)
   expect(line).toContain('Also open, answer made: GET /api/plan-graph')
-  expect(line, 'a request that arrived after the hold began was not open across it').not.toContain('/api/arrived-after')
+  expect(line, 'a request that arrived after the hold ended was not open across it').not.toContain('/api/arrived-after')
   expect(line).toContain('Which function held it is not known')
 
   expect(sayTheHold(2_000, 10_000, [])).toContain("No request was open across it, so the work was not a request's.")

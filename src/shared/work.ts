@@ -528,6 +528,12 @@ export const STATE_MEANING: Readonly<Record<string, Progress>> = {
   // somebody chose, and the sending that goes on is not work anybody owes.
   draft: 'not_started',
   'in use': 'finished',
+
+  // ---- departments (DEPARTMENT_STATES in ./departments.ts)
+  //
+  // One new word. `running` and `merged` are already here. `resting` — the department is kept and takes no work for
+  // now: `paused`, for the reason `deferred` is, put down on purpose.
+  resting: 'paused',
 }
 
 /**
@@ -1451,6 +1457,7 @@ export const KIND_FAMILIES = {
       'flow_run',
       // A `host_job` IS HERE, BESIDE THE FLOW RUN, for its reason: the office's own record of a tool it ran for a run.
       'host_job',
+      'pack',
       // A `counter` IS HERE, BESIDE THE FLOW, AND FOR THE FLOW'S REASON, for criteria CT1 to
       // CT7. A counter is the office watching itself: what
       // has happened so far and what is to happen when enough of it has. `work` is wrong because a
@@ -1476,6 +1483,14 @@ export const KIND_FAMILIES = {
       // here the share of the work the person gave it (item 2 of wave 13s's requirements). It is not itself work to
       // do, and it is not a part of the project being built. A reader finds them through GET /api/secretaries/duties.
       'secretary_duties',
+      // A `department` IS HERE, BESIDE THE SECRETARY'S DUTIES, AND FOR ITS REASON: it is an account of how the person
+      // divided the office (step 1 of departments and posts). It is not itself work to do, and it is not a part of the
+      // project being built. A reader finds them through GET /api/departments.
+      'department',
+      // A `key_item` IS HERE, BESIDE THE DEPARTMENT, AND FOR ITS REASON: it is an account of what the person keeps in
+      // front of them, with its progress and an estimate (point HD-2c of home as a data dashboard). It is not itself work
+      // to do: the work is in the packages it names. A reader finds them through GET /api/key-items.
+      'key_item',
       // A `watch` IS HERE, BESIDE THE BOOKING, AND FOR ITS REASON: it is an account of one watch or timer an agent keeps
       // running (item 38 of wave 13s's requirements). It is not itself work to do — the work is what it watches, and
       // what it wakes somebody for — and it is not a part of the project being built. A reader finds them through
@@ -1486,6 +1501,16 @@ export const KIND_FAMILIES = {
       // of the project being built. A reader finds handbooks on the Records page, filtered by their kind, and on the page
       // of each flow a handbook is linked to.
       'handbook',
+      // KNOWLEDGE KINDS ARE HERE, BESIDE THE HANDBOOK, AND FOR ITS REASON: an entry is guidance the office keeps
+      // and reads back to whoever asks; a category, a bookmark, a change, a query and a rating are its shelves, uses,
+      // reviews, the questions runs asked it and what they said after reading. None is work to do or a part of the
+      // project being built. They live in the shared knowledge workspace, and a reader finds them through GET /api/knowledge/entries.
+      'knowledge_entry',
+      'knowledge_category',
+      'knowledge_bookmark',
+      'knowledge_change',
+      'knowledge_query',
+      'knowledge_rating',
       // A `project_chapter` IS HERE, BESIDE THE REGULATION, AND FOR ITS REASON: it is a standing rule a project keeps,
       // not a choice somebody is asked to make (the design-first build of wave 13s's requirements). A `design` and a
       // `design_review` are here beside the report: a design is a written account of the candidates and the one chosen,
@@ -1808,6 +1833,12 @@ export interface PlanHoursRule {
  * order the product has always printed them, and the kinds that do not follow.
  */
 export const PLAN_HOURS_BY_KIND: Readonly<Record<RecordKind, PlanHoursRule>> = {
+  knowledge_entry: { mayHaveHours: false, get why() { return storedWordIfDeclared('knowledge.hours') ?? '' } },
+  knowledge_category: { mayHaveHours: false, get why() { return storedWordIfDeclared('knowledge.hours') ?? '' } },
+  knowledge_bookmark: { mayHaveHours: false, get why() { return storedWordIfDeclared('knowledge.hours') ?? '' } },
+  knowledge_change: { mayHaveHours: false, get why() { return storedWordIfDeclared('knowledge.hours') ?? '' } },
+  knowledge_query: { mayHaveHours: false, get why() { return storedWordIfDeclared('knowledge.hours') ?? '' } },
+  knowledge_rating: { mayHaveHours: false, get why() { return storedWordIfDeclared('knowledge.hours') ?? '' } },
   whole_suite_receipt: { mayHaveHours: false, why: 'a whole suite receipt keeps build and suite evidence; give hours to the work that produced it.' },
   sealed_tip: { mayHaveHours: false, why: 'a submitted tip preserves finished evidence; give hours to the work that produced it.' },
   merge_entry: { mayHaveHours: false, why: 'a merge entry is the office carrying finished work into the main world; give hours to the work that produced it.' },
@@ -2034,6 +2065,7 @@ export const PLAN_HOURS_BY_KIND: Readonly<Record<RecordKind, PlanHoursRule>> = {
     mayHaveHours: false,
     why: 'a host job is what the office recorded of a tool it ran for a run, not work somebody plans. Put the hours on the work the run did.',
   },
+  pack: { mayHaveHours: false, why: 'A pack is a record of a file that was made, not work to plan.' },
   notice_rules: {mayHaveHours:false,why:'Notice rules configure waking; they are not planned work.'},
   quick_note: { mayHaveHours: false, why: 'a quick note is what the person wrote and drew to keep a thought, not planned work. Give hours to the work it leads to.' },
   counter: {
@@ -2071,6 +2103,14 @@ export const PLAN_HOURS_BY_KIND: Readonly<Record<RecordKind, PlanHoursRule>> = {
     why:
       "a secretary's duties say what its share of the work is; they are not work. Put the hours on the task or the run " +
       'that does the work.',
+  },
+  department: {
+    mayHaveHours: false,
+    why: 'a department says how the office is divided; it is not work. Put the hours on the task or the run its people do.',
+  },
+  key_item: {
+    mayHaveHours: false,
+    why: 'a key item carries its own estimate of the time left; it is not work. Put the hours on the task or the run that does the work.',
   },
   watch: {
     mayHaveHours: false,

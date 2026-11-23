@@ -1,22 +1,26 @@
 // Copyright © 2026 Zhengyang Shen
 // Licensed under the MIT License. See LICENSE.
 /**
- * THE PROJECT BOARD'S PAGE: the table sorted by what needs a person as the "By block" tab, with the view by line and
- * the quick view as the two other tabs.
+ * THE PROJECT BOARD'S PAGE: the table sorted by what needs a person as the "By block" tab, with the view by line, the
+ * quick view and the people and packages as the three other tabs.
  *
- * WHERE EVERYTHING ON IT COMES FROM. The three tabs draw one answer of `GET /api/projects/<project>/board`, which
+ * WHERE EVERYTHING ON IT COMES FROM. The first three tabs draw one answer of `GET /api/projects/<project>/board`, which
  * src/server/lib/project-board.ts works out from records, links and main's history each time it is asked. The one
  * figure that answer does not hold is the hours main was red, which the quick view reads from
  * `GET /api/merge-queue/measures`, the merge queue page's own measure, so the two pages cannot give one hour two
- * colours. Nothing on this page is typed by hand, and the page keeps nothing between visits.
+ * colours. The fourth tab draws `GET /api/projects/<project>/people-and-packages`, which
+ * src/server/lib/project-people.ts works out, and reads it only when the tab is chosen. Nothing on this page is typed
+ * by hand, and the page keeps nothing between visits.
  *
  * NO SMALL PRINT AND NO EXPLANATORY TEXT: no footnote, no mark beside a value, no list of notes and no body text. A
  * cell with no value is blank. People are shown the tabs and the rows only. The reasons are for agents, who read them
- * in the board door's answer and its note.
+ * in the board door's answer and its note. The one plain line the fourth tab draws says what its word "accepted"
+ * means, because the line's counts use that word for the package state the rest of the office calls done.
  *
  * NO WORK ON COLOURS OR BORDERS: the page uses the office's own colours and lines.
  */
 import { useMemo, useState } from 'react'
+import { cardWord } from '@shared/card-words.ts'
 import { dayInThePageLanguage, t, type WordKey } from '@shared/i18n.ts'
 import type { QueueMeasures } from '@shared/merge-queue-measures.ts'
 import {
@@ -27,22 +31,26 @@ import {
   type BoardRow,
   type ProjectBoard,
 } from '@shared/project-board.ts'
+import { theLineIsAtRest, type PeopleAgent, type PeopleLine, type PeoplePackage, type PeopleRun } from '@shared/project-people.ts'
+import { packageStateWord } from '@shared/words.ts'
 import { api } from '../api.ts'
-import { pipelinePath, recordPath, RouteLink, sessionPath } from '../components/router.tsx'
+import { departmentPath, pipelinePath, recordPath, RouteLink, sessionPath, whoPath } from '../components/router.tsx'
 import { ErrorNote, Loading, PANEL_STATES, panelStateWord, type PanelState } from '../components/ui.tsx'
 import { useProjectAsync } from '../lib/project-async.ts'
 import { useLanguage } from '../lib/language.ts'
 import { stampToTheMinute } from '../lib/minute.ts'
+import { theLevelShown, theNameShown } from '../lib/department-words.ts'
 import { currentWorkspace } from '../lib/workspace.ts'
 
-/** The three tabs, in a fixed order: by block first, then by line, then the quick view. */
-export const BOARD_TABS = ['block', 'line', 'quick'] as const
+/** The four tabs, in a fixed order: by block first, then by line, then the quick view, then people and packages. */
+export const BOARD_TABS = ['block', 'line', 'quick', 'people'] as const
 export type BoardTab = (typeof BOARD_TABS)[number]
 
 const TAB_WORDS: Readonly<Record<BoardTab, WordKey>> = {
   block: 'board.tab.block',
   line: 'board.tab.line',
   quick: 'board.tab.quick',
+  people: 'board.tab.people',
 }
 
 const GROUP_WORDS: Readonly<Record<BoardGroup, WordKey>> = {
@@ -128,12 +136,12 @@ export function ProjectBoardPage() {
       <h1 className="pb-title" data-title-is="its-label">{t('nav.board')}</h1>
       {read.status === 'loading' ? <Loading what={t('nav.board')} /> : null}
       {read.status === 'error' ? <ErrorNote message={read.message} fault={read.fault} retry={reload} /> : null}
-      {read.status === 'ready' ? <TheBoard board={read.value} tab={tab} onTab={setTab} /> : null}
+      {read.status === 'ready' ? <TheBoard project={project} board={read.value} tab={tab} onTab={setTab} /> : null}
     </div>
   )
 }
 
-function TheBoard({ board, tab, onTab }: { board: ProjectBoard; tab: BoardTab; onTab: (tab: BoardTab) => void }) {
+function TheBoard({ project, board, tab, onTab }: { project: string; board: ProjectBoard; tab: BoardTab; onTab: (tab: BoardTab) => void }) {
   // A board whose master is not marked draws nothing under its title. Why it has no rows is in the door's answer.
   if (board.master.state !== 'marked') return null
   return (
@@ -159,6 +167,7 @@ function TheBoard({ board, tab, onTab }: { board: ProjectBoard; tab: BoardTab; o
         {tab === 'block' ? <ByBlock board={board} /> : null}
         {tab === 'line' ? <ByLine board={board} /> : null}
         {tab === 'quick' ? <QuickView board={board} /> : null}
+        {tab === 'people' ? <ByPeople project={project} /> : null}
       </div>
     </>
   )
@@ -337,11 +346,27 @@ function APart({ title, children }: { title: string; children: React.ReactNode }
   )
 }
 
-/** VIEW B: one lane for each line, with what it landed, what acts now, what is next and how much is later. */
+/**
+ * VIEW B: one lane for each line, with what it landed, what acts now, what is next and how much is later. It leads to the
+ * departments page, where the departments the lanes are titled by are read and changed.
+ */
 function ByLine({ board }: { board: ProjectBoard }) {
-  if (board.lines.length === 0) return <p className="pb-body">{t('board.line.none')}</p>
+  const toTheDepartments = (
+    <p className="pb-step-link">
+      <RouteLink to={departmentPath()}>{t('board.line.departments')}</RouteLink>
+    </p>
+  )
+  if (board.lines.length === 0) {
+    return (
+      <>
+        {toTheDepartments}
+        <p className="pb-body">{t('board.line.none')}</p>
+      </>
+    )
+  }
   return (
     <div className="pb-lanes" data-board-view="line">
+      {toTheDepartments}
       {board.lines.map((line) => (
         <ALane key={line.line ?? ''} board={board} line={line} />
       ))}
@@ -349,10 +374,30 @@ function ByLine({ board }: { board: ProjectBoard }) {
   )
 }
 
+/**
+ * A LANE'S TITLE. A code a department holds is titled by that department: its name in the reader's language and its
+ * level word. A code no department holds keeps the title it had, with the mark that it is not filed as a department,
+ * and so does a code merged departments ending in different places hold. The line not recorded keeps its title.
+ */
+export function theTitleOfALine(line: Pick<BoardLine, 'line' | 'department'>): string {
+  if (line.line === null) return t('board.line.notRecorded')
+  const department = line.department
+  if (department?.state === 'held') {
+    return t('board.line.department', { name: theNameShown(department.name), level: theLevelShown(department.level, department.teams) })
+  }
+  const named = t('board.line.named', { line: line.line })
+  if (department === null) return named
+  const mark = department.state === 'not-held' ? t('board.line.notFiled') : t('board.line.heldBySeveral', { n: department.ids.length })
+  return t('board.line.marked', { title: named, mark })
+}
+
 function ALane({ board, line }: { board: ProjectBoard; line: BoardLine }) {
+  const department = line.department
   return (
     <section className="pb-lane" data-board-line={line.line ?? ''}>
-      <h2 className="pb-lane-title">{line.line === null ? t('board.line.notRecorded') : t('board.line.named', { line: line.line })}</h2>
+      <h2 className="pb-lane-title">
+        {department?.state === 'held' ? <RouteLink to={departmentPath(department.id)}>{theTitleOfALine(line)}</RouteLink> : theTitleOfALine(line)}
+      </h2>
       <div className="pb-lane-columns">
         <ALaneColumn title={t('board.lane.landed')}>
           {board.landings.state === 'read'
@@ -412,6 +457,180 @@ function TheLater({ line }: { line: BoardLine }) {
         </ul>
       ) : null}
     </details>
+  )
+}
+
+// ============================================================================ the people and packages tab
+
+/** An agent's post in the reader's words, or the word for no card. */
+function aPostWord(post: string | null): string {
+  if (post === null) return t('board.people.post.none')
+  if (post === 'supervisor') return t('board.people.post.supervisor')
+  if (post === 'worker') return t('board.people.post.worker')
+  return cardWord(post)
+}
+
+/** A package's state in the reader's words: the word the task's package panel says, or "not read". */
+function aPackageStateWord(state: string): string {
+  return state === 'not-read' ? t('board.people.state.notRead') : packageStateWord(state).text
+}
+
+/**
+ * A LINE'S SUMMARY ROW: its packages counted by state, and its acting agents by card, or that it is at rest.
+ * The counts are the door's own, so the row cannot disagree with the answer.
+ */
+export function theSummaryOfALine(line: PeopleLine): string {
+  const { counts } = line
+  const packages =
+    counts.all === 0
+      ? t('board.people.counts.none')
+      : t('board.people.counts', {
+          all: aCount(counts.all, 'board.people.packages.one', 'board.people.packages.many'),
+          notTaken: String(counts.notTaken),
+          inProgress: String(counts.inProgress),
+          handedBack: String(counts.handedBack),
+          accepted: String(counts.accepted),
+          blocked: String(counts.blocked),
+        })
+  const kinds: string[] = []
+  if (line.running.supervisors > 0) kinds.push(aCount(line.running.supervisors, 'board.people.supervisors.one', 'board.people.supervisors.many'))
+  if (line.running.workers > 0) kinds.push(aCount(line.running.workers, 'board.people.workers.one', 'board.people.workers.many'))
+  for (const { card, count } of line.running.otherCards) {
+    if (card === 'inspector') kinds.push(aCount(count, 'board.people.inspectors.one', 'board.people.inspectors.many'))
+    else if (card === 'secretary') kinds.push(aCount(count, 'board.people.secretaries.one', 'board.people.secretaries.many'))
+    else if (card === 'administrator') kinds.push(aCount(count, 'board.people.administrators.one', 'board.people.administrators.many'))
+    else if (card === null) kinds.push(aCount(count, 'board.people.noCard.one', 'board.people.noCard.many'))
+    else kinds.push(t('board.people.otherCard', { count: String(count), card: cardWord(card) }))
+  }
+  const last = kinds.pop()
+  const words = last === undefined ? '' : kinds.length === 0 ? last : t('board.people.listAnd', { list: kinds.join(t('board.people.listComma')), last })
+  const running = theLineIsAtRest(line) ? t('board.people.atRest') : t('board.people.running', { kinds: words })
+  return t('board.people.summary', { packages, running })
+}
+
+/**
+ * VIEW C: one lane for each line, with who acts on it now, under whom, and the packages each one holds. It reads
+ * `GET /api/projects/<project>/people-and-packages` when the tab is chosen, and not before, and is drawn as the "By
+ * line" tab is, with the same parts.
+ */
+function ByPeople({ project }: { project: string }) {
+  const [read, reload] = useProjectAsync(() => api.peopleAndPackages(project), [project])
+  if (read.status === 'loading') return <Loading what={t('board.tab.people')} />
+  if (read.status === 'error') return <ErrorNote message={read.message} fault={read.fault} retry={reload} />
+  return (
+    <div className="pb-lanes" data-board-view="people">
+      <p className="pb-body">{t('board.people.accepted')}</p>
+      {read.value.lines.length === 0 ? <p className="pb-body">{t('board.people.none')}</p> : null}
+      {read.value.lines.map((line) => (
+        <APeopleLane key={line.line ?? ''} line={line} />
+      ))}
+    </div>
+  )
+}
+
+function APeopleLane({ line }: { line: PeopleLine }) {
+  const department = line.department
+  const title = theTitleOfALine(line)
+  return (
+    <section className="pb-lane" data-board-line={line.line ?? ''}>
+      <h2 className="pb-lane-title">
+        {department?.state === 'held' ? <RouteLink to={departmentPath(department.id)}>{title}</RouteLink> : title}{' '}
+        <span className="pb-quiet">
+          {line.secretary === null ? t('board.people.secretary.none') : t('board.people.secretary', { name: line.secretary.name })}
+        </span>
+      </h2>
+      <p className="pb-reason" data-people-summary="">
+        {theSummaryOfALine(line)}
+      </p>
+      {line.supervisors.length === 0 && line.workersUnderNoSupervisor.length === 0 ? null : (
+        <div className="pb-lane-columns">
+          {line.supervisors.map((agent) => (
+            <div key={agent.runs[0]!.id} className="pb-lane-column">
+              <AnAgent agent={agent} />
+            </div>
+          ))}
+          {line.workersUnderNoSupervisor.length === 0 ? null : (
+            <div className="pb-lane-column" data-people-under-no-supervisor="">
+              <h3 className="pb-part-title">{t('board.people.underNoSupervisor')}</h3>
+              {line.workersUnderNoSupervisor.map((agent) => (
+                <AnAgent key={agent.runs[0]!.id} agent={agent} />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </section>
+  )
+}
+
+/** One agent, with one run in the original presentation or several distinct run parts. */
+function AnAgent({ agent }: { agent: PeopleAgent }) {
+  const single = agent.runs.length === 1
+  const supervisor = agent.post === 'supervisor'
+  const first = agent.runs[0]!
+  return (
+    <div className="pb-part" data-people-agent={agent.id} data-post={agent.post ?? ''}>
+      <h3 className="pb-part-title">
+        <RouteLink to={single ? sessionPath(first.id) : whoPath('agent', agent.id)}>
+          {single && agent.handle === '' ? first.title : agent.handle}
+        </RouteLink>
+      </h3>
+      {single ? (
+        <RunContents agent={agent} run={first} showPackages />
+      ) : (
+        <>
+          {supervisor ? (
+            <div className="pb-part" data-people-packages="">
+              <h3 className="pb-part-title">{t('board.people.packagesHeading')}</h3>
+              <ul className="pb-list"><PackageList packages={agent.packages} supervisor /></ul>
+            </div>
+          ) : null}
+          {agent.runs.map((run) => (
+            <div className="pb-people-run" data-people-run={run.id} key={run.id}>
+              <h3 className="pb-part-title">
+                <RouteLink to={sessionPath(run.id)}>
+                  {run.startedAt === null ? t('board.people.run.startNotRecorded') : t('board.people.run.since', { time: stampToTheMinute(run.startedAt) })}
+                </RouteLink>
+              </h3>
+              <RunContents agent={agent} run={run} showPackages={!supervisor} />
+            </div>
+          ))}
+        </>
+      )}
+    </div>
+  )
+}
+
+function PackageList({ packages, supervisor }: { packages: PeoplePackage[]; supervisor: boolean }) {
+  return packages.length === 0 ? (
+    <li className="pb-quiet">{t(supervisor ? 'board.people.package.none' : 'board.people.package.notNamed')}</li>
+  ) : packages.map((one) => <APackage key={one.id} one={one} />)
+}
+
+function RunContents({ agent, run, showPackages }: { agent: PeopleAgent; run: PeopleRun; showPackages: boolean }) {
+  const supervisor = agent.post === 'supervisor'
+  return (
+    <>
+      <ul className="pb-list">
+        <li>{t('board.people.facts', { post: aPostWord(agent.post), model: run.model ?? t('board.people.model.none') })}</li>
+        {showPackages ? <PackageList packages={supervisor ? agent.packages : run.packages} supervisor={supervisor} /> : null}
+      </ul>
+      {run.workers.length === 0 ? null : (
+        <div className="pb-under">
+          {run.workers.map((worker) => <AnAgent key={worker.runs[0]!.id} agent={worker} />)}
+        </div>
+      )}
+    </>
+  )
+}
+
+function APackage({ one }: { one: PeoplePackage }) {
+  const points = aCount(one.points.length, 'board.people.points.one', 'board.people.points.many')
+  return (
+    <li data-people-package={one.id} data-state={one.state}>
+      <RouteLink to={recordPath(one.id)}>{one.title === '' ? one.id : one.title}</RouteLink>{' '}
+      <span className="pb-quiet">{t('board.people.package.facts', { state: aPackageStateWord(one.state), points })}</span>
+    </li>
   )
 }
 
@@ -548,6 +767,8 @@ export const PROJECT_BOARD_CSS = `
 .pb-under { display: grid; gap: var(--pad); padding: 4px 12px 12px; min-width: 0; }
 .pb-step-link { margin: 0; font: var(--fs-1)/var(--lh-read) var(--font-ui); }
 .pb-part { display: grid; gap: 4px; min-width: 0; }
+.pb-people-run { display: grid; gap: 4px; min-width: 0; }
+.pb-people-run + .pb-people-run { border-top: var(--border-w) solid var(--border); padding-top: 4px; }
 .pb-part-title { margin: 0; color: var(--text-3); font: 600 var(--fs-1)/var(--lh-tight) var(--font-ui); }
 .pb-list { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; color: var(--text); font: var(--fs-1)/var(--lh-read) var(--font-ui); min-width: 0; overflow-wrap: anywhere; }
 .pb-quiet { color: var(--text-3); }

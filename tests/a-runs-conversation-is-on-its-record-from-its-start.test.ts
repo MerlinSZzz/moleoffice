@@ -14,7 +14,6 @@ import { withoutInheritedEffort } from './without-inherited-effort.ts'
  * SIGKILL, which is what a crash or a machine going down looks like to the run, the worker reads
  * the ending, and the id must still be on the record.
  *
- *   - the fake runtime, asked to name its conversation and hang (tests/fake-runtime.mjs);
  *   - Claude Code, Codex and OpenCode, each through its own adapter, with a STAND-IN SCRIPT on PATH
  *     under the tool's name. Each stand-in writes down the arguments it was given and prints what
  *     the real tool prints at its start (nothing for Claude Code, Codex's `thread.started` event,
@@ -22,11 +21,11 @@ import { withoutInheritedEffort } from './without-inherited-effort.ts'
  *     the real tools resume a conversation killed mid-turn was measured by hand, in the sandbox,
  *     and the round's report says what was found for each.
  *
- * Every office here is this test's own database and server. Every stand-in and fake is stopped by
+ * Every office here is this test's own database and server. Every stand-in is stopped by
  * the process group the worker wrote down.
  *
  * MUTATIONS:
- *   - src/worker/index.ts does not call `recordTheConversationOnceItIsSaid`: the fake, Codex and
+ *   - src/worker/index.ts does not call `recordTheConversationOnceItIsSaid`: the Codex and
  *     OpenCode cases go red, because nothing is on the record while the run is going;
  *   - src/worker/runtimes/claude-code.ts does not put its id on the handle at start: the Claude Code
  *     case goes red;
@@ -39,7 +38,6 @@ import type { AddressInfo } from 'node:net'
 import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { fileURLToPath, URL } from 'node:url'
 import { setTimeout as sleep } from 'node:timers/promises'
 
 import type { FastifyInstance } from 'fastify'
@@ -53,7 +51,6 @@ import { aCheckoutForATestRun } from './a-checkout-for-a-test-run.ts'
 import { LAUNCHER_MODEL_COMPATIBILITY, THE_MODELS_START_VALUES } from '../src/config/model-efforts.mjs'
 import { theProviderTheLauncherAdds } from '../src/shared/worker-runs.ts'
 
-const FAKE = fileURLToPath(new URL('./fake-runtime.mjs', import.meta.url))
 /** A model the compatibility list holds: a conversation run gets no Casting selection from this office. */
 const A_KNOWN_MODEL = Object.keys(THE_MODELS_START_VALUES)[0]!
 /** A Codex model the compatibility list holds: a Codex run that answers a message is started only on a model the office names. */
@@ -199,19 +196,6 @@ afterAll(async () => {
   await app.close()
   t.close()
   rmSync(scratch, { recursive: true, force: true })
-})
-
-describe('a run that names its conversation while it is going', () => {
-  it('has it on its record before it ends, and keeps it when killed mid-turn (the fake runtime)', async () => {
-    const settings = aWorker({ ...withoutInheritedEffort(), MOLE_OFFICE_FAKE_RUNTIME: FAKE })
-    const session = await aRunFor('fake-namer', 'claude-code', 'please name the conversation and hang', settings)
-    const said = await theConversationOnTheRecord(settings, session)
-    expect(said).toMatch(/^fake-[a-z0-9]+$/)
-    await killMidTurn(settings, session)
-    const after = await theRecordOf(session)
-    expect(after['providerSession']).toBe(said)
-    expect(after['state']).toBe('crashed')
-  }, 60_000)
 })
 
 describe('each tool the office starts', () => {

@@ -50,6 +50,7 @@ import type { FastifyInstance } from 'fastify'
 import { apiApp, freshDb, type TestDb } from './helpers.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { PROFILE_WORDS } from '../src/shared/profile.ts'
+import { t as word } from '../src/shared/i18n.ts'
 import type { WhatTheEmbassySays } from '../src/shared/worlds.ts'
 
 type ProfileModule = typeof import('../src/web/pages/ProfilePage.tsx')
@@ -297,7 +298,7 @@ describe('the Embassy', () => {
 // ============================================================ 5. the profile
 
 describe('the agent’s profile', () => {
-  it('draws the press, and says what retiring does', async () => {
+  it('draws the press, and no sentence on what retiring does', async () => {
     const reply = await app.inject({
       method: 'GET',
       url: '/api/participants/agent/builder-four/profile',
@@ -310,9 +311,9 @@ describe('the agent’s profile', () => {
       >[0]),
     )
     expect(page).toContain(PROFILE_WORDS.retire)
-    // A DECISION AND CRITERION I3: the words say the handle is free again, where they said it
-    // was never reused.
-    expect(page, 'plan 7FEOshq3mBGG keeps the normal explanation free of identifiers').toContain('revokes its keys and stops new work')
+    // THE PANEL NO LONGER SAYS WHAT RETIRING DOES. The sentence was taken off the page in November 2026, as
+    // decided. It is drawn only after the press, as the warning on the question that confirms it.
+    expect(page, 'and not the sentence on what retiring does').not.toContain(word('g6b.profile.retireSays'))
   })
 
   it('draws what was recorded once it has been used, and no press', async () => {

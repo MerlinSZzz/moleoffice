@@ -421,7 +421,7 @@ describe('the key slots file and the unit', () => {
 
   it('is a user unit restarted always, run by node from the checkout, given no key, and only written out as text', () => {
     const home = join(folder, 'unit-home')
-    const unit = theProviderRouterUnit({ node: '/made-up/node', router: '/made-up/checkout/tools/provider-router.mjs', sandboxes: '/made-up/sandboxes' })
+    const unit = theProviderRouterUnit({ node: '/made-up/node', router: '/made-up/checkout/tools/provider-router.mjs', sandboxes: '/made-up/sandboxes', office: { api: 'http://127.0.0.1:40404', database: '/made-up/data/office.db' } })
     expect(theProviderRouterUnitPath(home)).toBe(join(home, '.config', 'systemd', 'user', 'mole-office-keyrouter.service'))
     expect(unit).toMatch(/^\[Unit\]\n/)
     expect(unit).toContain('\nType=simple\n')

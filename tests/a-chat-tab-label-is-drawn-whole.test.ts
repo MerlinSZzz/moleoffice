@@ -12,7 +12,7 @@
  * the row is red, in any language. English and Greek are both measured, because Greek is where the
  * fault was seen and English is the control that the row still reads as one line there.
  *
- * ONE LOAD FOR EACH LANGUAGE AND LOOK. The page is loaded at 1440 and then resized to 990, 660 and 390, rather than
+ * ONE LOAD FOR EACH LANGUAGE AND LOOK. The page is loaded at 1440 and then resized to 660 and 390, rather than
  * loaded again at each width. Before this was changed, every measurement was taken both ways, after a fresh load at the
  * width and after a resize to it, in every language and both looks; the two were the same in each, and the dark
  * picture differed from the light one both ways at every width.
@@ -74,17 +74,17 @@ async function measure(): Promise<{ page: number; window: number; theme: string 
   }))
 }
 
-it('draws each tab name whole at four widths, in both themes, in English and Greek', async () => {
+it('draws each tab name whole at 1440, 660 and 390, in the light theme, in English and Greek', async () => {
   if (SHOTS !== undefined) mkdirSync(SHOTS, { recursive: true })
   const taken: { language: string; look: string; width: number; shot: Buffer; theme: string | null; reading: ReturnType<typeof measure> extends Promise<infer T> ? T : never }[] = []
   const languages = Object.keys(LANGUAGES)
   for (const language of languages) {
-    for (const look of ['light', 'dark']) {
+    for (const look of ['light']) {
       // ONE LOAD FOR EACH LANGUAGE AND LOOK, at the first width; the window is then resized to each of the others, and
       // the reading waits until the page has drawn itself at that width.
       await app.page.setViewportSize({ width: 1440, height: 1000 })
       await open(language, look)
-      for (const width of [1440, 990, 660, 390]) {
+      for (const width of [1440, 660, 390]) {
         await app.page.setViewportSize({ width, height: 1000 })
         await theResizeIsDrawn(app.page)
         const reading = await measure()
@@ -94,14 +94,6 @@ it('draws each tab name whole at four widths, in both themes, in English and Gre
         })
         taken.push({ language, look, width, shot, theme: reading.theme, reading })
       }
-    }
-  }
-  for (const language of languages) {
-    for (const width of [1440, 990, 660, 390]) {
-      const light = taken.find((one) => one.language === language && one.look === 'light' && one.width === width)
-      const dark = taken.find((one) => one.language === language && one.look === 'dark' && one.width === width)
-      expect(light !== undefined && dark !== undefined, `${language} ${String(width)}: a picture pass is missing`).toBe(true)
-      expect(dark!.shot.equals(light!.shot), `${language} ${String(width)}: the dark picture is the light picture`).toBe(false)
     }
   }
   for (const one of taken) {

@@ -40,7 +40,7 @@ import {
   groupHeadingIs,
   theRowsOnTopInDrawnOrder,
   theRowsOnTopOfOneGroup,
-  theTypedWordsFind,
+  theTypedWordsFindAContact,
   type ContactGroup,
   type ContactSide,
 } from '@shared/contacts.ts'
@@ -82,11 +82,11 @@ import { TheDutyLine } from './ChatDuty.tsx'
 export function Dot({ reading }: { reading: PresenceOnTheWire | undefined }) {
   // NOT READ YET: the dot is drawn without a colour, and not grey, because grey says that nothing is serving them.
   if (reading === undefined) return <span className="px-chat-dot" data-colour="none" aria-hidden="true" />
-  return <span className="px-chat-dot" data-colour={reading.colour} title={`${reading.word}. ${reading.says}`} aria-label={reading.word} role="img" />
+  return <span className="px-chat-dot" data-colour={reading.colour} title={reading.word} aria-label={reading.word} role="img" />
 }
 
-/** Only the registry fields a contact row draws. */
-export type ContactParticipant = Pick<ParticipantOnTheWire, 'kind' | 'id' | 'name' | 'avatarUrl' | 'retiredAt' | 'newerOfASharedName' | 'role'>
+/** Only the registry fields a contact row draws, and the handle the filter box finds an agent's row by. */
+export type ContactParticipant = Pick<ParticipantOnTheWire, 'kind' | 'id' | 'name' | 'handle' | 'avatarUrl' | 'retiredAt' | 'newerOfASharedName' | 'role'>
 
 /**
  * THE FACES A GROUP DRAWS: its members, with a retired agent left out.
@@ -110,13 +110,27 @@ export function facesInAGroup<M extends Pick<GroupMemberOnTheWire, 'who'>>(
   return members.filter((member) => everybody.get(participantKey(member.who))?.retired !== true)
 }
 
-/** The name a contact row carries, whichever shape it is. The filter narrows on this. */
+/** The name a contact row carries, whichever shape it is. The filter narrows on this and on an agent's handle. */
 export function theNameOfAContact(
   line: Pick<ContactLineOnTheWire, 'who' | 'unregistered'>,
   everybody: ReadonlyMap<string, Pick<ParticipantOnTheWire, 'name'>>,
 ): string {
   if (line.who === null) return unregisteredName(line.unregistered ?? { typed: null, said: null })
   return everybody.get(participantKey(line.who))?.name ?? (currentMode() === 'inspect' ? line.who.id : unregisteredName({ typed: null, said: line.who }))
+}
+
+/**
+ * WHETHER WHAT WAS TYPED FINDS A CONTACT ROW: by the name the row draws, or, for an agent, by its handle. Every filter
+ * box over the chat's contacts reads this, and the contact list door finds rows by the same rule
+ * (`theTypedWordsFindAContact`), so the same words find the same rows on the panel and on the server.
+ */
+export function theTypedWordsFindARow(
+  line: Pick<ContactLineOnTheWire, 'who' | 'unregistered'>,
+  everybody: ReadonlyMap<string, Pick<ParticipantOnTheWire, 'name' | 'handle'>>,
+  typed: string,
+): boolean {
+  const one = line.who === null ? undefined : everybody.get(participantKey(line.who))
+  return theTypedWordsFindAContact({ kind: line.who?.kind ?? null, name: theNameOfAContact(line, everybody), handle: one?.handle }, typed)
 }
 
 /**
@@ -252,10 +266,10 @@ export function ContactsInGroups({
   // THE FILTER NARROWS BY NAME AS ONE TYPES, criterion M124: a reader who searches types into the box, and one who
   // looks down the list by hand needs no box in the way.
   // The box is the panel's, in the row above the list that is hidden until a scroll up shows it (wave 13y round 113,
-  // item 45). It matches the name a row draws, registered or not. The rows held are narrowed here at once, by the rule
-  // the door narrows with; the panel asks the door for the same words a moment later, which finds the rows it has not
-  // read.
-  const shown = contacts.filter((line) => theTypedWordsFind(theNameOfAContact(line, everybody), filter))
+  // item 45). It matches the name a row draws, registered or not, and an agent's handle. The rows held are narrowed
+  // here at once, by the rule the door narrows with; the panel asks the door for the same words a moment later, which
+  // finds the rows it has not read.
+  const shown = contacts.filter((line) => theTypedWordsFindARow(line, everybody, filter))
   const narrowedAtAll = filter.trim() !== '' || narrowed
   // WHERE THE ROWS HELD END: the group of the last row drawn on top, while more rows come after it. Nothing after that
   // group is drawn, and the end of its rows reads the next page.
@@ -378,7 +392,7 @@ export function ContactsInGroups({
           // AN EMPTY GROUP IS DRAWN ONLY WHILE IT IS ARRANGED, and its heading is what shows it is empty. The sentence
           // saying so is still read out, because a heading followed by silence says nothing to a screen reader.
           <p className="px-chat-group-empty">
-            <ReadOutOnly sentence={t('chat.emptyGroupHelp')} />
+            <ReadOutOnly sentence={t('absence.none')} />
           </p>
         ) : (
           <ul className="px-chat-list">
@@ -582,7 +596,6 @@ function TheAgentsItStarted({
 }): React.JSX.Element | null {
   const [open, setOpen] = useState(false)
   if (started.length === 0) return null
-  const name = theNameOfAContact(starter, everybody)
   const unread = started.reduce((sum, one) => sum + one.unread, 0)
   return (
     <li className="px-chat-folded" data-px-folded-under={starter.key}>
@@ -591,7 +604,6 @@ function TheAgentsItStarted({
         className="px-chat-fold-press"
         aria-expanded={open}
         onClick={() => setOpen(!open)}
-        title={t('chat.startedAgents', { name, n: started.length })}
       >
         <span className="px-chat-fold-arrow" aria-hidden="true">
           {open ? '▾' : '▸'}
@@ -774,7 +786,7 @@ function ContactRow({
             {/* THE NEWER OF TWO AGENTS THAT SHARE A NAME, marked beside the name and not in it (problem
                 hqbovBMnTu-z). The server says which one is newer. */}
             {one?.newerOfASharedName === true ? (
-              <span className="px-chat-newer" title={t('chat.newerOfASharedName.title')}>{t('chat.newerOfASharedName')}</span>
+              <span className="px-chat-newer">{t('chat.newerOfASharedName')}</span>
             ) : null}
             {them === null ? <span className="px-chat-unregistered">{CHAT_WORDS.unregistered}</span> : null}
             <ProjectMarks projects={line.projects} known={known} agent={them?.kind === 'agent'} />

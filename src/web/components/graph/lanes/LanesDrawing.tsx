@@ -14,9 +14,27 @@ import { bodyOf, drawTree } from './engine.ts'
 import { LANES_CSS } from './styles.ts'
 import type { LanesInput } from './tree.ts'
 
-export function LanesDrawing({ input, onSays }: { input: LanesInput; onSays: (sentences: readonly string[]) => void }) {
+/** A zoom held between the smallest and the largest the drawing is shown at, 10% and 160%: the wheel, the buttons and a pinch. */
+const withinTheZoomLimits = (zoom: number): number => Math.max(0.1, Math.min(1.6, zoom))
+
+/** A touch on the frame, by its pointer, at its latest place in the window. */
+interface Finger { pointer: number; x: number; y: number }
+
+/**
+ * A pinch under way: its two fingers, how far apart they were at its start, the zoom then, and the place of the drawing
+ * that was under their midpoint then, in the drawing's own units.
+ */
+interface Pinch { a: Finger; b: Finger; apart: number; zoom: number; x: number; y: number }
+
+export function LanesDrawing({ input, onSays, toDevelopers }: { input: LanesInput; onSays: (sentences: readonly string[]) => void; toDevelopers: readonly { key: string; words: string }[] }) {
   const outer = useRef<HTMLDivElement>(null)
   const slot = useRef<HTMLDivElement>(null)
+  const developerJSON = JSON.stringify(toDevelopers)
+  const developerJSONRef = useRef(developerJSON)
+  developerJSONRef.current = developerJSON
+  useEffect(() => {
+    for (const child of slot.current?.children ?? []) child.setAttribute('data-to-developers', developerJSON)
+  }, [developerJSON])
   const narrow = useNarrow()
   const detail = useDetail('graph', null, DRAWING_PLACES.pipeline.opensAt).rung
   const [width, setWidth] = useState(0)
@@ -48,7 +66,9 @@ export function LanesDrawing({ input, onSays }: { input: LanesInput; onSays: (se
   // THE PRESS OR DRAG UNDER WAY, held here rather than by one drawing's frame (round 231): the next drawing is shown in
   // place of the one being dragged, and a drag that has moved carries on in it without a new press. `width` is the width
   // of the drawing it was started on: a drawing laid out for another width waits for the drag to end (round 232).
-  const drag = useRef<{ pointer: number; x: number; y: number; worldX: number; worldY: number; zoom: number; width: number; moved: boolean } | null>(null)
+  // `touch` says it is a finger's, and `atX` and `atY` are where the pointer is now, so a second finger that comes down
+  // beside it, in this drawing or the next, starts a pinch from where the two fingers are.
+  const drag = useRef<{ pointer: number; touch: boolean; x: number; y: number; atX: number; atY: number; worldX: number; worldY: number; zoom: number; width: number; moved: boolean } | null>(null)
   // THE DRAWING DRAWN BUT HELD BACK, while a moved drag is under way on a drawing of another width (round 232). It is
   // kept hidden until the drag ends, and then shown at its own fit. A drawing replaced again before that is dropped.
   const waiting = useRef<(() => void) | null>(null)
@@ -79,6 +99,7 @@ export function LanesDrawing({ input, onSays }: { input: LanesInput; onSays: (se
     if (!mount || width <= 0) return
     let active = true
     const drawing = document.createElement('div')
+    drawing.dataset.toDevelopers = developerJSONRef.current
     // Laid out where the drawn one is, so it is measured as it will be seen, and not seen until it is drawn.
     Object.assign(drawing.style, { position: 'absolute', top: '0', left: '0', right: '0', visibility: 'hidden' })
     mount.append(drawing)
@@ -87,6 +108,7 @@ export function LanesDrawing({ input, onSays }: { input: LanesInput; onSays: (se
     let shown = false
     let fitAfterHeldDrag = false
     const show = () => {
+      drawing.dataset.toDevelopers = developerJSONRef.current
       shown = true
       Object.assign(drawing.style, { position: '', top: '', left: '', right: '', visibility: '' })
       mount.replaceChildren(drawing)
@@ -176,27 +198,58 @@ export function LanesDrawing({ input, onSays }: { input: LanesInput; onSays: (se
       }
       setZoom(nextFit)
       if (frame && world) {
+        // A place in the window as a place in the frame's content, which is where the world's translation is measured from.
+        const inTheFrame = (clientX: number, clientY: number) => {
+          const rect = frame.getBoundingClientRect()
+          return { x: clientX - rect.left - frame.clientLeft + frame.scrollLeft, y: clientY - rect.top - frame.clientTop + frame.scrollTop }
+        }
         // A Ctrl-wheel is also how the browser delivers a trackpad pinch. Keep its focal point fixed.
         frame.addEventListener('wheel', event => {
           if (!event.ctrlKey) return
           event.preventDefault()
           const matrix = new DOMMatrixReadOnly(getComputedStyle(world).transform)
-          const next = Math.max(0.1, Math.min(1.6, matrix.a * Math.pow(2, -event.deltaY * 0.002)))
-          const rect = frame.getBoundingClientRect()
-          const pointerX = event.clientX - rect.left - frame.clientLeft + frame.scrollLeft
-          const pointerY = event.clientY - rect.top - frame.clientTop + frame.scrollTop
-          const x = pointerX - (pointerX - matrix.e) * next / matrix.a
-          const y = pointerY - (pointerY - matrix.f) * next / matrix.a
+          const next = withinTheZoomLimits(matrix.a * Math.pow(2, -event.deltaY * 0.002))
+          const pointer = inTheFrame(event.clientX, event.clientY)
+          const x = pointer.x - (pointer.x - matrix.e) * next / matrix.a
+          const y = pointer.y - (pointer.y - matrix.f) * next / matrix.a
           world.style.transform = `translate(${x}px, ${y}px) scale(${next})`
           viewport.current = { drawing: drawnAs, width, x, y, zoom: next, scrollLeft: frame.scrollLeft, scrollTop: frame.scrollTop }
           setZoom(next)
         }, { passive: false })
         // A single threshold separates a press from a view drag, including a drag started on a card.
         let suppressClick = false
+        const suppressTheClick = () => {
+          suppressClick = true
+          window.setTimeout(() => { suppressClick = false }, 0)
+        }
         // A press that may become a drag selects no words, and neither does a drag carried here from the drawing before.
         // Such a press still clears what was selected, as any press does. The second press of a double-click still
         // selects its word, and a touch keeps the browser's own selection.
         let selectsWords = false
+        // A TOUCH-SCREEN PINCH, two fingers on the frame. The frame turns the browser's own pinch off (touch-action, below),
+        // so this is the only one there is. The zoom is the zoom at the pinch's start, times how far apart the fingers are
+        // now, over how far apart they were then. The place of the drawing that was under their midpoint at the start stays
+        // under it, so two fingers moving together pan as well. A pinch selects nothing, opens nothing and changes no
+        // card's detail and no level. Drawn afresh, this frame leaves the page and the pinch simply ends with it.
+        let pinch: Pinch | null = null
+        // THE FINGER A PINCH LEAVES when its other finger lifts. It moves nothing until it lifts, so the view never jumps to
+        // it, and a finger that comes down beside it starts a pinch again.
+        let resting: Finger | null = null
+        const startAPinch = (a: Finger, b: Finger) => {
+          const matrix = new DOMMatrixReadOnly(getComputedStyle(world).transform)
+          const middle = inTheFrame((a.x + b.x) / 2, (a.y + b.y) / 2)
+          // Two touches reported at one place have no distance to divide by, so the pinch measures from one pixel then.
+          const apart = Math.max(1, Math.hypot(b.x - a.x, b.y - a.y))
+          pinch = { a, b, apart, zoom: matrix.a, x: (middle.x - matrix.e) / matrix.a, y: (middle.y - matrix.f) / matrix.a }
+        }
+        const followThePinch = (now: Pinch) => {
+          const next = withinTheZoomLimits(now.zoom * Math.hypot(now.b.x - now.a.x, now.b.y - now.a.y) / now.apart)
+          const middle = inTheFrame((now.a.x + now.b.x) / 2, (now.a.y + now.b.y) / 2)
+          const x = middle.x - now.x * next, y = middle.y - now.y * next
+          world.style.transform = `translate(${x}px, ${y}px) scale(${next})`
+          viewport.current = { drawing: drawnAs, width, x, y, zoom: next, scrollLeft: frame.scrollLeft, scrollTop: frame.scrollTop }
+          setZoom(next)
+        }
         frame.style.touchAction = 'none'
         frame.addEventListener('mousedown', event => { if (event.detail > 1) selectsWords = true })
         frame.addEventListener('selectstart', event => {
@@ -207,12 +260,45 @@ export function LanesDrawing({ input, onSays }: { input: LanesInput; onSays: (se
         frame.addEventListener('pointerdown', event => {
           selectsWords = event.pointerType === 'touch'
           if (event.button !== 0 || (event.target as Element).closest('button, input, select, textarea, .e-key')) return
+          const touch = event.pointerType === 'touch'
+          // A first finger finds no other finger down, so nothing is left of a touch whose end this frame did not see.
+          if (touch && event.isPrimary) { pinch = null; resting = null }
+          if (touch && !event.isPrimary) {
+            // A third finger moves nothing while two pinch.
+            if (pinch !== null) return
+            // A finger that comes down beside a one-finger drag, or beside the finger a pinch left, starts a pinch. The drag
+            // ends here, and the click after the pinch is suppressed, so it selects nothing.
+            const down = drag.current
+            const beside = down !== null && down.touch && down.pointer !== event.pointerId ? { pointer: down.pointer, x: down.atX, y: down.atY } : resting
+            if (beside !== null) {
+              drag.current = null
+              resting = null
+              startAPinch(beside, { pointer: event.pointerId, x: event.clientX, y: event.clientY })
+              return
+            }
+          }
           const matrix = new DOMMatrixReadOnly(getComputedStyle(world).transform)
-          drag.current = { pointer: event.pointerId, x: event.clientX, y: event.clientY, worldX: matrix.e, worldY: matrix.f, zoom: matrix.a, width, moved: false }
+          drag.current = { pointer: event.pointerId, touch, x: event.clientX, y: event.clientY, atX: event.clientX, atY: event.clientY, worldX: matrix.e, worldY: matrix.f, zoom: matrix.a, width, moved: false }
         })
         frame.addEventListener('pointermove', event => {
+          const now = pinch
+          if (now !== null && (event.pointerId === now.a.pointer || event.pointerId === now.b.pointer)) {
+            const finger = event.pointerId === now.a.pointer ? now.a : now.b
+            finger.x = event.clientX
+            finger.y = event.clientY
+            event.preventDefault()
+            followThePinch(now)
+            return
+          }
+          if (resting !== null && event.pointerId === resting.pointer) {
+            resting.x = event.clientX
+            resting.y = event.clientY
+            return
+          }
           const down = drag.current
           if (!down || event.pointerId !== down.pointer) return
+          down.atX = event.clientX
+          down.atY = event.clientY
           const dx = event.clientX - down.x, dy = event.clientY - down.y
           if (!down.moved && Math.hypot(dx, dy) <= 4) return
           if (!down.moved) { down.moved = true; frame.setPointerCapture(event.pointerId) }
@@ -221,21 +307,36 @@ export function LanesDrawing({ input, onSays }: { input: LanesInput; onSays: (se
           world.style.transform = `translate(${x}px, ${y}px) scale(${down.zoom})`
           viewport.current = { drawing: drawnAs, width, x, y, zoom: down.zoom, scrollLeft: frame.scrollLeft, scrollTop: frame.scrollTop }
         })
-        const end = (event: PointerEvent) => {
-          const down = drag.current
-          if (!down || event.pointerId !== down.pointer) return
-          if (down.moved) {
-            suppressClick = true
-            window.setTimeout(() => { suppressClick = false }, 0)
-          }
-          drag.current = null
-          // A drawing of another width that was drawn under this drag is shown now that the drag has ended.
+        // A drawing of another width that was drawn under a drag is shown once the drag, or the pinch it became, has ended.
+        const showWhatWaited = () => {
           const waited = waiting.current
           waiting.current = null
           if (waited !== null) {
             delete mount.dataset.waitsForTheDrag
             waited()
           }
+        }
+        const end = (event: PointerEvent) => {
+          // A pinch's finger that lifts ends the pinch, and leaves the other finger resting. When the resting finger lifts
+          // too, the touch is over. Each time, the click that may follow is suppressed, as after a moved drag.
+          const now = pinch
+          if (now !== null && (event.pointerId === now.a.pointer || event.pointerId === now.b.pointer)) {
+            pinch = null
+            resting = event.pointerId === now.a.pointer ? now.b : now.a
+            suppressTheClick()
+            return
+          }
+          if (resting !== null && event.pointerId === resting.pointer) {
+            resting = null
+            suppressTheClick()
+            showWhatWaited()
+            return
+          }
+          const down = drag.current
+          if (!down || event.pointerId !== down.pointer) return
+          if (down.moved) suppressTheClick()
+          drag.current = null
+          showWhatWaited()
         }
         frame.addEventListener('pointerup', end)
         frame.addEventListener('pointercancel', end)
@@ -294,7 +395,7 @@ export function LanesDrawing({ input, onSays }: { input: LanesInput; onSays: (se
     const frame = slot.current?.querySelector<HTMLElement>('.e-frame')
     const world = frame?.querySelector<HTMLElement>('.e-world')
     if (!frame || !world) return
-    const bounded = Math.max(0.1, Math.min(1.6, next))
+    const bounded = withinTheZoomLimits(next)
     const box = bounds.current
     if (!box) return
     const drawnWidth = Number(frame.dataset.laidOutWidth)

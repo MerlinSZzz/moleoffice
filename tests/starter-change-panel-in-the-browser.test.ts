@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE.
 import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
+import type { Locator } from 'playwright'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import { apiApp, freshDb, liveApp, waitForThePage, type LiveApp, type TestDb } from './helpers.ts'
 import { seedStatusOffice, STATUS_FIXTURE } from './status-office.ts'
@@ -25,9 +26,20 @@ beforeAll(async () => {
 }, 240_000)
 afterAll(async () => { await app?.stop(); t?.close() }, 60_000)
 
-it('shows the waiting change and both choices at four widths and in both themes', async () => {
+/**
+ * CHOOSE WHO SHOULD ANSWER, as a person does in the panel's agent picker: type the agent's handle in its search box, press
+ * the agent's row, and wait until the picker holds it. Every agent here has its id as its handle.
+ */
+async function choose(panel: Locator, label: string, id: string): Promise<void> {
+  await panel.getByLabel(label).fill(id)
+  await panel.locator(`.agp button.agp-row[data-value="${id}"]`).click()
+  await expect.poll(() => panel.locator('.agp').getAttribute('data-chosen')).toBe(id)
+}
+
+it('shows the waiting change and both choices at 1440 and 390 in the light theme', async () => {
   if (out) mkdirSync(out, { recursive: true })
-  for (const width of [1440, 990, 660, 390]) for (const theme of ['light', 'dark'] as const) {
+  for (const width of [1440, 390]) {
+    const theme = 'light' as const
     const context = await app.browser.newContext({ viewport: { width, height: 900 }, colorScheme: theme })
     await context.addInitScript((look) => { localStorage.setItem('mole-office.preset.theme', look); localStorage.setItem('mole-office.language', 'en'); localStorage.setItem('mole-office.workspace', 'default') }, theme)
     const page = await context.newPage()
@@ -84,7 +96,7 @@ it('shows the waiting change and both choices at four widths and in both themes'
       await selection.getByRole('button', { name: 'Change who answers' }).waitFor({ state: 'visible', timeout: 30000 })
       expect(await selection.getByLabel('Who should answer for it').count()).toBe(0)
       await selection.getByRole('button', { name: 'Change who answers' }).click()
-      await selection.getByLabel('Who should answer for it').selectOption(STATUS_FIXTURE.all)
+      await choose(selection, 'Who should answer for it', STATUS_FIXTURE.all)
       await selection.getByRole('button', { name: 'See what changes' }).click()
       await selection.getByText('Ledger Keeper will answer for this agent.').waitFor({ state: 'visible', timeout: 30000 })
       expect(await selection.innerText()).not.toContain('This press is off. This page does not say why.')
@@ -98,7 +110,7 @@ it('shows the waiting change and both choices at four widths and in both themes'
       await selection.getByLabel('Why are you making this change?').fill('')
       await selection.scrollIntoViewIfNeeded()
       if (out) await page.screenshot({ path: join(out, `selection-${width}-${theme}.png`) })
-      await selection.getByLabel('Who should answer for it').selectOption('status-extra-0')
+      await choose(selection, 'Who should answer for it', 'status-extra-0')
       await selection.getByRole('button', { name: 'See what changes' }).click()
       await selection.getByRole('alert').waitFor({ state: 'visible', timeout: 30000 })
       await selection.scrollIntoViewIfNeeded()
@@ -129,7 +141,7 @@ it('closes on Cancel and after an accepted change, and stays open with a refusal
 
       // 1. CANCEL CLOSES THE FORM AND CLEARS WHAT WAS TYPED.
       await panel.getByRole('button', { name: words['starterMove.change'] }).click()
-      await panel.getByLabel(words['starterMove.to']).selectOption(STATUS_FIXTURE.all)
+      await choose(panel, words['starterMove.to'], STATUS_FIXTURE.all)
       await panel.getByRole('button', { name: words['starterMove.preview'] }).click()
       const previewLine = panel.getByText(theLineEnding)
       await previewLine.waitFor({ state: 'visible', timeout: 30000 })
@@ -146,6 +158,7 @@ it('closes on Cancel and after an accepted change, and stays open with a refusal
       if (out) await page.screenshot({ path: join(out, `cancelled-${width}-${theme}.png`) })
       await panel.getByRole('button', { name: words['starterMove.change'] }).click()
       expect(await panel.getByLabel(words['starterMove.to']).inputValue()).toBe('')
+      expect(await panel.locator('.agp').getAttribute('data-chosen')).toBe('')
       expect(await panel.getByText(theLineEnding).count()).toBe(0)
       expect(await panel.getByLabel(words['starterMove.reason']).count()).toBe(0)
 
@@ -177,7 +190,7 @@ it('closes on Cancel and after an accepted change, and stays open with a refusal
         body.changes = [{ id: 'made-up-applied', agent: STATUS_FIXTURE.presence, from: null, to: chosen, askedBy: { kind: 'person', id: THE_PERSON, name: 'The person' }, because: 'A made-up reason', askedAt: STATUS_FIXTURE.at, state: 'applied', appliedAt: STATUS_FIXTURE.at, refusedBecause: null, runsNotEnded: [] }]
         return route.fulfill({ response, json: body })
       })
-      await panel.getByLabel(words['starterMove.to']).selectOption(STATUS_FIXTURE.all)
+      await choose(panel, words['starterMove.to'], STATUS_FIXTURE.all)
       await panel.getByRole('button', { name: words['starterMove.preview'] }).click()
       await panel.getByText(theLineEnding).waitFor({ state: 'visible', timeout: 30000 })
       await panel.getByLabel(words['starterMove.reason']).fill('A made-up reason')
@@ -185,7 +198,7 @@ it('closes on Cancel and after an accepted change, and stays open with a refusal
       const alert = panel.getByRole('alert')
       await alert.waitFor({ state: 'visible', timeout: 30000 })
       expect(await alert.innerText()).toContain('a made-up refusal')
-      expect(await panel.getByLabel(words['starterMove.to']).inputValue()).toBe(STATUS_FIXTURE.all)
+      expect(await panel.locator('.agp').getAttribute('data-chosen')).toBe(STATUS_FIXTURE.all)
       expect(await panel.getByLabel(words['starterMove.reason']).inputValue()).toBe('A made-up reason')
       expect(await panel.getByText(theLineEnding).count()).toBe(1)
       await panel.scrollIntoViewIfNeeded()

@@ -388,7 +388,7 @@ describe('the decisions as tiles', () => {
     expect(html).not.toContain('Record this decision')
   })
 
-  it('opens the CHOICES, and says on the control what pressing it does', () => {
+  it('opens the CHOICES under the press Decide it', () => {
     /**
      * THE OWNER'S THIRD REVIEW, AND THE WHOLE OF WHAT THIS BAND WAS REBUILT FOR:
      *
@@ -403,7 +403,6 @@ describe('the decisions as tiles', () => {
     const html = body(h(tiles.DecisionTiles, props()))
     expect(html).toContain('>Decide it<')
     expect(html, 'the control that only opened more prose is back').not.toContain('>Expand<')
-    expect(html).toContain('title="Show the choices and record what you decide"')
   })
 
   it('mounts the one panel that settles a fork, rather than a button that goes somewhere else', () => {

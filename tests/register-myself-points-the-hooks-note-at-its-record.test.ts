@@ -56,6 +56,8 @@
  *      office refusing the close (409) and the record found gone (404) are judgments, and the name leaves the note;
  *      the office answering then closes the record (problem 72plHvwU1uAK, the inspector's two notes on the check of
  *      case 11's entry, YQD44W8WvLOs).
+ *  13. The note names the key file of the session's waiter and the office that waiter held: the note pointed at the
+ *      registration's record keeps both, as they are the conversation's and not the record's.
  *
  * ---------------------------------------------------------------------------------------
  * MUTATION PROOF (after a green control), each alone
@@ -361,7 +363,9 @@ async function aRecordingProxy(
       res.end(handled.body)
       return
     }
-    const onward = anHttpRequest({ host: target.hostname, port: target.port, method: req.method, path: req.url, headers: req.headers }, (answer) => {
+    // THE OFFICE ANSWERS A HOST ONLY WITH THE PORT THE REQUEST CAME IN ON, so the proxy gives it the office's own Host
+    // in place of the proxy's. What the hook asked is written down above as it was sent.
+    const onward = anHttpRequest({ host: target.hostname, port: target.port, method: req.method, path: req.url, headers: { ...req.headers, host: target.host } }, (answer) => {
       res.writeHead(answer.statusCode ?? 502, answer.headers)
       answer.pipe(res)
     })
@@ -644,5 +648,27 @@ describe('register-myself points the session hook note at the record its registr
     const mine = await theSessionRecordOf('note-after-a-close')
 
     expect(theWholeNote(conversation), 'a record already over was named as superseded').toEqual({ id: mine, at: expect.any(String), workspace: 'default' })
+  }, 180_000)
+
+  it("keeps the waiter's key file and the office it held when it points the note at its record", async () => {
+    const conversation = aConversation()
+    // A PATH AND AN ADDRESS ONLY: nothing reads the file here, so none is made.
+    const keyFile = join(dir, 'a-key-file-nobody-made')
+    writeFileSync(
+      join(NOTES, `session-${conversation}.json`),
+      JSON.stringify({ id: 'zzMadeUpRun0', at: '2026-11-23 09:00', agentKeyFile: keyFile, agentKeyOffice: api }),
+      'utf8',
+    )
+
+    await registerAndCollect('note-keeps-the-key-file', ['--provider-session', conversation])
+    const mine = await theSessionRecordOf('note-keeps-the-key-file')
+
+    expect(theWholeNote(conversation), "the note lost the waiter's key file or the office it held").toEqual({
+      id: mine,
+      at: expect.any(String),
+      workspace: 'default',
+      agentKeyFile: keyFile,
+      agentKeyOffice: api,
+    })
   }, 180_000)
 })

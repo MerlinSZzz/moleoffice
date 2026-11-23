@@ -33,7 +33,7 @@
 import type { FastifyInstance } from 'fastify'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { THE_PERSON } from '../src/shared/person.ts'
-import { apiApp, freshDb, type TestDb } from './helpers.ts'
+import { apiApp, freshDb, type TestDb, governsTheWholeProject } from './helpers.ts'
 
 let t: TestDb
 let app: FastifyInstance
@@ -93,7 +93,7 @@ beforeAll(async () => {
   const clay = await ask('POST', '/api/records', PERSON, {
     kind: 'decision',
     title: 'The spring batch is stoneware',
-    data: { option_taken: 'Stoneware', replaces: [] },
+    data: { option_taken: 'Stoneware', ...governsTheWholeProject(), replaces: [] },
   })
   expect(clay.status, JSON.stringify(clay.json)).toBe(201)
   clayDecisionId = String(clay.json.record.id)

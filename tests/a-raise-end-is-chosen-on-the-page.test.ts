@@ -5,8 +5,8 @@
  * easy to get wrong, so the owner chooses it. The raise form on the agent's page
  * (TheirCard.tsx) draws RaiseEndChoice.tsx.
  *
- * In a browser, against a test office of this file's own, with the browser paired as the person (the owner's key as the
- * cookie a paired browser holds). The browser's clock is set by this file; the office's clock is read by a second
+ * In a browser, against a test office of this file's own, with the browser paired as the person (the two halves the
+ * pairing press gives a browser). The browser's clock is set by this file; the office's clock is read by a second
  * server in this process on the same database, with a clock this file sets too.
  *
  * ---------------------------------------------------------------------------------------
@@ -38,6 +38,7 @@ import type { Page } from 'playwright'
 
 import { THE_TEST_OFFICES_SECRETARY } from './a-page-of-a-test-office.ts'
 import { apiApp, freshDb, liveApp, thePersonsKeyHeader, waitForThePage, type LiveApp, type TestDb } from './helpers.ts'
+import { pairTheContext } from './a-paired-context.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { localStamp } from '../src/shared/time.ts'
 import { thePress } from '../src/shared/the-press.ts'
@@ -90,9 +91,8 @@ beforeAll(async () => {
   const started = await inProcess.app.inject({ method: 'POST', url: '/api/agents/started', headers: AS_THE_PERSON, payload: { handle: THE_TEST_OFFICES_SECRETARY.handle, name: THE_TEST_OFFICES_SECRETARY.name, role: 'secretary' } })
   expect(started.statusCode, started.body).toBe(201)
   live = await liveApp({ name: 'raise-end-chosen', viewport: { width: 1440, height: 1000 }, workspace: 'default', database: t.file })
-  // PAIRED: the owner's key as the cookie a paired browser holds, so the press is the owner's.
-  const key = thePersonsKeyHeader()['x-mole-office-key'] as string
-  await live.context.addCookies([{ name: 'mole-office-key', value: key, domain: '127.0.0.1', path: '/' }])
+  // PAIRED: the two halves a paired browser holds, so the press is the owner's.
+  await pairTheContext(live.context, live.api)
   // THE BROWSER'S CLOCK STANDS AT 09:00 TOMORROW. Its timers still run; the time they read does not move.
   await live.page.clock.setFixedTime(tomorrowAtNine)
 })

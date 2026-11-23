@@ -24,9 +24,12 @@ import type { ParticipantRef } from '@shared/participants.ts'
 import type { RecordOrigin } from '@shared/types.ts'
 import { readClosedUnchecked, theLandedByHandOn, theSupersededOn, RELEASED, REFUSED, CONFIRMED } from '@shared/releasing.ts'
 import {
+  A_CHECKS_PURPOSES,
+  A_LANDINGS_PURPOSE,
   BY_HAND,
   FLOW_RUN_KIND,
   FLOW_RUN_TITLE,
+  FLOW_STARTING_EVENTS,
   NO_FLOW_NAMED,
   OFFICE_STEP_DOES,
   OFFICE_STEP_DONE_BY_HAND_WHY,
@@ -38,7 +41,9 @@ import {
   OFFICE_STEP_SUPERSEDED_BY,
   OFFICE_STEP_VERDICT_REFUSED_STATUS,
   noFlowRecordHas,
+  noFlowSeveralListTheStart,
   type FlowRunHow,
+  type FlowStartingEvent,
   type FlowRunOutcome,
   type VerdictDoorRefusal,
 } from '@shared/flow-run.ts'
@@ -46,7 +51,7 @@ import { THE_OFFICE_WRITES_AS } from './the-offices-secretary-run.ts'
 import { and, asc, eq, inArray, isNull, sql } from 'drizzle-orm'
 import { db, sqlite } from '../db/client.ts'
 import { ONE_KIND_WRITTEN_OUT, STORED_FIELDS, records } from '../db/schema.ts'
-import { createRecordWithReport, patchRecord, type Actor } from './records.ts'
+import { createRecordWithReport, getRecord, patchRecord, type Actor } from './records.ts'
 import { participantForActor } from './participant-for-actor.ts'
 import { asTheFlowRunWriter } from './flow-run-door.ts'
 import { PLANNING_FLOW_RUN_MODULE_FIELD } from '@shared/planning-flow.ts'
@@ -54,6 +59,11 @@ import { ENTERED_FLOW_FIELD } from '@shared/flow-run.ts'
 import { endTheFlowsARunWasIn } from './entered-flows.ts'
 import { sendTheHandbooksOfAFlowStart, type HandbooksAtAStart } from './handbooks.ts'
 import { theAgentARunServes } from './the-agent-a-run-serves.ts'
+import { theCardOfAgent } from '../db/the-card-of-agent.ts'
+import { THE_SUPERVISOR, THE_WORKER } from '@shared/roles.ts'
+import { isReplaced } from '../db/is-replaced.ts'
+import { isRetired } from '../db/is-retired.ts'
+import { sendKnowledgeForFlowStep } from '../knowledge/flow-step.ts'
 
 /** One step as stored. The declaration in src/shared/kinds/flow-run.ts (`FlowRunStep`) is the authority. */
 export interface FlowRunStep {
@@ -158,17 +168,82 @@ function howOf(actor: ParticipantRef | undefined): { how: FlowRunHow; why?: stri
   return actor.id === THE_OFFICE.id ? { how: 'by the office' } : { how: 'by an agent' }
 }
 
-/** The flow a session names, read once at its filing, with its newest revision or the sentence for why there is none. */
-function theFlowItNamed(data: Record<string, unknown>): Record<string, unknown> {
+/**
+ * The flow a session names, read once at its filing, with its newest revision or the sentence for why there is none. A
+ * session that names no flow is named the flow its start fits, in `theFlowItsStartFits`.
+ */
+function theFlowItNamed(data: Record<string, unknown>, workspaceId: string): Record<string, unknown> {
   const named = typeof data['flow'] === 'string' ? data['flow'].trim() : ''
-  if (named === '') return { noFlow: NO_FLOW_NAMED }
+  if (named === '') return theFlowItsStartFits(data, workspaceId)
+  const revision = theNewestRevisionOfTheFlow(named)
+  if (revision === undefined) return { flow: named, noFlow: noFlowRecordHas(named) }
+  return { flow: named, flowRevision: revision }
+}
+
+function theNewestRevisionOfTheFlow(id: string): { seq: number; contentHash: string } | undefined {
   const revision = sqlite
     .prepare(
       "SELECT v.seq AS seq, v.content_hash AS contentHash FROM records r JOIN revisions v ON v.record_id = r.id WHERE r.id = ? AND r.kind = 'flow' AND r.deleted_at IS NULL ORDER BY v.seq DESC LIMIT 1",
     )
-    .get(named) as { seq: number; contentHash: string } | undefined
-  if (revision === undefined) return { flow: named, noFlow: noFlowRecordHas(named) }
-  return { flow: named, flowRevision: { seq: revision.seq, contentHash: revision.contentHash } }
+    .get(id) as { seq: number; contentHash: string } | undefined
+  return revision === undefined ? undefined : { seq: revision.seq, contentHash: revision.contentHash }
+}
+
+/**
+ * A SESSION THAT NAMES NO FLOW IS NAMED THE ONE LIVE FLOW OF ITS PROJECT THAT LISTS HOW IT STARTED. With no start read,
+ * or no such flow, it names no flow; with two or more, it names none and says which. `startedAs` is present whenever a
+ * start was read. Nothing here refuses the run, and a run filed earlier is never named afterwards.
+ */
+function theFlowItsStartFits(data: Record<string, unknown>, workspaceId: string): Record<string, unknown> {
+  const start = theStartOf(data)
+  if (start === undefined) return { noFlow: NO_FLOW_NAMED }
+  const flows = theLiveFlowsThatList(start, workspaceId)
+  const [flow] = flows
+  if (flow === undefined) return { noFlow: NO_FLOW_NAMED, startedAs: start }
+  if (flows.length > 1) return { noFlow: noFlowSeveralListTheStart(start, flows), startedAs: start }
+  const revision = theNewestRevisionOfTheFlow(flow)
+  // A live flow was just read, so it has a revision. Without one the flow run is not filed, and the catch says why.
+  if (revision === undefined) throw new Error(`Flow ${flow} lists the start "${start}" and has no revision, so the flow run could not say which version the run follows.`)
+  return { flow, flowRevision: revision, startedAs: start }
+}
+
+const [A_SUPERVISORS_RUN, A_WORKERS_RUN, A_CHECK, A_LANDING] = FLOW_STARTING_EVENTS
+
+/** How a session started, as one of the starts a flow may list (src/shared/flow-run.ts), or undefined for none. */
+function theStartOf(data: Record<string, unknown>): FlowStartingEvent | undefined {
+  const given = data['extra']
+  const extra: Record<string, unknown> = isObject(given) ? given : {}
+  const purpose = extra['purpose']
+  if (purpose === undefined) {
+    const served = theAgentARunServes(data)
+    const card = served === null ? null : theCardOfAgent(served.id)
+    if (card === THE_SUPERVISOR) return A_SUPERVISORS_RUN
+    if (card === THE_WORKER) return A_WORKERS_RUN
+    return undefined
+  }
+  if (A_CHECKS_PURPOSES.some((one) => one === purpose)) return A_CHECK
+  if (purpose === A_LANDINGS_PURPOSE && extra['pinOnly'] === undefined && extra['checkResolution'] === undefined) return A_LANDING
+  return undefined
+}
+
+/** The flows of this project, not deleted, retired or replaced, whose `starts_on` lists this start, by id. */
+function theLiveFlowsThatList(start: FlowStartingEvent, workspaceId: string): string[] {
+  return db
+    .select({ id: records.id })
+    .from(records)
+    .where(
+      and(
+        eq(records.kind, 'flow'),
+        eq(records.workspaceId, workspaceId),
+        isNull(records.deletedAt),
+        sql`NOT ${isReplaced}`,
+        sql`NOT ${isRetired}`,
+        sql`json_valid(${records.data}) AND json_type(${records.data}, '$.starts_on') = 'array' AND EXISTS (SELECT 1 FROM json_each(${records.data}, '$.starts_on') s WHERE s.value = ${start})`,
+      ),
+    )
+    .orderBy(asc(records.id))
+    .all()
+    .map((row) => row.id)
 }
 
 /**
@@ -225,7 +300,7 @@ export function fileTheFlowRunOf(
       evidence: OFFICE_STEP_EVIDENCE.started,
     }
     const steps = [started, ...stepsOfAChange({}, session.data, actor, session.createdAt)]
-    const named = theFlowItNamed(session.data)
+    const named = theFlowItNamed(session.data, session.workspaceId)
     const made = sqlite.transaction(() =>
       asTheFlowRunWriter(() =>
         createRecordWithReport({
@@ -259,6 +334,11 @@ export function fileTheFlowRunOf(
             },
             origin: session.origin,
           })
+    if (named['flowRevision'] !== undefined) sendKnowledgeForFlowStep({
+      project: session.workspaceId, flow: String(named['flow']), step: 1, flowRun: made.record.id, run: session.id,
+      to: () => { const served = theAgentARunServes(session.data); return served === null ? null : { kind: 'agent', id: served.id } },
+      origin: session.origin,
+    })
     return handbooks === null ? { written: true, id: made.record.id } : { written: true, id: made.record.id, handbooks }
   } catch (error) {
     const because = error instanceof Error ? error.message : String(error)
@@ -434,6 +514,16 @@ export function addAStep(runId: string, step: FlowRunStep, actor: Actor): { flow
   const held = theFlowRunOf(runId)
   if (held === null) return null
   sqlite.transaction(() => asTheFlowRunWriter(() => patchRecord(held.id, { dataPatch: { stepsTaken: [...held.steps, step] } }, actor)))()
+  if (step.n !== undefined) {
+    const flowRun = getRecord(held.id)
+    const run = getRecord(runId)
+    const flow = flowRun?.data['flow']
+    if (typeof flow === 'string' && run !== null) sendKnowledgeForFlowStep({
+      project: held.workspaceId, flow, step: step.n, flowRun: held.id, run: runId,
+      to: () => { const served = theAgentARunServes(run.data); return served === null ? null : { kind: 'agent', id: served.id } },
+      ...(run.origin == null ? {} : { origin: run.origin }),
+    })
+  }
   return { flowRun: held.id, position: held.steps.length + 1 }
 }
 

@@ -9,12 +9,14 @@
  * it was not drawn. This file judges that on the made-up master of 34 boxes in tests/a-made-up-master-at-real-shape.ts,
  * whose 13 steps each have a block pipeline hung on them:
  *
- *   1. at the Boxes level each block heads its row, as `.e-area-head` with a title link to its block pipeline; at the
- *      Steps level each block is a card whose title links there;
- *   2. a real press on such a title opens the block pipeline in the same tab, at each level;
+ *   1. at the Boxes level each block has a legend entry with a link to its block pipeline (at the
+ *      Steps level tests/the-lanes-drawing-titles-lead-and-say-no-study-words.test.ts presses a step's title);
+ *   2. a real press on such a title opens the block pipeline in the same tab, at the Boxes level (at the Steps level
+ *      tests/the-lanes-drawing-titles-lead-and-say-no-study-words.test.ts presses a step's title);
  *   3. no part_of link from a block pipeline to its block is drawn as a line or named for a selection, at either level;
- *   4. no sentence names the part_of link of a block pipeline and its block, on the master at either level or on any
- *      block pipeline's own page, in the normal view or the developer view.
+ *   4. no sentence names the part_of link of a block pipeline and its block, on the master at either level, in the
+ *      normal view or the developer view. On a block pipeline's own page this is judged without a browser, by case 3 of
+ *      tests/the-lanes-input-is-read-from-records.test.ts.
  *
  * Parts 1 and 2 are expected to hold before the change; the decision asks for them, so they are judged here too.
  *
@@ -34,7 +36,7 @@ import { sayInEnglish } from '../src/shared/i18n.ts'
 import { linkWord } from '../src/shared/words.ts'
 import { hrefOf, pipelinePath } from '../src/web/components/router.tsx'
 import { freshDb, liveApp, type LiveApp, type TestDb } from './helpers.ts'
-import { A_PAGE_IS_READY_WITHIN, DEVELOPER, openInTheDeveloperView, openInTheNormalView } from './a-pipeline-page-in-the-developer-view.ts'
+import { A_PAGE_IS_READY_WITHIN, theDeveloperLines, openInTheDeveloperView, openInTheNormalView } from './a-pipeline-page-in-the-developer-view.ts'
 import { DRAWING, SAID, prepareThePage, readTheDrawing, theDrawingHoldsStill, writerFor } from './a-made-up-office-drawn-in-lanes.ts'
 import { MASTER, storeTheMadeUpMaster } from './a-made-up-master-at-real-shape.ts'
 
@@ -62,6 +64,9 @@ beforeAll(async () => {
   app = await liveApp({ name: 'block-pressed', database: db.file, workspace: 'default', viewport: { width: 1440, height: 1000 } })
   const write = writerFor(app, PROJECT.id, join(dirname(db.file), 'keys.json'))
   await write.call('PUT', `/api/projects/${PROJECT.id}/master-pipeline`, { pipeline: stored.master })
+  const outside = await write.call('POST', '/api/records', { kind: 'module', title: 'Outside service (made up)' })
+  const outsideId = (outside as { record: { id: string } }).record.id
+  await write.call('POST', '/api/links', { fromId: stored.id['box-01']!, toId: outsideId, type: 'feeds' })
   await prepareThePage(app, PROJECT.id)
 }, 300_000)
 afterAll(async () => {
@@ -83,13 +88,11 @@ async function atTheLevel(page: Page, level: 'boxes' | 'steps'): Promise<void> {
 }
 
 const titleOfTheBlock = (level: 'boxes' | 'steps', step: string): string =>
-  level === 'boxes' ? `${DRAWING} .e-area-head[data-head-of="${step}"] a.e-title` : `${DRAWING} .e-card[data-id="${step}"] a.e-title`
+  level === 'boxes' ? `${DRAWING} .e-block-legend-entry[data-block="${step}"] a` : `${DRAWING} .e-card[data-id="${step}"] a.e-title`
 
 /** Every sentence the said section and the developer section hold that names a part_of link, a block pipeline and its block. */
 async function sentencesNamingABlockAndItsPipeline(page: Page): Promise<string[]> {
-  const sentences = await page
-    .locator(`${SAID} p, ${DEVELOPER} li`)
-    .evaluateAll((all) => all.map((one) => (one.textContent ?? '').replace(/\s+/g, ' ').trim()))
+  const sentences = [...await page.locator(`${SAID} p`).allTextContents(), ...(await theDeveloperLines(page)).map((line) => line.words)]
   const partOf = `“${linkWord('part_of', 'forward').text}”`
   return sentences.filter((sentence) => sentence.includes(partOf) && blocks.some((block) => sentence.includes(`“${block.stepTitle}”`) && sentence.includes(`“${block.pipelineTitle}”`)))
 }
@@ -106,7 +109,7 @@ async function theSentencesAreIn(page: Page): Promise<void> {
   await page.evaluate(() => new Promise<void>((done) => requestAnimationFrame(() => requestAnimationFrame(() => done()))))
 }
 
-for (const level of ['boxes', 'steps'] as const) {
+for (const level of ['boxes'] as const) {
   it(`1. at the ${level} level, each of the 13 blocks has a title that leads to its block pipeline`, async () => {
     await openInTheNormalView(app, pipelinePath(stored.master))
     await atTheLevel(app.page, level)
@@ -117,12 +120,21 @@ for (const level of ['boxes', 'steps'] as const) {
       const href = count === 1 ? await title.getAttribute('href') : null
       if (count !== 1 || href !== hrefOf(pipelinePath(block.pipeline))) wrong.push(`${block.stepTitle}: ${String(count)} title links, the first to ${String(href)}`)
     }
+    const entries = app.page.locator(`${DRAWING} .e-block-legend-entry`)
+    expect(await entries.count()).toBe(13)
+    for (let n = 0; n < 13; n++) {
+      const badge = entries.nth(n).locator('.e-badge')
+      expect(await badge.textContent()).toBe(`M${n}`)
+      expect(await badge.getAttribute('data-module')).toBe(String(n))
+    }
+    expect(await app.page.locator(`${DRAWING} .e-area[data-key="api-server"]`).evaluate((el) => getComputedStyle(el).borderStyle)).toBe('solid')
+    expect(await app.page.locator(`${DRAWING} .e-area[data-key="outside"]`).evaluate((el) => getComputedStyle(el).borderStyle)).toBe('dashed')
     expect(blocks, 'the made-up master has 13 blocks').toHaveLength(13)
     expect(wrong, `at ${level}, each block's title leads to its block pipeline`).toEqual([])
   }, 400_000)
 }
 
-for (const [level, at] of [['boxes', 8], ['steps', 9]] as const) {
+for (const [level, at] of [['boxes', 8]] as const) {
   it(`2. at the ${level} level, a real press on a block's title opens its block pipeline in the same tab`, async () => {
     const block = blocks[at]!
     await openInTheNormalView(app, pipelinePath(stored.master))
@@ -154,17 +166,13 @@ for (const level of ['boxes', 'steps'] as const) {
   }, 400_000)
 }
 
-it("4. on each block pipeline's own page, no sentence names its part_of link to its block, in either view", async () => {
-  const said: string[] = []
-  for (const block of blocks) {
-    for (const view of ['normal', 'developer'] as const) {
-      if (view === 'normal') await openInTheNormalView(app, pipelinePath(block.pipeline))
-      else await openInTheDeveloperView(app, pipelinePath(block.pipeline))
-      await app.page.locator(`${DRAWING}[data-fit]`).waitFor({ timeout: 120_000 })
-      await theDrawingHoldsStill(app.page)
-      await theSentencesAreIn(app.page)
-      for (const sentence of await sentencesNamingABlockAndItsPipeline(app.page)) said.push(`${block.pipelineTitle}, ${view} view: ${sentence}`)
-    }
+
+it('names the step view in the key when no box has a tier', async () => {
+  const write = writerFor(app, PROJECT.id, join(dirname(db.file), 'keys.json'))
+  for (const box of MASTER.blockPipelines.flatMap((block) => block.boxes)) {
+    await write.call('PATCH', `/api/records/${stored.id[box]!}`, { dataPatch: { tier: null } })
   }
-  expect(said, "no block pipeline's page names its part_of link to its block").toEqual([])
-}, 600_000)
+  await openInTheNormalView(app, pipelinePath(stored.master))
+  await atTheLevel(app.page, 'boxes')
+  expect(await app.page.locator(`${DRAWING} .e-key`).innerText()).toContain('Drawn by step')
+}, 400_000)

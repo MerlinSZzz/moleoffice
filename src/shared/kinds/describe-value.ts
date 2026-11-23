@@ -101,6 +101,7 @@ export function typeGloss(node: TypeNode, expr: string): string {
       return `an object whose values are each ${recordValueType(expr)}`
     case 'array': {
       const inner = expr.slice(0, -2)
+      if (node.of.kind === 'literals') return `a list, each one of: ${node.of.values.join(', ')}`
       return node.of.kind === 'shape'
         ? `a list of ${inner} objects, each ${shapeGloss(node.of.name)}`
         : `a list of ${inner}`

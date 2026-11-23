@@ -15,7 +15,9 @@
  *      (wave 13y round 166): the quick search's press stands after Reviews, because it acts on the page being read.
  *      Test change (wave 13y round 167, point QN-2 of the quick notes): My notes stands in front after Reports, as
  *      option C's step 6 picture draws it. Test change (the same point): the New note press stands after the quick
- *      search. Option C's step 1 picture draws it right under Reviews, and has no quick search press.
+ *      search. Option C's step 1 picture draws it right under Reviews, and has no quick search press. Test change
+ *      (wave 13t, package OT-B): the Web page press stands after New note. It opens the form for a web page in the
+ *      window, and like New note it acts on the screen rather than leading to a page.
  *   2. Narrowed, the sidebar draws icons only: an entry draws no text but its count mark. The mouse over an
  *      entry, and the keyboard reaching it, show the entry's name beside it, whole, in the window and on top;
  *      the name goes when the mouse or the focus leaves. Open, and in the menu at 390, each word stands beside
@@ -38,28 +40,19 @@
  *      answer. Checklists counts the project's checklist steps waiting on the person, the sum the Checklists page
  *      adds up. Neither draws a mark when its count is nought, and no entry ever draws "0".
  *  13. All pages' title is drawn at the size, height and weight of the title of All records, a page it lists.
- *
- * THE PICTURES are taken only when W13Y_SIDEBAR_PICTURES names a folder. They are of a made-up office,
- * and each carries the made-up label above the page.
  */
-import { mkdirSync } from 'node:fs'
-import { join } from 'node:path'
 import type { BrowserContext, Page } from 'playwright'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import { SHIPPED_SIDEBAR, type SidebarArrangement } from '../src/shared/sidebar-arrangement.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 import type { SidebarSetting } from '../src/server/lib/sidebar.ts'
 import { DESTINATIONS, SIDEBAR_KEY } from '../src/web/components/Sidebar.tsx'
-import { categoryPath, FLAT_ROUTES, pathFor } from '../src/web/components/router.tsx'
+import { categoryPath, pathFor } from '../src/web/components/router.tsx'
 import { THE_SHELL_WIDTH } from '../src/web/lib/the-shell-width.ts'
 import { THE_TEST_OFFICES_OWNER } from './a-page-of-a-test-office.ts'
 import { liveApp, waitForThePage, type LiveApp } from './helpers.ts'
-import { putTheMadeUpLabelIn } from './the-made-up-label-above-the-page.ts'
 
 const CALLED = 'the-sidebar-in-one-style'
-const PICTURES = process.env['W13Y_SIDEBAR_PICTURES']
-const LABEL = 'Made-up data — an invented office, not real office data'
-const THE_PAGE_TOP = '#main > *:not([data-made-up-label]):not(style)'
 const PROJECT = { id: 'made-up-sidebar-project', title: 'Made-up Fern Workshop' }
 /** A project with nothing in it until case 12 files one report and one waiting step. */
 const COUNTED = { id: 'made-up-counted-project', title: 'Made-up Counting Room' }
@@ -71,8 +64,8 @@ const OWNER = {
   'x-mole-office-actor-id': THE_TEST_OFFICES_OWNER.id,
 }
 
-/** The chosen entries, in their order: the four presses, the six in front, All pages, and Settings at the foot. */
-const THE_ENTRIES = ['ask', 'reviews', 'rail.quicksearch', 'rail.quicknote', 'rail.home', 'rail.chat', 'rail.notes', 'rail.mynotes', 'rail.checklists', 'rail.decisions', 'rail.allpages', 'rail.settings']
+/** The chosen entries, in their order: the five presses, the six in front, All pages, and Settings at the foot. */
+const THE_ENTRIES = ['ask', 'reviews', 'rail.quicksearch', 'rail.quicknote', 'rail.webpage', 'rail.home', 'rail.chat', 'rail.notes', 'rail.mynotes', 'rail.checklists', 'rail.decisions', 'rail.allpages', 'rail.settings']
 /** The arranged pages that stand in front, and so are drawn grey on All pages and not listed there. */
 const IN_FRONT = ['home', 'notes', 'myNotes', 'checklists', 'decisions']
 
@@ -152,6 +145,11 @@ beforeAll(async () => {
   expect(fork.status, await fork.clone().text()).toBe(201)
   // A report and a checklist step waiting on the person, so Reports and Checklists have counts to draw.
   await fileOneOfEachWaiting('default')
+  // THE OWNER DECIDED THE UNREAD REPORT COUNT IS HIDDEN UNLESS THE PERSON TURNS IT ON (wave 13y round 175).
+  // This file measures the count marks as they are drawn, so it turns the count on once for the person through
+  // its door. The hidden default has its own test, tests/the-unread-report-count-is-hidden-unless-turned-on.test.ts.
+  const reportCount = await fetch(`${app.api}/api/report-count`, { method: 'PUT', headers: OWNER, body: JSON.stringify({ shown: true }) })
+  expect(reportCount.status, await reportCount.clone().text()).toBe(200)
 }, 300_000)
 
 afterAll(async () => {
@@ -655,7 +653,14 @@ it('11. All pages draws the headings of its groups all the same way', async () =
   }
 }, 180_000)
 
-it('12. Reports and Checklists count what waits on the person, and no entry draws a mark at nought', async () => {
+/**
+ * TEST CHANGE (wave 13y round 175): the unread report count is now hidden unless the person turns it on, by the
+ * owner's decision. This case asked for the Reports mark as soon as a report waited; it now runs with the count
+ * turned on in this file's setup, so it still asks what it always asked: with the count on, each entry counts what
+ * waits on the person, and no entry draws a mark at nought. The hidden default has its own test,
+ * tests/the-unread-report-count-is-hidden-unless-turned-on.test.ts.
+ */
+it('12. With the unread count turned on, Reports and Checklists count what waits on the person, and no entry draws a mark at nought', async () => {
   const made = await fetch(app.api + '/api/workspaces', { method: 'POST', headers: OWNER, body: JSON.stringify(COUNTED) })
   expect(made.status, await made.clone().text()).toBe(201)
   /** The text of each drawn count mark of Reports and Checklists, and every drawn mark's text, in each state. */
@@ -719,58 +724,3 @@ it("13. All pages' title is drawn as the title of a page it lists", async () => 
   }
 }, 120_000)
 
-it.skipIf(PICTURES === undefined)('takes the pictures of the sidebar, open, narrowed and as the menu', async () => {
-  const folder = PICTURES!
-  mkdirSync(folder, { recursive: true })
-  const label = async (page: Page): Promise<void> => {
-    await putTheMadeUpLabelIn(page, LABEL, page.locator(THE_PAGE_TOP).first(), CALLED)
-    await page.waitForTimeout(600)
-  }
-  for (const theme of ['light', 'dark'] as const) {
-    for (const [width, narrowed] of [[1440, false], [1440, true], [990, false], [660, false], [390, false]] as const) {
-      const { context, page } = await aWindow({ theme, narrowed, width })
-      try {
-        const name = (what: string): string => join(folder, `${what}-${String(width)}-${theme}.png`)
-        await open(page, '/')
-        await label(page)
-        const menu = await page.locator('.shell-menu').isVisible()
-        if (!menu) await page.screenshot({ path: name(narrowed ? 'home-narrowed' : 'home-open') })
-        else {
-          await page.screenshot({ path: name('home-menu-shut') })
-          await page.locator('.shell-menu').click()
-          await page.locator('#shell-side[data-drawer="open"]').waitFor()
-          await page.waitForTimeout(600)
-          await page.screenshot({ path: name('home-menu-open') })
-        }
-        // NARROWED, AN ENTRY'S NAME SHOWN: by the mouse over Reports, and by the keyboard on Checklists.
-        if (narrowed) {
-          await page.locator('#shell-side [data-target*="rail.notes"]').hover()
-          await page.waitForTimeout(600)
-          await page.screenshot({ path: name('home-narrowed-name-by-the-mouse') })
-          await page.mouse.move(width - 200, 450)
-          await page.locator('#shell-side .shell-brand').focus()
-          for (let press = 0; press < 20 && !(await page.evaluate(() => document.activeElement?.getAttribute('data-target')?.includes('rail.checklists') ?? false)); press++) {
-            await page.keyboard.press('Tab')
-          }
-          await page.waitForTimeout(600)
-          await page.screenshot({ path: name('home-narrowed-name-by-the-keyboard') })
-        }
-        // A page reached from All pages, so the picture shows which entry is lit.
-        if (!menu) {
-          await open(page, pathFor('records'))
-          await label(page)
-          await page.screenshot({ path: name(narrowed ? 'records-narrowed' : 'records-open') })
-          // The base has no All pages page, so the pictures before the change have none of it.
-          const allPages = Object.values(FLAT_ROUTES).includes('allPages' as never) ? pathFor('allPages' as never) : undefined
-          if (allPages !== undefined) await open(page, allPages)
-          if (allPages !== undefined && await page.locator('#main .ap-group').count() > 0) {
-            await label(page)
-            await page.screenshot({ path: name(narrowed ? 'all-pages-narrowed' : 'all-pages-open'), fullPage: true })
-          }
-        }
-      } finally {
-        await context.close()
-      }
-    }
-  }
-}, 900_000)

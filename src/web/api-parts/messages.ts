@@ -209,7 +209,7 @@ export const messagesDoors = {
      */
     sendId?: string,
     /**
-     * THE MARK THE PERSON CHOSE BESIDE SEND: none, just ask or proposal first. The composer
+     * THE MARK THE PERSON CHOSE BESIDE SEND: none, just ask, proposal first, align or give options. The composer
      * writes "none" too, so the record keeps the difference from a message sent where no selector was offered.
      * Left out, the message carries no mark, which is what every other sender writes.
      */

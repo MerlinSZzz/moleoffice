@@ -284,7 +284,9 @@ afterAll(async () => {
 })
 
 describe('the provider router setting, in a sandbox', () => {
-  for (const [name, setting] of [['quiet', undefined], ['said-off', 'off']] as const) {
+  // OFF IS RUN WITH THE SETTING ABSENT ALONE. The launcher reads the setting only through theProviderRouterIsOn, which is
+  // on only for the word on, so a setting that says off takes the same branch.
+  for (const [name, setting] of [['quiet', undefined]] as const) {
     it(`off (${setting === undefined ? 'absent' : `${THE_SETTING}=off`}): the mounts, the env files and the office are as before`, async () => {
       const up = await sandbox(['up', template, '--name', name, '--from', main, '--dsh', dsh, '--json'], setting)
       expect(up.status, up.err).toBe(0)

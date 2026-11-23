@@ -11,15 +11,18 @@
  *
  * WHAT THIS FILE PROVES, driven through the doors a caller drives:
  *
- *   (a) A hold whose heartbeat is fresh, whose session has no live process and whose transcript was
- *       last written longer ago than the hold's window, reads offline at the handle door and not
- *       answering at the presence door. So does a hold whose session has no transcript at all.
+ *   (a) A hold whose heartbeat is fresh, whose session has no process on record and whose transcript was
+ *       last written longer ago than the hold's window, reads answering on its hold at both doors, and the
+ *       sentence beside the dot names the old transcript. So does a hold whose transcript cannot be read,
+ *       and its sentence says so. While a hold beats it is the answer, and only a sign the office reads
+ *       turns it to not answering; an old transcript with no recorded process is not such a sign.
  *   (b) A hold whose session really is answering — its transcript grew just now, or a process
  *       resource row for it reads alive — reads online at both doors.
  *   (b2) A session waiting in its terminal: its record names its own process, and it reads online
  *       though its transcript is two hours old. A recorded process that is not running reads
  *       offline and the sentence names the pid. A pid that is running but whose start time does
- *       not match what was recorded is not trusted either.
+ *       not match what was recorded is not trusted either: it is not shown to have ended, so the
+ *       beating hold stands, and the sentence beside the dot names the pid it could not trust.
  *   (c) Ten presence reads of one agent on one fixed clock, with no fact changing, give one word.
  *
  * THE WINDOW IS THE HOLD'S OWN. `theSessionBehindTheHold` compares the transcript against
@@ -70,9 +73,10 @@
  *   (a) A session whose own recorded process is alive and trusted, and whose transcript's LAST line
  *       is a rate_limit error, reads offline at both doors; the sentence names the session limit,
  *       the reset time the line carries and the local moment it was stamped.
- *   (b) A session with a live bridge process registered against it and NO transcript path on record
- *       reads not answering with the sentence saying no transcript was recorded, so whether it can
- *       answer could not be read. This is the codex shape.
+ *   (b) A session with a live bridge process registered against it and NO transcript path on record,
+ *       while its hold beats, reads answering on its hold, and the sentence beside the dot says no
+ *       transcript was recorded. This is the codex shape. Nothing read shows it stopped, so the hold
+ *       stands; with no hold, the same facts still read not answering (M126b below).
  *   (c) A session whose transcript carries a limit line with ordinary activity after it reads
  *       online, because the cause is no longer the last word.
  *
@@ -91,6 +95,9 @@
  *
  * CONTROL AFTER EACH RESTORE: all eleven cases green.
  *
+ * THE MUTATION NOTES IN THIS FILE WERE RUN BEFORE 23 NOVEMBER 2026, when the hold became the base answer
+ * for every tool. They are kept as they were and were not run again against the cases as they now read.
+ *
  * ---------------------------------------------------------------------------------------
  * M126b — A LIVE PROCESS WITH NO HANDLE
  * ---------------------------------------------------------------------------------------
@@ -100,8 +107,9 @@
  * zhixu read Offline. The judgement now lives once, in `theReadingOf` in answering.ts, and both
  * doors call it. Two cases are added:
  *
- *   (a) an agent with a live process row, no transcript and no hold reads the same word and the
- *       same sentence shape as one that holds a handle with the same facts;
+ *   (a) an agent with a live process row, no transcript and no hold reads not answering, and says it
+ *       could not read whether the session answers; one that holds a beating handle with the same facts
+ *       reads answering on its hold, and its sentence names the same missing transcript;
  *   (b) the same agent with a transcript whose last line is a limit reads Offline with the cause.
  *
  * M126b MUTATION — PUT THE OLD PROCESS-ROW ANSWER BACK. In src/server/lib/presence.ts, the
@@ -375,15 +383,6 @@ async function presenceDoor(agentId: string): Promise<Dot> {
   return found as unknown as Dot
 }
 
-/**
- * The part of a reading after the opening words. M126b: a session that holds a handle and one that
- * does not share every word after "holding its handle, but", so two readings of the same facts can
- * be compared for shape without pretending their record ids are the same.
- */
-function afterTheOpening(said: string): string {
-  return said.replace(/^The session filed as record \S+ is (?:not )?holding its handle, but /, '')
-}
-
 beforeAll(async () => {
   t = await freshDb()
   presence = await import('../src/server/lib/presence.ts')
@@ -408,38 +407,35 @@ afterAll(async () => {
 // ============================================================ (a) a killed session behind a live waiter
 
 describe('a killed session behind a live waiter', () => {
-  it('reads offline at the handle door and not answering at the presence door, naming the transcript', async () => {
+  it('reads answering on its beating hold when nothing read shows it gone, and the dot names the old transcript', async () => {
     const agentId = anAgent('m106-killed')
     const session = aSessionFor(agentId, aTranscript(LONG_AGO()))
     await hold('m106-killed', session)
 
     const said = await handleDoor('m106-killed')
-    // THE HEARTBEAT IS FRESH — the hold was written a moment ago — AND THE SESSION IS GONE. The
-    // handle door must not read the beat alone.
-    expect(said.how).toBe('nobody')
-    expect(said.session).toBeNull()
-    expect(said.says).toContain('transcript')
-    expect(said.says).toContain('last grew')
+    // THE HEARTBEAT IS FRESH — the hold was written a moment ago — AND NO PROCESS OF THE SESSION WAS RECORDED. An old
+    // transcript alone is not a sign that turns a beating hold to not answering, so the hold is the answer.
+    expect(said.how).toBe('a live session')
+    expect(said.session).toBe(session)
 
     const dot = await presenceDoor(agentId)
-    expect(dot.colour).toBe('grey')
-    expect(dot.from).toBeNull()
-    expect(dot.word).toBe('Offline')
+    expect(dot.colour).toBe('green')
+    expect(dot.from).toBe('a session answering as it')
     expect(dot.says).toContain('transcript')
+    expect(dot.says).toContain('last grew')
   })
 
-  it('reads offline when the session has no transcript on record at all', async () => {
+  it('reads answering on its beating hold when its transcript cannot be read, and the dot says it could not be read', async () => {
     const agentId = anAgent('m106-no-transcript')
     const session = aSessionFor(agentId, join(transcripts, 'never-written.jsonl'))
     await hold('m106-no-transcript', session)
 
     const said = await handleDoor('m106-no-transcript')
-    expect(said.how).toBe('nobody')
-    expect(said.says).toContain('could not be read')
+    expect(said.how).toBe('a live session')
 
     const dot = await presenceDoor(agentId)
-    expect(dot.colour).toBe('grey')
-    expect(dot.from).toBeNull()
+    expect(dot.colour).toBe('green')
+    expect(dot.says).toContain('could not be read')
   })
 })
 
@@ -538,7 +534,7 @@ describe("a session that is waiting in its terminal, which is what its own proce
     expect(dot.word).toBe('Offline')
   })
 
-  it('does not trust its own pid when the recorded start time is wrong', async () => {
+  it('does not trust its own pid when the recorded start time is wrong, and names it beside the beating hold', async () => {
     const agentId = anAgent('m106-wrong-start')
     nameThisProcessClaude()
     const pid = process.pid
@@ -551,14 +547,15 @@ describe("a session that is waiting in its terminal, which is what its own proce
     })
     await hold('m106-wrong-start', session)
 
+    // A PROCESS THAT IS NOT SHOWN TO BE THE ONE RECORDED IS NOT SHOWN TO HAVE ENDED EITHER, so the beating hold stands,
+    // and the sentence beside the dot says which pid was not trusted.
     const said = await handleDoor('m106-wrong-start')
-    expect(said.how).toBe('nobody')
-    expect(said.says).toContain(String(pid))
-    expect(said.says).toContain('is not the process that was recorded')
+    expect(said.how).toBe('a live session')
 
     const dot = await presenceDoor(agentId)
-    expect(dot.colour).toBe('grey')
-    expect(dot.word).toBe('Offline')
+    expect(dot.colour).toBe('green')
+    expect(dot.says).toContain(String(pid))
+    expect(dot.says).toContain('is not the process that was recorded')
   })
 })
 
@@ -596,11 +593,11 @@ describe('a session whose transcript ended on a limit, though a process is alive
     expect(dot.says).toContain('resets 7:10pm')
   })
 
-  it('reads not answering with the cannot-read sentence when no transcript path is recorded', async () => {
+  it('reads answering on its beating hold, and says no transcript was recorded, when no transcript path is recorded', async () => {
     const agentId = anAgent('m126-codex')
     const session = aSessionWithNoTranscript(agentId)
-    // A LIVE BRIDGE PROCESS, exactly the shape the codex records have. The office must not read it
-    // as answering: a bridge can outlive the session it speaks for.
+    // A LIVE BRIDGE PROCESS, exactly the shape the codex records have. The bridge is not what answers: it can outlive
+    // the session it speaks for. The beating hold is, because nothing read shows the session stopped.
     resources.registerResource({
       workspaceId: 'default',
       sessionRecordId: session,
@@ -611,15 +608,12 @@ describe('a session whose transcript ended on a limit, though a process is alive
     await hold('m126-codex', session)
 
     const said = await handleDoor('m126-codex')
-    expect(said.how).toBe('nobody')
-    expect(said.session).toBeNull()
-    expect(said.says).toContain('no transcript was recorded')
-    expect(said.says).toContain('could not be read')
+    expect(said.how).toBe('a live session')
+    expect(said.session).toBe(session)
 
     const dot = await presenceDoor(agentId)
-    expect(dot.colour).toBe('grey')
-    expect(dot.word).toBe('Offline')
-    expect(dot.from).toBeNull()
+    expect(dot.colour).toBe('green')
+    expect(dot.from).toBe('a session answering as it')
     expect(dot.says).toContain('no transcript was recorded')
   })
 
@@ -644,15 +638,17 @@ describe('a session whose transcript ended on a limit, though a process is alive
 // ============================================================ M126b: a live process with no handle
 
 /**
- * M126b — A LIVE PROCESS WITH NO HANDLE READS THE SAME AS ONE WITH A HANDLE.
+ * M126b — A LIVE PROCESS WITH NO HANDLE IS NOT ANSWERING.
  *
  * M126 fixed the handle path: a codex bridge alive while its session had stopped read Offline, and
  * the sentence said no transcript could be read. The process-row path kept its own answer, so an
  * agent with the same live bridge and no hold still read Online from the row alone. The fix
- * is one judgement in answering.ts; these cases drive the door and prove the two paths agree.
+ * is one judgement in answering.ts. Since the hold became the base answer for every tool, a beating
+ * hold with the same facts reads answering on its hold; the process-row path still never turns a
+ * dot green, and both sentences name the transcript that was not recorded.
  */
 describe('M126b: a live process with no readable transcript', () => {
-  it('reads the same word and sentence shape with no handle as one holding a handle', async () => {
+  it('reads not answering with no handle, and answering on a beating hold, and both name the missing transcript', async () => {
     // THE ONE THAT HOLDS THE HANDLE. A codex-shaped session with no transcript path, a live bridge
     // process registered against it, and a hold.
     const heldAgent = anAgent('m126b-held')
@@ -681,17 +677,17 @@ describe('M126b: a live process with no readable transcript', () => {
     const held = await presenceDoor(heldAgent)
     const free = await presenceDoor(freeAgent)
 
-    for (const [name, dot] of [['held', held], ['free', free]] as const) {
-      expect(dot.colour, `${name} reads ${dot.colour}`).toBe('grey')
-      expect(dot.word, name).toBe('Offline')
-      expect(dot.from, name).toBeNull()
-      expect(dot.says, name).toContain('a process of it is alive now')
-      expect(dot.says, name).toContain('no transcript was recorded for it')
-      expect(dot.says, name).toContain('could not be read')
-    }
-    // THE SAME SENTENCE SHAPE. Only the record id and whether the session holds the handle differ;
-    // every word after that is the one judgement in answering.ts.
-    expect(afterTheOpening(free.says)).toBe(afterTheOpening(held.says))
+    // THE FREE ONE: a live process row is never enough to turn a dot green, and the sentence says what could not be read.
+    expect(free.colour, `free reads ${free.colour}`).toBe('grey')
+    expect(free.word).toBe('Offline')
+    expect(free.from).toBeNull()
+    expect(free.says).toContain('a process of it is alive now')
+    expect(free.says).toContain('no transcript was recorded for it')
+    expect(free.says).toContain('could not be read')
+    // THE HELD ONE: its hold beats, so the hold is the answer, and its sentence names the same missing transcript.
+    expect(held.colour, `held reads ${held.colour}`).toBe('green')
+    expect(held.from).toBe('a session answering as it')
+    expect(held.says).toContain('no transcript was recorded for it')
   })
 
   it('reads Offline with the cause when its transcript ends on a limit, and it holds no handle', async () => {

@@ -64,6 +64,7 @@ import { changes } from '../db/schema.ts'
 import { idleReminderHours } from '../db/env.ts'
 import { statedInRepository } from '../db/stated-in-repository.ts'
 import { theRunHasEnded } from './keys.ts'
+import { readTheDepartments, theBoardDepartment, type TheDepartmentsRead } from './departments.ts'
 import { theMasterPipeline } from './master-pipeline.ts'
 import { getRecordsWithIds, liveRecordsOfKinds } from './records.ts'
 import { listRepositories } from '../db/list-repositories.ts'
@@ -202,7 +203,7 @@ function theUnfinishedSteps(under: UnderTheRows, nowMs: number): Map<string, Boa
 // ============================================================================ the runs that act now
 
 /** A run that acts now, and the time of its newest request. */
-interface AnActingRun {
+export interface AnActingRun {
   run: PanelRecord
   newestRequestMs: number
 }
@@ -210,9 +211,10 @@ interface AnActingRun {
 /**
  * THE RUNS THAT ACT NOW, with each one's newest request. One statement reads the requests of the last
  * `withinHours` through `api_calls_at_idx`, which INDEXED BY names, so SQLite refuses the statement rather than read
- * the table some other way. Only the runs found there are read, by id.
+ * the table some other way. Only the runs found there are read, by id. The people and packages tab reads the same runs
+ * (./project-people.ts).
  */
-function theRunsActingNow(project: string, nowMs: number, withinHours: number): AnActingRun[] {
+export function theRunsActingNow(project: string, nowMs: number, withinHours: number): AnActingRun[] {
   const found = sqlite
     .prepare(
       'SELECT session_id AS sessionId, MAX(at_ms) AS atMs FROM api_calls INDEXED BY api_calls_at_idx ' +
@@ -527,13 +529,22 @@ export function readTheProjectBoard(project: string, nowMs: number = Date.now())
     rows: inGroupOrder(boardRows),
     actingUnderNoRow: acting.filter((run) => !runRows.has(run.id)).map((run) => boardRuns.get(run.id)!),
     landings,
-    lines: theLines([...boardRuns.values()], packages.map((one) => one.board), [...openItems.values()], landings),
+    lines: theLines([...boardRuns.values()], packages.map((one) => one.board), [...openItems.values()], landings, readTheDepartments(project)),
     backlogWithNoState: backlogRecords.filter((item) => item.data['state'] === undefined || item.data['state'] === null).length,
   }
 }
 
-/** View B: each line any part of the board names, with null, "line not recorded", last. */
-function theLines(runs: BoardRun[], packages: BoardPackage[], items: BoardBacklogItem[], landings: BoardLandings): BoardLine[] {
+/**
+ * View B: each line any part of the board names, with null, "line not recorded", last. Each line's code is read
+ * through the departments of the project, read once, to the department it names.
+ */
+function theLines(
+  runs: BoardRun[],
+  packages: BoardPackage[],
+  items: BoardBacklogItem[],
+  landings: BoardLandings,
+  departments: TheDepartmentsRead,
+): BoardLine[] {
   const lately = landings.state === 'read' ? landings.landings.filter((landing) => landing.lines !== null) : []
   const names = new Set<string | null>([
     ...runs.map((run) => run.line),
@@ -548,5 +559,6 @@ function theLines(runs: BoardRun[], packages: BoardPackage[], items: BoardBacklo
     now: runs.filter((run) => run.line === line),
     next: line === null ? [] : packages.filter((one) => one.lines.includes(line)),
     later: line === null ? [] : items.filter((item) => item.state === 'todo' && item.line === line),
+    department: line === null ? null : theBoardDepartment(departments.aCodeNames(line)),
   }))
 }

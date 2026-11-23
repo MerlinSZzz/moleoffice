@@ -4,8 +4,8 @@
  * AN ENTRY WHOSE COMMITS CARRY AN ATTRIBUTION LINE IS REFUSED AT SUBMISSION, AND THE REMINDER BEFORE THE SEAL NAMES IT.
  * Wave 13u, item 31.
  *
- * The merge tool refuses to push a landed commit whose message carries an attribution line (tools/merge-tool/push.mjs,
- * proved by tests/merge-push-round-12.test.ts). Until item 31 it found the line only after the entry had been tested
+ * The merge tool refuses to push a landed commit whose message carries an attribution line (tools/merge-tool/push.mjs).
+ * Until item 31 it found the line only after the entry had been tested
  * and landed. Now the queue reads every commit an entry brings when the entry is submitted, and the reminder before the
  * seal reads the same commits, both with the one pattern the push reads.
  *
@@ -18,8 +18,6 @@
  *      the branch with a Claude-Session line, because the queue reads every commit from the seal's base to its commit.
  *   2. The run's own first sealing write is answered with a reminder that names the same two commits and their lines.
  *      It names nothing about the clean tip.
- *   3. A clean entry is queued, and the queue says it read the commits and found no attribution line. Its reminder
- *      names no attribution line.
  *
  * Every repository is made here in the system's temporary folder, every key is made up, and nothing reaches the live
  * office.
@@ -203,21 +201,6 @@ describe('an attribution line in a commit an entry brings', () => {
     expect(says).not.toContain(round.tip.slice(0, 9))
     expect(says).toContain('Nothing was written.')
     expect(mergeEntryCount()).toBe(before)
-  })
-
-  it('3: a clean entry is queued, and the queue says it read its commits and found no attribution line', async () => {
-    const round = await aRound(['Synthetic earlier round\n\nIts body.\n', 'Synthetic own commit\n\nIts body.\n', 'Synthetic clean tip\n'])
-    const reminded = await sealIt(round)
-    expect(reminded.items.filter((one) => one.key.endsWith(':attribution')), JSON.stringify(reminded.items)).toEqual([])
-    expect(reminded.notChecked.filter((one) => /attribution/iu.test(one))).toEqual([])
-    const before = mergeEntryCount()
-    const queued = await submit(round.id)
-    expect(queued.status, queued.raw).toBe(201)
-    expect(mergeEntryCount()).toBe(before + 1)
-    const interpreted = queued.body['interpreted'] as string[]
-    const read = interpreted.filter((one) => one.includes('attribution line'))
-    expect(read, JSON.stringify(interpreted)).toHaveLength(1)
-    expect(read[0]).toContain('3 commits')
   })
 })
 

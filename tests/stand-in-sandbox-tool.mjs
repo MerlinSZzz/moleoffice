@@ -2,10 +2,7 @@
 // Copyright © 2026 Zhengyang Shen
 // Licensed under the MIT License. See LICENSE.
 /**
- * A STAND-IN FOR tools/sandbox.mjs, FOR THE MERGE TOOL'S TESTS ONLY (tests/the-merger.test.ts,
- * tests/the-merger-suite.test.ts, tests/the-merger-bus.test.ts, tests/one-merge-tool-per-entry.test.ts,
- * tests/a-test-that-could-not-run-is-not-red.test.ts, and tests/the-merge-tool-outlives-an-office-restart.test.ts
- * through tests/stand-in-sandbox-tool-that-files-rows.mjs).
+ * A STAND-IN FOR tools/sandbox.mjs, FOR THE MERGE TOOL'S TESTS ONLY.
  * SYNTHETIC: it starts no container. The merger is given it with --sandbox-tool; the message worker never passes that flag,
  * so the queue itself always runs tools/sandbox.mjs.
  *

@@ -47,7 +47,7 @@ import { avatarUrlFor, type ParticipantKind } from '@shared/participants.ts'
 import { participantKey } from '@shared/messages.ts'
 import { api, errorMessage } from '../api.ts'
 import { useLanguage } from '../lib/language.ts'
-import { whereRequestsGo } from '../lib/visiting.ts'
+import { theCrossOriginOfALoad, whereRequestsGo } from '../lib/visiting.ts'
 import { TieredPress } from './TieredPress.tsx'
 import { Absence, ErrorNote, Loading, useAsync } from './ui.tsx'
 
@@ -329,6 +329,7 @@ export function AvatarPicker({
                           <img
                             className="avp-img"
                             src={whereRequestsGo(one.url)}
+                            crossOrigin={theCrossOriginOfALoad()}
                             alt={PICKER_WORDS.labelFor(one.name, set.words)}
                             width={56}
                             height={56}

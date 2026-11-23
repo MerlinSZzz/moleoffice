@@ -11,7 +11,7 @@
  *   1. the newest run's model is named, and an older run's is not; the id is not in the plain view, and is in
  *      developer mode;
  *   2. a model the office has no name for is said to be one, and its id is not in the plain view;
- *   3. an agent with no run here says so;
+ *   3. an agent with no run here draws its state word;
  *   4. a provider prefix does not stop a model being named;
  *   5. when the runtime reported that a different model answered the newest run, the card adds the run page's own
  *      sentence for it (the engineering decision in wave 13q's round 39); when it reported the same model, or
@@ -32,6 +32,7 @@ import { historicalSession } from './synthetic-submission-fixtures.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { theModelsName } from '../src/shared/model-names.ts'
 import { en } from '../src/shared/words/en.ts'
+import { enWave13y } from '../src/shared/words/en-wave-13y.ts'
 
 let t: TestDb
 let app: FastifyInstance
@@ -124,8 +125,8 @@ describe('the agent card names its model', () => {
     expect(await theLine('kiln-stranger', 'inspect')).toContain('kiln-model-9')
   })
 
-  it('says so when no run of the agent is recorded here', async () => {
-    expect(await theLine('kiln-idle', 'normal')).toBe(en['agentPage.model.noRun'])
+  it('draws its state word when no run of the agent is recorded here', async () => {
+    expect(await theLine('kiln-idle', 'normal')).toBe(enWave13y['agentPage.model.noRunWord'])
   })
 
   it('adds the sentence for the model that answered only when the runtime reported a different one', async () => {

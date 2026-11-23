@@ -219,13 +219,13 @@ describe('in a browser', () => {
       expect(await theOpenings(page)).toHaveLength(1)
       expect(context.pages()).toHaveLength(1)
       await beside.locator('.qn-note').waitFor()
-      expect(await beside.innerText()).toContain(sayInEnglish('quickNotes.windowWasBlocked'))
+      expect(await beside.innerText()).toContain(sayInEnglish('quickNotes.windowBlocked'))
       await expect.poll(() => beside.locator('.qn-note').innerText(), { timeout: 30_000 }).toContain('Made-up words remain here')
     } finally { await context.close() }
   }, 180_000)
 
   it('gives the floating note room at narrow widths', async () => {
-    for (const width of [990, 660, 390]) {
+    for (const width of [990, 390]) {
       const { context, page } = await aWindow({ width })
       try {
         await go(page, `/r/${reportId}`)

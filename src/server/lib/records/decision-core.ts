@@ -552,6 +552,72 @@ export function checkNobodyIsChangingAStartFolder(next: unknown, before: unknown
   )
 }
 
+/** The door a work area is changed through, which a refusal of a record write names. */
+export const THE_WORK_AREA_DOOR = 'POST /api/participants/agent/<id>/work-area'
+
+/**
+ * THE DOOR THAT CHANGES A WORK AREA, open around its own write and nothing else.
+ *
+ * The same marker as the start-folder door, with the same counting, and separate from it for the same reason: a door
+ * allowed to write one field must not thereby be allowed to write another.
+ */
+let theWorkAreaDoorIsOpen = 0
+
+/** Run one write as the door that changes a work area. `changeWorkArea` and the office emptying an area are the callers. */
+export function throughTheWorkAreaDoor<T>(run: () => T): T {
+  theWorkAreaDoorIsOpen += 1
+  try {
+    return run()
+  } finally {
+    theWorkAreaDoorIsOpen -= 1
+  }
+}
+
+/**
+ * NOBODY BUT THE PERSON CHANGES A WORK AREA BY AN ORDINARY WRITE, ON ANY AGENT'S RECORD, ITS OWN INCLUDED.
+ *
+ * The work-area door asks `whoMayChangeItsAreas`, judges the area by the agent's card, wants a reason and keeps a mark
+ * of who changed it and why. A record write did none of that, so any agent could widen any agent's work area, its own
+ * included, and the registry row followed. The door keeps its own rule, and this refuses the other route.
+ *
+ * A WRITE THAT LEAVES THE VALUE ALONE IS NOT A CHANGE, as with a start folder.
+ */
+export function checkNobodyIsChangingAWorkArea(next: unknown, before: unknown, actor: Actor): void {
+  if (thePersonIsProved(actor)) return
+  if (theWorkAreaDoorIsOpen > 0) return
+  if (!isJsonObject(next)) return
+  const held = isJsonObject(before) ? before : {}
+  if (next['workArea'] === undefined) return
+  if (JSON.stringify(next['workArea']) === JSON.stringify(held['workArea'])) return
+  throw new PanelError(
+    '"workArea" on an agent record is changed by the person, or by the door that does that act, and this request is ' +
+      `neither. That holds on an agent's own record too. The door is ${THE_WORK_AREA_DOOR} {"workArea":[…],"because":…}, ` +
+      'which the owner, the agent that started it or a holder of the secretary card may use. It judges the area by the ' +
+      `agent's card and records who changed it and why. This request was made by "${actor.id}". Nothing was written.`,
+    403,
+  )
+}
+
+/**
+ * WHO CHOSE AN AGENT'S CARD IS WRITTEN WHEN ITS RECORD IS MADE, AND AFTER THAT ONLY THE PERSON CHANGES IT.
+ *
+ * The mark says whether the rule gave the card or somebody chose it, and who. Every writer of it in the product writes
+ * it on the record it makes. A record write that changed it later would put a choice on the record that nobody made.
+ * A write that leaves the value alone is not a change.
+ */
+export function checkNobodyIsChangingWhoChoseTheCard(next: unknown, before: unknown, actor: Actor): void {
+  if (thePersonIsProved(actor)) return
+  if (!isJsonObject(next)) return
+  const held = isJsonObject(before) ? before : {}
+  if (next['cardChosenBy'] === undefined) return
+  if (JSON.stringify(next['cardChosenBy']) === JSON.stringify(held['cardChosenBy'])) return
+  throw new PanelError(
+    '"cardChosenBy" on an agent record says who chose its card. It is written when the record is made, and after that ' +
+      `only the person changes it. This request was made by "${actor.id}". Nothing was written.`,
+    403,
+  )
+}
+
 export function checkAgentRole(data: unknown): void {
   if (!isJsonObject(data)) return
   const role = data['role']

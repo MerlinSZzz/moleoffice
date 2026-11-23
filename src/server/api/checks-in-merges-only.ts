@@ -44,6 +44,7 @@ import { getWorkspace } from '../db/get-workspace.ts'
 import { isAProjectOnAList } from '@shared/workspaces.ts'
 import { anAgentItsOwnKeyProves, refusedWhileTheGateIsOff } from '../lib/who-may-act.ts'
 import { whoMayDoThePersonsActsHere } from '../lib/worldauthority.ts'
+import { inspectorAnswerLinesAreConfigured } from '../lib/inspector-answers-lines.ts'
 
 /** The door's refusal of a number of checks at once outside the bounds. */
 const CHECKS_AT_ONCE_REFUSED = `checksAtOnce is a whole number ${WITHIN_THE_BOUNDS}, or null.`
@@ -165,10 +166,11 @@ export async function checksInMergesOnlyRoutes(app: FastifyInstance): Promise<vo
   app.get(
     '/office/checks-in-merges-only',
     route('office.checks-in-merges-only', 'remote', READ_NOTE),
-    async (): Promise<ChecksInMergesOnly & { limits: TheLimits; machine: TheMachine }> => ({
+    async (): Promise<ChecksInMergesOnly & { limits: TheLimits; machine: TheMachine; inspectorAnswerLines: boolean }> => ({
       ...whetherChecksRunInMergesOnly(),
       limits: theLimits(),
       machine: osProbe().machineNow?.() ?? { loadOneMinute: null, freeBytes: null },
+      inspectorAnswerLines: inspectorAnswerLinesAreConfigured(),
     }),
   )
 

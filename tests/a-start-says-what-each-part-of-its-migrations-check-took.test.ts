@@ -20,6 +20,10 @@
  *
  * No case reads a duration or has a time limit. They read names, order and the `N ms` form, so the same answer is
  * expected on a fast machine and a busy one. The names of data steps are read from `THE_STEPS` and never copied here.
+ *
+ * A START WITH NOTHING PENDING MAKES NO COPY (tests/a-start-with-nothing-pending-makes-no-copy.test.ts, which holds
+ * that path's parts). Cases 1, 2 and 5 name the copy's parts, so they are asked of a database one migration behind,
+ * which is still measured on a copy and refuses.
  */
 import { mkdirSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
 import { basename, dirname, join } from 'node:path'
@@ -46,6 +50,7 @@ import {
 } from '../src/server/lib/start-steps.ts'
 import { aTestDatabaseFolder } from './a-test-folder.ts'
 import { THE_TEST_OFFICES_OWNER } from './a-page-of-a-test-office.ts'
+import { oneMigrationBehind } from './an-office-one-migration-behind.ts'
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '..')
 const MIGRATIONS = join(REPO, 'drizzle')
@@ -75,23 +80,25 @@ afterEach(() => {
  * A fully migrated database holding one authored record, with nothing left to migrate.
  *
  * It takes the branch `prepareToServe` takes for a real corpus: the record is not a fixture, so the check is measured
- * against a copy rather than migrated in place.
+ * rather than migrated in place. With `behind`, it is migrated with drizzle/ less its newest migration, so that one is
+ * pending and the check is measured against a copy.
  */
-function aSettledDatabase(name: string, fileName = 'office.db'): Scratch {
+function aSettledDatabase(name: string, fileName = 'office.db', behind = false): Scratch {
   const dir = aTestDatabaseFolder(`migrations-check-timing-${name}`)
+  const migrations = behind ? oneMigrationBehind(dir) : MIGRATIONS
   const file = join(dir, fileName)
   const db = new Database(file)
   db.pragma('journal_mode = WAL')
   db.pragma('foreign_keys = ON')
   open.push({ dir, file, db })
-  migrateInPlace(db, MIGRATIONS)
+  migrateInPlace(db, migrations)
   db.prepare(
     'INSERT INTO records (id, workspace_id, owner_id, created_at, updated_at, kind, title, summary, data, origin) ' +
       `VALUES ('note-1', 'default', '${THE_TEST_OFFICES_OWNER.id}', '2026-07-01 09:00:00', '2026-07-01 09:00:00', ` +
       "'note', 'An invented note', NULL, '{}', 'authored')",
   ).run()
   // MIGRATED AGAIN, so the record has its baseline revision and the database genuinely has nothing to do.
-  migrateInPlace(db, MIGRATIONS)
+  migrateInPlace(db, migrations)
   return { dir, file, db }
 }
 
@@ -111,16 +118,16 @@ function whereSaid(line: string, part: string): number {
 
 describe('the migrations check says what each part took', () => {
   it('names every part and every data step from the code, in order, and decides as it does without timing', () => {
-    const s = aSettledDatabase('normal')
+    const s = aSettledDatabase('normal', 'office.db', true)
     const decide = (timing?: MigrationsCheckTiming) => prepareToServe(s.db, MIGRATIONS, timing)
 
     const timing = theMigrationsCheckTiming()
     const withTiming = decide(timing)
     const asToday = decide()
 
-    expect(withTiming.serve, withTiming.serve ? '' : withTiming.refusal).toBe(true)
-    expect(asToday.serve, asToday.serve ? '' : asToday.refusal).toBe(true)
-    if (withTiming.serve && asToday.serve) expect(withTiming.report).toBe(asToday.report)
+    expect(withTiming.serve).toBe(false)
+    expect(asToday.serve).toBe(false)
+    if (!withTiming.serve && !asToday.serve) expect(withTiming.refusal).toBe(asToday.refusal)
 
     const line = theMigrationsCheckLine(timing)
     expect(line.startsWith(`${THE_MIGRATIONS_CHECK_LINE} `), line).toBe(true)
@@ -210,7 +217,7 @@ describe('the migrations check says what each part took', () => {
   })
 
   it('still makes a line when a step throws, and the refusal is byte for byte the one without timing', () => {
-    const s = aSettledDatabase('failed')
+    const s = aSettledDatabase('failed', 'office.db', true)
     const aStepThatFallsOver = (): never => {
       throw new Error('a step that falls over')
     }
@@ -295,7 +302,7 @@ describe('the migrations check says what each part took', () => {
   })
 
   it('holds no path, no file name and no copy folder name', () => {
-    const s = aSettledDatabase('no-path', 'a-name-that-must-not-be-said.db')
+    const s = aSettledDatabase('no-path', 'a-name-that-must-not-be-said.db', true)
     THE_PREVIEW_SEAM.inMemoryLimit = 0
     // A folder a crashed preview left behind, old enough to be removed. Its name is a path and must not appear.
     const leftover = join(s.dir, '.migration-preview-AbC123')
@@ -307,7 +314,7 @@ describe('the migrations check says what each part took', () => {
 
     const timing = theMigrationsCheckTiming()
     const decision = prepareToServe(s.db, MIGRATIONS, timing)
-    expect(decision.serve, decision.serve ? '' : decision.refusal).toBe(true)
+    expect(decision.serve).toBe(false)
 
     const line = theMigrationsCheckLine(timing)
     expect(line.startsWith(`${THE_MIGRATIONS_CHECK_LINE} `), line).toBe(true)

@@ -81,7 +81,7 @@ import { ITEM_STATES, LINK_TYPES, type ItemState, type LinkType, type PanelRecor
 import type { LinkAnswered, LinkOnTheWire } from '@shared/link-shapes.ts'
 import { GATE_KINDS, type Gate, type GateKind } from '@shared/work.ts'
 import { api, errorMessage, moleOfficeRequest, type RecordReply } from '../../api.ts'
-import { Absence, Btn, Explain, Field, Select, TextArea, TextInput } from '../ui.tsx'
+import { Absence, Btn, Field, Select, TextArea, TextInput } from '../ui.tsx'
 // `intentScopeKey` and `intentTargetOf` come from model.ts and are NOT rebuilt here. A scope is
 // called `modules` by the model and `structure` by the stored vocabulary, and a node is a record id
 // or `step:<id>`; two places building those strings is two chances to split one arrangement in half.
@@ -218,8 +218,6 @@ export interface EditAction {
   id: EditActionId
   /** The words on the button that opens it. */
   label: string
-  /** What opens, in one line, printed as the drawer's heading. Never "more". */
-  opens: string
 }
 
 /**
@@ -230,14 +228,14 @@ export interface EditAction {
  * opens, and only that action's fields are ever on screen.
  */
 export const ACTIONS: readonly EditAction[] = [
-  { id: 'add-node', get label() { return t('g7b.Edit.add_a_module') }, get opens() { return t('g7b.Edit.a_name_and_the_reason_it_exists') } },
-  { id: 'edit-node', get label() { return t('g7b.Edit.edit_a_card') }, get opens() { return t('g7b.Edit.the_words_on_one_card') } },
-  { id: 'add-link', get label() { return t('g7b.Edit.add_a_relationship') }, get opens() { return t('g7b.Edit.two_ends_the_relationship_and_how_much') } },
-  { id: 'change-link', get label() { return t('g7b.Edit.change_a_relationship') }, get opens() { return t('g7b.Edit.one_line_s_relationship_and_its_gate') } },
-  { id: 'remove-link', get label() { return t('g7b.Edit.remove_a_relationship') }, get opens() { return t('g7b.Edit.which_stored_line_to_remove') } },
-  { id: 'step', get label() { return t('g7b.Edit.add_or_edit_a_block') }, get opens() { return t('g7b.Edit.one_pipeline_block_its_name_its_state') } },
-  { id: 'remove-item', get label() { return t('g7b.Edit.remove_an_item') }, get opens() { return t('g7b.Edit.which_card_to_delete_recoverably') } },
-  { id: 'presentation', get label() { return t('g7b.Edit.how_this_is_shown') }, get opens() { return t('g7b.Edit.direction_lane_order_role_emphasis_and_folding') } },
+  { id: 'add-node', get label() { return t('g7b.Edit.add_a_module') } },
+  { id: 'edit-node', get label() { return t('g7b.Edit.edit_a_card') } },
+  { id: 'add-link', get label() { return t('g7b.Edit.add_a_relationship') } },
+  { id: 'change-link', get label() { return t('g7b.Edit.change_a_relationship') } },
+  { id: 'remove-link', get label() { return t('g7b.Edit.remove_a_relationship') } },
+  { id: 'step', get label() { return t('g7b.Edit.add_or_edit_a_block') } },
+  { id: 'remove-item', get label() { return t('g7b.Edit.remove_an_item') } },
+  { id: 'presentation', get label() { return t('g7b.Edit.how_this_is_shown') } },
 ]
 
 // ============================================================================ what happened
@@ -356,7 +354,6 @@ export interface EditProps {
 }
 
 export function Edit(props: EditProps) {
-  const inspect = useInspect()
   const { graph, records, links, choices, intent, intentProblem, onChanged, onIntentChanged, onClose } = props
   const [open, setOpen] = useState<EditActionId | null>(props.openAction ?? null)
   const [outcome, setOutcome] = useState<Outcome | null>(null)
@@ -411,11 +408,8 @@ export function Edit(props: EditProps) {
         ))}
       </div>
 
-      {open === null ? (
-        <p className="gx-edit-idle">{t('g7b.Edit.pick_one_each_opens_only_the_fields')}</p>
-      ) : (
+      {open === null ? null : (
         <div className="gx-form">
-          <p className="gx-form-h">{ACTIONS.find((action) => action.id === open)?.opens}</p>
           {open === 'add-node' ? <AddNode {...shared} /> : null}
           {open === 'edit-node' ? <EditNode {...shared} /> : null}
           {open === 'add-link' ? <AddLink {...shared} /> : null}
@@ -430,26 +424,6 @@ export function Edit(props: EditProps) {
       )}
 
       <OutcomeLine outcome={outcome} />
-
-      {/*
-        THE ONE QUIET STATEMENT. It used to be the heading over the whole page — "the same requests an
-        agent sends" — which made ordinary product editing read as an implementation detail. It is a
-        true and useful fact, so it is kept, once, where somebody who wants it can find it.
-      */}
-      {inspect ? <Explain declares={{ surface: 'structure.edit' }}
-        meaning={<span>{t('g7b.Edit.a_person_and_an_agent_make_the')}</span>}
-        opens={t('g7b.Edit.how_these_edits_are_stored_and_what')}
-      >
-        <p className="gx-prose">{t('g7b.Edit.every_control_here_sends_an_ordinary_mole')}<code>POST /api/records</code>,{' '}
-          <code>PATCH /api/records/:id</code>, <code>POST /api/links</code>,{' '}
-          <code>PUT /api/presentation/:scope/nodes/:node</code>{t('g7b.Edit.and_there_is_nothing_on_this_drawer')}</p>
-        <p className="gx-prose">
-          <b>{t('g7b.Edit.a_link_cannot_be_changed_in_place')}</b>{t('g7b.Edit.the_server_has_no_patch_for_one')}</p>
-        <p className="gx-prose">
-          <b>{t('g7b.Edit.only_a')}<code>blocks</code>{t('g7b.Edit.link_may_carry_a_gate')}</b>{t('g7b.Edit.and_a_partial_gate_has_to_say')}</p>
-        <p className="gx-prose">
-          <b>{t('g7b.Edit.how_this_is_shown_is_meaning_not')}</b>{t('g7b.Edit.direction_lane_order_role_emphasis_and_folding_1256')}</p>
-      </Explain> : null}
     </div>
   )
 }
@@ -589,16 +563,10 @@ function AddNode({ busy, run }: FormProps) {
           weaker and said so here. It is carried now, and alsoCalledThis above turns the list into
           the sentence. A hint written before anybody has typed anything cannot say it: Mole Office only
           knows what else is called this once it knows what you called it. */}
-      <Field
-        label={t('g7b.Edit.its_name')}
-        hint={t('g7b.Edit.choose_a_name_that_helps_you_find')}
-      >
+      <Field label={t('g7b.Edit.its_name')}>
         <TextInput value={title} onChange={setTitle} placeholder={t('g7b.Edit.archive_shelf')} />
       </Field>
-      <Field
-        label={t('g7b.Edit.why_it_exists')}
-        hint={t('g7b.Edit.the_reason_not_the_description_what_goes')}
-      >
+      <Field label={t('g7b.Edit.why_it_exists')}>
         <TextArea
           value={context}
           onChange={setContext}
@@ -616,7 +584,6 @@ function AddNode({ busy, run }: FormProps) {
             : t('g7b.Edit.type_a_name_first_a_module_with')
         }
       >{t('g7b.Edit.file_it')}</Btn>
-      <p className="gx-prose">{t('g7b.Edit.a_pipeline_is_filed_on_the_records')}<b>{t('g7b.Edit.add_or_edit_a_block')}</b>{t('g7b.Edit.a_block_is_a_record_of_its')}</p>
     </>
   )
 }
@@ -658,10 +625,7 @@ function EditNode({ graph, busy, run }: FormProps) {
 
   return (
     <>
-      <Field
-        label={t('g7b.Edit.which_card')}
-        hint={t('g7b.Edit.pressing_a_card_on_the_canvas_opens')}
-      >
+      <Field label={t('g7b.Edit.which_card')}>
         <Select
           value={id}
           onChange={setId}
@@ -672,10 +636,10 @@ function EditNode({ graph, busy, run }: FormProps) {
           )}
         />
       </Field>
-      <Field label={t('g7b.Edit.new_name')} hint={t('g7b.Edit.leave_it_empty_to_keep_the_name')}>
+      <Field label={t('g7b.Edit.new_name')}>
         <TextInput value={title} onChange={setTitle} placeholder={picked?.title ?? ''} />
       </Field>
-      <Field label={t('g7b.Edit.new_reason_for_it_existing')} hint={t('g7b.Edit.leave_it_empty_to_keep_what_is')}>
+      <Field label={t('g7b.Edit.new_reason_for_it_existing')}>
         <TextArea value={context} onChange={setContext} rows={2} placeholder={t('g7b.Edit.why_it_exists_1303')} />
       </Field>
       <Btn
@@ -684,8 +648,6 @@ function EditNode({ graph, busy, run }: FormProps) {
         disabled={busy || picked === null}
         reason={busy ? BUSY() : t('g7b.Edit.pick_a_card_above_first')}
       >{t('g7b.Edit.change_it')}</Btn>
-      <p className="gx-prose">{t('g7b.Edit.a_pipeline_block_is_not_here_its')}{' '}
-        <b>{t('g7b.Edit.add_or_edit_a_block')}</b>{t('g7b.Edit.and_never_by_typing_a_title')}</p>
     </>
   )
 }
@@ -727,10 +689,7 @@ function AddLink({ choices, busy, run }: FormProps) {
       <Field label={t('g7b.Edit.from')}>
         <Select value={fromId} onChange={setFromId} options={options} />
       </Field>
-      <Field
-        label={t('g7b.Edit.which_relationship')}
-        hint={t('g7b.Edit.stored_once_in_this_direction_the_other')}
-      >
+      <Field label={t('g7b.Edit.which_relationship')}>
         <Select value={type} onChange={setType} options={linkTypeOptions()} />
       </Field>
       <Field label={t('g7b.Edit.to')}>
@@ -783,21 +742,11 @@ function GateFields({
 }) {
   return (
     <>
-      <Field
-        label={t('g7b.Edit.how_much_it_blocks')}
-        hint={
-          allowed
-            ? t('g7b.Edit.leaving_this_at_nobody_has_said_is')
-            : t('g7b.Edit.only_a_blocking_relationship_can_say_how')
-        }
-      >
+      <Field label={t('g7b.Edit.how_much_it_blocks')}>
         <Select value={kind} onChange={onKind} options={gateOptions(allowed)} />
       </Field>
       {allowed && kind === 'partial' ? (
-        <Field
-          label={t('g7b.Edit.how_far_it_may_go')}
-          hint={t('g7b.Edit.name_the_stage_that_may_be_reached')}
-        >
+        <Field label={t('g7b.Edit.how_far_it_may_go')}>
           <TextInput value={upTo} onChange={onUpTo} placeholder={t('g7b.Edit.first_review')} />
         </Field>
       ) : null}
@@ -870,10 +819,7 @@ function ChangeLink({ graph, busy, run }: FormProps) {
           options={withMissing(edgeOptions(graph), edgeId, t('g7b.Edit.no_longer_on_this_drawing'))}
         />
       </Field>
-      <Field
-        label={t('g7b.Edit.the_relationship_it_should_be')}
-        hint={t('g7b.Edit.this_removes_the_old_relationship_and_stores')}
-      >
+      <Field label={t('g7b.Edit.the_relationship_it_should_be')}>
         <Select value={type} onChange={setType} options={linkTypeOptions()} />
       </Field>
       <GateFields allowed={gateAllowed} kind={gateKind} onKind={setGateKind} upTo={upTo} onUpTo={setUpTo} />
@@ -1065,10 +1011,7 @@ function BlockForm({ graph, records, links, busy, run }: FormProps) {
           )}
         />
       </Field>
-      <Field
-        label={t('g7b.Edit.which_block')}
-        hint={t('g7b.Edit.renaming_a_block_keeps_its_relationships_intact')}
-      >
+      <Field label={t('g7b.Edit.which_block')}>
         <Select
           value={blockId}
           onChange={setBlockId}
@@ -1095,10 +1038,7 @@ function BlockForm({ graph, records, links, busy, run }: FormProps) {
           options={ITEM_STATES.map((word) => ({ value: word, label: stateWord(word).text }))}
         />
       </Field>
-      <Field
-        label={t('g7b.Edit.which_modules_carry_it')}
-        hint={t('g7b.Edit.choose_the_modules_responsible_for_this_block')}
-      >
+      <Field label={t('g7b.Edit.which_modules_carry_it')}>
         <Select
           value={adding}
           onChange={setAdding}
@@ -1223,8 +1163,6 @@ function BlockForm({ graph, records, links, busy, run }: FormProps) {
           </ol>
         </>
       )}
-
-      <p className="gx-prose">{t('g7b.Edit.use_add_a_relationship_to_say_which')}</p>
     </>
   )
 }
@@ -1327,7 +1265,6 @@ function RemoveItem({ graph, busy, run }: FormProps) {
           )}
         />
       </Field>
-      <p className="gx-prose">{t('g7b.Edit.the_record_can_be_restored_from_its')}</p>
       <ConfirmPress press={t('g7b.press.removeItem')} question={t('g7b.press.removeItemQuestion')}
         quote={picked?.title ?? ''} warning={t('g7b.press.removeItemWarning')}
         disabledReason={busy ? BUSY() : t('g7b.Edit.pick_a_card_above_first')}
@@ -1440,17 +1377,12 @@ function PresentationForm(
 
   return (
     <>
-      <p className="gx-prose">{laneAndOrderOnly ? t('laneAndOrderForm.intro') : t('g7b.Edit.these_are_meanings_not_styling_and_each')}</p>
-
       {intentProblem !== null ? (
         <p className="gx-prose gx-warn">{t('g7b.Edit.what_is_already_stored_could_not_be')}{intentProblem}</p>
       ) : null}
 
       {laneAndOrderOnly ? null : (
-        <Field
-          label={t('g7b.Edit.which_way_this_drawing_runs')}
-          hint={t('g7b.Edit.two_not_eight_dependencies_read_naturally_downward')}
-        >
+        <Field label={t('g7b.Edit.which_way_this_drawing_runs')}>
           <Select
             value={direction}
             onChange={(next) => void run(setDirection(next), 'intent')}
@@ -1465,20 +1397,17 @@ function PresentationForm(
       <Field label={t('g7b.Edit.which_card_you_are_arranging')}>
         <Select value={target} onChange={setTarget} options={targetOptions} />
       </Field>
-      <Field
-        label={t('g7b.Edit.which_lane_it_belongs_in')}
-        hint={t('g7b.Edit.a_name_in_your_own_words_perception')}
-      >
+      <Field label={t('g7b.Edit.which_lane_it_belongs_in')}>
         <TextInput value={lane} onChange={setLane} placeholder={t('g7b.Edit.perception')} />
       </Field>
-      <Field label={t('g7b.Edit.its_order_within_that_lane')} hint={t('g7b.Edit.a_number_low_first_a_hint_the')}>
+      <Field label={t('g7b.Edit.its_order_within_that_lane')}>
         <TextInput value={order} onChange={setOrder} mono placeholder="1" />
       </Field>
       {/* NOT OFFERED WHERE THE DRAWING READS ONLY LANE AND ORDER. What is stored for them is still loaded above and
           sent with a store, so storing a lane does not take away a room or an emphasis stored before. */}
       {laneAndOrderOnly ? null : (
         <>
-          <Field label={t('g7b.Edit.how_much_room_it_gets')} hint={t('g7b.Edit.a_rank_not_a_size_in_pixels')}>
+          <Field label={t('g7b.Edit.how_much_room_it_gets')}>
             <Select
               value={role}
               onChange={setRole}
@@ -1488,10 +1417,7 @@ function PresentationForm(
               ]}
             />
           </Field>
-          <Field
-            label={t('g7b.Edit.its_emphasis')}
-            hint={t('g7b.Edit.a_meaning_never_a_colour_safety_where')}
-          >
+          <Field label={t('g7b.Edit.its_emphasis')}>
             <Select
               value={emphasis}
               onChange={setEmphasis}
@@ -1501,7 +1427,7 @@ function PresentationForm(
               ]}
             />
           </Field>
-          <Field label={t('g7b.Edit.drawn_folded')} hint={t('g7b.Edit.the_count_of_what_is_inside_a')}>
+          <Field label={t('g7b.Edit.drawn_folded')}>
             <Select
               value={collapsed}
               onChange={setCollapsed}
@@ -1512,7 +1438,7 @@ function PresentationForm(
               ]}
             />
           </Field>
-          <Field label={t('g7b.Edit.kept_beside')} hint={t('g7b.Edit.a_request_to_the_layout_not_a')}>
+          <Field label={t('g7b.Edit.kept_beside')}>
             <Select value={near} onChange={setNear} options={nearOptions} />
           </Field>
         </>

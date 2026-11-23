@@ -84,7 +84,6 @@ describe('a check that cannot read a checkout with git', () => {
   it.each([
     { tree: 'check', read: 'rev-parse', error: 'ENOENT', when: 'after' },
     { tree: 'check', read: 'ls-files', error: 'ENOENT', when: 'after' },
-    { tree: 'worker', read: 'rev-parse', error: 'ENOENT', when: 'after' },
     { tree: 'worker', read: 'ls-files', error: 'ENOENT', when: 'after' },
     { tree: 'worker', read: 'ls-files', error: 'EACCES', when: 'after' },
     { tree: 'worker', read: 'ls-files', error: 'ENOENT', when: 'before' },

@@ -1,11 +1,11 @@
 // Copyright © 2026 Zhengyang Shen
 // Licensed under the MIT License. See LICENSE.
-import { defineConfig, type Plugin } from 'vite'
+import { defineConfig, searchForWorkspaceRoot, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import { createHash } from 'node:crypto'
 import { fileURLToPath, pathToFileURL, URL } from 'node:url'
 import { createServer } from 'node:http'
-import { writeFileSync } from 'node:fs'
+import { realpathSync, writeFileSync } from 'node:fs'
 import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
@@ -1384,6 +1384,10 @@ export default defineConfig(() => {
        * Failing sends the person to `ss -ltn` and one decision, which is the honest ten seconds.
        */
       strictPort: true,
+      // NODE_MODULES MAY BE A LINK TO A FOLDER OUTSIDE THE CHECKOUT, as in a worktree. Vite serves a file by its real
+      // path and only from the folders named here, so with Vite's default, the checkout alone, KaTeX's fonts answered 403.
+      // The first folder is Vite's own default, which a list set here replaces; the second is where node_modules really is.
+      fs: { allow: [searchForWorkspaceRoot(join(repoRoot, THE_VITE_ROOT)), realpathSync(join(repoRoot, 'node_modules'))] },
       /**
        * WATCH THE FILES, UNLESS THIS VITE IS SERVING A TEST.
        *

@@ -16,6 +16,7 @@ import { BOOTSTRAP_LAYOUT_WORDS as words } from './stable-bootstrap-words.mjs'
 import { bootstrapEvidencePin, bootstrapFail as fail, bootstrapGit as git, bootstrapProcessIdentity, readListeners, verifyLocalTopology, noDatabaseHolders, inspectNamedProcess } from './stable-bootstrap-support.mjs'
 import { inspectArtifacts, copyAndVerifyArtifacts, verifyRetainedArtifacts, copyAndVerifySqlite, checkpointBootstrapDatabase, bootstrapFileHash, syncBootstrapDirectory, syncBootstrapFile } from './stable-bootstrap-storage.mjs'
 import { createFsyncedJournal, startGatedBootstrapGroup, awaitBootstrapCommand, stopBootstrapGroup, observeBootstrapTopology, discoverBootstrapTopology } from './stable-bootstrap-processes.mjs'
+import { THE_ELECTRON_PACKAGE, electronsBinaryIn } from './electrons-binary.mjs'
 import { theExclusiveLockGuard } from '../database-holders.mjs'
 import { theFilesBuiltFrom } from '../../src/config/import-graph.mjs'
 import { THE_PROGRAMS_RESTARTED_WITH_THE_SERVER } from '../files-that-restart-the-server.mjs'
@@ -269,6 +270,10 @@ export async function runStableBootstrap(valid, options) {
     await journal.step('copy-private-check-database', () => copyAndVerifySqlite(c.database, candidateDatabase))
     const env = environment(c, paths, candidateDatabase, c.releaseCheckPort, 'release-check')
     await command('install-locked-dependencies', c.stableCheckout, 'npm', ['ci', '--include=dev', '--no-audit', '--no-fund'], env)
+    // npm ci does not run the electron package's install.js, which is what fetches Electron's binary.
+    await command('fetch-electron-binary', c.stableCheckout, process.execPath, [`${THE_ELECTRON_PACKAGE}/install.js`], env)
+    const electron = electronsBinaryIn(c.stableCheckout, fail)
+    journal.append('fetch-electron-binary', 'verified', { ...electron, says: `Electron's binary ${electron.binary} is in the stable checkout, ${electron.bytes} bytes.` })
     await command('typecheck-candidate', c.stableCheckout, 'npm', ['run', 'typecheck'], env)
     await command('build-web', c.stableCheckout, process.execPath, ['--input-type=module', '--eval', BUILD], env)
     for (const name of originalArtifacts.plugins) await command(`build-plugin-${name}`, c.stableCheckout, process.execPath, ['tools/build-a-plugin.mjs', name, '--json'], env)

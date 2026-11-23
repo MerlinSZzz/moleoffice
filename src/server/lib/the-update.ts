@@ -51,10 +51,16 @@
  * IT RUNS ON THE SERVICE'S OWN NODE (`theInstallsNode` in src/config/settings.mjs): on Linux the app's own program,
  * told to run as Node, and on Windows and the Mac the Node the installation carries.
  *
- * WHO MAY PRESS. A request carrying the owner's key, in the header or in the cookie a paired browser holds
+ * WHO MAY PRESS. A request carrying the owner's key, in the header or as the two halves a paired browser holds
  * (`howThisRequestProvedItself` in lib/keys.ts), or a keyless one from this computer's own program, which is
  * how the installed window asks (`mayPressTheUpdate` below). Anybody else reads the offer and is refused the
  * press in words. Nothing is ever updated without the press.
+ *
+ * WHAT IS REFUSED BEFORE THAT. The app's first two request hooks are the server's own first two: a request whose
+ * Host this office does not answer to is refused 421, and then a request that changes something without the office's
+ * mark, a header of its own or a JSON body, is refused 403. A website can make a browser send a keyless press, but not
+ * one with the mark, so the press is never read for such a request. Each refusal is answered as this app's own
+ * refusals are: its status, and its English sentence with its code.
  */
 import { existsSync, mkdirSync, mkdtempSync, rmdirSync, rmSync } from 'node:fs'
 import { basename, dirname, join } from 'node:path'
@@ -64,12 +70,17 @@ import { backupNameFor } from './complete-backups.ts'
 import { takeTheBackup, tableCounts } from './backup.ts'
 import { whereEachAgentsIdCameFrom } from './registry-aliases/remint-map.ts'
 import { THE_UPDATE_WAITS } from '../../config/world-address.mjs'
+import { DEVICE_HALF_HEADER, DEVICE_HALF_KEY } from '../../config/key-header.mjs'
 import { THE_MIGRATION_JOURNAL_TABLE, theMigrationsInTheFolder, theMigrationsNotYetApplied } from '../../config/migration-look.mjs'
 import { theSystemFor, thisSystem } from '../../config/systems/the-system.mjs'
 import { COUNTED_TABLES, describeHoldings, migrateInPlace, prepareToServe, type ServeDecision } from '../db/migrate.ts'
 import { THE_GENERATIONS, stageTheRemint } from '../db/remint-migration.ts'
 import { THEIR_OWN_PROGRAM, readWhoSentItFromThisComputer } from './from-a-sandbox.ts'
 import { howThisRequestProvedItself } from './keys.ts'
+import { refuseAHostThatIsNotThisOffice } from './a-host-that-is-not-this-office.ts'
+import { refuseAWriteWithoutTheOfficesMark } from './a-write-a-website-could-send.ts'
+import { stampArrival } from './http.ts'
+import { PanelError } from './panel-error.ts'
 import { ACTOR_HEADERS } from '@shared/request-headers.ts'
 import { enWave13n } from '@shared/words/en-wave-13n.ts'
 import type { TheUpdateOffer, TheUpdateReading, TheUpdateState } from '@shared/the-update.ts'
@@ -278,6 +289,10 @@ function whatDiffersFrom(was: ReadonlyMap<string, number> | Record<string, numbe
  * would be shown an offer it cannot press, and the reduced mode serves no pairing door. A request from a sandbox, from
  * another user, from another machine or from a program Mole Office cannot find is not the owner's; nor is one that
  * names an agent or carries a key that proves anybody else.
+ *
+ * IT IS ASKED ONLY OF A PRESS THE TWO REQUEST HOOKS OF `theReducedMode` LET THROUGH: one that names this office's Host
+ * and carries the office's mark. A keyless press with no mark, which a page on any website could make a browser send,
+ * is refused 403 before this is read, so it never counts as this computer's own program.
  */
 export async function mayPressTheUpdate(req: FastifyRequest): Promise<boolean> {
   const proof = howThisRequestProvedItself(req)
@@ -379,6 +394,26 @@ export function theReducedMode(options: {
   const exit = options.exit ?? ((code: number) => process.exit(code))
   const sayIt = options.say ?? ((sentence: string) => console.log(sentence))
   const app = Fastify({ logger: false })
+  // EACH REQUEST THIS APP'S LISTENER CARRIES IS STAMPED AS FROM THIS MACHINE, AND FROM THE CALLER ITSELF, as the server
+  // stamps its loopback listener. That is true here because the app listens only on the host `start()` gives it, which
+  // is 127.0.0.1 (src/server/index.ts), so the process at the other end of each socket is a program on this machine
+  // and the one that made the request, not a proxy. The two request hooks below read the stamp; a request no listener
+  // carried, as `inject()` makes one, has none and passes both.
+  app.server.prependListener('request', (raw) => stampArrival(raw, 'this machine', 'the caller'))
+  // THE SERVER'S OWN FIRST TWO REQUEST HOOKS, IN THE SAME ORDER: a Host this office does not answer to is refused 421,
+  // and then a request that changes something without the office's mark is refused 403. They are root hooks, so they
+  // run before every route, the `/api/*` catch-all and the page alike: a POST with no mark to any other path is
+  // refused too, where it used to be answered with the page.
+  refuseAHostThatIsNotThisOffice(app)
+  refuseAWriteWithoutTheOfficesMark(app)
+  // A REFUSAL IS ANSWERED IN THE SHAPE OF THIS APP'S OWN REFUSALS: its status, and { error, code }, where the error is
+  // the English sentence the page shows. Without this Fastify would put the sentence in `message` and the status's
+  // name in `error`. Any other error is thrown on, and Fastify answers it as before.
+  app.setErrorHandler(async (err, _req, reply) => {
+    if (!(err instanceof PanelError)) throw err
+    void reply.code(err.status)
+    return { error: err.message, code: err.code }
+  })
   let update: TheUpdateState = { state: 'offered' }
   let finished: () => void = () => {}
   const done = new Promise<void>((resolve) => (finished = resolve))
@@ -455,9 +490,19 @@ function theWordsOfThePage(): Record<string, string> {
 /**
  * THE OFFER'S PAGE: one page, with no build step, because the office's own pages are not served in this
  * mode. It reads GET /api/office/the-update, says what it found, and presses POST /api/office/the-update.
+ *
+ * BOTH CARRY THE HEADER HALF of this browser's device key, when the page's storage keeps one, beside the
+ * cookie half the browser sends by itself; with neither half the browser proves nothing. The header's
+ * name and the storage key are sent with the page from src/config/key-header.mjs, so the page types
+ * neither.
+ *
+ * THE PRESS ALWAYS CARRIES THE OFFICE'S MARK: Content-Type application/json, with the body {}. The
+ * mark check of `theReducedMode` refuses a press without it, whether the browser has paired or not. The
+ * read changes nothing, so it sends no mark.
  */
 export function thePage(): string {
   const words = JSON.stringify(theWordsOfThePage()).replace(/</gu, '\\u003c')
+  const half = JSON.stringify({ header: DEVICE_HALF_HEADER, key: DEVICE_HALF_KEY }).replace(/</gu, '\\u003c')
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -488,6 +533,9 @@ button:disabled { opacity: 0.6; cursor: default; }
 <main id="the-update" aria-live="polite"><p class="muted" id="reading"></p></main>
 <script>
 const W = ${words};
+const HALF = ${half};
+// The header half, or no header when the storage keeps none or cannot be read: the office then reads a browser that proves nothing.
+const withTheHalf = () => { let kept = null; try { kept = localStorage.getItem(HALF.key); } catch (err) { kept = null; } return kept ? { [HALF.header]: kept } : {}; };
 const t = (key, values = {}) => W['theUpdate.page.' + key].replace(/\\{(\\w+)\\}/g, (all, name) => (name in values ? String(values[name]) : all));
 const main = document.getElementById('the-update');
 const el = (tag, attrs, ...kids) => { const n = document.createElement(tag); for (const [k, v] of Object.entries(attrs || {})) n.setAttribute(k, v); for (const kid of kids) n.append(kid); return n; };
@@ -495,7 +543,7 @@ const list = (lines) => el('ul', {}, ...lines.map((line) => el('li', {}, line)))
 document.getElementById('reading').textContent = t('reading');
 async function read() {
   try {
-    const res = await fetch('/api/office/the-update', { credentials: 'same-origin' });
+    const res = await fetch('/api/office/the-update', { credentials: 'same-origin', headers: withTheHalf() });
     if (!res.ok) throw new Error(String(res.status));
     draw(await res.json(), null);
   } catch (err) {
@@ -510,7 +558,8 @@ async function press() {
   draw(last, null, true);
   let answer;
   try {
-    const res = await fetch('/api/office/the-update', { method: 'POST', credentials: 'same-origin' });
+    // The office's mark, a JSON body, which a website cannot make a browser send without asking first: the press is refused without it.
+    const res = await fetch('/api/office/the-update', { method: 'POST', credentials: 'same-origin', headers: { ...withTheHalf(), 'Content-Type': 'application/json' }, body: '{}' });
     answer = await res.json();
     if (!res.ok) { draw(last, answer.error || t('pressFailed')); return; }
   } catch (err) { draw(last, t('pressFailed')); return; }
@@ -522,15 +571,20 @@ async function waitForTheOffice() {
   if (health && health.ok !== false) { location.reload(); return; }
   setTimeout(waitForTheOffice, 1000);
 }
+// HOW THE START MEASURED, as the offer says it: on a copy, or on the database itself in a transaction it rolled back.
+// A reading that says neither has no sentence here, so it is not drawn.
+const MEASURED = { 'a copy': { found: 'found', nothing: 'nothingChanged' }, 'this file': { found: 'foundOnThisFile', nothing: 'nothingKept' } };
 let last = null;
 function draw(reading, refused, pressing = false) {
   last = reading;
   const { offer, update, mayPress } = reading;
+  const measured = MEASURED[offer.measuredOn];
+  if (measured === undefined) throw new Error('the reading does not say how the start measured');
   const kids = [el('h1', {}, t('title'))];
   // "Nothing has changed yet" is said only while the press is still to come; after a failure the file's own line says it.
-  const before = update.state === 'offered' || update.state === 'updating' ? [el('h2', {}, t('nothingChangedHeading')), el('p', {}, t('nothingChanged'))] : [];
+  const before = update.state === 'offered' || update.state === 'updating' ? [el('h2', {}, t('nothingChangedHeading')), el('p', {}, t(measured.nothing))] : [];
   const found = el('div', { class: 'panel' },
-    el('p', {}, t('found')),
+    el('p', {}, t(measured.found)),
     el('h2', {}, t('holdsHeading')), el('p', {}, offer.holds),
     el('p', { class: 'file' }, offer.file),
     ...before,

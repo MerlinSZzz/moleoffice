@@ -71,7 +71,7 @@
  * WHAT IS NOT DONE HERE. A worker that restarts does not pick up a launcher run it started before; an ask left
  * `starting` with no launcher running may be asked again.
  */
-import { existsSync, readFileSync, realpathSync } from 'node:fs'
+import { existsSync, lstatSync, readFileSync, realpathSync, statSync } from 'node:fs'
 import { basename, dirname, isAbsolute, join, resolve, sep } from 'node:path'
 
 import { SYSTEM_LINES } from '@shared/groups.ts'
@@ -80,6 +80,7 @@ import { readCastingRoll, theLimitsOn, theStartOfARoll, type CastingRollRecord }
 import { moleOffice } from '@shared/participants.ts'
 import { theReminderAStartWithNoWorkAreaCarries } from '@shared/a-start-with-no-work-area.ts'
 import { aRoleNeedsARegisteredWorkArea, THE_WORKER } from '@shared/roles.ts'
+import { theRunHasEnded } from '@shared/run-has-ended.ts'
 import { nowStamp } from '@shared/time.ts'
 import type { PanelRecord } from '@shared/types.ts'
 import { withArticle } from '@shared/work.ts'
@@ -91,6 +92,8 @@ import {
   theRowAsTheAskReadIt,
   theStartOfTheRow,
   WORKER_RUNS,
+  FOR_THE_PERSON,
+  HOST_DEFAULT_PERMISSIONS,
   type AChosenRuntime,
   type AWorkerARunAskedFor,
   type TheCutAsked,
@@ -98,6 +101,8 @@ import {
   type TheRunThatAskedForAWorker,
   type TheWorkerPackage,
   type TheWorkerRun,
+  type TheWorkerPlace,
+  type TheWorkerPlaceAsked,
   type TheWorkersARunStarted,
   type WorkerRunState,
 } from '@shared/worker-runs.ts'
@@ -129,7 +134,7 @@ import { theRealLocation } from '../../config/files-area.mjs'
 import { whyNotPlainPaths } from '../../config/a-workers-left-out-paths.mjs'
 import { IT_IS_A_LINK, IT_IS_NOT_A_FILE, NOTHING_IS_THERE, whyNotAFileOfTheWorktree } from '../../config/a-workers-images.mjs'
 import { theNextTryOfALongWait } from '../../config/a-long-wait.mjs'
-import { getRecord, recordInWorkspace, theAgentOfAnAskedWorkerRunUnder, writeTheCastingRoll, writeTheCutAsked, writeTheImagesGiven, writeTheWorkerPackage, writeTheWorkerRun, type Actor } from './records.ts'
+import { getRecord, recordInWorkspace, theAgentOfAnAskedWorkerRunUnder, writeTheCastingRoll, writeTheCutAsked, writeTheImagesGiven, writeTheWorkerPackage, writeTheWorkerPlace, writeTheWorkerRun, type Actor } from './records.ts'
 import { noRecordHasThisId } from './no-record-has-this-id.ts'
 import { PanelError } from './panel-error.ts'
 import { listResources } from './resources.ts'
@@ -141,6 +146,7 @@ import { thisAgentWasRegisteredWithNoKeyOfItsOwn } from '../db/this-agent-was-re
 import { runServing } from './worker.ts'
 import { theAgentARunServes } from './the-agent-a-run-serves.ts'
 import { listWorkspaces } from '../db/list-workspaces.ts'
+import { listRepositories } from '../db/list-repositories.ts'
 
 /** Who writes the office's own steps on the supervisor's run: the office itself, as on a next round. */
 function theOfficeWritesIt(): Actor { return { type: 'system', id: moleOffice().id } }
@@ -240,17 +246,36 @@ function theSupervisorsRun(supervisor: RegisteredAgent, actor: Actor, workspaceI
   return run
 }
 
-/** The same live-worker guard for a door ask and a hand start, before either can replace its entry. */
-function refuseASecondWorkerRun(worker: RegisteredAgent, workspaceId: string, byHand = false): void {
+/** The same guard for a door ask and a hand start, before either can replace its entry. */
+function refuseASecondWorkerRun(worker: RegisteredAgent, workspaceId: string, run: PanelRecord, byHand = false): void {
   const serving = runServing(worker.id, workspaceId)
-  if (serving === null) return
-  refused(
-    byHand
-      ? `Run ${serving} is already serving ${worker.handle}, so wait for it to end before starting it with --asked-by (askedBy) and --brief (brief), or through the worker-run door; nothing was started.`
-      : `Run ${serving} is already serving ${worker.handle}, so a worker run would be a second run of it. Ask again when ` +
-        'that run has ended. Nothing was written.',
-    409,
-  )
+  if (serving !== null) {
+    refused(
+      byHand
+        ? `Run ${serving} is already serving ${worker.handle}, so wait for it to end before starting it with --asked-by (askedBy) and --brief (brief), or through the worker-run door; nothing was started.`
+        : `Run ${serving} is already serving ${worker.handle}, so a worker run would be a second run of it. Ask again when ` +
+          'that run has ended. Nothing was written.',
+      409,
+    )
+  }
+
+  // A run is filed before its process is registered, leaving a gap in the live-process reading measured on 22 November 2026.
+  // Once a process row exists, leave it to runServing: its comment explains the 4 September case of a stale running record.
+  const filed = sqlite.prepare(
+    "SELECT id, data FROM records WHERE kind = 'session' AND workspace_id = ? AND deleted_at IS NULL AND json_extract(data, '$.parentAttachment') = ? " +
+      "AND (json_extract(data, '$.servingAgentId') IS NOT NULL OR json_extract(data, '$.servingAgent') IS NOT NULL)",
+  ).all(workspaceId, run.id) as { id: string; data: string }[]
+  for (const row of filed) {
+    const data = JSON.parse(row.data) as Record<string, unknown>
+    if (theAgentARunServes(data)?.id !== worker.id || theRunHasEnded(data['state'])) continue
+    if (listResources({ workspaceId, sessionRecordId: row.id, includeReleased: true }).some(resource => resource.type === 'process')) continue
+    refused(
+      byHand
+        ? `Run ${row.id} was filed for ${worker.handle} under run ${run.id} and has not ended, so wait for it to end before starting it with --asked-by (askedBy) and --brief (brief), or through the worker-run door; nothing was started.`
+        : `Run ${row.id} was filed for ${worker.handle} under run ${run.id} and has not ended, so a worker run would be a second run of it. Ask again when that run has ended. Nothing was written.`,
+      409,
+    )
+  }
 }
 
 /** A hand ask checked by the office, before the worktree and again inside the run's filing transaction. */
@@ -300,7 +325,7 @@ export function theHandStartAskedFor(input: {
     if (!(error instanceof PanelError)) throw error
     refused(sentence, 403)
   }
-  refuseASecondWorkerRun(worker, input.workspaceId, true)
+  refuseASecondWorkerRun(worker, input.workspaceId, run, true)
   const sandbox = theSandboxTheOfficeVouchesFor(run)
   if (sandbox === null) throw aRefusalForAnUnvouchedSandbox(run.data, new PanelError(sentence, 403))
   const brief = theBriefAt(input.brief!, sandbox.folder)
@@ -558,6 +583,42 @@ function theCommitOf(directory: string, name: string): { ok: true; line: string 
     const failed = error as { status?: unknown; stderr?: unknown }
     return { ok: false, says: failed.status === 1 && String(failed.stderr ?? '').trim() === '' ? NO_SUCH_COMMIT : whyGitDidNotAnswer(error) }
   }
+}
+
+export class OutsidePlaceRequired extends PanelError {}
+const PASS_ON_THE_SAFETY_LINE = 'The line in forThePerson is for the person: pass it on to them when the place is chosen.'
+
+/** Read and validate a place without making a folder, worktree or branch. */
+function thePlaceAsked(asked: TheWorkerPlaceAsked, cutFrom: string | undefined, workspaceId: string, handle: string): { place: TheWorkerPlace; cut: NonNullable<TheWorkerRun['cut']> } {
+  const folder = asked.folder
+  if (!isAbsolute(folder)) refused(`The folder ${folder} must be an absolute path. Nothing was written.`, 400)
+  const repositories = listRepositories(workspaceId)
+  if (asked.kind === 'worktree') {
+    const repo = repositories.find((one) => one.name === asked.repository)
+    if (repo === undefined || repo.root === null) refused(`The repository ${asked.repository} is not registered with a root in this project. Nothing was written.`, 400)
+    if (lstatSync(folder, { throwIfNoEntry: false }) !== undefined) refused(`The worktree folder ${folder} already exists. Nothing was written.`, 409)
+    try { if (!statSync(dirname(folder)).isDirectory()) refused(`The parent of ${folder} is not a folder. Nothing was written.`, 409) }
+    catch (error) { if (error instanceof PanelError) throw error; refused(`The parent of ${folder} does not exist as a folder. Nothing was written.`, 409) }
+    if (cutFrom === undefined || cutFrom.startsWith('-')) refused('A worktree place needs cutFrom naming a commit, and cutFrom must not begin with "-". Nothing was written.', 400)
+    const commit = theCommitOf(repo.root, cutFrom)
+    if (!commit.ok) refused(`cutFrom ${cutFrom} does not name a readable commit in the repository: ${commit.says}. Nothing was written.`, 400)
+    const branch = aGitLine(repo.root, ['for-each-ref', '--format=%(refname)', `refs/heads/${handle}`])
+    if (!branch.ok) refused(`Git could not read the worker branch: ${branch.says}. Nothing was written.`, 409)
+    if (branch.line.split('\n').includes(`refs/heads/${handle}`)) refused('The worker branch already exists in the repository. Nothing was written.', 409)
+    return { place: { kind: 'worktree', folder, repository: { name: repo.name, root: repo.root } }, cut: { named: cutFrom, commit: commit.line } }
+  }
+  if (cutFrom !== undefined) refused('A folder place is used as it stands, so it takes no cutFrom. Nothing was written.', 400)
+  let real: string
+  try { if (!statSync(folder).isDirectory()) throw new Error(); real = realpathSync(folder) }
+  catch { refused(`The folder ${folder} does not exist as a folder. Nothing was written.`, 409) }
+  const top = aGitLine(folder, ['rev-parse', '--show-toplevel'])
+  let realTop: string | null = null
+  try { if (top.ok) realTop = realpathSync(top.line) } catch { /* Git's answer is not a readable path. */ }
+  if (realTop !== real) refused(`The folder ${folder} is not the top of a git work tree. Nothing was written.`, 409)
+  const head = theCommitOf(folder, 'HEAD')
+  if (!head.ok) refused(`Git cannot read a commit at HEAD in ${folder}: ${head.says}. Nothing was written.`, 409)
+  const repo = repositories.find((one) => { try { return one.root !== null && realpathSync(one.root) === real } catch { return false } })
+  return { place: { kind: 'folder', folder, repository: repo?.root == null ? null : { name: repo.name, root: repo.root } }, cut: { named: null, commit: head.line } }
 }
 
 /** The clones `<sandbox>/instance.json` lists, by name, as `up` records them, or why the file could not be read. */
@@ -944,6 +1005,7 @@ function thePackageAWorkerIsGiven(
   marked: TheDifficultyMarked | null,
   workspaceId: string,
   handle: string,
+  askedAt: string,
 ): ThePackageAWorkerWasGiven | null {
   const named = input.package !== undefined
   if (!named) {
@@ -1032,7 +1094,7 @@ function thePackageAWorkerIsGiven(
       400,
     )
   }
-  return { package: { task: task.id, points: askedPoints, difficulty, why, askedAt: nowStamp() }, title: task.title }
+  return { package: { task: task.id, points: askedPoints, difficulty, why, askedAt }, title: task.title }
 }
 
 export interface TheWorkerRunAsked {
@@ -1040,6 +1102,7 @@ export interface TheWorkerRunAsked {
   worker: { id: string; handle: string }
   workerRun: TheWorkerRun
   says: string
+  forThePerson?: string
   limits: { says: string[] }
 }
 
@@ -1053,6 +1116,7 @@ export function askForAWorkerRun(input: {
   runtime?: string
   model?: string
   cutFrom?: string
+  place?: TheWorkerPlaceAsked
   /** One of the sandbox's clones beside repo/, by its folder name or its absolute path, to cut the worker from. */
   clone?: string
   /** Paths the worker needs that the sandbox's template may leave out of its worktree, given to the launcher as --with-path. */
@@ -1090,29 +1154,38 @@ export function askForAWorkerRun(input: {
   if (noWorker !== null) refused(`${noWorker} Nothing was written.`, 409)
   const run = theSupervisorsRun(supervisor, actor, workspaceId)
   const sandbox = theSandboxTheOfficeVouchesFor(run)
-  if (sandbox === null) {
-    refused(
+  if (sandbox === null && input.place === undefined) {
+    throw new OutsidePlaceRequired(
       `Run ${run.id} of ${supervisor.handle} names no sandbox the office can vouch for: its folder is not one a container ` +
-        'row of the ledger names. A worker run is started only in the sandbox its supervisor runs in. Nothing was written.',
+        'row of the ledger names. Name place as {"kind":"worktree","repository":"<name>","folder":"<path>"} or {"kind":"folder","folder":"<path>"}. Nothing was written.',
       409,
     )
   }
-  const read = theBriefAndItsWordsAt(input.brief, sandbox.folder)
+  if (sandbox !== null && input.place !== undefined) refused('A run in a sandbox cannot name place. Nothing was written.', 400)
+  if (input.place !== undefined && (input.clone !== undefined || input.paths !== undefined || input.images !== undefined)) {
+    const named = input.clone !== undefined ? 'clone' : input.paths !== undefined ? 'paths' : 'images'
+    refused(`${named} cannot be named with place. Nothing was written.`, 400)
+  }
+  const outside = input.place === undefined ? null : thePlaceAsked(input.place, input.cutFrom, workspaceId, worker.handle)
+  const briefFolder = outside === null ? sandbox!.folder : text(run.data['workingDirectory'])
+  if (briefFolder === null) refused('The asking run names no workingDirectory for its brief. Nothing was written.', 409)
+  const read = theBriefAndItsWordsAt(input.brief, briefFolder, outside !== null)
   const brief = read.brief
   // THE WORK AREA THE BRIEF'S DECLARATION NAMES, read from inside the sandbox folder as the brief is, and checked as the
   // launcher checks it. It is set with the ask below.
-  const declared = theWorkAreaDeclaredBeside(input.brief, sandbox.folder)
+  const declared = theWorkAreaDeclaredBeside(input.brief, briefFolder, outside !== null)
   // THE DIFFICULTY THE BRIEF MARKS picks the label of the rows a roll draws from. A model the ask names is given whatever it marks.
   const marked = theDifficultyMarkedIn(read.words, input.brief)
-  const work = thePackageAWorkerIsGiven(input, marked, workspaceId, worker.handle)
-  refuseASecondWorkerRun(worker, workspaceId)
+  const askedAt = nowStamp()
+  const work = thePackageAWorkerIsGiven(input, marked, workspaceId, worker.handle, askedAt)
+  refuseASecondWorkerRun(worker, workspaceId, run)
   // THE CUT: the commit the ask chooses, checked in the sandbox's repository or in the clone it names, or, when it names
   // neither a clone nor a cutFrom, in the listed clone the asking run's worktree belongs to; and the worker's worktree if
   // it is there.
-  const standsIn = input.clone === undefined && input.cutFrom === undefined ? theCloneTheRunStandsIn(run, sandbox.folder) : null
-  const clone = input.clone !== undefined ? theCloneAsked(sandbox.folder, input.clone) : standsIn !== null && 'clone' in standsIn ? standsIn.clone : undefined
-  const cut = theCutTheAskChooses(run, sandbox.folder, input.cutFrom, clone, standsIn !== null && 'repository' in standsIn ? standsIn : undefined)
-  const there = theWorktreeThere(sandbox.folder, worker.handle)
+  const standsIn = outside === null && input.clone === undefined && input.cutFrom === undefined ? theCloneTheRunStandsIn(run, sandbox!.folder) : null
+  const clone = input.clone !== undefined ? theCloneAsked(sandbox!.folder, input.clone) : standsIn !== null && 'clone' in standsIn ? standsIn.clone : undefined
+  const cut = outside === null ? theCutTheAskChooses(run, sandbox!.folder, input.cutFrom, clone, standsIn !== null && 'repository' in standsIn ? standsIn : undefined) : outside.cut
+  const there = outside === null ? theWorktreeThere(sandbox!.folder, worker.handle) : null
   // A worktree that is there is filed at the commit it stands at when the worker starts, so one whose HEAD git cannot
   // read is refused now.
   if (there !== null && there.head === null) refused(aHeadNobodyCanRead(there, 'ask'), 409)
@@ -1147,11 +1220,11 @@ export function askForAWorkerRun(input: {
   const replaces = before !== null && (before.state === 'wanted' || before.state === 'starting')
   const workerRun: TheWorkerRun = {
     state: 'wanted',
-    askedAt: nowStamp(),
+    askedAt,
     askedBy: { who: { kind: 'agent', id: supervisor.id }, session: run.id },
     handle: worker.handle,
     brief,
-    sandbox,
+    ...(outside === null ? { sandbox: sandbox! } : { place: outside.place }),
     ...(replaces ? { replaced: { askedAt: before.askedAt } } : {}),
     ...(work === null ? {} : { package: work.package }),
     ...(choice === null ? {} : { chosen: { runtime: choice.runtime, model: choice.model, by: { kind: 'agent', id: supervisor.id } } }),
@@ -1165,7 +1238,7 @@ export function askForAWorkerRun(input: {
   const runtime = choice === null ? card!.program : choice.runtime
   const noImages = whyNoImagesFor(runtime, images)
   if (noImages !== null) refused(`${noImages} Nothing was written.`, 400)
-  const imageNotThere = whyAnImageIsNotThere(images, paths, there, sandbox.folder, cut)
+  const imageNotThere = outside === null ? whyAnImageIsNotThere(images, paths, there, sandbox!.folder, cut) : null
   if (imageNotThere !== null) refused(`${imageNotThere} Nothing was written.`, 400)
   const exec = theLaunchersCommandFor(runtime) === 'exec'
   const command = exec ? `exec --agent ${worker.handle} --runtime ${runtime}` : 'worker'
@@ -1176,7 +1249,7 @@ export function askForAWorkerRun(input: {
       : `${supervisor.handle} chose ${choice.runtime} with the model ${choice.model}${given === choice.model ? '' : `, which the launcher is given as ${String(given)}`}, ` +
         `from row ${String(choice.row.id)} of the Casting table for the worker card. ${AS_THE_ASK_READ_IT}` +
         (kept === null ? '' : ' The Casting roll an earlier ask made is kept on the entry, unused, so a later ask that names no model takes it.')) +
-    (exec ? ` It runs in its own worktree, ${theWorkersOwnWorktree(sandbox.folder, worker.handle)}.` : '')
+    (exec && outside === null ? ` It runs in its own worktree, ${theWorkersOwnWorktree(sandbox!.folder, worker.handle)}.` : '')
   const foundIn =
     standsIn !== null && 'clone' in standsIn
       ? theCommitWasLookedForInTheClone(run.id, standsIn.dir, standsIn.clone)
@@ -1210,12 +1283,18 @@ export function askForAWorkerRun(input: {
     aRoleNeedsARegisteredWorkArea(theRoleCards(), worker.role)
       ? ` ${theReminderAStartWithNoWorkAreaCarries(worker.handle)}`
       : ''
+  const outsidePlaceWords = outside?.place.kind === 'folder' ? 'existing folder' : 'new worktree'
+  const outsideStartWords = outside?.place.kind === 'worktree'
+    ? 'The host launcher will make the worktree at the chosen cut and start the worker there.'
+    : 'The host launcher will use the folder as it stands and start the worker there.'
   return {
     run: run.id,
     worker: { id: worker.id, handle: worker.handle },
     workerRun,
-    says:
-      `A worker run of ${worker.handle} is asked for, under run ${run.id}, in sandbox ${sandbox.instance}. Nothing has started ` +
+    ...(outside === null ? {} : { forThePerson: FOR_THE_PERSON }),
+    says: outside !== null
+      ? `A worker run of ${worker.handle} is asked for, under run ${run.id}, in the ${outsidePlaceWords} ${outside.place.folder}. Nothing has started yet. ${outsideStartWords} ${chose} ${thePackageSays(work)}${set === null ? '' : ` ${theDeclaredAreaWasSetSays(worker.handle, set.workArea ?? [], declared.file, supervisor.handle)}`}${noWorkAreaReminder} ${HOST_DEFAULT_PERMISSIONS} ${PASS_ON_THE_SAFETY_LINE}`
+      : `A worker run of ${worker.handle} is asked for, under run ${run.id}, in sandbox ${sandbox!.instance}. Nothing has started ` +
       `yet. The message worker tries to start it on a later pass, with node tools/sandbox.mjs ${command} --parent ${run.id}. ` +
       `${chose} ${thePackageSays(work)} ${cutSays}${pathsSays}${imagesSays} Run ${run.id}'s ${WORKER_RUNS} field says where the ask is.` +
       (replaces ? ` It replaces the ask made at ${before.askedAt}.` : '') +
@@ -1350,8 +1429,11 @@ export interface TheWorkerRunStarts {
   paths: string[]
   /** The images the ask named, given as `--image` each, and empty when it named none. */
   images: string[]
-  instance: string
-  sandboxes: string
+  instance?: string
+  sandboxes?: string
+  place?: TheWorkerPlace
+  forThePerson?: string
+  says?: string
   brief: string
   /** The supervisor's run, which the worker's run is filed under. */
   parent: string
@@ -1438,15 +1520,34 @@ export function startingTheWorkerRun(input: { run: string; agent: string; wrappe
   if (waiting !== null) refused(`${waiting} The ask waits. Nothing was written.`, 409)
   const serving = runServing(worker.id, input.workspaceId)
   if (serving !== null) refused(`Run ${serving} is still serving ${worker.handle}. The ask waits. Nothing was written.`, 409)
-  const folder = theSandboxFolderOf(record.data)
-  if (folder !== workerRun.sandbox.folder) return failed(`The office can no longer vouch for sandbox ${workerRun.sandbox.folder}.`)
+  const place = workerRun.place
+  const sandbox = workerRun.sandbox
+  const folder = place === undefined ? theSandboxFolderOf(record.data) : text(record.data['workingDirectory'])
+  if (place === undefined && (sandbox === undefined || folder !== sandbox.folder)) return failed(`The office can no longer vouch for sandbox ${sandbox?.folder ?? ''}.`)
+  if (place !== undefined && theSandboxTheOfficeVouchesFor(record) !== null) return failed('The asking run is now in a sandbox the office vouches for.')
+  if (folder === null) return failed('The asking run names no workingDirectory for its brief.')
   let brief: TheWorkerRun['brief']
   try {
-    brief = theBriefAt(workerRun.brief.path, folder)
+    brief = place === undefined ? theBriefAt(workerRun.brief.path, folder) : theBriefAndItsWordsAt(workerRun.brief.path, folder, true).brief
   } catch (error) {
     return failed(error instanceof Error ? error.message.replace(/ Nothing was written\.$/, '') : String(error))
   }
   if (brief.sha256 !== workerRun.brief.sha256) return failed(`The brief ${brief.path} changed after it was asked for.`)
+  let outsideCut: NonNullable<TheWorkerRun['cut']> | null = null
+  if (place !== undefined) {
+    const oldCut = workerRun.cut
+    if (oldCut === undefined) return failed('The ask holds no commit.')
+    try {
+      const asked: TheWorkerPlaceAsked = place.kind === 'worktree'
+        ? { kind: 'worktree', folder: place.folder, repository: place.repository.name }
+        : { kind: 'folder', folder: place.folder }
+      const checked = thePlaceAsked(asked, place.kind === 'worktree' ? oldCut.commit : undefined, input.workspaceId, worker.handle)
+      if (place.kind === 'worktree' && (checked.place.repository === null || checked.place.repository.root !== place.repository.root || checked.cut.commit !== oldCut.commit)) throw new Error('The repository or commit the ask kept is no longer available.')
+      outsideCut = checked.cut
+    } catch (error) {
+      return failed(error instanceof Error ? error.message.replace(/ Nothing was written\.$/, '') : String(error))
+    }
+  }
   // THE ROW THE ASK KEPT, read again as the ask read it: a changed, held or removed row fails the start, and no other row
   // is taken. Nothing rolls here (round 46). The launcher is given the row's program and model by theStartOfTheRow, by
   // the same rule the ask used for the choice or for the roll the ask kept (wave 13n round BQ), so a kept roll whose row
@@ -1480,13 +1581,30 @@ export function startingTheWorkerRun(input: { run: string; agent: string; wrappe
       return failed(`The office's answer for this start is not the native selection of Casting row ${String(kept.row.id)} that the ask read. It is not swapped for another row.`)
     }
   }
+  if (place !== undefined && outsideCut !== null) {
+    const cutFrom = place.kind === 'worktree' ? outsideCut.commit : null
+    write(record.id, worker.id, {
+      ...workerRun, state: 'starting', starting: {
+        at: nowStamp(), wrapper: wrapper.id, ...given, cutFrom,
+        cutSays: place.kind === 'worktree' ? 'The host launcher makes the worktree at the chosen cut and starts the worker there.' : 'The host launcher uses the folder as it stands and starts the worker there.',
+        ...theEffortTheLauncherIsAnswered({ agentId: worker.id, handle: worker.handle, runtime: given.runtime, model: given.model, project: input.workspaceId }),
+      },
+    })
+    return {
+      run: record.id, agentId: worker.id, handle: worker.handle, runtime: given.runtime, model: given.model,
+      chosen: chosen ?? null, castingSays: given.castingSays ?? null, selection, verb: theLaunchersCommandFor(runtime),
+      worktree: null, cutFrom: outsideCut.commit, clone: null, paths: [], images: [], brief: workerRun.brief.path,
+      parent: record.id, workspaceId: input.workspaceId, place, forThePerson: FOR_THE_PERSON, says: PASS_ON_THE_SAFETY_LINE,
+    }
+  }
+  if (sandbox === undefined) return failed('The ask names neither a sandbox nor a place.')
   // THE CUT, used only when the worker's worktree is made now: a worktree that is there is used as it stands, and a cut
   // the ask named is then refused, unless the gate `worker-cuts-the-sandbox-cannot-use` is off. The launcher files the
   // run at the --cut-from it is given, so a worktree that is there is given the commit it stands at, and one whose HEAD
   // git cannot read fails, whatever the gate says.
   const cut = workerRun.cut
   if (cut === undefined) return failed('The ask chose no commit to cut the worker from, because it was made before an ask chose one. Ask again.')
-  const there = theWorktreeThere(workerRun.sandbox.folder, worker.handle)
+  const there = theWorktreeThere(sandbox.folder, worker.handle)
   const reused = there === null ? null : { there, head: there.head ?? failed(aHeadNobodyCanRead(there, 'start')) }
   if (there !== null && cut.named !== null) {
     aCutTheSandboxCannotUse(() => failed(
@@ -1497,13 +1615,13 @@ export function startingTheWorkerRun(input: { run: string; agent: string; wrappe
   const cutFrom = there === null ? cut.commit : null
   const cutSays =
     reused === null
-      ? aStartCutsTheWorktree(theWorkersOwnWorktree(workerRun.sandbox.folder, worker.handle), cut, record.id)
+      ? aStartCutsTheWorktree(theWorkersOwnWorktree(sandbox.folder, worker.handle), cut, record.id)
       : aStartUsesAWorktreeThatIsThere(reused.there, reused.head, cut.commit)
   // THE IMAGES, checked again where the worktree now stands, as the launcher checks them once it is made.
   const images = workerRun.images ?? []
   const noImages = whyNoImagesFor(runtime, images)
   if (noImages !== null) return failed(noImages)
-  const imageNotThere = whyAnImageIsNotThere(images, workerRun.paths ?? [], there, workerRun.sandbox.folder, cut)
+  const imageNotThere = whyAnImageIsNotThere(images, workerRun.paths ?? [], there, sandbox.folder, cut)
   if (imageNotThere !== null) return failed(imageNotThere)
   // A dsh or OpenCode program goes to `exec`, chosen or rolled, because `worker` takes claude-code and codex only.
   const verb = theLaunchersCommandFor(runtime)
@@ -1529,13 +1647,13 @@ export function startingTheWorkerRun(input: { run: string; agent: string; wrappe
     castingSays: given.castingSays ?? null,
     selection,
     verb,
-    worktree: verb === 'exec' ? theWorkersOwnWorktree(workerRun.sandbox.folder, worker.handle) : null,
+    worktree: verb === 'exec' ? theWorkersOwnWorktree(sandbox.folder, worker.handle) : null,
     cutFrom: reused === null ? cut.commit : reused.head,
     clone: reused === null && cut.clone !== undefined ? cut.clone : null,
     paths: workerRun.paths ?? [],
     images,
-    instance: workerRun.sandbox.instance,
-    sandboxes: dirname(workerRun.sandbox.folder),
+    instance: sandbox.instance,
+    sandboxes: dirname(sandbox.folder),
     brief: workerRun.brief.path,
     parent: record.id,
     workspaceId: input.workspaceId,
@@ -1546,7 +1664,7 @@ export function startingTheWorkerRun(input: { run: string; agent: string; wrappe
  * THE LAUNCHER ENDED. Still `starting` means it filed no run: the ask is failed and the supervisor told. `started`
  * keeps how it ended and the worker's open process row, or says none was open.
  */
-export function theWorkerRunsLauncherEnded(input: { run: string; agent: string; wrapper: string; ok: boolean; says: string; workspaceId: string }): TheWorkerRun {
+export function theWorkerRunsLauncherEnded(input: { run: string; agent: string; wrapper: string; ok: boolean; says: string; workspaceId: string; beforeRuntime?: boolean }): TheWorkerRun {
   const { record, workerRun } = theRunHolding(input.run, input.agent, input.workspaceId)
   const launcher = { at: nowStamp(), ok: input.ok, says: input.says }
   if (workerRun.state === 'starting' && workerRun.starting?.wrapper === input.wrapper) {
@@ -1554,6 +1672,9 @@ export function theWorkerRunsLauncherEnded(input: { run: string; agent: string; 
   }
   if (workerRun.state !== 'started' || workerRun.starting?.wrapper !== input.wrapper || workerRun.started === undefined) {
     refused(`The worker run of ${workerRun.handle} under run ${record.id} was not started by launcher run ${input.wrapper}. Nothing was written.`, 409)
+  }
+  if (workerRun.place !== undefined && input.beforeRuntime === true && !input.ok) {
+    return itFailed(record, input.agent, { ...workerRun, launcher }, input.says, 409)
   }
   const rows = listResources({ workspaceId: input.workspaceId, sessionRecordId: workerRun.started.run }).filter((row) => row.type === 'process')
   const process =
@@ -1585,7 +1706,12 @@ export function theWorkerRunThisRunStarts(record: PanelRecord, agentId: string, 
   const parentId = text(record.data['parentAttachment'])
   const parent = parentId === null ? null : getRecord(parentId)
   if (parent === null || parent.kind !== 'session') return null
-  return theAgentOfAnAskedWorkerRunUnder(parent, record.data, actor) === agentId ? parent.id : null
+  if (theAgentOfAnAskedWorkerRunUnder(parent, record.data, actor) !== agentId) return null
+  const workerRun = theWorkerRunOf(sqlite, parent.data, agentId)
+  if (workerRun?.place !== undefined && Object.hasOwn(record.data, 'sandbox')) {
+    refused('A worker run filed for an outside place may not name a sandbox. Nothing was written.', 409)
+  }
+  return parent.id
 }
 
 /** The worker's run is filed and its key minted: the entry is `started`. Inside the create's transaction. */
@@ -1597,6 +1723,7 @@ export function sayTheWorkerRunStarted(parentId: string, agentId: string, runId:
     throw new Error(`Run ${parentId} holds no worker run of agent ${agentId} that is starting, while run ${runId} was filed for it.`)
   }
   write(parentId, agentId, { ...workerRun, state: 'started', started: { at: nowStamp(), run: runId, runKeyId } })
+  if (workerRun.place !== undefined) writeTheWorkerPlace(runId, workerRun.place, theOfficeWritesIt())
   // HOW ITS MODEL WAS CHOSEN goes onto the worker's own run, where the agent's later starts read its roll.
   const roll = readCastingRoll(workerRun.starting?.castingRoll)
   if (roll !== null) writeTheCastingRoll(runId, roll, theOfficeWritesIt())
@@ -1609,6 +1736,7 @@ export function sayTheWorkerRunStarted(parentId: string, agentId: string, runId:
   // WHICH IMAGES IT WAS GIVEN goes onto it as well. The launcher files no run while one of them is not a file there.
   const images = workerRun.images ?? []
   if (images.length > 0) {
+    if (workerRun.sandbox === undefined) throw new Error('An outside worker run cannot hold images.')
     const worktree = theWorkersOwnWorktree(workerRun.sandbox.folder, workerRun.handle)
     writeTheImagesGiven(runId, { images, worktree, says: theImagesGivenSay(images, worktree) }, theOfficeWritesIt())
   }

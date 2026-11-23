@@ -44,6 +44,8 @@ let quietHandle: boolean
 let closedBriefAfter: number
 let briefSentAt: number | null
 let closedResourcesAfter: number
+// How many reads had arrived here when the answer to GET /api/resources was sent, or null while none was sent.
+let readsWhenResourcesAnswered: number | null
 let claudePid: number | null
 let processSource: 'stamp' | 'none'
 let wrongStart: boolean
@@ -83,6 +85,7 @@ beforeEach(async () => {
   closedBriefAfter = 0
   briefSentAt = null
   closedResourcesAfter = 0
+  readsWhenResourcesAnswered = null
   claudePid = null
   processSource = 'none'
   wrongStart = false
@@ -196,7 +199,11 @@ beforeEach(async () => {
     const delay = path === '/api/where-you-stand' ? delayBrief : path === '/api/resources' ? delayResources
       : path.startsWith('/api/onboarding') ? delaySetup : 0
     if (delay === 'never' || (quietHandle && path.startsWith('/api/handles/'))) return
-    const answer = () => { res.statusCode = status; res.end(JSON.stringify(body)) }
+    const answer = () => {
+      if (path === '/api/resources') readsWhenResourcesAnswered = reads.length
+      res.statusCode = status
+      res.end(JSON.stringify(body))
+    }
     if (delay === 0) answer()
     else {
       const timer = setTimeout(() => { timers.delete(timer); answer() }, delay)
@@ -608,6 +615,18 @@ it('where you stand goes last: sending it before the four small reads makes them
   expect(reads.map((one) => one.path)).not.toContain('/api/brief')
   expect(reads.map((one) => one.path)).not.toContain('/api/waiting')
   expect(reads.map((one) => one.path)).not.toContain('/api/open-loops')
+})
+it('where you stand waits for the four small reads: sending it beside them lets it arrive before a slow one has answered', async () => {
+  // The order of arrival is the hook's only when it sends GET /api/where-you-stand once the four have answered. Here the
+  // fake office holds back the answer to GET /api/resources, inside that read's own time limit, and where-you-stand may
+  // arrive only after that answer was sent.
+  delayResources = hookMs(1000)
+  const { out } = await run()
+  expect(readsWhenResourcesAnswered, 'the answer to GET /api/resources was sent').not.toBeNull()
+  const stand = reads.findIndex((one) => one.path === '/api/where-you-stand')
+  expect(stand).toBeGreaterThanOrEqual(0)
+  expect(stand).toBeGreaterThanOrEqual(readsWhenResourcesAnswered ?? Number.NaN)
+  expect(out).toContain('The brief opening reached this session.')
 })
 it('a kept answer says how old it is: leaving out its sentence tells a session an old brief as if it were current', async () => {
   keptSays = 'This was worked out at 08:59:20, 40 seconds before this request, and kept.'

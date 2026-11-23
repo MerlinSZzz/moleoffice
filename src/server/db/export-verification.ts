@@ -9,8 +9,10 @@
  *   mirror-before   the files of the mirror's last commit before the window, written out as a plain tree;
  *   export-1        `npx tsx scripts/export.ts --to <folder> --no-commit` on the store after the re-mint;
  *   export-2        the same command again, on the same store.
- * Every file and folder under the root is read before any check runs. A link, or anything that is neither a file nor a
- * folder, is refused, so a compare can never be pointed at another tree. Each file is opened without following a link.
+ * Every file and folder under the root is listed before any check runs, each file with its size. A link, or anything
+ * that is neither a file nor a folder, is refused, so a compare can never be pointed at another tree. Each file is
+ * opened without following a link, once when it is listed and again when a check reads it. A check reads one file of
+ * each tree at a time and keeps none, so the verifier never holds a tree whole.
  *
  * The checks, as the step's owner wrote them:
  *   history-pages   every page under revisions/ and changes/ in mirror-before is in export-1 with the same bytes, but
@@ -47,9 +49,10 @@ export interface ExportOutcome extends Outcome {
   differences: string[]
 }
 
-/** Every file under one folder, by its path under the folder, with its bytes, and every folder under it. */
+/** Every file under one folder, by its path under the folder, with its size in bytes, and every folder under it. */
 export interface ATree {
-  files: Map<string, Buffer>
+  folder: string
+  files: Map<string, number>
   folders: Set<string>
 }
 
@@ -69,20 +72,24 @@ const fail = (why: string, differences: string[]): ExportOutcome => ({ passed: f
 const plural = (n: number, one: string, many = `${one}s`) => `${String(n)} ${n === 1 ? one : many}`
 const theSameBytes = (a: Buffer, b: Buffer) => a.equals(b)
 
-/** One file's bytes, opened without following a link. */
-function theBytesOf(file: string): Buffer {
+/** One file, opened without following a link and refused unless it is an ordinary file, given to `read` with its size. */
+function theOpened<T>(file: string, read: (descriptor: number, size: number) => T): T {
   const descriptor = openSync(file, constants.O_RDONLY | constants.O_NOFOLLOW)
   try {
-    if (!fstatSync(descriptor).isFile()) throw new TheRootIsRefused(`${file} is not an ordinary file.`)
-    return readFileSync(descriptor)
+    const stat = fstatSync(descriptor)
+    if (!stat.isFile()) throw new TheRootIsRefused(`${file} is not an ordinary file.`)
+    return read(descriptor, stat.size)
   } finally {
     closeSync(descriptor)
   }
 }
 
+/** The bytes of the file at `path` in `tree`, read from disk now, and kept by nothing here. */
+const bytesOf = (tree: ATree, path: string): Buffer => theOpened(join(tree.folder, path), (descriptor) => readFileSync(descriptor))
+
 /** Every file and folder under `folder`, which is `under` in what a refusal says. */
 function theTreeOf(folder: string, under: string): ATree {
-  const tree: ATree = { files: new Map(), folders: new Set() }
+  const tree: ATree = { folder, files: new Map(), folders: new Set() }
   const visit = (at: string): void => {
     for (const entry of readdirSync(at === '' ? folder : join(folder, at), { withFileTypes: true }).sort((a, b) => byCodeUnit(a.name, b.name))) {
       const path = at === '' ? entry.name : `${at}/${entry.name}`
@@ -92,14 +99,14 @@ function theTreeOf(folder: string, under: string): ATree {
         visit(path)
         continue
       }
-      tree.files.set(path, theBytesOf(join(folder, path)))
+      tree.files.set(path, theOpened(join(folder, path), (_, size) => size))
     }
   }
   visit('')
   return tree
 }
 
-/** THE ROOT, READ WHOLE: a real folder holding the three folders and nothing else, each read with every file in it. */
+/** THE ROOT, LISTED WHOLE: a real folder holding the three folders and nothing else, each listed with every file in it. */
 export function theRootsFolders(root: string): TheRoot {
   const stat = lstatSync(root)
   if (stat.isSymbolicLink()) throw new TheRootIsRefused(`The root ${root} is a link, and it must be a real folder.`)
@@ -166,12 +173,12 @@ export function theExportChecks(root: TheRoot, remint: StagedRemint, after: () =
       const differences: string[] = []
       let replaced = 0
       for (const path of pages) {
-        const before = mirrorBefore.files.get(path)!
-        const staged = first.files.get(path)
-        if (staged === undefined) {
+        if (!first.files.has(path)) {
           differences.push(`mirror-before/${path}: export-1 holds no page there.`)
           continue
         }
+        const before = bytesOf(mirrorBefore, path)
+        const staged = bytesOf(first, path)
         if (theSameBytes(before, staged)) continue
         const differs = theFirstDifference(before.toString('utf8'), staged.toString('utf8'), mayBecome)
         if (differs === null) replaced++
@@ -183,9 +190,8 @@ export function theExportChecks(root: TheRoot, remint: StagedRemint, after: () =
 
     participants: () => {
       const file = 'export-1/participants.md'
-      const bytes = first.files.get('participants.md')
-      if (bytes === undefined) return fail('export-1 holds no participants.md.', [`${file}: there is no such file.`])
-      const text = bytes.toString('utf8')
+      if (!first.files.has('participants.md')) return fail('export-1 holds no participants.md.', [`${file}: there is no such file.`])
+      const text = bytesOf(first, 'participants.md').toString('utf8')
       let blocks
       try {
         blocks = parseExportFile(text, file).regions.filter((region) => region.name === 'agents' && region.kind === 'fields')
@@ -230,11 +236,13 @@ export function theExportChecks(root: TheRoot, remint: StagedRemint, after: () =
       }
       const differences: string[] = []
       const carried = new Map<string, { at: string; aliasId: unknown }>()
-      for (const [path, bytes] of first.files) {
+      for (const path of first.files.keys()) {
         if (!path.endsWith('.md')) continue
+        // Read outside the try, so a file that cannot be read stops the check, and is not shown as a page out of grammar.
+        const text = bytesOf(first, path).toString('utf8')
         let regions
         try {
-          regions = parseExportFile(bytes.toString('utf8'), `export-1/${path}`).regions
+          regions = parseExportFile(text, `export-1/${path}`).regions
         } catch (error) {
           differences.push(error instanceof Error ? error.message : String(error))
           continue
@@ -258,9 +266,10 @@ export function theExportChecks(root: TheRoot, remint: StagedRemint, after: () =
       const differences: string[] = []
       for (const path of first.files.keys()) if (!second.files.has(path)) differences.push(`export-1/${path}: export-2 has no file there.`)
       for (const path of second.files.keys()) if (!first.files.has(path)) differences.push(`export-2/${path}: export-1 has no file there.`)
-      for (const [path, bytes] of second.files) {
+      for (const [path, size] of second.files) {
         const was = first.files.get(path)
-        if (was !== undefined && !theSameBytes(was, bytes)) differences.push(`export-2/${path}: holds other bytes than export-1/${path}.`)
+        // Two sizes that differ are other bytes, so neither file is read; two that agree are compared byte for byte.
+        if (was !== undefined && (was !== size || !theSameBytes(bytesOf(first, path), bytesOf(second, path)))) differences.push(`export-2/${path}: holds other bytes than export-1/${path}.`)
       }
       for (const path of first.folders) if (!second.folders.has(path)) differences.push(`export-1/${path}/: export-2 has no folder there.`)
       for (const path of second.folders) if (!first.folders.has(path)) differences.push(`export-2/${path}/: export-1 has no folder there.`)

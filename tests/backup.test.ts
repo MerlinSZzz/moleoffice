@@ -82,7 +82,8 @@ import { fileURLToPath, pathToFileURL, URL } from 'node:url'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { migrateInPlace } from '../src/server/db/migrate.ts'
-import { AUTHORED_TABLES, PERSON_LEVEL_TABLES } from '../src/server/db/schema.ts'
+import { AUTHORED_TABLES } from '../src/server/db/schema.ts'
+import { PERSON_LEVEL_TABLES } from '../src/server/db/authored-table-of.ts'
 import { everyPartTable } from '../src/server/db/every-part-table.ts'
 import { theMigrationsInTheFolder } from '../src/config/migration-look.mjs'
 import { BACKUP_FILES_LINE_BYTES, filesFolderOf, leftOutListOf } from '../src/shared/what-is-kept.ts'
@@ -495,7 +496,8 @@ describe('a backup can rely on a recent complete copy', () => {
     sqliteCopy(join(folder, 'recent.db'))
     mkdirSync(filesFolderOf(join(folder, 'recent.db')))
     const before = readdirSync(folder)
-    for (const value of [undefined, '0', '-1', '1.5', 'NaN', 'Infinity', '1e2', '9007199254740992']) {
+    // One bad value for each part of the value guard: missing, not digits alone, not a safe integer, and not above zero.
+    for (const value of [undefined, '0', '1.5', '9007199254740992']) {
       const run = backup(['--to', join(folder, 'new.db'), '--if-older-than', ...(value === undefined ? [] : [value])])
       expect(run.status, String(value)).toBe(1)
       expect(run.stderr).toContain('--if-older-than needs a positive whole number of minutes')

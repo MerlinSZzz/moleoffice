@@ -22,6 +22,7 @@
  */
 import { KIND_SPECS, SHAPE_SPECS, THE_OWNER, type DeclaredType } from '@shared/kinds.ts'
 import type { ParticipantKind } from '@shared/participants.ts'
+import { SYSTEM_ACTOR_IDS_RENAMED } from '@shared/renamed-words.ts'
 import { THE_SECRETARY } from '@shared/roles.ts'
 import { ADAPTER_SHAPES, OPEN_BAGS, typeOf, type AdapterField } from './open-shapes.ts'
 
@@ -60,7 +61,15 @@ export interface IdentityPosition {
   below?: string
   /** For a stamp that holds this value when the person made the choice: the value. It names the person and no agent, so it is not read. */
   whenThePerson?: string
+  /**
+   * For a stamp that rows written under the office's old system name may hold: those names. Such a row was written by the
+   * office itself and names no agent, so it is not read. An agent's row under the same string is passed over with it.
+   */
+  oldSystemNames?: readonly string[]
 }
+
+/** The office's old system names, which a short form's writer may hold on a form the office wrote under one. */
+const OLD_SYSTEM_NAMES: readonly string[] = SYSTEM_ACTOR_IDS_RENAMED.map((renamed) => renamed.from)
 
 export interface NotAnIdentity {
   site: string
@@ -77,8 +86,8 @@ const HAND_LISTED: readonly IdentityPosition[] = [
   { site: 'AnswerSent.by', parse: 'registry-id', gate: "when underTheGrant is beside it: the secretary that sent it; without it, the person's id", present: 'underTheGrant' },
   { site: 'BundleExporter.actorId', parse: 'stamp', gate: "when actorType is 'agent': the handle the request named or the registry id its key proved", pair: { field: 'actorType', agent: 'agent' } },
   { site: 'CheckAlsoGivenBy.actorId', parse: 'stamp', gate: "when actorType is 'agent': the handle the request named or the registry id its key proved", pair: { field: 'actorType', agent: 'agent' } },
-  { site: 'ShortForm.by', parse: 'actor-pair', gate: "when writtenBy is 'agent'", pair: { field: 'writtenBy', agent: 'agent' } },
-  { site: 'ReportParts.by', parse: 'actor-pair', gate: "when writtenBy is 'agent'", pair: { field: 'writtenBy', agent: 'agent' } },
+  { site: 'ShortForm.by', parse: 'stamp', gate: "when writtenBy is 'agent': the writer's registry id, or on a form stored before that, the handle the request named; the office's old system name names no agent and is passed over", pair: { field: 'writtenBy', agent: 'agent' }, oldSystemNames: OLD_SYSTEM_NAMES },
+  { site: 'ReportParts.by', parse: 'stamp', gate: "when writtenBy is 'agent': the writer's registry id, or on parts stored before that, the handle the request named; the office's old system name names no agent and is passed over", pair: { field: 'writtenBy', agent: 'agent' }, oldSystemNames: OLD_SYSTEM_NAMES },
   { site: 'session.workerRuns', parse: 'map-key', gate: "every key: the worker's registry id" },
   { site: 'message.deadLetterSweep', parse: 'encoded', gate: 'each entry of waiting: a message id and its addressee\'s registry id joined by "~"', below: 'waiting[]' },
   { site: 'message.from', parse: 'historical', gate: "an object of exactly kind and id, the old ParticipantRef form, when its kind is 'agent'" },
@@ -275,6 +284,9 @@ export const PLAIN_ID_COLUMNS: readonly PlainIdColumn[] = [
   { site: 'agent_starter_changes.from_id', holds: 'registry-id', pair: { field: 'from_kind', agent: 'agent' }, gate: byItsId('from_kind', "the agent's starter before the change") },
   { site: 'agent_starter_changes.to_id', holds: 'registry-id', pair: { field: 'to_kind', agent: 'agent' }, gate: byItsId('to_kind', "the agent's new starter") },
   { site: 'agent_starter_changes.asked_by_id', holds: 'registry-id', pair: { field: 'asked_by_kind', agent: 'agent' }, gate: byItsId('asked_by_kind', "the agent that pressed for the change, inside a test world, where it holds the person's authority") },
+  { site: 'agent_owner_changes.from_id', holds: 'registry-id', pair: { field: 'from_kind', agent: 'agent' }, gate: byItsId('from_kind', "the agent's owner before the hand-over, as its row held it") },
+  { site: 'agent_owner_changes.to_id', holds: 'registry-id', pair: { field: 'to_kind', agent: 'agent' }, gate: byItsId('to_kind', "the agent's new owner") },
+  { site: 'agent_owner_changes.made_by_id', holds: 'registry-id', pair: { field: 'made_by_kind', agent: 'agent' }, gate: keyProved('made_by_kind', 'the agent that made the hand-over') },
   { site: 'agents.successor_named_by_id', holds: 'registry-id', pair: { field: 'successor_named_by_kind', agent: 'agent' }, gate: keyProved('successor_named_by_kind', "the agent that named the successor; the writer's fallback stores the id as sent under the person's kind, so only the agent's kind is read") },
   { site: 'conversation_reads.reader_id', holds: 'registry-id', pair: { field: 'reader_kind', agent: 'agent' }, gate: keyProved('reader_kind', 'the agent that read the conversation') },
   { site: 'groups.opened_by_id', holds: 'registry-id', pair: { field: 'opened_by_kind', agent: 'agent' }, gate: keyProved('opened_by_kind', 'the agent that opened the group') },
@@ -304,6 +316,7 @@ export const PLAIN_ID_COLUMNS: readonly PlainIdColumn[] = [
   { site: 'handle_holds.agent_id', holds: 'registry-id', gate: KEYED },
   { site: 'agent_renames.agent_id', holds: 'registry-id', gate: KEYED },
   { site: 'agent_starter_changes.agent_id', holds: 'registry-id', gate: KEYED },
+  { site: 'agent_owner_changes.agent_id', holds: 'registry-id', gate: KEYED },
   { site: 'dead_letter_claims.agent_id', holds: 'registry-id', gate: "always: the agent the undelivered messages were sent to, copied from a delivery's recipient_id where recipient_kind is 'agent'" },
   { site: 'agents.successor_id', holds: 'registry-id', gate: 'once a successor is named: the agent that takes over from this one, by its registry id' },
   { site: 'installation.dead_letter_secretary', holds: 'registry-id', gate: 'once one is chosen: the secretary that undelivered messages go to, by its registry id' },

@@ -31,7 +31,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { THE_PERSON } from '../src/shared/person.ts'
 import { sayInEnglish } from '../src/shared/i18n.ts'
-import { liveApp, waitForThePage, type LiveApp } from './helpers.ts'
+import { liveApp, waitForThePage, type LiveApp, governsTheWholeProject } from './helpers.ts'
 import { TEST_SHOTS } from './where-shots-go.ts'
 
 const HERE = 'default'
@@ -68,7 +68,7 @@ async function call<T>(
 }
 
 async function file(kind: string, title: string, data: Record<string, unknown> = {}): Promise<string> {
-  const withReplaces = kind === 'decision' && !Object.hasOwn(data, 'replaces') ? { replaces: [], ...data } : data
+  const withReplaces = kind === 'decision' ? { ...governsTheWholeProject(), replaces: [], ...data } : data
   const answer = await call<{ record: { id: string } }>('POST', '/api/records', AS_THE_PERSON, {
     kind,
     title,

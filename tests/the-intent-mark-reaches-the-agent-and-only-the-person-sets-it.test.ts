@@ -2,7 +2,7 @@
 // Licensed under the MIT License. See LICENSE.
 /**
  * THE MARK OF WHAT THE PERSON WANTS BACK REACHES THE AGENT, AND ONLY THE PERSON SETS IT. A message
- * from the person to an agent carries none, "just ask" or "proposal first".
+ * from the person to an agent carries none, "just ask", "proposal first", "align" or "give options".
  * The rule and its sentences are in src/shared/intent-mark.ts.
  *
  * WHAT IS PROVED HERE, against a real office on a free port, the real waiter and the real dsh hook:
@@ -12,7 +12,9 @@
  *      set, change or take it off: a dataPatch, a whole `data`, the agent's own message, and a record turned into a
  *      message. Each refusal writes nothing.
  *   3. The inbox read, GET /api/messages/:id, the waiter's hand-over and the dsh hook each carry the mark with its one
- *      sentence.
+ *      sentence. They do so for Proposal first, and again for Give options, the fourth flag the office ships. Give
+ *      options' sentence is read from the word list, never copied. On the code before that flag, a message marked
+ *      "give-options" is refused, so its case fails there.
  *   4. "Mark broken" files one problem naming the message, the mark and the reply, and tells the agent in one line to
  *      it alone. A second press files nothing. An agent's press, an unmarked message and a reply the person wrote are
  *      refused.
@@ -30,6 +32,8 @@
  */
 
 import { spawn, type ChildProcess } from 'node:child_process'
+import { writeFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
 import type { AddressInfo } from 'node:net'
 import { fileURLToPath } from 'node:url'
 
@@ -39,6 +43,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { deliveryEnvelope } from '../src/shared/messages.ts'
 import { THE_INTENT_MARK_IS_SET_WHEN_WRITTEN, THE_INTENT_MARK_IS_THE_PERSONS } from '../src/shared/intent-mark.ts'
+import { enWave13y } from '../src/shared/words/en-wave-13y.ts'
 import { apiApp, freshDb, type TestDb, theAnswerToAWriteInATestOffice } from './helpers.ts'
 
 const SESSION_START = fileURLToPath(new URL('../tools/dsh-hooks/session-start.mjs', import.meta.url))
@@ -46,6 +51,7 @@ const WAITER = fileURLToPath(new URL('../tools/hold-the-handle.mjs', import.meta
 
 const JUST_ASK = 'Just ask: answer only; change nothing.'
 const PROPOSAL_FIRST = 'Proposal first: come back with a proposal; build nothing until the person says yes.'
+const GIVE_OPTIONS = enWave13y['message.intent.giveOptions'] as string
 
 let t: TestDb
 let app: FastifyInstance
@@ -83,6 +89,8 @@ async function inject(
 async function started(handle: string): Promise<string> {
   const reply = await inject('POST', '/api/agents/started', AS_THE_PERSON, { handle, name: handle, runtime: 'claude-code' })
   expect(reply.status, reply.text).toBe(201)
+  const key = (reply.json['whatToGiveIt'] as { key?: string } | undefined)?.key
+  if (key) writeFileSync(join(dirname(t.file), `${handle}.key`), key, { mode: 0o600 })
   return (reply.json['agent'] as { id: string }).id
 }
 
@@ -159,7 +167,7 @@ async function theHookSays(handle: string, session: string): Promise<string> {
 /** Start the waiter for one handle, and answer what it printed once it has stopped. */
 async function theWaiterSays(handle: string, session: string): Promise<string> {
   const child = spawn(process.execPath, [WAITER, '--agent', handle, '--session', session, '--api', api, '--workspace', 'default'], {
-    env: { ...process.env, MOLE_OFFICE_HANDLE_BEAT_SECONDS: '1' },
+    env: { ...process.env, MOLE_AGENT_KEY: '', MOLE_OFFICE_TOOL_CONFIGURATION: '', MOLE_AGENT_KEY_FILE: join(dirname(t.file), `${handle}.key`), MOLE_OFFICE_HANDLE_BEAT_SECONDS: '1' },
   })
   waiters.push(child)
   let printed = ''
@@ -173,12 +181,12 @@ async function theWaiterSays(handle: string, session: string): Promise<string> {
   return printed
 }
 
-/** The lines of some printed text that are one of the two sentences. */
+/** The lines of some printed text that are one of the three sentences. */
 function sentenceLines(text: string): string[] {
   return text
     .split('\n')
     .map((line) => line.trim())
-    .filter((line) => line === JUST_ASK || line === PROPOSAL_FIRST)
+    .filter((line) => line === JUST_ASK || line === PROPOSAL_FIRST || line === GIVE_OPTIONS)
 }
 
 beforeAll(async () => {
@@ -205,7 +213,7 @@ afterAll(async () => {
 describe('the intent mark', () => {
   it('1. is stored as the person wrote it, and read back', async () => {
     const id = await started('intent-stored')
-    for (const intent of ['none', 'just-ask', 'proposal-first']) {
+    for (const intent of ['none', 'just-ask', 'proposal-first', 'align', 'give-options']) {
       const message = await send(AS_THE_PERSON, [{ kind: 'agent', id }], `Test: marked ${intent}.`, { intent })
       expect((await storedData(message))['intent']).toBe(intent)
     }
@@ -291,6 +299,42 @@ describe('the intent mark', () => {
     const waiter = await theWaiterSays('intent-by-waiter', await aSession('Test: the waiting terminal'))
     expect(waiter).toContain(`THE MESSAGE, record ${id}:`)
     expect(sentenceLines(waiter), waiter).toEqual([PROPOSAL_FIRST])
+  }, 90_000)
+
+  it('3. Give options reaches the agent with its sentence in the inbox, the message GET, the waiter and the dsh hook', async () => {
+    expect(GIVE_OPTIONS, 'the word list has no sentence for Give options').toBeTruthy()
+    const byWaiter = await started('options-by-waiter')
+    const byHook = await started('options-by-hook')
+    for (const handle of ['options-by-waiter', 'options-by-hook']) await clearInbox(handle)
+    const id = await send(
+      AS_THE_PERSON,
+      [
+        { kind: 'agent', id: byWaiter },
+        { kind: 'agent', id: byHook },
+      ],
+      'Test: how should the bench keep its fixtures?',
+      { intent: 'give-options' },
+    )
+
+    const inbox = await inject('GET', '/api/messages?only=waiting-for-me&limit=25&full=1', asAgent('options-by-waiter'))
+    expect(inbox.status, inbox.text).toBe(200)
+    const listed = ((inbox.json['messages'] ?? []) as Record<string, unknown>[]).find((one) => one['id'] === id)
+    expect(listed?.['intent']).toBe('give-options')
+    expect(listed?.['whatTheMarkAsks']).toBe(GIVE_OPTIONS)
+
+    const one = await inject('GET', `/api/messages/${id}`, asAgent('options-by-waiter'))
+    expect(one.status, one.text).toBe(200)
+    const message = (one.json['message'] ?? one.json) as Record<string, unknown>
+    expect(message['intent']).toBe('give-options')
+    expect(message['whatTheMarkAsks']).toBe(GIVE_OPTIONS)
+
+    const hook = await theHookSays('options-by-hook', await aSession('Test: the dsh session for Give options'))
+    expect(hook).toContain(`THE MESSAGE, record ${id}:`)
+    expect(sentenceLines(hook), hook).toEqual([GIVE_OPTIONS])
+
+    const waiter = await theWaiterSays('options-by-waiter', await aSession('Test: the waiting terminal for Give options'))
+    expect(waiter).toContain(`THE MESSAGE, record ${id}:`)
+    expect(sentenceLines(waiter), waiter).toEqual([GIVE_OPTIONS])
   }, 90_000)
 
   it('4. "mark broken" files one problem and tells the agent once; only the person presses it, on a marked message', async () => {

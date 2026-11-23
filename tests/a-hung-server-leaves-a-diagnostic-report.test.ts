@@ -3,7 +3,8 @@
 /**
  * Every child here is a stand-in in a temporary checkout. No real office is started or signalled.
  * The method changed in J4JKZx76YwuS after the busy-loop signal control failed.
- * EVXbsOmf3h6n allows only the report evaluation and the fixed inspector-close evaluation.
+ * EVXbsOmf3h6n allows only the report evaluation and the fixed inspector-close evaluation. A hand request adds
+ * one more fixed evaluation between them, which only lets the child's event loop turn.
  * Mutations: remove --inspect-port=0; skip pause; wait without a deadline; capture on every stop;
  * signal the group; signal despite an absent lock; bypass identity/start checks; print wrong
  * totals; skip inspector.close; accept a non-loopback inspector address.
@@ -307,10 +308,11 @@ it('the hand tool signals only the child recorded in the service lock, never kil
     expect(result).toBe(0)
     expect(sent.mock.calls).toEqual([[pid, 'SIGUSR1']])
     expect(protocol.map((one) => one.method)).toEqual([
-      'Debugger.enable', 'Debugger.pause', 'Runtime.evaluate', 'Debugger.resume', 'Runtime.evaluate',
+      'Debugger.enable', 'Debugger.pause', 'Runtime.evaluate', 'Debugger.resume', 'Runtime.evaluate', 'Runtime.evaluate',
     ])
     expect(protocol.filter((one) => one.method === 'Runtime.evaluate').map((one) => one.params?.expression)).toEqual([
-      'JSON.stringify(process.report.getReport())', "process.getBuiltinModule('node:inspector').close()",
+      'JSON.stringify(process.report.getReport())', 'new Promise((done) => setImmediate(() => setImmediate(done)))',
+      "process.getBuiltinModule('node:inspector').close()",
     ])
     expect(lines).toHaveLength(2)
     expect(lines[0]).not.toBe(old)
@@ -332,7 +334,7 @@ it('the hand tool signals only the child recorded in the service lock, never kil
     expect(refused).toBe(true)
     expect(existsSync(old)).toBe(true)
   } finally { await s?.owner.stop(); rmSync(f.root, { recursive: true, force: true }) }
-}, 20_000)
+}, 30_000)
 
 it('the hand tool refuses an absent child record and signals nothing', async () => {
   const root = mkdtempSync(join(tmpdir(), 'mole-office-diagnostic-absent-'))

@@ -70,7 +70,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { FastifyInstance, InjectOptions } from 'fastify'
 
-import { apiApp, freshDb, theAnswerToAWriteInATestOffice, type TestDb } from './helpers.ts'
+import { apiApp, freshDb, theAnswerToAWriteInATestOffice, type TestDb, governsTheWholeProject } from './helpers.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { SYSTEM_LINES } from '../src/shared/groups.ts'
 import { createI18n } from '../src/shared/i18n.ts'
@@ -514,7 +514,7 @@ describe('e. a handbook on a role card meets the card rule, and the same handboo
     const words = 'MADE-UP: put a handbook on the worker card.'
     const message = await file('message', 'MADE-UP about a card handbook', { body: `MADE-UP first line.\n\n${words}`, to: [{ kind: 'agent', id: THE_WRITER }] })
     await file('decision', 'MADE-UP: the worker card gets a handbook', {
-      replaces: [],
+      ...governsTheWholeProject(), replaces: [],
       decided_by: 'the owner',
       authority: 'the owner said so',
       authority_reference: message,

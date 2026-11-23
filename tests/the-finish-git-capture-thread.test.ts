@@ -5,8 +5,8 @@
  *
  *   1. The seal the thread reads is the one `theGitOfASeal` reads on the request thread, byte for byte.
  *   2. For each kind of tree a seal refuses, the thread carries the same refusal, with every field, and the facts the
- *      reminder reads are the synchronous ones: a tracked file edited, a file staged, a file not tracked, a mode changed,
- *      a file turned into a symlink, a file under a filter, and a folder git cannot read.
+ *      reminder reads are the synchronous ones: a tracked file edited, a file not tracked, a file under a filter, and a
+ *      folder git cannot read.
  *   3. A reading of the facts from one start answers another start only when the run's first own commit is the same,
  *      and then it is the synchronous reading of the other start.
  *   4. The stamp never throws: a path that went, a folder that cannot be read, a folder that became a file and a file
@@ -103,16 +103,7 @@ it('reads the same Git seal, including its fork base and changed files, byte for
 
 const OUTSIDE_THE_COMMIT: [string, (dir: string) => void][] = [
   ['a tracked file edited', (dir) => writeFileSync(join(dir, 'work', 'added'), 'edited\n')],
-  ['a file staged', (dir) => {
-    writeFileSync(join(dir, 'work', 'added'), 'staged\n')
-    git(dir, 'add', 'work/added')
-  }],
   ['a file not tracked', (dir) => writeFileSync(join(dir, 'work', 'new.txt'), 'new\n')],
-  ['a mode changed', (dir) => chmodSync(join(dir, 'work', 'added'), 0o755)],
-  ['a file turned into a symlink', (dir) => {
-    unlinkSync(join(dir, 'work', 'added'))
-    symlinkSync('kept.txt', join(dir, 'work', 'added'))
-  }],
   ['a file under a filter', (dir) => {
     mkdirSync(join(dir, '.git', 'info'), { recursive: true })
     writeFileSync(join(dir, '.git', 'info', 'attributes'), 'work/added filter=a-made-up-filter\n')

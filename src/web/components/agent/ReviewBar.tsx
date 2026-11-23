@@ -134,7 +134,7 @@ import { aSendKeyPress, useSendKey } from '../../lib/send-key.ts'
 // THE SENTENCE FOR A CLAIM ABOUT SEVERAL COMMENTS AT ONCE, written where the sentence beside one
 // comment's words is written. One writer, so the pair cannot come to read as two different voices.
 import { saidWithOthers } from '@shared/intent.ts'
-import { Absence, Btn, ErrorNote, Explain, Loading, Overlay, TextArea } from '../ui.tsx'
+import { Absence, Btn, ErrorNote, Loading, Overlay, ServerNote, TextArea } from '../ui.tsx'
 import { useProjectAsync } from '../../lib/project-async.ts'
 import { notesWaiting } from './marks.ts'
 // WHAT THEY CAN DO WITH A COMMENT THEY SAVED WITHOUT SENDING: send it, change it, remove it (problem 7VI4cV5ppiFQ).
@@ -145,6 +145,7 @@ import { elementDrawing } from '../../lib/drawnhere.ts'
 import { AGENT_CSS } from './agent-css.ts'
 import { SHELL_BAND_QUERY } from '../../lib/shell-layout.ts'
 import { whenThePageScrolls } from '../../lib/page-scroll.ts'
+import { watchTheSplit } from '../../lib/chat-split.ts'
 import { InReachMark, reachBox, useReach } from '../InReach.tsx'
 import { SHOWN_CHARACTERS, shortName, shortenToWords, wherePartIsOnThisPage, withoutIds } from './context.ts'
 import { useInspect, type Mode } from '../../lib/mode.ts'
@@ -162,7 +163,7 @@ import { TheChosenContact, type ContactRef } from './TalkBox.tsx'
 // contacts, one short list with a filter, in the order and with the reasons of one shared
 // function.
 import { ContactsInOrder, type WhatThePickIsAbout } from '../ContactsInOrder.tsx'
-import { navigate, pathFor, pipelinePath, planPath, recordPath } from '../router.tsx'
+import { navigate, pathFor, pipelineDrawingPath, pipelinePath, planPath, recordPath } from '../router.tsx'
 import {
   recordNamedByTarget,
   spanNamedBy,
@@ -370,11 +371,6 @@ export function ReviewSwitch({ getOutOfTheWay }: { getOutOfTheWay?: () => void }
           if (review.open) leaveReview()
           else openReviewList()
         }}
-        title={
-          review.open
-            ? t('review.pane.switch.closeTitle')
-            : t('review.pane.switch.openTitle')
-        }
       >
         {/* ITS ICON IS DRAWN AS THE SIDEBAR'S ICONS ARE, at their size: a ring, filled while a review is
             collecting. It is the sidebar's own ring (r 8.5, as Today's); at r 7 it read smaller than the icons. */}
@@ -735,9 +731,23 @@ function TheRing() {
     const watching = new ResizeObserver(paint)
     watching.observe(box)
     window.addEventListener('resize', paint)
+    // A SWAP OF THE CHAT MOVES THE PAGE WITHOUT CHANGING ITS SIZE, so neither the observer nor the window's resize
+    // hears it, and the ring was left where the page had been. The split store tells its watchers before the page has
+    // moved, so this measures in the next frame, when the page is where it is going.
+    let asked = 0
+    const soon = () => {
+      if (asked !== 0) return
+      asked = window.requestAnimationFrame(() => {
+        asked = 0
+        paint()
+      })
+    }
+    const stopWatchingTheSplit = watchTheSplit(soon)
     return () => {
       watching.disconnect()
       window.removeEventListener('resize', paint)
+      stopWatchingTheSplit()
+      if (asked !== 0) window.cancelAnimationFrame(asked)
     }
   }, [])
   return <div className="px-strip-ring" ref={ring} aria-hidden="true" data-drawn="1" />
@@ -876,8 +886,8 @@ export function pageHolding(context: Context): WhereToGo {
 /**
  * THE DRAWING A COMMENT WAS WRITTEN ON, as an address, or null when it was not written on one.
  *
- * `pipelinePath` is the router's own builder for both — the module drawing is `#/pipeline` and one
- * pipeline is `#/pipeline/<id>` — so the address is not spelled a second time here.
+ * The router builds each address, so none is spelled a second time here: `pipelineDrawingPath` is
+ * the modules drawing, `#/pipeline/drawing`, and `pipelinePath(<id>)` is one pipeline's drawing.
  */
 function theDrawingHolding(context: Context): { path: string } | null {
   const on = context.drawnOn
@@ -888,6 +898,9 @@ function theDrawingHolding(context: Context): { path: string } | null {
     // nothing about it.
     return on.pipelineId === undefined ? null : { path: pipelinePath(on.pipelineId) }
   }
+  // THE MODULES DRAWING HAS AN ADDRESS OF ITS OWN. The bare `pipelinePath()` is the list of pipelines, and a press
+  // that went there opened no drawing and focused no card.
+  if (on.drawing === 'modules') return { path: pipelineDrawingPath() }
   return { path: pipelinePath() }
 }
 
@@ -1184,10 +1197,10 @@ export function readWhatCameBack(text: string): AnswerRead {
   try {
     parsed = JSON.parse(trimmed)
   } catch {
-    return { problem: t('review.pane.paste.notJson') }
+    return { problem: t('review.pane.paste.unreadable') }
   }
   if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
-    return { problem: t('review.pane.paste.notAnAnswer') }
+    return { problem: t('review.pane.paste.notAboutThese') }
   }
   return { reading: parsed }
 }
@@ -1719,7 +1732,7 @@ function CommentsOnOneThing({ target }: { target: string }) {
         {read.status === 'ready' && here.length === 0 && kept === 0 ? (
           // MOLE OFFICE LOOKED AND THERE ARE NONE. Said as an absence rather than as an empty pane,
           // which is the thing this whole component exists to stop.
-          <Absence tier="told-apart" looked word={t('review.pane.none.here')} title={t('review.pane.none.hereTitle')} />
+          <Absence tier="told-apart" looked word={t('review.pane.none.here')} />
         ) : null}
       </div>
     </>
@@ -1822,7 +1835,6 @@ function ReviewList() {
           pending={starting}
           pendingFailed={failed !== null}
           onClick={start}
-          title={t('review.pane.start.title')}
         >
           {t('review.pane.start')}
         </Btn>
@@ -1838,7 +1850,7 @@ function ReviewList() {
         {list.status === 'ready' && list.value.reviews.length === 0 ? (
           // MOLE OFFICE LOOKED AND THERE ARE NONE, which is an answer. The press above is the way out of
           // it, so this is the quiet tier and not the loud one.
-          <Absence tier="told-apart" looked word={t('review.pane.none.yet')} title={t('review.pane.none.yetTitle')} />
+          <Absence tier="told-apart" looked word={t('review.pane.none.yet')} />
         ) : null}
         {list.status === 'ready'
           ? list.value.reviews.map((one) => (
@@ -1968,7 +1980,7 @@ function OneReview({ reviewId }: { reviewId: string }) {
     <>
       {changed ? (
         <p className="px-pane-note" role="status" data-part="changed-at-send">
-          {t('review.b.changedAtSend')}
+          {t('review.b.changedNothingSent')}
         </p>
       ) : null}
       <PaneBody
@@ -2131,7 +2143,7 @@ function commentsIn(detail: ReviewDetail): FoundMember[] {
  * writer leaves every comment without its own choice with nowhere to go, and the send would refuse.
  */
 function whyNotSendYet(detail: ReviewDetail, n: number): string | null {
-  if (n === 0) return t('review.b.none')
+  if (n === 0) return t('review.pane.send.nothing')
   if (detail.goesTo.recipient === null && detail.goesTo.elsewhere.length < n) return t('review.b.chooseFirst')
   return null
 }
@@ -2331,7 +2343,6 @@ function YourReview({
       {choosing ? (
         <>
           {/* WHAT CHANGE REACHES, said before the person picks: the comments in the review, not one sent on its own. */}
-          <p className="px-pane-note" data-part="change-says">{t('review.b.changeSays')}</p>
           <ContactsForAReview
             asked={{ about: detail.review.entry, review: { id: reviewId } }}
             onChoose={choose}
@@ -2345,7 +2356,7 @@ function YourReview({
 
       {deliveryPlan.status === 'error' ? <ErrorNote message={deliveryPlan.message} fault={theFaultANoteDraws(deliveryPlan.fault)} label={t('review.pane.send.cannotWorkOut')} /> : null}
       {rows.length === 0 ? (
-        <Absence tier="told-apart" looked word={t('review.b.none')} title={t('review.pane.empty.collectingTitle')} />
+        <Absence tier="told-apart" looked />
       ) : (
         <ol className="px-b-list">
           {rows.map(({ comment: one, removed: isRemoved }, place) => {
@@ -2799,7 +2810,7 @@ function LeaveQuestion() {
       <div className="px-leave-scrim">
         <div className="px-leave" role="dialog" aria-modal="true" aria-labelledby="px-leave-title" ref={first} data-part="leave-question">
           <h2 className="px-leave-title" id="px-leave-title">{collecting ? t('review.leave.title') : REVIEW_STATE_WORDS[ready!.review.state]}</h2>
-          {changed ? <p className="px-leave-says" role="status">{t('review.leave.changedAtSend')}</p> : null}
+          {changed ? <p className="px-leave-says" role="status">{t('review.b.changedNothingSent')}</p> : null}
           {collecting && ready !== null ? <p className="px-leave-says">{t('review.pane.state.collecting')}</p> : null}
           <p className="px-leave-says">{t('review.leave.count', { n })}</p>
           <p className="px-leave-says">
@@ -2812,13 +2823,9 @@ function LeaveQuestion() {
                     ? t('review.leave.unnamedRecipient')
                     : t('review.leave.recipient', { name: ready.goesTo.name })
               : ready.goesTo.recipient === null
-                ? t('review.leave.toNobody')
-                : ready.goesTo.ground === 'wrote-the-page'
-                  ? t('review.leave.toTheWriter', { name: ready.goesTo.name ?? t('review.b.goingToUnnamed') })
-                  : t('review.leave.to', { name: ready.goesTo.name ?? t('review.b.goingToUnnamed') })}
+                ? t('review.leave.noRecipient')
+                : t('review.leave.recipient', { name: ready.goesTo.name ?? t('review.b.goingToUnnamed') })}
           </p>
-          {collecting ? <p className="px-leave-says">{t('review.leave.keepSays')}</p> : null}
-          {collecting ? <p className="px-leave-says">{t('review.leave.discardSays')}</p> : null}
           {detail.status === 'error' ? <ErrorNote message={detail.message} fault={theFaultANoteDraws(detail.fault)} label={t('review.pane.review.failed')} /> : null}
           {failed === null ? null : <ErrorNote message={failed.message} fault={theFaultANoteDraws(failed.fault)} label={t('review.leave.failed')} />}
           <div className="px-leave-do">
@@ -2961,13 +2968,13 @@ function NotInItRow({
         {/* WHERE IT WAS WRITTEN, in the same sentence a member row draws, from the same field the
             server worked out for both. */}
         {row.about === null ? (
-          <Absence tier="told-apart" looked word={t('review.pane.notReadable')} title={row.detail} />
+          <Absence tier="told-apart" looked word={t('review.pane.notReadable')} />
         ) : (
           <span className="px-rev-where">
             {whereItWasWritten(row.about, row.context, names, inspect)}
           </span>
         )}
-        <span className="px-rev-why" title={row.detail}>
+        <span className="px-rev-why">
           {why.word}
         </span>
         {/* WHEN IT WAS WRITTEN, AS MOLE OFFICE STORED IT. The heading above says how many; this is the
@@ -3366,9 +3373,9 @@ export function PaneWhole({
         {/* TWO ELEMENTS AND NOT ONE WITH A TERNARY IN IT, so each sentence is written where a
             reader can see which channel it is in. Both are the tooltip. */}
         {detail.members.length > 0 ? null : collecting ? (
-          <Absence tier="told-apart" looked word={t('review.pane.empty.collecting')} title={t('review.pane.empty.collectingTitle')} />
+          <Absence tier="told-apart" looked word={t('review.pane.empty.collecting')} />
         ) : (
-          <Absence tier="told-apart" looked word={t('review.pane.empty.finished')} title={t('review.pane.empty.finishedTitle')} />
+          <Absence tier="told-apart" looked word={t('review.pane.empty.finished')} />
         )}
 
         {detail.members.map((member) =>
@@ -3861,12 +3868,8 @@ export function HaveThemRead({
   return (
     <section className="px-org" data-part="have-them-read">
       <p className="px-org-head">{t('review.pane.read.head')}</p>
-      {/* THE FIRST SENTENCE IS THE ONE THAT KEEPS EVERYTHING ELSE HONEST. */}
-      <p className="px-pane-note">
-        {t('review.pane.read.first', { n: request.count })}
-      </p>
       {alreadyRead ? (
-        <p className="px-pane-note">{t('review.pane.read.again')}</p>
+        <p className="px-pane-note">{t('review.pane.read.readOnce')}</p>
       ) : null}
 
       {/* WHERE IT HAS GOT TO. Three states, and waiting is one of them rather than a spinner.
@@ -3879,7 +3882,6 @@ export function HaveThemRead({
           tier="told-apart"
           looked
           word={reading.word}
-          title={t('review.pane.read.nobodyTitle')}
         />
       )}
       {/* AND WHAT THE REVIEW ALREADY HOLDS, WHICH IS THE DURABLE HALF. The receipt below is what
@@ -3948,7 +3950,6 @@ export function HaveThemRead({
       {/* DOING IT YOURSELF. The question, to take away, and a box for what comes back. */}
       <details className="px-org-self" open={showPaste} onToggle={(e) => setShowPaste(e.currentTarget.open)}>
         <summary>{t('review.pane.read.yourself')}</summary>
-        <p className="px-pane-note">{t('review.pane.read.takeIt')}</p>
         <MachineText words={request.asked} name={t('review.pane.read.question')} />
         <span className="px-org-acts">
           <Btn
@@ -4180,19 +4181,7 @@ export function SendTheReview({
         <p className="px-org-state">
           {t('review.pane.send.sentAt', { at: review.sentAt ?? t('review.pane.send.atNothing') })}
         </p>
-      ) : gone ? null : (
-        /* WHAT SEND DOES, ONE PRESS FROM THE PRESS. It is read carefully once and skipped every
-           visit after that, which is what `Explain` is for, and it stood open above the button on
-           every finished review. Nothing is deleted: the label says the shape of it — one
-           conversation for each agent — and the sentence is under it. */
-        <Explain
-          declares={{ surface: null }}
-          meaning={t('review.pane.send.meaning')}
-          opens={t('review.pane.send.opens')}
-        >
-          {t('review.send.whatSendDoes')}
-        </Explain>
-      )}
+      ) : null}
 
       {plan.status === 'loading' ? <Loading what={t('review.pane.loading.whereEach')} rows={2} /> : null}
       {plan.status === 'error' ? (
@@ -4248,7 +4237,7 @@ export function SendTheReview({
             ))}
           </ul>
           {plan.value.comments.length === 0 ? (
-            <Absence tier="told-apart" looked word={t('review.pane.send.nothing')} title={t('review.pane.send.nothingTitle')} />
+            <Absence tier="told-apart" looked word={t('review.pane.send.nothing')} />
           ) : null}
           {inspect ? <p className="px-pane-note">{sayThePlan(plan.value.facts)}</p> : null}
         </>
@@ -4274,7 +4263,6 @@ export function SendTheReview({
               tier="told-apart"
               looked
               word={t('review.pane.send.nobody')}
-              title={t('review.pane.send.nobodyTitle')}
             />
           ) : null}
           <Btn
@@ -4328,7 +4316,6 @@ function DeliveryRecovery({ detail, member, plan }: { detail: ReviewDetail; memb
   if (saidOverTheList(detail, lines, line)) return <TheWayOut reviewId={detail.review.id} line={line} />
   const crossProject = line.sentence?.key === 'agentElsewhere' || line.sentence?.key === 'agentInAnotherProject' ||
     line.sentence?.key === 'runElsewhere' || line.sentence?.key === 'runInAnotherProject'
-  const sessionElsewhere = line.sentence?.key === 'runElsewhere' || line.sentence?.key === 'runInAnotherProject'
   const reason = key === null ? (line.sentence === undefined ? line.says : sayTheLine(line.sentence)) : t(key, line.sentence?.values)
 
   const choose = async (choice: AgentContact) => {
@@ -4362,7 +4349,7 @@ function DeliveryRecovery({ detail, member, plan }: { detail: ReviewDetail; memb
       const resolved = line.resolvedAgent
       if (resolved == null) throw new Error(t('review.delivery.notFound'))
       const projects = resolved.projects.filter((project) => project !== detail.review.workspaceId)
-      if (projects.length !== 1) throw new Error(t('review.delivery.ambiguousProject'))
+      if (projects.length !== 1) throw new Error(t('review.delivery.noSingleProject'))
       setSource({ agent: resolved.agent, project: projects[0]! })
     } catch (err: unknown) {
       setFailed({ message: errorMessage(err), fault: faultOf(err) })
@@ -4373,14 +4360,12 @@ function DeliveryRecovery({ detail, member, plan }: { detail: ReviewDetail; memb
   return (
     <div className="px-delivery-recovery" data-part="delivery-recovery">
       <span className="px-send-says">{reason}</span>
-      {sessionElsewhere ? <span className="px-send-says">{t('review.delivery.sessionMove')}</span> : null}
       <span className="px-rev-acts">
         {crossProject ? <Btn size="sm" variant="secondary" pending={moving && source === null} onClick={() => void findAgent()} disabled={busy}>{t('review.delivery.move')}</Btn> : null}
         {line.yoursToAnswer || line.sentence?.key === 'notReadableInConversation' || line.takenOut !== undefined ? null : <Btn size="sm" variant="secondary" pending={busy} onClick={() => setPicking(!picking)}>{t('review.delivery.choose')}</Btn>}
       </span>
       <TheWayOut reviewId={detail.review.id} line={line} />
       {picking ? <>
-        {detail.review.threadId === null ? null : <span className="px-send-says">{t('review.delivery.sharedMessage')}</span>}
         <ContactsForAReview asked={{ about: detail.review.entry, review: { id: detail.review.id } }} onChoose={(choice) => void choose(choice)} onClose={() => setPicking(false)} />
       </> : null}
       {source === null ? null : <AgentProjectMove agentId={source.agent} fromProject={source.project} toProject={detail.review.workspaceId} onMoved={() => { setMoving(false); setSource(null); reviewChanged() }} />}
@@ -4423,7 +4408,6 @@ function TheWayOut({ reviewId, line }: { reviewId: string; line: WhereOneComment
       {said === undefined ? null : <p className="px-pane-note" data-part="taken-out">{said}</p>}
       {because === undefined ? null : (
         <>
-          <span className="px-send-says">{t(because === 'the-person-answers-it' ? 'review.takeOut.yoursWhy' : 'review.takeOut.missingWhy')}</span>
           <span className="px-rev-acts">
             <Btn size="sm" variant="secondary" pending={busy} onClick={() => void press(because)}>
               {t(because === 'the-person-answers-it' ? 'review.takeOut.answerMyself' : 'review.takeOut.remove')}
@@ -4588,7 +4572,7 @@ function WhatWasMarked({ showing }: { showing: Showing }) {
     // the answer every comment written before Mole Office recorded a place gets, which is both of the
     // owner's own.
     return (
-      <span className="px-rev-stands" title={t('review.vocab.readingNotKnown.detail')}>
+      <span className="px-rev-stands">
         {t('review.vocab.readingNotKnown.word')}
       </span>
     )
@@ -4597,7 +4581,7 @@ function WhatWasMarked({ showing }: { showing: Showing }) {
   // The words themselves were lit, and §8.2 gives that row no word: the quote is the word.
   if (word === null) return null
   return (
-    <span className="px-rev-stands" title={t(`review.vocab.place.${showing.place.at}.detail` as WordKey)}>
+    <span className="px-rev-stands">
       {word}
     </span>
   )
@@ -4801,7 +4785,7 @@ export function MemberDetail({
           <p className="px-rev-gist prose-measure">
             {gist.text}
             {gist.current ? null : (
-              <Absence tier="told-apart" looked word={t('review.pane.gist.older')} title={gist.says} />
+              <Absence tier="told-apart" looked word={t('review.pane.gist.older')} />
             )}
           </p>
         </>
@@ -4810,17 +4794,13 @@ export function MemberDetail({
           tier="told-apart"
           looked={gist.kind === 'none'}
           word={gist.kind === 'none' ? t('review.pane.gist.none') : t('review.pane.gist.nobodyLooked')}
-          title={gist.says}
         />
       )}
       {member.source === 'conversation' ? (
         // WHERE THIS ONE CAME FROM, AS A LABEL. It is a fact about this row, the same shape as the
         // gist mark above it, and the sentence behind it says the part a reader may want: the words
         // are read from the conversation and are not a copy.
-        <p
-          className="px-pane-note"
-          title={t('review.pane.fromConversation.title')}
-        >
+        <p className="px-pane-note">
           {t('review.pane.fromConversation')}
         </p>
       ) : (
@@ -4984,9 +4964,9 @@ export function ReadingBesideIt({
             tier="told-apart"
             looked={false}
             word={t('review.pane.reading.nothing')}
-            title={without ?? t('review.pane.reading.fault')}
+            title={without === null ? t('review.pane.reading.fault') : undefined}
           />
-          {without === null ? null : <p className="px-read-note">{without}</p>}
+          {without === null ? null : <ServerNote text={without} />}
         </>
       ) : editing ? (
         <>
@@ -5002,16 +4982,11 @@ export function ReadingBesideIt({
               if (busy === null && said.trim() !== '' && said.trim() !== reading) write(said.trim())
             })}
           />
-          <p className="px-read-note">{t('review.pane.reading.yours')}</p>
           {/* WHAT THIS BOX HOLDS, SAID BEFORE THE PRESS THAT REPLACES IT. Everything in it is
               Mole Office's claim about this one comment — including what it made of what the person
               wants and of what could exist afterwards — and saving replaces the lot. A person who
               writes one sentence over three has not lost anything they could not see; a person who
               was not told had no way to know. */}
-          <p className="px-read-note">
-            {t('review.pane.reading.whole')}
-            {alsoSaid.length === 0 ? '' : t('review.pane.reading.alsoSaid', { n: alsoSaid.length })}
-          </p>
           <span className="px-read-acts">
             <Btn
               size="sm"
@@ -5023,7 +4998,7 @@ export function ReadingBesideIt({
                     disabled: true,
                     reason:
                       said.trim() === ''
-                        ? t('review.pane.reading.empty')
+                        ? t('review.pane.reading.isEmpty')
                         : t('review.pane.reading.unchanged'),
                   }
                 : offWhile('save'))}
@@ -5280,7 +5255,7 @@ export function NoteWaiting({
           {/* WHERE IT WOULD GO, IN THE SERVER'S OWN WORDS, AND STORED. A choice made here is
               written onto the comment before this line changes, so what a person reads is what
               Mole Office holds — not what this browser is remembering until something reloads. */}
-          <span className="px-review-to" title={chosen === null ? t('review.pane.note.nobodyTitle') : undefined}>
+          <span className="px-review-to">
             {chosen === null ? t('review.pane.read.nobodyChosen') : chosen.sentence === undefined ? chosen.says : sayTheLine(chosen.sentence)}
           </span>
           <span className="px-review-item-acts">
@@ -5387,9 +5362,9 @@ function ContactsForAReview({
           stayOpen.current = false
         }}
       />
-      {notChosen === 'a person' ? <p className="px-pane-note" role="status">{t('review.pane.contacts.aPerson')}</p> : null}
+      {notChosen === 'a person' ? <p className="px-pane-note" role="status">{t('savedComment.personRefused')}</p> : null}
       {notChosen === 'no record here' ? (
-        <p className="px-pane-note" role="status">{t('review.pane.contacts.noRecord')}</p>
+        <p className="px-pane-note" role="status">{t('savedComment.agentHasNoRecord')}</p>
       ) : null}
       {failed === null ? null : <ErrorNote message={failed.message} fault={theFaultANoteDraws(failed.fault)} />}
     </div>

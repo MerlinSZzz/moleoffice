@@ -7,12 +7,13 @@
  * The real confirmation door, record read, shared waiting sentence and rendered panel are exercised.
  * Reading (a): the asking run has ended and no other run of the asker's agent is live.
  * Both registry ids and stored handles count. Runs belonging to another agent do not count.
- * The reporting standing's sentence names nobody, so it stays true whoever the door allows.
- * At off, the gate who-confirms-a-report lets anybody registered confirm, and the reading, the waiting sentence and the
- * press say so (wave 13r round M, item 8, point 1). The door still counts a confirmation the gate would have refused.
+ * At off, the gate who-confirms-a-report lets anybody registered confirm, and the reading and the waiting sentence say
+ * so (wave 13r round M, item 8, point 1). The door still counts a confirmation the gate would have refused.
+ * As decided in November 2026 (explanations off the pages): the reporting standing is drawn as its word with no
+ * sentence, and the press that closes the run has no sentence above it, so the waiting line is the one that names who
+ * may confirm. A run with no inspector draws the standing word and the review level as states.
  * MUTATIONS, after a control run: take the off answer out of whoMayConfirmThisReport, the off sentence out of
- * whatARunWaitsFor or out of the panel's press, or let confirmTheReport read the answer at the gate's position, and the
- * off case goes red.
+ * whatARunWaitsFor, or let confirmTheReport read the answer at the gate's position, and the off case goes red.
  */
 import { dirname, join } from 'node:path'
 import { createElement as h } from 'react'
@@ -100,19 +101,21 @@ async function waiting(run: string, expected: string | null, rule: string) {
     const shared = whatTheRunWaitsFor(record.data, howARunStands(record.data), word, nameOf, permission)
     const html = renderToStaticMarkup(h(panel, { record, reportConfirmation: permission, participants: { agents: Object.entries(names).map(([handle, id]) => ({ id, handle, name: handle })) } as any }))
     const standing = /class="chk-waiting[^"]*">(.*?)<\/p>/s.exec(html)?.[1]?.replace(/&#x27;/g, "'")
-    const press = /class="chk-part chk-confirm">.*?<p class="chk-said">(.*?)<\/p>/s.exec(html)?.[1]
-    // The reporting sentence names nobody: the agent the run reported to may be refused while the asker's run is live.
-    const reporting = /data-standing="reporting">.*?<\/p><p class="chk-said[^"]*">(.*?)<\/p>/s.exec(html)?.[1]?.replace(/&#x27;/g, "'")
-    expect(reporting).toBe(word('chk.standing.reporting.sentence'))
-    expect(reporting).toContain(lang === 'en' ? 'its report waits to be confirmed' : '它的报告正在等待确认')
-    if (lang === 'en') expect(reporting).toBe(RUN_STANDING.reporting.sentence)
+    const press = /class="chk-part chk-confirm">(.*?)<\/section>/s.exec(html)?.[1]
+    // The reporting standing is its word and the waiting line, with no sentence between them.
+    const reporting = /data-standing="reporting">(.*?)<\/section>/s.exec(html)?.[1]
+    expect(reporting, 'the reporting standing is drawn').toBeDefined()
+    expect(reporting).not.toContain('chk-said')
+    expect(html.replace(/&#x27;/g, "'")).not.toContain(word('chk.standing.reporting.sentence'))
+    if (lang === 'en') expect(html.replace(/&#x27;/g, "'")).not.toContain(RUN_STANDING.reporting.sentence)
     expect(standing).toBe(shared)
+    expect(press, 'the press is drawn').toBeDefined()
+    expect(press, 'no sentence above the press').not.toContain('chk-said')
     if (expected === null) {
-      expect(press).toContain(lang === 'en' ? 'anybody registered' : '任何已注册')
+      if (lang === 'en') expect(standing).toContain('anybody registered')
     } else {
       expect(shared).toContain(expected)
-      expect(press).toContain(expected)
-      if (expected !== 'registrar') expect(press).not.toContain('registrar')
+      if (expected !== 'registrar') expect(shared).not.toContain('registrar')
     }
   }
   setWordLanguage('en')
@@ -218,18 +221,20 @@ describe("the supervisor who asked for a worker confirms its report", () => {
     await waiting(f.worker, null, 'any-registered')
     expect((await confirm(f.worker, 'stranger')).statusCode).toBe(201)
   })
-  it('with no asker and no inspector the panel keeps the sentence saying that no check happened', async () => {
+  it('with no asker and no inspector the panel draws the states that say no check happened', async () => {
     const f = await fixture({ noAsker: true, nobodyTold: true })
     put(f.worker, { released: undefined, theCheck: { reviewLevel: 'none', askedAt: '2026-10-15 09:00:00' } })
     const answer = await read(f.worker)
     for (const lang of ['en', 'zh'] as const) {
       setWordLanguage(lang)
       const html = renderToStaticMarkup(h(panel, { record: answer['record'], reportConfirmation: answer['reportConfirmation'] })).replace(/&#x27;/g, "'")
-      expect(html).toContain(word('chk.noInspectorConfirm'))
+      expect(html).toContain(word('chk.standingNoCheck.inspecting.word'))
+      expect(html).toContain(word('chk.reviewLevelWord', { level: word('chk.reviewLevel.none') }))
+      expect(/class="chk-part chk-confirm">(.*?)<\/section>/s.exec(html)?.[1]).not.toContain('chk-said')
     }
     setWordLanguage('en')
   })
-  it('at off, the reading, the waiting sentence and the press say anybody registered may confirm, and the door counts the stranger it lets confirm', async () => {
+  it('at off, the reading and the waiting sentence say anybody registered may confirm, and the door counts the stranger it lets confirm', async () => {
     const gate = GATES.find(row => row.id === 'who-confirms-a-report')!
     const asThePerson = { ...person, ...thePersonsKeyHeader(join(dirname(db.file), 'keys.json')), 'content-type': 'application/json' }
     const setTheGate = async (value: 'off' | null) => {
@@ -250,7 +255,7 @@ describe("the supervisor who asked for a worker confirms its report", () => {
         expect(shared).toBe(word('chk.says.waits.anybodyAtOff'))
         const html = renderToStaticMarkup(h(panel, { record, reportConfirmation: answer['reportConfirmation'], participants: { agents: Object.entries(names).map(([handle, id]) => ({ id, handle, name: handle })) } as any }))
         expect(/class="chk-waiting[^"]*">(.*?)<\/p>/s.exec(html)?.[1]?.replace(/&#x27;/g, "'")).toBe(shared)
-        expect(/class="chk-part chk-confirm">.*?<p class="chk-said">(.*?)<\/p>/s.exec(html)?.[1]).toBe(word('chk.anybodyConfirmsAtOff'))
+        expect(/class="chk-part chk-confirm">(.*?)<\/section>/s.exec(html)?.[1]).not.toContain('chk-said')
       }
       setWordLanguage('en')
       const before = counted()

@@ -1,6 +1,5 @@
 // Copyright © 2026 Zhengyang Shen
 // Licensed under the MIT License. See LICENSE.
-import { en } from '../src/shared/words/en.ts'
 /**
  * THE RETIRE PRESS IS DRAWN FOR WHOEVER MAY PRESS IT, FROM THE REPLY. Criterion P82.
  *
@@ -31,7 +30,8 @@ import { en } from '../src/shared/words/en.ts'
  *
  *   · the profile reply carries may-retire and why-not, and the two agree with the door;
  *   · the page draws the press where the reply says the reader may;
- *   · where it says they may not, the page draws the door's own sentence and NO press;
+ *   · where it says they may not, the page draws that it is not theirs to retire and NO press, and the door's own
+ *     sentence in developer mode;
  *   · a person's page carries no answer at all, because nobody retires a person;
  *   · a row already retired says who closed it and why, and offers no press.
  *
@@ -54,6 +54,10 @@ import { THE_TEST_OFFICES_SECRETARY } from './a-page-of-a-test-office.ts'
 import { apiApp, freshDb, type TestDb } from './helpers.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { PROFILE_WORDS } from '../src/shared/profile.ts'
+import { t as word } from '../src/shared/i18n.ts'
+
+/** The retire press itself, as `Btn` draws it, and not the panel's heading of the same words. */
+const THE_PRESS = `>${PROFILE_WORDS.retire}</button>`
 
 type ProfileModule = typeof import('../src/web/pages/ProfilePage.tsx')
 
@@ -169,15 +173,20 @@ describe('the profile reply', () => {
 describe('the page', () => {
   it('draws the press where the reply says the reader may', async () => {
     const page = drawn(await profile(asAgent(THE_TEST_OFFICES_SECRETARY.handle), 'agent', 'work-one'))
-    expect(page).toContain(PROFILE_WORDS.retire)
-    expect(page, 'and what retiring does').toContain(en['g6b.profile.retireSays'])
+    expect(page, 'the press').toContain(THE_PRESS)
   })
 
-  it('draws the reason and no press where the reply says they may not', async () => {
+  it('draws that it is not theirs to retire, and no press, where the reply says they may not', async () => {
     const said = await profile(asAgent('work-one'), 'agent', 'sup-one')
     const page = drawn(said)
-    expect(page, 'the door’s own sentence').toContain('below its own rung')
-    expect(page, 'and no press').not.toContain(en['g6b.profile.retireSays'])
+    expect(page, 'the short state').toContain(word('g6b.profile.notYoursToRetire'))
+    expect(page, 'and no press').not.toContain(THE_PRESS)
+    expect(page, 'the door’s own sentence is for a developer').not.toContain('below its own rung')
+    const mode = await import('../src/web/lib/mode.ts')
+    mode.setMode('inspect')
+    const inspected = drawn(said)
+    mode.setMode('normal')
+    expect(inspected, 'the door’s own sentence, in developer mode').toContain('below its own rung')
   })
 
   it('draws nothing about retiring on a person’s page', async () => {
@@ -201,6 +210,6 @@ describe('the page', () => {
     expect(page, 'that it is closed').toContain(PROFILE_WORDS.retired)
     expect(page, 'why').toContain('its task is done')
     expect(page, 'and whose hand').toContain(THE_TEST_OFFICES_SECRETARY.handle)
-    expect(page, 'and nothing left to do to it').not.toContain(en['g6b.profile.retireSays'])
+    expect(page, 'and nothing left to do to it').not.toContain(THE_PRESS)
   })
 })

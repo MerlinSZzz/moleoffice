@@ -107,12 +107,12 @@ describe('asks answered together', () => {
     const dee = messages.theMessageReader({ type: 'agent', id: 'dee-bystander' })
     const of = (reader: typeof owner | undefined, workspaceId = HERE) => ({ workspaceId, resources: [], now: NOW, ...(reader === undefined ? {} : { reader }) })
     const asks: AttentionAsk[] = [
-      { id: 1, input: of(owner), asked: { shape: 'home' } },
-      { id: 2, input: of(owner), asked: { shape: 'flow' } },
-      { id: 3, input: of(undefined), asked: { shape: 'whole' } },
-      { id: 4, input: of(owner), asked: { shape: 'part', part: 'noState', from: 0 } },
-      { id: 5, input: of(dee), asked: { shape: 'home' } },
-      { id: 6, forEach: { resources: [], now: NOW, reader: owner }, each: ['elsewhere'] },
+      { id: 1, sentAt: NOW, input: of(owner), asked: { shape: 'home' } },
+      { id: 2, sentAt: NOW, input: of(owner), asked: { shape: 'flow' } },
+      { id: 3, sentAt: NOW, input: of(undefined), asked: { shape: 'whole' } },
+      { id: 4, sentAt: NOW, input: of(owner), asked: { shape: 'part', part: 'noState', from: 0 } },
+      { id: 5, sentAt: NOW, input: of(dee), asked: { shape: 'home' } },
+      { id: 6, sentAt: NOW, forEach: { resources: [], now: NOW, reader: owner }, each: ['elsewhere'] },
     ]
     // EACH READING WORKED OUT, named by its project and the messages hidden from its reader, counted where
     // the records file works it out. `readings` in an answer counts the different readings asked for, so
@@ -161,8 +161,8 @@ describe('asks answered together', () => {
       },
     }
     const asks: AttentionAsk[] = [
-      { id: 1, input: { workspaceId: 'elsewhere', resources: [], now: NOW }, asked: { shape: 'flow' } },
-      { id: 2, input: { workspaceId: HERE, resources: [], now: NOW }, asked: { shape: 'flow' } },
+      { id: 1, sentAt: NOW, input: { workspaceId: 'elsewhere', resources: [], now: NOW }, asked: { shape: 'flow' } },
+      { id: 2, sentAt: NOW, input: { workspaceId: HERE, resources: [], now: NOW }, asked: { shape: 'flow' } },
     ]
     const answers: Exclude<AttentionAnswer, { ready: true }>[] = []
     worker.answerTheseAsksTogether(asks, null, { records: failing, shapes, messages }, (answer) => answers.push(answer))

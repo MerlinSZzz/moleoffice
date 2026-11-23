@@ -62,6 +62,9 @@ import { codexUsage, theRoundsOwnCodexUsage } from './usage.ts'
  * The second flag does not widen what the run may do: it tells Codex to run a hook nobody reviewed in Codex's own
  * interface, which this one is, because the office wrote it. Measured on Codex 0.155.1: a shell command reaches the
  * hook as tool `Bash` and a patch as `apply_patch`, and exit 2 stops either.
+ *
+ * ITS PROGRAM IS LOOKED UP IN THE WHOLE ENVIRONMENT IT WAS GIVEN, through `whereItIs` in ./os.ts, so on Windows a
+ * search path held as `Path` is found.
  */
 
 import {
@@ -77,7 +80,7 @@ import {
 import { A_UUID, endRun, firstMatch, nothingWasPrinted, outputOf, readFileOrEmpty, runIsAlive, startModelRun, withExitStatus } from './common.ts'
 import { whereItIs } from './os.ts'
 import { codexGuard, theGuardOn } from '../../config/main-world-guard.mjs'
-import { thePermissionsARunGets } from '../../config/run-permissions.mjs'
+import { CODEX_SHELL_SNAPSHOT_OFF, thePermissionsARunGets } from '../../config/run-permissions.mjs'
 import { theServedOfACodexRun } from '../../config/runtime-served.mjs'
 import { theOutputOfTheRunItContinues } from '../../config/the-run-it-continues.mjs'
 import { NOTHING_CHOSEN, type TheOfficesChoice } from '../../shared/run-models.ts'
@@ -112,14 +115,15 @@ export class CodexAdapter implements RuntimeAdapter {
   }
 
   whereItIs(): string | null {
-    return whereItIs(this.command, this.from['PATH'])
+    return whereItIs(this.command, this.from)
   }
 
   commandFor(run: RunRequest): CommandLine {
     const answer = lastMessagePathOf(run.outputPath)
     // `-m` FOLLOWS `exec` AND COMES BEFORE `resume`, where Codex takes it for a new run and a resumed one alike.
     const model = this.modelItWouldUse?.()
-    const exec = model === undefined ? ['exec'] : ['exec', '-m', model]
+    // THE SHELL SNAPSHOT IS OFF, right after `exec` where it was measured: this run's environment holds its key.
+    const exec = ['exec', ...CODEX_SHELL_SNAPSHOT_OFF, ...(model === undefined ? [] : ['-m', model])]
     const rest =
       run.resume !== undefined && run.resume !== ''
         ? [...exec, 'resume', run.resume, '--json', '-o', answer, '--skip-git-repo-check', ...codexGuard(run.agent), '--', '-']

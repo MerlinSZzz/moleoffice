@@ -70,7 +70,7 @@ import type { TheWorkerRun } from '../src/shared/worker-runs.ts'
 import { onePass, type WatchingARound, type WorkerSettings } from '../src/worker/index.ts'
 import { RoundAdapter, THE_LAUNCHER_ASKS_AS } from '../src/worker/runtimes/round.ts'
 import { aMadeUpSandboxRepo } from './a-made-up-sandbox-repo.ts'
-import { apiApp, freshDb, type TestDb } from './helpers.ts'
+import { apiApp, freshDb, type TestDb, governsTheWholeProject } from './helpers.ts'
 
 const CHECKOUT = fileURLToPath(new URL('..', import.meta.url)).replace(/\/$/, '')
 const A_MADE_UP_OFFICE_KEY = randomBytes(32).toString('hex')
@@ -259,7 +259,7 @@ beforeAll(async () => {
   bossRunKey = String(run.body['runKey']?.key)
 
   // THE ROWS, cast by the person under a decision of this test's own. The first carries the mark.
-  const decided = await call('POST', '/api/records', AS_THE_PERSON, { kind: 'decision', title: 'The test casts the worker card', data: { replaces: [] } })
+  const decided = await call('POST', '/api/records', AS_THE_PERSON, { kind: 'decision', title: 'The test casts the worker card', data: { ...governsTheWholeProject(), replaces: [] } })
   expect(decided.status, JSON.stringify(decided.body)).toBe(201)
   const decision = String(decided.body['record'].id)
   for (const [program, model, effort] of THE_ROWS) {

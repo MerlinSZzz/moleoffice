@@ -15,14 +15,15 @@
  *   press-does-nothing — in src/web/pages/ProfilePage.tsx the press calls `Promise.resolve()` instead of
  *                        `api.skipABroadcast(agent, next.at)`. Red: the reading names no skipped slot.
  *
- * PICTURES. The page after the press at 1440 and 390 in light, and at 1440 in Chinese.
+ * PICTURES. The page before the press at 1440 in light.
  * They go to a folder of the test's own, or under TEST_SHOTS where that names one.
  */
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { Page } from 'playwright'
 import { join } from 'node:path'
-import { liveApp, thePersonsKeyHeader, type LiveApp, waitForThePage } from './helpers.ts'
+import { liveApp, type LiveApp, waitForThePage } from './helpers.ts'
+import { pairTheContext } from './a-paired-context.ts'
 import { testShots } from './where-shots-go.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 import type { BroadcastReading } from '../src/shared/broadcast.ts'
@@ -61,8 +62,7 @@ async function ternsReading(): Promise<BroadcastReading> {
 beforeAll(async () => {
   app = await liveApp({ name: 'the-person-skips-a-broadcast', viewport: { width: 1440, height: 1000 }, workspace: 'default' })
   page = app.page
-  const key = thePersonsKeyHeader(join(app.dir, 'keys.json'))['x-mole-office-key'] as string
-  await app.context.addCookies([{ name: 'mole-office-key', value: key, domain: '127.0.0.1', path: '/' }])
+  await pairTheContext(app.context, app.api)
   const started = await fetch(`${app.api}/api/agents/started`, {
     method: 'POST',
     headers: THEIR,
@@ -93,13 +93,4 @@ describe('the press that skips the next broadcast', () => {
     await page.locator(PANEL).getByText('is skipped, because there is nothing to report.').waitFor({ state: 'visible', timeout: 30_000 })
     expect(await page.locator(PANEL).getByRole('button', { name: 'Skip the next broadcast' }).count()).toBe(0)
   }, 180_000)
-
-  it('photographs the page after the press at 1440 and 390 in light, and at 1440 in Chinese', async () => {
-    for (const width of [1440, 390]) {
-      await open('en', width, 'light')
-      await page.screenshot({ path: join(SHOTS, `agent-page-skipped-${width}-en-light.png`), fullPage: true })
-    }
-    await open('zh')
-    await page.screenshot({ path: join(SHOTS, 'agent-page-skipped-1440-zh-light.png'), fullPage: true })
-  }, 590_000)
 })

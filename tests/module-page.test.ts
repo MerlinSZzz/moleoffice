@@ -205,10 +205,9 @@ describe('ModuleView draws what it read', () => {
     expect(html).toContain('2h')
   })
 
-  it('shows the path in full, and says the file is not copied in', () => {
+  it('shows the path in full, with its copy press', () => {
     const html = body(h(mv.ModuleView, { title: 'Two-finger printed gripper', summary: null, data: gripper, relations: [], editable: true, onSave: noSave }))
     expect(html).toContain(`${THE_TEST_FIXTURE_ROOT}/PROJECTS/proj_1st_baseline/docs`)
-    expect(html).toContain('not copied into Mole Office')
     expect(html).toContain('copy path')
   })
 
@@ -289,9 +288,8 @@ describe('ModuleView draws what it read', () => {
     expect(parts).toBeGreaterThan(standing)
   })
 
-  it('drops the state control on a deleted record and says why', () => {
+  it('drops the state control on a deleted record', () => {
     const html = body(h(mv.ModuleView, { title: 'Two-finger printed gripper', summary: null, data: gripper, relations: [], editable: false, onSave: noSave }))
-    expect(html).toContain('read-only')
     // The editable chip is a <button aria-haspopup="menu">; the label form is a <span>.
     expect(html).not.toContain('aria-haspopup')
   })
@@ -328,7 +326,6 @@ describe('LinksPanel keeps a dead link visible', () => {
     expect(html).toContain('Broken')
     expect(html).toContain('1 broken')
     expect(html).toContain('Restore')
-    expect(html).toContain('was deleted')
   })
 
   it('ranks the whole panel as an alarm when any link is broken, and not otherwise', () => {
@@ -343,12 +340,10 @@ describe('LinksPanel keeps a dead link visible', () => {
     expect(render([link({})])).toContain('href="#/r/r2"')
   })
 
-  it('splits the two directions and labels what each one means', () => {
+  it('splits the two directions under Outgoing and Incoming', () => {
     const html = render([link({}), link({ linkId: 'l2', isBacklink: true, label: 'consumed by' })])
     expect(html).toContain('Outgoing')
-    expect(html).toContain('stored here')
     expect(html).toContain('Incoming')
-    expect(html).toContain('stored on their side')
   })
 
   it('says both empties in words', () => {
@@ -364,10 +359,9 @@ describe('LinksPanel keeps a dead link visible', () => {
     expect(html).toContain('inferred')
   })
 
-  it('offers no link form on a deleted record, and says what would enable it', () => {
+  it('offers no link form on a deleted record', () => {
     const html = render([], false)
     expect(html).not.toContain('Add link')
-    expect(html).toContain('Restore this record')
   })
 })
 

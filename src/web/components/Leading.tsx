@@ -925,7 +925,6 @@ export function Leading() {
                 <p className="px-lead-said">{said.words}</p>
               </div>
             )}
-            <p className="px-lead-words px-lead-folds">{LEADING.whileFollowing(nameOf(followed))}</p>
             {/* THE ONE LINE A NARROW SCREEN GETS. Everything above it folds away; this does not. */}
             <div className="px-lead-line">
               <p className="px-lead-short">{LEADING.following(nameOf(followed))}</p>
@@ -1023,7 +1022,8 @@ export function Leading() {
  * ON A NARROW SCREEN THE LEAD'S BAND IS ROOM AT THE PAGE'S FOOT. Under the lead's narrow line the box is a band across
  * the window's foot, and the page's last line was drawn under it. The band's height is written on the root as
  * `--lead-room` whenever its size changes, and the shell's foot adds it to the room it keeps there, so the last line
- * can be scrolled clear of the band. Above the line the box is a card in the corner, and the room is not written.
+ * can be scrolled clear of the band. Above the line the box is a card in the corner; the room extends from
+ * its top to the window's foot, so the last content can be scrolled clear of the card too.
  * When the box goes, so does the room.
  *
  * THE READER'S PLACE MOVES ONCE, when the window's scroll becomes the page box's. A later measure,
@@ -1058,8 +1058,8 @@ function useTheLeadIsRoomAtTheFoot(box: { current: HTMLElement | null }, drawn: 
       }
       const main = document.getElementById('main')
       const at = main?.scrollTop ?? 0
-      root.style.removeProperty('--lead-room')
       root.removeAttribute('data-lead-band')
+      root.style.setProperty('--lead-room', `${String(Math.ceil(window.innerHeight - band.getBoundingClientRect().top))}px`)
       if (inFlow && fromTheWindow) {
         document.body.getBoundingClientRect()
         window.scrollTo(0, at)
@@ -1207,8 +1207,8 @@ const THE_LEAD_IS_NARROW = '(max-width: 60rem)'
  *
  * So under 60rem it is one line — the name of the agent being followed and the press that stops it
  * — and everything else folds away behind one press. The stop press is never folded: criterion M8
- * says it is on screen the whole time. Above 60rem the card is drawn as it was, because there the
- * page's own writing does not reach the corner it sits in.
+ * says it is on screen the whole time. Above 60rem the card remains in the corner, and the page keeps
+ * enough room at its foot to scroll its last content above the card.
  *
  * AND UNDER 60REM THE BOX IS A BAND ACROSS THE FOOT OF THE WINDOW, its height given to the page as
  * room at the page's foot (`useTheLeadIsRoomAtTheFoot`). As a card in the corner it covered the

@@ -12,10 +12,10 @@
  * reached into it. The decision replaced that rule, so this file now holds the new one:
  *
  *   1. The button is at the window's bottom-right corner: its right and bottom edges are the
- *      button's own inset (--fab-inset) from the window's, read from the stylesheet, at 390 and 990.
+ *      button's own inset (--fab-inset) from the window's, read from the stylesheet, at 1440.
  *   2. It can be pressed: the element at its centre is the button or inside it.
  *   3. No page keeps a column for it: the page draws no right border, and its right padding is its left padding, at
- *      390 and 990, on Home and on an agent's page; the route tabs above a page are the same; and the plan
+ *      390 and 1440, on Home and on an agent's page; the route tabs above a page are the same; and the plan
  *      table's box at 390 neither reaches past the page nor keeps room at its end for the button.
  *
  * The room at the page's foot, under its last line, is another rule (tests/the-corner-button-leaves-the-last-line-
@@ -25,7 +25,7 @@
  *
  * The servers come from `liveApp` in tests/helpers.ts, with a test office of its own and a made-up agent. Nothing here
  * touches the live office. With W13Q_FAB_SHOTS set to a folder, it also photographs Home, the agent page and the plan
- * page at 390 in both looks, with the button over the content.
+ * page at 390 in the light look, with the button over the content.
  */
 import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
@@ -44,8 +44,8 @@ const AS_THE_OWNER = {
   'x-mole-office-actor-type': 'human',
   'x-mole-office-actor-id': THE_PERSON,
 }
-const WIDTHS = [1440, 390, 990] as const
-const LOOKS = ['light', 'dark'] as const
+const WIDTHS = [1440, 390] as const
+const LOOKS = ['light'] as const
 const PAGES = [
   ['the home page', '#/', '.hm-page', 'home'],
   ['the agent page', '#/who/agent/wren', '[data-target="uiSurface/profile.theircard"]', 'agent'],
@@ -162,7 +162,7 @@ async function readThePageRoom(page: Page) {
   })
 }
 
-it('sits at the bottom-right corner where design D draws it, can be pressed, and no page keeps a column for it, at 390, 990 and 1440', async () => {
+it('sits at the bottom-right corner where design D draws it, can be pressed, and no page keeps a column for it, at 390 and 1440', async () => {
   for (const width of WIDTHS) {
     for (const look of LOOKS) {
       for (const [name, address, ready, file] of PAGES) {

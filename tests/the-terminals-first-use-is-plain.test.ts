@@ -9,7 +9,7 @@
  * tests/the-terminal-pages-in-the-browser.test.ts does, because liveApp's own server always has the holder off).
  *
  *   2. The press on the Chinese page starts the holder; the page then says it runs, in both languages, and says no
- *      terminal is open as a sentence, not a dash.
+ *      terminal is open in words, not a dash.
  *   3. A terminal the person opens then appears; pressing its row opens it, and what they type into it runs.
  *   4. One press opens the person's shell in their home folder, and it opens where its row is and runs what they type.
  *   5. A folder the person enters behind the fold opens their shell there; a folder that is not there, and a path that
@@ -17,15 +17,15 @@
  *   7. At 390, the round chat button in the corner covers no part of any button, link or fold of the page: each one,
  *      scrolled to, is the element found at its middle and just inside each of its corners.
  *
- * Every scene is measured at 1440, 990, 660 and 390, in light and dark, and photographed into the folder
- * FIRST_USE_SHOTS names, when it names one.
+ * Every scene is measured at 1440 and 390, in light, and photographed into the folder FIRST_USE_SHOTS names, when it
+ * names one.
  *
  * WAVE 13n ROUND F: the Start-at-login word checks (cases 1, 6, 8 and 9) are gone, and so are their two-language
  * comparisons. What stays is the first use itself: the press, the holder running, a shell opening and running, the
  * folder refusal and the corner button.
  *
  * MUTATION (after a control run; the commit message that added this file has the runs): Round 7's mutations, one at a
- * time: TerminalsPage.tsx draws terminals.none as an Absence dash again (case 2); the server's open door requires a
+ * time: TerminalsPage.tsx draws the empty list as an Absence dash again (case 2); the server's open door requires a
  * folder again (case 4); openAShell sends no folder when one is written (case 5); App.tsx's room for the corner button
  * is taken away and Start at login's presses move to the right, under it (case 7). Round 7b's: theFolder's refusal of
  * a missing folder carries no code again (case 5, Chinese page).
@@ -87,8 +87,10 @@ beforeAll(async () => {
   registry = await aStandInRegistry()
   const env = { PATH: `${standIns}:${process.env['PATH'] ?? '/usr/bin:/bin'}`, MOLE_OFFICE_HARNESS_REGISTRY: registry.at, LANG: 'C.UTF-8', SHELL: '/bin/sh' }
   app = await liveApp({ name: 'first-use', viewport: { width: 1440, height: 900 }, database: join(place.dir, 'page.db') })
-  // THE OFFICE OF THE FIRST USE: the holder on, and none has run in this place, so there is no log.
-  first = await startAServer(place, undefined, { MOLE_OFFICE_TERMINAL_HOLDER: 'on', ...env })
+  // THE OFFICE OF THE FIRST USE: the holder on, and none has run in this place, so there is no log. It is told the
+  // liveApp's web port, because it refuses a page on a loopback port that is not its own unless that port is its dev
+  // page's.
+  first = await startAServer(place, undefined, { MOLE_OFFICE_TERMINAL_HOLDER: 'on', MOLE_OFFICE_WEB_PORT: String(app.webPort), ...env })
   context = await app.browser.newContext({ viewport: { width: 1440, height: 900 } })
   const theFirstApi = new URL(first.api)
   const thePagesApiPort = String(app.apiPort)
@@ -133,18 +135,20 @@ async function visit(lang: 'en' | 'zh', mode: 'inspect' | 'normal' = 'inspect'):
   expect(await on.evaluate(() => document.documentElement.lang)).toBe(lang)
 }
 
-/** Measure a scene at four widths in both themes: it never scrolls sideways, and it is photographed when asked. */
+/**
+ * Measure a scene at the widest and the narrowest width in the light theme: it never scrolls sideways, and it is
+ * photographed when asked. Whether a page scrolls sideways does not depend on the colours.
+ */
 async function sweep(scene: string, lang: 'en' | 'zh'): Promise<void> {
   const on = thePage()
-  for (const theme of ['light', 'dark'] as const) {
-    await on.emulateMedia({ colorScheme: theme })
-    for (const width of [1440, 990, 660, 390]) {
-      await on.setViewportSize({ width, height: 900 })
-      await theResizeIsDrawn(on)
-      expect(await on.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth), `${scene} ${String(width)} ${theme} ${lang}`).toBeLessThanOrEqual(1)
-      if (SHOOT) await on.evaluate(() => window.scrollTo(0, 0))
-      if (SHOOT) await on.screenshot({ path: join(SHOTS as string, `${scene}-${String(width)}-${theme}-${lang}.png`), fullPage: true })
-    }
+  const theme = 'light'
+  await on.emulateMedia({ colorScheme: theme })
+  for (const width of [1440, 390]) {
+    await on.setViewportSize({ width, height: 900 })
+    await theResizeIsDrawn(on)
+    expect(await on.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth), `${scene} ${String(width)} ${theme} ${lang}`).toBeLessThanOrEqual(1)
+    if (SHOOT) await on.evaluate(() => window.scrollTo(0, 0))
+    if (SHOOT) await on.screenshot({ path: join(SHOTS as string, `${scene}-${String(width)}-${theme}-${lang}.png`), fullPage: true })
   }
   await on.emulateMedia({ colorScheme: 'light' })
   await on.setViewportSize({ width: 1440, height: 900 })
@@ -167,9 +171,9 @@ describe('the first use of Terminal management', () => {
       const t = WORDS[lang]
       await visit(lang)
       expect(await on.locator('.tm-holder-running .tm-holder-line').innerText()).toBe(t('terminals.holder.running'))
-      expect(await on.getByText(t('terminals.none')).count()).toBe(1)
-      // SAID, NOT A DASH (round 7): the sentence is the whole of what is drawn.
-      expect(await on.locator('.tm-none').innerText()).toBe(t('terminals.none'))
+      expect(await on.getByText(t('terminals.noneOpen')).count()).toBe(1)
+      // SAID, NOT A DASH (round 7): the state words are the whole of what is drawn.
+      expect(await on.locator('.tm-none').innerText()).toBe(t('terminals.noneOpen'))
       await sweep('first-use-after', lang)
     }
   }, 180_000)
@@ -202,7 +206,7 @@ describe('the first use of Terminal management', () => {
     await row.locator('.tm-view-screen').click()
     await on.keyboard.type(`echo ${word}-${lang}-$((6*7)) && pwd`)
     await on.keyboard.press('Enter')
-    const rows = await until(() => row.locator('.tm-view .xterm-rows').innerText().catch(() => ''), (text) => text.includes(`${word}-${lang}-42`))
+    const rows = await until(() => row.locator('.tm-view .xterm-rows').innerText().catch(() => ''), (text) => text.includes(`${word}-${lang}-42`) && text.includes(at))
     expect(rows).toContain(`${word}-${lang}-42`)
     expect(rows).toContain(at)
   }

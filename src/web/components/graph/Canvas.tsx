@@ -2734,9 +2734,8 @@ function Flow({ projection, onOpen, onIntentChanged, onSays }: CanvasProps) {
     const out: string[] = []
     if (state.at === 'drawn' && !state.fits.whole) {
       out.push(
-        `${t('g7b.Canvas.fit_all')}${t('g7b.Canvas.cannot_show_the_whole_shape_here_it')} ${String(Math.round(state.fits.zoom * 100))}%` +
-          `${t('g7b.Canvas.and_even_there_only')} ${String(Math.round(state.fits.shows * 100))}%${t('g7b.Canvas.of_the_drawing_is_in_the_window')}` +
-          `${DRAWING_WORDS.list}${t('g7b.Canvas.prints_all')} ${String(projection.total)}${t('g7b.Canvas.cards_in_dependency_order_where_find_in')}`,
+        (`${t('g7b.Canvas.fit_all')}${t('g7b.Canvas.cannot_show_the_whole_shape_here_it')} ${String(Math.round(state.fits.zoom * 100))}%` +
+          `${t('g7b.Canvas.and_even_there_only')} ${String(Math.round(state.fits.shows * 100))}%${t('g7b.Canvas.of_the_drawing_is_in_the_window')}`).trimEnd(),
       )
     }
     // WHETHER ANYBODY HAS LOOKED AT WHAT RESTRICTS THESE RECORDS, while that read runs and only once the drawing is
@@ -2777,7 +2776,7 @@ function Flow({ projection, onOpen, onIntentChanged, onSays }: CanvasProps) {
       }
     }
     return out
-  }, [state, projection.total, restrictions, restrictionsHere, says, presence, presenceHere])
+  }, [state, restrictions, restrictionsHere, says, presence, presenceHere])
   // Keyed on the words, so a new list with the same facts is not handed up again.
   const factsKey = facts.join('\n')
   useEffect(() => {

@@ -244,11 +244,12 @@
  *       decision (R5). A sandbox another session registered is stopped only with --force, which
  *       the ledger's change log records.
  *
- *   node tools/sandbox.mjs hand-over <instance> --to-session <run> [--json]
+ *   node tools/sandbox.mjs hand-over <instance> --to-session <run> [--to-workspace <project>] [--json]
  *       Gives the sandbox's container row to another run that is still running, and leaves the container as it is.
- *       Only the session holding the open row may hand it over. The new row is registered first, under the run named;
- *       the facts then name it, and the old row is closed with nothing signalled. The inspector's shared sandbox uses
- *       it: the check that started the sandbox may leave while others still use it, and its run then holds nothing.
+ *       Only the session holding the open row may hand it over. The new row is registered in the target project, then
+ *       the facts name it, and only then is the old row closed in its own project with nothing signalled. A release not
+ *       confirmed exits non-zero with the facts naming the new row. The inspector's shared sandbox uses it: the check
+ *       that started the sandbox may leave while others still use it, and its run then holds nothing.
  *
  *   node tools/sandbox.mjs clear <instance> [--force] [--json]
  *       Brings a labelled merge sandbox down and removes only the trees the merge tool can make
@@ -314,13 +315,14 @@ import { THE_LEDGER_COUNTS_A_SESSION_OVER_IN } from '../src/config/the-ledgers-e
 import { clockStamp, fileNameStamp, localStamp, momentOfAnInstant, parseAnyStamp } from '../src/shared/time.ts'
 import { whereIsTheApi, whichWorkspace } from './where-is-the-api.mjs'
 import { whyAPathIsTheOfficesDataFolder } from './the-offices-data-folder.mjs'
-import { A_RUN_GIVEN_NO_TITLE, A_RUN_IS_OVER_IN, CHECK_VIEW_LABEL, HOST_ONLY_FOLDER, ID_LABEL, INSTANCE_FILE, aRunWithNoTitleARoundCanTakeWords, askTheOffice, askTheOfficeWhileItRestarts, BETWEEN_LEDGER_TRIES_MS, leftOut, officeHeaders, readHostInstance, THE_FACTS_VARIABLE, theFactsAStartIsGiven, readInstance, readCheckView, theHostOnlyFolder, theAgentKey, theAgentsOwnWorktree, theAgentsWorktree, theWorktreesBranchAfterFiling, theDshHandoffIsCurrent, theCloneNamed, theModelLine, theModelRefusal, theModelTheOfficeGives, theOfficeSaid, theSandboxField, theMainMirrorOf, THE_LONGEST_WAIT_FOR_THE_LEDGER_MS, stillThere, theChecksMarker, whyAPathIsTheStableCheckout, whyARunMayNotWorkIn, writeHostInstance, writeInstance, writeWhole } from './sandbox-common.mjs'
+import { A_RUN_GIVEN_NO_TITLE, A_RUN_IS_OVER_IN, CHECK_VIEW_LABEL, HOST_ONLY_FOLDER, ID_LABEL, INSTANCE_FILE, aRunWithNoTitleARoundCanTakeWords, askTheOffice, askTheOfficeWhileItRestarts, BETWEEN_LEDGER_TRIES_MS, leftOut, officeHeaders, readHostInstance, THE_FACTS_VARIABLE, theFactsAStartIsGiven, readInstance, readCheckView, theHostOnlyFolder, theAgentKey, theAgentsOwnWorktree, theAgentsWorktree, theWorktreesBranchAfterFiling, theDshHandoffIsCurrent, theCloneNamed, theModelLine, theModelRefusal, theModelTheOfficeGives, theOfficeSaid, theSandboxField, theMainMirrorOf, THE_LONGEST_WAIT_FOR_THE_LEDGER_MS, stillThere, theChecksMarker, whereAStoredMessageWaits, whyAPathIsTheStableCheckout, whyARunMayNotWorkIn, writeHostInstance, writeInstance, writeWhole } from './sandbox-common.mjs'
 import { fileARun } from './file-a-run.mjs'
 import { A_ROUNDS_RULES, prepareRoundChapters, saveRoundChapters, theBriefWithTheStandingStages, theSameWorkArea, theWorkAreaDeclaredFor } from '../src/shared/round-chapters/delivery.ts'
 import { THE_MESSAGE_WORKER_ID } from '../src/shared/the-message-worker-id.ts'
 import { readTheRoundsBacklog } from '../src/shared/round-chapters/backlog.ts'
 import { readTheRoundsDelegations } from '../src/shared/round-start-delegations.ts'
-import { roundChaptersList, standingStagesLine } from '../src/shared/round-chapters/manifest.ts'
+import { readTheRoundsRules } from '../src/shared/round-start-rules.ts'
+import { roundChaptersList, standingStagesLine, THE_CHAPTERS_DOOR } from '../src/shared/round-chapters/manifest.ts'
 import { readTheStandingStages, theStandingStagesWereRead } from '../src/shared/round-chapters/standing.ts'
 import { theRecordedBaseOfRun } from '../src/shared/next-round.ts'
 import { A_CUT_FROM_MAY_NOT_START_WITH_A_DASH } from '../src/shared/kind-fields/session-wave-13n.ts'
@@ -328,6 +330,8 @@ import { A_FAST_FORWARD_INSIDE_MS, bringTheMainMirrorForward, fastForwardInside,
 import { writeAUseLine } from './use-line.mjs'
 import { CLAUDE_CODE_LOGINS, aClaudeCodeLogin, theCredentialsFile } from '../src/config/claude-code-login.mjs'
 import { FULL_PERMISSIONS, aCommandsPermissions, aCodexContainerCommand } from '../src/config/run-permissions.mjs'
+import { theSystemFor } from '../src/config/systems/the-system.mjs'
+import { theEnvironmentACodexGets } from '../src/config/the-environment-a-codex-gets.mjs'
 import { carriesTheTestMark } from '../src/config/the-test-mark.mjs'
 import { aWaitATestMayShorten } from '../src/config/sandbox-start-values.mjs'
 import { theCodexRolloutFor } from '../src/config/codex-log.mjs'
@@ -352,6 +356,7 @@ const THE_HELPER = join('tools', 'sandbox-start.mjs')
 // ============================================================================ words
 
 function usage(problem) {
+  problem = theUnfiledRoundWorktreeRemoved(problem)
   process.stderr.write(
     [
       problem,
@@ -388,7 +393,7 @@ function usage(problem) {
       '    Exits 1 when the host refused a sandbox\'s facts because it could not check them; a folder',
       '    that holds no instance.json still exits 0.',
       'node tools/sandbox.mjs down <instance> [--force]',
-      'node tools/sandbox.mjs hand-over <instance> --to-session <run> [--json]',
+      'node tools/sandbox.mjs hand-over <instance> --to-session <run> [--to-workspace <project>] [--json]',
       '    Gives the container\'s ledger row to another running session; the container is left as it is.',
       'node tools/sandbox.mjs clear <instance> [--force] [--json]',
       '    Brings a labelled merge sandbox down and removes only the trees the merge tool makes again (repo/, work/clone,',
@@ -415,6 +420,7 @@ function detailsBeforeStart(prefix) {
 }
 
 function refuse(sentence, code = 1) {
+  sentence = theUnfiledRoundWorktreeRemoved(sentence)
   const controllerTicket = process.env.MOLE_CHECK_VIEW_CONTROLLER
   if (controllerTicket !== undefined) {
     try { writeCheckViewFailure(JSON.parse(readFileSync(controllerTicket, 'utf8')), sentence, code) }
@@ -438,9 +444,28 @@ function refuse(sentence, code = 1) {
 
 let launchDetails = null
 let filedLaunchRun = null
+/**
+ * A FRESH ROUND'S WORKTREE THAT NO FILED RUN HOLDS YET: `{ sb, worktree, tip }` from the moment aFreshRoundsWorktree
+ * makes it until anAgentsRunFiledHere has filed its run, and null otherwise. refuse() and usage() end the process, so
+ * no finally runs; they remove it themselves, through theUnfiledRoundWorktreeRemoved.
+ */
+let aRoundsUnfiledWorktree = null
 let prelaunchDetails = null
 let prelaunchLineCount = 0
 const launchLines = []
+
+/**
+ * A REFUSAL WHILE A FRESH ROUND'S WORKTREE IS UNFILED REMOVES THAT WORKTREE (aRoundsUnfiledWorktree), with
+ * removeANewRoundWorktree's own checks, and answers the refusal's words with what was done: the same words when it was
+ * removed, and words that say it was left for inspection, and why, when it was not. It is let go of first, so a
+ * refusal inside the removal does not try again. With no such worktree the words are answered as they are.
+ */
+function theUnfiledRoundWorktreeRemoved(words) {
+  if (aRoundsUnfiledWorktree === null) return words
+  const { sb, worktree, tip } = aRoundsUnfiledWorktree
+  aRoundsUnfiledWorktree = null
+  return removeANewRoundWorktree(sb, worktree, tip, words)
+}
 
 function say(line, quiet = false) {
   const words = `sandbox: ${line}\n`
@@ -483,7 +508,7 @@ const REPEATED = ['ro', 'label', 'secret', 'with-path', 'image']
 const VALUED = [
   'name', 'ro', 'label', 'secret', 'ref', 'from', 'dsh', 'as', 'session', 'parent', 'asked-by', 'workspace', 'api', 'sandboxes',
   'agent', 'runtime', 'model', 'selection', 'worktree', 'clone', 'cut-from', 'at', 'title', 'brief', 'cwd', 'slot', 'run', 'rw', 'timeout', 'network', 'flow', 'check-view',
-  'to-session', 'provider-key-file', 'with-path', 'image',
+  'to-session', 'to-workspace', 'provider-key-file', 'with-path', 'image',
 ]
 /**
  * THE NETWORKS `up --network` TAKES, docker's own three. A name outside them is refused rather than handed to docker,
@@ -2560,6 +2585,50 @@ function theWorktreesLeftOut(sb, agent, role) {
 }
 
 /**
+ * A FRESH ROUND'S NEW WORKTREE, MADE BEFORE ITS CHAPTERS ARE READ, so they are checked against the rules files of the
+ * commit the round works on, and not against another run's worktree or the sandbox's own checkout. It is made at
+ * `startAt`, detached until its run is filed, when the round is given --at, and at `cutFrom` otherwise, and its packages
+ * are brought to its lockfile. From the making until its run is filed, aRoundsUnfiledWorktree names it, so refuse() and
+ * usage() remove it. A directory that was there already is not named: nothing here made it.
+ *
+ * Answers `{ made, dir, packages }`, which commandRound gives anAgentsRunFiledHere as `madeBefore`.
+ */
+function aFreshRoundsWorktree(sb, { agent, worktree, cutFrom, startAt }) {
+  let absent = false
+  try { lstatSync(worktree) } catch (error) { absent = error?.code === 'ENOENT' }
+  if (!absent) refuse(startAt === undefined ? `The fresh repair worktree ${worktree} already exists. Nothing was started.` : `The new round directory ${worktree} already exists or cannot be checked. Nothing was started.`)
+  try {
+    aRoundsUnfiledWorktree = { sb, worktree, tip: startAt ?? cutFrom }
+    const made = theAgentsWorktree({ instanceDir: sb.dir, from: sb.instance.from, branch: agent, value: worktree, cutFrom: startAt ?? cutFrom, detached: startAt !== undefined, cutNamed: true, git: gitInside(sb) })
+    if (made.made === null) {
+      aRoundsUnfiledWorktree = null
+      if (startAt !== undefined) throw new Error(`The new round directory ${worktree} already exists. Nothing was started.`)
+    }
+    if (made.made !== null) say(made.made, true)
+    const dir = made.dir
+    const head = gitInside(sb)(['-C', dir, 'rev-parse', 'HEAD'])
+    if (head.status !== 0 || head.stdout.trim() !== (startAt ?? cutFrom)) throw new Error(startAt === undefined ? 'The fresh repair worktree does not stand at the exact requested cut. Nothing was started.' : 'The new worktree does not stand at the requested tip. Nothing was started.')
+    let packages
+    const lockfile = theLockfileHash(dir)
+    if (lockfile.why !== null) say(lockfile.why)
+    const installed = theInstalledPackageHash(sb.dir, dir)
+    if (lockfile.hash !== null && lockfile.hash === installed) {
+      packages = `packages skipped; installed lockfile ${installed} matches the cut`
+    } else if (lockfile.hash !== null) {
+      ownPackagesAndOrigin({ dir: sb.dir, repo: dir, container: sb.instance.container.name, from: sb.instance.from, mirror: null, network: sb.instance.network ?? null })
+      const after = theInstalledPackageHash(sb.dir, dir)
+      packages = `packages ${after === lockfile.hash ? 'refreshed' : 'not refreshed'}; cut lockfile ${lockfile.hash}; installed lockfile ${after ?? 'unverified'}`
+      if (startAt !== undefined && after !== lockfile.hash) throw new Error('The new worktree packages could not be refreshed. Nothing was started.')
+    } else {
+      packages = `packages skipped; the cut has no readable lockfile; installed lockfile ${installed ?? 'unverified'}`
+    }
+    return { made, dir, packages }
+  } catch (why) {
+    refuse(why instanceof Error ? why.message : String(why))
+  }
+}
+
+/**
  * AN AGENT'S RUN, FILED HERE ON THE HOST WITH THE CALLER'S OWN KEY (see "a run's own key" in the header). exec --agent,
  * worker and round all come here, and it files through fileARun (tools/file-a-run.mjs), the launcher's one filing
  * function. The model is asked of the office when none was named, and the worktree is made when it is not there
@@ -2575,6 +2644,11 @@ function theWorktreesLeftOut(sb, agent, role) {
  * WITH `leaving` (worker and exec --agent), A NEW WORKTREE MAY LEAVE OUT WHAT THE TEMPLATE DECLARES, by the agent's
  * role (theWorktreesLeftOut). worker passes the role its registration read gave; exec --agent's is read here, from the
  * read it makes first. round's worktree is whole.
+ *
+ * WITH `madeBefore`, A FRESH ROUND'S, THE WORKTREE IS THERE ALREADY: aFreshRoundsWorktree made it at the round's own cut
+ * before its chapters were read. Nothing is made here then, the run is filed with that worktree and its packages, and
+ * a cut the hand-run door answers is refused, since the worktree does not stand at it. A refusal before the filing
+ * removes that worktree, through refuse().
  *
  * Answers `{ id, key, agent, words, worktree }`: the helper's words for this run, `--filed <id>` among them, the run's
  * own key, or null when the office answered none, and the worktree it works in. It files nothing, and answers the
@@ -2598,7 +2672,7 @@ function removeANewRoundWorktree(sb, worktree, tip, words) {
   return left('it could not be fully removed')
 }
 
-async function anAgentsRunFiledHere(sb, who, { agent, runtime, model, worktree, clone = null, cutFrom, cutNamed = false, title, brief, continues, flow, parent, command, startup, selection, fresh = false, startAt, recordedCut, leaving = false, role, images = [] }) {
+async function anAgentsRunFiledHere(sb, who, { agent, runtime, model, worktree, clone = null, cutFrom, cutNamed = false, title, brief, continues, flow, parent, command, startup, selection, madeBefore, startAt, recordedCut, leaving = false, role, images = [] }) {
   // A RUN GIVEN NO --worktree AND NO --clone WORKS IN THE AGENT'S OWN WORKTREE, never in the shared checkout, whose main
   // every start moves. It is worked out first, so the hand-run ask, the helper's words and the filing name one folder.
   if (worktree === undefined && clone === null) {
@@ -2664,6 +2738,9 @@ async function anAgentsRunFiledHere(sb, who, { agent, runtime, model, worktree, 
   refuseAHandStartTheOfficeNeverAnswered(checked)
   if (checked.status !== 200) refuse(String(checked.body.error ?? theOfficeSaid(checked)), 2)
   const handCut = checked.body.cut
+  if (madeBefore !== undefined && handCut !== null) {
+    refuse(`The office's hand-run door answered the cut ${String(handCut?.commit)} for this fresh round of ${agent}, but its worktree ${madeBefore.dir} was made at the round's own cut ${startAt ?? cutFrom} before the ask. Nothing was started.`)
+  }
   if (theHelperWillRefuse) {
     if (parent !== undefined) usage('--parent needs a run filed by exec --agent; these options do not file a run.')
     return asTheHelperFilesIt
@@ -2671,7 +2748,7 @@ async function anAgentsRunFiledHere(sb, who, { agent, runtime, model, worktree, 
   // THE MIRROR BROUGHT FORWARD, AND THIS SANDBOX'S OWN NODE_MODULES AND ORIGIN (item 2f), after main was brought forward
   // and before the worktree is made, so a lockfile main changed is installed first and a new worktree links to the copy.
   // The mirror's place is worked out again from the host's facts; an agent's start never makes one.
-  if (!fresh) {
+  if (madeBefore === undefined) {
     let mirror = null
     try { mirror = theMainMirrorOf(sandboxes, sb.instance.from) } catch (why) { say(`the mirror of the main of ${String(sb.instance.from)} has no place: ${why instanceof Error ? why.message : String(why)}.`) }
     if (mirror !== null) {
@@ -2704,58 +2781,32 @@ async function anAgentsRunFiledHere(sb, who, { agent, runtime, model, worktree, 
   let dir
   let made
   let packages = null
-  let mayHaveMade = false
-  if (fresh) {
-    let absent = false
-    try { lstatSync(worktree) } catch (error) { absent = error?.code === 'ENOENT' }
-    if (!absent) refuse(startAt === undefined ? `The fresh repair worktree ${worktree} already exists. Nothing was started.` : `The new round directory ${worktree} already exists or cannot be checked. Nothing was started.`)
-  }
-  try {
-    mayHaveMade = startAt !== undefined
-    made = theAgentsWorktree({
-      instanceDir: sb.dir,
-      from: theClone === null ? sb.instance.from : theClone.from,
-      branch: agent,
-      value: worktree ?? join(sb.dir, theClone === null ? 'repo' : theClone.name),
-      cutFrom: startAt ?? cut,
-      detached: startAt !== undefined,
-      cutNamed: handCut === null ? cutNamed : handCut.named !== null,
-      clone: theClone === null ? null : theClone.name,
-      leaveOut: leftOut.leaveOut,
-      bringBack: leftOut.bringBack,
-      git: gitInside(sb),
-    })
-    if (startAt !== undefined && made.made === null) {
-      mayHaveMade = false
-      throw new Error(`The new round directory ${worktree} already exists. Nothing was started.`)
+  if (madeBefore !== undefined) {
+    ({ made, dir, packages } = madeBefore)
+  } else {
+    try {
+      made = theAgentsWorktree({
+        instanceDir: sb.dir,
+        from: theClone === null ? sb.instance.from : theClone.from,
+        branch: agent,
+        value: worktree ?? join(sb.dir, theClone === null ? 'repo' : theClone.name),
+        cutFrom: cut,
+        cutNamed: handCut === null ? cutNamed : handCut.named !== null,
+        clone: theClone === null ? null : theClone.name,
+        leaveOut: leftOut.leaveOut,
+        bringBack: leftOut.bringBack,
+        git: gitInside(sb),
+      })
+      if (leftOut.says !== null) say(leftOut.says, !leftOut.loud)
+      if (made.made !== null) say(made.made, true)
+      if (made.brought !== undefined) say(made.brought, true)
+      dir = made.dir
+      const imageNotThere = whyAnImageIsNotInTheWorktree(dir, images)
+      if (imageNotThere !== null) throw new Error(imageNotThere)
+      if (images.length > 0) say(codexExecIsGiven(images, dir), true)
+    } catch (why) {
+      refuse(why instanceof Error ? why.message : String(why))
     }
-    if (leftOut.says !== null) say(leftOut.says, !leftOut.loud)
-    if (made.made !== null) say(made.made, true)
-    if (made.brought !== undefined) say(made.brought, true)
-    dir = made.dir
-    const imageNotThere = whyAnImageIsNotInTheWorktree(dir, images)
-    if (imageNotThere !== null) throw new Error(imageNotThere)
-    if (images.length > 0) say(codexExecIsGiven(images, dir), true)
-    if (fresh) {
-      const head = gitInside(sb)(['-C', dir, 'rev-parse', 'HEAD'])
-      if (cut !== cutFrom || head.status !== 0 || head.stdout.trim() !== (startAt ?? cutFrom)) throw new Error(startAt === undefined ? 'The fresh repair worktree does not stand at the exact requested cut. Nothing was started.' : 'The new worktree does not stand at the requested tip. Nothing was started.')
-      const lockfile = theLockfileHash(dir)
-      if (lockfile.why !== null) say(lockfile.why)
-      const installed = theInstalledPackageHash(sb.dir, dir)
-      if (lockfile.hash !== null && lockfile.hash === installed) {
-        packages = `packages skipped; installed lockfile ${installed} matches the cut`
-      } else if (lockfile.hash !== null) {
-        ownPackagesAndOrigin({ dir: sb.dir, repo: dir, container: sb.instance.container.name, from: sb.instance.from, mirror: null, network: sb.instance.network ?? null })
-        const after = theInstalledPackageHash(sb.dir, dir)
-        packages = `packages ${after === lockfile.hash ? 'refreshed' : 'not refreshed'}; cut lockfile ${lockfile.hash}; installed lockfile ${after ?? 'unverified'}`
-        if (startAt !== undefined && after !== lockfile.hash) throw new Error('The new worktree packages could not be refreshed. Nothing was started.')
-      } else {
-        packages = `packages skipped; the cut has no readable lockfile; installed lockfile ${installed ?? 'unverified'}`
-      }
-    }
-  } catch (why) {
-    const words = why instanceof Error ? why.message : String(why)
-    refuse(!mayHaveMade ? words : removeANewRoundWorktree(sb, worktree, startAt, words))
   }
 
   const keyFolder = hostOnlyFolder(sb.name)
@@ -2781,19 +2832,21 @@ async function anAgentsRunFiledHere(sb, who, { agent, runtime, model, worktree, 
     flow: flow ?? null,
     keyFolder,
   }) } catch (error) {
-    const words = error instanceof Error ? error.message : String(error)
-    refuse(startAt === undefined ? words : removeANewRoundWorktree(sb, worktree, startAt, words))
+    // A fresh round's worktree, made before (`madeBefore`), is removed by refuse() itself, through aRoundsUnfiledWorktree.
+    refuse(error instanceof Error ? error.message : String(error))
   }
   if (!filed.ok) {
     if (startAt !== undefined) {
       const detail = filed.says === '' ? '' : `${filed.says} `
-      refuse(removeANewRoundWorktree(sb, worktree, startAt, `${detail}The run could not be filed (tools/register-a-run.mjs exited ${filed.exited}). Nothing was started.`))
+      refuse(`${detail}The run could not be filed (tools/register-a-run.mjs exited ${filed.exited}). Nothing was started.`)
     }
     if (filed.says !== '') process.stderr.write(`${filed.says}\n`)
-    const words = `the run could not be filed (tools/register-a-run.mjs exited ${filed.exited}), so nothing was started.`
-    refuse(startAt === undefined ? words : removeANewRoundWorktree(sb, worktree, startAt, words))
+    refuse(`the run could not be filed (tools/register-a-run.mjs exited ${filed.exited}), so nothing was started.`)
   }
   filedLaunchRun = filed.id
+  // THE FILED RUN NOW HOLDS A FRESH ROUND'S WORKTREE, so refuse() no longer removes it. A failure in the steps below is
+  // handled here as before.
+  aRoundsUnfiledWorktree = null
   try {
     // ON THE HOST'S LIST before anything else is done for it, so that a round can continue it (theHostsList).
     // containerSession is the session that registered this sandbox's container row, under which a round finds that row
@@ -3035,7 +3088,8 @@ function writeCheckViewFailure(ticket, why, code) {
 /**
  * Check-view execution stays on the host. The detached controller captures evidence and survives
  * a release of the command's host group. The native gate owns that group and cannot run the
- * command before the ledger holds both rows. No office helper or handshake storage is mounted.
+ * command before the ledger holds both rows. The holder project selects the ledger unless the caller names one.
+ * No office helper or handshake storage is mounted.
  */
 async function commandCheckView() {
   const [name, extra] = chosen.targets
@@ -3063,7 +3117,7 @@ async function commandCheckView() {
   if (!container?.State?.Running || typeof container.Config?.Image !== 'string') refuse('Check view needs a running instance with a known image; no ordinary exec was started.')
   const network = container.HostConfig?.NetworkMode
   if (!['host', 'none', 'bridge', 'default'].includes(network)) refuse(`Check view cannot copy the instance network rules ${String(network)}.`)
-  const workspace = chosen.workspace ?? instance.workspace
+  const workspace = chosen.workspace ?? instance.containerRowHeldBy?.workspace ?? instance.workspace
   const controllerTicket = process.env.MOLE_CHECK_VIEW_CONTROLLER
   if (controllerTicket !== undefined) {
     const ticket = JSON.parse(readFileSync(controllerTicket, 'utf8'))
@@ -3526,6 +3580,10 @@ async function startThroughTheHelper(sb, who, passed, handshake = null, filed = 
     // (theClaudeCodeVariablesInASandbox); the helper passes them on.
     ...claudeCodes.variables.flatMap((one) => ['-e', `${one.name}=${one.value}`]),
     ...(theCommitAddress() === null ? [] : ['-e', `MOLE_OFFICE_COMMIT_EMAIL=${theCommitAddress()}`]),
+    // A TEST'S SHORTER SEAT ASK AND SWEEP PAUSE (tools/slot.mjs, tools/sweep-run-scratch.mjs), passed in only when this
+    // process's own environment has them. Nothing but a test sets them.
+    ...['SLOT_ASK_EVERY_S_FOR_A_TEST', 'SWEEP_PAUSE_MS_FOR_A_TEST'].filter((name) => process.env[name] !== undefined)
+      .flatMap((name) => ['-e', `${name}=${process.env[name]}`]),
     '-w', dir,
     instance.container.name,
     'node', helper, ...passed,
@@ -4115,6 +4173,19 @@ async function commandExecIsolated() {
     if (closed.status !== 200) say(`the row ${id} could not be closed (${theOfficeSaid(closed)}); it may still say something runs.`)
   }
 
+  // A CODEX RUN GETS ONLY THE NAMES A CODEX KEEPS (src/config/the-environment-a-codex-gets.mjs), as the last change to
+  // its lines. No sandbox helper starts it, so the sandbox's own codex is not on its PATH, and the lines are narrowed
+  // here. The last line of a name is the one docker gives, so it is the one kept. The container is Linux whatever this
+  // machine is, so the names are matched as Linux spells them. The gate adds HOME, USER and LOGNAME, which are kept.
+  // ITS SIGN-IN: its home of its own holds no Codex login, so it signs in by key, as OPENAI_API_KEY or CODEX_API_KEY from
+  // the template's secrets, and the list keeps both. It needs no provider row's names: while the provider router is on,
+  // an isolated Codex run is refused above. Case 5 of tests/a-codex-in-a-sandbox-gets-only-the-kept-names.test.ts
+  // checks that both keys reach its env file.
+  if (aCommandsRuntime(off.command, chosen.runtime) === 'codex') {
+    const given = Object.fromEntries(lines.map((line) => [line.split('=')[0], line.slice(line.indexOf('=') + 1)]))
+    const kept = Object.entries(theEnvironmentACodexGets(given, theSystemFor('linux'))).map(([key, value]) => `${key}=${value}`)
+    lines.splice(0, lines.length, ...kept)
+  }
   // MADE, then the env file goes: docker has read it.
   const envFile = writeTheEnvFile(hostOnlyFolder(name), lines)
   const created = spawnSync('docker', [
@@ -5304,15 +5375,34 @@ async function commandRound() {
   }
   if (taken !== last) await theRoundsRunWasFiledHere(sb, who, chosen.agent, null, taken.run, taken.data, taken.entry)
   const { run: before, data, title: itsTitle } = taken
-  // ITS CHAPTERS come from the worktree of the run it takes, as before; a fresh round whose run's worktree a round cannot work
-  // in reads them from the sandbox's own repository, which its new worktree is cut from.
-  const chaptersFrom = fresh && whyARoundCannotWorkIn(typeof data.workingDirectory === 'string' ? data.workingDirectory : '') !== null ? join(sb.dir, 'repo') : data.workingDirectory
-  if (chaptersFrom !== data.workingDirectory && whyARoundCannotWorkIn(chaptersFrom) !== null) {
-    refuse(`A fresh round of ${chosen.agent} has no chapters to read: run ${before}, which it follows, ${whyARoundCannotWorkIn(typeof data.workingDirectory === 'string' ? data.workingDirectory : '')}, and this sandbox's repository ${chaptersFrom} holds no ${A_ROUNDS_RULES}. Nothing was started.`)
+  const worktree = fresh ? chosen.worktree : data.workingDirectory
+  const cutFrom = fresh ? repairCut ?? chosen['cut-from'] : data.cutFrom
+  // A FRESH ROUND'S NEW WORKTREE IS MADE FIRST, at the round's own cut, so its chapters are checked against the rules
+  // files of the commit it works on (aFreshRoundsWorktree). Before, they were checked against the worktree of the run it
+  // follows, or the sandbox's own checkout when that was gone, whose rules files may be another commit's. A repair's cut
+  // is brought into the sandbox and proved on current main first, as before; a round with --at is made at its tip.
+  // From here until its run is filed, a refusal removes that worktree (aRoundsUnfiledWorktree).
+  let freshlyMade
+  if (fresh) {
+    // The replayed main can be ahead of and not an ancestor of the released tip.
+    if (!atTip) {
+      refreshMainBeforeRun(sb, repairCut)
+      const source = guardedGitRun(sb.instance.from, ['rev-parse', '--verify', 'refs/heads/main^{commit}'], { timeout: 30_000 })
+      const sourceProof = source.status === 0 ? guardedGitRun(sb.instance.from, ['merge-base', '--is-ancestor', cutFrom, source.stdout.trim()], { timeout: 30_000 }) : source
+      const proof = sb.repairRef === undefined ? null : gitInside(sb)(['-C', join(sb.dir, 'repo'), 'rev-parse', '--verify', `${sb.repairRef}^{commit}`])
+      if (sourceProof.status !== 0 || proof?.status !== 0 || proof.stdout.trim() !== cutFrom) refuse('The fresh repair cut cannot be proved on current main in the source and sandbox. Nothing was started.')
+    }
+    freshlyMade = aFreshRoundsWorktree(sb, { agent: chosen.agent, worktree, cutFrom, startAt: atTip ? chosen.at : undefined })
+  }
+  // ITS CHAPTERS are read from GET THE_CHAPTERS_DOOR and checked against the rules files in the worktree it works in: the
+  // worktree of the run it takes, or a fresh round's new worktree, just made.
+  const chaptersFrom = fresh ? freshlyMade.dir : data.workingDirectory
+  if (fresh && whyARoundCannotWorkIn(chaptersFrom) !== null) {
+    refuse(`A fresh round of ${chosen.agent} has no chapters to read: its new worktree ${chaptersFrom}, made at ${atTip ? `the round's tip ${chosen.at}` : `its cut ${cutFrom}`}, holds no ${A_ROUNDS_RULES}. Nothing was started.`)
   }
   if (why !== null) {
     const where = fresh ? `${chosen.worktree}, a new worktree` : `${data.workingDirectory}, the worktree of run ${before}`
-    say(`this round starts a new conversation on runtime ${runtime}, because ${why}; it works in ${where}, and reads its chapters from ${join(chaptersFrom, A_ROUNDS_RULES)}.`)
+    say(`this round starts a new conversation on runtime ${runtime}, because ${why}; it works in ${where}, and reads its chapters from GET ${THE_CHAPTERS_DOOR}, checked against the rules files in ${chaptersFrom}.`)
   }
   const aNewConversation = fresh || why !== null
   // A FRESH REPAIR CONTINUES NOTHING (round 54's refusal, item 2): it is a new conversation, so it is linked only to
@@ -5345,8 +5435,9 @@ async function commandRound() {
   const askThisRoundsOffice = (path) => askTheOfficeWhileItRestarts(api, path, { workspace: sb.workspace, headers: theCallerNamed(sb.workspace, who) }, { saying: say })
   const backlog = await readTheRoundsBacklog({ brief: chosen.brief, request: askThisRoundsOffice })
   const delegations = await readTheRoundsDelegations({ brief: chosen.brief, request: askThisRoundsOffice })
+  const rules = await readTheRoundsRules({ request: askThisRoundsOffice, checkout: chaptersFrom })
   const standing = await theStandingStagesFor(chosen.agent, sb, who, { saying: false })
-  const delivery = prepareRoundChapters({ sandboxDir: sb.dir, worktree: chaptersFrom, brief: chosen.brief, territory: data.territory, backlog, standing, delegations })
+  const delivery = prepareRoundChapters({ sandboxDir: sb.dir, worktree: chaptersFrom, brief: chosen.brief, territory: data.territory, backlog, standing, delegations, rules })
   theAreaTheDoorSetIsTheDeclaredOne(who, registered, delivery.workArea)
   say(roundChaptersList(delivery.manifest))
   const thread = runtime === 'codex' && !aNewConversation ? theCodexThreadOf(sb, before) : null
@@ -5355,17 +5446,9 @@ async function commandRound() {
     say(openCodeSession.says)
     sb.startSaysFirst = openCodeSession.says
   }
-  // The replayed main can be ahead of and not an ancestor of the released tip.
-  if (!atTip) refreshMainBeforeRun(sb, repairCut)
+  // A fresh round's main was brought forward before its worktree was made, above.
+  if (!fresh) refreshMainBeforeRun(sb, repairCut)
   const brief = theBriefWithTheStartingWords(sb, runtime, delivery.brief)
-  const worktree = fresh ? chosen.worktree : data.workingDirectory
-  const cutFrom = fresh ? repairCut ?? chosen['cut-from'] : data.cutFrom
-  if (fresh && !atTip) {
-    const source = guardedGitRun(sb.instance.from, ['rev-parse', '--verify', 'refs/heads/main^{commit}'], { timeout: 30_000 })
-    const sourceProof = source.status === 0 ? guardedGitRun(sb.instance.from, ['merge-base', '--is-ancestor', cutFrom, source.stdout.trim()], { timeout: 30_000 }) : source
-    const proof = sb.repairRef === undefined ? null : gitInside(sb)(['-C', join(sb.dir, 'repo'), 'rev-parse', '--verify', `${sb.repairRef}^{commit}`])
-    if (sourceProof.status !== 0 || proof?.status !== 0 || proof.stdout.trim() !== cutFrom) refuse('The fresh repair cut cannot be proved on current main in the source and sandbox. Nothing was started.')
-  }
   const givesTheDatabase = openCodeSession !== null && theHelperTakesTheOpenCodeDatabase(sb, before, openCodeSession.database)
   const direct = runtime !== 'dsh' && theHelperTakesStdin(sb, runtime)
   const command = runtime === 'dsh' ? null : runtime === 'opencode' ? theOpenCodeCommand({ model, worktree, session: openCodeSession?.session ?? null }) : runtime === 'codex' ? theCodexCommand({ model: codexModel, thread }) : runtime === A_WORKERS_RUNTIME ? theClaudeCodeCommand({ model, brief, continues: !aNewConversation, direct }) : refuse(theRuntimeWithNoCommandWords('round', runtime), 2)
@@ -5377,7 +5460,7 @@ async function commandRound() {
     worktree,
     cutFrom,
     cutNamed: fresh,
-    fresh,
+    ...(fresh ? { madeBefore: freshlyMade } : {}),
     ...(atTip ? { startAt: chosen.at, recordedCut: recordedCutForRound } : {}),
     title,
     brief,
@@ -5422,6 +5505,7 @@ function notOpenInTheLedger(workspace) {
   return `not open in the ledger of ${workspace}: closed, or never written. The launcher reads only the open rows; the history is GET /api/resources?includeReleased=true, which holds the office for 20 seconds or more (acceptance finding 67).`
 }
 
+/** Read each instance and its open rows, in the holder project unless the caller names a project. */
 async function commandStatus() {
   const who = whoIsAskingIfSaid()
   const names = chosen.targets.length > 0
@@ -5444,7 +5528,7 @@ async function commandStatus() {
       reports.push({ instance: name, folder: dir, says: `${dir} is not a sandbox: it holds no instance.json.` })
       continue
     }
-    const workspace = chosen.workspace ?? instance.workspace
+    const workspace = chosen.workspace ?? instance.containerRowHeldBy?.workspace ?? instance.workspace
     if (!ledgers.has(workspace)) ledgers.set(workspace, await theLedger(workspace, who))
     const ledger = ledgers.get(workspace)
     const byId = new Map((ledger.rows ?? []).map((r) => [r.id, r]))
@@ -5574,13 +5658,14 @@ async function commandStatus() {
 
 // ============================================================================ down
 
+/** Stop through the holder project's ledger unless the caller names another project. */
 async function commandDown({ print = true } = {}) {
   const [name, extra] = chosen.targets
   if (name === undefined || extra !== undefined) usage('Say which sandbox, once: node tools/sandbox.mjs down <instance>.')
   const who = whoIsAsking()
   const dir = instanceFolder(name)
   const instance = await theFactsOrRefuse(name, who, `There is no sandbox called ${name} in ${sandboxes}. Nothing was done.`)
-  const workspace = chosen.workspace ?? instance.workspace
+  const workspace = chosen.workspace ?? instance.containerRowHeldBy?.workspace ?? instance.workspace
   const ledger = await theLedgerWhenItAnswers(workspace, who)
   if (ledger.rows === null) refuse(`The ledger could not be read (${ledger.why}), so the sandbox was not stopped: it is stopped only through the ledger.`)
   const byId = new Map(ledger.rows.map((r) => [r.id, r]))
@@ -5667,26 +5752,28 @@ async function commandDown({ print = true } = {}) {
  * check that happened to start it. When that check left first, its run still held the row, and the office said the run
  * had left a container open while other checks were using it. The leaving check now hands the row to one still using it.
  *
- * ONLY THE SESSION HOLDING THE OPEN ROW HANDS IT OVER, and only to another session record of this project that is still
+ * ONLY THE SESSION HOLDING THE OPEN ROW HANDS IT OVER, and only to another session in the target project that is still
  * running and is written down as using the sandbox: a row handed to a run that has ended would be named as left open at
  * once, and one handed to a run not using the container would be held by a run that never stops it. A check of the
  * inspector writes itself down in the sandbox's checks folder (theChecksMarker), naming its process; a marker whose
  * process has ended does not count.
  *
- * THE NEW ROW FIRST. It is registered under the run named, the facts then name it, and only then is the old row closed,
- * with nothing signalled, which only the session that registered it may ask: a release that signals would stop the
- * container the other run is using. So the container is never without a row, and a refusal part way says which row
- * holds it.
+ * THE NEW ROW FIRST, registered in the target project; the facts then name it, and only then is the old row closed in
+ * its own project with nothing signalled, which only its session may ask. A release not confirmed exits non-zero with
+ * the facts naming the new row; a release that signals would stop a container another run is using.
  */
 async function commandHandOver() {
   const [name, extra] = chosen.targets
   if (name === undefined || extra !== undefined) usage('Say which sandbox, once: node tools/sandbox.mjs hand-over <instance> --to-session <run>.')
   const to = chosen['to-session']
+  if (chosen['to-workspace'] !== undefined && (typeof to !== 'string' || to.trim() === '')) usage('--to-workspace needs --to-session <run>.')
+  if (chosen['to-workspace'] !== undefined && (typeof chosen['to-workspace'] !== 'string' || chosen['to-workspace'].trim() === '')) usage('--to-workspace needs a non-blank project.')
   if (typeof to !== 'string' || to.trim() === '') usage('hand-over needs --to-session <run>: the running session the row goes to.')
   const who = whoIsAsking()
   const dir = instanceFolder(name)
   const instance = await theFactsOrRefuse(name, who, `There is no sandbox called ${name} in ${sandboxes}. Nothing was handed over.`)
-  const workspace = chosen.workspace ?? instance.workspace
+  const workspace = chosen.workspace ?? instance.containerRowHeldBy?.workspace ?? instance.workspace
+  const targetWorkspace = chosen['to-workspace'] ?? workspace
   if (to === who.session) refuse(`The container row of ${name} is session ${who.session}'s already, so there is nothing to hand over.`)
   const ledger = await theLedgerWhenItAnswers(workspace, who)
   if (ledger.rows === null) refuse(`The ledger could not be read (${ledger.why}), so nothing was handed over.`)
@@ -5695,9 +5782,9 @@ async function commandHandOver() {
   if (row.sessionRecordId !== who.session) {
     refuse(`The container row ${row.id} of ${name} is held by session ${row.sessionRecordId}, not by ${who.session}, so it is not this session's to hand over. Nothing was handed over.`)
   }
-  const target = await askTheOffice(api, `/api/records/${encodeURIComponent(to)}`, { workspace, headers: theCallerNamed(workspace, who) })
+  const target = await askTheOffice(api, `/api/records/${encodeURIComponent(to)}`, { workspace: targetWorkspace, headers: theCallerNamed(targetWorkspace, who) })
   if (target.status !== 200 || target.body?.record?.kind !== 'session') {
-    refuse(`${to} is not a session record of ${workspace} (${theOfficeSaid(target)}), so the container row of ${name} was not handed to it.`)
+    refuse(`${to} is not a session record of ${targetWorkspace} (${theOfficeSaid(target)}), so the container row of ${name} was not handed to it.`)
   }
   const state = target.body.record.data?.state
   if (state !== 'running') {
@@ -5716,7 +5803,7 @@ async function commandHandOver() {
 
   const registered = await askTheOffice(api, '/api/resources', {
     method: 'POST',
-    headers: officeHeaders({ workspace, agent: who.agent, session: who.session }),
+    headers: officeHeaders({ workspace: targetWorkspace, agent: who.agent, session: who.session }),
     body: {
       type: 'container',
       key: instance.container.name,
@@ -5726,18 +5813,17 @@ async function commandHandOver() {
     },
   })
   if (registered.status !== 201) {
-    refuse(`The ledger did not take a container row of ${name} for session ${to} (${theOfficeSaid(registered)}), so the row ${row.id} stays with session ${who.session}. Nothing was changed.`)
+    refuse(`The ledger in ${targetWorkspace} did not take a container row of ${name} for session ${to} (${theOfficeSaid(registered)}), so the row ${row.id} stays with session ${who.session}. Nothing was changed.`)
   }
   const handed = registered.body.resource.id
-  writeInstance(dir, { ...instance, containerRow: handed, containerRowHeldBy: { session: to, since: localStamp(new Date()), from: { session: who.session, row: row.id } } })
+  writeInstance(dir, { ...instance, containerRow: handed, containerRowHeldBy: { session: to, workspace: targetWorkspace, since: localStamp(new Date()), from: { session: who.session, workspace, row: row.id } } })
   const closed = await askTheOffice(api, `/api/resources/${encodeURIComponent(row.id)}/release`, {
     method: 'POST',
     headers: officeHeaders({ workspace, agent: who.agent, session: who.session }),
     body: { signalNothing: true, note: `handed over to session ${to} as row ${handed} by node tools/sandbox.mjs hand-over; the container ${instance.container.name} is still in use` },
   })
   if (closed.status !== 200) {
-    refuse(`The row ${handed} holds the container of ${name} for session ${to}, and the sandbox's facts name it, but the old row ${row.id} could not be closed (${theOfficeSaid(closed)}). ` +
-      `Close it from session ${who.session} with POST /api/resources/${row.id}/release {"signalNothing":true}.`)
+    refuse(`The new row ${handed} in ${targetWorkspace} holds the container of ${name} and the facts name it; the old row ${row.id} in ${workspace} may still be open (the office said: ${theOfficeSaid(closed)}); if it is still open, close it from the old session ${who.session} in ${workspace} with POST /api/resources/${row.id}/release {"signalNothing":true}; never release it with a signal, because that would stop a container another run is using; if it is already closed, nothing is left to do.`)
   }
   const answer = { instance: name, handedOver: { from: { session: who.session, row: row.id }, to: { session: to, row: handed } } }
   if (chosen.json) process.stdout.write(`${JSON.stringify(answer)}\n`)
@@ -5758,6 +5844,7 @@ function bytesIn(path) {
   return readdirSync(path).reduce((sum, name) => sum + bytesIn(join(path, name)), 0)
 }
 
+/** Clear a stopped merge sandbox, checking the holder project's ledger unless the caller names one. */
 async function commandClear() {
   const [name, extra] = chosen.targets
   if (name === undefined || extra !== undefined) usage('Say which sandbox, once: node tools/sandbox.mjs clear <instance> [--force] [--json].')
@@ -5771,7 +5858,7 @@ async function commandClear() {
     const parent = dirname(join(dir, part))
     if (existsSync(parent) && realpathSync(parent) !== parent) refuse(`Sandbox ${name} has a linked parent of ${part}, so nothing was removed.`)
   }
-  const workspace = chosen.workspace ?? instance.workspace
+  const workspace = chosen.workspace ?? instance.containerRowHeldBy?.workspace ?? instance.workspace
   let ledger = await theLedgerWhenItAnswers(workspace, who)
   if (ledger.rows === null) refuse(`The ledger could not be read (${ledger.why}), so nothing was removed.`)
   if (ledger.rows.some((row) => row.id === instance.containerRow || (row.type === 'container' && row.key === instance.container.name))) {
@@ -5860,11 +5947,15 @@ async function commandSizes() {
         method: 'POST', headers: theCallerNamed(workspace, who),
         body: { kind: 'message', title: `Sandbox ${size.instance} has passed ${SANDBOX_FOLDER_WARNING.gb} GB`, data: { body, to: watchers.map((id) => ({ kind: 'agent', id })) } },
       })
-      if (sent.status !== 201) {
+      // A WARNING THE OFFICE STORED AND ANSWERED 409 IS SENT: the office stores a message to a registered agent that
+      // nothing holds, routes it and answers 409, and the warning waits where it was routed. Every other answer is a refusal.
+      const waits = whereAStoredMessageWaits(sent, 'The warning')
+      if (sent.status !== 201 && waits === null) {
         // The folders already told in this run stay told, so the next run warns again only about this one and those after it.
         if (existsSync(sandboxes)) writeJsonWhole(file, next)
         refuse(`the size warning for ${size.folder} could not be sent (${theOfficeSaid(sent)}). Its warning state was left unchanged; the next run tries again.`)
       }
+      if (waits !== null) process.stderr.write(`The size warning for ${size.folder} was stored as message ${sent.body.record.id}, and the office answered 409.${waits}\n`)
       // A warning is counted once the office has taken it (gate sandbox-folder-size-warning).
       spoolAGateMet('sandbox-folder-size-warning', 'remind', size.instance)
     }
@@ -5879,7 +5970,13 @@ async function commandSizes() {
 if (chosen.verb === 'up') await commandUp()
 else if (chosen.verb === 'exec') await commandExec()
 else if (chosen.verb === 'worker') await commandWorker()
-else if (chosen.verb === 'round') await commandRound()
+// A ROUND'S CHAPTER READERS THROW THEIR REFUSALS (readTheRoundsRules, prepareRoundChapters and the declaration's reader),
+// and a fresh round reads them after its new worktree is made. A throw while that worktree is unfiled is refused here, so
+// refuse() removes it; every other throw ends the process as it did before.
+else if (chosen.verb === 'round') await commandRound().catch((error) => {
+  if (aRoundsUnfiledWorktree === null) throw error
+  refuse(error instanceof Error ? error.message : String(error))
+})
 else if (chosen.verb === 'status') await commandStatus()
 else if (chosen.verb === 'down') await commandDown()
 else if (chosen.verb === 'hand-over') await commandHandOver()

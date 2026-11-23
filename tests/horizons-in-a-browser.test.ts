@@ -30,6 +30,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { type LiveApp, liveApp, waitForThePage } from './helpers.ts'
 import { THE_TEST_OFFICES_OWNER } from './a-page-of-a-test-office.ts'
 import { recordPath } from '../src/web/components/router.tsx'
+import { t } from '../src/shared/i18n.ts'
 
 let app: LiveApp
 let page: Page
@@ -416,7 +417,7 @@ describe('the Goals page as designed again', () => {
     )
     for (const one of facts) {
       expect(one.facts, `${one.title}: the kind is said on the row`).not.toMatch(/\bgoal\b/i)
-      expect(one.facts, `${one.title}: the stored handle is drawn`).not.toMatch(/\bjamie\b/)
+      expect(one.facts, `${one.title}: the stored handle is drawn`).not.toMatch(new RegExp(`\\b${THE_TEST_OFFICES_OWNER.id}\\b`))
       for (const piece of one.pieces) {
         expect(['open', 'met', 'dropped', 'goal', THE_TEST_OFFICES_OWNER.id], `${one.title}: a stored word is drawn on its own`).not.toContain(piece)
       }
@@ -542,7 +543,9 @@ describe('the confirm press on an agent-filed goal (criterion P1)', () => {
     await page.evaluate(() => window.localStorage.removeItem('mole-office.actor'))
     await open('/horizons')
     const said = await words()
-    expect(said).toContain('An agent filed each goal here. You have not confirmed it yet.')
+    // CRITERION CHANGE, as decided: the sentence under the heading is gone; the heading's own words
+    // say whose move it is. Read as text, because the heading's style may set its case.
+    expect(await page.locator('[data-group="needs-you"] .hz-head span').first().textContent()).toBe(t('goals.needsYou'))
     expect(said).toContain('Confirm this goal')
     // The press is on the goal's row under Needs you; the other agent goal keeps its own.
     const row = page.locator('[data-group="needs-you"] .hz-needrow', { hasText: AGENT_GOAL })
@@ -587,7 +590,7 @@ describe('the confirm press on an agent-filed goal (criterion P1)', () => {
     )
     const said = await words()
     expect(said).toContain(AGENT_GOAL_UNCONFIRMED)
-    expect(said).toContain('An agent filed each goal here. The person has not confirmed it yet.')
+    expect(await page.locator('[data-group="needs-you"] .hz-head span').first().textContent()).toBe(t('goals.waitingForThePerson'))
     expect(said).not.toContain('Confirm this goal')
     const patch = await fetch(`${app.api}/api/records/${agentGoalUnconfirmedId}`, {
       method: 'PATCH',

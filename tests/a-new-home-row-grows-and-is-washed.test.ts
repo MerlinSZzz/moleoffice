@@ -30,7 +30,31 @@ async function fileAgentQuestion(title:string):Promise<string> {
   expect(row?.because.writtenBy).toBeTruthy()
   return id
 }
-beforeAll(async()=>{app=await liveApp({name:'home-arrival-motion',viewport:{width:1440,height:900}});await fileFork('An invented existing fork')},240_000)
+// THE AGENT THAT ASKED WITHDRAWS ITS QUESTION, THEN FIXES THE PROBLEM. An agent may not close a problem that still asks
+// the person something, because that answers the question for them; the asker may take its own question back first.
+async function fixQuestion(id:string):Promise<void> {
+  for(const dataPatch of [{whose_move:null},{state:'fixed',fix:'An invented fix.'}]) {
+    const response=await fetch(`${app.api}/api/records/${id}`,{
+      method:'PATCH',headers:{'content-type':'application/json','x-mole-office-actor-type':'agent','x-mole-office-actor-id':'claude-code'},
+      body:JSON.stringify({dataPatch}),
+    })
+    expect(response.status,await response.text()).toBe(200)
+  }
+  const reading=await (await fetch(`${app.api}/api/waiting`)).json() as {items:{id:string}[]}
+  expect(reading.items.map(one=>one.id),'a fixed question no longer waits on the person').not.toContain(id)
+}
+// A REFUSED CLOSE KEEPS THE IDS IT DID NOT CLOSE, so the next case closes them first and its own row is still drawn.
+async function fixTheQuestionsFiledBefore():Promise<void> {
+  while(filedBefore.length>0) {
+    await fixQuestion(filedBefore[0]!)
+    filedBefore.shift()
+  }
+}
+// HOME DRAWS ONLY THE FIRST TWO ROWS OF NEEDS YOU, oldest first, so a row filed after two others is not drawn. Each
+// case fixes the questions the cases before it filed, before it files its own, and its new row is the second.
+const filedBefore:string[]=[]
+let existing=''
+beforeAll(async()=>{app=await liveApp({name:'home-arrival-motion',viewport:{width:1440,height:900}});existing=await fileAgentQuestion('An invented existing question')},240_000)
 afterAll(async()=>{await app?.stop()})
 
 for(const reduced of [false,true]) it(`a new Home row ${reduced?'is washed without moving':'grows and is washed'} while the existing row stays still`,async()=>{
@@ -40,6 +64,7 @@ for(const reduced of [false,true]) it(`a new Home row ${reduced?'is washed witho
   await context.addInitScript(look=>localStorage.setItem('mole-office.preset.theme',look),theme)
   const page=await context.newPage()
   try {
+    await fixTheQuestionsFiledBefore()
     await page.goto(`${app.site}/#/`);await waitForThePage(page)
     const list=page.locator('.hm-needs-list'),old=list.locator('li').first()
     await old.waitFor({timeout:30_000})
@@ -65,6 +90,7 @@ for(const reduced of [false,true]) it(`a new Home row ${reduced?'is washed witho
       await route.fulfill({status:answer.status(),headers,body:JSON.stringify(body)})
     })
     const id=await fileAgentQuestion(`An invented incoming question for ${reduced?'less':'ordinary'} motion`)
+    filedBefore.push(id)
     const row=page.locator(`[data-home-waiting-id="${id}"]`).locator('xpath=ancestor::li[1]')
     await row.waitFor({timeout:30_000})
     const observed=await row.evaluate(element=>{
@@ -97,6 +123,7 @@ it('draws new rows plainly when their arrival cause is not known, even if an age
   const context=await app.browser.newContext({reducedMotion:'reduce'})
   const page=await context.newPage()
   try {
+    await fixTheQuestionsFiledBefore()
     await page.goto(`${app.site}/#/`);await waitForThePage(page)
     const old=page.locator('.hm-needs-list li').first();await old.waitFor({timeout:30_000})
     const plain=await old.evaluate(element=>getComputedStyle(element).backgroundColor)
@@ -105,6 +132,8 @@ it('draws new rows plainly when their arrival cause is not known, even if an age
     await row.waitFor({timeout:30_000})
     expect(await row.evaluate(element=>getComputedStyle(element).backgroundColor)).toBe(plain)
     expect(await row.evaluate(element=>element.getAnimations().length)).toBe(0)
+    // The existing question is fixed, so the agent's question is the second row after the new fork.
+    await fixQuestion(existing)
     const asked=await fileAgentQuestion('An invented agent question with no arrival cause')
     const askedRow=page.locator(`[data-home-waiting-id="${asked}"]`).locator('xpath=ancestor::li[1]')
     await askedRow.waitFor({timeout:30_000})

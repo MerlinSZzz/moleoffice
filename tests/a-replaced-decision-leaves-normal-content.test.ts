@@ -4,7 +4,7 @@ import type { FastifyInstance } from 'fastify'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 
 import { THE_PERSON } from '../src/shared/person.ts'
-import { apiApp, freshDb, type TestDb } from './helpers.ts'
+import { apiApp, freshDb, type TestDb, governsTheWholeProject } from './helpers.ts'
 let PROJECT = 'default'
 const AS_THE_PERSON: Record<string, string> = {
   'content-type': 'application/json',
@@ -64,7 +64,7 @@ async function aDecision(title: string, subject: string, replaces: string[] = []
   const made = await post('/api/records', {
     kind: 'decision',
     title,
-    data: { option_taken: `Test: ${title}`, because: 'A made-up reason.', replaces },
+    data: { option_taken: `Test: ${title}`, because: 'A made-up reason.', ...governsTheWholeProject(), replaces },
     links: [{ type: 'about', toId: subject }],
   })
   expect(made.status, JSON.stringify(made.body)).toBe(201)
@@ -148,14 +148,14 @@ describe('a replaced decision leaves normal content by itself', () => {
     const again = await post('/api/records', {
       kind: 'decision',
       title: 'Test: third',
-      data: { option_taken: 'Test: third', because: 'A made-up reason.', replaces: [first] },
+      data: { option_taken: 'Test: third', because: 'A made-up reason.', ...governsTheWholeProject(), replaces: [first] },
     })
     expect(again.status).toBe(409)
     expect(String(again.body['error'])).toContain('already replaced')
     const notADecision = await post('/api/records', {
       kind: 'decision',
       title: 'Test: fourth',
-      data: { option_taken: 'Test: fourth', because: 'A made-up reason.', replaces: [subject] },
+      data: { option_taken: 'Test: fourth', because: 'A made-up reason.', ...governsTheWholeProject(), replaces: [subject] },
     })
     expect(notADecision.status).toBe(400)
     expect(String(notADecision.body['error'])).toContain('only a decision is replaced')

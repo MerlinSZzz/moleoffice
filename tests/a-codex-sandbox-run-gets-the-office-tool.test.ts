@@ -34,7 +34,7 @@ const theFactsGiven = { [THE_FACTS_VARIABLE]: theFactsAStartIsGiven(facts) }
 const officeOverrides = [
   '-c', 'mcp_servers.mole_office.command="node"',
   '-c', `mcp_servers.mole_office.args=${JSON.stringify([join(process.cwd(), 'tools/office-mcp.mjs')])}`,
-  '-c', 'mcp_servers.mole_office.env_vars=["MOLE_OFFICE_AGENT","MOLE_OFFICE_SESSION","MOLE_OFFICE_WORKSPACE","MOLE_OFFICE_API","MOLE_AGENT_KEY","MOLE_OFFICE_RUN_OUTPUT","CODEX_HOME"]',
+  '-c', 'mcp_servers.mole_office.env_vars=["MOLE_OFFICE_AGENT","MOLE_OFFICE_SESSION","MOLE_OFFICE_WORKSPACE","MOLE_OFFICE_API","MOLE_AGENT_KEY","MOLE_AGENT_KEY_FILE","MOLE_OFFICE_RUN_OUTPUT","CODEX_HOME"]',
   '-c', 'mcp_servers.mole_office.enabled=true',
 ]
 const policy = ['-c', 'shell_environment_policy.exclude=["MOLE_AGENT_KEY"]']
@@ -155,12 +155,13 @@ describe('Codex’s sandbox office tool arguments', () => {
   it('4: the real launcher gives new and resumed Codex commands the overrides right after exec and says what it gave', async () => {
     for (const tail of [['exec', 'hello'], ['exec', 'resume', 'synthetic-id']]) {
       const answer = await launched(tail.length === 2 ? 'new' : 'resumed', ['--verbose'], ['codex', ...tail])
-      // A Codex start with no model now receives no effort and no tier: Codex's own configuration decides.
-      expect(answer.argv).toEqual([...CODEX_FEATURES_OFF, 'exec', ...overrides, ...tail.slice(1)])
+      // A Codex start with no model now receives no effort and no tier: Codex's own configuration decides. The
+      // sandbox's codex (tools/codex-in-a-sandbox.mjs) puts the snapshot switch in front of the launcher's words.
+      expect(answer.argv).toEqual([...noSnapshot, ...CODEX_FEATURES_OFF, ...noSnapshot, 'exec', ...overrides, ...tail.slice(1)])
       expect(answer.argv.some((word) => word.startsWith('model_reasoning_effort='))).toBe(false)
       expect(answer.argv.some((word) => word.startsWith('service_tier='))).toBe(false)
       expect(answer.err).toContain("Codex's own configuration decides")
-      expect(answer.record.command).toEqual(['codex', ...answer.argv])
+      expect(answer.record.command).toEqual(['codex', ...answer.argv.slice(noSnapshot.length)])
       expect(answer.err).toContain('Codex gets office_request')
       expect(answer.err).toContain('no permission flags given')
       expect(answer.err).not.toContain('codex runs with full permissions')
@@ -174,14 +175,15 @@ describe('Codex’s sandbox office tool arguments', () => {
   it('5: the real launcher gives plain-env and no-office-variables Codex commands no MCP overrides', async () => {
     const plain = await launched('plain', ['--plain-env'], ['codex', 'exec'])
     // No effort and no tier reach a Codex start with no model: Codex's own configuration decides.
-    // Its switch that turns Codex's subagents off goes in all the same (tools/harness-features-off.mjs).
-    expect(plain.argv).toEqual([...CODEX_FEATURES_OFF, 'exec'])
+    // Its switch that turns Codex's subagents off goes in all the same (tools/harness-features-off.mjs), and the
+    // sandbox's codex puts the snapshot switch in front of a plain start's words too.
+    expect(plain.argv).toEqual([...noSnapshot, ...CODEX_FEATURES_OFF, ...noSnapshot, 'exec'])
     expect(plain.argv.some((word) => word.startsWith('model_reasoning_effort='))).toBe(false)
     expect(plain.argv.some((word) => word.startsWith('service_tier='))).toBe(false)
     expect(plain.err).toContain("Codex's own configuration decides")
     expect(plain.err).not.toContain('Codex gets office_request')
     const noOffice = await launched('no-office', ['--no-office-variables'], ['codex', 'exec'])
-    expect(noOffice.argv).toEqual([...CODEX_FEATURES_OFF, 'exec'])
+    expect(noOffice.argv).toEqual([...noSnapshot, ...CODEX_FEATURES_OFF, ...noSnapshot, 'exec'])
     expect(noOffice.argv.some((word) => word.startsWith('model_reasoning_effort='))).toBe(false)
     expect(noOffice.argv.some((word) => word.startsWith('service_tier='))).toBe(false)
     expect(noOffice.err).toContain("Codex's own configuration decides")
@@ -298,7 +300,7 @@ describe('Codex’s sandbox office tool arguments', () => {
       expect(code, err).toBe(0)
       expect(effortWrites).toEqual(program === 'codex' ? [{ dataPatch: { effort: 'xhigh' } }] : [])
       const start = JSON.parse(out.trim()) as { command: string[]; out: string }
-      const argv = program === 'codex' ? [...CODEX_FEATURES_OFF, '-s', 'danger-full-access', '-a', 'never', 'exec', ...officeOverrides, ...noSnapshot, 'hello', '-c', 'model_reasoning_effort=xhigh', ...theFastFlag] : [...DSH_FEATURES_OFF, 'exec', 'hello']
+      const argv = program === 'codex' ? [...CODEX_FEATURES_OFF, ...noSnapshot, '-s', 'danger-full-access', '-a', 'never', 'exec', ...officeOverrides, ...noSnapshot, 'hello', '-c', 'model_reasoning_effort=xhigh', ...theFastFlag] : [...DSH_FEATURES_OFF, 'exec', 'hello']
       expect(start.command).toEqual([join(dir, 'bin', program), ...argv])
       expect(JSON.parse(readFileSync(start.out, 'utf8'))).toEqual(argv)
       expect(out + err).not.toContain(key)

@@ -9,7 +9,7 @@
  */
 
 import { sqlite } from './client.ts'
-import type { ReadAll } from '../lib/participants.ts'
+import type { ReadAll } from './types/participants.ts'
 
 /**
  * EVERY AGENT'S OWN RECORD IN ONE PROJECT, IN ONE QUERY (acceptance finding 26, 22 September 2026).

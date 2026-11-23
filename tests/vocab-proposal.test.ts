@@ -39,7 +39,7 @@ import { KIND_SPECS, validateData } from '../src/shared/kinds.ts'
 import { HUMAN_ONLY_KINDS, LINK_TYPES, RECORD_KINDS } from '../src/shared/types.ts'
 import { familyOf } from '../src/shared/work.ts'
 import { THE_TEST_OFFICES_OWNER } from './a-page-of-a-test-office.ts'
-import { apiApp, freshDb, type TestDb } from './helpers.ts'
+import { apiApp, freshDb, type TestDb, governsTheWholeProject } from './helpers.ts'
 
 const WORKSPACE = 'default'
 const PERSON = { 'x-mole-office-actor-type': 'human', 'x-mole-office-actor-id': THE_TEST_OFFICES_OWNER.id, 'x-mole-office-workspace': WORKSPACE }
@@ -202,7 +202,7 @@ describe('how a proposal is resolved', () => {
     const decision = await post('/api/records', {
       kind: 'decision',
       title: 'Cache it for one process',
-      data: { replaces: [], because: 'It is read on every request.' },
+      data: { ...governsTheWholeProject(), replaces: [], because: 'It is read on every request.' },
     })
     expect(decision.status).toBeLessThan(300)
     const decisionId = decision.body.record.id as string

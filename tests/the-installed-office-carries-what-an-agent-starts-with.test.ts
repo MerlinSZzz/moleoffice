@@ -58,6 +58,20 @@
  *      with Claude Code's payload, no node on PATH and none of this shell's office settings, files a session in the
  *      bundle's office, and its stop and end lines then end with 0 and say nothing on stderr. This bundle was not
  *      packed, so the program the office runs on is the Node running this test, which reads nothing in that variable.
+ *  12. IT CARRIES THE SCRIPT THAT SHOWS AN AGENT'S TMUX PANE. The terminal holder runs it from the install's root, at
+ *      the path a checkout has it (THE_PANE_VIEW in src/server/lib/agent-pane.ts). No installed office shipped it, so
+ *      there a view of an agent's pane had no script to run. The bundle above holds it at that path, as it is written.
+ *  13. IT CARRIES EVERY FILE A RUN IS GIVEN FOR THE MAIN-WORLD GUARD. The guard and its OpenCode
+ *      plugin were in tools/, which no bundle carries, so an installed office refused every Claude Code, Codex and
+ *      OpenCode run whose guard was mounted. For each of the three, the command the office mounts the guard with is
+ *      read by theGuardOn, and the refusal in src/config/run-permissions.mjs is asked with each file it names looked
+ *      for at the same place in the bundle. No path is typed here: each comes from the refusal's own list.
+ *  14. ITS BUILT GUARD ANSWERS AS THE CHECKOUT'S DOES. Started with the command line guardArgv writes, with the hook's
+ *      path in the bundle, it lets a call through that the policy allows and stops one it refuses, with the exits of
+ *      the checkout's guard. Neither call asks an office.
+ *  15. ITS BUILT OPENCODE PLUGIN LOADS IN NODE and exports only the plugin, whose `tool.execute.before` throws the
+ *      guard's reason for a refused call and returns for an allowed one. Whether OpenCode itself loads it is not read
+ *      here: that needs OpenCode.
  *
  * Never the live office: the office and the tools run with none of this shell's MOLE_OFFICE_ settings,
  * and the driver is given only the stand-in's. The built page must exist (`npm run build`), because a
@@ -113,14 +127,17 @@
 import { spawn, spawnSync } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
-import { fileURLToPath, URL } from 'node:url'
+import { dirname, join, relative } from 'node:path'
+import { userInfo } from 'node:os'
+import { fileURLToPath, pathToFileURL, URL } from 'node:url'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { theInstallsOwnOffice } from '../for-agents/where-is-the-api.mjs'
 import { PORTS_VARIABLE } from '../tools/live-office-guard.mjs'
 import { KEY_HEADER } from '../src/config/key-header.mjs'
-import { apiAddressFrom, forgetTheDefaultApiAddressWarning, THE_AGENTS_TOOLS, THE_FOR_AGENTS_FOLDER } from '../src/config/settings.mjs'
+import { claudeCodeGuard, codexGuard, guardArgv, openCodeGuard, THE_GUARD, THE_GUARD_COMMAND, THE_OPENCODE_PLUGIN, theGuardOn } from '../src/config/main-world-guard.mjs'
+import { thePermissionsARunGets } from '../src/config/run-permissions.mjs'
+import { apiAddressFrom, forgetTheDefaultApiAddressWarning, REPO_ROOT, THE_AGENTS_TOOLS, THE_FOR_AGENTS_FOLDER } from '../src/config/settings.mjs'
 import { theProcessAt } from '../src/config/session-process.mjs'
 import { readTheServiceLock } from '../src/config/the-service-lock.mjs'
 import { THE_TEST_MARK } from '../src/config/the-test-mark.mjs'
@@ -544,4 +561,102 @@ describe('an installed office carries what an agent needs to start', () => {
       expect(stopped.code, stopped.out).toBe(0)
     }
   }, 120_000)
+
+  it("carries the script that shows an agent's tmux pane, at the path the holder runs it from", async () => {
+    // IMPORTED HERE, AFTER A SCRATCH DATABASE IS CHOSEN: agent-pane.ts reaches the database client, which opens
+    // its database when it is imported and refuses to under the test runner while none is named.
+    const t = await freshDb()
+    try {
+      const { THE_PANE_VIEW } = await import('../src/server/lib/agent-pane.ts')
+      // THE PATH agent-pane.ts RUNS IT FROM, taken relative to the install's root, which in a bundle is the bundle's folder.
+      const where = relative(REPO_ROOT, THE_PANE_VIEW)
+      expect(where.startsWith('..'), `${THE_PANE_VIEW} is not inside ${REPO_ROOT}`).toBe(false)
+      const carried = join(bundle, where)
+      expect(existsSync(carried), `the bundle carries no ${where}, so the press that shows an agent's pane runs nothing`).toBe(true)
+      expect(readFileSync(carried, 'utf8')).toBe(readFileSync(THE_PANE_VIEW, 'utf8'))
+    } finally {
+      t.close()
+    }
+  })
+})
+
+/** A checkout file at the same place in the bundle, whose root is the install's root as REPO_ROOT is the checkout's. */
+function inTheBundle(file: string): string {
+  const where = relative(REPO_ROOT, file)
+  expect(where.startsWith('..'), `${file} is not inside ${REPO_ROOT}`).toBe(false)
+  return join(bundle, where)
+}
+
+/** The guard's command line as the office writes it, run by this Node, and the same line with the hook in the bundle. */
+function theGuardsCommandLines(): { checkout: string[]; bundled: string[] } {
+  const checkout = guardArgv('a-made-up-guarded-agent', process.execPath)
+  const at = checkout.indexOf(THE_GUARD)
+  expect(at, `guardArgv does not name ${THE_GUARD}`).toBeGreaterThan(-1)
+  return { checkout, bundled: checkout.map((word, i) => (i === at ? inTheBundle(THE_GUARD) : word)) }
+}
+
+/**
+ * The guard's environment on a plain machine: the shell's `~` and the password database's home are the same, as the
+ * guard's own tests set them, and nothing says a sandbox started it, so the guard does not stand down.
+ */
+function aPlainMachinesEnvironment(): NodeJS.ProcessEnv {
+  return { PATH: process.env['PATH'], HOME: userInfo().homedir }
+}
+
+/** A Claude Code PreToolUse payload for one shell command. */
+const aShellCall = (command: string) => JSON.stringify({ hook_event_name: 'PreToolUse', tool_name: 'Bash', tool_input: { command }, cwd: dir })
+
+describe('an installed office carries the main-world guard', () => {
+  it('carries every file a Claude Code, Codex or OpenCode run is given for the guard', () => {
+    const commands: Record<string, { args: string[]; env?: Record<string, string> }> = {
+      'claude-code': { args: claudeCodeGuard('a-made-up-guarded-agent', process.execPath) },
+      codex: { args: codexGuard('a-made-up-guarded-agent', process.execPath) },
+      opencode: { args: [], env: openCodeGuard('a-made-up-guarded-agent', process.execPath) },
+    }
+    for (const [runtime, command] of Object.entries(commands)) {
+      const guard = theGuardOn(runtime, command)
+      expect(guard.mounted, `${runtime}: ${guard.because}`).toBe(true)
+      const asked: string[] = []
+      const isThere = (file: string) => {
+        asked.push(file)
+        return existsSync(inTheBundle(file))
+      }
+      // THE REFUSAL THROWS NAMING EACH FILE THE BUNDLE LACKS, so not throwing is every file found.
+      expect(() => thePermissionsARunGets(runtime, {}, guard, isThere), runtime).not.toThrow()
+      expect(asked, `${runtime}: the refusal looked for none of the guard's files`).not.toEqual([])
+    }
+  })
+
+  it("runs its built guard on the command line guardArgv writes, with the checkout guard's exits", () => {
+    const { checkout, bundled } = theGuardsCommandLines()
+    for (const [command, expected] of [['ls -la && git status', 0], ['rm -rf ~/', 2]] as const) {
+      const fromTheCheckout = spawnSync(String(checkout[0]), checkout.slice(1), { input: aShellCall(command), env: aPlainMachinesEnvironment(), encoding: 'utf8', timeout: 30_000 })
+      expect(fromTheCheckout.status, `the checkout's guard on ${command}: ${fromTheCheckout.stderr}`).toBe(expected)
+      const fromTheBundle = spawnSync(String(bundled[0]), bundled.slice(1), { input: aShellCall(command), env: aPlainMachinesEnvironment(), encoding: 'utf8', timeout: 30_000 })
+      expect(fromTheBundle.status, `the bundle's guard on ${command}: ${fromTheBundle.stderr}`).toBe(fromTheCheckout.status)
+    }
+  }, 90_000)
+
+  it('loads its built OpenCode plugin in Node, which exports only the plugin, and the plugin stops a refused call', () => {
+    const { bundled } = theGuardsCommandLines()
+    const plugin = pathToFileURL(inTheBundle(THE_OPENCODE_PLUGIN)).href
+    // OPENCODE CALLS THE PLUGIN WITH ITS CONTEXT, THEN ITS HOOK BEFORE EACH TOOL; a thrown message stops the call.
+    const script = [
+      `const loaded = await import(${JSON.stringify(plugin)})`,
+      `const hooks = await loaded.MoleOfficeMainWorldGuard({ directory: ${JSON.stringify(dir)} })`,
+      `const before = async (command) => { try { await hooks['tool.execute.before']({ tool: 'bash' }, { args: { command } }); return null } catch (error) { return String(error.message) } }`,
+      `process.stdout.write(JSON.stringify({ exported: Object.keys(loaded), refused: await before('rm -rf ~/'), allowed: await before('ls -la') }))`,
+    ].join('\n')
+    const ran = spawnSync(process.execPath, ['--input-type=module', '-e', script], {
+      cwd: dir,
+      env: { ...aPlainMachinesEnvironment(), [THE_GUARD_COMMAND]: JSON.stringify(bundled) },
+      encoding: 'utf8',
+      timeout: 60_000,
+    })
+    expect(ran.status, `${ran.stdout}\n${ran.stderr}`).toBe(0)
+    const said = JSON.parse(ran.stdout) as { exported: string[]; refused: string | null; allowed: string | null }
+    expect(said.exported).toEqual(['MoleOfficeMainWorldGuard'])
+    expect(said.refused).toContain('would delete the home directory')
+    expect(said.allowed).toBeNull()
+  }, 90_000)
 })

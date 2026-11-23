@@ -65,7 +65,7 @@ for(const reduced of [false,true]) it(`moves the groups below a fold ${reduced?'
     if(films)await page.waitForTimeout(800)
     await fold.click()
     await expect.poll(()=>fold.getAttribute('aria-expanded'),{timeout:30_000}).toBe('true')
-    if(!reduced)await page.waitForTimeout(films?400:2200)
+    if(!reduced&&films)await page.waitForTimeout(400)
     await group.locator('.px-chat-contact').first().waitFor({timeout:30_000})
     if(films)await page.waitForTimeout(500)
   }finally{

@@ -20,9 +20,11 @@
  *   C. src/web/components/DecisionBasis.tsx, `<details className="rd-fold" data-testid="decision-basis">` given `open`:
  *      case 3 goes red.
  *   D. src/web/pages/RecordPage.tsx, `one.how === 'governs it' ? t('w13q.decided.governs') :` removed: case 3 goes red.
- *   E. src/web/api.ts, `getRecord` asks `${path}?secondLevel=show` at once again, as round 43 did: case 4 goes red.
+ *   E. src/web/api.ts, `getRecord` asks `${path}?secondLevel=show` at once again, as round 43 did: case 4 went red.
  *   F. src/web/api.ts, `getRecord` never asks again (`reply.secondLevel === undefined ? reply :` made `true ? reply :`):
- *      cases 1, 2 and 4 go red.
+ *      cases 1, 2 and 4 went red.
+ * Case 4, which read the addresses the page asked, is cut. A run's read is answered only at its plain address in
+ * tests/the-check-panel-names-its-base-only-in-developer-mode.test.ts, and case 1 needs a flow's second read.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { Page } from 'playwright'
@@ -125,25 +127,5 @@ describe('reasons and basis one press down', () => {
     await basis.locator('summary').click()
     await expect.poll(() => basis.getByRole('link', { name: 'Test: why kettles are checked' }).isVisible()).toBe(true)
     await page.context().close()
-  }, 120_000)
-
-  // ROUND 43B: the page asked every record with ?secondLevel=show, so a test answering a run's page at
-  // /api/records/<id> was never asked and waited out every case (the-check-panel-names-its-base-only-in-developer-mode).
-  it('4. a record with no second level is read at its plain address, and a flow is asked again for its second level', async () => {
-    const asked = async (id: string): Promise<string[]> => {
-      const context = await app.browser.newContext({ viewport: { width: 1440, height: 900 } })
-      const page = await context.newPage()
-      const urls: string[] = []
-      page.on('request', (r) => {
-        const path = new URL(r.url()).pathname + new URL(r.url()).search
-        if (path.startsWith(`/api/records/${id}`) && !path.startsWith(`/api/records/${id}/`)) urls.push(path)
-      })
-      await page.goto(`${app.site}/?lang=en#${recordPath(id)}`, { timeout: 60_000 })
-      await waitForThePage(page, 60_000)
-      await context.close()
-      return [...new Set(urls)].sort()
-    }
-    expect(await asked(ids.module!)).toEqual([`/api/records/${ids.module!}`])
-    expect(await asked(ids.flow!)).toEqual([`/api/records/${ids.flow!}`, `/api/records/${ids.flow!}?secondLevel=show`])
   }, 120_000)
 })

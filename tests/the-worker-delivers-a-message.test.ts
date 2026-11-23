@@ -1130,6 +1130,33 @@ describe('the visit a run is on ends when the run does', () => {
   }, 60_000)
 })
 
+describe('a run from this office’s former home', () => {
+  it('starts without registering a visit', async () => {
+    const world = await import('../src/server/lib/world.ts')
+    const office = await import('../src/server/lib/office.ts')
+    const installation = world.theInstallationThisDatabaseBelongsTo()
+    if (installation === null || installation === '') throw new Error('the test office has no installation')
+    const formerHome = 'aaaaaaaaaaaaaaaa'
+    const made = office.registerWorldHere({
+      name: 'a former home', kind: 'home',
+      startedBy: { kind: 'person', id: THE_TEST_OFFICES_OWNER.id },
+      checkout: null, head: null, databaseIdentity: formerHome, address: null,
+      addressForOtherMachines: null, standing: 'canonical', parentWorld: null, installation,
+    })
+    office.closeWorldHere(made.id, 'the office moved')
+    const agentId = await anAgent('builder-former-home', 'claude-code')
+    t.client.sqlite.prepare('UPDATE agents SET home_world = ? WHERE id = ?').run(formerHome, agentId)
+    const messageId = await messageTo(agentId, 'work here after the move')
+    const started = await until(async () => (await delivery(messageId)).run !== null)
+    expect(started, 'no run was ever started for the message').toBe(true)
+    const listed = (await get('/api/office/visits')) as {
+      visits: { visitor: { id: string } }[]; all: { visitor: { id: string } }[]
+    }
+    expect(listed.visits.filter((one) => one.visitor.id === agentId)).toHaveLength(0)
+    expect(listed.all.filter((one) => one.visitor.id === agentId)).toHaveLength(0)
+  }, 60_000)
+})
+
 /**
  * A RUN THE WORKER STARTS SAYS WHICH RUN STARTED IT.
  *

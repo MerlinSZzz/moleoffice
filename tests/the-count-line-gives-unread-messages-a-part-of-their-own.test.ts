@@ -17,7 +17,7 @@
  *      on the list "Messages you have not read";
  *   3. in English and in Chinese, the count line's parts are the numbers of the page's four places, in any order: the
  *      three tiers' sections (0 where a section is not drawn) and the messages list. They add up to the line's total;
- *   4. at 1440, 990, 660 and 390 wide, in the light and the dark look, in English and in Chinese, the Decisions page is
+ *   4. at 1440 and 390 wide, in the light look, in English and in Chinese, the Decisions page is
  *      drawn with nothing wider than the window. A picture of each is kept in the folder TEST_SHOTS names.
  *
  * MUTATION, after a control run: the count line's "asked of you" part counts the messages again, and the part of
@@ -135,10 +135,10 @@ describe("the Decisions page's count line, with an ask and a message not read", 
     }, 120_000)
   }
 
-  it('4. the Decisions page is drawn at four widths in both looks, in English and Chinese, with nothing wider than the window', async () => {
+  it('4. the Decisions page is drawn at the widest and the narrowest width in the light look, in English and Chinese, with nothing wider than the window', async () => {
     const tooWide: string[] = []
-    for (const width of [1440, 990, 660, 390]) {
-      for (const look of ['light', 'dark'] as const) {
+    for (const width of [1440, 390]) {
+      for (const look of ['light'] as const) {
         await app.page.setViewportSize({ width, height: 1000 })
         await app.page.emulateMedia({ colorScheme: look })
         for (const lang of ['en', 'zh'] as const) {

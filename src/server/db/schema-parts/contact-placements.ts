@@ -5,6 +5,20 @@ import { aPartTable } from '../part-tables.ts'
 
 const existingArchive = { existingArchive: true } as const
 
+/**
+ * WHERE ONE CONTACT SITS, when somebody has moved it or ordered it by hand. Migration 0127.
+ *
+ * A contact with no row here is in the group its kind puts it in — `defaultGroupFor` in
+ * `src/shared/contacts.ts` — and in the order the list already had. So a new agent lands in `agent`
+ * and a new person in `human` with nothing written when they arrive, which is what M29 asks for.
+ *
+ * `contact` IS THE CONTACT KEY AND NOT A PARTICIPANT REFERENCE, because a contact row is one of two
+ * shapes: somebody a registry holds, or a writer nobody registered (criterion M25). One string names
+ * either, and it is the same string the panel keys its rows by.
+ *
+ * BOTH `group_key` AND `at` ARE NULLABLE and at least one is set: somebody may move a contact
+ * without ordering it, or order it without moving it.
+ */
 export const contactPlacements = aPartTable(sqliteTable(
   'contact_placements',
   {

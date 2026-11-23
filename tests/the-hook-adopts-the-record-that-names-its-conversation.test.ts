@@ -35,6 +35,10 @@ import { readTheHookDetails } from './hook-details.ts'
  * with HOME set to a scratch folder. Cases 1 and 2 put a shell script called `claude` above the hook,
  * the way tests/the-hook-writes-down-which-conversation-this-is.test.ts does, so the process is recorded.
  *
+ * THE AGENT THE RUNS ANSWER AS HOLDS A KEY OF ITS OWN, from the door that registers it, and every run that names it
+ * is given it. The records cases 1 and 2 take over ran as that agent, so its key may stamp them. A session that
+ * names an agent and holds no key of it sends the name alone, and the office lets no name alone stamp a run.
+ *
  * ---------------------------------------------------------------------------------------
  * CONTROL, MUTATION, RESTORE
  * ---------------------------------------------------------------------------------------
@@ -69,6 +73,8 @@ let url: string
 let scratch: string
 const notesWritten: string[] = []
 const TESTER = 'adopt-tester'
+/** TESTER's agent record, and the key the office gave it when it was registered. */
+let tester = { id: '', key: '' }
 
 const AS_THE_OWNER = {
   'content-type': 'application/json',
@@ -86,13 +92,17 @@ beforeEach(async () => {
   // THE AGENT THESE RUNS ANSWER AS, named in the environment. The scratch folder is outside the checkout,
   // and a run there that nothing names prints only that it does not know who it answers as, which would
   // hide the line these cases read. The start-folder case names nobody here, on purpose.
-  t.api.createRecord({
-    workspaceId: 'default',
-    kind: 'agent',
-    title: TESTER,
-    data: { handle: TESTER, state: 'active', runtime: 'claude-code' },
-    actor: { type: 'human', id: THE_PERSON },
+  const registered = await server.app.inject({
+    method: 'POST',
+    url: '/api/agents/started',
+    headers: AS_THE_OWNER,
+    payload: { handle: TESTER, name: TESTER, runtime: 'claude-code' },
   })
+  expect(registered.statusCode, registered.body).toBe(201)
+  const answer = registered.json() as { agent?: { id?: string }; whatToGiveIt?: { key?: string } }
+  tester = { id: String(answer.agent?.id ?? ''), key: String(answer.whatToGiveIt?.key ?? '') }
+  expect(tester.id, 'the registration named no agent record').not.toBe('')
+  expect(tester.key, 'the registration gave TESTER no key').not.toBe('')
 })
 
 afterEach(async () => {
@@ -131,9 +141,14 @@ async function runHook(
     MOLE_OFFICE_DB: t.file,
     MOLE_HOOK_DETAILS_FOLDER: join(scratch, 'hook-details'),
     MOLE_OFFICE_AGENT: TESTER,
+    MOLE_AGENT_KEY: tester.key,
   }
   delete env['TMUX_PANE']
-  if (options.namesNoAgent === true) delete env['MOLE_OFFICE_AGENT']
+  delete env['MOLE_AGENT_KEY_FILE']
+  if (options.namesNoAgent === true) {
+    delete env['MOLE_OFFICE_AGENT']
+    delete env['MOLE_AGENT_KEY']
+  }
   let program = 'node'
   if (options.behindClaude === true) {
     program = join(scratch, 'claude')
@@ -177,7 +192,11 @@ function discoveredOn(id: string): Record<string, unknown> {
 describe('exactly one open record names the conversation, and the hook takes it over', () => {
   it('by providerSession: writes the note to it, records this process on it, and files no second record', async () => {
     const sessionId = aSessionId()
-    const named = aSessionRecord('filed by register-myself', { state: 'running', providerSession: sessionId })
+    const named = aSessionRecord('filed by register-myself', {
+      state: 'running',
+      providerSession: sessionId,
+      ranAs: [{ workspaceId: 'default', agentId: tester.id }],
+    })
     expect(theNote(sessionId), 'the case needs the note to be missing').toBeNull()
 
     const out = await runHook({ session_id: sessionId, transcript_path: aTranscript(), cwd: scratch }, { behindClaude: true })
@@ -201,6 +220,7 @@ describe('exactly one open record names the conversation, and the hook takes it 
     const transcript = aTranscript()
     const named = aSessionRecord('stamped by a waiter', {
       state: 'running',
+      ranAs: [{ workspaceId: 'default', agentId: tester.id }],
       extra: { discovered: { tool: 'claude-code', externalId: sessionId, logPath: transcript } },
     })
     expect((t.api.getRecord(named)!.data as Record<string, unknown>)['providerSession']).toBeUndefined()

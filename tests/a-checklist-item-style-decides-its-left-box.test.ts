@@ -16,8 +16,8 @@
  *      it, the picker draws a box for the owner's own words, and words typed there are stored whole with the owner's
  *      mark and drawn under the item once it is opened. A standing item has no box even when it has the special style.
  *   2. THE WINDOW: no row draws the right-hand "Mark done"; a plain box ticks directly and a special box opens the
- *      picker. In the full view another owner's special item shows the special icon and no box, because it is shown to
- *      read.
+ *      picker. Under another owner's name another owner's special item shows the special icon and no box, because it
+ *      is shown to read.
  *   3. A PICKER'S SAVE RESPECTS A STALE READING AND A MOVED ROW: when another change bumps the version, Save is refused
  *      with the code's words and the page reads again; the moved row's Save takes no press for a second and says why;
  *      pressed once it takes presses again, the words are stored and the item is done.
@@ -25,11 +25,21 @@
  *
  * CONTROL: 4 passed. MUTATIONS: each named beside its case, one at a time, restored. The logs are named in the round's
  * report.
+ *
+ * Test change (wave 13y round 175): the page and the window draw design E, as decided. On the page a checklist is a
+ * card, and the cases read the card the address `#/checklists/<id>` marks; in the window another owner's checklists
+ * are drawn by choosing that owner's name in the row of names. Before, the page read the one opened checklist and its
+ * counts line, and the window reached another owner's checklists through its full view, which went.
+ *
+ * Test change (wave 13y round 175, the names behind Back): the window's names are folded behind a Back press at the
+ * start of its head, as decided, and they are plain presses, not tabs. Case 2 presses Back, found by its words, before
+ * it chooses the other owner's name among the window's name presses. What the case checks is unchanged.
  */
 
 import type { Locator, Page } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { ChecklistReading } from '../src/shared/checklists.ts'
+import { t } from '../src/shared/i18n.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { whatTheRowDraws } from '../src/web/components/ChecklistParts.tsx'
 import { liveApp, waitForThePage, type LiveApp } from './helpers.ts'
@@ -70,7 +80,7 @@ async function openThePage(page: Page, id: string): Promise<void> {
   await page.goto('about:blank')
   await page.goto(`${app.site}/?lang=en#/checklists/${id}`, { timeout: 60_000 })
   await waitForThePage(page, 60_000)
-  await page.locator('.ck1 .ck1-counts').waitFor({ timeout: 30_000 })
+  await page.locator(`${MARKED} .ckp-item`).first().waitFor({ timeout: 30_000 })
 }
 
 async function openTheWindow(page: Page): Promise<void> {
@@ -80,10 +90,12 @@ async function openTheWindow(page: Page): Promise<void> {
   await waitForThePage(page, 60_000)
   await page.waitForSelector('.ckw-press', { timeout: 30_000 })
   await page.click('.ckw-press')
-  await page.waitForSelector('.ckw-panel .ckw-group', { timeout: 30_000 })
+  await page.waitForSelector('.ckw-panel .cks-card', { timeout: 30_000 })
 }
 
-const pageItem = (page: Page, words: string) => page.locator('.ck1 .ckp-item', { hasText: words })
+/** The card the address `#/checklists/<id>` marks on the page. */
+const MARKED = '.cks-card[data-marked="yes"]'
+const pageItem = (page: Page, words: string) => page.locator(`${MARKED} .ckp-item`, { hasText: words })
 const windowItem = (page: Page, words: string) => page.locator('.ckw-panel .ckp-item', { hasText: words })
 const plainBox = (row: ReturnType<typeof pageItem>) => row.getByRole('button', { name: /^Mark as done: / })
 const specialBox = (row: ReturnType<typeof pageItem>) => row.getByRole('button', { name: /^Mark done with evidence or words: / })
@@ -154,7 +166,7 @@ describe('an item\'s style decides what its left box does', () => {
     expect(stored['doneByThePerson']?.by?.kind, "the owner's mark").toBe('person')
     expect(stored['evidence'], 'no evidence was needed').toBeUndefined()
     // THE DONE ITEM IS FOLDED UNDER THE OTHERS once the page reads again, so the fold is opened before it is.
-    const fold = page.locator('.ck1 .ckp-fold')
+    const fold = page.locator(`${MARKED} .ckp-fold`)
     if ((await fold.count()) > 0) await fold.click()
     await special.locator('summary').click()
     await expect.poll(() => special.locator('.ckp-response').innerText(), { timeout: 10_000 }).toContain('Written response:')
@@ -191,8 +203,9 @@ describe('an item\'s style decides what its left box does', () => {
     // ANOTHER OWNER'S SPECIAL ITEM IS SHOWN TO READ: its icon is drawn, and it has no box and no picker.
     await openTheWindow(page)
     const panel = page.locator('.ckw-panel')
-    await panel.locator('.ckw-head').getByRole('button', { name: 'All checklists', exact: true }).click()
-    const theirs = panel.locator('.ckw-group', { hasText: "Quill's list" })
+    await panel.getByRole('button', { name: t('checklists.window.back'), exact: true }).click()
+    await panel.locator('.ckw-names button', { hasText: 'Quill' }).click()
+    const theirs = panel.locator('.cks-card', { hasText: "Quill's list" })
     await theirs.waitFor({ timeout: 20_000 })
     const theirItem = theirs.locator('.ckp-item', { hasText: 'Clear the top shelf' })
     expect(await theirItem.locator('.ckp-mark[data-special="yes"]').count(), 'the icon is read-only information').toBe(1)

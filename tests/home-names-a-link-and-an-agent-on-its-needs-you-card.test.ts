@@ -15,6 +15,12 @@
  *   - a second session that registers itself with a name of spaces, which the door trims to blank,
  *     so its row has no name to draw and must be called by its handle.
  *
+ * HOME DRAWS ONLY THE FIRST ROWS OF NEEDS YOU, so no more than two of these rows wait at once and each
+ * case's row is among the rows Home draws. The message and the first registration are filed before the
+ * cases. The case that reads the blank name first has the person refuse the first registration, which
+ * the case before it has finished with, and then files the second one. Each case waits only for the
+ * row it reads, and the picture case waits for the Needs you card, which Home always draws.
+ *
  * WHAT IS PROVED
  *   1. The message row draws the link's label, not the id, and the long title is cut at a word with
  *      the shortening mark.
@@ -32,10 +38,13 @@
  *   the row is named by the stored handle again              → case 2
  *   the small line is named by the stored handle again       → case 2
  *   a blank name is drawn instead of the handle              → case 3
+ *   a refused registration still waits on the person         → case 3
  */
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import type { Locator } from 'playwright'
+import type { HomePart } from '../src/shared/home-layout.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { CUT_MARK, shortenToWords } from '../src/shared/shortening.ts'
 import { t } from '../src/shared/i18n.ts'
@@ -86,20 +95,45 @@ async function call(method: string, path: string, headers: Record<string, string
   return { status: res.status, json: text === '' ? {} : (JSON.parse(text) as Record<string, any>) }
 }
 
+const NEEDS: HomePart = 'needs'
+/** Home's Needs you card, which Home always draws. */
+const theNeeds = () => app.page.locator(`[data-home-section="${NEEDS}"]`).first()
 /** The row Home's Needs you draws for one waiting item. */
-const theRow = (id: string) => app.page.locator(`[data-home-section="needs"] [data-home-waiting-id="${id}"]`).first()
+const theRow = (id: string) => app.page.locator(`[data-home-section="${NEEDS}"] [data-home-waiting-id="${id}"]`).first()
 
-/** Open Home in one look, waiting for every row this file made. */
-async function openHome(theme: 'light' | 'dark', width: number): Promise<void> {
+/** Open Home in one look, waiting for the one thing the case reads. */
+async function openHome(theme: 'light' | 'dark', width: number, shown: Locator): Promise<void> {
   await app.page.setViewportSize({ width, height: 900 })
   await app.page.emulateMedia({ colorScheme: theme })
   await app.page.goto(`${app.site}/#/`, { waitUntil: 'domcontentloaded', timeout: 60_000 })
   await app.page.evaluate((look) => localStorage.setItem('mole-office.preset.theme', look), theme)
   await app.page.reload({ timeout: 60_000 })
   await waitForThePage(app.page, 60_000)
-  await theRow(messageId).waitFor({ state: 'visible', timeout: 30_000 })
-  await theRow(requestId).waitFor({ state: 'visible', timeout: 30_000 })
-  await theRow(blankRequestId).waitFor({ state: 'visible', timeout: 30_000 })
+  await shown.waitFor({ state: 'visible', timeout: 30_000 })
+}
+
+/** The person refuses a waiting registration, and it no longer waits on them. */
+async function refuseTheRegistration(id: string): Promise<void> {
+  const refused = await call('POST', `/api/roles/requests/${id}/refuse`, asPerson(), {})
+  expect(refused.status, JSON.stringify(refused.json)).toBe(200)
+  expect(refused.json['answer'], 'the door did not answer the registration as refused').toBe('refused')
+  const waiting = await call('GET', '/api/waiting', asPerson())
+  expect((waiting.json['items'] as { id: string }[]).map((one) => one.id), 'a refused registration still waits on the person').not.toContain(id)
+}
+
+/**
+ * A NAME OF SPACES IS A BLANK NAME: the door trims it, so the row is filed with nothing to call the agent by and the
+ * handle is the only name it has.
+ */
+async function registerWithABlankName(): Promise<void> {
+  const unnamed = await call('POST', '/api/agents/register-myself', asAgent(BLANK_HANDLE), {
+    handle: BLANK_HANDLE,
+    name: ' ',
+    workingDirectory: `${THE_TEST_FIXTURE_ROOT}/test_claude/panelx`,
+    requestedRole: 'worker',
+  })
+  expect(unnamed.status, JSON.stringify(unnamed.json)).toBe(202)
+  blankRequestId = String(unnamed.json['request'])
 }
 
 const wordsOf = async (id: string): Promise<string> =>
@@ -148,17 +182,6 @@ beforeAll(async () => {
   })
   expect(asked.status, JSON.stringify(asked.json)).toBe(202)
   requestId = String(asked.json['request'])
-
-  // A NAME OF SPACES IS A BLANK NAME: the door trims it, so the row is filed with nothing to call
-  // the agent by and the handle is the only name it has.
-  const unnamed = await call('POST', '/api/agents/register-myself', asAgent(BLANK_HANDLE), {
-    handle: BLANK_HANDLE,
-    name: ' ',
-    workingDirectory: `${THE_TEST_FIXTURE_ROOT}/test_claude/panelx`,
-    requestedRole: 'worker',
-  })
-  expect(unnamed.status, JSON.stringify(unnamed.json)).toBe(202)
-  blankRequestId = String(unnamed.json['request'])
 }, 300_000)
 
 afterAll(async () => {
@@ -169,8 +192,8 @@ describe('Home names a link and an agent, and cuts a long title at a word', () =
   it('takes the before and after pictures of the Needs you card', async () => {
     if (process.env[TEST_SHOTS] === undefined || process.env[TEST_SHOTS] === '') return
     for (const theme of PICTURE_THEMES) for (const width of PICTURE_WIDTHS) {
-      await openHome(theme, width)
-      await app.page.locator('[data-home-section="needs"]').screenshot({ path: join(shots, `needs-you-${String(width)}-${theme}.png`) })
+      await openHome(theme, width, theNeeds())
+      await theNeeds().screenshot({ path: join(shots, `needs-you-${String(width)}-${theme}.png`) })
     }
     for (const width of PICTURE_WIDTHS) {
       const light = readFileSync(join(shots, `needs-you-${String(width)}-light.png`))
@@ -180,7 +203,7 @@ describe('Home names a link and an agent, and cuts a long title at a word', () =
   }, 590_000)
 
   it('draws the link as its label and cuts the long title at a word with a mark', async () => {
-    await openHome('light', 1440)
+    await openHome('light', 1440, theRow(messageId))
     const shown = await wordsOf(messageId)
     expect(shown, 'the row still draws the raw record id').not.toContain(labelled)
     expect(shown, 'the row does not draw the link’s label').toContain(LABEL)
@@ -191,7 +214,7 @@ describe('Home names a link and an agent, and cuts a long title at a word', () =
   }, 240_000)
 
   it('draws the registered agent by the name it gave on both lines of its row', async () => {
-    await openHome('light', 1440)
+    await openHome('light', 1440, theRow(requestId))
     expect(await wordsOf(requestId)).toBe(t('decisions.selfRegistrationRow', { name: SELF_NAME }))
     const meta = (await theRow(requestId).locator('.hm-row-meta').innerText()).replace(/\s+/g, ' ').trim()
     expect(meta, 'the row small line does not draw the office name').toContain(SELF_NAME)
@@ -199,7 +222,11 @@ describe('Home names a link and an agent, and cuts a long title at a word', () =
   }, 240_000)
 
   it('calls a self-registration with a blank name by its handle on both lines', async () => {
-    await openHome('light', 1440)
+    // The case before has finished with the first registration, so the person refuses it and only the message and
+    // this row wait.
+    await refuseTheRegistration(requestId)
+    await registerWithABlankName()
+    await openHome('light', 1440, theRow(blankRequestId))
     expect(await wordsOf(blankRequestId)).toBe(t('decisions.selfRegistrationRow', { name: BLANK_HANDLE }))
     const meta = (await theRow(blankRequestId).locator('.hm-row-meta').innerText()).replace(/\s+/g, ' ').trim()
     expect(meta, 'the row small line does not fall back to the handle').toContain(BLANK_HANDLE)

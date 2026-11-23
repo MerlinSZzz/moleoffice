@@ -26,6 +26,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import type { AWorkerARunAskedFor, TheWorkersARunStarted } from '../src/shared/worker-runs.ts'
+import { enWave13y } from '../src/shared/words/en-wave-13y.ts'
 
 type Shown = typeof import('../src/web/components/TheWorkersOfARun.tsx')
 type Mode = typeof import('../src/web/lib/mode.ts')
@@ -85,7 +86,7 @@ const words = (html: string) => html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' 
 describe("the workers of a supervisor's run are drawn in words", () => {
   it('1: each worker is drawn with who it is, the model, its state, its seal and its cost, and its name opens its run', () => {
     const html = renderToStaticMarkup(h(shown.TheWorkersOfARun, { workers: READING }))
-    expect(words(html)).toContain('The workers this run asked the office to start, oldest first.')
+    expect(html, 'no line above the list says what it lists').not.toContain('wr-intro')
 
     const ada = rowOf(html, 'ws-ada')
     expect(ada).toContain(runPage('run-ada'))
@@ -111,13 +112,13 @@ describe("the workers of a supervisor's run are drawn in words", () => {
     const di = rowOf(html, 'ws-di')
     expect(di).not.toContain('href=')
     expect(words(di)).toContain('Di, a made-up writer')
-    expect(words(di)).toContain('Asked for. Nothing has started yet.')
+    expect(words(di)).toContain(enWave13y['w13j.workers.wantedWord'])
     expect(words(di)).toContain('Nobody recorded one.')
     expect(words(di), 'a worker with no run is said to be sealed or not').not.toMatch(/Sealed|Not sealed|No receipt/)
 
     const ed = rowOf(html, 'ws-ed')
     expect(ed, 'a run that is not live here is a link').not.toContain('href=')
-    expect(words(ed)).toContain('Started, but its run run-ed-gone is not a live run in this project.')
+    expect(words(ed)).toContain(enWave13y['w13j.workers.runNotHereWord'].replace('{id}', 'run-ed-gone'))
     expect(words(ed)).toContain('luna-2, the model its launcher was given')
 
     const fy = rowOf(html, 'ws-fy')
@@ -126,7 +127,7 @@ describe("the workers of a supervisor's run are drawn in words", () => {
 
     const gone = rowOf(html, 'ws-gone')
     expect(words(gone)).toContain('Nothing was started: The brief changed after it was asked for.')
-    expect(words(rowOf(html, 'ws-quiet'))).toContain('Nothing was started, and no reason was kept.')
+    expect(words(rowOf(html, 'ws-quiet'))).toContain(enWave13y['w13j.workers.failedNoReasonWord'])
 
     expect(words(rowOf(html, 'ws-hy')).match(/ws-hy/g), 'a name that is the handle is drawn twice').toHaveLength(1)
 

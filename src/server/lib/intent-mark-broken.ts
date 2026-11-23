@@ -3,7 +3,9 @@
 /**
  * THE "MARK BROKEN" PRESS: THE PERSON SAYS AN AGENT'S REPLY BROKE THE MARK ON THEIR MESSAGE.
  * The marks are in src/shared/intent-mark.ts: "just ask" asks the agent to answer and
- * change nothing, "proposal first" asks it to come back with a proposal and build nothing until the person says yes.
+ * change nothing, "proposal first" asks it to come back with a proposal and build nothing until the person says yes,
+ * "align" asks it to agree first, restate what was agreed, and act only after the person's yes to that, and "give
+ * options" asks it to come back with two or three options and build nothing until the person chooses one.
  *
  * The press is on the agent's reply, and it names the marked message the reply answers. Nothing here works out which
  * message a reply answers: the person's page knows which one it drew the reply under, and a guess could file a problem
@@ -95,8 +97,8 @@ export function fileAMarkBrokenPress(replyId: string, markedId: string, actor: A
   const intent = marked.intent ?? null
   if (named === null && !anIntentThatAsks(intent)) {
     throw new PanelError(
-      `Message ${markedId} carries no mark that asks anything ("just ask" or "proposal first"), so no reply can break ` +
-        'one. Nothing was written.',
+      `Message ${markedId} carries no mark that asks anything ("just ask", "proposal first", "align" or "give ` +
+        'options"), so no reply can break one. Nothing was written.',
     )
   }
   if (!marked.deliveries.some((one) => sameParticipant(one.to, agent))) {

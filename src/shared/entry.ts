@@ -44,4 +44,26 @@ export interface TheEntryInstallResult {
   replacedSkillLink: boolean
   /** What happened, in a person's words: what was written, into which file, and where the backup is. */
   says: string
+  /** The state of this computer's entry key after the press: none yet, held, or refused. */
+  thisComputersKey: TheEntrysKeyState
+}
+
+/**
+ * THE STATE OF THIS COMPUTER'S ENTRY KEY, the key the entry press gives the agent of this computer's coding-tool
+ * sessions (src/server/lib/an-agents-key-file.ts). `none-yet`: no key file is there, and the same press gives one.
+ * `held`: the file holds a live key of the live agent its neighbour file names. `refused`: a file is there and the
+ * office would not take its key.
+ */
+export type TheEntrysKeyState = 'none-yet' | 'held' | 'refused'
+
+/** The state word the Settings entry draws for each state. */
+export const THE_ENTRYS_KEY_WORDS = {
+  'none-yet': 'settingsPanel.entry.key.noneYet',
+  held: 'settingsPanel.entry.key.held',
+  refused: 'settingsPanel.entry.key.refused',
+} as const satisfies Record<TheEntrysKeyState, string>
+
+/** What the state door answers: GET /api/office/install-the-entry/this-computers-key. */
+export interface TheEntrysKeyReading {
+  thisComputersKey: TheEntrysKeyState
 }

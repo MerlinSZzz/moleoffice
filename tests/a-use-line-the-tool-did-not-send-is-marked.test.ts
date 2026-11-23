@@ -5,8 +5,7 @@
  *
  * A key in a shell can still be used by hand, so the key alone does not say whether tools/use-line.mjs sent a line. The
  * tool sends a proof beside each line, made from the key it sends and the words of the line. The office checks it and
- * keeps what it found on the line. A hand-sent line is a reminder in the seal preview, not a refusal: its test runs still
- * count.
+ * keeps what it found on the line. A hand-sent line is a reminder in the seal preview, not a refusal.
  *
  * ---------------------------------------------------------------------------------------
  * WHAT IS CLAIMED
@@ -20,8 +19,8 @@
  *   5. A line with files and tree is unmarked, and so is the second send without them that an office older than
  *      migration 0279 asks for.
  *   6. A line the office wrote without checking says so, and is not called hand-sent.
- *   7. The seal preview names each hand-sent named-tests line by its place and words, as a likely item about test proof,
- *      and still counts its result. A run whose lines all came through the tool gets no such item.
+ *   7. The seal preview names each hand-sent named-tests line by its place and words, as a likely item about test proof.
+ *      A run whose lines all came through the tool gets no such item.
  *
  * Every repository is made here in the system's temporary folder; every key, run and line is made up. Nothing here reaches
  * an office other than the one this file makes.
@@ -289,7 +288,7 @@ describe('a use line the tool did not send is marked where use lines are read', 
     expect(one?.mark).not.toEqual(expect.stringContaining('by hand'))
   })
 
-  it('7: the seal preview names each hand-sent named-tests line, still counts it, and says nothing when the tool sent them all', async () => {
+  it('7: the seal preview names each hand-sent named-tests line, and says nothing when the tool sent them all', async () => {
     const mixed = await aRun()
     expect(await byTheTool(mixed.id, mixed.key, { tool: THE_TEST_FILES_TOOL, said: aNamedTestsLine(0) })).toMatchObject({ written: true })
     await byHand(asTheRun(mixed.id, mixed.key), { tool: THE_TEST_FILES_TOOL, said: aNamedTestsLine(1) })
@@ -303,7 +302,7 @@ describe('a use line the tool did not send is marked where use lines are read', 
     expect(marked?.says).toContain('No proof that tools/use-line.mjs sent it')
     expect(marked?.says).not.toContain('use 1 ')
     expect(marked?.says).not.toContain('use 3 ')
-    // The hand-sent red still counts: control, mutation and restore are all there, so the test file is not named.
+    // No item asks for a control, a mutation and a restore of the changed test.
     expect(items.map((one) => one.key)).not.toContain('test:work/made-up.test.ts')
 
     const allByTheTool = await aRun()

@@ -1,25 +1,55 @@
 // Copyright © 2026 Zhengyang Shen
 // Licensed under the MIT License. See LICENSE.
 /**
- * WHETHER THE SESSION BEHIND A HOLD IS STILL ANSWERING: one reading, for the handle door and the
- * presence dot.
+ * WHETHER THE SESSION BEHIND A HOLD IS STILL ANSWERING: two readings, one for a hold that beats and
+ * one for everything else, and the handle door and the presence dot share both.
  *
  * ---------------------------------------------------------------------------------------
- * WHY THE HEARTBEAT ALONE IS NOT AN ANSWER
+ * THE RULE: A HOLD THAT BEATS IS THE ANSWER, AND WHAT IS READ CAN ONLY TURN IT GREY
  * ---------------------------------------------------------------------------------------
  *
- * Criterion M106 of design/messages/ACCEPTANCE.md: an agent that has stopped for a long time on a usage
- * limit must not still be shown online. A hold is a claim written by a waiter process, and the waiter is
- * not the session: the session starts it in the background and it goes on beating when the session
- * has stopped — a usage limit, a crash, a closed terminal. Measured by Investigator ZI (problem
- * `DyEIJyDCG01X`): the handle read `fresh` for ten hours and twelve minutes with a dead thread
- * behind it, and 85 messages piled up. For a RUN the office already refuses to believe a record
- * that says running unless a process is alive in the ledger now; this makes a HOLD ask the same
- * kind of question about the session it names.
+ * While a hold beats, the agent reads as answering, whatever tool its session runs in. A hold beats
+ * while it is fresh: its waiter beat within the lapse. This is `theSessionBehindTheHold`.
+ *
+ * For a tool whose session the office can read inside — claude-code and codex today, as
+ * `aHarnessTheOfficeCannotReadInside` in src/shared/participants.ts says — four signs turn that answer
+ * to not answering, and nothing else does (`theReadingOfABeatingHold`):
+ *
+ *   1. the transcript's last real line is a stop cause the person must act on: a limit, a quota or a
+ *      login error;
+ *   2. a message was handed over after the transcript last grew, and has waited unread longer than
+ *      `handleUnreadAfterSeconds()`;
+ *   3. a process recorded as the session's own — a claude-code session's own pid, or the bridge a codex
+ *      record names — runs no more, and the transcript has not grown within the lapse. With no process
+ *      recorded the hold stands, and a transcript that grew within the lapse is the session speaking
+ *      now, so it answers;
+ *   4. the session's record names an office terminal, and its run there has ended.
+ *
+ * WHAT THE OFFICE READS CAN ONLY TURN THE ANSWER TO NOT ANSWERING. A check that cannot read anything
+ * leaves it standing: no transcript on record, no adapter for the tool, a transcript that would not
+ * open, no process recorded. Each of those changes only the sentence. The sentence says what the
+ * answer rests on — the hold alone, with what could not be read, or the hold and what was read — so a
+ * reader knows how far to trust it.
+ *
+ * WHY A HOLD THAT BEATS IS ENOUGH, AND WHY THE SIGNS ARE STILL READ. A hold is a claim written by a
+ * waiter process, and the waiter is not the session: it can go on beating after the session has
+ * stopped on a usage limit, crashed, or had its terminal closed. The four signs are how the office
+ * sees that, where it can see inside. Where it cannot, the waiter that holds the handle is also the one
+ * that takes the messages, so an agent whose waiter beats is not read as unreachable for want of a
+ * process or transcript the office could not read.
+ *
+ * A HOLD THAT NO LONGER BEATS reads as it did before this rule. A kept hold, past its lapse and inside
+ * its grace, is put to `theReadingOf` below, as a live process row with no hold is; a lapsed hold is no
+ * hold at all.
  *
  * ---------------------------------------------------------------------------------------
- * THE THREE FACTS A HOLD MAY REST ON, AND NONE IS INVENTED
+ * THE OLDER READING: THE THREE FACTS IT MAY REST ON, AND NONE IS INVENTED
  * ---------------------------------------------------------------------------------------
+ *
+ * `theReadingOf` answers for a kept hold and for a live process row with no hold. It never answers
+ * from the heartbeat. The sections from here to the last are about it. It reads the stop cause and
+ * the unread hand-over as the signs above do, through the same functions, and it does not read the
+ * office terminal.
  *
  * 1. **The session's own process, which the hook recorded on its record.** A session waiting in its
  *    terminal writes nothing to its transcript — it is idle between turns — yet it can take a
@@ -43,19 +73,20 @@
  *    `handleLapsesAfterSeconds()` and it is the hold's window, not a second one: one window for one
  *    claim.
  *
- * IF NONE CAN BE READ, THE OFFICE SAYS SO. `answering: false` with a sentence naming what could not
+ * IF NONE CAN BE READ, THIS READING SAYS SO. `answering: false` with a sentence naming what could not
  * be read — no process recorded for it, a recorded process that is not alive or is not the one that
  * was recorded, no process resource row, no transcript on record, no adapter for the tool, a
  * transcript that would not open, or a transcript that was read and last grew longer ago than the
- * window. It never falls back to the heartbeat, because a fresh beat with a dead session behind it
- * is the whole defect.
+ * window. It does not fall back to the heartbeat: a hold that has stopped beating, and a process row
+ * with no hold, have no heartbeat to stand on.
  *
  * "COULD NOT TELL" IS ITS OWN ANSWER (problem `TOoUy7fMbg1P`). When a process of the session is alive
  * but its transcript cannot be read — none on record, no adapter, a file that would not open — the
  * reading is `answering: false` with `couldNotTell: true`, and the sentence ends "so whether it is
  * still answering could not be read". Every other `answering: false` is a known answer, and its
  * sentence ends "so nothing shows it is still answering" or names a stop cause. The routing up the
- * chain of starters acts only on a known one.
+ * chain of starters acts only on a known one. A hold that beats never reads "could not tell": what
+ * cannot be read leaves its answer standing.
  *
  * ---------------------------------------------------------------------------------------
  * M126: THE TRANSCRIPT'S LAST WORD, AND NO TRANSCRIPT AT ALL
@@ -65,7 +96,9 @@
  * cut off should have been offline, but the contacts still showed them online. Both were codex
  * sessions whose bridges were alive while the sessions behind them had hit a usage limit and
  * stopped, and their records carry no `extra.discovered.logPath`, so M106's reading trusted the live
- * bridge. Two things follow, and they are the whole of this criterion.
+ * bridge. Three things follow in the older reading. Under a hold that beats, only the first still
+ * turns the answer, as sign 1: with no transcript, or an old one, the hold answers, and the sentence
+ * says what was read.
  *
  * 1. **When a transcript path is on record, its LAST REAL LINE is read before any process is
  *    trusted.** If that line is a limit, quota or login error — M94's shared reading of the same
@@ -113,23 +146,27 @@
  * ---------------------------------------------------------------------------------------
  *
  * `whoIsAnsweringAs` (the handle door) and `participantPresence` (the dot and the contacts list)
- * both arrive at the one judgement, `theReadingOf`, so they cannot disagree about one agent — the
- * defect CLAUDE.md names as this codebase's own. The handle door reaches it through
- * `theSessionBehindTheHold`; the presence door reaches it either through that same function when a
- * hold is there, or through the live-process branch when the only evidence is a resource row the
- * operating system confirms. A live process with no transcript the office can read therefore reads
- * the same word and the same sentence-shaped reading on both paths, which is what M126's bridge
+ * both arrive at the same judgements, so they cannot disagree about one agent — the defect CLAUDE.md
+ * names as this codebase's own. Both read a hold through `theSessionBehindTheHold`, which reads a hold
+ * that beats by `theReadingOfABeatingHold` and any other by `theReadingOf`; the presence door also
+ * reaches `theReadingOf` through the live-process branch, when the only evidence is a resource row the
+ * operating system confirms. A live process with no transcript the office can read, and no hold that
+ * beats, therefore reads the same word and the same sentence-shaped reading on both paths, which is what M126's bridge
  * case demanded and what the process-row path had kept working out for itself. The reading is pure
  * apart from the resource and record reads it makes: it writes nothing, so asking cannot change the
  * answer (criterion M106's second half: a change is drawn only when the office's answer changes).
  */
 
 import type { HoldOnTheWire } from '@shared/handles.ts'
+import { readStoredWord } from '@shared/i18n.ts'
+import { aHarnessTheOfficeCannotReadInside, aHarnessWithNoAdapter } from '@shared/participants.ts'
+import { theRunHasEnded } from '@shared/run-has-ended.ts'
 import { localStamp } from '@shared/time.ts'
 import type { PanelRecord } from '@shared/types.ts'
 import { join } from 'node:path'
 
 import { adapterFor, theHomeDirectory } from './adapters/index.ts'
+import type { TranscriptWrite } from './adapters/types.ts'
 import { handleLapsesAfterSeconds, handleUnreadAfterSeconds } from './env.ts'
 import { theFirstMessageHandedToThisSessionAfter } from './the-first-message-handed-to-this-session-after.ts'
 import { getRecord } from './records.ts'
@@ -137,14 +174,14 @@ import { listResources, type ResourceReport } from './resources.ts'
 import { type DiscoveryStamp } from './sessions.ts'
 import { stampOf } from './stamp-of.ts'
 import { theRecordedProcessOf } from '../../config/own-rows.mjs'
-// THE SESSION'S OWN PROCESS, shared with the hook that records it. Criterion M106's second half.
-// AND, FOR CODEX, THE PROCESS THE SESSION IS TIED TO: the resume thread in a live codex process's
-// arguments, or the bridge the record itself names. Criterion M126.
+// THE SESSION'S OWN PROCESS, shared with the hook that records it, read as running, ended, or neither
+// shown. AND, FOR CODEX, THE PROCESS THE SESSION IS TIED TO: the resume thread in a live codex
+// process's arguments, or the bridge the record itself names.
 import {
   codexThreadIn,
   commandLineOf,
   theCodexProcessTiedTo,
-  theRecordedProcess,
+  whetherTheRecordedProcessRuns,
 } from '../../config/session-process.mjs'
 // WHICH FILE A CODEX SESSION WROTE ITS TURN IN. A codex record carries no discovery stamp; the
 // thread id on it, and the process behind it, are what name the rollout.
@@ -162,25 +199,32 @@ import {
 /**
  * What one hold's session was found to be, and what said so. THREE ANSWERS, NOT TWO.
  *
- * `answering: true` when its recorded process, a process row, or the transcript inside the window
- * says so. `answering: false` with `couldNotTell: false` when the office knows it is not answering:
- * its transcript ended on a stop cause, or nothing of it is alive and nothing it wrote is recent.
- * `answering: false` with `couldNotTell: true` when a process of the session is alive but the office
- * could not read its transcript, so it cannot tell either way (problem `TOoUy7fMbg1P`). A reader
- * that acts on "not answering" — the routing up the chain of starters — must act only on the second.
+ * `answering: true` when its hold beats and no sign turned it; in the older reading, when its
+ * recorded process, a process row, or the transcript inside the window says so. `answering: false`
+ * with `couldNotTell: false` when the office knows it is not answering: a sign read the session
+ * stopped, or, in the older reading, nothing of it is alive and nothing it wrote is recent.
+ * `answering: false` with `couldNotTell: true` comes only from the older reading: a process of the
+ * session is alive but the office could not read its transcript, so it cannot tell either way. A
+ * hold that beats never reads so. A reader that acts on "not answering" — the routing up the chain
+ * of starters — must act only on the second.
  */
 export type HeldSessionReading = TheReadingsSentence &
   (
     | {
         answering: true
-        /** What proved it. */
-        from: 'its process' | 'a live process' | 'its transcript'
+        /**
+         * What proved it. `its hold` is the hold's own heartbeat with nothing else of the session
+         * answering: a hold that beats where no process or transcript of the session answered, or a
+         * session of a tool the office cannot read inside. A lapsed hold is read as no hold at all.
+         */
+        from: 'its process' | 'a live process' | 'its transcript' | 'its hold'
       }
     | {
         answering: false
         /**
          * True when a process of the session is alive and its transcript could not be read, so the
-         * office cannot tell whether it is answering. False when the office knows it is not.
+         * office cannot tell whether it is answering. False when the office knows it is not. Always
+         * false for a hold that beats.
          */
         couldNotTell: boolean
         /** Nothing proved it. */
@@ -193,7 +237,11 @@ interface TheReadingsSentence {
   /**
    * One plain sentence saying what was read. Null when the reading has nothing to add.
    *
-   * A READING THAT ANSWERS FROM A PROCESS STILL CARRIES ONE when the transcript on record is older
+   * A READING OF A HOLD THAT BEATS ALWAYS CARRIES ONE. When it answers, the sentence says what the
+   * answer rests on: the hold alone and what else was read, or the hold and what answered with it.
+   * When a sign turns it, the sentence names the sign.
+   *
+   * IN THE OLDER READING, ONE THAT ANSWERS FROM A PROCESS STILL CARRIES ONE when the transcript on record is older
    * than the lapse: it says the log has been quiet since the moment it last grew, and names the live
    * process that is known to be tied to the session. A reading proved by a fresh transcript needs no
    * sentence — the transcript is the session speaking now — and answers with null. Criterion M126.
@@ -327,13 +375,46 @@ export interface TheProcessFacts {
   theTieSays: string
   /** The office's words for what the resource rows said, including a row it could not check. */
   theRowsSay: string
+  /**
+   * THE OFFICE'S WORDS FOR A PROCESS RECORDED AS THE SESSION'S OWN THAT RUNS NO MORE, or null when
+   * none is known to have ended.
+   *
+   * It is set only when a process was recorded and no process runs under its number now: the pid a
+   * session's record names, or the bridge a codex record names. With no process recorded, nothing has
+   * ended. A number that some other process now runs under is not ended either, because that does not
+   * show the session stopped.
+   */
+  whichRecordedProcessEnded: string | null
+  /**
+   * True when the record names a codex thread, so a process tied to it was looked for and `theTieSays`
+   * is what that look found. False for every other session, whose `theTieSays` was never read.
+   */
+  theTieWasLookedFor: boolean
+}
+
+/**
+ * THE OFFICE TERMINAL A SESSION'S RECORD SAYS IT RUNS IN, and whether its run there has ended.
+ *
+ * The office writes `extra.inATerminal` on the record of a session it starts in one of its own
+ * terminals, and writes the record's `state` and `closedBecause` when the program in that terminal
+ * exits. "Ended" is `theRunHasEnded`, the one reading of a run's state.
+ */
+export interface TheTerminalFacts {
+  /** The terminal the record names. */
+  terminal: string
+  /** True when the record's state says its run has ended. */
+  ended: boolean
+  /** The record's state as written, or null when none is. */
+  state: string | null
+  /** The record's own words for why its run ended, or null when it gives none. */
+  because: string | null
 }
 
 /**
  * WHAT ONE READING FOUND ABOUT A SESSION'S TRANSCRIPT, in the shape both doors hand in.
  *
- * The hold is carried here because it changes only the opening words of a sentence. It is not
- * evidence: a session holding a handle is not a session that can answer.
+ * The hold is carried here because it changes only the opening words of a sentence. Whether a hold
+ * beats is not read from here: `theSessionBehindTheHold` reads that from the hold itself.
  */
 export interface TheTranscriptFacts {
   /** The session record this reading is about. Every sentence names it. */
@@ -432,6 +513,33 @@ function theCodexBridgeOn(record: PanelRecord): { pid: number | null; script: st
 }
 
 /**
+ * THE OFFICE TERMINAL A SESSION'S RECORD NAMES, from the record already read, or null when it names
+ * none.
+ *
+ * Only `extra.inATerminal.terminal` is read here. The holder written beside it is not, because whether
+ * the run there has ended is the record's own state. src/server/lib/terminal-agents.ts reads the same
+ * field for the office's terminals and also asks for a holder pid; this file cannot import that one
+ * without a cycle.
+ */
+function theOfficeTerminalOn(record: PanelRecord | null): TheTerminalFacts | null {
+  if (record === null) return null
+  const extra = record.data['extra']
+  if (extra === null || typeof extra !== 'object' || Array.isArray(extra)) return null
+  const held = (extra as Record<string, unknown>)['inATerminal']
+  if (held === null || typeof held !== 'object' || Array.isArray(held)) return null
+  const terminal = (held as Record<string, unknown>)['terminal']
+  if (typeof terminal !== 'string' || terminal.trim() === '') return null
+  const state = record.data['state']
+  const because = record.data['closedBecause']
+  return {
+    terminal,
+    ended: theRunHasEnded(state),
+    state: typeof state === 'string' ? state : null,
+    because: typeof because === 'string' && because.trim() !== '' ? because : null,
+  }
+}
+
+/**
  * EVERYTHING ONE SESSION'S RECORD SAYS, gathered once so the hold path and the live-process path
  * cannot gather it differently.
  *
@@ -443,7 +551,7 @@ export function theFactsOfASession(
   holdingTheHandle: boolean,
   workspaceId: string,
   machine?: () => readonly ResourceReport[],
-): { process: TheProcessFacts; transcript: TheTranscriptFacts } {
+): { process: TheProcessFacts; transcript: TheTranscriptFacts; terminal: TheTerminalFacts | null } {
   // THE SESSION'S OWN PROJECT, NOT THE REQUESTER'S. A hold is global and the chat is the person's across
   // every project (criterion M55), so a presence read made in one project may ask about a hold
   // claimed in another. The resource row is looked up where the session was registered; the one
@@ -451,9 +559,9 @@ export function theFactsOfASession(
   const record = getRecord(session)
 
   // THE SESSION'S OWN PROCESS, THE TRANSCRIPT IT WAS FILED WITH, AND THE PROCESS ROWS, all read
-  // once. Nothing is trusted yet: the judgement below is what order criterion M126 changed.
+  // once. Nothing is trusted yet: the readings below decide what each counts for.
   const recordedProcess = record === null ? { pid: null, pidStartedAt: null } : theRecordedProcessOf(record)
-  const itsProcess = theRecordedProcess(recordedProcess.pid, recordedProcess.pidStartedAt)
+  const itsProcess = whetherTheRecordedProcessRuns(recordedProcess.pid, recordedProcess.pidStartedAt)
   const stamp = record === null ? null : stampOf(record)
   // A CODEX SESSION CARRIES NO STAMP, so its thread is read and its log looked for now. Only when
   // there is no stamp: a record that already names a transcript is read from that path and not from
@@ -465,8 +573,8 @@ export function theFactsOfASession(
   // this thread, or the bridge the record itself names. Nothing here trusts the bridge's `state`.
   const codexTie =
     thread === null
-      ? { trusted: false, says: 'no process was recorded for it' }
-      : ((): { trusted: boolean; says: string } => {
+      ? { trusted: false, ended: false, says: 'no process was recorded for it' }
+      : ((): { trusted: boolean; ended: boolean; says: string } => {
           const bridge = theCodexBridgeOn(record as PanelRecord)
           return theCodexProcessTiedTo(thread, bridge.pid, bridge.script)
         })()
@@ -492,12 +600,14 @@ export function theFactsOfASession(
 
   return {
     process: {
-      itsOwnProcessIsAlive: itsProcess.trusted,
+      itsOwnProcessIsAlive: itsProcess.runs === 'yes',
       aProcessRowIsAlive: aLiveProcess,
       aProcessIsTiedToTheSession: codexTie.trusted,
       itsOwnProcessSays: itsProcess.says,
       theTieSays: codexTie.says,
       theRowsSay,
+      whichRecordedProcessEnded: itsProcess.runs === 'no' ? itsProcess.says : codexTie.ended ? codexTie.says : null,
+      theTieWasLookedFor: thread !== null,
     },
     transcript: {
       session,
@@ -506,18 +616,90 @@ export function theFactsOfASession(
       codexLogPath,
       firstHandedOverAfter: holdingTheHandle ? (after) => theFirstMessageHandedToThisSessionAfter(session, after) : () => null,
     },
+    terminal: theOfficeTerminalOn(record),
   }
 }
 
+// ======================================================================= what both readings read
+
 /**
- * IS THE SESSION THESE FACTS DESCRIBE STILL ANSWERING? THE ONE READING, FOR BOTH DOORS.
+ * THE ONE TRANSCRIPT ON RECORD, whichever way it was found, and the tool that wrote it: a record's
+ * own discovery stamp, or a codex record's rollout looked up by the thread it names. Both readings
+ * read this one path, so a codex session is judged by the same rules as any other.
+ */
+function theTranscriptOnRecord(transcript: TheTranscriptFacts): { logPath: string | null; toolName: string } {
+  const { stamp, codexLogPath } = transcript
+  return { logPath: stamp !== null ? stamp.logPath : codexLogPath, toolName: stamp !== null ? stamp.tool : 'codex' }
+}
+
+/**
+ * THE SENTENCE FOR A TRANSCRIPT WHOSE LAST REAL LINE IS A STOP CAUSE THE PERSON MUST ACT ON, or null
+ * when it is not. A usage limit, a quota or a login failure leaves the waiter or bridge beating while
+ * the session behind it is frozen. When the last real line names one of those causes, nothing later
+ * in the transcript shows the session went on.
+ */
+function theStopSentence(logPath: string | null, transcript: TheTranscriptFacts): string | null {
+  if (logPath === null) return null
+  const stopCause = theStopCauseAtTheEndOfTheTranscript(logPath)
+  if (stopCause === null || !isACauseTheyMustActOn(stopCause.kind)) return null
+  return theSentenceForAStoppedSession(transcript.session, stopCause, transcript.holdingTheHandle)
+}
+
+/**
+ * WHEN THE TRANSCRIPT LAST GREW, read through the adapter that wrote the record or, for a codex
+ * session that wrote no stamp, through the shared codex reader. Null when this build has no reader
+ * for the tool the record names: that is an absence, and the sentence says it.
+ */
+function whenTheTranscriptLastGrew(logPath: string, stamp: DiscoveryStamp | null): TranscriptWrite | null {
+  if (stamp === null) return theCodexTranscriptLastWrittenAt(logPath)
+  const adapter = adapterFor(stamp.tool)
+  if (adapter === null) return null
+  return adapter.transcriptLastWrittenAt({ externalId: stamp.externalId, logPath })
+}
+
+/**
+ * THE TRANSCRIPT AS A SENTENCE NAMES IT: when it last grew, past the lapse or not, or why that could
+ * not be read. Both readings say it in these words.
+ */
+function theTranscriptPart(
+  logPath: string | null,
+  toolName: string,
+  wrote: TranscriptWrite | null,
+  quiet: number | null,
+  lapse: number,
+): string {
+  if (logPath === null) return 'no transcript was recorded for it'
+  if (wrote === null) return `this build has no adapter that can read a "${toolName}" session's transcript`
+  if (!wrote.read) return `its transcript could not be read (${wrote.reason})`
+  const since = `its transcript last grew ${String(quiet)} seconds ago`
+  return quiet !== null && quiet > lapse ? `${since} — longer than the ${String(lapse)} seconds a hold is allowed` : since
+}
+
+/** How many whole seconds before `now` the transcript last grew. */
+function theSecondsSince(at: Date, now: Date): number {
+  return Math.max(0, Math.round((now.getTime() - at.getTime()) / 1000))
+}
+
+/**
+ * THE SENTENCE FOR A MESSAGE HANDED OVER AFTER THE TRANSCRIPT LAST GREW AND LEFT UNREAD LONGER THAN
+ * `handleUnreadAfterSeconds()`, or null when none was. It is asked only of a transcript that was read.
+ */
+function theUnreadSentence(lastRead: Date, transcript: TheTranscriptFacts, now: Date): string | null {
+  const unread = transcript.firstHandedOverAfter(lastRead)
+  const limit = handleUnreadAfterSeconds()
+  if (unread === null || now.getTime() - unread.getTime() <= limit * 1000) return null
+  return theSentenceForAnUnreadHandOver(transcript.session, lastRead, unread, limit, transcript.holdingTheHandle)
+}
+
+/**
+ * IS THE SESSION THESE FACTS DESCRIBE STILL ANSWERING, WITH NO HEARTBEAT TO STAND ON?
  *
- * A hold and a live process row are two ways to arrive at the same question: is there a session
- * here that can take a message now? This function is the only place that question is answered. The
- * handle door (`whoIsAnsweringAs`) and the presence dot both call it — one through
- * `theSessionBehindTheHold`, one through the live-process branch in `participantPresence` — so a
- * live process with no transcript the office can read gets one word and one sentence, whichever
- * path found it. Criterion M126, extended to the process-row path.
+ * This is the reading of a live process row with no hold, and of a hold past its lapse that is still
+ * inside its grace. It never answers from a heartbeat: it answers only when a process or a transcript
+ * of the session says so. The handle door (`whoIsAnsweringAs`) and the presence dot both reach it —
+ * through `theSessionBehindTheHold` for a kept hold, and through the live-process branch in
+ * `participantPresence` — so a live process with no transcript the office can read gets one word and
+ * one sentence, whichever path found it. A hold that beats is read by `theReadingOfABeatingHold`.
  *
  * `now` is supplied by the caller so both doors measure the transcript against the same instant.
  */
@@ -527,16 +709,13 @@ export function theReadingOf(
   now: Date,
 ): HeldSessionReading {
   const lapse = handleLapsesAfterSeconds()
-  const { session, holdingTheHandle, stamp, codexLogPath } = transcript
+  const { session, holdingTheHandle, stamp } = transcript
   const opening = theOpening(session, holdingTheHandle)
   // EVERY SENTENCE THAT SAYS NOTHING COULD BE READ NAMES THE PROCESS CHECK TOO, including when no
   // process was recorded at all, so a reader is not left thinking the process was never asked.
   const behindTheHold = `${process.itsOwnProcessSays}; ${process.theRowsSay}`
-  // ONE TRANSCRIPT, WHICHEVER WAY IT WAS FOUND: a record's own discovery stamp, or a codex record's
-  // rollout looked up by the thread it names. Everything below reads this one path, so a codex
-  // session is judged by the same rules as any other and no second reading exists.
-  const logPath = stamp !== null ? stamp.logPath : codexLogPath
-  const toolName = stamp !== null ? stamp.tool : 'codex'
+  // ONE TRANSCRIPT, WHICHEVER WAY IT WAS FOUND, as `theTranscriptOnRecord` says.
+  const { logPath, toolName } = theTranscriptOnRecord(transcript)
   // WHETHER ANY PROCESS OF THIS SESSION IS ALIVE NOW: its own recorded process, a process resource row,
   // or a live codex process tied to its thread. When the transcript cannot be read, this is what
   // separates "the office could not tell" from "the office knows it is not answering" (problem
@@ -558,21 +737,9 @@ export function theReadingOf(
 
   // ---------------------------------------------------------- M126: the transcript's last word
   // BEFORE ANY PROCESS IS TRUSTED, the session's own transcript is asked whether it ended on a
-  // cause the person must act on. A process that is still running is not a session that can answer:
-  // a usage limit, a quota or a login failure leaves the waiter or bridge beating while the session
-  // behind it is frozen. When the last real line names one of those causes, nothing later in the
-  // transcript shows the session went on, and the sentence says so in the cause's own words.
-  if (logPath !== null) {
-    const stopCause = theStopCauseAtTheEndOfTheTranscript(logPath)
-    if (stopCause !== null && isACauseTheyMustActOn(stopCause.kind)) {
-      return {
-        answering: false,
-        couldNotTell: false,
-        from: null,
-        says: theSentenceForAStoppedSession(session, stopCause, holdingTheHandle),
-      }
-    }
-  }
+  // cause the person must act on. A process that is still running is not a session that can answer.
+  const stopped = theStopSentence(logPath, transcript)
+  if (stopped !== null) return { answering: false, couldNotTell: false, from: null, says: stopped }
 
   // ---------------------------------------------------------- M126: no transcript, no reading
   // WHERE NO TRANSCRIPT PATH IS RECORDED, a live process alone does not make a session answering. A
@@ -598,7 +765,7 @@ export function theReadingOf(
       answering: false,
       couldNotTell: aProcessIsAlive,
       from: null,
-      says: `${opening} ${processFact}, and no transcript was recorded for it, ${theEndWhenItCannotBeRead}`,
+      says: `${opening} ${processFact}, and ${theTranscriptPart(null, toolName, null, null, lapse)}, ${theEndWhenItCannotBeRead}`,
     }
   }
 
@@ -607,17 +774,10 @@ export function theReadingOf(
   // reading that answers from a process can say how long the log has been quiet. A session recorded
   // under a tool this build has no reader for cannot be read at all; that is an absence and it is
   // said rather than guessed.
-  const wrote =
-    stamp === null
-      ? theCodexTranscriptLastWrittenAt(logPath)
-      : (() => {
-          const adapter = adapterFor(stamp.tool)
-          if (adapter === null) return null
-          return adapter.transcriptLastWrittenAt({ externalId: stamp.externalId, logPath })
-        })()
+  const wrote = whenTheTranscriptLastGrew(logPath, stamp)
   // HOW LONG AGO THE TRANSCRIPT LAST GREW, when it could be read and dated. Null when it could not,
   // and the sentence for a process that answers anyway then says nothing about the log.
-  const quiet = wrote !== null && wrote.read ? Math.max(0, Math.round((now.getTime() - wrote.at.getTime()) / 1000)) : null
+  const quiet = wrote !== null && wrote.read ? theSecondsSince(wrote.at, now) : null
   // THE SENTENCE FOR A LIVE PROCESS WITH A QUIET LOG (criterion M126). A process is alive and tied
   // to this session, and the transcript on record has not grown for longer than the lapse, so the
   // reading says when the log was last written and names the process that makes it answering still.
@@ -625,22 +785,14 @@ export function theReadingOf(
     wrote !== null && wrote.read && quiet !== null && quiet > lapse
       ? theSentenceForAQuietLog(session, wrote.at, quiet, lapse, holdingTheHandle, theAliveProcessWords(process))
       : null
+  const theTranscriptSays = theTranscriptPart(logPath, toolName, wrote, quiet, lapse)
 
   // A MESSAGE HANDED OVER AFTER THE TRANSCRIPT LAST GREW, AND LEFT UNREAD FOR TOO LONG. Problem
   // `-MLrleDe93wM`. This comes before every process check, because a live process is what kept
   // an agent reading as answering while nobody read. It is asked only of a transcript that was read.
   if (wrote !== null && wrote.read) {
-    const lastRead = wrote.at
-    const unread = transcript.firstHandedOverAfter(lastRead)
-    const limit = handleUnreadAfterSeconds()
-    if (unread !== null && now.getTime() - unread.getTime() > limit * 1000) {
-      return {
-        answering: false,
-        couldNotTell: false,
-        from: null,
-        says: theSentenceForAnUnreadHandOver(session, lastRead, unread, limit, holdingTheHandle),
-      }
-    }
+    const unread = theUnreadSentence(wrote.at, transcript, now)
+    if (unread !== null) return { answering: false, couldNotTell: false, from: null, says: unread }
   }
 
   // THE SESSION'S OWN PROCESS FIRST, when a transcript is on record. A session waiting in its
@@ -664,9 +816,7 @@ export function theReadingOf(
       answering: false,
       couldNotTell: aProcessIsAlive,
       from: null,
-      says:
-        `${opening} ${theProcessCheck}, and this build has ` +
-        `no adapter that can read a "${toolName}" session's transcript, ${theEndWhenItCannotBeRead}`,
+      says: `${opening} ${theProcessCheck}, and ${theTranscriptSays}, ${theEndWhenItCannotBeRead}`,
     }
   }
   if (!wrote.read) {
@@ -674,7 +824,7 @@ export function theReadingOf(
       answering: false,
       couldNotTell: aProcessIsAlive,
       from: null,
-      says: `${opening} ${theProcessCheck}, and its transcript could not be read (${wrote.reason}), ${theEndWhenItCannotBeRead}`,
+      says: `${opening} ${theProcessCheck}, and ${theTranscriptSays}, ${theEndWhenItCannotBeRead}`,
     }
   }
   if (quiet === null || quiet <= lapse) return { answering: true, from: 'its transcript', says: null }
@@ -695,19 +845,113 @@ export function theReadingOf(
     answering: false,
     couldNotTell: false,
     from: null,
-    says:
-      `${opening} ${behindTheHold}, and its transcript ` +
-      `last grew ${String(quiet)} seconds ago — longer than the ${String(lapse)} seconds a hold is allowed — ` +
-      'so nothing shows it is still answering.',
+    says: `${opening} ${behindTheHold}, and ${theTranscriptSays} — so nothing shows it is still answering.`,
+  }
+}
+
+/**
+ * IS THE SESSION BEHIND A HOLD THAT BEATS STILL ANSWERING? The hold says it is, and four signs may
+ * say it is not.
+ *
+ * The signs are read in this order, and the first that holds turns the answer to not answering:
+ *
+ *   · the transcript's last real line is a stop cause the person must act on;
+ *   · the record names an office terminal, and its run there has ended. It comes second because it
+ *     needs nothing but the record, and the record's word that its run ended outranks a fresh
+ *     transcript;
+ *   · a message handed over after the transcript last grew has waited unread past the limit;
+ *   · a process recorded as the session's own runs no more, and the transcript has not grown within
+ *     the lapse. A transcript that grew within the lapse is the session speaking now, so it answers.
+ *
+ * WHEN NO SIGN HOLDS, THE HOLD ANSWERS, and the sentence says what the answer rests on. When a process
+ * or transcript of the session answered too — its own process, a live process row, a transcript that
+ * grew within the lapse, a codex process tied to its thread — the sentence names it and the
+ * transcript. When none did, the answer rests on the hold alone, and the sentence lists what was read.
+ * Nothing here reads "could not tell": what cannot be read leaves the hold's answer standing.
+ */
+export function theReadingOfABeatingHold(
+  process: TheProcessFacts,
+  transcript: TheTranscriptFacts,
+  terminal: TheTerminalFacts | null,
+  now: Date,
+): HeldSessionReading {
+  const lapse = handleLapsesAfterSeconds()
+  const { session, stamp } = transcript
+  const { logPath, toolName } = theTranscriptOnRecord(transcript)
+  const grey = (says: string): HeldSessionReading => ({ answering: false, couldNotTell: false, from: null, says })
+
+  // THE TRANSCRIPT'S LAST REAL LINE IS A STOP CAUSE.
+  const stopped = theStopSentence(logPath, transcript)
+  if (stopped !== null) return grey(stopped)
+
+  // ITS RUN IN AN OFFICE TERMINAL HAS ENDED. The record's own words for why are quoted when it has them.
+  if (terminal !== null && terminal.ended) {
+    return grey(
+      terminal.because === null
+        ? readStoredWord('heldSession.grey.itsTerminalEndedUnsaid', { session, terminal: terminal.terminal, state: String(terminal.state) })
+        : readStoredWord('heldSession.grey.itsTerminalEnded', { session, terminal: terminal.terminal, because: terminal.because }),
+    )
+  }
+
+  const wrote = logPath === null ? null : whenTheTranscriptLastGrew(logPath, stamp)
+  const quiet = wrote !== null && wrote.read ? theSecondsSince(wrote.at, now) : null
+  const grewWithinTheLapse = quiet !== null && quiet <= lapse
+  const theTranscriptSays = theTranscriptPart(logPath, toolName, wrote, quiet, lapse)
+
+  // A MESSAGE HANDED OVER AFTER THE TRANSCRIPT LAST GREW HAS WAITED UNREAD PAST THE LIMIT.
+  if (wrote !== null && wrote.read) {
+    const unread = theUnreadSentence(wrote.at, transcript, now)
+    if (unread !== null) return grey(unread)
+  }
+
+  // A PROCESS RECORDED AS THE SESSION'S OWN HAS ENDED, AND THE TRANSCRIPT HAS NOT GROWN WITHIN THE LAPSE.
+  if (process.whichRecordedProcessEnded !== null && !grewWithinTheLapse) {
+    return grey(
+      readStoredWord('heldSession.grey.itsProcessEnded', {
+        session,
+        ended: process.whichRecordedProcessEnded,
+        transcript: theTranscriptSays,
+      }),
+    )
+  }
+
+  // NO SIGN HOLDS. The hold answers, and the sentence names what else answered, or that nothing did.
+  const withWhatWasRead = (
+    from: 'its process' | 'a live process' | 'its transcript',
+    read: readonly string[],
+  ): HeldSessionReading => ({
+    answering: true,
+    from,
+    says: readStoredWord('heldSession.rests.onTheHoldAndWhatWasRead', { read: read.join('; ') }),
+  })
+  if (process.itsOwnProcessIsAlive) return withWhatWasRead('its process', [process.itsOwnProcessSays, theTranscriptSays])
+  // A CODEX SESSION'S PROCESS ROW IS ITS BRIDGE, which runs on while the session it speaks for is
+  // frozen, so a row answers with the hold only for a session whose record stamps a transcript.
+  if (stamp !== null && process.aProcessRowIsAlive) return withWhatWasRead('a live process', [process.theRowsSay, theTranscriptSays])
+  if (grewWithinTheLapse) {
+    const ended = process.whichRecordedProcessEnded
+    return withWhatWasRead('its transcript', ended === null ? [theTranscriptSays] : [theTranscriptSays, ended])
+  }
+  if (process.aProcessIsTiedToTheSession) return withWhatWasRead('its process', [process.theTieSays, theTranscriptSays])
+  const read = [process.itsOwnProcessSays, process.theRowsSay, ...(process.theTieWasLookedFor ? [process.theTieSays] : []), theTranscriptSays]
+  return {
+    answering: true,
+    from: 'its hold',
+    says: readStoredWord('heldSession.rests.onTheHoldAlone', { read: [...new Set(read)].join('; ') }),
   }
 }
 
 /**
  * IS THE SESSION NAMED ON THIS HOLD STILL ANSWERING?
  *
- * The handle door's entry point. It gathers the session's facts and hands them to `theReadingOf`,
- * the one judgement; it adds nothing of its own, so the hold path and the live-process path cannot
- * drift apart.
+ * The entry point for both doors. A HOLD THAT BEATS IS THE ANSWER. For a tool the office cannot read
+ * inside, nothing is read and it answers, saying the office cannot read inside that tool. For a tool
+ * the office can read, the session's facts are put to `theReadingOfABeatingHold`, and only its signs
+ * turn the answer.
+ *
+ * A HOLD THAT NO LONGER BEATS — past its lapse and inside its grace — is read as it was before the
+ * hold became the base answer: a harness with no adapter answers on its hold, and any other session is
+ * put to `theReadingOf`, which never answers from a heartbeat.
  */
 export function theSessionBehindTheHold(
   hold: HoldOnTheWire,
@@ -715,6 +959,15 @@ export function theSessionBehindTheHold(
   now: Date,
   machine?: () => readonly ResourceReport[],
 ): HeldSessionReading {
-  const { process, transcript } = theFactsOfASession(hold.session, true, workspaceId, machine)
-  return theReadingOf(process, transcript, now)
+  if (hold.state !== 'fresh') {
+    if (aHarnessWithNoAdapter(hold.runtime) !== null) return { answering: true, from: 'its hold', says: null }
+    const { process, transcript } = theFactsOfASession(hold.session, true, workspaceId, machine)
+    return theReadingOf(process, transcript, now)
+  }
+  const cannotRead = aHarnessTheOfficeCannotReadInside(hold.runtime)
+  if (cannotRead !== null) {
+    return { answering: true, from: 'its hold', says: readStoredWord('heldSession.rests.onTheHoldInsideUnread', { runtime: cannotRead }) }
+  }
+  const { process, transcript, terminal } = theFactsOfASession(hold.session, true, workspaceId, machine)
+  return theReadingOfABeatingHold(process, transcript, terminal, now)
 }

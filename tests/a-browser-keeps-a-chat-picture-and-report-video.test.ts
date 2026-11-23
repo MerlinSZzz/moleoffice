@@ -8,7 +8,7 @@ import { firefox, type Browser, type BrowserContext, type Page } from 'playwrigh
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { bundlePageCode } from './a-bundle-of-page-code.ts'
-import { freshDb, openRecordPagesAt, theBrowserThisWorkerShares, theBuiltPage, type TestDb } from './helpers.ts'
+import { freshDb, openRecordPagesAt, storeNormalModeWhereNothingIsStored, theBrowserThisWorkerShares, theBuiltPage, type TestDb } from './helpers.ts'
 
 const picture = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64')
 const owner = { 'content-type': 'application/json', 'x-mole-office-workspace': 'default', 'x-mole-office-actor-type': 'human', 'x-mole-office-actor-id': THE_PERSON }
@@ -75,6 +75,8 @@ async function context(engine: 'chromium' | 'firefox' = 'chromium'): Promise<Bro
   if (engine === 'firefox' && firefoxBrowser === undefined) firefoxBrowser = await firefox.launch({ headless: true })
   const browser = engine === 'firefox' ? firefoxBrowser! : await theBrowserThisWorkerShares()
   const result = await browser.newContext({ viewport: { width: 1440, height: 1000 } })
+  // The shared Chromium stores Normal by itself; the Firefox this file launches does not.
+  if (engine === 'firefox') await storeNormalModeWhereNothingIsStored(result)
   await openRecordPagesAt(result, 'full')
   await result.addInitScript({ content: pageCode })
   return result

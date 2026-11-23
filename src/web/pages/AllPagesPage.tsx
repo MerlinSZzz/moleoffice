@@ -28,6 +28,7 @@ import { useLanguage } from '../lib/language.ts'
 import { useMode } from '../lib/mode.ts'
 import { useSidebarArrangement } from '../lib/sidebar-arrangement.ts'
 import { useSidebarPins } from '../lib/sidebar-pins.ts'
+import { useReportsCount } from '../lib/report-count.ts'
 import type { WaitingReply } from '../lib/waiting.ts'
 import type { WorkspaceSight } from '../lib/workspace.ts'
 import { declaredAttributes } from '../components/declares.ts'
@@ -48,6 +49,7 @@ export function AllPagesPage({ sight, counts }: { sight: WorkspaceSight; counts?
   useSidebarArrangement()
   const mode = useMode()
   const { pins } = useSidebarPins()
+  const reportsCountShown = useReportsCount()
   const pinWrites = usePinWrites()
   const plugins = usePluginPageRows()
   const [typed, setTyped] = useState('')
@@ -79,6 +81,7 @@ export function AllPagesPage({ sight, counts }: { sight: WorkspaceSight; counts?
     waiting: counts.waiting.status === 'ready' ? counts.waiting.value : null,
     wordsWaiting: counts.wordsWaiting.status === 'ready' ? counts.wordsWaiting.value.total : null,
     checklistsWaiting,
+    reportsCountShown,
   }
   return (
     <div className="ap">

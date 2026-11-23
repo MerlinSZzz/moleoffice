@@ -139,6 +139,10 @@ if (program === 'git') {
   if (config.mode !== 'no-report') writeFileSync(report, JSON.stringify({ fixture: true, testResults: [
     { name: join(process.cwd(), 'tests', 'made-up.test.ts'), status: code === 0 ? 'passed' : 'failed', message: config.mode === 'logins' ? loginText : 'made-up suite result' },
   ] }))
+  // A made-up blob report beside it when the run asks for one (criterion 28). It is not vitest's format, and it names a
+  // made-up address so the mask can be seen. 'blob-too-big' writes more than the test's bound.
+  const blob = args.find((word) => word.startsWith('--outputFile.blob='))?.slice('--outputFile.blob='.length)
+  if (blob !== undefined && config.mode !== 'no-report') writeFileSync(blob, config.mode === 'blob-too-big' ? 'x'.repeat(4096) : JSON.stringify({ fixture: true, blob: 'made-up blob of made-up.test.ts at 192.0.2.91' }))
   if (config.mode === 'read-formats') {
     // Real recorder observations of a made-up suite, not seeded read lines.
     readdirSync(process.cwd())

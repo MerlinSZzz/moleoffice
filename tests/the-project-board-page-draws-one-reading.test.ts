@@ -2,7 +2,8 @@
 // Licensed under the MIT License. See LICENSE.
 /**
  * THE PROJECT BOARD'S PAGE DRAWS ONE READING. Wave 13u round 216, package BV, point BV-3: the table by block, with
- * the view by line and the quick view as tabs.
+ * the view by line and the quick view as tabs. Wave 13u round 242 added a fourth tab, people and packages, which
+ * reads its own door when it is chosen.
  *
  * WHAT IS PROVED, in a test office with a made-up project:
  *   1. All pages draws one row for Board in the project's group, its link opens `#/board`, and the page's title is
@@ -16,7 +17,8 @@
  *   4. The "By line" and "Quick view" tabs draw the same answer. The board door is asked once while all three tabs
  *      are opened, the run that acts stands in its line's "Now" lane, and the quick view's runs per block are the
  *      rows' own counts.
- *   5. No small print: no superscript, no footnote mark and no list of notes. A cell with no value is blank.
+ *   5. No small print, in any of the four tabs: no superscript, no footnote mark and no list of notes. A cell with no
+ *      value is blank.
  *   6. In a project with no master pipeline, the page draws no sentence and no tab: its only text is its title. The
  *      board door still answers that no master is marked, which is where an agent reads why.
  *   7. Each row says, under its block's name, why it is in its group. The words are the page's `theReasonOfARow` of
@@ -27,8 +29,11 @@
  *      words and no bar, and its row is marked as not known. This test office has no repository, so its landings
  *      are not read, and the quick view draws no landings chart and no landings heading.
  *   9. On a board with a master, nothing stands between the title and the tabs, and no sentence the page drew above
- *      the tabs or in place of them is on the page, in any tab. The board shows people no explanatory text: agents
- *      read the reasons in the board door's answer and its note.
+ *      the tabs or in place of them is on the page, in any of the four tabs. The board shows people no explanatory
+ *      text: agents read the reasons in the board door's answer and its note.
+ *  10. The "By line" and "Quick view" tabs read the records again when the page is opened again: a run that starts
+ *      acting under a row joins its line's "Now" lane and adds one to that row's count, and every other row's count
+ *      stays the same.
  *
  * Pictures are taken only when TEST_SHOTS names a folder: four widths, both themes, each tab and the page of the
  * project with no master, each of the whole page.
@@ -197,7 +202,7 @@ async function theDoor(): Promise<ProjectBoard> {
   return (await call('GET', `/api/projects/${PROJECT.id}/board`)) as ProjectBoard
 }
 
-async function aTab(tab: 'block' | 'line' | 'quick'): Promise<void> {
+async function aTab(tab: 'block' | 'line' | 'quick' | 'people'): Promise<void> {
   await app.page.locator(`button.pb-tab[data-tab="${tab}"]`).click()
   await app.page.locator(`[data-board-view="${tab}"]`).waitFor()
 }
@@ -361,7 +366,7 @@ describe('the project board page', () => {
   it('5. has no small print, and a cell with no value is blank', async () => {
     await open()
     const page = app.page
-    for (const tab of ['block', 'line', 'quick'] as const) {
+    for (const tab of ['block', 'line', 'quick', 'people'] as const) {
       await aTab(tab)
       expect(await page.locator('.pb sup, .pb small').count(), tab).toBe(0)
       expect(await page.locator('.pb').innerText(), tab).not.toMatch(/[¹²³⁴⁵⁶⁷⁸⁹⁰†‡*]/u)
@@ -457,7 +462,7 @@ describe('the project board page', () => {
       return `${next.tagName.toLowerCase()}${[...next.classList].map((one) => `.${one}`).join('')}[role=${next.getAttribute('role') ?? ''}]`
     })
     expect(afterTheTitle, 'what the page draws next after its title').toBe('div.pb-tabs[role=tablist]')
-    for (const tab of ['block', 'line', 'quick'] as const) {
+    for (const tab of ['block', 'line', 'quick', 'people'] as const) {
       await aTab(tab)
       await noSentenceItNoLongerDrawsIsOnThePage(tab)
     }
@@ -484,4 +489,42 @@ describe('the project board page', () => {
     }
     // Four pictures at each width and theme, where there were three, so a third more time.
   }, 400_000)
+
+  it('10. the line view and the quick view both change when a run starts acting under a row', async () => {
+    await open()
+    const page = app.page
+    await aTab('line')
+    const lineLinks = async (): Promise<string[]> =>
+      page.locator('[data-board-line="13x"] a').evaluateAll((all) => all.map((one) => one.getAttribute('href') ?? ''))
+    const linksBefore = await lineLinks()
+    await aTab('quick')
+    const actingRows = async (): Promise<string[][]> =>
+      page.locator('[data-board-chart="acting"] .pb-bar-row').evaluateAll((all) =>
+        all.map((one) => [one.querySelector('.pb-bar-label')?.textContent ?? '', one.querySelector('.pb-bar-words')?.textContent ?? '']),
+      )
+    const actingBefore = await actingRows()
+
+    // A second run acting under the row, made as beforeAll made the first.
+    const second = await call('POST', '/api/records', { kind: 'session', title: 'Example second run (made up)', data: { state: 'running', servingAgent: 'wave-13x-supervisor' } })
+    id['second-run'] = second.record.id as string
+    await aLink('second-run', 'under-work', 'part_of')
+    await call('GET', `/api/records/${id['second-run']!}`, undefined, PROJECT.id, { 'x-mole-office-session': id['second-run']! })
+
+    await open()
+    const door = await theDoor()
+    await aTab('line')
+    const linksAfter = await lineLinks()
+    expect(linksAfter.filter((href) => href.includes(id['run']!))).toHaveLength(1)
+    expect(linksAfter.filter((href) => href.includes(id['second-run']!))).toHaveLength(1)
+    expect(linksAfter).toEqual(expect.arrayContaining(linksBefore))
+
+    await aTab('quick')
+    const actingAfter = await actingRows()
+    expect(actingAfter).toEqual(door.rows.map((row) => [row.title, String(row.acting.length)]))
+    for (const row of door.rows) {
+      const was = actingBefore.find(([label]) => label === row.title)
+      expect(was, row.title).toBeDefined()
+      expect(actingAfter.find(([label]) => label === row.title)?.[1], row.title).toBe(String(Number(was![1]) + (row.id === id['row-with-work'] ? 1 : 0)))
+    }
+  })
 })

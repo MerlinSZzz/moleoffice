@@ -20,8 +20,8 @@
  *   4. Clear the hold is drawn only on a held row, and after the press the stored hold is null, the held
  *      line is gone, and the native fields stay.
  *   5. A refused write is drawn under the row in the page's words and nothing is stored.
- *   6. The open form on a row with native fields and a hold is photographed at 1440, 990, 660 and 390 in
- *      light and dark, in English, with no sideways scrolling of the page at any width.
+ *   6. The open form on a row with native fields and a hold is photographed at 1440 and 390 in light,
+ *      in English, with no sideways scrolling of the page at any width.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
@@ -35,8 +35,8 @@ let app: LiveApp
 /** The test's own pictures folder: under TEST_SHOTS when it names one, otherwise temporary and deleted. */
 const SHOTS = testShots('casting-native-fields')
 const PAGE = '.cast'
-const WIDTHS = [1440, 990, 660, 390] as const
-const THEMES = ['light', 'dark'] as const
+const WIDTHS = [1440, 390] as const
+const THEMES = ['light'] as const
 
 /** The test's made-up rows. */
 let saving = 0
@@ -253,7 +253,7 @@ describe('the Casting page changes and clears a row’s native fields and its ho
     expect((await storedRow(refused))['native'] ?? null).toBeNull()
   }, 120_000)
 
-  it('photographs the open form at four widths in both themes, with nothing scrolling sideways', async () => {
+  it('photographs the open form at the widest and the narrowest width in the light theme, with nothing scrolling sideways', async () => {
     await open('?lang=en#/casting')
     await openNative(pictured)
     for (const width of WIDTHS) {

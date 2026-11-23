@@ -233,7 +233,15 @@ describe('a later look at named agents', () => {
 
   it('1 and 2. reads a held agent, and the hold, with a waiting run given to it and to an agent not named', async () => {
     // THE HOLD, taken through its door, whose own look at the agent is checked by the look at every agent after it.
-    const session = await aRun('behind the hold', { state: 'running', doing: 'made-up' })
+    // ITS SESSION NAMES A PROCESS OF ITS OWN THAT NO LONGER RUNS, and has no transcript, so the hold does not answer
+    // and the waiting run given to the agent changes its reading. A hold that still beats is the session's answer
+    // unless what is read of the session says it is gone, and an ended process is that sign. The number is above
+    // any pid the system hands out, so nothing runs under it.
+    const session = await aRun('behind the hold', {
+      state: 'running',
+      doing: 'made-up',
+      extra: { discovered: { pid: 2147483014, pidStartedAt: '2026-01-01 00:00:00' } },
+    })
     filed.set('behind the hold', (t.client.sqlite.prepare('SELECT data FROM records WHERE id = ?').get(session) as { data: string }).data)
     await call('POST', '/api/handles/made-up-named-one/hold', { session, machine: 'a-made-up-machine', runtime: 'claude-code' })
     expect(told.answeringLookNow('every agent')).toEqual([])

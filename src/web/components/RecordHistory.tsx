@@ -83,7 +83,7 @@ import { actorTypeWord, provenanceWord, relationWord } from '../lib/words.ts'
 // again here. See `whatHappened`.
 import { changeVerb } from './ChangeLog.tsx'
 import type { HistoryEvent } from '../../server/lib/history.ts'
-import { Absence, Btn, ErrorNote, Explain, Field, Panel, Stamp, Tag, TextArea } from './ui.tsx'
+import { Absence, Btn, ErrorNote, Field, Hint, Panel, ServerNote, Stamp, Tag, TextArea } from './ui.tsx'
 import { useProjectAsync } from '../lib/project-async.ts'
 import { declaredAttributes, type Declares } from './declares.ts'
 // WHAT THIS SECTION IS CALLED, from the one place a section's title is written. See `historyControl`.
@@ -576,7 +576,6 @@ function SidesOf({
     if (worthLiningUp) {
       return (
         <>
-          <p className="rh-note">{t('record.history.tooLong')}</p>
           <OneSide tag={t('record.history.sideVersion', { seq: from })} value={before} />
           <OneSide tag={t('record.history.sideVersion', { seq: to })} value={after} />
         </>
@@ -726,7 +725,7 @@ function PutBack({
     <div className="rh-put-back">
       <details>
         <summary>{t('record.history.why')}</summary>
-        <Field label={t('record.history.why')} hint={t('record.history.whyHint')}>
+        <Field label={t('record.history.why')}>
           <TextArea value={why} onChange={setWhy} rows={2} />
         </Field>
       </details>
@@ -1002,52 +1001,34 @@ export function RecordHistory({
         declares={{ surface: null }}
         titleIs="label" title={t('record.history.versions')}
         rank={2}
-        actions={<Tag tone="quiet">{count}</Tag>}
+        actions={
+          <>
+            {/* ONLY WHERE IT IS TRUE: there is an earlier version to put back, and the press it names opens editing. */}
+            {count > 1 && editPressOpensEditing ? <Hint>{t('record.history.pressEditToPutBack')}</Hint> : null}
+            <Tag tone="quiet">{count}</Tag>
+          </>
+        }
       >
-        {/* THE FOUR BOXES THAT EXPLAIN THIS PANEL'S RULES ARE DEVELOPER MODE'S. Each says how the office
-            keeps versions, and a reader in normal mode does nothing with that. Normal mode is told only
-            where the put-back is, in one sentence under the list, and only when it is true; and when no
-            version holds what the record holds now, it is told so in a plain paragraph, because that
-            changes what the list can do. */}
-        {mode === 'inspect' ? (
-          <Explain
-            declares={{ surface: null }}
-            meaning={<span>{t('record.history.kept')}</span>}
-            opens={t('record.history.putBackMeaning')}
-          >
-            <p className="rh-note">
-              {t('record.history.putBackExplanation')}
-            </p>
-          </Explain>
-        ) : null}
-        {nowSeq === null ? (
-          mode === 'inspect' ? (
-            <Explain
-              declares={{ surface: null }}
-              meaning={<span>{t('record.history.notCurrent')}</span>}
-              opens={t('record.history.notCurrentMeaning')}
-            >
-              <p className="rh-note">
-                {t('record.history.notCurrentExplanation')}
-              </p>
-            </Explain>
-          ) : (
-            <p className="rh-says">{t('record.history.notCurrentExplanation')}</p>
-          )
-        ) : null}
+        {/* WHEN NO VERSION HOLDS WHAT THE RECORD HOLDS NOW, a plain state line says so, in both modes,
+            because that changes what the list can do. */}
+        {nowSeq === null ? <p className="rh-says">{t('record.history.inNoVersion')}</p> : null}
         {did === null ? null : (
           <div className="rh-did">
             {/* THE SERVER'S OWN SENTENCE, not a second telling of it. The reply already says which
                 version was put back, what number the new one has, what moved, and — where they
                 apply — that the delete stamp was left alone or that a pipeline's blocks moved with
                 its title. A restatement here could disagree with it. */}
-            <p className="rh-did-said">{mode === 'inspect' ? did.note : did.newSeq === null ? t('record.history.putUnchanged', { seq: did.putBack }) : t('record.history.putDone', { seq: did.putBack, newSeq: did.newSeq })}</p>
+            <p className="rh-did-said">{did.newSeq === null ? t('record.history.putUnchanged', { seq: did.putBack }) : t('record.history.putDone', { seq: did.putBack, newSeq: did.newSeq })}</p>
+            <ServerNote text={did.note} />
             {did.changed.length === 0 ? null : (
               <p className="rh-note">{whatMovedHere(did.changed, mode).said}</p>
             )}
             {did.throughKindChange === undefined ? null : <p className="rh-note">{t('record.history.kindChanged', { from: kindWord(did.throughKindChange.from).text, to: kindWord(did.throughKindChange.to).text })}</p>}
             {did.deletedStateUntouched === undefined ? null : (
-              <p className="rh-note">{mode === 'inspect' ? did.deletedStateUntouched.whatToSend : t('record.history.deletionUnchanged')}</p>
+              <>
+                <p className="rh-note">{t('record.history.deletionUnchanged')}</p>
+                <ServerNote text={did.deletedStateUntouched.whatToSend} />
+              </>
             )}
           </div>
         )}
@@ -1085,22 +1066,6 @@ export function RecordHistory({
             ))}
           </ul>
         )}
-        {mode === 'inspect' ? (
-          editable ? null : (
-            <Explain
-              declares={{ surface: null }}
-              meaning={<span>{t('record.history.editingOnly')}</span>}
-              opens={t('record.history.wherePutBack')}
-            >
-              <p className="rh-note">
-                {t('record.history.editingExplanation')}
-              </p>
-            </Explain>
-          )
-        ) : count > 1 && editPressOpensEditing ? (
-          // ONLY WHERE IT IS TRUE: there is an earlier version to put back, and the press it names opens editing.
-          <p className="rh-says">{t('record.history.pressEditToPutBack')}</p>
-        ) : null}
       </Panel>
 
       {/* AND EVERYTHING ELSE THAT HAPPENED, which the versions list cannot show. A module's claims
@@ -1206,10 +1171,7 @@ function WhatHappenedHere({ recordId, changedAt, participants }: { recordId: str
     )
   }
 
-  const { events, scope, read } = reading.value
-  // WHAT IS IN THE READING BESIDE THIS RECORD ITSELF. A module carries blocks and their rows are
-  // here too; saying how many is what stops a reader taking a block's rename for the module's.
-  const carried = scope.filter((entry) => entry.because === 'carries').length
+  const { events, read } = reading.value
 
   return (
     <Panel
@@ -1218,20 +1180,9 @@ function WhatHappenedHere({ recordId, changedAt, participants }: { recordId: str
       rank={2}
       actions={<Tag tone="quiet">{events.length}</Tag>}
     >
-      {/* WHAT WAS READ, IN DEVELOPER MODE ONLY. It explains the office's own reading, which a reader in
-          normal mode does nothing with. The fold holds the server's own sentence: which tables were read
-          and what it does not invent. */}
-      {mode === 'inspect' ? (
-        <Explain
-          declares={{ surface: null }}
-          meaning={
-            <span>{t(carried === 0 ? 'record.history.eventsScope' : 'record.history.carriedScope', { n: carried })}</span>
-          }
-          opens={t('record.history.whatRead')}
-        >
-          <p className="rh-note">{read.sources}</p>
-        </Explain>
-      ) : null}
+      {/* WHAT WAS READ, IN DEVELOPER MODE ONLY: the server's own sentence, which tables were read and what
+          it does not invent. */}
+      <ServerNote text={read.sources} />
       {events.length === 0 ? (
         <Absence />
       ) : (
@@ -1335,29 +1286,7 @@ export function VersionRow({
           )}
         </div>
       )}
-      {/* A `div`, NOT A `p`, AND THAT IS THE WHOLE OF THE CHANGE HERE. The fold below renders a
-          `<details>` holding a `<summary>` and a `<p>`, and none of the three may be inside a `<p>`:
-          the browser closes the paragraph at the `<details>` and reopens it afterwards, so the tree
-          React built and the tree the browser has are different ones. React reported it on every
-          record page as "In HTML, <summary> cannot be a descendant of <p>. This will cause a
-          hydration error", four times over. `.rh-said` sets its own margin, so nothing moves. */}
-      <div className="rh-said">
-        {says.told}
-        {/* THE ONE ROW A READER CAN MISREAD INTO SOMETHING FALSE. 539 of 617 versions in this corpus
-            are this row, and a reader who takes it for the record as first written has been told a
-            past by a product that never stored one. */}
-        {says.warn ? (
-          <Explain
-            declares={{ surface: null }}
-            meaning={<span>{t('record.history.notFirst')}</span>}
-            opens={t('record.history.oldestMeaning')}
-          >
-            <p className="rh-note">
-              {t('record.history.baselineExplanation')}
-            </p>
-          </Explain>
-        ) : null}
-      </div>
+      <div className="rh-said">{says.told}</div>
       {entry.note === null ? null : <p className="rh-said rh-why">{entry.note}</p>}
       <p className="rh-moved">
         {moved.at === 'moved' ? (

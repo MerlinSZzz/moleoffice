@@ -109,7 +109,8 @@ export interface VisitRegistration {
 /**
  * Register a visit in this database.
  *
- * IT REFUSES A VISIT TO THE WORLD THE VISITOR ALREADY LIVES IN. There is nothing to register: a
+ * IT REFUSES A VISIT TO THE WORLD THE VISITOR ALREADY LIVES IN, including when the visitor remembers
+ * a former home of this office. Both refusals have one reason: the visitor lives here. There is nothing to register: a
  * citizen at home is not checked, and a row saying otherwise would put a visit on a list of people
  * working away from home who are not.
  *
@@ -132,6 +133,12 @@ export function registerVisitHere(said: VisitRegistration): Visit {
     throw new PanelError(
       `The world ${said.toWorld} is where this citizen lives, so there is nothing to register. A visit is a ` +
         'citizen of one world working in another.',
+      400,
+    )
+  }
+  if (isAVisitFromThisOfficesFormerHome(said.fromWorld, said.toWorld)) {
+    throw new PanelError(
+      `The world ${said.fromWorld} is a former home of this office, so this citizen lives here and there is nothing to register.`,
       400,
     )
   }
@@ -282,6 +289,10 @@ export type WhereTheCallerIsFrom =
  * installation already live, and asking it means a world that is renamed or closed cannot drift from
  * a second copy of the answer. `theInstallationThisDatabaseBelongsTo()` is the installation this
  * database says it is, so a home of somebody else's installation is not read as this one's.
+ *
+ * ONE QUESTION FOR EVERY READER OF A HOME WORLD. `isThisOfficesHome` below asks this together with
+ * this database's own identity, and every reader that asks whether a stored home world is this
+ * office's asks it, never this one alone and never an equality with this database's identity.
  */
 function isADeadHomeOfThisInstallation(databaseIdentity: string): boolean {
   const installation = theInstallationThisDatabaseBelongsTo()
@@ -293,6 +304,31 @@ function isADeadHomeOfThisInstallation(databaseIdentity: string): boolean {
       one.diedAt !== null &&
       one.installation === installation,
   )
+}
+
+/**
+ * IS THIS HOME WORLD THIS OFFICE'S HOME? A stored home world is a database identity, and a move of the
+ * data folder gives the office a new one. So the answer is true for this database's own identity and
+ * for a dead home of this installation, and false for every other world.
+ *
+ * NULL IS NOT FALSE. The answer is null when nobody recorded the home world, and when this office
+ * cannot say which world it is: in both cases nobody can tell, and a caller that needs a yes treats
+ * null as no and says so in its own words.
+ */
+export function isThisOfficesHome(databaseIdentity: string | null): boolean | null {
+  if (databaseIdentity === null) return null
+  const here = theWorldThisDatabaseIs()
+  if (here === null) return null
+  return databaseIdentity === here || isADeadHomeOfThisInstallation(databaseIdentity)
+}
+
+/**
+ * Is this visit to this office from one of its former homes? The destination must be this database:
+ * a world reporting a visit made elsewhere may name this office's home as the origin, and that visit
+ * is real and must still be registered.
+ */
+export function isAVisitFromThisOfficesFormerHome(fromWorld: string, toWorld: string): boolean {
+  return fromWorld !== toWorld && toWorld === theWorldThisDatabaseIs() && isThisOfficesHome(fromWorld) === true
 }
 
 /**

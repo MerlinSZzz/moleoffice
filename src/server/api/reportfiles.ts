@@ -21,15 +21,18 @@
  */
 
 import type { FastifyInstance } from 'fastify'
-import { isAbsolute, resolve } from 'node:path'
+import { basename, isAbsolute, resolve, sep } from 'node:path'
 import { sql, type SQL } from 'drizzle-orm'
 import { z } from 'zod'
 import { actorFrom } from '../lib/http.ts'
 import { parse } from '../lib/parse.ts'
-import { ACROSS_WORKSPACES, actorMayActAsSecretaryOrThePerson, listRecordNamesWithDataAs, listRecords } from '../lib/records.ts'
+import { ACROSS_WORKSPACES, actorMayActAsSecretaryOrThePerson, listRecordNamesWithDataAs, listRecords, onlyTheseFieldsOf } from '../lib/records.ts'
 import { PanelError } from '../lib/panel-error.ts'
 import { theMessageReader, theMessagesHiddenFrom } from '../lib/messages.ts'
 import { records } from '../db/schema.ts'
+import { sqlite } from '../db/client.ts'
+import { theCanonicalAgentId } from '../db/registry-aliases/worker-runs.ts'
+import { whoFiledFromWhichRun } from '../lib/records/filed-from.ts'
 import { theRecordsThatMayHoldOneOf } from '../lib/record-text-index.ts'
 import {
   STORES_BESIDE_THE_DATABASE,
@@ -42,6 +45,8 @@ import {
   type StoreBesideTheDatabase,
 } from './files.ts'
 import { theRunHasEnded } from '@shared/run-has-ended.ts'
+import { theLauncherIsForThisWorkerRun } from '@shared/worker-runs.ts'
+import { THE_HEADS_ONLY_THE_OFFICE_WRITES } from '@shared/kinds.ts'
 import { theBranchesThatKeepASealedCommit } from '../lib/sealed-tip.ts'
 import { route } from '../lib/route.ts'
 import { readClosedUnchecked, readConfirmation, theInspectorAsked, theSupersededOn } from '@shared/releasing.ts'
@@ -146,20 +151,73 @@ function aFileInsideReader(folder: string): (path: string) => boolean {
   return (path) => place(path) !== null
 }
 
+/** How many records the named-inside door reads whole in one page, and so the most it holds whole at once. */
+export const NAMED_INSIDE_PAGE_SIZE = 200
+
+/**
+ * A NAMED-INSIDE CALL THAT TAKES THIS MANY MILLISECONDS OR MORE writes one warning to the server's log, saying which part
+ * took the time (`theSlowNamedInsideLine`). One call on the live office took 15.4 s, on the thread that answers every
+ * request, and nothing said which part it was.
+ */
+export const NAMED_INSIDE_SLOW_MS = 1000
+
+/** How long each part of one named-inside call took, in whole milliseconds, for `theSlowNamedInsideLine`. */
+interface NamedInsideTimes {
+  total: number
+  finding: { ms: number; byTheIndex: boolean; ids: number }
+  narrowingMs: number
+  pages: { ms: number; pages: number; records: number }
+  comparison: { ms: number; lookedFor: boolean }
+}
+
+/**
+ * THE LINE A SLOW NAMED-INSIDE CALL WRITES. It names the folder by its last segment alone, and nothing else of the path
+ * or of the caller. The rest is the total less every part, so the parts add up to the total.
+ *
+ * The comparison says whether the worktree was looked for, and not whether git was asked: a folder that is not there is
+ * known without git (`theWorktreeAsGitHoldsIt`). The fallback is named without its reason, since
+ * `whichRecordsCouldNameIt` gives none: the folder is the root, its last segment cannot be asked of the index, or the
+ * index kept too many records.
+ */
+function theSlowNamedInsideLine(folder: string, times: NamedInsideTimes): string {
+  const { total, finding, narrowingMs, pages, comparison } = times
+  const last = basename(folder)
+  const count = (n: number, one: string, many: string): string => `${n} ${n === 1 ? one : many}`
+  const rest = total - finding.ms - narrowingMs - pages.ms - comparison.ms
+  return `The named-inside door took ${total} ms for ${last === '' ? 'the root folder' : `a folder ending in ${last}`}: ` +
+    `finding ${finding.ms} ms ${finding.byTheIndex ? 'by the text index' : 'by a pass over every record, without the text index'}, ` +
+    `${count(finding.ids, 'id', 'ids')}; ` +
+    `narrowing ${narrowingMs} ms; ` +
+    `pages ${pages.ms} ms without the comparison, ${count(pages.pages, 'page', 'pages')}, ${count(pages.records, 'record', 'records')}; ` +
+    `comparison ${comparison.ms} ms, ${comparison.lookedFor ? 'a worktree looked for once' : 'no worktree looked for'}; ` +
+    `the rest ${rest} ms.`
+}
+
+/**
+ * HOW MANY RECORDS THE NAMED-INSIDE DOOR READS BY THE IDS THE INDEX OF THE RECORDS' TEXT KEEPS, AT MOST. Past this many,
+ * the door reads every record by `theRecordsThatCouldNameIt`.
+ *
+ * On a copy of the made-up office at 196,570 live records (wave 14c round 9), the index kept 8,589 records for a
+ * folder's last segment. The pass by the condition over every record took 601 to 610 ms. Read by the index's ids, the
+ * same records in the same order took 30 to 35 ms, about 4 µs a record. So 50,000 records cost about 200 ms by id, a
+ * third of the pass, and the pass grows with every record of the office.
+ */
+export const AT_MOST_READ_BY_ID_FOR_A_FOLDER = 50_000
+
 /**
  * WHICH RECORDS THE DOOR READS FOR A FOLDER: the ones the index of the records' text keeps, by id, or else the ones
  * `theRecordsThatCouldNameIt` keeps.
  *
  * The index holds the text of every string in `data` with its escapes read, as `aFolderNamer` reads it, and it works
- * in any script. A record that names the folder holds its last segment as written, or the name of a store at or inside
- * the folder when the data folder has moved, for the reasons below. The index cannot be asked about a text of fewer
- * than three letters, and it gives no ids when it keeps more records than are read by id
- * (src/server/lib/record-text-index.ts).
+ * in any script. A record that names the folder holds its last segment beside a "/", as `theTextsTheIndexIsAskedFor`
+ * gives it, or the name of a store at or inside the folder when the data folder has moved, for the reasons below. The
+ * index cannot be asked about a text of fewer than three letters, and it gives no ids when it keeps more than
+ * `AT_MOST_READ_BY_ID_FOR_A_FOLDER` records, the door's own number (src/server/lib/record-text-index.ts).
  */
 export function whichRecordsCouldNameIt(folder: string): { ids: readonly string[] } | { alsoWhere: SQL | undefined } {
   const segments = folder.split('/').filter((one) => one !== '')
   const last = segments[segments.length - 1]
-  const ids = last === undefined ? undefined : theRecordsThatMayHoldOneOf([last, ...theStoresAtOrInside(folder)])
+  const ids = last === undefined ? undefined : theRecordsThatMayHoldOneOf([...theTextsTheIndexIsAskedFor(last), ...theStoresAtOrInside(folder)], AT_MOST_READ_BY_ID_FOR_A_FOLDER)
   return ids === undefined ? { alsoWhere: theRecordsThatCouldNameIt(folder) } : { ids }
 }
 
@@ -250,9 +308,36 @@ const ENDS_THE_NAME = /[\s"'`,;:!?)}\]]|\P{ASCII}/u
 const AFTER_A_FULL_STOP = /^(?:$|[\s"')\]]|\P{ASCII})/u
 
 /**
+ * THE TEXTS THE INDEX OF THE RECORDS' TEXT IS ASKED FOR, FOR A FOLDER'S LAST SEGMENT: the segment with a "/" just before
+ * it and the segment with a "/" just after it, or else the segment as written.
+ *
+ * Every record the door lists, counts or leaves out holds one of the two in one of its strings. `theFolderPlaceFinder`
+ * finds a place only where a "/" follows the segment, where the segment before it and a "/" come before it, or where
+ * the folder has one segment and a "/" leads it. A stored path counts only when `usableStoredPath`
+ * (src/server/lib/where-a-file-may-be-read.ts) takes it, and it takes only an absolute path with no ".." name, so every
+ * segment in it has a "/" before it. A path read at a moved store's new place is found by the store's name
+ * (`theStoresAtOrInside`).
+ *
+ * A segment of fewer than three letters is asked as written, because the index cannot be asked about it, so such a
+ * folder is still read by the condition of round 63. A separator other than "/" is asked as written, because the door
+ * splits the folder on "/" and `resolve` writes it with "\" on Windows, so the last segment is the whole path and two
+ * texts built with "/" would miss a stored path that is the folder itself.
+ *
+ * On a copy of the made-up office grown to 280,183 live records (wave 14c round 9), the index kept 25,505 records for a
+ * folder's last segment, none of them held it beside a "/", and reading them whole took about 750 ms of the call.
+ *
+ * If `theFolderPlaceFinder` or `usableStoredPath` comes to find a place where no "/" is beside the last segment, this
+ * function must change with it, or the door will miss the records that place names.
+ */
+export function theTextsTheIndexIsAskedFor(last: string, separator: string = sep): string[] {
+  return separator === '/' && [...last].length >= 3 ? [`/${last}`, `${last}/`] : [last]
+}
+
+/**
  * EACH PLACE IN A TEXT THAT NAMES THE FOLDER, by the rules `aFolderNamer` gives: the index just after the folder and
  * its "/" where more path follows, or -1 where the text names the folder itself. The named-inside door compares what
- * follows with the worktree's commit.
+ * follows with the worktree's commit. The index is asked for what this function finds by `theTextsTheIndexIsAskedFor`,
+ * so a change here may change that too.
  */
 function theFolderPlaceFinder(folder: string): (text: string) => Generator<number> {
   const segments = folder.split('/').filter((one) => one !== '')
@@ -290,11 +375,30 @@ function theFolderPlaceFinder(folder: string): (text: string) => Generator<numbe
  * WHAT EACH RECORD NAMES INSIDE THE FOLDER, compared with the HEAD of the worktree whose top it is, or why nothing was
  * compared. A stored path is compared as it is stored. Prose is compared at each place
  * `theFolderPlaceFinder` finds, in every string `aFolderNamer` reads, less the strings that are the stored paths
- * compared, so one path is not read twice.
+ * compared, so one path is not read twice. Git is asked once, by the first record compared, so it is asked only when the
+ * door lists or counts a record. `classOf` gives null when there is no worktree to compare with. `lookedFor` says
+ * whether a record has been compared, and so whether the worktree was looked for.
  */
-function whatEachRecordNamesInside(folder: string, compared: PanelRecord[]):
-  { head: string; classOf: (record: PanelRecord) => WhatARecordNamesInside } | { because: string } {
-  if (compared.length === 0) return { because: 'No record names the folder or a path inside it, so nothing was compared with git.' }
+function whatEachRecordNamesInside(folder: string): {
+  classOf: (record: PanelRecord) => WhatARecordNamesInside | null
+  comparison: () => { head: string } | { because: string }
+  lookedFor: () => boolean
+} {
+  let asked: { head: string; classOf: (record: PanelRecord) => WhatARecordNamesInside } | { because: string } | undefined
+  return {
+    classOf: (record) => {
+      const compared = asked ?? (asked = theComparisonWithGit(folder))
+      return 'because' in compared ? null : compared.classOf(record)
+    },
+    comparison: () => asked === undefined
+      ? { because: 'No record names the folder or a path inside it, so nothing was compared with git.' }
+      : 'because' in asked ? asked : { head: asked.head },
+    lookedFor: () => asked !== undefined,
+  }
+}
+
+/** The HEAD of the worktree whose top is the folder, with the class of each record compared with it, or why there is none. */
+function theComparisonWithGit(folder: string): { head: string; classOf: (record: PanelRecord) => WhatARecordNamesInside } | { because: string } {
   const tree = theWorktreeAsGitHoldsIt(folder)
   if ('because' in tree) return tree
   const placeInside = aPlaceInsideReader(folder)
@@ -321,37 +425,99 @@ function whatEachRecordNamesInside(folder: string, compared: PanelRecord[]):
 
 const isObject = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value)
 
-/** Each readable run whose session gives `folder` as its working directory and that has ended, with its state. */
-function theEndedRunsThatWorkedIn(readable: PanelRecord[], folder: string): Map<string, string> {
-  const ended = new Map<string, string>()
-  for (const record of readable) {
+/**
+ * ONE RUN IN `ended`, with the fields of its session that say whose worker run it is: the parent it was filed under,
+ * and the agent it serves by its canonical id. A field its session does not name is null.
+ */
+interface AnEndedRunThatWorkedHere {
+  state: string
+  parent: string | null
+  worker: string | null
+}
+
+/**
+ * Each readable run whose session gives `folder` as its working directory and that has ended, with its state and the
+ * fields that name the parent and the worker of a worker run. Only those fields of each session are read, so every
+ * ended run is known before the door reads a record whole.
+ */
+function theEndedRunsThatWorkedIn(readable: readonly string[], folder: string): Map<string, AnEndedRunThatWorkedHere> {
+  const ended = new Map<string, AnEndedRunThatWorkedHere>()
+  const sessions = listRecordNamesWithDataAs(
+    { workspaceId: ACROSS_WORKSPACES, includeDeleted: false, kind: 'session', ids: readable },
+    onlyTheseFieldsOf(['workingDirectory', 'state', 'parentAttachment', 'servingAgentId', 'servingAgent']),
+  )
+  for (const record of sessions) {
     const directory = record.data['workingDirectory']
     if (record.kind !== 'session' || typeof directory !== 'string' || !isAbsolute(directory) || resolve(directory) !== folder) continue
-    if (theRunHasEnded(record.data['state'])) ended.set(record.id, String(record.data['state']))
+    if (!theRunHasEnded(record.data['state'])) continue
+    const parent = record.data['parentAttachment']
+    const id = record.data['servingAgentId']
+    const handle = record.data['servingAgent']
+    const named = typeof id === 'string' && id !== '' ? id : typeof handle === 'string' && handle !== '' ? handle : null
+    ended.set(record.id, {
+      state: String(record.data['state']),
+      parent: typeof parent === 'string' && parent !== '' ? parent : null,
+      worker: named === null ? null : theCanonicalAgentId(sqlite, named),
+    })
   }
   return ended
+}
+
+/** The launcher session one worker run in `ended` was filed from, with the parent and worker its own session names. */
+interface ALauncherOfAnEndedRun {
+  run: string
+  parent: string
+  worker: string
+}
+
+/**
+ * THE LAUNCHER SESSION EACH ENDED WORKER RUN IN `ended` WAS FILED FROM, by the worker run's id. The worker run's first
+ * create change names the session it was filed from (`whoFiledFromWhichRun`), and its own session names the parent it
+ * was filed under and the agent it serves. A run that names no parent or no worker is left out here, since no launcher
+ * can be shown to be its launcher.
+ */
+function theLaunchersOfTheEndedRuns(ended: Map<string, AnEndedRunThatWorkedHere>, workspaceId: string): Map<string, ALauncherOfAnEndedRun> {
+  const launchers = new Map<string, ALauncherOfAnEndedRun>()
+  for (const [run, about] of ended) {
+    if (about.parent === null || about.worker === null) continue
+    const launcher = whoFiledFromWhichRun(workspaceId, run)?.run?.recordId
+    if (typeof launcher === 'string' && launcher !== '') launchers.set(launcher, { run, parent: about.parent, worker: about.worker })
+  }
+  return launchers
 }
 
 /**
  * THE PLACES IN ONE READABLE RECORD THAT THE RULES SET ASIDE, each a path into its data with the rule's words. Only the
  * fields named below are set aside, and only about a run in
  * `ended`:
- *   · the run's own session: its working directory; and its check's checkout directory, only when no check can read that
+ *   · the run's own session: its working directory, with the HEADs the office read there (`filingHead`, `endHead`). Only
+ *     the office writes those, from the working directory, so they go with it by the same rule and are not listed apart;
+ *     and its check's checkout directory, only when no check can read that
  *     folder again: no check was asked of the run, or its check is confirmed, closed unchecked or
  *     superseded. A check asked and not started, running, ended with no verdict, released and not confirmed, or refused
  *     keeps it, because a crashed check may be queued again and a released one reads the tip until it is confirmed;
  *   · a seal of the run naming the folder as its sealed directory: that directory, while a branch of the repository the
  *     seal is read in contains the sealed commit. No chosen repository, git not answering and no branch all keep it;
- *   · an entry about the run in workerRuns: starting.cutSays and launcher.says; a next round about it: launcher.says.
+ *   · an entry about the run in workerRuns: starting.cutSays and launcher.says; a next round about it: launcher.says;
+ *   · a launcher session's `doing` line, once the worker run it was filed from has ended and worked here: that line,
+ *     with aboutAStart's words for the worker run, because a launcher repeats its worker's last output there and that
+ *     output names the worker's worktree. The worker run is the one in `ended` whose first create change names this
+ *     session, whose parent is the launcher's `extra.run`, and whose agent is its `extra.worker`
+ *     (`theLauncherIsForThisWorkerRun`). Only `doing` is set aside; a launcher that names the folder in another field
+ *     keeps the record.
  */
-function thePlacesSetAside(record: PanelRecord, ended: Map<string, string>, folder: string): { path: string[]; rule: string }[] {
-  const places: { path: string[]; rule: string }[] = []
-  const aboutAStart = (run: string): string => `a start line about run ${run}, which has ended (${ended.get(run)!}) and worked in this folder`
+function thePlacesSetAside(record: PanelRecord, ended: Map<string, AnEndedRunThatWorkedHere>, launchers: Map<string, ALauncherOfAnEndedRun>, folder: string): { path: string[]; rule: string; with?: string[][] }[] {
+  const places: { path: string[]; rule: string; with?: string[][] }[] = []
+  const aboutAStart = (run: string): string => `a start line about run ${run}, which has ended (${ended.get(run)!.state}) and worked in this folder`
   if (record.kind === 'session' && ended.has(record.id)) {
-    places.push({ path: ['workingDirectory'], rule: `run ${record.id} has ended (${ended.get(record.id)!}) and this folder is its working directory` })
+    const readThere = THE_HEADS_ONLY_THE_OFFICE_WRITES.filter((field) => {
+      const read = record.data[field]
+      return isObject(read) && read['directory'] === record.data['workingDirectory']
+    }).map((field) => [field])
+    places.push({ path: ['workingDirectory'], rule: `run ${record.id} has ended (${ended.get(record.id)!.state}) and this folder is its working directory`, with: readThere })
     const settled = theCheckIsSettled(record.data)
     if (settled !== null) {
-      places.push({ path: ['theCheck', 'checkout', 'directory'], rule: `run ${record.id} has ended (${ended.get(record.id)!}) and this folder is its working directory; ${settled}` })
+      places.push({ path: ['theCheck', 'checkout', 'directory'], rule: `run ${record.id} has ended (${ended.get(record.id)!.state}) and this folder is its working directory; ${settled}` })
     }
   }
   const seal = record.data['seal']
@@ -361,7 +527,7 @@ function thePlacesSetAside(record: PanelRecord, ended: Map<string, string>, fold
     if (typeof sealed.directory === 'string' && isAbsolute(sealed.directory) && resolve(sealed.directory) === folder && typeof sealed.commit === 'string') {
       const kept = theBranchesThatKeepASealedCommit(run, record.id, sealed)
       if (kept.kept) {
-        places.push({ path: ['seal', 'git', 'directory'], rule: `the seal of run ${run}, which has ended (${ended.get(run)!}) and worked in this folder; ` +
+        places.push({ path: ['seal', 'git', 'directory'], rule: `the seal of run ${run}, which has ended (${ended.get(run)!.state}) and worked in this folder; ` +
           `${kept.branches.length === 1 ? 'branch' : 'branches'} ${kept.branches.join(', ')} of ${kept.repository} ${kept.branches.length === 1 ? 'contains' : 'contain'} its sealed commit ${sealed.commit}` })
       }
     }
@@ -375,6 +541,11 @@ function thePlacesSetAside(record: PanelRecord, ended: Map<string, string>, fold
   const next = record.data['nextRound']
   const nextRun = isObject(next) && isObject(next['started']) ? next['started']['run'] : undefined
   if (typeof nextRun === 'string' && ended.has(nextRun)) places.push({ path: ['nextRound', 'launcher', 'says'], rule: aboutAStart(nextRun) })
+  const launched = launchers.get(record.id)
+  if (record.kind === 'session' && launched !== undefined &&
+      theLauncherIsForThisWorkerRun(record.data, launched.parent, launched.worker, (id) => theCanonicalAgentId(sqlite, id))) {
+    places.push({ path: ['doing'], rule: aboutAStart(launched.run) })
+  }
   return places
 }
 
@@ -397,13 +568,16 @@ function at(data: unknown, path: string[]): unknown {
  * else too, or names it nowhere a rule sets aside.
  */
 function leftOutByARule(
-  record: PanelRecord, ended: Map<string, string>, folder: string, names: (value: unknown) => boolean, namesAFile: (path: string) => boolean,
+  record: PanelRecord, ended: Map<string, AnEndedRunThatWorkedHere>, launchers: Map<string, ALauncherOfAnEndedRun>, folder: string,
+  names: (value: unknown) => boolean, namesAFile: (path: string) => boolean,
 ):
   { id: string; kind: string; title: string; setAside: { where: string; rule: string }[] } | null {
-  const places = thePlacesSetAside(record, ended, folder).filter((place) => names(at(record.data, place.path)))
+  const places = thePlacesSetAside(record, ended, launchers, folder).filter((place) => names(at(record.data, place.path)))
   if (places.length === 0) return null
   const rest = structuredClone(record.data)
-  for (const place of places) delete (at(rest, place.path.slice(0, -1)) as Record<string, unknown>)[place.path[place.path.length - 1]!]
+  for (const place of places) {
+    for (const path of [place.path, ...(place.with ?? [])]) delete (at(rest, path.slice(0, -1)) as Record<string, unknown>)[path[path.length - 1]!]
+  }
   const stillNamed = names([record.title, record.summary, rest]) ||
     storedPathsIn({ ...record, data: rest }).some((ref) => ref.normalised !== null && ref.machine === null && namesAFile(ref.normalised))
   if (stillNamed) return null
@@ -476,6 +650,10 @@ export async function reportFilesRoutes(app: FastifyInstance): Promise<void> {
   })
 
   app.get('/report-files/named-inside', route('report-file.named-inside', 'remote', NAMED_INSIDE_NOTE), async (req, reply) => {
+    // THE CLOCK, read between the parts for the line a slow call writes (`theSlowNamedInsideLine`). Each reading is
+    // rounded down from the start, so every part is a whole number of milliseconds and the parts add up to the total.
+    const began = performance.now()
+    const since = (): number => Math.floor(performance.now() - began)
     const workspaceId = workspaceOf(req)
     const query = z.object({ folder: z.string() }).strict().safeParse(req.query)
     const raw = query.success ? query.data.folder : ''
@@ -493,46 +671,86 @@ export async function reportFilesRoutes(app: FastifyInstance): Promise<void> {
     // reading no text again. A project's read under a narrowing is the read of every project under it, less what the
     // project's condition leaves out, in the same order. Before the narrowing the door read this project's records whole for
     // its list and every project's again for hiddenCount, and by its condition that was two passes over the stored text.
+    // The records are read whole in pages of their ids, so that one ask cannot fill the heap.
+    const findingBegan = since()
     const couldNameIt = whichRecordsCouldNameIt(folder)
-    const everywhere = listRecords({ workspaceId: ACROSS_WORKSPACES, includeDeleted: false, ...couldNameIt })
-    const ids = everywhere.map((record) => record.id)
+    const ids = listRecordNamesWithDataAs({ workspaceId: ACROSS_WORKSPACES, includeDeleted: false, ...couldNameIt }, sql<string>`'{}'`).map((record) => record.id)
+    const found = since()
     const inThisProject = new Set(listRecordNamesWithDataAs({ workspaceId, includeDeleted: false, ids }, sql<string>`'{}'`).map((record) => record.id))
-    const current = everywhere.filter((record) => inThisProject.has(record.id))
+    const current = ids.filter((id) => inThisProject.has(id))
     const reader = theMessageReader(actorFrom(req))
-    const hidden = theMessagesHiddenFrom(reader, current.map((record) => record.id))
-    const readable = current.filter((record) => !hidden.has(record.id))
+    const hidden = theMessagesHiddenFrom(reader, current)
+    const readable = current.filter((id) => !hidden.has(id))
     const ended = theEndedRunsThatWorkedIn(readable, folder)
-    const leftOut = ended.size === 0 ? [] : readable.flatMap((record) => leftOutByARule(record, ended, folder, names, namesAFile) ?? [])
-    const setAside = new Set(leftOut.map((record) => record.id))
-    const listing = readable.filter((record) => !setAside.has(record.id)).flatMap((record) => {
-      const paths = storedPathsIn(record)
-        .filter((ref) => ref.normalised !== null && ref.machine === null && namesAFile(ref.normalised))
-        .map(({ where, path }) => ({ where, path }))
-      return paths.length === 0 ? [] : [{ record, paths }]
-    })
-    const listed = new Set(listing.map(({ record }) => record.id))
-    const counted = everywhere
-      .filter(record => !listed.has(record.id) && !setAside.has(record.id) && (names([record.title, record.summary, record.data]) ||
-        storedPathsIn(record).some(ref => ref.normalised !== null && ref.machine === null && namesAFile(ref.normalised))))
-    const hiddenCount = counted.length
-    const comparison = whatEachRecordNamesInside(folder, [...listing.map(({ record }) => record), ...counted])
-    const compared = 'because' in comparison ? null : comparison
-    const records = listing.map(({ record, paths }) => ({ id: record.id, kind: record.kind, title: record.title, paths,
-      ...(compared === null ? {} : { names: compared.classOf(record) }) }))
-    let hiddenCiters: Record<WhatARecordNamesInside, number> | null = null
-    if (compared !== null) {
-      hiddenCiters = Object.fromEntries(NAMED_INSIDE_CLASSES.map((key) => [key, 0])) as Record<WhatARecordNamesInside, number>
-      for (const record of counted) hiddenCiters[compared.classOf(record)] += 1
+    const launchers = theLaunchersOfTheEndedRuns(ended, workspaceId)
+    const isReadable = new Set(readable)
+    const comparing = whatEachRecordNamesInside(folder)
+    // The comparison is timed apart from the pages it is made in, since git is asked inside the first record's class.
+    let comparedMs = 0
+    const classOf = (record: PanelRecord): WhatARecordNamesInside | null => {
+      const from = since()
+      const named = comparing.classOf(record)
+      comparedMs += since() - from
+      return named
     }
+    const records: { id: string; kind: PanelRecord['kind']; title: string; paths: { where: string; path: string }[]; names?: WhatARecordNamesInside }[] = []
+    const leftOut: NonNullable<ReturnType<typeof leftOutByARule>>[] = []
+    let hiddenCount = 0
+    const counted = Object.fromEntries(NAMED_INSIDE_CLASSES.map((key) => [key, 0])) as Record<WhatARecordNamesInside, number>
+    let pagesRead = 0
+    let recordsRead = 0
+    const narrowed = since()
+    for (let at = 0; at < ids.length; at += NAMED_INSIDE_PAGE_SIZE) {
+      const page = listRecords({ workspaceId: ACROSS_WORKSPACES, includeDeleted: false, ids: ids.slice(at, at + NAMED_INSIDE_PAGE_SIZE) })
+      pagesRead += 1
+      recordsRead += page.length
+      for (const record of page) {
+        if (isReadable.has(record.id)) {
+          const out = ended.size === 0 ? null : leftOutByARule(record, ended, launchers, folder, names, namesAFile)
+          if (out !== null) {
+            leftOut.push(out)
+            continue
+          }
+          const paths = storedPathsIn(record)
+            .filter((ref) => ref.normalised !== null && ref.machine === null && namesAFile(ref.normalised))
+            .map(({ where, path }) => ({ where, path }))
+          if (paths.length > 0) {
+            const named = classOf(record)
+            records.push({ id: record.id, kind: record.kind, title: record.title, paths, ...(named === null ? {} : { names: named }) })
+            continue
+          }
+        }
+        if (names([record.title, record.summary, record.data]) ||
+          storedPathsIn(record).some((ref) => ref.normalised !== null && ref.machine === null && namesAFile(ref.normalised))) {
+          hiddenCount += 1
+          const named = classOf(record)
+          if (named !== null) counted[named] += 1
+        }
+      }
+    }
+    const paged = since()
+    const comparison = comparing.comparison()
+    const hiddenCiters = 'because' in comparison ? null : counted
     reply.header('cache-control', 'no-store')
-    return {
-      folder, records, hiddenCount, hiddenCiters, comparedWith: compared?.head ?? null,
+    const answer = {
+      folder, records, hiddenCount, hiddenCiters, comparedWith: 'because' in comparison ? null : comparison.head,
       notComparedBecause: 'because' in comparison ? comparison.because : null,
       leftOut, scope: NAMED_INSIDE_SCOPE, answeredAt: clockStamp().instant,
       says: `${records.length} readable ${records.length === 1 ? 'record lists' : 'records list'} files inside ${folder}; ` +
         `${hiddenCount} other live ${hiddenCount === 1 ? 'record names' : 'records name'} the folder or a path inside it; ` +
         `leftOut lists ${leftOut.length} readable ${leftOut.length === 1 ? 'record that names' : 'records that name'} it only in places a rule sets aside.`,
     }
+    const took = since()
+    if (took >= NAMED_INSIDE_SLOW_MS) {
+      req.log.warn(theSlowNamedInsideLine(folder, {
+        total: took,
+        finding: { ms: found - findingBegan, byTheIndex: 'ids' in couldNameIt, ids: ids.length },
+        narrowingMs: narrowed - found,
+        pages: { ms: paged - narrowed - comparedMs, pages: pagesRead, records: recordsRead },
+        comparison: { ms: comparedMs, lookedFor: comparing.lookedFor() },
+      }))
+    }
+    return answer
   })
 
   app.post(

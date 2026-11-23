@@ -20,7 +20,8 @@
  *   - a corrective action's state is read off the record it names — the action naming a problem
  *     gone `fixed` reads "built", the one naming a decision reads "decided", the one naming a
  *     criterion reads "decided" — and nothing is typed twice: the incident's own data carries no
- *     state on the action;
+ *     state on the action; what the state was read from is on hover over the state, and no longer
+ *     drawn beside it, as decided;
  *   - the scene holds at 1440, 990, 660 and 390 with nothing scrolling sideways, and in both
  *     themes.
  *
@@ -34,7 +35,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { Page } from 'playwright'
 import { THE_TEST_OFFICES_OWNER } from './a-page-of-a-test-office.ts'
-import { type LiveApp, liveApp, waitForThePage } from './helpers.ts'
+import { type LiveApp, liveApp, waitForThePage, governsTheWholeProject } from './helpers.ts'
 
 let app: LiveApp
 let page: Page
@@ -69,7 +70,8 @@ beforeAll(async () => {
   // A PROBLEM GONE FIXED, for the corrective action that must read "built".
   const problemId = (await post('/records', { kind: 'problem', title: 'EGM speed only latches on a fresh activation', data: { state: 'fixed' } })).id
   // A DECISION, for the corrective action that must read "decided".
-  const decisionId = (await post('/records', { kind: 'decision', title: 'Latch the speed limit fresh on every resume', data: { replaces: [] } })).id
+  const decisionId = (await post('/records', { kind: 'decision', title: 'Latch the speed limit fresh on every resume', data: {
+    ...governsTheWholeProject(), replaces: [] } })).id
 
   // THE INCIDENT, FILED BY THE PERSON (criterion I4), with the scene the page reads. The two
   // timeline moments are APPENDED OUT OF CHRONOLOGICAL ORDER on purpose: the page must draw them
@@ -218,9 +220,9 @@ describe("a corrective action state is read from the record it names, never type
     expect(states.map((one) => one.trim())).toEqual(['built', 'decided', 'decided'])
   })
 
-  it('each state says what it was read from', async () => {
+  it('each state keeps what it was read from on hover', async () => {
     await openTheScene()
-    const readFroms = await page.locator('.inc-action .inc-action-readfrom').allTextContents()
+    const readFroms = await page.locator('.inc-action .inc-action-state').evaluateAll((all) => all.map((one) => one.getAttribute('title') ?? ''))
     expect(readFroms[0]).toContain('the problem it became reads fixed')
     expect(readFroms[1]).toContain('the decision it became')
   })

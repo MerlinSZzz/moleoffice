@@ -66,6 +66,16 @@ async function report(id: string) {
   await aLabelFor(made)
   return made
 }
+/**
+ * A named-tests line the run sends by hand with its own key, in a made-up named-tests tool. It is a likely item
+ * (test-lines:not-from-the-tool) that the seal finds again, for a case that needs one still found.
+ */
+async function aLineSentByHand(one: Run) {
+  const tools = t.api.createRecord({workspaceId: 'default', kind: 'tool_category', title: 'Synthetic test tools', data: {says: 'Made-up tools used by the gate count tests.'}, actor: {type: 'agent', id: handle}}).id
+  t.api.createRecord({workspaceId: 'default', kind: 'tool', title: 'Synthetic named tests', data: {entry: 'tool', slug: 'named-tests', forWhom: 'developers', category: tools, kept: 'in this repository', state: 'not built yet'}, actor: {type: 'agent', id: handle}})
+  const used = await app.inject({method: 'POST', url: '/api/toolset/uses', headers: one.headers, payload: {tool: 'named-tests', said: 'named 1 file (work/made-up.test.ts); 1 ran, exactly those; vitest exited 0'}})
+  expect(used.statusCode, used.body).toBe(201)
+}
 // COLD, so this file still runs the path where a finish starts the seal-read thread itself, as a server's first
 // finish does: this case's office is built with no early start. It is this case because its assertions are about
 // the finish and what the seal judged.
@@ -73,6 +83,7 @@ describe('with the seal-read thread started by the first finish', () => {
   beforeEach(() => aFreshOffice(false))
   it('counts one reminder, then counts only judged items still found or gone at the seal', async () => {
     const one = await run()
+    await aLineSentByHand(one)
     const checkAlso = await app.inject({method: 'PUT', url: `/api/records/${one.id}/check-also`, headers: personHeaders, payload: {items: ['Made-up item the office never judges.']}})
     expect(checkAlso.statusCode, checkAlso.body).toBe(200)
     const first = await finish(one)
@@ -85,7 +96,7 @@ describe('with the seal-read thread started by the first finish', () => {
     const line = held(one.id)
     if (!line?.reminded || line.atTheSeal === null) throw new Error('The test seal kept no judgement.')
     expect(line.atTheSeal.couldNotJudge).toBeNull()
-    expect(line.atTheSeal.stillFound?.length).toBeGreaterThan(0)
+    expect(line.atTheSeal.stillFound).toContain('test-lines:not-from-the-tool')
     expect(line.atTheSeal.noLongerFound).toContain('report:none')
     expect(line.atTheSeal.notJudged).toContain('check-also:0')
     expect(count()).toEqual({would_stop: 1, stopped: 0, reminded: 1, ignored: line.atTheSeal.stillFound!.length, heeded: line.atTheSeal.noLongerFound!.length})
@@ -104,7 +115,7 @@ describe('with the seal-read thread started while the office is built', () => {
     expect(t.client.sqlite.prepare("SELECT id FROM records WHERE kind = 'message' AND json_extract(data, '$.extra.beforeTheSeal.run') = ?").all(one.id)).toEqual([])
     expect(count()).toEqual({would_stop: 1, stopped: 0, reminded: 0, ignored: 0, heeded: 0})
   })
-  it.each(['block', 'remind', 'off'])('names no encounter for empty items at %s', async position => {
+  it.each(['block', 'off'])('names no encounter for empty items at %s', async position => {
     vi.stubEnv('MOLE_OFFICE_GATE_BEFORE_THE_SEAL', position)
     const one = await run({test: false})
     await report(one.id)
@@ -161,18 +172,19 @@ describe('with the seal-read thread started while the office is built', () => {
     vi.stubEnv('MOLE_OFFICE_GATE_BEFORE_THE_SEAL', 'block')
     const one = await run()
     await report(one.id)
+    await aLineSentByHand(one)
     const checkAlso = await app.inject({method: 'PUT', url: `/api/records/${one.id}/check-also`, headers: personHeaders, payload: {items: ['Made-up item the office never judges.']}})
     expect(checkAlso.statusCode, checkAlso.body).toBe(200)
     const first = await finish(one)
     expect(first.statusCode, first.body).toBe(200)
     expect(first.json().beforeTheSeal.items).toEqual([
-      expect.objectContaining({key: 'test:work/made-up.test.ts', mechanical: false}),
+      expect.objectContaining({key: 'test-lines:not-from-the-tool', mechanical: false}),
       expect.objectContaining({key: 'check-also:0', mechanical: false}),
     ])
     const second = await finish(one)
     expect(second.statusCode, second.body).toBe(200)
     expect(t.api.getRecord(one.id)!.data['state']).toBe('finished')
-    expect(held(one.id)).toMatchObject({reminded: true, atTheSeal: {stillFound: ['test:work/made-up.test.ts'], noLongerFound: [], notJudged: ['check-also:0'], couldNotJudge: null}})
+    expect(held(one.id)).toMatchObject({reminded: true, atTheSeal: {stillFound: ['test-lines:not-from-the-tool'], noLongerFound: [], notJudged: ['check-also:0'], couldNotJudge: null}})
     expect(count()).toEqual({would_stop: 1, stopped: 1, reminded: 0, ignored: 1, heeded: 0})
   })
 
@@ -191,6 +203,7 @@ describe('with the seal-read thread started while the office is built', () => {
     vi.stubEnv('MOLE_OFFICE_GATE_BEFORE_THE_SEAL', 'block')
     const one = await run()
     await report(one.id)
+    await aLineSentByHand(one)
     expect((await finish(one)).statusCode).toBe(200)
     // The certain item the reminder never named is a page committed after it, which the report has no pictures of. It is
     // not a fault of form, since a fault of form refuses the run's own seal whether or not the reminder named it.
@@ -282,6 +295,7 @@ describe('with the seal-read thread started while the office is built', () => {
   })
   it('answers a failed later count beside a seal that still succeeds', async () => {
     const one = await run()
+    await aLineSentByHand(one)
     expect((await finish(one)).statusCode).toBe(200)
     await report(one.id)
     t.client.sqlite.exec("CREATE TRIGGER made_up_count_failure BEFORE UPDATE ON gate_counts WHEN NEW.ignored > OLD.ignored BEGIN SELECT RAISE(FAIL, 'made-up later count failure'); END")

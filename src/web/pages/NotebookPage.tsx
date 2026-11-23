@@ -296,7 +296,6 @@ function TheForm({
           </label>
         ))}
       </fieldset>
-      <p className="nb-what">{notebookKind(entryKind, 'what') ?? ''}</p>
       <label className="nb-key" htmlFor="nb-words">
         {NOTEBOOK_WORDS.theWords}
       </label>
@@ -364,7 +363,6 @@ export const NOTEBOOK_CSS = `
 .nb-kind-choice { display: flex; align-items: center; gap: var(--pad); min-height: 44px; max-width: 24rem; overflow-wrap: anywhere; cursor: pointer; }
 .nb-kind-choice input { flex: none; width: 1.1rem; height: 1.1rem; margin: 0; accent-color: var(--accent); }
 .nb-area { width: 100%; min-width: 0; resize: vertical; }
-.nb-what { margin: var(--pad) 0 0 0; color: var(--text-3); max-width: var(--measure-read); }
 @media (max-width: 40rem) {
   .nb-entry-head { gap: var(--pad); }
   .nb-presses > * { flex: 1 1 auto; }

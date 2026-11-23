@@ -17,10 +17,10 @@
  * recorded when. A flow run that names no flow says so, and one whose flow no record has says that. Nothing is guessed.
  */
 
-import { content, t } from '@shared/i18n.ts'
+import { content, t, type WordKey } from '@shared/i18n.ts'
 import {
   ENTERED_STEP_DOES, FLOW_RUN_HOWS, FLOW_RUN_KIND, FLOW_RUN_OUTCOMES, NO_FLOW_NAMED, OFFICE_STEP_DOES, OFFICE_STEP_DONE_BY_HAND_WHY, OFFICE_STEP_ENDED_RESULT, OFFICE_STEP_LANDED_COMMIT, OFFICE_STEP_LANDED_NO_REASON, OFFICE_STEP_SEALED_TIP, OFFICE_STEP_SENTENCES_ONCE_WRITTEN,
-  OFFICE_STEP_SUPERSEDED_BY, OFFICE_STEP_VERDICT_REFUSED_STATUS, type FlowRunHow, type FlowRunOutcome,
+  OFFICE_STEP_SUPERSEDED_BY, OFFICE_STEP_VERDICT_REFUSED_STATUS, theStartAndFlowsOfANoFlowSentence, type FlowRunHow, type FlowRunOutcome,
 } from '@shared/flow-run.ts'
 import { isMoleOffice } from '@shared/participants.ts'
 import { PLANNING_STEP_DOES } from '@shared/planning-flow.ts'
@@ -28,6 +28,7 @@ import type { ParticipantRef } from '@shared/participants.ts'
 import { gapBetween } from '@shared/spacing.ts'
 import type { PanelRecord } from '@shared/types.ts'
 import { useInspect } from '../lib/mode.ts'
+import { titleOrSentence, useRecordTitles } from '../lib/titles.ts'
 import { storedActorName, type StoredActorParticipants } from './Governance.tsx'
 import { RouteLink, recordPath } from './router.tsx'
 import { Absence, Panel, StampAfter } from './ui.tsx'
@@ -125,6 +126,9 @@ function word<T extends string>(value: unknown, list: readonly T[], words: Recor
 
 function FlowLine({ data }: { data: Record<string, unknown> }) {
   const flow = typeof data['flow'] === 'string' ? data['flow'] : null
+  const noFlow = data['noFlow']
+  const several = flow === null ? theStartAndFlowsOfANoFlowSentence(noFlow) : null
+  const titles = useRecordTitles(several?.flows ?? [])
   const revision = data['flowRevision'] as { seq?: unknown } | undefined
   if (flow !== null && revision !== undefined && typeof revision.seq === 'number') {
     const followed = t('flowRunSteps.followed', { seq: String(revision.seq) })
@@ -137,7 +141,28 @@ function FlowLine({ data }: { data: Record<string, unknown> }) {
       </p>
     )
   }
-  if (data['noFlow'] === NO_FLOW_NAMED || flow === null) return <p className="rd-sub">{t('flowRunSteps.noFlowNamed')}</p>
+  if (several !== null) {
+    const startName = several.start.replaceAll(' ', '_')
+    const startedAs = `record.option.flow_run.startedAs.${startName}` as WordKey
+    const sentence = t('flowRunSteps.severalFlowsListTheStart', {
+      start: t(startedAs),
+      count: String(several.flows.length),
+    })
+    return (
+      <div className="rd-sub">
+        <p style={{ margin: 0 }}>{sentence}</p>
+        <ol style={{ margin: 0, paddingInlineStart: '1.5rem' }}>
+          {several.flows.map((id) => (
+            <li key={id}><RouteLink to={recordPath(id)}>{titleOrSentence(titles, id)}</RouteLink></li>
+          ))}
+        </ol>
+      </div>
+    )
+  }
+  if (flow === null && typeof noFlow === 'string' && noFlow !== '' && noFlow !== NO_FLOW_NAMED) {
+    return <p className="rd-sub">{content(noFlow)}</p>
+  }
+  if (noFlow === NO_FLOW_NAMED || flow === null) return <p className="rd-sub">{t('flowRunSteps.noFlowNamed')}</p>
   return <p className="rd-sub">{t('flowRunSteps.noSuchFlow', { id: content(flow) })}</p>
 }
 

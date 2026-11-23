@@ -1053,8 +1053,8 @@ export function endedWithItsMergeEntrySays(ended: EndedWithItsMergeEntry, say: S
  */
 export const NEEDS_NO_CHECK = 'needsNoCheck'
 
-/** The office filed this run for a secretary's design/-only entry, which no rule asks a check of. */
-export const NEEDS_NO_CHECK_RULES = ['a-take-back-returns-main-to-a-checked-state'] as const
+/** Rules under which the office closes a run without a check. The existing order is stable. */
+export const NEEDS_NO_CHECK_RULES = ['a-take-back-returns-main-to-a-checked-state', 'the-offices-checks-are-switched-off'] as const
 
 export interface NeedsNoCheck {
   /** The decision that asks no check of such an entry, by record id. */
@@ -1087,7 +1087,8 @@ export function readNeedsNoCheck(value: unknown): NeedsNoCheck | null {
  * writes as that decision's id.
  */
 export function needsNoCheckSays(needs: NeedsNoCheck, say: Say): string {
-  if (needs.rule !== undefined) return say('chk.says.takeBackNeedsNoCheck')
+  if (needs.rule === 'a-take-back-returns-main-to-a-checked-state') return say('chk.says.takeBackNeedsNoCheck')
+  if (needs.rule === 'the-offices-checks-are-switched-off') return say('chk.says.checksOffNeedsNoCheck')
   return sayWithValues(say, 'chk.says.needsNoCheck', { decision: needs.decision! })
 }
 
@@ -1258,7 +1259,7 @@ export function standingOf(input: {
   superseded: Superseded | null
   /** The office's ending of a check-again run, or null because it holds none. */
   ended?: EndedWithItsMergeEntry | null
-  /** The office's mark that it filed this run for a secretary's entry, or null because it holds none. */
+  /** The office's mark that this run needs no check, or null because it holds none. */
   needsNoCheck?: NeedsNoCheck | null
   closedUnchecked?: ClosedUnchecked | null
 }): RunStanding {

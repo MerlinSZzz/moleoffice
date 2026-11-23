@@ -25,6 +25,7 @@ import { THE_TEST_OFFICES_OWNER } from './a-page-of-a-test-office.ts'
 import type { OsProbe, OsProcess } from '../src/server/lib/resources.ts'
 import { PRODUCER_OFFICE_ANSWER_WAIT_MS, producerOfficeRequest, runPeriodicSuiteOnce, SEAT_ASKED_AGAIN_EVERY_MS, SEAT_ASKS_UNANSWERED_IN_A_ROW, watchPeriodicSuites } from '../tools/periodic-main-suite.mjs'
 import { localStamp } from '../src/shared/time.ts'
+import { WHOLE_SUITE_RECEIPT_EXAMPLE, wholeSuiteReceiptCrossChecks, wholeSuiteReceiptIsComplete, wholeSuiteReceiptIsGreen } from '../src/shared/whole-suite-receipt.ts'
 import { THE_TEST_MARK } from '../src/config/the-test-mark.mjs'
 import { askTheOffice, THE_LONGEST_REPLY } from '../tools/office-request.mjs'
 import { packTheReads, readsDigestOf } from '../tools/reads-archive.mjs'
@@ -45,6 +46,7 @@ const CRASH_MODES = ['worker crash', 'worker crash red alone', 'worker crash mul
 let mode: 'green' | 'shared processes' | 'red' | 'busy' | 'build' | 'partial' | 'wrong commit' | 'bad counts' | 'bad suite' | 'bad passed' | 'cleanup' | 'interrupted' | typeof ALONE_MODES[number] | typeof CRASH_MODES[number]
 let takesVersion2: boolean
 let takesWorkerCrashes: boolean
+let takesSkippedCases: boolean
 let live: Map<number, OsProcess>
 let released: string[]
 let env: NodeJS.ProcessEnv
@@ -95,6 +97,7 @@ beforeEach(async () => {
   mode = 'green'
   takesVersion2 = true
   takesWorkerCrashes = true
+  takesSkippedCases = true
   released = []
   const agent = office.api.createRecord({ workspaceId: 'default', kind: 'agent', title: 'Synthetic receipt producer', data: { handle: 'synthetic-receipt-producer', runtime: 'codex', state: 'active' }, actor: office.api.HUMAN })
   const participants = await import('../src/server/lib/participants.ts')
@@ -126,7 +129,7 @@ async function officeRequest(asked: { method: string; path: string; body?: unkno
   // An office from before version 2 describes the same kind without the two fields version 2 adds.
   const body = JSON.parse(String(reply.body))
   body.kind.fields = body.kind.fields.filter((one: { key: string }) =>
-    (takesVersion2 || !['aloneRuns', 'errorsOutsideTests'].includes(one.key)) && (takesWorkerCrashes || one.key !== 'workerCrashes'))
+    (takesVersion2 || !['aloneRuns', 'errorsOutsideTests'].includes(one.key)) && (takesWorkerCrashes || one.key !== 'workerCrashes') && (takesSkippedCases || one.key !== 'skippedCases'))
   return { ...reply, body: JSON.stringify(body) }
 }
 
@@ -201,6 +204,37 @@ async function syntheticCloud({ clone, commit, paths, carriedOver }: { clone: st
   const result = { code, answer: { ran: true, code, commit: mode === 'wrong commit' ? 'f'.repeat(40) : commit, phase: 'test', buildExitCode: 0, suiteExitCode: code, files: observed.length, failed, workers: 1, wallSec: 1, ...(mode === 'shared processes' ? { filesShareAProcess: true } : {}), ...(carriedOver === undefined ? {} : { carriedOverFirst: carriedOver.filter((file) => failed.includes(file)) }) }, output: join(clone, '..', 'door-output.log') }
   writeFileSync(result.output, `${JSON.stringify(result.answer)}\n`)
   return result
+}
+
+type SkippedCase = { file: string; fullName: string; status: 'skipped' | 'disabled' | 'pending' }
+
+/** A made-up green whole run with the requested skipped cases in its report, and no actual suite. */
+function aCloudWithSkippedCases(skipped: SkippedCase[], files = ['tests/one.test.ts', 'tests/two.test.ts']) {
+  return ({ clone, commit, paths }: { clone: string; commit: string; paths: Paths }) => {
+    writeFileSync(paths.log, 'Synthetic cloud log. No real tests ran.\n')
+    writeFileSync(paths.manifest, JSON.stringify(files.map((file) => ({ file: join(clone, file) }))))
+    const rows: { name: string; status: string; assertionResults: { fullName: string; status: string }[] }[] = files.map((file) => ({
+      name: join(clone, file), status: 'passed', assertionResults: [{ fullName: `made-up passing assertion in ${file}`, status: 'passed' }],
+    }))
+    for (const one of skipped) {
+      const row = rows.find((candidate) => candidate.name === join(clone, one.file))
+      if (row === undefined) throw new Error(`Made-up skipped case names a file outside the manifest: ${one.file}`)
+      row.assertionResults.push({ fullName: one.fullName, status: one.status })
+    }
+    const assertions = rows.flatMap((row) => row.assertionResults)
+    writeFileSync(paths.report, JSON.stringify({
+      fixture: true, success: true, numTotalTests: assertions.length,
+      numPassedTests: assertions.filter((test) => test.status === 'passed').length, numFailedTests: 0,
+      numPendingTests: assertions.filter((test) => ['pending', 'skipped', 'disabled'].includes(test.status)).length, numTodoTests: 0,
+      numTotalTestSuites: rows.length, numPassedTestSuites: rows.length, numFailedTestSuites: 0, numPendingTestSuites: 0, testResults: rows,
+    }))
+    mkdirSync(paths.reads)
+    writeFileSync(join(paths.reads, 'fixture.jsonl'), 'Made-up read record; no actual suite was executed.\n')
+    const answer = { ran: true, code: 0, commit, phase: 'test', buildExitCode: 0, suiteExitCode: 0, files: rows.length, failed: [], workers: 1, wallSec: 1 }
+    const result = { code: 0, answer, output: join(clone, '..', 'door-output.log') }
+    writeFileSync(result.output, `${JSON.stringify(answer)}\n`)
+    return result
+  }
 }
 
 const options = () => ({ repository, workdir: join(root, 'receipts'), processResource, env })
@@ -952,4 +986,113 @@ it('refuses a door answer that did not put the carried-over red files first, and
   await onANewTip('not run alone')
   await expect(onANewTip('carried mismatch')).rejects.toThrow(two)
   expect(receipts()).toHaveLength(1)
+})
+
+it('names three skipped cases in two files, sorted by file and name, and says so in the receipt and the answer', async () => {
+  const skipped: SkippedCase[] = [
+    { file: 'tests/two.test.ts', fullName: 'made-up skipped b', status: 'skipped' },
+    { file: 'tests/one.test.ts', fullName: 'made-up skipped z', status: 'skipped' },
+    { file: 'tests/one.test.ts', fullName: 'made-up skipped a', status: 'skipped' },
+  ]
+  const result = await runPeriodicSuiteOnce(options(), { ...transport(), runCloud: aCloudWithSkippedCases(skipped) })
+  expect(result).toMatchObject({ status: 'filed', green: true })
+  const receipt = receipts()[0]!
+  expect(receipt.data.skippedCases).toEqual({ count: 3, cases: [
+    { file: 'tests/one.test.ts', name: 'made-up skipped a' },
+    { file: 'tests/one.test.ts', name: 'made-up skipped z' },
+    { file: 'tests/two.test.ts', name: 'made-up skipped b' },
+  ] })
+  const sentence = '3 test cases were skipped, which leaves the receipt neither red nor incomplete. The receipt names each by file and name.'
+  expect(receipt.summary).toContain(sentence)
+  expect(result.says).toContain(sentence)
+})
+
+it('files a zero skipped count and says nothing about skipped cases when the suite skipped none', async () => {
+  const result = await runPeriodicSuiteOnce(options(), transport())
+  expect(result).toMatchObject({ status: 'filed', green: true })
+  const receipt = receipts()[0]!
+  expect(receipt.data.skippedCases).toEqual({ count: 0 })
+  expect(receipt.data.skippedCases).not.toHaveProperty('cases')
+  expect(receipt.data.skippedCases).not.toHaveProperty('notListed')
+  expect(receipt.summary).not.toContain('skipped')
+  expect(result.says).not.toContain('skipped')
+})
+
+it('names the first 200 skipped cases and says how many more were only counted', async () => {
+  const skipped: SkippedCase[] = Array.from({ length: 250 }, (_, n) => ({
+    file: n % 2 === 0 ? 'tests/one.test.ts' : 'tests/two.test.ts',
+    fullName: `made-up skipped ${String(249 - n).padStart(3, '0')}`,
+    status: 'skipped',
+  }))
+  const result = await runPeriodicSuiteOnce(options(), { ...transport(), runCloud: aCloudWithSkippedCases(skipped) })
+  expect(result).toMatchObject({ status: 'filed', green: true })
+  const receipt = receipts()[0]!
+  const counted = receipt.data.skippedCases as { count: number; cases: { file: string; name: string }[]; notListed?: number }
+  expect(counted.count).toBe(250)
+  expect(counted.cases).toHaveLength(200)
+  expect(counted.notListed).toBe(50)
+  expect(counted.cases).toEqual([...counted.cases].sort((a, b) => a.file.localeCompare(b.file) || a.name.localeCompare(b.name)))
+  expect(counted.cases[0]).toEqual({ file: 'tests/one.test.ts', name: 'made-up skipped 001' })
+  expect(counted.cases[199]).toEqual({ file: 'tests/two.test.ts', name: 'made-up skipped 148' })
+  const sentence = '250 test cases were skipped, which leaves the receipt neither red nor incomplete. The receipt names the first 200 by file and name, and 50 more are only counted.'
+  expect(receipt.summary).toContain(sentence)
+  expect(result.says).toContain(sentence)
+})
+
+it('lists two skipped cases with the same file and name and keeps the receipt valid', async () => {
+  const skipped: SkippedCase[] = [
+    { file: 'tests/one.test.ts', fullName: 'made-up repeated skip', status: 'skipped' },
+    { file: 'tests/one.test.ts', fullName: 'made-up repeated skip', status: 'skipped' },
+  ]
+  const result = await runPeriodicSuiteOnce(options(), { ...transport(), runCloud: aCloudWithSkippedCases(skipped) })
+  expect(result).toMatchObject({ status: 'filed', green: true })
+  const receipt = receipts()[0]!
+  expect(receipt.data.skippedCases).toEqual({ count: 2, cases: [
+    { file: 'tests/one.test.ts', name: 'made-up repeated skip' },
+    { file: 'tests/one.test.ts', name: 'made-up repeated skip' },
+  ] })
+  expect(wholeSuiteReceiptCrossChecks(receipt.data)).toEqual([])
+})
+
+it('files no skipped field when the office has none, but still counts the skipped cases', async () => {
+  takesSkippedCases = false
+  const skipped: SkippedCase[] = [
+    { file: 'tests/two.test.ts', fullName: 'made-up skipped b', status: 'skipped' },
+    { file: 'tests/one.test.ts', fullName: 'made-up skipped a', status: 'skipped' },
+  ]
+  const result = await runPeriodicSuiteOnce(options(), { ...transport(), runCloud: aCloudWithSkippedCases(skipped) })
+  expect(result).toMatchObject({ status: 'filed', green: true })
+  const receipt = receipts()[0]!
+  expect(receipt.data).not.toHaveProperty('skippedCases')
+  const sentence = '2 test cases were skipped, which leaves the receipt neither red nor incomplete. This office has no skippedCases field, so the receipt does not name them; the original hashed report does.'
+  expect(receipt.summary).toContain(sentence)
+  expect(receipt.summary).not.toContain('The receipt names')
+  expect(result.says).toContain(sentence)
+  expect(result.says).not.toContain('The receipt names')
+})
+
+it('refuses a skipped case with no recorded name and files nothing', async () => {
+  const skipped: SkippedCase[] = [{ file: 'tests/one.test.ts', fullName: '   ', status: 'skipped' }]
+  await expect(runPeriodicSuiteOnce(options(), { ...transport(), runCloud: aCloudWithSkippedCases(skipped) }))
+    .rejects.toThrow('A skipped test has no recorded name. No receipt was filed.')
+  expect(receipts()).toHaveLength(0)
+})
+
+it('keeps the complete and green answers the same with and without skipped cases, for green and red receipts', () => {
+  const green = { ...WHOLE_SUITE_RECEIPT_EXAMPLE }
+  const greenSkipped = { ...green, skippedCases: { count: 2, cases: [
+    { file: 'tests/one.test.ts', name: 'made-up skipped one' },
+    { file: 'tests/two.test.ts', name: 'made-up skipped two' },
+  ] } }
+  const red = { ...green, suiteExitCode: 1, failedFiles: ['tests/one.test.ts'], failedTests: [{ file: 'tests/one.test.ts', name: 'made-up failed one' }] }
+  const redSkipped = { ...red, skippedCases: { count: 1, cases: [{ file: 'tests/two.test.ts', name: 'made-up skipped two' }] } }
+  for (const [name, plain, withSkipped, greenAnswer] of [
+    ['green', green, greenSkipped, true],
+    ['red', red, redSkipped, false],
+  ] as const) {
+    expect(wholeSuiteReceiptIsComplete(plain), `${name} receipt is complete`).toBe(true)
+    expect(wholeSuiteReceiptIsComplete(withSkipped), `${name} receipt is complete with skipped cases`).toBe(true)
+    expect(wholeSuiteReceiptIsGreen(withSkipped), `${name} receipt is green with skipped cases`).toBe(greenAnswer)
+    expect(wholeSuiteReceiptIsGreen(withSkipped), `${name} receipt keeps its answer`).toBe(wholeSuiteReceiptIsGreen(plain))
+  }
 })

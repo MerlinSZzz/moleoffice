@@ -8,11 +8,11 @@
  *
  *   1. the panel is in the Chat category, straight after the machine names, and drawn in normal mode;
  *   2. with nobody named it says so, and says a letter from the person waits, and offers the secretaries;
- *   3. it says first what a dead letter is, then where messages for an unreachable agent go, in plain
- *      words with no word of how the office works inside, in English and in Chinese (the secretary's
- *      review of round 32; the list of each kind was taken out in wave 13y round 121);
+ *   3. what a dead letter is sits behind the hint on the heading, with no word of how the office works
+ *      inside, in English and in Chinese, and every page language draws its own state word (as decided,
+ *      the panel draws no explanation, so the sentence on where the letters go is gone);
  *   4. a press names one: the state, the waiting line and the change line follow the stored value, and
- *      the panel says the named secretary reads the letters and acts on them;
+ *      the state names the secretary who receives the notice;
  *   5. when TEST_SHOTS names a folder, the panel is photographed named and not named, at 1440, 990, 660
  *      and 390 in light and dark, in English and in Chinese.
  *
@@ -24,6 +24,7 @@ import { readFileSync } from 'node:fs'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { createI18n } from '../src/shared/i18n.ts'
+import { englishWords } from '../src/shared/words/joined.ts'
 import { theRoleCardsFile } from '../src/server/lib/roles.ts'
 import { THE_TEST_OFFICES_SECRETARY } from './a-page-of-a-test-office.ts'
 import { liveApp, waitForThePage, type LiveApp, theAnswerToAWriteInATestOffice } from './helpers.ts'
@@ -40,6 +41,7 @@ const PANEL = '[data-target="uiSurface/settings.deadletters"]'
 const ENTRY = '[data-settings-panel="settings.deadletters"]'
 
 let app: LiveApp
+const en = englishWords()
 const shots = testShots('the-settings-page-names-the-dead-letter-secretary')
 
 /** The card that may act for the person, read from the declaration and never typed. */
@@ -111,9 +113,14 @@ it('says nobody is named, shows no waiting-for-a-secretary warning, and offers t
   await openThePanel()
   expect((await app.page.locator(`${PANEL} .dls-state`).innerText()).trim()).toBe('No secretary named.')
   expect(await app.page.locator(`${PANEL} .dls-waiting`).count()).toBe(0)
-  const offered = await app.page.locator(`${PANEL} .dls-pick select option`).allInnerTexts()
-  // EACH SECRETARY BY ITS NAME ALONE, with no handle beside it (wave 13n round 33).
-  expect(offered.map((one) => one.trim())).toEqual(['None', THE_TEST_OFFICES_SECRETARY.name, 'Quill'])
+  const door = (await call('GET', '/api/office/dead-letter-secretary')) as { mayBeNamed: { handle: string }[] }
+  expect(door.mayBeNamed.map((one) => one.handle), 'the door offers the two secretaries in the registry\'s order').toEqual([THE_TEST_OFFICES_SECRETARY.handle, 'quill'])
+  // THE PICKER'S ROWS, once its search box is pressed and the registries it names them from are read. Each name stays
+  // alone in its own `.agp-name` part, and the handle is drawn beside it in `.agp-handle`.
+  await app.page.locator(PANEL).getByLabel(en['deadLetterSecretary.pick'], { exact: true }).click()
+  await app.page.locator(`${PANEL} .agp .agp-row:not(.agp-fixed)`).first().waitFor({ timeout: 15_000 })
+  const offered = await app.page.locator(`${PANEL} .agp .agp-row .agp-name`).allInnerTexts()
+  expect(offered.map((one) => one.trim())).toEqual([en['deadLetterSecretary.pickNobody'], THE_TEST_OFFICES_SECRETARY.name, 'Quill'])
   expect((await app.page.locator(`${PANEL} .scl-line`).innerText()).trim()).toBe('No change recorded.')
 }, 120_000)
 
@@ -125,27 +132,30 @@ async function thePanelsWords(): Promise<string[]> {
 /** Words of how the office works inside, which a person reading Settings does not know. */
 const INSIDE_WORDS = /starter|chain|sweep|启动者链|清扫/i
 
-it('draws the ownership explanation on English and Chinese pages', async () => {
+/** The hint on the panel's heading. A closed hint is not drawn, so its words are read as text, not as drawn text. */
+async function theHint(): Promise<string> {
+  return ((await app.page.locator(`${PANEL} .px-hint-body`).textContent()) ?? '').trim()
+}
+
+// Test change (as decided, the panel draws no explanation): what a dead letter is moved behind the hint, and the
+// sentence on where the letters of an unreachable agent go is gone. Before, both were the panel's first two lines.
+it('puts what a dead letter is behind the hint on English and Chinese pages', async () => {
   await openThePanel()
-  const words = (await thePanelsWords()).map((one) => one.trim())
-  const english = createI18n('en')
-  expect(words[0]).toBe(english.t('deadLetterSecretary.whatADeadLetterIs'))
-  expect(words[1]).toBe(english.t('deadLetterSecretary.ownerRoute'))
-  for (const one of words) expect(one, `the panel says "${one}"`).not.toMatch(INSIDE_WORDS)
-  // The language's own words include the English fallback until translated.
+  expect(await theHint()).toBe(createI18n('en').t('deadLetterSecretary.whatADeadLetterIs'))
+  for (const one of [...(await thePanelsWords()), await theHint()]) expect(one, `the panel says "${one}"`).not.toMatch(INSIDE_WORDS)
   await openThePanel('zh')
-  const chinese = (await thePanelsWords()).map((one) => one.trim())
-  const translated = createI18n('zh')
-  expect(chinese[0]).toBe(translated.t('deadLetterSecretary.whatADeadLetterIs'))
-  expect(chinese[1]).toBe(translated.t('deadLetterSecretary.ownerRoute'))
-  for (const one of chinese) expect(one, `the panel says "${one}"`).not.toMatch(INSIDE_WORDS)
+  expect(await theHint()).toBe(createI18n('zh').t('deadLetterSecretary.whatADeadLetterIs'))
+  for (const one of [...(await thePanelsWords()), await theHint()]) expect(one, `the panel says "${one}"`).not.toMatch(INSIDE_WORDS)
 }, 120_000)
 
-it('uses the current route in every page language', async () => {
+// Test change (as decided): the route sentence each language was read for is gone, so each language is read by the
+// state word it draws with nobody named.
+it('draws the state word in every page language', async () => {
   for (const language of ['el', 'es', 'it', 'ko', 'pt', 'th'] as const) {
     await openThePanel(language)
-    const words = (await thePanelsWords()).map((one) => one.trim())
-    expect(words[1], language).toMatch(/owner/i)
+    expect((await app.page.locator(`${PANEL} .dls-state`).innerText()).trim(), language).toBe(
+      createI18n(language).t('deadLetterSecretary.nobody.nobodyChose'),
+    )
   }
 }, 240_000)
 
@@ -157,7 +167,8 @@ it('names one secretary with one press, and draws back what was stored', async (
   await openThePanel()
   const ids = (await call('GET', '/api/office/dead-letter-secretary')) as { mayBeNamed: { id: string; handle: string }[] }
   const secretary = ids.mayBeNamed.find((one) => one.handle === THE_TEST_OFFICES_SECRETARY.handle)!.id
-  await app.page.locator(`${PANEL} .dls-pick select`).selectOption(secretary)
+  await app.page.locator(PANEL).getByLabel(en['deadLetterSecretary.pick'], { exact: true }).fill(THE_TEST_OFFICES_SECRETARY.handle)
+  await app.page.locator(`${PANEL} .agp button.agp-row[data-value="${secretary}"]`).click()
   await app.page.locator(`${PANEL} .dls-button`).click()
   await app.page.waitForFunction(
     ({ selector, expected }) => {
@@ -182,10 +193,11 @@ it('names one secretary with one press, and draws back what was stored', async (
   const changed = (await app.page.locator(`${PANEL} .scl-line`).innerText()).trim()
   expect(changed.startsWith(`Changed by ${name} `), changed).toBe(true)
   if (name !== THE_PERSON) expect(changed).not.toContain(THE_PERSON)
-  // WITH A SECRETARY NAMED, THE PANEL SAYS THAT SECRETARY READS THE LETTERS AND ACTS ON THEM.
-  const acts = (await app.page.locator(`${PANEL} .dls-who-acts`).innerText()).trim()
-  expect(acts).toMatch(/notice|line/i)
-  expect(acts).not.toMatch(/reads these letters/i)
+  // WITH A SECRETARY NAMED, THE STATE NAMES THAT SECRETARY. Test change (as decided): the sentence under it on the
+  // notice's place is gone.
+  expect((await app.page.locator(`${PANEL} .dls-state`).innerText()).trim()).toBe(
+    createI18n('en').t('deadLetterSecretary.noticeNamed', { who: THE_TEST_OFFICES_SECRETARY.name }),
+  )
 }, 120_000)
 
 it.skipIf(!process.env['TEST_SHOTS'])('photographs the panel with a secretary named', async () => {

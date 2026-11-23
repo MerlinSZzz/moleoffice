@@ -20,15 +20,15 @@
  * WHAT THIS FILE PINS
  * ---------------------------------------------------------------------------------------
  *
- *   1. Sketch and digest carry `text: null`, never a slice of the full content.
- *   2. Nowhere in either position's own reading does a run of the full content's distinctive
- *      words appear — the whole reading is checked, not just its `text` field, so a field renamed
- *      to carry the same cut-down copy would still be caught.
+ *   Nowhere in either position's own reading does a run of the full content's distinctive
+ *   words appear — the whole reading is checked, not just its `text` field, so a field renamed
+ *   to carry the same cut-down copy would still be caught. That sketch and digest carry
+ *   `text: null` on the same branch is held in tests/an-unwritten-reading-position-answers-none.test.ts.
  *
  * Proved by mutation with a control run of this file first: in src/server/lib/zoom.ts, inside the
  * by-part branch of the reading (`parts === null`, the unwritten case both sketch and digest share),
  * changing `text: null` to a 40-character slice of the record's own `context` field turns this
- * file's second case red — the exact defect the owner’s ruling names, made to happen on purpose and then
+ * file's case red — the exact defect the owner’s ruling names, made to happen on purpose and then
  * undone.
  */
 import { THE_TEST_OFFICES_OWNER } from './a-page-of-a-test-office.ts'
@@ -81,16 +81,6 @@ async function aChapterWithFullTextButNoSketchOrDigest(): Promise<string> {
 }
 
 describe('an unwritten sketch or digest is never a cut-down copy of the full text', () => {
-  it('carries no text at all for sketch or digest, not a shortened one', async () => {
-    const id = await aChapterWithFullTextButNoSketchOrDigest()
-    const read = await get(`/api/records/${id}/short-forms`)
-    const levels = read.body.levels as { rung: string; text: string | null }[]
-    for (const rung of ['sketch', 'digest']) {
-      const one = levels.find((l) => l.rung === rung)
-      expect(one?.text, `${rung} should be null, not a shortened copy of the full text`).toBeNull()
-    }
-  })
-
   it('never echoes a run of the full text\'s own words at the sketch or digest position', async () => {
     const id = await aChapterWithFullTextButNoSketchOrDigest()
     const read = await get(`/api/records/${id}/short-forms`)

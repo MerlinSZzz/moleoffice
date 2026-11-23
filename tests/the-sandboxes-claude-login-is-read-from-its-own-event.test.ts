@@ -54,7 +54,7 @@ import type { FastifyInstance } from 'fastify'
 import { mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { apiApp, freshDb, type TestDb } from './helpers.ts'
+import { apiApp, freshDb, type TestDb, governsTheWholeProject } from './helpers.ts'
 import { SYSTEM_LINES } from '../src/shared/groups.ts'
 import { sayInEnglish } from '../src/shared/i18n.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
@@ -566,7 +566,7 @@ describe('9. the one secretary who takes usage notices is told at 50% and at 80%
     second = low!
     t.client.sqlite.prepare('UPDATE agents SET created_at = ? WHERE id = ?').run('2026-10-01 09:00:00', idOf[first])
     t.client.sqlite.prepare('UPDATE agents SET created_at = ? WHERE id = ?').run('2026-10-01 09:00:01', idOf[second])
-    const decided = await ask('POST', '/api/records', AS_THE_PERSON, { kind: 'decision', title: 'A made-up usage decision', data: { replaces: [] } })
+    const decided = await ask('POST', '/api/records', AS_THE_PERSON, { kind: 'decision', title: 'A made-up usage decision', data: { ...governsTheWholeProject(), replaces: [] } })
     expect(decided.status, decided.raw).toBe(201)
     decision = String(decided.body['record'].id)
   })
@@ -698,7 +698,7 @@ describe('10. the doors of the two settings', () => {
 
   beforeAll(async () => {
     MOST = (await import('../src/server/lib/usage-notices.ts')).WHAT_TO_DO_MOST
-    const decided = await ask('POST', '/api/records', AS_THE_PERSON, { kind: 'decision', title: DECISION_TITLE, data: { replaces: [] } })
+    const decided = await ask('POST', '/api/records', AS_THE_PERSON, { kind: 'decision', title: DECISION_TITLE, data: { ...governsTheWholeProject(), replaces: [] } })
     expect(decided.status, decided.raw).toBe(201)
     decision = String(decided.body['record'].id)
     const other = t.client.sqlite.prepare("SELECT id FROM records WHERE kind <> 'decision' AND deleted_at IS NULL ORDER BY rowid LIMIT 1").get() as { id: string } | undefined

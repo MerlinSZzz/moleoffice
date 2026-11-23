@@ -215,12 +215,17 @@ installed() {
 # timeout given, five seconds unless the caller gives another.
 the_answer_from() {
   local method=$1 path=$2 timeout=${3:-5}
-  local status line body='' length='' chunked=''
+  local status line body='' length='' chunked='' mark='' sent=''
   if ! exec 3<>"/dev/tcp/127.0.0.1/$PORT"; then
     echo 'no answer'
     return
   fi 2>/dev/null
-  printf '%s %s HTTP/1.1\r\nHost: 127.0.0.1:%s\r\nx-mole-office-workspace: default\r\nx-mole-office-actor-type: human\r\nx-mole-office-actor-id: owner\r\nContent-Length: 0\r\nConnection: close\r\n\r\n' "$method" "$path" "$PORT" >&3 2>/dev/null
+  # A POST carries the office's mark as the waiting page's press sends it: a JSON body, which is {}.
+  if [ "$method" = POST ]; then
+    mark='Content-Type: application/json\r\n'
+    sent='{}'
+  fi
+  printf '%s %s HTTP/1.1\r\nHost: 127.0.0.1:%s\r\nx-mole-office-workspace: default\r\nx-mole-office-actor-type: human\r\nx-mole-office-actor-id: owner\r\n%bContent-Length: %s\r\nConnection: close\r\n\r\n%s' "$method" "$path" "$PORT" "$mark" "${#sent}" "$sent" >&3 2>/dev/null
   if ! read -r -t "$timeout" _ status _ <&3 2>/dev/null; then
     exec 3<&- 3>&- 2>/dev/null
     echo 'no status line'

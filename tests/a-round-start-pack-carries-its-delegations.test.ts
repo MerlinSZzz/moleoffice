@@ -9,7 +9,8 @@
  * src/shared/round-start-pack.ts writes the part.
  *
  * WHAT IS REAL: a scratch office in process (`freshDb` and `apiApp`), never the live office, and its own doors to
- * package, take, restate, answer, hand back and check. The worker, the line, the points and their words are made up. A
+ * package, take, restate, answer, hand back and check. The worker, the line, the points and their words are made up, and
+ * so is chapter 2, the one chapter the office holds, which a launched round's start reads from its chapters door. A
  * refusal is answered by a stand-in that changes the scratch office's own answer, or answers with the server's own
  * words for a door it does not have (`noSuchEndpoint`). The launcher-level cases run the real commandRound from
  * tools/sandbox.mjs over the scratch office, a sandbox folder the test makes and removes, a made-up brief and made-up
@@ -60,7 +61,7 @@ import {
 } from '../src/shared/round-start-pack.ts'
 import { aRunWithNoTitleARoundCanTakeWords, theAgentsOwnWorktree, whyARunMayNotWorkIn } from '../tools/sandbox-common.mjs'
 import { THE_TEST_OFFICES_OWNER } from './a-page-of-a-test-office.ts'
-import { apiApp, freshDb, theOfficesKeyHeader, thePersonsKeyHeader, type TestDb } from './helpers.ts'
+import { apiApp, freshDb, theOfficesKeyHeader, thePersonsKeyHeader, type TestDb, governsTheWholeProject } from './helpers.ts'
 import { madeUpRound } from './round-chapters-fixture.ts'
 
 const WORKER = 'delegation-round-worker'
@@ -180,11 +181,19 @@ beforeAll(async () => {
   expect(started.statusCode, started.body).toBe(201)
   workerKey = String(started.json().whatToGiveIt?.key ?? '')
   workerId = (t.client.sqlite.prepare('SELECT id FROM agents WHERE handle = ?').get(WORKER) as { id: string }).id
-  decision = String((await posted('/api/records', PERSON, { kind: 'decision', title: 'Made-up decision the delegations come from', data: { replaces: [] } })).record.id)
+  decision = String((await posted('/api/records', PERSON, { kind: 'decision', title: 'Made-up decision the delegations come from', data: { ...governsTheWholeProject(), replaces: [] } })).record.id)
   for (const { title, ...data } of POINTS) {
     const made = await posted('/api/records', PERSON, { kind: 'backlog_item', title, data: { line: LINE, state: 'todo', placedBy: { kind: 'person', id: THE_TEST_OFFICES_OWNER.id }, ...data } })
     ids.push(String(made.record.id))
   }
+  // THE CHAPTER A LAUNCHED ROUND IS GIVEN: its start reads the chapters from the office, and the policy selects chapter 2.
+  const chapter = {
+    label: 'MADE-UP chapter 2', title: 'MADE-UP rules of chapter 2', conclusion: 'MADE-UP conclusion of chapter 2: read it before the made-up work.',
+    zh: { label: '测试章节 2', title: '测试规章 2', conclusion: '测试结论 2。' },
+    rules: [{ id: 'r-1', heading: 'MADE-UP rule of chapter 2', text: 'MADE-UP work of chapter 2 is recorded.', zh: { heading: '测试条文 2', text: '测试工作 2 已记录。' } }],
+  }
+  const written = await app.inject({ method: 'POST', url: '/api/office-regulations/chapters', headers: PERSON, payload: { n: 2, version: null, because: 'MADE-UP chapter for the launched round', chapter } })
+  expect(written.statusCode, written.body).toBe(200)
 }, 60_000)
 
 afterAll(async () => {
@@ -556,7 +565,7 @@ function actual(name: string, globals: Record<string, unknown>) {
   return runInNewContext(`(${source.slice(start, end + 2)})`, globals, { filename: launcher }) as (...args: any[]) => any
 }
 
-/** Every exported function the round delivery, its chapters and the delegation reader are made from. */
+/** Every exported function the round delivery, its chapters, the delegation reader and the rules reader are made from. */
 async function theRoundFunctions(): Promise<Record<string, any>> {
   return {
     ...await import('../src/shared/round-chapters/delivery.ts'),
@@ -564,6 +573,7 @@ async function theRoundFunctions(): Promise<Record<string, any>> {
     ...await import('../src/shared/round-chapters/backlog.ts'),
     ...await import('../src/shared/round-chapters/standing.ts'),
     ...await import('../src/shared/round-start-delegations.ts'),
+    ...await import('../src/shared/round-start-rules.ts'),
   }
 }
 
@@ -598,7 +608,7 @@ describe('a round the launcher starts carries what its delegation reader read', 
       theClaudeCodeCommand: ({ brief }: any) => ['claude', brief],
       anAgentsRunFiledHere: async (_sb: any, _who: any, args: any) => { filedArgs = args; events.push('filed'); return { id: 'filed', words: ['--filed', 'filed', '--brief', args.brief] } },
       api: 'synthetic', theCallerNamed: () => ({}),
-      // THE STAND-IN OFFICE answers the inside delegation door, the backlog and every point's record from the scratch office.
+      // THE STAND-IN OFFICE answers the inside delegation door, the backlog, every point's record and the two rules doors from the scratch office.
       askTheOfficeWhileItRestarts: async (_api: string, path: string) => {
         const reply = await app.inject({ method: 'GET', url: path, headers: PERSON })
         return { status: reply.statusCode, body: reply.json() as unknown }

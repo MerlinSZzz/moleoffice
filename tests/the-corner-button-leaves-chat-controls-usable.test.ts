@@ -76,7 +76,8 @@ it('the unchosen button follows the reader kind', async () => {
 })
 
 it('an unchosen person sees the unread count on the button beside the open chat', async () => {
-  const cleared = await fetch(`${app.api}/api/participants/person/${THE_PERSON}`, { method: 'PATCH', headers: PERSON, body: JSON.stringify({ chatButtonStays: '', chatOpensAs: '' }) })
+  // THE BUTTON IS UNCHOSEN, AND THE PERSON LAST HAD THE CHAT BESIDE THE PAGE, so the sidebar's Chat row opens it there.
+  const cleared = await fetch(`${app.api}/api/participants/person/${THE_PERSON}`, { method: 'PATCH', headers: PERSON, body: JSON.stringify({ chatButtonStays: '', chatOpensAs: 'split' }) })
   expect(cleared.status, await cleared.clone().text()).toBe(200)
   const peopleReply = await fetch(`${app.api}/api/participants`, { headers: PERSON })
   expect(peopleReply.status, await peopleReply.clone().text()).toBe(200)

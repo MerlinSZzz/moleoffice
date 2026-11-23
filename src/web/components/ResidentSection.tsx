@@ -52,7 +52,8 @@ import { HeartbeatFact } from './ResidentSleep.tsx'
 import { RouteLink, recordPath, sessionPath } from './router.tsx'
 import { CommandLine } from './SessionPanel.tsx'
 import { SideBySide } from './SideBySide.tsx'
-import { Absence, Btn, ErrorNote, Loading, Panel, Select, TextArea, useAsync, type AsyncState } from './ui.tsx'
+import { Absence, Btn, ErrorNote, Loading, Panel, TextArea, useAsync, type AsyncState } from './ui.tsx'
+import { AgentPicker } from './agent/AgentPicker.tsx'
 import { useProjectAsync } from '../lib/project-async.ts'
 
 /** What the page knows of the session-origin file. */
@@ -211,7 +212,11 @@ function TheResidency({ reading, thePerson, withHeartbeat = true }: { reading: O
         {withHeartbeat ? <HeartbeatFact heartbeat={resident.heartbeat} /> : null}
       </dl>
       <h3 className="resident-head">{t('resident.facts.atProposal')}</h3>
-      {resident.factsAtProposal === null ? <p className="resident-quiet">{t('resident.unknown')}</p> : <ResidentFactsList facts={resident.factsAtProposal} />}
+      {resident.factsAtProposal === null ? (
+        <p className="resident-quiet">{t('resident.unknown')}</p>
+      ) : (
+        <ResidentFactsList facts={resident.factsAtProposal} homeWorldIsThisOffice={resident.homeWorldIsThisOffice} />
+      )}
     </Panel>
   )
 }
@@ -709,8 +714,10 @@ function NameASuccessor({ resident, onChanged }: { resident: string; onChanged: 
   }
   const choosable = participants.value.agents.filter((one) => one.id !== resident && one.retired !== true)
   if (choosable.length === 0) return <span className="resident-quiet">{t('resident.successor.nobodyToName')}</span>
-  const pick = choosable.find((one) => one.id === chosen) ?? choosable[0]!
+  // NOTHING IS CHOSEN UNTIL A ROW IS PRESSED, so the save press is drawn only once an agent is chosen.
+  const pick = choosable.find((one) => one.id === chosen)
   const press = (): void => {
+    if (pick === undefined) return
     setFault(null)
     setBusy(true)
     api
@@ -725,18 +732,20 @@ function NameASuccessor({ resident, onChanged }: { resident: string; onChanged: 
       })
   }
   return (
-    <span className="resident-successor-form">
-      <Select
-        aria-label={t('resident.successor.pick')}
-        value={pick.id}
-        onChange={setChosen}
-        options={choosable.map((one) => ({ value: one.id, label: content(one.name) }))}
+    <div className="resident-successor-form">
+      <AgentPicker
+        label={t('resident.successor.pick')}
+        candidates={choosable.map((one) => ({ kind: 'agent' as const, id: one.id }))}
+        chosen={chosen}
+        onChoose={setChosen}
       />
-      <Btn size="sm" variant="primary" onClick={press} disabled={busy} reason={t('resident.working')}>
-        {t('resident.successor.save', { name: content(pick.name) })}
-      </Btn>
+      {pick === undefined ? null : (
+        <Btn size="sm" variant="primary" onClick={press} disabled={busy} reason={t('resident.working')}>
+          {t('resident.successor.save', { name: content(pick.name) })}
+        </Btn>
+      )}
       {fault === null ? null : <ErrorNote message={fault.message} fault={fault.fault} />}
-    </span>
+    </div>
   )
 }
 

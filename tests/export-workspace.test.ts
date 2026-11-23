@@ -621,9 +621,9 @@ describe('a project archive states what it cannot carry, with the numbers', () =
   it('the fixture really has a row in every person-level table', async () => {
     // Not vacuous, and DERIVED: a fifth person-level table added to the schema and not given a row
     // here fails this rather than quietly making the four tests below prove less than they say.
-    const schema = await import('../src/server/db/schema.ts')
-    expect(schema.PERSON_LEVEL_TABLES.length).toBeGreaterThan(0)
-    for (const table of schema.PERSON_LEVEL_TABLES) {
+    const { PERSON_LEVEL_TABLES } = await import('../src/server/db/authored-table-of.ts')
+    expect(PERSON_LEVEL_TABLES.length).toBeGreaterThan(0)
+    for (const table of PERSON_LEVEL_TABLES) {
       const n = (
         planning.client.sqlite.prepare(`SELECT count(*) AS n FROM ${table}`).get() as { n: number }
       ).n
@@ -632,9 +632,9 @@ describe('a project archive states what it cannot carry, with the numbers', () =
   })
 
   it('names every person-level table in its notes, with the count the database holds', async () => {
-    const schema = await import('../src/server/db/schema.ts')
+    const { PERSON_LEVEL_TABLES } = await import('../src/server/db/authored-table-of.ts')
     const said = report.notes.join('\n')
-    for (const table of schema.PERSON_LEVEL_TABLES) {
+    for (const table of PERSON_LEVEL_TABLES) {
       expect(said, `the archive's notes say nothing about ${table}`).toContain(table)
       // THE NUMBER THE DATABASE REALLY HOLDS, read here rather than typed. It was typed as `1`, which
       // was true while every person-level table was one this fixture wrote exactly one row into; the
@@ -659,12 +659,12 @@ describe('a project archive states what it cannot carry, with the numbers', () =
     // And what it says instead, for EVERY person-level table, read from the schema rather than from
     // a list of pages typed here. A list typed here is how the defect happened in the first place:
     // it named the tables there were when it was written, and migrations went on adding more.
-    const schema = await import('../src/server/db/schema.ts')
+    const { PERSON_LEVEL_TABLES } = await import('../src/server/db/authored-table-of.ts')
     const pages = [...tree(onlyRobotics)].map((file) => ({
       file,
       text: readFileSync(join(onlyRobotics, ...file.split('/')), 'utf8'),
     }))
-    for (const table of schema.PERSON_LEVEL_TABLES) {
+    for (const table of PERSON_LEVEL_TABLES) {
       const saying = pages.filter((p) => p.text.includes(`carries no \`${table}\` rows AT ALL`))
       expect(saying.length, `no page of this archive says where the ${table} rows went`).toBeGreaterThan(0)
       for (const page of saying) {
@@ -700,7 +700,7 @@ describe('a project archive states what it cannot carry, with the numbers', () =
     }))
     const scopedFiles = tree(onlyRobotics)
     const checked: string[] = []
-    for (const table of schema.PERSON_LEVEL_TABLES) {
+    for (const table of PERSON_LEVEL_TABLES) {
       const holders = wholePages.filter((p) => p.text.includes('```mole-office ' + table)).map((p) => p.file)
       expect(
         holders.length,
@@ -727,19 +727,19 @@ describe('a project archive states what it cannot carry, with the numbers', () =
   })
 
   it('says in MANIFEST.md that its planning zeroes are counts of the archive, not of the database', async () => {
-    const schema = await import('../src/server/db/schema.ts')
+    const { PERSON_LEVEL_TABLES } = await import('../src/server/db/authored-table-of.ts')
     const manifest = readFileSync(join(onlyRobotics, 'MANIFEST.md'), 'utf8')
     // The counts THEMSELVES stay 0 and must: the importer verifies what it read against them, so
     // they are a count of this archive's files. Which is exactly why the manifest has to say so.
-    for (const table of schema.PERSON_LEVEL_TABLES) expect(manifest).toContain(`${table}: 0`)
+    for (const table of PERSON_LEVEL_TABLES) expect(manifest).toContain(`${table}: 0`)
     expect(manifest).toContain('COUNTS OF THIS ARCHIVE AND NOT OF')
-    for (const table of schema.PERSON_LEVEL_TABLES) expect(manifest).toContain(`${String(held(table))} ${table}`)
+    for (const table of PERSON_LEVEL_TABLES) expect(manifest).toContain(`${String(held(table))} ${table}`)
   })
 
   it('and the whole-installation archive carries all of it, so the scoping is what was measured', async () => {
-    const schema = await import('../src/server/db/schema.ts')
+    const { PERSON_LEVEL_TABLES } = await import('../src/server/db/authored-table-of.ts')
     const manifest = readFileSync(join(everything, 'MANIFEST.md'), 'utf8')
-    for (const table of schema.PERSON_LEVEL_TABLES) expect(manifest).toContain(`${table}: ${String(held(table))}`)
+    for (const table of PERSON_LEVEL_TABLES) expect(manifest).toContain(`${table}: ${String(held(table))}`)
     // The plan's words, verbatim, are in the archive that is allowed to hold them. (This was the draft's body in
     // drafts.md until migration 0196 moved every draft into a plan.)
     expect(readFileSync(join(everything, 'plans.md'), 'utf8')).toContain('- baseline')

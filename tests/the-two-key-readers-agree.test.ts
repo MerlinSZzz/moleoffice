@@ -43,6 +43,8 @@
  *      example is in /Users, and on Windows the sentence does not say "starting with /".
  *   2. Each of the three Python tools sends the key file's key on the key header.
  *   3. Each of the three Python tools, with both variables set, asks nothing, ends 2, and says the reader's sentence.
+ *   4. Both run-key readers give the same key or reason for missing, unsafe, malformed, mismatched and valid files,
+ *      and their shared refusals agree without disclosing the configuration path.
  *
  * ---------------------------------------------------------------------------------------
  * MUTATION PROOF (after a green control), each alone
@@ -71,6 +73,8 @@
  *   n. send-message.py giving the Linux example of a full path on Windows: case 1 goes red on the relative path on
  *      Windows, where the readers differ.
  *   o. agent-key.mjs giving the Linux example of a full path on a Mac: case 1 goes red on the relative path on a Mac.
+ *   p. Either run-key reader accepting a file naming another run: case 4 goes red on the mismatched run.
+ *   q. Either refusal leaving the configuration path in its line: case 4 goes red on the matching refusal.
  */
 import { spawn, spawnSync } from 'node:child_process'
 import { chmodSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
@@ -80,7 +84,8 @@ import { join, posix, win32 } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 
-import { aSecretFromTheEnvironment, THE_AGENT_KEY } from '../for-agents/agent-key.mjs'
+import { aSecretFromTheEnvironment, THE_AGENT_KEY, theNoKeyLine } from '../for-agents/agent-key.mjs'
+import { theKeyARunsToolSends } from '../src/config/run-permissions.mjs'
 
 const REPO = fileURLToPath(new URL('..', import.meta.url)).replace(/\/+$/, '')
 const SEND_MESSAGE = join(REPO, 'for-agents', 'send-message.py')
@@ -296,6 +301,50 @@ describe('the JavaScript and the Python reader of an agent’s key agree', () =>
       }
     })
     expect(differ).toEqual([])
+  })
+})
+
+/** The Python mirror is loaded exactly as the other kit tools load it. */
+const THE_RUN_KEY_PYTHON = `
+import importlib.util, json, sys
+spec = importlib.util.spec_from_file_location('message', sys.argv[1])
+m = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(m)
+cases = json.load(sys.stdin)
+print(json.dumps([{'answer': m.the_key_a_kit_tool_sends(c['env'], c['agent'], c['session'], {'agent': 'agent', 'session': 'session'}, ''), 'line': m.the_no_key_line(c['why'], c['env'])} for c in cases]))
+`
+
+it('the run-key readers and their refusal lines agree', () => {
+  const good = (agent: string, session: string, key: string | null) => JSON.stringify({ mcpServers: { mole_office: { env: { MOLE_OFFICE_AGENT: agent, MOLE_OFFICE_SESSION: session, MOLE_AGENT_KEY: key } } } })
+  const files = [
+    join(dir, 'run-missing'),
+    aFile('run-bad-mode', '{}', 0o644),
+    aFile('run-not-json', '{'),
+    aFile('run-no-office', '{}'),
+    aFile('run-other-agent', good('other', 'run', A_KEY)),
+    aFile('run-other-run', good('agent', 'other', A_KEY)),
+    aFile('run-no-key', good('agent', 'run', null)),
+    aFile('run-good', good('agent', 'run', A_KEY)),
+  ]
+  const folder = join(dir, 'run-folder')
+  mkdirSync(folder)
+  const link = join(dir, 'run-link')
+  symlinkSync(files[7]!, link)
+  const cases = [
+    { env: {}, agent: 'agent', session: 'run' },
+    { env: {}, agent: '', session: 'run' },
+    { env: {}, agent: 'agent', session: '' },
+    ...[...files, folder, link].map(path => ({ env: { MOLE_OFFICE_TOOL_CONFIGURATION: path }, agent: 'agent', session: 'run' })),
+  ].map(one => ({ ...one, why: 'the office tool configuration ' + ((one.env as Record<string, string>).MOLE_OFFICE_TOOL_CONFIGURATION ?? 'unset') + ' was not used' }))
+  const ran = spawnSync('python3', ['-B', '-c', THE_RUN_KEY_PYTHON, SEND_MESSAGE], {
+    input: JSON.stringify(cases), env: { PATH: process.env.PATH ?? '' }, encoding: 'utf8', timeout: 20_000,
+  })
+  expect(ran.status, ran.stderr).toBe(0)
+  const python = JSON.parse(ran.stdout) as Array<{ answer: [string | null, string | null]; line: string }>
+  cases.forEach((one, index) => {
+    const node = theKeyARunsToolSends(one.env, { agent: one.agent, session: one.session }, { agent: 'agent', session: 'session' })
+    expect(python[index]!.answer).toEqual([node.key, node.why])
+    expect(python[index]!.line).toBe(theNoKeyLine(one.why, one.env))
   })
 })
 

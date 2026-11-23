@@ -190,7 +190,7 @@ import { nameAttributes } from '../agent/pointing.ts'
 import { InReachBox, useReach } from '../InReach.tsx'
 import { whenTheLookMayChange } from '../PresetBar.tsx'
 import { recordPath, RouteLink } from '../router.tsx'
-import { Absence, ErrorNote, Hint, useAsync } from '../ui.tsx'
+import { Absence, ErrorNote, useAsync } from '../ui.tsx'
 import { effortOf, whatWasNotRead, type EffortReading, type EffortTotals } from '@shared/envelope.ts'
 // THE LADDER'S OWN BUDGETS AND THE OFFICE'S OWN WORD COUNT, called rather than copied: the mark this
 // table draws on an over-long line is measured by the same numbers the door refuses by, so a line
@@ -229,7 +229,6 @@ import {
   TickAgainstState,
   useWorkList,
   whereACellSits,
-  WhatTheTypesMean,
   wordsOf,
   writtenValue,
   type ItemActs,
@@ -244,8 +243,6 @@ export interface Column {
   key: string
   /** The heading on the wide table AND the label on a phone. One string, so they cannot differ. */
   heading: string
-  /** What this cell is made of, in plain words. Shown when a reader rests on the heading. */
-  means: string
   /**
    * What the column is about: the item's own words, one of the writer's own pipe-table columns, or
    * EITHER — the line until it is tracked and the record after.
@@ -340,16 +337,6 @@ export interface Column {
     canRewrite: boolean,
     envelope: EffortReading | undefined,
   ) => React.ReactNode
-  /**
-   * WHAT THIS COLUMN'S WORDS MEAN, BEHIND THE HELP MARK ON ITS HEADING, or absent where the heading
-   * says enough on its own.
-   *
-   * ONCE PER COLUMN AND NEVER ONCE PER ROW. The four type definitions used to sit permanently under
-   * four buttons on a form; the labels are to stay visible and the definitions to go
-   * behind the help affordance. Forty help marks down a column would be the same mistake with a
-   * smaller footprint, so it belongs on the heading, which is drawn once.
-   */
-  hint?: () => React.ReactNode
 }
 
 /** Which form is open under which row, so only one is ever on screen. */
@@ -658,7 +645,6 @@ const COLUMNS: readonly Column[] = [
   {
     key: 'what',
     get heading() { return t('g8.table.task') },
-    get means() { return t('g8.table.theItemSOwnWordsWrittenBackIntoThe') },
     about: 'line',
     sortOn: (item) => item.text.trim().toLowerCase(),
     keepWhenNarrow: true,
@@ -668,19 +654,16 @@ const COLUMNS: readonly Column[] = [
   {
     key: 'type',
     get heading() { return t('g8.table.type') },
-    get means() { return t('g8.table.whatSortOfThingThisIsBeforeYouTrack') },
     about: 'either',
     sortOn: (item) => item.entry.work?.kind ?? null,
     keepWhenNarrow: true,
     narrowest: 74,
     cell: (item, acts) => <ItemType item={item} acts={acts} />,
-    hint: () => <WhatTheTypesMean />,
   },
   {
     key: 'big',
     fact: 'size',
     get heading() { return PLANNING_WORDS.size },
-    get means() { return t('g8.table.howMuchWorkThisProbablyTakesUntilYouTrack') },
     about: 'either',
     sortOn: (item) => item.entry.work?.effortHours ?? null,
     keepWhenNarrow: true,
@@ -693,7 +676,6 @@ const COLUMNS: readonly Column[] = [
     key: 'time',
     fact: 'time',
     get heading() { return PLANNING_WORDS.time },
-    get means() { return t('g8.table.whenYouMeanToWorkOnThisUntilYou') },
     about: 'either',
     // NOT SORTABLE ON PURPOSE. Hours at a month, a week and a day are three answers to three
     // questions and shared/planning.ts refuses to add them, so there is no one number to sort on.
@@ -722,7 +704,6 @@ const COLUMNS: readonly Column[] = [
     key: 'project',
     fact: 'project',
     get heading() { return PLANNING_WORDS.project },
-    get means() { return t('g8.table.whichProjectOwnsThisUntilYouTrackTheLine') },
     about: 'either',
     sortOn: (item) => item.entry.work?.workspaceId ?? writtenValue(item, 'project').said,
     keepWhenNarrow: true,
@@ -732,7 +713,6 @@ const COLUMNS: readonly Column[] = [
   {
     key: 'note',
     get heading() { return PLANNING_WORDS.note },
-    get means() { return t('g8.table.anythingElseAboutThisItemItLivesInThe') },
     about: 'line',
     sortOn: (item) => writtenValue(item, 'note').said,
     keepWhenNarrow: true,
@@ -745,7 +725,6 @@ const COLUMNS: readonly Column[] = [
 const WHERE_IT_SITS: Column = {
   key: 'sits',
   get heading() { return t('g8.table.whereItSits') },
-  get means() { return t('g8.table.theItemsThisOneIsWrittenUnderOutermostFirst') },
   about: 'line',
   sortOn: (item) => item.above.map((one) => one.text).join(' › ').toLowerCase(),
   // It replaces the indent, which is the depth this table draws, so it survives a narrow column for
@@ -775,7 +754,6 @@ function yourColumn(heading: string): Column {
   return {
     key: `yours:${heading}`,
     heading,
-    means: t('g8.table.aColumnFromATableYouWroteInThis'),
     about: 'yours',
     // A column of the writer's own is their data and is never dropped for being theirs; it is dropped
     // for the same reason Mole Office's own extra columns are, and it is named under the table with them.
@@ -905,13 +883,9 @@ export function planTotalSaid(effort: EffortTotals, sizedInThePlan: number): str
   // NO TOTAL IS SAID IN WORDS, not with the short mark: the line goes on "· 3 not sized as work", and a
   // lone mark before it read as a stray dash (problem ZPNVOJkn1oVp). Which of the two it is matters.
   if (effort.total === null) {
-    return sizedInThePlan === 0 ? t('r14.plan.nothingSized') : t('r14.plan.noTotal')
+    return sizedInThePlan === 0 ? t('planTable.total.nothingSized') : t('planTable.total.none')
   }
-  const said = t('g8.table.hInAllFromOfTopLevelRows', { value1: effort.total, value2: effort.totalFrom, value3: effort.roots })
-  if (effort.atLeastTotal !== null && effort.atLeastTotal > effort.total) {
-    return t('g8.table.thatIsWhatThePlanSays', { value1: said })
-  }
-  return said
+  return t('g8.table.hInAllFromOfTopLevelRows', { value1: effort.total, value2: effort.totalFrom, value3: effort.roots })
 }
 
 // ============================================================================ the person owns the widths
@@ -1651,13 +1625,6 @@ export function PlanTable({ plan, lines, onWrote, behind = false, versionToWrite
         <ErrorNote message={reloadFailed.message} fault={reloadFailed.fault} label={t('g8.table.moleOfficeCouldNotReadThePlanAgain')} retry={reload} />
       )}
 
-      {/* WHERE THE WORDS ARE CHANGED, WHEN THEY CANNOT BE CHANGED HERE. It is one sentence and it
-          names the place, rather than a refusal a person meets only after typing into a box that
-          then throws their words away. */}
-      {canRewrite || items.length === 0 ? null : (
-        <p className="pt-readonly">{t('g8.table.changeTheWordsOfAnItemInTheWriting')}</p>
-      )}
-
       {items.length === 0 ? null : (
         <div className="pt-bar">
           <button type="button" className="pt-press" aria-pressed={flat} onClick={() => setFlat(!flat)}>
@@ -1688,7 +1655,7 @@ export function PlanTable({ plan, lines, onWrote, behind = false, versionToWrite
 
       {/* A BROWSER THAT WILL NOT REMEMBER THE LAYOUT SAYS SO, rather than forgetting it on every
           load with nothing to explain why. The same rule the mode switch and the sidebar follow. */}
-      {widthFault === null ? null : <p className="pt-readonly">{inspect ? widthFault : t('g8.table.cannotRememberWidths')}</p>}
+      {widthFault === null ? null : <p className="pt-readonly">{inspect ? widthFault : t('planTable.widthsNotKept')}</p>}
 
       {pickedItems.length === 0 ? null : (
         <div className="pt-picked">
@@ -1802,12 +1769,11 @@ export function PlanTable({ plan, lines, onWrote, behind = false, versionToWrite
                   <th key={col.key} scope="col" data-about={col.about} data-col={col.key}>
                     <span className="pt-head">
                       {col.sortOn === null ? (
-                        <span title={col.means}>{col.heading}</span>
+                        <span>{col.heading}</span>
                       ) : (
                         <button
                           type="button"
                           className="pt-sort"
-                          title={col.means}
                           aria-pressed={sorted?.key === col.key}
                           onClick={() => press(col.key)}
                         >
@@ -1816,12 +1782,6 @@ export function PlanTable({ plan, lines, onWrote, behind = false, versionToWrite
                             {sorted?.key === col.key ? (sorted.up ? '↑' : '↓') : ''}
                           </span>
                         </button>
-                      )}
-                      {/* WHAT THIS COLUMN'S WORDS MEAN, ONCE, ON THE HEADING. See `hint` on Column:
-                          the four type definitions used to be four paragraphs on every filing form,
-                          and forty help marks down a column would be the same mistake again. */}
-                      {col.hint === undefined ? null : (
-                        <Hint label={t('g8.table.whatMeans', { value1: col.heading })}>{col.hint()}</Hint>
                       )}
                     </span>
                     <WidthGrip
@@ -1893,13 +1853,13 @@ export function PlanTable({ plan, lines, onWrote, behind = false, versionToWrite
           See `planEffortOf` above for the arithmetic and for the 44h-against-12h defect it fixes. */}
       <p className="pt-totals">{t('g8.table.notSizedAsWorkNotTrackedAsWork', { value1: planTotalSaid(effort, sizedInThePlan), value2: effort.ownHoursAdded === null || effort.ownHoursAdded === effort.total
           ? ''
-          : t('g8.table.aPartIsNeverAddedToWhatHoldsIt', { value1: effort.ownHoursAdded }), value3: effort.atLeastTotal === null || effort.total === null || effort.atLeastTotal <= effort.total
+          : ` · ${t('schedule.rowsAddUp', { rows: effort.ownHoursAdded })}`, value3: effort.atLeastTotal === null || effort.total === null || effort.atLeastTotal <= effort.total
           ? ''
-          : t('g8.table.partsOfThisPlanAddUpToMoreThan', { value1: atLeastSaid(effort.atLeastTotal) }), value4: effort.withoutOwn, value5: items.length - filed.length, value6: sizedInThePlan === 0 ? '' : t('g8.table.sizedInThePlanOnlyWhichIsInNo', { value1: sizedInThePlan }), value7: notItems.blank === 0 ? '' : t('g8.table.blankNotShown', { value1: notItems.blank, value2: notItems.blank === 1 ? t('g8.table.lineIs') : t('g8.table.linesAre') }), value8: notItems.prose === 0
+          : t('planTable.partsOver', { atLeast: atLeastSaid(effort.atLeastTotal) }), value4: effort.withoutOwn, value5: items.length - filed.length, value6: sizedInThePlan === 0 ? '' : t('planTable.sizedInPlanOnly', { n: sizedInThePlan }), value7: notItems.blank === 0 ? '' : t('g8.table.blankNotShown', { value1: notItems.blank, value2: notItems.blank === 1 ? t('g8.table.lineIs') : t('g8.table.linesAre') }), value8: notItems.prose === 0
           ? ''
-          : t('g8.table.ofProseWhichIsWritingRatherThanWork', { value1: notItems.prose, value2: notItems.prose === 1 ? t('g8.onePlan.line') : t('g8.onePlan.lines') }), value9: notItems.unreadable === 0
+          : t('planTable.proseLines', { n: notItems.prose, lines: notItems.prose === 1 ? t('g8.onePlan.line') : t('g8.onePlan.lines') }), value9: notItems.unreadable === 0
           ? ''
-          : t('g8.table.moleOfficeCouldNotReadPrintedAsTypedIn', { value1: notItems.unreadable, value2: notItems.unreadable === 1 ? t('g8.onePlan.line') : t('g8.onePlan.lines') }), value10: couldNotCount === null ? '' : ` · ${couldNotCount}` })}</p>
+          : t('planTable.unreadLines', { n: notItems.unreadable, lines: notItems.unreadable === 1 ? t('g8.onePlan.line') : t('g8.onePlan.lines') }), value10: couldNotCount === null ? '' : ` · ${couldNotCount}` })}</p>
 
       <ItemsOriginNote />
     </div>

@@ -14,7 +14,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import type { Page } from 'playwright'
-import { liveApp, waitForThePage, type LiveApp } from './helpers.ts'
+import { liveApp, waitForThePage, type LiveApp, governsTheWholeProject } from './helpers.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { setWordLanguage } from '../src/shared/i18n.ts'
 
@@ -37,7 +37,7 @@ beforeAll(async () => {
   const key = JSON.parse(readFileSync(join(app.dir, 'keys.json'), 'utf8')) as { person: string }
   await post('/api/roles/elevation/test-kite-secretary', { reason: 'Test: a made-up raise', endsWhen: 'when you say' }, { ...AS, 'x-mole-office-key': key.person })
   // A DECISION WITH TWO FIELDS FILLED, so the band draws both a filled name and grey ones.
-  decisionId = (await post('/api/records', { kind: 'decision', title: 'Test: mend the tail with tape', data: { option_taken: 'Test: tape', because: 'A made-up reason.', replaces: [] } })).record.id
+  decisionId = (await post('/api/records', { kind: 'decision', title: 'Test: mend the tail with tape', data: { option_taken: 'Test: tape', because: 'A made-up reason.', ...governsTheWholeProject(), replaces: [] } })).record.id
   // ONE QUESTION WAITING ON THE PERSON, so the settle tier is drawn with a count of 1.
   await post('/api/records', { kind: 'proposal', title: 'Test which glue for the spar', data: { question: 'Which glue should mend the spar?', options: ['a — wood glue', 'b — epoxy'], recommendation: 'Take (b).', because: 'A made-up reason.', who_settles_it: 'the owner' } }, KEEPER)
 }, 240_000)

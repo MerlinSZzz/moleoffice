@@ -13,7 +13,8 @@
  *
  * WHAT THIS FILE PROVES, with a fresh database, the office's own doors through app.inject, and a stand-in for the
  * queue reader that records its arguments and writes made-up rows where --out says:
- *   1. without each of its five environment variables, productionDoors() refuses with one sentence;
+ *   1. without one of its five environment variables, productionDoors() refuses with one sentence: tried for
+ *      MOLE_OFFICE_API, which stands for the four read plainly, and for MOLE_AGENT_KEY, which has its own reader;
  *   2. the command line needs --queue, --work and --sandboxes, each an absolute path, and nothing else;
  *   3. the first tick files the daily counter, the second files no other, and a paused one stays paused;
  *   4. with no firing waiting, nothing is read;
@@ -211,7 +212,7 @@ describe('the runner names its own agent', () => {
     }
   }
 
-  it.each(FIVE)('1. refuses to build its doors without %s, in one sentence that shows no key', (missing) => {
+  it.each(['MOLE_OFFICE_API', 'MOLE_AGENT_KEY'] as const)('1. refuses to build its doors without %s, in one sentence that shows no key', (missing) => {
     withTheEnvironment(missing, () => {
       let said = ''
       try {

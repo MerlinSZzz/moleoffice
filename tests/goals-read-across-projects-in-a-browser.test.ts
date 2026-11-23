@@ -181,7 +181,6 @@ interface Seen {
   counts: { at: string; count: string; goals: number }[]
   facts: { said: string; project: string }[]
   drawing: number
-  drawingLine: string
 }
 
 async function seen(): Promise<Seen> {
@@ -210,7 +209,6 @@ async function seen(): Promise<Seen> {
       project: one.querySelector('.pch-name')?.getAttribute('data-project') ?? '',
     })),
     drawing: document.querySelectorAll('.hz-drawing [data-target="uiSurface/plan.toward"]').length,
-    drawingLine: document.querySelector('.hz-drawing-one')?.textContent ?? '',
   }))
 }
 
@@ -234,7 +232,6 @@ describe('the Goals page reads across projects', () => {
     expect(late[0]!.said).toContain(HERE_WORK)
     // THE DRAWING IS THIS PROJECT'S.
     expect(now.drawing).toBe(1)
-    expect(now.drawingLine).toBe('')
   }, 120_000)
 
   it('reads every project when Show every project is pressed, each row naming its project, and counts over both', async () => {
@@ -269,9 +266,9 @@ describe('the Goals page reads across projects', () => {
     // BOTH LATE WINDOWS, each naming its project.
     const late = now.facts.filter((one) => one.said.includes('was meant to be worked on until'))
     expect(late.map((one) => one.project).sort()).toEqual([HERE, THERE].sort())
-    // THE DRAWING IS ONE PROJECT'S, so none is drawn and a line says why.
+    // THE DRAWING IS ONE PROJECT'S, so none is drawn.
+    // CRITERION CHANGE, as decided: no line is drawn in its place, and none is checked.
     expect(now.drawing).toBe(0)
-    expect(now.drawingLine).toBe('The goal drawing shows one project at a time. Choose a project above to see its drawing.')
 
     // WHAT THE READER MAY READ: nothing was narrowed, and every row is in a project the office lists.
     const projects = new Set((await callApi<{ workspaces: { id: string }[] }>('/api/workspaces')).workspaces.map((one) => one.id))

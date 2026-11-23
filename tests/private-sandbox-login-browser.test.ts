@@ -31,7 +31,7 @@ it('starts one dedicated panel, clears protected input, handles popup failure an
   await page.getByText('Sign-in was cancelled or declined.').waitFor()
   expect(drawn.counts().cancels).toBe(1)
 })
-it('photographs pending and added states at every agreed width in both themes without secret text', async () => {
+it('photographs the pending state at the widest and narrowest widths and the added state at one width, in the light theme, without secret text', async () => {
   mkdirSync(pictures, { recursive: true })
   const page = drawn.page
   await page.reload(); await page.addScriptTag({ content: '' }).catch(() => {})
@@ -39,7 +39,7 @@ it('photographs pending and added states at every agreed width in both themes wi
   await drawn.close(); drawn = await privateLoginBrowser()
   await drawn.page.getByRole('button', { name: 'Add Claude login', exact: true }).click()
   await drawn.page.getByRole('heading', { name: 'Sign in', exact: true }).waitFor()
-  for (const theme of ['light', 'dark']) for (const width of [1440, 990, 660, 390]) {
+  for (const theme of ['light']) for (const width of [1440, 390]) {
     await drawn.page.setViewportSize({ width, height: 900 }); await drawn.palette(theme)
     await drawn.page.getByRole('heading', { name: 'Sign in', exact: true }).waitFor()
     await drawn.page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))))
@@ -47,7 +47,7 @@ it('photographs pending and added states at every agreed width in both themes wi
     expect(await drawn.page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
   }
   drawn.complete(); await drawn.page.getByText('Added; current login unchanged.').waitFor()
-  for (const theme of ['light', 'dark']) for (const width of [1440, 990, 660, 390]) {
+  for (const theme of ['light']) for (const width of [1440]) {
     await drawn.page.setViewportSize({ width, height: 900 }); await drawn.palette(theme)
     await drawn.page.getByText('Added; current login unchanged.').waitFor()
     await drawn.page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))))

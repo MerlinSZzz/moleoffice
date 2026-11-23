@@ -18,6 +18,9 @@
  * evaluated. records/reading.ts and records/territory.ts do not import this file, so their names are imported from
  * them directly.
  */
+import { KNOWLEDGE_WORKSPACE, isKnowledgeKind } from '@shared/knowledge/constants.ts'
+import { KNOWLEDGE_WORDS } from '@shared/words/en-wave-13u.ts'
+import { refuseOrdinaryKnowledgeWrite } from '../../knowledge/guard.ts'
 import { refuseModulePartChanges } from '../module-requirements.ts'
 import { MESSAGE_QUOTE_POSITIONS_INVALID } from '@shared/refusal-codes.ts'
 import { refuseANewRunWhileAStarterChangeWaits } from '../agent-starter.ts'
@@ -28,6 +31,8 @@ import { NEXT_ROUND, ONLY_THE_OFFICE_WRITES_THE_NEXT_ROUND } from '@shared/next-
 import {
   CUT_ASKED,
   IMAGES_GIVEN,
+  WORKER_PLACE,
+  ONLY_THE_OFFICE_WRITES_THE_WORKER_PLACE,
   WORKER_PACKAGE,
   ONLY_THE_OFFICE_WRITES_THE_CUT_ASKED,
   ONLY_THE_OFFICE_WRITES_THE_IMAGES_GIVEN,
@@ -36,6 +41,7 @@ import {
   WORKER_RUNS,
 } from '@shared/worker-runs.ts'
 import { refuseTheSealOverAFault } from '../before-the-seal.ts'
+import { refuseTheHeadsInACreate, type AHeadRead } from '../a-runs-own-commits.ts'
 import { officeIsWritingSeal, runSubmitsWork, sealFinishedRun } from '../sealed-tip.ts'
 import { aRunSaysItIsFinished } from '@shared/releasing.ts'
 import { and, asc, desc, eq, inArray, isNull, ne, or, sql } from 'drizzle-orm'
@@ -54,7 +60,7 @@ import { onlyChecking } from '../only-checking.ts'
 import { links, records, STORED_FIELDS } from '../../db/schema.ts'
 import { validateRecordData, type Incompleteness } from '../validate.ts'
 import { canonicalise } from '../summary.ts'
-import { type ForkSettler, type MoveActor } from '@shared/kinds.ts'
+import { FILING_HEAD, type ForkSettler, type MoveActor } from '@shared/kinds.ts'
 import { GATE_KINDS, gateLabel, type Gate, type GateKind } from '@shared/work.ts'
 import {
   LINK_TYPES,
@@ -92,6 +98,7 @@ import { theReadingsForOneMessage, theRoutingOfOneAddressee } from '../superiors
 import { theNameOf } from '@shared/participant-name.ts'
 import { aNewCheckpointLetterAsItIsWritten } from '../deadletters.ts'
 import { aStartersLetterToAnEndedWorker } from '../worker-delivery/letters.ts'
+import { whenStored } from '../../db/told-when-stored.ts'
 import { answeringOfTheAgentsTheseRunsServeMayHaveChanged } from '../answering-told.ts'
 import type { GreyPresenceWord } from '../presence.ts'
 import {
@@ -118,6 +125,7 @@ import {
 import { asAMessageStoresIt, whyARunsMachineIsNotKnown, type WrittenFrom } from '../machines.ts'
 import { whatThisDecisionReplaces } from '../replaced-decisions.ts'
 import { assertTheGovernedPlacesAreReal } from '../assert-the-governed-places-are-real.ts'
+import { assertTheDecisionNamesWhatItGoverns, whatTheWriteNames, type WhatTheWriteNames } from '../what-a-record-names.ts'
 import {
   checkTheDecisionBasis,
   checkTheFlowSteps,
@@ -177,11 +185,12 @@ import { settleShortForms } from '../zoom.ts'
 import { refuseANoticeKindNotAllowed } from '../notices.ts'
 import { checkTheSecretaryDuties } from '../grant/secretary-duties.ts'
 import { SECRETARY_DUTIES_KIND } from '@shared/secretary-duties-record.ts'
+import { checkTheDepartment, DEPARTMENT_KIND } from '../grant/departments.ts'
 import { checkTheParticipantsNamed } from '../participant-fields.ts'
 import { writeTheNextDayOfADailyObligation } from '../daily-obligations.ts'
 import { getRecord, listRecords } from './reading.ts'
 import { checkAndNormalizeTerritory, type TerritoryWriteCheck } from './territory.ts'
-import { now } from '@shared/now.ts'
+import { clockStamp } from '@shared/time.ts'
 import { thePersonIsProved } from '@shared/the-person-proved.ts'
 import {
   type Actor,
@@ -596,6 +605,12 @@ export interface CreateResult {
    */
   sameTitle?: { id: string; kind: RecordKind; title: string }[]
   /**
+   * WHAT A DECISION OR A REPORT NAMES, said back: the module a whole-project decision should name instead, and to whom
+   * each new nothingFits entry was sent, or why nobody (src/server/lib/what-a-record-names.ts). It reminds and refuses
+   * nothing. Absent when there is nothing to say.
+   */
+  whatItNames?: WhatTheWriteNames
+  /**
    * Present when filing this record bound a run name to it, or when it could not.
    *
    * Binding is the ordinary case: an agent works under a name for a while, then files the session
@@ -642,8 +657,10 @@ export interface CreateResult {
   routed?: RoutedAddressee[]
   /**
    * TRUE WHEN ONE OF THE ROUTED ADDRESSEES WAS RETIRED. The route answers 409 for it, as it does for
-   * `routedToAnUnheldAddressee`; every other routed send answers 201. Only a person can produce
+   * `routedToAnUnheldAddressee`; every other routed send answers 201. An agent's send never sets
    * it, because an agent's send to a retired agent is refused before anything is written (M110).
+   * Every other routing to a retired addressee sets it, a person's send among them; only a send
+   * through the route is answered, and the office's own lines are not written through it.
    */
   routedARetiredAddressee?: boolean
   /**
@@ -929,6 +946,12 @@ export function createRecordWithReport(input: {
   /** The door the write came through, in words, for that refusal. */
   door?: string
   /**
+   * WHETHER THIS WRITE MUST SAY WHAT IT GOVERNS. Every door a decision is made through sets it, beside
+   * `mustSayWhatItReplaces`, and a decision that names no page, no whole project and no nothingFits entry is refused.
+   * Left out for a write nobody asked, such as a test's fixture. See lib/what-a-record-names.ts.
+   */
+  mustSayWhatItGoverns?: boolean
+  /**
    * WHETHER THE ANSWER NAMES THE RECORDS ALREADY CALLED THIS, OR NEARLY: `sameTitle` and `similar`. Default true.
    * A caller passes false when nothing reads either list: no door's answer names it and nothing else keeps it. Each
    * such call says why beside it. `createRecord` passes false, because it gives back the record alone. The near list
@@ -943,7 +966,14 @@ export function createRecordWithReport(input: {
    * its links and every other write carry nothing. See `provedHolderWritten`.
    */
   startersKey?: ProvedHolder
+  /**
+   * THE COMMIT THE RUN'S WORKING DIRECTORY WAS AT AS IT IS FILED, set only by the record door, which read it apart from
+   * the request's thread (`theHeadReadApart` in ../a-runs-own-commits.ts). Stored as the session's `filingHead`.
+   */
+  filingHead?: AHeadRead
 }): CreateResult {
+  refuseOrdinaryKnowledgeWrite(input.kind)
+  if (input.workspaceId === KNOWLEDGE_WORKSPACE && !isKnowledgeKind(input.kind)) throw new PanelError(KNOWLEDGE_WORDS.onlyDoor, 400)
   if (input.kind === 'session' && input.data && Object.hasOwn(input.data, ENDED_RUN_LOOK_FIELD)) {
     throw new PanelError(ONLY_THE_OFFICE_WRITES_THE_LOOK_MARK, 403)
   }
@@ -953,7 +983,9 @@ export function createRecordWithReport(input: {
   if (input.data && Object.hasOwn(input.data, CASTING_ROLL)) throw new PanelError(ONLY_THE_OFFICE_WRITES_THE_CASTING_ROLL, 403)
   if (input.data && Object.hasOwn(input.data, CUT_ASKED)) throw new PanelError(ONLY_THE_OFFICE_WRITES_THE_CUT_ASKED, 403)
   if (input.data && Object.hasOwn(input.data, IMAGES_GIVEN)) throw new PanelError(ONLY_THE_OFFICE_WRITES_THE_IMAGES_GIVEN, 403)
+  if (input.data && Object.hasOwn(input.data, WORKER_PLACE)) throw new PanelError(ONLY_THE_OFFICE_WRITES_THE_WORKER_PLACE, 403)
   if (input.data && Object.hasOwn(input.data, WORKER_PACKAGE)) throw new PanelError(ONLY_THE_OFFICE_WRITES_THE_WORKER_PACKAGE, 403)
+  refuseTheHeadsInACreate(input.data)
   refuseAGenericUpgradeNotice(undefined, input.data)
   if (input.kind === 'sealed_tip' && !officeIsWritingSeal()) throw new PanelError('Only the finish writer creates a sealed tip.', 403)
   if (input.data && Object.hasOwn(input.data, 'sealedTip')) throw new PanelError('The office writes sealedTip when a run finishes.', 403)
@@ -1219,6 +1251,9 @@ export function createRecordWithReport(input: {
   // A SECRETARY'S DUTIES ARE WRITTEN BY THE PERSON, OR BY THAT SECRETARY ON THE PERSON'S DECISION.
   // On this path as well as on the patch, so POST /api/records meets the guard PUT /api/secretaries/<id>/duties does.
   if (kind === SECRETARY_DUTIES_KIND) checkTheSecretaryDuties({ workspaceId, data, before: null, mine: null, actor })
+  // A DEPARTMENT IS WRITTEN BY THE PERSON, OR BY A SECRETARY ON THE PERSON'S DECISION (lib/grant/departments.ts). On this
+  // path as well as on the patch, so POST /api/records meets the guard POST /api/departments does.
+  if (kind === DEPARTMENT_KIND) checkTheDepartment({ workspaceId, data, before: null, mine: null, actor })
 
   // A FIELD THAT HOLDS A PARTICIPANT NAMES SOMEBODY A REGISTRY ROW ANSWERS TO. After the duties' guard, so its own
   // refusal answers first. On this path as well as on the patch.
@@ -1651,7 +1686,7 @@ export function createRecordWithReport(input: {
           const addressed = Array.isArray(data['to']) ? data['to'] : null
           // A PERSON OR AGENT SENDING TO AN UNHELD ADDRESSEE GETS THE 409. The office's own lines and a run's
           // reply have no caller to answer and keep their 201s.
-          const aPersonIsSending =
+          const aPersonOrAgentIsSending =
             mine !== null && input.senderIsTheRun !== true && input.senderIsMoleOffice !== true
           if (addressed !== null) {
             for (const one of addressed) {
@@ -1670,7 +1705,7 @@ export function createRecordWithReport(input: {
               // no word, no reason is built and the send stays a 201 with the routing. A handle a session holds carries
               // none, because the waiter holding it takes the message when it comes.
               const theUnheldReason = (): string | null => {
-                if (!aPersonIsSending || reach.was !== 'nothing answering') return null
+                if (!aPersonOrAgentIsSending || reach.was !== 'nothing answering') return null
                 const word = reach.theWordOf?.()
                 return word === undefined ? null : theReasonOfAnUnheldAgent(ref.id, word)
               }
@@ -1723,16 +1758,16 @@ export function createRecordWithReport(input: {
       if (routed.length > 0) data['routed'] = routed
       // AND THE OFFICE'S OWN LINES AND A RUN'S REPLIES HAVE NO CALLER TO ANSWER, so the process log
       // says where each letter went instead. One line per routed entry, the finished line itself.
-      // A person's send is answered through the reply, so nothing is logged
+      // A person's or an agent's own send is answered through the reply, so nothing is logged
       // for it.
       // A CHECK LOGS NOTHING, because no letter went anywhere (lib/only-a-check.ts).
       if (!onlyChecking() && routed.length > 0 && (input.senderIsMoleOffice === true || input.senderIsTheRun === true)) {
-        for (const one of routed) console.log(one.line)
+        for (const one of routed) whenStored(() => console.log(one.line))
       }
       // AND A RUN'S REPLY TO AN ADDRESSEE THE OFFICE COULD NOT TELL ABOUT is logged the same way,
       // because a run has no caller to answer either.
       if (!onlyChecking() && input.senderIsTheRun === true) {
-        for (const one of notRouted) console.log(one.line)
+        for (const one of notRouted) whenStored(() => console.log(one.line))
       }
     }
   }
@@ -1787,8 +1822,13 @@ export function createRecordWithReport(input: {
     checkWorkDomainIds(data, workspaceId)
     assertNothingResolvedOnCreate(data)
   }
-  // WHAT A DECISION GOVERNS IS THERE: each record it names is a live module, flow or pipeline of this project.
+  // WHAT A DECISION GOVERNS IS THERE: each record it names is a live page of this project, of a kind in PAGE_KINDS.
   if (kind === DECISION_KIND) assertTheGovernedPlacesAreReal(data, workspaceId)
+  // AND IT NAMES WHAT IT GOVERNS, OR SAYS NO PAGE FITS, when a decision door asked. A report is never refused for this.
+  if (kind === DECISION_KIND && input.mustSayWhatItGoverns === true) {
+    const sent = isJsonObject(data) ? data : {}
+    assertTheDecisionNamesWhatItGoverns(sent, sent, workspaceId)
+  }
   // AND A DECISION'S BASIS IS THERE, AND A FLOW'S NEW STEPS SAY WHY AND ON WHAT.
   if (kind === DECISION_KIND) checkTheDecisionBasis(data)
   if (kind === 'flow') checkTheFlowSteps(data, null)
@@ -1874,10 +1914,22 @@ export function createRecordWithReport(input: {
     // writes `filed_by` from the actor rather than trusting a caller's name, and refuses a caller
     // that tried to write another name; a goal the person files carries none. See lib/goals.ts.
     const marked = theAgentMarkAsStored(withChosen, actor, kind)
-    const dataToStore = marked ?? withChosen
+    // A RUN'S FILING COMMIT IS THE OFFICE'S OWN READING, which the record door made before this write. Typed as the data
+    // it joins, so every read of `dataToStore` below indexes one object type.
+    const filed: Record<string, unknown> | null = input.filingHead === undefined || kind !== 'session' ? null : { ...(marked ?? withChosen) as Record<string, unknown>, [FILING_HEAD]: input.filingHead }
+    // THE MOMENT A MESSAGE WAS WRITTEN OR A RUN WAS FILED, FROM THE ONE READING OF THE CLOCK THAT MAKES ITS STAMP below.
+    // The stamp is the local wall clock with no offset, and on the night the clocks go back it cannot say which pass of
+    // the hour from 01:00 it means; the instant beside it can. Mole Office writes it, and what a caller sent under the
+    // name is replaced.
+    const written = clockStamp()
+    const itsMoment = kind === 'message' ? 'writtenTime' : kind === 'session' ? 'filedTime' : null
+    const stamped = filed ?? marked ?? withChosen
+    const withItsMoment: Record<string, unknown> | null = itsMoment === null ? null : { ...(isJsonObject(stamped) ? stamped : {}), [itsMoment]: written }
+    const dataToStore = withItsMoment ?? stamped
     // AND THE COMPLETED VALUE GOES THROUGH THE SAME GATE AS THE ONE THAT WAS SENT. It is a shape a
-    // caller could have sent, and this is what says so rather than a comment claiming it.
-    if (chosen !== null || marked !== null) validateRecordData(kind, dataToStore)
+    // caller could have sent, and this is what says so rather than a comment claiming it. The moment alone does not send
+    // it through again: it is the office's own reading of the clock, in the shape its kind declares.
+    if (chosen !== null || marked !== null || filed !== null) validateRecordData(kind, dataToStore)
 
     const row = {
       id: anOfficeId(),
@@ -1889,8 +1941,8 @@ export function createRecordWithReport(input: {
       title: title.trim(),
       summary: input.summary ?? null,
       data: dataToStore ?? {},
-      createdAt: now(),
-      updatedAt: now(),
+      createdAt: written.stamp,
+      updatedAt: written.stamp,
       deletedAt: null,
       // See `origin` on the input above for why a default is a fact here and not a guess.
       origin: input.origin ?? 'authored',
@@ -2044,7 +2096,7 @@ export function createRecordWithReport(input: {
       // the rest of the filing have been written, so a refusal rolls the whole filing back — no run, no key, no history,
       // no notice. It does not stand before the first INSERT. It refuses only a migration item of a git seal, for every
       // writer, and its count is made once this transaction is taken back.
-      refuseTheSealOverAFault({ ...toRecord(row as typeof records.$inferSelect), data: dataToStore })
+      refuseTheSealOverAFault({ ...toRecord(row as typeof records.$inferSelect), data: dataToStore }, true)
       const sealed = { ...dataToStore, ...sealFinishedRun(row.id, dataToStore, actor, dataToStore['tip']) }
       db.update(records).set({ data: sealed }).where(eq(records.id, row.id)).run()
       row.data = sealed
@@ -2080,8 +2132,8 @@ export function createRecordWithReport(input: {
       }
     }
     // AND WHERE THE MESSAGE WENT WHEN ITS ADDRESSEE COULD NOT BE REACHED. See `routed` above; the
-    // reply the route builds from these two fields says where the copy went, and the 409 the owner's
-    // decision keeps for a retired addressee.
+    // reply the route builds from these fields says where the copy went, and the 409 the route answers
+    // for a retired addressee, which the owner's decision keeps, and for a registered agent nothing holds.
     if (kind === 'message' && routed.length > 0) {
       result.routed = routed
       if (routedARetiredAddressee) {
@@ -2156,6 +2208,16 @@ export function createRecordWithReport(input: {
       if (there.length > 0) result.alreadyLinkedThere = there
     }
     if (keyReminder !== null) result.keyReminder = keyReminder
+    // AND WHAT A DECISION OR A REPORT NAMES IS SAID BACK, and each new nothingFits entry is sent at once, in this write.
+    if (kind === DECISION_KIND || kind === 'report') {
+      const names = whatTheWriteNames(
+        { id: row.id, kind, title: row.title, workspaceId },
+        null,
+        isJsonObject(result.record.data) ? result.record.data : {},
+        actor,
+      )
+      if (names !== null) result.whatItNames = names
+    }
     // AND THE ONE WHO WROTE A NOTE DOWN FOR THE PERSON IS TOLD THAT IT WAITS, in this same write.
     if (kind === 'note' && waitsForThePerson(result.record)) tellTheWriterOfTheNote(result.record, { is: 'waits' })
 

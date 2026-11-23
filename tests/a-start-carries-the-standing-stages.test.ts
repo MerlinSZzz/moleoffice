@@ -49,11 +49,12 @@ import * as backlog from '../src/shared/round-chapters/backlog.ts'
 import * as delivery from '../src/shared/round-chapters/delivery.ts'
 import * as manifest from '../src/shared/round-chapters/manifest.ts'
 import * as standingStages from '../src/shared/round-chapters/standing.ts'
+import * as roundStartRules from '../src/shared/round-start-rules.ts'
 import * as routerHost from '../tools/provider-router-host.mjs'
 import { aRunWithNoTitleARoundCanTakeWords, askTheOfficeWhileItRestarts, theAgentsOwnWorktree, whyARunMayNotWorkIn } from '../tools/sandbox-common.mjs'
 import { THE_TEST_OFFICES_OWNER } from './a-page-of-a-test-office.ts'
 import { apiApp, freshDb, thePersonsKeyHeader, type TestDb } from './helpers.ts'
-import { madeUpRound } from './round-chapters-fixture.ts'
+import { madeUpRound, theMadeUpOfficesAnswer, THE_MADE_UP_OFFICE_WITH_CHAPTER_2 } from './round-chapters-fixture.ts'
 
 const launcher = resolve('tools/sandbox.mjs')
 const delegationsFile = resolve('src/shared/round-start-delegations.ts')
@@ -140,7 +141,7 @@ describe('a start carries the standing stages of the flows that apply to it', ()
     }
     const record: { data: Record<string, any> } = { data: { extra: {} } }
     const globals: Record<string, any> = {
-      ...delivery, ...manifest, ...backlog, ...standingStages, ...existsSync(delegationsFile) ? await import(delegationsFile) : {},
+      ...delivery, ...manifest, ...backlog, ...standingStages, ...roundStartRules, ...existsSync(delegationsFile) ? await import(delegationsFile) : {},
       readTheStandingStages: async (input: Parameters<typeof standingStages.readTheStandingStages>[0]) => {
         try { return (gave.standing = await standingStages.readTheStandingStages(input)) } catch (error) { return refusedBy('readTheStandingStages')(error) }
       },
@@ -171,7 +172,13 @@ describe('a start carries the standing stages of the flows that apply to it', ()
       // and the start is as it was asked. The launcher hands it its sandboxes folder, a made-up one here.
       sandboxes: join(f.dir, 'made-up-sandboxes'),
       theStartWhenEveryGoSlotIsUsedUp: (given: Parameters<typeof routerHost.theStartWhenEveryGoSlotIsUsedUp>[0]) => routerHost.theStartWhenEveryGoSlotIsUsedUp({ ...given, env: {} }),
-      askTheOfficeWhileItRestarts: (_api: string, path: string, options: any) => { heard.push(path); return ask(path, options) },
+      // A ROUND'S TWO RULES DOORS ANSWER AS A MADE-UP OFFICE THAT HOLDS ONLY A MADE-UP CHAPTER 2, the chapter the round's
+      // policy selects, which this test office does not hold. They are not among the doors a case heard.
+      askTheOfficeWhileItRestarts: (_api: string, path: string, options: any) => {
+        const rules = theMadeUpOfficesAnswer(path, THE_MADE_UP_OFFICE_WITH_CHAPTER_2)
+        if (rules !== null) return Promise.resolve({ status: 200, body: rules })
+        heard.push(path); return ask(path, options)
+      },
       askTheOffice: async (_api: string, path: string, options: any = {}) => {
         // THE ROUND'S RUN, made up: what the round saves on it, and the acknowledgement the check door would give.
         if (options.method === 'PATCH') { record.data = { ...record.data, ...options.body.dataPatch }; events.push('saved'); return { status: 200, body: { record } } }
@@ -343,7 +350,9 @@ describe('a start carries the standing stages of the flows that apply to it', ()
     expect(saved['standing']?.role).toBe('supervisor')
     expect(saved['standing'].flows).toContainEqual(expect.objectContaining({ id: flow, version: await revisionOf(flow), stages: [{ n: 2, does: words }] }))
     const delivered = readFileSync(String(run.filed()!['brief']), 'utf8')
-    expect(delivered.startsWith(saved['brief'].text + '\n\n---\n\n' + saved['standing'].text + '\n\n---\n\n')).toBe(true)
+    // THE PERSON'S REGULATIONS COME RIGHT AFTER THE BRIEF, here the sentence that the office holds none, then the stages.
+    expect(saved['regulations'].text).toBe(manifest.regulationsText(saved['regulations'].at, []))
+    expect(delivered.startsWith(saved['brief'].text + '\n\n---\n\n' + saved['regulations'].text + '\n\n---\n\n' + saved['standing'].text + '\n\n---\n\n')).toBe(true)
     expect(saved['standing'].text).toContain(words)
     expect(saved['standing'].bytes).toBe(manifest.bytes(saved['standing'].text))
     expectTheLineNames(run.said.join('\n'), run.gave.standing, 'supervisor', 1, flow, await revisionOf(flow))

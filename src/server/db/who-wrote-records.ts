@@ -10,7 +10,7 @@ import { asc, inArray } from 'drizzle-orm'
 import { db } from './client.ts'
 import { readInPieces } from './in-pieces.ts'
 import { revisions } from './schema.ts'
-import type { TheEndsOfTheLedger } from '../lib/revisions.ts'
+import type { TheEndsOfTheLedger } from './types/revisions.ts'
 
 /**
  * WHO WROTE THESE RECORDS, read off the first revision of each. `${actorType}:${actorId}`.

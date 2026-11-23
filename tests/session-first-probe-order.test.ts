@@ -172,7 +172,7 @@ it('closes a recovered ordinary pre-spawn session without signalling a process',
 })
 
 function probeWithinTestProcessGroup(directory: string) {
-  return os.theProgramThatRan('stand-in-probe', directory)
+  return os.theProgramThatRan('stand-in-probe', { PATH: directory })
 }
 
 it.skipIf(process.platform !== 'linux')('observes the version probe group and its timeout using a stand-in', () => {

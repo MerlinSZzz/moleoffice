@@ -33,7 +33,7 @@ import { aPartTable } from '../part-tables.ts'
  * and NULL when there was none — a run may have neither, which means it has not finished.
  *
  * NO `workspace_id`: the thread has one, and this row belongs to that project through it. See
- * `agent_messages` above and `WORKSPACE_COLUMN` at the foot of this file.
+ * `agent_messages` in agent-messages.ts and `WORKSPACE_COLUMN` in authored-table-of.ts.
  */
 export const agentRuns = aPartTable(sqliteTable(
   'agent_runs',

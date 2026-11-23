@@ -45,7 +45,8 @@
  *   3. WHERE THERE IS NOT, the page says so, in one line, under the button that was pressed, in
  *      words about the page and not about a JavaScript variable.
  *   4. AND THE TEXT IS STILL THERE TO TAKE: selecting the whole of it works, and saving it as a
- *      file hands over a file holding the copy.
+ *      file hands over a file holding the copy. The file's name is drawn on a row of its own, under
+ *      the label that says the browser was handed it, and no sentence holds it.
  *   5. ON THE PRESS THE OWNER PRESSED — `Copy it` on a filed row — the export is still recorded, and the
  *      text the sentence points at really is on the page this time.
  *
@@ -66,6 +67,7 @@ import type { Page } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { join } from 'node:path'
 import { liveApp, trustTheMachineThatCallsThroughTheOtherDoor, waitForThePage, type LiveApp } from './helpers.ts'
+import { createI18n, type WordKey } from '../src/shared/i18n.ts'
 
 /**
  * THE ADDRESS THAT IS NOT A SECURE CONTEXT: this machine's own name, lower-cased because that is
@@ -255,6 +257,19 @@ describe('a copy press on a browser with no clipboard', () => {
     expect(inside).toContain(THE_TEXT_OPENS_WITH)
     expect(inside, 'the file carries no record of this project').toContain(PROBLEM)
     expect(file.suggestedFilename()).toMatch(/\.txt$/)
+
+    // THE FILE'S NAME IS A ROW OF ITS OWN, under the label that says the browser was handed it, and no sentence holds it.
+    const handed = createI18n('en').t('frameFiles.row.handed' as WordKey)
+    const term = block.locator('dl.code-rows dt', { hasText: handed })
+    await term.waitFor()
+    expect(await term.evaluate((one) => ({
+      label: one.textContent ?? '',
+      tag: one.nextElementSibling?.firstElementChild?.tagName ?? 'none',
+      value: one.nextElementSibling?.firstElementChild?.textContent ?? '',
+    }))).toEqual({ label: handed, tag: 'CODE', value: file.suggestedFilename() })
+    for (const said of await block.locator('p').allTextContents()) {
+      expect(said, 'a sentence holds the file name').not.toContain(file.suggestedFilename())
+    }
   }, 180_000)
 
   it('records the export on the press the owner pressed, and puts the text it names on the page', async () => {

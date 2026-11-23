@@ -433,9 +433,15 @@ export interface ClockStamp {
   timeZone: string
 }
 
+/**
+ * THE SHAPES OF AN INSTANT: the date and time to the second with T between them, then milliseconds or none, then Z or
+ * an offset in hours and minutes. `clockStamp` writes one of them, and `instantMs` reads only these.
+ */
+const THE_SHAPE_OF_AN_INSTANT = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(\.\d{3})?(Z|([+-])(\d{2}):(\d{2}))$/
+
 /** An instant must state its offset. Local strings cannot identify a repeated hour or a gap. */
 function instantMs(instant: string): number {
-  const match = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(\.\d{3})?(Z|([+-])(\d{2}):(\d{2}))$/.exec(instant)
+  const match = THE_SHAPE_OF_AN_INSTANT.exec(instant)
   if (match === null) throw new RangeError('An instant must include seconds and an explicit timezone offset.')
   const hours = Number(match[5] ?? 0)
   const minutes = Number(match[6] ?? 0)
@@ -457,6 +463,37 @@ export function momentOfAnInstant(words: string): number | null {
     if (error instanceof RangeError) return null
     throw error
   }
+}
+
+/**
+ * WHETHER AN INSTANT KEPT BESIDE A STAMP NAMES THAT STAMP: it is text in one of the shapes above, and its first 19
+ * characters are the stamp with T for the space. `clockStamp` writes the instant from the same reading as the stamp, so
+ * an instant a door kept names its stamp until somebody changes the stamp alone. The idle reminder's grouped SQL repeats
+ * this test (`theMomentInSQLiteOf` in src/server/lib/reminders.ts).
+ */
+export function anInstantNamesItsStamp(stamp: unknown, instant: unknown): instant is string {
+  return typeof stamp === 'string' && typeof instant === 'string' && THE_SHAPE_OF_AN_INSTANT.test(instant) && instant.slice(0, 19) === stamp.replace(' ', 'T')
+}
+
+/**
+ * THE MOMENT A LOCAL STAMP NAMES, READ WITH THE INSTANT KEPT BESIDE IT, as milliseconds, or null when it cannot be read.
+ *
+ * A local stamp has no offset, so on the night the clocks go back its words cannot say which pass of the hour from
+ * 01:00 they mean. The instant kept beside it says only that.
+ *
+ *   - When the instant names its stamp (`anInstantNamesItsStamp`), the moment is that second in the instant's offset,
+ *     with the milliseconds left out. So outside the repeated hour the moment is what the stamp alone gives.
+ *   - When it names its stamp and cannot be read, for example with the offset +25:00, the answer is null, as for a stamp
+ *     that cannot be read.
+ *   - When it is missing, is not text, or names another stamp, it is passed over, and the stamp is read with the reader
+ *     the caller used before the instant was kept. That is the case of a stamp changed alone, by hand or by a writer
+ *     that does not keep the instant.
+ */
+export function momentOfAStampAndItsInstant<Stamp>(stamp: Stamp, instant: unknown, readTheStampAlone: (stamp: Stamp) => number | null): number | null {
+  if (!anInstantNamesItsStamp(stamp, instant)) return readTheStampAlone(stamp)
+  const ms = momentOfAnInstant(instant)
+  // An offset is whole minutes, so the instant's milliseconds are the moment's milliseconds past its second.
+  return ms === null ? null : Math.floor(ms / 1000) * 1000
 }
 
 /**

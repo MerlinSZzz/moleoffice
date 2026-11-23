@@ -32,6 +32,8 @@
  */
 
 import { KIND_SPECS } from '@shared/kinds.ts'
+import { PACK_KIND } from '@shared/kinds/pack.ts'
+import { isKnowledgeKind } from '@shared/knowledge/constants.ts'
 import { RECORD_KINDS, type RecordKind } from '@shared/types.ts'
 import Fastify, { type FastifyInstance } from 'fastify'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
@@ -896,8 +898,7 @@ describe('the change log records a kind change with the provenance every other c
  * the two records first and drives both write paths.
  */
 // `merge_entry` IS LEFT OUT BOTH WAYS, for the seal's reason: only the merge queue's doors write one,
-// so neither a kind change into it nor out of it is a write anybody may make here. Sandbox v1, P6;
-// tests/merge-queue-doors.test.ts proves the refusal.
+// so neither a kind change into it nor out of it is a write anybody may make here. Sandbox v1, P6.
 // `counter` IS LEFT OUT BOTH WAYS, for the merge entry's reason: only its own doors write one, so
 // neither a kind change into it nor out of it is a write anybody may make here. Criteria CT1 and CT6;
 // tests/counter-doors.test.ts proves the refusal.
@@ -925,8 +926,17 @@ describe('the change log records a kind change with the provenance every other c
 // only its own doors judge one, so that the office writes who judged it from the key (wave 13s round 228). The guard in
 // assertMayWrite refuses a create and a change into one, so no sweep could start from one;
 // tests/a-design-reminder-is-judged-once-and-counted-by-the-day.test.ts (case 6) proves the create's refusal.
+// `department` is left out both ways, for the secretary duties' reason (wave 13s round 281). Its example names an
+// agent's registry id and the person's decisions, which this fresh database has none of, and only the person or a
+// secretary on the person's words may write one. tests/departments-are-records-of-their-own.test.ts drives its writes.
+// `key_item` is left out both ways, for the booking's reason: only its own doors at /api/key-items write one, so that the
+// office writes who set its progress and its estimate, and when (wave 13s round 281). The guard in assertMayWrite refuses
+// a create and a change into one, so no sweep could start from one;
+// tests/key-items-carry-progress-and-a-time-left-estimate.test.ts (case 1) proves the refusal.
+// The knowledge kinds are left out both ways since 20 NOVEMBER 2026: only their own doors write them, preserving
+// workspace and review rules. tests/knowledge-entries-and-changes.test.ts proves the ordinary door's refusals.
 const SWEEPABLE = RECORD_KINDS.filter(
-  (k) => k !== 'block' && k !== 'pipeline' && k !== 'sealed_tip' && k !== 'merge_entry' && k !== 'counter' && k !== 'flow_run' && k !== 'checklist' && k !== 'booking' && k !== 'notice_rules' && k !== 'secretary_duties' && k !== 'emergency_push' && k !== 'host_job' && k !== 'project_chapter' && k !== 'design_review' && k !== 'design_reminder',
+  (k) => k !== 'block' && k !== 'pipeline' && k !== 'sealed_tip' && k !== 'merge_entry' && k !== 'counter' && k !== 'flow_run' && k !== 'checklist' && k !== 'booking' && k !== 'notice_rules' && k !== 'secretary_duties' && k !== 'emergency_push' && k !== 'host_job' && k !== PACK_KIND && k !== 'project_chapter' && k !== 'design_review' && k !== 'design_reminder' && k !== 'department' && k !== 'key_item' && !isKnowledgeKind(k),
 )
 // A whole-suite receipt records an original cloud run. Another record cannot acquire that evidence by
 // changing kind. A receipt can still change into an ordinary kind, which keeps its facts in extra.
@@ -951,7 +961,12 @@ const SWEEPABLE_TO = SWEEPABLE.filter((kind) => !new Set<string>(['whole_suite_r
 // `design` IS LEFT OUT AS A STARTING POINT FOR THE SAME REASON SINCE 8 NOVEMBER 2026 (wave 13s round 226), and is left in
 // as a destination: its example names who asked for it by a registry id this fresh database has no row for.
 // tests/project-rules-the-judge.test.ts files designs asked for by an agent it registers.
-const SWEEPABLE_FROM = SWEEPABLE.filter((k) => k !== 'work_domain' && k !== 'ran_instead' && k !== 'message' && k !== 'watch' && k !== 'backlog_item' && k !== 'design')
+// `agent` IS LEFT OUT AS A STARTING POINT SINCE 22 NOVEMBER 2026, and is left in as a destination. No record write
+// changes an agent record into another kind, whoever sends it, because the agent's registry row follows its record
+// (refuseTakingAnAgentRecordOutOfItsKind in src/server/lib/records/patching.ts). Every change that starts at an agent is
+// refused, so an agent's worked example has no change left to keep its values through. A change into an agent is still
+// allowed and stays in the sweep. tests/no-agent-moves-a-starter-by-a-record-write.test.ts (case 10) proves the refusal.
+const SWEEPABLE_FROM = SWEEPABLE.filter((k) => k !== 'work_domain' && k !== 'ran_instead' && k !== 'message' && k !== 'watch' && k !== 'backlog_item' && k !== 'design' && k !== 'agent')
 
 /**
  * THE AGENT THE NOTEBOOK'S OWN WORKED EXAMPLE IS KEPT UNDER, registered before the sweep runs.

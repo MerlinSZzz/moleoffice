@@ -2,7 +2,8 @@
 // Licensed under the MIT License. See LICENSE.
 /**
  * THE MARK THE PERSON PUTS ON A MESSAGE TO AN AGENT, TO SAY WHAT THEY WANT BACK. The answers are none, just ask, or
- * proposal first, on wave 13n's proposal.
+ * proposal first, on wave 13n's proposal, align, which the person asked for on 21 November 2026, and give options, which
+ * the person asked for on 22 November 2026.
  *
  * It is stored on the message as `data.intent`, so no migration was needed. Only the person sets it, on a message they
  * write, at the moment they write it: an agent's message carries none, and a later write may not set, change or take it
@@ -22,11 +23,11 @@ import { sayInEnglish, type Say } from './i18n.ts'
 import { trimmed } from './intent.ts'
 import { isAnUnreadableMessageLabels, isLabelColour, LABEL_COLOURS, LONGEST_LABEL, LONGEST_LABEL_DESCRIPTION, LONGEST_LABEL_INSTRUCTION, readMessageLabel, type LabelColour, type MessageLabel, type MessageLabelEntry, type TheStoredMessageLabels } from './message-label.ts'
 
-/** The three marks, as stored. */
-export const INTENT_MARKS = ['none', 'just-ask', 'proposal-first'] as const
+/** The five marks, as stored. Give options is stored as a mark of its own, so a message keeps what the person chose. */
+export const INTENT_MARKS = ['none', 'just-ask', 'proposal-first', 'align', 'give-options'] as const
 export type IntentMark = (typeof INTENT_MARKS)[number]
 
-/** The two marks that ask something of the agent, and so the two a reply can break. */
+/** The four marks that ask something of the agent, and so the four a reply can break. */
 export type AnIntentThatAsks = Exclude<IntentMark, 'none'>
 
 /** The mark a stored message holds, or null because nobody set one. */
@@ -37,19 +38,22 @@ export function intentOf(data: Record<string, unknown>): IntentMark | null {
 
 /** Whether a mark asks something of the agent. */
 export function anIntentThatAsks(intent: unknown): intent is AnIntentThatAsks {
-  return intent === 'just-ask' || intent === 'proposal-first'
+  return intent === 'just-ask' || intent === 'proposal-first' || intent === 'align' || intent === 'give-options'
 }
 
 // ============================================================================ flags
 //
-// THE TWO SHIPPED FLAGS AND THE PERSON'S OWN ARE ONE KIND: A FLAG. Each has a name, a description shown under the name
+// THE FOUR SHIPPED FLAGS AND THE PERSON'S OWN ARE ONE KIND: A FLAG. Each has a name, a description shown under the name
 // in the menu, an instruction handed to the agent, a short word on the flag left of Send, a colour the flag is drawn in,
-// and a colour the words it marks are drawn in. The shipped two and 'No mark' keep any of these the person changed in
+// and a colour the words it marks are drawn in. The shipped four and 'No mark' keep any of these the person changed in
 // the `shipped_flags` column of `people` (migration 0346); a thing left out is its default. The person's own flags are
 // the entries of `chat_labels`, each with its word and colour as before and the four new fields optional.
 
-/** The two flags the office ships. 'No mark' is not a flag: it is the menu's entry that takes a flag off. */
-export const SHIPPED_FLAGS = ['just-ask', 'proposal-first'] as const
+/**
+ * The four flags the office ships, in menu order. 'No mark' is not a flag: it is the menu's entry that takes a flag off.
+ * Give options comes fourth, after align, as decided.
+ */
+export const SHIPPED_FLAGS = ['just-ask', 'proposal-first', 'align', 'give-options'] as const
 export type ShippedFlag = (typeof SHIPPED_FLAGS)[number]
 
 /** The menu entry that takes a flag off. It hands the agent nothing. */
@@ -66,18 +70,23 @@ export interface AStoredShippedFlag {
 }
 
 /**
- * WHAT THE `shipped_flags` COLUMN HOLDS: one JSON object keyed by the two shipped flags and 'No mark'. A thing left out
+ * WHAT THE `shipped_flags` COLUMN HOLDS: one JSON object keyed by the four shipped flags and 'No mark'. A thing left out
  * is its default, so an empty object is every default. 'No mark' holds only its name.
  */
 export type StoredShippedFlags = {
   'just-ask'?: AStoredShippedFlag
   'proposal-first'?: AStoredShippedFlag
+  align?: AStoredShippedFlag
+  'give-options'?: AStoredShippedFlag
   none?: { name?: string }
 }
 
 /** A flag as every reader gets it: the six things, after the defaults are applied. */
 export interface AFlagOfThePersons {
-  /** `just-ask`, `proposal-first`, `none`, or `label:<the word in lower case>` for one of the person's own. */
+  /**
+   * `just-ask`, `proposal-first`, `align`, `give-options`, `none`, or `label:<the word in lower case>` for one of the
+   * person's own.
+   */
   id: string
   kind: 'shipped' | 'own' | 'none'
   name: string
@@ -90,21 +99,34 @@ export interface AFlagOfThePersons {
 
 /** A person's whole list of flags, in the order the menu draws them, with 'No mark' last. */
 export interface TheFlagsOfAPerson {
-  shipped: readonly [AFlagOfThePersons, AFlagOfThePersons]
+  shipped: readonly [AFlagOfThePersons, AFlagOfThePersons, AFlagOfThePersons, AFlagOfThePersons]
   own: readonly AFlagOfThePersons[]
   noMark: AFlagOfThePersons
-  /** Every entry in menu order: the two shipped flags, the person's own, then 'No mark'. */
+  /** Every entry in menu order: the four shipped flags, the person's own, then 'No mark'. */
   all: readonly AFlagOfThePersons[]
 }
 
-/** The word each shipped flag's name, instruction and short word default to. */
-const THE_SHIPPED_WORDS: Readonly<Record<ShippedFlag, { name: Parameters<Say>[0]; instruction: Parameters<Say>[0]; shortWord: Parameters<Say>[0] }>> = {
-  'just-ask': { name: 'message.intent.name.justAsk', instruction: 'message.intent.justAsk', shortWord: 'chat.intent.short.justAsk' },
-  'proposal-first': { name: 'message.intent.name.proposalFirst', instruction: 'message.intent.proposalFirst', shortWord: 'chat.intent.short.proposalFirst' },
+/** The word each shipped flag's name, description, instruction and short word default to. */
+const THE_SHIPPED_WORDS: Readonly<Record<ShippedFlag, { name: Parameters<Say>[0]; description: Parameters<Say>[0]; instruction: Parameters<Say>[0]; shortWord: Parameters<Say>[0] }>> = {
+  'just-ask': { name: 'message.intent.name.justAsk', description: 'chat.intent.description.justAsk', instruction: 'message.intent.justAsk', shortWord: 'chat.intent.short.justAsk' },
+  'proposal-first': { name: 'message.intent.name.proposalFirst', description: 'chat.intent.description.proposalFirst', instruction: 'message.intent.proposalFirst', shortWord: 'chat.intent.short.proposalFirst' },
+  align: { name: 'message.intent.name.align', description: 'chat.intent.description.align', instruction: 'message.intent.align', shortWord: 'chat.intent.short.align' },
+  'give-options': { name: 'message.intent.name.giveOptions', description: 'chat.intent.description.giveOptions', instruction: 'message.intent.giveOptions', shortWord: 'chat.intent.short.giveOptions' },
 }
 
-/** The colour every shipped flag is drawn in until the person changes it: `LABEL_COLOURS`' blue, which is the accent. */
-export const THE_SHIPPED_DEFAULT_COLOUR: LabelColour = 'blue'
+/**
+ * THE COLOUR EACH SHIPPED FLAG IS DRAWN IN UNTIL THE PERSON CHANGES IT, one colour each, as the person asked. It is
+ * applied when the flag is read and never stored, so a shipped flag whose colour the person has not changed takes this
+ * colour in an office that already exists. Before, every shipped flag was blue, and Settings stored no colour equal to
+ * that default, so a person who once chose blue by hand for a shipped flag now sees this colour instead.
+ */
+export const THE_SHIPPED_COLOURS: Readonly<Record<ShippedFlag, LabelColour>> = {
+  'just-ask': 'pink',
+  'proposal-first': 'light-blue',
+  align: 'orange',
+  // Forest green is a colour of its own, so this flag is not drawn in the green a person may give a flag of their own.
+  'give-options': 'forest-green',
+}
 
 /** One line of text, with no space at either end, and at most `longest` characters, or a sentence saying what is wrong. */
 function readOneLine(value: unknown, what: string, longest: number): { ok: true; text: string } | { ok: false; why: string } {
@@ -118,7 +140,7 @@ function readOneLine(value: unknown, what: string, longest: number): { ok: true;
 
 /**
  * THE ONE STRICT READING OF A STORED OR SENT `shipped_flags` VALUE. It answers what it read, or a sentence saying what
- * is wrong. The shipped two may hold any of the six things; 'No mark' holds only its name, because it has nothing to
+ * is wrong. The shipped four may hold any of the six things; 'No mark' holds only its name, because it has nothing to
  * tell an agent.
  */
 export function readShippedFlags(value: unknown): { ok: true; flags: StoredShippedFlags } | { ok: false; why: string } {
@@ -126,8 +148,8 @@ export function readShippedFlags(value: unknown): { ok: true; flags: StoredShipp
     return { ok: false, why: 'The shipped flags must be an object with a part for each shipped flag, or null.' }
   }
   const held = value as Record<string, unknown>
-  const unknown = Object.keys(held).filter((key) => key !== 'just-ask' && key !== 'proposal-first' && key !== NO_MARK)
-  if (unknown.length > 0) return { ok: false, why: `The shipped flags hold only just-ask, proposal-first and none; it was sent ${unknown.join(', ')} as well.` }
+  const unknown = Object.keys(held).filter((key) => !(SHIPPED_FLAGS as readonly string[]).includes(key) && key !== NO_MARK)
+  if (unknown.length > 0) return { ok: false, why: `The shipped flags hold only just-ask, proposal-first, align, give-options and none; it was sent ${unknown.join(', ')} as well.` }
   const flags: StoredShippedFlags = {}
   for (const id of SHIPPED_FLAGS) {
     const one = held[id]
@@ -186,18 +208,18 @@ export function theFlagsOf(
   const shippedFlags = SHIPPED_FLAGS.map((id): AFlagOfThePersons => {
     const stored = shipped?.[id] ?? {}
     const words = THE_SHIPPED_WORDS[id]
-    const colour = stored.colour ?? THE_SHIPPED_DEFAULT_COLOUR
+    const colour = stored.colour ?? THE_SHIPPED_COLOURS[id]
     return {
       id,
       kind: 'shipped',
       name: stored.name ?? say(words.name),
-      description: stored.description ?? null,
+      description: stored.description ?? say(words.description),
       instruction: stored.instruction ?? say(words.instruction),
       shortWord: stored.shortWord ?? say(words.shortWord),
       colour,
       wordsColour: stored.wordsColour ?? colour,
     }
-  }) as [AFlagOfThePersons, AFlagOfThePersons]
+  }) as [AFlagOfThePersons, AFlagOfThePersons, AFlagOfThePersons, AFlagOfThePersons]
   const ownLabels = labels === null || isAnUnreadableMessageLabels(labels) ? [] : labels
   const own = ownLabels.map((entry): AFlagOfThePersons => ({
     id: `label:${entry.text.toLocaleLowerCase()}`,
@@ -255,9 +277,7 @@ export function whatTheLabelAsks(label: MessageLabel | null, flags: TheFlagsOfAP
 /** The mark's name, as a person reads it. */
 export function theNameOfTheMark(intent: AnIntentThatAsks, flags?: TheFlagsOfAPerson | null): string {
   const list = flags === undefined ? theFlagsOf(null, null) : flags
-  return (list === null ? null : theFlagFor(intent, list)?.name) ?? (intent === 'just-ask'
-    ? sayInEnglish('message.intent.name.justAsk')
-    : sayInEnglish('message.intent.name.proposalFirst'))
+  return (list === null ? null : theFlagFor(intent, list)?.name) ?? sayInEnglish(THE_SHIPPED_WORDS[intent].name)
 }
 
 /**
@@ -311,8 +331,8 @@ export const A_MARKED_PART_HOLDS_ONE_FLAG =
 
 /** Why a part's own mark must be one that asks something. */
 export const A_MARKED_PART_HOLDS_ONE_ASKING_MARK =
-  'A marked part\u2019s `intent` must ask something: "just ask" or "proposal first". A part that asks nothing is not ' +
-  'marked. Nothing was written.'
+  'A marked part\u2019s `intent` must ask something: "just ask", "proposal first", "align" or "give options". A part ' +
+  'that asks nothing is not marked. Nothing was written.'
 
 /** Why a part must name a real run of the message's own words. */
 export const A_MARKED_PART_IS_A_RUN_OF_THE_WORDS =

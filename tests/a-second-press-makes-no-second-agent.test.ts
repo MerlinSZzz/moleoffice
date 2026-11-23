@@ -9,8 +9,8 @@
  * WHAT IS PROVED HERE, in a real browser against a real server. No message worker runs, so the new
  * agent stays unanswered for as long as the case needs.
  *
- *   1. After the press, the new agent's conversation says it was made on this page and that nothing
- *      is answering as it yet. It draws no press at all: the message the first press carried is
+ *   1. After the press, the new agent's conversation says that nothing is answering as it yet. It
+ *      draws no press at all: the message the first press carried is
  *      already pressed, and the line Mole Office wrote there needs no run, so the server says a press
  *      would carry nothing (problem hqbovBMnTu-z). No third agent is made. Wave 13q's round 38 changed
  *      this case, by the secretary's coordination: it expected a held press, which was drawn only because the
@@ -42,12 +42,14 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { fakeTranscript, liveApp, waitForThePage, type LiveApp, thePersonsKeyHeader } from './helpers.ts'
 import { THE_PERSON } from '../src/shared/person.ts'
 import { CANNOT_REACH_WORDS } from '../src/shared/messages.ts'
+import { createI18n } from '../src/shared/i18n.ts'
 import { en } from '../src/shared/words/en.ts'
 import { openTheChat } from './open-the-chat.ts'
 
 let app: LiveApp
 let heron = ''
 let made: { id: string; handle: string; name: string } | undefined
+const { t } = createI18n('en')
 
 const AS_THE_OWNER = {
   'content-type': 'application/json',
@@ -130,7 +132,7 @@ describe('a second press before the new agent answers', () => {
     )
     const words = app.page.locator('.px-chat-cannot-reach-words')
     await words.waitFor({ state: 'visible', timeout: 30_000 })
-    expect(await words.innerText()).toBe(en['newAgentKeys.madeHere'].replace('{who}', made!.name))
+    expect(await words.innerText()).toBe(t('chat.notAnsweringYet', { who: made!.name }))
     // NO PRESS IS DRAWN, once the server's reading of what a press would carry has come back. Until it has,
     // the page draws the press held; it is then taken away.
     await app.page.waitForFunction(

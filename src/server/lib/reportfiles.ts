@@ -93,6 +93,7 @@ import { clockStamp } from '../../shared/time.ts'
 import { db } from '../db/client.ts'
 import { records, revisions } from '../db/schema.ts'
 import { MAX_PREVIEW_BYTES } from '../../shared/preview-limit.ts'
+import { MAX_REPORT_FILE_NAME } from '../../shared/report-file-name-limit.ts'
 import {
   PREVIEW_ROOTS_VAR, previewRoots, rootsSentence, storedPathsIn, whereAStoreIs, whereStoredFilesAreNow,
   type StoreBesideTheDatabase,
@@ -331,8 +332,11 @@ export function maxReportFileBytes(): number {
   return MAX_PREVIEW_BYTES
 }
 
-/** How long a file's name may be, in characters. A filename is at most 255 bytes on the filesystems this runs on. */
-export const MAX_REPORT_FILE_NAME = 512
+/**
+ * How long a file's name may be, in characters. The number is in src/shared/report-file-name-limit.ts.
+ * This file exports it again, so the files that import it from here keep their import.
+ */
+export { MAX_REPORT_FILE_NAME }
 
 /**
  * WHERE THIS FILE WOULD GO, OR THE REASON IT MAY NOT BE STORED AT ALL.

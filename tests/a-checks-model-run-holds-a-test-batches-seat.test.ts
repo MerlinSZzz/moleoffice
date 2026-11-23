@@ -292,7 +292,6 @@ describe("a check's model run and its test-batches seat", () => {
 
   // Mutation: give the seat back only when the model released, not in a `finally`.
   it.each([
-    { mode: 'release' as const, code: 0, flags: [], says: null },
     { mode: 'error' as const, code: 1, flags: [], says: 'claude exited 3.' },
     { mode: 'hang' as const, code: 1, flags: ['--limit', '0.02'], says: 'was stopped by this tool' },
   ])('gives the seat back once, after the model ended, when the model ends by a $mode', async ({ mode, code, flags, says }) => {

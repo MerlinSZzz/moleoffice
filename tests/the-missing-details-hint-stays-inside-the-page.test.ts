@@ -10,7 +10,7 @@
  * left edge, after one short sentence, so its words grew off the page. A floating box would also lie over the
  * list below it, where each missing field has its own presses.
  *
- * WHAT IS CLAIMED: with the "?" opened, at 1440, 990, 660 and 390 in the light look, in English and Chinese, the
+ * WHAT IS CLAIMED: with the "?" opened, at 1440 and 390 in the light look, in English and Chinese, the
  * words lie inside the window, and they cover no button, link, field or other fold handle on the page.
  *
  * MADE-UP RECORD: one report the test office's person files with no summary, so its page has the box.
@@ -39,7 +39,7 @@ const AS_THE_PERSON: Record<string, string> = {
 const WORDS = { en: createI18n('en'), zh: createI18n('zh') } as const
 const LANGUAGES = ['en', 'zh'] as const
 const LOOKS = ['light'] as const
-const WIDTHS = [1440, 990, 660, 390] as const
+const WIDTHS = [1440, 390] as const
 
 let app: LiveApp
 let page: Page

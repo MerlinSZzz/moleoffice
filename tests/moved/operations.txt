@@ -1,6 +1,5 @@
 tests/a-bare-pid-from-a-sandbox-is-read-in-its-own-container.test.ts
 tests/a-brief-is-kept-where-the-next-writer-reads-it.test.ts
-tests/a-check-again-nobody-starts-is-said.test.ts
 tests/a-check-names-the-records-it-could-not-hand-its-model.test.ts
 tests/a-check-on-the-host-gives-its-model-no-key.test.ts
 tests/a-check-records-the-kind-of-seal-it-read.test.ts
@@ -22,7 +21,6 @@ tests/a-files-run-lands-only-inside-its-files-area.test.ts
 tests/a-files-seal-records-where-each-file-came-from.test.ts
 tests/a-git-rewrite-does-not-stop-the-server-being-watched.test.ts
 tests/a-hand-over-carries-only-the-group-news-that-did-not-reach-you.test.ts
-tests/a-held-lane-is-not-a-stall.test.ts
 tests/a-key-file-changed-by-hand-is-read-again.test.ts
 tests/a-key-is-set-up-by-a-guided-script.test.ts
 tests/a-large-hand-over-reaches-the-session-whole.test.ts
@@ -73,11 +71,8 @@ tests/inspection-api-wait.test.ts
 tests/inspector-tool-fixture.ts
 tests/ledger-prompt.test.ts
 tests/local-only-routes.test.ts
-tests/merge-state-machine.test.ts
 tests/more-than-one-secretary-may-exist.test.ts
-tests/one-merge-tool-per-entry.test.ts
 tests/one-row-for-one-running-process.test.ts
-tests/only-the-office-writes-ended-with-its-merge-entry.test.ts
 tests/opencode-is-given-a-model-and-a-variant.test.ts
 tests/overlay-host.test.ts
 tests/prune-backups.test.ts
@@ -124,11 +119,6 @@ tests/the-mail-tool-is-installed-by-the-persons-press.test.ts
 tests/the-mail-tool-mails-each-summons.test.ts
 tests/the-mail-tools-settings-are-in-its-entry.test.ts
 tests/the-main-world-reminds-past-its-share.test.ts
-tests/the-merge-tool-outlives-an-office-restart.test.ts
-tests/the-merger-bus.test.ts
-tests/the-merger-fixture.ts
-tests/the-merger-suite.test.ts
-tests/the-merger.test.ts
 tests/the-negative-control-stops-what-it-starts.test.ts
 tests/the-office-names-key-files-left-in-a-sandbox.test.ts
 tests/the-office-profile-mounts-the-dsh-hooks-bridge.test.ts

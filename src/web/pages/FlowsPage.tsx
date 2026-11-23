@@ -5,16 +5,15 @@ import { content, LANGUAGES, t } from '@shared/i18n.ts'
 import type { FlowAppliesTo } from '@shared/flow-applies-to.ts'
 import { DEFAULT_FLOW_SORT, FLOW_PAGE_LIMIT, FLOW_SORTS, type FlowListPage, type FlowListRow, type FlowReplacedRow, type FlowRead, type FlowRunRead, type FlowSort, type FlowStageRead } from '@shared/flows.ts'
 import type { FlowRunOutcome } from '@shared/flow-run.ts'
-import { HANDBOOK_KIND, type FlowHandbookRead } from '@shared/handbooks.ts'
+import type { FlowHandbookRead } from '@shared/handbooks.ts'
 import { api } from '../api.ts'
 import { ProjectName, useProjectTitles } from '../components/ProjectChoice.tsx'
 import { Absence, ErrorNote, Loading, Stamp, WordsAroundAStamp } from '../components/ui.tsx'
 import { useProjectAsync } from '../lib/project-async.ts'
-import { flowsPath, handbookPath, newFlowPath, pathFor, recordPath, RouteLink } from '../components/router.tsx'
+import { flowsPath, handbookPath, newFlowPath, recordPath, RouteLink } from '../components/router.tsx'
 import { declaredAttributes } from '../components/declares.ts'
 import { OUTCOME_WORD } from '../components/FlowRunSteps.tsx'
 import { InReach } from '../components/InReach.tsx'
-import { kindWord } from '../lib/words.ts'
 import { FlowEditor, useMayWriteFlows } from './FlowEditor.tsx'
 import { handbookStateKey, NewHandbookOnAFlow } from './HandbookPage.tsx'
 /**
@@ -117,7 +116,7 @@ function TheList() {
       ) : (
         <>
           <TheGeneral page={reading.value} titles={titles} />
-          <TheRows page={reading.value} q={asked.q} titles={titles} offset={asked.offset} onPage={(offset) => setAsked({ ...asked, offset })} />
+          <TheRows page={reading.value} titles={titles} offset={asked.offset} onPage={(offset) => setAsked({ ...asked, offset })} />
           <TheReplaced
             matched={reading.value.replaced.matched}
             retired={reading.value.replaced.retired}
@@ -178,36 +177,39 @@ function TheGeneral({ page, titles }: { page: FlowListPage; titles: ReadonlyMap<
   return (
     <section className="flw-list flw-group" data-group="general">
       <h2 className="flw-h2">{t('flows.group.general')}</h2>
-      <p className="flw-note">{t('flows.group.generalNote')}</p>
-      <ColumnHeads />
-      <ul className="flw-rows">
-        {page.general.flows.map((row) => (
-          <li key={row.id}>
-            <FlowRow row={row} titles={titles} />
-          </li>
-        ))}
-      </ul>
+      <div className="flw-table">
+        <ColumnHeads />
+        <ul className="flw-rows">
+          {page.general.flows.map((row) => (
+            <li key={row.id}>
+              <FlowRow row={row} titles={titles} />
+            </li>
+          ))}
+        </ul>
+      </div>
     </section>
   )
 }
 
-function TheRows({ page, q, titles, offset, onPage }: { page: FlowListPage; q: string; titles: ReadonlyMap<string, string>; offset: number; onPage: (offset: number) => void }) {
+function TheRows({ page, titles, offset, onPage }: { page: FlowListPage; titles: ReadonlyMap<string, string>; offset: number; onPage: (offset: number) => void }) {
   const withGeneral = page.general.flows.length > 0
   if (page.flows.length === 0) {
     if (withGeneral) return null
-    return <p className="flw-says">{q === '' ? (page.replaced.matched > 0 ? t('flows.noneOwn') : t('flows.none')) : t('flows.noneMatch', { q })}</p>
+    return <p className="flw-says">{t('absence.none')}</p>
   }
   return (
     <section className="flw-list flw-group" data-group="own" {...declaredAttributes({ surface: 'flows.list' })}>
       {withGeneral ? <h2 className="flw-h2">{t('flows.group.own')}</h2> : null}
-      <ColumnHeads />
-      <ul className="flw-rows">
-        {page.flows.map((row) => (
-          <li key={row.id}>
-            <FlowRow row={row} titles={titles} />
-          </li>
-        ))}
-      </ul>
+      <div className="flw-table">
+        <ColumnHeads />
+        <ul className="flw-rows">
+          {page.flows.map((row) => (
+            <li key={row.id}>
+              <FlowRow row={row} titles={titles} />
+            </li>
+          ))}
+        </ul>
+      </div>
       <nav className="flw-pages" aria-label={t('flows.shown', { from: offset + 1, to: offset + page.returned, n: page.matched })}>
         <span className="flw-shown">{t('flows.shown', { from: offset + 1, to: offset + page.returned, n: page.matched })}</span>
         {offset > 0 ? (
@@ -250,7 +252,6 @@ function TheReplacedRows({ asked, titles }: { asked: typeof kept; titles: Readon
   if (reading.status === 'error') return <ErrorNote message={reading.message} fault={reading.fault} retry={reload} />
   return (
     <>
-      <p className="flw-note">{reading.value.replaced.retired > 0 ? t('flows.replaced.noteWithRetired') : t('flows.replaced.note')}</p>
       <ul className="flw-rows">
         {(reading.value.replaced.flows ?? []).map((row) => (
           <li key={row.id}>
@@ -323,8 +324,8 @@ function FlowRow({ row, titles }: { row: FlowListRow; titles: ReadonlyMap<string
       </span>
       <span className="flw-row-fact">{t('flows.stages', { n: row.stages })}</span>
       <span className="flw-row-fact">{t('flows.runs30d', { n: row.runs30d })}</span>
-      <span className="flw-row-fact" data-never={row.lastRunAt === null ? 'yes' : 'no'}>
-        {row.lastRunAt === null ? t('flows.neverRun') : <WordsAroundAStamp words={(when) => t('flows.lastRun', { when })} at={row.lastRunAt} />}
+      <span className="flw-row-fact" data-run-recorded={row.lastRunAt === null ? 'no' : 'yes'}>
+        {row.lastRunAt === null ? t('flows.noRunRecorded') : <WordsAroundAStamp words={(when) => t('flows.lastRun', { when })} at={row.lastRunAt} />}
       </span>
     </RouteLink>
   )
@@ -405,7 +406,7 @@ function TheFlow({ flow, titles }: { flow: FlowRead; titles: ReadonlyMap<string,
         <span aria-hidden="true"> · </span>
         <span>{t('flows.runs30d', { n: flow.runs.runs30d })}</span>
         <span aria-hidden="true"> · </span>
-        <span>{flow.runs.lastRunAt === null ? t('flows.neverRun') : <WordsAroundAStamp words={(when) => t('flows.lastRun', { when })} at={flow.runs.lastRunAt} />}</span>
+        <span>{flow.runs.lastRunAt === null ? t('flows.noRunRecorded') : <WordsAroundAStamp words={(when) => t('flows.lastRun', { when })} at={flow.runs.lastRunAt} />}</span>
       </p>
       <dl className="flw-facts" {...declaredAttributes({ surface: 'flows.facts' })}>
         <Fact name={t('flows.fact.trigger')} value={flow.trigger} />
@@ -421,10 +422,10 @@ function TheFlow({ flow, titles }: { flow: FlowRead; titles: ReadonlyMap<string,
       <section {...declaredAttributes({ surface: 'flows.stages' })}>
         <h2 className="flw-h2">{t('flows.stagesHeading')}</h2>
         {flow.stages.length === 0 ? (
-          <p className="flw-says">{t('flows.noStages')}</p>
+          <p className="flw-says">{t('absence.none')}</p>
         ) : (
           <>
-            <p className="flw-note">{marked.length === 0 ? t('flows.tally.noneRecorded') : t('flows.tally.from', { n: marked.length })}</p>
+            {marked.length === 0 ? null : <p className="flw-note">{t('flows.tally.counted', { n: marked.length })}</p>}
             <TheStages stages={flow.stages} places={places} runs={marked} handbooks={flow.handbooks} />
           </>
         )}
@@ -553,7 +554,7 @@ function TheHandbooks({ flow }: { flow: FlowRead }) {
         )}
       </div>
       {flow.handbooks.length === 0 ? (
-        <p className="flw-says">{t('flows.handbooks.none')}</p>
+        <p className="flw-says">{t('absence.none')}</p>
       ) : (
         <ul className="flw-handbook-list">
           {flow.handbooks.map((handbook) => (
@@ -570,9 +571,6 @@ function TheHandbooks({ flow }: { flow: FlowRead }) {
           ))}
         </ul>
       )}
-      <p className="flw-note">
-        {t('flows.handbooks.everyOne', { records: t('nav.records'), kind: kindWord(HANDBOOK_KIND).text })} <RouteLink to={pathFor('records')}>{t('flows.handbooks.toRecords', { records: t('nav.records') })}</RouteLink>
-      </p>
       {adding ? <NewHandbookOnAFlow flow={flow.id} project={flow.project} onCancel={() => setAdding(false)} /> : null}
     </section>
   )
@@ -588,7 +586,7 @@ function TheRuns({ flow, places }: { flow: FlowRead; places: number[] }) {
     <section {...declaredAttributes({ surface: 'flows.runs' })}>
       <h2 className="flw-h2">{t('flows.runsHeading')}</h2>
       {runs.length === 0 ? (
-        <p className="flw-says">{t('flows.runs.none')}</p>
+        <p className="flw-says">{t('flows.noRunRecorded')}</p>
       ) : (
         <>
           <p className="flw-note">{t('flows.runs.shown', { n: flow.runs.count, shown: runs.length })}</p>
@@ -616,7 +614,7 @@ function TheRuns({ flow, places }: { flow: FlowRead; places: number[] }) {
                       </th>
                       {run.stagesRecorded === null ? (
                         <td colSpan={Math.max(1, places.length)} className="flw-grid-none">
-                          {t('flows.runs.noStageNumbers')}
+                          {t('word.notRecorded')}
                         </td>
                       ) : (
                         places.map((place) => (
@@ -640,7 +638,7 @@ function TheRuns({ flow, places }: { flow: FlowRead; places: number[] }) {
                     <Stamp at={run.at} />
                   </RouteLink>
                   {run.stagesRecorded === null ? (
-                    <span className="flw-runlist-none">{t('flows.runs.noStageNumbers')}</span>
+                    <span className="flw-runlist-none">{t('word.notRecorded')}</span>
                   ) : (
                     <span className="flw-runlist-marks">
                       {places.map((place) => (
@@ -689,11 +687,11 @@ function TheReasonsRead({ id }: { id: string }) {
             <b className="flw-reasons-label">{t('flows.stage', { n: placeOf(stage, i) })}</b>
             <p className="flw-reasons-value flw-reasons-head">{content(stage.does)}</p>
             <span className="flw-reasons-label">{t('flowEditor.goingWhy')}</span>
-            <p className="flw-reasons-value">{stage.why === null || stage.why === undefined || stage.why.trim() === '' ? <Absence word={t('flows.reasons.noWhy')} /> : content(stage.why)}</p>
+            <p className="flw-reasons-value">{stage.why === null || stage.why === undefined || stage.why.trim() === '' ? <Absence word={t('word.notRecorded')} /> : content(stage.why)}</p>
             <span className="flw-reasons-label">{t('flows.reasons.sources')}</span>
             <p className="flw-reasons-value flw-reasons-sources">
               {(stage.sources ?? []).length === 0 ? (
-                <Absence word={t('flows.reasons.noSources')} />
+                <Absence word={t('absence.none')} />
               ) : (
                 (stage.sources ?? []).map((source) => (
                   <RouteLink key={source} className="flw-source" to={recordPath(source)}>
@@ -707,7 +705,7 @@ function TheReasonsRead({ id }: { id: string }) {
       </ol>
       <h3 className="flw-h3">{t('flows.reasons.changes')}</h3>
       {changes.length === 0 ? (
-        <p className="flw-says">{t('flows.reasons.noChanges')}</p>
+        <p className="flw-says">{t('absence.none')}</p>
       ) : (
         <ul className="flw-changes">
           {changes.map((change, i) => (
@@ -770,8 +768,10 @@ export const FLOWS_PAGE_CSS = `
 .flw-switch-one:last-of-type { border-radius: 0 var(--radius-sm) var(--radius-sm) 0; }
 .flw-switch-one[aria-pressed='true'] { background: var(--accent); color: var(--accent-text); font-weight: 600; }
 
-/* THE LIST. Six columns at 60rem and wider, under one heading row; below that each value carries its own label. */
-.flw-list { min-width: 0; }
+/* THE LIST. Six columns when the list's own box is wider than 60rem, under one heading row; below that each value
+   carries its own label. The box is asked and not the window, so the chat or the sidebar beside the page narrows the
+   list as a narrow window does. */
+.flw-list { min-width: 0; container-type: inline-size; container-name: flw-list; }
 /* Round 40: General, each project's own, and the replaced ones folded, one group under the other. */
 .flw-group + .flw-group { margin-top: var(--gut); }
 .flw-group > .flw-h2 { margin-top: 0; }
@@ -784,34 +784,42 @@ export const FLOWS_PAGE_CSS = `
 .flw-replaced-name .pch-name, .flw-replaced-by .pch-name { font-size: var(--fs-1); color: var(--text-3); }
 .flw-replaced-by { margin: 0; font-size: var(--fs-2); color: var(--text-2); overflow-wrap: anywhere; }
 .flw-retired { margin: 0; font-size: var(--fs-2); color: var(--text-2); overflow-wrap: anywhere; }
-.flw-colhead, .flw-row {
-  display: grid; gap: 4px var(--gut); align-items: baseline; min-width: 0;
-  grid-template-columns: minmax(0, 2.2fr) minmax(0, 2.4fr) minmax(0, 1.4fr) minmax(5.5rem, auto) minmax(8rem, auto) minmax(9rem, auto);
+/* ONE SET OF COLUMNS FOR THE HEADINGS AND EVERY ROW. A column is never narrower than its longest word, and the
+   headings, the list, each item and each row take the table's columns, so they stand in line. */
+.flw-table {
+  display: grid; column-gap: var(--gut); min-width: 0;
+  grid-template-columns: minmax(min-content, 2.2fr) minmax(min-content, 2.4fr) minmax(min-content, 1.4fr) minmax(5.5rem, auto) minmax(8rem, auto) minmax(9rem, auto);
 }
+.flw-table > .flw-rows, .flw-table > .flw-rows > li { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; }
+.flw-colhead, .flw-row { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; gap: 4px var(--gut); align-items: baseline; min-width: 0; }
 .flw-colhead { padding: 0 var(--gut) 6px var(--gut); font-size: var(--fs-1); color: var(--text-2); font-weight: 600; }
 .flw-rows { list-style: none; margin: 0; padding: 0; border: var(--border-w) solid var(--border); border-radius: var(--radius); background: var(--panel); }
 .flw-rows > li + li { border-top: var(--border-w) solid var(--border); }
 .flw-row { padding: 10px var(--gut); color: var(--text); text-decoration: none; }
 .flw-row:hover { background: var(--hover); }
 .flw-row-name { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.flw-row-title { font-weight: 600; overflow-wrap: anywhere; }
+.flw-row-title { font-weight: 600; }
 .flw-row-name .pch-name { font-size: var(--fs-1); color: var(--text-2); }
-.flw-row-cell { font-size: var(--fs-2); color: var(--text-2); min-width: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
+.flw-row-cell { font-size: var(--fs-2); color: var(--text-2); min-width: 0; white-space: pre-wrap; }
 .flw-row-fact { font-size: var(--fs-2); color: var(--text-2); }
-.flw-row-fact[data-never='yes'] { color: var(--text-3); }
+.flw-row-fact[data-run-recorded='no'] { color: var(--text-3); }
 .flw-cell-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .flw-pages { display: flex; flex-wrap: wrap; gap: var(--pad) var(--gut); align-items: center; margin: var(--gut) 0 0 0; }
 .flw-shown { color: var(--text-2); font-size: var(--fs-1); }
-@media (max-width: 60rem) {
+@container flw-list (max-width: 60rem) {
+  .flw-table, .flw-table > .flw-rows, .flw-table > .flw-rows > li { display: block; }
   .flw-colhead { display: none; }
   .flw-row { grid-template-columns: repeat(3, auto) 1fr; }
   .flw-row-name, .flw-row-cell { grid-column: 1 / -1; }
   .flw-cell-label { position: static; width: auto; height: auto; overflow: visible; clip: auto; white-space: normal; color: var(--text-3); }
 }
+@container flw-list (max-width: 40rem) {
+  .flw-row { grid-template-columns: minmax(min-content, 1fr); }
+}
+/* The search and the presses stand outside the list, so they still follow the window. */
 @media (max-width: 40rem) {
   .flw-search { flex-basis: 100%; max-width: none; }
   .flw-press, .flw-switch-one { min-height: 44px; }
-  .flw-row { grid-template-columns: minmax(0, 1fr); }
 }
 
 /* ONE FLOW. */

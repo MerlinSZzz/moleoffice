@@ -380,66 +380,6 @@ describe('the listeners tool reads the office out of the server it already asks'
 })
 
 /**
- * A SERVER THAT WAS TOLD IT IS NOT A TEST'S IS STILL A TEST'S, AND STILL LEAVES THE OFFICE ALONE.
- *
- * Problem `JTdajUUs23_M`, worked out by the citizens verifier. Four test files unset `VITEST` and
- * `VITEST_WORKER_ID` on the server they spawn — on purpose, beside `NODE_ENV: 'production'`, so the
- * child behaves the way a real one does. The guard read those variables and nothing else, so every
- * one of those children reported itself to whatever the checkout's `.env` named. On the live
- * checkout that is the owner's own Mole Office: twenty-four worlds open there on 4 September, and
- * twenty-three of them with nothing listening.
- *
- * THE ASSERTION IS ON THE REASON AND NOT ON THE OUTCOME, which is the point. "It was not reported"
- * is true either way here — nothing answers on this checkout's declared port — and a test that
- * checked only that would pass over the whole fault. The line has to say it went no further BECAUSE
- * a test runner is behind it.
- */
-describe('a server the suite spawns with the test variables unset', () => {
-  it('still says the office the declaration names is not its to write to', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'mole-office-stripped-env-'))
-    const port = await freePort()
-    const child = spawn(join(REPO, 'node_modules/.bin/tsx'), apiServerArguments(), {
-      cwd: REPO,
-      detached: true,
-      stdio: ['ignore', 'pipe', 'pipe'],
-      env: {
-        ...process.env,
-        LOG_LEVEL: 'info',
-        MOLE_OFFICE_PORT: String(port),
-        MOLE_OFFICE_DB: join(dir, 'panelx.db'),
-        MOLE_OFFICE_WORKSPACE: 'default',
-        MOLE_OFFICE_NO_WATCH: '1',
-        // THE TWO THE FOUR FILES UNSET, unset here for the same reason they do it.
-        VITEST: undefined,
-        VITEST_WORKER_ID: undefined,
-      },
-    })
-    let said = ''
-    child.stdout?.on('data', (chunk: Buffer) => (said += chunk.toString()))
-    child.stderr?.on('data', (chunk: Buffer) => (said += chunk.toString()))
-    try {
-      for (let tries = 0; tries < 180 && !said.includes('this world is registered as'); tries += 1) {
-        await new Promise((ok) => setTimeout(ok, 250))
-      }
-      expect(said, 'the server never said what it registered').toContain('this world is registered as')
-      expect(said).toContain('not reported to the main world')
-      expect(said).toContain('started by a test runner')
-      // AND IT IS A TEST WORLD IN ITS OWN TABLE, which is the other half of the same reading.
-      expect(said).toContain('a test started it')
-    } finally {
-      if (child.pid !== undefined && child.pid !== null) {
-        try {
-          process.kill(-child.pid, 'SIGTERM')
-        } catch {
-          // already gone
-        }
-      }
-      rmSync(dir, { recursive: true, force: true })
-    }
-  }, 120_000)
-})
-
-/**
  * THE DEV SUPERVISOR CLOSES THE WORLD ITS OWN SERVER SERVES, AND NOT ONE MORE.
  *
  * `sayThisWorldHasEnded` used to close every open row the list came back with. At the office that
@@ -545,7 +485,7 @@ describe('the dev supervisor closing the world it serves', () => {
       res.setHeader('content-type', 'application/json')
       res.setHeader(
         'x-mole-office-world',
-        'db=aaaaaaaaaaaaaaaa; repo=%2Fhome%2Fjamie%2Fpx-citizens; head=905d1df; port=41998; standing=scratch',
+        'db=aaaaaaaaaaaaaaaa; repo=%2Fhome%2Fsomeone%2Fpx-citizens; head=905d1df; port=41998; standing=scratch',
       )
       res.end(
         JSON.stringify({

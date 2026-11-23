@@ -82,6 +82,8 @@ export interface QuickNoteAdded {
   x: number
   y: number
   width: number
+  /** How tall it is drawn, once the person has resized it; without it, as tall as what it holds. */
+  height?: number
   at: string
   from: QuickNotePage
   copy: QuickNoteCopy
@@ -94,6 +96,16 @@ export type QuickNotePart =
   | QuickNotePicture
   | QuickNoteVideo
   | QuickNoteAdded
+
+/** How many tags a note holds at most, and how many characters one tag holds at most. */
+export const A_NOTE_HOLDS_TAGS = 12
+export const A_TAG_HOLDS = 40
+
+/** THE TAGS A NOTE IS GROUPED BY, in the order the person gave them, or none. The door has checked each one. */
+export function quickNoteTagsOf(data: Record<string, unknown>): string[] {
+  const tags = data['tags']
+  return Array.isArray(tags) ? tags.filter((tag): tag is string => typeof tag === 'string') : []
+}
 
 /** How many characters a title made from a note's words holds, with the mark of a cut. */
 const A_TITLE_HOLDS = 80
@@ -133,8 +145,8 @@ const idField = (example: string): FieldSpec =>
 const typeField = (type: QuickNotePartType): FieldSpec =>
   field('type', `'${type}'`, true, `Always the string "${type}".`, type)
 const placeFields = (x: number, y: number): FieldSpec[] => [
-  field('x', 'number', true, 'How far from the sheet\'s left edge the part starts, in pixels of the sheet at its own size.', x),
-  field('y', 'number', true, 'How far from the sheet\'s top edge the part starts, in pixels of the sheet at its own size.', y),
+  field('x', 'number', true, 'How far right of the sheet\'s first point the part starts, in pixels of the sheet at its own size. Below 0 is left of that point, where the sheet grew as the person drew.', x),
+  field('y', 'number', true, 'How far below the sheet\'s first point the part starts, in pixels of the sheet at its own size. Below 0 is above that point, where the sheet grew as the person drew.', y),
 ]
 const widthField = (description: string, example: number): FieldSpec => field('width', 'number', true, description, example)
 const heightField = (example: number): FieldSpec => field('height', 'number', true, 'How tall it is, in pixels of the sheet. Above 0.', example)
@@ -245,6 +257,7 @@ export const QUICK_NOTE_SHAPES: Record<string, ShapeSpec> = {
       typeField('added'),
       ...placeFields(40, 300),
       widthField('How wide the copy is drawn, in pixels of the sheet. Above 0.', 360),
+      field('height', 'number', false, 'How tall the copy is drawn, in pixels of the sheet, once the person has resized it. Above 0. Without it, the copy is as tall as what it holds.', 240),
       field('at', 'date', true, 'When it was added, as local wall time YYYY-MM-DD HH:MM:SS.', '2026-11-14 21:40:00'),
       field('from', 'QuickNotePage', true, 'The page it was copied from, as that page was named when it was copied.', { ...MADE_UP_PAGE, recordId: 'MadeUpRec001' }),
       field('copy', 'QuickNoteCopy', true, 'What was copied, kept whole.', { type: 'card', recordId: 'MadeUpRec001', kind: 'task', title: 'A made-up task' }),
@@ -302,6 +315,7 @@ const QUICK_NOTE_RULES = [
   'A stroke\'s points are x and y pairs, so it holds an even count of numbers, and at least one point.',
   'Every width and height is above 0.',
   'A picture or a film keeps the path POST /api/report-files handed back, never its bytes and never an address that lives only in one browser tab. A film\'s path ends in one of the film endings.',
+  `A tag is 1 to ${String(A_TAG_HOLDS)} characters with no space at either end. A note holds at most ${String(A_NOTE_HOLDS_TAGS)} tags, and no two are the same apart from capitals.`,
 ]
 
 /** An object, read as one, or null. */
@@ -399,6 +413,22 @@ export function quickNoteCrossChecks(data: Record<string, unknown>): ValidationE
       }
     }
   })
+  const tags = Array.isArray(data['tags']) ? data['tags'] : []
+  if (tags.length > A_NOTE_HOLDS_TAGS) {
+    errors.push({ path: 'data.tags', message: `data.tags holds ${String(tags.length)} tags. A note holds at most ${String(A_NOTE_HOLDS_TAGS)}.` })
+  }
+  const firstTag = new Map<string, number>()
+  tags.forEach((tag, index) => {
+    if (typeof tag !== 'string') return
+    const at = `data.tags[${index}]`
+    if (tag.trim() !== tag || tag === '' || tag.length > A_TAG_HOLDS) {
+      errors.push({ path: at, message: `${at} is ${JSON.stringify(tag)}. A tag is 1 to ${String(A_TAG_HOLDS)} characters, with no space at either end.` })
+    }
+    const same = tag.toLowerCase()
+    const earlier = firstTag.get(same)
+    if (earlier === undefined) firstTag.set(same, index)
+    else errors.push({ path: at, message: `${at} is ${JSON.stringify(tag)}, and data.tags[${earlier}] is the same tag. A note holds each tag once.` })
+  })
   return errors
 }
 
@@ -422,6 +452,14 @@ export const quickNoteKind: KindSpec = {
       { id: 'l-first', type: 'line', from: 'b-first', to: 'b-second' },
       { id: 's-first', type: 'stroke', colour: 'red', width: 2, points: [40, 120, 52, 124, 70, 131] },
     ]),
+    field(
+      'tags',
+      'string[]',
+      false,
+      'Words the person groups and sorts the note by, beside the week it was started in, in the order they were given. ' +
+        'Left out, or an empty list, while the note has none.',
+      ['made-up tag'],
+    ),
     field(
       'from_page',
       'QuickNotePage',

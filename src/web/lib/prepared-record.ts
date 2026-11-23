@@ -1,7 +1,7 @@
 // Copyright © 2026 Zhengyang Shen
 // Licensed under the MIT License. See LICENSE.
 import type { RecordPageData } from '../pages/RecordPage.tsx'
-import { keptAnswer, placeOf } from './pagecache.ts'
+import { keptAnswer, keptInEveryProject, placeOf } from './pagecache.ts'
 
 export type PreparedRecord = { key:string; value:RecordPageData }
 const prepared = new Map<string, PreparedRecord>()
@@ -12,6 +12,16 @@ const keyFor = (id:string, editing:boolean, workspace?:string):string => placeOf
 /** Whether the record page holds an answer kept from before for this record, actor and project. */
 export function theRecordPageKept(id:string, editing:boolean):boolean {
   return keptAnswer(recordPageKeepName(id,editing)) !== undefined
+}
+
+/**
+ * The project this record's page is kept in, when it is not kept in the project on screen. Only a project the kept
+ * record itself says it is in counts: a message belongs to no project, and is read in whichever one is open.
+ */
+export function theProjectARecordIsKeptIn(id:string, editing:boolean):string | null {
+  if(theRecordPageKept(id,editing))return null
+  const own=keptInEveryProject<RecordPageData>(recordPageKeepName(id,editing)).find(one=>one.value.detail.record.workspaceId===one.workspace)
+  return own===undefined?null:own.workspace
 }
 
 /** A prepared answer is usable only for the same record, actor and project. */

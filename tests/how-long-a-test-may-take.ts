@@ -205,8 +205,6 @@ export const STARTERS: readonly Starter[] = [
   { name: 'runToItsEnd', from: 'the-shells-office-stand-in.ts', starts: 'a process run to its end, and in most files that write it a stand-in office served over HTTP' },
   { name: 'theListsThatLostTheirDoneLine', from: 'the-moved-test-files.ts', starts: "git, to read each wave list's history" },
   { name: 'aMadeUpSandboxRepo', from: 'a-made-up-sandbox-repo.ts', starts: "git, to make a repository that reads a checkout's objects" },
-  { name: 'theRunReportsForTheQueue', from: 'a-report-the-merge-queue-reads.ts', starts: "git, to list the test files in a fixture run's tree" },
-  { name: 'aRealOfficeForTheMerger', from: 'the-merger-fixture.ts', starts: 'an API server and a proxy on loopback ports, git, and the merge tool as a process of its own' },
   { name: 'runOpenCode', from: 'real-opencode-stand-in.ts', starts: 'the real OpenCode as a process of its own, against a stand-in model served over HTTP on loopback' },
   { name: 'aStandInOwner', from: 'the-owner-watching-gate.ts', starts: 'a stand-in for the test worker, a Node process a case can kill with SIGKILL' },
   { name: 'aSealedRun', from: 'a-seal-read-fixture.ts', starts: "git, to make and seal a run's worktree, and the office's seal-read thread when a check door reads that seal" },

@@ -98,7 +98,6 @@ import { pipelineScope } from '../src/shared/presentation.ts'
 import { englishWords } from '../src/shared/words/joined.ts'
 import { THE_TEST_OFFICES_OWNER } from './a-page-of-a-test-office.ts'
 import { SAID, theDrawingIsDrawn } from './a-made-up-office-drawn-in-lanes.ts'
-import { DEVELOPER } from './a-pipeline-page-in-the-developer-view.ts'
 
 let app: LiveApp
 let first = ''
@@ -145,7 +144,7 @@ async function onScreen(): Promise<{
   pageSays: string
   developerSays: string
 }> {
-  return app.page.evaluate(([saidPart, developerPart]) => {
+  return app.page.evaluate((saidPart) => {
     const drawer = document.querySelector('.gx-drawer')
     const label = [...document.querySelectorAll('.gx-drawer label.px-label')].find(
       (one) => one.textContent?.trim() === 'Which lane it belongs in',
@@ -161,9 +160,9 @@ async function onScreen(): Promise<{
       said: document.querySelector('.gx-drawer .gx-outcome-said')?.textContent?.trim() ?? null,
       formOpen: act?.getAttribute('aria-expanded') === 'true',
       pageSays: document.querySelector(saidPart)?.textContent ?? '',
-      developerSays: document.querySelector(developerPart)?.textContent ?? '',
+      developerSays: document.querySelector('[data-to-developers]')?.getAttribute('data-to-developers') ?? '',
     }
-  }, [SAID, DEVELOPER] as const)
+  }, SAID)
 }
 
 /** Open the drawer if it is closed, then open its "How this is shown" form. */
@@ -229,6 +228,8 @@ describe('the edit drawer on a pipeline drawing', () => {
     expect(afterWrite.lane, 'A does not show the lane that was just written').toBe(LANE)
 
     // ---- 2. change to B, and look while B's read is held ----
+    // The arrangement read now starts when the page mounts, so a read that is out no longer means the panel is
+    // mounted: the step waits for the page's own Loading to go before it looks (round 238).
     let seen: () => void = () => undefined
     const theReadIsOut = new Promise<void>((done) => {
       seen = done
@@ -248,8 +249,9 @@ describe('the edit drawer on a pipeline drawing', () => {
     }
     await page.route('**/api/presentation/**', hold)
     try {
-      await page.locator('nav.gx-scopes a', { hasText: SECOND_TITLE }).click()
+      await page.evaluate((id) => { location.hash = `/pipeline/${id}` }, second)
       await theReadIsOut
+      await page.waitForFunction(() => document.querySelector('.px-loading') === null, undefined, { timeout: 30_000 })
       await twoFrames()
       const whileReading = await onScreen()
       expect(
@@ -273,7 +275,7 @@ describe('the edit drawer on a pipeline drawing', () => {
 
     // ---- 4. back to A, which still has its own ----
     const readOfA = page.waitForResponse((response) => isTheRead(response.request(), first), { timeout: 30_000 })
-    await page.locator('nav.gx-scopes a', { hasText: FIRST_TITLE }).click()
+    await page.evaluate((id) => { location.hash = `/pipeline/${id}` }, first)
     await readOfA
     await page.waitForFunction(() => document.querySelector('.gx-loading') === null, undefined, { timeout: 30_000 })
     await openTheArrangementForm()
@@ -287,3 +289,37 @@ describe('the edit drawer on a pipeline drawing', () => {
     expect(backOnA.pageSays, 'A’s said section, which every reader sees, names the stored lane').not.toContain(LANE)
   }, 240_000)
 })
+
+
+it('shows only the current pipeline and master on a pipeline page, and every pipeline on the modules drawing', async () => {
+  const master = await filePipeline('Example master for the row', ['Example master step'])
+  const answer = await fetch(`${app.api}/api/projects/default/master-pipeline`, { method: 'PUT', headers: HEADERS, body: JSON.stringify({ pipeline: master }) })
+  expect(answer.ok).toBe(true)
+  const page = app.page
+  // This case judges which pipelines the row holds, not their order. The pipelines come in the order
+  // GET /api/records lists them, newest changed first, so they are sorted before they are compared.
+  const sorted = (titles: readonly string[]) => [...titles].sort()
+  // The chip for the drawing on screen adds the words that say so after its name, so each chip is
+  // read by its name alone. Which chip is on screen is the drawing control's own test.
+  const row = async () => {
+    const [head, ...pipelines] = await page.locator('nav.gx-scopes .gx-scope').evaluateAll((chips) =>
+      chips.map((chip) => {
+        const name = chip.cloneNode(true) as Element
+        name.querySelector('.gx-on-screen')?.remove()
+        return (name.textContent ?? '').trim()
+      }),
+    )
+    return [head, ...sorted(pipelines)]
+  }
+  const open = async (path: string) => {
+    await page.goto(`${app.site}/#${path}`)
+    await waitForThePage(page, 60_000)
+    await page.locator('nav.gx-scopes').waitFor()
+  }
+  await open(`/pipeline/${second}`)
+  expect(await row()).toEqual(['Every module', ...sorted([SECOND_TITLE, 'Example master for the row'])])
+  await open(`/pipeline/${master}`)
+  expect(await row()).toEqual(['Every module', 'Example master for the row'])
+  await open('/pipeline/drawing')
+  expect(await row()).toEqual(['Every module', ...sorted([FIRST_TITLE, SECOND_TITLE, 'Example master for the row'])])
+}, 240_000)

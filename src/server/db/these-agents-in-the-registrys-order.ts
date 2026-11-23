@@ -7,7 +7,7 @@
 
 import { asAgent } from './read-participant.ts'
 import { everyAgentsRuntime, theRegistryListStatements } from './list-participants.ts'
-import type { RegisteredAgent } from '../lib/participants.ts'
+import type { RegisteredAgent } from './types/participants.ts'
 
 /**
  * THE AGENTS WITH THESE IDS, built as `listParticipants` builds them and in its order (wave 13y round 51): what that

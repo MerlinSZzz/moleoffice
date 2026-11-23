@@ -1,0 +1,17 @@
+{
+  "why": "The file tickets (wave 13s, line 13s, SEC-2): a ticket asked without both halves of a paired browser's key, and a load whose ticket this office does not honour. No request in this test carries a half of a device key, asks a ticket or loads a file by one. tests/a-file-ticket.test.ts meets both through their doors: fileTicketNeedsTwoHalves in case 8, and fileTicketNotHonoured in cases 2 to 6.",
+  "refusals": [
+    {
+      "code": "fileTicketNeedsTwoHalves",
+      "status": 403,
+      "english": "Test: this request did not carry both halves of a paired browser's key.",
+      "values": {}
+    },
+    {
+      "code": "fileTicketNotHonoured",
+      "status": 403,
+      "english": "Test: this file address was refused.",
+      "values": {}
+    }
+  ]
+}

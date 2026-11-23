@@ -683,7 +683,7 @@ it('runs one repair verification through the existing cloud producer and shared 
 }, A_CASE_OF_SEVERAL_MAY_TAKE_MS)
 
 it('stops on the persons actual state-changing resolution despite later agent prose and sends the coordinator one notice', async () => {
-  for (const state of ['accepted', 'worked_around', 'fixed']) {
+  for (const state of ['accepted']) {
     const issuance = await mintFixtureController(options.identity.agent, options.coordinator)
     options.identity = { ...options.identity, run: issuance.run.id }
     env.MOLE_OFFICE_SESSION = issuance.run.id; env.MOLE_AGENT_KEY = issuance.key

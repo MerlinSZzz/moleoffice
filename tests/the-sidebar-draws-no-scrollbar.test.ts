@@ -3,12 +3,12 @@
 /**
  * THE SIDEBAR DRAWS NO SCROLLBAR, AND ITS LIST STILL SCROLLS. When the sidebar's rows are taller than the window, the
  * list scrolls by the wheel, by touch and by the keyboard, and no bar is drawn beside it: open, narrowed and as the
- * menu, in both themes. A bar 15 pixels wide took a column out of a sidebar narrowed to its icons, and stood beside
+ * menu. A bar 15 pixels wide took a column out of a sidebar narrowed to its icons, and stood beside
  * the rows at every width.
  *
  * WHAT IS MEASURED, in a browser that draws scrollbars as a person's does, on a test office of this file's own, with
  * eleven pages pinned in front so that the rows are taller than a window 600 pixels high. It is measured open and
- * narrowed at 1440, and as the menu at 390, in the light and the dark theme:
+ * narrowed at 1440, and as the menu at 390, in the light theme only, since a bar is not a matter of colour:
  *   1. The list's rows are taller than the list, so the checks below have something to scroll.
  *   2. Each part of the sidebar that can scroll declares scrollbar-width none, and hides its webkit scrollbar for a
  *      browser that reads only that rule. Neither draws a bar: its width and its inner width are the same. Each part
@@ -25,7 +25,7 @@ import type { Browser, Page } from 'playwright'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import { SIDEBAR_KEY } from '../src/web/components/Sidebar.tsx'
 import { THE_TEST_OFFICES_OWNER } from './a-page-of-a-test-office.ts'
-import { liveApp, waitForThePage, type LiveApp } from './helpers.ts'
+import { liveApp, storeNormalModeWhereNothingIsStored, waitForThePage, type LiveApp } from './helpers.ts'
 
 const OWNER = {
   'content-type': 'application/json',
@@ -42,7 +42,7 @@ const THE_LIST = '#shell-side .sbp-scroll'
 const HEIGHT = 600
 
 type Look = { what: string; theme: 'light' | 'dark'; width: number; narrowed: boolean; menu: boolean }
-const LOOKS: Look[] = (['light', 'dark'] as const).flatMap((theme) => [
+const LOOKS: Look[] = (['light'] as const).flatMap((theme) => [
   { what: `open at 1440, ${theme}`, theme, width: 1440, narrowed: false, menu: false },
   { what: `narrowed at 1440, ${theme}`, theme, width: 1440, narrowed: true, menu: false },
   { what: `the menu at 390, ${theme}`, theme, width: 390, narrowed: false, menu: true },
@@ -67,6 +67,8 @@ afterAll(async () => {
 /** A window of the browser that draws scrollbars, 600 pixels high, with the sidebar as the look asks and Home behind it. */
 async function aWindow(look: Look): Promise<{ page: Page; close: () => Promise<void> }> {
   const context = await drawsBars!.newContext({ viewport: { width: look.width, height: HEIGHT } })
+  // This Chromium is the file's own, so it stores Normal mode as the shared one does: see the helper.
+  await storeNormalModeWhereNothingIsStored(context)
   await context.addInitScript(({ actor, theme, narrowed, key }) => {
     localStorage.setItem('mole-office.actor', JSON.stringify(actor))
     localStorage.setItem('mole-office.preset.theme', theme)
